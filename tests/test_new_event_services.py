@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 
 from astropy.time import Time
 
+from app import _translate_special_phenomena_events
 from planetary_events import PlanetaryEventsService
 from special_phenomena import SpecialPhenomenaService
 from sidereal_time import SiderealTimeService
@@ -72,6 +73,24 @@ class TestSpecialPhenomenaService:
         assert isinstance(autumn, Time)
         assert isinstance(summer, Time)
         assert isinstance(winter, Time)
+
+    def test_milky_way_event_translation_uses_requested_language(self):
+        phenomena_data = {
+            "events": [
+                {
+                    "event_type": "Milky Way Core Visibility",
+                    "title": "Milky Way Core Visible",
+                    "description": "Galactic center visible at 5° altitude. Excellent night for wide-field astrophotography.",
+                    "galactic_center_altitude": 5,
+                }
+            ]
+        }
+
+        translated = _translate_special_phenomena_events(phenomena_data, "fr")
+        translated_event = translated["events"][0]
+
+        assert translated_event["title"] == "Voie Lactée visible"
+        assert translated_event["description"] == "Centre galactique visible à 5° d'altitude. Excellente nuit pour l'astrophotographie grand champ."
 
 
 class TestSiderealTimeService:

@@ -1789,6 +1789,9 @@ def get_upcoming_events_api():
             if cache_store.is_cache_valid(cache_store._solar_system_events_cache, CACHE_TTL_SOLAR_SYSTEM_EVENTS):
                 solar_system_events_data = cache_store._solar_system_events_cache.get("data")
 
+        if special_phenomena_data:
+            special_phenomena_data = _translate_special_phenomena_events(special_phenomena_data, language)
+
         # Translate solar system events if needed
         if solar_system_events_data and language != "en":
             solar_system_events_data = _translate_solar_system_events(solar_system_events_data, language)
@@ -1840,17 +1843,25 @@ def get_planetary_events_api():
 def get_special_phenomena_api():
     """Return special phenomena (equinoxes, solstices, zodiacal light, Milky Way visibility)"""
     try:
+        requested_language = request.args.get("lang") or request.headers.get("Accept-Language", "en")
+        requested_language = requested_language.split(",")[0].split("-")[0].lower()
+        supported_languages = I18nManager.get_supported_languages()
+        language = requested_language if requested_language in supported_languages else "en"
+
         if cache_store.is_cache_valid(cache_store._special_phenomena_cache, CACHE_TTL):
-            return jsonify(cache_store._special_phenomena_cache["data"])
+            data = cache_store._special_phenomena_cache["data"]
+            return jsonify(_translate_special_phenomena_events(data, language))
 
         # Try shared cache first
         if cache_store.sync_cache_from_shared("special_phenomena", cache_store._special_phenomena_cache):
             if cache_store.is_cache_valid(cache_store._special_phenomena_cache, CACHE_TTL):
-                return jsonify(cache_store._special_phenomena_cache["data"])
+                data = cache_store._special_phenomena_cache["data"]
+                return jsonify(_translate_special_phenomena_events(data, language))
 
         # Cache not ready -> refresh it
         update_special_phenomena_cache()
-        return jsonify(cache_store._special_phenomena_cache.get("data", {"events": []}))
+        data = cache_store._special_phenomena_cache.get("data", {"events": []})
+        return jsonify(_translate_special_phenomena_events(data, language))
 
     except Exception as e:
         logger.error(f"Error retrieving special phenomena: {e}")
@@ -1963,6 +1974,48 @@ def _translate_solar_system_events(data: Dict[str, Any], language: str) -> Dict[
         
         translated_events.append(translated_event)
     
+    translated_data["events"] = translated_events
+    return translated_data
+
+
+def _translate_special_phenomena_events(data: Dict[str, Any], language: str) -> Dict[str, Any]:
+    """Translate special phenomena events that are cached with localized strings."""
+    translated_data = data.copy() if isinstance(data, dict) else {"events": []}
+    events = translated_data.get("events", [])
+
+    if not isinstance(events, list):
+        return translated_data
+
+    i18n = I18nManager(language)
+    translated_events = []
+
+    for event in events:
+        if not isinstance(event, dict):
+            translated_events.append(event)
+            continue
+
+        translated_event = event.copy()
+
+        try:
+            if event.get("event_type") == "Milky Way Core Visibility":
+                gc_altitude = event.get("galactic_center_altitude")
+
+                if gc_altitude is None:
+                    raw_data = event.get("raw_data", {})
+                    gc_altitude = raw_data.get("gc_altitude") if isinstance(raw_data, dict) else None
+
+                if gc_altitude is not None:
+                    altitude_text = f"{float(gc_altitude):.0f}"
+                    translated_event["title"] = i18n.t('events_api.special_phenomena.milky_way_title')
+                    translated_event["description"] = i18n.t(
+                        'events_api.special_phenomena.milky_way_description',
+                        gc_altitude=altitude_text
+                    )
+        except Exception as e:
+            logger.debug(f"Error translating special phenomenon event: {e}")
+
+        translated_events.append(translated_event)
+
     translated_data["events"] = translated_events
     return translated_data
 
