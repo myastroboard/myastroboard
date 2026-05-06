@@ -52,6 +52,7 @@ class EventType(Enum):
     LUNAR_ECLIPSE = "Lunar Eclipse"
     AURORA = "Aurora"
     ISS_PASS = "ISS Pass"
+    ISS_SOLAR_TRANSIT = "ISS Solar Transit"
     MOON_PHASE = "Moon Phase"
     PLANETARY_CONJUNCTION = "Planetary Conjunction"
     PLANETARY_OPPOSITION = "Planetary Opposition"
@@ -203,6 +204,7 @@ class EventsAggregator:
             EventType.LUNAR_ECLIPSE.value: "bi bi-moon-stars",
             EventType.AURORA.value: "bi bi-stars",
             EventType.ISS_PASS.value: "bi bi-iss",
+            EventType.ISS_SOLAR_TRANSIT.value: "bi bi-sun",
             EventType.MOON_PHASE.value: "bi bi-moon-stars",
             EventType.PLANETARY_CONJUNCTION.value: "bi bi-conjonction",
             EventType.PLANETARY_OPPOSITION.value: "bi bi-bullseye",
@@ -671,11 +673,16 @@ class EventsAggregator:
         return events
 
     def _extract_iss_pass_events(self, iss_data: Dict[str, Any]) -> List[AstronomicalEvent]:
-        """Extract ISS visible pass events occurring in the next 7 days."""
+        """Extract ISS visible pass and solar transit events occurring in the next 7 days."""
         raw_passes = iss_data.get("passes")
         if not isinstance(raw_passes, list):
             next_pass = iss_data.get("next_visible_passage")
             raw_passes = [next_pass] if next_pass else []
+
+        raw_transits = iss_data.get("solar_transits")
+        if not isinstance(raw_transits, list):
+            next_transit = iss_data.get("next_solar_transit")
+            raw_transits = [next_transit] if next_transit else []
 
         events: List[AstronomicalEvent] = []
 
@@ -731,6 +738,57 @@ class EventsAggregator:
                 importance=importance,
                 score=score,
                 raw_data=iss_pass,
+                structure_key="iss",
+            )
+            events.append(event)
+
+        for transit in raw_transits:
+            if not isinstance(transit, dict):
+                continue
+
+            peak_time_str = transit.get("peak_time")
+            if not peak_time_str:
+                continue
+
+            peak_time = self._parse_iso_time(peak_time_str)
+            days_until = (peak_time.date() - self.local_now.date()).days
+
+            if days_until < 0 or days_until > 7:
+                continue
+
+            min_sep_arcmin = float(transit.get("minimum_separation_arcmin", 0) or 0)
+            duration_seconds = float(transit.get("duration_seconds", 0) or 0)
+            sun_altitude_deg = float(transit.get("sun_altitude_deg", 0) or 0)
+            solar_radius_arcmin = float(transit.get("solar_radius_arcmin", 0) or 0)
+
+            score = 10.0
+            importance = EventImportance.CRITICAL.value
+
+            event = AstronomicalEvent(
+                id=f"iss_solar_transit_{peak_time_str.replace(':', '').replace('-', '')}",
+                event_type=EventType.ISS_SOLAR_TRANSIT.value,
+                icon_class="bi bi-sun",
+                icon_color_class=self._importance_icon_color_class(importance),
+                title=self._t(
+                    "events_api.iss_solar_transit_title",
+                    "ISS Solar Transit",
+                ),
+                description=self._t(
+                    "events_api.iss_solar_transit_description",
+                    "ISS crosses the solar disk from your location. Minimum separation {minimum_separation_arcmin}′, estimated transit window {duration_seconds}s near {sun_altitude_deg}° solar altitude. Certified solar filter required.",
+                    minimum_separation_arcmin=f"{min_sep_arcmin:.2f}",
+                    duration_seconds=f"{duration_seconds:.1f}",
+                    sun_altitude_deg=f"{sun_altitude_deg:.1f}",
+                    solar_radius_arcmin=f"{solar_radius_arcmin:.2f}",
+                ),
+                start_time=transit.get("start_time"),
+                peak_time=peak_time_str,
+                end_time=transit.get("end_time"),
+                days_until_event=days_until,
+                visibility=bool(transit.get("is_visible", True)),
+                importance=importance,
+                score=score,
+                raw_data=transit,
                 structure_key="iss",
             )
             events.append(event)

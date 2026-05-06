@@ -7,6 +7,7 @@ score and day/night visibility classification.
 """
 
 from datetime import datetime, timedelta, timezone
+from math import acos, asin, cos, degrees, radians, sin
 from typing import Optional, Dict, Any, List, Tuple, cast
 from zoneinfo import ZoneInfo
 import os
@@ -53,6 +54,13 @@ MAX_FORECAST_DAYS = 30
 MIN_EVENT_ALTITUDE_DEG = 10.0
 MAX_VISIBLE_SKY_SUN_ALTITUDE_DEG = -4.0
 VISIBILITY_SAMPLE_SECONDS = 5
+GEOMETRIC_PASS_MIN_ALTITUDE_DEG = 0.0
+SOLAR_TRANSIT_SAMPLE_SECONDS = 1.0
+SOLAR_TRANSIT_REFINE_WINDOW_SECONDS = 1.0
+SOLAR_TRANSIT_REFINE_SAMPLE_SECONDS = 0.1
+SOLAR_TRANSIT_MIN_SUN_ALTITUDE_DEG = 0.0
+SOLAR_ANGULAR_RADIUS_FALLBACK_DEG = 0.2666
+SOLAR_RADIUS_KM = 695700.0
 ISS_TLE_CACHE_FILE = os.path.join(DATA_DIR_CACHE, 'iss_tle_cache.json')
 ISS_TLE_MAX_AGE_SECONDS = 6 * 60 * 60
 ISS_TLE_FAILURE_COOLDOWN_SECONDS = 3 * 60 * 60
@@ -153,6 +161,8 @@ class ISSPassService:
         all_passes = self._build_passes(event_times, event_types, satellite, observer, ts, eph)
         passes = [entry for entry in all_passes if entry.get("is_visible")]
         next_visible = passes[0] if passes else None
+        solar_transits = self._find_solar_transits(now_utc, end_utc, satellite, observer, ts, eph)
+        next_solar_transit = solar_transits[0] if solar_transits else None
 
         return {
             "timestamp": datetime.now(self.timezone).isoformat(),
@@ -164,15 +174,20 @@ class ISSPassService:
             },
             "window_days": forecast_days,
             "next_visible_passage": next_visible,
+            "next_solar_transit": next_solar_transit,
             "passes": passes,
+            "solar_transits": solar_transits,
             "total_passes": len(passes),
+            "total_solar_transits": len(solar_transits),
             "cache_ttl": CACHE_TTL,
             "units": {
                 "times": "ISO format local timezone",
                 "duration_minutes": "minutes",
+                "duration_seconds": "seconds",
                 "peak_altitude": "degrees",
                 "azimuth": "degrees",
                 "visibility_score": "0-100",
+                "angular_separation": "arcminutes",
             },
         }
 
@@ -372,6 +387,202 @@ class ISSPassService:
             "is_visible": True,
         }
 
+    def _find_solar_transits(
+        self,
+        start_utc: datetime,
+        end_utc: datetime,
+        satellite: EarthSatellite,
+        observer,
+        ts,
+        eph,
+    ) -> List[Dict[str, Any]]:
+        """Find ISS solar transits for the observer using per-pass refinement."""
+        event_times, event_types = satellite.find_events(
+            observer,
+            ts.from_datetime(start_utc),
+            ts.from_datetime(end_utc),
+            altitude_degrees=GEOMETRIC_PASS_MIN_ALTITUDE_DEG,
+        )
+
+        transits: List[Dict[str, Any]] = []
+        current: Dict[str, Any] = {}
+
+        for event_time, event_type in zip(event_times, event_types):
+            dt_utc = event_time.utc_datetime().replace(tzinfo=timezone.utc)
+
+            if event_type == 0:
+                current = {"start": dt_utc}
+                continue
+
+            if event_type == 1:
+                if current:
+                    current["peak"] = dt_utc
+                continue
+
+            if event_type == 2:
+                if not current or "start" not in current:
+                    current = {}
+                    continue
+
+                current["end"] = dt_utc
+                transit = self._extract_solar_transit_segment(
+                    start_utc=current["start"],
+                    end_utc=current["end"],
+                    satellite=satellite,
+                    observer=observer,
+                    ts=ts,
+                    eph=eph,
+                )
+                if transit is not None:
+                    transits.append(transit)
+
+                current = {}
+
+        transits.sort(key=lambda event: event.get("peak_time", ""))
+        return transits
+
+    def _extract_solar_transit_segment(
+        self,
+        start_utc: datetime,
+        end_utc: datetime,
+        satellite: EarthSatellite,
+        observer,
+        ts,
+        eph,
+    ) -> Optional[Dict[str, Any]]:
+        """Find a refined ISS solar transit within a daylight geometric pass."""
+        if end_utc <= start_utc:
+            return None
+
+        samples = self._sample_time_range(
+            start_utc=start_utc,
+            end_utc=end_utc,
+            step_seconds=SOLAR_TRANSIT_SAMPLE_SECONDS,
+            sampler=lambda when: self._sample_solar_transit_observation(when, satellite, observer, ts, eph),
+        )
+
+        candidate_indices = [
+            idx for idx, sample in enumerate(samples)
+            if sample["sun_altitude_deg"] >= SOLAR_TRANSIT_MIN_SUN_ALTITUDE_DEG
+            and sample["iss_altitude_deg"] >= GEOMETRIC_PASS_MIN_ALTITUDE_DEG
+            and sample["separation_deg"] <= sample["solar_radius_deg"]
+        ]
+        if not candidate_indices:
+            return None
+
+        segments = self._group_consecutive_indices(candidate_indices)
+        best_segment = min(
+            segments,
+            key=lambda segment: min(samples[idx]["separation_deg"] for idx in segment),
+        )
+        coarse_peak = min((samples[idx] for idx in best_segment), key=lambda sample: sample["separation_deg"])
+
+        refined_start = max(start_utc, coarse_peak["time_utc"] - timedelta(seconds=SOLAR_TRANSIT_REFINE_WINDOW_SECONDS))
+        refined_end = min(end_utc, coarse_peak["time_utc"] + timedelta(seconds=SOLAR_TRANSIT_REFINE_WINDOW_SECONDS))
+        refined_samples = self._sample_time_range(
+            start_utc=refined_start,
+            end_utc=refined_end,
+            step_seconds=SOLAR_TRANSIT_REFINE_SAMPLE_SECONDS,
+            sampler=lambda when: self._sample_solar_transit_observation(when, satellite, observer, ts, eph),
+        )
+
+        refined_candidates = [
+            sample for sample in refined_samples
+            if sample["sun_altitude_deg"] >= SOLAR_TRANSIT_MIN_SUN_ALTITUDE_DEG
+            and sample["iss_altitude_deg"] >= GEOMETRIC_PASS_MIN_ALTITUDE_DEG
+            and sample["separation_deg"] <= sample["solar_radius_deg"]
+        ]
+        if not refined_candidates:
+            refined_candidates = [coarse_peak]
+
+        start_sample = refined_candidates[0]
+        end_sample = refined_candidates[-1]
+        peak_sample = min(refined_candidates, key=lambda sample: sample["separation_deg"])
+        duration_seconds = max(0.0, (end_sample["time_utc"] - start_sample["time_utc"]).total_seconds())
+
+        return {
+            "start_time": start_sample["time_utc"].astimezone(self.timezone).isoformat(),
+            "peak_time": peak_sample["time_utc"].astimezone(self.timezone).isoformat(),
+            "end_time": end_sample["time_utc"].astimezone(self.timezone).isoformat(),
+            "duration_seconds": round(duration_seconds, 1),
+            "minimum_separation_arcmin": round(float(peak_sample["separation_deg"]) * 60.0, 2),
+            "solar_radius_arcmin": round(float(peak_sample["solar_radius_deg"]) * 60.0, 2),
+            "sun_altitude_deg": round(float(peak_sample["sun_altitude_deg"]), 1),
+            "sun_azimuth_deg": round(float(peak_sample["sun_azimuth_deg"]), 1),
+            "iss_altitude_deg": round(float(peak_sample["iss_altitude_deg"]), 1),
+            "iss_azimuth_deg": round(float(peak_sample["iss_azimuth_deg"]), 1),
+            "pass_type": "solar_transit",
+            "is_visible": True,
+        }
+
+    def _sample_time_range(self, start_utc: datetime, end_utc: datetime, step_seconds: float, sampler) -> List[Dict[str, Any]]:
+        """Sample a time range inclusively with a fixed step."""
+        if end_utc <= start_utc:
+            return [sampler(start_utc)]
+
+        total_seconds = max(0.0, (end_utc - start_utc).total_seconds())
+        step_count = max(1, int(total_seconds / step_seconds))
+        samples = [sampler(start_utc + timedelta(seconds=idx * step_seconds)) for idx in range(step_count + 1)]
+        if samples[-1]["time_utc"] != end_utc:
+            samples.append(sampler(end_utc))
+        return samples
+
+    def _sample_solar_transit_observation(self, when_utc: datetime, satellite: EarthSatellite, observer, ts, eph) -> Dict[str, Any]:
+        """Sample ISS/Sun geometry for solar-transit detection at one instant."""
+        event_time = ts.from_datetime(when_utc)
+        topocentric = (satellite - observer).at(event_time)
+        iss_altitude, iss_azimuth, _ = topocentric.altaz()
+        iss_altitude_deg = float(iss_altitude.degrees)
+        iss_azimuth_deg = float(iss_azimuth.degrees)
+
+        if eph is not None:
+            earth = eph["earth"]
+            sun = eph["sun"]
+            sun_apparent = (earth + observer).at(event_time).observe(sun).apparent()
+            sun_altitude, sun_azimuth, _ = sun_apparent.altaz()
+            sun_altitude_deg = float(sun_altitude.degrees)
+            sun_azimuth_deg = float(sun_azimuth.degrees)
+            solar_radius_deg = self._solar_angular_radius_deg(sun_apparent)
+        else:
+            sun_altitude_deg, sun_azimuth_deg = self._sun_alt_az_deg(when_utc)
+            solar_radius_deg = SOLAR_ANGULAR_RADIUS_FALLBACK_DEG
+
+        separation_deg = self._angular_separation_deg(
+            iss_altitude_deg,
+            iss_azimuth_deg,
+            sun_altitude_deg,
+            sun_azimuth_deg,
+        )
+
+        return {
+            "time_utc": when_utc,
+            "iss_altitude_deg": iss_altitude_deg,
+            "iss_azimuth_deg": iss_azimuth_deg,
+            "sun_altitude_deg": sun_altitude_deg,
+            "sun_azimuth_deg": sun_azimuth_deg,
+            "solar_radius_deg": solar_radius_deg,
+            "separation_deg": separation_deg,
+        }
+
+    def _solar_angular_radius_deg(self, sun_apparent) -> float:
+        """Estimate solar apparent angular radius from observer distance."""
+        try:
+            distance_km = float(sun_apparent.distance().km)
+            if distance_km > SOLAR_RADIUS_KM:
+                return degrees(asin(SOLAR_RADIUS_KM / distance_km))
+        except Exception:
+            pass
+        return SOLAR_ANGULAR_RADIUS_FALLBACK_DEG
+
+    def _angular_separation_deg(self, altitude1_deg: float, azimuth1_deg: float, altitude2_deg: float, azimuth2_deg: float) -> float:
+        """Compute angular separation in local alt/az coordinates."""
+        alt1 = radians(altitude1_deg)
+        alt2 = radians(altitude2_deg)
+        delta_az = radians((azimuth1_deg - azimuth2_deg) % 360.0)
+        cos_sep = (sin(alt1) * sin(alt2)) + (cos(alt1) * cos(alt2) * cos(delta_az))
+        cos_sep = max(-1.0, min(1.0, cos_sep))
+        return degrees(acos(cos_sep))
+
     def _sample_observation(self, when_utc: datetime, satellite: EarthSatellite, observer, ts, eph) -> Dict[str, Any]:
         """Sample observer-relative ISS geometry and visibility at one instant."""
         event_time = ts.from_datetime(when_utc)
@@ -449,8 +660,25 @@ class ISSPassService:
         """Compute Sun altitude in degrees for observer at a UTC datetime."""
         astro_time = AstroTime(when_utc)
         frame = AltAz(obstime=astro_time, location=self.location)
-        sun_alt = cast(Angle, get_sun(astro_time).transform_to(frame).alt)
-        return cast(float, sun_alt.deg)
+        sun_altaz = get_sun(astro_time).transform_to(frame)
+        sun_alt = getattr(sun_altaz, "alt", None)
+        if sun_alt is None:
+            raise ValueError("Could not determine Sun altitude")
+        return float(cast(Any, sun_alt.to_value(u.deg)))
+
+    def _sun_alt_az_deg(self, when_utc: datetime) -> Tuple[float, float]:
+        """Compute Sun altitude and azimuth in degrees for observer at a UTC datetime."""
+        astro_time = AstroTime(when_utc)
+        frame = AltAz(obstime=astro_time, location=self.location)
+        sun_altaz = get_sun(astro_time).transform_to(frame)
+        sun_alt = getattr(sun_altaz, "alt", None)
+        sun_az = getattr(sun_altaz, "az", None)
+        if sun_alt is None or sun_az is None:
+            raise ValueError("Could not determine Sun altitude/azimuth")
+        return (
+            float(cast(Any, sun_alt.to_value(u.deg))),
+            float(cast(Any, sun_az.to_value(u.deg))),
+        )
 
     def _classify_day_night(self, sun_altitude_deg: float) -> str:
         """Classify visibility context based on Sun altitude."""

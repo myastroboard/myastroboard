@@ -1325,6 +1325,8 @@
     "aurora_description": "Visibilité aurorale : {visibility_percent}% de probabilité. Indice Kp : {kp_index}",
     "moon_phase_description": "{phase} à observer. Bon moment pour {activity}.",
     "iss_description": "Score du passage ISS {score}/100 ({visibility_day_night}). Altitude maximale {peak_altitude_deg}°.",
+    "iss_solar_transit_title": "Transit solaire de l'ISS",
+    "iss_solar_transit_description": "L'ISS traverse le disque solaire depuis votre position. Séparation minimale {minimum_separation_arcmin}′, fenêtre estimée de transit {duration_seconds}s avec un Soleil à {sun_altitude_deg}°. Filtre solaire certifié obligatoire.",
     "activities": {
       "deep_sky_observations": "l'observation du ciel profond",
       "lunar_observations": "l'observation lunaire",

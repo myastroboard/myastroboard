@@ -1,6 +1,6 @@
 """Unit tests for ISS pass service and ISS event aggregation."""
 
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from requests import HTTPError
 
 from iss_passes import ISSPassService, get_iss_passes_report
@@ -65,6 +65,74 @@ class TestISSPassServiceWrapper:
         )
 
         assert result is None
+
+
+class TestISSPassServiceSolarTransit:
+    """Test ISS solar transit detection helpers."""
+
+    def test_extract_solar_transit_segment_returns_refined_window(self, monkeypatch):
+        service = ISSPassService(45.5, -73.5, 30, "America/Montreal")
+        start_utc = datetime(2026, 5, 8, 12, 0, 0, tzinfo=timezone.utc)
+        end_utc = start_utc + timedelta(seconds=4)
+
+        coarse_samples = [
+            {
+                "time_utc": start_utc + timedelta(seconds=offset),
+                "iss_altitude_deg": 25.0,
+                "iss_azimuth_deg": 180.0,
+                "sun_altitude_deg": 30.0,
+                "sun_azimuth_deg": 180.0,
+                "solar_radius_deg": 0.27,
+                "separation_deg": separation,
+            }
+            for offset, separation in [
+                (0, 0.40),
+                (1, 0.26),
+                (2, 0.05),
+                (3, 0.24),
+                (4, 0.38),
+            ]
+        ]
+        refined_samples = [
+            {
+                "time_utc": start_utc + timedelta(seconds=offset),
+                "iss_altitude_deg": 25.0,
+                "iss_azimuth_deg": 180.0,
+                "sun_altitude_deg": 30.0,
+                "sun_azimuth_deg": 180.0,
+                "solar_radius_deg": 0.27,
+                "separation_deg": separation,
+            }
+            for offset, separation in [
+                (1.8, 0.28),
+                (1.9, 0.20),
+                (2.0, 0.03),
+                (2.1, 0.21),
+                (2.2, 0.29),
+            ]
+        ]
+
+        def _mock_sample_time_range(start_utc, end_utc, step_seconds, sampler):
+            if step_seconds == 1.0:
+                return coarse_samples
+            return refined_samples
+
+        monkeypatch.setattr(service, "_sample_time_range", _mock_sample_time_range)
+
+        transit = service._extract_solar_transit_segment(
+            start_utc=start_utc,
+            end_utc=end_utc,
+            satellite=None,
+            observer=None,
+            ts=None,
+            eph=None,
+        )
+
+        assert transit is not None
+        assert transit["peak_time"] == (start_utc + timedelta(seconds=2)).astimezone(service.timezone).isoformat()
+        assert transit["duration_seconds"] == 0.2
+        assert transit["minimum_separation_arcmin"] == 1.8
+        assert transit["is_visible"] is True
 
 
 class TestISSPassServiceTleFallback:
@@ -298,6 +366,34 @@ class TestISSCalendarAggregation:
         assert result["upcoming_events"][0]["event_type"] == "ISS Pass"
         assert result["upcoming_events"][0]["title"] == "ISS Visible Passage"
         assert result["upcoming_events"][0]["structure_key"] == "iss"
+
+    def test_aggregate_all_events_includes_iss_solar_transit(self):
+        aggregator = EventsAggregator(45.5, -73.5, "America/Montreal", language="fr")
+
+        peak_time = (aggregator.local_now + timedelta(days=1)).replace(hour=11, minute=30, second=0, microsecond=0)
+        iss_payload = {
+            "solar_transits": [
+                {
+                    "start_time": (peak_time - timedelta(seconds=1)).isoformat(),
+                    "peak_time": peak_time.isoformat(),
+                    "end_time": (peak_time + timedelta(seconds=1)).isoformat(),
+                    "duration_seconds": 0.8,
+                    "minimum_separation_arcmin": 0.18,
+                    "solar_radius_arcmin": 15.9,
+                    "sun_altitude_deg": 36.2,
+                    "is_visible": True,
+                }
+            ]
+        }
+
+        result = aggregator.aggregate_all_events(iss_passes_data=iss_payload)
+
+        assert result["events_count"] == 1
+        event = result["upcoming_events"][0]
+        assert event["event_type"] == "ISS Solar Transit"
+        assert event["title"] == "Transit solaire de l'ISS"
+        assert event["structure_key"] == "iss"
+        assert "0.18" in event["description"]
 
     def test_aggregate_all_events_localizes_titles_with_language(self):
         aggregator = EventsAggregator(45.5, -73.5, "America/Montreal", language="fr")
