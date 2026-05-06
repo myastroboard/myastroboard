@@ -1106,7 +1106,7 @@
     "scheduler_bodies_count": "Corps célestes",
     "scheduler_comets_count": "Comètes",
     "cache_jobs_title": "Jobs de cache",
-    "cache_jobs_info": "Chaque job dispose de son propre TTL. Le planificateur vérifie toutes les 25 min mais n'exécute que les jobs dont le TTL est expiré.",
+    "cache_jobs_info": "Chaque job dispose de son propre TTL. Le planificateur vérifie toutes les 5 min mais n'exécute que les jobs dont le TTL est expiré.",
     "cache_job_name": "Job",
     "cache_job_ttl": "TTL",
     "cache_job_status": "État",

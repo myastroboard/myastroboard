@@ -1091,7 +1091,7 @@
     "scheduler_bodies_count": "Himmelskörper",
     "scheduler_comets_count": "Kometen",
     "cache_jobs_title": "Cache-Jobs",
-    "cache_jobs_info": "Jeder Cache-Job hat seine eigene TTL. Der Scheduler prüft alle 25 Min., führt aber nur abgelaufene Jobs aus.",
+    "cache_jobs_info": "Jeder Cache-Job hat seine eigene TTL. Der Scheduler prüft alle 5 Min., führt aber nur abgelaufene Jobs aus.",
     "cache_job_name": "Job",
     "cache_job_ttl": "TTL",
     "cache_job_status": "Status",

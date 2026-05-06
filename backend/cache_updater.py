@@ -988,7 +988,7 @@ def update_spaceflight_events_cache():
         # Prune stale images from the three spaceflight caches
         try:
             from spaceflight_tracker import prune_image_cache
-            import itertools, re as _re
+            import itertools
 
             def _collect_images(obj):
                 """Recursively yield all string values that look like cached image paths."""
@@ -1001,10 +1001,14 @@ def update_spaceflight_events_cache():
                 elif isinstance(obj, str) and obj.startswith("/api/spaceflight/img/"):
                     yield obj
 
+            shared_launches = cache_store.load_shared_cache_entry("spaceflight_launches") or {}
+            shared_astronauts = cache_store.load_shared_cache_entry("spaceflight_astronauts") or {}
+            shared_events = cache_store.load_shared_cache_entry("spaceflight_events") or {}
+
             active = list(itertools.chain(
-                _collect_images(cache_store._spaceflight_launches_cache.get("data") or {}),
-                _collect_images(cache_store._spaceflight_astronauts_cache.get("data") or {}),
-                _collect_images(cache_store._spaceflight_events_cache.get("data") or {}),
+                _collect_images(shared_launches.get("data") or {}),
+                _collect_images(shared_astronauts.get("data") or {}),
+                _collect_images(shared_events.get("data") or {}),
             ))
             prune_image_cache(active)
         except Exception as _prune_exc:
@@ -1027,7 +1031,7 @@ def fully_initialize_caches():
     - best_window runs all 3 modes in one Astropy night-scan pass.
 
     Automatically resets all caches if location configuration has changed.
-    Called on startup and by the cache scheduler every ~25 minutes.
+    Called on startup and by the cache scheduler every ~5 minutes.
     """
     from functools import partial
     logger.debug("Starting cache refresh cycle...")

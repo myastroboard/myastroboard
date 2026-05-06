@@ -1105,7 +1105,7 @@
     "scheduler_bodies_count": "Bodies",
     "scheduler_comets_count": "Comets",
     "cache_jobs_title": "Cache Jobs",
-    "cache_jobs_info": "Each cache job has its own TTL. The scheduler polls every 25 min but only runs jobs whose TTL has expired.",
+    "cache_jobs_info": "Each cache job has its own TTL. The scheduler polls every 5 min but only runs jobs whose TTL has expired.",
     "cache_job_name": "Job",
     "cache_job_ttl": "TTL",
     "cache_job_status": "Status",

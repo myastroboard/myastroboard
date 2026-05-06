@@ -37,9 +37,10 @@ URL_OPENMETEO = "https://api.open-meteo.com/v1/forecast"
 
 # Cache configuration
 CACHE_TTL = 1800  # seconds (legacy default, prefer per-job TTLs below)
+CACHE_SCHEDULER_INTERVAL_SECONDS = 300  # 5 minutes
 
 # Per-job cache TTLs — each cache is refreshed only when its own TTL expires.
-# The scheduler polls every ~25 min but only runs a job if its TTL has elapsed.
+# The scheduler polls every ~5 min but only runs a job if its TTL has elapsed.
 CACHE_TTL_MOON_REPORT         = 7200    # 2 hours — moon phase changes gradually (~0.5%/h)
 CACHE_TTL_DARK_WINDOW         = 7200    # 2 hours — derived from moon report (same TTL)
 CACHE_TTL_MOON_PLANNER        = 7200    # 2 hours — 7-night forecast, daily precision

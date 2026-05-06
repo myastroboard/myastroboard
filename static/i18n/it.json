@@ -1090,7 +1090,7 @@
     "scheduler_bodies_count": "Corpi",
     "scheduler_comets_count": "Comete",
     "cache_jobs_title": "Job della cache",
-    "cache_jobs_info": "Ogni job ha il proprio TTL. Lo scheduler controlla ogni 25 min ma esegue solo i job scaduti.",
+    "cache_jobs_info": "Ogni job ha il proprio TTL. Lo scheduler controlla ogni 5 min ma esegue solo i job scaduti.",
     "cache_job_name": "Job",
     "cache_job_ttl": "TTL",
     "cache_job_status": "Stato",

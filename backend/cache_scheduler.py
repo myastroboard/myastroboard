@@ -4,7 +4,7 @@ import sys
 from datetime import datetime
 from logging_config import get_logger
 from cache_updater import fully_initialize_caches
-from constants import DATA_DIR_CACHE
+from constants import DATA_DIR_CACHE, CACHE_SCHEDULER_INTERVAL_SECONDS
 
 # Windows-compatible file locking
 if sys.platform == "win32":
@@ -16,10 +16,10 @@ else:
 logger = get_logger(__name__)
 
 class CacheScheduler:
-    def __init__(self, interval_seconds=1500):
+    def __init__(self, interval_seconds=CACHE_SCHEDULER_INTERVAL_SECONDS):
         """
         Scheduler to pre-compute heavy caches in the background.
-        interval_seconds: frequency of calculations (default 1500s = 25 min, less than 30 min CACHE_TTL)
+        interval_seconds: frequency of calculations (default 300s = 5 min; TTL gating prevents unnecessary work)
         """
         self.interval = interval_seconds
         self._stop_event = threading.Event()

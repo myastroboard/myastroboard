@@ -235,6 +235,39 @@ class TestAdditionalCachePaths:
     """Extra branch coverage for cache updater services."""
 
     @patch("cache_updater.cache_store")
+    def test_update_spaceflight_events_prunes_using_shared_cache_entries(self, mock_cache_store):
+        from cache_updater import update_spaceflight_events_cache
+
+        mock_cache_store._spaceflight_events_cache = {"data": None, "timestamp": 0}
+
+        fake_prune = MagicMock()
+        fake_module = types.SimpleNamespace(
+            get_upcoming_space_events=MagicMock(return_value={"results": []}),
+            prune_image_cache=fake_prune,
+        )
+
+        mock_cache_store.load_shared_cache_entry.side_effect = lambda key: {
+            "spaceflight_launches": {
+                "data": {"upcoming": {"results": [{"image_url": "/api/spaceflight/img/launch.jpg"}]}}
+            },
+            "spaceflight_astronauts": {
+                "data": {"astronauts_in_space": {"results": [{"profile_image": "/api/spaceflight/img/astro.jpg"}]}}
+            },
+            "spaceflight_events": {
+                "data": {"results": [{"image_url": "/api/spaceflight/img/event.jpg"}]}
+            },
+        }.get(key)
+
+        with patch.dict(sys.modules, {"spaceflight_tracker": fake_module}):
+            update_spaceflight_events_cache()
+
+        fake_prune.assert_called_once()
+        active_images = fake_prune.call_args.args[0]
+        assert "/api/spaceflight/img/launch.jpg" in active_images
+        assert "/api/spaceflight/img/astro.jpg" in active_images
+        assert "/api/spaceflight/img/event.jpg" in active_images
+
+    @patch("cache_updater.cache_store")
     @patch("cache_updater.load_config")
     def test_update_planetary_events_cache_success(self, mock_load_config, mock_cache_store, mock_config):
         from cache_updater import update_planetary_events_cache

@@ -1090,7 +1090,7 @@
     "scheduler_bodies_count": "Corpos",
     "scheduler_comets_count": "Cometas",
     "cache_jobs_title": "Jobs de cache",
-    "cache_jobs_info": "Cada job tem o seu próprio TTL. O agendador verifica a cada 25 min mas executa apenas os jobs expirados.",
+    "cache_jobs_info": "Cada job tem o seu próprio TTL. O agendador verifica a cada 5 min mas executa apenas os jobs expirados.",
     "cache_job_name": "Job",
     "cache_job_ttl": "TTL",
     "cache_job_status": "Estado",

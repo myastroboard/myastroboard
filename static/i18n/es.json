@@ -1092,7 +1092,7 @@
     "scheduler_bodies_count": "Cuerpos celestes",
     "scheduler_comets_count": "Cometas",
     "cache_jobs_title": "Jobs de caché",
-    "cache_jobs_info": "Cada job tiene su propia TTL. El planificador verifica cada 25 min pero solo ejecuta los jobs caducados.",
+    "cache_jobs_info": "Cada job tiene su propia TTL. El planificador verifica cada 5 min pero solo ejecuta los jobs caducados.",
     "cache_job_name": "Job",
     "cache_job_ttl": "TTL",
     "cache_job_status": "Estado",
