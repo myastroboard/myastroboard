@@ -1169,6 +1169,14 @@ The background cache is **selective-refresh**: the scheduler polls every 25 min 
 - **Moon caches merged**: `update_moon_caches(config=None)` in `cache_updater.py` instantiates `MoonService` and calls `get_report()` once, then writes both `moon_report` and `dark_window` caches. The individual `update_moon_report_cache()` / `update_dark_window_cache()` functions delegate to it and exist only for direct/test compatibility.
 - **Best-window single pass**: `AstroTonightService.best_windows_all_modes()` in `moon_astrotonight.py` runs one 12-hour night-scan loop, computing Astropy AltAz transforms once per step while evaluating all three modes simultaneously. `best_window_tonight(mode)` delegates to it.
 - Execution metrics for `moon_report` **and** `dark_window` are both recorded (same timing) because they are computed together — the `moon_report` job entry records both after success or failure.
+- **ISS pass event extraction early exit**: `events_aggregator._extract_iss_pass_events()` breaks out of the passes loop as soon as `days_until > 7` since passes are generated in chronological order by Skyfield's `find_events`.
+
+### Version Comparison
+- `version_checker.is_newer_version()` uses `packaging.version.parse()` (from the `packaging` library, declared in `requirements.txt`) for correct PEP 440 semantic version comparison. Do not revert to manual string parsing.
+- `version_checker._save_version_result(result)` is a private helper that writes a result dict to both the in-memory `_version_update_cache` and the shared on-disk cache — always use this helper instead of repeating the three-line save pattern.
+
+### utils.py Conventions
+- numpy is imported **once** at module level as `_np` with `_HAS_NUMPY` flag. Both `_NumpySafeEncoder` and `_sanitize_for_json` reference `_np` directly — never re-introduce per-call `import numpy` inside these functions.
 
 ### Mandatory Rules for New Cache Jobs
 1. **Add a `CACHE_TTL_<NAME>` constant** in `constants.py` — never reuse the generic `CACHE_TTL`; choose TTL based on how frequently the underlying data actually changes

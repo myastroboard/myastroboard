@@ -697,7 +697,10 @@ class EventsAggregator:
             peak_time = self._parse_iso_time(peak_time_str)
             days_until = (peak_time.date() - self.local_now.date()).days
 
-            if days_until < 0 or days_until > 7:
+            # Passes are in chronological order; once beyond 7 days we can stop
+            if days_until > 7:
+                break
+            if days_until < 0:
                 continue
 
             score = float(iss_pass.get("visibility_score", 0) or 0)

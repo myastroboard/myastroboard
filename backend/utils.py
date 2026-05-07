@@ -12,6 +12,14 @@ import yaml
 from typing import Dict, Tuple, Optional
 from constants import CONFIG_FILE, DATA_DIR
 
+# Optional numpy dependency — imported once at module level
+try:
+    import numpy as _np
+    _HAS_NUMPY = True
+except ImportError:
+    _np = None  # type: ignore[assignment]
+    _HAS_NUMPY = False
+
 
 class _NumpySafeEncoder(json.JSONEncoder):
     """JSON encoder that converts numpy scalar types to native Python types.
@@ -22,37 +30,31 @@ class _NumpySafeEncoder(json.JSONEncoder):
     """
 
     def default(self, obj: object) -> object:  # type: ignore[override]
-        try:
-            import numpy as np  # local import - optional dependency
-            if isinstance(obj, np.integer):
+        if _HAS_NUMPY:
+            if isinstance(obj, _np.integer):  # type: ignore[union-attr]
                 return int(obj)
-            if isinstance(obj, np.floating):
+            if isinstance(obj, _np.floating):  # type: ignore[union-attr]
                 v = float(obj)
                 return None if (math.isnan(v) or math.isinf(v)) else v
-            if isinstance(obj, np.ndarray):
+            if isinstance(obj, _np.ndarray):  # type: ignore[union-attr]
                 return obj.tolist()
-            if isinstance(obj, np.bool_):
+            if isinstance(obj, _np.bool_):  # type: ignore[union-attr]
                 return bool(obj)
-        except ImportError:
-            pass
         return super().default(obj)
 
 
 def _sanitize_for_json(obj: object) -> object:
     """Recursively convert numpy types and replace NaN/Inf with None."""
-    try:
-        import numpy as np
-        if isinstance(obj, np.integer):
+    if _HAS_NUMPY:
+        if isinstance(obj, _np.integer):  # type: ignore[union-attr]
             return int(obj)
-        if isinstance(obj, np.floating):
+        if isinstance(obj, _np.floating):  # type: ignore[union-attr]
             v = float(obj)
             return None if (math.isnan(v) or math.isinf(v)) else v
-        if isinstance(obj, np.bool_):
+        if isinstance(obj, _np.bool_):  # type: ignore[union-attr]
             return bool(obj)
-        if isinstance(obj, np.ndarray):
+        if isinstance(obj, _np.ndarray):  # type: ignore[union-attr]
             return [_sanitize_for_json(x) for x in obj.tolist()]
-    except ImportError:
-        pass
     if isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
         return None
     if isinstance(obj, dict):

@@ -792,9 +792,8 @@ def update_sidereal_time_cache(config=None):
 
         # Get current sidereal time
         current_info = sidereal_service.get_current_sidereal_info()
-        
+
         # Get hourly sidereal times for current day
-        from datetime import datetime
         today = datetime.today().date()
         hourly_info = sidereal_service.get_hourly_sidereal_times(today)
 
