@@ -74,6 +74,110 @@ function _sfCountdown(isoStr) {
 
 // Live countdown ticker — updates every second for the next launch hero card
 let _sfCountdownTimer = null;
+const _sfTranslateCache = new Map();
+
+function _sfCurrentLang() {
+    return (typeof i18n !== 'undefined' && typeof i18n.getCurrentLanguage === 'function')
+        ? i18n.getCurrentLanguage()
+        : 'en';
+}
+
+function _sfShouldOfferTranslation() {
+    return _sfCurrentLang() !== 'en';
+}
+
+async function _sfTranslateTextOnDemand(originalText, targetLang) {
+    const text = (originalText || '').trim();
+    if (!text) return null;
+    const cacheKey = `${targetLang}::${text}`;
+    if (_sfTranslateCache.has(cacheKey)) {
+        return _sfTranslateCache.get(cacheKey);
+    }
+
+    const response = await fetch('/api/translate/on-demand', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            text,
+            source_lang: 'en',
+            target_lang: targetLang,
+        })
+    });
+
+    if (!response.ok) {
+        throw new Error('translation_http_error');
+    }
+
+    const payload = await response.json();
+    const translated = (payload && typeof payload.translated_text === 'string')
+        ? payload.translated_text.trim()
+        : '';
+    if (!translated) {
+        return null;
+    }
+    _sfTranslateCache.set(cacheKey, translated);
+    return translated;
+}
+
+function _sfAttachTranslateToggle(textEl, originalText) {
+    if (!textEl || !originalText || !_sfShouldOfferTranslation()) {
+        return;
+    }
+
+    const parent = textEl.parentElement;
+    if (!parent) {
+        return;
+    }
+
+    const targetLang = _sfCurrentLang();
+    let translatedText = null;
+    let showingTranslated = false;
+
+    const controls = document.createElement('div');
+    controls.className = 'mt-1';
+
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'btn btn-link btn-sm p-0 align-baseline';
+    toggle.textContent = i18n.t('spaceflight.translate_action', 'Translate');
+
+    const hint = document.createElement('small');
+    hint.className = 'text-muted ms-2';
+
+    toggle.addEventListener('click', async () => {
+        if (showingTranslated) {
+            textEl.textContent = originalText;
+            toggle.textContent = i18n.t('spaceflight.translate_action', 'Translate');
+            hint.textContent = '';
+            showingTranslated = false;
+            return;
+        }
+
+        if (!translatedText) {
+            toggle.disabled = true;
+            hint.textContent = i18n.t('spaceflight.translating', 'Translating...');
+            try {
+                translatedText = await _sfTranslateTextOnDemand(originalText, targetLang);
+            } catch (_) {
+                translatedText = null;
+            }
+            toggle.disabled = false;
+        }
+
+        if (translatedText && translatedText !== originalText) {
+            textEl.textContent = translatedText;
+            toggle.textContent = i18n.t('spaceflight.show_original_action', 'Show original');
+            hint.textContent = i18n.t('spaceflight.translated_via_free_service', 'Machine translated');
+            showingTranslated = true;
+        } else {
+            hint.textContent = i18n.t('spaceflight.translation_unavailable', 'Translation unavailable for this text.');
+        }
+    });
+
+    controls.appendChild(toggle);
+    controls.appendChild(hint);
+    parent.appendChild(controls);
+}
 
 function _sfStartLiveCountdown(netIso, valueEl) {
     if (_sfCountdownTimer) clearInterval(_sfCountdownTimer);
@@ -249,6 +353,7 @@ function _sfShowLaunchModal(launch) {
         desc.className = 'small text-muted mt-2';
         desc.textContent = launch.mission_description;
         content.appendChild(desc);
+        _sfAttachTranslateToggle(desc, launch.mission_description);
     }
 
     // Action buttons
@@ -792,6 +897,7 @@ function _makeAstronautCard(ast) {
         bio.className = 'text-muted small mt-2 mb-0 sf-astronaut-bio';
         bio.textContent = ast.bio;
         body.appendChild(bio);
+        _sfAttachTranslateToggle(bio, ast.bio);
     }
 
     card.appendChild(body);
@@ -900,6 +1006,7 @@ function _makeEventCard(ev) {
         desc.className = 'card-text text-muted small mt-2 mb-1';
         desc.textContent = ev.description;
         body.appendChild(desc);
+        _sfAttachTranslateToggle(desc, ev.description);
     }
 
     if (ev.location) {

@@ -56,6 +56,7 @@ from metrics_collector import collect_metrics
 from skytonight_storage import (
     get_scheduler_lock_file as get_skytonight_scheduler_lock_file,
 )
+from on_demand_translate import translate_text_on_demand
 from skytonight_calculator import load_calculation_results
 from sun_phases import SunService
 from cache_updater import (
@@ -1638,6 +1639,37 @@ def get_spaceflight_launch_vidurls(launch_id):
     except Exception as exc:
         logger.error(f"Error fetching vidURLs for launch {launch_id}: {exc}")
         return jsonify({"vidURLs": []}), 200
+
+
+@app.route("/api/translate/on-demand", methods=["POST"])
+@login_required
+def translate_on_demand_api():
+    """Translate dynamic third-party text for non-English users on demand."""
+    try:
+        payload = request.get_json(silent=True) or {}
+        text = str(payload.get("text") or "").strip()
+        target_lang = str(payload.get("target_lang") or "").split(",")[0].split("-")[0].lower().strip()
+        source_lang = str(payload.get("source_lang") or "en").split(",")[0].split("-")[0].lower().strip()
+
+        if not text:
+            return jsonify({"error": "missing_text"}), 400
+        if len(text) > 5000:
+            return jsonify({"error": "text_too_long"}), 400
+
+        supported_languages = set(I18nManager.get_supported_languages())
+        if target_lang not in supported_languages:
+            return jsonify({"error": "unsupported_target_language"}), 400
+
+        result = translate_text_on_demand(
+            text=text,
+            source_lang=source_lang or "en",
+            target_lang=target_lang,
+        )
+        return jsonify(result), 200
+
+    except Exception as exc:
+        logger.error(f"Error translating on demand: {exc}")
+        return jsonify({"error": "Internal server error"}), 500
 
 
 @app.route("/api/sun/today", methods=["GET"])
