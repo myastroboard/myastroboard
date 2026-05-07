@@ -316,6 +316,11 @@ def update_weather_cache():
         
         cache_store._weather_cache["data"] = {"location": location, "hourly": df.to_dict(orient="records")}
         cache_store._weather_cache["timestamp"] = time.time()
+        cache_store.update_shared_cache_entry(
+            "weather_forecast",
+            cache_store._weather_cache["data"],
+            cache_store._weather_cache["timestamp"],
+        )
         
         logger.info(f"Weather forecast cache updated at {datetime.now().isoformat()}")
         

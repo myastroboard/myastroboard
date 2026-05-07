@@ -363,6 +363,7 @@ def _sync_all_from_shared():
         "spaceflight_launches":     _spaceflight_launches_cache,
         "spaceflight_astronauts":   _spaceflight_astronauts_cache,
         "spaceflight_events":       _spaceflight_events_cache,
+        "weather_forecast":         _weather_cache,
     }
     for key, cache_entry in mapping.items():
         entry = shared.get(key)

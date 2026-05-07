@@ -16,6 +16,7 @@ import re
 import json
 import uuid
 import io
+import time
 import zipfile
 import sys
 from datetime import datetime, timedelta
@@ -1184,6 +1185,8 @@ def check_updates_api():
 def get_hourly_forecast_api():
     """Get hourly weather forecast"""
     try:
+        cache_store.sync_cache_from_shared("weather_forecast", cache_store._weather_cache)
+
         # Serve from app cache if valid — avoids a live API call on every page load
         if cache_store.is_cache_valid(cache_store._weather_cache, WEATHER_CACHE_TTL):
             return jsonify(cache_store._weather_cache["data"])
@@ -1204,7 +1207,20 @@ def get_hourly_forecast_api():
                 df[col] = df[col].apply(lambda x: x.decode() if isinstance(x, bytes) else x)
         hourly_json = df.to_dict(orient="records")
         location = {k: (v.decode() if isinstance(v, bytes) else v) for k, v in forecast["location"].items()}
-        return jsonify({"location": location, "hourly": hourly_json})
+        response_payload = {"location": location, "hourly": hourly_json}
+
+        # Keep cache status/metrics consistent even when this endpoint performs
+        # an on-demand refresh outside the scheduler cycle.
+        now_ts = time.time()
+        cache_store._weather_cache["data"] = response_payload
+        cache_store._weather_cache["timestamp"] = now_ts
+        cache_store.update_shared_cache_entry(
+            "weather_forecast",
+            cache_store._weather_cache["data"],
+            cache_store._weather_cache["timestamp"],
+        )
+
+        return jsonify(response_payload)
 
     except Exception as e:
         logger.error(f"Error getting hourly forecast: {e}")
