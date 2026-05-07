@@ -53,6 +53,7 @@ from skytonight_storage import (
     get_scheduler_lock_file as get_skytonight_scheduler_lock_file,
 )
 from skytonight_calculator import load_calculation_results
+from sun_phases import SunService
 from cache_updater import (
     update_dark_window_cache,
     update_moon_report_cache,
@@ -2180,8 +2181,54 @@ def best_window_api():
 # ============================================================
 
 
-def _resolve_astronomical_night_for_plan() -> Optional[dict]:
-    """Return the full astronomical night window from SkyTonight calculation metadata."""
+def _resolve_observing_night_for_plan() -> Optional[dict]:
+    """Return the nautical night window for Plan My Night.
+
+    Uses nautical dusk/dawn (sun at -12 deg) so the observing session starts
+    when bright stars, planets and clusters become visible, before full
+    astronomical darkness.  Falls back to SkyTonight calculation metadata
+    (astronomical window) when the location is not configured or the sun
+    service fails.
+    """
+    try:
+        config = load_config()
+        location = config.get('location', {})
+        lat = location.get('latitude')
+        lon = location.get('longitude')
+        tz_name = location.get('timezone')
+        if lat is not None and lon is not None and tz_name:
+            tz = ZoneInfo(str(tz_name))
+            sun_service = SunService(latitude=float(lat), longitude=float(lon), timezone=str(tz_name))
+
+            def _parse(time_str: str) -> Optional[datetime]:
+                text = str(time_str or '').strip()
+                if not text or text == 'Not found':
+                    return None
+                try:
+                    return datetime.strptime(text, '%Y-%m-%d %H:%M').replace(tzinfo=tz)
+                except ValueError:
+                    return None
+
+            report = sun_service.get_today_report()
+            dusk = _parse(report.nautical_dusk)
+            dawn = _parse(report.nautical_dawn)
+
+            if dusk is None or dawn is None or dawn <= dusk:
+                report_tomorrow = sun_service.get_tomorrow_report()
+                dusk = _parse(report_tomorrow.nautical_dusk)
+                dawn = _parse(report_tomorrow.nautical_dawn)
+
+            if dusk is not None and dawn is not None and dawn > dusk:
+                duration_hours = (dawn - dusk).total_seconds() / 3600.0
+                return {
+                    'start': dusk.isoformat(),
+                    'end': dawn.isoformat(),
+                    'duration_hours': round(duration_hours, 2),
+                }
+    except Exception as error:
+        logger.error(f'Error resolving observing night for plan: {error}')
+
+    # Fallback: use SkyTonight calculation metadata (astronomical window)
     try:
         calc = load_calculation_results()
         metadata = calc.get('metadata') or {}
@@ -2198,7 +2245,7 @@ def _resolve_astronomical_night_for_plan() -> Optional[dict]:
             'duration_hours': round(duration_hours, 2),
         }
     except Exception as error:
-        logger.error(f'Error resolving astronomical night for plan: {error}')
+        logger.error(f'Error resolving fallback night for plan: {error}')
     return None
 
 
@@ -2356,7 +2403,7 @@ def add_target_to_plan_my_night():
         if not catalogue:
             return jsonify({'error': 'Catalogue is required'}), 400
 
-        astro_night = _resolve_astronomical_night_for_plan()
+        astro_night = _resolve_observing_night_for_plan()
         start_value = astro_night.get('start') if astro_night else None
         end_value = astro_night.get('end') if astro_night else None
         duration_hours = astro_night.get('duration_hours', 0.0) if astro_night else 0.0

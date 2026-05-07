@@ -871,7 +871,7 @@ function renderPlanMyNight(payload) {
     civilStartItem.appendChild(civilStartBadge);
     const civilStartTitle = document.createElement('h5');
     civilStartTitle.className = 'fw-bold mb-1';
-    civilStartTitle.textContent = i18n.t('plan_my_night.astronomical_night_start');
+    civilStartTitle.textContent = i18n.t('plan_my_night.observing_session_start');
     civilStartItem.appendChild(civilStartTitle);
     const civilStartDescription = document.createElement('p');
     civilStartDescription.className = 'text-muted mb-0';
@@ -1173,7 +1173,7 @@ function renderPlanMyNight(payload) {
     civilEndItem.appendChild(civilEndBadge);
     const civilEndTitle = document.createElement('h5');
     civilEndTitle.className = 'fw-bold mb-1';
-    civilEndTitle.textContent = i18n.t('plan_my_night.astronomical_night_end');
+    civilEndTitle.textContent = i18n.t('plan_my_night.observing_session_end');
     civilEndItem.appendChild(civilEndTitle);
     const civilEndDescription = document.createElement('p');
     civilEndDescription.className = 'text-muted mb-0';

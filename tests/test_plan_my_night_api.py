@@ -38,7 +38,7 @@ def client_admin(monkeypatch):
             'end': (now + timedelta(hours=7)).strftime('%Y-%m-%d %H:%M'),
             'duration_hours': 6.0,
         }
-        monkeypatch.setattr(app_module, '_resolve_astronomical_night_for_plan', lambda: astro_night)
+        monkeypatch.setattr(app_module, '_resolve_observing_night_for_plan', lambda: astro_night)
 
         with app.test_client() as test_client:
             user = user_manager.get_user_by_username('admin')
