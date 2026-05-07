@@ -11,7 +11,8 @@ const DOMUtils = {
     createElement,
     clearContainer,
     setLoading,
-    createIcon
+    createIcon,
+    createSpinnerWrapper
 };
 
 /**
@@ -165,6 +166,27 @@ function createElement(tag, attributes = {}, content = '') {
     }
     
     return element;
+}
+
+/**
+ * Create a Bootstrap spinner + text wrapper element (d-flex align-items-center gap-2).
+ * Used by loading-message update functions across multiple modules.
+ * @param {string} message - The loading message text
+ * @param {string} [spinnerClass='text-info'] - Extra class(es) added to the spinner element
+ * @returns {HTMLElement} The wrapper div
+ */
+function createSpinnerWrapper(message, spinnerClass = 'text-info') {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'd-flex align-items-center gap-2';
+    const spinner = document.createElement('span');
+    spinner.className = `spinner-border spinner-border-sm${spinnerClass ? ' ' + spinnerClass : ''}`;
+    spinner.setAttribute('role', 'status');
+    spinner.setAttribute('aria-hidden', 'true');
+    const text = document.createElement('span');
+    text.textContent = message;
+    wrapper.appendChild(spinner);
+    wrapper.appendChild(text);
+    return wrapper;
 }
 
 window.DOMUtils = DOMUtils;

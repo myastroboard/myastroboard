@@ -17,11 +17,6 @@ let astrodexFilters = {
     sortOrder: 'asc'
 };
 
-function tSkyTonightCompat(key, params = {}) {
-    const skytonightKey = `skytonight.${key}`;
-    return i18n.t(skytonightKey, params);
-}
-
 function getObjectTypeOptionsHtml(selectedType = '') {
     const objectTypes = [
         ['Galaxy', 'type_galaxy'],

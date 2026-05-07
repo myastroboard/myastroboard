@@ -15,11 +15,6 @@ let _skytHasTelescopesCache = null;
 let _skytHasTelescopesPromise = null;
 const _skytListenerTimers = {};  // catalogue+type -> pending setTimeout id (cancelled on re-render)
 
-function tSkyTonightCompat(key, params = {}) {
-    const skytonightKey = `skytonight.${key}`;
-    return i18n.t(skytonightKey, params);
-}
-
 /**
  * Show a modal to pick a telescope for "Add to Plan My Night".
  * Returns a Promise that resolves with {telescope_id, telescope_name} or null if cancelled.
@@ -115,15 +110,6 @@ async function showPlanTelescopePickerModal(telescopeItems, row) {
             if (ev.target === overlay) { overlay.remove(); resolve(null); }
         });
     });
-}
-
-function tSkyTonightType(value) {
-    const suffix = strToTranslateKey(value);
-    const skytonightKey = `skytonight.type_${suffix}`;
-    if (i18n.has(skytonightKey)) {
-        return i18n.t(skytonightKey);
-    }
-    return value;
 }
 
 function _translatedConstellation(value) {

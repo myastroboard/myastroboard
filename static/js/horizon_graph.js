@@ -11,21 +11,7 @@ let horizonGraphRequestInFlight = null;
 function updateHorizonLoadingMessage(message) {
     const loadingDiv = document.getElementById('horizon-graph-loading');
     if (!loadingDiv) return;
-
-    const wrapper = document.createElement('div');
-    wrapper.className = 'd-flex align-items-center gap-2';
-
-    const spinner = document.createElement('span');
-    spinner.className = 'spinner-border spinner-border-sm text-info';
-    spinner.setAttribute('role', 'status');
-    spinner.setAttribute('aria-hidden', 'true');
-
-    const text = document.createElement('span');
-    text.textContent = message;
-
-    wrapper.appendChild(spinner);
-    wrapper.appendChild(text);
-    loadingDiv.replaceChildren(wrapper);
+    loadingDiv.replaceChildren(DOMUtils.createSpinnerWrapper(message));
 }
 
 

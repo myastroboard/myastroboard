@@ -316,3 +316,21 @@ function formatAltAz(altitudeDeg, azimuthCardinal, azimuthDeg) {
     const safeAz = Number.isFinite(Number(azimuthDeg)) ? `${Number(azimuthDeg).toFixed(1)}${i18n.t('units.degrees')}` : i18n.t('units.na');
     return `${safeAlt} / ${safeCardinal} (${safeAz})`;
 }
+
+// ---------------------------------------------------------------------------
+// SkyTonight / Catalogue shared translation helpers
+// Single canonical definitions — loaded before astrodex.js, plan_my_night.js,
+// and skytonight.js so all three can reference these without re-declaring them.
+// ---------------------------------------------------------------------------
+
+function tSkyTonightCompat(key, params = {}) {
+    return i18n.t(`skytonight.${key}`, params);
+}
+
+function tSkyTonightType(value) {
+    const normalizedValue = (value || '').toString().trim();
+    if (!normalizedValue) return '-';
+    const suffix = strToTranslateKey(normalizedValue);
+    const skytonightKey = `skytonight.type_${suffix}`;
+    return i18n.has(skytonightKey) ? i18n.t(skytonightKey) : normalizedValue;
+}

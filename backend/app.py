@@ -34,9 +34,12 @@ sys.path.insert(0, os.path.dirname(__file__))
 # Disable Astropy's automatic IERS Earth-orientation data download.
 # The bundled IERS-B table is sufficient for the arc-minute precision used here,
 # and the auto-download produces noisy timeout warnings in Docker containers.
+# When calculations fall outside the IERS data range (typically ~1 year ahead),
+# Astropy falls back to the 50-yr mean for polar motions — acceptable for our use.
 from astropy.utils import iers as _iers
 _iers.conf.auto_download = False
-_iers.conf.auto_max_age = None  # suppress age warnings
+_iers.conf.auto_max_age = None          # suppress "IERS data is old" warnings
+_iers.conf.iers_degraded_accuracy = 'ignore'  # suppress "beyond IERS data range" warnings
 
 from weather_openmeteo import get_hourly_forecast
 from events_aggregator import EventsAggregator

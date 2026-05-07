@@ -223,21 +223,7 @@ let astroChartsRequestInFlight = null;
 function updateAstroChartsLoadingMessage(message) {
     const loadingDiv = document.getElementById('astro-charts-loading');
     if (!loadingDiv) return;
-
-    const wrapper = document.createElement('div');
-    wrapper.className = 'd-flex align-items-center gap-2';
-
-    const spinner = document.createElement('span');
-    spinner.className = 'spinner-border spinner-border-sm text-info';
-    spinner.setAttribute('role', 'status');
-    spinner.setAttribute('aria-hidden', 'true');
-
-    const text = document.createElement('span');
-    text.textContent = message;
-
-    wrapper.appendChild(spinner);
-    wrapper.appendChild(text);
-    loadingDiv.replaceChildren(wrapper);
+    loadingDiv.replaceChildren(DOMUtils.createSpinnerWrapper(message));
 }
 
 
@@ -302,19 +288,25 @@ async function loadAstronomicalCharts() {
         const now = Date.now();
         const configuredTimezone = data?.location?.timezone || 'UTC';
         const futureHourly = data.hourly.filter(item => new Date(item.date).getTime() >= now);
-        const labels = futureHourly.map(item => formatTimeOnlyInTimezone(item.date, configuredTimezone));
-        
-        const condition = futureHourly.map(item => item.condition);
-        const cloudless = futureHourly.map(item => item.cloudless);
-        const cloudHigh = futureHourly.map(item => item.cloudless_high);
-        const cloudMid = futureHourly.map(item => item.cloudless_mid);
-        const cloudLow = futureHourly.map(item => item.cloudless_low);
-        const calm = futureHourly.map(item => item.calm);
-        const fog = futureHourly.map(item => item.fog);
-        const seeing = futureHourly.map(item => item.seeing);
-        const transparency = futureHourly.map(item => item.transparency);
-        const liftedIndex = futureHourly.map(item => item.lifted_index);
-        const precipitation = futureHourly.map(item => item.precipitation);
+
+        // Extract all chart data arrays in a single pass over futureHourly
+        const labels = [], condition = [], cloudless = [], cloudHigh = [], cloudMid = [],
+              cloudLow = [], calm = [], fog = [], seeing = [], transparency = [],
+              liftedIndex = [], precipitation = [];
+        for (const item of futureHourly) {
+            labels.push(formatTimeOnlyInTimezone(item.date, configuredTimezone));
+            condition.push(item.condition);
+            cloudless.push(item.cloudless);
+            cloudHigh.push(item.cloudless_high);
+            cloudMid.push(item.cloudless_mid);
+            cloudLow.push(item.cloudless_low);
+            calm.push(item.calm);
+            fog.push(item.fog);
+            seeing.push(item.seeing);
+            transparency.push(item.transparency);
+            liftedIndex.push(item.lifted_index);
+            precipitation.push(item.precipitation);
+        }
         
         // Destroy existing charts if they exist
         destroyAstronomicalCharts();

@@ -5,25 +5,6 @@ let planMyNightStructureSnapshot = null;
 let currentPlanTelescopeId = null;   // null = no/default telescope
 let planTelescopeList = [];          // array from /api/plan-my-night/list
 
-function tSkyTonightCompat(key, params = {}) {
-    const skytonightKey = `skytonight.${key}`;
-    return i18n.t(skytonightKey, params);
-}
-
-function tSkyTonightType(value) {
-    const normalizedValue = (value || '').toString().trim();
-    if (!normalizedValue) {
-        return '-';
-    }
-
-    const suffix = strToTranslateKey(normalizedValue);
-    const skytonightKey = `skytonight.type_${suffix}`;
-    if (i18n.has(skytonightKey)) {
-        return i18n.t(skytonightKey);
-    }
-    return normalizedValue;
-}
-
 function isPlanEditRole(role) {
     return role === 'admin' || role === 'user';
 }
