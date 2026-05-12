@@ -63,7 +63,29 @@
     "iss": "ISS",
     "calendar": "Events Calendar",
     "plan_my_night": "Plan my night",
-    "spaceflight": "Spaceflight"
+    "spaceflight": "Spaceflight",
+    "about": "About"
+  },
+
+  "about": {
+    "title": "About MyAstroBoard",
+    "summary_title": "Project at a glance",
+    "summary_text": "MyAstroBoard is a self-hosted astronomy dashboard for observation and astrophotography planning.",
+    "website_label": "Project website",
+    "vitrine_note": "Public showcase and presentation page.",
+    "maintainer_title": "Maintainer",
+    "maintainer_name": "WorldOfGZ",
+    "maintainer_contact": "GitHub: @WorldOfGZ",
+    "sponsor_title": "Support the project",
+    "sponsor_text": "If MyAstroBoard helps you, you can support its maintenance and development.",
+    "sponsor_github": "GitHub Sponsors",
+    "sponsor_kofi": "Ko-fi",
+    "funding_label": "Funding file",
+    "funding_hint": "See all active support links in FUNDING.yml.",
+    "license_title": "License",
+    "license_text": "MyAstroBoard is licensed under AGPL-3.0. Source code remains available for deployed versions.",
+    "source_label": "Source repository",
+    "issues_label": "Report an issue"
   },
 
   "planets": {

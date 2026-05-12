@@ -62,7 +62,28 @@
     "iss": "ISS",
     "calendar": "Veranstaltungskalender",
     "plan_my_night": "Plane meine Nacht",
-    "spaceflight": "Raumfahrt"
+    "spaceflight": "Raumfahrt",
+    "about": "Über"
+  },
+  "about": {
+    "title": "Über MyAstroBoard",
+    "summary_title": "Projekt auf einen Blick",
+    "summary_text": "MyAstroBoard ist ein selbst gehostetes Astronomie-Dashboard zur Planung von Beobachtungen und Astrofotografie.",
+    "website_label": "Projekt-Website",
+    "vitrine_note": "Öffentliche Präsentations- und Schaufensterseite.",
+    "maintainer_title": "Maintainer",
+    "maintainer_name": "WorldOfGZ",
+    "maintainer_contact": "GitHub: @WorldOfGZ",
+    "sponsor_title": "Projekt unterstützen",
+    "sponsor_text": "Wenn MyAstroBoard dir hilft, kannst du Wartung und Entwicklung unterstützen.",
+    "sponsor_github": "GitHub Sponsors",
+    "sponsor_kofi": "Ko-fi",
+    "funding_label": "Funding-Datei",
+    "funding_hint": "Alle aktiven Unterstützungslinks in FUNDING.yml anzeigen.",
+    "license_title": "Lizenz",
+    "license_text": "MyAstroBoard ist unter AGPL-3.0 lizenziert. Der Quellcode bleibt für bereitgestellte Versionen verfügbar.",
+    "source_label": "Quell-Repository",
+    "issues_label": "Problem melden"
   },
   "planets": {
     "mercury": "Merkur",
