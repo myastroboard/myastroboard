@@ -29,6 +29,8 @@ def _cache_image(url: Optional[str]) -> Optional[str]:
     """
     Download *url* into the local image cache directory and return the local
     serving path ``/api/spaceflight/img/<hash>.<ext>``.
+    Also writes a ``<filename>.url`` sidecar so the serve endpoint can
+    re-download the image if the file is later deleted.
     Falls back to the original URL on any error so nothing breaks.
     """
     if not url:
@@ -41,6 +43,10 @@ def _cache_image(url: Optional[str]) -> Optional[str]:
             ext = '.jpg'
         filename = f"{url_hash}{ext}"
         local_path = os.path.join(_SPACEFLIGHT_IMAGES_DIR, filename)
+        sidecar_path = local_path + '.url'
+        # Always (re)write the sidecar so we can recover later
+        with open(sidecar_path, 'w', encoding='utf-8') as sf:
+            sf.write(url)
         if not os.path.exists(local_path):
             resp = requests.get(url, timeout=_REQUEST_TIMEOUT, stream=True)
             resp.raise_for_status()
@@ -370,3 +376,36 @@ def prune_image_cache(active_data: list) -> None:
             "Pruned %d stale spaceflight image(s), freed %.1f KB",
             removed, freed / 1024,
         )
+
+
+def spaceflight_cache_images_intact(cache_data: dict) -> bool:
+    """
+    Return True if every ``/api/spaceflight/img/`` path referenced in
+    *cache_data* has a corresponding file on disk.
+
+    Returns True when *cache_data* is None/empty (no images to check).
+    Returns False as soon as the first missing image is detected, so the
+    caller can immediately invalidate the cache and schedule a re-fetch.
+    """
+    if not cache_data:
+        return True
+
+    def _walk(obj):
+        if isinstance(obj, str):
+            if obj.startswith("/api/spaceflight/img/"):
+                fname = os.path.basename(obj)
+                fpath = os.path.join(_SPACEFLIGHT_IMAGES_DIR, fname)
+                if not os.path.exists(fpath):
+                    logger.debug("Spaceflight image missing from disk: %s", fpath)
+                    return False
+        elif isinstance(obj, dict):
+            for v in obj.values():
+                if not _walk(v):
+                    return False
+        elif isinstance(obj, (list, tuple)):
+            for item in obj:
+                if not _walk(item):
+                    return False
+        return True
+
+    return _walk(cache_data)

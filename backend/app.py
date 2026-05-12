@@ -1615,11 +1615,34 @@ def get_spaceflight_events_api():
 @app.route("/api/spaceflight/img/<filename>", methods=["GET"])
 @login_required
 def spaceflight_image(filename):
-    """Serve a locally cached spaceflight/astronaut image."""
+    """Serve a locally cached spaceflight/astronaut image.
+    If the image file is missing but a .url sidecar exists, re-download it
+    on the fly so stale cache entries pointing to deleted files self-heal.
+    """
     import re
     if not re.match(r'^[a-f0-9]{32}\.(jpg|jpeg|png|webp|gif)$', filename):
         return jsonify({"error": "Invalid filename"}), 400
     img_dir = os.path.join(DATA_DIR_CACHE, 'spaceflight_images')
+    local_path = os.path.join(img_dir, filename)
+    if not os.path.exists(local_path):
+        sidecar = local_path + '.url'
+        if os.path.exists(sidecar):
+            try:
+                with open(sidecar, 'r', encoding='utf-8') as sf:
+                    original_url = sf.read().strip()
+                import requests as _req
+                resp = _req.get(original_url, timeout=15, stream=True)
+                resp.raise_for_status()
+                os.makedirs(img_dir, exist_ok=True)
+                with open(local_path, 'wb') as fh:
+                    for chunk in resp.iter_content(chunk_size=8192):
+                        fh.write(chunk)
+                logger.info("Re-downloaded missing spaceflight image: %s", filename)
+            except Exception as exc:
+                logger.warning("Could not re-download spaceflight image %s: %s", filename, exc)
+                return jsonify({"error": "Image unavailable"}), 404
+        else:
+            return jsonify({"error": "Image not found"}), 404
     return send_from_directory(img_dir, filename, max_age=86400)
 
 

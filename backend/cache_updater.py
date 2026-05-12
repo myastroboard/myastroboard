@@ -1074,12 +1074,28 @@ def fully_initialize_caches():
             ("weather_forecast",      None,                    update_weather_cache,                                     WEATHER_CACHE_TTL,                 cache_store._weather_cache,                False),
         ]
 
+        # Spaceflight image-integrity check jobs (cache_entry key -> name for logging)
+        _SPACEFLIGHT_IMAGE_JOBS = {
+            "spaceflight_launches", "spaceflight_astronauts",
+        }
+
         # Determine which jobs actually need to run
         jobs_to_run = []
         for job_name, shared_key, update_fn, ttl, cache_entry, day_sensitive in cache_jobs:
             # Sync in-memory entry from shared file to get the persisted timestamp
             if shared_key is not None:
                 cache_store.sync_cache_from_shared(shared_key, cache_entry)
+
+            # For spaceflight jobs: invalidate if any referenced image is gone from disk
+            if job_name in _SPACEFLIGHT_IMAGE_JOBS and cache_entry.get("data"):
+                from spaceflight_tracker import spaceflight_cache_images_intact
+                if not spaceflight_cache_images_intact(cache_entry["data"]):
+                    logger.info(
+                        "Spaceflight cache '%s' has missing image files — forcing re-fetch",
+                        job_name,
+                    )
+                    cache_entry["timestamp"] = 0
+
             valid = (
                 cache_store.is_cache_valid_for_today(cache_entry, ttl)
                 if day_sensitive
