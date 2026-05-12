@@ -1314,6 +1314,8 @@
     "iss_description": "ISS Bestehenspunktzahl {score}/100 ({visibility_day_night}). Gipfelhöhe {peak_altitude_deg}°.",
     "iss_solar_transit_title": "ISS-Sonnentransit",
     "iss_solar_transit_description": "Die ISS durchquert von Ihrem Standort aus die Sonnenscheibe. Minimale Trennung {minimum_separation_arcmin}′, geschätztes Transitfenster {duration_seconds}s bei {sun_altitude_deg}° Sonnenhöhe. Zertifizierter Sonnenfilter erforderlich.",
+    "iss_lunar_transit_title": "ISS-Mondtransit",
+    "iss_lunar_transit_description": "Die ISS durchquert von Ihrem Standort aus die Mondscheibe. Minimale Trennung {minimum_separation_arcmin}′, geschätztes Transitfenster {duration_seconds}s bei {moon_altitude_deg}° Mondhöhe. Mondbeleuchtung {moon_illumination_pct}%.",
     "activities": {
       "deep_sky_observations": "Deep-Sky-Beobachtungen",
       "lunar_observations": "Mondbeobachtungen",

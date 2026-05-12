@@ -1313,6 +1313,8 @@
     "iss_description": "ISS punteggio minimo {score}/100 ({visibility_day_night}). Altitudine massima {peak_altitude_deg}°.",
     "iss_solar_transit_title": "Transito solare della ISS",
     "iss_solar_transit_description": "La ISS attraversa il disco solare dalla tua posizione. Separazione minima {minimum_separation_arcmin}′, finestra di transito stimata di {duration_seconds}s con Sole a {sun_altitude_deg}°. Filtro solare certificato obbligatorio.",
+    "iss_lunar_transit_title": "Transito lunare della ISS",
+    "iss_lunar_transit_description": "La ISS attraversa il disco lunare dalla tua posizione. Separazione minima {minimum_separation_arcmin}′, finestra di transito stimata di {duration_seconds}s con la Luna a {moon_altitude_deg}°. Illuminazione lunare {moon_illumination_pct}%.",
     "activities": {
       "deep_sky_observations": "osservazioni del cielo profondo",
       "lunar_observations": "osservazioni lunari",

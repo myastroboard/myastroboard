@@ -53,6 +53,7 @@ class EventType(Enum):
     AURORA = "Aurora"
     ISS_PASS = "ISS Pass"
     ISS_SOLAR_TRANSIT = "ISS Solar Transit"
+    ISS_LUNAR_TRANSIT = "ISS Lunar Transit"
     MOON_PHASE = "Moon Phase"
     PLANETARY_CONJUNCTION = "Planetary Conjunction"
     PLANETARY_OPPOSITION = "Planetary Opposition"
@@ -205,6 +206,7 @@ class EventsAggregator:
             EventType.AURORA.value: "bi bi-stars",
             EventType.ISS_PASS.value: "bi bi-iss",
             EventType.ISS_SOLAR_TRANSIT.value: "bi bi-sun",
+            EventType.ISS_LUNAR_TRANSIT.value: "bi bi-moon-stars",
             EventType.MOON_PHASE.value: "bi bi-moon-stars",
             EventType.PLANETARY_CONJUNCTION.value: "bi bi-conjonction",
             EventType.PLANETARY_OPPOSITION.value: "bi bi-bullseye",
@@ -673,7 +675,7 @@ class EventsAggregator:
         return events
 
     def _extract_iss_pass_events(self, iss_data: Dict[str, Any]) -> List[AstronomicalEvent]:
-        """Extract ISS visible pass and solar transit events occurring in the next 7 days."""
+        """Extract ISS visible pass, solar transit, and lunar transit events occurring in the next 7 days."""
         raw_passes = iss_data.get("passes")
         if not isinstance(raw_passes, list):
             next_pass = iss_data.get("next_visible_passage")
@@ -683,6 +685,11 @@ class EventsAggregator:
         if not isinstance(raw_transits, list):
             next_transit = iss_data.get("next_solar_transit")
             raw_transits = [next_transit] if next_transit else []
+
+        raw_lunar_transits = iss_data.get("lunar_transits")
+        if not isinstance(raw_lunar_transits, list):
+            next_lunar_transit = iss_data.get("next_lunar_transit")
+            raw_lunar_transits = [next_lunar_transit] if next_lunar_transit else []
 
         events: List[AstronomicalEvent] = []
 
@@ -792,6 +799,59 @@ class EventsAggregator:
                 importance=importance,
                 score=score,
                 raw_data=transit,
+                structure_key="iss",
+            )
+            events.append(event)
+
+        for lunar_transit in raw_lunar_transits:
+            if not isinstance(lunar_transit, dict):
+                continue
+
+            peak_time_str = lunar_transit.get("peak_time")
+            if not peak_time_str:
+                continue
+
+            peak_time = self._parse_iso_time(peak_time_str)
+            days_until = (peak_time.date() - self.local_now.date()).days
+
+            if days_until < 0 or days_until > 7:
+                continue
+
+            min_sep_arcmin = float(lunar_transit.get("minimum_separation_arcmin", 0) or 0)
+            duration_seconds = float(lunar_transit.get("duration_seconds", 0) or 0)
+            moon_altitude_deg = float(lunar_transit.get("moon_altitude_deg", 0) or 0)
+            lunar_radius_arcmin = float(lunar_transit.get("lunar_radius_arcmin", 0) or 0)
+            moon_illumination_pct = float(lunar_transit.get("moon_illumination_pct", 0) or 0)
+
+            score = 9.0
+            importance = EventImportance.CRITICAL.value
+
+            event = AstronomicalEvent(
+                id=f"iss_lunar_transit_{peak_time_str.replace(':', '').replace('-', '')}",
+                event_type=EventType.ISS_LUNAR_TRANSIT.value,
+                icon_class="bi bi-moon-stars",
+                icon_color_class=self._importance_icon_color_class(importance),
+                title=self._t(
+                    "events_api.iss_lunar_transit_title",
+                    "ISS Lunar Transit",
+                ),
+                description=self._t(
+                    "events_api.iss_lunar_transit_description",
+                    "ISS crosses the lunar disk from your location. Minimum separation {minimum_separation_arcmin}′, estimated transit window {duration_seconds}s near {moon_altitude_deg}° lunar altitude. Moon illumination {moon_illumination_pct}%.",
+                    minimum_separation_arcmin=f"{min_sep_arcmin:.2f}",
+                    duration_seconds=f"{duration_seconds:.1f}",
+                    moon_altitude_deg=f"{moon_altitude_deg:.1f}",
+                    lunar_radius_arcmin=f"{lunar_radius_arcmin:.2f}",
+                    moon_illumination_pct=f"{moon_illumination_pct:.0f}",
+                ),
+                start_time=lunar_transit.get("start_time"),
+                peak_time=peak_time_str,
+                end_time=lunar_transit.get("end_time"),
+                days_until_event=days_until,
+                visibility=bool(lunar_transit.get("is_visible", True)),
+                importance=importance,
+                score=score,
+                raw_data=lunar_transit,
                 structure_key="iss",
             )
             events.append(event)

@@ -2,6 +2,7 @@
 
 from datetime import datetime, timedelta, timezone
 from requests import HTTPError
+import pytest
 
 from iss_passes import ISSPassService, get_iss_passes_report
 from events_aggregator import EventsAggregator
@@ -394,6 +395,349 @@ class TestISSCalendarAggregation:
         assert event["title"] == "Transit solaire de l'ISS"
         assert event["structure_key"] == "iss"
         assert "0.18" in event["description"]
+
+    def test_aggregate_all_events_includes_iss_lunar_transit(self):
+        aggregator = EventsAggregator(45.5, -73.5, "America/Montreal", language="fr")
+
+        peak_time = (aggregator.local_now + timedelta(days=2)).replace(hour=22, minute=15, second=0, microsecond=0)
+        iss_payload = {
+            "lunar_transits": [
+                {
+                    "start_time": (peak_time - timedelta(seconds=0.5)).isoformat(),
+                    "peak_time": peak_time.isoformat(),
+                    "end_time": (peak_time + timedelta(seconds=0.5)).isoformat(),
+                    "duration_seconds": 0.6,
+                    "minimum_separation_arcmin": 0.22,
+                    "lunar_radius_arcmin": 14.7,
+                    "moon_altitude_deg": 42.5,
+                    "moon_azimuth_deg": 195.0,
+                    "moon_illumination_pct": 78.0,
+                    "iss_altitude_deg": 42.3,
+                    "iss_azimuth_deg": 195.1,
+                    "pass_type": "lunar_transit",
+                    "is_visible": True,
+                }
+            ]
+        }
+
+        result = aggregator.aggregate_all_events(iss_passes_data=iss_payload)
+
+        assert result["events_count"] == 1
+        event = result["upcoming_events"][0]
+        assert event["event_type"] == "ISS Lunar Transit"
+        assert event["title"] == "Transit lunaire de l'ISS"
+        assert event["structure_key"] == "iss"
+        assert event["importance"] == "critical"
+        assert event["score"] == 9.0
+        assert "0.22" in event["description"]
+        assert "78" in event["description"]
+
+    def test_aggregate_all_events_iss_lunar_transit_all_languages(self):
+        """Verify the lunar transit title is present in all supported languages."""
+        expected_titles = {
+            "en": "ISS Lunar Transit",
+            "fr": "Transit lunaire de l'ISS",
+            "de": "ISS-Mondtransit",
+            "es": "Tránsito lunar de la ISS",
+            "it": "Transito lunare della ISS",
+            "pt": "Trânsito lunar da ISS",
+        }
+        for lang, expected_title in expected_titles.items():
+            aggregator = EventsAggregator(45.5, -73.5, "America/Montreal", language=lang)
+            peak_time = (aggregator.local_now + timedelta(days=1)).replace(hour=21, minute=0, second=0, microsecond=0)
+            iss_payload = {
+                "lunar_transits": [
+                    {
+                        "start_time": (peak_time - timedelta(seconds=0.5)).isoformat(),
+                        "peak_time": peak_time.isoformat(),
+                        "end_time": (peak_time + timedelta(seconds=0.5)).isoformat(),
+                        "duration_seconds": 0.5,
+                        "minimum_separation_arcmin": 0.10,
+                        "lunar_radius_arcmin": 14.7,
+                        "moon_altitude_deg": 30.0,
+                        "moon_azimuth_deg": 180.0,
+                        "moon_illumination_pct": 50.0,
+                        "iss_altitude_deg": 30.1,
+                        "iss_azimuth_deg": 180.1,
+                        "pass_type": "lunar_transit",
+                        "is_visible": True,
+                    }
+                ]
+            }
+            result = aggregator.aggregate_all_events(iss_passes_data=iss_payload)
+            assert result["events_count"] == 1, f"Expected 1 event for lang={lang}"
+            assert result["upcoming_events"][0]["title"] == expected_title, f"Title mismatch for lang={lang}"
+
+    def test_aggregate_all_events_iss_lunar_transit_outside_window_excluded(self):
+        aggregator = EventsAggregator(45.5, -73.5, "America/Montreal")
+
+        # 10 days out — should be excluded
+        peak_time = (aggregator.local_now + timedelta(days=10)).replace(hour=21, minute=0, second=0, microsecond=0)
+        iss_payload = {
+            "lunar_transits": [
+                {
+                    "start_time": (peak_time - timedelta(seconds=0.5)).isoformat(),
+                    "peak_time": peak_time.isoformat(),
+                    "end_time": (peak_time + timedelta(seconds=0.5)).isoformat(),
+                    "duration_seconds": 0.5,
+                    "minimum_separation_arcmin": 0.10,
+                    "lunar_radius_arcmin": 14.7,
+                    "moon_altitude_deg": 30.0,
+                    "moon_azimuth_deg": 180.0,
+                    "moon_illumination_pct": 50.0,
+                    "iss_altitude_deg": 30.1,
+                    "iss_azimuth_deg": 180.1,
+                    "pass_type": "lunar_transit",
+                    "is_visible": True,
+                }
+            ]
+        }
+
+        result = aggregator.aggregate_all_events(iss_passes_data=iss_payload)
+        assert result["events_count"] == 0
+
+    def test_aggregate_all_events_iss_lunar_transit_uses_next_lunar_transit_fallback(self):
+        """next_lunar_transit fallback is used when lunar_transits list is absent."""
+        aggregator = EventsAggregator(45.5, -73.5, "America/Montreal")
+
+        peak_time = (aggregator.local_now + timedelta(days=1)).replace(hour=21, minute=0, second=0, microsecond=0)
+        iss_payload = {
+            "next_lunar_transit": {
+                "start_time": (peak_time - timedelta(seconds=0.5)).isoformat(),
+                "peak_time": peak_time.isoformat(),
+                "end_time": (peak_time + timedelta(seconds=0.5)).isoformat(),
+                "duration_seconds": 0.5,
+                "minimum_separation_arcmin": 0.10,
+                "lunar_radius_arcmin": 14.7,
+                "moon_altitude_deg": 30.0,
+                "moon_azimuth_deg": 180.0,
+                "moon_illumination_pct": 50.0,
+                "iss_altitude_deg": 30.1,
+                "iss_azimuth_deg": 180.1,
+                "pass_type": "lunar_transit",
+                "is_visible": True,
+            }
+        }
+
+        result = aggregator.aggregate_all_events(iss_passes_data=iss_payload)
+        assert result["events_count"] == 1
+        assert result["upcoming_events"][0]["event_type"] == "ISS Lunar Transit"
+
+
+class TestISSPassServiceLunarTransit:
+    """Test ISS lunar transit detection helpers."""
+
+    def test_extract_lunar_transit_segment_returns_refined_window(self, monkeypatch):
+        service = ISSPassService(45.5, -73.5, 30, "America/Montreal")
+        start_utc = datetime(2026, 5, 8, 21, 0, 0, tzinfo=timezone.utc)
+        end_utc = start_utc + timedelta(seconds=4)
+
+        coarse_samples = [
+            {
+                "time_utc": start_utc + timedelta(seconds=offset),
+                "iss_altitude_deg": 40.0,
+                "iss_azimuth_deg": 195.0,
+                "moon_altitude_deg": 40.0,
+                "moon_azimuth_deg": 195.0,
+                "lunar_radius_deg": 0.27,
+                "moon_illumination_pct": 75.0,
+                "separation_deg": separation,
+            }
+            for offset, separation in [
+                (0, 0.40),
+                (1, 0.26),
+                (2, 0.05),
+                (3, 0.24),
+                (4, 0.38),
+            ]
+        ]
+        refined_samples = [
+            {
+                "time_utc": start_utc + timedelta(seconds=offset),
+                "iss_altitude_deg": 40.0,
+                "iss_azimuth_deg": 195.0,
+                "moon_altitude_deg": 40.0,
+                "moon_azimuth_deg": 195.0,
+                "lunar_radius_deg": 0.27,
+                "moon_illumination_pct": 75.0,
+                "separation_deg": separation,
+            }
+            for offset, separation in [
+                (1.8, 0.28),
+                (1.9, 0.20),
+                (2.0, 0.03),
+                (2.1, 0.21),
+                (2.2, 0.29),
+            ]
+        ]
+
+        def _mock_sample_time_range(start_utc, end_utc, step_seconds, sampler):
+            if step_seconds == 1.0:
+                return coarse_samples
+            return refined_samples
+
+        monkeypatch.setattr(service, "_sample_time_range", _mock_sample_time_range)
+
+        transit = service._extract_lunar_transit_segment(
+            start_utc=start_utc,
+            end_utc=end_utc,
+            satellite=None,
+            observer=None,
+            ts=None,
+            eph=None,
+        )
+
+        assert transit is not None
+        assert transit["pass_type"] == "lunar_transit"
+        assert transit["peak_time"] == (start_utc + timedelta(seconds=2)).astimezone(service.timezone).isoformat()
+        assert transit["duration_seconds"] == 0.2
+        assert transit["minimum_separation_arcmin"] == pytest.approx(0.03 * 60, abs=0.01)
+        assert transit["moon_illumination_pct"] == 75.0
+        assert transit["is_visible"] is True
+
+    def test_extract_lunar_transit_segment_returns_none_when_no_candidates(self, monkeypatch):
+        service = ISSPassService(45.5, -73.5, 30, "America/Montreal")
+        start_utc = datetime(2026, 5, 8, 21, 0, 0, tzinfo=timezone.utc)
+        end_utc = start_utc + timedelta(seconds=4)
+
+        # All separations exceed the lunar radius → no transit
+        samples = [
+            {
+                "time_utc": start_utc + timedelta(seconds=offset),
+                "iss_altitude_deg": 40.0,
+                "iss_azimuth_deg": 195.0,
+                "moon_altitude_deg": 40.0,
+                "moon_azimuth_deg": 195.0,
+                "lunar_radius_deg": 0.27,
+                "moon_illumination_pct": 50.0,
+                "separation_deg": 1.5,
+            }
+            for offset in range(5)
+        ]
+
+        monkeypatch.setattr(service, "_sample_time_range", lambda *args, **kwargs: samples)
+
+        transit = service._extract_lunar_transit_segment(
+            start_utc=start_utc,
+            end_utc=end_utc,
+            satellite=None,
+            observer=None,
+            ts=None,
+            eph=None,
+        )
+
+        assert transit is None
+
+    def test_extract_lunar_transit_segment_returns_none_when_moon_too_low(self, monkeypatch):
+        service = ISSPassService(45.5, -73.5, 30, "America/Montreal")
+        start_utc = datetime(2026, 5, 8, 21, 0, 0, tzinfo=timezone.utc)
+        end_utc = start_utc + timedelta(seconds=4)
+
+        # Moon altitude below LUNAR_TRANSIT_MIN_MOON_ALTITUDE_DEG (5°) → excluded
+        samples = [
+            {
+                "time_utc": start_utc + timedelta(seconds=offset),
+                "iss_altitude_deg": 40.0,
+                "iss_azimuth_deg": 195.0,
+                "moon_altitude_deg": 2.0,
+                "moon_azimuth_deg": 195.0,
+                "lunar_radius_deg": 0.27,
+                "moon_illumination_pct": 50.0,
+                "separation_deg": 0.05,
+            }
+            for offset in range(5)
+        ]
+
+        monkeypatch.setattr(service, "_sample_time_range", lambda *args, **kwargs: samples)
+
+        transit = service._extract_lunar_transit_segment(
+            start_utc=start_utc,
+            end_utc=end_utc,
+            satellite=None,
+            observer=None,
+            ts=None,
+            eph=None,
+        )
+
+        assert transit is None
+
+    def test_find_lunar_transits_skipped_without_ephemeris(self, monkeypatch):
+        """_find_lunar_transits returns [] gracefully when eph is None."""
+        from datetime import datetime, timezone
+        service = ISSPassService(45.5, -73.5, 30, "America/Montreal")
+        start_utc = datetime(2026, 5, 8, 0, 0, 0, tzinfo=timezone.utc)
+        end_utc = start_utc + timedelta(days=1)
+
+        result = service._find_lunar_transits(
+            start_utc=start_utc,
+            end_utc=end_utc,
+            satellite=None,
+            observer=None,
+            ts=None,
+            eph=None,
+        )
+
+        assert result == []
+
+    def test_lunar_angular_radius_fallback(self):
+        service = ISSPassService(45.5, -73.5, 30, "America/Montreal")
+
+        class _BadApparent:
+            def distance(self):
+                raise ValueError("no distance")
+
+        radius = service._lunar_angular_radius_deg(_BadApparent())
+        from iss_passes import LUNAR_ANGULAR_RADIUS_FALLBACK_DEG
+        assert radius == LUNAR_ANGULAR_RADIUS_FALLBACK_DEG
+
+    def test_get_report_includes_lunar_transit_keys(self, monkeypatch):
+        """get_report() always returns lunar_transits / next_lunar_transit / total_lunar_transits."""
+        service = ISSPassService(45.5, -73.5, 30, "America/Montreal")
+
+        monkeypatch.setattr(service, "_fetch_iss_tle", lambda: (
+            "1 25544U 98067A   26100.00000000  .00010000  00000+0  18000-3 0  9991",
+            "2 25544  51.6400 120.0000 0005000 200.0000 160.0000 15.50000000000000",
+        ))
+        monkeypatch.setattr(service, "_load_ephemeris", lambda: None)
+        monkeypatch.setattr(service, "_build_passes", lambda *args, **kwargs: [])
+        monkeypatch.setattr(service, "_find_solar_transits", lambda *args, **kwargs: [])
+        monkeypatch.setattr(service, "_find_lunar_transits", lambda *args, **kwargs: [])
+
+        from skyfield.api import Loader
+        import os
+        from constants import DATA_DIR_CACHE
+        SKYFIELD_CACHE_DIR = os.path.join(DATA_DIR_CACHE, "skyfield")
+        os.makedirs(SKYFIELD_CACHE_DIR, exist_ok=True)
+
+        # Patch find_events to return empty sequences
+        class _FakeTS:
+            def from_datetime(self, dt):
+                return dt
+            def timescale(self):
+                return self
+
+        import iss_passes as iss_module
+        fake_ts = _FakeTS()
+        monkeypatch.setattr(iss_module, "SKYFIELD_LOADER", type("L", (), {
+            "timescale": lambda self: fake_ts,
+        })())
+
+        class _FakeSatellite:
+            def find_events(self, *args, **kwargs):
+                return [], []
+
+        monkeypatch.setattr(iss_module, "EarthSatellite", lambda *args, **kwargs: _FakeSatellite())
+        monkeypatch.setattr(iss_module, "wgs84", type("W", (), {
+            "latlon": lambda *args, **kwargs: None,
+        })())
+
+        report = service.get_report(days=1)
+
+        assert "lunar_transits" in report
+        assert "next_lunar_transit" in report
+        assert "total_lunar_transits" in report
+        assert isinstance(report["lunar_transits"], list)
+        assert report["total_lunar_transits"] == 0
 
     def test_aggregate_all_events_localizes_titles_with_language(self):
         aggregator = EventsAggregator(45.5, -73.5, "America/Montreal", language="fr")

@@ -61,6 +61,12 @@ SOLAR_TRANSIT_REFINE_SAMPLE_SECONDS = 0.1
 SOLAR_TRANSIT_MIN_SUN_ALTITUDE_DEG = 0.0
 SOLAR_ANGULAR_RADIUS_FALLBACK_DEG = 0.2666
 SOLAR_RADIUS_KM = 695700.0
+LUNAR_TRANSIT_SAMPLE_SECONDS = 1.0
+LUNAR_TRANSIT_REFINE_WINDOW_SECONDS = 1.0
+LUNAR_TRANSIT_REFINE_SAMPLE_SECONDS = 0.1
+LUNAR_TRANSIT_MIN_MOON_ALTITUDE_DEG = 5.0
+LUNAR_ANGULAR_RADIUS_FALLBACK_DEG = 0.2615
+LUNAR_RADIUS_KM = 1737.4
 ISS_TLE_CACHE_FILE = os.path.join(DATA_DIR_CACHE, 'iss_tle_cache.json')
 ISS_TLE_MAX_AGE_SECONDS = 6 * 60 * 60
 ISS_TLE_FAILURE_COOLDOWN_SECONDS = 3 * 60 * 60
@@ -163,6 +169,8 @@ class ISSPassService:
         next_visible = passes[0] if passes else None
         solar_transits = self._find_solar_transits(now_utc, end_utc, satellite, observer, ts, eph)
         next_solar_transit = solar_transits[0] if solar_transits else None
+        lunar_transits = self._find_lunar_transits(now_utc, end_utc, satellite, observer, ts, eph)
+        next_lunar_transit = lunar_transits[0] if lunar_transits else None
 
         return {
             "timestamp": datetime.now(self.timezone).isoformat(),
@@ -175,10 +183,13 @@ class ISSPassService:
             "window_days": forecast_days,
             "next_visible_passage": next_visible,
             "next_solar_transit": next_solar_transit,
+            "next_lunar_transit": next_lunar_transit,
             "passes": passes,
             "solar_transits": solar_transits,
+            "lunar_transits": lunar_transits,
             "total_passes": len(passes),
             "total_solar_transits": len(solar_transits),
+            "total_lunar_transits": len(lunar_transits),
             "cache_ttl": CACHE_TTL,
             "units": {
                 "times": "ISO format local timezone",
@@ -573,6 +584,199 @@ class ISSPassService:
         except Exception:
             pass
         return SOLAR_ANGULAR_RADIUS_FALLBACK_DEG
+
+    def _find_lunar_transits(
+        self,
+        start_utc: datetime,
+        end_utc: datetime,
+        satellite: EarthSatellite,
+        observer,
+        ts,
+        eph,
+    ) -> List[Dict[str, Any]]:
+        """Find ISS lunar transits for the observer using per-pass refinement."""
+        if eph is None:
+            logger.warning("Ephemeris not loaded; lunar transit detection skipped")
+            return []
+
+        event_times, event_types = satellite.find_events(
+            observer,
+            ts.from_datetime(start_utc),
+            ts.from_datetime(end_utc),
+            altitude_degrees=GEOMETRIC_PASS_MIN_ALTITUDE_DEG,
+        )
+
+        transits: List[Dict[str, Any]] = []
+        current: Dict[str, Any] = {}
+
+        for event_time, event_type in zip(event_times, event_types):
+            dt_utc = event_time.utc_datetime().replace(tzinfo=timezone.utc)
+
+            if event_type == 0:
+                current = {"start": dt_utc}
+                continue
+
+            if event_type == 1:
+                if current:
+                    current["peak"] = dt_utc
+                continue
+
+            if event_type == 2:
+                if not current or "start" not in current:
+                    current = {}
+                    continue
+
+                current["end"] = dt_utc
+                transit = self._extract_lunar_transit_segment(
+                    start_utc=current["start"],
+                    end_utc=current["end"],
+                    satellite=satellite,
+                    observer=observer,
+                    ts=ts,
+                    eph=eph,
+                )
+                if transit is not None:
+                    transits.append(transit)
+
+                current = {}
+
+        transits.sort(key=lambda event: event.get("peak_time", ""))
+        return transits
+
+    def _extract_lunar_transit_segment(
+        self,
+        start_utc: datetime,
+        end_utc: datetime,
+        satellite: EarthSatellite,
+        observer,
+        ts,
+        eph,
+    ) -> Optional[Dict[str, Any]]:
+        """Find a refined ISS lunar transit within a geometric pass where the Moon is visible."""
+        if end_utc <= start_utc:
+            return None
+
+        samples = self._sample_time_range(
+            start_utc=start_utc,
+            end_utc=end_utc,
+            step_seconds=LUNAR_TRANSIT_SAMPLE_SECONDS,
+            sampler=lambda when: self._sample_lunar_transit_observation(when, satellite, observer, ts, eph),
+        )
+
+        candidate_indices = [
+            idx for idx, sample in enumerate(samples)
+            if sample["moon_altitude_deg"] >= LUNAR_TRANSIT_MIN_MOON_ALTITUDE_DEG
+            and sample["iss_altitude_deg"] >= GEOMETRIC_PASS_MIN_ALTITUDE_DEG
+            and sample["separation_deg"] <= sample["lunar_radius_deg"]
+        ]
+        if not candidate_indices:
+            return None
+
+        segments = self._group_consecutive_indices(candidate_indices)
+        best_segment = min(
+            segments,
+            key=lambda segment: min(samples[idx]["separation_deg"] for idx in segment),
+        )
+        coarse_peak = min((samples[idx] for idx in best_segment), key=lambda sample: sample["separation_deg"])
+
+        refined_start = max(start_utc, coarse_peak["time_utc"] - timedelta(seconds=LUNAR_TRANSIT_REFINE_WINDOW_SECONDS))
+        refined_end = min(end_utc, coarse_peak["time_utc"] + timedelta(seconds=LUNAR_TRANSIT_REFINE_WINDOW_SECONDS))
+        refined_samples = self._sample_time_range(
+            start_utc=refined_start,
+            end_utc=refined_end,
+            step_seconds=LUNAR_TRANSIT_REFINE_SAMPLE_SECONDS,
+            sampler=lambda when: self._sample_lunar_transit_observation(when, satellite, observer, ts, eph),
+        )
+
+        refined_candidates = [
+            sample for sample in refined_samples
+            if sample["moon_altitude_deg"] >= LUNAR_TRANSIT_MIN_MOON_ALTITUDE_DEG
+            and sample["iss_altitude_deg"] >= GEOMETRIC_PASS_MIN_ALTITUDE_DEG
+            and sample["separation_deg"] <= sample["lunar_radius_deg"]
+        ]
+        if not refined_candidates:
+            refined_candidates = [coarse_peak]
+
+        start_sample = refined_candidates[0]
+        end_sample = refined_candidates[-1]
+        peak_sample = min(refined_candidates, key=lambda sample: sample["separation_deg"])
+        duration_seconds = max(0.0, (end_sample["time_utc"] - start_sample["time_utc"]).total_seconds())
+
+        return {
+            "start_time": start_sample["time_utc"].astimezone(self.timezone).isoformat(),
+            "peak_time": peak_sample["time_utc"].astimezone(self.timezone).isoformat(),
+            "end_time": end_sample["time_utc"].astimezone(self.timezone).isoformat(),
+            "duration_seconds": round(duration_seconds, 1),
+            "minimum_separation_arcmin": round(float(peak_sample["separation_deg"]) * 60.0, 2),
+            "lunar_radius_arcmin": round(float(peak_sample["lunar_radius_deg"]) * 60.0, 2),
+            "moon_altitude_deg": round(float(peak_sample["moon_altitude_deg"]), 1),
+            "moon_azimuth_deg": round(float(peak_sample["moon_azimuth_deg"]), 1),
+            "moon_illumination_pct": round(float(peak_sample.get("moon_illumination_pct", 0.0)), 1),
+            "iss_altitude_deg": round(float(peak_sample["iss_altitude_deg"]), 1),
+            "iss_azimuth_deg": round(float(peak_sample["iss_azimuth_deg"]), 1),
+            "pass_type": "lunar_transit",
+            "is_visible": True,
+        }
+
+    def _sample_lunar_transit_observation(self, when_utc: datetime, satellite: EarthSatellite, observer, ts, eph) -> Dict[str, Any]:
+        """Sample ISS/Moon geometry for lunar-transit detection at one instant."""
+        event_time = ts.from_datetime(when_utc)
+        topocentric = (satellite - observer).at(event_time)
+        iss_altitude, iss_azimuth, _ = topocentric.altaz()
+        iss_altitude_deg = float(iss_altitude.degrees)
+        iss_azimuth_deg = float(iss_azimuth.degrees)
+
+        earth = eph["earth"]
+        moon = eph["moon"]
+        moon_apparent = (earth + observer).at(event_time).observe(moon).apparent()
+        moon_altitude, moon_azimuth, _ = moon_apparent.altaz()
+        moon_altitude_deg = float(moon_altitude.degrees)
+        moon_azimuth_deg = float(moon_azimuth.degrees)
+        lunar_radius_deg = self._lunar_angular_radius_deg(moon_apparent)
+
+        # Estimate Moon illumination fraction using Sun-Moon-Earth geometry.
+        try:
+            sun = eph["sun"]
+            moon_astrometric = (earth + observer).at(event_time).observe(moon)
+            sun_astrometric = (earth + observer).at(event_time).observe(sun)
+            moon_ra, moon_dec, _ = moon_astrometric.apparent().radec()
+            sun_ra, sun_dec, _ = sun_astrometric.apparent().radec()
+            elongation_deg = self._angular_separation_deg(
+                float(moon_dec.degrees), float(moon_ra.hours) * 15.0,
+                float(sun_dec.degrees), float(sun_ra.hours) * 15.0,
+            )
+            moon_illumination_pct = 50.0 * (1.0 - cos(radians(elongation_deg))) * 100.0 / 100.0
+            moon_illumination_pct = max(0.0, min(100.0, moon_illumination_pct))
+        except Exception:
+            moon_illumination_pct = 0.0
+
+        separation_deg = self._angular_separation_deg(
+            iss_altitude_deg,
+            iss_azimuth_deg,
+            moon_altitude_deg,
+            moon_azimuth_deg,
+        )
+
+        return {
+            "time_utc": when_utc,
+            "iss_altitude_deg": iss_altitude_deg,
+            "iss_azimuth_deg": iss_azimuth_deg,
+            "moon_altitude_deg": moon_altitude_deg,
+            "moon_azimuth_deg": moon_azimuth_deg,
+            "lunar_radius_deg": lunar_radius_deg,
+            "moon_illumination_pct": moon_illumination_pct,
+            "separation_deg": separation_deg,
+        }
+
+    def _lunar_angular_radius_deg(self, moon_apparent) -> float:
+        """Estimate lunar apparent angular radius from observer distance."""
+        try:
+            distance_km = float(moon_apparent.distance().km)
+            if distance_km > LUNAR_RADIUS_KM:
+                return degrees(asin(LUNAR_RADIUS_KM / distance_km))
+        except Exception:
+            pass
+        return LUNAR_ANGULAR_RADIUS_FALLBACK_DEG
 
     def _angular_separation_deg(self, altitude1_deg: float, azimuth1_deg: float, altitude2_deg: float, azimuth2_deg: float) -> float:
         """Compute angular separation in local alt/az coordinates."""

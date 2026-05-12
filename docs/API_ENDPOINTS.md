@@ -89,7 +89,7 @@ This page lists the HTTP routes currently declared in `backend/app.py` and `back
 - `GET /api/moon/dark-window`
 - `GET /api/moon/next-7-nights`
 - `GET /api/aurora/predictions`
-- `GET /api/iss/passes`
+- `GET /api/iss/passes` — Returns passes, solar transits, and lunar transits; all times in configured local TZ. Response includes `passes`, `solar_transits`, `lunar_transits`, `next_visible_passage`, `next_solar_transit`, `next_lunar_transit`, `total_passes`, `total_solar_transits`, `total_lunar_transits`.
 - `GET /api/iss/location`
 - `GET /api/sun/today`
 - `GET /api/sun/next-eclipse`

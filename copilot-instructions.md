@@ -44,7 +44,7 @@ myastroboard/
 │   ├── events_aggregator.py         # Unified upcoming events data
 │   ├── horizon_graph.py             # Horizon graph generation
 │   ├── i18n_utils.py                # Translation backend helpers
-│   ├── iss_passes.py                # ISS passes integration
+│   ├── iss_passes.py                # ISS passes, solar transit, and lunar transit integration
 │   ├── logging_config.py            # Centralized logger setup
 │   ├── metrics_collector.py         # Metrics collection service
 │   ├── moon_astrotonight.py         # Best astrophotography window calculations
@@ -403,7 +403,7 @@ except Exception as e:
   - `GET /api/skytonight/log`
 - **Other key feature endpoints** (`@login_required` unless noted):
     - Seeing forecast: `GET /api/seeing-forecast`
-    - ISS tracking: `GET /api/iss/passes`, `GET /api/iss/location`
+    - ISS tracking: `GET /api/iss/passes` (returns passes, solar transits **and lunar transits**, all times in configured local TZ), `GET /api/iss/location`
     - Spaceflight: `GET /api/spaceflight/launches`, `GET /api/spaceflight/astronauts`, `GET /api/spaceflight/events`, `GET /api/spaceflight/img/<filename>`, `GET /api/spaceflight/launch/<launch_id>/vidurls`
     - Object lookup: `GET /api/object/<path:identifier>`
     - Astrodex helpers: `GET /api/astrodex/catalogue-lookup`
@@ -1170,6 +1170,7 @@ The background cache is **selective-refresh**: the scheduler polls every 25 min 
 - **Best-window single pass**: `AstroTonightService.best_windows_all_modes()` in `moon_astrotonight.py` runs one 12-hour night-scan loop, computing Astropy AltAz transforms once per step while evaluating all three modes simultaneously. `best_window_tonight(mode)` delegates to it.
 - Execution metrics for `moon_report` **and** `dark_window` are both recorded (same timing) because they are computed together — the `moon_report` job entry records both after success or failure.
 - **ISS pass event extraction early exit**: `events_aggregator._extract_iss_pass_events()` breaks out of the passes loop as soon as `days_until > 7` since passes are generated in chronological order by Skyfield's `find_events`.
+- **ISS lunar transit**: `iss_passes.ISSPassService` detects ISS transits across the **lunar** disk in addition to the solar disk. Detection requires the `de421.bsp` ephemeris (gracefully skipped if absent). The report includes `lunar_transits` (list), `next_lunar_transit`, and `total_lunar_transits`. Each entry carries `start_time`/`peak_time`/`end_time` in the configured local timezone, `minimum_separation_arcmin`, `lunar_radius_arcmin`, `moon_altitude_deg`, `moon_azimuth_deg`, `moon_illumination_pct`, `iss_altitude_deg`, `iss_azimuth_deg`. The `events_aggregator` converts these to `EventType.ISS_LUNAR_TRANSIT` events (importance: CRITICAL, score 9.0, icon `bi bi-moon-stars`, `structure_key="iss"`). All i18n keys (`events_api.iss_lunar_transit_title`, `events_api.iss_lunar_transit_description`) are provided for all 6 supported languages.
 
 ### Version Comparison
 - `version_checker.is_newer_version()` uses `packaging.version.parse()` (from the `packaging` library, declared in `requirements.txt`) for correct PEP 440 semantic version comparison. Do not revert to manual string parsing.

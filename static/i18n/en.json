@@ -1331,6 +1331,8 @@
     "iss_description": "ISS pass score {score}/100 ({visibility_day_night}). Peak altitude {peak_altitude_deg}°.",
     "iss_solar_transit_title": "ISS Solar Transit",
     "iss_solar_transit_description": "ISS crosses the solar disk from your location. Minimum separation {minimum_separation_arcmin}′, estimated transit window {duration_seconds}s near {sun_altitude_deg}° solar altitude. Certified solar filter required.",
+    "iss_lunar_transit_title": "ISS Lunar Transit",
+    "iss_lunar_transit_description": "ISS crosses the lunar disk from your location. Minimum separation {minimum_separation_arcmin}′, estimated transit window {duration_seconds}s near {moon_altitude_deg}° lunar altitude. Moon illumination {moon_illumination_pct}%.",
     "activities": {
       "deep_sky_observations": "deep-sky observations",
       "lunar_observations": "lunar observations",
