@@ -1622,8 +1622,11 @@ def spaceflight_image(filename):
     import re
     if not re.match(r'^[a-f0-9]{32}\.(jpg|jpeg|png|webp|gif)$', filename):
         return jsonify({"error": "Invalid filename"}), 400
-    img_dir = os.path.join(DATA_DIR_CACHE, 'spaceflight_images')
-    local_path = os.path.join(img_dir, filename)
+    img_dir = os.path.realpath(os.path.join(DATA_DIR_CACHE, 'spaceflight_images'))
+    local_path = os.path.realpath(os.path.join(img_dir, filename))
+    # Prevent path traversal: resolved path must be inside img_dir
+    if not local_path.startswith(img_dir + os.sep):
+        return jsonify({"error": "Invalid filename"}), 400
     if not os.path.exists(local_path):
         sidecar = local_path + '.url'
         if os.path.exists(sidecar):
