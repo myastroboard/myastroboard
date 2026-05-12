@@ -86,7 +86,7 @@ function applyUserStartupPreferences(force = false) {
     const hash = window.location.hash.replace(/^#/, '').toLowerCase();
     if (hash) {
         const firstSegment = hash.split('/')[0];
-        const navigableMains = ['forecast-astro', 'forecast-weather', 'skytonight', 'spaceflight', 'astrodex', 'equipment', 'my-settings', 'parameters', 'weather', 'planmynight', 'plan-my-night'];
+        const navigableMains = ['forecast-astro', 'forecast-weather', 'skytonight', 'spaceflight', 'astrodex', 'about', 'equipment', 'my-settings', 'parameters', 'weather', 'planmynight', 'plan-my-night'];
         if (navigableMains.includes(firstSegment) || navigableMains.some(m => hash.startsWith(m + '/'))) {
             window.__myastroboardStartupApplied = true;
             return;

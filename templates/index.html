@@ -1934,6 +1934,99 @@
 
         </div>
 
+        <!-- About Section -->
+        <div id="about-tab" class="main-tab-content">
+            <div class="shadow p-2 mb-3 rounded bg-sub-container">
+                <h2>
+                    <i class="bi bi-info-circle text-info icon-inline" aria-hidden="true"></i>
+                    <span data-i18n="about.title">About MyAstroBoard</span>
+                </h2>
+                <div class="alert alert-info" role="alert" data-i18n="about.summary_text">
+                    MyAstroBoard is a self-hosted astronomy dashboard for observation and astrophotography planning.
+                </div>
+            </div>
+
+            <div class="shadow p-2 mb-3 rounded bg-sub-container">
+                <h2>
+                    <i class="bi bi-globe2 text-primary icon-inline" aria-hidden="true"></i>
+                    <span data-i18n="about.summary_title">Project at a glance</span>
+                </h2>
+
+                <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3">
+                    <div class="col">
+                        <div class="card h-100">
+                            <div class="card-header">
+                                <i class="bi bi-globe2 text-primary icon-inline" aria-hidden="true"></i>
+                                <span data-i18n="about.summary_title">Project at a glance</span>
+                            </div>
+                            <div class="card-body">
+                                <p class="mb-2 text-muted" data-i18n="about.vitrine_note">Public showcase and presentation page.</p>
+                                <p class="mb-2">
+                                    <strong data-i18n="about.source_label">Source repository</strong>:<br>
+                                    <a href="https://github.com/WorldOfGZ/myastroboard" target="_blank" rel="noopener noreferrer">github.com/WorldOfGZ/myastroboard</a>
+                                </p>
+                                <p class="mb-0">
+                                    <strong data-i18n="about.issues_label">Report an issue</strong>:<br>
+                                    <a href="https://github.com/WorldOfGZ/myastroboard/issues" target="_blank" rel="noopener noreferrer">GitHub Issues</a>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col">
+                        <div class="card h-100">
+                            <div class="card-header">
+                                <i class="bi bi-person-badge text-success icon-inline" aria-hidden="true"></i>
+                                <span data-i18n="about.maintainer_title">Maintainer</span>
+                            </div>
+                            <div class="card-body">
+                                <p class="mb-1"><strong data-i18n="about.maintainer_name">WorldOfGZ</strong></p>
+                                <p class="mb-0 text-muted" data-i18n="about.maintainer_contact">GitHub: @WorldOfGZ</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col">
+                        <div class="card h-100">
+                            <div class="card-header">
+                                <i class="bi bi-heart-fill text-danger icon-inline" aria-hidden="true"></i>
+                                <span data-i18n="about.sponsor_title">Support the project</span>
+                            </div>
+                            <div class="card-body">
+                                <p data-i18n="about.sponsor_text">If MyAstroBoard helps you, you can support its maintenance and development.</p>
+                                <div class="d-flex flex-wrap gap-2 mb-2">
+                                    <a class="btn btn-outline-primary btn-sm" href="https://github.com/sponsors/WorldOfGZ" target="_blank" rel="noopener noreferrer">
+                                        <i class="bi bi-github icon-inline" aria-hidden="true"></i>
+                                        <span data-i18n="about.sponsor_github">GitHub Sponsors</span>
+                                    </a>
+                                    <a class="btn btn-outline-success btn-sm" href="https://ko-fi.com/gloup" target="_blank" rel="noopener noreferrer">
+                                        <i class="bi bi-cup-hot icon-inline" aria-hidden="true"></i>
+                                        <span data-i18n="about.sponsor_kofi">Ko-fi</span>
+                                    </a>
+                                </div>
+                                <p class="mb-0 text-muted">
+                                    <span data-i18n="about.funding_label">Funding file</span>: 
+                                    <a href="https://github.com/WorldOfGZ/myastroboard/blob/main/.github/FUNDING.yml" target="_blank" rel="noopener noreferrer">.github/FUNDING.yml</a><br>
+                                    <span data-i18n="about.funding_hint">See all active support links in FUNDING.yml.</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="shadow p-2 mb-3 rounded bg-sub-container">
+                <h2>
+                    <i class="bi bi-shield-check text-warning icon-inline" aria-hidden="true"></i>
+                    <span data-i18n="about.license_title">License</span>
+                </h2>
+                <div class="alert alert-info mb-2" role="alert" data-i18n="about.license_text">
+                    MyAstroBoard is licensed under AGPL-3.0. Source code remains available for deployed versions.
+                </div>
+                <a class="btn btn-outline-secondary btn-sm" href="https://github.com/WorldOfGZ/myastroboard/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">AGPL-3.0</a>
+            </div>
+        </div>
+
 
     <!-- End of mainContainer -->    
     </main>
@@ -1948,6 +2041,10 @@
                     &nbsp;|&nbsp;
                     <span id="version" class="text-light"></span>
                 </span>
+                <a href="https://myastroboard.org/" target="_blank" rel="noopener noreferrer" class="footer-link footer-link-subtle link-light ms-2" title="myastroboard.org" aria-label="myastroboard.org">
+                    <i class="bi bi-globe2" aria-hidden="true"></i>
+                    <span class="visually-hidden">myastroboard.org</span>
+                </a>
             </div>
             <div class="footer-section footer-update">
                 <span id="update-notification" class="text-light" style="display: none;">
@@ -1956,33 +2053,41 @@
                 </span>
             </div>
             <div class="footer-section footer-actions">
-                <div class="footer-language">
-                    <label class="language-label" for="language-select-footer" data-i18n="common.language">Language</label>
-                    <select id="language-select-footer" class="form-select form-select-sm language-select" aria-label="Language">
-                        <option value="de">Deutsch</option>
-                        <option value="en">English</option>
-                        <option value="es">Espanol</option>
-                        <option value="fr">Francais</option>
-                        <option value="it">Italiano</option>
-                        <option value="pt">Português</option>
-                    </select>
+                <div class="footer-controls">
+                    <div class="footer-language">
+                        <label class="language-label" for="language-select-footer" data-i18n="common.language">Language</label>
+                        <select id="language-select-footer" class="form-select form-select-sm language-select" aria-label="Language">
+                            <option value="de">Deutsch</option>
+                            <option value="en">English</option>
+                            <option value="es">Espanol</option>
+                            <option value="fr">Francais</option>
+                            <option value="it">Italiano</option>
+                            <option value="pt">Português</option>
+                        </select>
+                    </div>
+                    <div class="footer-theme">
+                        <label class="theme-label" for="theme-select-footer" data-i18n="common.theme">Theme</label>
+                        <select id="theme-select-footer" class="form-select form-select-sm theme-select theme-select-footer" data-theme-picker aria-label="Theme">
+                            <option value="auto">Auto</option>
+                            <option value="light">Light</option>
+                            <option value="dark">Dark</option>
+                            <option value="red">Red Light</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="footer-theme">
-                    <label class="theme-label" for="theme-select-footer" data-i18n="common.theme">Theme</label>
-                    <select id="theme-select-footer" class="form-select form-select-sm theme-select theme-select-footer" data-theme-picker aria-label="Theme">
-                        <option value="auto">Auto</option>
-                        <option value="light">Light</option>
-                        <option value="dark">Dark</option>
-                        <option value="red">Red Light</option>
-                    </select>
+                <div class="footer-links">
+                    <button type="button" class="btn btn-outline-light btn-sm pwa-install-btn" data-pwa-install hidden>
+                        <span data-i18n="pwa.install_app"></span>
+                    </button>
+                    <a href="https://github.com/WorldOfGZ/myastroboard" target="_blank" rel="noopener noreferrer" class="footer-link link-light link-offset-2 link-underline-opacity-25 link-underline-opacity-100-hover">
+                        <i class="bi bi-github icon-inline"></i>
+                        GitHub
+                    </a>
+                    <a href="#about" class="footer-link link-light link-offset-2 link-underline-opacity-25 link-underline-opacity-100-hover main-tab-btn" data-tab="about">
+                        <i class="bi bi-info-circle icon-inline" aria-hidden="true"></i>
+                        <span data-i18n="navbar.about">About</span>
+                    </a>
                 </div>
-                <button type="button" class="btn btn-outline-light btn-sm pwa-install-btn" data-pwa-install hidden>
-                    <span data-i18n="pwa.install_app"></span>
-                </button>
-                <a href="https://github.com/WorldOfGZ/myastroboard" target="_blank" rel="noopener noreferrer" class="footer-github link-light link-offset-2 link-underline-opacity-25 link-underline-opacity-100-hover">
-                    <i class="bi bi-github icon-inline"></i>
-                    GitHub
-                </a>
             </div>
         </div>
     </footer>

@@ -67,7 +67,7 @@ class I18nManager {
         const browserLang = navigator.language || navigator.userLanguage;
         const shortLang = browserLang.split('-')[0]; // e.g., 'en' from 'en-US'
 
-        const supportedLanguages = ['en', 'fr', 'es', 'de'];
+        const supportedLanguages = ['en', 'fr', 'es', 'de', 'it', 'pt'];
         return supportedLanguages.includes(shortLang) ? shortLang : 'en';
     }
 
@@ -231,7 +231,7 @@ class I18nManager {
      * @returns {array} Array of language codes
      */
     getSupportedLanguages() {
-        return ['en', 'fr', 'es', 'de'];
+        return ['en', 'fr', 'es', 'de', 'it', 'pt'];
     }
 
     /**
