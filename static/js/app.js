@@ -250,6 +250,10 @@ function switchMainTab(tabName, options = {}) {
     const { syncHistory = true } = options;
     //console.log(`Switching to main tab: ${tabName}`);
 
+    if (tabName === 'about') {
+        window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+
     cleanupTransientCharts();
 
     // Forach .main-tab-dropdown remove "active" class
