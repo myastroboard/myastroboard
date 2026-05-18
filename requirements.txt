@@ -20,7 +20,7 @@ matplotlib==3.10.9
 pandas==3.0.2
 
 # HTTP and API
-requests==2.33.1
+requests==2.34.2
 openmeteo-requests==1.7.5
 requests-cache==1.3.2
 retry-requests==2.0.0
