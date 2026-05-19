@@ -40,6 +40,8 @@
     "retrying_in": "Nova tentativa em {seconds}s ({attempt}/{maxAttempts})",
     "sun": "Sol",
     "moon": "Lua",
+    "day": "Dia",
+    "night": "Noite",
     "modal_not_initialized": "Modal de configuração não inicializado corretamente",
     "comming_soon": "Esta funcionalidade está em desenvolvimento e estará disponível!",
     "update_available": "Uma nova versão está disponível!",
