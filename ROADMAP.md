@@ -32,7 +32,5 @@ This document describes features that could potentially be integrated into MyAst
 - PWA notifications for improving conditions (weather, ... ?)
 
 ### Ideas in raw
-2	Equipment FOV matching      Medium      Very high — practical astrophotography fit
-3	Bortle/SQM in AstroScore    Low	        High — corrects score_object for light pollution
-4	Solar elongation filter     Low	        Medium — correctness for planets
-5	Seeing forecast (7Timer)    Medium      Medium — planetary imaging only
+1	Bortle/SQM in AstroScore    Low	        High — corrects score_object for light pollution
+2	Solar elongation filter     Low	        Medium — correctness for planets
