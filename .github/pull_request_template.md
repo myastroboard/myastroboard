@@ -7,7 +7,7 @@ Please fill out this template to help us review your pull request efficiently.
 
 <!-- Provide a clear and concise description of your changes -->
 
-### Type of Change
+## Type of Change
 
 <!-- Check all that apply by placing an 'x' in the brackets: [x] -->
 
@@ -27,70 +27,10 @@ Please fill out this template to help us review your pull request efficiently.
 
 Fixes #
 
-## Changes Made
-
-<!-- Provide a detailed list of changes made in this PR -->
-
-### Backend Changes
-<!-- List backend/Python changes, or remove this section if not applicable -->
-
-- 
-
-### Frontend Changes
-<!-- List frontend/JavaScript/CSS changes, or remove this section if not applicable -->
-
-- 
-
-### Documentation Changes
-<!-- List documentation changes, or remove this section if not applicable -->
-
-- 
-
-### Other Changes
-<!-- List any other changes, or remove this section if not applicable -->
-
-- 
-
-## Motivation and Context
-
-<!-- Why is this change required? What problem does it solve? -->
-
 ## Screenshots (if applicable)
 
 <!-- Add screenshots for UI changes. You can drag and drop images here. -->
-
-### Before
-<!-- Screenshot showing the state before your changes -->
-
-### After
-<!-- Screenshot showing the state after your changes -->
-
-## Testing
-
-### How Has This Been Tested?
-
-<!-- Describe the tests you ran to verify your changes -->
-
-- [ ] Manual testing
-- [ ] Unit tests
-- [ ] Integration tests
-- [ ] Tested in Docker container
-- [ ] Tested with multiple browsers (if frontend changes)
-
-### Test Configuration
-
-- **Python version**: 
-- **Docker version**: 
-- **OS**: 
-- **Browser(s)**: <!-- If applicable -->
-
-### Test Cases
-
-<!-- Describe specific test cases you executed -->
-
-1. 
-2. 
-3. 
+<!-- Before / After for UI changes -->
 
 ## Checklist
 
@@ -99,19 +39,10 @@ Fixes #
 ### Code Quality
 
 - [ ] My code follows the [project style guidelines](../CONTRIBUTING.md#style-guidelines)
-- [ ] All code, comments, and documentation are **in English**
+- [ ] All code, comments, and documentation are **in English**, and updated according my changes- [ ] 
+- [ ] I have added/updated code comments where necessary, particularly in hard-to-understand areas
 - [ ] I have performed a self-review of my code
-- [ ] I have commented my code, particularly in hard-to-understand areas
 - [ ] I have used the centralized logging system (no `print()` statements in backend)
-- [ ] I have used type hints for Python functions where appropriate
-- [ ] My code is formatted according to PEP 8 (Python) or project conventions (JavaScript/CSS)
-
-### Documentation
-
-- [ ] I have updated the documentation to reflect my changes
-- [ ] I have updated relevant docstrings
-- [ ] I have added/updated code comments where necessary
-- [ ] I have updated README.md if feature is user-facing
 
 ### Testing
 
@@ -122,10 +53,7 @@ Fixes #
 
 ### Dependencies
 
-- [ ] I have updated `requirements.txt` if I added new Python dependencies
-- [ ] I have updated `requirements-dev.txt` if I added new dev dependencies
-- [ ] I have verified all dependencies are compatible with Python 3.11+
-- [ ] I have considered security implications of new dependencies
+- [ ] I have updated `requirements(-dev|-build).txt` if I added new Python dependencies
 
 ### Git Hygiene
 
@@ -154,27 +82,9 @@ If this is a breaking change, describe:
 
 <!-- If yes, describe the breaking changes and migration path -->
 
-## Additional Notes
+### Additional Notes, if yes
 
 <!-- Any additional information, context, or notes for reviewers -->
-
-## Deployment Notes
-
-<!-- Any special deployment considerations, environment variables, or configuration changes needed -->
-
-## For Maintainers
-
-<!-- Maintainers can fill this section during review -->
-
-### Review Notes
-
-- [ ] Code review completed
-- [ ] Tests verified
-- [ ] Documentation verified
-- [ ] Security implications assessed
-- [ ] Performance impact considered
-- [ ] Breaking changes communicated
-- [ ] VERSION file updated (if applicable)
 
 ---
 
