@@ -1231,6 +1231,5 @@ AGPL-3.0 License — See LICENSE file for details
 
 ---
 
-**Last Updated**: 2026-04-03
-**Version**: SkyTonight implementation
+**Last Updated**: 2026-05-19
 **Maintainer**: WorldOfGZ
