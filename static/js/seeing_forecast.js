@@ -100,9 +100,33 @@ function formatTimeThenDateInTimezone(isoString, timezone, locale = navigator.la
     }
 }
 
+function getHourInTimezone(isoString, timezone) {
+    if (!isoString) return null;
+    try {
+        const date = new Date(isoString);
+        const parts = new Intl.DateTimeFormat('en-GB', {
+            hour: '2-digit',
+            hour12: false,
+            timeZone: timezone || 'UTC'
+        }).formatToParts(date);
+        const hourPart = parts.find(p => p.type === 'hour');
+        const hour = Number(hourPart?.value);
+        return Number.isFinite(hour) ? hour : null;
+    } catch {
+        return null;
+    }
+}
+
+function isLikelyNight(isoString, timezone) {
+    const hour = getHourInTimezone(isoString, timezone);
+    if (hour === null) return false;
+    // Visual heuristic for night period in local time.
+    return hour >= 19 || hour < 6;
+}
+
 function renderSeeingForecastRows(forecast, timezone) {
     const table = document.createElement('table');
-    table.className = 'table table-striped table-hover mb-0';
+    table.className = 'table table-striped table-hover mb-0 seeing-forecast-table';
 
     const thead = document.createElement('thead');
     const trh = document.createElement('tr');
@@ -117,13 +141,32 @@ function renderSeeingForecastRows(forecast, timezone) {
     const now = Date.now();
     (forecast || []).filter(point => new Date(point.time).getTime() >= now).forEach((point) => {
         const tr = document.createElement('tr');
+        const night = isLikelyNight(point.time, timezone);
+        tr.classList.add(night ? 'seeing-row-night' : 'seeing-row-day');
 
         const tdTime = document.createElement('td');
-        tdTime.textContent = formatTimeThenDateInTimezone(point.time, timezone);
+        const timeCellWrap = document.createElement('div');
+        timeCellWrap.className = 'seeing-time-cell';
+
+        const period = document.createElement('span');
+        const periodLabel = night
+            ? i18n.t('common.night', 'Night')
+            : i18n.t('common.day', 'Day');
+        period.className = `seeing-daynight-indicator ${night ? 'is-night' : 'is-day'}`;
+        period.setAttribute('title', periodLabel);
+        period.setAttribute('aria-label', periodLabel);
+        period.innerHTML = `<i class="bi ${night ? 'bi-moon-stars-fill' : 'bi-sun-fill'}" aria-hidden="true"></i>`;
+        timeCellWrap.appendChild(period);
+
+        const tlabel = document.createElement('span');
+        tlabel.className = 'seeing-time-label';
+        tlabel.textContent = formatTimeThenDateInTimezone(point.time, timezone);
+        timeCellWrap.appendChild(tlabel);
+        tdTime.appendChild(timeCellWrap);
 
         const tdSeeing = document.createElement('td');
         const badgeClass = getSeeingBadgeClass(point.seeing);
-        tdSeeing.innerHTML = `<span class="fw-bold ${badgeClass}">${point.seeing}</span>`;
+        tdSeeing.innerHTML = `<span class="seeing-score-pill fw-bold ${badgeClass}">${point.seeing}</span>`;
 
         const tdDesc = document.createElement('td');
         const qualityText = document.createElement('div');

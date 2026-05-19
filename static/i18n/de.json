@@ -40,6 +40,8 @@
     "retrying_in": "Wiederholung in {seconds}s ({attempt}/{maxAttempts})",
     "sun": "Sonne",
     "moon": "Mond",
+    "day": "Tag",
+    "night": "Nacht",
     "modal_not_initialized": "Konfigurationsmodalität nicht ordnungsgemäß initialisiert",
     "comming_soon": "Diese Funktion befindet sich in Entwicklung und wird bald verfügbar sein.",
     "update_available": "Eine neue Version ist verfügbar!",
