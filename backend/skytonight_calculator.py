@@ -1,7 +1,7 @@
 """SkyTonight observability calculator.
 
 Computes, for each target in the dataset, the visibility metrics and
-AstroScore for the upcoming astronomical night and writes the results
+AstroScore for the upcoming nautical night and writes the results
 to a JSON cache file.  The scheduler calls :func:`run_calculations`
 once per cycle; the API reads from the cache file rather than
 recomputing on every request.
@@ -229,21 +229,21 @@ def _get_night_window(
     lon: float,
     timezone_name: str,
 ) -> Optional[Tuple[datetime, datetime]]:
-    """Return (dusk, dawn) for tonight's astronomical night; None if no night."""
+    """Return (dusk, dawn) for tonight's nautical night; None if no night."""
     tz = ZoneInfo(timezone_name)
     sun_service = SunService(latitude=lat, longitude=lon, timezone=timezone_name)
     report = sun_service.get_today_report()
 
-    dusk = _parse_localtime(report.astronomical_dusk, tz)
-    dawn = _parse_localtime(report.astronomical_dawn, tz)
+    dusk = _parse_localtime(report.nautical_dusk, tz)
+    dawn = _parse_localtime(report.nautical_dawn, tz)
 
     if dusk is None or dawn is None:
         return None
     if dawn <= dusk:
         # Dusk already past — try tomorrow
         report_tomorrow = sun_service.get_tomorrow_report()
-        dusk = _parse_localtime(report_tomorrow.astronomical_dusk, tz)
-        dawn = _parse_localtime(report_tomorrow.astronomical_dawn, tz)
+        dusk = _parse_localtime(report_tomorrow.nautical_dusk, tz)
+        dawn = _parse_localtime(report_tomorrow.nautical_dawn, tz)
 
     if dusk is None or dawn is None or dawn <= dusk:
         return None
@@ -776,7 +776,7 @@ def _compute_body_result(
     # The Moon is always included regardless of observability: its phase and
     # rise/set window affect every other target, so users need it even when
     # it is below the horizon all night (e.g. a new-moon night where the Moon
-    # sets before astronomical dusk).
+    # sets before nautical dusk).
     is_moon = (target.object_type or '').lower() == 'moon'
 
     # Bodies use their own minimum observable-fraction threshold that is
@@ -1004,10 +1004,10 @@ def run_calculations(
         }
     })
 
-    # --- Determine astronomical night window ---
+    # --- Determine nautical night window ---
     night_window = _get_night_window(lat, lon, timezone_name)
     if night_window is None:
-        logger.warning('No astronomical night found for tonight; SkyTonight calculations skipped.')
+        logger.warning('No nautical night found for tonight; SkyTonight calculations skipped.')
         _empty_meta = {
             'calculated_at': datetime.now(timezone.utc).isoformat(),
             'location_name': location_name,
@@ -1015,6 +1015,7 @@ def run_calculations(
             'longitude': lon,
             'elevation': elevation,
             'timezone': timezone_name,
+            'night_basis': 'nautical',
             'night_start': None,
             'night_end': None,
             'night_hours': 0.0,
@@ -1358,6 +1359,7 @@ def run_calculations(
         'longitude': lon,
         'elevation': elevation,
         'timezone': timezone_name,
+        'night_basis': 'nautical',
         'night_start': night_start.isoformat(),
         'night_end': night_end.isoformat(),
         'night_hours': round(night_hours, 2),

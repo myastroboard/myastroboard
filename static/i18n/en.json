@@ -896,7 +896,7 @@
     "type_variable_nebula": "Variable Nebula",
     "altitude_time_title": "Altitude vs Time",
     "altitude_time_load_error": "Failed to load altitude-time data",
-    "altitude_time_night_window": "Astronomical night",
+    "altitude_time_night_window": "Nautical night",
     "altitude_time_observable_zone": "Observable zone",
     "altitude_time_altitude_label": "Altitude (°)",
     "altitude_time_x_axis": "Time",

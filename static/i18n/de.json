@@ -884,7 +884,7 @@
     "type_variable_nebula": "Variabler Nebel",
     "altitude_time_title": "Höhe vs Zeit",
     "altitude_time_load_error": "Höhe/Zeit-Daten konnten nicht geladen werden",
-    "altitude_time_night_window": "Astronomische Nacht",
+    "altitude_time_night_window": "Nautische Nacht",
     "altitude_time_observable_zone": "Beobachtbarer Bereich",
     "altitude_time_altitude_label": "Höhe (°)",
     "altitude_time_x_axis": "Zeit",

@@ -86,22 +86,22 @@ def resolve_schedule(config: Dict[str, Any], now: Optional[datetime] = None) -> 
     if latitude is not None and longitude is not None:
         sun_service = SunService(latitude=latitude, longitude=longitude, timezone=timezone_name)
         for report in (sun_service.get_today_report(), sun_service.get_tomorrow_report()):
-            # Post-astronomical-night run: 1 hour after astronomical dawn
-            dawn_time = _parse_local_datetime(report.astronomical_dawn, timezone_name)
+            # Post-nautical-night run: 1 hour after nautical dawn
+            dawn_time = _parse_local_datetime(report.nautical_dawn, timezone_name)
             if dawn_time is not None:
                 candidate = dawn_time + SKYTONIGHT_POST_NIGHT_OFFSET
                 if candidate > current_time:
                     candidates.append(
-                        ('post-astronomical-night', candidate, 'One hour after astronomical night ends.'),
+                        ('post-nautical-night', candidate, 'One hour after nautical night ends.'),
                     )
-            # Pre-astronomical-night run: 1 hour before astronomical dusk
-            dusk_time = _parse_local_datetime(report.astronomical_dusk, timezone_name)
+            # Pre-nautical-night run: 1 hour before nautical dusk
+            dusk_time = _parse_local_datetime(report.nautical_dusk, timezone_name)
             if dusk_time is None:
                 continue
             candidate = dusk_time - SKYTONIGHT_PRE_NIGHT_OFFSET
             if candidate > current_time:
                 candidates.append(
-                    ('pre-astronomical-night', candidate, 'One hour before astronomical night.'),
+                    ('pre-nautical-night', candidate, 'One hour before nautical night.'),
                 )
 
     if not candidates:
@@ -109,7 +109,7 @@ def resolve_schedule(config: Dict[str, Any], now: Optional[datetime] = None) -> 
         candidates.append((
             'fallback-6h',
             current_time + timedelta(seconds=SKYTONIGHT_FALLBACK_INTERVAL_SECONDS),
-            'No astronomical times available; using 6-hour fallback cadence.',
+            'No twilight times available; using 6-hour fallback cadence.',
         ))
 
     selected_mode, selected_time, reason = min(candidates, key=lambda item: item[1])
@@ -242,7 +242,7 @@ class SkyTonightScheduler:
         # _write_status always has access to the real committed value.
 
         # Missed-run recovery: if the app was restarted while a
-        # post-astronomical-night run was pending (status file holds the
+        # post-nautical-night run was pending (status file holds the
         # *evening* next_run that was written after midnight when
         # resolve_schedule stopped seeing the morning dawn), detect the skipped
         # morning slot via last_result.calculation.night_end and restore it.

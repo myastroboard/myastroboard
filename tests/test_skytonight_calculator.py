@@ -504,8 +504,8 @@ class TestProgressAndNightWindow:
     def test_get_night_window_today(self, mock_sun_service):
         fake = MagicMock()
         fake.get_today_report.return_value = SimpleNamespace(
-            astronomical_dusk="2026-04-17 21:00",
-            astronomical_dawn="2026-04-18 05:00",
+            nautical_dusk="2026-04-17 21:00",
+            nautical_dawn="2026-04-18 05:00",
         )
         mock_sun_service.return_value = fake
 
@@ -517,12 +517,12 @@ class TestProgressAndNightWindow:
     def test_get_night_window_tomorrow_fallback(self, mock_sun_service):
         fake = MagicMock()
         fake.get_today_report.return_value = SimpleNamespace(
-            astronomical_dusk="2026-04-18 21:00",
-            astronomical_dawn="2026-04-18 05:00",
+            nautical_dusk="2026-04-18 21:00",
+            nautical_dawn="2026-04-18 05:00",
         )
         fake.get_tomorrow_report.return_value = SimpleNamespace(
-            astronomical_dusk="2026-04-18 21:00",
-            astronomical_dawn="2026-04-19 05:00",
+            nautical_dusk="2026-04-18 21:00",
+            nautical_dawn="2026-04-19 05:00",
         )
         mock_sun_service.return_value = fake
 

@@ -897,7 +897,7 @@
     "type_variable_nebula": "Nébuleuse variable",
     "altitude_time_title": "Altitude vs Temps",
     "altitude_time_load_error": "Impossible de charger les données altitude/temps",
-    "altitude_time_night_window": "Nuit astronomique",
+    "altitude_time_night_window": "Nuit nautique",
     "altitude_time_observable_zone": "Zone observable",
     "altitude_time_altitude_label": "Altitude (°)",
     "altitude_time_x_axis": "Heure",
