@@ -113,3 +113,27 @@
 .astrodex-catalogue-alias-value {
     overflow-wrap: anywhere;
 }
+
+.astrodex-slideshow-counter-badge {
+    background-color: var(--accent-1);
+    color: var(--text-light);
+}
+
+.astrodex-slideshow-tile {
+    background-color: var(--surface-2);
+    border: 1px solid var(--surface-border);
+    color: var(--text-color);
+}
+
+.astrodex-slideshow-arrow {
+    background-color: var(--surface-panel);
+    border: 1px solid var(--surface-border);
+    color: var(--text-color);
+}
+
+.astrodex-slideshow-arrow:hover,
+.astrodex-slideshow-arrow:focus-visible {
+    background-color: var(--surface-1);
+    border-color: var(--surface-border-strong);
+    color: var(--text-color);
+}

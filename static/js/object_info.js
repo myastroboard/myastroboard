@@ -73,7 +73,7 @@ function buildObjectInfoCardHtml(data, opts = {}) {
     // ── Section heading ───────────────────────────────────
     html += `<div class="row mb-3">
         <div class="col">
-            <h5 class="text-dark mb-0">
+            <h5 class="mb-0">
                 <i class="bi bi-telescope icon-inline" aria-hidden="true"></i>
                 ${escapeHtml(t('object_info.title', 'Object Information'))}
             </h5>
@@ -103,11 +103,11 @@ function buildObjectInfoCardHtml(data, opts = {}) {
 
     if (data.type) {
         html += `<div class="${colClass}">
-            <div class="d-flex align-items-center p-2 rounded shadow-sm bg-light h-100">
+            <div class="d-flex align-items-center p-2 rounded shadow-sm object-info-tile h-100">
                 <div class="me-3 fs-4"><i class="bi bi-tag text-primary" aria-hidden="true"></i></div>
                 <div>
                     <small class="text-muted d-block">${escapeHtml(t('object_info.type_label', 'Type'))}</small>
-                    <strong class="text-dark">${escapeHtml(data.type)}</strong>
+                    <strong>${escapeHtml(data.type)}</strong>
                 </div>
             </div>
         </div>`;
@@ -117,11 +117,11 @@ function buildObjectInfoCardHtml(data, opts = {}) {
         const ra  = data.coordinates.ra  != null ? Number(data.coordinates.ra).toFixed(4)  : '-';
         const dec = data.coordinates.dec != null ? Number(data.coordinates.dec).toFixed(4) : '-';
         html += `<div class="${colClass}">
-            <div class="d-flex align-items-center p-2 rounded shadow-sm bg-light h-100">
+            <div class="d-flex align-items-center p-2 rounded shadow-sm object-info-tile h-100">
                 <div class="me-3 fs-4"><i class="bi bi-geo-alt text-success" aria-hidden="true"></i></div>
                 <div>
                     <small class="text-muted d-block">${escapeHtml(t('object_info.coordinates_label', 'Coordinates'))}</small>
-                    <strong class="text-dark">RA ${escapeHtml(ra)}° &nbsp; Dec ${escapeHtml(dec)}°</strong>
+                    <strong>RA ${escapeHtml(ra)}° &nbsp; Dec ${escapeHtml(dec)}°</strong>
                 </div>
             </div>
         </div>`;
@@ -130,7 +130,7 @@ function buildObjectInfoCardHtml(data, opts = {}) {
     if (data.aliases && data.aliases.length > 0) {
         const shown = compact ? data.aliases.slice(0, 4) : data.aliases;
         html += `<div class="${colClass}">
-            <div class="d-flex align-items-start p-2 rounded shadow-sm bg-light h-100">
+            <div class="d-flex align-items-start p-2 rounded shadow-sm object-info-tile h-100">
                 <div class="me-3 fs-4"><i class="bi bi-bookmarks text-warning" aria-hidden="true"></i></div>
                 <div>
                     <small class="text-muted d-block">${escapeHtml(t('object_info.aliases_label', 'Also known as'))}</small>
@@ -150,7 +150,7 @@ function buildObjectInfoCardHtml(data, opts = {}) {
             : data.description;
         html += `<div class="row mt-3">
             <div class="col">
-                <div class="d-flex align-items-start p-2 rounded shadow-sm bg-light">
+                <div class="d-flex align-items-start p-2 rounded shadow-sm object-info-tile">
                     <div class="me-3 fs-4"><i class="bi bi-journal-text" aria-hidden="true"></i></div>
                     <div>
                         <small class="text-muted d-block">${escapeHtml(t('object_info.description_label', 'Description'))}</small>

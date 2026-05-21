@@ -103,6 +103,48 @@ button.in-astrodex-badge:focus-visible {
     padding: 0.2rem 0.55rem;
 }
 
+/* Theme-safe surface for object-info modal cards used by SkyTonight/Astrodex. */
+.object-info-tile {
+    background-color: var(--surface-2);
+    border: 1px solid var(--surface-border);
+    color: var(--text-color);
+}
+
+/* Dedicated AstroScore colors keep tiers distinct in every theme (especially red). */
+.astroscore-badge {
+    font-weight: 600;
+}
+
+.astroscore-badge-exceptional {
+    background-color: #198754;
+    color: #ffffff;
+}
+
+.astroscore-badge-good {
+    background-color: #0d6efd;
+    color: #ffffff;
+}
+
+.astroscore-badge-average {
+    background-color: #ffc107;
+    color: #111827;
+}
+
+.astroscore-badge-poor {
+    background-color: #dc3545;
+    color: #ffffff;
+}
+
+html[data-theme="red"] .astroscore-badge-good {
+    background-color: #2563eb;
+    color: #eff6ff;
+}
+
+html[data-theme="red"] .astroscore-badge-poor {
+    background-color: #b91c1c;
+    color: #fee2e2;
+}
+
 /* ── Sky Map constellation filter pills ─────────────────────────────────── */
 .sky-map-constellation-filter {
     max-height: 90px;

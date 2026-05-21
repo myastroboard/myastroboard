@@ -1492,7 +1492,7 @@ function showPictureSlideshow(itemId) {
         <div class="slideshow-info mt-4">
             <div class="row mb-3">
                 <div class="col text-center">
-                    <span class="badge bg-primary fs-6">${i18n.t('astrodex.photo_x_on_y', { current: currentIndex + 1, total: slideshowPictures.length })}</span>
+                    <span class="badge fs-6 astrodex-slideshow-counter-badge">${i18n.t('astrodex.photo_x_on_y', { current: currentIndex + 1, total: slideshowPictures.length })}</span>
                 </div>
             </div>
             ${showOwner ? `
@@ -1505,66 +1505,66 @@ function showPictureSlideshow(itemId) {
             <div class="row g-3">
                 ${picture.date ? `
                     <div class="col-md-6 col-lg-4">
-                        <div class="d-flex align-items-center p-2 rounded shadow-sm bg-light">
+                        <div class="d-flex align-items-center p-2 rounded shadow-sm astrodex-slideshow-tile">
                             <div class="me-3 fs-4"><i class="bi bi-calendar-event text-danger" aria-hidden="true"></i></div>
                             <div>
                                 <small class="text-muted d-block">${i18n.t('astrodex.observation_date')}</small>
-                                <strong class="text-dark">${escapeHtml(formatStringToDate(picture.date))}</strong>
+                                <strong>${escapeHtml(formatStringToDate(picture.date))}</strong>
                             </div>
                         </div>
                     </div>
                 ` : ''}
                 ${picture.exposition_time ? `
                     <div class="col-md-6 col-lg-4">
-                        <div class="d-flex align-items-center p-2 rounded shadow-sm bg-light">
+                        <div class="d-flex align-items-center p-2 rounded shadow-sm astrodex-slideshow-tile">
                             <div class="me-3 fs-4"><i class="bi bi-stopwatch" aria-hidden="true"></i></div>
                             <div>
                                 <small class="text-muted d-block">${i18n.t('astrodex.exposition_time')}</small>
-                                <strong class="text-dark">${escapeHtml(picture.exposition_time)}</strong>
+                                <strong>${escapeHtml(picture.exposition_time)}</strong>
                             </div>
                         </div>
                     </div>
                 ` : ''}
                 ${picture.device ? `
                     <div class="col-md-6 col-lg-4">
-                        <div class="d-flex align-items-center p-2 rounded shadow-sm bg-light">
+                        <div class="d-flex align-items-center p-2 rounded shadow-sm astrodex-slideshow-tile">
                             <div class="me-3 fs-4"><i class="bi bi-binoculars" aria-hidden="true"></i></div>
                             <div>
                                 <small class="text-muted d-block">${i18n.t('astrodex.device_telescope')}</small>
-                                <strong class="text-dark">${escapeHtml(picture.device)}</strong>
+                                <strong>${escapeHtml(picture.device)}</strong>
                             </div>
                         </div>
                     </div>
                 ` : ''}
                 ${picture.filters ? `
                     <div class="col-md-6 col-lg-4">
-                        <div class="d-flex align-items-center p-2 rounded shadow-sm bg-light">
+                        <div class="d-flex align-items-center p-2 rounded shadow-sm astrodex-slideshow-tile">
                             <div class="me-3 fs-4"><i class="bi bi-palette" aria-hidden="true"></i></div>
                             <div>
                                 <small class="text-muted d-block">${i18n.t('astrodex.filters')}</small>
-                                <strong class="text-dark">${escapeHtml(picture.filters)}</strong>
+                                <strong>${escapeHtml(picture.filters)}</strong>
                             </div>
                         </div>
                     </div>
                 ` : ''}
                 ${picture.iso ? `
                     <div class="col-md-6 col-lg-4">
-                        <div class="d-flex align-items-center p-2 rounded shadow-sm bg-light">
+                        <div class="d-flex align-items-center p-2 rounded shadow-sm astrodex-slideshow-tile">
                             <div class="me-3 fs-4"><i class="bi bi-camera" aria-hidden="true"></i></div>
                             <div>
                                 <small class="text-muted d-block">${i18n.t('astrodex.iso')}</small>
-                                <strong class="text-dark">${escapeHtml(picture.iso)}</strong>
+                                <strong>${escapeHtml(picture.iso)}</strong>
                             </div>
                         </div>
                     </div>
                 ` : ''}
                 ${picture.frames ? `
                     <div class="col-md-6 col-lg-4">
-                        <div class="d-flex align-items-center p-2 rounded shadow-sm bg-light">
+                        <div class="d-flex align-items-center p-2 rounded shadow-sm astrodex-slideshow-tile">
                             <div class="me-3 fs-4"><i class="bi bi-film" aria-hidden="true"></i></div>
                             <div>
                                 <small class="text-muted d-block">${i18n.t('astrodex.number_of_frames')}</small>
-                                <strong class="text-dark">${escapeHtml(picture.frames)}</strong>
+                                <strong>${escapeHtml(picture.frames)}</strong>
                             </div>
                         </div>
                     </div>
@@ -1573,7 +1573,7 @@ function showPictureSlideshow(itemId) {
             ${picture.notes ? `
                 <div class="row mt-3">
                     <div class="col">
-                        <div class="d-flex align-items-start p-2 rounded shadow-sm bg-light">
+                        <div class="d-flex align-items-start p-2 rounded shadow-sm astrodex-slideshow-tile">
                             <div class="me-3 fs-4"><i class="bi bi-journal-text" aria-hidden="true"></i></div>
                             <div>
                                 <small class="text-muted d-block">${i18n.t('astrodex.notes')}</small>
@@ -1588,7 +1588,7 @@ function showPictureSlideshow(itemId) {
         
         const leftArrow = slideshowPictures.length > 1 && currentIndex > 0 ? `
             <button type="button" 
-                class="btn btn-dark btn-lg slideshow-arrow slideshow-prev position-absolute top-50 start-0 translate-middle-y ms-3 
+                class="btn btn-lg slideshow-arrow astrodex-slideshow-arrow slideshow-prev position-absolute top-50 start-0 translate-middle-y ms-3 
                     d-flex align-items-center justify-content-center" 
                 aria-label="Previous photo" 
                 style="z-index: 10; opacity: 0.7; border-radius: 50%; width: 50px; height: 50px;">
@@ -1598,7 +1598,7 @@ function showPictureSlideshow(itemId) {
         
         const rightArrow = slideshowPictures.length > 1 && currentIndex < slideshowPictures.length - 1 ? `
             <button type="button" 
-                class="btn btn-dark btn-lg slideshow-arrow slideshow-next position-absolute top-50 end-0 translate-middle-y me-3 
+                class="btn btn-lg slideshow-arrow astrodex-slideshow-arrow slideshow-next position-absolute top-50 end-0 translate-middle-y me-3 
                     d-flex align-items-center justify-content-center"
                 aria-label="Next photo"
                 style="z-index: 10; opacity: 0.7; border-radius: 50%; width: 50px; height: 50px;">

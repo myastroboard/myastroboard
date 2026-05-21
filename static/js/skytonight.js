@@ -250,10 +250,10 @@ function _skytBuildTelescopeRecommendationsHtml(response, row) {
 // ── AstroScore visual helpers ─────────────────────────────────────────────────
 
 function _astroScoreBadgeClass(score) {
-    if (score >= 0.85) return 'bg-success';
-    if (score >= 0.65) return 'bg-primary';
-    if (score >= 0.45) return 'bg-warning text-dark';
-    return 'bg-danger';
+    if (score >= 0.85) return 'astroscore-badge astroscore-badge-exceptional';
+    if (score >= 0.65) return 'astroscore-badge astroscore-badge-good';
+    if (score >= 0.45) return 'astroscore-badge astroscore-badge-average';
+    return 'astroscore-badge astroscore-badge-poor';
 }
 
 function _astroScoreTierKey(score) {
@@ -277,10 +277,10 @@ function _astroScoreBadgeHtml(score) {
 /** Returns an HTML string: a compact legend row for all 4 AstroScore tiers. */
 function _astroScoreLegendHtml() {
     const tiers = [
-        { key: 'astroscore_exceptional', cls: 'bg-success',           range: '≥ 85%' },
-        { key: 'astroscore_good',        cls: 'bg-primary',           range: '65-84%' },
-        { key: 'astroscore_average',     cls: 'bg-warning text-dark', range: '45-64%' },
-        { key: 'astroscore_poor',        cls: 'bg-danger',            range: '< 45%' },
+        { key: 'astroscore_exceptional', cls: 'astroscore-badge astroscore-badge-exceptional', range: '≥ 85%' },
+        { key: 'astroscore_good',        cls: 'astroscore-badge astroscore-badge-good',        range: '65-84%' },
+        { key: 'astroscore_average',     cls: 'astroscore-badge astroscore-badge-average',     range: '45-64%' },
+        { key: 'astroscore_poor',        cls: 'astroscore-badge astroscore-badge-poor',        range: '< 45%' },
     ];
     let html = `<div class="d-flex flex-wrap gap-2 mb-2 align-items-center small mt-3">`;
     html += `<span class="text-muted fw-semibold">${escapeHtml(tSkyTonightCompat('astroscore_legend_title'))}:</span>`;
@@ -2456,6 +2456,25 @@ async function showAlttimePopup(title, targetId) {
     const nightStart = data.night_start ? tzFmt.format(new Date(data.night_start)) : '';
     const nightEnd   = data.night_end   ? tzFmt.format(new Date(data.night_end))   : '';
 
+    // Resolve chart colors from current theme variables so dark/red modes stay readable.
+    const rootStyle = getComputedStyle(document.documentElement);
+    const theme = (document.documentElement.getAttribute('data-theme') || '').toLowerCase();
+    const bsTheme = (document.documentElement.getAttribute('data-bs-theme') || '').toLowerCase();
+    const isDarkLikeTheme = theme === 'dark' || theme === 'red' || bsTheme === 'dark';
+    const cssVar = (name, fallback) => {
+        const raw = rootStyle.getPropertyValue(name);
+        return raw ? raw.trim() : fallback;
+    };
+    const primaryRgb = cssVar('--bs-primary-rgb', '13, 110, 253');
+    const textColor = cssVar('--text-color', '#1f2937');
+    const mutedTextColor = cssVar('--text-grey', '#4b4b4b');
+    const gridColor = isDarkLikeTheme ? 'rgba(255, 255, 255, 0.16)' : 'rgba(15, 23, 42, 0.12)';
+    const constraintLineColor = 'rgba(20, 110, 40, 0.8)';
+    const altitudeLineColor = `rgba(${primaryRgb}, 0.92)`;
+    const altitudeFillColor = `rgba(${primaryRgb}, 0.2)`;
+    const customHorizonLineColor = 'rgba(200, 80, 0, 0.75)';
+    const customHorizonFillColor = isDarkLikeTheme ? 'rgba(200, 80, 0, 0.16)' : 'rgba(200, 80, 0, 0.07)';
+
     // -----------------------------------------------------------------------
     // Build card shell matching the weather-chart style (createChartShell)
     // -----------------------------------------------------------------------
@@ -2486,11 +2505,11 @@ async function showAlttimePopup(title, targetId) {
     footerRow.className = 'row align-items-center';
 
     const legendDefs = [
-        { color: 'rgba(13, 110, 253, 0.9)',   label: tSkyTonightCompat('altitude_time_altitude_label') || 'Altitude (°)' },
-        { color: 'rgba(40, 167, 69, 0.45)',    label: tSkyTonightCompat('altitude_time_observable_zone') },
+        { color: altitudeLineColor,      label: tSkyTonightCompat('altitude_time_altitude_label') || 'Altitude (°)' },
+        { color: constraintLineColor,    label: tSkyTonightCompat('altitude_time_observable_zone') },
     ];
     if (hasCustomHorizon) {
-        legendDefs.push({ color: 'rgba(200, 80, 0, 0.75)', label: tSkyTonightCompat('horizon_custom_line') || 'Custom Horizon' });
+        legendDefs.push({ color: customHorizonLineColor, label: tSkyTonightCompat('horizon_custom_line') || 'Custom Horizon' });
     }
     legendDefs.forEach(item => {
         const col = document.createElement('div');
@@ -2563,7 +2582,7 @@ async function showAlttimePopup(title, targetId) {
             const yMinPx = Math.min(bottom, Math.max(top, yScale.getPixelForValue(altMin)));
             const yMaxPx = Math.min(bottom, Math.max(top, yScale.getPixelForValue(altMax)));
             ctx.save();
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.07)';
+            ctx.fillStyle = isDarkLikeTheme ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.07)';
             if (yMaxPx > top) {
                 ctx.fillRect(left, top, right - left, yMaxPx - top);
             }
@@ -2586,7 +2605,7 @@ async function showAlttimePopup(title, targetId) {
                     label: tSkyTonightCompat('altitude_time_observable_zone'),
                     data: constraintBand,
                     fill: false,
-                    borderColor: 'rgba(20, 110, 40, 0.8)',
+                    borderColor: constraintLineColor,
                     borderWidth: 2,
                     borderDash: [5, 4],
                     pointRadius: 0,
@@ -2598,7 +2617,7 @@ async function showAlttimePopup(title, targetId) {
                     label: `${altMin}° (min)`,
                     data: constraintFloor,
                     fill: false,
-                    borderColor: 'rgba(20, 110, 40, 0.8)',
+                    borderColor: constraintLineColor,
                     borderWidth: 2,
                     borderDash: [5, 4],
                     pointRadius: 0,
@@ -2609,8 +2628,8 @@ async function showAlttimePopup(title, targetId) {
                     label: tSkyTonightCompat('horizon_custom_line') || 'Custom Horizon',
                     data: customHorizonData,
                     fill: 'origin',
-                    borderColor: 'rgba(200, 80, 0, 0.75)',
-                    backgroundColor: 'rgba(200, 80, 0, 0.07)',
+                    borderColor: customHorizonLineColor,
+                    backgroundColor: customHorizonFillColor,
                     borderWidth: 1.5,
                     borderDash: [4, 3],
                     pointRadius: 0,
@@ -2621,8 +2640,8 @@ async function showAlttimePopup(title, targetId) {
                     label: tSkyTonightCompat('altitude_time_altitude_label') || 'Altitude (°)',
                     data: altitudes,
                     fill: false,
-                    borderColor: 'rgba(13, 110, 253, 0.9)',
-                    backgroundColor: 'rgba(13, 110, 253, 0.15)',
+                    borderColor: altitudeLineColor,
+                    backgroundColor: altitudeFillColor,
                     borderWidth: 2,
                     pointRadius: 0,
                     pointHoverRadius: 4,
@@ -2649,14 +2668,24 @@ async function showAlttimePopup(title, targetId) {
             },
             scales: {
                 x: {
-                    ticks: { maxTicksLimit: 12, maxRotation: 0 },
-                    title: { display: true, text: `${tSkyTonightCompat('altitude_time_x_axis')} (${obsTz})` },
+                    ticks: { maxTicksLimit: 12, maxRotation: 0, color: mutedTextColor },
+                    grid: { color: gridColor },
+                    title: {
+                        display: true,
+                        text: `${tSkyTonightCompat('altitude_time_x_axis')} (${obsTz})`,
+                        color: textColor,
+                    },
                 },
                 y: {
                     min: 0,
                     max: yMax,
-                    ticks: { stepSize: 15 },
-                    title: { display: true, text: tSkyTonightCompat('altitude_time_y_axis') || 'Altitude (°)' },
+                    ticks: { stepSize: 15, color: mutedTextColor },
+                    grid: { color: gridColor },
+                    title: {
+                        display: true,
+                        text: tSkyTonightCompat('altitude_time_y_axis') || 'Altitude (°)',
+                        color: textColor,
+                    },
                 },
             },
         },
