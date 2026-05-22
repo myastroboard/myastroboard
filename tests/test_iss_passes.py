@@ -139,7 +139,7 @@ class TestISSPassServiceSolarTransit:
 class TestISSPassServiceTleFallback:
     """Test ISS TLE multi-source fallback behavior."""
 
-    def test_fetch_iss_tle_falls_back_after_http_403(self, monkeypatch):
+    def test_fetch_iss_tle_stops_immediately_after_celestrak_http_403(self, monkeypatch):
         service = ISSPassService(45.5, -73.5, 30, "America/Montreal")
         calls = {"count": 0}
 
@@ -168,11 +168,11 @@ class TestISSPassServiceTleFallback:
 
         monkeypatch.setattr("iss_passes.requests.get", _mock_get)
 
-        line1, line2 = service._fetch_iss_tle()
+        with pytest.raises(RuntimeError):
+            service._fetch_iss_tle()
 
-        assert line1.startswith("1 25544")
-        assert line2.startswith("2 25544")
-        assert calls["count"] == 2
+        # Policy compliance: non-200 on Celestrak must stop immediately.
+        assert calls["count"] == 1
 
     def test_fetch_iss_tle_raises_when_all_sources_fail(self, monkeypatch):
         service = ISSPassService(45.5, -73.5, 30, "America/Montreal")
@@ -183,7 +183,7 @@ class TestISSPassServiceTleFallback:
 
         class _Response:
             def raise_for_status(self):
-                raise HTTPError("403 Client Error: Forbidden")
+                raise HTTPError("503 Service Unavailable")
 
         monkeypatch.setattr("iss_passes.requests.get", lambda *args, **kwargs: _Response())
 

@@ -43,10 +43,6 @@ ISS_TLE_URLS = [
     "https://tle.ivanstanojevic.me/api/tle/25544",
     # Alternative 2: wheretheiss.at - returns JSON {line1, line2}
     "https://api.wheretheiss.at/v1/satellites/25544/tles",
-    # Celestrak group / legacy fallbacks
-    "https://celestrak.org/NORAD/elements/gp.php?GROUP=stations&FORMAT=tle",
-    "https://celestrak.org/NORAD/elements/stations.txt",
-    "https://www.celestrak.com/NORAD/elements/stations.txt",
 ]
 REQUEST_TIMEOUT_SECONDS = 10
 DEFAULT_FORECAST_DAYS = 20
@@ -211,7 +207,7 @@ class ISSPassService:
             return None
 
     def _fetch_iss_tle(self) -> Tuple[str, str]:
-        """Fetch latest ISS TLE, trying multiple CelesTrak endpoints as fallback."""
+        """Fetch latest ISS TLE with strict handling for Celestrak policy errors."""
         # Fast path: prefer recent cached TLE to avoid unnecessary upstream requests.
         cached_recent = _get_cached_tle(max_age_seconds=ISS_TLE_MAX_AGE_SECONDS)
         if cached_recent is not None:
@@ -233,11 +229,46 @@ class ISSPassService:
         for tle_url in ISS_TLE_URLS:
             try:
                 response = requests.get(tle_url, timeout=REQUEST_TIMEOUT_SECONDS)
+                status_code = int(getattr(response, "status_code", 200) or 0)
+
+                # Celestrak policy compliance: any non-200 response must stop
+                # further upstream querying and be escalated to human review.
+                if "celestrak.org" in tle_url and status_code != 200:
+                    raise RuntimeError(
+                        f"Celestrak returned HTTP {status_code}; stopping TLE queries and requiring manual investigation"
+                    )
+
                 response.raise_for_status()
                 line1, line2 = self._parse_iss_tle_from_response(response.text)
                 _set_cached_tle(line1, line2)
                 return line1, line2
             except Exception as exc:
+                if "celestrak.org" in tle_url:
+                    status_message = str(exc).upper()
+                    if (
+                        isinstance(exc, RuntimeError)
+                        and "CELESTRAK RETURNED HTTP" in status_message
+                    ) or ("403" in status_message):
+                        _set_tle_error_timestamp()
+                        logger.error(
+                            "Celestrak rejected a TLE request with a non-200 response. "
+                            "Automatic queries have been stopped and human intervention is required. "
+                            "See https://celestrak.org/usage-policy.php and "
+                            "https://celestrak.org/NORAD/documentation/gp-data-formats.php#addendum"
+                        )
+                        cached_any = _get_cached_tle(max_age_seconds=None)
+                        if cached_any is not None:
+                            line1, line2, fetched_at = cached_any
+                            age_hours = (_utc_timestamp() - fetched_at) / 3600.0
+                            logger.warning(
+                                f"Celestrak policy block detected; reusing stale cached TLE ({age_hours:.1f}h old)"
+                            )
+                            return line1, line2
+                        raise RuntimeError(
+                            "Celestrak returned a non-200 response and no cached TLE is available; "
+                            "manual intervention required"
+                        ) from exc
+
                 last_error = exc
                 logger.debug(f"ISS TLE fetch failed for {tle_url}: {exc}")
 
