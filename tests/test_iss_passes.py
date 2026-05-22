@@ -139,6 +139,12 @@ class TestISSPassServiceSolarTransit:
 class TestISSPassServiceTleFallback:
     """Test ISS TLE multi-source fallback behavior."""
 
+    @pytest.fixture(autouse=True)
+    def _isolate_celestrak_block_state(self, monkeypatch):
+        monkeypatch.setattr("iss_passes.get_celestrak_status", lambda: {"blocked": False})
+        monkeypatch.setattr("iss_passes._set_celestrak_block", lambda *args, **kwargs: None)
+        monkeypatch.setattr("iss_passes._clear_celestrak_block", lambda *args, **kwargs: None)
+
     def test_fetch_iss_tle_stops_immediately_after_celestrak_http_403(self, monkeypatch):
         service = ISSPassService(45.5, -73.5, 30, "America/Montreal")
         calls = {"count": 0}
@@ -313,6 +319,39 @@ class TestISSPassServiceTleFallback:
         # The first Celestrak URL is tried and fails; the first alternative succeeds
         assert calls[0] == iss_module.ISS_TLE_URLS[0]
         assert "celestrak" not in calls[-1]
+
+    def test_fetch_iss_tle_skips_celestrak_when_block_flag_is_set(self, monkeypatch):
+        import json as _json
+        service = ISSPassService(45.5, -73.5, 30, "America/Montreal")
+
+        line1_str = "1 25544U 98067A   26100.00000000  .00010000  00000+0  18000-3 0  9991"
+        line2_str = "2 25544  51.6400 120.0000 0005000 200.0000 160.0000 15.50000000000000"
+
+        monkeypatch.setattr("iss_passes._get_cached_tle", lambda max_age_seconds=None: None)
+        monkeypatch.setattr("iss_passes._in_tle_failure_cooldown", lambda: False)
+        monkeypatch.setattr("iss_passes._set_tle_error_timestamp", lambda: None)
+        monkeypatch.setattr("iss_passes._set_cached_tle", lambda l1, l2: None)
+        monkeypatch.setattr("iss_passes.get_celestrak_status", lambda: {"blocked": True})
+
+        calls = []
+
+        def _mock_get(url, **kwargs):
+            calls.append(url)
+            if "celestrak.org" in url:
+                raise AssertionError("Celestrak URL should be skipped when block flag is set")
+            return type("R", (), {
+                "text": _json.dumps({"line1": line1_str, "line2": line2_str}),
+                "status_code": 200,
+                "raise_for_status": lambda self: None,
+            })()
+
+        monkeypatch.setattr("iss_passes.requests.get", _mock_get)
+
+        l1, l2 = service._fetch_iss_tle()
+        assert l1 == line1_str
+        assert l2 == line2_str
+        assert len(calls) == 1
+        assert "celestrak.org" not in calls[0]
 
 
 class TestISSCalendarAggregation:

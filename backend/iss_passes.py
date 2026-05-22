@@ -66,6 +66,9 @@ LUNAR_RADIUS_KM = 1737.4
 ISS_TLE_CACHE_FILE = os.path.join(DATA_DIR_CACHE, 'iss_tle_cache.json')
 ISS_TLE_MAX_AGE_SECONDS = 6 * 60 * 60
 ISS_TLE_FAILURE_COOLDOWN_SECONDS = 3 * 60 * 60
+CELESTRAK_USAGE_POLICY_URL = "https://celestrak.org/usage-policy.php"
+CELESTRAK_ADDENDUM_URL = "https://celestrak.org/NORAD/documentation/gp-data-formats.php#addendum"
+CELESTRAK_ISS_QUERY_URL = "https://celestrak.org/NORAD/elements/gp.php?CATNR=25544&FORMAT=TLE"
 
 # Server-side ground-track cache: recompute the ±50-min orbit path at most once per 5 min.
 # The current ISS position is always computed fresh (1 propagation per request).
@@ -123,6 +126,48 @@ def _in_tle_failure_cooldown() -> bool:
     if last_error_at <= 0:
         return False
     return (_utc_timestamp() - last_error_at) < ISS_TLE_FAILURE_COOLDOWN_SECONDS
+
+
+def _set_celestrak_block(status_code: int, reason: str, source_url: str) -> None:
+    payload = _read_tle_cache()
+    payload['celestrak_blocked'] = True
+    payload['celestrak_blocked_at'] = _utc_timestamp()
+    payload['celestrak_blocked_status_code'] = int(status_code)
+    payload['celestrak_blocked_reason'] = reason
+    payload['celestrak_blocked_source_url'] = source_url
+    _write_tle_cache(payload)
+
+
+def _clear_celestrak_block(reset_failure_cooldown: bool = True) -> None:
+    payload = _read_tle_cache()
+    payload['celestrak_blocked'] = False
+    payload['celestrak_blocked_at'] = None
+    payload['celestrak_blocked_status_code'] = None
+    payload['celestrak_blocked_reason'] = None
+    payload['celestrak_blocked_source_url'] = None
+    if reset_failure_cooldown:
+        payload['last_error_at'] = None
+    _write_tle_cache(payload)
+
+
+def get_celestrak_status() -> Dict[str, Any]:
+    payload = _read_tle_cache()
+    return {
+        "blocked": bool(payload.get("celestrak_blocked") is True),
+        "blocked_at": int(payload.get("celestrak_blocked_at") or 0),
+        "blocked_status_code": int(payload.get("celestrak_blocked_status_code") or 0),
+        "blocked_reason": str(payload.get("celestrak_blocked_reason") or "").strip(),
+        "blocked_source_url": str(payload.get("celestrak_blocked_source_url") or "").strip(),
+        "policy_url": CELESTRAK_USAGE_POLICY_URL,
+        "addendum_url": CELESTRAK_ADDENDUM_URL,
+        "manual_check_url": CELESTRAK_ISS_QUERY_URL,
+    }
+
+
+def clear_celestrak_block_flag() -> Dict[str, Any]:
+    """Clear persisted Celestrak block flag after manual operator confirmation."""
+    _clear_celestrak_block(reset_failure_cooldown=True)
+    return get_celestrak_status()
 
 
 class ISSPassService:
@@ -187,6 +232,7 @@ class ISSPassService:
             "total_solar_transits": len(solar_transits),
             "total_lunar_transits": len(lunar_transits),
             "cache_ttl": CACHE_TTL,
+            "celestrak_status": get_celestrak_status(),
             "units": {
                 "times": "ISO format local timezone",
                 "duration_minutes": "minutes",
@@ -225,8 +271,13 @@ class ISSPassService:
             raise RuntimeError('ISS TLE fetch is in cooldown and no cached TLE is available')
 
         last_error: Optional[Exception] = None
+        celestrak_status = get_celestrak_status()
 
         for tle_url in ISS_TLE_URLS:
+            if celestrak_status.get("blocked") and "celestrak.org" in tle_url:
+                logger.warning("Celestrak is flagged as blocked; skipping Celestrak query until manually reset")
+                continue
+
             try:
                 response = requests.get(tle_url, timeout=REQUEST_TIMEOUT_SECONDS)
                 status_code = int(getattr(response, "status_code", 200) or 0)
@@ -234,6 +285,12 @@ class ISSPassService:
                 # Celestrak policy compliance: any non-200 response must stop
                 # further upstream querying and be escalated to human review.
                 if "celestrak.org" in tle_url and status_code != 200:
+                    _set_tle_error_timestamp()
+                    _set_celestrak_block(
+                        status_code=status_code,
+                        reason=f"HTTP {status_code}",
+                        source_url=tle_url,
+                    )
                     raise RuntimeError(
                         f"Celestrak returned HTTP {status_code}; stopping TLE queries and requiring manual investigation"
                     )
@@ -241,6 +298,8 @@ class ISSPassService:
                 response.raise_for_status()
                 line1, line2 = self._parse_iss_tle_from_response(response.text)
                 _set_cached_tle(line1, line2)
+                if "celestrak.org" in tle_url:
+                    _clear_celestrak_block(reset_failure_cooldown=True)
                 return line1, line2
             except Exception as exc:
                 if "celestrak.org" in tle_url:
@@ -250,11 +309,16 @@ class ISSPassService:
                         and "CELESTRAK RETURNED HTTP" in status_message
                     ) or ("403" in status_message):
                         _set_tle_error_timestamp()
+                        _set_celestrak_block(
+                            status_code=403 if "403" in status_message else 0,
+                            reason=str(exc),
+                            source_url=tle_url,
+                        )
                         logger.error(
                             "Celestrak rejected a TLE request with a non-200 response. "
                             "Automatic queries have been stopped and human intervention is required. "
-                            "See https://celestrak.org/usage-policy.php and "
-                            "https://celestrak.org/NORAD/documentation/gp-data-formats.php#addendum"
+                            f"See {CELESTRAK_USAGE_POLICY_URL} and "
+                            f"{CELESTRAK_ADDENDUM_URL}"
                         )
                         cached_any = _get_cached_tle(max_age_seconds=None)
                         if cached_any is not None:

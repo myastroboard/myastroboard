@@ -414,7 +414,14 @@
     "map_future_track": "Nächste Bahn",
     "map_your_location": "Ihr Standort",
     "map_visible": "Sichtbar",
-    "map_not_visible": "Nicht sichtbar"
+    "map_not_visible": "Nicht sichtbar",
+    "celestrak_blocked_title": "Celestrak-Zugriff ist derzeit blockiert",
+    "celestrak_blocked_description": "MyAstroBoard hat für diesen Host eine Celestrak-Policy-Sperre erkannt. Automatische Celestrak-Abfragen sind pausiert, alternative Anbieter werden verwendet.",
+    "celestrak_check_link": "Celestrak von diesem Host prüfen",
+    "celestrak_policy_link": "Celestrak-Richtlinie öffnen",
+    "celestrak_restart_hint": "Öffnen Sie den Prüf-Link von derselben externen IP wie dieser MyAstroBoard-Host. Nach Bestätigung der Entsperrung können Sie den Celestrak-Abruf neu starten.",
+    "celestrak_restart_button": "Celestrak-Abruf neu starten",
+    "celestrak_restart_confirm": "Neustart bestätigen: Nur verwenden, wenn Celestrak die Sperre für diese Host-IP entfernt hat. Fortfahren?"
   },
 
   "spaceflight": {

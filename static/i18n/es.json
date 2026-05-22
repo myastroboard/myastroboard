@@ -414,7 +414,14 @@
     "map_future_track": "Órbita próxima",
     "map_your_location": "Tu ubicación",
     "map_visible": "Visible",
-    "map_not_visible": "No visible"
+    "map_not_visible": "No visible",
+    "celestrak_blocked_title": "El acceso a Celestrak está bloqueado actualmente",
+    "celestrak_blocked_description": "MyAstroBoard detectó un bloqueo de política de Celestrak para este host. Las consultas automáticas a Celestrak están en pausa y se usan proveedores alternativos.",
+    "celestrak_check_link": "Comprobar Celestrak desde este host",
+    "celestrak_policy_link": "Abrir política de Celestrak",
+    "celestrak_restart_hint": "Abra el enlace de comprobación desde la misma IP externa que este host de MyAstroBoard. Después de confirmar que se levantó el bloqueo, puede reiniciar el rastreo de Celestrak.",
+    "celestrak_restart_button": "Reiniciar rastreo de Celestrak",
+    "celestrak_restart_confirm": "Confirmar reinicio: use esto solo después de que Celestrak quite el bloqueo para la IP de este host. ¿Continuar?"
   },
 
   "spaceflight": {

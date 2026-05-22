@@ -262,6 +262,108 @@ function createVisibilityGauge(scorePercent) {
     return container;
 }
 
+function _appendCelestrakStatusBanner(container, celestrakStatus) {
+    if (!celestrakStatus || celestrakStatus.blocked !== true) {
+        return;
+    }
+
+    const blockedAt = Number(celestrakStatus.blocked_at || 0);
+    const dismissedKey = 'iss.celestrak.dismissed_blocked_at';
+    if (blockedAt > 0 && localStorage.getItem(dismissedKey) === String(blockedAt)) {
+        return;
+    }
+
+    const alert = document.createElement('div');
+    alert.className = 'alert alert-warning alert-dismissible fade show mb-3';
+    alert.setAttribute('role', 'alert');
+
+    const title = document.createElement('div');
+    title.className = 'fw-bold mb-1';
+    title.textContent = i18n.t('iss.celestrak_blocked_title');
+    alert.appendChild(title);
+
+    const description = document.createElement('div');
+    description.className = 'mb-2';
+    description.textContent = i18n.t('iss.celestrak_blocked_description');
+    alert.appendChild(description);
+
+    const linksWrap = document.createElement('div');
+    linksWrap.className = 'mb-2';
+
+    const checkLink = document.createElement('a');
+    checkLink.href = celestrakStatus.manual_check_url || 'https://celestrak.org/NORAD/elements/gp.php?CATNR=25544&FORMAT=TLE';
+    checkLink.target = '_blank';
+    checkLink.rel = 'noopener noreferrer';
+    checkLink.className = 'btn btn-outline-secondary btn-sm me-2';
+    checkLink.textContent = i18n.t('iss.celestrak_check_link');
+    linksWrap.appendChild(checkLink);
+
+    const policyLink = document.createElement('a');
+    policyLink.href = celestrakStatus.policy_url || 'https://celestrak.org/usage-policy.php';
+    policyLink.target = '_blank';
+    policyLink.rel = 'noopener noreferrer';
+    policyLink.className = 'btn btn-outline-secondary btn-sm';
+    policyLink.textContent = i18n.t('iss.celestrak_policy_link');
+    linksWrap.appendChild(policyLink);
+
+    alert.appendChild(linksWrap);
+
+    const hint = document.createElement('div');
+    hint.className = 'small text-muted mb-2';
+    hint.textContent = i18n.t('iss.celestrak_restart_hint');
+    alert.appendChild(hint);
+
+    const restartButton = document.createElement('button');
+    restartButton.type = 'button';
+    restartButton.className = 'btn btn-warning btn-sm';
+    restartButton.textContent = i18n.t('iss.celestrak_restart_button');
+    restartButton.disabled = true;
+    alert.appendChild(restartButton);
+
+    checkLink.addEventListener('click', () => {
+        restartButton.disabled = false;
+    });
+
+    restartButton.addEventListener('click', async () => {
+        const confirmed = window.confirm(i18n.t('iss.celestrak_restart_confirm'));
+        if (!confirmed) {
+            return;
+        }
+
+        restartButton.disabled = true;
+        try {
+            const resp = await fetch('/api/iss/celestrak/restart', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ confirmed: true }),
+            });
+            if (!resp.ok) {
+                throw new Error(`HTTP ${resp.status}`);
+            }
+            await loadIss();
+        } catch (_) {
+            restartButton.disabled = false;
+        }
+    });
+
+    const closeButton = document.createElement('button');
+    closeButton.type = 'button';
+    closeButton.className = 'btn-close';
+    closeButton.setAttribute('aria-label', i18n.t('common.close'));
+    closeButton.addEventListener('click', () => {
+        if (blockedAt > 0) {
+            localStorage.setItem(dismissedKey, String(blockedAt));
+        }
+        if (alert.parentNode) {
+            alert.parentNode.removeChild(alert);
+        }
+    });
+    alert.appendChild(closeButton);
+
+    container.appendChild(alert);
+}
+
 /**
  * Load ISS upcoming passes for current location (next 20 days).
  */
@@ -282,6 +384,8 @@ async function loadIss() {
     const passes = Array.isArray(data.passes) ? data.passes : [];
 
     DOMUtils.clear(container);
+
+    _appendCelestrakStatusBanner(container, data.celestrak_status);
 
     const infoAlert = document.createElement('div');
     infoAlert.className = 'alert alert-info';

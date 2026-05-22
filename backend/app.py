@@ -1504,19 +1504,24 @@ def get_object_info_api(identifier):
 def get_iss_passes_api():
     """Return ISS passes report, from cache only"""
     try:
+        def _with_celestrak_status(payload: Dict[str, Any]) -> Dict[str, Any]:
+            merged = dict(payload)
+            merged["celestrak_status"] = iss_passes.get_celestrak_status()
+            return merged
+
         days = request.args.get("days", default=20, type=int)
         days = max(1, min(days, 30))
 
         if cache_store.is_cache_valid(cache_store._iss_passes_cache, CACHE_TTL_ISS_PASSES):
             cached_data = cache_store._iss_passes_cache["data"]
             if isinstance(cached_data, dict) and cached_data.get("window_days") == days:
-                return jsonify(cached_data)
+                return jsonify(_with_celestrak_status(cached_data))
 
         if cache_store.sync_cache_from_shared("iss_passes", cache_store._iss_passes_cache):
             if cache_store.is_cache_valid(cache_store._iss_passes_cache, CACHE_TTL_ISS_PASSES):
                 cached_data = cache_store._iss_passes_cache["data"]
                 if isinstance(cached_data, dict) and cached_data.get("window_days") == days:
-                    return jsonify(cached_data)
+                    return jsonify(_with_celestrak_status(cached_data))
 
         return jsonify({
             "status": "pending",
@@ -1549,6 +1554,22 @@ def get_iss_location_api():
         return jsonify({'error': 'Service temporarily unavailable'}), 503
     except Exception as exc:
         logger.error(f"Error computing ISS location: {exc}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@app.route("/api/iss/celestrak/restart", methods=["POST"])
+@login_required
+def restart_iss_celestrak_crawl_api():
+    """Clear Celestrak block flag after explicit operator confirmation in UI."""
+    try:
+        status = iss_passes.clear_celestrak_block_flag()
+        return jsonify({
+            "status": "ok",
+            "message": "Celestrak block flag cleared. Next crawl may query Celestrak again.",
+            "celestrak_status": status,
+        })
+    except Exception as exc:
+        logger.error(f"Error resetting Celestrak block flag: {exc}")
         return jsonify({'error': 'Internal server error'}), 500
 
 
