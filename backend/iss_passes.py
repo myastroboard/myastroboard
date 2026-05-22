@@ -9,6 +9,7 @@ score and day/night visibility classification.
 from datetime import datetime, timedelta, timezone
 from math import acos, asin, cos, degrees, radians, sin
 from typing import Optional, Dict, Any, List, Tuple, cast
+from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 import os
 import threading
@@ -116,14 +117,19 @@ def _set_cached_tle(line1: str, line2: str) -> None:
 
 
 def _source_name_from_url(source_url: str) -> str:
-    source = (source_url or "").lower()
-    if "celestrak.org" in source:
+    hostname = (urlparse(source_url or "").hostname or "").lower()
+    if hostname == "celestrak.org" or hostname.endswith(".celestrak.org"):
         return "Celestrak"
-    if "ivanstanojevic" in source:
+    if hostname == "tle.ivanstanojevic.me":
         return "TLE API (ivanstanojevic.me)"
-    if "wheretheiss.at" in source:
+    if hostname == "api.wheretheiss.at" or hostname == "wheretheiss.at":
         return "WhereTheISS"
     return "Unknown"
+
+
+def _is_celestrak_url(candidate_url: str) -> bool:
+    hostname = (urlparse(candidate_url or "").hostname or "").lower()
+    return hostname == "celestrak.org" or hostname.endswith(".celestrak.org")
 
 
 def _set_cached_tle_with_source(line1: str, line2: str, source_url: str) -> None:
@@ -343,7 +349,7 @@ class ISSPassService:
         celestrak_status = get_celestrak_status()
 
         for tle_url in ISS_TLE_URLS:
-            if celestrak_status.get("blocked") and "celestrak.org" in tle_url:
+            if celestrak_status.get("blocked") and _is_celestrak_url(tle_url):
                 logger.warning("Celestrak is flagged as blocked; skipping Celestrak query until manually reset")
                 continue
 
@@ -353,7 +359,7 @@ class ISSPassService:
 
                 # Celestrak policy compliance: any non-200 response must stop
                 # further upstream querying and be escalated to human review.
-                if "celestrak.org" in tle_url and status_code != 200:
+                if _is_celestrak_url(tle_url) and status_code != 200:
                     _reset_celestrak_timeout_streak()
                     _set_tle_error_timestamp()
                     _set_celestrak_block(
@@ -368,12 +374,12 @@ class ISSPassService:
                 response.raise_for_status()
                 line1, line2 = self._parse_iss_tle_from_response(response.text)
                 _set_cached_tle_with_source(line1, line2, tle_url)
-                if "celestrak.org" in tle_url:
+                if _is_celestrak_url(tle_url):
                     _reset_celestrak_timeout_streak()
                     _clear_celestrak_block(reset_failure_cooldown=True)
                 return line1, line2
             except Exception as exc:
-                if "celestrak.org" in tle_url:
+                if _is_celestrak_url(tle_url):
                     status_message = str(exc).upper()
                     if (
                         isinstance(exc, RuntimeError)
