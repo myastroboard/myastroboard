@@ -314,9 +314,13 @@ function getDaysUntilText(daysUntil) {
  * Scroll to event details section
  */
 function scrollToEventDetails(eventType, structureKey = null) {
+    const normalizedEventType = String(eventType || '').toLowerCase();
+    const normalizedStructureKey = String(structureKey || '').toLowerCase();
+
+    let mainTabName = 'forecast-astro';
     let subTabName = '';
 
-    if (structureKey) {
+    if (normalizedStructureKey) {
         const structureMap = {
             moon: 'moon',
             sun: 'sun',
@@ -324,37 +328,37 @@ function scrollToEventDetails(eventType, structureKey = null) {
             iss: 'iss',
             calendar: 'calendar'
         };
-        subTabName = structureMap[structureKey] || '';
+        subTabName = structureMap[normalizedStructureKey] || '';
     }
     
     // Map event types to corresponding tabs
-    if (!subTabName && eventType.includes('Eclipse')) {
-        subTabName = eventType.includes('Solar') ? 'sun' : 'moon';
-    } else if (!subTabName && eventType === 'Aurora') {
+    if (!subTabName && normalizedEventType.includes('eclipse')) {
+        subTabName = normalizedEventType.includes('solar') ? 'sun' : 'moon';
+    } else if (!subTabName && normalizedEventType === 'aurora') {
         subTabName = 'aurora';
-    } else if (!subTabName && eventType === 'ISS Pass') {
+    } else if (!subTabName && normalizedEventType.includes('iss')) {
         subTabName = 'iss';
-    } else if (!subTabName && eventType === 'Moon Phase') {
+    } else if (!subTabName && normalizedEventType === 'moon phase') {
         subTabName = 'moon';
-    } else if (!subTabName && (eventType.includes('Planetary') || 
-               eventType.includes('Conjunction') || 
-               eventType.includes('Opposition') || 
-               eventType.includes('Elongation') || 
-               eventType.includes('Retrograde'))) {
+    } else if (!subTabName && (normalizedEventType.includes('planetary') || 
+               normalizedEventType.includes('conjunction') || 
+               normalizedEventType.includes('opposition') || 
+               normalizedEventType.includes('elongation') || 
+               normalizedEventType.includes('retrograde'))) {
         // Navigate to calendar for planetary events overview
         subTabName = 'calendar';
-    } else if (!subTabName && (eventType.includes('Equinox') || 
-               eventType.includes('Solstice') || 
-               eventType.includes('Zodiacal Light') || 
-               eventType.includes('Milky Way'))) {
+    } else if (!subTabName && (normalizedEventType.includes('equinox') || 
+               normalizedEventType.includes('solstice') || 
+               normalizedEventType.includes('zodiacal light') || 
+               normalizedEventType.includes('milky way'))) {
         // Navigate to calendar for special phenomena overview
         subTabName = 'calendar';
-    } else if (!subTabName && (eventType.includes('Meteor Shower') || 
-               eventType.includes('Comet') || 
-               eventType.includes('Asteroid Occultation'))) {
+    } else if (!subTabName && (normalizedEventType.includes('meteor shower') || 
+               normalizedEventType.includes('comet') || 
+               normalizedEventType.includes('asteroid occultation'))) {
         // Navigate to calendar for solar system events overview
         subTabName = 'calendar';
-    } else if (!subTabName && eventType.includes('Sidereal')) {
+    } else if (!subTabName && normalizedEventType.includes('sidereal')) {
         // Navigate to calendar for sidereal time info
         subTabName = 'calendar';
     } else if (!subTabName) {
@@ -362,9 +366,14 @@ function scrollToEventDetails(eventType, structureKey = null) {
         subTabName = 'calendar';
     }
 
+    if (subTabName === 'iss') {
+        // ISS details live under Spaceflight tab, not Astrophotography.
+        mainTabName = 'spaceflight';
+    }
+
     if (subTabName) {
-        // First, make sure the main "Astrophotography" tab is active
-        const mainTab = document.querySelector('[data-tab="forecast-astro"]');
+        // First, make sure the target main tab is active
+        const mainTab = document.querySelector(`[data-tab="${mainTabName}"]`);
         if (mainTab) {
             mainTab.click();
         }
