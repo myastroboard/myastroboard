@@ -212,6 +212,22 @@ async function loadWeather() {
             container.appendChild(item);
         });
     }
+
+    const weatherSection = container ? container.closest('.bg-sub-container') : null;
+    if (weatherSection) {
+        const existingFooter = weatherSection.querySelector('.js-weather-data-source-footer');
+        if (existingFooter && existingFooter.parentNode) {
+            existingFooter.parentNode.removeChild(existingFooter);
+        }
+        const footer = createDataSourceFooter({
+            text: i18n.t('weather.footer_source'),
+            links: [
+                { href: 'https://open-meteo.com/', label: 'Open-Meteo' }
+            ]
+        });
+        footer.classList.add('js-weather-data-source-footer');
+        weatherSection.appendChild(footer);
+    }
 }
 
 // Global chart instances
@@ -642,6 +658,22 @@ async function loadAstronomicalCharts() {
                 }
             }
         });
+
+        const trendSection = containerDiv ? containerDiv.closest('.bg-sub-container') : null;
+        if (trendSection) {
+            const existingTrendFooter = trendSection.querySelector('.js-trend-data-source-footer');
+            if (existingTrendFooter && existingTrendFooter.parentNode) {
+                existingTrendFooter.parentNode.removeChild(existingTrendFooter);
+            }
+            const trendFooter = createDataSourceFooter({
+                text: i18n.t('weather.footer_source'),
+                links: [
+                    { href: 'https://open-meteo.com/', label: 'Open-Meteo' }
+                ]
+            });
+            trendFooter.classList.add('js-trend-data-source-footer');
+            trendSection.appendChild(trendFooter);
+        }
         
     } catch (error) {
         console.error('Error loading astronomical charts:', error);

@@ -540,4 +540,13 @@ async function loadIss() {
     tableCol.appendChild(tableCard);
     tableRow.appendChild(tableCol);
     container.appendChild(tableRow);
+
+    const tleSource = data.tle_source || {};
+    const sourceName = (tleSource.name || '').trim() || i18n.t('iss.footer_unknown_source');
+    const sourceUrl = (tleSource.url || '').trim();
+    const sourceText = i18n.t('iss.footer_source', { source: sourceName });
+    appendDataSourceFooter(container, {
+        text: sourceText,
+        links: sourceUrl ? [{ href: sourceUrl, label: sourceName }] : []
+    });
 }

@@ -147,7 +147,8 @@
     "now_badge": "Ahora",
     "chart_horizon_axis": "Altitud (grados)",
     "horizon_graph_details": "Altitud (-90° a +90°) | Fecha: {date}",
-    "chart_time_axis": "Hora local (formato 24h)"
+    "chart_time_axis": "Hora local (formato 24h)",
+    "footer_source": "Fuente de datos: entradas meteorológicas de Open-Meteo + análisis astrofotográfico 100% local de MyAstroBoard."
   },
   "best_window": {
     "section_title": "Mejor ventana de observación",
@@ -233,7 +234,10 @@
     "failed_to_load_lunar_eclipse_data": "No se pudieron cargar los datos del eclipse lunar",
     "eclipse_chart_title": "Altitud vs Tiempo",
     "moon_altitude": "Altitud de la Luna (°)",
-    "eclipse_chart_footer": "Grados (°) | Hora local"
+    "eclipse_chart_footer": "Grados (°) | Hora local",
+    "footer_source_report": "Fuente de datos: cálculos astronómicos 100% locales (efemérides lunares y eventos derivados).",
+    "footer_source_planner": "Fuente de datos: cálculos 100% locales de MyAstroBoard para próximas noches y puntuación astrofotográfica.",
+    "footer_source_best_window": "Fuente de datos: cálculos 100% locales de MyAstroBoard para dark-window y best-window."
   },
   "sun": {
     "solar_eclipse": "Eclipse solar",
@@ -280,7 +284,8 @@
     "nautical_twilight": "Crepúsculo náutico",
     "astronomical_twilight": "Crepúsculo astronómico",
     "dusk": "Oscuridad:",
-    "dawn": "Amanecer:"
+    "dawn": "Amanecer:",
+    "footer_source": "Fuente de datos: cálculos astronómicos 100% locales (salida, puesta y crepúsculos del Sol)."
   },
   "aurora": {
     "borealis_predictions": "Predicciones de auroras boreales",
@@ -345,7 +350,8 @@
       "6": "Mejor visibilidad en noches claras y sin luna"
     },
     "failed_to_load_predictions": "No se pudieron cargar las predicciones de auroras. Inténtelo de nuevo más tarde.",
-    "tips_for_aurora_hunting": "Consejos para la caza de auroras:"
+    "tips_for_aurora_hunting": "Consejos para la caza de auroras:",
+    "footer_source": "Fuente de datos: flujos de clima espacial NOAA SWPC + puntuación de visibilidad local de MyAstroBoard."
   },
   "seeing_forecast": {
     "title": "Pronóstico de Seeing",
@@ -371,6 +377,7 @@
     },
     "no_data": "No hay datos de seeing disponibles",
     "data_source": "Fuente de datos: 7Timer",
+    "footer_source": "Fuente de datos: pronóstico de seeing 7Timer + normalización local y puntuación de mejor ventana.",
     "unavailable_no_usable_values": "La API numérica pública de 7Timer devolvió valores de seeing indefinidos para este ciclo. El gráfico del sitio puede seguir mostrando iconos, pero actualmente no hay valores numéricos utilizables.",
     "unavailable_fetch_failed": "El pronóstico de seeing no está disponible temporalmente porque falló la solicitud a 7Timer. Inténtelo de nuevo más tarde.",
     "tips": {
@@ -421,7 +428,9 @@
     "celestrak_policy_link": "Abrir política de Celestrak",
     "celestrak_restart_hint": "Abra el enlace de comprobación desde la misma IP externa que este host de MyAstroBoard. Después de confirmar que se levantó el bloqueo, puede reiniciar el rastreo de Celestrak.",
     "celestrak_restart_button": "Reiniciar rastreo de Celestrak",
-    "celestrak_restart_confirm": "Confirmar reinicio: use esto solo después de que Celestrak quite el bloqueo para la IP de este host. ¿Continuar?"
+    "celestrak_restart_confirm": "Confirmar reinicio: use esto solo después de que Celestrak quite el bloqueo para la IP de este host. ¿Continuar?",
+    "footer_unknown_source": "Fuente desconocida",
+    "footer_source": "Fuente de datos: el proveedor TLE activo es {source}. La geometría de los pasos orbitales se calcula localmente a partir de este TLE."
   },
 
   "spaceflight": {
@@ -902,7 +911,8 @@
     "astroscore_exceptional": "Excepcional",
     "astroscore_good": "Bueno",
     "astroscore_average": "Promedio",
-    "astroscore_poor": "Deficiente"
+    "astroscore_poor": "Deficiente",
+    "footer_source": "Fuente de datos: cálculos locales de SkyTonight usando tus catálogos configurados y restricciones de observación (motor Astropy/Astroplan)."
   },
 
   "plan_my_night": {
@@ -1335,7 +1345,8 @@
     "longitude": "Longitud:",
     "latitude": "Latitud:",
     "elevation": "Elevación:",
-    "timezone": "Zona horaria:"
+    "timezone": "Zona horaria:",
+    "footer_source": "Fuente de datos: API meteorológica de Open-Meteo."
   },
   "events_api": {
     "solar_eclipse_description": "{eclipse_type} eclipse con {obscuration_percent}% de oscurecimiento. Pico a {peak_altitude_deg}° de altitud.",

@@ -151,7 +151,8 @@
     "now_badge": "Maintenant",
     "chart_horizon_axis": "Altitude (degrés)",
     "horizon_graph_details": "Altitude (-90° à +90°) | Date : {date}",
-    "chart_time_axis": "Heure locale (format 24h)"
+    "chart_time_axis": "Heure locale (format 24h)",
+    "footer_source": "Source des données : entrées météo Open-Meteo + analyse astrophotographique MyAstroBoard 100% locale."
   },
 
   "best_window": {
@@ -239,7 +240,10 @@
     "failed_to_load_lunar_eclipse_data": "Échec du chargement des données d'éclipse lunaire",
     "eclipse_chart_title": "Altitude vs Temps",
     "moon_altitude": "Altitude de la Lune (°)",
-    "eclipse_chart_footer": "Degrés (°) | Heure Locale"
+    "eclipse_chart_footer": "Degrés (°) | Heure Locale",
+    "footer_source_report": "Source des données : calculs astronomiques 100% locaux (éphémérides lunaires et événements dérivés).",
+    "footer_source_planner": "Source des données : calculs MyAstroBoard 100% locaux pour les prochaines nuits et le score astrophotographie.",
+    "footer_source_best_window": "Source des données : calculs MyAstroBoard 100% locaux pour dark-window et best-window."
   },
 
   "sun": {
@@ -287,7 +291,8 @@
     "nautical_twilight": "Crépuscule Nautique",
     "astronomical_twilight": "Crépuscule Astronomique",
     "dusk": "Crépuscule : ",
-    "dawn": "Aube : "
+    "dawn": "Aube : ",
+    "footer_source": "Source des données : calculs astronomiques 100% locaux (lever, coucher et crépuscules du Soleil)."
   },
 
   "aurora": {
@@ -353,7 +358,8 @@
       "6": "Meilleure visibilité par nuits claires et sans lune"
     },
     "failed_to_load_predictions": "Échec du chargement des prévisions d'aurore. Veuillez réessayer plus tard.",
-    "tips_for_aurora_hunting": "Conseils pour l'observation des aurores :"
+    "tips_for_aurora_hunting": "Conseils pour l'observation des aurores :",
+    "footer_source": "Source des données : flux météo spatiale NOAA SWPC + score de visibilité local MyAstroBoard."
   },
 
   "seeing_forecast": {
@@ -380,6 +386,7 @@
     },
     "no_data": "Aucune donnée de seeing disponible",
     "data_source": "Source des données : 7Timer",
+    "footer_source": "Source des données : prévisions de seeing 7Timer + normalisation locale et score de meilleure fenêtre.",
     "unavailable_no_usable_values": "L'API numérique publique de 7Timer a renvoyé des valeurs de seeing indéfinies pour ce cycle. Le graphique du site peut encore afficher des icônes, mais aucune valeur numérique exploitable n'est fournie actuellement.",
     "unavailable_fetch_failed": "Les prévisions de seeing sont temporairement indisponibles car la requête 7Timer a échoué. Veuillez réessayer plus tard.",
     "tips": {
@@ -431,7 +438,9 @@
     "celestrak_policy_link": "Ouvrir la politique Celestrak",
     "celestrak_restart_hint": "Ouvrez le lien de vérification depuis la même IP externe que cet hôte MyAstroBoard. Après confirmation de la levée du blocage, vous pouvez relancer l'exploration Celestrak.",
     "celestrak_restart_button": "Relancer l'exploration Celestrak",
-    "celestrak_restart_confirm": "Confirmer la relance : utilisez ceci uniquement après levée du blocage Celestrak pour l'IP de cet hôte. Continuer ?"
+    "celestrak_restart_confirm": "Confirmer la relance : utilisez ceci uniquement après levée du blocage Celestrak pour l'IP de cet hôte. Continuer ?",
+    "footer_unknown_source": "Source inconnue",
+    "footer_source": "Source des données : le fournisseur TLE actif est {source}. La géométrie des passages orbitaux est calculée localement à partir de ce TLE."
   },
 
   "spaceflight": {
@@ -915,7 +924,8 @@
     "astroscore_exceptional": "Exceptionnel",
     "astroscore_good": "Bon",
     "astroscore_average": "Moyen",
-    "astroscore_poor": "Faible"
+    "astroscore_poor": "Faible",
+    "footer_source": "Source des données : calculs locaux SkyTonight basés sur vos catalogues configurés et vos contraintes d'observation (moteur Astropy/Astroplan)."
   },
 
   "plan_my_night": {
@@ -1352,7 +1362,8 @@
     "longitude": "Longitude : ",
     "latitude": "Latitude : ",
     "elevation": "Élévation : ",
-    "timezone": "Fuseau horaire : "
+    "timezone": "Fuseau horaire : ",
+    "footer_source": "Source des données : API météo Open-Meteo."
   },
 
   "events_api": {

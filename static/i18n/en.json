@@ -151,7 +151,8 @@
     "now_badge": "Now",
     "chart_horizon_axis": "Altitude (degrees)",
     "horizon_graph_details": "Altitude (-90° to +90°) | Date: {date}",
-    "chart_time_axis": "Local Time (24h format)"
+    "chart_time_axis": "Local Time (24h format)",
+    "footer_source": "Data source: Open-Meteo weather inputs + 100% local MyAstroBoard astrophotography analysis."
   },
 
   "best_window": {
@@ -239,7 +240,10 @@
     "failed_to_load_lunar_eclipse_data": "Failed to load lunar eclipse data",
     "eclipse_chart_title": "Altitude vs Time",
     "moon_altitude": "Moon Altitude (°)",
-    "eclipse_chart_footer": "Degrees (°) | Local Time"
+    "eclipse_chart_footer": "Degrees (°) | Local Time",
+    "footer_source_report": "Data source: 100% local astronomical calculations (Moon ephemeris and derived events).",
+    "footer_source_planner": "Data source: 100% local MyAstroBoard calculations for next nights and astrophotography score.",
+    "footer_source_best_window": "Data source: 100% local MyAstroBoard dark-window and best-window calculations."
   },
 
   "sun": {
@@ -287,7 +291,8 @@
     "nautical_twilight": "Nautical Twilight",
     "astronomical_twilight": "Astronomical Twilight",
     "dusk": "Dusk: ",
-    "dawn": "Dawn: "
+    "dawn": "Dawn: ",
+    "footer_source": "Data source: 100% local astronomical calculations (sunrise, sunset, and twilight times)."
   },
 
   "aurora": {
@@ -353,7 +358,8 @@
       "6": "Better visibility on clear, moonless nights"
     },
     "failed_to_load_predictions": "Failed to load aurora predictions. Please try again later.",
-    "tips_for_aurora_hunting": "Tips for Aurora Hunting:"
+    "tips_for_aurora_hunting": "Tips for Aurora Hunting:",
+    "footer_source": "Data source: NOAA SWPC space weather feeds + local MyAstroBoard visibility scoring."
   },
 
   "seeing_forecast": {
@@ -380,6 +386,7 @@
     },
     "no_data": "No seeing data available",
     "data_source": "Data source: 7Timer",
+    "footer_source": "Data source: 7Timer seeing forecast + local normalization and best-window scoring.",
     "unavailable_no_usable_values": "7Timer's public numeric API returned undefined seeing values for this cycle. The website chart may still show icons, but no usable numeric seeing values are currently provided.",
     "unavailable_fetch_failed": "Seeing forecast is temporarily unavailable because the 7Timer request failed. Please try again later.",
     "tips": {
@@ -431,7 +438,9 @@
     "celestrak_policy_link": "Open Celestrak policy",
     "celestrak_restart_hint": "Open the check link from the same external IP as this MyAstroBoard host. After confirming the block is lifted, you can restart Celestrak crawling.",
     "celestrak_restart_button": "Restart Celestrak crawl",
-    "celestrak_restart_confirm": "Confirm restart: use this only after Celestrak has removed the block for this host IP. Continue?"
+    "celestrak_restart_confirm": "Confirm restart: use this only after Celestrak has removed the block for this host IP. Continue?",
+    "footer_unknown_source": "Unknown source",
+    "footer_source": "Data source: Active TLE provider is {source}. Orbital pass geometry is calculated locally from this TLE."
   },
 
   "spaceflight": {
@@ -914,7 +923,8 @@
     "astroscore_exceptional": "Exceptional",
     "astroscore_good": "Good",
     "astroscore_average": "Average",
-    "astroscore_poor": "Poor"
+    "astroscore_poor": "Poor",
+    "footer_source": "Data source: local SkyTonight calculations using your configured catalogues and observing constraints (Astropy/Astroplan engine)."
   },
 
   "plan_my_night": {
@@ -1351,7 +1361,8 @@
     "longitude": "Longitude: ",
     "latitude": "Latitude: ",
     "elevation": "Elevation: ",
-    "timezone": "Timezone: "
+    "timezone": "Timezone: ",
+    "footer_source": "Data source: Open-Meteo weather API."
   },
 
   "events_api": {

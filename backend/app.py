@@ -1507,6 +1507,7 @@ def get_iss_passes_api():
         def _with_celestrak_status(payload: Dict[str, Any]) -> Dict[str, Any]:
             merged = dict(payload)
             merged["celestrak_status"] = iss_passes.get_celestrak_status()
+            merged["tle_source"] = iss_passes.get_iss_tle_source_info()
             return merged
 
         days = request.args.get("days", default=20, type=int)

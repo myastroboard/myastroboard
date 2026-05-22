@@ -183,7 +183,19 @@ async function loadAstroWeather() {
         renderWeatherAlerts(data.weather_alerts, data.location?.timezone);
         
         // Load horizon graph separately (has its own API call)
-        loadHorizonGraph();
+        loadHorizonGraph();        
+
+        const footerContainer = document.getElementById('astro-advanced-weather-main');
+        const existingFooter = footerContainer ? footerContainer.querySelector('.sf-data-source') : null;
+        if (existingFooter && existingFooter.parentNode) {
+            existingFooter.parentNode.removeChild(existingFooter);
+        }
+        appendDataSourceFooter(footerContainer, {
+            text: i18n.t('astro_weather.footer_source'),
+            links: [
+                { href: 'https://open-meteo.com/', label: 'Open-Meteo' }
+            ]
+        });
         
         //console.log('Astro weather data loaded:', data);
         

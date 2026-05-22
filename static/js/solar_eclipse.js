@@ -291,4 +291,8 @@ function renderSolarEclipseAltitudeChart(altitudeData) {
             }
         }
     });
+
+    appendDataSourceFooter(container, {
+        text: i18n.t('sun.footer_source')
+    });
 }

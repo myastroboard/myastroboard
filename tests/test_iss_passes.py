@@ -353,6 +353,58 @@ class TestISSPassServiceTleFallback:
         assert len(calls) == 1
         assert "celestrak.org" not in calls[0]
 
+    def test_fetch_iss_tle_marks_celestrak_blocked_after_3_timeouts(self, monkeypatch):
+        service = ISSPassService(45.5, -73.5, 30, "America/Montreal")
+
+        monkeypatch.setattr("iss_passes._get_cached_tle", lambda max_age_seconds=None: None)
+        monkeypatch.setattr("iss_passes._in_tle_failure_cooldown", lambda: False)
+
+        cache_payload = {}
+
+        def _mock_read_cache():
+            return dict(cache_payload)
+
+        def _mock_write_cache(payload):
+            cache_payload.clear()
+            cache_payload.update(payload)
+
+        monkeypatch.setattr("iss_passes._read_tle_cache", _mock_read_cache)
+        monkeypatch.setattr("iss_passes._write_tle_cache", _mock_write_cache)
+
+        block_calls = []
+
+        def _mock_set_celestrak_block(status_code, reason, source_url):
+            block_calls.append({
+                "status_code": status_code,
+                "reason": reason,
+                "source_url": source_url,
+            })
+
+        monkeypatch.setattr("iss_passes._set_celestrak_block", _mock_set_celestrak_block)
+
+        class _Response:
+            status_code = 200
+            text = ""
+
+            def raise_for_status(self):
+                return None
+
+        def _mock_get(url, **kwargs):
+            if "celestrak.org" in url:
+                raise Exception("Connection to celestrak.org timed out. (connect timeout=10)")
+            return _Response()
+
+        monkeypatch.setattr("iss_passes.requests.get", _mock_get)
+
+        for _ in range(3):
+            with pytest.raises(RuntimeError):
+                service._fetch_iss_tle()
+
+        assert int(cache_payload.get("celestrak_timeout_streak") or 0) == 3
+        assert len(block_calls) == 1
+        assert block_calls[0]["status_code"] == 0
+        assert "Consecutive Celestrak timeout threshold reached" in block_calls[0]["reason"]
+
 
 class TestISSCalendarAggregation:
     """Test ISS event integration in event aggregation payload."""
