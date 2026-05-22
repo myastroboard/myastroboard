@@ -15,7 +15,7 @@ sgp4==2.25
 PyOngc==1.2.2
 
 # Data processing
-numpy==2.4.5
+numpy==2.4.6
 matplotlib==3.10.9
 pandas==3.0.3
 
@@ -32,4 +32,4 @@ psutil==7.2.2
 Flask-Login==0.6.3
 
 # Version comparison
-packaging>=26.2
+packaging==26.2
