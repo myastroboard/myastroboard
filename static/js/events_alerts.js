@@ -22,6 +22,16 @@ function resolveEventIconExtraClasses(event, baseClass = '') {
     return [baseClass, event?.icon_color_class].filter(Boolean).join(' ');
 }
 
+function resolveEventBannerModifier(event) {
+    const map = {
+        'text-danger':    'critical',
+        'text-warning':   'high',
+        'text-info':      'medium',
+        'text-secondary': 'low',
+    };
+    return map[event?.icon_color_class] || 'medium';
+}
+
 /**
  * Initialize events alert system
  */
@@ -161,69 +171,98 @@ function startEventsRotary(container, events) {
         return;
     }
 
+    // Build dots navigation
+    const dotsNav = document.createElement('div');
+    dotsNav.className = 'event-banner-dots';
+    events.forEach((_, i) => {
+        const dot = document.createElement('span');
+        dot.className = 'event-banner-dot' + (i === 0 ? ' active' : '');
+        dot.addEventListener('click', () => {
+            currentIndex = i;
+            if (eventsRotaryIntervalId) {
+                clearInterval(eventsRotaryIntervalId);
+                eventsRotaryIntervalId = null;
+            }
+            showEvent(currentIndex);
+            eventsRotaryIntervalId = setInterval(() => {
+                currentIndex = (currentIndex + 1) % events.length;
+                showEvent(currentIndex);
+            }, EVENTS_ROTARY_INTERVAL);
+        });
+        dotsNav.appendChild(dot);
+    });
+    container.appendChild(dotsNav);
+
+    function showEvent(idx) {
+        const existing = container.querySelector('.event-banner');
+        if (existing) existing.remove();
+        container.insertBefore(createEventAlertCard(events[idx]), dotsNav);
+        dotsNav.querySelectorAll('.event-banner-dot').forEach((dot, i) => {
+            dot.classList.toggle('active', i === idx);
+        });
+    }
+
     eventsRotaryIntervalId = setInterval(() => {
         currentIndex = (currentIndex + 1) % events.length;
-        DOMUtils.clear(container);
-        container.appendChild(createEventAlertCard(events[currentIndex]));
+        showEvent(currentIndex);
     }, EVENTS_ROTARY_INTERVAL);
 }
 
 /**
- * Create a prominent alert card for the most important event
+ * Create a prominent banner card for an event
  */
 function createEventAlertCard(event) {
-    const card = document.createElement('div');
-    card.className = `alert alert-info mb-3`;
-    card.setAttribute('role', 'alert');
+    const banner = document.createElement('div');
+    banner.className = `event-banner event-banner--${resolveEventBannerModifier(event)}`;
 
-    const header = document.createElement('div');
+    // Left icon circle
+    const iconWrap = document.createElement('div');
+    iconWrap.className = 'event-banner__icon';
+    iconWrap.appendChild(DOMUtils.createIcon(resolveEventIconClass(event), 'icon-inline'));
+    banner.appendChild(iconWrap);
 
-    const titleDiv = document.createElement('div');
-    const titleHeading = document.createElement('h4');
-    titleHeading.className = 'alert-heading';
-    titleHeading.appendChild(DOMUtils.createIcon(resolveEventIconClass(event), resolveEventIconExtraClasses(event, 'icon-inline')));
-    const strong = document.createElement('strong');
-    strong.textContent = event.title || '';
-    titleHeading.appendChild(strong);
+    // Content area
+    const content = document.createElement('div');
+    content.className = 'event-banner__content';
 
-    const subtitle = document.createElement('h6');
-    subtitle.textContent = event.description || '';
+    const titleEl = document.createElement('div');
+    titleEl.className = 'event-banner__title';
+    titleEl.textContent = event.title || '';
+    content.appendChild(titleEl);
 
-    titleDiv.appendChild(titleHeading);
-    titleDiv.appendChild(subtitle);
-
-    header.appendChild(titleDiv);
-    card.appendChild(header);
-
-    // Add timing information if available
-    if (event.peak_time && event.days_until_event !== undefined) {
-        const timingDiv = document.createElement('div');
-        timingDiv.className = 'mt-2 small';
-        timingDiv.appendChild(DOMUtils.createIcon('bi bi-calendar-event text-danger', 'icon-inline'));
-        timingDiv.appendChild(document.createTextNode(`${formatTimeThenDate(new Date(event.peak_time))} - ${getDaysUntilText(event.days_until_event)}`));
-        card.appendChild(timingDiv);
+    if (event.description) {
+        const descEl = document.createElement('div');
+        descEl.className = 'event-banner__desc';
+        descEl.textContent = event.description;
+        content.appendChild(descEl);
     }
 
-    // Add action buttons
-    const actionsDiv = document.createElement('div');
-    actionsDiv.className = 'float-end';
-    
-    const learnMoreButton = document.createElement('a');
-    learnMoreButton.className = 'btn btn-sm sub-tab-btn active';
-    learnMoreButton.href = '#';
-    learnMoreButton.appendChild(DOMUtils.createIcon('bi bi-journal-text', 'icon-inline'));
-    learnMoreButton.appendChild(document.createTextNode(i18n.t('calendar.details')));
-    learnMoreButton.addEventListener('click', (e) => {
+    if (event.peak_time && event.days_until_event !== undefined) {
+        const metaEl = document.createElement('div');
+        metaEl.className = 'event-banner__meta';
+        metaEl.appendChild(DOMUtils.createIcon('bi bi-calendar-event text-danger', 'icon-inline me-1'));
+        metaEl.appendChild(document.createTextNode(`${formatTimeThenDate(new Date(event.peak_time))} · ${getDaysUntilText(event.days_until_event)}`));
+        content.appendChild(metaEl);
+    }
+
+    banner.appendChild(content);
+
+    // Action button
+    const actionEl = document.createElement('div');
+    actionEl.className = 'event-banner__action';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-sm event-banner__btn';
+    btn.appendChild(DOMUtils.createIcon('bi bi-journal-text', 'icon-inline'));
+    btn.appendChild(document.createTextNode(' ' + i18n.t('calendar.details')));
+    btn.addEventListener('click', (e) => {
         e.preventDefault();
         scrollToEventDetails(event.event_type, event.structure_key);
     });
-    actionsDiv.appendChild(learnMoreButton);
+    actionEl.appendChild(btn);
+    banner.appendChild(actionEl);
 
-    //card.appendChild(actionsDiv);
-    //Put actionDiv at first position to make it more visible
-    card.insertBefore(actionsDiv, card.firstChild);
-
-    return card;
+    return banner;
 }
 
 /**

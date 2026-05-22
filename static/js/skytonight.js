@@ -468,7 +468,7 @@ async function _renderSkyMap(reports, container) {
     const plotConfig = {
         responsive:             true,
         displaylogo:            false,
-        modeBarButtonsToRemove: ['sendDataToCloud', 'toImage'],
+        modeBarButtonsToRemove: ['toImage'],
     };
 
     // ── DOM: outer row ────────────────────────────────────────────────────────
