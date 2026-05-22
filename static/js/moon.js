@@ -305,6 +305,15 @@ async function loadBestDarkWindow() {
     try {
         const container = document.getElementById('window-display');
         const containerLoader = document.getElementById('window-loader-info-notice');
+        const sectionContainer = document.getElementById('save-actions-section');
+
+        // Ensure we do not keep stale/duplicate footer nodes between reloads.
+        if (sectionContainer) {
+            const existingFooter = sectionContainer.querySelector('.js-window-data-source-footer');
+            if (existingFooter && existingFooter.parentNode) {
+                existingFooter.parentNode.removeChild(existingFooter);
+            }
+        }
         
         // Clear container and reset loader at the very beginning
         DOMUtils.clear(container);
@@ -514,6 +523,14 @@ async function loadBestDarkWindow() {
             item.appendChild(modeCard);
 
             container.appendChild(item);
+        }
+
+        if (sectionContainer) {
+            const footer = createDataSourceFooter({
+                text: i18n.t('moon.footer_source_best_window')
+            });
+            footer.classList.add('js-window-data-source-footer');
+            sectionContainer.appendChild(footer);
         }
 
         

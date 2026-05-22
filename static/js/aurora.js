@@ -330,6 +330,13 @@ async function loadAurora() {
         tipsCol.appendChild(tipsAlert);
         tipsRow.appendChild(tipsCol);
         container.appendChild(tipsRow);
+
+        appendDataSourceFooter(container, {
+            text: i18n.t('aurora.footer_source'),
+            links: [
+                { href: 'https://www.swpc.noaa.gov/', label: 'NOAA SWPC' }
+            ]
+        });
     } else {
         // Error block
         const errorBlock = document.createElement('div');

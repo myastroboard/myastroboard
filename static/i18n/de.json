@@ -147,7 +147,8 @@
     "now_badge": "Jetzt",
     "chart_horizon_axis": "Höhe (Grad)",
     "horizon_graph_details": "Höhe (-90° bis +90°) | Datum: {date}",
-    "chart_time_axis": "Ortszeit (24-Stunden-Format)"
+    "chart_time_axis": "Ortszeit (24-Stunden-Format)",
+    "footer_source": "Datenquelle: Open-Meteo-Wetterdaten + 100% lokale MyAstroBoard-Astrofotografie-Analyse."
   },
   "best_window": {
     "section_title": "Bestes Beobachtungsfenster",
@@ -233,7 +234,10 @@
     "failed_to_load_lunar_eclipse_data": "Die Daten zur Mondfinsternis konnten nicht geladen werden",
     "eclipse_chart_title": "Höhe vs. Zeit",
     "moon_altitude": "Mondhöhe (°)",
-    "eclipse_chart_footer": "Grad (°) | Ortszeit"
+    "eclipse_chart_footer": "Grad (°) | Ortszeit",
+    "footer_source_report": "Datenquelle: 100% lokale astronomische Berechnungen (Mond-Ephemeriden und abgeleitete Ereignisse).",
+    "footer_source_planner": "Datenquelle: 100% lokale MyAstroBoard-Berechnungen für kommende Nächte und Astrofotografie-Score.",
+    "footer_source_best_window": "Datenquelle: 100% lokale MyAstroBoard-Berechnungen für Dark-Window und Best-Window."
   },
   "sun": {
     "solar_eclipse": "Sonnenfinsternis",
@@ -280,7 +284,8 @@
     "nautical_twilight": "Nautische Dämmerung",
     "astronomical_twilight": "Astronomische Dämmerung",
     "dusk": "Dämmerung:",
-    "dawn": "Dämmerung:"
+    "dawn": "Dämmerung:",
+    "footer_source": "Datenquelle: 100% lokale astronomische Berechnungen (Sonnenaufgang, Sonnenuntergang und Dämmerungszeiten)."
   },
   "aurora": {
     "borealis_predictions": "Aurora Borealis-Vorhersagen",
@@ -345,7 +350,8 @@
       "6": "Bessere Sicht in klaren, mondlosen Nächten"
     },
     "failed_to_load_predictions": "Die Aurora-Vorhersagen konnten nicht geladen werden. Bitte versuchen Sie es später noch einmal.",
-    "tips_for_aurora_hunting": "Tipps für die Aurora-Jagd:"
+    "tips_for_aurora_hunting": "Tipps für die Aurora-Jagd:",
+    "footer_source": "Datenquelle: NOAA SWPC Space-Weather-Feeds + lokales MyAstroBoard-Sichtbarkeits-Scoring."
   },
   "seeing_forecast": {
     "title": "Seeing-Vorhersage",
@@ -371,6 +377,7 @@
     },
     "no_data": "Keine Seeing-Daten verfügbar",
     "data_source": "Datenquelle: 7Timer",
+    "footer_source": "Datenquelle: 7Timer-Seeing-Vorhersage + lokale Normalisierung und Best-Window-Scoring.",
     "unavailable_no_usable_values": "Die öffentliche numerische API von 7Timer liefert in diesem Zyklus undefinierte Seeing-Werte. Das Website-Diagramm kann weiterhin Symbole anzeigen, aber derzeit keine nutzbaren numerischen Seeing-Werte.",
     "unavailable_fetch_failed": "Die Seeing-Vorhersage ist vorübergehend nicht verfügbar, weil die 7Timer-Anfrage fehlgeschlagen ist. Bitte versuchen Sie es später erneut.",
     "tips": {
@@ -421,7 +428,9 @@
     "celestrak_policy_link": "Celestrak-Richtlinie öffnen",
     "celestrak_restart_hint": "Öffnen Sie den Prüf-Link von derselben externen IP wie dieser MyAstroBoard-Host. Nach Bestätigung der Entsperrung können Sie den Celestrak-Abruf neu starten.",
     "celestrak_restart_button": "Celestrak-Abruf neu starten",
-    "celestrak_restart_confirm": "Neustart bestätigen: Nur verwenden, wenn Celestrak die Sperre für diese Host-IP entfernt hat. Fortfahren?"
+    "celestrak_restart_confirm": "Neustart bestätigen: Nur verwenden, wenn Celestrak die Sperre für diese Host-IP entfernt hat. Fortfahren?",
+    "footer_unknown_source": "Unbekannte Quelle",
+    "footer_source": "Datenquelle: Aktiver TLE-Anbieter ist {source}. Die Geometrie der Überflüge wird lokal aus diesem TLE berechnet."
   },
 
   "spaceflight": {
@@ -902,7 +911,8 @@
     "astroscore_exceptional": "Ausgezeichnet",
     "astroscore_good": "Gut",
     "astroscore_average": "Mittel",
-    "astroscore_poor": "Schwach"
+    "astroscore_poor": "Schwach",
+    "footer_source": "Datenquelle: lokale SkyTonight-Berechnungen mit Ihren konfigurierten Katalogen und Beobachtungsbedingungen (Astropy/Astroplan-Engine)."
   },
   "plan_my_night": {
     "section_intro": "Erstellen Sie direkt aus SkyTonight-Zielen eine private Zeitplanung für die heutige Nacht.",
@@ -1334,7 +1344,8 @@
     "longitude": "Länge:",
     "latitude": "Breite:",
     "elevation": "Elevation:",
-    "timezone": "Zeitzone:"
+    "timezone": "Zeitzone:",
+    "footer_source": "Datenquelle: Open-Meteo-Wetter-API."
   },
   "events_api": {
     "solar_eclipse_description": "{eclipse_type} Sonnenfinsternis mit {obscuration_percent} % Verdunkelung. Höhepunkt bei {peak_altitude_deg}° Höhe.",

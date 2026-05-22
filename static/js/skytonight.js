@@ -1212,6 +1212,9 @@ async function _showSkyTonightDataSection(sectionKey, container) {
                 ? tSkyTonightCompat('no_target_in_report')
                 : tSkyTonightCompat('no_data_available');
             container.appendChild(empty);
+            appendDataSourceFooter(container, {
+                text: tSkyTonightCompat('footer_source')
+            });
             return;
         }
 
@@ -1220,6 +1223,9 @@ async function _showSkyTonightDataSection(sectionKey, container) {
         const tableHtml = generateReportTable(tableData, 'SkyTonight', tableType, displayAstrodex, currentPage);
         const fragment = document.createRange().createContextualFragment(tableHtml);
         container.appendChild(fragment);
+        appendDataSourceFooter(container, {
+            text: tSkyTonightCompat('footer_source')
+        });
 
     } catch (err) {
         console.error('Error loading SkyTonight section:', sectionKey, err);

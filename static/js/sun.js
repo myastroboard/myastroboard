@@ -106,6 +106,7 @@ async function loadSun() {
 
         container.appendChild(header);
         container.appendChild(cardsRow);
+        
     } catch (error) {
         console.error('Error loading weather:', error);
         DOMUtils.clear(container);

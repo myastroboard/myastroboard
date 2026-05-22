@@ -45,6 +45,7 @@ ISS_TLE_URLS = [
     "https://api.wheretheiss.at/v1/satellites/25544/tles",
 ]
 REQUEST_TIMEOUT_SECONDS = 10
+CELESTRAK_TIMEOUT_BLOCK_THRESHOLD = 3
 DEFAULT_FORECAST_DAYS = 20
 MAX_FORECAST_DAYS = 30
 MIN_EVENT_ALTITUDE_DEG = 10.0
@@ -114,6 +115,37 @@ def _set_cached_tle(line1: str, line2: str) -> None:
     _write_tle_cache(payload)
 
 
+def _source_name_from_url(source_url: str) -> str:
+    source = (source_url or "").lower()
+    if "celestrak.org" in source:
+        return "Celestrak"
+    if "ivanstanojevic" in source:
+        return "TLE API (ivanstanojevic.me)"
+    if "wheretheiss.at" in source:
+        return "WhereTheISS"
+    return "Unknown"
+
+
+def _set_cached_tle_with_source(line1: str, line2: str, source_url: str) -> None:
+    payload = _read_tle_cache()
+    payload['line1'] = line1
+    payload['line2'] = line2
+    payload['fetched_at'] = _utc_timestamp()
+    payload['last_error_at'] = None
+    payload['last_source_url'] = source_url
+    payload['last_source_name'] = _source_name_from_url(source_url)
+    _write_tle_cache(payload)
+
+
+def get_iss_tle_source_info() -> Dict[str, Any]:
+    payload = _read_tle_cache()
+    return {
+        "name": str(payload.get("last_source_name") or "").strip(),
+        "url": str(payload.get("last_source_url") or "").strip(),
+        "fetched_at": int(payload.get("fetched_at") or 0),
+    }
+
+
 def _set_tle_error_timestamp() -> None:
     payload = _read_tle_cache()
     payload['last_error_at'] = _utc_timestamp()
@@ -138,6 +170,33 @@ def _set_celestrak_block(status_code: int, reason: str, source_url: str) -> None
     _write_tle_cache(payload)
 
 
+def _reset_celestrak_timeout_streak() -> None:
+    payload = _read_tle_cache()
+    payload['celestrak_timeout_streak'] = 0
+    payload['celestrak_last_timeout_at'] = None
+    payload['celestrak_last_timeout_reason'] = None
+    payload['celestrak_last_timeout_source_url'] = None
+    _write_tle_cache(payload)
+
+
+def _increment_celestrak_timeout_streak(reason: str, source_url: str) -> int:
+    payload = _read_tle_cache()
+    streak = int(payload.get('celestrak_timeout_streak') or 0) + 1
+    payload['celestrak_timeout_streak'] = streak
+    payload['celestrak_last_timeout_at'] = _utc_timestamp()
+    payload['celestrak_last_timeout_reason'] = reason
+    payload['celestrak_last_timeout_source_url'] = source_url
+    _write_tle_cache(payload)
+    return streak
+
+
+def _is_celestrak_timeout_error(exc: Exception) -> bool:
+    if isinstance(exc, requests.exceptions.Timeout):
+        return True
+    message = str(exc).lower()
+    return "timed out" in message or "connect timeout" in message
+
+
 def _clear_celestrak_block(reset_failure_cooldown: bool = True) -> None:
     payload = _read_tle_cache()
     payload['celestrak_blocked'] = False
@@ -145,6 +204,10 @@ def _clear_celestrak_block(reset_failure_cooldown: bool = True) -> None:
     payload['celestrak_blocked_status_code'] = None
     payload['celestrak_blocked_reason'] = None
     payload['celestrak_blocked_source_url'] = None
+    payload['celestrak_timeout_streak'] = 0
+    payload['celestrak_last_timeout_at'] = None
+    payload['celestrak_last_timeout_reason'] = None
+    payload['celestrak_last_timeout_source_url'] = None
     if reset_failure_cooldown:
         payload['last_error_at'] = None
     _write_tle_cache(payload)
@@ -158,6 +221,11 @@ def get_celestrak_status() -> Dict[str, Any]:
         "blocked_status_code": int(payload.get("celestrak_blocked_status_code") or 0),
         "blocked_reason": str(payload.get("celestrak_blocked_reason") or "").strip(),
         "blocked_source_url": str(payload.get("celestrak_blocked_source_url") or "").strip(),
+        "timeout_streak": int(payload.get("celestrak_timeout_streak") or 0),
+        "timeout_block_threshold": CELESTRAK_TIMEOUT_BLOCK_THRESHOLD,
+        "last_timeout_at": int(payload.get("celestrak_last_timeout_at") or 0),
+        "last_timeout_reason": str(payload.get("celestrak_last_timeout_reason") or "").strip(),
+        "last_timeout_source_url": str(payload.get("celestrak_last_timeout_source_url") or "").strip(),
         "policy_url": CELESTRAK_USAGE_POLICY_URL,
         "addendum_url": CELESTRAK_ADDENDUM_URL,
         "manual_check_url": CELESTRAK_ISS_QUERY_URL,
@@ -233,6 +301,7 @@ class ISSPassService:
             "total_lunar_transits": len(lunar_transits),
             "cache_ttl": CACHE_TTL,
             "celestrak_status": get_celestrak_status(),
+            "tle_source": get_iss_tle_source_info(),
             "units": {
                 "times": "ISO format local timezone",
                 "duration_minutes": "minutes",
@@ -285,6 +354,7 @@ class ISSPassService:
                 # Celestrak policy compliance: any non-200 response must stop
                 # further upstream querying and be escalated to human review.
                 if "celestrak.org" in tle_url and status_code != 200:
+                    _reset_celestrak_timeout_streak()
                     _set_tle_error_timestamp()
                     _set_celestrak_block(
                         status_code=status_code,
@@ -297,8 +367,9 @@ class ISSPassService:
 
                 response.raise_for_status()
                 line1, line2 = self._parse_iss_tle_from_response(response.text)
-                _set_cached_tle(line1, line2)
+                _set_cached_tle_with_source(line1, line2, tle_url)
                 if "celestrak.org" in tle_url:
+                    _reset_celestrak_timeout_streak()
                     _clear_celestrak_block(reset_failure_cooldown=True)
                 return line1, line2
             except Exception as exc:
@@ -332,6 +403,32 @@ class ISSPassService:
                             "Celestrak returned a non-200 response and no cached TLE is available; "
                             "manual intervention required"
                         ) from exc
+
+                    if _is_celestrak_timeout_error(exc):
+                        timeout_streak = _increment_celestrak_timeout_streak(str(exc), tle_url)
+                        logger.warning(
+                            "Celestrak timeout detected (%s/%s consecutive): %s",
+                            timeout_streak,
+                            CELESTRAK_TIMEOUT_BLOCK_THRESHOLD,
+                            exc,
+                        )
+                        if timeout_streak >= CELESTRAK_TIMEOUT_BLOCK_THRESHOLD:
+                            _set_tle_error_timestamp()
+                            _set_celestrak_block(
+                                status_code=0,
+                                reason=(
+                                    "Consecutive Celestrak timeout threshold reached "
+                                    f"({CELESTRAK_TIMEOUT_BLOCK_THRESHOLD})"
+                                ),
+                                source_url=tle_url,
+                            )
+                            logger.error(
+                                "Celestrak was auto-flagged as blocked after %s consecutive timeouts. "
+                                "Automatic Celestrak queries are paused until manual reset.",
+                                CELESTRAK_TIMEOUT_BLOCK_THRESHOLD,
+                            )
+                    else:
+                        _reset_celestrak_timeout_streak()
 
                 last_error = exc
                 logger.debug(f"ISS TLE fetch failed for {tle_url}: {exc}")

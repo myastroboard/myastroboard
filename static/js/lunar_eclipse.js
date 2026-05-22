@@ -298,4 +298,8 @@ function renderLunarEclipseAltitudeChart(altitudeData) {
             }
         }
     });
+
+    appendDataSourceFooter(container, {
+        text: i18n.t('moon.footer_source_planner')
+    });
 }

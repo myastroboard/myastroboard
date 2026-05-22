@@ -330,4 +330,11 @@ async function loadSeeingForecast() {
         tipsCard.appendChild(tipsBody);
         container.appendChild(tipsCard);
     }
+
+    appendDataSourceFooter(container, {
+        text: i18n.t('seeing_forecast.footer_source'),
+        links: [
+            { href: 'http://www.7timer.info/', label: '7Timer' }
+        ]
+    });
 }

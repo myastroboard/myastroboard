@@ -145,6 +145,44 @@ function escapeForJs(text) {
                .replace(/\r/g, '\\r');
 }
 
+/**
+ * Build a standardized data-source footer paragraph for data-driven sections.
+ * Pass plain text plus optional links to avoid unsafe HTML insertion.
+ */
+function createDataSourceFooter({ text, links = [] }) {
+    const footer = document.createElement('p');
+    footer.className = 'sf-data-source text-muted small mt-4 text-center';
+
+    const icon = document.createElement('i');
+    icon.className = 'bi bi-database me-1';
+    footer.appendChild(icon);
+
+    if (text) {
+        footer.appendChild(document.createTextNode(text));
+    }
+
+    links.forEach((entry, index) => {
+        if (index === 0 && text) {
+            footer.appendChild(document.createTextNode(' '));
+        } else if (index > 0) {
+            footer.appendChild(document.createTextNode(' | '));
+        }
+        const link = document.createElement('a');
+        link.href = entry.href;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = entry.label;
+        footer.appendChild(link);
+    });
+
+    return footer;
+}
+
+function appendDataSourceFooter(container, options) {
+    if (!container) return;
+    container.appendChild(createDataSourceFooter(options));
+}
+
 // =======================
 // Helpers date formating
 // =======================
