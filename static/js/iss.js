@@ -160,7 +160,11 @@ async function _createIssMapCard(container) {
         return;
     }
 
-    _issMap = L.map('iss-map', { zoomControl: true, scrollWheelZoom: true });
+    _issMap = L.map('iss-map', {
+        zoomControl: true,
+        scrollWheelZoom: false,
+        touchZoom: false,
+    });
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
         maxZoom: 7,
         attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
