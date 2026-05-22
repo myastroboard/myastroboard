@@ -1409,7 +1409,19 @@
     },
     "special_phenomena": {
       "milky_way_title": "Milky Way Core Visible",
-      "milky_way_description": "Galactic center visible at {gc_altitude}° altitude. Excellent night for wide-field astrophotography."
+      "milky_way_description": "Galactic center visible at {gc_altitude}° altitude. Excellent night for wide-field astrophotography.",
+      "spring_equinox_title": "Vernal Equinox (Spring)",
+      "spring_equinox_description": "First day of spring. Equal day and night length. Sun directly above equator.",
+      "summer_solstice_title": "Summer Solstice",
+      "summer_solstice_description": "First day of summer. Longest day of the year in Northern Hemisphere.",
+      "autumn_equinox_title": "Autumnal Equinox (Fall)",
+      "autumn_equinox_description": "First day of autumn. Equal day and night length. Sun directly above equator.",
+      "winter_solstice_title": "Winter Solstice",
+      "winter_solstice_description": "First day of winter. Shortest day of the year in Northern Hemisphere.",
+      "zodiacal_light_title": "Zodiacal Light Visible ({viewing_type})",
+      "zodiacal_light_description": "Faint cone of light from interplanetary dust visible during twilight. Best viewed in dark skies.",
+      "zodiacal_viewing_evening": "Evening",
+      "zodiacal_viewing_morning": "Morning"
     }
   },
   

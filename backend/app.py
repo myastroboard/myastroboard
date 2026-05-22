@@ -2089,6 +2089,17 @@ def _translate_special_phenomena_events(data: Dict[str, Any], language: str) -> 
     i18n = I18nManager(language)
     translated_events = []
 
+    def _t(key: str, fallback: str, **kwargs: Any) -> str:
+        translated = i18n.t(key, **kwargs)
+        if translated and translated != key:
+            return translated
+        if kwargs:
+            try:
+                return fallback.format(**kwargs)
+            except Exception:
+                return fallback
+        return fallback
+
     for event in events:
         if not isinstance(event, dict):
             translated_events.append(event)
@@ -2097,18 +2108,80 @@ def _translate_special_phenomena_events(data: Dict[str, Any], language: str) -> 
         translated_event = event.copy()
 
         try:
-            if event.get("event_type") == "Milky Way Core Visibility":
+            event_type = str(event.get("event_type", ""))
+            raw_data = event.get("raw_data", {}) if isinstance(event.get("raw_data"), dict) else {}
+            event_key = str(raw_data.get("event", "")).strip().lower()
+
+            if event_key == "spring_equinox":
+                translated_event["title"] = _t(
+                    'events_api.special_phenomena.spring_equinox_title',
+                    str(event.get("title", "Vernal Equinox (Spring)"))
+                )
+                translated_event["description"] = _t(
+                    'events_api.special_phenomena.spring_equinox_description',
+                    str(event.get("description", "First day of spring. Equal day and night length. Sun directly above equator."))
+                )
+            elif event_key == "summer_solstice":
+                translated_event["title"] = _t(
+                    'events_api.special_phenomena.summer_solstice_title',
+                    str(event.get("title", "Summer Solstice"))
+                )
+                translated_event["description"] = _t(
+                    'events_api.special_phenomena.summer_solstice_description',
+                    str(event.get("description", "First day of summer. Longest day of the year in Northern Hemisphere."))
+                )
+            elif event_key == "autumn_equinox":
+                translated_event["title"] = _t(
+                    'events_api.special_phenomena.autumn_equinox_title',
+                    str(event.get("title", "Autumnal Equinox (Fall)"))
+                )
+                translated_event["description"] = _t(
+                    'events_api.special_phenomena.autumn_equinox_description',
+                    str(event.get("description", "First day of autumn. Equal day and night length. Sun directly above equator."))
+                )
+            elif event_key == "winter_solstice":
+                translated_event["title"] = _t(
+                    'events_api.special_phenomena.winter_solstice_title',
+                    str(event.get("title", "Winter Solstice"))
+                )
+                translated_event["description"] = _t(
+                    'events_api.special_phenomena.winter_solstice_description',
+                    str(event.get("description", "First day of winter. Shortest day of the year in Northern Hemisphere."))
+                )
+            elif event_key == "zodiacal_light":
+                viewing_raw = str(event.get("viewing_type", "")).strip().lower()
+                if viewing_raw == "morning":
+                    viewing_label = _t('events_api.special_phenomena.zodiacal_viewing_morning', 'Morning')
+                else:
+                    viewing_label = _t('events_api.special_phenomena.zodiacal_viewing_evening', 'Evening')
+
+                translated_event["title"] = _t(
+                    'events_api.special_phenomena.zodiacal_light_title',
+                    str(event.get("title", "Zodiacal Light Visible ({viewing_type})")),
+                    viewing_type=viewing_label
+                )
+                translated_event["description"] = _t(
+                    'events_api.special_phenomena.zodiacal_light_description',
+                    str(event.get("description", "Faint cone of light from interplanetary dust visible during twilight. Best viewed in dark skies."))
+                )
+                translated_event["viewing_type"] = viewing_label
+            elif event_type == "Milky Way Core Visibility":
                 gc_altitude = event.get("galactic_center_altitude")
 
                 if gc_altitude is None:
-                    raw_data = event.get("raw_data", {})
-                    gc_altitude = raw_data.get("gc_altitude") if isinstance(raw_data, dict) else None
+                    gc_altitude = raw_data.get("galactic_center_altitude")
+                if gc_altitude is None:
+                    gc_altitude = raw_data.get("gc_altitude")
 
                 if gc_altitude is not None:
                     altitude_text = f"{float(gc_altitude):.0f}"
-                    translated_event["title"] = i18n.t('events_api.special_phenomena.milky_way_title')
-                    translated_event["description"] = i18n.t(
+                    translated_event["title"] = _t(
+                        'events_api.special_phenomena.milky_way_title',
+                        str(event.get("title", "Milky Way Core Visible"))
+                    )
+                    translated_event["description"] = _t(
                         'events_api.special_phenomena.milky_way_description',
+                        str(event.get("description", "Galactic center visible at {gc_altitude}° altitude. Excellent night for wide-field astrophotography.")),
                         gc_altitude=altitude_text
                     )
         except Exception as e:

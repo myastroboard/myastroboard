@@ -1390,7 +1390,19 @@
     },
     "special_phenomena": {
       "milky_way_title": "Nucleo della Via Lattea visibile",
-      "milky_way_description": "Centro galattico visibile a {gc_altitude}° di altitudine. Ottima notte per la fotografia astronomica grandangolare."
+      "milky_way_description": "Centro galattico visibile a {gc_altitude}° di altitudine. Ottima notte per la fotografia astronomica grandangolare.",
+      "spring_equinox_title": "Equinozio di primavera",
+      "spring_equinox_description": "Primo giorno di primavera. Giorno e notte hanno uguale durata. Sole sopra l'equatore.",
+      "summer_solstice_title": "Solstizio d'estate",
+      "summer_solstice_description": "Primo giorno d'estate. Giorno più lungo dell'anno nell'emisfero nord.",
+      "autumn_equinox_title": "Equinozio d'autunno",
+      "autumn_equinox_description": "Primo giorno d'autunno. Giorno e notte hanno uguale durata. Sole sopra l'equatore.",
+      "winter_solstice_title": "Solstizio d'inverno",
+      "winter_solstice_description": "Primo giorno d'inverno. Giorno più corto dell'anno nell'emisfero nord.",
+      "zodiacal_light_title": "Luce zodiacale visibile ({viewing_type})",
+      "zodiacal_light_description": "Debole cono di luce della polvere interplanetaria visibile durante il crepuscolo. Migliore osservazione sotto cieli bui.",
+      "zodiacal_viewing_evening": "sera",
+      "zodiacal_viewing_morning": "mattina"
     }
   },
   "weather_alerts": {

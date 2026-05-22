@@ -1390,7 +1390,19 @@
     },
     "special_phenomena": {
       "milky_way_title": "Núcleo da Via Láctea visível",
-      "milky_way_description": "Centro galáctico visível a {gc_altitude}° de altitude. Excelente noite para astrofotografia de campo amplo."
+      "milky_way_description": "Centro galáctico visível a {gc_altitude}° de altitude. Excelente noite para astrofotografia de campo amplo.",
+      "spring_equinox_title": "Equinócio da primavera",
+      "spring_equinox_description": "Primeiro dia da primavera. Dia e noite têm a mesma duração. Sol diretamente sobre o equador.",
+      "summer_solstice_title": "Solstício de verão",
+      "summer_solstice_description": "Primeiro dia do verão. Dia mais longo do ano no Hemisfério Norte.",
+      "autumn_equinox_title": "Equinócio de outono",
+      "autumn_equinox_description": "Primeiro dia do outono. Dia e noite têm a mesma duração. Sol diretamente sobre o equador.",
+      "winter_solstice_title": "Solstício de inverno",
+      "winter_solstice_description": "Primeiro dia do inverno. Dia mais curto do ano no Hemisfério Norte.",
+      "zodiacal_light_title": "Luz zodiacal visível ({viewing_type})",
+      "zodiacal_light_description": "Tênue cone de luz da poeira interplanetária visível durante o crepúsculo. Melhor observada sob céus escuros.",
+      "zodiacal_viewing_evening": "entardecer",
+      "zodiacal_viewing_morning": "amanhecer"
     }
   },
   "weather_alerts": {

@@ -1391,7 +1391,19 @@
     },
     "special_phenomena": {
       "milky_way_title": "Milchstraßenkern sichtbar",
-      "milky_way_description": "Galaktisches Zentrum bei {gc_altitude}° Höhe sichtbar. Ausgezeichnete Nacht für Weitfeld-Astrofotografie."
+      "milky_way_description": "Galaktisches Zentrum bei {gc_altitude}° Höhe sichtbar. Ausgezeichnete Nacht für Weitfeld-Astrofotografie.",
+      "spring_equinox_title": "Frühlings-Tagundnachtgleiche",
+      "spring_equinox_description": "Erster Frühlingstag. Tag und Nacht sind gleich lang. Die Sonne steht über dem Äquator.",
+      "summer_solstice_title": "Sommersonnenwende",
+      "summer_solstice_description": "Erster Sommertag. Längster Tag des Jahres auf der Nordhalbkugel.",
+      "autumn_equinox_title": "Herbst-Tagundnachtgleiche",
+      "autumn_equinox_description": "Erster Herbsttag. Tag und Nacht sind gleich lang. Die Sonne steht über dem Äquator.",
+      "winter_solstice_title": "Wintersonnenwende",
+      "winter_solstice_description": "Erster Wintertag. Kürzester Tag des Jahres auf der Nordhalbkugel.",
+      "zodiacal_light_title": "Zodiakallicht sichtbar ({viewing_type})",
+      "zodiacal_light_description": "Schwacher Lichtkegel aus interplanetarem Staub in der Dämmerung sichtbar. Am besten unter dunklem Himmel.",
+      "zodiacal_viewing_evening": "abends",
+      "zodiacal_viewing_morning": "morgens"
     }
   },
   "weather_alerts": {

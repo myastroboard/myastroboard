@@ -60,6 +60,20 @@ class SpecialPhenomenaService:
             height=elevation * u.m
         )
 
+    def _t(self, key: str, fallback: str, **kwargs: Any) -> str:
+        """Translate key with fallback text when translation is unavailable."""
+        translated = self.i18n.t(key, **kwargs)
+        if translated and translated != key:
+            return translated
+
+        if kwargs:
+            try:
+                return fallback.format(**kwargs)
+            except Exception:
+                return fallback
+
+        return fallback
+
     def get_special_phenomena(self, days_ahead: int = 365) -> List[Dict[str, Any]]:
         """
         Get all special phenomena for the next N days.
@@ -114,8 +128,14 @@ class SpecialPhenomenaService:
                     spring_eq_refined = self._refine_equinox_time(spring_eq, 'spring')
                     events.append({
                         'event_type': 'Equinox',
-                        'title': 'Vernal Equinox (Spring)',
-                        'description': 'First day of spring. Equal day and night length. Sun directly above equator.',
+                        'title': self._t(
+                            'events_api.special_phenomena.spring_equinox_title',
+                            'Vernal Equinox (Spring)'
+                        ),
+                        'description': self._t(
+                            'events_api.special_phenomena.spring_equinox_description',
+                            'First day of spring. Equal day and night length. Sun directly above equator.'
+                        ),
                         'icon_class': 'bi bi-sunrise',
                         'peak_time': self._to_local_iso(spring_eq_refined),
                         'season_start': True,
@@ -135,8 +155,14 @@ class SpecialPhenomenaService:
                     summer_sol_refined = self._refine_solstice_time(summer_sol, 'summer')
                     events.append({
                         'event_type': 'Solstice',
-                        'title': 'Summer Solstice',
-                        'description': 'First day of summer. Longest day of the year in Northern Hemisphere.',
+                        'title': self._t(
+                            'events_api.special_phenomena.summer_solstice_title',
+                            'Summer Solstice'
+                        ),
+                        'description': self._t(
+                            'events_api.special_phenomena.summer_solstice_description',
+                            'First day of summer. Longest day of the year in Northern Hemisphere.'
+                        ),
                         'icon_class': 'bi bi-sun',
                         'peak_time': self._to_local_iso(summer_sol_refined),
                         'season_start': True,
@@ -156,8 +182,14 @@ class SpecialPhenomenaService:
                     autumn_eq_refined = self._refine_equinox_time(autumn_eq, 'autumn')
                     events.append({
                         'event_type': 'Equinox',
-                        'title': 'Autumnal Equinox (Fall)',
-                        'description': 'First day of autumn. Equal day and night length. Sun directly above equator.',
+                        'title': self._t(
+                            'events_api.special_phenomena.autumn_equinox_title',
+                            'Autumnal Equinox (Fall)'
+                        ),
+                        'description': self._t(
+                            'events_api.special_phenomena.autumn_equinox_description',
+                            'First day of autumn. Equal day and night length. Sun directly above equator.'
+                        ),
                         'icon_class': 'bi bi-sunset',
                         'peak_time': self._to_local_iso(autumn_eq_refined),
                         'season_start': True,
@@ -177,8 +209,14 @@ class SpecialPhenomenaService:
                     winter_sol_refined = self._refine_solstice_time(winter_sol, 'winter')
                     events.append({
                         'event_type': 'Solstice',
-                        'title': 'Winter Solstice',
-                        'description': 'First day of winter. Shortest day of the year in Northern Hemisphere.',
+                        'title': self._t(
+                            'events_api.special_phenomena.winter_solstice_title',
+                            'Winter Solstice'
+                        ),
+                        'description': self._t(
+                            'events_api.special_phenomena.winter_solstice_description',
+                            'First day of winter. Shortest day of the year in Northern Hemisphere.'
+                        ),
                         'icon_class': 'bi bi-snow',
                         'peak_time': self._to_local_iso(winter_sol_refined),
                         'season_start': True,
@@ -383,10 +421,24 @@ class SpecialPhenomenaService:
                             
                             if is_moon_ok:
                                 viewing_type = 'Evening' if is_spring else 'Morning'
+                                viewing_type_localized = self._t(
+                                    'events_api.special_phenomena.zodiacal_viewing_evening',
+                                    'Evening'
+                                ) if is_spring else self._t(
+                                    'events_api.special_phenomena.zodiacal_viewing_morning',
+                                    'Morning'
+                                )
                                 events.append({
                                     'event_type': 'Zodiacal Light Window',
-                                    'title': f'Zodiacal Light Visible ({viewing_type})',
-                                    'description': f'Faint cone of light from interplanetary dust visible during twilight. Best viewed in dark skies.',
+                                    'title': self._t(
+                                        'events_api.special_phenomena.zodiacal_light_title',
+                                        'Zodiacal Light Visible ({viewing_type})',
+                                        viewing_type=viewing_type_localized
+                                    ),
+                                    'description': self._t(
+                                        'events_api.special_phenomena.zodiacal_light_description',
+                                        'Faint cone of light from interplanetary dust visible during twilight. Best viewed in dark skies.'
+                                    ),
                                     'icon_class': 'bi bi-stars',
                                     'peak_time': self._to_local_iso(current_time),
                                     'start_time': self._to_local_iso(current_time),
@@ -515,19 +567,15 @@ class SpecialPhenomenaService:
                 # Score: weighted altitude (0-8) + dark-sky bonus (always 2 here, moon already filtered)
                 score = round(min(10.0, (gc_altitude / 60.0) * 8.0 + 2.0), 1)
 
-                title = self.i18n.t('events_api.special_phenomena.milky_way_title')
-                if not title or title == 'events_api.special_phenomena.milky_way_title':
-                    title = 'Milky Way Core Visible'
-
-                description = self.i18n.t(
+                title = self._t(
+                    'events_api.special_phenomena.milky_way_title',
+                    'Milky Way Core Visible'
+                )
+                description = self._t(
                     'events_api.special_phenomena.milky_way_description',
+                    'Galactic center visible at {gc_altitude}° altitude. Excellent night for wide-field astrophotography.',
                     gc_altitude=f"{gc_altitude:.0f}"
                 )
-                if not description or description == 'events_api.special_phenomena.milky_way_description':
-                    description = (
-                        f"Galactic center visible at {gc_altitude:.0f}° altitude. "
-                        "Excellent for wide-field astrophotography."
-                    )
 
                 events.append({
                     'event_type': 'Milky Way Core Visibility',

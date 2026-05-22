@@ -280,6 +280,53 @@ class EventsAggregator:
 
         return fallback_title, fallback_description
 
+    def _localize_special_phenomena_text(self, event_data: Dict[str, Any]) -> tuple[str, str]:
+        """Localize special phenomena title/description using raw event identifiers."""
+        raw = event_data.get("raw_data", {}) or {}
+        fallback_title = event_data.get("title", "Special Phenomenon")
+        fallback_description = event_data.get("description", "")
+        event_key = str(raw.get("event", "")).strip().lower()
+
+        if event_key == "spring_equinox":
+            return (
+                self._t("events_api.special_phenomena.spring_equinox_title", fallback_title),
+                self._t("events_api.special_phenomena.spring_equinox_description", fallback_description),
+            )
+        if event_key == "summer_solstice":
+            return (
+                self._t("events_api.special_phenomena.summer_solstice_title", fallback_title),
+                self._t("events_api.special_phenomena.summer_solstice_description", fallback_description),
+            )
+        if event_key == "autumn_equinox":
+            return (
+                self._t("events_api.special_phenomena.autumn_equinox_title", fallback_title),
+                self._t("events_api.special_phenomena.autumn_equinox_description", fallback_description),
+            )
+        if event_key == "winter_solstice":
+            return (
+                self._t("events_api.special_phenomena.winter_solstice_title", fallback_title),
+                self._t("events_api.special_phenomena.winter_solstice_description", fallback_description),
+            )
+        if event_key == "zodiacal_light":
+            viewing_raw = str(event_data.get("viewing_type") or raw.get("viewing_type") or "").strip().lower()
+            viewing_type = self._t(
+                "events_api.special_phenomena.zodiacal_viewing_morning",
+                "Morning",
+            ) if viewing_raw == "morning" else self._t(
+                "events_api.special_phenomena.zodiacal_viewing_evening",
+                "Evening",
+            )
+            return (
+                self._t(
+                    "events_api.special_phenomena.zodiacal_light_title",
+                    fallback_title,
+                    viewing_type=viewing_type,
+                ),
+                self._t("events_api.special_phenomena.zodiacal_light_description", fallback_description),
+            )
+
+        return fallback_title, fallback_description
+
     def aggregate_all_events(
         self,
         solar_eclipse_data: Optional[Dict[str, Any]] = None,
@@ -960,8 +1007,7 @@ class EventsAggregator:
                 importance = event_data.get("importance", "medium")
                 
                 event_type = event_data.get("event_type", "Special Phenomenon")
-                title = event_data.get("title", "Special Phenomenon")
-                description = event_data.get("description", "")
+                title, description = self._localize_special_phenomena_text(event_data)
                 icon_class = event_data.get("icon_class") or self._infer_icon_class(event_type)
                 icon_color_class = event_data.get("icon_color_class") or self._importance_icon_color_class(importance)
 
