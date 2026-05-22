@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from requests import HTTPError
 import pytest
 
+import iss_passes as iss_module
 from iss_passes import ISSPassService, get_iss_passes_report
 from events_aggregator import EventsAggregator
 
@@ -337,7 +338,7 @@ class TestISSPassServiceTleFallback:
 
         def _mock_get(url, **kwargs):
             calls.append(url)
-            if "celestrak.org" in url:
+            if iss_module._is_celestrak_url(url):
                 raise AssertionError("Celestrak URL should be skipped when block flag is set")
             return type("R", (), {
                 "text": _json.dumps({"line1": line1_str, "line2": line2_str}),
@@ -351,7 +352,7 @@ class TestISSPassServiceTleFallback:
         assert l1 == line1_str
         assert l2 == line2_str
         assert len(calls) == 1
-        assert "celestrak.org" not in calls[0]
+        assert not iss_module._is_celestrak_url(calls[0])
 
     def test_fetch_iss_tle_marks_celestrak_blocked_after_3_timeouts(self, monkeypatch):
         service = ISSPassService(45.5, -73.5, 30, "America/Montreal")
@@ -390,7 +391,7 @@ class TestISSPassServiceTleFallback:
                 return None
 
         def _mock_get(url, **kwargs):
-            if "celestrak.org" in url:
+            if iss_module._is_celestrak_url(url):
                 raise Exception("Connection to celestrak.org timed out. (connect timeout=10)")
             return _Response()
 
