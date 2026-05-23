@@ -177,7 +177,7 @@ class EventsAggregator:
     def _importance_icon_color_class(self, importance: str) -> str:
         """Map event importance to a Bootstrap text color class."""
         color_map = {
-            EventImportance.CRITICAL.value: "text-danger",
+            EventImportance.CRITICAL.value: "text-must-see",
             EventImportance.HIGH.value: "text-warning",
             EventImportance.MEDIUM.value: "text-info",
             EventImportance.LOW.value: "text-secondary",

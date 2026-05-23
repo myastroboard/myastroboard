@@ -138,4 +138,13 @@
     transform: scale(1.35);
 }
 
+/* ─── Must-see / Critical event badge color ─────────────── */
+.bg-must-see {
+    background-color: #e8a000 !important;
+    color: #fff !important;
+}
+.text-must-see {
+    color: #e8a000 !important;
+}
+
 

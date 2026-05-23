@@ -299,7 +299,10 @@ function createEventTimeline(events) {
         importanceBadge.classList.add('badge', 'ms-1', 'bg-opacity-75');
         // inline replace string text-* by bg-* for badge color        
         importanceBadge.classList.add(event.icon_color_class.replace('text-', 'bg-'));
-        importanceBadge.textContent = i18n.t(`calendar.importance.${event.importance}`);
+        if (event.importance === 'critical') {
+            importanceBadge.appendChild(DOMUtils.createIcon('bi bi-star-fill', 'icon-inline me-1'));
+        }
+        importanceBadge.appendChild(document.createTextNode(i18n.t(`calendar.importance.${event.importance}`)));
 
         // Title
         const title = document.createElement('h5');
