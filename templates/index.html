@@ -1183,6 +1183,75 @@
                             <div class="form-text" data-i18n="settings.north_ccw_info">Set azimuth display: counter-clockwise (north at top, east at left) or clockwise</div>
                         </div>
                     </div>
+
+                    <!-- Visual constraint guides -->
+                    <div class="mt-3">
+                        <button class="btn btn-sm btn-outline-secondary" type="button"
+                                data-bs-toggle="collapse" data-bs-target="#constraint-guides"
+                                aria-expanded="false" aria-controls="constraint-guides">
+                            <i class="bi bi-question-circle me-1" aria-hidden="true"></i>
+                            <span data-i18n="settings.show_visual_guides">Visual guides</span>
+                        </button>
+                    </div>
+                    <div class="collapse mt-3" id="constraint-guides">
+                        <div class="row g-2">
+                            <!-- Altitude -->
+                            <div class="col-md-4">
+                                <div class="p-2 rounded h-100" style="background:var(--surface-2)">
+                                    <div class="small fw-semibold mb-1">
+                                        <i class="bi bi-arrow-up-short text-success icon-inline" aria-hidden="true"></i>
+                                        <span data-i18n="settings.guide_altitude_title">Altitude constraints</span>
+                                    </div>
+                                    <canvas id="guide-altitude" style="width:100%;height:160px;display:block"></canvas>
+                                    <p class="form-text mt-1 mb-0" data-i18n="settings.guide_altitude_desc">Targets must reach an altitude between min and max during the observable night. The green band is the valid zone.</p>
+                                </div>
+                            </div>
+                            <!-- Airmass -->
+                            <div class="col-md-4">
+                                <div class="p-2 rounded h-100" style="background:var(--surface-2)">
+                                    <div class="small fw-semibold mb-1">
+                                        <i class="bi bi-layers text-warning icon-inline" aria-hidden="true"></i>
+                                        <span data-i18n="settings.guide_airmass_title">Airmass</span>
+                                    </div>
+                                    <canvas id="guide-airmass" style="width:100%;height:160px;display:block"></canvas>
+                                    <p class="form-text mt-1 mb-0" data-i18n="settings.guide_airmass_desc">Airmass measures the thickness of atmosphere a light ray crosses. Lower altitude = more atmosphere = worse quality. This constraint overrides min altitude if stricter.</p>
+                                </div>
+                            </div>
+                            <!-- Size -->
+                            <div class="col-md-4">
+                                <div class="p-2 rounded h-100" style="background:var(--surface-2)">
+                                    <div class="small fw-semibold mb-1">
+                                        <i class="bi bi-arrows-angle-expand text-info icon-inline" aria-hidden="true"></i>
+                                        <span data-i18n="settings.guide_size_title">Angular size (arcmin)</span>
+                                    </div>
+                                    <canvas id="guide-size" style="width:100%;height:160px;display:block"></canvas>
+                                    <p class="form-text mt-1 mb-0" data-i18n="settings.guide_size_desc">Filters deep-sky objects by apparent size. Use to remove objects too small to resolve or too large for your sensor's field of view.</p>
+                                </div>
+                            </div>
+                            <!-- Moon -->
+                            <div class="col-md-6">
+                                <div class="p-2 rounded h-100" style="background:var(--surface-2)">
+                                    <div class="small fw-semibold mb-1">
+                                        <i class="bi bi-moon-stars text-warning icon-inline" aria-hidden="true"></i>
+                                        <span data-i18n="settings.guide_moon_title">Moon separation</span>
+                                    </div>
+                                    <canvas id="guide-moon" style="width:100%;height:175px;display:block"></canvas>
+                                    <p class="form-text mt-1 mb-0" data-i18n="settings.guide_moon_desc">Targets within the exclusion zone around the moon are filtered out. With dynamic mode enabled, the minimum gap automatically scales with moon brightness.</p>
+                                </div>
+                            </div>
+                            <!-- Time threshold -->
+                            <div class="col-md-6">
+                                <div class="p-2 rounded h-100" style="background:var(--surface-2)">
+                                    <div class="small fw-semibold mb-1">
+                                        <i class="bi bi-clock text-primary icon-inline" aria-hidden="true"></i>
+                                        <span data-i18n="settings.guide_time_title">Observable time threshold</span>
+                                    </div>
+                                    <canvas id="guide-time" style="width:100%;height:175px;display:block"></canvas>
+                                    <p class="form-text mt-1 mb-0" data-i18n="settings.guide_time_desc">A target must be above all constraints for at least this fraction of the night. Lower values include objects visible only briefly near dusk or dawn.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Custom Horizon Profile -->
@@ -2231,6 +2300,7 @@
     <script src="/static/js/logs.js?v={{ version }}"></script>
     <script src="/static/js/metrics.js?v={{ version }}"></script>
     <script src="/static/js/pwa.js?v={{ version }}"></script>
+    <script src="/static/js/constraint_help.js?v={{ version }}"></script>
     <script src="/static/js/app.js?v={{ version }}"></script>
 </body>
 </html>
