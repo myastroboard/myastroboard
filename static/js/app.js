@@ -226,6 +226,9 @@ async function initializeApp() {
     setupEventListeners();
     loadVersion();
 
+    // Init constraint visual guides
+    if (typeof initConstraintHelp === 'function') initConstraintHelp();
+
     // Init SkyTonight scheduler
     SkyTonightScheduler.init();
 
