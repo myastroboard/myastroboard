@@ -89,6 +89,44 @@ def _simbad_query(adql: str) -> Optional[Dict]:
         return None
 
 
+def _sort_aliases(aliases: List[str]) -> List[str]:
+    """
+    Return *aliases* sorted so that well-known catalogue names come first
+    and noisy survey identifiers (NVSS, TGSS, Gaia, 2MASS, SDSS, …) come last.
+
+    Priority tiers (lower = shown earlier):
+      0 - Messier (M \\d)
+      1 - NGC / IC
+      2 - Caldwell (C \\d), named common names without survey keywords
+      3 - Other recognisable catalogue prefixes (UGC, MCG, PGC, LMC, SMC, …)
+      4 - Everything else
+      5 - Known noisy survey prefixes (NVSS, TGSS, Gaia, 2MASS, SDSS, WISE, …)
+    """
+    _SURVEY_PREFIXES = (
+        '2MASS', '2MASX', 'NVSS', 'TGSS', 'TGSSADR',
+        'GAIA', 'SDSS', 'WISE', 'IRAS', 'ROSAT', 'XMM',
+        'CHANDRA', 'FIRST', 'WENSS', 'SUMSS', 'GLEAM',
+        'LOTSS', 'RACS', 'VLASS',
+    )
+    _KNOWN_PREFIXES = (
+        ('M ',  0), ('NGC ', 1), ('IC ',  1),
+        ('C ',  2), ('UGC ', 3), ('MCG ', 3), ('PGC ', 3),
+        ('LMC',  3), ('SMC', 3),
+    )
+
+    def _priority(alias: str) -> tuple:
+        up = alias.upper()
+        for prefix, tier in _KNOWN_PREFIXES:
+            if up.startswith(prefix.upper()):
+                return (tier, alias.lower())
+        for survey in _SURVEY_PREFIXES:
+            if up.startswith(survey):
+                return (5, alias.lower())
+        return (4, alias.lower())
+
+    return sorted(aliases, key=_priority)
+
+
 def _resolve_via_simbad(identifier: str) -> Optional[Dict[str, Any]]:
     """
     Resolve *identifier* through SIMBAD TAP.
@@ -135,12 +173,16 @@ def _resolve_via_simbad(identifier: str) -> Optional[Dict[str, Any]]:
         f"WHERE ref.id = '{safe_main}'"
     )
     alias_result = _simbad_query(alias_query)
-    aliases: List[str] = []
+    raw_aliases: List[str] = []
     if alias_result and alias_result.get('data'):
         for alias_row in alias_result['data']:
             alias_val = str(alias_row[0]).strip()
-            if alias_val and alias_val != main_id:
-                aliases.append(alias_val)
+            # Exclude only the identifier the user searched for — it is already
+            # the modal title, so showing it again as an alias is redundant.
+            # Keep main_id even if it differs from identifier: it is a valid
+            # "also known as" name (e.g. user clicked "M 100", main_id is "NGC 4258").
+            if alias_val and alias_val != identifier:
+                raw_aliases.append(alias_val)
 
     return {
         'id': main_id,
@@ -148,7 +190,7 @@ def _resolve_via_simbad(identifier: str) -> Optional[Dict[str, Any]]:
         'type': obj_type,
         'ra': float(ra_raw) if ra_raw is not None else None,
         'dec': float(dec_raw) if dec_raw is not None else None,
-        'aliases': aliases[:20],
+        'aliases': _sort_aliases(raw_aliases)[:20],
     }
 
 
