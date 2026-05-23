@@ -268,6 +268,9 @@ def _get_wikipedia_summary(search_term: str, lang: str = 'en') -> Optional[Dict[
             return None
         resp.raise_for_status()
         data = resp.json()
+        # Skip disambiguation pages — they list unrelated topics sharing the same label
+        if data.get('type') == 'disambiguation':
+            return None
         extract = data.get('extract', '').strip()
         if not extract:
             return None
