@@ -705,11 +705,23 @@ async function showAddAstrodexItemModal() {
 
     createModal(i18n.t('astrodex.add_to_astrodex'), `
         <form id="add-astrodex-form" class="form row g-3">
+            <div class="col-12">
+                <div class="input-group">
+                    <input type="text" id="catalogue-search-input" class="form-control"
+                        placeholder="${escapeHtml(i18n.t('astrodex.search_catalogue_placeholder'))}"
+                        autocomplete="off">
+                    <button type="button" id="catalogue-search-btn" class="btn btn-secondary"
+                        title="${escapeHtml(i18n.t('astrodex.search_catalogue_btn'))}">
+                        <i class="bi bi-search"></i>
+                    </button>
+                </div>
+                <div id="catalogue-search-feedback" class="mt-1 small d-none"></div>
+            </div>
+            <div class="col-12"><hr class="my-1 opacity-25"></div>
             <div class="col-md-12">
                 <label for="item-name" class="form-label">${i18n.t('astrodex.form_object_name')} *</label>
                 <input type="text" id="item-name" class="form-control" required autocomplete="off">
                 <input type="hidden" id="item-catalogue" value="">
-                <div id="catalogue-lookup-hint" class="d-none mt-1"><span class="badge bg-success"></span></div>
             </div>
             <div class="col-md-6">
                 <label for="item-type" class="form-label">${i18n.t('astrodex.form_object_type')}</label>
@@ -734,10 +746,10 @@ async function showAddAstrodexItemModal() {
         </form>
     `, 'lg');
 
-    // --- Catalogue auto-prefill on name input ---
-    let _catalogueLookupTimer = null;
-    const nameInput = document.getElementById('item-name');
-    const hintEl = document.getElementById('catalogue-lookup-hint');
+    // --- Catalogue search row ---
+    const searchInput = document.getElementById('catalogue-search-input');
+    const searchBtn = document.getElementById('catalogue-search-btn');
+    const feedbackEl = document.getElementById('catalogue-search-feedback');
 
     function _mapCatalogueType(rawType) {
         if (!rawType) return '';
@@ -754,67 +766,76 @@ async function showAddAstrodexItemModal() {
         return 'Other';
     }
 
-    if (nameInput) {
-        nameInput.addEventListener('input', () => {
-            clearTimeout(_catalogueLookupTimer);
-            if (hintEl) hintEl.classList.add('d-none');
-            const val = nameInput.value.trim();
-            if (val.length < 2) return;
-            _catalogueLookupTimer = setTimeout(async () => {
-                try {
-                    const res = await fetchJSON(`/api/astrodex/catalogue-lookup?name=${encodeURIComponent(val)}`);
-                    if (!res || !res.found) return;
+    async function _triggerCatalogueSearch() {
+        const val = (searchInput?.value || '').trim();
+        if (!val) return;
 
-                    const typeSelect = document.getElementById('item-type');
-                    const constSelect = document.getElementById('item-constellation');
-                    const catInput = document.getElementById('item-catalogue');
+        if (searchBtn) {
+            searchBtn.disabled = true;
+            searchBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+        }
+        if (feedbackEl) feedbackEl.classList.add('d-none');
 
-                    // Match the user's typed value against known catalogue names so we
-                    // normalise spacing ("M44" -> "M 44") without overwriting with a
-                    // common alias ("Beehive"). Comparison ignores whitespace and case.
-                    const typedNorm = val.replace(/\s+/g, '').toLowerCase();
-                    let matchedCatName = null;
-                    let matchedCat = null;
-                    for (const [cat, catName] of Object.entries(res.catalogue_names || {})) {
-                        if ((catName || '').replace(/\s+/g, '').toLowerCase() === typedNorm) {
-                            matchedCatName = catName;
-                            matchedCat = cat;
-                            break;
-                        }
-                    }
-                    if (matchedCatName) {
-                        // Normalise spacing to the official catalogue form
-                        nameInput.value = matchedCatName;
-                        if (catInput) catInput.value = matchedCat;
-                    }
-                    // If no catalogue match the user typed a common alias (e.g. "Beehive");
-                    // keep their original input as-is and leave catalogue blank.
+        try {
+            const res = await fetchJSON(`/api/astrodex/catalogue-lookup?name=${encodeURIComponent(val)}`);
 
-                    if (typeSelect) {
-                        const mappedType = _mapCatalogueType(res.object_type);
-                        if (mappedType) {
-                            for (const opt of typeSelect.options) {
-                                if (opt.value === mappedType) { typeSelect.value = mappedType; break; }
-                            }
-                        }
+            if (!res || !res.found) {
+                if (feedbackEl) {
+                    feedbackEl.innerHTML = `<span class="badge bg-warning text-dark"><i class="bi bi-exclamation-circle me-1"></i>${i18n.t('astrodex.catalogue_not_found')}</span>`;
+                    feedbackEl.classList.remove('d-none');
+                }
+                return;
+            }
+
+            const nameInput = document.getElementById('item-name');
+            const typeSelect = document.getElementById('item-type');
+            const constSelect = document.getElementById('item-constellation');
+            const catInput = document.getElementById('item-catalogue');
+
+            if (nameInput) nameInput.value = res.preferred_name || val;
+
+            // Resolve catalogue key matching the preferred_name
+            let matchedCat = '';
+            for (const [cat, catName] of Object.entries(res.catalogue_names || {})) {
+                if (catName === res.preferred_name) { matchedCat = cat; break; }
+            }
+            if (catInput) catInput.value = matchedCat;
+
+            if (typeSelect) {
+                const mappedType = _mapCatalogueType(res.object_type);
+                if (mappedType) {
+                    for (const opt of typeSelect.options) {
+                        if (opt.value === mappedType) { typeSelect.value = mappedType; break; }
                     }
-                    if (constSelect && res.constellation) {
-                        // Backend returns the full lowercase name (e.g. 'cancer')
-                        const constLower = res.constellation.toLowerCase();
-                        for (const opt of constSelect.options) {
-                            if (opt.value === constLower) { constSelect.value = constLower; break; }
-                        }
-                    }
-                    if (hintEl) {
-                        const badge = hintEl.querySelector('.badge');
-                        if (badge) badge.textContent = i18n.t('astrodex.catalogue_found');
-                        hintEl.classList.remove('d-none');
-                    }
-                } catch (_) { /* silent — lookup is best-effort */ }
-            }, 500);
+                }
+            }
+            if (constSelect && res.constellation) {
+                const constLower = res.constellation.toLowerCase();
+                for (const opt of constSelect.options) {
+                    if (opt.value === constLower) { constSelect.value = constLower; break; }
+                }
+            }
+
+            if (feedbackEl) {
+                feedbackEl.innerHTML = `<span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>${i18n.t('astrodex.catalogue_found')}</span>`;
+                feedbackEl.classList.remove('d-none');
+            }
+        } catch (_) { /* silent — lookup is best-effort */ }
+        finally {
+            if (searchBtn) {
+                searchBtn.disabled = false;
+                searchBtn.innerHTML = '<i class="bi bi-search"></i>';
+            }
+        }
+    }
+
+    if (searchBtn) searchBtn.addEventListener('click', _triggerCatalogueSearch);
+    if (searchInput) {
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); _triggerCatalogueSearch(); }
         });
     }
-    // --- end catalogue prefill ---
+    // --- end catalogue search ---
     
     document.getElementById('add-astrodex-form').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -843,7 +864,6 @@ async function showAddAstrodexItemModal() {
 
     // Event listener when modal is closed
     document.getElementById('modal_lg_close').addEventListener('hidden.bs.modal', () => {
-        clearTimeout(_catalogueLookupTimer);
         // Remove previous event listeners to prevent duplicates
         const form = document.getElementById('add-astrodex-form');
         if (form) {

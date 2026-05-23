@@ -37,7 +37,7 @@ from logging_config import get_logger
 from repo_config import load_config
 from skytonight_models import SkyTonightTarget
 from skytonight_storage import ensure_skytonight_directories
-from skytonight_targets import load_targets_dataset
+from skytonight_targets import choose_preferred_catalogue_name, load_targets_dataset
 from sun_phases import SunService
 from utils import ensure_directory_exists, load_json_file, save_json_file
 
@@ -553,6 +553,7 @@ def _compute_target_result(
     az_values: Optional[np.ndarray] = None,
     lst_hours: Optional[np.ndarray] = None,
     times_local: Optional[List[datetime]] = None,
+    preferred_name_order: Optional[List[str]] = None,
 ) -> Optional[Dict[str, Any]]:
     """Return a computed result dict for one target, or None if not visible."""
     if target.coordinates is None:
@@ -709,7 +710,10 @@ def _compute_target_result(
 
     return {
         'target_id': target.target_id,
-        'preferred_name': target.preferred_name,
+        'preferred_name': (
+            choose_preferred_catalogue_name(target.catalogue_names, order=preferred_name_order)
+            or target.preferred_name
+        ) if preferred_name_order and target.catalogue_names else target.preferred_name,
         'catalogue_names': target.catalogue_names,
         'category': target.category,
         'object_type': target.object_type,
@@ -987,6 +991,15 @@ def run_calculations(
     skytonight_cfg = config.get('skytonight', {}) if isinstance(config, dict) else {}
     constraints: Dict[str, Any] = skytonight_cfg.get('constraints', {})
 
+    # User-configured catalogue name order: applied at result time to override the
+    # dataset's build-time preferred_name so the display matches user preference.
+    _raw_name_order = skytonight_cfg.get('preferred_name_order')
+    preferred_name_order: Optional[List[str]] = (
+        [str(x) for x in _raw_name_order if x]
+        if isinstance(_raw_name_order, list) and _raw_name_order
+        else None
+    )
+
     logger.info(f'SkyTonight calculations starting for location: {location_name}')
     _set_progress('night_window')
 
@@ -1179,6 +1192,7 @@ def run_calculations(
             lat=lat,
             lon=lon,
             az_values=az_values_comet,
+            preferred_name_order=preferred_name_order,
         )
         if result is not None:
             comets_results.append(result)
@@ -1306,6 +1320,7 @@ def run_calculations(
                     az_values=az_matrix[idx],
                     lst_hours=lst_hours_arr,
                     times_local=times_local,
+                    preferred_name_order=preferred_name_order,
                 )
                 if result is not None:
                     deep_sky_results.append(result)

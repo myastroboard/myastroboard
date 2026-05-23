@@ -36,20 +36,30 @@ def normalize_object_name(value: str) -> str:
     return filtered
 
 
-def _catalogue_priority(catalogue: str) -> Tuple[int, str]:
+def _catalogue_priority(catalogue: str, order: Optional[List[str]] = None) -> Tuple[int, str]:
     normalized = normalize_catalogue_name(catalogue)
+    effective_order = order if order is not None else SKYTONIGHT_PREFERRED_NAME_ORDER
     try:
-        return (SKYTONIGHT_PREFERRED_NAME_ORDER.index(normalized), normalized.lower())
+        return (effective_order.index(normalized), normalized.lower())
     except ValueError:
-        return (len(SKYTONIGHT_PREFERRED_NAME_ORDER), normalized.lower())
+        return (len(effective_order), normalized.lower())
 
 
-def choose_preferred_catalogue_name(catalogue_names: Dict[str, str]) -> str:
-    """Choose the display name using the SkyTonight catalogue priority."""
+def choose_preferred_catalogue_name(catalogue_names: Dict[str, str], order: Optional[List[str]] = None) -> str:
+    """Choose the display name using the SkyTonight catalogue priority.
+
+    Parameters
+    ----------
+    catalogue_names:
+        Dict of catalogue label → name string (e.g. ``{'Messier': 'M 31', 'OpenNGC': 'NGC 224'}``).
+    order:
+        Optional list of catalogue labels defining the preference order.
+        When *None* the module-level :data:`SKYTONIGHT_PREFERRED_NAME_ORDER` constant is used.
+    """
     if not isinstance(catalogue_names, dict) or not catalogue_names:
         return ''
 
-    best_catalogue = sorted(catalogue_names.keys(), key=_catalogue_priority)[0]
+    best_catalogue = sorted(catalogue_names.keys(), key=lambda c: _catalogue_priority(c, order))[0]
     return str(catalogue_names.get(best_catalogue, '') or '').strip()
 
 
