@@ -268,14 +268,26 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Clear CHANGELOG_NEXT after release
-        if: startsWith(github.ref, 'refs/tags/') && hashFiles('CHANGELOG_NEXT.md') != ''
+        if: startsWith(github.ref, 'refs/tags/')
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          # Clear the file (without deleting it to keep the habit of editing it)
-          > CHANGELOG_NEXT.md
-          git add CHANGELOG_NEXT.md
-          git commit -m "chore: clear CHANGELOG_NEXT after release ${{ steps.version.outputs.VERSION }}"
-          git push origin HEAD:main
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Get SHA of the file (necessary for update via API)
+          SHA=$(curl -s \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/contents/CHANGELOG_NEXT.md" \
+            | jq -r '.sha')
+
+          if [ "$SHA" != "null" ] && [ -n "$SHA" ]; then
+            # Empty content encoded in base64
+            EMPTY_CONTENT=$(echo -n "" | base64)
+
+            curl -s -X PUT \
+              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${{ github.repository }}/contents/CHANGELOG_NEXT.md" \
+              -d "{
+                \"message\": \"chore: clear CHANGELOG_NEXT after release ${{ steps.version.outputs.VERSION }}\",
+                \"content\": \"$EMPTY_CONTENT\",
+                \"sha\": \"$SHA\"
+              }"
+          fi

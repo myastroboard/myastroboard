@@ -1,6 +1,0 @@
-- A badge "Must-see" on exceptional events has now a better identification (before it was same color as "invisible" badge...)
-- Serve stale cache when the call arrive exactly when the TTL is expired (so calculation running). So the app is not blocked waiting for heavy calculation.
-- Update calculation on moon phases:
-  - Previously was processing 50 days where we use only 10.
-  - Coarse scan every 15 minutes (instead of 5-minute full scan)
-  - Then fine refinement at 1-minute resolution only around the detected start/end boundaries.
