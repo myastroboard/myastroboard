@@ -169,10 +169,15 @@ async function loadMoon() {
             { label: `<i class="bi bi-arrows-angle-expand icon-inline" aria-hidden="true"></i>${i18n.t('moon.altitude')}`, value: moon.altitude_deg ? `${moon.altitude_deg.toFixed(2)}${i18n.t('units.degrees')}` : i18n.t('units.na') },
             { label: `<i class="bi bi-compass icon-inline" aria-hidden="true"></i>${i18n.t('moon.azimuth')}`, value: moon.azimuth_deg ? `${moon.azimuth_deg.toFixed(2)}${i18n.t('units.degrees')}` : i18n.t('units.na') }
         ]));
+
+        const next_full_moon_txt = moon.next_full_moon === 'Not found' ? i18n.t('best_window.not_found') : formatTimeThenDate(new Date(moon.next_full_moon));
+        const next_new_moon_txt = moon.next_new_moon === 'Not found' ? i18n.t('best_window.not_found') : formatTimeThenDate(new Date(moon.next_new_moon));
+        const next_dark_night_start_txt = moon.next_dark_night_start === 'Not found' ? i18n.t('best_window.not_found') : formatTimeThenDate(new Date(moon.next_dark_night_start));
+
         row.appendChild(createCard(`<i class="bi bi-calendar-event text-danger icon-inline" aria-hidden="true"></i>${i18n.t('moon.next_events')}`, [
-            { label: `<i class="bi bi-moon-stars-fill icon-inline" aria-hidden="true"></i>${i18n.t('moon.next_full_moon')}`, value: formatTimeThenDate(moon.next_full_moon) },
-            { label: `<i class="bi bi-moon-fill icon-inline" aria-hidden="true"></i>${i18n.t('moon.next_new_moon')}`, value: formatTimeThenDate(moon.next_new_moon) },
-            { label: `<i class="bi bi-stars icon-inline" aria-hidden="true"></i>${i18n.t('moon.next_dark_night')}`, value: formatTimeThenDate(moon.next_dark_night_start) }
+            { label: `<i class="bi bi-moon-stars-fill icon-inline" aria-hidden="true"></i>${i18n.t('moon.next_full_moon')}`, value: next_full_moon_txt },
+            { label: `<i class="bi bi-moon-fill icon-inline" aria-hidden="true"></i>${i18n.t('moon.next_new_moon')}`, value: next_new_moon_txt },
+            { label: `<i class="bi bi-stars icon-inline" aria-hidden="true"></i>${i18n.t('moon.next_dark_night')}`, value: next_dark_night_start_txt }
         ]));
 
         container.appendChild(header);
@@ -366,8 +371,8 @@ async function loadBestDarkWindow() {
             return;
         }
 
-        const start = new Date(data.next_dark_night.start);
-        const end   = new Date(data.next_dark_night.end);
+        const start_txt = data.next_dark_night.start === 'Not found' ? i18n.t('best_window.not_found') : formatTimeThenDate(new Date(data.next_dark_night.start));
+        const end_txt = data.next_dark_night.end === 'Not found' ? i18n.t('best_window.not_found') : formatTimeThenDate(new Date(data.next_dark_night.end));
 
         // Bloc normal
         const item = document.createElement("div");
@@ -390,8 +395,8 @@ async function loadBestDarkWindow() {
             li.appendChild(value);
             list.appendChild(li);
         };
-        addTiming(`<i class="bi bi-sunset icon-inline" aria-hidden="true"></i>${i18n.t('best_window.start')}`, formatTimeThenDate(start));
-        addTiming(`<i class="bi bi-sunrise icon-inline" aria-hidden="true"></i>${i18n.t('best_window.end')}`, formatTimeThenDate(end));
+        addTiming(`<i class="bi bi-sunset icon-inline" aria-hidden="true"></i>${i18n.t('best_window.start')}`, start_txt);
+        addTiming(`<i class="bi bi-sunrise icon-inline" aria-hidden="true"></i>${i18n.t('best_window.end')}`, end_txt);
         card.appendChild(header);
         card.appendChild(list);
         item.appendChild(card);

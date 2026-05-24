@@ -209,8 +209,9 @@ function getHour12Option() {
 // Helper function to format ISO date to local time string
 // Example output: "9:30 PM (6/30)" in US locale, "21:30 (30/06)" in many European locales
 function formatTimeThenDate(isoString, locale = navigator.language) {
-    if (!isoString) return 'N/A';
+    if (!isoString || isoString === 'Not found') return 'N/A';
     const date = new Date(isoString);
+    if (isNaN(date.getTime())) return 'N/A';
 
     // Format the time
     const timeFormatter = new Intl.DateTimeFormat(locale, {
@@ -231,8 +232,9 @@ function formatTimeThenDate(isoString, locale = navigator.language) {
 // Format time, then date with seconds
 // Example output: "9:30:45 PM (6/30)" in US locale, "21:30:45 (30/06)" in many European locales
 function formatTimeThenDateWithSeconds(isoString, locale = navigator.language) {
-    if (!isoString) return 'N/A';
+    if (!isoString || isoString === 'Not found') return 'N/A';
     const date = new Date(isoString);
+    if (isNaN(date.getTime())) return 'N/A';
 
     const timeFormatter = new Intl.DateTimeFormat(locale, {
         hour: '2-digit',
