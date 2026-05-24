@@ -1,0 +1,2 @@
+- A badge "Must-see" on exceptional events has now a better identification (before it was same color as "invisible" badge...)
+- Serve stale cache when the call arrive exactly when the TTL is expired (so calculation running). So the app is not blocked waiting for heavy calculation.

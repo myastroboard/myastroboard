@@ -1309,7 +1309,7 @@ def get_weather_alerts_api():
 @app.route("/api/moon/report", methods=["GET"])
 @login_required
 def get_moon_report_api():
-    """Return astrophotography-grade Moon report, from cache only"""
+    """Return astrophotography-grade Moon report from scheduler-managed cache."""
     try:
         if cache_store.is_cache_valid(cache_store._moon_report_cache, CACHE_TTL):
             return jsonify(cache_store._moon_report_cache["data"])
@@ -1319,12 +1319,13 @@ def get_moon_report_api():
             if cache_store.is_cache_valid(cache_store._moon_report_cache, CACHE_TTL):
                 return jsonify(cache_store._moon_report_cache["data"])
 
-        # Cache not ready in this worker -> attempt to refresh just this cache
-        update_moon_report_cache()
-        if cache_store.is_cache_valid(cache_store._moon_report_cache, CACHE_TTL):
-            return jsonify(cache_store._moon_report_cache["data"])
+        # Avoid synchronous recomputation in request path: moon calculations can
+        # exceed gunicorn timeout on small hosts and cause worker restart loops.
+        stale_data = cache_store._moon_report_cache.get("data")
+        if stale_data:
+            return jsonify(stale_data)
 
-        # Cache non disponible
+        # Cache not ready yet (scheduler will refresh in background).
         return jsonify({
             "status": "pending",
             "message": "Moon report cache is not ready yet. Please try again shortly."
@@ -1338,7 +1339,7 @@ def get_moon_report_api():
 @app.route("/api/moon/dark-window", methods=["GET"])
 @login_required
 def get_next_dark_window_api():
-    """Return next astronomical moonless dark window, from cache only"""
+    """Return next astronomical moonless dark window from scheduler-managed cache."""
     try:
         if cache_store.is_cache_valid(cache_store._dark_window_report_cache, CACHE_TTL):
             return jsonify(cache_store._dark_window_report_cache["data"])
@@ -1348,12 +1349,13 @@ def get_next_dark_window_api():
             if cache_store.is_cache_valid(cache_store._dark_window_report_cache, CACHE_TTL):
                 return jsonify(cache_store._dark_window_report_cache["data"])
 
-        # Cache not ready in this worker -> attempt to refresh just this cache
-        update_dark_window_cache()
-        if cache_store.is_cache_valid(cache_store._dark_window_report_cache, CACHE_TTL):
-            return jsonify(cache_store._dark_window_report_cache["data"])
+        # Avoid synchronous recomputation in request path: moon calculations can
+        # exceed gunicorn timeout on small hosts and cause worker restart loops.
+        stale_data = cache_store._dark_window_report_cache.get("data")
+        if stale_data:
+            return jsonify(stale_data)
 
-        # Cache non disponible
+        # Cache not ready yet (scheduler will refresh in background).
         return jsonify({
             "status": "pending",
             "message": "Dark window cache is not ready yet. Please try again shortly."
@@ -1377,10 +1379,9 @@ def get_next_7_nights_api():
             if cache_store.is_cache_valid(cache_store._moon_planner_report_cache, CACHE_TTL):
                 return jsonify(cache_store._moon_planner_report_cache["data"])
 
-        # Cache not ready in this worker -> attempt to refresh just this cache
-        update_moon_planner_cache()
-        if cache_store.is_cache_valid(cache_store._moon_planner_report_cache, CACHE_TTL):
-            return jsonify(cache_store._moon_planner_report_cache["data"])
+        stale_data = cache_store._moon_planner_report_cache.get("data")
+        if stale_data:
+            return jsonify(stale_data)
 
         # Cache non disponible
         return jsonify({
@@ -1406,10 +1407,9 @@ def get_aurora_predictions_api():
             if cache_store.is_cache_valid(cache_store._aurora_cache, CACHE_TTL):
                 return jsonify(cache_store._aurora_cache["data"])
 
-        # Cache not ready in this worker -> attempt to refresh just this cache
-        update_aurora_cache()
-        if cache_store.is_cache_valid(cache_store._aurora_cache, CACHE_TTL):
-            return jsonify(cache_store._aurora_cache["data"])
+        stale_data = cache_store._aurora_cache.get("data")
+        if stale_data:
+            return jsonify(stale_data)
 
         # Cache not available
         return jsonify({
@@ -1435,11 +1435,9 @@ def get_seeing_forecast_api():
             if cache_store.is_cache_valid(cache_store._seeing_forecast_cache, CACHE_TTL):
                 return jsonify(cache_store._seeing_forecast_cache["data"])
 
-        # Cache not ready in this worker -> attempt to refresh just this cache
-        from cache_updater import update_seeing_forecast_cache
-        update_seeing_forecast_cache()
-        if cache_store.is_cache_valid(cache_store._seeing_forecast_cache, CACHE_TTL):
-            return jsonify(cache_store._seeing_forecast_cache["data"])
+        stale_data = cache_store._seeing_forecast_cache.get("data")
+        if stale_data:
+            return jsonify(stale_data)
 
         # Cache not available
         return jsonify({
@@ -1584,10 +1582,11 @@ def get_spaceflight_launches_api():
         cache_store.sync_cache_from_shared("spaceflight_launches", cache_store._spaceflight_launches_cache)
         if cache_store.is_cache_valid(cache_store._spaceflight_launches_cache, CACHE_TTL_SPACEFLIGHT_LAUNCHES):
             return jsonify(cache_store._spaceflight_launches_cache["data"])
-        # Cache not ready in this worker -> attempt to refresh just this cache
-        update_spaceflight_launches_cache()
-        if cache_store.is_cache_valid(cache_store._spaceflight_launches_cache, CACHE_TTL_SPACEFLIGHT_LAUNCHES):
-            return jsonify(cache_store._spaceflight_launches_cache["data"])
+
+        stale_data = cache_store._spaceflight_launches_cache.get("data")
+        if stale_data:
+            return jsonify(stale_data)
+
         return jsonify({"error": "cache_not_ready"}), 503
     except Exception as exc:
         logger.error(f"Error fetching spaceflight launches: {exc}")
@@ -1604,10 +1603,11 @@ def get_spaceflight_astronauts_api():
         cache_store.sync_cache_from_shared("spaceflight_astronauts", cache_store._spaceflight_astronauts_cache)
         if cache_store.is_cache_valid(cache_store._spaceflight_astronauts_cache, CACHE_TTL_SPACEFLIGHT_ASTRONAUTS):
             return jsonify(cache_store._spaceflight_astronauts_cache["data"])
-        # Cache not ready in this worker -> attempt to refresh just this cache
-        update_spaceflight_astronauts_cache()
-        if cache_store.is_cache_valid(cache_store._spaceflight_astronauts_cache, CACHE_TTL_SPACEFLIGHT_ASTRONAUTS):
-            return jsonify(cache_store._spaceflight_astronauts_cache["data"])
+
+        stale_data = cache_store._spaceflight_astronauts_cache.get("data")
+        if stale_data:
+            return jsonify(stale_data)
+
         return jsonify({"error": "cache_not_ready"}), 503
     except Exception as exc:
         logger.error(f"Error fetching spaceflight astronauts: {exc}")
@@ -1624,10 +1624,11 @@ def get_spaceflight_events_api():
         cache_store.sync_cache_from_shared("spaceflight_events", cache_store._spaceflight_events_cache)
         if cache_store.is_cache_valid(cache_store._spaceflight_events_cache, CACHE_TTL_SPACEFLIGHT_EVENTS):
             return jsonify(cache_store._spaceflight_events_cache["data"])
-        # Cache not ready in this worker -> attempt to refresh just this cache
-        update_spaceflight_events_cache()
-        if cache_store.is_cache_valid(cache_store._spaceflight_events_cache, CACHE_TTL_SPACEFLIGHT_EVENTS):
-            return jsonify(cache_store._spaceflight_events_cache["data"])
+
+        stale_data = cache_store._spaceflight_events_cache.get("data")
+        if stale_data:
+            return jsonify(stale_data)
+
         return jsonify({"error": "cache_not_ready"}), 503
     except Exception as exc:
         logger.error(f"Error fetching spaceflight events: {exc}")
@@ -1733,10 +1734,9 @@ def get_sun_today_api():
             if cache_store.is_cache_valid(cache_store._sun_report_cache, CACHE_TTL):
                 return jsonify(cache_store._sun_report_cache["data"])
 
-        # Cache not ready in this worker -> attempt to refresh just this cache
-        update_sun_report_cache()
-        if cache_store.is_cache_valid(cache_store._sun_report_cache, CACHE_TTL):
-            return jsonify(cache_store._sun_report_cache["data"])
+        stale_data = cache_store._sun_report_cache.get("data")
+        if stale_data:
+            return jsonify(stale_data)
 
         # Cache non disponible
         return jsonify({
@@ -1762,10 +1762,9 @@ def get_solar_eclipse_api():
             if cache_store.is_cache_valid(cache_store._solar_eclipse_cache, CACHE_TTL):
                 return jsonify(cache_store._solar_eclipse_cache["data"])
 
-        # Cache not ready in this worker -> attempt to refresh just this cache
-        update_solar_eclipse_cache()
-        if cache_store.is_cache_valid(cache_store._solar_eclipse_cache, CACHE_TTL):
-            return jsonify(cache_store._solar_eclipse_cache["data"])
+        stale_data = cache_store._solar_eclipse_cache.get("data")
+        if stale_data:
+            return jsonify(stale_data)
 
         # Cache non disponible
         return jsonify({
@@ -1791,10 +1790,9 @@ def get_lunar_eclipse_api():
             if cache_store.is_cache_valid(cache_store._lunar_eclipse_cache, CACHE_TTL):
                 return jsonify(cache_store._lunar_eclipse_cache["data"])
 
-        # Cache not ready in this worker -> attempt to refresh just this cache
-        update_lunar_eclipse_cache()
-        if cache_store.is_cache_valid(cache_store._lunar_eclipse_cache, CACHE_TTL):
-            return jsonify(cache_store._lunar_eclipse_cache["data"])
+        stale_data = cache_store._lunar_eclipse_cache.get("data")
+        if stale_data:
+            return jsonify(stale_data)
 
         # Cache non disponible
         return jsonify({
@@ -1929,9 +1927,14 @@ def get_planetary_events_api():
             if cache_store.is_cache_valid(cache_store._planetary_events_cache, CACHE_TTL):
                 return jsonify(cache_store._planetary_events_cache["data"])
 
-        # Cache not ready -> refresh it
-        update_planetary_events_cache()
-        return jsonify(cache_store._planetary_events_cache.get("data", {"events": []}))
+        stale_data = cache_store._planetary_events_cache.get("data")
+        if stale_data:
+            return jsonify(stale_data)
+
+        return jsonify({
+            "status": "pending",
+            "message": "Planetary events cache is not ready yet. Please try again shortly.",
+        }), 202
 
     except Exception as e:
         logger.error(f"Error retrieving planetary events: {e}")
@@ -1958,10 +1961,14 @@ def get_special_phenomena_api():
                 data = cache_store._special_phenomena_cache["data"]
                 return jsonify(_translate_special_phenomena_events(data, language))
 
-        # Cache not ready -> refresh it
-        update_special_phenomena_cache()
-        data = cache_store._special_phenomena_cache.get("data", {"events": []})
-        return jsonify(_translate_special_phenomena_events(data, language))
+        stale_data = cache_store._special_phenomena_cache.get("data")
+        if stale_data:
+            return jsonify(_translate_special_phenomena_events(stale_data, language))
+
+        return jsonify({
+            "status": "pending",
+            "message": "Special phenomena cache is not ready yet. Please try again shortly.",
+        }), 202
 
     except Exception as e:
         logger.error(f"Error retrieving special phenomena: {e}")
@@ -1989,10 +1996,14 @@ def get_solar_system_events_api():
                 data = cache_store._solar_system_events_cache["data"]
                 return jsonify(_translate_solar_system_events(data, language))
 
-        # Cache not ready -> refresh it
-        update_solar_system_events_cache()
-        data = cache_store._solar_system_events_cache.get("data", {"events": []})
-        return jsonify(_translate_solar_system_events(data, language))
+        stale_data = cache_store._solar_system_events_cache.get("data")
+        if stale_data:
+            return jsonify(_translate_solar_system_events(stale_data, language))
+
+        return jsonify({
+            "status": "pending",
+            "message": "Solar system events cache is not ready yet. Please try again shortly.",
+        }), 202
 
     except Exception as e:
         logger.error(f"Error retrieving solar system events: {e}")
@@ -2255,10 +2266,9 @@ def get_horizon_graph_api():
             if cache_store.is_cache_valid(cache_store._horizon_graph_cache, CACHE_TTL):
                 return jsonify(cache_store._horizon_graph_cache["data"])
 
-        # Cache not ready in this worker -> attempt to refresh just this cache
-        update_horizon_graph_cache()
-        if cache_store.is_cache_valid(cache_store._horizon_graph_cache, CACHE_TTL):
-            return jsonify(cache_store._horizon_graph_cache["data"])
+        stale_data = cache_store._horizon_graph_cache.get("data")
+        if stale_data:
+            return jsonify(stale_data)
 
         # Cache not available
         return jsonify({
@@ -2298,23 +2308,21 @@ def best_window_api():
                         results[current_mode] = cache_entry["data"]
                         continue
 
+                # Serve stale data when available instead of recomputing inline.
+                if cache_entry.get("data") is not None:
+                    results[current_mode] = cache_entry["data"]
+                    continue
+
                 missing_modes.append(current_mode)
 
-            if missing_modes:
-                update_best_window_cache()
-
-                for current_mode in missing_modes:
-                    cache_entry = cache_store._best_window_cache[current_mode]
-                    if cache_store.is_cache_valid(cache_entry, CACHE_TTL):
-                        results[current_mode] = cache_entry["data"]
-                    else:
-                        results[current_mode] = {
-                            "status": "pending",
-                            "message": (
-                                f"Best window cache for mode '{current_mode}' is not ready yet. "
-                                "Please try again shortly."
-                            )
-                        }
+            for current_mode in missing_modes:
+                results[current_mode] = {
+                    "status": "pending",
+                    "message": (
+                        f"Best window cache for mode '{current_mode}' is not ready yet. "
+                        "Please try again shortly."
+                    )
+                }
 
             return jsonify({"modes": results})
 
@@ -2331,10 +2339,9 @@ def best_window_api():
             if cache_store.is_cache_valid(cache_entry, CACHE_TTL):
                 return jsonify(cache_entry["data"])
 
-        # Cache not ready in this worker -> attempt to refresh just this cache
-        update_best_window_cache()
-        cache_entry = cache_store._best_window_cache[mode]
-        if cache_store.is_cache_valid(cache_entry, CACHE_TTL):
+        # Serve stale cache when available instead of triggering a heavy inline
+        # recomputation that can exceed gunicorn timeout on small hosts.
+        if cache_entry.get("data") is not None:
             return jsonify(cache_entry["data"])
 
         # Cache non disponible

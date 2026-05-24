@@ -27,6 +27,14 @@ This document describes features that could potentially be integrated into MyAst
 
 ## Upgrade Features
 
+### Various
+- Improve plan my night with : 
+  - alttime graph with all targets instead of the baregraph
+  - Visual plot with range Astronomic night
+- Alt vs time graph: add a different background or vertical line to clearly see astronomic night
+- Astrodex: on manual add/research, currently only Messier and NGC are searchable, extend to others catalogues (ex HIP 11505)
+- Manage old cache files myastroboard.log.1, myastroboard.log.2, ...
+
 ### Shared equipments
 **Possibility to share equipments between users**, for example family, or astronomy club.
 - Equipements could be shared between users
