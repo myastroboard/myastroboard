@@ -5,6 +5,11 @@ let planMyNightStructureSnapshot = null;
 let currentPlanTelescopeId = null;   // null = no/default telescope
 let planTelescopeList = [];          // array from /api/plan-my-night/list
 
+// Plan Summary Graph
+let planSummaryChartInstance = null;
+let planSummaryTargetBands   = [];
+let planSummaryGraphGen      = 0;
+
 function isPlanEditRole(role) {
     return role === 'admin' || role === 'user';
 }
@@ -103,10 +108,8 @@ function patchPlanMyNightView(payload) {
     }
 
     const summaryElement = document.getElementById('plan-my-night-summary');
-    const progressLabel = document.getElementById('plan-my-night-progress-label');
-    const progressBar = document.getElementById('plan-my-night-progress-bar');
     const timelineList = document.getElementById('plan-my-night-timeline-list');
-    if (!summaryElement || !progressLabel || !progressBar || !timelineList) {
+    if (!summaryElement || !timelineList) {
         return false;
     }
 
@@ -114,11 +117,7 @@ function patchPlanMyNightView(payload) {
         return false;
     }
 
-    progressLabel.textContent = i18n.t('plan_my_night.timeline_progress', {
-        progress: (timeline.progress_percent || 0).toFixed(1)
-    });
-    progressBar.style.width = `${Math.max(0, Math.min(100, timeline.progress_percent || 0))}%`;
-    progressBar.setAttribute('aria-valuenow', String(Math.round(timeline.progress_percent || 0)));
+    updatePlanSummaryChart(timeline);
 
     const currentTargetId = timeline.current_target_id ? String(timeline.current_target_id) : null;
     timelineList.querySelectorAll('.plan-target-item').forEach(item => {
@@ -192,6 +191,14 @@ async function loadPlanMyNight(options = {}) {
 
         if (!(canPatchInPlace && patchedInPlace) && !shouldUsePatchOnly) {
             renderPlanMyNight(payload);
+        } else if (shouldUsePatchOnly && !canPatchInPlace) {
+            // Structure changed (e.g. reorder shifted timeline_start/end) but DOM was patched
+            // in place — rebuild only the summary graph with the updated entry order/times.
+            const graphContainer = document.getElementById('plan-summary-graph-container');
+            if (graphContainer) {
+                buildPlanSummaryGraph(graphContainer, payload?.plan?.entries || [], payload?.plan, payload?.timeline || {})
+                    .catch(err => console.error('Plan summary graph error:', err));
+            }
         }
 
         restorePlanMyNightViewport(viewportState, container);
@@ -200,12 +207,14 @@ async function loadPlanMyNight(options = {}) {
         planMyNightStructureSnapshot = nextStructureSnapshot;
 
         // Keep timeline/current target fresh while tab remains visible.
+        // Use a shorter interval during the night so the graph cursor stays accurate.
+        const pollIntervalMs = payload?.timeline?.is_inside_night ? 30000 : 60000;
         planMyNightPollTimer = setTimeout(() => {
             const tab = document.getElementById('plan-my-night-subtab');
             if (tab && tab.classList.contains('active') && !document.hidden) {
                 loadPlanMyNight({ silent: true });
             }
-        }, 60000);
+        }, pollIntervalMs);
     } catch (error) {
         restorePlanMyNightViewport(viewportState, container);
 
@@ -495,59 +504,7 @@ function getPlanEntryMinutes(entry) {
     return parsePlanDurationToMinutes(entry?.planned_duration);
 }
 
-function getPlanCoverageSegmentColor(index) {
-    const palette = [
-        'bg-primary',
-        'bg-info',
-        'bg-success',
-        'bg-warning',
-        'bg-danger',
-        'bg-secondary',
-    ];
-    return palette[index % palette.length];
-}
 
-function buildPlanCoverageSegments(entries, nightMinutes) {
-    const safeNightMinutes = Math.max(0, Number(nightMinutes) || 0);
-    const sourceEntries = Array.isArray(entries) ? entries : [];
-
-    if (!sourceEntries.length || safeNightMinutes <= 0) {
-        return [];
-    }
-
-    let consumedMinutes = 0;
-    const segments = [];
-
-    sourceEntries.forEach((entry, index) => {
-        const entryMinutes = Math.max(0, getPlanEntryMinutes(entry));
-        if (entryMinutes <= 0) {
-            return;
-        }
-
-        const remainingNightMinutes = Math.max(0, safeNightMinutes - consumedMinutes);
-        if (remainingNightMinutes <= 0) {
-            return;
-        }
-
-        const visibleMinutes = Math.min(entryMinutes, remainingNightMinutes);
-        const widthPercent = (visibleMinutes / safeNightMinutes) * 100;
-        if (widthPercent <= 0) {
-            return;
-        }
-
-        consumedMinutes += visibleMinutes;
-
-        segments.push({
-            widthPercent,
-            targetNumber: index + 1,
-            label: entry?.name || entry?.target_name || `Target ${index + 1}`,
-            minutes: entryMinutes,
-            colorClass: getPlanCoverageSegmentColor(index),
-        });
-    });
-
-    return segments;
-}
 
 function getCoverageStatus(fillPercent) {
     const safePercent = Number(fillPercent) || 0;
@@ -560,10 +517,468 @@ function getCoverageStatus(fillPercent) {
     return { key: 'underplanned', className: 'text-bg-warning' };
 }
 
+// ── Plan Summary Altitude Graph ─────────────────────────────────────────────
+
+function destroyPlanSummaryChart() {
+    if (planSummaryChartInstance) {
+        planSummaryChartInstance.destroy();
+        planSummaryChartInstance = null;
+    }
+    planSummaryTargetBands = [];
+    planSummaryGraphGen++;
+}
+
+/**
+ * Clip alttime arrays to a time window, interpolating boundary points.
+ * Returns [{x: ms, y: altitude, az: azimuth|null}, ...]
+ */
+function _planClipAlttime(timesUtc, altitudes, azimuths, windowStartIso, windowEndIso) {
+    const wsMs = new Date(windowStartIso).getTime();
+    const weMs = new Date(windowEndIso).getTime();
+    if (wsMs >= weMs || !timesUtc || !timesUtc.length) return [];
+
+    // times_utc values have no 'Z' suffix (bare ISO strings) — force UTC parsing,
+    // matching the same pattern used in skytonight.js: new Date(t + 'Z')
+    const pts = timesUtc.map((t, i) => ({
+        x:  new Date(t + 'Z').getTime(),
+        y:  altitudes[i],
+        az: azimuths ? (azimuths[i] ?? null) : null,
+    }));
+
+    function lerpPt(a, b, x) {
+        const t = (x - a.x) / (b.x - a.x);
+        return { x, y: a.y + t * (b.y - a.y), az: (a.az !== null && b.az !== null) ? a.az + t * (b.az - a.az) : null };
+    }
+
+    const out = [];
+    for (let i = 0; i < pts.length; i++) {
+        const p    = pts[i];
+        const prev = pts[i - 1];
+        const next = pts[i + 1];
+        if (prev && prev.x < wsMs && p.x > wsMs)  out.push(lerpPt(prev, p, wsMs));
+        if (p.x >= wsMs && p.x <= weMs)             out.push({ x: p.x, y: p.y, az: p.az });
+        if (p.x <= weMs && next && next.x > weMs)   out.push(lerpPt(p, next, weMs));
+    }
+    return out;
+}
+
+/**
+ * Linearly interpolate custom horizon altitude at a given azimuth.
+ * Matches _horizonAltAtAz in skytonight.js.
+ */
+function _planHorizonAltAtAz(az, profile) {
+    if (!profile || !profile.length) return null;
+    const sorted = [...profile].sort((a, b) => a.az - b.az);
+    const azNorm = ((az % 360) + 360) % 360;
+    const idx = sorted.findIndex(p => p.az > azNorm);
+    if (idx === -1) {
+        const p0 = sorted[sorted.length - 1];
+        const p1 = { az: sorted[0].az + 360, alt: sorted[0].alt };
+        const t  = (azNorm - p0.az) / (p1.az - p0.az);
+        return p0.alt + t * (p1.alt - p0.alt);
+    }
+    if (idx === 0) {
+        const p0 = { az: sorted[sorted.length - 1].az - 360, alt: sorted[sorted.length - 1].alt };
+        const t  = (azNorm - p0.az) / (sorted[0].az - p0.az);
+        return p0.alt + t * (sorted[0].alt - p0.alt);
+    }
+    const p0 = sorted[idx - 1];
+    const p1 = sorted[idx];
+    const t  = (azNorm - p0.az) / (p1.az - p0.az);
+    return p0.alt + t * (p1.alt - p0.alt);
+}
+
+function _planBandStatus(entryId, endMs, currentTargetId) {
+    if (currentTargetId && String(entryId) === String(currentTargetId)) return 'current';
+    if (endMs < Date.now()) return 'done';
+    return 'future';
+}
+
+function _planBandColors(status) {
+    if (status === 'current') return { border: '#198754', bg: 'rgba(25,135,84,0.18)' };
+    if (status === 'done')    return { border: '#fd7e14', bg: 'rgba(253,126,20,0.12)' };
+    return                           { border: '#6c757d', bg: 'rgba(108,117,125,0.09)' };
+}
+
+async function buildPlanSummaryGraph(container, entries, plan, timeline) {
+    destroyPlanSummaryChart();
+    const myGen = planSummaryGraphGen;
+
+    const nightStartMs = plan.night_start ? new Date(plan.night_start).getTime() : null;
+    const nightEndMs   = plan.night_end   ? new Date(plan.night_end).getTime()   : null;
+    if (!nightStartMs || !nightEndMs || !entries.length) return;
+
+    // Loading state
+    DOMUtils.clear(container);
+    const loadingEl = document.createElement('div');
+    loadingEl.className = 'text-center text-muted small py-3';
+    loadingEl.textContent = i18n.t('common.loading');
+    container.appendChild(loadingEl);
+
+    // Fetch alttime for all entries concurrently
+    const entriesWithAlt = entries.filter(e => e.alttime_file);
+    const settled = await Promise.allSettled(
+        entriesWithAlt.map(e =>
+            fetchJSON(`/api/skytonight/alttime/${encodeURIComponent(e.alttime_file)}`)
+        )
+    );
+
+    if (myGen !== planSummaryGraphGen) return; // stale — a new render started
+
+    const alttimeMap = {};
+    entriesWithAlt.forEach((e, i) => {
+        const r = settled[i];
+        if (r.status === 'fulfilled' && r.value && !r.value.error) {
+            alttimeMap[e.id] = r.value;
+        }
+    });
+
+    DOMUtils.clear(container);
+
+    // Settings from first available alttime response
+    const firstAlt  = Object.values(alttimeMap)[0];
+    const altMin    = firstAlt?.altitude_constraint_min ?? 30;
+    const altMax    = firstAlt?.altitude_constraint_max ?? 80;
+    const horizProf = firstAlt?.horizon_profile ?? null;
+    const timezone  = firstAlt?.timezone ?? null;
+    const yMax      = altMax >= 85 ? altMax + 5 : altMax + 10;
+
+    // Resolve theme-aware chart colors — same CSS variables as skytonight.js
+    const rootStyle      = getComputedStyle(document.documentElement);
+    const bsTheme        = (document.documentElement.getAttribute('data-bs-theme') || '').toLowerCase();
+    const theme          = (document.documentElement.getAttribute('data-theme') || '').toLowerCase();
+    const isDark         = theme === 'dark' || theme === 'red' || bsTheme === 'dark';
+    const cssVar         = (name, fb) => { const v = rootStyle.getPropertyValue(name); return v ? v.trim() : fb; };
+    const primaryRgb     = cssVar('--bs-primary-rgb', '13, 110, 253');
+    const gridColor      = isDark ? 'rgba(255,255,255,0.16)' : 'rgba(15,23,42,0.12)';
+    const altLineColor   = `rgba(${primaryRgb}, 0.92)`;
+    const altFillColor   = `rgba(${primaryRgb}, 0.18)`;
+    const constColor     = 'rgba(20,110,40,0.8)';
+    const horizLineColor = 'rgba(200,80,0,0.75)';
+    const horizFillColor = isDark ? 'rgba(200,80,0,0.16)' : 'rgba(200,80,0,0.07)';
+
+    const tzFmt = timezone
+        ? new Intl.DateTimeFormat([], { hour: '2-digit', minute: '2-digit', timeZone: timezone, hour12: false })
+        : null;
+
+    function fmtXTick(ms) {
+        if (tzFmt) return tzFmt.format(new Date(ms));
+        const d = new Date(ms);
+        return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    }
+
+    const currentTargetId = timeline?.current_target_id;
+    const datasets = [];
+    const bands    = [];
+
+    entries.forEach((entry, index) => {
+        const startMs  = entry.timeline_start ? new Date(entry.timeline_start).getTime() : null;
+        const rawEndMs = entry.timeline_end   ? new Date(entry.timeline_end).getTime()   : null;
+        const endMs    = rawEndMs ? Math.min(rawEndMs, nightEndMs) : null;
+
+        if (!startMs || !endMs || startMs >= nightEndMs || endMs <= startMs) return;
+
+        const status    = _planBandStatus(entry.id, endMs, currentTargetId);
+        const colors    = _planBandColors(status);
+        const entryName = entry.name || entry.target_name || `Target ${index + 1}`;
+
+        bands.push({
+            startMs,
+            endMs,
+            num:         index + 1,
+            name:        entryName,
+            entryId:     entry.id,
+            status,
+            borderColor: colors.border,
+            bgColor:     colors.bg,
+        });
+
+        const atd = alttimeMap[entry.id];
+        if (!atd?.times_utc) return;
+
+        const clippedEndMs  = Math.min(rawEndMs, nightEndMs);
+        const clippedEndIso = new Date(clippedEndMs).toISOString();
+        const clipped = _planClipAlttime(atd.times_utc, atd.altitudes, atd.azimuths, entry.timeline_start, clippedEndIso);
+        if (!clipped.length) return;
+
+        // Altitude curve — consistent primary color for all targets
+        datasets.push({
+            label:            entryName,
+            data:             clipped.map(p => ({ x: p.x, y: p.y })),
+            parsing:          false,
+            borderColor:      altLineColor,
+            backgroundColor:  'transparent',
+            fill:             false,
+            tension:          0.3,
+            borderWidth:      2,
+            pointRadius:      0,
+            pointHoverRadius: 3,
+            order:            2,
+            _entryId:         entry.id,
+        });
+
+        // Custom horizon curve per target (azimuth-mapped)
+        if (horizProf && clipped.some(p => p.az !== null)) {
+            const horizPts = clipped
+                .map(p => ({ x: p.x, y: p.az !== null ? _planHorizonAltAtAz(p.az, horizProf) : null }))
+                .filter(p => p.y !== null);
+            if (horizPts.length) {
+                datasets.push({
+                    label:           '',
+                    data:            horizPts,
+                    parsing:         false,
+                    borderColor:     horizLineColor,
+                    backgroundColor: 'transparent',
+                    fill:            false,
+                    tension:         0.3,
+                    borderWidth:     1,
+                    borderDash:      [3, 3],
+                    pointRadius:     0,
+                    order:           3,
+                    _isHorizon:      true,
+                });
+            }
+        }
+    });
+
+    // Observable zone lines spanning the full night (matching skytonight.js style)
+    datasets.push({
+        label:           `${altMin}°`,
+        data:            [{ x: nightStartMs, y: altMin }, { x: nightEndMs, y: altMin }],
+        parsing:         false,
+        borderColor:     constColor,
+        backgroundColor: 'transparent',
+        fill:            false,
+        borderWidth:     1,
+        borderDash:      [5, 4],
+        pointRadius:     0,
+        tension:         0,
+        order:           4,
+        _isConstraint:   true,
+    });
+    datasets.push({
+        label:           `${altMax}°`,
+        data:            [{ x: nightStartMs, y: altMax }, { x: nightEndMs, y: altMax }],
+        parsing:         false,
+        borderColor:     constColor,
+        backgroundColor: 'transparent',
+        fill:            false,
+        borderWidth:     1,
+        borderDash:      [5, 4],
+        pointRadius:     0,
+        tension:         0,
+        order:           4,
+        _isConstraint:   true,
+    });
+
+    // Current time vertical line
+    const nowMs = Date.now();
+    datasets.push({
+        label:           '',
+        data:            [{ x: nowMs, y: 0 }, { x: nowMs, y: yMax }],
+        parsing:         false,
+        borderColor:     '#ef4444',
+        backgroundColor: 'transparent',
+        fill:            false,
+        borderWidth:     1.5,
+        borderDash:      [4, 4],
+        pointRadius:     0,
+        tension:         0,
+        order:           1,
+        _isCurrentTime:  true,
+    });
+
+    planSummaryTargetBands = bands;
+
+    // Plugin: colored band rectangles with number + name label
+    const planTargetBandsPlugin = {
+        id: 'planTargetBands',
+        beforeDatasetsDraw(chart) {
+            const { ctx, chartArea, scales } = chart;
+            if (!chartArea) return;
+            const xScale = scales.x;
+            const { top, bottom } = chartArea;
+            ctx.save();
+            ctx.textBaseline = 'middle';
+            ctx.save();
+            ctx.rect(chartArea.left, top, chartArea.right - chartArea.left, bottom - top);
+            ctx.clip();
+            const bandRadius  = 5;
+            const labelFont   = 'bold 12px sans-serif';
+            const labelPadX   = 7;
+            const labelPadY   = 4;
+            const labelRadius = 3;
+            ctx.font = labelFont;
+            for (const band of planSummaryTargetBands) {
+                const x1 = Math.max(chartArea.left,  xScale.getPixelForValue(band.startMs));
+                const x2 = Math.min(chartArea.right, xScale.getPixelForValue(band.endMs));
+                if (x2 <= x1) continue;
+                // Border — rounded rect, no horizontal inset so adjacent bands share the edge pixel
+                ctx.strokeStyle = band.borderColor;
+                ctx.lineWidth   = 1.5;
+                ctx.setLineDash([]);
+                ctx.beginPath();
+                ctx.roundRect(x1, top + 1, x2 - x1, bottom - top - 2, bandRadius);
+                ctx.stroke();
+                // Label: "N. Name" with pill background, truncated to fit band width
+                const full       = `${band.num}. ${band.name}`;
+                const bandW      = x2 - x1;
+                const maxTextW   = bandW - labelPadX * 2 - 8;
+                if (maxTextW > 12) {
+                    let label = full;
+                    while (ctx.measureText(label).width > maxTextW && label.length > `${band.num}.`.length) {
+                        label = label.slice(0, -1);
+                    }
+                    if (label !== full) label += '…';
+                    const textW  = ctx.measureText(label).width;
+                    const pillW  = textW + labelPadX * 2;
+                    const pillH  = 12 + labelPadY * 2;
+                    const pillX  = x1 + 6;
+                    const pillY  = top + 7;
+                    ctx.fillStyle = band.borderColor;
+                    ctx.beginPath();
+                    ctx.roundRect(pillX, pillY, pillW, pillH, labelRadius);
+                    ctx.fill();
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillText(label, pillX + labelPadX, pillY + pillH / 2);
+                }
+            }
+            ctx.restore(); // pop clip
+            ctx.restore(); // pop font/textBaseline
+        },
+    };
+
+    // ── DOM structure (canvas wrapper with fixed height + legend footer) ──
+    // The canvas must be the only child of its wrapper so Chart.js responsive
+    // mode reads a stable fixed height and does not enter an infinite growth loop.
+
+    const canvasWrap = document.createElement('div');
+    canvasWrap.className = 'plan-summary-graph-canvas-wrap';
+    const canvas = document.createElement('canvas');
+    canvasWrap.appendChild(canvas);
+    container.appendChild(canvasWrap);
+
+    // Legend footer row (matching card-footer badge style from horizon-graph.js)
+    const footerRow = document.createElement('div');
+    footerRow.className = 'row align-items-center mt-2';
+
+    const mkBadge = (color, text, dashed) => {
+        const col   = document.createElement('div');
+        col.className = 'col-auto';
+        const badge = document.createElement('span');
+        badge.className = 'badge';
+        badge.style.backgroundColor = color;
+        if (dashed) badge.style.outline = `2px dashed ${color}`;
+        badge.textContent = text;
+        col.appendChild(badge);
+        return col;
+    };
+
+    footerRow.appendChild(mkBadge(altLineColor,   i18n.t('skytonight.altitude_time_altitude_label') || 'Altitude'));
+    footerRow.appendChild(mkBadge(constColor,      i18n.t('skytonight.altitude_time_observable_zone') || 'Observable zone'));
+    if (horizProf) {
+        footerRow.appendChild(mkBadge(horizLineColor, i18n.t('skytonight.horizon_custom_line') || 'Custom horizon'));
+    }
+    footerRow.appendChild(mkBadge('#198754', i18n.t('plan_my_night.plan_status_current') || 'Active'));
+    footerRow.appendChild(mkBadge('#fd7e14', i18n.t('plan_my_night.plan_status_previous') || 'Expired'));
+    footerRow.appendChild(mkBadge('#6c757d', i18n.t('skytonight.planned') || 'Planned'));
+    footerRow.appendChild(mkBadge('#ef4444', i18n.t('astro_weather.now_badge') || 'Now', true));
+
+    container.appendChild(footerRow);
+
+    // Custom interaction mode: nearest altitude-only point (excludes horizon, constraint, now-line)
+    if (!Chart.Interaction.modes.planAltNearest) {
+        Chart.Interaction.modes.planAltNearest = function(chart, e, options, useFinalPosition) {
+            return Chart.Interaction.modes.nearest(chart, e, options, useFinalPosition)
+                .filter(i => {
+                    const ds = chart.data.datasets[i.datasetIndex];
+                    return !ds._isHorizon && !ds._isConstraint && !ds._isCurrentTime;
+                });
+        };
+    }
+
+    planSummaryChartInstance = new Chart(canvas.getContext('2d'), {
+        type:    'line',
+        plugins: [planTargetBandsPlugin],
+        data:    { datasets },
+        options: {
+            responsive:          true,
+            maintainAspectRatio: false,
+            animation:           false,
+            interaction:         { mode: 'planAltNearest', intersect: false, axis: 'x' },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        title(items) {
+                            if (!items.length) return '';
+                            const x = items[0].parsed?.x ?? items[0].raw?.x;
+                            return fmtXTick(x);
+                        },
+                        label(ctx) {
+                            const y = +(ctx.parsed?.y ?? ctx.raw?.y);
+                            if (isNaN(y)) return null;
+                            return `${ctx.dataset.label}  ${y.toFixed(1)}°`;
+                        },
+                    },
+                },
+            },
+            scales: {
+                x: {
+                    type:  'linear',
+                    min:   nightStartMs,
+                    max:   nightEndMs,
+                    ticks: { maxTicksLimit: 8, callback: v => fmtXTick(v) },
+                    grid:  { color: gridColor },
+                },
+                y: {
+                    type:  'linear',
+                    min:   0,
+                    max:   yMax,
+                    ticks: { maxTicksLimit: 5, callback: v => `${v}°` },
+                    grid:  { color: gridColor },
+                    title: { display: true, text: i18n.t('units.degrees') || '°', font: { size: 10 } },
+                },
+            },
+        },
+    });
+}
+
+function updatePlanSummaryChart(timeline) {
+    if (!planSummaryChartInstance) return;
+
+    const currentTargetId = timeline?.current_target_id;
+    const nowMs           = Date.now();
+
+    // Update current time line position
+    const nowDs = planSummaryChartInstance.data.datasets.find(d => d._isCurrentTime);
+    if (nowDs) {
+        nowDs.data[0].x = nowMs;
+        nowDs.data[1].x = nowMs;
+    }
+
+    // Update band border/bg colors based on current status
+    // (altitude curve colors remain constant — only the band boxes change)
+    for (const band of planSummaryTargetBands) {
+        const status = _planBandStatus(band.entryId, band.endMs, currentTargetId);
+        if (status !== band.status) {
+            const colors     = _planBandColors(status);
+            band.status      = status;
+            band.borderColor = colors.border;
+            band.bgColor     = colors.bg;
+        }
+    }
+
+    planSummaryChartInstance.update('none');
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+
 function renderPlanMyNight(payload) {
     const container = document.getElementById('plan-my-night-display');
     if (!container) return;
 
+    destroyPlanSummaryChart();
     DOMUtils.clear(container);
 
     if (!isPlanEditRole(payload.role)) {
@@ -738,7 +1153,7 @@ function renderPlanMyNight(payload) {
     coverageWrap.className = 'mt-3';
 
     const coverageHeader = document.createElement('div');
-    coverageHeader.className = 'd-flex align-items-center justify-content-between gap-2 mb-1 flex-wrap';
+    coverageHeader.className = 'd-flex align-items-center justify-content-between gap-2 mb-2 flex-wrap';
 
     const coverageLabel = document.createElement('div');
     coverageLabel.className = 'small text-muted';
@@ -756,42 +1171,13 @@ function renderPlanMyNight(payload) {
     coverageHeader.appendChild(coverageLabel);
     coverageHeader.appendChild(coverageBadge);
 
-    const coverageProgress = document.createElement('div');
-    coverageProgress.className = 'progress-stacked plan-coverage-progress';
-
-    const coverageSegments = buildPlanCoverageSegments(entries, coverage.nightMinutes);
-    if (coverageSegments.length) {
-        coverageSegments.forEach(segment => {
-            const segmentWrap = document.createElement('div');
-            segmentWrap.className = 'progress';
-            segmentWrap.style.width = `${segment.widthPercent.toFixed(2)}%`;
-
-            const segmentBar = document.createElement('div');
-            segmentBar.className = `progress-bar ${segment.colorClass}`;
-            segmentBar.setAttribute('role', 'progressbar');
-            segmentBar.setAttribute('aria-valuemin', '0');
-            segmentBar.setAttribute('aria-valuemax', '100');
-            segmentBar.setAttribute('aria-valuenow', String(Math.round(segment.widthPercent)));
-            segmentBar.setAttribute('aria-label', `${segment.label} (${formatMinutesAsHourMinute(segment.minutes)})`);
-            segmentBar.title = `${segment.label} (${formatMinutesAsHourMinute(segment.minutes)})`;
-            segmentBar.textContent = String(segment.targetNumber);
-
-            segmentWrap.appendChild(segmentBar);
-            coverageProgress.appendChild(segmentWrap);
-        });
-    } else {
-        const coverageProgressBar = document.createElement('div');
-        coverageProgressBar.className = `progress-bar ${coverage.fillPercent > 100 ? 'bg-danger' : 'bg-success'}`;
-        coverageProgressBar.style.width = `${Math.max(0, Math.min(100, coverage.fillPercent))}%`;
-        coverageProgressBar.setAttribute('role', 'progressbar');
-        coverageProgressBar.setAttribute('aria-valuemin', '0');
-        coverageProgressBar.setAttribute('aria-valuemax', '100');
-        coverageProgressBar.setAttribute('aria-valuenow', String(Math.round(Math.min(100, coverage.fillPercent))));
-        coverageProgress.appendChild(coverageProgressBar);
-    }
+    // Graph container — replaces both the stacked coverage bar and the timeline progress bar
+    const graphContainer = document.createElement('div');
+    graphContainer.id = 'plan-summary-graph-container';
+    graphContainer.className = 'plan-summary-graph-wrap';
 
     coverageWrap.appendChild(coverageHeader);
-    coverageWrap.appendChild(coverageProgress);
+    coverageWrap.appendChild(graphContainer);
     summaryBody.appendChild(coverageWrap);
 
     if (coverage.overflowMinutes > 0) {
@@ -803,34 +1189,11 @@ function renderPlanMyNight(payload) {
         summaryBody.appendChild(overflowAlert);
     }
 
-    const timelineWrap = document.createElement('div');
-    timelineWrap.className = 'mt-3';
-
-    const progressLabel = document.createElement('div');
-    progressLabel.id = 'plan-my-night-progress-label';
-    progressLabel.className = 'small text-muted mb-1';
-    progressLabel.textContent = i18n.t('plan_my_night.timeline_progress', {
-        progress: (timeline.progress_percent || 0).toFixed(1)
-    });
-
-    const progress = document.createElement('div');
-    progress.className = 'progress';
-    const progressBar = document.createElement('div');
-    progressBar.id = 'plan-my-night-progress-bar';
-    progressBar.className = 'progress-bar bg-info';
-    progressBar.style.width = `${Math.max(0, Math.min(100, timeline.progress_percent || 0))}%`;
-    progressBar.setAttribute('role', 'progressbar');
-    progressBar.setAttribute('aria-valuemin', '0');
-    progressBar.setAttribute('aria-valuemax', '100');
-    progressBar.setAttribute('aria-valuenow', String(Math.round(timeline.progress_percent || 0)));
-    progress.appendChild(progressBar);
-
-    timelineWrap.appendChild(progressLabel);
-    timelineWrap.appendChild(progress);
-
-    summaryBody.appendChild(timelineWrap);
     summary.appendChild(summaryBody);
     container.appendChild(summary);
+
+    buildPlanSummaryGraph(graphContainer, entries, plan, timeline)
+        .catch(err => console.error('Plan summary graph error:', err));
 
     if (!entries.length) {
         const empty = document.createElement('div');
@@ -1167,4 +1530,5 @@ function renderPlanMyNight(payload) {
 
 window.addEventListener('beforeunload', () => {
     clearPlanPollTimer();
+    destroyPlanSummaryChart();
 });

@@ -1142,7 +1142,7 @@ return jsonify({
 
 ## Cache System Rules
 
-The background cache is **selective-refresh**: the scheduler polls every 25 min but only runs jobs whose individual TTL has elapsed. Full documentation: [docs/CACHE_SYSTEM.md](docs/CACHE_SYSTEM.md).
+The background cache is **selective-refresh**: the scheduler polls every 25 min but only runs jobs whose individual TTL has elapsed. Full documentation: [docs/CACHE_SYSTEM.md](../../docs/CACHE_SYSTEM.md).
 
 ### Per-Job TTLs (defined in `backend/constants.py`)
 | Job | Constant | TTL |
@@ -1207,10 +1207,10 @@ The background cache is **selective-refresh**: the scheduler polls every 25 min 
 - [JPL Small-Body Database](https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html)
 
 ### SkyTonight Documentation
-- [SkyTonight Architecture & AstroScore](docs/SKYTONIGHT.md)
-- [Plan My Night](docs/PLAN_MY_NIGHT.md)
-- [API Endpoints](docs/API_ENDPOINTS.md)
-- [Cache System](docs/CACHE_SYSTEM.md)
+- [SkyTonight Architecture & AstroScore](../../docs/SKYTONIGHT.md)
+- [Plan My Night](../../docs/PLAN_MY_NIGHT.md)
+- [API Endpoints](../../docs/API_ENDPOINTS.md)
+- [Cache System](../../docs/CACHE_SYSTEM.md)
 
 ### Docker
 - [Docker Documentation](https://docs.docker.com/)
