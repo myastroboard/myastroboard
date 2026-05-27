@@ -1051,15 +1051,35 @@ function renderPlanMyNight(payload) {
 
     if (state !== 'none' && plan) {
         if (state === 'current') {
+            const _triggerDownload = async (url) => {
+                try {
+                    const resp = await fetch(url, { credentials: 'same-origin' });
+                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                    const blob    = await resp.blob();
+                    const blobUrl = URL.createObjectURL(blob);
+                    const disposition = resp.headers.get('Content-Disposition') || '';
+                    const match    = disposition.match(/filename[^;=\n]*=(['"]?)([^'";\n]+)\1/);
+                    const filename = match ? match[2].trim() : '';
+                    const a = document.createElement('a');
+                    a.href     = blobUrl;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(blobUrl);
+                } catch (err) {
+                    console.error('Export download failed:', err);
+                }
+            };
             const exportCsvBtn = makePlanActionButton('plan_my_night.export_csv', 'btn btn-primary btn-sm', async () => {
                 const lang = typeof i18n?.getCurrentLanguage === 'function' ? i18n.getCurrentLanguage() : 'en';
                 const tidParam = currentPlanTelescopeId ? `&telescope_id=${encodeURIComponent(currentPlanTelescopeId)}` : '';
-                window.location.href = `/api/plan-my-night/export.csv?lang=${encodeURIComponent(lang)}${tidParam}`;
+                _triggerDownload(`/api/plan-my-night/export.csv?lang=${encodeURIComponent(lang)}${tidParam}`);
             });
             const exportPdfBtn = makePlanActionButton('plan_my_night.export_pdf', 'btn btn-success btn-sm', async () => {
                 const lang = typeof i18n?.getCurrentLanguage === 'function' ? i18n.getCurrentLanguage() : 'en';
                 const tidParam = currentPlanTelescopeId ? `&telescope_id=${encodeURIComponent(currentPlanTelescopeId)}` : '';
-                window.location.href = `/api/plan-my-night/export.pdf?lang=${encodeURIComponent(lang)}${tidParam}`;
+                _triggerDownload(`/api/plan-my-night/export.pdf?lang=${encodeURIComponent(lang)}${tidParam}`);
             });
             toolbar.appendChild(exportPdfBtn);
             toolbar.appendChild(exportCsvBtn);
