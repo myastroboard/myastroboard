@@ -17,29 +17,13 @@
     border-left: 4px solid var(--bs-success);
 }
 
-#plan-my-night-display .plan-coverage-progress {
-    height: 0.9rem;
+.plan-summary-graph-wrap {
+    position: relative;
 }
 
-#plan-my-night-display .plan-coverage-progress .progress {
-    min-width: 2px;
-}
-
-#plan-my-night-display .plan-coverage-progress .progress-bar {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.66rem;
-    font-weight: var(--font-bold);
-    line-height: 1;
-    color: var(--bs-light);
-    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
-    overflow: hidden;
-    white-space: nowrap;
-}
-
-#plan-my-night-display .plan-coverage-progress .progress + .progress {
-    box-shadow: inset 1px 0 0 color-mix(in srgb, #fff 40%, transparent);
+.plan-summary-graph-canvas-wrap {
+    position: relative;
+    height: 250px;
 }
 
 #plan-my-night-display .plan-my-night-timeline {
