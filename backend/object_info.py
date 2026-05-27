@@ -194,6 +194,98 @@ def _resolve_via_simbad(identifier: str) -> Optional[Dict[str, Any]]:
     }
 
 
+# Recognized catalog patterns for building catalogue_names dicts from SIMBAD aliases.
+# Order matters: higher-priority catalogs are matched first.
+_CATALOGUE_ALIAS_PATTERNS: List[tuple] = [
+    (re.compile(r'^M\s+\d+$', re.I), 'Messier'),
+    (re.compile(r'^NGC\s+\w+$', re.I), 'OpenNGC'),
+    (re.compile(r'^IC\s+\w+$', re.I), 'OpenIC'),
+    (re.compile(r'^C\s+\d+$', re.I), 'Caldwell'),
+    (re.compile(r'^HIP\s+\d+$', re.I), 'HIP'),
+    (re.compile(r'^HD\s+\d+$', re.I), 'HD'),
+    (re.compile(r'^SAO\s+\d+$', re.I), 'SAO'),
+    (re.compile(r'^TYC\s+\S+$', re.I), 'TYC'),
+    (re.compile(r'^UGC\s+\d+$', re.I), 'UGC'),
+    (re.compile(r'^PGC\s+\d+$', re.I), 'PGC'),
+    (re.compile(r'^MCG\s+\S+$', re.I), 'MCG'),
+]
+
+
+def build_catalogue_names_from_aliases(identifier: str, aliases: List[str]) -> Dict[str, str]:
+    """Build a {catalogue_key: identifier} dict from a SIMBAD alias list.
+
+    The input identifier is always included under its detected catalog key (or 'Simbad').
+    """
+    result: Dict[str, str] = {}
+    for name in [identifier] + aliases:
+        for pattern, key in _CATALOGUE_ALIAS_PATTERNS:
+            if key not in result and pattern.match(name.strip()):
+                result[key] = name.strip()
+                break
+    if not result:
+        result['Simbad'] = identifier
+    return result
+
+
+def resolve_identifier_for_catalogue_lookup(identifier: str) -> Optional[Dict[str, Any]]:
+    """Resolve *identifier* via SIMBAD TAP for the Astrodex catalogue-lookup fallback.
+
+    Returns {'object_type', 'constellation', 'aliases'} or None.
+    'constellation' is the full lowercase constellation name derived from RA/Dec via astropy
+    (e.g. 'cassiopeia', 'ursa major') — ready for the dropdown without further conversion.
+    'aliases' is a sorted list (most recognizable first).
+    """
+    safe_id = identifier.replace("'", "''")
+    main_query = (
+        "SELECT b.main_id, b.otype_txt, b.ra, b.dec "
+        "FROM basic AS b "
+        "JOIN ident AS i ON b.oid = i.oidref "
+        f"WHERE i.id = '{safe_id}'"
+    )
+    result = _simbad_query(main_query)
+    if not result or not result.get('data'):
+        return None
+
+    row = result['data'][0]
+    cols = [c['name'] for c in result.get('metadata', [])]
+    row_dict = dict(zip(cols, row))
+
+    main_id = str(row_dict.get('main_id') or '').strip()
+    obj_type = str(row_dict.get('otype_txt') or '').strip()
+    ra_raw = row_dict.get('ra')
+    dec_raw = row_dict.get('dec')
+
+    # Derive constellation from coordinates using astropy
+    constellation = ''
+    if ra_raw is not None and dec_raw is not None:
+        try:
+            from astropy.coordinates import SkyCoord, get_constellation
+            coord = SkyCoord(ra=float(ra_raw), dec=float(dec_raw), unit='deg')
+            constellation = str(get_constellation(coord)).lower()
+        except Exception:
+            pass
+
+    safe_main = main_id.replace("'", "''")
+    alias_query = (
+        "SELECT i.id FROM ident AS i "
+        "JOIN ident AS ref ON i.oidref = ref.oidref "
+        f"WHERE ref.id = '{safe_main}'"
+    )
+    alias_result = _simbad_query(alias_query)
+    raw_aliases: List[str] = []
+    if alias_result and alias_result.get('data'):
+        for alias_row in alias_result['data']:
+            alias_val = str(alias_row[0]).strip()
+            if alias_val:
+                raw_aliases.append(alias_val)
+
+    return {
+        'object_type': obj_type,
+        'constellation': constellation,
+        'aliases': _sort_aliases(raw_aliases),
+    }
+
+
 # ──────────────────────────────────────────────
 # Phase 2 — Image URL (SkyView / DSS)
 # ──────────────────────────────────────────────

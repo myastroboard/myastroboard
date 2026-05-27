@@ -3364,21 +3364,42 @@ def astrodex_catalogue_lookup():
         # 'alias' key covers all catalogue names and common aliases since the
         # lookup table registers every target under alias::<normalised_name>.
         entry = skytonight_targets.get_lookup_entry('alias', name)
-        if not entry:
-            return jsonify({'found': False})
+        if entry:
+            raw_constellation = entry.get('constellation') or ''
+            full_constellation = (_abbr_to_name.get(raw_constellation, raw_constellation) or '').lower()
+            return jsonify({
+                'found': True,
+                'preferred_name': entry.get('preferred_name', ''),
+                'object_type': entry.get('object_type', ''),
+                'constellation': full_constellation,
+                'catalogue_names': entry.get('aliases', {}),
+            })
 
-        # PyOngc stores constellation as a 3-letter IAU abbreviation (e.g. 'Cnc');
-        # the dropdown expects the full lowercase name (e.g. 'cancer').
-        raw_constellation = entry.get('constellation') or ''
-        full_constellation = (_abbr_to_name.get(raw_constellation, raw_constellation) or '').lower()
+        # Fallback: query SIMBAD TAP to support extended catalogs (HIP, HD, SAO, TYC…)
+        from object_info import (
+            resolve_identifier_for_catalogue_lookup,
+            build_catalogue_names_from_aliases,
+            is_safe_identifier,
+        )
+        if is_safe_identifier(name):
+            simbad = resolve_identifier_for_catalogue_lookup(name)
+            if simbad:
+                catalogue_names = build_catalogue_names_from_aliases(name, simbad['aliases'])
+                # preferred_name: the typed identifier if it maps to a known catalog,
+                # otherwise the best sorted alias, otherwise the typed identifier as-is.
+                if any(v == name for v in catalogue_names.values()):
+                    preferred_name = name
+                else:
+                    preferred_name = simbad['aliases'][0] if simbad['aliases'] else name
+                return jsonify({
+                    'found': True,
+                    'preferred_name': preferred_name,
+                    'object_type': simbad['object_type'],
+                    'constellation': simbad['constellation'],
+                    'catalogue_names': catalogue_names,
+                })
 
-        return jsonify({
-            'found': True,
-            'preferred_name': entry.get('preferred_name', ''),
-            'object_type': entry.get('object_type', ''),
-            'constellation': full_constellation,
-            'catalogue_names': entry.get('aliases', {}),
-        })
+        return jsonify({'found': False})
     except Exception as e:
         logger.error(f"Error in catalogue lookup: {e}")
         return jsonify({'error': 'Internal server error'}), 500

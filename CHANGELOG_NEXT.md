@@ -1,0 +1,3 @@
+- Improve visualization of the moon with more realistic shadow
+- Search on astrodex, add object, is done on multiple catalogues
+- Fix date issue when there is no dark night
