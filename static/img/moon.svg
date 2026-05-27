@@ -8,10 +8,10 @@
     <circle cx="50" cy="50" r="44"/>
   </clipPath>
 
-  <!-- White reveals shadow overlay, black hides it -->
+  <!-- white = show shadow overlay, black = lit region (no shadow) -->
   <mask id="shadow-mask">
-    <rect width="100" height="100" fill="black"/>
-    <ellipse id="terminator" cx="50" cy="50" rx="44" ry="44" fill="white"/>
+    <rect width="100" height="100" fill="white"/>
+    <path id="lit-region" d="" fill="black"/>
   </mask>
 </defs>
 
@@ -27,13 +27,13 @@
   filter="url(#moon-glow)"
 />
 
-<!-- Shadow darkens texture instead of replacing it with black -->
+<!-- Shadow darkens the unlit region -->
 <circle
   cx="50"
   cy="50"
   r="44"
   fill="#000000"
-  fill-opacity="0.65"
+  fill-opacity="0.70"
   clip-path="url(#moon-disc-clip)"
   mask="url(#shadow-mask)"
 />

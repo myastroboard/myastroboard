@@ -33,48 +33,39 @@ function getMoonSvgTemplate() {
 }
 
 async function createMoonPhaseSvg(illumination, waxing) {
-    //console.log(`Creating moon SVG with illumination=${illumination}, waxing=${waxing}`);
-    //illumination = 0.3; // Temporary fixed value for testing, replace with actual illumination when available
     const svgTemplate = await getMoonSvgTemplate();
     const moonSvg = svgTemplate.cloneNode(true);
-    const terminator = moonSvg.querySelector('#terminator');
-    if (terminator) {
-        const clampedIllumination = Math.max(0, Math.min(1, Number.isFinite(illumination) ? illumination : 0));
-        const radius = 44;
-        const targetShadowFraction = 1 - clampedIllumination;
+    const litRegion = moonSvg.querySelector('#lit-region');
+    if (litRegion) {
+        const R = 44;
+        const cx = 50;
+        const topY = cx - R;  // 6
+        const botY = cx + R;  // 94
+        const p = Math.max(0, Math.min(1, Number.isFinite(illumination) ? illumination : 0));
 
-        const overlapFractionForDistance = (distance) => {
-            const d = Math.max(0, Math.min(2 * radius, distance));
-            if (d <= 0) {
-                return 1;
-            }
-            if (d >= 2 * radius) {
-                return 0;
-            }
-            const term = d / (2 * radius);
-            const overlapArea =
-                2 * radius * radius * Math.acos(term) -
-                (d / 2) * Math.sqrt(4 * radius * radius - d * d);
-            return overlapArea / (Math.PI * radius * radius);
-        };
-
-        // Find the circle offset that yields the expected shadow coverage.
-        let low = 0;
-        let high = 2 * radius;
-        for (let i = 0; i < 24; i += 1) {
-            const mid = (low + high) / 2;
-            const currentFraction = overlapFractionForDistance(mid);
-            if (currentFraction > targetShadowFraction) {
-                low = mid;
+        // The terminator is an ellipse with vertical semi-axis R and horizontal
+        // semi-axis R*|cos(phase_angle)| = R*|1-2p|. The lit region is bounded by
+        // one semicircle arc (outer edge) and one ellipse arc (the terminator).
+        // Sweep direction of the terminator arc flips at the quarter phases.
+        let path = '';
+        if (p > 0 && p < 1) {
+            const rx = Math.abs(1 - 2 * p) * R;
+            if (waxing) {
+                // Right side lit; terminator bulges right for crescent, left for gibbous
+                const termSweep = p < 0.5 ? 0 : 1;
+                path = `M ${cx} ${topY} A ${R} ${R} 0 0 1 ${cx} ${botY} A ${rx} ${R} 0 0 ${termSweep} ${cx} ${topY} Z`;
             } else {
-                high = mid;
+                // Left side lit; mirror of waxing
+                const termSweep = p < 0.5 ? 1 : 0;
+                path = `M ${cx} ${topY} A ${R} ${R} 0 0 0 ${cx} ${botY} A ${rx} ${R} 0 0 ${termSweep} ${cx} ${topY} Z`;
             }
+        } else if (p >= 1) {
+            // Full moon: two semicircle arcs form the complete disc
+            path = `M ${cx} ${topY} A ${R} ${R} 0 0 1 ${cx} ${botY} A ${R} ${R} 0 0 1 ${cx} ${topY} Z`;
         }
-        const distance = (low + high) / 2;
+        // p === 0: new moon → path stays '' → shadow covers the entire disc
 
-        terminator.setAttribute('rx', String(radius));
-        // Waxing is lit on the right, so shadow sits on the left.
-        terminator.setAttribute('cx', String(waxing ? 50 - distance : 50 + distance));
+        litRegion.setAttribute('d', path);
     }
     moonSvg.setAttribute('width', '80');
     return moonSvg;
