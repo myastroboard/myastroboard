@@ -2462,6 +2462,14 @@ async function showAlttimePopup(title, targetId) {
     const nightStart = data.night_start ? tzFmt.format(new Date(data.night_start)) : '';
     const nightEnd   = data.night_end   ? tzFmt.format(new Date(data.night_end))   : '';
 
+    const nightAstroStart = data.night_astro_start ? new Date(data.night_astro_start) : null;
+    const nightAstroEnd   = data.night_astro_end   ? new Date(data.night_astro_end)   : null;
+    const nightAstroStartFmt = nightAstroStart ? tzFmt.format(nightAstroStart) : '';
+    const nightAstroEndFmt   = nightAstroEnd   ? tzFmt.format(nightAstroEnd)   : '';
+    // UTC millisecond timestamps for each sample — used by the astro-night plugin
+    // to find the chart x-index matching the astronomical twilight boundaries.
+    const timesUtcMs = (data.times_utc || []).map(t => new Date(t + 'Z').getTime());
+
     // Resolve chart colors from current theme variables so dark/red modes stay readable.
     const rootStyle = getComputedStyle(document.documentElement);
     const theme = (document.documentElement.getAttribute('data-theme') || '').toLowerCase();
@@ -2528,14 +2536,20 @@ async function showAlttimePopup(title, targetId) {
         footerRow.appendChild(col);
     });
 
-    // Night window text
+    // Night window text (nautical + astronomical stacked on the right)
     if (nightStart && nightEnd) {
         const col = document.createElement('div');
-        col.className = 'col-auto ms-auto';
-        const span = document.createElement('span');
-        span.className = 'text-muted';
-        span.textContent = `${tSkyTonightCompat('altitude_time_night_window')}: ${nightStart} - ${nightEnd}`;
-        col.appendChild(span);
+        col.className = 'col-auto ms-auto text-end';
+        const span1 = document.createElement('div');
+        span1.className = 'text-muted';
+        span1.textContent = `${tSkyTonightCompat('altitude_time_night_window')}: ${nightStart} - ${nightEnd}`;
+        col.appendChild(span1);
+        if (nightAstroStartFmt && nightAstroEndFmt) {
+            const span2 = document.createElement('div');
+            span2.className = 'text-muted';
+            span2.textContent = `${tSkyTonightCompat('altitude_time_astro_night_window')}: ${nightAstroStartFmt} - ${nightAstroEndFmt}`;
+            col.appendChild(span2);
+        }
         footerRow.appendChild(col);
     }
 
@@ -2599,10 +2613,42 @@ async function showAlttimePopup(title, targetId) {
         },
     };
 
+    // Plugin: tint the nautical-but-not-astronomical twilight zones (before astro dusk
+    // and after astro dawn) with a warm overlay so the true dark-sky period stands out.
+    const astroNightPlugin = {
+        id: 'alttime_astro_night',
+        beforeDatasetsDraw(chart) {
+            if (!nightAstroStart || !nightAstroEnd || timesUtcMs.length === 0) return;
+            const { ctx, chartArea, scales } = chart;
+            if (!chartArea) return;
+            const { left, right, top, bottom } = chartArea;
+            const astroStartMs = nightAstroStart.getTime();
+            const astroEndMs   = nightAstroEnd.getTime();
+
+            // Find the chart x-index closest to astro dusk and astro dawn.
+            let xAstroStart = left;
+            for (let i = 0; i < timesUtcMs.length; i++) {
+                if (timesUtcMs[i] >= astroStartMs) { xAstroStart = scales.x.getPixelForValue(i); break; }
+            }
+            let xAstroEnd = right;
+            for (let i = timesUtcMs.length - 1; i >= 0; i--) {
+                if (timesUtcMs[i] <= astroEndMs) { xAstroEnd = scales.x.getPixelForValue(i); break; }
+            }
+
+            // Twilight tint color: warm amber works for both light and dark themes.
+            const twilightColor = isDarkLikeTheme ? 'rgba(255, 160, 40, 0.12)' : 'rgba(200, 110, 0, 0.10)';
+            ctx.save();
+            ctx.fillStyle = twilightColor;
+            if (xAstroStart > left) ctx.fillRect(left,       top, xAstroStart - left,  bottom - top);
+            if (xAstroEnd  < right) ctx.fillRect(xAstroEnd,  top, right - xAstroEnd,   bottom - top);
+            ctx.restore();
+        },
+    };
+
     const ctx2d = canvas.getContext('2d');
     _alttimeChartInstance = new Chart(ctx2d, {
         type: 'line',
-        plugins: [observableBgPlugin],
+        plugins: [observableBgPlugin, astroNightPlugin],
         data: {
             labels: times,
             datasets: [

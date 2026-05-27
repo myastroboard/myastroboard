@@ -432,7 +432,6 @@
     "footer_unknown_source": "Fonte desconhecida",
     "footer_source": "Fonte de dados: o provedor TLE ativo é {source}. A geometria das passagens orbitais é calculada localmente a partir deste TLE."
   },
-
   "spaceflight": {
     "subtab_launches": "Lançamentos",
     "subtab_astronauts": "Astronautas",
@@ -443,7 +442,7 @@
     "next_launch": "Próximo lançamento",
     "upcoming_title": "Próximos lançamentos",
     "past_title": "Lançamentos recentes",
-    "t_minus": "T\u2212",
+    "t_minus": "T-",
     "countdown_d": "d",
     "countdown_h": "h",
     "countdown_m": "m",
@@ -455,22 +454,22 @@
     "astronauts_error": "Falha ao carregar dados de astronautas.",
     "events_error": "Falha ao carregar eventos espaciais.",
     "data_source": "Dados e imagens fornecidos por <a href=\"https://thespacedevs.com/\" target=\"_blank\" rel=\"noopener\">The Space Devs</a> via Launch Library 2",
-    "english_only_notice": "Este conte\u00fado est\u00e1 dispon\u00edvel apenas em ingl\u00eas.",
+    "english_only_notice": "Este conteúdo está disponível apenas em inglês.",
     "translate_action": "Traduzir",
     "show_original_action": "Mostrar original",
     "translating": "Traduzindo...",
     "translation_unavailable": "Tradução indisponível para este texto.",
     "translated_via_free_service": "Tradução automática",
-    "webcast_live": "Transmiss\u00e3o ao vivo",
-    "launched": "Lan\u00e7ado!",
-    "window": "Janela de lan\u00e7amento",
-    "agency": "Ag\u00eancia",
-    "mission": "Miss\u00e3o",
-    "mission_type": "Tipo de miss\u00e3o",
-    "orbit": "\u00d3rbita",
-    "pad": "Plataforma de lan\u00e7amento",
+    "webcast_live": "Transmissão ao vivo",
+    "launched": "Lançado!",
+    "window": "Janela de lançamento",
+    "agency": "Agência",
+    "mission": "Missão",
+    "mission_type": "Tipo de missão",
+    "orbit": "Órbita",
+    "pad": "Plataforma de lançamento",
     "watch_live": "Assistir ao vivo",
-    "more_info": "Mais informa\u00e7\u00f5es"
+    "more_info": "Mais informações"
   },
   "calendar": {
     "no_significant_events": "Nenhum evento astronômico significativo nos próximos 30 dias.",
@@ -914,6 +913,7 @@
     "altitude_time_title": "Altitude versus Tempo",
     "altitude_time_load_error": "Falha ao carregar dados de altitude e tempo",
     "altitude_time_night_window": "Noite náutica",
+    "altitude_time_astro_night_window": "Noite astronômica",
     "altitude_time_observable_zone": "Zona observável",
     "altitude_time_altitude_label": "Altitude (°)",
     "altitude_time_x_axis": "Tempo",
@@ -1665,7 +1665,6 @@
     "still_offline": "Ainda off-line. Verifique sua rede e tente novamente.",
     "auto_retry_in": "Nova tentativa automática em {seconds}s"
   },
-
   "object_info": {
     "title": "Informações do objeto",
     "loading": "Carregando dados do objeto...",

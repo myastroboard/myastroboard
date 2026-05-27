@@ -432,7 +432,6 @@
     "footer_unknown_source": "Fonte sconosciuta",
     "footer_source": "Fonte dati: il provider TLE attivo è {source}. La geometria dei passaggi orbitali è calcolata localmente da questo TLE."
   },
-
   "spaceflight": {
     "subtab_launches": "Lanci",
     "subtab_astronauts": "Astronauti",
@@ -443,7 +442,7 @@
     "next_launch": "Prossimo lancio",
     "upcoming_title": "Prossimi lanci",
     "past_title": "Lanci recenti",
-    "t_minus": "T\u2212",
+    "t_minus": "T-",
     "countdown_d": "g",
     "countdown_h": "h",
     "countdown_m": "m",
@@ -455,7 +454,7 @@
     "astronauts_error": "Impossibile caricare i dati degli astronauti.",
     "events_error": "Impossibile caricare gli eventi spaziali.",
     "data_source": "Dati e immagini forniti da <a href=\"https://thespacedevs.com/\" target=\"_blank\" rel=\"noopener\">The Space Devs</a> tramite Launch Library 2",
-    "english_only_notice": "Questo contenuto \u00e8 disponibile solo in inglese.",
+    "english_only_notice": "Questo contenuto è disponibile solo in inglese.",
     "translate_action": "Traduci",
     "show_original_action": "Mostra originale",
     "translating": "Traduzione in corso...",
@@ -914,6 +913,7 @@
     "altitude_time_title": "Altitudine vs tempo",
     "altitude_time_load_error": "Impossibile caricare i dati relativi all'altitudine e al tempo",
     "altitude_time_night_window": "Notte nautica",
+    "altitude_time_astro_night_window": "Notte astronomica",
     "altitude_time_observable_zone": "Zona osservabile",
     "altitude_time_altitude_label": "Altitudine (°)",
     "altitude_time_x_axis": "Tempo",
@@ -1665,7 +1665,6 @@
     "still_offline": "Ancora offline. Verifica la tua rete e riprova.",
     "auto_retry_in": "Nuovo tentativo automatico tra {seconds}s"
   },
-
   "object_info": {
     "title": "Informazioni sull'oggetto",
     "loading": "Caricamento dati oggetto...",

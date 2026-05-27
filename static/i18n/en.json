@@ -47,7 +47,6 @@
     "update_available": "A new version is available!",
     "update_version_link": "See version v{version}"
   },
-  
   "navbar": {
     "astrophotography": "Astrophotography",
     "weather": "Weather",
@@ -68,7 +67,6 @@
     "spaceflight": "Spaceflight",
     "about": "About"
   },
-
   "about": {
     "title": "About MyAstroBoard",
     "summary_title": "Project at a glance",
@@ -89,7 +87,6 @@
     "source_label": "Source repository",
     "issues_label": "Report an issue"
   },
-
   "planets": {
     "mercury": "Mercury",
     "venus": "Venus",
@@ -102,7 +99,6 @@
     "pluto": "Pluto",
     "moon": "Moon"
   },
-  
   "astro_weather": {
     "section_title": "Current Conditions",
     "loading_details": "Loading astrophotography weather analysis...",
@@ -154,7 +150,6 @@
     "chart_time_axis": "Local Time (24h format)",
     "footer_source": "Data source: Open-Meteo weather inputs + 100% local MyAstroBoard astrophotography analysis."
   },
-
   "best_window": {
     "section_title": "Best Observation Window",
     "info_1": "Best next window is calculated within three differents modes, return is in hours:",
@@ -179,7 +174,6 @@
     "not_found": "Not found",
     "failed_to_load_dark_window_data": "Failed to load dark window data"
   },
-
   "moon": {
     "new_moon": "New Moon",
     "waxing_crescent": "Waxing Crescent",
@@ -245,7 +239,6 @@
     "footer_source_planner": "Data source: 100% local MyAstroBoard calculations for next nights and astrophotography score.",
     "footer_source_best_window": "Data source: 100% local MyAstroBoard dark-window and best-window calculations."
   },
-
   "sun": {
     "solar_eclipse": "Solar Eclipse",
     "no_solar_eclipse_data": "No solar eclipse data available",
@@ -294,7 +287,6 @@
     "dawn": "Dawn: ",
     "footer_source": "Data source: 100% local astronomical calculations (sunrise, sunset, and twilight times)."
   },
-
   "aurora": {
     "borealis_predictions": "Aurora Borealis Predictions",
     "loading_predictions": "Loading aurora borealis predictions...",
@@ -361,7 +353,6 @@
     "tips_for_aurora_hunting": "Tips for Aurora Hunting:",
     "footer_source": "Data source: NOAA SWPC space weather feeds + local MyAstroBoard visibility scoring."
   },
-
   "seeing_forecast": {
     "title": "Seeing Forecast",
     "description": "Atmospheric seeing conditions from 7Timer",
@@ -401,7 +392,6 @@
     "scale_mapping_title": "Scale mapping",
     "scale_mapping_info": "7Timer raw seeing values (1-8) are normalized to this app's 5-level quality scale (1-5) to keep labels and descriptions consistent."
   },
-
   "iss": {
     "passes": "ISS Passes",
     "loading_passes": "Loading ISS pass predictions...",
@@ -442,7 +432,6 @@
     "footer_unknown_source": "Unknown source",
     "footer_source": "Data source: Active TLE provider is {source}. Orbital pass geometry is calculated locally from this TLE."
   },
-
   "spaceflight": {
     "subtab_launches": "Launches",
     "subtab_astronauts": "Astronauts",
@@ -453,7 +442,7 @@
     "next_launch": "Next Launch",
     "upcoming_title": "Upcoming Launches",
     "past_title": "Recent Launches",
-    "t_minus": "T\u2212",
+    "t_minus": "T-",
     "countdown_d": "d",
     "countdown_h": "h",
     "countdown_m": "m",
@@ -482,7 +471,6 @@
     "watch_live": "Watch Live",
     "more_info": "More info"
   },
-
   "calendar": {
     "no_significant_events": "No significant astronomical events in the next 30 days.",
     "details": "Details",
@@ -679,8 +667,7 @@
     "log_export_and_rotated": "(+ rotated files if any)",
     "log_export_download": "Download Log Archive",
     "log_export_started": "Log archive download started"
-  }, 
-
+  },
   "astrodex": {
     "title": "Astrodex - Gotta Catch 'Em All!",
     "your_collection": "Your personal collection of captured celestial objects",
@@ -726,7 +713,7 @@
     "search_catalogue_placeholder": "Search catalogue (e.g. NGC 6826, M 31...)",
     "search_catalogue_btn": "Search in catalogue",
     "catalogue_not_found": "Not found in catalogue",
-    "catalogue_found": "\u2713 Found in catalogue — fields pre-filled",
+    "catalogue_found": "✓ Found in catalogue — fields pre-filled",
     "my_photos": "My Photos ({ownPicturesCount}) • Shared Total ({totalPicturesCount})",
     "all_photos": "Photos ({ownPicturesCount})",
     "object_info": "Object Information",
@@ -777,8 +764,7 @@
     "photos": "Photos",
     "astrodex_empty": "Your Astrodex is empty",
     "notes": "Notes"
-  }, 
-
+  },
   "skytonight": {
     "info_1": "SkyTonight calculates the best observation targets for the night based on your location, weather forecast, and internal datasets.",
     "info_2": "Wait before loading, or check parameters if a calculation failed.",
@@ -856,7 +842,7 @@
     "search_foto": "Foto >=",
     "search_foto_score": "Foto score",
     "search_constellations": "Constellations",
-    "search_all_constellations" : "All constellations",
+    "search_all_constellations": "All constellations",
     "search_types": "Types",
     "search_all_types": "All types",
     "meridian_transit": "Meridian transit",
@@ -897,7 +883,7 @@
     "type_duplicate": "Duplicate",
     "type_diffuse_nebula": "Diffuse Nebula",
     "type_galaxy_pair": "Galaxy Pair",
-    "type_n_cl":  "N+CL",
+    "type_n_cl": "N+CL",
     "type_star_cluster": "Star Cluster",
     "type_comet": "Comet",
     "type_sun": "Sun",
@@ -927,6 +913,7 @@
     "altitude_time_title": "Altitude vs Time",
     "altitude_time_load_error": "Failed to load altitude-time data",
     "altitude_time_night_window": "Nautical night",
+    "altitude_time_astro_night_window": "Astronomical night",
     "altitude_time_observable_zone": "Observable zone",
     "altitude_time_altitude_label": "Altitude (°)",
     "altitude_time_x_axis": "Time",
@@ -940,7 +927,6 @@
     "astroscore_poor": "Poor",
     "footer_source": "Data source: local SkyTonight calculations using your configured catalogues and observing constraints (Astropy/Astroplan engine)."
   },
-
   "plan_my_night": {
     "section_intro": "Build a private timeline for tonight directly from SkyTonight targets.",
     "failed_to_load": "Failed to load Plan My Night",
@@ -1023,7 +1009,6 @@
     "export_csv": "Export CSV",
     "export_pdf": "Export PDF"
   },
-
   "users": {
     "user_management": "User Management",
     "manage_users": "Manage users and their access roles.",
@@ -1088,7 +1073,6 @@
     "user_deleted_successfully": "User deleted successfully",
     "error_delete_user": "Failed to delete user"
   },
-
   "metrics": {
     "system_metrics": "System Metrics",
     "info_title": "System performance and resource monitoring. Data refreshes automatically every 5 seconds.",
@@ -1177,7 +1161,6 @@
     "cache_status_failed": "Failed",
     "cache_status_unknown": "-"
   },
-
   "equipment": {
     "combinations": "Combinations",
     "fov_calculator": "FOV Calculator",
@@ -1238,7 +1221,7 @@
     "diagonal": "Diagonal",
     "no_mounts_created_yet": "No mounts created yet.",
     "max_payload": "Max Payload",
-    "guiding" : "Guiding",
+    "guiding": "Guiding",
     "no_filters_created_yet": "No filters created yet.",
     "wavelength": "Wavelength",
     "bandwidth": "Bandwidth",
@@ -1260,7 +1243,7 @@
     "form_aperture": "Aperture (mm)",
     "form_focal_length": "Focal Length (mm)",
     "form_reducer_barlow_factor": "Reducer/Barlow Factor",
-    "form_reducer_barlow_text" : "1.0 = no modification, 0.63 = reducer, 2.0 = barlow",
+    "form_reducer_barlow_text": "1.0 = no modification, 0.63 = reducer, 2.0 = barlow",
     "form_weight": "Weight (kg)",
     "form_notes": "Notes",
     "form_save": "Save",
@@ -1338,7 +1321,6 @@
     "form_accessories": "Accessories",
     "form_filters": "Filters"
   },
-
   "weather": {
     "observation_conditions": "Observation Conditions",
     "forecast": "Forecast",
@@ -1378,7 +1360,6 @@
     "timezone": "Timezone: ",
     "footer_source": "Data source: Open-Meteo weather API."
   },
-
   "events_api": {
     "solar_eclipse_description": "{eclipse_type} eclipse with {obscuration_percent}% obscuration. Peak at {peak_altitude_deg}° altitude.",
     "lunar_eclipse_description": "{eclipse_type} lunar eclipse with {obscuration_percent}% coverage at peak.",
@@ -1438,7 +1419,6 @@
       "zodiacal_viewing_morning": "Morning"
     }
   },
-  
   "weather_alerts": {
     "section_title": "Weather Alerts",
     "no_alerts": "No active weather alerts",
@@ -1462,7 +1442,6 @@
     "no_astro_alerts": "No weather alerts for astrophotography",
     "conditions_next_6_hours": "Conditions affecting astrophotography in the next 6 hours"
   },
-  
   "auth": {
     "default_password_warning_alert": "You are using the default password.",
     "default_password_warning_request": "Please change it in the Users section for security.",
@@ -1480,7 +1459,6 @@
     "internal_server_error": "Internal server error",
     "authentication_required": "Authentication required"
   },
-  
   "cache": {
     "updating_data": "Updating astronomical data, please wait...",
     "updating_data_details": "Updating astronomical data ({currentStep}/{totalSteps}) {progress}% - {stepName}",
@@ -1511,7 +1489,6 @@
     "step_spaceflight_events": "Space events",
     "step_parallel_network": "Parallel network requests"
   },
-  
   "scheduler": {
     "processing_catalogues": "Processing SkyTonight catalogues...",
     "status_running": "Running",
@@ -1539,7 +1516,6 @@
     "phase_comets": "Computing comets",
     "phase_saving": "Saving results"
   },
-  
   "units": {
     "day": "d",
     "hour": "h",
@@ -1561,7 +1537,6 @@
     "kg": "kg",
     "arcsec_per_pixel": "arcsec/pixel"
   },
-
   "cardinal_directions": {
     "N": "N",
     "NNE": "NNE",
@@ -1580,7 +1555,6 @@
     "NW": "NW",
     "NNW": "NNW"
   },
-
   "constellations": {
     "andromeda": "Andromeda",
     "antlia": "Antlia",
@@ -1674,7 +1648,6 @@
     "volans": "Volans",
     "vulpecula": "Vulpecula"
   },
-
   "pwa": {
     "install_app": "Install app",
     "install_prompt_unavailable": "Install prompt is not currently available in this browser.",
@@ -1692,7 +1665,6 @@
     "still_offline": "Still offline. Please verify your network and try again.",
     "auto_retry_in": "Automatic retry in {seconds}s"
   },
-
   "object_info": {
     "title": "Object Information",
     "loading": "Loading object data...",

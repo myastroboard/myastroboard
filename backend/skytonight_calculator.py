@@ -79,6 +79,8 @@ def _save_alttime_json(
     timezone_name: str = 'UTC',
     precomputed_times_iso: Optional[List[str]] = None,
     az_degrees: Optional[np.ndarray] = None,
+    astro_night_start: Optional[datetime] = None,
+    astro_night_end: Optional[datetime] = None,
 ) -> bool:
     """Persist altitude-time series for one target to the outputs directory.
 
@@ -107,6 +109,10 @@ def _save_alttime_json(
             'altitude_constraint_min': float(constraints.get('altitude_constraint_min', 30)),
             'altitude_constraint_max': float(constraints.get('altitude_constraint_max', 80)),
         }
+        if astro_night_start is not None:
+            payload['night_astro_start'] = astro_night_start.isoformat()
+        if astro_night_end is not None:
+            payload['night_astro_end'] = astro_night_end.isoformat()
         if az_degrees is not None:
             payload['azimuths'] = [round(float(a), 1) for a in az_degrees]
         horizon_profile_save = constraints.get('horizon_profile', [])
@@ -244,6 +250,30 @@ def _get_night_window(
         report_tomorrow = sun_service.get_tomorrow_report()
         dusk = _parse_localtime(report_tomorrow.nautical_dusk, tz)
         dawn = _parse_localtime(report_tomorrow.nautical_dawn, tz)
+
+    if dusk is None or dawn is None or dawn <= dusk:
+        return None
+
+    return dusk, dawn
+
+
+def _get_astro_night_window(
+    lat: float,
+    lon: float,
+    timezone_name: str,
+) -> Optional[Tuple[datetime, datetime]]:
+    """Return (astro_dusk, astro_dawn) for tonight's astronomical night (-18° sun); None if unavailable."""
+    tz = ZoneInfo(timezone_name)
+    sun_service = SunService(latitude=lat, longitude=lon, timezone=timezone_name)
+    report = sun_service.get_today_report()
+
+    dusk = _parse_localtime(report.astronomical_dusk, tz)
+    dawn = _parse_localtime(report.astronomical_dawn, tz)
+
+    if dusk is None or dawn is None or dawn <= dusk:
+        report_tomorrow = sun_service.get_tomorrow_report()
+        dusk = _parse_localtime(report_tomorrow.astronomical_dusk, tz)
+        dawn = _parse_localtime(report_tomorrow.astronomical_dawn, tz)
 
     if dusk is None or dawn is None or dawn <= dusk:
         return None
@@ -1017,7 +1047,7 @@ def run_calculations(
         }
     })
 
-    # --- Determine nautical night window ---
+    # --- Determine nautical and astronomical night windows ---
     night_window = _get_night_window(lat, lon, timezone_name)
     if night_window is None:
         logger.warning('No nautical night found for tonight; SkyTonight calculations skipped.')
@@ -1043,6 +1073,10 @@ def run_calculations(
 
     night_start, night_end = night_window
     night_hours = (night_end - night_start).total_seconds() / 3600.0
+
+    astro_window = _get_astro_night_window(lat, lon, timezone_name)
+    astro_night_start = astro_window[0] if astro_window else None
+    astro_night_end = astro_window[1] if astro_window else None
 
     logger.info(
         f'Night window: {night_start.strftime("%Y-%m-%d %H:%M %Z")} → '
@@ -1138,6 +1172,8 @@ def run_calculations(
                     constraints=constraints,
                     timezone_name=timezone_name,
                     az_degrees=body_az_deg,
+                    astro_night_start=astro_night_start,
+                    astro_night_end=astro_night_end,
                 )
         processed_bodies += 1
         _set_progress('bodies', processed_bodies, n_bodies)
@@ -1216,6 +1252,8 @@ def run_calculations(
                 constraints=constraints,
                 timezone_name=timezone_name,
                 az_degrees=az_values_comet,
+                astro_night_start=astro_night_start,
+                astro_night_end=astro_night_end,
             )
         processed_comets += 1
         _set_progress('comets', processed_comets, n_comets)
@@ -1347,6 +1385,8 @@ def run_calculations(
                         timezone_name,
                         times_iso_list,
                         az_matrix[idx],
+                        astro_night_start,
+                        astro_night_end,
                     )
                 processed_deep_sky += 1
                 if processed_deep_sky % _DSO_LOG_INTERVAL == 0:

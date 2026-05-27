@@ -432,7 +432,6 @@
     "footer_unknown_source": "Unbekannte Quelle",
     "footer_source": "Datenquelle: Aktiver TLE-Anbieter ist {source}. Die Geometrie der Überflüge wird lokal aus diesem TLE berechnet."
   },
-
   "spaceflight": {
     "subtab_launches": "Starts",
     "subtab_astronauts": "Astronauten",
@@ -440,22 +439,22 @@
     "launches_title": "Startzeitplan",
     "astronauts_title": "Astronauten & bemannte Raumfahrt",
     "events_title": "Weltraumevents",
-    "next_launch": "N\u00e4chster Start",
+    "next_launch": "Nächster Start",
     "upcoming_title": "Bevorstehende Starts",
     "past_title": "Vergangene Starts",
-    "t_minus": "T\u2212",
+    "t_minus": "T-",
     "countdown_d": "T",
     "countdown_h": "h",
     "countdown_m": "m",
     "iss_crew_title": "Aktuelle ISS-Besatzung",
     "all_in_space": "Personen derzeit im Weltall",
-    "no_data": "Keine Daten verf\u00fcgbar.",
+    "no_data": "Keine Daten verfügbar.",
     "no_events": "Keine bevorstehenden Weltraumevents gefunden.",
     "launches_error": "Startdaten konnten nicht geladen werden.",
     "astronauts_error": "Astronautendaten konnten nicht geladen werden.",
     "events_error": "Weltraumevents konnten nicht geladen werden.",
     "data_source": "Daten und Bilder bereitgestellt von <a href=\"https://thespacedevs.com/\" target=\"_blank\" rel=\"noopener\">The Space Devs</a> via Launch Library 2",
-    "english_only_notice": "Dieser Inhalt ist nur auf Englisch verf\u00fcgbar.",
+    "english_only_notice": "Dieser Inhalt ist nur auf Englisch verfügbar.",
     "translate_action": "Übersetzen",
     "show_original_action": "Original anzeigen",
     "translating": "Wird übersetzt...",
@@ -714,7 +713,7 @@
     "search_catalogue_placeholder": "Katalog durchsuchen (z. B. NGC 6826, M 31...)",
     "search_catalogue_btn": "Im Katalog suchen",
     "catalogue_not_found": "Nicht im Katalog gefunden",
-    "catalogue_found": "\u2713 Im Katalog gefunden — Felder vorausgefüllt",
+    "catalogue_found": "✓ Im Katalog gefunden — Felder vorausgefüllt",
     "my_photos": "Meine Fotos ({ownPicturesCount}) • Geteilte Gesamtzahl ({totalPicturesCount})",
     "all_photos": "Fotos ({ownPicturesCount})",
     "object_info": "Objektinformationen",
@@ -766,7 +765,6 @@
     "astrodex_empty": "Ihr Astrodex ist leer",
     "notes": "Notizen"
   },
-
   "skytonight": {
     "info_1": "SkyTonight berechnet die besten Beobachtungsziele der Nacht basierend auf Standort, Wetter und internen Datensatzen.",
     "info_2": "Bitte warten Sie vor dem Laden oder prüfen Sie die Parameter, wenn eine Berechnung fehlgeschlagen ist.",
@@ -915,6 +913,7 @@
     "altitude_time_title": "Höhe vs Zeit",
     "altitude_time_load_error": "Höhe/Zeit-Daten konnten nicht geladen werden",
     "altitude_time_night_window": "Nautische Nacht",
+    "altitude_time_astro_night_window": "Astronomische Nacht",
     "altitude_time_observable_zone": "Beobachtbarer Bereich",
     "altitude_time_altitude_label": "Höhe (°)",
     "altitude_time_x_axis": "Zeit",
@@ -1649,7 +1648,6 @@
     "volans": "Volans",
     "vulpecula": "Vulpecula"
   },
-
   "pwa": {
     "install_app": "App installieren",
     "install_prompt_unavailable": "Die Installationsabfrage ist in diesem Browser derzeit nicht verfugbar.",
@@ -1667,7 +1665,6 @@
     "still_offline": "Weiterhin offline. Bitte Verbindung prufen und erneut versuchen.",
     "auto_retry_in": "Automatischer neuer Versuch in {seconds}s"
   },
-
   "object_info": {
     "title": "Objektinformationen",
     "loading": "Objektdaten werden geladen...",

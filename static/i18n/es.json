@@ -432,45 +432,44 @@
     "footer_unknown_source": "Fuente desconocida",
     "footer_source": "Fuente de datos: el proveedor TLE activo es {source}. La geometría de los pasos orbitales se calcula localmente a partir de este TLE."
   },
-
   "spaceflight": {
     "subtab_launches": "Lanzamientos",
     "subtab_astronauts": "Astronautas",
     "subtab_events": "Eventos espaciales",
-    "launches_title": "Cronolog\u00eda de lanzamientos",
+    "launches_title": "Cronología de lanzamientos",
     "astronauts_title": "Astronautas y vuelos tripulados",
     "events_title": "Eventos espaciales",
-    "next_launch": "Pr\u00f3ximo lanzamiento",
-    "upcoming_title": "Pr\u00f3ximos lanzamientos",
+    "next_launch": "Próximo lanzamiento",
+    "upcoming_title": "Próximos lanzamientos",
     "past_title": "Lanzamientos recientes",
-    "t_minus": "T\u2212",
+    "t_minus": "T-",
     "countdown_d": "d",
     "countdown_h": "h",
     "countdown_m": "m",
-    "iss_crew_title": "Tripulaci\u00f3n actual de la ISS",
+    "iss_crew_title": "Tripulación actual de la ISS",
     "all_in_space": "Personas actualmente en el espacio",
     "no_data": "No hay datos disponibles.",
-    "no_events": "No se encontraron eventos espaciales pr\u00f3ximos.",
+    "no_events": "No se encontraron eventos espaciales próximos.",
     "launches_error": "Error al cargar los datos de lanzamiento.",
     "astronauts_error": "Error al cargar los datos de astronautas.",
     "events_error": "Error al cargar los eventos espaciales.",
-    "data_source": "Datos e im\u00e1genes proporcionados por <a href=\"https://thespacedevs.com/\" target=\"_blank\" rel=\"noopener\">The Space Devs</a> v\u00eda Launch Library 2",
-    "english_only_notice": "Este contenido solo est\u00e1 disponible en ingl\u00e9s.",
+    "data_source": "Datos e imágenes proporcionados por <a href=\"https://thespacedevs.com/\" target=\"_blank\" rel=\"noopener\">The Space Devs</a> vía Launch Library 2",
+    "english_only_notice": "Este contenido solo está disponible en inglés.",
     "translate_action": "Traducir",
     "show_original_action": "Mostrar original",
     "translating": "Traduciendo...",
     "translation_unavailable": "Traducción no disponible para este texto.",
     "translated_via_free_service": "Traducción automática",
-    "webcast_live": "Emisi\u00f3n en vivo",
-    "launched": "\u00a1Lanzado!",
+    "webcast_live": "Emisión en vivo",
+    "launched": "¡Lanzado!",
     "window": "Ventana de lanzamiento",
     "agency": "Agencia",
-    "mission": "Misi\u00f3n",
-    "mission_type": "Tipo de misi\u00f3n",
-    "orbit": "\u00d3rbita",
+    "mission": "Misión",
+    "mission_type": "Tipo de misión",
+    "orbit": "Órbita",
     "pad": "Plataforma de lanzamiento",
     "watch_live": "Ver en vivo",
-    "more_info": "M\u00e1s informaci\u00f3n"
+    "more_info": "Más información"
   },
   "calendar": {
     "no_significant_events": "No habrá eventos astronómicos significativos en los próximos 30 días.",
@@ -714,7 +713,7 @@
     "search_catalogue_placeholder": "Buscar en el catálogo (p. ej. NGC 6826, M 31...)",
     "search_catalogue_btn": "Buscar en el catálogo",
     "catalogue_not_found": "No encontrado en el catálogo",
-    "catalogue_found": "\u2713 Encontrado en el catálogo — campos rellenados",
+    "catalogue_found": "✓ Encontrado en el catálogo — campos rellenados",
     "my_photos": "Mis fotos ({ownPicturesCount}) • Total compartido ({totalPicturesCount})",
     "all_photos": "Fotos ({ownPicturesCount})",
     "object_info": "Información del objeto",
@@ -766,7 +765,6 @@
     "astrodex_empty": "Tu Astrodex está vacío",
     "notes": "Notas"
   },
-
   "skytonight": {
     "info_1": "SkyTonight calcula los mejores objetivos de observación de la noche según su ubicación, el clima y los conjuntos de datos internos.",
     "info_2": "Espere antes de cargar o revise los parámetros si falló un cálculo.",
@@ -915,6 +913,7 @@
     "altitude_time_title": "Altitud vs Tiempo",
     "altitude_time_load_error": "Error al cargar los datos de altitud/tiempo",
     "altitude_time_night_window": "Noche náutica",
+    "altitude_time_astro_night_window": "Noche astronómica",
     "altitude_time_observable_zone": "Zona observable",
     "altitude_time_altitude_label": "Altitud (°)",
     "altitude_time_x_axis": "Hora",
@@ -928,7 +927,6 @@
     "astroscore_poor": "Deficiente",
     "footer_source": "Fuente de datos: cálculos locales de SkyTonight usando tus catálogos configurados y restricciones de observación (motor Astropy/Astroplan)."
   },
-
   "plan_my_night": {
     "section_intro": "Crea una línea de tiempo privada para esta noche directamente desde los objetivos de SkyTonight.",
     "failed_to_load": "No se pudo cargar Plan My Night",
@@ -1650,7 +1648,6 @@
     "volans": "Volans",
     "vulpecula": "Vulpecula"
   },
-
   "pwa": {
     "install_app": "Instalar app",
     "install_prompt_unavailable": "La solicitud de instalacion no esta disponible en este navegador.",
@@ -1668,7 +1665,6 @@
     "still_offline": "Sigues sin conexion. Verifica tu red e intentalo de nuevo.",
     "auto_retry_in": "Reintento automatico en {seconds}s"
   },
-
   "object_info": {
     "title": "Información del objeto",
     "loading": "Cargando datos del objeto...",

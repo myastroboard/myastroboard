@@ -47,7 +47,6 @@
     "update_available": "Une nouvelle version est disponible !",
     "update_version_link": "Voir la version v{version}"
   },
-  
   "navbar": {
     "astrophotography": "Astrophotographie",
     "weather": "Météo",
@@ -68,7 +67,6 @@
     "spaceflight": "Vols spatiaux",
     "about": "À propos"
   },
-
   "about": {
     "title": "À propos de MyAstroBoard",
     "summary_title": "Le projet en bref",
@@ -89,7 +87,6 @@
     "source_label": "Dépôt source",
     "issues_label": "Signaler un problème"
   },
-
   "planets": {
     "mercury": "Mercure",
     "venus": "Vénus",
@@ -102,7 +99,6 @@
     "pluto": "Pluton",
     "moon": "Lune"
   },
-  
   "astro_weather": {
     "section_title": "Conditions Actuelles",
     "loading_details": "Chargement de l'analyse météo astrophotographique...",
@@ -154,7 +150,6 @@
     "chart_time_axis": "Heure locale (format 24h)",
     "footer_source": "Source des données : entrées météo Open-Meteo + analyse astrophotographique MyAstroBoard 100% locale."
   },
-
   "best_window": {
     "section_title": "Meilleure Fenêtre d'Observation",
     "info_1": "La prochaine meilleure fenêtre est calculée selon trois modes différents, le retour est en heures :",
@@ -179,7 +174,6 @@
     "not_found": "Non trouvé",
     "failed_to_load_dark_window_data": "Echec du chargement des données de la fenêtre d'observation"
   },
-
   "moon": {
     "new_moon": "Nouvelle Lune",
     "waxing_crescent": "Premier Croissant",
@@ -245,7 +239,6 @@
     "footer_source_planner": "Source des données : calculs MyAstroBoard 100% locaux pour les prochaines nuits et le score astrophotographie.",
     "footer_source_best_window": "Source des données : calculs MyAstroBoard 100% locaux pour dark-window et best-window."
   },
-
   "sun": {
     "solar_eclipse": "Éclipse Solaire",
     "no_solar_eclipse_data": "Aucune donnée d'éclipse solaire disponible",
@@ -294,11 +287,10 @@
     "dawn": "Aube : ",
     "footer_source": "Source des données : calculs astronomiques 100% locaux (lever, coucher et crépuscules du Soleil)."
   },
-
   "aurora": {
     "borealis_predictions": "Prévisions des Aurores Boréales",
     "loading_predictions": "Chargement des prévisions d'aurores boréales...",
-    "visibility": {    
+    "visibility": {
       "none": "Aucune",
       "very_low": "Très faible",
       "low": "Faible",
@@ -307,7 +299,7 @@
       "excellent": "Excellente",
       "severe_storm": "Tempête sévère"
     },
-    "probability": {    
+    "probability": {
       "none": "Aucune",
       "very_low": "Très faible",
       "low": "Faible",
@@ -315,7 +307,7 @@
       "high": "Élevée",
       "very_high": "Très élevée"
     },
-    "description": { 
+    "description": {
       "none": "Aucune activité aurorale prévue",
       "very_low": "Aurore possible uniquement à des latitudes très élevées",
       "low": "Aurore possible à des latitudes élevées",
@@ -361,7 +353,6 @@
     "tips_for_aurora_hunting": "Conseils pour l'observation des aurores :",
     "footer_source": "Source des données : flux météo spatiale NOAA SWPC + score de visibilité local MyAstroBoard."
   },
-
   "seeing_forecast": {
     "title": "Prévisions de Seeing",
     "description": "Conditions de seeing atmosphérique de 7Timer",
@@ -401,7 +392,6 @@
     "scale_mapping_title": "Correspondance des échelles",
     "scale_mapping_info": "Les valeurs brutes de seeing 7Timer (1-8) sont normalisées vers l'échelle de qualité à 5 niveaux de l'application (1-5) afin de garder des libellés et descriptions cohérents."
   },
-
   "iss": {
     "passes": "Passages de l'ISS",
     "loading_passes": "Chargement des prévisions de passages de l'ISS...",
@@ -442,29 +432,28 @@
     "footer_unknown_source": "Source inconnue",
     "footer_source": "Source des données : le fournisseur TLE actif est {source}. La géométrie des passages orbitaux est calculée localement à partir de ce TLE."
   },
-
   "spaceflight": {
     "subtab_launches": "Lancements",
     "subtab_astronauts": "Astronautes",
-    "subtab_events": "\u00c9v\u00e9nements spatiaux",
+    "subtab_events": "Événements spatiaux",
     "launches_title": "Calendrier des lancements",
-    "astronauts_title": "Astronautes & vols habit\u00e9s",
-    "events_title": "\u00c9v\u00e9nements spatiaux",
+    "astronauts_title": "Astronautes & vols habités",
+    "events_title": "Événements spatiaux",
     "next_launch": "Prochain lancement",
-    "upcoming_title": "Lancements \u00e0 venir",
-    "past_title": "Lancements r\u00e9cents",
-    "t_minus": "T\u2212",
+    "upcoming_title": "Lancements à venir",
+    "past_title": "Lancements récents",
+    "t_minus": "T-",
     "countdown_d": "j",
     "countdown_h": "h",
     "countdown_m": "m",
-    "iss_crew_title": "\u00c9quipage ISS actuel",
+    "iss_crew_title": "Équipage ISS actuel",
     "all_in_space": "Personnes actuellement dans l'espace",
-    "no_data": "Aucune donn\u00e9e disponible.",
-    "no_events": "Aucun \u00e9v\u00e9nement spatial \u00e0 venir trouv\u00e9.",
-    "launches_error": "Impossible de charger les donn\u00e9es de lancement.",
-    "astronauts_error": "Impossible de charger les donn\u00e9es des astronautes.",
-    "events_error": "Impossible de charger les \u00e9v\u00e9nements spatiaux.",
-    "data_source": "Donn\u00e9es et images fournies par <a href=\"https://thespacedevs.com/\" target=\"_blank\" rel=\"noopener\">The Space Devs</a> via Launch Library 2",
+    "no_data": "Aucune donnée disponible.",
+    "no_events": "Aucun événement spatial à venir trouvé.",
+    "launches_error": "Impossible de charger les données de lancement.",
+    "astronauts_error": "Impossible de charger les données des astronautes.",
+    "events_error": "Impossible de charger les événements spatiaux.",
+    "data_source": "Données et images fournies par <a href=\"https://thespacedevs.com/\" target=\"_blank\" rel=\"noopener\">The Space Devs</a> via Launch Library 2",
     "english_only_notice": "Ce contenu est uniquement disponible en anglais.",
     "translate_action": "Traduire",
     "show_original_action": "Afficher l'original",
@@ -473,7 +462,7 @@
     "translated_via_free_service": "Traduction automatique",
     "webcast_live": "Diffusion en direct",
     "launched": "Lancé !",
-    "window": "Fen\u00eatre de tir",
+    "window": "Fenêtre de tir",
     "agency": "Agence",
     "mission": "Mission",
     "mission_type": "Type de mission",
@@ -482,7 +471,6 @@
     "watch_live": "Voir en direct",
     "more_info": "Plus d'infos"
   },
-
   "calendar": {
     "no_significant_events": "Aucun événement astronomique significatif dans les 30 prochains jours.",
     "details": "Détails",
@@ -499,7 +487,6 @@
       "critical": "Événements incontournables"
     }
   },
-
   "settings": {
     "customize": "Personnaliser",
     "customize_info": "Personnalisez les valeurs par défaut du tableau de bord et les préférences d'affichage. Ces paramètres s'appliquent uniquement à votre compte.",
@@ -680,8 +667,7 @@
     "log_export_and_rotated": "(+ fichiers rotatifs si existants)",
     "log_export_download": "Télécharger l'archive des journaux",
     "log_export_started": "Téléchargement de l'archive des journaux démarré"
-  }, 
-
+  },
   "astrodex": {
     "title": "Astrodex - Attrapez-les tous !",
     "your_collection": "Votre collection personnelle d'objets célestes capturés",
@@ -727,7 +713,7 @@
     "search_catalogue_placeholder": "Rechercher dans le catalogue (ex. NGC 6826, M 31...)",
     "search_catalogue_btn": "Rechercher dans le catalogue",
     "catalogue_not_found": "Introuvable dans le catalogue",
-    "catalogue_found": "\u2713 Trouvé dans le catalogue — champs pré-remplis",
+    "catalogue_found": "✓ Trouvé dans le catalogue — champs pré-remplis",
     "my_photos": "Mes photos ({ownPicturesCount}) • Total partagé ({totalPicturesCount})",
     "all_photos": "Photos ({ownPicturesCount})",
     "object_info": "Informations sur l'objet",
@@ -779,7 +765,6 @@
     "astrodex_empty": "Votre Astrodex est vide",
     "notes": "Notes"
   },
-
   "skytonight": {
     "info_1": "SkyTonight calcule les meilleures cibles d'observation de la nuit en fonction de votre emplacement, de la météo et des jeux de données internes.",
     "info_2": "Patientez avant le chargement, ou vérifiez les paramètres en cas d'échec du calcul.",
@@ -857,7 +842,7 @@
     "search_foto": "Photo >=",
     "search_foto_score": "Score de la photo",
     "search_constellations": "Constellations",
-    "search_all_constellations" : "Toutes les constellations",
+    "search_all_constellations": "Toutes les constellations",
     "search_types": "Types",
     "search_all_types": "Tous les types",
     "meridian_transit": "Transit méridien",
@@ -928,6 +913,7 @@
     "altitude_time_title": "Altitude vs Temps",
     "altitude_time_load_error": "Impossible de charger les données altitude/temps",
     "altitude_time_night_window": "Nuit nautique",
+    "altitude_time_astro_night_window": "Nuit astronomique",
     "altitude_time_observable_zone": "Zone observable",
     "altitude_time_altitude_label": "Altitude (°)",
     "altitude_time_x_axis": "Heure",
@@ -941,7 +927,6 @@
     "astroscore_poor": "Faible",
     "footer_source": "Source des données : calculs locaux SkyTonight basés sur vos catalogues configurés et vos contraintes d'observation (moteur Astropy/Astroplan)."
   },
-
   "plan_my_night": {
     "section_intro": "Construisez une chronologie privée pour cette nuit directement depuis les cibles SkyTonight.",
     "failed_to_load": "Échec du chargement de Plan My Night",
@@ -1024,7 +1009,6 @@
     "export_csv": "Exporter CSV",
     "export_pdf": "Exporter PDF"
   },
-
   "users": {
     "user_management": "Gestion des utilisateurs",
     "manage_users": "Gérer les utilisateurs et leurs rôles d'accès.",
@@ -1089,7 +1073,6 @@
     "user_deleted_successfully": "Utilisateur supprimé avec succès",
     "error_delete_user": "Échec de la suppression de l'utilisateur"
   },
-
   "metrics": {
     "system_metrics": "Métriques du système",
     "info_title": "Surveillance des performances et des ressources du système. Les données se mettent à jour automatiquement toutes les 5 secondes.",
@@ -1178,7 +1161,6 @@
     "cache_status_failed": "Échec",
     "cache_status_unknown": "-"
   },
-
   "equipment": {
     "combinations": "Combinaisons",
     "fov_calculator": "Calculateur de champ",
@@ -1239,7 +1221,7 @@
     "diagonal": "Diagonale",
     "no_mounts_created_yet": "Aucune monture créée pour le moment.",
     "max_payload": "Charge utile maximale",
-    "guiding" : "Guidage",
+    "guiding": "Guidage",
     "no_filters_created_yet": "Aucun filtre créé pour le moment.",
     "wavelength": "Longueur d'onde",
     "bandwidth": "Largeur de bande",
@@ -1261,7 +1243,7 @@
     "form_aperture": "Ouverture (mm)",
     "form_focal_length": "Longueur focale (mm)",
     "form_reducer_barlow_factor": "Facteur de réducteur/Barlow",
-    "form_reducer_barlow_text" : "1.0 = pas de modification, 0.63 = réducteur, 2.0 = Barlow",
+    "form_reducer_barlow_text": "1.0 = pas de modification, 0.63 = réducteur, 2.0 = Barlow",
     "form_weight": "Poids (kg)",
     "form_notes": "Notes",
     "form_save": "Sauvegarder",
@@ -1339,7 +1321,6 @@
     "form_accessories": "Accessoires",
     "form_filters": "Filtres"
   },
-
   "weather": {
     "observation_conditions": "Conditions d'observation",
     "forecast": "Prévisions",
@@ -1379,7 +1360,6 @@
     "timezone": "Fuseau horaire : ",
     "footer_source": "Source des données : API météo Open-Meteo."
   },
-
   "events_api": {
     "solar_eclipse_description": "Éclipse {eclipse_type} avec {obscuration_percent}% d'obscuration. Pic à {peak_altitude_deg}° d'altitude.",
     "lunar_eclipse_description": "Éclipse lunaire {eclipse_type} avec {obscuration_percent}% de couverture au pic.",
@@ -1439,7 +1419,6 @@
       "zodiacal_viewing_morning": "matin"
     }
   },
-  
   "weather_alerts": {
     "section_title": "Alertes Météo",
     "no_alerts": "Aucune alerte météo active",
@@ -1463,7 +1442,6 @@
     "no_astro_alerts": "Aucune alerte météo pour l'astrophotographie",
     "conditions_next_6_hours": "Conditions affectant l'astrophotographie dans les 6 prochaines heures"
   },
-  
   "auth": {
     "default_password_warning_alert": "Vous utilisez le mot de passe par défaut.",
     "default_password_warning_request": "Veuillez le changer dans la section Utilisateurs pour la sécurité.",
@@ -1481,7 +1459,6 @@
     "internal_server_error": "Erreur interne du serveur",
     "authentication_required": "Authentification requise"
   },
-  
   "cache": {
     "updating_data": "Mise à jour des données astronomiques, veuillez patienter...",
     "updating_data_details": "Mise à jour des données astronomiques ({currentStep}/{totalSteps}) {progress}% - {stepName}",
@@ -1512,7 +1489,6 @@
     "step_spaceflight_events": "Événements spatiaux",
     "step_parallel_network": "Requêtes réseau parallèles"
   },
-  
   "scheduler": {
     "processing_catalogues": "Traitement des catalogues SkyTonight...",
     "status_running": "En cours d'exécution",
@@ -1540,7 +1516,6 @@
     "phase_comets": "Calcul des comètes",
     "phase_saving": "Sauvegarde des résultats"
   },
-  
   "units": {
     "day": "j",
     "hour": "h",
@@ -1562,7 +1537,6 @@
     "kg": "kg",
     "arcsec_per_pixel": "arcsec/pixel"
   },
-
   "cardinal_directions": {
     "N": "N",
     "NNE": "NNE",
@@ -1581,7 +1555,6 @@
     "NW": "NO",
     "NNW": "NNO"
   },
-
   "constellations": {
     "andromeda": "Andromède",
     "antlia": "Machine pneumatique",
@@ -1675,7 +1648,6 @@
     "volans": "Poisson volant",
     "vulpecula": "Petit Renard"
   },
-
   "pwa": {
     "install_app": "Installer l'application",
     "install_prompt_unavailable": "La demande d'installation n'est pas disponible dans ce navigateur.",
@@ -1693,7 +1665,6 @@
     "still_offline": "Toujours hors ligne. Vérifiez votre connexion puis réessayez.",
     "auto_retry_in": "Nouvelle tentative automatique dans {seconds}s"
   },
-
   "object_info": {
     "title": "Informations sur l'objet",
     "loading": "Chargement des données...",

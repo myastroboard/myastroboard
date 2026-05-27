@@ -535,7 +535,7 @@ function _renderLaunches(container, data) {
         cdWrap.className = 'sf-countdown';
         const cdLabel = document.createElement('span');
         cdLabel.className = 'text-muted small me-1';
-        cdLabel.textContent = i18n.t('spaceflight.t_minus', 'T−');
+        cdLabel.textContent = i18n.t('spaceflight.t_minus', 'T-');
         cdWrap.appendChild(cdLabel);
         const cdValue = document.createElement('strong');
         cdWrap.appendChild(cdValue);
