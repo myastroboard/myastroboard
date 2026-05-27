@@ -1209,7 +1209,7 @@ def get_hourly_forecast_api():
         for col in df.columns:
             if df[col].dtype == "object":
                 df[col] = df[col].apply(lambda x: x.decode() if isinstance(x, bytes) else x)
-        hourly_json = df.to_dict(orient="records")
+        hourly_json = json.loads(df.to_json(orient="records"))
         location = {k: (v.decode() if isinstance(v, bytes) else v) for k, v in forecast["location"].items()}
         response_payload = {"location": location, "hourly": hourly_json}
 
@@ -1290,7 +1290,7 @@ def get_weather_alerts_api():
         
         analysis = get_astro_weather_analysis(6, language=language)  # Next 6 hours for alerts
         if analysis is None:
-            return jsonify({"error": "Failed to fetch weather alerts"}), 500
+            return jsonify({"alerts": [], "status": "pending"}), 200
         
         return jsonify({
             "alerts": analysis.get("weather_alerts", []),
