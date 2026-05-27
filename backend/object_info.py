@@ -401,6 +401,22 @@ def _wikipedia_with_fallback(aliases: List[str], lang: str) -> Optional[Dict[str
 # Public API
 # ──────────────────────────────────────────────
 
+def _translate_object_type(object_type: str, lang: str) -> str:
+    """Return a localized object type using the skytonight i18n keys.
+
+    Mirrors the frontend's strToTranslateKey + tSkyTonightType logic:
+      "Open Cluster" → skytonight.type_open_cluster → "Amas ouvert" (fr)
+    Falls back to the original string when the key is not found.
+    """
+    if not object_type or lang == 'en':
+        return object_type
+    from i18n_utils import I18nManager
+    key_suffix = re.sub(r'[^a-z0-9]+', '_', object_type.lower()).strip('_')
+    i18n_key = f'skytonight.type_{key_suffix}'
+    translated = I18nManager(lang).t(i18n_key)
+    return object_type if translated == i18n_key else translated
+
+
 def get_object_info(identifier: str, lang: str = 'en') -> Dict[str, Any]:
     """
     Return full metadata for an astronomical object.
@@ -457,6 +473,19 @@ def get_object_info(identifier: str, lang: str = 'en') -> Dict[str, Any]:
     ra = resolved.get('ra')
     dec = resolved.get('dec')
 
+    # Replace SIMBAD's raw otype_txt code (e.g. "OpC", "GlCl") with the human-readable
+    # object_type from the local dataset when available — the local type matches the
+    # i18n keys used by tSkyTonightType() in the frontend (e.g. "Open Cluster" →
+    # skytonight.type_open_cluster → "Amas ouvert").
+    from skytonight_targets import get_lookup_entry as _get_local_entry
+    _local_entry = _get_local_entry('alias', identifier)
+    if not _local_entry:
+        # Also try via SIMBAD main_id in case identifier was an alias
+        _local_entry = _get_local_entry('alias', resolved.get('name', ''))
+    local_type = str(_local_entry.get('object_type') or '').strip() if _local_entry else ''
+    if local_type:
+        resolved = dict(resolved, type=local_type)
+
     # ── Phase 2: image ──────────────────────────────
     image = None
     if ra is not None and dec is not None:
@@ -488,7 +517,7 @@ def get_object_info(identifier: str, lang: str = 'en') -> Dict[str, Any]:
         'id': resolved['id'],
         'name': resolved['name'],
         'aliases': resolved.get('aliases', []),
-        'type': resolved.get('type'),
+        'type': _translate_object_type(str(resolved.get('type') or ''), lang),
         'coordinates': {'ra': ra, 'dec': dec} if ra is not None else None,
         'description': wiki_data.get('extract') if wiki_data else None,
         'description_title': wiki_data.get('title') if wiki_data else None,
