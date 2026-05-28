@@ -825,3 +825,502 @@ def get_all_plan_states(user_id: str, username: str, telescopes: list) -> list:
         })
 
     return result
+
+
+# ---------------------------------------------------------------------------
+# PDF export
+# ---------------------------------------------------------------------------
+
+def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
+    """Render the observation plan as a print-friendly A4 PDF.
+
+    Parameters
+    ----------
+    payload:      output of :func:`get_plan_with_timeline`
+    metrics:      output of ``_compute_plan_fill_metrics`` from app.py
+    i18n_manager: :class:`i18n_utils.I18nManager` instance for the request language
+    """
+    from matplotlib.backends.backend_pdf import PdfPages
+    import matplotlib.pyplot as plt
+    import matplotlib.gridspec as gridspec
+    import matplotlib.dates as mdates
+    from matplotlib.patches import Rectangle
+    from datetime import timezone
+    import re as _re
+    from constants import SKYTONIGHT_OUTPUT_DIR
+
+    plan    = payload.get('plan')
+    entries = plan.get('entries', []) if plan else []
+
+    t = i18n_manager.t   # shorthand
+
+    # ── colour palette (high-contrast, print-friendly) ──────────────────────
+    PALETTE = [
+        '#1565c0', '#c62828', '#2e7d32', '#6a1b9a',
+        '#e65100', '#00838f', '#558b2f', '#ad1457',
+        '#4527a0', '#e65100', '#0277bd', '#6d4c41',
+    ]
+
+    # ── print-friendly colours ───────────────────────────────────────────────
+    C_HDR_BG   = '#1a1f35'
+    C_WHITE    = '#ffffff'
+    C_TXT_DRK  = '#212121'
+    C_TXT_MID  = '#616161'
+    C_GRID     = '#e0e0e0'
+    C_BAR_BG   = '#e0e7ff'
+    C_BRAND    = '#4e9af1'
+    C_CHT_TXT  = '#424242'
+    C_CHT_GRID = '#eeeeee'
+    C_CHT_ZONE = '#e8f5e9'
+    C_CHT_ZONE_BORDER = '#66bb6a'
+    C_NIGHT_LN = '#37474f'
+
+    # ── helpers ──────────────────────────────────────────────────────────────
+    _safe_re = _re.compile(r'[^a-z0-9_-]')
+
+    def _load_alttime(alttime_file: str):
+        if not alttime_file:
+            return None
+        safe = _safe_re.sub('_', str(alttime_file).lower())
+        path = os.path.normpath(os.path.join(SKYTONIGHT_OUTPUT_DIR, f'{safe}_alttime.json'))
+        if not os.path.isfile(path):
+            return None
+        try:
+            with open(path, 'r', encoding='utf-8') as fh:
+                return json.load(fh)
+        except Exception:
+            return None
+
+    def _parse_utc(s):
+        if not s:
+            return None
+        try:
+            text = str(s).strip()
+            if text.endswith('Z'):
+                dt = datetime.fromisoformat(text[:-1]).replace(tzinfo=timezone.utc)
+            else:
+                dt = datetime.fromisoformat(text)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                else:
+                    dt = dt.astimezone(timezone.utc)
+            return dt
+        except Exception:
+            return None
+
+    _local_tz: Any = timezone.utc  # updated after alttime_map is loaded
+    _tz_name  = 'UTC'
+
+    def _fmt_hm(iso_str: str | None) -> str:
+        dt = _parse_utc(iso_str)
+        return dt.astimezone(_local_tz).strftime('%H:%M') if dt else '--:--'
+
+    def _fmt_date(iso_str: str | None) -> str:
+        dt = _parse_utc(iso_str)
+        return dt.strftime('%B %d, %Y') if dt else '?'
+
+    def _fmt_min(minutes) -> str:
+        m = max(0, int(minutes))
+        return f"{m // 60}h{m % 60:02d}"
+
+    def _clip_alttime(times_utc, altitudes, start_dt, end_dt):
+        """Clip altitude series to [start_dt, end_dt] with boundary interpolation."""
+        if not times_utc or not altitudes or not start_dt or not end_dt or start_dt >= end_dt:
+            return [], []
+        pts = []
+        for raw_t, a in zip(times_utc, altitudes):
+            dt = _parse_utc(raw_t)
+            if dt is not None and a is not None:
+                pts.append((dt, float(a)))
+        if not pts:
+            return [], []
+
+        def _lerp(p0, p1, x):
+            span = (p1[0] - p0[0]).total_seconds()
+            if span == 0:
+                return x, p0[1]
+            frac = (x - p0[0]).total_seconds() / span
+            return x, p0[1] + frac * (p1[1] - p0[1])
+
+        out = []
+        for i, p in enumerate(pts):
+            prev = pts[i - 1] if i > 0 else None
+            nxt  = pts[i + 1] if i < len(pts) - 1 else None
+            if prev and prev[0] < start_dt < p[0]:
+                out.append(_lerp(prev, p, start_dt))
+            if start_dt <= p[0] <= end_dt:
+                out.append(p)
+            if nxt and p[0] < end_dt < nxt[0]:
+                out.append(_lerp(p, nxt, end_dt))
+        if not out:
+            return [], []
+        xs, ys = zip(*out)
+        return list(xs), list(ys)
+
+    # ── load altitude-time JSON files ────────────────────────────────────────
+    alttime_map: Dict[str, Any] = {}
+    for entry in entries:
+        af = entry.get('alttime_file')
+        if af:
+            data = _load_alttime(af)
+            if data:
+                alttime_map[entry.get('id')] = data
+
+    # ── resolve local timezone from alttime data (matches browser display) ───
+    from zoneinfo import ZoneInfo as _ZoneInfo
+    _tz_name  = (next(iter(alttime_map.values()), None) or {}).get('timezone') or 'UTC'
+    try:
+        _local_tz = _ZoneInfo(_tz_name)
+    except Exception:
+        _local_tz = timezone.utc
+        _tz_name  = 'UTC'
+
+    # ── shared header / footer ───────────────────────────────────────────────
+    def _render_header(ax, subtitle: str = '') -> None:
+        ax.axis('off')
+        ax.set_facecolor(C_HDR_BG)
+        ax.text(0.015, 0.5, 'myastroboard',
+                va='center', ha='left', fontsize=10,
+                color=C_BRAND, fontweight='bold', transform=ax.transAxes)
+        title = t('plan_my_night.export_pdf_title') or 'My Observation Plan'
+        if subtitle:
+            title += f'  —  {subtitle}'
+        ax.text(0.5, 0.5, title,
+                va='center', ha='center', fontsize=12,
+                color=C_WHITE, fontweight='bold', transform=ax.transAxes)
+        ax.text(0.985, 0.5, 'myastroboard.org',
+                va='center', ha='right', fontsize=8,
+                color='#8898cc', transform=ax.transAxes)
+
+    def _render_footer(ax) -> None:
+        ax.axis('off')
+        ax.set_facecolor(C_HDR_BG)
+        ax.text(0.5, 0.5,
+                f"myastroboard.org  —  {t('common.title_html') or 'MyAstroBoard'}",
+                va='center', ha='center', fontsize=7.5,
+                color='#6a7a99', transform=ax.transAxes)
+
+    # ── column layout ────────────────────────────────────────────────────────
+    COL_X = [0.00, 0.38, 0.54, 0.66, 0.80]
+    COL_H = [
+        t('plan_my_night.export_pdf_col_target')    or 'Target',
+        t('plan_my_night.export_pdf_slot')          or 'Slot',
+        t('plan_my_night.export_pdf_duration')      or 'Duration',
+        t('plan_my_night.export_pdf_type')          or 'Type',
+        t('plan_my_night.export_pdf_constellation') or 'Constellation',
+    ]
+
+    def _render_col_headers(ax, y: float) -> float:
+        for cx, cl in zip(COL_X, COL_H):
+            ax.text(cx, y, cl, va='top', ha='left', fontsize=7,
+                    color=C_TXT_MID, fontweight='bold', transform=ax.transAxes)
+        y -= 0.013
+        ax.plot([0.0, 1.0], [y + 0.005, y + 0.005],
+                color=C_GRID, lw=0.7, transform=ax.transAxes)
+        return y - 0.004
+
+    ROW_H = 0.030   # compact fixed row height
+
+    def _render_entry_row(ax, abs_idx: int, entry: Dict, y: float) -> None:
+        color  = PALETTE[abs_idx % len(PALETTE)]
+        done   = bool(entry.get('done'))
+        name   = (entry.get('name') or entry.get('target_name') or '?')[:26]
+        cat    = entry.get('catalogue') or ''
+        ts     = _fmt_hm(entry.get('timeline_start'))
+        te     = _fmt_hm(entry.get('timeline_end'))
+        dur    = entry.get('planned_duration') or '--:--'
+        typ    = (entry.get('type') or '')[:16]
+        const  = (entry.get('constellation') or '')[:13]
+
+        row_bg = '#f5f7fc' if abs_idx % 2 == 0 else C_WHITE
+        ax.add_patch(Rectangle((0.0, y - ROW_H), 1.0, ROW_H,
+                                transform=ax.transAxes,
+                                facecolor=row_bg, edgecolor='none'))
+        mid_y = y - ROW_H / 2
+        ax.plot(0.007, mid_y, 'o', color=color,
+                markersize=4.5, transform=ax.transAxes, zorder=5)
+
+        check    = '✓' if done else '○'
+        name_txt = f"{abs_idx + 1}. {check}  {name}"
+        if cat:
+            name_txt += f' ({cat})'
+        ax.text(0.018, mid_y, name_txt,
+                va='center', ha='left', fontsize=7.5,
+                color=C_TXT_MID if done else C_TXT_DRK,
+                fontstyle='italic' if done else 'normal',
+                transform=ax.transAxes)
+        ax.text(COL_X[1], mid_y, f"{ts}→{te}",
+                va='center', ha='left', fontsize=7.5,
+                color=C_TXT_DRK, transform=ax.transAxes)
+        ax.text(COL_X[2], mid_y, dur,
+                va='center', ha='left', fontsize=7.5,
+                color=C_TXT_DRK, transform=ax.transAxes)
+        ax.text(COL_X[3], mid_y, typ,
+                va='center', ha='left', fontsize=7,
+                color=C_TXT_DRK, transform=ax.transAxes)
+        ax.text(COL_X[4], mid_y, const,
+                va='center', ha='left', fontsize=7,
+                color=C_TXT_DRK, transform=ax.transAxes)
+
+    def _setup_list_ax(ax) -> None:
+        ax.set_facecolor(C_WHITE)
+        ax.axis('off')
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+
+    # ── build PDF pages ──────────────────────────────────────────────────────
+    buffer   = io.BytesIO()
+    MAX_P1   = 10
+    PER_PAGE = 28
+
+    with PdfPages(buffer) as pdf:
+
+        # ─── PAGE 1 ─────────────────────────────────────────────────────────
+        fig = plt.figure(figsize=(8.27, 11.69))
+        fig.patch.set_facecolor(C_WHITE)
+
+        # rows: header | info | chart | spacer | list | footer
+        gs = gridspec.GridSpec(
+            6, 1, figure=fig,
+            height_ratios=[0.065, 0.095, 0.355, 0.015, 0.445, 0.025],
+            hspace=0.01,
+            left=0.10, right=0.90,
+            top=0.985, bottom=0.015,
+        )
+
+        _render_header(fig.add_subplot(gs[0]))
+
+        # info panel
+        ax_info = fig.add_subplot(gs[1])
+        ax_info.set_facecolor('#f4f6fb')
+        ax_info.axis('off')
+        ax_info.set_xlim(0, 1)
+        ax_info.set_ylim(0, 1)
+
+        if not plan:
+            ax_info.text(0.5, 0.55,
+                         t('plan_my_night.export_pdf_no_plan') or 'No plan available.',
+                         va='center', ha='center', fontsize=11,
+                         color=C_TXT_MID, transform=ax_info.transAxes)
+        else:
+            date_str = _fmt_date(plan.get('night_start'))
+            ns_str   = _fmt_hm(plan.get('night_start'))
+            ne_str   = _fmt_hm(plan.get('night_end'))
+            scope    = (plan.get('telescope_name') or '').strip()
+            n_tgts   = len(entries)
+            fill_pct = metrics.get('fill_percent', 0.0)
+            planned  = _fmt_min(metrics.get('planned_minutes', 0))
+            night_d  = _fmt_min(metrics.get('night_minutes', 0))
+            delay    = int(plan.get('start_delay_minutes') or 0)
+            delay_s  = f'  (+{delay} min)' if delay else ''
+
+            ax_info.text(0.01, 0.88,
+                         f"{t('plan_my_night.export_pdf_date') or 'Date'}:  {date_str}",
+                         va='top', ha='left', fontsize=9.5,
+                         color=C_TXT_DRK, transform=ax_info.transAxes)
+            if scope:
+                ax_info.text(0.50, 0.88,
+                             f"{t('plan_my_night.export_pdf_telescope') or 'Telescope'}:"
+                             f"  {scope}",
+                             va='top', ha='left', fontsize=9.5,
+                             color=C_TXT_DRK, transform=ax_info.transAxes)
+            ax_info.text(0.01, 0.58,
+                         f"{t('plan_my_night.export_pdf_night_window') or 'Night window'}:"
+                         f"  {ns_str} → {ne_str}{delay_s}",
+                         va='top', ha='left', fontsize=9.5,
+                         color=C_TXT_DRK, transform=ax_info.transAxes)
+            ax_info.text(0.50, 0.58,
+                         f"{t('plan_my_night.export_pdf_targets') or 'Targets'}:  {n_tgts}",
+                         va='top', ha='left', fontsize=9.5,
+                         color=C_TXT_DRK, transform=ax_info.transAxes)
+
+            bx, by, bw, bh = 0.01, 0.07, 0.98, 0.20
+            fill_w    = min(1.0, fill_pct / 100.0) * bw
+            bar_color = C_BRAND if fill_pct <= 100 else '#e53935'
+            ax_info.add_patch(Rectangle((bx, by), bw, bh,
+                                        transform=ax_info.transAxes,
+                                        facecolor=C_BAR_BG, edgecolor='none'))
+            if fill_w > 0.01:
+                ax_info.add_patch(Rectangle((bx, by), fill_w, bh,
+                                            transform=ax_info.transAxes,
+                                            facecolor=bar_color, edgecolor='none'))
+            overflow = metrics.get('overflow_minutes', 0)
+            cov_lbl  = (f"{t('plan_my_night.export_pdf_planned_coverage') or 'Coverage'}:"
+                        f"  {fill_pct:.0f}%   ({planned} / {night_d})")
+            if overflow > 0:
+                cov_lbl += (f"   {t('plan_my_night.export_pdf_overflow') or 'Overflow'}:"
+                            f" +{_fmt_min(overflow)}")
+            ax_info.text(bx + bw / 2, by + bh / 2, cov_lbl,
+                         va='center', ha='center', fontsize=8.5,
+                         color=C_WHITE if fill_pct > 12 else C_TXT_DRK,
+                         fontweight='bold', transform=ax_info.transAxes)
+
+        # altitude-time chart
+        ax_chart = fig.add_subplot(gs[2])
+        ax_chart.set_facecolor(C_WHITE)
+        for spine in ax_chart.spines.values():
+            spine.set_edgecolor(C_GRID)
+            spine.set_linewidth(0.7)
+
+        chart_ok = False
+        if plan and alttime_map:
+            ns_dt = _parse_utc(plan.get('night_start'))
+            ne_dt = _parse_utc(plan.get('night_end'))
+
+            if ns_dt and ne_dt:
+                chart_ok = True
+                first_data = next(iter(alttime_map.values()), {})
+                alt_min = first_data.get('altitude_constraint_min', 30)
+                alt_max = first_data.get('altitude_constraint_max', 80)
+
+                ax_chart.axhspan(alt_min, alt_max, color=C_CHT_ZONE, alpha=0.8, zorder=1)
+                ax_chart.axhline(y=alt_min, color=C_CHT_ZONE_BORDER,
+                                 lw=0.8, ls='--', alpha=0.8, zorder=2)
+                ax_chart.axhline(y=alt_max, color=C_CHT_ZONE_BORDER,
+                                 lw=0.8, ls='--', alpha=0.8, zorder=2)
+
+                for i, entry in enumerate(entries):
+                    eid     = entry.get('id')
+                    adata   = alttime_map.get(eid)
+                    if not adata:
+                        continue
+                    color   = PALETTE[i % len(PALETTE)]
+                    t_start = _parse_utc(entry.get('timeline_start'))
+                    t_end   = _parse_utc(entry.get('timeline_end'))
+                    if not t_start or not t_end:
+                        continue
+                    t_end = min(t_end, ne_dt)  # cap at night end, mirrors JS Math.min(rawEndMs, nightEndMs)
+                    if t_end <= t_start:
+                        continue
+
+                    xs, ys = _clip_alttime(
+                        adata.get('times_utc', []),
+                        adata.get('altitudes', []),
+                        t_start, t_end,
+                    )
+                    if not xs:
+                        continue
+
+                    ax_chart.plot(xs, ys, color=color, lw=1.8, zorder=4)
+                    ax_chart.fill_between(xs, 0, ys,
+                                          color=color, alpha=0.07, zorder=3)
+
+                    peak_idx = ys.index(max(ys))
+                    label    = (entry.get('name') or entry.get('target_name') or '')[:14]
+                    ax_chart.annotate(
+                        label, xy=(xs[peak_idx], ys[peak_idx]),
+                        xytext=(0, 5), textcoords='offset points',
+                        fontsize=6.5, color=color, fontweight='bold',
+                        ha='center', va='bottom', zorder=6, clip_on=True,
+                    )
+
+                ns_num = float(mdates.date2num(ns_dt))
+                ne_num = float(mdates.date2num(ne_dt))
+                ax_chart.axvline(x=ns_num, color=C_NIGHT_LN, lw=0.8, zorder=5)
+                ax_chart.axvline(x=ne_num, color=C_NIGHT_LN, lw=0.8, zorder=5)
+                ax_chart.set_xlim(ns_num, ne_num)
+                ax_chart.set_ylim(0, 90)
+                ax_chart.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M', tz=_local_tz))
+                ax_chart.xaxis.set_major_locator(mdates.HourLocator(interval=1, tz=_local_tz))
+                ax_chart.tick_params(colors=C_CHT_TXT, labelsize=7.5)
+                ax_chart.tick_params(axis='x', colors=C_CHT_TXT)
+                ax_chart.tick_params(axis='y', colors=C_CHT_TXT)
+                ax_chart.set_ylabel(
+                    t('skytonight.altitude_time_y_axis') or 'Altitude (°)',
+                    color=C_CHT_TXT, fontsize=8,
+                )
+                ax_chart.set_xlabel(
+                    f"{t('skytonight.altitude_time_x_axis') or 'Time'} ({_tz_name})",
+                    color=C_CHT_TXT, fontsize=8,
+                )
+                ax_chart.yaxis.label.set_color(C_CHT_TXT)
+                ax_chart.xaxis.label.set_color(C_CHT_TXT)
+                ax_chart.grid(True, color=C_CHT_GRID, lw=0.5)
+                # title inside axes area — no risk of overlapping adjacent panels
+                ax_chart.text(
+                    0.01, 0.97,
+                    t('skytonight.altitude_time_title') or 'Altitude vs Time',
+                    va='top', ha='left', fontsize=8,
+                    color=C_TXT_MID, fontstyle='italic',
+                    transform=ax_chart.transAxes, zorder=7,
+                )
+
+        if not chart_ok:
+            ax_chart.axis('off')
+            ax_chart.text(
+                0.5, 0.5,
+                (t('skytonight.altitude_time_title') or 'Altitude vs Time') + '\n'
+                + (t('skytonight.altitude_time_load_error') or 'No data available'),
+                va='center', ha='center', fontsize=9,
+                color=C_TXT_MID, linespacing=1.7, transform=ax_chart.transAxes,
+            )
+
+        # explicit spacer between chart and target list
+        fig.add_subplot(gs[3]).axis('off')
+
+        # target list
+        ax_list = fig.add_subplot(gs[4])
+        _setup_list_ax(ax_list)
+
+        if not entries:
+            ax_list.text(0.5, 0.55,
+                         t('plan_my_night.export_pdf_no_plan') or 'No targets.',
+                         va='center', ha='center', fontsize=10,
+                         color=C_TXT_MID, transform=ax_list.transAxes)
+        else:
+            y = 0.975
+            ax_list.text(0.0, y,
+                         t('plan_my_night.export_pdf_section_targets') or 'Planned targets',
+                         va='top', ha='left', fontsize=9,
+                         color=C_TXT_DRK, fontweight='bold', transform=ax_list.transAxes)
+            y -= 0.032
+            y = _render_col_headers(ax_list, y)
+
+            for idx, entry in enumerate(entries[:MAX_P1]):
+                _render_entry_row(ax_list, idx, entry, y)
+                y -= ROW_H
+
+            if len(entries) > MAX_P1:
+                ax_list.text(0.5, 0.005,
+                             f'+ {len(entries) - MAX_P1} targets continued on next page',
+                             va='bottom', ha='center', fontsize=7,
+                             color=C_TXT_MID, transform=ax_list.transAxes)
+
+        _render_footer(fig.add_subplot(gs[5]))
+        pdf.savefig(fig)
+        plt.close(fig)
+
+        # ─── OVERFLOW PAGES ──────────────────────────────────────────────────
+        if entries and len(entries) > MAX_P1:
+            remaining = entries[MAX_P1:]
+            chunks    = [remaining[i:i + PER_PAGE]
+                         for i in range(0, len(remaining), PER_PAGE)]
+
+            for chunk_idx, chunk in enumerate(chunks):
+                fig2 = plt.figure(figsize=(8.27, 11.69))
+                fig2.patch.set_facecolor(C_WHITE)
+                gs2 = gridspec.GridSpec(
+                    3, 1, figure=fig2,
+                    height_ratios=[0.065, 0.910, 0.025],
+                    hspace=0.01,
+                    left=0.10, right=0.90,
+                    top=0.985, bottom=0.015,
+                )
+                _render_header(fig2.add_subplot(gs2[0]),
+                               subtitle=f'Page {chunk_idx + 2}')
+
+                ax_t = fig2.add_subplot(gs2[1])
+                _setup_list_ax(ax_t)
+                y = 0.990
+                y = _render_col_headers(ax_t, y)
+                for i, entry in enumerate(chunk):
+                    abs_idx = MAX_P1 + chunk_idx * PER_PAGE + i
+                    _render_entry_row(ax_t, abs_idx, entry, y)
+                    y -= ROW_H
+
+                _render_footer(fig2.add_subplot(gs2[2]))
+                pdf.savefig(fig2)
+                plt.close(fig2)
+
+    buffer.seek(0)
+    return buffer
