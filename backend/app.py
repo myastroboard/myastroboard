@@ -2866,89 +2866,29 @@ def export_plan_my_night_csv():
 @app.route('/api/plan-my-night/export.pdf', methods=['GET'])
 @login_required
 def export_plan_my_night_pdf():
-    """Export the current plan as a simple PDF summary."""
+    """Export the current plan as a polished, print-friendly PDF."""
     try:
-        from matplotlib.backends.backend_pdf import PdfPages
-        import matplotlib.pyplot as plt
-
         user = get_current_user()
         if not user:
             return jsonify({'error': 'User not authenticated'}), 401
 
         language = _resolve_requested_language()
-        i18n = I18nManager(language)
-        payload = plan_my_night.get_plan_with_timeline(user.user_id, user.username,
-                                                       telescope_id=request.args.get('telescope_id') or None)
-        plan = payload.get('plan')
-
-        buffer = io.BytesIO()
-        with PdfPages(buffer) as pdf:
-            fig = plt.figure(figsize=(8.27, 11.69))
-            ax = fig.add_subplot(111)
-            ax.axis('off')
-
-            lines = [i18n.t('plan_my_night.export_pdf_title'), '']
-            if not plan:
-                lines.append(i18n.t('plan_my_night.export_pdf_no_plan'))
-            else:
-                metrics = _compute_plan_fill_metrics(plan)
-                lines.append(
-                    f"{i18n.t('plan_my_night.export_pdf_night')}: "
-                    f"{plan.get('night_start', 'N/A')} -> {plan.get('night_end', 'N/A')}"
-                )
-                lines.append(f"{i18n.t('plan_my_night.export_pdf_targets')}: {len(plan.get('entries', []))}")
-                lines.append(
-                    f"{i18n.t('plan_my_night.export_pdf_planned_coverage')}: "
-                    f"{metrics['fill_percent']:.1f}% "
-                    f"({_format_minutes_hhmm(metrics['planned_minutes'])}/{_format_minutes_hhmm(metrics['night_minutes'])})"
-                )
-                if metrics['overflow_minutes'] > 0:
-                    lines.append(
-                        f"{i18n.t('plan_my_night.export_pdf_overflow')}: +"
-                        f"{_format_minutes_hhmm(metrics['overflow_minutes'])}"
-                    )
-                lines.append('')
-                for index, entry in enumerate(plan.get('entries', []), start=1):
-                    done_marker = '[x]' if entry.get('done') else '[ ]'
-                    timeline_start = entry.get('timeline_start') or '-'
-                    timeline_end = entry.get('timeline_end') or '-'
-                    lines.append(
-                        f"{index}. {done_marker} {entry.get('name', '')}"
-                        f" ({entry.get('catalogue', '')})"
-                    )
-                    lines.append(
-                        f"   {i18n.t('plan_my_night.export_pdf_slot')}: {timeline_start} -> {timeline_end} | "
-                        f"{i18n.t('plan_my_night.export_pdf_duration')}: {entry.get('planned_duration', '00:00')}"
-                    )
-                    lines.append(
-                        f"   {i18n.t('plan_my_night.export_pdf_type')}: {entry.get('type', '')} | "
-                        f"{i18n.t('plan_my_night.export_pdf_constellation')}: {entry.get('constellation', '')}"
-                    )
-                    lines.append(
-                        f"   {i18n.t('plan_my_night.export_pdf_ra')}: {entry.get('ra', '')} | "
-                        f"{i18n.t('plan_my_night.export_pdf_dec')}: {entry.get('dec', '')} | "
-                        f"{i18n.t('plan_my_night.export_pdf_mag')}: {entry.get('mag', '')} | "
-                        f"{i18n.t('plan_my_night.export_pdf_size')}: {entry.get('size', '')} | "
-                        f"{i18n.t('plan_my_night.export_pdf_foto')}: {entry.get('foto', '')}"
-                    )
-
-            text = '\n'.join(lines)
-            ax.text(0.02, 0.98, text, va='top', ha='left', fontsize=10, family='monospace')
-
-            pdf.savefig(fig)
-            plt.close(fig)
-
-        buffer.seek(0)
-        _pdf_date = (plan.get('plan_date') or '').replace('-', '') if plan else 'unknown'
-        _pdf_scope = re.sub(r'[^\w\-]', '_', (plan.get('telescope_name') or '').strip()) if plan else None
-        _pdf_name = f'plan-my-night_{_pdf_date}_{_pdf_scope}.pdf' if _pdf_scope else f'plan-my-night_{_pdf_date}.pdf'
-
-        return send_file(
-            buffer,
-            as_attachment=True,
-            mimetype='application/pdf',
-            download_name=_pdf_name
+        i18n     = I18nManager(language)
+        payload  = plan_my_night.get_plan_with_timeline(
+            user.user_id, user.username,
+            telescope_id=request.args.get('telescope_id') or None,
         )
+        metrics = _compute_plan_fill_metrics(payload.get('plan') or {})
+        buffer  = plan_my_night.generate_plan_pdf(payload, metrics, i18n)
+
+        plan       = payload.get('plan')
+        _pdf_date  = (plan.get('plan_date') or '').replace('-', '') if plan else 'unknown'
+        _pdf_scope = re.sub(r'[^\w\-]', '_', (plan.get('telescope_name') or '').strip()) if plan else None
+        _pdf_name  = (f'plan-my-night_{_pdf_date}_{_pdf_scope}.pdf' if _pdf_scope
+                      else f'plan-my-night_{_pdf_date}.pdf')
+
+        return send_file(buffer, as_attachment=True, mimetype='application/pdf',
+                         download_name=_pdf_name)
     except Exception as error:
         logger.error(f'Error exporting Plan My Night PDF: {error}')
         return jsonify({'error': 'Internal server error'}), 500

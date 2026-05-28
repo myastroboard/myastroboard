@@ -1,5 +1,6 @@
 - Improve visualization of the moon with more realistic shadow
 - Plan my night display now partial alttime graph instead of progressbar
+- PDF export is now more than a list. Better display, graph, ...
 - Search on astrodex, add object, is done on multiple catalogues
 - Alt vs time graph considere both nautoc and astro night
 - Fix date issue when there is no dark night
