@@ -40,4 +40,3 @@ This document describes features that could potentially be integrated into MyAst
 
 ### Ideas in raw
 1	Bortle/SQM in AstroScore    Low	        High — corrects score_object for light pollution
-2	Solar elongation filter     Low	        Medium — correctness for planets

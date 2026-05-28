@@ -889,6 +889,25 @@ def _compute_body_result(
         )
         angular_distance_moon = ang_sep
 
+    # Solar elongation — angular separation between this body and the Sun at night midpoint.
+    # Used to detect opposition (+0.20 AstroScore bonus) and to flag inner planets in solar glare.
+    solar_elongation_deg: Optional[float] = None
+    is_opposition = False
+    try:
+        mid_idx_b = len(times) // 2
+        sun_coord = get_body('sun', times[mid_idx_b], location)
+        solar_elongation_deg = round(
+            _angular_separation_deg(
+                ra_hours * 15.0, dec_degrees,
+                float(sun_coord.ra.deg),   # type: ignore[attr-defined]
+                float(sun_coord.dec.deg),  # type: ignore[attr-defined]
+            ),
+            1,
+        )
+        is_opposition = (target.object_type or '').lower() == 'planet' and solar_elongation_deg > 160.0
+    except Exception as exc:
+        logger.debug(f'Solar elongation computation failed for {body_name}: {exc}')
+
     meridian_time = _meridian_transit_time(ra_hours, night_start, night_end, lat, lon)
     antimeridian_time = _antimeridian_transit_time(ra_hours, night_start, night_end, lat, lon)
     ra_hms = _hours_to_hms(ra_hours)
@@ -906,7 +925,7 @@ def _compute_body_result(
         window_start_hour=window_start_hour,
         is_messier=False,
         is_planet=(target.object_type or '').lower() == 'planet',
-        is_opposition=False,
+        is_opposition=is_opposition,
     )
 
     return {
@@ -933,6 +952,7 @@ def _compute_body_result(
             'dec_dms': dec_dms,
         },
         'astro_score': astro_score,
+        'solar_elongation_deg': solar_elongation_deg,
         'moon_angular_distance': round(angular_distance_moon, 1) if angular_distance_moon is not None else None,
         'lunar_phase': round(moon.phase, 4) if is_moon else None,
         'source_catalogues': target.source_catalogues,
