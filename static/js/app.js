@@ -472,6 +472,9 @@ function cleanupTransientCharts() {
     if (typeof destroySolarEclipseChart === 'function') {
         destroySolarEclipseChart();
     }
+    if (typeof destroyDebugAlttimeChart === 'function') {
+        destroyDebugAlttimeChart();
+    }
 }
 
 function setupModalAccessibility() {

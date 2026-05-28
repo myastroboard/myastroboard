@@ -37,7 +37,7 @@ from logging_config import get_logger
 from repo_config import load_config
 from skytonight_models import SkyTonightTarget
 from skytonight_storage import ensure_skytonight_directories
-from skytonight_targets import choose_preferred_catalogue_name, load_targets_dataset
+from skytonight_targets import choose_preferred_catalogue_name, load_targets_dataset, normalize_object_name
 from sun_phases import SunService
 from utils import ensure_directory_exists, load_json_file, save_json_file
 
@@ -1498,4 +1498,374 @@ def load_calculation_results() -> Dict[str, Any]:
         'deep_sky': dso_file.get('deep_sky', []),
         'bodies': bodies_file.get('bodies', []),
         'comets': comets_file.get('comets', []),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Per-target debug diagnostics
+# ---------------------------------------------------------------------------
+
+_body_alias_map_cache: Optional[Dict[str, str]] = None
+
+
+def _build_body_alias_map() -> Dict[str, str]:
+    """Build a reverse map: normalized localized body name → canonical English body name.
+
+    Reads the 'planets' i18n namespace from every supported language so that
+    any translated name (e.g. 'Lune', 'Saturne') resolves to the English name
+    used in the dataset (e.g. 'Moon', 'Saturn').
+    """
+    from i18n_utils import I18nManager, SUPPORTED_LANGUAGES
+
+    result: Dict[str, str] = {}
+    for lang in SUPPORTED_LANGUAGES:
+        try:
+            ns = I18nManager(lang).get_namespace('planets')
+            for key, localized_name in ns.items():
+                if not isinstance(localized_name, str) or not localized_name.strip():
+                    continue
+                # i18n key is lowercase English (e.g. 'moon') → canonical 'Moon'
+                canonical = key.capitalize()
+                norm = normalize_object_name(localized_name)
+                if norm:
+                    result[norm] = canonical
+        except Exception:
+            pass
+    return result
+
+
+def _find_body_entry_by_localized_name(
+    name_norm: str,
+    lookup: Dict[str, Any],
+) -> Optional[Dict[str, Any]]:
+    """Return a lookup entry by matching a localized body name via the i18n map."""
+    global _body_alias_map_cache
+    if _body_alias_map_cache is None:
+        _body_alias_map_cache = _build_body_alias_map()
+    canonical = _body_alias_map_cache.get(name_norm)
+    if not canonical:
+        return None
+    english_norm = normalize_object_name(canonical)
+    return lookup.get(f'alias::{english_norm}') or lookup.get(f'preferred::{english_norm}')
+
+
+def compute_target_debug(name: str, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Compute detailed constraint diagnostics for a single target by name.
+
+    Returns a structured dict describing which SkyTonight constraints the target
+    passes or fails tonight, plus altitude-time data for the frontend chart.
+    This powers the 'DSO not found?' debug tab.
+    """
+    if config is None:
+        config = load_config()
+
+    location_cfg = config.get('location', {}) if isinstance(config, dict) else {}
+    lat = float(location_cfg.get('latitude') or 0.0)
+    lon = float(location_cfg.get('longitude') or 0.0)
+    elevation = float(location_cfg.get('elevation') or 0.0)
+    timezone_name = str(location_cfg.get('timezone') or 'UTC')
+
+    skytonight_cfg = config.get('skytonight', {}) if isinstance(config, dict) else {}
+    constraints: Dict[str, Any] = skytonight_cfg.get('constraints', {})
+    _raw_name_order = skytonight_cfg.get('preferred_name_order')
+    preferred_name_order: Optional[List[str]] = (
+        [str(x) for x in _raw_name_order if x]
+        if isinstance(_raw_name_order, list) and _raw_name_order
+        else None
+    )
+
+    # --- Look up target by name ---
+    dataset = load_targets_dataset()
+    lookup: Dict[str, Any] = dataset.get('lookup', {})
+    all_targets: List[SkyTonightTarget] = dataset.get('targets', [])
+
+    name_norm = normalize_object_name(name)
+    entry: Optional[Dict[str, Any]] = (
+        lookup.get(f'alias::{name_norm}')
+        or lookup.get(f'preferred::{name_norm}')
+    )
+    if not entry:
+        for key, val in lookup.items():
+            if '::' in key and key.split('::', 1)[1] == name_norm:
+                entry = val
+                break
+
+    # Fallback: check whether the search term is a localized body name in any
+    # supported language.  The 'planets' i18n namespace maps English keys
+    # (e.g. 'moon') to translated names (e.g. 'Lune', 'Luna').  We invert that
+    # map so that any localized name routes to the canonical English body name.
+    if not entry:
+        entry = _find_body_entry_by_localized_name(name_norm, lookup)
+
+    if not entry:
+        return {'found': False}
+
+    target_id = str(entry.get('target_id') or entry.get('group_id') or '')
+    target: Optional[SkyTonightTarget] = next(
+        (t for t in all_targets if t.target_id == target_id), None
+    )
+    if target is None:
+        return {'found': False}
+
+    # --- Constraint values ---
+    alt_min = float(constraints.get('altitude_constraint_min', 30))
+    alt_max = float(constraints.get('altitude_constraint_max', 80))
+    airmass = float(constraints.get('airmass_constraint', 2.0))
+    size_min = float(constraints.get('size_constraint_min', 10))
+    size_max = float(constraints.get('size_constraint_max', 300))
+    moon_sep_min = float(constraints.get('moon_separation_min', 45))
+    frac_threshold = float(constraints.get('fraction_of_time_observable_threshold', 0.5))
+    moon_use_illum = bool(constraints.get('moon_separation_use_illumination', True))
+    horizon_profile: List[Dict[str, Any]] = constraints.get('horizon_profile', [])
+
+    # Effective altitude floor: stricter of alt_min vs airmass-derived
+    effective_alt_min = alt_min
+    if airmass >= 1.0:
+        alt_from_airmass = math.degrees(math.asin(min(1.0, 1.0 / airmass)))
+        effective_alt_min = max(alt_min, alt_from_airmass)
+
+    constraints_summary = {
+        'altitude_constraint_min': alt_min,
+        'altitude_constraint_max': alt_max,
+        'airmass_constraint': airmass,
+        'effective_alt_min': round(effective_alt_min, 1),
+        'size_constraint_min': size_min,
+        'size_constraint_max': size_max,
+        'moon_separation_min': moon_sep_min,
+        'moon_separation_use_illumination': moon_use_illum,
+        'fraction_of_time_observable_threshold': frac_threshold,
+        'horizon_active': bool(horizon_profile),
+    }
+
+    # Resolve preferred display name
+    display_name = (
+        choose_preferred_catalogue_name(target.catalogue_names, order=preferred_name_order)
+        if preferred_name_order and target.catalogue_names
+        else target.preferred_name
+    )
+
+    target_info = {
+        'target_id': target.target_id,
+        'preferred_name': display_name or target.preferred_name,
+        'catalogue_names': target.catalogue_names,
+        'object_type': target.object_type,
+        'category': target.category,
+        'constellation': target.constellation,
+        'magnitude': target.magnitude,
+        'size_arcmin': target.size_arcmin,
+        'coordinates': (
+            {'ra_hours': target.coordinates.ra_hours, 'dec_degrees': target.coordinates.dec_degrees}
+            if target.coordinates else None
+        ),
+    }
+
+    # Bodies have no static coordinates (computed live from ephemeris) — skip coordinates check.
+    # For non-body targets, missing coordinates means we cannot compute anything.
+    is_body = target.category == 'bodies'
+    is_moon = is_body and (target.object_type or '').lower() == 'moon'
+    if not is_body and target.coordinates is None:
+        return {
+            'found': True,
+            'target': target_info,
+            'night_window': None,
+            'moon': None,
+            'alttime': None,
+            'constraints': constraints_summary,
+            'checks': [{'name': 'coordinates', 'passed': False, 'note': 'Target has no coordinates'}],
+            'overall': 'no_coordinates',
+        }
+
+    # Placeholder; will be overwritten by _compute_body_altaz_series for bodies.
+    ra_hours: float = target.coordinates.ra_hours if target.coordinates else 0.0
+    dec_degrees: float = target.coordinates.dec_degrees if target.coordinates else 0.0
+
+    # --- Night window ---
+    night_window = _get_night_window(lat, lon, timezone_name)
+    astro_window = _get_astro_night_window(lat, lon, timezone_name)
+
+    if night_window is None:
+        return {
+            'found': True,
+            'target': target_info,
+            'night_window': {'available': False},
+            'moon': None,
+            'alttime': None,
+            'constraints': constraints_summary,
+            'checks': [{'name': 'night_window', 'passed': False}],
+            'overall': 'no_night',
+        }
+
+    night_start, night_end = night_window
+    night_hours = (night_end - night_start).total_seconds() / 3600.0
+    astro_night_start = astro_window[0] if astro_window else None
+    astro_night_end = astro_window[1] if astro_window else None
+
+    # --- Compute altaz series ---
+    location_obj = EarthLocation(lat=lat * u.deg, lon=lon * u.deg, height=elevation * u.m)
+    times = _sample_times(night_start, night_end)
+    moon = _MoonInfo(times, location_obj)
+
+    try:
+        if is_body:
+            alt_deg, az_deg, ra_hours, dec_degrees = _compute_body_altaz_series(
+                target.preferred_name, times, location_obj
+            )
+        else:
+            alt_deg, az_deg = _compute_altaz_series(ra_hours, dec_degrees, times, location_obj)
+    except Exception as exc:
+        logger.debug(f'compute_target_debug: altaz computation failed for {target.target_id}: {exc}')
+        return {
+            'found': True,
+            'target': target_info,
+            'night_window': {
+                'available': True,
+                'night_start': night_start.isoformat(),
+                'night_end': night_end.isoformat(),
+                'night_hours': round(night_hours, 2),
+            },
+            'moon': None,
+            'alttime': None,
+            'constraints': constraints_summary,
+            'checks': [{'name': 'altaz_computation', 'passed': False, 'note': 'Failed to compute altitude data'}],
+            'overall': 'error',
+        }
+
+    times_iso = [
+        t.strftime('%Y-%m-%dT%H:%M:%S')
+        for t in times.to_datetime(timezone=timezone.utc)
+    ]
+
+    # --- Run constraint checks ---
+    checks: List[Dict[str, Any]] = []
+    overall = 'visible'
+
+    # Size filter (DSOs and comets only, skip bodies)
+    if target.category == 'deep_sky':
+        if target.size_arcmin is not None:
+            size_min_ok = target.size_arcmin >= size_min
+            size_max_ok = target.size_arcmin <= size_max
+            checks.append({
+                'name': 'size_min',
+                'passed': size_min_ok,
+                'value': target.size_arcmin,
+                'threshold': size_min,
+                'unit': 'arcmin',
+            })
+            checks.append({
+                'name': 'size_max',
+                'passed': size_max_ok,
+                'value': target.size_arcmin,
+                'threshold': size_max,
+                'unit': 'arcmin',
+            })
+            if not (size_min_ok and size_max_ok):
+                overall = 'filtered'
+        else:
+            checks.append({'name': 'size_min', 'passed': True, 'note': 'No size data, filter skipped'})
+            checks.append({'name': 'size_max', 'passed': True, 'note': 'No size data, filter skipped'})
+
+    # Moon separation (DSOs and comets only)
+    effective_min_sep = moon_sep_min
+    if not is_body and moon.ra_deg is not None and moon.dec_deg is not None:
+        ang_sep = _angular_separation_deg(ra_hours * 15.0, dec_degrees, moon.ra_deg, moon.dec_deg)
+        if moon_use_illum:
+            effective_min_sep = moon.phase * 100.0
+        moon_ok = ang_sep >= effective_min_sep
+        checks.append({
+            'name': 'moon_separation',
+            'passed': moon_ok,
+            'value': round(ang_sep, 1),
+            'threshold': round(effective_min_sep, 1),
+            'unit': '°',
+            'moon_phase': round(moon.phase, 3),
+            'moon_phase_pct': round(moon.phase * 100.0, 1),
+        })
+        if not moon_ok:
+            overall = 'filtered'
+
+    # Altitude / observable fraction
+    total_steps = len(alt_deg)
+    max_altitude = float(np.max(alt_deg))
+
+    checks.append({
+        'name': 'max_altitude',
+        'passed': is_moon or max_altitude >= effective_alt_min,
+        'value': round(max_altitude, 1),
+        'threshold': round(effective_alt_min, 1),
+        'unit': '°',
+    })
+    if not is_moon and max_altitude < effective_alt_min:
+        overall = 'filtered'
+
+    if horizon_profile and az_deg is not None:
+        horizon_floors = np.maximum(effective_alt_min, _horizon_floor_array(az_deg, horizon_profile))
+        in_window_mask = (alt_deg >= horizon_floors) if is_body else (alt_deg >= horizon_floors) & (alt_deg <= alt_max)
+    else:
+        in_window_mask = (alt_deg >= effective_alt_min) if is_body else (alt_deg >= effective_alt_min) & (alt_deg <= alt_max)
+
+    observable_steps = int(np.sum(in_window_mask))
+    observable_fraction = observable_steps / total_steps if total_steps > 0 else 0.0
+    observable_hours = night_hours * observable_fraction
+
+    # Bodies use a much lower threshold; Moon is always shown regardless (same logic as _compute_target_result).
+    _BODIES_MIN_FRACTION_DEBUG = 0.05
+    if is_moon:
+        fraction_or_hours_ok = True
+    elif is_body:
+        fraction_or_hours_ok = observable_fraction >= _BODIES_MIN_FRACTION_DEBUG
+    else:
+        fraction_or_hours_ok = (
+            observable_fraction >= frac_threshold or observable_hours >= _MIN_OBSERVABLE_HOURS_DSO
+        )
+    checks.append({
+        'name': 'observable_fraction',
+        'passed': fraction_or_hours_ok,
+        'value': round(observable_fraction, 3),
+        'threshold': _BODIES_MIN_FRACTION_DEBUG if is_body else frac_threshold,
+        'observable_hours': round(observable_hours, 2),
+        'min_observable_hours': None if is_body else _MIN_OBSERVABLE_HOURS_DSO,
+    })
+    if not fraction_or_hours_ok:
+        overall = 'filtered'
+
+    # --- Alt-time series for chart ---
+    alttime: Dict[str, Any] = {
+        'times_utc': times_iso,
+        'altitudes': [round(float(a), 2) for a in alt_deg],
+        'azimuths': [round(float(a), 1) for a in az_deg],
+        'altitude_constraint_min': effective_alt_min,
+        'altitude_constraint_max': alt_max,
+        'night_start': night_start.isoformat(),
+        'night_end': night_end.isoformat(),
+        'timezone': timezone_name,
+    }
+    if astro_night_start is not None:
+        alttime['night_astro_start'] = astro_night_start.isoformat()
+    if astro_night_end is not None:
+        alttime['night_astro_end'] = astro_night_end.isoformat()
+    if horizon_profile:
+        alttime['horizon_profile'] = horizon_profile
+
+    moon_info = {
+        'phase': round(moon.phase, 3),
+        'phase_pct': round(moon.phase * 100.0, 1),
+        'ra_deg': round(moon.ra_deg, 2) if moon.ra_deg is not None else None,
+        'dec_deg': round(moon.dec_deg, 2) if moon.dec_deg is not None else None,
+        'effective_min_separation': round(effective_min_sep, 1),
+    }
+
+    return {
+        'found': True,
+        'target': target_info,
+        'night_window': {
+            'available': True,
+            'night_start': night_start.isoformat(),
+            'night_end': night_end.isoformat(),
+            'night_hours': round(night_hours, 2),
+        },
+        'moon': moon_info,
+        'alttime': alttime,
+        'constraints': constraints_summary,
+        'checks': checks,
+        'overall': overall,
     }
