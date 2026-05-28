@@ -180,3 +180,62 @@ def test_skytonight_log_endpoint_returns_content(client_admin, monkeypatch, tmp_
     payload = response.get_json()
     assert isinstance(payload, dict)
     assert payload.get('log_content') == '{"status":"success"}\n'
+
+
+# ---------------------------------------------------------------------------
+# /api/skytonight/target-debug endpoint tests
+# ---------------------------------------------------------------------------
+
+def test_target_debug_missing_name_returns_400(client_admin):
+    response = client_admin.get('/api/skytonight/target-debug')
+    assert response.status_code == 400
+    assert 'error' in response.get_json()
+
+
+def test_target_debug_empty_name_returns_400(client_admin):
+    response = client_admin.get('/api/skytonight/target-debug?name=')
+    assert response.status_code == 400
+    assert 'error' in response.get_json()
+
+
+def test_target_debug_requires_login():
+    app.config['TESTING'] = True
+    with app.test_client() as unauthenticated:
+        response = unauthenticated.get('/api/skytonight/target-debug?name=Jupiter')
+    # login_required redirects unauthenticated requests
+    assert response.status_code in (302, 401)
+
+
+def test_target_debug_unknown_name_returns_found_false(client_admin, monkeypatch):
+    monkeypatch.setattr(
+        skytonight_api_module,
+        'compute_target_debug',
+        lambda name, config=None: {'found': False},
+    )
+    response = client_admin.get('/api/skytonight/target-debug?name=ZZZ_NoSuch')
+    assert response.status_code == 200
+    assert response.get_json() == {'found': False}
+
+
+def test_target_debug_known_target_returns_debug_payload(client_admin, monkeypatch):
+    fake_result = {
+        'found': True,
+        'overall': 'visible',
+        'target': {'preferred_name': 'M 31', 'object_type': 'Galaxy'},
+        'checks': [{'name': 'max_altitude', 'passed': True}],
+        'constraints': {'horizon_active': False},
+        'night_window': {'available': True},
+        'alttime': {},
+        'moon': None,
+    }
+    monkeypatch.setattr(
+        skytonight_api_module,
+        'compute_target_debug',
+        lambda name, config=None: fake_result,
+    )
+    response = client_admin.get('/api/skytonight/target-debug?name=M+31')
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['found'] is True
+    assert payload['overall'] == 'visible'
+    assert payload['constraints']['horizon_active'] is False

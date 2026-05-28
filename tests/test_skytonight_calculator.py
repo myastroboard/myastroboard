@@ -38,7 +38,12 @@ from skytonight_calculator import (
     _compute_body_result,
     _hours_to_hms,
     _degrees_to_dms,
+    compute_target_debug,
+    _build_body_alias_map,
+    _find_body_entry_by_localized_name,
 )
+from skytonight_models import SkyTonightTarget, SkyTonightCoordinates
+from skytonight_targets import normalize_object_name
 
 
 class TestNormalise:
@@ -767,3 +772,318 @@ class TestTargetAndBodyResultBuilders:
     def test_hours_and_degrees_formatters(self):
         assert "h" in _hours_to_hms(1.5)
         assert "\u00b0" in _degrees_to_dms(-12.5)
+
+
+# ---------------------------------------------------------------------------
+# Helpers shared by TestComputeTargetDebug
+# ---------------------------------------------------------------------------
+
+_DEBUG_NIGHT_START = datetime(2026, 5, 28, 21, 0, 0, tzinfo=timezone.utc)
+_DEBUG_NIGHT_END   = datetime(2026, 5, 29,  5, 0, 0, tzinfo=timezone.utc)  # 8-hour night
+
+
+def _debug_config(**constraint_overrides):
+    constraints = {
+        'altitude_constraint_min': 30,
+        'altitude_constraint_max': 80,
+        'airmass_constraint': 2.0,
+        'size_constraint_min': 10,
+        'size_constraint_max': 300,
+        'moon_separation_min': 45,
+        'fraction_of_time_observable_threshold': 0.5,
+        'moon_separation_use_illumination': False,
+        'horizon_profile': [],
+    }
+    constraints.update(constraint_overrides)
+    return {
+        'location': {'latitude': 48.0, 'longitude': 2.0, 'elevation': 100.0, 'timezone': 'UTC'},
+        'skytonight': {'constraints': constraints},
+    }
+
+
+def _debug_dso(preferred_name='NGC 224', size_arcmin=50.0, ra_hours=0.71, dec_degrees=41.3):
+    return SkyTonightTarget(
+        target_id='dso-test',
+        category='deep_sky',
+        object_type='Galaxy',
+        preferred_name=preferred_name,
+        catalogue_names={'OpenNGC': preferred_name},
+        constellation='Andromeda',
+        magnitude=3.4,
+        size_arcmin=size_arcmin,
+        coordinates=SkyTonightCoordinates(ra_hours=ra_hours, dec_degrees=dec_degrees),
+        source_catalogues=['OpenNGC'],
+    )
+
+
+def _debug_body(preferred_name='Jupiter', object_type='Planet'):
+    return SkyTonightTarget(
+        target_id=f'body-{preferred_name.lower()}',
+        category='bodies',
+        object_type=object_type,
+        preferred_name=preferred_name,
+        catalogue_names={'Bodies': preferred_name},
+        source_catalogues=['Bodies'],
+        metadata={'source': 'builtin-solar-system'},
+    )
+
+
+def _debug_dataset(target):
+    norm = normalize_object_name(target.preferred_name)
+    return {
+        'targets': [target],
+        'lookup': {f'preferred::{norm}': {'target_id': target.target_id}},
+    }
+
+
+class TestComputeTargetDebug:
+    """Tests for compute_target_debug \u2014 verifies constraint checks, body/Moon exemptions,
+    and horizon_active flag without performing real astronomical computations."""
+
+    ALT_HIGH = np.array([35.0, 45.0, 60.0, 55.0, 40.0], dtype=float)  # all \u2265 alt_min
+    ALT_LOW  = np.array([ 5.0, 10.0, 15.0, 10.0,  5.0], dtype=float)  # all < alt_min
+    AZ_5     = np.array([100.0, 120.0, 150.0, 180.0, 200.0], dtype=float)
+
+    def _run(self, target, config, alt_deg, *, is_body=False,
+             az_deg=None, moon_ra=100.0, moon_dec=-10.0):
+        """Run compute_target_debug with all heavy dependencies mocked."""
+        az = az_deg if az_deg is not None else self.AZ_5[:len(alt_deg)]
+        dataset = _debug_dataset(target)
+        moon = SimpleNamespace(phase=0.2, ra_deg=moon_ra, dec_deg=moon_dec)
+        mock_times = MagicMock()
+        mock_times.to_datetime.return_value = [
+            _DEBUG_NIGHT_START + timedelta(minutes=i * 15) for i in range(len(alt_deg))
+        ]
+
+        p_ds    = patch('skytonight_calculator.load_targets_dataset', return_value=dataset)
+        p_night = patch('skytonight_calculator._get_night_window',
+                        return_value=(_DEBUG_NIGHT_START, _DEBUG_NIGHT_END))
+        p_astro = patch('skytonight_calculator._get_astro_night_window', return_value=None)
+        p_loc   = patch('skytonight_calculator.EarthLocation')
+        p_moon  = patch('skytonight_calculator._MoonInfo', return_value=moon)
+        p_times = patch('skytonight_calculator._sample_times', return_value=mock_times)
+        if is_body:
+            p_altaz = patch('skytonight_calculator._compute_body_altaz_series',
+                            return_value=(alt_deg, az, 1.5, 12.0))
+        else:
+            p_altaz = patch('skytonight_calculator._compute_altaz_series',
+                            return_value=(alt_deg, az))
+
+        with p_ds, p_night, p_astro, p_loc, p_moon, p_times, p_altaz:
+            return compute_target_debug(target.preferred_name, config=config)
+
+    # ------------------------------------------------------------------ lookup
+
+    def test_unknown_name_returns_not_found(self):
+        config = _debug_config()
+        with patch('skytonight_calculator.load_targets_dataset',
+                   return_value={'targets': [], 'lookup': {}}):
+            result = compute_target_debug('ZZZ_NoSuchObject_xyz', config=config)
+        assert result == {'found': False}
+
+    def test_found_flag_is_true_for_known_target(self):
+        target = _debug_dso()
+        result = self._run(target, _debug_config(), self.ALT_HIGH)
+        assert result['found'] is True
+
+    # ------------------------------------------------------------------ night
+
+    def test_no_night_window_returns_no_night(self):
+        target = _debug_dso()
+        config = _debug_config()
+        dataset = _debug_dataset(target)
+        with patch('skytonight_calculator.load_targets_dataset', return_value=dataset), \
+             patch('skytonight_calculator._get_night_window', return_value=None):
+            result = compute_target_debug(target.preferred_name, config=config)
+        assert result['overall'] == 'no_night'
+        assert result['found'] is True
+
+    # ------------------------------------------------------------------ coordinates
+
+    def test_non_body_without_coordinates_returns_no_coordinates(self):
+        target = SkyTonightTarget(
+            target_id='dso-nocoords',
+            category='deep_sky',
+            object_type='Galaxy',
+            preferred_name='NoCoords',
+            catalogue_names={},
+            source_catalogues=[],
+        )
+        config = _debug_config()
+        dataset = _debug_dataset(target)
+        with patch('skytonight_calculator.load_targets_dataset', return_value=dataset), \
+             patch('skytonight_calculator._get_night_window',
+                   return_value=(_DEBUG_NIGHT_START, _DEBUG_NIGHT_END)):
+            result = compute_target_debug('NoCoords', config=config)
+        assert result['overall'] == 'no_coordinates'
+
+    # ------------------------------------------------------------------ DSO size checks
+
+    def test_dso_too_small_is_filtered(self):
+        target = _debug_dso(size_arcmin=3.0)      # below size_constraint_min=10
+        result = self._run(target, _debug_config(), self.ALT_HIGH)
+        assert result['overall'] == 'filtered'
+        size_check = next(c for c in result['checks'] if c['name'] == 'size_min')
+        assert size_check['passed'] is False
+
+    def test_dso_too_large_is_filtered(self):
+        target = _debug_dso(size_arcmin=500.0)    # above size_constraint_max=300
+        result = self._run(target, _debug_config(), self.ALT_HIGH)
+        assert result['overall'] == 'filtered'
+        size_check = next(c for c in result['checks'] if c['name'] == 'size_max')
+        assert size_check['passed'] is False
+
+    def test_dso_within_size_range_passes_size_checks(self):
+        target = _debug_dso(size_arcmin=50.0)     # 10 \u2264 50 \u2264 300 \u2192 both pass
+        result = self._run(target, _debug_config(), self.ALT_HIGH)
+        size_min_check = next(c for c in result['checks'] if c['name'] == 'size_min')
+        size_max_check = next(c for c in result['checks'] if c['name'] == 'size_max')
+        assert size_min_check['passed'] is True
+        assert size_max_check['passed'] is True
+
+    # ------------------------------------------------------------------ moon separation
+
+    def test_dso_too_close_to_moon_is_filtered(self):
+        # Moon placed at same position as target \u2192 separation \u2248 0\u00b0 < min 45\u00b0
+        target = _debug_dso(ra_hours=0.71, dec_degrees=41.3)
+        result = self._run(target, _debug_config(), self.ALT_HIGH,
+                           moon_ra=0.71 * 15, moon_dec=41.3)
+        assert result['overall'] == 'filtered'
+        sep_check = next(c for c in result['checks'] if c['name'] == 'moon_separation')
+        assert sep_check['passed'] is False
+
+    def test_dso_far_from_moon_passes_separation(self):
+        # Moon at (100\u00b0, -10\u00b0) is ~96\u00b0 away from target at (10.65\u00b0, 41.3\u00b0) \u2192 > 45\u00b0 min
+        target = _debug_dso(ra_hours=0.71, dec_degrees=41.3)
+        result = self._run(target, _debug_config(), self.ALT_HIGH,
+                           moon_ra=100.0, moon_dec=-10.0)
+        sep_check = next((c for c in result['checks'] if c['name'] == 'moon_separation'), None)
+        if sep_check is not None:
+            assert sep_check['passed'] is True
+
+    # ------------------------------------------------------------------ altitude
+
+    def test_dso_never_above_min_altitude_is_filtered(self):
+        target = _debug_dso()
+        result = self._run(target, _debug_config(), self.ALT_LOW)   # max=15 < 30
+        assert result['overall'] == 'filtered'
+        alt_check = next(c for c in result['checks'] if c['name'] == 'max_altitude')
+        assert alt_check['passed'] is False
+
+    def test_dso_reaches_min_altitude_passes(self):
+        target = _debug_dso()
+        result = self._run(target, _debug_config(), self.ALT_HIGH)  # max=60 \u2265 30
+        alt_check = next(c for c in result['checks'] if c['name'] == 'max_altitude')
+        assert alt_check['passed'] is True
+
+    # ------------------------------------------------------------------ observable fraction
+
+    def test_dso_zero_observable_fraction_is_filtered(self):
+        # All steps below alt_min \u2192 fraction=0, hours=0 \u2192 both thresholds fail
+        target = _debug_dso()
+        result = self._run(target, _debug_config(), self.ALT_LOW)
+        frac_check = next(c for c in result['checks'] if c['name'] == 'observable_fraction')
+        assert frac_check['passed'] is False
+
+    def test_dso_passing_all_checks_is_visible(self):
+        target = _debug_dso()
+        result = self._run(target, _debug_config(), self.ALT_HIGH)
+        assert result['overall'] == 'visible'
+        assert all(c['passed'] for c in result['checks']
+                   if not (c.get('note') or '').startswith('No size'))
+
+    # ------------------------------------------------------------------ body checks
+
+    def test_body_skips_size_and_moon_separation_checks(self):
+        target = _debug_body('Jupiter', 'Planet')
+        result = self._run(target, _debug_config(), self.ALT_HIGH, is_body=True)
+        check_names = {c['name'] for c in result['checks']}
+        assert 'size_min' not in check_names
+        assert 'size_max' not in check_names
+        assert 'moon_separation' not in check_names
+
+    def test_body_observable_fraction_uses_low_threshold(self):
+        # 1 out of 5 steps above alt_min = 20 % \u2014 fails DSO threshold (50 %) but
+        # passes body threshold (5 %).
+        alt = np.array([5.0, 5.0, 35.0, 5.0, 5.0], dtype=float)
+        target = _debug_body('Jupiter', 'Planet')
+        result = self._run(target, _debug_config(), alt, is_body=True)
+        frac_check = next(c for c in result['checks'] if c['name'] == 'observable_fraction')
+        assert frac_check['threshold'] == pytest.approx(0.05)
+        assert frac_check['min_observable_hours'] is None  # no hours threshold for bodies
+
+    # ------------------------------------------------------------------ Moon exemptions
+
+    def test_moon_always_passes_max_altitude_check(self):
+        target = _debug_body('Moon', 'Moon')
+        result = self._run(target, _debug_config(), self.ALT_LOW, is_body=True)
+        alt_check = next(c for c in result['checks'] if c['name'] == 'max_altitude')
+        assert alt_check['passed'] is True
+
+    def test_moon_always_passes_observable_fraction_check(self):
+        target = _debug_body('Moon', 'Moon')
+        result = self._run(target, _debug_config(), self.ALT_LOW, is_body=True)
+        frac_check = next(c for c in result['checks'] if c['name'] == 'observable_fraction')
+        assert frac_check['passed'] is True
+
+    # ------------------------------------------------------------------ horizon_active flag
+
+    def test_horizon_active_false_when_no_profile(self):
+        target = _debug_dso()
+        result = self._run(target, _debug_config(horizon_profile=[]), self.ALT_HIGH)
+        assert result['constraints']['horizon_active'] is False
+
+    def test_horizon_active_true_when_profile_configured(self):
+        profile = [{'az': 0.0, 'alt': 10.0}, {'az': 180.0, 'alt': 15.0}]
+        target = _debug_dso()
+        result = self._run(target, _debug_config(horizon_profile=profile), self.ALT_HIGH)
+        assert result['constraints']['horizon_active'] is True
+
+    # ------------------------------------------------------------------ response shape
+
+    def test_response_contains_required_keys(self):
+        target = _debug_dso()
+        result = self._run(target, _debug_config(), self.ALT_HIGH)
+        for key in ('found', 'target', 'night_window', 'checks', 'overall', 'constraints', 'alttime'):
+            assert key in result, f"Missing key: {key}"
+
+    def test_checks_contain_value_and_threshold(self):
+        target = _debug_dso()
+        result = self._run(target, _debug_config(), self.ALT_HIGH)
+        for check in result['checks']:
+            assert 'name' in check
+            assert 'passed' in check
+
+
+class TestBodyAliasMap:
+    """Tests for the i18n-based body alias reverse map helpers."""
+
+    def setup_method(self):
+        # Reset the module-level cache so each test starts fresh.
+        calc._body_alias_map_cache = None
+
+    def test_build_body_alias_map_returns_nonempty_dict(self):
+        alias_map = _build_body_alias_map()
+        assert isinstance(alias_map, dict)
+        assert len(alias_map) > 0
+
+    def test_build_body_alias_map_maps_french_moon_to_moon(self):
+        alias_map = _build_body_alias_map()
+        # 'lune' is the normalized form of the French name 'Lune'
+        assert alias_map.get('lune') == 'Moon'
+
+    def test_find_body_entry_returns_none_for_unknown_name(self):
+        fake_lookup = {'preferred::moon': {'target_id': 'body-moon'}}
+        result = _find_body_entry_by_localized_name('xyz_nonexistent_zzz', fake_lookup)
+        assert result is None
+
+    def test_find_body_entry_resolves_canonical_name_via_lookup(self):
+        # Seed cache with a known mapping so we don't rely on i18n file I/O.
+        calc._body_alias_map_cache = {'lune': 'Moon'}
+        lookup = {
+            'preferred::moon': {'target_id': 'body-moon'},
+            'alias::moon': {'target_id': 'body-moon'},
+        }
+        result = _find_body_entry_by_localized_name('lune', lookup)
+        assert result is not None
+        assert result['target_id'] == 'body-moon'

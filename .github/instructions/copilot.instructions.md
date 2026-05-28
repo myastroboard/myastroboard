@@ -16,7 +16,7 @@ MyAstroBoard is a web-based astronomy observation planning system with a fully b
 ## Architecture
 
 ### Technology Stack
-- **Backend**: Python 3.11 + Flask
+- **Backend**: Python 3.13 + Flask
 - **Frontend**: Vanilla HTML/CSS/JavaScript
 - **Astronomy**: Astropy + Astroplan for calculations; Skyfield (`de421.bsp`) for planet/body ephemeris
 - **Catalogues**: PyOngc (OpenNGC/OpenIC), Minor Planet Center / JPL SBDB (comets), built-in solar system bodies
