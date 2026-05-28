@@ -274,6 +274,26 @@ function _astroScoreBadgeHtml(score) {
     return `<span class="badge ${cls}" title="${escapeHtml(tier)}">${pct}%</span>`;
 }
 
+/**
+ * Returns a colour-coded badge for solar elongation (angular distance from the Sun).
+ * Reuses the same quality CSS classes as the AstroScore badge for consistency.
+ *   ≥ 90° → exceptional (green)  — opposition / quadrature zone
+ *   45-89° → good (blue)         — well separated from the Sun
+ *   20-44° → average (amber)     — twilight-affected, challenging
+ *   < 20°  → poor (red)          — solar glare zone, effectively unobservable
+ */
+function _elongationBadgeHtml(deg) {
+    if (deg === null || deg === undefined || deg === '') return '—';
+    const num = parseFloat(deg);
+    if (isNaN(num)) return '—';
+    let cls;
+    if (num >= 90) cls = 'astroscore-badge astroscore-badge-exceptional';
+    else if (num >= 45) cls = 'astroscore-badge astroscore-badge-good';
+    else if (num >= 20) cls = 'astroscore-badge astroscore-badge-average';
+    else cls = 'astroscore-badge astroscore-badge-poor';
+    return `<span class="badge ${cls}">${num.toFixed(1)}°</span>`;
+}
+
 /** Returns an HTML string: a compact legend row for all 4 AstroScore tiers. */
 function _astroScoreLegendHtml() {
     const tiers = [
@@ -1218,6 +1238,41 @@ async function _showSkyTonightDataSection(sectionKey, container) {
             return;
         }
 
+        // Solar elongation info box — only on the Bodies sub-tab
+        if (sectionKey === 'bodies') {
+            const infoBox = document.createElement('div');
+            infoBox.className = 'alert alert-info d-flex flex-column gap-2 mb-3';
+
+            const infoRow = document.createElement('div');
+            infoRow.className = 'd-flex align-items-start gap-2';
+            const infoIcon = document.createElement('i');
+            infoIcon.className = 'bi bi-info-circle-fill flex-shrink-0 mt-1';
+            infoIcon.setAttribute('aria-hidden', 'true');
+            const infoText = document.createElement('span');
+            infoText.textContent = tSkyTonightCompat('bodies_elongation_info');
+            infoRow.appendChild(infoIcon);
+            infoRow.appendChild(infoText);
+
+            const scaleRow = document.createElement('div');
+            scaleRow.className = 'd-flex flex-wrap gap-2';
+            const scale = [
+                { cls: 'astroscore-badge astroscore-badge-exceptional', key: 'bodies_elongation_scale_excellent' },
+                { cls: 'astroscore-badge astroscore-badge-good',        key: 'bodies_elongation_scale_good' },
+                { cls: 'astroscore-badge astroscore-badge-average',     key: 'bodies_elongation_scale_average' },
+                { cls: 'astroscore-badge astroscore-badge-poor',        key: 'bodies_elongation_scale_poor' },
+            ];
+            scale.forEach(({ cls, key }) => {
+                const badge = document.createElement('span');
+                badge.className = `badge ${cls}`;
+                badge.textContent = tSkyTonightCompat(key);
+                scaleRow.appendChild(badge);
+            });
+
+            infoBox.appendChild(infoRow);
+            infoBox.appendChild(scaleRow);
+            container.appendChild(infoBox);
+        }
+
         const tableType = sectionKey === 'report' ? 'report' : sectionKey;
         const currentPage = _skytCurrentPages[sectionKey] || 0;
         const tableHtml = generateReportTable(tableData, 'SkyTonight', tableType, displayAstrodex, currentPage);
@@ -1556,6 +1611,7 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
         { key: 'target name', label: tSkyTonightCompat('table_name'), align: 'left' },
         { key: 'altitude', label: tSkyTonightCompat('table_altitude'), align: 'center', unit: '°', decimals: 2 },
         { key: 'azimuth', label: tSkyTonightCompat('table_azimuth'), align: 'center', unit: '°', decimals: 2 },
+        { key: 'solar elongation', label: tSkyTonightCompat('table_solar_elongation'), align: 'center' },
         { key: 'max altitude time', label: tSkyTonightCompat('table_max_altitude_time'), align: 'center' },
         { key: 'visual magnitude', label: tSkyTonightCompat('table_visual_magnitude'), align: 'center', decimals: 2 },
         { key: 'foto', label: tSkyTonightCompat('table_foto'), align: 'center' },
@@ -1786,6 +1842,11 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
                     ? parseFloat(row[col.key]) : NaN;
                 const sortVal = isNaN(fotoNum) ? -1 : Math.round(fotoNum * 100);
                 html += `<td style="text-align: ${col.align}" data-sort-value="${sortVal}">${isNaN(fotoNum) ? '\u2014' : _astroScoreBadgeHtml(fotoNum)}</td>`;
+            } else if (col.key === 'solar elongation') {
+                const elongVal = (row[col.key] !== null && row[col.key] !== undefined)
+                    ? parseFloat(row[col.key]) : NaN;
+                const elongSort = isNaN(elongVal) ? -1 : Math.round(elongVal * 10);
+                html += `<td style="text-align: ${col.align}" data-sort-value="${elongSort}">${isNaN(elongVal) ? '\u2014' : _elongationBadgeHtml(elongVal)}</td>`;
             } else {
                 let value = row[col.key];
                 
