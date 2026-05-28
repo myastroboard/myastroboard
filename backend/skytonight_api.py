@@ -39,7 +39,7 @@ from skytonight_storage import (
     has_comets_results,
     has_dso_results,
 )
-from skytonight_calculator import load_calculation_results
+from skytonight_calculator import compute_target_debug, load_calculation_results
 from utils import load_json_file
 
 logger = get_logger(__name__)
@@ -1258,4 +1258,30 @@ def check_catalogue_log_exists(catalogue):
 
     except Exception:
         logger.exception("Error checking if catalogue log exists")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@skytonight_bp.route('/api/skytonight/target-debug', methods=['GET'])
+@login_required
+def skytonight_target_debug():
+    """Return per-constraint diagnostic data for a target searched by name.
+
+    Computes the same observability checks as the nightly scheduler and
+    explains why the target would or would not appear in SkyTonight results.
+
+    Query parameters
+    ----------------
+    name : str
+        Target name (e.g. 'M 31', 'NGC 224', 'Jupiter').
+    """
+    name = (request.args.get('name') or '').strip()
+    if not name:
+        return jsonify({'error': 'Missing name parameter'}), 400
+
+    try:
+        config = load_config()
+        result = compute_target_debug(name, config=config)
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f'Error in skytonight_target_debug for name={name!r}: {e}')
         return jsonify({'error': 'Internal server error'}), 500

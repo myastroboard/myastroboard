@@ -991,6 +991,7 @@ function _buildSkyTonightSectionButtons() {
         { key: 'bodies', icon: 'bi-globe2 text-warning',         labelKey: 'bodies' },
         { key: 'comets', icon: 'bi-comet text-warning',          labelKey: 'comets' },
         { key: 'log',    icon: 'bi-journal-text text-danger',    labelKey: 'logs' },
+        { key: 'debug',  icon: 'bi-question-circle text-info',   labelKey: 'target_debug' },
     ];
 
     sections.forEach(sec => {
@@ -1034,7 +1035,7 @@ function _buildSkyTonightSectionButtons() {
  * Called by app.js switchSubTab when a skytonight-* subtab is activated.
  * Loads data into the already-visible sub-tab-content div.
  *
- * @param {string} sectionKey  'plot' | 'report' | 'bodies' | 'comets' | 'log'
+ * @param {string} sectionKey  'plot' | 'report' | 'bodies' | 'comets' | 'log' | 'debug'
  */
 async function _showSkyTonightSectionData(sectionKey) {
     _skytCurrentSection = sectionKey;
@@ -1061,6 +1062,11 @@ async function _showSkyTonightSectionData(sectionKey) {
 
     if (sectionKey === 'log') {
         await _showSkyTonightLogSection(dataDiv);
+        return;
+    }
+
+    if (sectionKey === 'debug') {
+        _renderSkytDebugSection(dataDiv);
         return;
     }
 
@@ -1166,6 +1172,615 @@ async function _showSkyTonightLogSection(container) {
         frag.appendChild(card);
     });
     container.appendChild(frag);
+}
+
+// ---------------------------------------------------------------------------
+// Debug section — "DSO not found?"
+// ---------------------------------------------------------------------------
+
+/** Chart instance used by the debug altitude-time chart; cleaned up on re-search or tab switch. */
+let _debugAlttimeChart = null;
+
+function destroyDebugAlttimeChart() {
+    if (_debugAlttimeChart) {
+        _debugAlttimeChart.destroy();
+        _debugAlttimeChart = null;
+    }
+}
+
+/**
+ * Render the static shell of the debug section (search form + empty results area).
+ * Called once when the user first visits the 'debug' sub-tab.
+ */
+function _renderSkytDebugSection(container) {
+    if (container.dataset.debugReady === '1') return;
+    container.dataset.debugReady = '1';
+
+    DOMUtils.clear(container);
+
+    // Intro text
+    const intro = document.createElement('p');
+    intro.className = 'text-muted mb-3';
+    intro.textContent = tSkyTonightCompat('target_debug_intro');
+    container.appendChild(intro);
+
+    // Search form
+    const formRow = document.createElement('div');
+    formRow.className = 'row g-2 mb-4 align-items-end';
+
+    const inputCol = document.createElement('div');
+    inputCol.className = 'col-12 col-sm-8 col-md-6';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.id = 'skyt-debug-search-input';
+    input.className = 'form-control';
+    input.placeholder = tSkyTonightCompat('target_debug_search_placeholder');
+    inputCol.appendChild(input);
+
+    const btnCol = document.createElement('div');
+    btnCol.className = 'col-auto';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-primary';
+    btn.id = 'skyt-debug-search-btn';
+    const btnIcon = document.createElement('i');
+    btnIcon.className = 'bi bi-search me-1';
+    btnIcon.setAttribute('aria-hidden', 'true');
+    btn.appendChild(btnIcon);
+    btn.appendChild(document.createTextNode(tSkyTonightCompat('target_debug_search_btn')));
+    btnCol.appendChild(btn);
+
+    formRow.appendChild(inputCol);
+    formRow.appendChild(btnCol);
+    container.appendChild(formRow);
+
+    // Results container
+    const results = document.createElement('div');
+    results.id = 'skyt-debug-results';
+    container.appendChild(results);
+
+    // Wire up search
+    const doSearch = () => {
+        const name = input.value.trim();
+        if (name) _searchTargetDebug(results, name);
+    };
+    btn.addEventListener('click', doSearch);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') doSearch(); });
+}
+
+/**
+ * Call the /api/skytonight/target-debug endpoint and render the result.
+ */
+async function _searchTargetDebug(resultsContainer, name) {
+    // Destroy previous chart before clearing DOM
+    if (_debugAlttimeChart) {
+        _debugAlttimeChart.destroy();
+        _debugAlttimeChart = null;
+    }
+    DOMUtils.clear(resultsContainer);
+
+    const spinner = document.createElement('div');
+    spinner.className = 'text-muted';
+    const spinnerIcon = document.createElement('i');
+    spinnerIcon.className = 'bi bi-hourglass-split me-1';
+    spinnerIcon.setAttribute('aria-hidden', 'true');
+    spinner.appendChild(spinnerIcon);
+    spinner.appendChild(document.createTextNode(i18n.t('common.loading')));
+    resultsContainer.appendChild(spinner);
+
+    let data;
+    try {
+        data = await fetchJSON(`${API_BASE}/api/skytonight/target-debug?name=${encodeURIComponent(name)}`);
+    } catch (err) {
+        DOMUtils.clear(resultsContainer);
+        const errDiv = document.createElement('div');
+        errDiv.className = 'alert alert-danger';
+        errDiv.textContent = i18n.t('common.error');
+        resultsContainer.appendChild(errDiv);
+        return;
+    }
+
+    DOMUtils.clear(resultsContainer);
+
+    // Not found in catalogue
+    if (!data || !data.found) {
+        const notFound = document.createElement('div');
+        notFound.className = 'alert alert-warning';
+        const icon = document.createElement('i');
+        icon.className = 'bi bi-search me-2';
+        icon.setAttribute('aria-hidden', 'true');
+        notFound.appendChild(icon);
+        notFound.appendChild(document.createTextNode(tSkyTonightCompat('target_debug_not_found')));
+        resultsContainer.appendChild(notFound);
+        return;
+    }
+
+    // Overall status banner
+    _renderDebugStatusBanner(resultsContainer, data);
+
+    // Two-column layout for cards on wider screens
+    const row = document.createElement('div');
+    row.className = 'row g-3 mt-0';
+
+    const leftCol = document.createElement('div');
+    leftCol.className = 'col-12 col-lg-5';
+
+    const rightCol = document.createElement('div');
+    rightCol.className = 'col-12 col-lg-7';
+
+    // Object info card (left)
+    _renderDebugObjectCard(leftCol, data.target);
+
+    // Night window card (left, below object)
+    if (data.night_window) {
+        const tz = (data.alttime && data.alttime.timezone) || 'UTC';
+        _renderDebugNightCard(leftCol, data.night_window, data.moon, tz);
+    }
+
+    // Constraints table (right)
+    if (data.checks && data.checks.length > 0) {
+        _renderDebugChecksCard(rightCol, data.checks, data.constraints);
+    }
+
+    row.appendChild(leftCol);
+    row.appendChild(rightCol);
+    resultsContainer.appendChild(row);
+
+    // Altitude-time chart (full width below)
+    if (data.alttime && data.alttime.times_utc && data.alttime.times_utc.length > 0) {
+        const chartRow = document.createElement('div');
+        chartRow.className = 'row g-3 mt-0';
+        const chartCol = document.createElement('div');
+        chartCol.className = 'col-12';
+        _renderDebugAltimeChart(chartCol, data.alttime, data.target);
+        chartRow.appendChild(chartCol);
+        resultsContainer.appendChild(chartRow);
+    }
+}
+
+function _renderDebugStatusBanner(container, data) {
+    const banner = document.createElement('div');
+    const overall = data.overall;
+
+    if (overall === 'visible') {
+        banner.className = 'alert alert-success d-flex align-items-center gap-2 mb-3';
+        const icon = document.createElement('i');
+        icon.className = 'bi bi-check-circle-fill flex-shrink-0';
+        icon.setAttribute('aria-hidden', 'true');
+        const txt = document.createElement('span');
+        txt.textContent = tSkyTonightCompat('target_debug_visible');
+        banner.appendChild(icon);
+        banner.appendChild(txt);
+    } else if (overall === 'no_night') {
+        banner.className = 'alert alert-warning d-flex align-items-center gap-2 mb-3';
+        const icon = document.createElement('i');
+        icon.className = 'bi bi-moon-stars flex-shrink-0';
+        icon.setAttribute('aria-hidden', 'true');
+        const txt = document.createElement('span');
+        txt.textContent = tSkyTonightCompat('target_debug_no_night');
+        banner.appendChild(icon);
+        banner.appendChild(txt);
+    } else if (overall === 'no_coordinates') {
+        banner.className = 'alert alert-secondary d-flex align-items-center gap-2 mb-3';
+        const icon = document.createElement('i');
+        icon.className = 'bi bi-crosshair flex-shrink-0';
+        icon.setAttribute('aria-hidden', 'true');
+        const txt = document.createElement('span');
+        txt.textContent = tSkyTonightCompat('target_debug_no_coordinates');
+        banner.appendChild(icon);
+        banner.appendChild(txt);
+    } else {
+        banner.className = 'alert alert-danger d-flex align-items-center gap-2 mb-3';
+        const icon = document.createElement('i');
+        icon.className = 'bi bi-funnel-fill flex-shrink-0';
+        icon.setAttribute('aria-hidden', 'true');
+        const txt = document.createElement('span');
+        txt.textContent = tSkyTonightCompat('target_debug_filtered');
+        banner.appendChild(icon);
+        banner.appendChild(txt);
+    }
+    container.appendChild(banner);
+}
+
+function _renderDebugObjectCard(container, target) {
+    const card = document.createElement('div');
+    card.className = 'card mb-3';
+
+    const header = document.createElement('div');
+    header.className = 'card-header';
+    const title = document.createElement('h6');
+    title.className = 'mb-0';
+    const hIcon = document.createElement('i');
+    hIcon.className = 'bi bi-stars me-1';
+    hIcon.setAttribute('aria-hidden', 'true');
+    title.appendChild(hIcon);
+    title.appendChild(document.createTextNode(tSkyTonightCompat('target_debug_object_card_title')));
+    header.appendChild(title);
+
+    const body = document.createElement('div');
+    body.className = 'card-body py-2';
+
+    const rows = [
+        [tSkyTonightCompat('table_name'), target.preferred_name],
+        [tSkyTonightCompat('table_type'), target.object_type],
+        [tSkyTonightCompat('table_constellation') || 'Constellation', target.constellation],
+        [tSkyTonightCompat('table_mag'), target.magnitude != null ? target.magnitude : '—'],
+        [tSkyTonightCompat('table_size'), target.size_arcmin != null ? `${target.size_arcmin} arcmin` : '—'],
+    ];
+
+    if (target.catalogue_names && Object.keys(target.catalogue_names).length > 0) {
+        const names = Object.entries(target.catalogue_names).map(([k, v]) => `${k}: ${v}`).join(' · ');
+        rows.push([tSkyTonightCompat('catalogue_names'), names]);
+    }
+
+    const dl = document.createElement('dl');
+    dl.className = 'row mb-0 small';
+    rows.forEach(([label, value]) => {
+        const dt = document.createElement('dt');
+        dt.className = 'col-5 text-muted fw-normal';
+        dt.textContent = label;
+        const dd = document.createElement('dd');
+        dd.className = 'col-7 mb-1';
+        dd.textContent = value ?? '—';
+        dl.appendChild(dt);
+        dl.appendChild(dd);
+    });
+    body.appendChild(dl);
+
+    card.appendChild(header);
+    card.appendChild(body);
+    container.appendChild(card);
+}
+
+function _renderDebugNightCard(container, nightWindow, moon, tz) {
+    const card = document.createElement('div');
+    card.className = 'card mb-3';
+
+    const header = document.createElement('div');
+    header.className = 'card-header';
+    const title = document.createElement('h6');
+    title.className = 'mb-0';
+    const hIcon = document.createElement('i');
+    hIcon.className = 'bi bi-moon me-1';
+    hIcon.setAttribute('aria-hidden', 'true');
+    title.appendChild(hIcon);
+    title.appendChild(document.createTextNode(tSkyTonightCompat('target_debug_night_card_title')));
+    header.appendChild(title);
+
+    const body = document.createElement('div');
+    body.className = 'card-body py-2';
+
+    const tzFmt = new Intl.DateTimeFormat([], { hour: '2-digit', minute: '2-digit', timeZone: tz || 'UTC', hour12: false });
+    const fmtIso = (iso) => {
+        try { return tzFmt.format(new Date(iso)); } catch { return iso || '—'; }
+    };
+
+    const rows = [];
+    if (nightWindow.available) {
+        rows.push([tSkyTonightCompat('altitude_time_night_window'), `${fmtIso(nightWindow.night_start)} – ${fmtIso(nightWindow.night_end)}`]);
+        rows.push([tSkyTonightCompat('target_debug_night_hours'), nightWindow.night_hours != null ? `${nightWindow.night_hours.toFixed(1)} h` : '—']);
+    }
+    if (moon) {
+        rows.push([tSkyTonightCompat('target_debug_moon_phase'), `${moon.phase_pct}%`]);
+    }
+
+    const dl = document.createElement('dl');
+    dl.className = 'row mb-0 small';
+    rows.forEach(([label, value]) => {
+        const dt = document.createElement('dt');
+        dt.className = 'col-6 text-muted fw-normal';
+        dt.textContent = label;
+        const dd = document.createElement('dd');
+        dd.className = 'col-6 mb-1';
+        dd.textContent = value ?? '—';
+        dl.appendChild(dt);
+        dl.appendChild(dd);
+    });
+    body.appendChild(dl);
+
+    card.appendChild(header);
+    card.appendChild(body);
+    container.appendChild(card);
+}
+
+function _renderDebugChecksCard(container, checks, constraints) {
+    const card = document.createElement('div');
+    card.className = 'card mb-3';
+
+    const header = document.createElement('div');
+    header.className = 'card-header';
+    const title = document.createElement('h6');
+    title.className = 'mb-0';
+    const hIcon = document.createElement('i');
+    hIcon.className = 'bi bi-funnel me-1';
+    hIcon.setAttribute('aria-hidden', 'true');
+    title.appendChild(hIcon);
+    title.appendChild(document.createTextNode(tSkyTonightCompat('target_debug_constraints_title')));
+    header.appendChild(title);
+
+    const body = document.createElement('div');
+    body.className = 'card-body py-0';
+
+    const table = document.createElement('table');
+    table.className = 'table table-sm table-borderless mb-0 small align-middle';
+
+    const tbody = document.createElement('tbody');
+
+    const checkLabelKeys = {
+        'size_min':             'target_debug_check_size_min',
+        'size_max':             'target_debug_check_size_max',
+        'moon_separation':      'target_debug_check_moon_separation',
+        'max_altitude':         'target_debug_check_max_altitude',
+        'observable_fraction':  'target_debug_check_observable_fraction',
+    };
+
+    const horizonActive = constraints && constraints.horizon_active;
+    const checkSettingKeys = {
+        'size_min':            ['settings.size_min'],
+        'size_max':            ['settings.size_max'],
+        'moon_separation':     ['settings.moon_sep'],
+        'max_altitude':        ['settings.altitude_min'],
+        'observable_fraction': horizonActive
+            ? ['settings.time_threshold', 'settings.horizon_profile']
+            : ['settings.time_threshold'],
+    };
+
+    checks.forEach(check => {
+        if (check.name === 'night_window' || check.name === 'coordinates' || check.name === 'altaz_computation') return;
+
+        const isNa = check.note && !check.passed && check.note.includes('filter skipped');
+        const tr = document.createElement('tr');
+
+        // Status badge
+        const tdStatus = document.createElement('td');
+        tdStatus.style.width = '70px';
+        const badge = document.createElement('span');
+        if (isNa) {
+            badge.className = 'badge bg-secondary';
+            badge.textContent = tSkyTonightCompat('target_debug_check_na');
+        } else if (check.passed) {
+            badge.className = 'badge bg-success';
+            badge.textContent = tSkyTonightCompat('target_debug_check_pass');
+        } else {
+            badge.className = 'badge bg-danger';
+            badge.textContent = tSkyTonightCompat('target_debug_check_fail');
+        }
+        tdStatus.appendChild(badge);
+
+        // Constraint name
+        const tdName = document.createElement('td');
+        const labelKey = checkLabelKeys[check.name] || check.name;
+        tdName.textContent = tSkyTonightCompat(labelKey) || labelKey;
+
+        // Value vs threshold
+        const tdValue = document.createElement('td');
+        tdValue.className = 'text-end text-muted';
+
+        if (check.name === 'observable_fraction') {
+            const obsH = check.observable_hours != null ? check.observable_hours.toFixed(1) : '?';
+            const frac = check.value != null ? (check.value * 100).toFixed(1) : '?';
+            const fracThresh = check.threshold != null ? (check.threshold * 100).toFixed(0) : '?';
+            const minHSuffix = check.min_observable_hours != null
+                ? ` or ${check.min_observable_hours.toFixed(1)}h`
+                : '';
+            tdValue.textContent = `${frac}% (${obsH}h) — min ${fracThresh}%${minHSuffix}`;
+        } else if (check.name === 'moon_separation') {
+            const val = check.value != null ? `${check.value}°` : '?';
+            const thr = check.threshold != null ? `${check.threshold}°` : '?';
+            const moonPct = check.moon_phase_pct != null ? ` (moon ${check.moon_phase_pct}%)` : '';
+            tdValue.textContent = `${val} — min ${thr}${moonPct}`;
+        } else {
+            const val = check.value != null ? `${check.value}${check.unit || ''}` : (check.note || '—');
+            const thr = check.threshold != null ? ` — min ${check.threshold}${check.unit || ''}` : '';
+            tdValue.textContent = `${val}${thr}`;
+        }
+
+        tr.appendChild(tdStatus);
+        tr.appendChild(tdName);
+        tr.appendChild(tdValue);
+        tbody.appendChild(tr);
+
+        if (!check.passed && !isNa && checkSettingKeys[check.name]) {
+            const hintTr = document.createElement('tr');
+            const hintTd = document.createElement('td');
+            hintTd.setAttribute('colspan', '3');
+            hintTd.className = 'pt-0 pb-2';
+            const small = document.createElement('small');
+            small.className = 'text-muted fst-italic';
+            const icon = document.createElement('i');
+            icon.className = 'bi bi-gear me-1';
+            icon.setAttribute('aria-hidden', 'true');
+            const settingLabels = checkSettingKeys[check.name].map(k =>
+                (i18n.t(k) || k).replace(/[:\s]+$/, '').trim()
+            ).join(', ');
+            small.appendChild(icon);
+            small.appendChild(document.createTextNode(
+                `${tSkyTonightCompat('target_debug_adjust_hint') || 'Adjust:'} ${settingLabels}`
+            ));
+            hintTd.appendChild(small);
+            hintTr.appendChild(hintTd);
+            tbody.appendChild(hintTr);
+        }
+    });
+
+    table.appendChild(tbody);
+    body.appendChild(table);
+    card.appendChild(header);
+    card.appendChild(body);
+    container.appendChild(card);
+}
+
+function _renderDebugAltimeChart(container, alttimeData, target) {
+    const card = document.createElement('div');
+    card.className = 'card mb-3';
+
+    const cardHeader = document.createElement('div');
+    cardHeader.className = 'card-header';
+    const cardTitle = document.createElement('h6');
+    cardTitle.className = 'mb-0';
+    const hIcon = document.createElement('i');
+    hIcon.className = 'bi bi-graph-up-arrow me-1 text-primary';
+    hIcon.setAttribute('aria-hidden', 'true');
+    cardTitle.appendChild(hIcon);
+    const titleText = target && target.preferred_name
+        ? `${tSkyTonightCompat('target_debug_altitude_chart_title')} — ${target.preferred_name}`
+        : tSkyTonightCompat('target_debug_altitude_chart_title');
+    cardTitle.appendChild(document.createTextNode(titleText));
+    cardHeader.appendChild(cardTitle);
+
+    const cardBody = document.createElement('div');
+    cardBody.className = 'card-body';
+    const canvas = document.createElement('canvas');
+    canvas.id = 'skyt-debug-alttime-canvas';
+    canvas.style.width = '100%';
+    canvas.style.height = '280px';
+    cardBody.appendChild(canvas);
+
+    // Footer with legend
+    const cardFooter = document.createElement('div');
+    cardFooter.className = 'card-footer text-muted small';
+    const footerRow = document.createElement('div');
+    footerRow.className = 'row align-items-center';
+
+    const rootStyle = getComputedStyle(document.documentElement);
+    const theme = (document.documentElement.getAttribute('data-theme') || '').toLowerCase();
+    const bsTheme = (document.documentElement.getAttribute('data-bs-theme') || '').toLowerCase();
+    const isDark = theme === 'dark' || theme === 'red' || bsTheme === 'dark';
+    const primaryRgb = rootStyle.getPropertyValue('--bs-primary-rgb').trim() || '13, 110, 253';
+    const altColor = `rgba(${primaryRgb}, 0.92)`;
+    const zoneColor = 'rgba(20, 110, 40, 0.8)';
+
+    [{color: altColor, label: tSkyTonightCompat('altitude_time_altitude_label') || 'Altitude (°)'},
+     {color: zoneColor, label: tSkyTonightCompat('altitude_time_observable_zone')}].forEach(item => {
+        const col = document.createElement('div');
+        col.className = 'col-auto';
+        const badge = document.createElement('span');
+        badge.className = 'badge';
+        badge.style.backgroundColor = item.color;
+        badge.textContent = item.label;
+        col.appendChild(badge);
+        footerRow.appendChild(col);
+    });
+
+    // Night window text on right
+    if (alttimeData.night_start && alttimeData.night_end) {
+        const obsTz = alttimeData.timezone || 'UTC';
+        const tzFmt = new Intl.DateTimeFormat([], { hour: '2-digit', minute: '2-digit', timeZone: obsTz, hour12: false });
+        const nightStartFmt = tzFmt.format(new Date(alttimeData.night_start));
+        const nightEndFmt = tzFmt.format(new Date(alttimeData.night_end));
+        const col = document.createElement('div');
+        col.className = 'col-auto ms-auto text-end';
+        const span = document.createElement('span');
+        span.textContent = `${tSkyTonightCompat('altitude_time_night_window')}: ${nightStartFmt} – ${nightEndFmt}`;
+        col.appendChild(span);
+        footerRow.appendChild(col);
+    }
+    cardFooter.appendChild(footerRow);
+
+    card.appendChild(cardHeader);
+    card.appendChild(cardBody);
+    card.appendChild(cardFooter);
+    container.appendChild(card);
+
+    // Build chart data
+    const obsTz = alttimeData.timezone || 'UTC';
+    const tzFmt2 = new Intl.DateTimeFormat([], { hour: '2-digit', minute: '2-digit', timeZone: obsTz, hour12: false });
+    const labels = (alttimeData.times_utc || []).map(t => tzFmt2.format(new Date(t + 'Z')));
+    const altitudes = alttimeData.altitudes || [];
+    const altMin = alttimeData.altitude_constraint_min ?? 30;
+    const altMax = alttimeData.altitude_constraint_max ?? 80;
+    const yMax = altMax >= 85 ? altMax + 5 : 90;
+
+    const textColor = rootStyle.getPropertyValue('--text-color').trim() || '#1f2937';
+    const mutedColor = rootStyle.getPropertyValue('--text-grey').trim() || '#4b4b4b';
+    const gridColor = isDark ? 'rgba(255,255,255,0.16)' : 'rgba(15,23,42,0.12)';
+
+    const observableBgPlugin = {
+        id: 'debug_alttime_bg',
+        beforeDatasetsDraw(chart) {
+            const { ctx, chartArea, scales } = chart;
+            if (!chartArea) return;
+            const yScale = scales.y;
+            const { left, right, top, bottom } = chartArea;
+            const yMinPx = Math.min(bottom, Math.max(top, yScale.getPixelForValue(altMin)));
+            const yMaxPx = Math.min(bottom, Math.max(top, yScale.getPixelForValue(altMax)));
+            ctx.save();
+            ctx.fillStyle = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)';
+            if (yMaxPx > top) ctx.fillRect(left, top, right - left, yMaxPx - top);
+            if (yMinPx < bottom) ctx.fillRect(left, yMinPx, right - left, bottom - yMinPx);
+            ctx.restore();
+        },
+    };
+
+    if (_debugAlttimeChart) { _debugAlttimeChart.destroy(); _debugAlttimeChart = null; }
+
+    _debugAlttimeChart = new Chart(canvas, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: tSkyTonightCompat('altitude_time_altitude_label') || 'Altitude (°)',
+                    data: altitudes,
+                    borderColor: altColor,
+                    backgroundColor: `rgba(${primaryRgb}, 0.15)`,
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    fill: true,
+                    tension: 0.3,
+                },
+                {
+                    label: tSkyTonightCompat('altitude_time_observable_zone'),
+                    data: altitudes.map(() => altMax),
+                    borderColor: zoneColor,
+                    borderWidth: 1.5,
+                    borderDash: [4, 4],
+                    pointRadius: 0,
+                    fill: false,
+                },
+                {
+                    label: '_floor',
+                    data: altitudes.map(() => altMin),
+                    borderColor: zoneColor,
+                    borderWidth: 1.5,
+                    borderDash: [4, 4],
+                    pointRadius: 0,
+                    fill: false,
+                },
+            ],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => ctx.dataset.label && ctx.dataset.label !== '_floor'
+                            ? `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}°`
+                            : null,
+                    },
+                    filter: (item) => item.dataset.label !== '_floor',
+                },
+            },
+            scales: {
+                x: {
+                    ticks: { maxTicksLimit: 12, color: mutedColor },
+                    grid: { color: gridColor },
+                    title: { display: true, text: tSkyTonightCompat('altitude_time_x_axis') || 'Time', color: textColor },
+                },
+                y: {
+                    min: 0,
+                    max: yMax,
+                    ticks: { stepSize: 15, color: mutedColor },
+                    grid: { color: gridColor },
+                    title: { display: true, text: tSkyTonightCompat('altitude_time_y_axis') || 'Altitude (°)', color: textColor },
+                },
+            },
+        },
+        plugins: [observableBgPlugin],
+    });
 }
 
 async function _showSkyTonightDataSection(sectionKey, container) {
