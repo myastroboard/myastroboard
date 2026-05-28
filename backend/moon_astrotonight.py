@@ -80,42 +80,44 @@ class AstroTonightService:
 
     def best_windows_all_modes(self) -> dict:
         """
-        Compute best windows for all three modes in a single pass through the night.
-        Altitudes are calculated once per time-step instead of once per mode,
-        reducing Astropy frame transforms by ~66%.
+        Compute best windows for all three modes in a single vectorized Astropy pass.
+        All altitudes for the full night grid are computed in one batch call instead
+        of one AltAz frame per time-step, reducing frame constructions from O(N) to 1.
         Returns a dict keyed by mode: {'strict': BestWindow, 'practical': BestWindow, 'illumination': BestWindow}
         """
         now = datetime.datetime.now(self.timezone)
         today = now.date()
 
+        step_minutes = 5
+        step = datetime.timedelta(minutes=step_minutes)
+
         # Night interval: 18:00 → 06:00 local
-        start = datetime.datetime.combine(
-            today,
-            datetime.time(18, 0),
-            tzinfo=self.timezone
-        )
-        end = datetime.datetime.combine(
-            today + datetime.timedelta(days=1),
-            datetime.time(6, 0),
-            tzinfo=self.timezone
-        )
+        start = datetime.datetime.combine(today, datetime.time(18, 0), tzinfo=self.timezone)
+        end   = datetime.datetime.combine(today + datetime.timedelta(days=1), datetime.time(6, 0), tzinfo=self.timezone)
 
         # Illumination computed once per night (used by 'illumination' mode)
         illumination = self._moon_illumination(start)
 
-        step_minutes = 5
-        step = datetime.timedelta(minutes=step_minutes)
+        # Build full time grid upfront
+        times_local = []
+        dt = start
+        while dt <= end:
+            times_local.append(dt)
+            dt += step
+
+        # Single vectorized Astropy pass: one AltAz frame for all N time steps
+        times_utc = [t.astimezone(datetime.timezone.utc) for t in times_local]
+        t_array   = Time(times_utc)
+        frame     = AltAz(obstime=t_array, location=self.location)
+        sun_alts  = cast(Any, get_sun(t_array).transform_to(frame).alt).to_value(u.deg)
+        moon_alts = cast(Any, get_body("moon", t_array).transform_to(frame).alt).to_value(u.deg)
 
         modes = ["strict", "practical", "illumination"]
 
-        # Per-mode tracking state
         best_start    = {m: None for m in modes}
         best_duration = {m: datetime.timedelta(0) for m in modes}
         current_start = {m: None for m in modes}
 
-        dt = start
-
-        # Mode condition lambdas — evaluated once per step with shared altitudes
         def is_ok(mode, sun_alt, moon_alt):
             if sun_alt >= -18:
                 return False
@@ -123,15 +125,11 @@ class AstroTonightService:
                 return moon_alt < 0
             if mode == "practical":
                 return moon_alt < 5
-            # illumination
             return illumination < 15
 
-        while dt <= end:
-            sun_alt, moon_alt = self._altitudes(dt)
-
-            if sun_alt is None or moon_alt is None:
-                dt += step
-                continue
+        for i, dt in enumerate(times_local):
+            sun_alt  = float(sun_alts[i])
+            moon_alt = float(moon_alts[i])
 
             for m in modes:
                 ok = is_ok(m, sun_alt, moon_alt)
@@ -139,22 +137,22 @@ class AstroTonightService:
                     if current_start[m] is None:
                         current_start[m] = dt
                 else:
-                    if current_start[m] is not None:
-                        duration = dt - current_start[m]
+                    cs = current_start[m]
+                    if cs is not None:
+                        duration = dt - cs
                         if duration > best_duration[m]:
                             best_duration[m] = duration
-                            best_start[m] = current_start[m]
+                            best_start[m]    = cs
                         current_start[m] = None
-
-            dt += step
 
         # Close any still-open windows at end of scan
         for m in modes:
-            if current_start[m] is not None:
-                duration = end - current_start[m]
+            cs = current_start[m]
+            if cs is not None:
+                duration = end - cs
                 if duration > best_duration[m]:
                     best_duration[m] = duration
-                    best_start[m] = current_start[m]
+                    best_start[m]    = cs
 
         # Build result dict
         result = {}
@@ -168,10 +166,13 @@ class AstroTonightService:
                     score=0,
                 )
             else:
-                b_end = best_start[m] + best_duration[m]
+                bs = best_start[m]
+                if bs is None:
+                    continue
+                b_end = bs + best_duration[m]
                 hours = best_duration[m].total_seconds() / 3600
                 result[m] = BestWindow(
-                    start=best_start[m].strftime("%Y-%m-%d %H:%M"),
+                    start=bs.strftime("%Y-%m-%d %H:%M"),
                     end=b_end.strftime("%Y-%m-%d %H:%M"),
                     duration_hours=round(hours, 2),
                     moon_condition=m,
@@ -179,45 +180,6 @@ class AstroTonightService:
                 )
 
         return result
-
-    # ============================================================
-    # Compute altitudes (Sun + Moon)
-    # ============================================================
-
-    def _altitudes(self, dt_local) -> tuple[Optional[float], Optional[float]]:
-
-        # Local → UTC
-        utc_dt = dt_local.astimezone(datetime.timezone.utc)
-
-        # Astropy Time
-        t = Time(utc_dt)
-
-        # AltAz frame
-        frame = AltAz(obstime=t, location=self.location)
-
-        # Sun altitude
-        sun_coord = get_sun(t)
-        moon_coord = get_body("moon", t)
-
-        sun_alt = self._coord_altitude_deg(sun_coord, frame)
-        moon_alt = self._coord_altitude_deg(moon_coord, frame)
-
-        return sun_alt, moon_alt
-
-    def _coord_altitude_deg(self, coord: Any, frame: AltAz) -> Optional[float]:
-        if coord is None:
-            return None
-
-        transformed = coord.transform_to(frame)
-        alt = getattr(transformed, "alt", None)
-        if alt is None:
-            return None
-
-        value = alt.to_value(u.deg) if hasattr(alt, "to_value") else None
-        if value is None:
-            return None
-
-        return float(cast(Any, value))
 
     # ============================================================
     # Moon illumination %

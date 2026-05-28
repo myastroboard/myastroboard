@@ -27,10 +27,6 @@ This document describes features that could potentially be integrated into MyAst
 
 ## Upgrade Features
 
-### Various
-- Manage old cache files myastroboard.log.1, myastroboard.log.2, ...
-- Improve moon_report calculation using vectorized Astropy (batch time grid) to compute all altitudes at once
-
 ### Shared equipments
 **Possibility to share equipments between users**, for example family, or astronomy club.
 - Equipements could be shared between users

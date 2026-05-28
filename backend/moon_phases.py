@@ -199,11 +199,9 @@ class MoonService:
         def _is_dark_moonless(dt_local: datetime.datetime) -> Optional[bool]:
             utc = dt_local.astimezone(datetime.timezone.utc)
             t_astropy = AstroTime(utc)
-
             frame = AltAz(obstime=t_astropy, location=self.location)
             sun_alt = self._coord_altitude_deg(get_sun(t_astropy), frame)
             moon_alt = self._coord_altitude_deg(get_body("moon", t_astropy), frame)
-
             if sun_alt is None or moon_alt is None:
                 return None
             return sun_alt < -18 and moon_alt < 0
@@ -211,8 +209,7 @@ class MoonService:
         def _refine_first_true(start_dt: datetime.datetime, end_dt: datetime.datetime) -> datetime.datetime:
             dt_local = start_dt
             while dt_local <= end_dt:
-                is_dark = _is_dark_moonless(dt_local)
-                if is_dark is True:
+                if _is_dark_moonless(dt_local) is True:
                     return dt_local
                 dt_local += datetime.timedelta(minutes=fine_step_minutes)
             return end_dt
@@ -220,44 +217,41 @@ class MoonService:
         def _refine_first_false(start_dt: datetime.datetime, end_dt: datetime.datetime) -> datetime.datetime:
             dt_local = start_dt
             while dt_local <= end_dt:
-                is_dark = _is_dark_moonless(dt_local)
-                if is_dark is False:
+                if _is_dark_moonless(dt_local) is False:
                     return dt_local
                 dt_local += datetime.timedelta(minutes=fine_step_minutes)
             return end_dt
 
-        dt = start_local
+        # Build full coarse grid and compute all altitudes in one vectorized batch
+        n_coarse = int((max_days * 24 * 60) / coarse_step_minutes)
+        coarse_times = [
+            start_local + datetime.timedelta(minutes=i * coarse_step_minutes)
+            for i in range(n_coarse)
+        ]
+        times_utc = [dt.astimezone(datetime.timezone.utc) for dt in coarse_times]
+        t_array   = AstroTime(times_utc)
+        frame     = AltAz(obstime=t_array, location=self.location)
+        sun_alts  = cast(Any, get_sun(t_array).transform_to(frame).alt).to_value(u.deg)
+        moon_alts = cast(Any, get_body("moon", t_array).transform_to(frame).alt).to_value(u.deg)
+        coarse_dark = (sun_alts < -18) & (moon_alts < 0)
+
         found_start: Optional[datetime.datetime] = None
-        max_steps = int((24 * 60 / coarse_step_minutes) * max_days)
 
-        # Coarse scan keeps Astropy calls low, then refine transition boundaries.
-        for _ in range(max_steps):
-            is_dark = _is_dark_moonless(dt)
-
-            if is_dark is None:
-                dt += datetime.timedelta(minutes=coarse_step_minutes)
-                continue
+        for i, dt in enumerate(coarse_times):
+            is_dark = bool(coarse_dark[i])
 
             if is_dark:
                 if found_start is None:
-                    coarse_window_start = max(
-                        start_local,
-                        dt - datetime.timedelta(minutes=coarse_step_minutes)
-                    )
-                    found_start = _refine_first_true(coarse_window_start, dt)
+                    window_lo   = max(start_local, dt - datetime.timedelta(minutes=coarse_step_minutes))
+                    found_start = _refine_first_true(window_lo, dt)
             else:
                 if found_start is not None:
-                    coarse_window_start = max(
-                        found_start,
-                        dt - datetime.timedelta(minutes=coarse_step_minutes)
-                    )
-                    refined_end = _refine_first_false(coarse_window_start, dt)
+                    window_lo   = max(found_start, dt - datetime.timedelta(minutes=coarse_step_minutes))
+                    refined_end = _refine_first_false(window_lo, dt)
                     return (
                         self._fmt_time(found_start),
                         self._fmt_time(refined_end)
                     )
-
-            dt += datetime.timedelta(minutes=coarse_step_minutes)
 
         return ("Not found", "Not found")
 
