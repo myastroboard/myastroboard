@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import json
+import os
 import re
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 from logging_config import get_logger
 from skytonight_bodies import build_body_targets
@@ -16,9 +18,52 @@ from skytonight_targets import normalize_catalogue_name, normalize_object_name, 
 
 logger = get_logger(__name__)
 
+_CATALOGUES_DIR = os.path.join(os.path.dirname(__file__), 'catalogues')
 
 DEFAULT_CALDWELL_MAP: Dict[str, str] = {}
 IDENTIFIER_PATTERN = re.compile(r'\b(M\s*\d+|NGC\s*\d+|IC\s*\d+)\b', re.IGNORECASE)
+
+# ── Herschel 400 — Astronomical League program (NGC objects only) ─────────────
+# Source: https://www.astroleague.org/herschel-400-observing-program/
+_HERSCHEL400_NGC: frozenset = frozenset({
+     40,  129,  136,  157,  185,  188,  205,  225,  246,  247,
+    253,  278,  288,  300,  404,  436,  457,  524,  559,  584,
+    596,  598,  613,  615,  628,  636,  650,  651,  654,  659,
+    663,  720,  752,  772,  779,  869,  884,  891,  908,  936,
+   1003, 1023, 1027, 1055, 1084, 1245, 1300, 1342, 1444, 1502,
+   1513, 1528, 1545, 1647, 1664, 1788, 1817, 1857, 1907, 1931,
+   1961, 2022, 2024, 2126, 2129, 2158, 2169, 2185, 2186, 2194,
+   2215, 2232, 2244, 2245, 2251, 2261, 2266, 2281, 2286, 2304,
+   2311, 2324, 2335, 2343, 2353, 2354, 2355, 2360, 2362, 2371,
+   2372, 2392, 2395, 2403, 2419, 2420, 2421, 2422, 2423, 2438,
+   2440, 2479, 2489, 2506, 2509, 2527, 2539, 2548, 2571, 2613,
+   2627, 2655, 2681, 2683, 2742, 2768, 2775, 2782, 2787, 2811,
+   2841, 2859, 2903, 2950, 2964, 2974, 2976, 2985, 3034, 3077,
+   3079, 3115, 3147, 3166, 3169, 3184, 3193, 3198, 3227, 3242,
+   3245, 3277, 3294, 3310, 3344, 3377, 3379, 3384, 3395, 3412,
+   3414, 3432, 3489, 3504, 3521, 3593, 3607, 3608, 3610, 3613,
+   3619, 3621, 3626, 3628, 3631, 3640, 3655, 3665, 3675, 3686,
+   3705, 3726, 3729, 3810, 3813, 3877, 3893, 3898, 3938, 3941,
+   3945, 3949, 3953, 3962, 3982, 3992, 3998, 4026, 4027, 4030,
+   4036, 4038, 4039, 4041, 4051, 4085, 4088, 4102, 4111, 4143,
+   4147, 4150, 4151, 4157, 4179, 4203, 4214, 4216, 4245, 4251,
+   4258, 4261, 4273, 4274, 4278, 4281, 4293, 4294, 4298, 4302,
+   4303, 4314, 4346, 4350, 4361, 4365, 4371, 4378, 4380, 4387,
+   4388, 4394, 4395, 4414, 4419, 4429, 4435, 4436, 4438, 4442,
+   4448, 4449, 4450, 4460, 4473, 4477, 4478, 4485, 4490, 4494,
+   4526, 4527, 4531, 4536, 4546, 4550, 4559, 4564, 4565, 4570,
+   4596, 4618, 4631, 4636, 4643, 4654, 4656, 4660, 4665, 4666,
+   4689, 4697, 4698, 4699, 4710, 4725, 4747, 4753, 4754, 4762,
+   4772, 4781, 4800, 4845, 4856, 4866, 4900, 4958, 4995, 5005,
+   5033, 5054, 5195, 5248, 5273, 5322, 5363, 5364, 5371, 5377,
+   5389, 5395, 5422, 5448, 5473, 5474, 5557, 5566, 5576, 5631,
+   5638, 5645, 5676, 5689, 5694, 5746, 5775, 5806, 5813, 5831,
+   5838, 5846, 5854, 5866, 5907, 5965, 6015, 6118, 6207, 6217,
+   6229, 6503, 6543, 6654, 6742, 6946, 6951, 7000, 7008, 7009,
+   7044, 7062, 7086, 7128, 7139, 7142, 7160, 7209, 7217, 7243,
+   7296, 7331, 7380, 7448, 7479, 7510, 7606, 7619, 7626, 7662,
+   7686, 7723, 7727, 7789, 7790,
+})
 
 
 @dataclass(frozen=True)
@@ -200,6 +245,109 @@ def _merge_target(existing: SkyTonightTarget, incoming: SkyTonightTarget) -> Sky
     )
 
 
+def _load_json_catalogue(filename: str) -> Any:
+    """Load a catalogue JSON file from backend/catalogues/ and return its decoded content."""
+    filepath = os.path.join(_CATALOGUES_DIR, filename)
+    if not os.path.exists(filepath):
+        logger.warning(f'Catalogue file not found: {filepath}')
+        return None
+    try:
+        with open(filepath, encoding='utf-8') as f:
+            return json.load(f)
+    except Exception as e:
+        logger.warning(f'Failed to load catalogue file {filename}: {e}')
+        return None
+
+
+def _build_cross_ref_map() -> Dict[str, Dict[str, str]]:
+    """Build a unified cross-reference map: normalize_object_name(ngc_name) → {catalogue: name}.
+
+    Merges Herschel 400 (static), Pensack 500 (JSON) and LBN (JSON cross-refs).
+    The result is passed to _apply_cross_refs() after the main PyOngc build.
+    """
+    cross_refs: Dict[str, Dict[str, str]] = {}
+
+    # ── Herschel 400 ─────────────────────────────────────────────────────────
+    for ngc_num in _HERSCHEL400_NGC:
+        ngc_name = f'NGC {ngc_num}'
+        key = normalize_object_name(ngc_name)
+        cross_refs.setdefault(key, {})['Herschel400'] = ngc_name
+
+    # ── Pensack 500 ───────────────────────────────────────────────────────────
+    pensack_data = _load_json_catalogue('pensack500.json')
+    if isinstance(pensack_data, list):
+        for raw_name in pensack_data:
+            if not isinstance(raw_name, str) or not raw_name.strip():
+                continue
+            key = normalize_object_name(raw_name.strip())
+            if key:
+                cross_refs.setdefault(key, {})['Pensack500'] = raw_name.strip()
+    else:
+        logger.warning('pensack500.json missing or invalid — Pensack 500 catalogue not applied')
+
+    # ── LBN cross-refs ────────────────────────────────────────────────────────
+    lbn_data = _load_json_catalogue('lbn.json')
+    if isinstance(lbn_data, dict):
+        for raw_ngc_name, lbn_name in lbn_data.items():
+            if not raw_ngc_name or not lbn_name:
+                continue
+            key = normalize_object_name(str(raw_ngc_name).strip())
+            if key:
+                cross_refs.setdefault(key, {})['LBN'] = str(lbn_name).strip()
+    else:
+        logger.warning('lbn.json missing or invalid — LBN cross-references not applied')
+
+    total_keys = len(cross_refs)
+    catalogues_applied = sorted({cat for refs in cross_refs.values() for cat in refs})
+    logger.info(f'Cross-ref map built: {total_keys} NGC/IC keys, catalogues: {catalogues_applied}')
+    return cross_refs
+
+
+def _apply_cross_refs(
+    targets: List[SkyTonightTarget],
+    cross_refs: Dict[str, Dict[str, str]],
+) -> List[SkyTonightTarget]:
+    """Inject cross-catalogue membership (Herschel400, Pensack500, LBN) into existing targets."""
+    if not cross_refs:
+        return targets
+
+    enriched = 0
+    result: List[SkyTonightTarget] = []
+    for target in targets:
+        # Lookup by all NGC/IC names this target carries
+        extra: Dict[str, str] = {}
+        for cat_key in ('OpenNGC', 'OpenIC'):
+            val = target.catalogue_names.get(cat_key, '')
+            if val:
+                extra.update(cross_refs.get(normalize_object_name(val), {}))
+
+        if extra:
+            new_catalogue_names = {**target.catalogue_names, **extra}
+            new_source_catalogues = sorted({*target.source_catalogues, *extra.keys()})
+            new_aliases = sorted({*target.aliases, *extra.values()})
+            target = SkyTonightTarget(
+                target_id=target.target_id,
+                category=target.category,
+                object_type=target.object_type,
+                preferred_name=target.preferred_name,
+                catalogue_names=new_catalogue_names,
+                aliases=new_aliases,
+                constellation=target.constellation,
+                magnitude=target.magnitude,
+                size_arcmin=target.size_arcmin,
+                coordinates=target.coordinates,
+                source_catalogues=new_source_catalogues,
+                translation_key=target.translation_key,
+                metadata=target.metadata,
+            )
+            enriched += 1
+
+        result.append(target)
+
+    logger.info(f'Cross-ref injection: {enriched}/{len(result)} targets enriched')
+    return result
+
+
 def build_targets_from_rows(rows: Iterable[PyOngcRow], caldwell_map: Optional[Dict[str, str]] = None) -> List[SkyTonightTarget]:
     """Normalize PyOngc rows into deduplicated SkyTonight targets."""
     targets_by_key: Dict[Tuple[str, str], SkyTonightTarget] = {}
@@ -304,13 +452,16 @@ def build_and_save_default_dataset(
     """Build the first SkyTonight dataset and persist it to the configured dataset file."""
     rows, source_name = _load_deep_sky_rows()
     deep_sky_targets = build_targets_from_rows(rows, caldwell_map=caldwell_map)
+    cross_refs = _build_cross_ref_map()
+    deep_sky_targets = _apply_cross_refs(deep_sky_targets, cross_refs)
     body_targets = build_body_targets()
     comet_targets = build_comet_targets(source_mode=comet_source_mode)
     all_targets = [*deep_sky_targets, *body_targets, *comet_targets]
 
     comet_sources = sorted({str(target.metadata.get('source') or '') for target in comet_targets if isinstance(target.metadata, dict) and target.metadata.get('source')})
     body_sources = sorted({str(target.metadata.get('source') or '') for target in body_targets if isinstance(target.metadata, dict) and target.metadata.get('source')})
-    source_values = [source_name, *body_sources, *comet_sources]
+    cross_ref_sources = sorted(cat for cat in ('Herschel400', 'LBN', 'Pensack500') if any(cat in t.source_catalogues for t in deep_sky_targets))
+    source_values = [source_name, *body_sources, *comet_sources, *cross_ref_sources]
     deduplicated_sources = [value for index, value in enumerate(source_values) if value and value not in source_values[:index]]
 
     metadata = {

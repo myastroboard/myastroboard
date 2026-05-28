@@ -2098,6 +2098,7 @@ function _skytApplyFilter(catalogue, type) {
     const fotoValueInput     = document.getElementById(`foto-value-${catalogue}-${type}`);
     const constellationSelect = document.getElementById(`constellation-filter-${catalogue}-${type}`);
     const typeSelect         = document.getElementById(`type-filter-${catalogue}-${type}`);
+    const catalogueSelect    = document.getElementById(`catalogue-filter-${catalogue}-${type}`);
 
     const filterRaw    = filterInput        ? filterInput.value        : '';
     const filterText   = filterRaw.trim().toLowerCase();
@@ -2105,13 +2106,14 @@ function _skytApplyFilter(catalogue, type) {
     const fotoThreshold = fotoValueInput     ? parseFloat(sanitizeFotoFilterValue(fotoValueInput.value)) / 100 : 0.8;
     const constellation = constellationSelect ? constellationSelect.value : '';
     const typeVal       = typeSelect          ? typeSelect.value          : '';
+    const catalogueVal  = catalogueSelect     ? catalogueSelect.value    : '';
 
     // Persist state so it survives pagination re-renders.
     // filterRaw preserves the original un-trimmed value so it can be restored
     // exactly as typed if the user revisits the section.
-    _skytFilterState[type] = { filterText, filterRaw, fotoEnabled, fotoThreshold, constellation, typeVal };
+    _skytFilterState[type] = { filterText, filterRaw, fotoEnabled, fotoThreshold, constellation, typeVal, catalogueVal };
 
-    const hasFilter = filterText || fotoEnabled || constellation || typeVal;
+    const hasFilter = filterText || fotoEnabled || constellation || typeVal || catalogueVal;
     const fullData  = _skytSectionCache[type][type];
     if (!Array.isArray(fullData)) return;
 
@@ -2141,6 +2143,7 @@ function _skytApplyFilter(catalogue, type) {
         }
         if (constellation && (row.constellation || '') !== constellation) return false;
         if (typeVal       && (row.type          || '') !== typeVal)        return false;
+        if (catalogueVal  && !(row.catalogue_names && row.catalogue_names[catalogueVal])) return false;
         return true;
     });
 
@@ -2351,6 +2354,32 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
             </div>`;
         }
 
+        // Add catalogue filter for curated sub-lists present in this report
+        const _catFilterOptions = [
+            { key: 'Caldwell',    label: 'Caldwell' },
+            { key: 'Herschel400', label: 'Herschel 400' },
+            { key: 'OpenIC',      label: 'IC' },
+            { key: 'LBN',         label: 'LBN' },
+            { key: 'Messier',     label: 'Messier' },
+            { key: 'OpenNGC',     label: 'NGC' },
+            { key: 'Pensack500',  label: 'Pensack 500' },
+        ];
+        const _availableCatFilters = _catFilterOptions.filter(opt =>
+            report.some(r => r.catalogue_names && r.catalogue_names[opt.key])
+        );
+        if (_availableCatFilters.length > 0) {
+            html += `
+            <div class="col-12">
+                <label class="visually-hidden" for="catalogue-filter-${eCat}-${eType}">${tSkyTonightCompat('search_catalogue')}</label>
+                <select id="catalogue-filter-${eCat}-${eType}" class="form-select filter-select">
+                    <option value="">${tSkyTonightCompat('search_all_catalogues')}</option>`;
+            _availableCatFilters.forEach(opt => {
+                html += `<option value="${escapeHtml(opt.key)}">${escapeHtml(opt.label)}</option>`;
+            });
+            html += `</select>
+            </div>`;
+        }
+
         html += `
         </div>`; // closes filter row div
         html += `</div>`; // closes skyt-ctrl div
@@ -2382,7 +2411,8 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
     _pageRows.forEach((row, _pageIdx) => {
         const idx = _startIdx + _pageIdx; // absolute row index across all pages
         const fotoValue = row['foto'] || row['fraction of time observable'] || 0;
-        html += `<tr data-foto="${escapeHtml(String(fotoValue))}" data-constellation="${escapeHtml(row.constellation || '')}" data-type="${escapeHtml(row.type || '')}">`;  
+        const _catKeys = row.catalogue_names ? Object.keys(row.catalogue_names).join(',') : '';
+        html += `<tr data-foto="${escapeHtml(String(fotoValue))}" data-constellation="${escapeHtml(row.constellation || '')}" data-type="${escapeHtml(row.type || '')}" data-catalogues="${escapeHtml(_catKeys)}">`;
         
         columns.forEach(col => {
             if (col.key === 'more') {
@@ -2569,6 +2599,8 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
                 if (fotoValueInput)      fotoValueInput.value       = String(Math.round(_savedFilter.fotoThreshold * 100));
                 if (constellationSelect) constellationSelect.value  = _savedFilter.constellation;
                 if (typeSelect)          typeSelect.value           = _savedFilter.typeVal;
+                const _catSel = document.getElementById(`catalogue-filter-${catalogue}-${type}`);
+                if (_catSel && _savedFilter.catalogueVal) _catSel.value = _savedFilter.catalogueVal;
             }
         }
 
@@ -2606,6 +2638,11 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
         if (typeSelect && !typeSelect._skytListened) {
             typeSelect._skytListened = true;
             typeSelect.addEventListener('change', () => _skytApplyFilter(catalogue, type));
+        }
+        const _catSelEl = document.getElementById(`catalogue-filter-${catalogue}-${type}`);
+        if (_catSelEl && !_catSelEl._skytListened) {
+            _catSelEl._skytListened = true;
+            _catSelEl.addEventListener('change', () => _skytApplyFilter(catalogue, type));
         }
 
         // Add event listeners for Astrodex "Add" buttons
@@ -2857,29 +2894,33 @@ function filterTable(catalogue, type) {
     const fotoValueInput = document.getElementById(`foto-value-${catalogue}-${type}`);
     const constellationSelect = document.getElementById(`constellation-filter-${catalogue}-${type}`);
     const typeSelect = document.getElementById(`type-filter-${catalogue}-${type}`);
+    const catalogueSelect = document.getElementById(`catalogue-filter-${catalogue}-${type}`);
     const table = document.getElementById(`table-${catalogue}-${type}`);
-    
+
     if (!table) return;
-    
+
     const filterText = filterInput ? filterInput.value.toLowerCase() : '';
     const fotoFilter = fotoCheckbox ? fotoCheckbox.checked : false;
     const fotoThreshold = fotoValueInput ? parseFloat(sanitizeFotoFilterValue(fotoValueInput.value)) / 100 : 0.8;
     const constellationFilter = constellationSelect ? constellationSelect.value : '';
     const typeFilter = typeSelect ? typeSelect.value : '';
+    const catalogueFilter = catalogueSelect ? catalogueSelect.value : '';
     const rows = table.querySelectorAll('tbody tr');
-    
+
     rows.forEach(row => {
         const text = row.textContent.toLowerCase();
         const fotoValue = parseFloat(row.getAttribute('data-foto')) || 0;
         const constellation = row.getAttribute('data-constellation') || '';
         const rowType = row.getAttribute('data-type') || '';
-        
+        const rowCatalogues = (row.getAttribute('data-catalogues') || '').split(',');
+
         const matchesFilter = !filterText || text.includes(filterText);
         const matchesFoto = !fotoFilter || fotoValue >= fotoThreshold;
         const matchesConstellation = !constellationFilter || constellation === constellationFilter;
         const matchesType = !typeFilter || rowType === typeFilter;
-        
-        row.style.display = (matchesFilter && matchesFoto && matchesConstellation && matchesType) ? '' : 'none';
+        const matchesCatalogue = !catalogueFilter || rowCatalogues.includes(catalogueFilter);
+
+        row.style.display = (matchesFilter && matchesFoto && matchesConstellation && matchesType && matchesCatalogue) ? '' : 'none';
     });
 }
 

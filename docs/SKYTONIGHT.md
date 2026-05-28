@@ -9,7 +9,7 @@ SkyTonight is the built-in observability calculator. It computes, for every targ
 ```
 Scheduler (skytonight_scheduler.py)
   └─ run_calculations()  (skytonight_calculator.py)
-       ├─ load_targets_dataset()       ← DSOs (OpenNGC / OpenIC / Caldwell / Messier)
+       ├─ load_targets_dataset()       ← DSOs (OpenNGC / OpenIC / Caldwell / Messier / Herschel400 / Pensack500 / LBN)
        ├─ load_comets_dataset()        ← MPC / JPL comets (auto-updated)
        ├─ Solar-system bodies          ← Skyfield ephemeris (de421.bsp)
        └─ Writes shared JSON to /data/skytonight/
@@ -40,13 +40,19 @@ Multiple Gunicorn workers are protected by a file-level lock so only one worker 
 
 | Catalogue | Source | Notes |
 |---|---|---|
-| OpenNGC | [PyOngc](https://github.com/mattiaverga/PyOngc) | NGC + IC objects |
+| OpenNGC | [PyOngc](https://github.com/mattiaverga/PyOngc) | NGC objects |
+| OpenIC | [PyOngc](https://github.com/mattiaverga/PyOngc) | IC objects |
 | Messier | subset of OpenNGC | flagged via `identifiers[0]` |
-| Caldwell | subset of OpenNGC | cross-referenced |
+| Caldwell | subset of OpenNGC | extracted from PyOngc `other_identifiers` |
+| Herschel 400 | static list in `skytonight_catalogue_builder.py` | Astronomical League H400 program — cross-ref tag injected on matching NGC records |
+| Pensack 500 | `backend/catalogues/pensack500.json` | 502 NGC/IC objects — cross-ref tag injected on matching records |
+| LBN | `backend/catalogues/lbn.json` | Lynds' Bright Nebulae — 94 cross-refs injected on matching NGC/IC records |
 | Comets | [Minor Planet Center](https://minorplanetcenter.net/) / JPL SBDB | auto-refreshed |
 | Planets / Moon / Sun | Skyfield `de421.bsp` | already computed elsewhere |
 
-Target names are preferred in this order: **CommonName → Messier → OpenNGC → OpenIC → Caldwell**.
+Cross-ref catalogues (Herschel400, Pensack500, LBN) add a `catalogue_names` entry and a `source_catalogues` tag to existing NGC/IC records; they never add new coordinates or change the preferred display name.
+
+Target names are preferred in this order: **CommonName → Messier → OpenNGC → OpenIC → Caldwell → LBN → Herschel400 → Pensack500**.
 
 ---
 
@@ -198,6 +204,9 @@ Full parameter details: [API_ENDPOINTS.md](API_ENDPOINTS.md)
 ## Source references
 
 - **OpenNGC / OpenIC**: Mattia Verga, [PyOngc](https://github.com/mattiaverga/PyOngc), CC BY-SA 4.0
+- **Herschel 400**: [Astronomical League Herschel 400 Observing Program](https://www.astroleague.org/herschel-400-observing-program/)
+- **Pensack 500**: original list by Pensack, [Cloudy Nights — 500 Best DSO List](https://www.cloudynights.com/forums/topic/472872-500-best-dso-list)
+- **LBN cross-refs**: Lynds' Bright Nebulae catalogue, YAML source via [uptonight](https://github.com/mawinkler/uptonight)
 - **Minor Planet Center comet elements**: [minorplanetcenter.net](https://minorplanetcenter.net/)
 - **JPL Small-Body Database**: [NASA JPL](https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html)
 - **Skyfield ephemeris**: DE421 / DE430 via [Skyfield](https://rhodesmill.org/skyfield/)

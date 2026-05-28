@@ -851,6 +851,8 @@
     "search_all_constellations": "All constellations",
     "search_types": "Types",
     "search_all_types": "All types",
+    "search_catalogue": "Catalogue",
+    "search_all_catalogues": "All catalogues",
     "meridian_transit": "Meridian transit",
     "antimeridian_transit": "Antimeridian transit",
     "right_ascension": "Right ascension",

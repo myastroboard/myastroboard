@@ -19,7 +19,7 @@ MyAstroBoard is a web-based astronomy observation planning system with a fully b
 - **Backend**: Python 3.13 + Flask
 - **Frontend**: Vanilla HTML/CSS/JavaScript
 - **Astronomy**: Astropy + Astroplan for calculations; Skyfield (`de421.bsp`) for planet/body ephemeris
-- **Catalogues**: PyOngc (OpenNGC/OpenIC), Minor Planet Center / JPL SBDB (comets), built-in solar system bodies
+- **Catalogues**: PyOngc (OpenNGC/OpenIC/Messier/Caldwell), Herschel 400 (static cross-ref), Pensack 500 (JSON cross-ref), LBN (JSON cross-ref), Minor Planet Center / JPL SBDB (comets), built-in solar system bodies
 - **Visualization**: Chart.js (interactive, browser-side)
 - **Containerization**: Docker + Docker Compose
 - **Scheduler**: Custom Python threading-based scheduler (no Docker SDK dependency)
@@ -354,10 +354,11 @@ except Exception as e:
 - **Why**: Personalized UX without compromising role boundaries or data integrity
 
 ### 2. SkyTonight Target Dataset
-- **Source catalogues**: OpenNGC + OpenIC (via PyOngc), Messier (subset of OpenNGC), Caldwell (cross-referenced), comets (MPC primary + JPL enrichment), solar-system bodies (Skyfield `de421.bsp`)
+- **Source catalogues**: OpenNGC + OpenIC (via PyOngc), Messier (subset of OpenNGC), Caldwell (cross-referenced from PyOngc), Herschel 400 (static cross-ref injected via `_HERSCHEL400_NGC` frozenset), Pensack 500 (JSON cross-ref from `backend/catalogues/pensack500.json`), LBN (JSON cross-ref from `backend/catalogues/lbn.json`), comets (MPC primary + JPL enrichment), solar-system bodies (Skyfield `de421.bsp`)
 - **Dataset file**: `data/skytonight/catalogues/targets.json` — generated offline by `scripts/build_skytonight_catalogue.py` or rebuilt on-demand via API
 - **Model**: `SkyTonightTarget` dataclass (`skytonight_models.py`) — immutable, with `target_id`, `category`, `object_type`, `preferred_name`, `catalogue_names` (dict), `coordinates`, `magnitude`, `size_arcmin`, `source_catalogues`
-- **Preferred name order**: `CommonName → Messier → OpenNGC → OpenIC → Caldwell` (defined in `constants.SKYTONIGHT_PREFERRED_NAME_ORDER`)
+- **Preferred name order**: `CommonName → Messier → OpenNGC → OpenIC → Caldwell → LBN → Herschel400 → Pensack500` (defined in `constants.SKYTONIGHT_PREFERRED_NAME_ORDER`)
+- **Cross-ref catalogues** (H400, Pensack500, LBN): injected as extra `catalogue_names` keys on existing NGC/IC records by `_build_cross_ref_map()` + `_apply_cross_refs()` in `skytonight_catalogue_builder.py`. These never change the preferred display name (OpenNGC/Messier/Caldwell always take priority) but they do populate `source_catalogues` and appear in the catalogue filter dropdown in the DSO report.
 - **No duplicates**: Objects identifiable across catalogues are merged into one record with all `catalogue_names` entries
 - **Stable IDs**: `target_id` is derived deterministically from catalogue identifiers (never changes between regenerations)
 - **Why**: Stable, offline-capable, no per-request recalculation, extensible for more catalogues
