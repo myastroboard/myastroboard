@@ -2,5 +2,6 @@
 - Plan my night display now partial alttime graph instead of progressbar
 - PDF export is now more than a list. Better display, graph, ...
 - Search on astrodex, add object, is done on multiple catalogues
-- Alt vs time graph considere both nautoc and astro night
+- Add solar elongation calculations and display in reports
+- Alt vs time graph considere both nautic and astro night
 - Fix date issue when there is no dark night
