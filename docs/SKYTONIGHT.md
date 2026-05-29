@@ -47,12 +47,19 @@ Multiple Gunicorn workers are protected by a file-level lock so only one worker 
 | Herschel 400 | static list in `skytonight_catalogue_builder.py` | Astronomical League H400 program — cross-ref tag injected on matching NGC records |
 | Pensack 500 | `backend/catalogues/pensack500.json` | 502 NGC/IC objects — cross-ref tag injected on matching records |
 | LBN | `backend/catalogues/lbn.json` | Lynds' Bright Nebulae — 94 cross-refs injected on matching NGC/IC records |
+| GaryImm | `backend/catalogues/garyimm_crossrefs.json` + `garyimm_standalone.json` | 206-object astrophotography list by Gary Imm — 133 cross-refs on existing records + 33 standalone objects with no NGC/IC ID (Arp groups, LBN/LDN standalone, etc.) |
+| Arp | `backend/catalogues/arp.json` | Arp Atlas of Peculiar Galaxies — 120 NGC/IC cross-refs injected on matching records |
+| Sharpless | `backend/catalogues/sharpless.json` | 313 HII emission nebulae (Sh2 catalogue, Sharpless 1959) — all standalone records |
+| Barnard | `backend/catalogues/barnard.json` | 343 dark nebulae (Barnard 1927 catalogue) — all standalone records |
+| vdB | `backend/catalogues/vdb.json` | 158 reflection nebulae (van den Bergh 1966 catalogue) — all standalone records |
+| Abell PNe | `backend/catalogues/abell_pne.json` | 71 large planetary nebulae (Abell 1966 catalogue) — all standalone records |
+| Abell Clusters | `backend/catalogues/abell_clusters.json` | 2,712 rich galaxy clusters (Abell, Corwin & Olowin 1989) — all standalone records, size bypassed (null) |
 | Comets | [Minor Planet Center](https://minorplanetcenter.net/) / JPL SBDB | auto-refreshed |
 | Planets / Moon / Sun | Skyfield `de421.bsp` | already computed elsewhere |
 
-Cross-ref catalogues (Herschel400, Pensack500, LBN) add a `catalogue_names` entry and a `source_catalogues` tag to existing NGC/IC records; they never add new coordinates or change the preferred display name.
+Cross-ref catalogues (Herschel400, Pensack500, LBN, GaryImm, Arp) add a `catalogue_names` entry and a `source_catalogues` tag to existing NGC/IC records; they never add new coordinates or change the preferred display name.  Standalone catalogues (GaryImm, Sharpless, Barnard, vdB, AbellPNe, AbellClusters) create new records for objects with no NGC/IC identifier.  Objects selected by Gary Imm in the Sharpless/Barnard/vdB catalogues receive both the catalogue tag and the GaryImm tag via `extra_catalogues`.
 
-Target names are preferred in this order: **CommonName → Messier → OpenNGC → OpenIC → Caldwell → LBN → Herschel400 → Pensack500**.
+Target names are preferred in this order: **CommonName → Messier → OpenNGC → OpenIC → Caldwell → LBN → Herschel400 → Pensack500 → GaryImm → Arp → Sharpless → Barnard → vdB → AbellPNe → AbellClusters**.
 
 ---
 
@@ -207,6 +214,13 @@ Full parameter details: [API_ENDPOINTS.md](API_ENDPOINTS.md)
 - **Herschel 400**: [Astronomical League Herschel 400 Observing Program](https://www.astroleague.org/herschel-400-observing-program/)
 - **Pensack 500**: original list by Pensack, [Cloudy Nights — 500 Best DSO List](https://www.cloudynights.com/forums/topic/472872-500-best-dso-list)
 - **LBN cross-refs**: Lynds' Bright Nebulae catalogue, YAML source via [uptonight](https://github.com/mawinkler/uptonight)
+- **GaryImm**: astrophotography list compiled by Gary Imm, YAML source via [uptonight](https://github.com/mawinkler/uptonight)
+- **Arp Atlas of Peculiar Galaxies**: Halton Arp (1966); NGC/IC cross-refs from NASA/IPAC Extragalactic Database (NED)
+- **Sharpless catalogue**: Sharpless (1959), VizieR VII/20
+- **Barnard dark nebulae**: Barnard (1927), VizieR VII/220A
+- **van den Bergh reflection nebulae**: van den Bergh (1966), VizieR VII/21
+- **Abell planetary nebulae**: Abell (1966), ApJS 12, 391; coordinates from SIMBAD (CDS, Strasbourg)
+- **Abell galaxy clusters**: Abell, Corwin & Olowin (1989), ApJS 70, 1; VizieR VII/110A
 - **Minor Planet Center comet elements**: [minorplanetcenter.net](https://minorplanetcenter.net/)
 - **JPL Small-Body Database**: [NASA JPL](https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html)
 - **Skyfield ephemeris**: DE421 / DE430 via [Skyfield](https://rhodesmill.org/skyfield/)

@@ -259,10 +259,25 @@ def _load_json_catalogue(filename: str) -> Any:
         return None
 
 
-def _build_cross_ref_map() -> Dict[str, Dict[str, str]]:
-    """Build a unified cross-reference map: normalize_object_name(ngc_name) → {catalogue: name}.
+def _ngc_ic_match_key(name: str) -> str:
+    """Normalise an NGC/IC name to a key that matches PyOngc's zero-padded output.
 
-    Merges Herschel 400 (static), Pensack 500 (JSON) and LBN (JSON cross-refs).
+    PyOngc stores names as 'NGC0891' internally; _normalize_identifier converts
+    that to 'NGC 0891', so normalize_object_name gives 'ngc0891'.  A cross-ref
+    JSON entry like 'NGC 891' would produce key 'ngc891', which would never
+    match.  This helper pads the number to 4 digits before normalising, so both
+    sides of the lookup agree on the key format.
+    """
+    m = re.match(r'^(NGC|IC)\s*(\d+)\s*$', name.strip(), re.IGNORECASE)
+    if m:
+        return normalize_object_name(f"{m.group(1).upper()} {int(m.group(2)):04d}")
+    return normalize_object_name(name.strip())
+
+
+def _build_cross_ref_map() -> Dict[str, Dict[str, str]]:
+    """Build a unified cross-reference map: _ngc_ic_match_key(ngc_name) → {catalogue: name}.
+
+    Merges Herschel 400 (static), Pensack 500, LBN, GaryImm, and Arp (all JSON).
     The result is passed to _apply_cross_refs() after the main PyOngc build.
     """
     cross_refs: Dict[str, Dict[str, str]] = {}
@@ -270,7 +285,7 @@ def _build_cross_ref_map() -> Dict[str, Dict[str, str]]:
     # ── Herschel 400 ─────────────────────────────────────────────────────────
     for ngc_num in _HERSCHEL400_NGC:
         ngc_name = f'NGC {ngc_num}'
-        key = normalize_object_name(ngc_name)
+        key = normalize_object_name(f'NGC {ngc_num:04d}')
         cross_refs.setdefault(key, {})['Herschel400'] = ngc_name
 
     # ── Pensack 500 ───────────────────────────────────────────────────────────
@@ -279,7 +294,7 @@ def _build_cross_ref_map() -> Dict[str, Dict[str, str]]:
         for raw_name in pensack_data:
             if not isinstance(raw_name, str) or not raw_name.strip():
                 continue
-            key = normalize_object_name(raw_name.strip())
+            key = _ngc_ic_match_key(raw_name.strip())
             if key:
                 cross_refs.setdefault(key, {})['Pensack500'] = raw_name.strip()
     else:
@@ -291,11 +306,35 @@ def _build_cross_ref_map() -> Dict[str, Dict[str, str]]:
         for raw_ngc_name, lbn_name in lbn_data.items():
             if not raw_ngc_name or not lbn_name:
                 continue
-            key = normalize_object_name(str(raw_ngc_name).strip())
+            key = _ngc_ic_match_key(str(raw_ngc_name).strip())
             if key:
                 cross_refs.setdefault(key, {})['LBN'] = str(lbn_name).strip()
     else:
         logger.warning('lbn.json missing or invalid — LBN cross-references not applied')
+
+    # ── GaryImm cross-refs ────────────────────────────────────────────────────
+    garyimm_data = _load_json_catalogue('garyimm_crossrefs.json')
+    if isinstance(garyimm_data, list):
+        for raw_name in garyimm_data:
+            if not isinstance(raw_name, str) or not raw_name.strip():
+                continue
+            key = _ngc_ic_match_key(raw_name.strip())
+            if key:
+                cross_refs.setdefault(key, {})['GaryImm'] = raw_name.strip()
+    else:
+        logger.warning('garyimm_crossrefs.json missing or invalid — GaryImm cross-refs not applied')
+
+    # ── Arp cross-refs ────────────────────────────────────────────────────────
+    arp_data = _load_json_catalogue('arp.json')
+    if isinstance(arp_data, dict):
+        for raw_ngc_name, arp_name in arp_data.items():
+            if not raw_ngc_name or not arp_name:
+                continue
+            key = _ngc_ic_match_key(str(raw_ngc_name).strip())
+            if key:
+                cross_refs.setdefault(key, {})['Arp'] = str(arp_name).strip()
+    else:
+        logger.warning('arp.json missing or invalid — Arp cross-references not applied')
 
     total_keys = len(cross_refs)
     catalogues_applied = sorted({cat for refs in cross_refs.values() for cat in refs})
@@ -307,19 +346,21 @@ def _apply_cross_refs(
     targets: List[SkyTonightTarget],
     cross_refs: Dict[str, Dict[str, str]],
 ) -> List[SkyTonightTarget]:
-    """Inject cross-catalogue membership (Herschel400, Pensack500, LBN) into existing targets."""
+    """Inject cross-catalogue membership (Herschel400, Pensack500, LBN, GaryImm, Arp) into targets."""
     if not cross_refs:
         return targets
 
     enriched = 0
     result: List[SkyTonightTarget] = []
     for target in targets:
-        # Lookup by all NGC/IC names this target carries
+        # Lookup by all NGC/IC names this target carries.
+        # Use _ngc_ic_match_key so that PyOngc's zero-padded names (e.g. "NGC 0891")
+        # produce the same key as the JSON entries (e.g. "NGC 891" → "ngc0891").
         extra: Dict[str, str] = {}
         for cat_key in ('OpenNGC', 'OpenIC'):
             val = target.catalogue_names.get(cat_key, '')
             if val:
-                extra.update(cross_refs.get(normalize_object_name(val), {}))
+                extra.update(cross_refs.get(_ngc_ic_match_key(val), {}))
 
         if extra:
             new_catalogue_names = {**target.catalogue_names, **extra}
@@ -445,6 +486,115 @@ def build_deep_sky_targets(caldwell_map: Optional[Dict[str, str]] = None) -> Lis
     return build_targets_from_rows(rows, caldwell_map=caldwell_map)
 
 
+def _build_standalone_targets_from_json(filename: str, catalogue_key: str) -> List[SkyTonightTarget]:
+    """Create SkyTonightTarget records from a standalone-objects JSON catalogue.
+
+    Each JSON entry must have:
+      name, ra_hours, dec_degrees, size_arcmin, type, description, mag, constellation
+
+    Optional field:
+      extra_catalogues  — list of additional catalogue keys to tag on this target
+                          (e.g. ["GaryImm"] marks an object as part of Gary Imm's list)
+
+    These are objects that have no NGC/IC identifier and therefore cannot be
+    expressed as cross-references to existing PyOngc records.
+    """
+    data = _load_json_catalogue(filename)
+    if not isinstance(data, list):
+        logger.warning(f'{filename} missing or invalid — {catalogue_key} standalone targets not loaded')
+        return []
+
+    # Phase 1 — parse all valid entries into intermediate dicts
+    parsed: List[Dict] = []
+    skipped = 0
+    for entry in data:
+        if not isinstance(entry, dict):
+            skipped += 1
+            continue
+        name = str(entry.get('name') or '').strip()
+        ra_hours = entry.get('ra_hours')
+        dec_degrees = entry.get('dec_degrees')
+        if not name or ra_hours is None or dec_degrees is None:
+            skipped += 1
+            continue
+        try:
+            ra_h = float(ra_hours)
+            dec_d = float(dec_degrees)
+        except (TypeError, ValueError):
+            skipped += 1
+            continue
+        canonical_name = normalize_object_name(name)
+        if not canonical_name:
+            skipped += 1
+            continue
+        parsed.append({
+            'name': name,
+            'canonical_name': canonical_name,
+            'ra_h': ra_h,
+            'dec_d': dec_d,
+            'size_arcmin': _safe_float(entry.get('size_arcmin')),
+            'mag': _safe_float(entry.get('mag')),
+            'object_type': str(entry.get('type') or 'Unknown').strip(),
+            'description': str(entry.get('description') or '').strip(),
+            'constellation': str(entry.get('constellation') or '').strip(),
+            'extra_cats': [str(c) for c in (entry.get('extra_catalogues') or []) if c],
+        })
+
+    # Phase 2 — batch-compute constellations for entries that have none
+    missing_idx = [i for i, e in enumerate(parsed) if not e['constellation']]
+    if missing_idx:
+        try:
+            import numpy as np
+            from astropy.coordinates import SkyCoord, get_constellation
+            ras  = np.array([parsed[i]['ra_h'] * 15.0 for i in missing_idx])
+            decs = np.array([parsed[i]['dec_d']       for i in missing_idx])
+            coords = SkyCoord(ra=ras, dec=decs, unit='deg')
+            names = get_constellation(coords)
+            for i, con in zip(missing_idx, names):
+                parsed[i]['constellation'] = str(con)
+            logger.info(f'{filename}: resolved constellations for {len(missing_idx)} entries via astropy')
+        except Exception as exc:
+            logger.warning(f'{filename}: constellation batch lookup failed — {exc}')
+
+    # Phase 3 — build SkyTonightTarget objects
+    targets: List[SkyTonightTarget] = []
+    for e in parsed:
+        catalogue_names: Dict[str, str] = {catalogue_key: e['name']}
+        for extra_cat in e['extra_cats']:
+            catalogue_names[extra_cat] = e['name']
+        # Only promote description to CommonName for GaryImm standalone objects,
+        # where Gary Imm's labels are the primary identifiers. For all other
+        # catalogues (Sharpless, Barnard, vdB, AbellPNe, AbellClusters…) the
+        # catalogue designation (Sh2-N, vdB N, …) is the preferred display name;
+        # the description is kept as a searchable alias only.
+        use_common_name = catalogue_key == 'GaryImm' and e['description'] and e['description'] != e['name']
+        if use_common_name:
+            catalogue_names['CommonName'] = e['description']
+
+        preferred_name = e['description'] if use_common_name else e['name']
+        all_catalogues = sorted({catalogue_key, *e['extra_cats'], *catalogue_names.keys()})
+        targets.append(SkyTonightTarget(
+            target_id=f"dso-{catalogue_key.lower()}-{e['canonical_name']}",
+            category='deep_sky',
+            object_type=e['object_type'],
+            preferred_name=preferred_name,
+            catalogue_names=catalogue_names,
+            aliases=sorted({e['name'], e['description']} - {''}),
+            constellation=e['constellation'],
+            magnitude=e['mag'],
+            size_arcmin=e['size_arcmin'],
+            coordinates=SkyTonightCoordinates(ra_hours=e['ra_h'], dec_degrees=e['dec_d']),
+            source_catalogues=all_catalogues,
+            translation_key=f"skytonight.type_{normalize_object_name(e['object_type']) or 'unknown'}",
+            metadata={'source': catalogue_key},
+        ))
+
+    if skipped:
+        logger.warning(f'{filename}: skipped {skipped} invalid entries')
+    logger.info(f'Loaded {len(targets)} standalone targets from {filename}')
+    return targets
+
+
 def build_and_save_default_dataset(
     caldwell_map: Optional[Dict[str, str]] = None,
     comet_source_mode: str = 'mpc+jpl',
@@ -454,13 +604,28 @@ def build_and_save_default_dataset(
     deep_sky_targets = build_targets_from_rows(rows, caldwell_map=caldwell_map)
     cross_refs = _build_cross_ref_map()
     deep_sky_targets = _apply_cross_refs(deep_sky_targets, cross_refs)
+
+    # Standalone targets: objects with no NGC/IC identifier.
+    # Each catalogue has its own JSON; objects selected by Gary Imm are tagged via extra_catalogues.
+    standalone_garyimm       = _build_standalone_targets_from_json('garyimm_standalone.json', 'GaryImm')
+    standalone_sharpless     = _build_standalone_targets_from_json('sharpless.json', 'Sharpless')
+    standalone_barnard       = _build_standalone_targets_from_json('barnard.json', 'Barnard')
+    standalone_vdb           = _build_standalone_targets_from_json('vdb.json', 'vdB')
+    standalone_abell_pne     = _build_standalone_targets_from_json('abell_pne.json', 'AbellPNe')
+    standalone_abell_clusters = _build_standalone_targets_from_json('abell_clusters.json', 'AbellClusters')
+    standalone_targets = [
+        *standalone_garyimm, *standalone_sharpless, *standalone_barnard, *standalone_vdb,
+        *standalone_abell_pne, *standalone_abell_clusters,
+    ]
+
     body_targets = build_body_targets()
     comet_targets = build_comet_targets(source_mode=comet_source_mode)
-    all_targets = [*deep_sky_targets, *body_targets, *comet_targets]
+    all_targets = [*deep_sky_targets, *standalone_targets, *body_targets, *comet_targets]
 
     comet_sources = sorted({str(target.metadata.get('source') or '') for target in comet_targets if isinstance(target.metadata, dict) and target.metadata.get('source')})
     body_sources = sorted({str(target.metadata.get('source') or '') for target in body_targets if isinstance(target.metadata, dict) and target.metadata.get('source')})
-    cross_ref_sources = sorted(cat for cat in ('Herschel400', 'LBN', 'Pensack500') if any(cat in t.source_catalogues for t in deep_sky_targets))
+    all_dso_targets = [*deep_sky_targets, *standalone_targets]
+    cross_ref_sources = sorted(cat for cat in ('AbellClusters', 'AbellPNe', 'Arp', 'Barnard', 'GaryImm', 'Herschel400', 'LBN', 'Pensack500', 'Sharpless', 'vdB') if any(cat in t.source_catalogues for t in all_dso_targets))
     source_values = [source_name, *body_sources, *comet_sources, *cross_ref_sources]
     deduplicated_sources = [value for index, value in enumerate(source_values) if value and value not in source_values[:index]]
 
@@ -468,7 +633,7 @@ def build_and_save_default_dataset(
         'generated_at': datetime.now(timezone.utc).isoformat(),
         'sources': deduplicated_sources,
         'counts': {
-            'deep_sky': len(deep_sky_targets),
+            'deep_sky': len(deep_sky_targets) + len(standalone_targets),
             'bodies': len(body_targets),
             'comets': len(comet_targets),
         },

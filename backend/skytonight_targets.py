@@ -66,6 +66,7 @@ def choose_preferred_catalogue_name(catalogue_names: Dict[str, str], order: Opti
 def _build_lookup_entry(target: SkyTonightTarget) -> Dict[str, Any]:
     aliases = {normalize_catalogue_name(key): str(value) for key, value in target.catalogue_names.items() if str(value).strip()}
     group_id = target.target_id
+    coords = target.coordinates
     return {
         'group_id': group_id,
         'aliases': aliases,
@@ -74,6 +75,8 @@ def _build_lookup_entry(target: SkyTonightTarget) -> Dict[str, Any]:
         'category': target.category,
         'object_type': target.object_type,
         'constellation': target.constellation,
+        'ra_deg': coords.ra_hours * 15.0 if coords else None,
+        'dec_deg': coords.dec_degrees if coords else None,
     }
 
 
