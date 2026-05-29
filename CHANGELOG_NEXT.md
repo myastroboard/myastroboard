@@ -1,16 +1,12 @@
-#### Equipment — Shared Equipments
+#### Equipment — Shared Equipment
 
-- Each equipment item (telescope, camera, mount, filter, accessory) has a new **"Share with all users"** toggle. Shared items are visible to all other users of the instance (e.g. family, astronomy club), but remain read-only for anyone who is not the owner.
-- Equipment cards show a **"Shared"** badge on own shared items, and a **"Shared by {username}"** badge on items owned by other users.
-- **Equipment combinations** are automatically flagged as shared when all their constituent items (telescope, camera, mount, filters, accessories) are shared. The combination card shows a computed **"Shared"** badge accordingly.
-- A **broken-share warning** (⚠) is displayed on a combination when one of its referenced items was previously shared but is no longer accessible (owner removed or unshared it).
-- When building or editing a combination, the modal dropdowns show `(shared)` next to own shared items and `(shared by {username})` next to items from other users, so the share impact of each choice is visible at selection time.
-- **Field of View Calculator**: telescope and camera dropdowns include shared items from other users, labeled `(shared by {username})`.
-- **SkyTonight — Best Telescope For This Target**: shared telescopes from other users are included in recommendations, annotated with a `shared by {username}` badge. Own telescopes are listed first, then shared ones.
-- **Astrodex — Add Picture**: equipment-combination and filter dropdowns include shared items from other users.
-- **Plan My Night**: shared telescopes appear in the telescope selector (own first, then `──────`, then shared with `(shared by {username})` label) and in the SkyTonight "Add to Plan My Night" picker modal.
-- **Orphaned plan detection**: if a shared telescope is later removed or unshared by its owner, any existing plan built around it is preserved and displayed with a `⚠ telescope no longer available` warning. The user can review and delete it manually — no silent data loss.
-- Shared equipment data is automatically refreshed (without F5) whenever the user navigates between equipment subtabs or switches back to the Equipment main tab.
+You can now share your equipment with everyone on your MyAstroBoard instance — perfect for families or astronomy clubs sharing a common set of gear.
+
+- Any telescope, camera, mount, filter, or accessory can be shared with a single toggle. Shared gear is visible to all users, but only you can edit or delete your own items.
+- Shared items are clearly labeled throughout the app — your own shared gear shows a **"Shared"** badge, and gear from others shows **"Shared by [name]"**.
+- Equipment combinations are automatically considered shared when all their parts are shared — no extra steps needed.
+- Shared gear shows up everywhere it's useful: equipment combinations, Field of View Calculator, Plan My Night telescope picker, SkyTonight recommendations, and Astrodex picture logging.
+- If someone un-shares a telescope you had used in a plan, your plan is kept safe with a warning rather than disappearing silently.
 
 #### SkyTonight
 
