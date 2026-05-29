@@ -821,6 +821,8 @@ def _recommend_telescopes_for_target(target_payload: Dict[str, Any], telescopes:
             'target_magnitude': round(magnitude, 2) if magnitude is not None else None,
             'target_size_arcmin': round(size_arcmin, 1) if size_arcmin is not None else None,
             'rating_1_to_5': final_score,
+            'is_shared': bool(scope.get('is_shared', False)),
+            'owner_username': scope.get('owner_username'),
         })
 
     recommendations.sort(
@@ -1080,7 +1082,9 @@ def get_skytonight_telescope_recommendations_api():
             return jsonify({'error': 'Invalid payload'}), 400
 
         telescopes_blob = equipment_profiles.load_user_telescopes(user_id)
-        telescopes = telescopes_blob.get('items', []) if isinstance(telescopes_blob, dict) else []
+        telescopes = list(telescopes_blob.get('items', []) if isinstance(telescopes_blob, dict) else [])
+        shared_telescopes = equipment_profiles.load_all_shared_equipment('telescopes', user_id)
+        telescopes = telescopes + shared_telescopes
         if not telescopes:
             return jsonify({
                 'has_telescopes': False,

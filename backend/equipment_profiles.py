@@ -99,6 +99,7 @@ class Telescope:
     notes: str = ""
     created_at: str = ""
     updated_at: str = ""
+    is_shared: bool = False
 
     def __post_init__(self):
         """Calculate derived values"""
@@ -129,6 +130,7 @@ class Camera:
     notes: str = ""
     created_at: str = ""
     updated_at: str = ""
+    is_shared: bool = False
 
     def __post_init__(self):
         """Calculate derived values"""
@@ -152,6 +154,7 @@ class Mount:
     notes: str = ""
     created_at: str = ""
     updated_at: str = ""
+    is_shared: bool = False
 
     def __post_init__(self):
         """Calculate recommended payload"""
@@ -174,6 +177,7 @@ class Filter:
     notes: str = ""
     created_at: str = ""
     updated_at: str = ""
+    is_shared: bool = False
 
 
 @dataclass
@@ -187,6 +191,7 @@ class Accessory:
     notes: str = ""
     created_at: str = ""
     updated_at: str = ""
+    is_shared: bool = False
 
 
 @dataclass
@@ -358,6 +363,161 @@ def safe_save_equipment(file_path: str, data: Dict) -> bool:
 
 
 # ============================================================
+# Shared Equipment Helpers
+# ============================================================
+
+def load_all_shared_equipment(equipment_type: str, exclude_user_id: str) -> List[Dict]:
+    """Return items marked is_shared=True from all users except exclude_user_id.
+
+    Each returned item is annotated with owner_id and owner_username.
+    """
+    from auth import user_manager
+
+    user_map = {u['user_id']: u['username'] for u in user_manager.list_users()}
+    ensure_equipment_directories()
+
+    shared_items: List[Dict] = []
+    try:
+        for fname in os.listdir(EQUIPMENT_DIR):
+            if not fname.endswith(f'_{equipment_type}.json'):
+                continue
+            owner_id = fname[: -(len(equipment_type) + 6)]  # strip _{type}.json
+            if owner_id == exclude_user_id:
+                continue
+            fpath = os.path.join(EQUIPMENT_DIR, fname)
+            try:
+                with open(fpath, 'r') as f:
+                    data = json.load(f)
+            except Exception:
+                continue
+            for item in data.get('items', []):
+                if item.get('is_shared'):
+                    annotated = dict(item)
+                    annotated['owner_id'] = owner_id
+                    annotated['owner_username'] = user_map.get(owner_id, owner_id)
+                    shared_items.append(annotated)
+    except Exception as e:
+        logger.error(f"Error scanning shared equipment ({equipment_type}): {e}")
+
+    return shared_items
+
+
+def compute_combination_share_status(combination: Dict, user_id: str) -> Dict:
+    """Compute is_shared, has_broken_share, and broken_items for a combination.
+
+    A combination is 'shared' iff ALL constituent equipment items are accessible
+    (own or from others) and have is_shared=True.
+    'has_broken_share' is True when a referenced item can no longer be found in
+    any user's shared pool (it was previously accessible but is now gone/unshared).
+    """
+    own_by_id: Dict[str, Dict] = {}
+    for eq_type in ('telescopes', 'cameras', 'mounts', 'filters', 'accessories'):
+        loader = {
+            'telescopes': load_user_telescopes,
+            'cameras': load_user_cameras,
+            'mounts': load_user_mounts,
+            'filters': load_user_filters,
+            'accessories': load_user_accessories,
+        }[eq_type]
+        for item in loader(user_id).get('items', []):
+            own_by_id[item['id']] = item
+
+    shared_by_id: Dict[str, Dict] = {}
+    for eq_type in ('telescopes', 'cameras', 'mounts', 'filters', 'accessories'):
+        for item in load_all_shared_equipment(eq_type, user_id):
+            shared_by_id[item['id']] = item
+
+    ref_ids: List[str] = []
+    for field in ('telescope_id', 'camera_id', 'mount_id'):
+        val = combination.get(field)
+        if val:
+            ref_ids.append(val)
+    ref_ids.extend(combination.get('filter_ids') or [])
+    ref_ids.extend(combination.get('accessory_ids') or [])
+
+    is_shared = True
+    has_broken_share = False
+    broken_items: List[str] = []
+
+    for eq_id in ref_ids:
+        if eq_id in own_by_id:
+            if not own_by_id[eq_id].get('is_shared', False):
+                is_shared = False
+        elif eq_id in shared_by_id:
+            pass  # still shared by owner, counts as shared
+        else:
+            # Not found anywhere — previously accessible but now gone/unshared
+            is_shared = False
+            has_broken_share = True
+            broken_items.append(eq_id)
+
+    # Build per-equipment-id metadata for the UI (shared status of each item)
+    items_share_info: Dict[str, Dict] = {}
+    for eq_id in ref_ids:
+        if eq_id in own_by_id:
+            item = own_by_id[eq_id]
+            items_share_info[eq_id] = {
+                'is_shared': bool(item.get('is_shared', False)),
+                'owner_id': user_id,
+                'owner_username': None,  # own item
+            }
+        elif eq_id in shared_by_id:
+            item = shared_by_id[eq_id]
+            items_share_info[eq_id] = {
+                'is_shared': True,
+                'owner_id': item.get('owner_id'),
+                'owner_username': item.get('owner_username'),
+            }
+        else:
+            items_share_info[eq_id] = {'is_shared': False, 'owner_id': None, 'owner_username': None}
+
+    return {
+        'is_shared': is_shared and bool(ref_ids),
+        'has_broken_share': has_broken_share,
+        'broken_items': broken_items,
+        'items_share_info': items_share_info,
+    }
+
+
+def load_all_shared_combinations(exclude_user_id: str) -> List[Dict]:
+    """Return combinations from other users whose constituent equipment is all shared.
+
+    Computes share status from the owner's perspective for each combination.
+    """
+    from auth import user_manager
+
+    user_map = {u['user_id']: u['username'] for u in user_manager.list_users()}
+    ensure_equipment_directories()
+
+    result: List[Dict] = []
+    try:
+        for fname in os.listdir(EQUIPMENT_DIR):
+            if not fname.endswith('_combinations.json'):
+                continue
+            owner_id = fname[: -(len('combinations') + 6)]  # strip _combinations.json
+            if owner_id == exclude_user_id:
+                continue
+            fpath = os.path.join(EQUIPMENT_DIR, fname)
+            try:
+                with open(fpath, 'r') as f:
+                    data = json.load(f)
+            except Exception:
+                continue
+            for combo in data.get('items', []):
+                # Compute from the owner's perspective
+                status = compute_combination_share_status(combo, owner_id)
+                if status['is_shared']:
+                    annotated = {**combo, **status}
+                    annotated['owner_id'] = owner_id
+                    annotated['owner_username'] = user_map.get(owner_id, owner_id)
+                    result.append(annotated)
+    except Exception as e:
+        logger.error(f"Error scanning shared combinations: {e}")
+
+    return result
+
+
+# ============================================================
 # CRUD Operations - Telescopes
 # ============================================================
 
@@ -415,7 +575,8 @@ def create_telescope(user_id: str, telescope_data: Dict) -> Optional[Dict]:
             effective_focal_ratio=0.0,  # Will be calculated
             notes=telescope_data.get('notes', ''),
             created_at=datetime.now().isoformat(),
-            updated_at=datetime.now().isoformat()
+            updated_at=datetime.now().isoformat(),
+            is_shared=bool(telescope_data.get('is_shared', False))
         )
         
         # Load existing data
@@ -471,7 +632,8 @@ def update_telescope(user_id: str, telescope_id: str, telescope_data: Dict) -> O
                     effective_focal_ratio=0.0,
                     notes=telescope_data.get('notes', ''),
                     created_at=item.get('created_at', datetime.now().isoformat()),
-                    updated_at=datetime.now().isoformat()
+                    updated_at=datetime.now().isoformat(),
+                    is_shared=bool(telescope_data.get('is_shared', item.get('is_shared', False)))
                 )
                 
                 data['items'][i] = asdict(telescope)
@@ -567,7 +729,8 @@ def create_camera(user_id: str, camera_data: Dict) -> Optional[Dict]:
             quantum_efficiency=get_float_or_none(camera_data.get('quantum_efficiency')),
             notes=camera_data.get('notes', ''),
             created_at=datetime.now().isoformat(),
-            updated_at=datetime.now().isoformat()
+            updated_at=datetime.now().isoformat(),
+            is_shared=bool(camera_data.get('is_shared', False))
         )
         
         data = load_user_cameras(user_id)
@@ -622,7 +785,8 @@ def update_camera(user_id: str, camera_id: str, camera_data: Dict) -> Optional[D
                     quantum_efficiency=get_float_or_none(camera_data.get('quantum_efficiency')),
                     notes=camera_data.get('notes', ''),
                     created_at=item.get('created_at', datetime.now().isoformat()),
-                    updated_at=datetime.now().isoformat()
+                    updated_at=datetime.now().isoformat(),
+                    is_shared=bool(camera_data.get('is_shared', item.get('is_shared', False)))
                 )
                 
                 data['items'][i] = asdict(camera)
@@ -697,7 +861,8 @@ def create_mount(user_id: str, mount_data: Dict) -> Optional[Dict]:
             guiding_supported=mount_data.get('guiding_supported', False),
             notes=mount_data.get('notes', ''),
             created_at=datetime.now().isoformat(),
-            updated_at=datetime.now().isoformat()
+            updated_at=datetime.now().isoformat(),
+            is_shared=bool(mount_data.get('is_shared', False))
         )
         
         data = load_user_mounts(user_id)
@@ -737,6 +902,7 @@ def update_mount(user_id: str, mount_id: str, mount_data: Dict) -> Optional[Dict
                     recommended_payload_kg=0.0,
                     tracking_accuracy_arcsec=float(mount_data['tracking_accuracy_arcsec']) if mount_data.get('tracking_accuracy_arcsec') else None,
                     guiding_supported=mount_data.get('guiding_supported', False),
+                    is_shared=bool(mount_data.get('is_shared', item.get('is_shared', False))),
                     notes=mount_data.get('notes', ''),
                     created_at=item.get('created_at', datetime.now().isoformat()),
                     updated_at=datetime.now().isoformat()
@@ -814,7 +980,8 @@ def create_filter(user_id: str, filter_data: Dict) -> Optional[Dict]:
             intended_use=filter_data.get('intended_use', ''),
             notes=filter_data.get('notes', ''),
             created_at=datetime.now().isoformat(),
-            updated_at=datetime.now().isoformat()
+            updated_at=datetime.now().isoformat(),
+            is_shared=bool(filter_data.get('is_shared', False))
         )
         
         data = load_user_filters(user_id)
@@ -856,7 +1023,8 @@ def update_filter(user_id: str, filter_id: str, filter_data: Dict) -> Optional[D
                     intended_use=filter_data.get('intended_use', ''),
                     notes=filter_data.get('notes', ''),
                     created_at=item.get('created_at', datetime.now().isoformat()),
-                    updated_at=datetime.now().isoformat()
+                    updated_at=datetime.now().isoformat(),
+                    is_shared=bool(filter_data.get('is_shared', item.get('is_shared', False)))
                 )
                 
                 data['items'][i] = asdict(filter_obj)
@@ -923,7 +1091,8 @@ def create_accessory(user_id: str, accessory_data: Dict) -> Optional[Dict]:
             weight_kg=get_float_or_none(accessory_data.get('weight_kg'), 0.0),
             notes=accessory_data.get('notes', ''),
             created_at=datetime.now().isoformat(),
-            updated_at=datetime.now().isoformat()
+            updated_at=datetime.now().isoformat(),
+            is_shared=bool(accessory_data.get('is_shared', False))
         )
         
         data = load_user_accessories(user_id)
@@ -967,7 +1136,8 @@ def update_accessory(user_id: str, accessory_id: str, accessory_data: Dict) -> O
                     weight_kg=get_float_or_none(accessory_data.get('weight_kg'), item.get('weight_kg', 0.0)),
                     notes=accessory_data.get('notes', ''),
                     created_at=item.get('created_at', datetime.now().isoformat()),
-                    updated_at=datetime.now().isoformat()
+                    updated_at=datetime.now().isoformat(),
+                    is_shared=bool(accessory_data.get('is_shared', item.get('is_shared', False)))
                 )
                 
                 data['items'][i] = asdict(accessory)

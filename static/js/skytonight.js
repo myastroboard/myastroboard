@@ -67,7 +67,11 @@ async function showPlanTelescopePickerModal(telescopeItems, row) {
 
         const hasRatings = Object.keys(ratingsById).length > 0;
 
-        telescopeItems.forEach(t => {
+        // Exclude orphaned plans from the picker (telescope no longer accessible)
+        const ownItems    = telescopeItems.filter(t => t.is_own !== false && !t.is_orphaned);
+        const sharedItems = telescopeItems.filter(t => t.is_own === false  && !t.is_orphaned);
+
+        const appendTelescopeBtn = (t) => {
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'btn btn-telescope-pick w-100 mb-2 text-start d-flex align-items-center gap-2';
@@ -76,18 +80,35 @@ async function showPlanTelescopePickerModal(telescopeItems, row) {
                 ? `<span class="badge bg-${t.state === 'current' ? 'success' : 'warning'}">${i18n.t(`plan_my_night.plan_status_${t.state}`, {defaultValue: t.state})}</span>`
                 : `<span class="badge bg-secondary">${i18n.t('plan_my_night.plan_status_none', {defaultValue: 'no plan'})}</span>`;
 
+            const sharedBadge = t.owner_username
+                ? ` <span class="badge bg-info text-dark" style="font-size:0.75em">${escapeHtml(i18n.t('equipment.shared_fov_suffix', { username: t.owner_username }))}</span>`
+                : '';
+
             const rating = ratingsById[t.telescope_id];
             const ratingHtml = rating
                 ? `<span class="ms-auto text-warning text-nowrap" title="${escapeHtml(String(rating))}/5" aria-label="${escapeHtml(String(rating))} stars">${escapeHtml(_skytStarsFromRating(rating))}</span>`
                 : (hasRatings ? `<span class="ms-auto text-muted text-nowrap" aria-hidden="true">&#8212;</span>` : '');
 
-            btn.innerHTML = `<i class="bi bi-telescope icon-inline flex-shrink-0" aria-hidden="true"></i><span class="flex-grow-1">${escapeHtml(t.telescope_name || t.telescope_id)} ${stateBadge}</span>${ratingHtml}`;
+            btn.innerHTML = `<i class="bi bi-telescope icon-inline flex-shrink-0" aria-hidden="true"></i><span class="flex-grow-1">${escapeHtml(t.telescope_name || t.telescope_id)}${sharedBadge} ${stateBadge}</span>${ratingHtml}`;
             btn.addEventListener('click', () => {
                 overlay.remove();
                 resolve({ telescope_id: t.telescope_id, telescope_name: t.telescope_name });
             });
             body.appendChild(btn);
-        });
+        };
+
+        ownItems.forEach(appendTelescopeBtn);
+
+        if (sharedItems.length > 0) {
+            const sep = document.createElement('hr');
+            sep.className = 'my-2';
+            body.appendChild(sep);
+            const sepLabel = document.createElement('div');
+            sepLabel.className = 'text-muted small px-1 mb-1';
+            sepLabel.textContent = i18n.t('equipment.shared_by_others_section');
+            body.appendChild(sepLabel);
+            sharedItems.forEach(appendTelescopeBtn);
+        }
 
         const footer = document.createElement('div');
         footer.className = 'modal-footer';
@@ -231,13 +252,23 @@ function _skytBuildTelescopeRecommendationsHtml(response, row) {
                 </thead>
                 <tbody>`;
 
-    recommendations.forEach((item) => {
+    const sorted = [...recommendations].sort((a, b) => {
+        const aOwned = !a.owner_username ? 0 : 1;
+        const bOwned = !b.owner_username ? 0 : 1;
+        if (aOwned !== bOwned) return aOwned - bOwned;
+        return (b.rating_1_to_5 || 0) - (a.rating_1_to_5 || 0);
+    });
+
+    sorted.forEach((item) => {
         const scopeName = `${item.name || ''}${item.manufacturer ? ` (${item.manufacturer})` : ''}`.trim();
         const rating = parseInt(item.rating_1_to_5, 10) || 1;
         const noteText = _skytBuildTelescopeRecommendationNote(item);
+        const sharedBadge = item.owner_username
+            ? ` <span class="badge bg-info text-dark" style="font-size:0.7em">${escapeHtml(tSkyTonightCompat('telescope_reco_shared_by').replace('{username}', item.owner_username))}</span>`
+            : '';
         html += `
             <tr>
-                <td>${escapeHtml(scopeName)}</td>
+                <td>${escapeHtml(scopeName)}${sharedBadge}</td>
                 <td class="text-center" title="${escapeHtml(String(rating))}/5">${escapeHtml(_skytStarsFromRating(rating))}</td>
                 <td>${escapeHtml(noteText)}</td>
             </tr>`;
