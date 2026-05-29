@@ -139,8 +139,22 @@ h3 {
     display: block;
 }
 
-@media (max-width: 1024px) {
-    .navbar .nav-link {        
+@media (min-width: 992px) and (max-width: 1292px) {
+    .navbar .nav-link {
+        margin-right: 0.25rem;
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+        font-size: 0.875rem;
+    }
+
+    .main-tab-btn, .main-tab-dropdown {
+        padding: 0.5rem 0.65rem !important;
+        gap: 0.3rem;
+    }
+}
+
+@media (max-width: 991.98px) {
+    .navbar .nav-link {
         text-align: center;
         vertical-align: middle;
     }
@@ -635,6 +649,17 @@ body.density-compact .alert {
 
 .sub-tab-btn.active::before {
     left: 0;
+}
+
+@media (max-width: 1292px) {
+    .sub-tab-btn {
+        padding: 0.4rem 0.6rem !important;
+        font-size: 0.8rem;
+    }
+
+    .sub-tabs li {
+        margin-right: 0.25rem;
+    }
 }
 
 /* Catalogue Type Button Styling */
