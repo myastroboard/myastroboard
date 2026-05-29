@@ -850,7 +850,7 @@ function renderMyChart(data) {
 ## Internationalization (i18n) & Translations
 
 ### Overview
-MyAstroBoard supports multiple languages through a structured i18n system. Currently supported languages: **English (en)**, **French (fr)**.
+MyAstroBoard supports multiple languages through a structured i18n system. Currently supported languages: **English (en)**, **French (fr)**, **Spanish (es)**, **German (de)**, **Italian (it)**, **Portuguese (pt)**.
 
 ### Key Principles
 - **All user-facing text must be translatable** - No hardcoded strings in UI
@@ -932,7 +932,7 @@ await i18n.setLanguage('fr');  // Switch to French
 const currentLang = i18n.getCurrentLanguage();
 
 // Get supported languages
-const langs = i18n.getSupportedLanguages();  // Returns ['en', 'fr']
+const langs = i18n.getSupportedLanguages();  // Returns ['en', 'fr', 'es', 'de', 'it', 'pt']
 
 // Listen for language changes (useful for components needing dynamic updates)
 window.addEventListener('i18nLanguageChanged', (e) => {
@@ -1065,7 +1065,7 @@ Example structure:
 ### Guidelines for Implementing Translations
 
 #### When Adding New User-Facing Text
-1. **Define translation keys** in both `en.json` and `fr.json`
+1. **Define translation keys** in all language files (`en.json`, `fr.json`, `es.json`, `de.json`, `it.json`, `pt.json`)
 2. **Use descriptive key names** that reflect the content location
 3. **Group related keys** in the same namespace
 4. **Include context in comments** if key meaning is ambiguous
@@ -1112,11 +1112,16 @@ return jsonify({
 
 ### Adding a New Language
 
-1. Create new translation file: `static/i18n/[language].json`
-2. Copy structure from `en.json`
-3. Translate all keys to the new language
-4. Update `SUPPORTED_LANGUAGES` in `backend/i18n_utils.py`
-5. Languages will be automatically available in the UI
+Every step below is mandatory — missing any one of them causes a partial or broken language integration.
+
+1. Add the language code to the `choices` list in `scripts/translate_i18n_values.py`
+2. Run the translation script: `python scripts/translate_i18n_values.py --lang XX`; review output carefully
+3. Add the language to `_TRANSLATION_FILENAMES` in `backend/i18n_utils.py`
+4. **Add the language code to the `allowed` set in `backend/app.py` → `web_manifest_localized()`** — omitting this returns 404 for the manifest and breaks the PWA service worker install
+5. Add `'/manifest.XX.webmanifest'` and `'/static/i18n/XX.json'` to `APP_SHELL_URLS` in `static/sw.js`
+6. Add a `<option value="XX">` to the language selector in `templates/index.html`
+7. Add the language code to the `supported` array in the inline `<script>` block in `templates/index.html` (controls PWA manifest URL switching)
+8. Create the translated webmanifest: copy `static/manifest.webmanifest` to `static/manifest.XX.webmanifest` and translate the required keys (`description`, `lang`, `screenshots[].label`, `shortcuts[].name/short_name/description`)
 
 ### Translation Quality Assurance
 - **Scientific accuracy** - Translations must maintain accuracy for astronomical terms
