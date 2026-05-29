@@ -1,5 +1,7 @@
 #### SkyTonight
 
+- Light pollution (Bortle/SQM) integration: configure your site's Bortle class once in Location Settings to weight AstroScore by sky darkness. Galaxies are most affected; planets are immune. Integration is inactive when no Bortle class is configured. Optional SQM field for users with a real SQM meter (overrides the Bortle midpoint estimate).
+
 - Add solar elongation calculations and display in reports
 - Alt vs time graph considere both nautic and astro night
 - New "DSO not found?" sub-tab

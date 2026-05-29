@@ -88,6 +88,8 @@ def sample_config():
             "longitude": -73.5,
             "elevation": 50,
             "timezone": "America/Montreal",
+            "bortle": None,
+            "sqm": None,
         },
         "min_altitude": 25,
         "astrodex": {"private": False},

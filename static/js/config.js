@@ -53,6 +53,13 @@ async function loadConfiguration() {
         const timezone = document.getElementById('timezone');
         if (timezone) timezone.value = config.location?.timezone || 'UTC';
 
+        // Sky quality (light pollution)
+        const bortleSelect = document.getElementById('bortle-class');
+        if (bortleSelect) bortleSelect.value = config.location?.bortle != null ? String(config.location.bortle) : '';
+
+        const sqmInput = document.getElementById('sqm-value');
+        if (sqmInput) sqmInput.value = config.location?.sqm != null ? config.location.sqm : '';
+
         // Astrodex options
         const astrodexPrivate = document.getElementById('astrodex-private');
         if (astrodexPrivate) astrodexPrivate.checked = config.astrodex?.private !== false;
@@ -103,7 +110,9 @@ async function saveConfiguration() {
             latitude: parseFloat(document.getElementById('latitude-input').value),
             longitude: parseFloat(document.getElementById('longitude-input').value),
             elevation: parseFloat(document.getElementById('elevation').value || 0),
-            timezone: document.getElementById('timezone').value
+            timezone: document.getElementById('timezone').value,
+            bortle: (() => { const v = document.getElementById('bortle-class')?.value; return v ? parseInt(v, 10) : null; })(),
+            sqm: (() => { const v = document.getElementById('sqm-value')?.value; return v !== '' && v != null ? parseFloat(v) : null; })(),
         },
         astrodex: {
             private: document.getElementById('astrodex-private').checked

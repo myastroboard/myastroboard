@@ -1079,6 +1079,45 @@
 
                 <div class="shadow p-2 mb-3 rounded bg-sub-container">
                     <h2>
+                        <i class="bi bi-moon-stars text-info icon-inline" aria-hidden="true"></i> <span data-i18n="settings.sky_quality">Sky Quality (Light Pollution)</span>
+                    </h2>
+
+                    <div class="alert alert-info" role="alert">
+                        <span data-i18n="settings.sky_quality_info">Bortle class describes your site's light pollution level. Find it at <a href="https://www.lightpollutionmap.info" target="_blank" rel="noopener noreferrer">lightpollutionmap.info</a> (World Atlas layer).</span>
+                    </div>
+
+                    <div class="row g-3 mb-2">
+                        <div class="col-md-4">
+                            <label for="bortle-class" class="form-label" data-i18n="settings.sky_quality_bortle">Bortle Class:</label>
+                            <select id="bortle-class" class="form-select">
+                                <option value="" data-i18n="settings.sky_quality_bortle_disabled">Not configured (LP disabled)</option>
+                                <option value="1" data-i18n="settings.sky_quality_bortle_1">1 — Excellent dark sky</option>
+                                <option value="2" data-i18n="settings.sky_quality_bortle_2">2 — Dark sky</option>
+                                <option value="3" data-i18n="settings.sky_quality_bortle_3">3 — Rural</option>
+                                <option value="4" data-i18n="settings.sky_quality_bortle_4">4 — Rural / suburban</option>
+                                <option value="5" data-i18n="settings.sky_quality_bortle_5">5 — Suburban</option>
+                                <option value="6" data-i18n="settings.sky_quality_bortle_6">6 — Bright suburban</option>
+                                <option value="7" data-i18n="settings.sky_quality_bortle_7">7 — Suburban / urban</option>
+                                <option value="8" data-i18n="settings.sky_quality_bortle_8">8 — City</option>
+                                <option value="9" data-i18n="settings.sky_quality_bortle_9">9 — Inner city</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label for="sqm-value" class="form-label" data-i18n="settings.sky_quality_sqm">SQM (optional):</label>
+                            <div class="input-group">
+                                <input type="number" id="sqm-value" class="form-control" step="0.1" min="15" max="23" data-i18n-placeholder="settings.sky_quality_sqm_placeholder" placeholder="e.g. 20.8">
+                                <span class="input-group-text">mag/arcsec²</span>
+                            </div>
+                            <div class="form-text" data-i18n="settings.sky_quality_sqm_info">Enter if you have a real SQM meter reading. Overrides the Bortle midpoint estimate.</div>
+                        </div>
+                    </div>
+
+                    <div class="form-text text-muted" data-i18n="settings.sky_quality_disabled_info">Leaving both empty disables light pollution integration.</div>
+                </div>
+
+                <div class="shadow p-2 mb-3 rounded bg-sub-container">
+                    <h2>
                         <i class="bi bi-stars text-warning icon-inline" aria-hidden="true"></i> <span data-i18n="settings.astrodex">Astrodex</span>
                     </h2>
 

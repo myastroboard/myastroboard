@@ -135,6 +135,22 @@ async function loadWeather() {
         containerLocation.appendChild(nameCol);
         containerLocation.appendChild(coordCol);
         containerLocation.appendChild(tzCol);
+
+        // Append Bortle/SQM to the timezone card if configured (non-blocking)
+        fetchJSON('/api/skyquality').then(sq => {
+            if (sq && sq.bortle != null) {
+                const sqP = document.createElement('p');
+                sqP.className = 'card-text mt-2';
+                const bortleLabel = i18n.t(`settings.sky_quality_bortle_${sq.bortle}`);
+                let sqText = `${i18n.t('weather.bortle')}${bortleLabel}`;
+                if (sq.sqm != null) {
+                    sqText += `\n${i18n.t('weather.sqm')}${sq.sqm} mag/arcsec²`;
+                }
+                sqP.textContent = sqText;
+                sqP.style.whiteSpace = 'pre-line';
+                tzBody.appendChild(sqP);
+            }
+        }).catch(() => {});
     }
 
     // if forecast list is available

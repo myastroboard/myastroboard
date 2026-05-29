@@ -489,6 +489,8 @@ def compute_astro_score(
     is_messier: bool = False,
     is_planet: bool = False,
     is_opposition: bool = False,
+    sqm: Optional[float] = None,
+    object_type: Optional[str] = None,
 ) -> float:
     """
     Compute AstroScore on [0, 1] for astrophotography suitability.
@@ -522,6 +524,12 @@ def compute_astro_score(
     moon_distance_used = angular_distance_moon if angular_distance_moon is not None else 180.0
     moon_impact = moon_phase * (1.0 - moon_distance_used / 180.0)
     sky_score = max(0.0, 1.0 - moon_impact)
+
+    # Light pollution penalty: multiply sky score by the per-object-type LP factor.
+    # When sqm is None (not configured) the factor is 1.0 → no change.
+    if sqm is not None:
+        from sky_quality import object_lp_factor
+        sky_score *= object_lp_factor(sqm, object_type)
 
     # --- score_object ---
     sb = _surface_brightness(magnitude, size_arcmin)
@@ -584,6 +592,7 @@ def _compute_target_result(
     lst_hours: Optional[np.ndarray] = None,
     times_local: Optional[List[datetime]] = None,
     preferred_name_order: Optional[List[str]] = None,
+    sqm: Optional[float] = None,
 ) -> Optional[Dict[str, Any]]:
     """Return a computed result dict for one target, or None if not visible."""
     if target.coordinates is None:
@@ -736,6 +745,8 @@ def _compute_target_result(
         is_messier=is_messier,
         is_planet=(target.object_type or '').lower() == 'planet',
         is_opposition=False,
+        sqm=sqm,
+        object_type=target.object_type,
     )
 
     return {
@@ -1038,6 +1049,24 @@ def run_calculations(
     timezone_name = str(location.get('timezone') or 'UTC')
     location_name = str(location.get('name') or 'default-location')
 
+    # Derive effective SQM for light-pollution weighting.
+    # User-measured SQM takes priority; otherwise derive from Bortle midpoint.
+    # If neither is configured, sqm stays None and LP weighting is disabled.
+    _sqm_for_run: Optional[float] = None
+    _raw_sqm = location.get('sqm')
+    _raw_bortle = location.get('bortle')
+    if _raw_sqm is not None:
+        try:
+            _sqm_for_run = float(_raw_sqm)
+        except (TypeError, ValueError):
+            pass
+    elif _raw_bortle is not None:
+        try:
+            from sky_quality import bortle_to_sqm as _bortle_to_sqm
+            _sqm_for_run = _bortle_to_sqm(int(_raw_bortle))
+        except (TypeError, ValueError):
+            pass
+
     skytonight_cfg = config.get('skytonight', {}) if isinstance(config, dict) else {}
     constraints: Dict[str, Any] = skytonight_cfg.get('constraints', {})
 
@@ -1249,6 +1278,7 @@ def run_calculations(
             lon=lon,
             az_values=az_values_comet,
             preferred_name_order=preferred_name_order,
+            sqm=_sqm_for_run,
         )
         if result is not None:
             comets_results.append(result)
@@ -1379,6 +1409,7 @@ def run_calculations(
                     lst_hours=lst_hours_arr,
                     times_local=times_local,
                     preferred_name_order=preferred_name_order,
+                    sqm=_sqm_for_run,
                 )
                 if result is not None:
                     deep_sky_results.append(result)

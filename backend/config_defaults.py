@@ -11,7 +11,9 @@ DEFAULT_LOCATION = {
     "latitude": 48.866669,
     "longitude": 2.33333,
     "elevation": 35,
-    "timezone": "Europe/Paris"
+    "timezone": "Europe/Paris",
+    "bortle": None,   # int 1–9, or null (light pollution integration inactive)
+    "sqm": None,      # float mag/arcsec², user-measured; takes priority over bortle
 }
 
 # Default feature flags

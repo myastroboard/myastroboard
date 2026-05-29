@@ -645,7 +645,28 @@ def update_config_api():
         config['skytonight']['constraints'] = legacy_constraints
 
     config['skytonight']['enabled'] = True
-    
+
+    # Validate light pollution fields
+    _bortle_val = new_location.get('bortle')
+    _sqm_val = new_location.get('sqm')
+    if _bortle_val is not None:
+        try:
+            _b = int(_bortle_val)
+            if not (1 <= _b <= 9):
+                raise ValueError()
+            new_location['bortle'] = _b
+        except (TypeError, ValueError):
+            return jsonify({"error": "location.bortle must be an integer between 1 and 9"}), 400
+    if _sqm_val is not None:
+        try:
+            _s = float(_sqm_val)
+            if _s <= 0:
+                raise ValueError()
+            new_location['sqm'] = _s
+        except (TypeError, ValueError):
+            return jsonify({"error": "location.sqm must be a positive float (mag/arcsec²)"}), 400
+    config['location'] = new_location
+
     # Save the new config
     save_config(config)
     
@@ -701,6 +722,71 @@ def export_config_api():
     except Exception as e:
         logger.error(f"Error exporting config: {e}")
         return jsonify({'error': 'Internal server error'}), 500
+
+
+@app.route('/api/skyquality', methods=['GET'])
+@login_required
+def get_sky_quality_api():
+    """
+    Return the configured sky quality (Bortle / SQM) for the current location.
+
+    When neither bortle nor sqm is configured, sqm_source is "not_configured"
+    and all numeric fields are null — the LP integration is inactive.
+    """
+    from sky_quality import (
+        bortle_to_sqm, sqm_to_bortle, light_pollution_factor,
+        BORTLE_DESCRIPTIONS,
+    )
+    config = load_config()
+    location = config.get('location', {})
+    raw_sqm = location.get('sqm')
+    raw_bortle = location.get('bortle')
+
+    sqm: Optional[float] = None
+    bortle: Optional[int] = None
+    sqm_source: str = "not_configured"
+
+    if raw_sqm is not None and raw_bortle is not None:
+        # Both provided (e.g. read from lightpollutionmap.info): trust as-is.
+        # Do not re-derive bortle from sqm — the two values come from the same
+        # source and may use different boundary tables.
+        try:
+            sqm = float(raw_sqm)
+            bortle = int(raw_bortle)
+            sqm_source = "user_measured"
+        except (TypeError, ValueError):
+            pass
+    elif raw_sqm is not None:
+        try:
+            sqm = float(raw_sqm)
+            bortle = sqm_to_bortle(sqm)
+            sqm_source = "user_measured"
+        except (TypeError, ValueError):
+            pass
+    elif raw_bortle is not None:
+        try:
+            bortle = int(raw_bortle)
+            sqm = bortle_to_sqm(bortle)
+            sqm_source = "bortle_midpoint"
+        except (TypeError, ValueError):
+            pass
+
+    if sqm is not None and bortle is not None:
+        return jsonify({
+            "bortle": bortle,
+            "sqm": round(sqm, 2),
+            "sqm_source": sqm_source,
+            "light_pollution_factor": light_pollution_factor(sqm),
+            "description": BORTLE_DESCRIPTIONS.get(bortle, ""),
+        })
+
+    return jsonify({
+        "bortle": None,
+        "sqm": None,
+        "sqm_source": "not_configured",
+        "light_pollution_factor": None,
+        "description": None,
+    })
 
 
 @app.route('/api/backup/download', methods=['GET'])

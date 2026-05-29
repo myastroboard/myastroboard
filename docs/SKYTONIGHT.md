@@ -217,6 +217,56 @@ Full parameter details: [API_ENDPOINTS.md](API_ENDPOINTS.md)
 - **GaryImm**: astrophotography list compiled by Gary Imm, YAML source via [uptonight](https://github.com/mawinkler/uptonight)
 - **Arp Atlas of Peculiar Galaxies**: Halton Arp (1966); NGC/IC cross-refs from NASA/IPAC Extragalactic Database (NED)
 - **Sharpless catalogue**: Sharpless (1959), VizieR VII/20
+---
+
+## Light Pollution Integration
+
+AstroScore includes an optional light pollution penalty based on your site's **Bortle class** or a direct **SQM** (Sky Quality Meter) reading.
+
+### Configuration
+
+Set your site's Bortle class in **Settings → Configuration → Sky Quality (Light Pollution)**:
+
+- **Bortle Class** (dropdown 1–9): choose the class that matches your observing site. You can look up your location on [lightpollutionmap.info](https://www.lightpollutionmap.info) using the *World Atlas* layer.
+- **SQM** (optional, mag/arcsec²): enter if you have a real SQM-meter reading. This overrides the Bortle midpoint estimate and gives more precise weighting.
+
+Leaving both fields empty disables the feature entirely — AstroScore behaves exactly as before.
+
+### How it affects AstroScore
+
+The LP factor is applied to the **sky score** component (weight 0.25) of AstroScore, which already accounts for moon phase and angular distance. The combined factor degrades the sky score in proportion to your light pollution level.
+
+Different object types respond differently to light pollution:
+
+| Object type | LP sensitivity | Notes |
+|---|---|---|
+| Galaxy | 1.0 (full) | Very sensitive to sky gradient |
+| Nebula | 0.85 | Broadband is affected |
+| Cluster | 0.50 | Moderately affected |
+| Comet | 0.70 | Moderately affected |
+| Planet | 0.05 | Effectively immune |
+| Moon | 0.00 | Completely immune |
+
+At a Bortle 5 (suburban) site, a galaxy loses roughly 20–25 % of its sky score compared to a Bortle 2 site, while planets are unaffected.
+
+### API
+
+`GET /api/skyquality` returns the current sky quality configuration:
+
+```json
+{
+  "bortle": 5,
+  "sqm": 20.55,
+  "sqm_source": "bortle_midpoint",
+  "light_pollution_factor": 0.5196,
+  "description": "Suburban"
+}
+```
+
+`sqm_source` is one of `"user_measured"`, `"bortle_midpoint"`, or `"not_configured"`.
+
+---
+
 - **Barnard dark nebulae**: Barnard (1927), VizieR VII/220A
 - **van den Bergh reflection nebulae**: van den Bergh (1966), VizieR VII/21
 - **Abell planetary nebulae**: Abell (1966), ApJS 12, 391; coordinates from SIMBAD (CDS, Strasbourg)

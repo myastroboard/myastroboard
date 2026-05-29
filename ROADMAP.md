@@ -37,6 +37,3 @@ This document describes features that could potentially be integrated into MyAst
 ### PWA application
 **Objective: Real PWA application for mobile**
 - PWA notifications for improving conditions (weather, ... ?)
-
-### Ideas in raw
-1	Bortle/SQM in AstroScore    Low	        High — corrects score_object for light pollution

@@ -33,6 +33,7 @@ This page lists the HTTP routes currently declared in `backend/app.py` and `back
 - `GET /api/config`
 - `POST /api/config`
 - `GET /api/config/export`
+- `GET /api/skyquality`
 
 ## Backup & Restore
 
