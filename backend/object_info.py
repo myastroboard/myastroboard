@@ -398,6 +398,48 @@ def _wikipedia_with_fallback(aliases: List[str], lang: str) -> Optional[Dict[str
 
 
 # ──────────────────────────────────────────────
+# SIMBAD identifier normalisation
+# ──────────────────────────────────────────────
+
+# Mapping from our identifier formats to the formats SIMBAD uses internally.
+# SIMBAD identifiers are case-sensitive and use specific spacing conventions.
+_VDB_RE      = re.compile(r'^vdB\s+(\d+)$', re.I)
+_SH2_RE      = re.compile(r'^Sh2-(\d+)$', re.I)
+_BARNARD_RE  = re.compile(r'^Barnard\s+(\d+)$', re.I)
+_ABELL_RE    = re.compile(r'^Abell\s+(\d+)$', re.I)
+
+
+def _simbad_identifier_variants(identifier: str) -> List[str]:
+    """Return alternative SIMBAD-compatible identifiers to try when the primary lookup fails.
+
+    SIMBAD uses different capitalization and spacing than our preferred names:
+      vdB N    → VdB N       (different capitalisation)
+      Sh2-N    → Sh 2-N      (space before "2-")
+      Barnard N → B  N       (abbreviated with double space)
+      Abell N  → PN A66  N   (planetary nebula catalog)
+                 ACO  N      (galaxy cluster catalog)
+    """
+    m = _VDB_RE.match(identifier)
+    if m:
+        return [f'VdB {m.group(1)}']
+
+    m = _SH2_RE.match(identifier)
+    if m:
+        return [f'Sh 2-{m.group(1)}']
+
+    m = _BARNARD_RE.match(identifier)
+    if m:
+        return [f'B  {m.group(1)}']
+
+    m = _ABELL_RE.match(identifier)
+    if m:
+        n = m.group(1)
+        return [f'PN A66  {n}', f'ACO  {n}']
+
+    return []
+
+
+# ──────────────────────────────────────────────
 # Public API
 # ──────────────────────────────────────────────
 
@@ -456,8 +498,48 @@ def get_object_info(identifier: str, lang: str = 'en') -> Dict[str, Any]:
         }
 
     # ── Phase 1: object resolution ──────────────────
+    from skytonight_targets import get_lookup_entry as _get_local_entry
+
     resolved = _resolve_via_simbad(identifier)
+
+    # When the primary lookup fails, try alternative SIMBAD identifier formats
+    # (e.g. "vdB 146" → "VdB 146", "Sh2-1" → "Sh 2-1", "Barnard 1" → "B  1").
     if not resolved:
+        for _variant in _simbad_identifier_variants(identifier):
+            resolved = _resolve_via_simbad(_variant)
+            if resolved:
+                break
+
+    # When SIMBAD has no record at all, fall back to local dataset coordinates
+    # so we can still show the DSS image and Wikipedia description.
+    if not resolved:
+        _local_entry = _get_local_entry('alias', identifier)
+        if not _local_entry:
+            _local_entry = _get_local_entry('preferred', identifier)
+        if _local_entry and _local_entry.get('ra_deg') is not None:
+            _ra  = float(_local_entry['ra_deg'])
+            _dec = float(_local_entry['dec_deg'])
+            _local_type = str(_local_entry.get('object_type') or '').strip()
+            _preferred  = str(_local_entry.get('preferred_name') or identifier).strip()
+            _image = {'url': _get_dss_image_url(_ra, _dec), 'credit': 'DSS2 Red / CDS HiPS'}
+            _seen: set = set()
+            _search_terms: List[str] = []
+            for _t in [identifier, _preferred]:
+                _norm = _normalize_wikipedia_term(_t)
+                if _norm not in _seen:
+                    _seen.add(_norm)
+                    _search_terms.append(_norm)
+            _wiki = _wikipedia_with_fallback(_search_terms, lang)
+            return {
+                'id': _preferred,
+                'name': _preferred,
+                'aliases': [],
+                'type': _translate_object_type(_local_type, lang),
+                'coordinates': {'ra': _ra, 'dec': _dec},
+                'description': _wiki.get('extract') if _wiki else None,
+                'description_title': _wiki.get('title') if _wiki else None,
+                'image': _image,
+            }
         return {
             'id': identifier,
             'name': identifier,
@@ -477,7 +559,6 @@ def get_object_info(identifier: str, lang: str = 'en') -> Dict[str, Any]:
     # object_type from the local dataset when available — the local type matches the
     # i18n keys used by tSkyTonightType() in the frontend (e.g. "Open Cluster" →
     # skytonight.type_open_cluster → "Amas ouvert").
-    from skytonight_targets import get_lookup_entry as _get_local_entry
     _local_entry = _get_local_entry('alias', identifier)
     if not _local_entry:
         # Also try via SIMBAD main_id in case identifier was an alias

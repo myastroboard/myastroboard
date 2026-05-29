@@ -2280,9 +2280,12 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
     const _startIdx   = page * SKYT_PAGE_SIZE;
     const _pageRows   = report.slice(_startIdx, Math.min(_startIdx + SKYT_PAGE_SIZE, _totalItems));
 
-    // Extract unique values for constellation and type filters (from the FULL dataset for complete filter lists)
-    const constellations = [...new Set(report.map(r => r.constellation).filter(c => c))].sort();
-    const types = [...new Set(report.map(r => r.type).filter(t => t))].sort();
+    // Extract unique values for constellation and type filters (from the FULL dataset for complete filter lists).
+    // Sort by translated label so the dropdown order is alphabetical in the active locale.
+    const constellations = [...new Set(report.map(r => r.constellation).filter(c => c))]
+        .sort((a, b) => _translatedConstellation(a).localeCompare(_translatedConstellation(b)));
+    const types = [...new Set(report.map(r => r.type).filter(t => t))]
+        .sort((a, b) => tSkyTonightType(a).localeCompare(tSkyTonightType(b)));
 
     const eCat = escapeHtml(catalogue);
     const eType = escapeHtml(type);
@@ -2356,13 +2359,20 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
 
         // Add catalogue filter for curated sub-lists present in this report
         const _catFilterOptions = [
-            { key: 'Caldwell',    label: 'Caldwell' },
-            { key: 'Herschel400', label: 'Herschel 400' },
-            { key: 'OpenIC',      label: 'IC' },
-            { key: 'LBN',         label: 'LBN' },
-            { key: 'Messier',     label: 'Messier' },
-            { key: 'OpenNGC',     label: 'NGC' },
-            { key: 'Pensack500',  label: 'Pensack 500' },
+            { key: 'AbellClusters', label: 'Abell Clusters' },
+            { key: 'AbellPNe',      label: 'Abell PNe' },
+            { key: 'Arp',           label: 'Arp' },
+            { key: 'Barnard',       label: 'Barnard' },
+            { key: 'Caldwell',      label: 'Caldwell' },
+            { key: 'GaryImm',       label: 'GaryImm' },
+            { key: 'Herschel400',   label: 'Herschel 400' },
+            { key: 'OpenIC',        label: 'IC' },
+            { key: 'LBN',           label: 'LBN' },
+            { key: 'Messier',       label: 'Messier' },
+            { key: 'OpenNGC',       label: 'NGC' },
+            { key: 'Pensack500',    label: 'Pensack 500' },
+            { key: 'Sharpless',     label: 'Sharpless' },
+            { key: 'vdB',           label: 'vdB' },
         ];
         const _availableCatFilters = _catFilterOptions.filter(opt =>
             report.some(r => r.catalogue_names && r.catalogue_names[opt.key])

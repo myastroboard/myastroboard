@@ -7,6 +7,7 @@
   - Check the calcultation and compare to the constrainst
   - And finally, you can adapt your configuration according these results.
 - Possibility to filter by catalogue
+- Add catalogues: Abell PNe, Abell Clusters, Arp, Barnard, GaryImm, Sharpless, vdB
 
 #### Plan my Night
 

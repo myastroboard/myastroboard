@@ -86,4 +86,4 @@ LOG_LEVEL = os.environ.get('LOG_LEVEL', 'WARNING').upper()  # Global log level f
 CONSOLE_LOG_LEVEL = os.environ.get('CONSOLE_LOG_LEVEL', 'WARNING').upper()  # Console log level
 
 # SkyTonight dataset configuration
-SKYTONIGHT_PREFERRED_NAME_ORDER = ['CommonName', 'Messier', 'OpenNGC', 'OpenIC', 'Caldwell', 'LBN', 'Herschel400', 'Pensack500']
+SKYTONIGHT_PREFERRED_NAME_ORDER = ['CommonName', 'Messier', 'OpenNGC', 'OpenIC', 'Caldwell', 'LBN', 'Herschel400', 'Pensack500', 'GaryImm', 'Arp', 'Sharpless', 'Barnard', 'vdB', 'AbellPNe', 'AbellClusters']

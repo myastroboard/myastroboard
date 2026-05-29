@@ -1,0 +1,332 @@
+[
+  {
+    "name": "Arp 142",
+    "ra_hours": 9.629167,
+    "dec_degrees": 2.733333,
+    "size_arcmin": 2.0,
+    "type": "Galaxy Duo",
+    "description": "Penguin and Egg Galaxy",
+    "mag": null,
+    "constellation": "Hydra"
+  },
+  {
+    "name": "Arp 188",
+    "ra_hours": 16.101111,
+    "dec_degrees": 55.425556,
+    "size_arcmin": 3.6,
+    "type": "Galaxy",
+    "description": "Tadpole Galaxy",
+    "mag": null,
+    "constellation": "Draco"
+  },
+  {
+    "name": "Arp 244",
+    "ra_hours": 12.031389,
+    "dec_degrees": -18.868611,
+    "size_arcmin": 2.6,
+    "type": "Galaxy",
+    "description": "Antennae Galaxy Duo",
+    "mag": null,
+    "constellation": "Corvus"
+  },
+  {
+    "name": "Arp 269",
+    "ra_hours": 12.51,
+    "dec_degrees": 41.642222,
+    "size_arcmin": 6.0,
+    "type": "Galaxy",
+    "description": "Cocoon Galaxy",
+    "mag": 9.8,
+    "constellation": "Canes Venatici"
+  },
+  {
+    "name": "Arp 273",
+    "ra_hours": 2.358889,
+    "dec_degrees": 39.35,
+    "size_arcmin": 1.5,
+    "type": "Galaxy",
+    "description": "The Rose Galaxies",
+    "mag": 12.9,
+    "constellation": "Andromeda"
+  },
+  {
+    "name": "Arp 316",
+    "ra_hours": 10.301667,
+    "dec_degrees": 21.816667,
+    "size_arcmin": 30.0,
+    "type": "Galaxy",
+    "description": "Hickson 44 Galaxy Group",
+    "mag": 11.1,
+    "constellation": "Leo"
+  },
+  {
+    "name": "Arp 317",
+    "ra_hours": 11.315278,
+    "dec_degrees": 13.083333,
+    "size_arcmin": 50.0,
+    "type": "Galaxy Group",
+    "description": "Leo Triplet",
+    "mag": null,
+    "constellation": "Leo"
+  },
+  {
+    "name": "Arp 319",
+    "ra_hours": 22.601111,
+    "dec_degrees": 33.933333,
+    "size_arcmin": 5.0,
+    "type": "Galaxy Group",
+    "description": "Stephan Quintet",
+    "mag": 13.6,
+    "constellation": "Pegasus"
+  },
+  {
+    "name": "Arp 321",
+    "ra_hours": 9.648056,
+    "dec_degrees": -4.85,
+    "size_arcmin": 4.0,
+    "type": "Galaxy Group",
+    "description": "Arp 321",
+    "mag": null,
+    "constellation": "Hydra"
+  },
+  {
+    "name": "Arp 84",
+    "ra_hours": 13.977222,
+    "dec_degrees": 37.425,
+    "size_arcmin": 3.0,
+    "type": "Galaxy",
+    "description": "Heron Galaxies",
+    "mag": null,
+    "constellation": "Canes Venatici"
+  },
+  {
+    "name": "Bernes 149",
+    "ra_hours": 16.16,
+    "dec_degrees": -39.05,
+    "size_arcmin": 50.0,
+    "type": "Dark Nebula",
+    "description": "Lupus 3 Cloud",
+    "mag": null,
+    "constellation": "Scorpius"
+  },
+  {
+    "name": "Cederblad 211",
+    "ra_hours": 23.729444,
+    "dec_degrees": -15.278611,
+    "size_arcmin": 1.5,
+    "type": "Nova",
+    "description": "R Aquarii",
+    "mag": null,
+    "constellation": "Aquila"
+  },
+  {
+    "name": "CRL 2688",
+    "ra_hours": 21.038333,
+    "dec_degrees": 36.7,
+    "size_arcmin": 0.5,
+    "type": "Preplanetary Nebula",
+    "description": "Egg Nebula",
+    "mag": null,
+    "constellation": "Cygnus"
+  },
+  {
+    "name": "G100.4+04.6",
+    "ra_hours": 21.666667,
+    "dec_degrees": 58.983333,
+    "size_arcmin": 1.0,
+    "type": "Planetary Nebula",
+    "description": "PM 1-333",
+    "mag": null,
+    "constellation": "Cepheus"
+  },
+  {
+    "name": "Hickson 61",
+    "ra_hours": 12.206667,
+    "dec_degrees": 29.177778,
+    "size_arcmin": 3.8,
+    "type": "Galaxy Group",
+    "description": "The Box",
+    "mag": null,
+    "constellation": "Coma Berenices"
+  },
+  {
+    "name": "HP Tau",
+    "ra_hours": 4.598333,
+    "dec_degrees": 22.903889,
+    "size_arcmin": 3.0,
+    "type": "Variable Star",
+    "description": "V1025 Tau",
+    "mag": 14.9,
+    "constellation": "Taurus"
+  },
+  {
+    "name": "Jones-Emberson 1",
+    "ra_hours": 7.965,
+    "dec_degrees": 53.416667,
+    "size_arcmin": 6.0,
+    "type": "Planetary Nebula",
+    "description": "Headphone Nebula",
+    "mag": null,
+    "constellation": "Lynx"
+  },
+  {
+    "name": "LBN 437",
+    "ra_hours": 22.636944,
+    "dec_degrees": 41.09,
+    "size_arcmin": 120.0,
+    "type": "Molecular Cloud",
+    "description": "Gecko Nebula",
+    "mag": null,
+    "constellation": "Lacerta"
+  },
+  {
+    "name": "LBN 438",
+    "ra_hours": 22.688056,
+    "dec_degrees": 37.76,
+    "size_arcmin": 30.0,
+    "type": "Molecular Cloud",
+    "description": "Reaching Hand Nebula",
+    "mag": null,
+    "constellation": "Lacerta"
+  },
+  {
+    "name": "LBN 468",
+    "ra_hours": 20.708056,
+    "dec_degrees": 67.85,
+    "size_arcmin": 120.0,
+    "type": "Molecular Cloud",
+    "description": "Loop of Darkness",
+    "mag": null,
+    "constellation": "Cepheus"
+  },
+  {
+    "name": "LBN 535",
+    "ra_hours": 22.248611,
+    "dec_degrees": 73.416667,
+    "size_arcmin": 15.0,
+    "type": "Reflection Nebula",
+    "description": "Shark Nebula",
+    "mag": null,
+    "constellation": "Cepheus"
+  },
+  {
+    "name": "LBN 777",
+    "ra_hours": 4.083889,
+    "dec_degrees": 26.39,
+    "size_arcmin": 60.0,
+    "type": "Molecular Cloud",
+    "description": "Baby Eagle Nebula",
+    "mag": null,
+    "constellation": "Taurus"
+  },
+  {
+    "name": "LDN 1251",
+    "ra_hours": 22.600833,
+    "dec_degrees": 75.259722,
+    "size_arcmin": 90.0,
+    "type": "Dark Nebula",
+    "description": "Angler Fish Nebula",
+    "mag": null,
+    "constellation": "Cepheus"
+  },
+  {
+    "name": "LDN 1495",
+    "ra_hours": 4.301389,
+    "dec_degrees": 27.621389,
+    "size_arcmin": 40.0,
+    "type": "Dark Nebula",
+    "description": "Taurus Dark Nebulae Region",
+    "mag": null,
+    "constellation": "Taurus"
+  },
+  {
+    "name": "LDN 1622",
+    "ra_hours": 5.900556,
+    "dec_degrees": 1.670833,
+    "size_arcmin": 40.0,
+    "type": "Dark Nebula",
+    "description": "Bogeyman Nebula",
+    "mag": null,
+    "constellation": "Orion"
+  },
+  {
+    "name": "Markarian Chain",
+    "ra_hours": 12.436944,
+    "dec_degrees": 12.946111,
+    "size_arcmin": 90.0,
+    "type": "Galaxy",
+    "description": "Markarian Chain M 86 M 84",
+    "mag": null,
+    "constellation": "Virgo"
+  },
+  {
+    "name": "OU 4",
+    "ra_hours": 21.196389,
+    "dec_degrees": 59.950278,
+    "size_arcmin": 60.0,
+    "type": "Emission Nebula",
+    "description": "Squid Nebula SH2-129",
+    "mag": null,
+    "constellation": "Cepheus"
+  },
+  {
+    "name": "Red Rectangle",
+    "ra_hours": 6.332778,
+    "dec_degrees": -10.6375,
+    "size_arcmin": 0.2,
+    "type": "Preplanetary Nebula",
+    "description": "HD 44179",
+    "mag": 9.0,
+    "constellation": "Monoceros"
+  },
+  {
+    "name": "Rho Ophiuchi",
+    "ra_hours": 16.426389,
+    "dec_degrees": -23.447222,
+    "size_arcmin": 300.0,
+    "type": "Emission Nebula",
+    "description": "rho Ophiuchi",
+    "mag": 4.6,
+    "constellation": "Ophiuchus"
+  },
+  {
+    "name": "Simeis 57",
+    "ra_hours": 20.269444,
+    "dec_degrees": 43.669722,
+    "size_arcmin": 20.0,
+    "type": "Emission Nebula",
+    "description": "Propeller Nebula",
+    "mag": null,
+    "constellation": "Cygnus"
+  },
+  {
+    "name": "Vela Bridge",
+    "ra_hours": 8.6275,
+    "dec_degrees": -42.989167,
+    "size_arcmin": 60.0,
+    "type": "Supernova Remnant",
+    "description": "Vela Bridge Nebula",
+    "mag": null,
+    "constellation": "Vela"
+  },
+  {
+    "name": "Vela Spiral Flame",
+    "ra_hours": 8.905833,
+    "dec_degrees": -43.845278,
+    "size_arcmin": 60.0,
+    "type": "Supernova Remnant",
+    "description": "Vela SNR",
+    "mag": null,
+    "constellation": "Vela"
+  },
+  {
+    "name": "WR 134",
+    "ra_hours": 20.166667,
+    "dec_degrees": 36.183333,
+    "size_arcmin": 25.0,
+    "type": "Wolf-Rayet Nebula",
+    "description": "WR 134",
+    "mag": 8.1,
+    "constellation": "Cygnus"
+  }
+]

@@ -158,6 +158,7 @@ def test_build_and_save_default_dataset_includes_comets(monkeypatch):
     monkeypatch.setattr('skytonight_catalogue_builder.build_body_targets', lambda: [body_target])
     monkeypatch.setattr('skytonight_catalogue_builder.build_comet_targets', lambda source_mode='mpc+jpl': [comet_target])
     monkeypatch.setattr('skytonight_catalogue_builder.save_targets_dataset', lambda targets, metadata=None: True)
+    monkeypatch.setattr('skytonight_catalogue_builder._build_standalone_targets_from_json', lambda filename, catalogue_key: [])
 
     from skytonight_catalogue_builder import build_and_save_default_dataset
 
