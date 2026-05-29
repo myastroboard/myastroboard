@@ -2622,9 +2622,11 @@ def list_plan_my_night():
 
         import equipment_profiles as _ep
         telescopes_data = _ep.load_user_telescopes(user.user_id)
-        telescopes = telescopes_data.get('items', [])
-        states = plan_my_night.get_all_plan_states(user.user_id, user.username, telescopes)
-        return jsonify({'status': 'success', 'plans': states, 'telescope_count': len(telescopes)})
+        own = [{**t, 'is_own': True, 'owner_username': None} for t in telescopes_data.get('items', [])]
+        shared = [{**t, 'is_own': False} for t in _ep.load_all_shared_equipment('telescopes', user.user_id)]
+        all_telescopes = own + shared
+        states = plan_my_night.get_all_plan_states(user.user_id, user.username, all_telescopes)
+        return jsonify({'status': 'success', 'plans': states, 'telescope_count': len(all_telescopes)})
     except Exception as error:
         logger.error(f'Error listing plans: {error}')
         return jsonify({'error': 'Internal server error'}), 500
@@ -3446,8 +3448,10 @@ def get_telescopes():
             return jsonify({'error': 'User not authenticated'}), 401
         
         data = equipment_profiles.load_user_telescopes(user_id)
+        shared = equipment_profiles.load_all_shared_equipment('telescopes', user_id)
         return jsonify({
             'data': data.get('items', []),
+            'shared_from_others': shared,
             'created_at': data.get('created_at'),
             'updated_at': data.get('updated_at')
         })
@@ -3513,8 +3517,11 @@ def update_telescope(telescope_id):
             return jsonify({'error': 'User not authenticated'}), 401
         
         telescope_data = request.json
+        shared = equipment_profiles.load_all_shared_equipment('telescopes', user_id)
+        if any(t['id'] == telescope_id for t in shared):
+            return jsonify({'error': 'Cannot modify shared equipment owned by another user'}), 403
         updated_telescope = equipment_profiles.update_telescope(user_id, telescope_id, telescope_data)
-        
+
         if updated_telescope:
             return jsonify({
                 'status': 'success',
@@ -3560,8 +3567,10 @@ def get_cameras():
             return jsonify({'error': 'User not authenticated'}), 401
         
         data = equipment_profiles.load_user_cameras(user_id)
+        shared = equipment_profiles.load_all_shared_equipment('cameras', user_id)
         return jsonify({
             'data': data.get('items', []),
+            'shared_from_others': shared,
             'created_at': data.get('created_at'),
             'updated_at': data.get('updated_at')
         })
@@ -3627,8 +3636,11 @@ def update_camera(camera_id):
             return jsonify({'error': 'User not authenticated'}), 401
         
         camera_data = request.json
+        shared = equipment_profiles.load_all_shared_equipment('cameras', user_id)
+        if any(c['id'] == camera_id for c in shared):
+            return jsonify({'error': 'Cannot modify shared equipment owned by another user'}), 403
         updated_camera = equipment_profiles.update_camera(user_id, camera_id, camera_data)
-        
+
         if updated_camera:
             return jsonify({
                 'status': 'success',
@@ -3674,8 +3686,10 @@ def get_mounts():
             return jsonify({'error': 'User not authenticated'}), 401
         
         data = equipment_profiles.load_user_mounts(user_id)
+        shared = equipment_profiles.load_all_shared_equipment('mounts', user_id)
         return jsonify({
             'data': data.get('items', []),
+            'shared_from_others': shared,
             'created_at': data.get('created_at'),
             'updated_at': data.get('updated_at')
         })
@@ -3741,8 +3755,11 @@ def update_mount(mount_id):
             return jsonify({'error': 'User not authenticated'}), 401
         
         mount_data = request.json
+        shared = equipment_profiles.load_all_shared_equipment('mounts', user_id)
+        if any(m['id'] == mount_id for m in shared):
+            return jsonify({'error': 'Cannot modify shared equipment owned by another user'}), 403
         updated_mount = equipment_profiles.update_mount(user_id, mount_id, mount_data)
-        
+
         if updated_mount:
             return jsonify({
                 'status': 'success',
@@ -3788,8 +3805,10 @@ def get_filters():
             return jsonify({'error': 'User not authenticated'}), 401
         
         data = equipment_profiles.load_user_filters(user_id)
+        shared = equipment_profiles.load_all_shared_equipment('filters', user_id)
         return jsonify({
             'data': data.get('items', []),
+            'shared_from_others': shared,
             'created_at': data.get('created_at'),
             'updated_at': data.get('updated_at')
         })
@@ -3855,8 +3874,11 @@ def update_filter(filter_id):
             return jsonify({'error': 'User not authenticated'}), 401
         
         filter_data = request.json
+        shared = equipment_profiles.load_all_shared_equipment('filters', user_id)
+        if any(f['id'] == filter_id for f in shared):
+            return jsonify({'error': 'Cannot modify shared equipment owned by another user'}), 403
         updated_filter = equipment_profiles.update_filter(user_id, filter_id, filter_data)
-        
+
         if updated_filter:
             return jsonify({
                 'status': 'success',
@@ -3902,8 +3924,10 @@ def get_accessories():
             return jsonify({'error': 'User not authenticated'}), 401
         
         data = equipment_profiles.load_user_accessories(user_id)
+        shared = equipment_profiles.load_all_shared_equipment('accessories', user_id)
         return jsonify({
             'data': data.get('items', []),
+            'shared_from_others': shared,
             'created_at': data.get('created_at'),
             'updated_at': data.get('updated_at')
         })
@@ -3969,8 +3993,11 @@ def update_accessory(accessory_id):
             return jsonify({'error': 'User not authenticated'}), 401
         
         accessory_data = request.json
+        shared = equipment_profiles.load_all_shared_equipment('accessories', user_id)
+        if any(a['id'] == accessory_id for a in shared):
+            return jsonify({'error': 'Cannot modify shared equipment owned by another user'}), 403
         updated_accessory = equipment_profiles.update_accessory(user_id, accessory_id, accessory_data)
-        
+
         if updated_accessory:
             return jsonify({
                 'status': 'success',
@@ -4016,8 +4043,14 @@ def get_combinations():
             return jsonify({'error': 'User not authenticated'}), 401
         
         data = equipment_profiles.load_user_combinations(user_id)
+        items_with_status = []
+        for combo in data.get('items', []):
+            status = equipment_profiles.compute_combination_share_status(combo, user_id)
+            items_with_status.append({**combo, **status})
+        shared_with_status = equipment_profiles.load_all_shared_combinations(user_id)
         return jsonify({
-            'data': data.get('items', []),
+            'data': items_with_status,
+            'shared_from_others': shared_with_status,
             'created_at': data.get('created_at'),
             'updated_at': data.get('updated_at')
         })
@@ -4062,9 +4095,10 @@ def get_combination(combination_id):
             return jsonify({'error': 'User not authenticated'}), 401
         
         combination = equipment_profiles.get_combination(user_id, combination_id)
-        
+
         if combination:
-            return jsonify(combination)
+            status = equipment_profiles.compute_combination_share_status(combination, user_id)
+            return jsonify({**combination, **status})
         else:
             return jsonify({'error': 'Combination not found'}), 404
     except Exception as e:

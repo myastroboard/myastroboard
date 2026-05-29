@@ -843,6 +843,7 @@
     "telescope_reco_table_rating": "Note",
     "telescope_reco_table_note": "Pourquoi",
     "telescope_reco_no_result": "Aucune recommandation disponible pour cette cible.",
+    "telescope_reco_shared_by": "partagé par {username}",
     "telescope_reco_load_error": "Impossible de charger les recommandations de télescope",
     "telescope_reco_note_focal": "Focale {focal} mm (ideal ~{ideal_min}-{ideal_max} mm).",
     "telescope_reco_note_aperture": "Ouverture {aperture} mm, f/{f_ratio}.",
@@ -1059,6 +1060,7 @@
     "plan_status_current": "Actif",
     "plan_status_previous": "Expiré",
     "plan_status_none": "Aucun plan",
+    "orphaned_telescope": "télescope plus disponible",
     "target_added": "Cible ajoutée à Plan My Night",
     "failed_to_add_target": "Échec de l'ajout de la cible à Plan My Night",
     "export_csv": "Exporter CSV",
@@ -1374,7 +1376,16 @@
     "form_camera": "Caméra",
     "form_mount": "Monture",
     "form_accessories": "Accessoires",
-    "form_filters": "Filtres"
+    "form_filters": "Filtres",
+    "is_shared": "Partager avec tous les utilisateurs",
+    "shared_badge": "Partagé",
+    "shared_by": "Partagé par {username}",
+    "shared_readonly_hint": "Cet équipement appartient à un autre utilisateur (lecture seule)",
+    "combination_broken_share": "Certains équipements de cette combinaison ne sont plus partagés",
+    "broken_share_items": "Concerné : {items}",
+    "my_equipment_section": "Mon Équipement",
+    "shared_by_others_section": "Partagé par d'autres",
+    "shared_fov_suffix": "(partagé par {username})"
   },
   "weather": {
     "observation_conditions": "Conditions d'observation",

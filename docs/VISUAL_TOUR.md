@@ -118,6 +118,8 @@ Plan My Night turns your SkyTonight shortlist into a structured observation sche
 
 Built for real field use: readable in low light, quick to update, and exportable for your records.
 
+Shared telescopes (see [Sharing Equipment](#sharing-equipment--perfect-for-families--astronomy-clubs)) appear in the telescope selector alongside your own, so every club member can plan their session around the shared club scope without needing to duplicate it in their own profile.
+
 ![Plan My Night](img/astrodex_plan_my_night.png)
 
 ---
@@ -163,6 +165,29 @@ Track everything in your kit:
 ![Add telescope](img/equipment_telescopes.png)
 
 ![Equipment accessories](img/equipment_accessories_popup.png)
+
+### Sharing Equipment — Perfect for Families & Astronomy Clubs
+
+Every piece of equipment can be marked **"Share with all users"** in its edit form. Shared items are immediately visible to every other user on the instance — without any configuration on their side.
+
+**What sharing looks like:**
+- Shared items appear in other users' equipment tabs under a *"Shared by Others"* section, clearly labelled with the owner's name. They are **read-only** for non-owners — nobody can accidentally change your gear settings.
+- Your own shared items show a **Shared** badge so you always know what you've made available.
+- **Equipment combinations** inherit shared status automatically: a combination is flagged *Shared* only when every piece of equipment it references (telescope, camera, mount, filters, accessories) is individually shared. If one item later becomes private, the combination shows a ⚠ warning.
+
+**Shared equipment flows through the whole app:**
+
+| Feature | What you get |
+|---------|-------------|
+| **Field of View Calculator** | Shared telescopes & cameras appear in the dropdowns, labelled *(shared by X)* |
+| **SkyTonight — Best Telescope For This Target** | Recommendations include shared telescopes. Own telescopes are listed first. |
+| **Astrodex — Add Picture** | Shared equipment combinations and filters appear in the selection dropdowns. |
+| **Plan My Night** | Shared telescopes appear in the telescope selector (own first, then shared), so any member can plan a session around the club's scope. |
+
+**When a shared telescope is removed or made private:**
+Any observation plan built around it is preserved intact and shown with a ⚠ *"telescope no longer available"* warning. Nothing is deleted silently — the user can review the plan and decide what to do with it.
+
+> **Typical use cases:** A family where one member owns the mount and another owns the camera; an astronomy club with shared club equipment alongside members' personal gear; a pair of astrophotographers splitting a filter set.
 
 ---
 
@@ -271,6 +296,7 @@ New to MyAstroBoard? Here's the quick path to your first observation session:
 
 ## 💡 Pro Tips
 
+- Running MyAstroBoard for a family or club? Enable **"Share with all users"** on your common gear — everyone sees it instantly in their equipment, SkyTonight, Astrodex, and Plan My Night, with no duplicate profiles to maintain
 - Cross-reference the weather and astrophotography dashboards to find the true sweet spot of a night
 - Use altitude charts to avoid slewing to a target that's already past its peak
 - Assign an equipment profile before opening SkyTonight — the AstroScore adapts to your focal length and aperture

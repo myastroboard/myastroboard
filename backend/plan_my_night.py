@@ -809,9 +809,13 @@ def get_all_plan_states(user_id: str, username: str, telescopes: list) -> list:
             'night_end': plan.get('night_end') if plan else None,
         })
 
+    known_ids: set = set()
     for telescope in telescopes:
         tid = telescope.get('id')
         tname = telescope.get('name', '')
+        is_own = telescope.get('is_own', True)
+        owner_username = telescope.get('owner_username')
+        known_ids.add(tid)
         payload = load_user_plan(user_id, username, telescope_id=tid)
         plan = payload.get('plan')
         state = get_plan_state(plan)
@@ -822,6 +826,36 @@ def get_all_plan_states(user_id: str, username: str, telescopes: list) -> list:
             'entries_count': len(plan.get('entries', [])) if plan else 0,
             'night_start': plan.get('night_start') if plan else None,
             'night_end': plan.get('night_end') if plan else None,
+            'is_own': is_own,
+            'owner_username': owner_username,
+            'is_orphaned': False,
+        })
+
+    # Detect orphaned plans: plan files exist but their telescope is no longer accessible
+    # (shared telescope was removed or unshared by its owner)
+    prefix = f'{user_id}_plan_'
+    suffix = '.json'
+    for plan_file in get_all_plan_files(user_id):
+        fname = os.path.basename(plan_file)
+        if not (fname.startswith(prefix) and fname.endswith(suffix)):
+            continue
+        tid = fname[len(prefix):-len(suffix)]
+        if tid == 'my_night' or tid in known_ids:
+            continue
+        payload = load_user_plan(user_id, username, telescope_id=tid)
+        plan = payload.get('plan')
+        orphaned_name = (plan.get('telescope_name') if plan else None) or tid
+        state = get_plan_state(plan)
+        result.append({
+            'telescope_id': tid,
+            'telescope_name': orphaned_name,
+            'state': state,
+            'entries_count': len(plan.get('entries', [])) if plan else 0,
+            'night_start': plan.get('night_start') if plan else None,
+            'night_end': plan.get('night_end') if plan else None,
+            'is_own': True,
+            'owner_username': None,
+            'is_orphaned': True,
         })
 
     return result

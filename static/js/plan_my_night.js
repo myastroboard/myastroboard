@@ -1010,21 +1010,43 @@ function renderPlanMyNight(payload) {
         const selector = document.createElement('select');
         selector.id = 'plan-telescope-selector';
         selector.className = 'form-select form-select-sm';
-        selector.style.maxWidth = '220px';
+        selector.style.maxWidth = '260px';
 
-        telescopeItems.forEach(t => {
+        const ownItems     = telescopeItems.filter(t => t.is_own !== false && !t.is_orphaned);
+        const sharedItems  = telescopeItems.filter(t => t.is_own === false  && !t.is_orphaned);
+        const orphanItems  = telescopeItems.filter(t => t.is_orphaned);
+
+        const appendOption = (t) => {
             const opt = document.createElement('option');
             opt.value = t.telescope_id;
-            opt.textContent = t.telescope_name || t.telescope_id;
+            let label = t.telescope_name || t.telescope_id;
+            if (t.owner_username) label += ` ${i18n.t('equipment.shared_fov_suffix', { username: t.owner_username })}`;
+            if (t.is_orphaned)    label += ` ⚠ ${i18n.t('plan_my_night.orphaned_telescope')}`;
             const stateLabel = t.state !== 'none'
                 ? ` (${i18n.t(`plan_my_night.plan_status_${t.state}`, {defaultValue: t.state})})`
                 : ` (${i18n.t('plan_my_night.plan_status_none', {defaultValue: 'no plan'})})`;
-            opt.textContent += stateLabel;
-            if (t.telescope_id === currentPlanTelescopeId) {
-                opt.selected = true;
-            }
+            opt.textContent = label + stateLabel;
+            if (t.telescope_id === currentPlanTelescopeId) opt.selected = true;
             selector.appendChild(opt);
-        });
+        };
+
+        ownItems.forEach(appendOption);
+
+        if (sharedItems.length > 0) {
+            const sep = document.createElement('option');
+            sep.disabled = true;
+            sep.textContent = '──────────────';
+            selector.appendChild(sep);
+            sharedItems.forEach(appendOption);
+        }
+
+        if (orphanItems.length > 0) {
+            const sep = document.createElement('option');
+            sep.disabled = true;
+            sep.textContent = '──────────────';
+            selector.appendChild(sep);
+            orphanItems.forEach(appendOption);
+        }
 
         selector.addEventListener('change', async () => {
             currentPlanTelescopeId = selector.value || null;

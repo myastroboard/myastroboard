@@ -43,33 +43,55 @@ function getObjectTypeOptionsHtml(selectedType = '') {
 
 let astrodexEquipmentCache = {
     combinations: [],
-    filters: []
+    sharedCombinations: [],
+    filters: [],
+    sharedFilters: []
 };
 
 async function loadEquipmentForAstrodex() {
     try {
-        // Load combinations
+        // Load combinations (own + shared)
         const combosRes = await fetchJSON('/api/equipment/combinations');
         astrodexEquipmentCache.combinations = combosRes.data || [];
-        
-        // Load filters
+        astrodexEquipmentCache.sharedCombinations = combosRes.shared_from_others || [];
+
+        // Load filters (own + shared)
         const filtersRes = await fetchJSON('/api/equipment/filters');
         astrodexEquipmentCache.filters = filtersRes.data || [];
+        astrodexEquipmentCache.sharedFilters = filtersRes.shared_from_others || [];
     } catch (error) {
         console.error('Error loading equipment for Astrodex:', error);
     }
 }
 
 function buildEquipmentCombinationOptions() {
-    return astrodexEquipmentCache.combinations
+    const own = astrodexEquipmentCache.combinations
         .map(combo => `<option value="${escapeHtml(combo.name)}" data-combo-id="${combo.id}">${escapeHtml(combo.name)}</option>`)
         .join('');
+    const shared = astrodexEquipmentCache.sharedCombinations
+        .map(combo => {
+            const label = combo.owner_username
+                ? `${escapeHtml(combo.name)} ${i18n.t('equipment.shared_fov_suffix', { username: escapeHtml(combo.owner_username) })}`
+                : escapeHtml(combo.name);
+            return `<option value="${escapeHtml(combo.name)}" data-combo-id="${combo.id}">${label}</option>`;
+        })
+        .join('');
+    return own + shared;
 }
 
 function buildEquipmentFilterOptions() {
-    return astrodexEquipmentCache.filters
+    const own = astrodexEquipmentCache.filters
         .map(filter => `<option value="${escapeHtml(filter.name)}" data-filter-id="${filter.id}">${escapeHtml(filter.name)}</option>`)
         .join('');
+    const shared = astrodexEquipmentCache.sharedFilters
+        .map(filter => {
+            const label = filter.owner_username
+                ? `${escapeHtml(filter.name)} ${i18n.t('equipment.shared_fov_suffix', { username: escapeHtml(filter.owner_username) })}`
+                : escapeHtml(filter.name);
+            return `<option value="${escapeHtml(filter.name)}" data-filter-id="${filter.id}">${label}</option>`;
+        })
+        .join('');
+    return own + shared;
 }
 
 function updateDeviceField() {

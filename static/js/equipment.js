@@ -7,7 +7,13 @@ let equipmentData = {
     mounts: [],
     filters: [],
     accessories: [],
-    combinations: []
+    combinations: [],
+    sharedTelescopes: [],
+    sharedCameras: [],
+    sharedMounts: [],
+    sharedFilters: [],
+    sharedAccessories: [],
+    sharedCombinations: []
 };
 
 let equipmentFilters = {
@@ -22,15 +28,39 @@ let equipmentFilters = {
 async function initializeEquipment() {
     // Get role user
     const roleUser = await getUserRole();
-    
+
     // If user is not admin, not user, we don't load equipment management features
     if (roleUser !== 'admin' && roleUser !== 'user') {
-        //console.log('User does not have permission to access equipment management');
         return;
     }
-    
+
     loadAllEquipment();
     setupEquipmentEventListeners();
+    setupEquipmentSharedRefresh();
+}
+
+function setupEquipmentSharedRefresh() {
+    // Case 1: admin switches back to Equipment from another main tab.
+    // MutationObserver detects 'active' being added to #equipment-tab.
+    // Skip the very first activation (already loaded above at init).
+    const equipmentTabEl = document.getElementById('equipment-tab');
+    if (equipmentTabEl) {
+        let initialActivation = true;
+        new MutationObserver(() => {
+            if (equipmentTabEl.classList.contains('active')) {
+                if (initialActivation) { initialActivation = false; return; }
+                loadAllEquipment();
+            }
+        }).observe(equipmentTabEl, { attributes: true, attributeFilter: ['class'] });
+    }
+
+    // Case 2: admin clicks any subtab within Equipment (Filters, Mounts, etc.).
+    // Click events on .sub-tab-btn inside #equipment-tab trigger a reload.
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.sub-tab-btn');
+        if (!btn) return;
+        if (btn.closest('#equipment-tab')) loadAllEquipment();
+    });
 }
 
 function setupEquipmentEventListeners() {
@@ -94,10 +124,19 @@ async function loadEquipmentType(type) {
     try {
         const response = await fetchJSON(`/api/equipment/${type}`);
         equipmentData[type] = response.data || [];
+        const sharedKey = 'shared' + type.charAt(0).toUpperCase() + type.slice(1);
+        equipmentData[sharedKey] = response.shared_from_others || [];
     } catch (error) {
         console.error(`Error loading ${type}:`, error);
         equipmentData[type] = [];
     }
+}
+
+function findEquipmentById(type, id) {
+    const sharedKey = 'shared' + type.charAt(0).toUpperCase() + type.slice(1);
+    return equipmentData[type].find(e => e.id === id)
+        || equipmentData[sharedKey]?.find(e => e.id === id)
+        || null;
 }
 
 // ============================================
@@ -115,6 +154,9 @@ function renderAllEquipmentTabs() {
 }
 
 function createEmptyStateCard(message) {
+    const row = document.createElement('div');
+    row.className = 'row';
+
     const col = document.createElement('div');
     col.className = 'col mb-3';
 
@@ -131,7 +173,8 @@ function createEmptyStateCard(message) {
     body.appendChild(p);
     card.appendChild(body);
     col.appendChild(card);
-    return col;
+    row.appendChild(col);
+    return row;
 }
 
 function appendInfoLine(container, label, value) {
@@ -144,6 +187,7 @@ function appendInfoLine(container, label, value) {
     container.appendChild(document.createTextNode(` ${value}`));
     container.appendChild(document.createElement('br'));
 }
+
 
 function createCardFooter(editClass, deleteClass, id) {
     const footer = document.createElement('div');
@@ -170,86 +214,153 @@ function createCardFooter(editClass, deleteClass, id) {
     return footer;
 }
 
+function createSharedBadge(ownerUsername) {
+    const badge = document.createElement('span');
+    badge.className = 'badge bg-info text-dark ms-1';
+    badge.title = i18n.t('equipment.shared_readonly_hint');
+    badge.textContent = ownerUsername
+        ? i18n.t('equipment.shared_by', { username: ownerUsername })
+        : i18n.t('equipment.shared_badge');
+    return badge;
+}
+
+function createReadOnlyFooter(ownerUsername) {
+    const footer = document.createElement('div');
+    footer.className = 'card-footer text-center';
+    const hint = document.createElement('small');
+    hint.className = 'text-body-secondary';
+    hint.textContent = i18n.t('equipment.shared_readonly_hint');
+    footer.appendChild(hint);
+    return footer;
+}
+
 // --- Combinations Tab (Position 1) ---
+
+function renderCombinationCard(combo, isReadOnly) {
+    const telescope = combo.telescope_id ? findEquipmentById('telescopes', combo.telescope_id) : null;
+    const camera = combo.camera_id ? findEquipmentById('cameras', combo.camera_id) : null;
+    const mount = combo.mount_id ? findEquipmentById('mounts', combo.mount_id) : null;
+
+    const telescopeWeight = telescope?.weight_kg || 0;
+    const cameraWeight = camera?.weight_kg || 0;
+    const allAccessories = [...(equipmentData.accessories || []), ...(equipmentData.sharedAccessories || [])];
+    const accessoriesWeight = combo.accessory_ids
+        ? allAccessories.filter(a => combo.accessory_ids.includes(a.id)).reduce((sum, a) => sum + (a.weight_kg || 0), 0)
+        : 0;
+    const totalWeight = telescopeWeight + cameraWeight + accessoriesWeight;
+    const mountCapacity = mount?.payload_capacity_kg || 0;
+    const mountRecommended = mount?.recommended_payload_kg || 0;
+    const isOverCapacity = mount && totalWeight > mountCapacity;
+    const isOverRecommended = mount && totalWeight > mountRecommended;
+
+    let payloadAlert = '';
+    if (isOverCapacity) {
+        payloadAlert = i18n.t('equipment.overweight', { totalweight: totalWeight.toFixed(1), mountcapacity: mountCapacity });
+    } else if (isOverRecommended) {
+        payloadAlert = i18n.t('equipment.recommanded_max_payload', { totalweight: totalWeight.toFixed(1), mountrecommended: mountRecommended });
+    } else if (mount) {
+        payloadAlert = i18n.t('equipment.payload', { totalweight: totalWeight.toFixed(1), mountcapacity: mountCapacity });
+    }
+
+    const col = document.createElement('div');
+    col.className = 'col mb-3';
+    const card = document.createElement('div');
+    card.className = 'card h-100';
+    const body = document.createElement('div');
+    body.className = 'card-body';
+
+    const titleRow = document.createElement('div');
+    titleRow.className = 'd-flex align-items-center mb-1 gap-2 flex-wrap';
+    const title = document.createElement('h5');
+    title.className = 'card-title mb-0';
+    title.textContent = combo.name;
+    titleRow.appendChild(title);
+    if (combo.is_shared) {
+        const sharedBadge = document.createElement('span');
+        sharedBadge.className = 'badge bg-info text-dark';
+        sharedBadge.textContent = i18n.t('equipment.shared_badge');
+        titleRow.appendChild(sharedBadge);
+    }
+    if (isReadOnly && combo.owner_username) {
+        titleRow.appendChild(createSharedBadge(combo.owner_username));
+    }
+    if (combo.has_broken_share) {
+        const brokenBadge = document.createElement('span');
+        brokenBadge.className = 'badge bg-warning text-dark';
+        brokenBadge.title = i18n.t('equipment.combination_broken_share');
+        brokenBadge.textContent = '⚠ ' + i18n.t('equipment.combination_broken_share');
+        titleRow.appendChild(brokenBadge);
+    }
+    body.appendChild(titleRow);
+
+    const p = document.createElement('p');
+    p.className = 'card-text';
+    if (telescope) appendInfoLine(p, i18n.t('equipment.telescope'), `${telescope.name}${telescopeWeight > 0 ? ` (${telescopeWeight}${i18n.t('units.kg')})` : ''}`);
+    if (camera) appendInfoLine(p, i18n.t('equipment.camera'), `${camera.name}${cameraWeight > 0 ? ` (${cameraWeight}${i18n.t('units.kg')})` : ''}`);
+    if (mount) appendInfoLine(p, i18n.t('equipment.mount'), mount.name);
+    if (combo.filter_ids && combo.filter_ids.length > 0) {
+        const allFilters = [...(equipmentData.filters || []), ...(equipmentData.sharedFilters || [])];
+        const filterNames = allFilters.filter(f => combo.filter_ids.includes(f.id)).map(f => f.name).join(', ');
+        appendInfoLine(p, i18n.t('equipment.filters'), filterNames);
+    }
+    if (combo.accessory_ids && combo.accessory_ids.length > 0) {
+        const accessoryNames = allAccessories.filter(a => combo.accessory_ids.includes(a.id)).map(a => a.name).join(', ');
+        appendInfoLine(p, i18n.t('equipment.accessories'), `${accessoryNames}${accessoriesWeight > 0 ? ` (${accessoriesWeight}${i18n.t('units.kg')})` : ''}`);
+    }
+    body.appendChild(p);
+
+    if (payloadAlert) {
+        const payloadInfo = document.createElement('div');
+        payloadInfo.className = `alert alert-sm py-1 px-2 mt-2 fw-light ${isOverCapacity ? 'alert-danger' : isOverRecommended ? 'alert-info' : 'alert-success'}`;
+        payloadInfo.textContent = payloadAlert;
+        body.appendChild(payloadInfo);
+    }
+
+    card.appendChild(body);
+    card.appendChild(isReadOnly
+        ? createReadOnlyFooter(combo.owner_username)
+        : createCardFooter('btn-edit-combination', 'btn-delete-combination', combo.id));
+    col.appendChild(card);
+    return col;
+}
 
 function renderCombinationsTab() {
     const container = document.getElementById('equipment-combinations-display');
     if (!container) return;
-    
+
     DOMUtils.clear(container);
-    
-    if (equipmentData.combinations.length === 0) {
+
+    const hasOwn = equipmentData.combinations.length > 0;
+    const hasShared = equipmentData.sharedCombinations.length > 0;
+
+    if (!hasOwn && !hasShared) {
         container.appendChild(createEmptyStateCard(i18n.t('equipment.no_equipment_yet')));
         return;
     }
 
-    equipmentData.combinations.forEach((combo) => {
-        const telescope = combo.telescope_id ? equipmentData.telescopes.find(t => t.id === combo.telescope_id) : null;
-        const camera = combo.camera_id ? equipmentData.cameras.find(c => c.id === combo.camera_id) : null;
-        const mount = combo.mount_id ? equipmentData.mounts.find(m => m.id === combo.mount_id) : null;
-        
-        // Calculate payload
-        const telescopeWeight = telescope?.weight_kg || 0;
-        const cameraWeight = camera?.weight_kg || 0;
-        const accessoriesWeight = combo.accessory_ids 
-            ? equipmentData.accessories
-                .filter(a => combo.accessory_ids.includes(a.id))
-                .reduce((sum, a) => sum + (a.weight_kg || 0), 0)
-            : 0;
-        const totalWeight = telescopeWeight + cameraWeight + accessoriesWeight;
-        const mountCapacity = mount?.payload_capacity_kg || 0;
-        const mountRecommended = mount?.recommended_payload_kg || 0;
-        const isOverCapacity = mount && totalWeight > mountCapacity;
-        const isOverRecommended = mount && totalWeight > mountRecommended;
-        
-        let payloadAlert = '';
-        if (isOverCapacity) {
-            payloadAlert = i18n.t('equipment.overweight', { totalweight: totalWeight.toFixed(1), mountcapacity: mountCapacity });
-        } else if (isOverRecommended) {
-            payloadAlert = i18n.t('equipment.recommanded_max_payload', { totalweight: totalWeight.toFixed(1), mountrecommended: mountRecommended });
-        } else if (mount) {
-            payloadAlert = i18n.t('equipment.payload', { totalweight: totalWeight.toFixed(1), mountcapacity: mountCapacity });
+    if (hasOwn) {
+        if (hasShared) {
+            const hdr = document.createElement('h6');
+            hdr.className = 'text-body-secondary mb-1';
+            hdr.textContent = i18n.t('equipment.my_equipment_section');
+            container.appendChild(hdr);
         }
+        const row = document.createElement('div');
+        row.className = 'row row-cols-1 row-cols-md-2 row-cols-lg-3';
+        equipmentData.combinations.forEach(combo => row.appendChild(renderCombinationCard(combo, false)));
+        container.appendChild(row);
+    }
 
-        const col = document.createElement('div');
-        col.className = 'col mb-3';
-        const card = document.createElement('div');
-        card.className = 'card h-100';
-        const body = document.createElement('div');
-        body.className = 'card-body';
-
-        const title = document.createElement('h5');
-        title.className = 'card-title mb-1';
-        title.textContent = combo.name;
-        body.appendChild(title);
-
-        const p = document.createElement('p');
-        p.className = 'card-text';
-        if (telescope) appendInfoLine(p, i18n.t('equipment.telescope'), `${telescope.name}${telescopeWeight > 0 ? ` (${telescopeWeight}${i18n.t('units.kg')})` : ''}`);
-        if (camera) appendInfoLine(p, i18n.t('equipment.camera'), `${camera.name}${cameraWeight > 0 ? ` (${cameraWeight}${i18n.t('units.kg')})` : ''}`);
-        if (mount) appendInfoLine(p, i18n.t('equipment.mount'), mount.name);
-        if (combo.filter_ids && combo.filter_ids.length > 0) {
-            const filterNames = equipmentData.filters.filter(f => combo.filter_ids.includes(f.id)).map(f => f.name).join(', ');
-            appendInfoLine(p, i18n.t('equipment.filters'), filterNames);
-        }
-        if (combo.accessory_ids && combo.accessory_ids.length > 0) {
-            const accessoryNames = equipmentData.accessories.filter(a => combo.accessory_ids.includes(a.id)).map(a => a.name).join(', ');
-            appendInfoLine(p, i18n.t('equipment.accessories'), `${accessoryNames}${accessoriesWeight > 0 ? ` (${accessoriesWeight}${i18n.t('units.kg')})` : ''}`);
-        }
-        body.appendChild(p);
-
-        if (payloadAlert) {
-            const payloadInfo = document.createElement('div');
-            payloadInfo.className = `alert alert-sm py-1 px-2 mt-2 fw-light ${isOverCapacity ? 'alert-danger' : isOverRecommended ? 'alert-info' : 'alert-success'}`;
-            payloadInfo.textContent = payloadAlert;
-            body.appendChild(payloadInfo);
-        }
-
-        card.appendChild(body);
-        card.appendChild(createCardFooter('btn-edit-combination', 'btn-delete-combination', combo.id));
-        col.appendChild(card);
-        container.appendChild(col);
-    });
+    if (hasShared) {
+        const hdr = document.createElement('h6');
+        hdr.className = 'text-body-secondary mb-1 mt-3';
+        hdr.textContent = i18n.t('equipment.shared_by_others_section');
+        container.appendChild(hdr);
+        const row = document.createElement('div');
+        row.className = 'row row-cols-1 row-cols-md-2 row-cols-lg-3';
+        equipmentData.sharedCombinations.forEach(combo => row.appendChild(renderCombinationCard(combo, true)));
+        container.appendChild(row);
+    }
 }
 
 // --- FOV Calculator Tab (Position 2) ---
@@ -257,9 +368,9 @@ function renderCombinationsTab() {
 function renderFOVCalculatorTab() {
     const container = document.getElementById('equipment-fov-display');
     if (!container) return;
-    
-    const telescopes = equipmentData.telescopes;
-    const cameras = equipmentData.cameras;
+
+    const telescopes = [...equipmentData.telescopes, ...equipmentData.sharedTelescopes];
+    const cameras = [...equipmentData.cameras, ...equipmentData.sharedCameras];
     
     DOMUtils.clear(container);
 
@@ -290,7 +401,8 @@ function renderFOVCalculatorTab() {
     telescopes.forEach((t) => {
         const option = document.createElement('option');
         option.value = t.id;
-        option.textContent = `${t.name} (${t.effective_focal_length}${i18n.t('units.mm')} f/${t.effective_focal_ratio})`;
+        const suffix = t.owner_username ? ` ${i18n.t('equipment.shared_fov_suffix', { username: t.owner_username })}` : '';
+        option.textContent = `${t.name} (${t.effective_focal_length}${i18n.t('units.mm')} f/${t.effective_focal_ratio})${suffix}`;
         tSelect.appendChild(option);
     });
     tCol.appendChild(tLabel);
@@ -312,7 +424,8 @@ function renderFOVCalculatorTab() {
     cameras.forEach((c) => {
         const option = document.createElement('option');
         option.value = c.id;
-        option.textContent = `${c.name} (${c.pixel_size_um}${i18n.t('units.um')})`;
+        const suffix = c.owner_username ? ` ${i18n.t('equipment.shared_fov_suffix', { username: c.owner_username })}` : '';
+        option.textContent = `${c.name} (${c.pixel_size_um}${i18n.t('units.um')})${suffix}`;
         cSelect.appendChild(option);
     });
     cCol.appendChild(cLabel);
@@ -371,8 +484,8 @@ async function calculateFOVFromUI() {
         return;
     }
 
-    const telescope = equipmentData.telescopes.find(t => t.id === telescopeId);
-    const camera = equipmentData.cameras.find(c => c.id === cameraId);
+    const telescope = findEquipmentById('telescopes', telescopeId);
+    const camera = findEquipmentById('cameras', cameraId);
     if (!telescope || !camera) {
         showMessage('warning', i18n.t('equipment.selected_equipment_not_found'));
         return;
@@ -447,243 +560,325 @@ async function calculateFOVFromUI() {
     }
 }
 
+function renderEquipmentSection(container, items, isReadOnly, renderCard) {
+    const hasAnyShared = equipmentData.sharedTelescopes.length + equipmentData.sharedCameras.length
+        + equipmentData.sharedMounts.length + equipmentData.sharedFilters.length
+        + equipmentData.sharedAccessories.length > 0;
+
+    if (items.length === 0) return;
+
+    if (isReadOnly || (!isReadOnly && hasAnyShared)) {
+        const hdr = document.createElement('h6');
+        hdr.className = 'text-body-secondary mb-1' + (isReadOnly ? ' mt-3' : '');
+        hdr.textContent = isReadOnly
+            ? i18n.t('equipment.shared_by_others_section')
+            : i18n.t('equipment.my_equipment_section');
+        container.appendChild(hdr);
+    }
+
+    const row = document.createElement('div');
+    row.className = 'row row-cols-1 row-cols-md-2 row-cols-lg-3';
+    items.forEach(item => row.appendChild(renderCard(item, isReadOnly)));
+    container.appendChild(row);
+}
+
 // --- Telescopes Tab (Position 3) ---
+
+function renderTelescopeCard(scope, isReadOnly) {
+    const col = document.createElement('div');
+    col.className = 'col mb-3';
+    const card = document.createElement('div');
+    card.className = 'card h-100';
+    const body = document.createElement('div');
+    body.className = 'card-body';
+
+    const titleRow = document.createElement('div');
+    titleRow.className = 'd-flex align-items-center mb-1 gap-2 flex-wrap';
+    const title = document.createElement('h5');
+    title.className = 'card-title mb-0';
+    title.textContent = scope.name;
+    titleRow.appendChild(title);
+    if (scope.is_shared && !isReadOnly) {
+        const b = document.createElement('span');
+        b.className = 'badge bg-info text-dark';
+        b.textContent = i18n.t('equipment.shared_badge');
+        titleRow.appendChild(b);
+    }
+    if (isReadOnly) titleRow.appendChild(createSharedBadge(scope.owner_username));
+    body.appendChild(titleRow);
+
+    if (scope.manufacturer) {
+        const subtitle = document.createElement('h6');
+        subtitle.className = 'card-subtitle mb-2 text-body-secondary';
+        subtitle.textContent = scope.manufacturer;
+        body.appendChild(subtitle);
+    }
+
+    const p = document.createElement('p');
+    p.className = 'card-text';
+    appendInfoLine(p, i18n.t('equipment.type'), scope.telescope_type);
+    appendInfoLine(p, i18n.t('equipment.aperture'), `${scope.aperture_mm}${i18n.t('units.mm')}`);
+    appendInfoLine(p, i18n.t('equipment.native_f'), scope.native_focal_ratio);
+    appendInfoLine(p, i18n.t('equipment.effective_f'), scope.effective_focal_ratio);
+    if (scope.weight_kg > 0) appendInfoLine(p, i18n.t('equipment.weight'), `${scope.weight_kg}${i18n.t('units.kg')}`);
+    body.appendChild(p);
+
+    card.appendChild(body);
+    card.appendChild(isReadOnly
+        ? createReadOnlyFooter(scope.owner_username)
+        : createCardFooter('btn-edit-telescope', 'btn-delete-telescope', scope.id));
+    col.appendChild(card);
+    return col;
+}
 
 function renderTelescopesTab() {
     const container = document.getElementById('equipment-telescopes-display');
     if (!container) return;
-    
     DOMUtils.clear(container);
-    
-    if (equipmentData.telescopes.length === 0) {
+    if (equipmentData.telescopes.length === 0 && equipmentData.sharedTelescopes.length === 0) {
         container.appendChild(createEmptyStateCard(i18n.t('equipment.no_telescopes_created_yet')));
         return;
     }
-
-    equipmentData.telescopes.forEach((scope) => {
-        const col = document.createElement('div');
-        col.className = 'col mb-3';
-        const card = document.createElement('div');
-        card.className = 'card h-100';
-        const body = document.createElement('div');
-        body.className = 'card-body';
-
-        const title = document.createElement('h5');
-        title.className = 'card-title mb-1';
-        title.textContent = scope.name;
-        body.appendChild(title);
-
-        if (scope.manufacturer) {
-            const subtitle = document.createElement('h6');
-            subtitle.className = 'card-subtitle mb-2 text-body-secondary';
-            subtitle.textContent = scope.manufacturer;
-            body.appendChild(subtitle);
-        }
-
-        const p = document.createElement('p');
-        p.className = 'card-text';
-        appendInfoLine(p, i18n.t('equipment.type'), scope.telescope_type);
-        appendInfoLine(p, i18n.t('equipment.aperture'), `${scope.aperture_mm}${i18n.t('units.mm')}`);
-        appendInfoLine(p, i18n.t('equipment.native_f'), scope.native_focal_ratio);
-        appendInfoLine(p, i18n.t('equipment.effective_f'), scope.effective_focal_ratio);
-        if (scope.weight_kg > 0) appendInfoLine(p, i18n.t('equipment.weight'), `${scope.weight_kg}${i18n.t('units.kg')}`);
-        body.appendChild(p);
-
-        card.appendChild(body);
-        card.appendChild(createCardFooter('btn-edit-telescope', 'btn-delete-telescope', scope.id));
-        col.appendChild(card);
-        container.appendChild(col);
-    });
+    renderEquipmentSection(container, equipmentData.telescopes, false, renderTelescopeCard);
+    renderEquipmentSection(container, equipmentData.sharedTelescopes, true, renderTelescopeCard);
 }
 
 // --- Cameras Tab (Position 4) ---
 
+function renderCameraCard(cam, isReadOnly) {
+    const col = document.createElement('div');
+    col.className = 'col mb-3';
+    const card = document.createElement('div');
+    card.className = 'card h-100';
+    const body = document.createElement('div');
+    body.className = 'card-body';
+
+    const titleRow = document.createElement('div');
+    titleRow.className = 'd-flex align-items-center mb-1 gap-2 flex-wrap';
+    const title = document.createElement('h5');
+    title.className = 'card-title mb-0';
+    title.textContent = cam.name;
+    titleRow.appendChild(title);
+    if (cam.is_shared && !isReadOnly) {
+        const b = document.createElement('span');
+        b.className = 'badge bg-info text-dark';
+        b.textContent = i18n.t('equipment.shared_badge');
+        titleRow.appendChild(b);
+    }
+    if (isReadOnly) titleRow.appendChild(createSharedBadge(cam.owner_username));
+    body.appendChild(titleRow);
+
+    if (cam.manufacturer) {
+        const subtitle = document.createElement('h6');
+        subtitle.className = 'card-subtitle mb-2 text-body-secondary';
+        subtitle.textContent = cam.manufacturer;
+        body.appendChild(subtitle);
+    }
+
+    const p = document.createElement('p');
+    p.className = 'card-text';
+    appendInfoLine(p, i18n.t('equipment.type'), cam.sensor_type);
+    appendInfoLine(p, i18n.t('equipment.resolution'), `${cam.resolution_width_px}x${cam.resolution_height_px}`);
+    appendInfoLine(p, i18n.t('equipment.pixel_size'), `${cam.pixel_size_um}${i18n.t('units.um')}`);
+    appendInfoLine(p, i18n.t('equipment.diagonal'), `${cam.sensor_diagonal_mm.toFixed(2)}${i18n.t('units.mm')}`);
+    if (cam.weight_kg > 0) appendInfoLine(p, i18n.t('equipment.weight'), `${cam.weight_kg}${i18n.t('units.kg')}`);
+    body.appendChild(p);
+
+    card.appendChild(body);
+    card.appendChild(isReadOnly
+        ? createReadOnlyFooter(cam.owner_username)
+        : createCardFooter('btn-edit-camera', 'btn-delete-camera', cam.id));
+    col.appendChild(card);
+    return col;
+}
+
 function renderCamerasTab() {
     const container = document.getElementById('equipment-cameras-display');
     if (!container) return;
-    
     DOMUtils.clear(container);
-    
-    if (equipmentData.cameras.length === 0) {
+    if (equipmentData.cameras.length === 0 && equipmentData.sharedCameras.length === 0) {
         container.appendChild(createEmptyStateCard(i18n.t('equipment.no_cameras_created_yet')));
         return;
     }
-
-    equipmentData.cameras.forEach((cam) => {
-        const col = document.createElement('div');
-        col.className = 'col mb-3';
-        const card = document.createElement('div');
-        card.className = 'card h-100';
-        const body = document.createElement('div');
-        body.className = 'card-body';
-
-        const title = document.createElement('h5');
-        title.className = 'card-title mb-1';
-        title.textContent = cam.name;
-        body.appendChild(title);
-
-        if (cam.manufacturer) {
-            const subtitle = document.createElement('h6');
-            subtitle.className = 'card-subtitle mb-2 text-body-secondary';
-            subtitle.textContent = cam.manufacturer;
-            body.appendChild(subtitle);
-        }
-
-        const p = document.createElement('p');
-        p.className = 'card-text';
-        appendInfoLine(p, i18n.t('equipment.type'), cam.sensor_type);
-        appendInfoLine(p, i18n.t('equipment.resolution'), `${cam.resolution_width_px}x${cam.resolution_height_px}`);
-        appendInfoLine(p, i18n.t('equipment.pixel_size'), `${cam.pixel_size_um}${i18n.t('units.um')}`);
-        appendInfoLine(p, i18n.t('equipment.diagonal'), `${cam.sensor_diagonal_mm.toFixed(2)}${i18n.t('units.mm')}`);
-        if (cam.weight_kg > 0) appendInfoLine(p, i18n.t('equipment.weight'), `${cam.weight_kg}${i18n.t('units.kg')}`);
-        body.appendChild(p);
-
-        card.appendChild(body);
-        card.appendChild(createCardFooter('btn-edit-camera', 'btn-delete-camera', cam.id));
-        col.appendChild(card);
-        container.appendChild(col);
-    });
+    renderEquipmentSection(container, equipmentData.cameras, false, renderCameraCard);
+    renderEquipmentSection(container, equipmentData.sharedCameras, true, renderCameraCard);
 }
 
 // --- Mounts Tab (Position 5) ---
 
+function renderMountCard(mount, isReadOnly) {
+    const col = document.createElement('div');
+    col.className = 'col mb-3';
+    const card = document.createElement('div');
+    card.className = 'card h-100';
+    const body = document.createElement('div');
+    body.className = 'card-body';
+
+    const titleRow = document.createElement('div');
+    titleRow.className = 'd-flex align-items-center mb-1 gap-2 flex-wrap';
+    const title = document.createElement('h5');
+    title.className = 'card-title mb-0';
+    title.textContent = mount.name;
+    titleRow.appendChild(title);
+    if (mount.is_shared && !isReadOnly) {
+        const b = document.createElement('span');
+        b.className = 'badge bg-info text-dark';
+        b.textContent = i18n.t('equipment.shared_badge');
+        titleRow.appendChild(b);
+    }
+    if (isReadOnly) titleRow.appendChild(createSharedBadge(mount.owner_username));
+    body.appendChild(titleRow);
+
+    if (mount.manufacturer) {
+        const subtitle = document.createElement('h6');
+        subtitle.className = 'card-subtitle mb-2 text-body-secondary';
+        subtitle.textContent = mount.manufacturer;
+        body.appendChild(subtitle);
+    }
+
+    const p = document.createElement('p');
+    p.className = 'card-text';
+    appendInfoLine(p, i18n.t('equipment.type'), mount.mount_type);
+    appendInfoLine(p, i18n.t('equipment.max_payload'), `${mount.payload_capacity_kg}${i18n.t('units.kg')}`);
+    appendInfoLine(p, i18n.t('equipment.guiding'), mount.guiding_supported ? i18n.t('equipment.yes') : i18n.t('equipment.no'));
+    body.appendChild(p);
+
+    card.appendChild(body);
+    card.appendChild(isReadOnly
+        ? createReadOnlyFooter(mount.owner_username)
+        : createCardFooter('btn-edit-mount', 'btn-delete-mount', mount.id));
+    col.appendChild(card);
+    return col;
+}
+
 function renderMountsTab() {
     const container = document.getElementById('equipment-mounts-display');
     if (!container) return;
-    
     DOMUtils.clear(container);
-    
-    if (equipmentData.mounts.length === 0) {
+    if (equipmentData.mounts.length === 0 && equipmentData.sharedMounts.length === 0) {
         container.appendChild(createEmptyStateCard(i18n.t('equipment.no_mounts_created_yet')));
         return;
     }
-
-    equipmentData.mounts.forEach((mount) => {
-        const col = document.createElement('div');
-        col.className = 'col mb-3';
-        const card = document.createElement('div');
-        card.className = 'card h-100';
-        const body = document.createElement('div');
-        body.className = 'card-body';
-
-        const title = document.createElement('h5');
-        title.className = 'card-title mb-1';
-        title.textContent = mount.name;
-        body.appendChild(title);
-
-        if (mount.manufacturer) {
-            const subtitle = document.createElement('h6');
-            subtitle.className = 'card-subtitle mb-2 text-body-secondary';
-            subtitle.textContent = mount.manufacturer;
-            body.appendChild(subtitle);
-        }
-
-        const p = document.createElement('p');
-        p.className = 'card-text';
-        appendInfoLine(p, i18n.t('equipment.type'), mount.mount_type);
-        appendInfoLine(p, i18n.t('equipment.max_payload'), `${mount.payload_capacity_kg}${i18n.t('units.kg')}`);
-        appendInfoLine(p, i18n.t('equipment.guiding'), mount.guiding_supported ? i18n.t('equipment.yes') : i18n.t('equipment.no'));
-        body.appendChild(p);
-
-        card.appendChild(body);
-        card.appendChild(createCardFooter('btn-edit-mount', 'btn-delete-mount', mount.id));
-        col.appendChild(card);
-        container.appendChild(col);
-    });
+    renderEquipmentSection(container, equipmentData.mounts, false, renderMountCard);
+    renderEquipmentSection(container, equipmentData.sharedMounts, true, renderMountCard);
 }
 
 // --- Filters Tab (Position 6) ---
 
+function renderFilterCard(filter, isReadOnly) {
+    const col = document.createElement('div');
+    col.className = 'col mb-3';
+    const card = document.createElement('div');
+    card.className = 'card h-100';
+    const body = document.createElement('div');
+    body.className = 'card-body';
+
+    const titleRow = document.createElement('div');
+    titleRow.className = 'd-flex align-items-center mb-1 gap-2 flex-wrap';
+    const title = document.createElement('h5');
+    title.className = 'card-title mb-0';
+    title.textContent = filter.name;
+    titleRow.appendChild(title);
+    if (filter.is_shared && !isReadOnly) {
+        const b = document.createElement('span');
+        b.className = 'badge bg-info text-dark';
+        b.textContent = i18n.t('equipment.shared_badge');
+        titleRow.appendChild(b);
+    }
+    if (isReadOnly) titleRow.appendChild(createSharedBadge(filter.owner_username));
+    body.appendChild(titleRow);
+
+    if (filter.manufacturer) {
+        const subtitle = document.createElement('h6');
+        subtitle.className = 'card-subtitle mb-2 text-body-secondary';
+        subtitle.textContent = filter.manufacturer;
+        body.appendChild(subtitle);
+    }
+
+    const p = document.createElement('p');
+    p.className = 'card-text';
+    appendInfoLine(p, i18n.t('equipment.type'), filter.filter_type);
+    if (filter.central_wavelength_nm) appendInfoLine(p, i18n.t('equipment.wavelength'), `${filter.central_wavelength_nm}${i18n.t('units.nm')}`);
+    if (filter.bandwidth_nm) appendInfoLine(p, i18n.t('equipment.bandwidth'), `${filter.bandwidth_nm}${i18n.t('units.nm')}`);
+    appendInfoLine(p, i18n.t('equipment.use'), filter.intended_use || i18n.t('equipment.general'));
+    body.appendChild(p);
+
+    card.appendChild(body);
+    card.appendChild(isReadOnly
+        ? createReadOnlyFooter(filter.owner_username)
+        : createCardFooter('btn-edit-filter', 'btn-delete-filter', filter.id));
+    col.appendChild(card);
+    return col;
+}
+
 function renderFiltersTab() {
     const container = document.getElementById('equipment-filters-display');
     if (!container) return;
-    
     DOMUtils.clear(container);
-    
-    if (equipmentData.filters.length === 0) {
+    if (equipmentData.filters.length === 0 && equipmentData.sharedFilters.length === 0) {
         container.appendChild(createEmptyStateCard(i18n.t('equipment.no_filters_created_yet')));
         return;
     }
-
-    equipmentData.filters.forEach((filter) => {
-        const col = document.createElement('div');
-        col.className = 'col mb-3';
-        const card = document.createElement('div');
-        card.className = 'card h-100';
-        const body = document.createElement('div');
-        body.className = 'card-body';
-
-        const title = document.createElement('h5');
-        title.className = 'card-title mb-1';
-        title.textContent = filter.name;
-        body.appendChild(title);
-
-        if (filter.manufacturer) {
-            const subtitle = document.createElement('h6');
-            subtitle.className = 'card-subtitle mb-2 text-body-secondary';
-            subtitle.textContent = filter.manufacturer;
-            body.appendChild(subtitle);
-        }
-
-        const p = document.createElement('p');
-        p.className = 'card-text';
-        appendInfoLine(p, i18n.t('equipment.type'), filter.filter_type);
-        if (filter.central_wavelength_nm) appendInfoLine(p, i18n.t('equipment.wavelength'), `${filter.central_wavelength_nm}${i18n.t('units.nm')}`);
-        if (filter.bandwidth_nm) appendInfoLine(p, i18n.t('equipment.bandwidth'), `${filter.bandwidth_nm}${i18n.t('units.nm')}`);
-        appendInfoLine(p, i18n.t('equipment.use'), filter.intended_use || i18n.t('equipment.general'));
-        body.appendChild(p);
-
-        card.appendChild(body);
-        card.appendChild(createCardFooter('btn-edit-filter', 'btn-delete-filter', filter.id));
-        col.appendChild(card);
-        container.appendChild(col);
-    });
+    renderEquipmentSection(container, equipmentData.filters, false, renderFilterCard);
+    renderEquipmentSection(container, equipmentData.sharedFilters, true, renderFilterCard);
 }
 
 // --- Accessories Tab (Position 7) ---
 
+function renderAccessoryCard(accessory, isReadOnly) {
+    const col = document.createElement('div');
+    col.className = 'col mb-3';
+    const card = document.createElement('div');
+    card.className = 'card h-100';
+    const body = document.createElement('div');
+    body.className = 'card-body';
+
+    const titleRow = document.createElement('div');
+    titleRow.className = 'd-flex align-items-center mb-1 gap-2 flex-wrap';
+    const title = document.createElement('h5');
+    title.className = 'card-title mb-0';
+    title.textContent = accessory.name;
+    titleRow.appendChild(title);
+    if (accessory.is_shared && !isReadOnly) {
+        const b = document.createElement('span');
+        b.className = 'badge bg-info text-dark';
+        b.textContent = i18n.t('equipment.shared_badge');
+        titleRow.appendChild(b);
+    }
+    if (isReadOnly) titleRow.appendChild(createSharedBadge(accessory.owner_username));
+    body.appendChild(titleRow);
+
+    if (accessory.manufacturer) {
+        const subtitle = document.createElement('h6');
+        subtitle.className = 'card-subtitle mb-2 text-body-secondary';
+        subtitle.textContent = accessory.manufacturer;
+        body.appendChild(subtitle);
+    }
+
+    const p = document.createElement('p');
+    p.className = 'card-text';
+    appendInfoLine(p, i18n.t('equipment.type'), accessory.accessory_type);
+    if (accessory.weight_kg > 0) appendInfoLine(p, i18n.t('equipment.weight'), `${accessory.weight_kg}${i18n.t('units.kg')}`);
+    body.appendChild(p);
+
+    card.appendChild(body);
+    card.appendChild(isReadOnly
+        ? createReadOnlyFooter(accessory.owner_username)
+        : createCardFooter('btn-edit-accessory', 'btn-delete-accessory', accessory.id));
+    col.appendChild(card);
+    return col;
+}
+
 function renderAccessoriesTab() {
     const container = document.getElementById('equipment-accessories-display');
     if (!container) return;
-    
     DOMUtils.clear(container);
-    
-    if (equipmentData.accessories.length === 0) {
+    if (equipmentData.accessories.length === 0 && equipmentData.sharedAccessories.length === 0) {
         container.appendChild(createEmptyStateCard(i18n.t('equipment.no_accessories_created_yet')));
         return;
     }
-
-    equipmentData.accessories.forEach((accessory) => {
-        const col = document.createElement('div');
-        col.className = 'col mb-3';
-        const card = document.createElement('div');
-        card.className = 'card h-100';
-        const body = document.createElement('div');
-        body.className = 'card-body';
-
-        const title = document.createElement('h5');
-        title.className = 'card-title mb-1';
-        title.textContent = accessory.name;
-        body.appendChild(title);
-
-        if (accessory.manufacturer) {
-            const subtitle = document.createElement('h6');
-            subtitle.className = 'card-subtitle mb-2 text-body-secondary';
-            subtitle.textContent = accessory.manufacturer;
-            body.appendChild(subtitle);
-        }
-
-        const p = document.createElement('p');
-        p.className = 'card-text';
-        appendInfoLine(p, i18n.t('equipment.type'), accessory.accessory_type);
-        if (accessory.weight_kg > 0) appendInfoLine(p, i18n.t('equipment.weight'), `${accessory.weight_kg}${i18n.t('units.kg')}`);
-        body.appendChild(p);
-
-        card.appendChild(body);
-        card.appendChild(createCardFooter('btn-edit-accessory', 'btn-delete-accessory', accessory.id));
-        col.appendChild(card);
-        container.appendChild(col);
-    });
+    renderEquipmentSection(container, equipmentData.accessories, false, renderAccessoryCard);
+    renderEquipmentSection(container, equipmentData.sharedAccessories, true, renderAccessoryCard);
 }
 
 // ============================================
@@ -740,6 +935,12 @@ async function showTelescopeModal(id = null) {
                 <label for="telescope-notes" class="form-label">${i18n.t('equipment.form_notes')}</label>
                 <textarea class="form-control" id="telescope-notes" name="notes" rows="2">${escapeHtml(telescope?.notes || '')}</textarea>
             </div>
+            <div class="col-md-12">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="telescope-is-shared" name="is_shared" value="true" ${telescope?.is_shared ? 'checked' : ''}>
+                    <label class="form-check-label" for="telescope-is-shared">${i18n.t('equipment.is_shared')}</label>
+                </div>
+            </div>
             <div class="text-end mt-3">
                 <button type="submit" class="btn btn-primary">${i18n.t('equipment.form_save')}</button>
             </div>
@@ -768,11 +969,12 @@ async function saveTelescope(id) {
     const form = document.getElementById('telescopeForm');
     const formData = new FormData(form);
     const data = Object.fromEntries(formData);
-    
+    data.is_shared = form.querySelector('#telescope-is-shared')?.checked ?? false;
+
     try {
         const url = id ? `/api/equipment/telescopes/${id}` : '/api/equipment/telescopes';
         const method = id ? 'PUT' : 'POST';
-        
+
         await fetchJSON(url, {
             method,
             headers: { 'Content-Type': 'application/json' },
@@ -860,6 +1062,12 @@ async function showCameraModal(id = null) {
                 <label for="camera-notes" class="form-label">${i18n.t('equipment.form_notes')}</label>
                 <textarea class="form-control" id="camera-notes" name="notes" rows="2">${escapeHtml(camera?.notes || '')}</textarea>
             </div>
+            <div class="col-md-12">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="camera-is-shared" name="is_shared" value="true" ${camera?.is_shared ? 'checked' : ''}>
+                    <label class="form-check-label" for="camera-is-shared">${i18n.t('equipment.is_shared')}</label>
+                </div>
+            </div>
             <div class="text-end mt-3">
                 <button type="submit" class="btn btn-primary">${i18n.t('equipment.form_save')}</button>
             </div>
@@ -889,6 +1097,7 @@ async function saveCamera(id) {
     const formData = new FormData(form);
     const data = Object.fromEntries(formData);
     data.cooling_supported = data.cooling_supported === 'true';
+    data.is_shared = form.querySelector('#camera-is-shared')?.checked ?? false;
     
     try {
         const url = id ? `/api/equipment/cameras/${id}` : '/api/equipment/cameras';
@@ -961,6 +1170,12 @@ async function showMountModal(id = null) {
                 <label for="mount-notes" class="form-label">${i18n.t('equipment.form_notes')}</label>
                 <textarea class="form-control" id="mount-notes" name="notes" rows="2">${escapeHtml(mount?.notes || '')}</textarea>
             </div>
+            <div class="col-md-12">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="mount-is-shared" name="is_shared" value="true" ${mount?.is_shared ? 'checked' : ''}>
+                    <label class="form-check-label" for="mount-is-shared">${i18n.t('equipment.is_shared')}</label>
+                </div>
+            </div>
             <div class="text-end mt-3">
                 <button type="submit" class="btn btn-primary">${i18n.t('equipment.form_save')}</button>
             </div>
@@ -990,6 +1205,7 @@ async function saveMount(id) {
     const formData = new FormData(form);
     const data = Object.fromEntries(formData);
     data.guiding_supported = data.guiding_supported === 'true';
+    data.is_shared = form.querySelector('#mount-is-shared')?.checked ?? false;
     
     try {
         const url = id ? `/api/equipment/mounts/${id}` : '/api/equipment/mounts';
@@ -1066,6 +1282,12 @@ async function showFilterModal(id = null) {
                 <label for="filter-notes" class="form-label">${i18n.t('equipment.form_notes')}</label>
                 <textarea class="form-control" id="filter-notes" name="notes" rows="2">${escapeHtml(filter?.notes || '')}</textarea>
             </div>
+            <div class="col-md-12">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="filter-is-shared" name="is_shared" value="true" ${filter?.is_shared ? 'checked' : ''}>
+                    <label class="form-check-label" for="filter-is-shared">${i18n.t('equipment.is_shared')}</label>
+                </div>
+            </div>
             <div class="text-end mt-3">
                 <button type="submit" class="btn btn-primary">${i18n.t('equipment.form_save')}</button>
             </div>
@@ -1094,6 +1316,7 @@ async function saveFilter(id) {
     const form = document.getElementById('filterForm');
     const formData = new FormData(form);
     const data = Object.fromEntries(formData);
+    data.is_shared = form.querySelector('#filter-is-shared')?.checked ?? false;
     
     try {
         const url = id ? `/api/equipment/filters/${id}` : '/api/equipment/filters';
@@ -1151,6 +1374,12 @@ async function showAccessoryModal(id = null) {
                 <label for="accessory-notes" class="form-label">${i18n.t('equipment.form_notes')}</label>
                 <textarea class="form-control" id="accessory-notes" name="notes" rows="2">${escapeHtml(accessory?.notes || '')}</textarea>
             </div>
+            <div class="mb-3">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="accessory-is-shared" name="is_shared" value="true" ${accessory?.is_shared ? 'checked' : ''}>
+                    <label class="form-check-label" for="accessory-is-shared">${i18n.t('equipment.is_shared')}</label>
+                </div>
+            </div>
             <div class="text-end mt-3">
                 <button type="submit" class="btn btn-primary">${i18n.t('equipment.form_save')}</button>
             </div>
@@ -1179,7 +1408,8 @@ async function saveAccessory(id) {
     const form = document.getElementById('accessoryForm');
     const formData = new FormData(form);
     const data = Object.fromEntries(formData);
-    
+    data.is_shared = form.querySelector('#accessory-is-shared')?.checked ?? false;
+
     try {
         const url = id ? `/api/equipment/accessories/${id}` : '/api/equipment/accessories';
         const method = id ? 'PUT' : 'POST';
@@ -1212,12 +1442,22 @@ async function showCombinationModal(id = null) {
     const combination = id ? equipmentData.combinations.find(c => c.id === id) : null;
     const title = combination ? i18n.t('equipment.edit_combination') : i18n.t('equipment.new_combination');
     
-    const telescopes = equipmentData.telescopes;
-    const cameras = equipmentData.cameras;
-    const mounts = equipmentData.mounts;
-    const filters = equipmentData.filters;
-    const accessories = equipmentData.accessories;
+    const telescopes = [...equipmentData.telescopes, ...equipmentData.sharedTelescopes];
+    const cameras = [...equipmentData.cameras, ...equipmentData.sharedCameras];
+    const mounts = [...equipmentData.mounts, ...equipmentData.sharedMounts];
+    const filters = [...equipmentData.filters, ...equipmentData.sharedFilters];
+    const accessories = [...equipmentData.accessories, ...equipmentData.sharedAccessories];
     
+    const sharedSuffix = (item) => {
+        if (item.owner_username) {
+            return ` ${i18n.t('equipment.shared_fov_suffix', { username: item.owner_username })}`;
+        }
+        if (item.is_shared) {
+            return ` (${i18n.t('equipment.shared_badge').toLowerCase()})`;
+        }
+        return '';
+    };
+
     const modalContent = `
         <form id="combinationForm" class="form">
             <div class="mb-3">
@@ -1228,21 +1468,21 @@ async function showCombinationModal(id = null) {
                 <label for="combination-telescope" class="form-label">${i18n.t('equipment.form_telescope')}</label>
                 <select class="form-select" id="combination-telescope" name="telescope_id">
                     <option value="">${i18n.t('equipment.none')}</option>
-                    ${telescopes.map(t => `<option value="${t.id}" ${combination?.telescope_id === t.id ? 'selected' : ''}>${escapeHtml(t.name)}</option>`).join('')}
+                    ${telescopes.map(t => `<option value="${t.id}" ${combination?.telescope_id === t.id ? 'selected' : ''}>${escapeHtml(t.name)}${escapeHtml(sharedSuffix(t))}</option>`).join('')}
                 </select>
             </div>
             <div class="mb-3">
                 <label for="combination-camera" class="form-label">${i18n.t('equipment.form_camera')}</label>
                 <select class="form-select" id="combination-camera" name="camera_id">
                     <option value="">${i18n.t('equipment.none')}</option>
-                    ${cameras.map(c => `<option value="${c.id}" ${combination?.camera_id === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
+                    ${cameras.map(c => `<option value="${c.id}" ${combination?.camera_id === c.id ? 'selected' : ''}>${escapeHtml(c.name)}${escapeHtml(sharedSuffix(c))}</option>`).join('')}
                 </select>
             </div>
             <div class="mb-3">
                 <label for="combination-mount" class="form-label">${i18n.t('equipment.form_mount')}</label>
                 <select class="form-select" id="combination-mount" name="mount_id">
                     <option value="">${i18n.t('equipment.none')}</option>
-                    ${mounts.map(m => `<option value="${m.id}" ${combination?.mount_id === m.id ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('')}
+                    ${mounts.map(m => `<option value="${m.id}" ${combination?.mount_id === m.id ? 'selected' : ''}>${escapeHtml(m.name)}${escapeHtml(sharedSuffix(m))}</option>`).join('')}
                 </select>
             </div>
             <div class="mb-3">
@@ -1251,9 +1491,9 @@ async function showCombinationModal(id = null) {
                     ${filters.length === 0 ? `<div class="alert alert-info fw-light">${i18n.t('equipment.form_no_filters_created')}</div>` : ''}
                     ${filters.map(f => `
                         <div class="form-check">
-                            <input class="form-check-input filter-checkbox" type="checkbox" value="${f.id}" 
+                            <input class="form-check-input filter-checkbox" type="checkbox" value="${f.id}"
                                 ${combination?.filter_ids?.includes(f.id) ? 'checked' : ''}>
-                            <label class="form-check-label">${escapeHtml(f.name)}</label>
+                            <label class="form-check-label">${escapeHtml(f.name)}${escapeHtml(sharedSuffix(f))}</label>
                         </div>
                     `).join('')}
                 </div>
@@ -1264,9 +1504,9 @@ async function showCombinationModal(id = null) {
                     ${accessories.length === 0 ? `<div class="alert alert-info fw-light">${i18n.t('equipment.form_no_accessories_created')}</div>` : ''}
                     ${accessories.map(a => `
                         <div class="form-check">
-                            <input class="form-check-input accessory-checkbox" type="checkbox" value="${a.id}" 
+                            <input class="form-check-input accessory-checkbox" type="checkbox" value="${a.id}"
                                 ${combination?.accessory_ids?.includes(a.id) ? 'checked' : ''}>
-                            <label class="form-check-label">${escapeHtml(a.name)}</label>
+                            <label class="form-check-label">${escapeHtml(a.name)}${escapeHtml(sharedSuffix(a))}</label>
                         </div>
                     `).join('')}
                 </div>
