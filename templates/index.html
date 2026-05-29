@@ -853,6 +853,11 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link sub-tab-btn" href="#" data-subtab="notifications">
+                            <i class="bi bi-bell text-warning icon-inline" aria-hidden="true"></i> <span data-i18n="settings.notifications">Notifications</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link sub-tab-btn" aria-current="page" href="#" data-subtab="security">
                             <i class="bi bi-shield-lock text-danger icon-inline" aria-hidden="true"></i> <span data-i18n="settings.security">Security</span>
                         </a>
@@ -932,6 +937,220 @@
                             </button>
                         </div>
                     </form>
+                </div>
+            </div>
+
+            <!-- Notifications Sub-tab -->
+            <div id="notifications-subtab" class="sub-tab-content">
+                <div class="shadow p-2 mb-3 rounded bg-sub-container">
+                    <h2>
+                        <i class="bi bi-bell text-warning icon-inline" aria-hidden="true"></i>
+                        <span data-i18n="settings.notifications">Notifications</span>
+                    </h2>
+
+                    <div class="alert alert-info" role="alert" data-i18n="settings.notifications_info">
+                        Control which events trigger alerts. Notifications appear even when this tab is in the background.
+                    </div>
+
+                    <!-- Permission status banner -->
+                    <div id="notif-permission-banner" class="alert mb-3" role="alert" style="display:none;"></div>
+
+                    <!-- Master toggle + enable button -->
+                    <div class="d-flex flex-wrap align-items-center gap-3 mb-4">
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" id="notif-master-toggle" role="switch">
+                            <label class="form-check-label fw-semibold" for="notif-master-toggle" data-i18n="settings.notifications_master_toggle">Enable all notifications</label>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-warning" id="notif-enable-btn" style="display:none;">
+                            <i class="bi bi-bell-fill icon-inline" aria-hidden="true"></i>
+                            <span data-i18n="settings.notifications_enable_btn">Enable notifications</span>
+                        </button>
+                    </div>
+
+                    <!-- Per-trigger settings -->
+                    <div id="notif-triggers-list" class="row g-2 mb-4">
+
+                        <!-- N1 — Plan My Night session starts -->
+                        <div class="col-12">
+                            <div class="bg-features rounded p-2 d-flex flex-wrap align-items-center gap-3">
+                                <div class="form-check form-switch mb-0 flex-shrink-0">
+                                    <input class="form-check-input notif-trigger-toggle" type="checkbox" id="notif-trigger-N1" data-trigger="N1" role="switch">
+                                    <label class="form-check-label" for="notif-trigger-N1">
+                                        <i class="bi bi-calendar-check text-success icon-inline" aria-hidden="true"></i>
+                                        <span data-i18n="settings.notifications_n1">Plan My Night session starts</span>
+                                    </label>
+                                </div>
+                                <div class="d-flex align-items-center gap-2 ms-auto">
+                                    <label class="form-label mb-0 text-muted small" data-i18n="settings.notifications_lead_label">Notify before</label>
+                                    <select class="form-select form-select-sm notif-lead-select" id="notif-lead-N1" data-trigger="N1" style="width:auto;">
+                                        <option value="5">5 <span data-i18n="settings.notifications_minutes">min</span></option>
+                                        <option value="10">10 min</option>
+                                        <option value="15">15 min</option>
+                                        <option value="20">20 min</option>
+                                        <option value="30">30 min</option>
+                                        <option value="45">45 min</option>
+                                        <option value="60">60 min</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- N2 — Next target -->
+                        <div class="col-12">
+                            <div class="bg-features rounded p-2 d-flex flex-wrap align-items-center gap-3">
+                                <div class="form-check form-switch mb-0 flex-shrink-0">
+                                    <input class="form-check-input notif-trigger-toggle" type="checkbox" id="notif-trigger-N2" data-trigger="N2" role="switch">
+                                    <label class="form-check-label" for="notif-trigger-N2">
+                                        <i class="bi bi-star text-info icon-inline" aria-hidden="true"></i>
+                                        <span data-i18n="settings.notifications_n2">Next observation target</span>
+                                    </label>
+                                </div>
+                                <div class="d-flex align-items-center gap-2 ms-auto">
+                                    <label class="form-label mb-0 text-muted small" data-i18n="settings.notifications_lead_label">Notify before</label>
+                                    <select class="form-select form-select-sm notif-lead-select" id="notif-lead-N2" data-trigger="N2" style="width:auto;">
+                                        <option value="2">2 min</option>
+                                        <option value="5">5 min</option>
+                                        <option value="10">10 min</option>
+                                        <option value="15">15 min</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- N3 — ISS transit -->
+                        <div class="col-12">
+                            <div class="bg-features rounded p-2 d-flex flex-wrap align-items-center gap-3">
+                                <div class="form-check form-switch mb-0 flex-shrink-0">
+                                    <input class="form-check-input notif-trigger-toggle" type="checkbox" id="notif-trigger-N3" data-trigger="N3" role="switch">
+                                    <label class="form-check-label" for="notif-trigger-N3">
+                                        <i class="bi bi-rocket text-warning icon-inline" aria-hidden="true"></i>
+                                        <span data-i18n="settings.notifications_n3">ISS transit (solar or lunar)</span>
+                                    </label>
+                                </div>
+                                <div class="d-flex align-items-center gap-2 ms-auto">
+                                    <label class="form-label mb-0 text-muted small" data-i18n="settings.notifications_lead_label">Notify before</label>
+                                    <select class="form-select form-select-sm notif-lead-select" id="notif-lead-N3" data-trigger="N3" style="width:auto;">
+                                        <option value="5">5 min</option>
+                                        <option value="10">10 min</option>
+                                        <option value="15">15 min</option>
+                                        <option value="20">20 min</option>
+                                        <option value="30">30 min</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- N4 — Lunar eclipse -->
+                        <div class="col-12">
+                            <div class="bg-features rounded p-2 d-flex flex-wrap align-items-center gap-3">
+                                <div class="form-check form-switch mb-0 flex-shrink-0">
+                                    <input class="form-check-input notif-trigger-toggle" type="checkbox" id="notif-trigger-N4" data-trigger="N4" role="switch">
+                                    <label class="form-check-label" for="notif-trigger-N4">
+                                        <i class="bi bi-moon-stars text-info icon-inline" aria-hidden="true"></i>
+                                        <span data-i18n="settings.notifications_n4">Lunar eclipse</span>
+                                    </label>
+                                </div>
+                                <div class="d-flex align-items-center gap-2 ms-auto">
+                                    <label class="form-label mb-0 text-muted small" data-i18n="settings.notifications_lead_label">Notify before</label>
+                                    <select class="form-select form-select-sm notif-lead-select" id="notif-lead-N4" data-trigger="N4" style="width:auto;">
+                                        <option value="15">15 min</option>
+                                        <option value="20">20 min</option>
+                                        <option value="30">30 min</option>
+                                        <option value="45">45 min</option>
+                                        <option value="60">60 min</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- N5 — Solar eclipse -->
+                        <div class="col-12">
+                            <div class="bg-features rounded p-2 d-flex flex-wrap align-items-center gap-3">
+                                <div class="form-check form-switch mb-0 flex-shrink-0">
+                                    <input class="form-check-input notif-trigger-toggle" type="checkbox" id="notif-trigger-N5" data-trigger="N5" role="switch">
+                                    <label class="form-check-label" for="notif-trigger-N5">
+                                        <i class="bi bi-sun text-warning icon-inline" aria-hidden="true"></i>
+                                        <span data-i18n="settings.notifications_n5">Solar eclipse</span>
+                                    </label>
+                                </div>
+                                <div class="d-flex align-items-center gap-2 ms-auto">
+                                    <label class="form-label mb-0 text-muted small" data-i18n="settings.notifications_lead_label">Notify before</label>
+                                    <select class="form-select form-select-sm notif-lead-select" id="notif-lead-N5" data-trigger="N5" style="width:auto;">
+                                        <option value="15">15 min</option>
+                                        <option value="20">20 min</option>
+                                        <option value="30">30 min</option>
+                                        <option value="45">45 min</option>
+                                        <option value="60">60 min</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- N6 — Astronomical darkness -->
+                        <div class="col-12">
+                            <div class="bg-features rounded p-2 d-flex flex-wrap align-items-center gap-3">
+                                <div class="form-check form-switch mb-0 flex-shrink-0">
+                                    <input class="form-check-input notif-trigger-toggle" type="checkbox" id="notif-trigger-N6" data-trigger="N6" role="switch">
+                                    <label class="form-check-label" for="notif-trigger-N6">
+                                        <i class="bi bi-moon text-primary icon-inline" aria-hidden="true"></i>
+                                        <span data-i18n="settings.notifications_n6">Astronomical darkness begins</span>
+                                    </label>
+                                </div>
+                                <div class="d-flex align-items-center gap-2 ms-auto">
+                                    <label class="form-label mb-0 text-muted small" data-i18n="settings.notifications_lead_label">Notify before</label>
+                                    <select class="form-select form-select-sm notif-lead-select" id="notif-lead-N6" data-trigger="N6" style="width:auto;">
+                                        <option value="10">10 min</option>
+                                        <option value="15">15 min</option>
+                                        <option value="20">20 min</option>
+                                        <option value="30">30 min</option>
+                                        <option value="45">45 min</option>
+                                        <option value="60">60 min</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- N7 — Aurora Kp -->
+                        <div class="col-12">
+                            <div class="bg-features rounded p-2 d-flex flex-wrap align-items-center gap-3">
+                                <div class="form-check form-switch mb-0 flex-shrink-0">
+                                    <input class="form-check-input notif-trigger-toggle" type="checkbox" id="notif-trigger-N7" data-trigger="N7" role="switch">
+                                    <label class="form-check-label" for="notif-trigger-N7">
+                                        <i class="bi bi-activity text-success icon-inline" aria-hidden="true"></i>
+                                        <span data-i18n="settings.notifications_n7">Aurora alert (Kp index)</span>
+                                    </label>
+                                </div>
+                                <div class="d-flex align-items-center gap-2 ms-auto">
+                                    <label class="form-label mb-0 text-muted small" data-i18n="settings.notifications_kp_label">Kp ≥</label>
+                                    <select class="form-select form-select-sm" id="notif-kp-threshold" style="width:auto;">
+                                        <option value="3">3</option>
+                                        <option value="4">4</option>
+                                        <option value="5">5</option>
+                                        <option value="6">6</option>
+                                        <option value="7">7</option>
+                                        <option value="8">8</option>
+                                        <option value="9">9</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-primary" id="notif-save-btn">
+                            <i class="bi bi-save icon-inline" aria-hidden="true"></i>
+                            <span data-i18n="settings.notifications_save_btn">Save preferences</span>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="notif-test-btn">
+                            <i class="bi bi-bell icon-inline" aria-hidden="true"></i>
+                            <span data-i18n="settings.notifications_test_btn">Send test notification</span>
+                        </button>
+                    </div>
+
+                    <div id="notif-save-message" class="alert mt-3" role="alert" style="display:none;"></div>
+
                 </div>
             </div>
 
@@ -2317,6 +2536,7 @@
     <script src="/static/js/apiHelper.js?v={{ version }}"></script>
     <script src="/static/js/events_alerts.js?v={{ version }}"></script>
     <script src="/static/js/utils.js?v={{ version }}"></script>
+    <script src="/static/js/notifications.js?v={{ version }}"></script>
     <script src="/static/js/skytonightScheduler.js?v={{ version }}"></script>
     <script src="/static/js/moon.js?v={{ version }}"></script>
     <script src="/static/js/sun.js?v={{ version }}"></script>

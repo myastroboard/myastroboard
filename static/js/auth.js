@@ -14,7 +14,8 @@ const DEFAULT_USER_PREFERENCES = {
     startup_subtab: 'astro-weather',
     time_format: 'auto',
     density: 'comfortable',
-    theme_mode: 'auto'
+    theme_mode: 'auto',
+    notifications: null,
 };
 
 const startupSubtabsByMain = {
@@ -24,7 +25,7 @@ const startupSubtabsByMain = {
     'spaceflight': ['launches', 'astronauts', 'space-events', 'iss'],
     'astrodex': ['astrodex', 'plan-my-night'],
     'equipment': ['combinations', 'fov', 'telescopes', 'cameras', 'mounts', 'filters', 'accessories'],
-    'my-settings': ['customize', 'security'],
+    'my-settings': ['customize', 'notifications', 'security'],
     'parameters': ['configuration', 'advanced', 'logs', 'users', 'metrics']
 };
 

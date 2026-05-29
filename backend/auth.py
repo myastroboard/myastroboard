@@ -53,7 +53,20 @@ DEFAULT_USER_PREFERENCES = {
     'startup_subtab': 'astro-weather',
     'time_format': 'auto',
     'density': 'comfortable',
-    'theme_mode': 'auto'
+    'theme_mode': 'auto',
+    'notifications': {
+        'enabled': True,
+        'permission_asked': False,
+        'triggers': {
+            'N1': {'enabled': True, 'lead_minutes': 15},
+            'N2': {'enabled': True, 'lead_minutes': 5},
+            'N3': {'enabled': True, 'lead_minutes': 10},
+            'N4': {'enabled': True, 'lead_minutes': 30},
+            'N5': {'enabled': True, 'lead_minutes': 30},
+            'N6': {'enabled': True, 'lead_minutes': 20},
+            'N7': {'enabled': True, 'kp_threshold': 5},
+        }
+    }
 }
 
 # Users storage file
@@ -305,6 +318,10 @@ class UserManager:
         theme_mode = preferences.get('theme_mode')
         if theme_mode is not None and theme_mode not in ALLOWED_THEME_MODES:
             return False, f"Invalid theme_mode: {theme_mode}"
+
+        notifications = preferences.get('notifications')
+        if notifications is not None and not isinstance(notifications, dict):
+            return False, "Invalid notifications: must be a dictionary"
 
         return True, ""
 

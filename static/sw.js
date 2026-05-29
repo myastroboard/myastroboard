@@ -19,6 +19,7 @@ const APP_SHELL_URLS = [
     '/static/js/i18n.js',
     '/static/js/apiHelper.js',
     '/static/js/offline.js',
+    '/static/js/notifications.js',
     '/static/i18n/en.json',
     '/static/i18n/fr.json',
     '/static/i18n/de.json',

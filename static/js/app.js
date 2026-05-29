@@ -424,6 +424,9 @@ function switchSubTab(parentTab, subtabName, options = {}) {
         case 'plan-my-night':
             loadPlanMyNight();
             break; // Astrodex tab
+        case 'notifications':
+            if (typeof initNotificationSettingsUI === 'function') initNotificationSettingsUI();
+            break; // My Settings tab
         default:
             if (subtabName.startsWith('skytonight-')) { // SkyTonight section tabs
                 const skytSection = subtabName.slice('skytonight-'.length);
