@@ -2347,7 +2347,7 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
             html += `
             <div class="col-12">
                 <label for="foto-value-${eCat}-${eType}" class="visually-hidden">${tSkyTonightCompat('search_foto_score')}</label>
-                <input type="number" id="foto-value-${eCat}-${eType}" step="5" min="0" max="100" class="shared-foto-value form-control">
+                <input type="number" id="foto-value-${eCat}-${eType}" step="5" min="0" max="100" inputmode="numeric" class="shared-foto-value form-control">
             </div>`;
         }
 

@@ -1064,7 +1064,7 @@
 
                         <div class="col-md-3">
                             <label for="elevation" class="form-label" data-i18n="settings.elevation">Elevation (meters):</label>
-                            <input type="number" id="elevation" class="form-control" placeholder="10" step="0.1" data-i18n-placeholder="settings.elevation_placeholder">
+                            <input type="number" id="elevation" class="form-control" placeholder="10" step="0.1" inputmode="decimal" data-i18n-placeholder="settings.elevation_placeholder">
                         </div>
 
                         <div class="col-md-3">
@@ -1106,7 +1106,7 @@
                         <div class="col-md-3">
                             <label for="sqm-value" class="form-label" data-i18n="settings.sky_quality_sqm">SQM (optional):</label>
                             <div class="input-group">
-                                <input type="number" id="sqm-value" class="form-control" step="0.1" min="15" max="23" data-i18n-placeholder="settings.sky_quality_sqm_placeholder" placeholder="e.g. 20.8">
+                                <input type="number" id="sqm-value" class="form-control" step="0.1" min="15" max="23" inputmode="decimal" data-i18n-placeholder="settings.sky_quality_sqm_placeholder" placeholder="e.g. 20.8">
                                 <span class="input-group-text">mag/arcsec²</span>
                             </div>
                             <div class="form-text" data-i18n="settings.sky_quality_sqm_info">Enter if you have a real SQM meter reading. Overrides the Bortle midpoint estimate.</div>
@@ -1175,37 +1175,37 @@
                     <div class="row g-3 mt-1 mb-2" id="constraints-fields">
                         <div id="max-targets-field" class="col-md-3">
                             <label for="altitude-min" class="form-label" data-i18n="settings.altitude_min">Min Altitude (&deg;):</label>
-                            <input type="number" id="altitude-min" class="form-control" value="30" step="1" title="Minimum altitude in degrees above horizon (typical: 30&deg;)" data-i18n-title="settings.altitude_min_title">
+                            <input type="number" id="altitude-min" class="form-control" value="30" step="1" inputmode="numeric" title="Minimum altitude in degrees above horizon (typical: 30&deg;)" data-i18n-title="settings.altitude_min_title">
                             <div class="form-text" data-i18n="settings.altitude_min_info">Degrees above horizon</div>
                         </div>
                         <div class="col-md-3">
                             <label for="altitude-max" class="form-label" data-i18n="settings.altitude_max">Max Altitude (&deg;):</label>
-                            <input type="number" id="altitude-max" class="form-control" value="80" step="1" title="Maximum altitude in degrees above horizon (typical: 80&deg;)" data-i18n-title="settings.altitude_max_title">
+                            <input type="number" id="altitude-max" class="form-control" value="80" step="1" inputmode="numeric" title="Maximum altitude in degrees above horizon (typical: 80&deg;)" data-i18n-title="settings.altitude_max_title">
                             <div class="form-text" data-i18n="settings.altitude_max_info">Degrees above horizon</div>
                         </div>
                         <div class="col-md-3">
                             <label for="airmass" class="form-label" data-i18n="settings.airmass_constraint">Airmass Constraint:</label>
-                            <input type="number" id="airmass" class="form-control" value="2" step="0.1" title="Maximum airmass (2 = 60&deg; zenith angle, 3 = 70.5&deg;)" data-i18n-title="settings.airmass_constraint_title">
+                            <input type="number" id="airmass" class="form-control" value="2" step="0.1" inputmode="decimal" title="Maximum airmass (2 = 60&deg; zenith angle, 3 = 70.5&deg;)" data-i18n-title="settings.airmass_constraint_title">
                             <div class="form-text" data-i18n="settings.airmass_constraint_info">2 = 1/cos(60&deg;)</div>
                         </div>
                         <div class="col-md-3">
                             <label for="size-min" class="form-label" data-i18n="settings.size_min">Min Size (arcmin):</label>
-                            <input type="number" id="size-min" class="form-control" value="10" step="1">
+                            <input type="number" id="size-min" class="form-control" value="10" step="1" inputmode="numeric">
                             <div class="form-text" data-i18n="settings.size_min_info">Minimum object size in arc minutes</div>
                         </div>
                         <div class="col-md-3">
                             <label for="size-max" class="form-label" data-i18n="settings.size_max">Max Size (arcmin):</label>
-                            <input type="number" id="size-max" class="form-control" value="300" step="1">
+                            <input type="number" id="size-max" class="form-control" value="300" step="1" inputmode="numeric">
                             <div class="form-text" data-i18n="settings.size_max_info">Maximum object size in arc minutes</div>
                         </div>
                         <div class="col-md-3">
                             <label for="moon-sep" class="form-label" data-i18n="settings.moon_sep">Min Moon Separation (&deg;):</label>
-                            <input type="number" id="moon-sep" class="form-control" value="45" step="1">
+                            <input type="number" id="moon-sep" class="form-control" value="45" step="1" inputmode="numeric">
                             <div class="form-text" data-i18n="settings.moon_sep_info">Minimum separation from moon in degrees (overridden if 'Use Moon Illumination' is checked)</div>
                         </div>
                         <div class="col-md-3">
                             <label for="time-threshold" class="form-label" data-i18n="settings.time_threshold">Observable Time Threshold:</label>
-                            <input type="number" id="time-threshold" class="form-control" value="0.5" step="0.1" min="0" max="1">
+                            <input type="number" id="time-threshold" class="form-control" value="0.5" step="0.1" min="0" max="1" inputmode="decimal">
                             <div class="form-text" data-i18n="settings.time_threshold_info">Fraction of darkness time object must be observable (0.0-1.0, e.g., 0.5 = 50%)</div>
                         </div>
                     </div>

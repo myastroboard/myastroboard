@@ -190,8 +190,8 @@ function addHorizonRow(az = '', alt = '') {
     if (!tbody) return;
     const tr = document.createElement('tr');
     tr.innerHTML = `
-        <td><input type="number" class="form-control form-control-sm horizon-az" value="${az}" min="0" max="360" step="1" placeholder="0-360"></td>
-        <td><input type="number" class="form-control form-control-sm horizon-alt" value="${alt}" min="0" max="90" step="1" placeholder="0-90"></td>
+        <td><input type="number" class="form-control form-control-sm horizon-az" value="${az}" min="0" max="360" step="1" inputmode="numeric" placeholder="0-360"></td>
+        <td><input type="number" class="form-control form-control-sm horizon-alt" value="${alt}" min="0" max="90" step="1" inputmode="numeric" placeholder="0-90"></td>
         <td><button type="button" class="btn btn-sm btn-danger" data-action="delete-horizon-row"><i class="bi bi-trash icon-inline" aria-hidden="true"></i></button></td>`;
     tbody.appendChild(tr);
     _updateHorizonTableVisibility();

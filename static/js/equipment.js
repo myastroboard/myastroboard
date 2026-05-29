@@ -916,20 +916,20 @@ async function showTelescopeModal(id = null) {
             </div>
             <div class="col-md-6">
                 <label for="telescope-aperture" class="form-label">${i18n.t('equipment.form_aperture')} *</label>
-                <input type="number" class="form-control" id="telescope-aperture" name="aperture_mm" value="${telescope?.aperture_mm || ''}" required min="10" max="2000">
+                <input type="number" class="form-control" id="telescope-aperture" name="aperture_mm" value="${telescope?.aperture_mm || ''}" required min="10" max="2000" inputmode="numeric">
             </div>
             <div class="col-md-6">
                 <label for="telescope-focal-length" class="form-label">${i18n.t('equipment.form_focal_length')} *</label>
-                <input type="number" class="form-control" id="telescope-focal-length" name="focal_length_mm" value="${telescope?.focal_length_mm || ''}" required min="100" max="20000">
+                <input type="number" class="form-control" id="telescope-focal-length" name="focal_length_mm" value="${telescope?.focal_length_mm || ''}" required min="100" max="20000" inputmode="numeric">
             </div>
             <div class="col-md-6">
                 <label for="telescope-reducer-barlow-factor" class="form-label">${i18n.t('equipment.form_reducer_barlow_factor')}</label>
-                <input type="number" class="form-control" id="telescope-reducer-barlow-factor" name="reducer_barlow_factor" value="${telescope?.reducer_barlow_factor || 1.0}" min="0.1" max="3" step="0.1">
+                <input type="number" class="form-control" id="telescope-reducer-barlow-factor" name="reducer_barlow_factor" value="${telescope?.reducer_barlow_factor || 1.0}" min="0.1" max="3" step="0.1" inputmode="decimal">
                 <small class="form-text text-muted">${i18n.t('equipment.form_reducer_barlow_text')}</small>
             </div>
             <div class="col-md-6">
                 <label for="telescope-weight" class="form-label">${i18n.t('equipment.form_weight')}</label>
-                <input type="number" class="form-control" id="telescope-weight" name="weight_kg" value="${telescope?.weight_kg || ''}" min="0" max="100" step="0.1">
+                <input type="number" class="form-control" id="telescope-weight" name="weight_kg" value="${telescope?.weight_kg || ''}" min="0" max="100" step="0.1" inputmode="decimal">
             </div>
             <div class="col-md-12">
                 <label for="telescope-notes" class="form-label">${i18n.t('equipment.form_notes')}</label>
@@ -1025,23 +1025,23 @@ async function showCameraModal(id = null) {
             </div>
             <div class="col-md-6">
                 <label for="camera-pixel-size" class="form-label">${i18n.t('equipment.form_pixel_size')} *</label>
-                <input type="number" class="form-control" id="camera-pixel-size" name="pixel_size_um" value="${camera?.pixel_size_um || ''}" required min="1" max="10" step="0.01">
+                <input type="number" class="form-control" id="camera-pixel-size" name="pixel_size_um" value="${camera?.pixel_size_um || ''}" required min="1" max="10" step="0.01" inputmode="decimal">
             </div>
             <div class="col-md-6">
                 <label for="camera-sensor-width" class="form-label">${i18n.t('equipment.form_sensor_width')} *</label>
-                <input type="number" class="form-control" id="camera-sensor-width" name="sensor_width_mm" value="${camera?.sensor_width_mm || ''}" required min="1" max="100" step="0.1">
+                <input type="number" class="form-control" id="camera-sensor-width" name="sensor_width_mm" value="${camera?.sensor_width_mm || ''}" required min="1" max="100" step="0.1" inputmode="decimal">
             </div>
             <div class="col-md-6">
                 <label for="camera-sensor-height" class="form-label">${i18n.t('equipment.form_sensor_height')} *</label>
-                <input type="number" class="form-control" id="camera-sensor-height" name="sensor_height_mm" value="${camera?.sensor_height_mm || ''}" required min="1" max="100" step="0.1">
+                <input type="number" class="form-control" id="camera-sensor-height" name="sensor_height_mm" value="${camera?.sensor_height_mm || ''}" required min="1" max="100" step="0.1" inputmode="decimal">
             </div>
             <div class="col-md-6">
                 <label for="camera-resolution-width" class="form-label">${i18n.t('equipment.form_resolution_width')} *</label>
-                <input type="number" class="form-control" id="camera-resolution-width" name="resolution_width_px" value="${camera?.resolution_width_px || ''}" required min="640" max="16000">
+                <input type="number" class="form-control" id="camera-resolution-width" name="resolution_width_px" value="${camera?.resolution_width_px || ''}" required min="640" max="16000" inputmode="numeric">
             </div>
             <div class="col-md-6">
                 <label for="camera-resolution-height" class="form-label">${i18n.t('equipment.form_resolution_height')} *</label>
-                <input type="number" class="form-control" id="camera-resolution-height" name="resolution_height_px" value="${camera?.resolution_height_px || ''}" required min="480" max="12000">
+                <input type="number" class="form-control" id="camera-resolution-height" name="resolution_height_px" value="${camera?.resolution_height_px || ''}" required min="480" max="12000" inputmode="numeric">
             </div>
             <div class="col-md-6">
                 <label for="camera-cooling-supported" class="form-label">${i18n.t('equipment.form_cooling_supported')}</label>
@@ -1052,11 +1052,11 @@ async function showCameraModal(id = null) {
             </div>
             <div class="col-md-6">
                 <label for="camera-min-temperature" class="form-label">${i18n.t('equipment.form_min_temperature')}</label>
-                <input type="number" class="form-control" id="camera-min-temperature" name="min_temperature_c" value="${camera?.min_temperature_c || ''}" min="-50" max="0">
+                <input type="number" class="form-control" id="camera-min-temperature" name="min_temperature_c" value="${camera?.min_temperature_c || ''}" min="-50" max="0" inputmode="numeric">
             </div>
             <div class="col-md-6">
                 <label for="camera-weight" class="form-label">${i18n.t('equipment.form_weight')}</label>
-                <input type="number" class="form-control" id="camera-weight" name="weight_kg" value="${camera?.weight_kg || ''}" min="0" max="50" step="0.1">
+                <input type="number" class="form-control" id="camera-weight" name="weight_kg" value="${camera?.weight_kg || ''}" min="0" max="50" step="0.1" inputmode="decimal">
             </div>
             <div class="col-md-12">
                 <label for="camera-notes" class="form-label">${i18n.t('equipment.form_notes')}</label>
@@ -1153,11 +1153,11 @@ async function showMountModal(id = null) {
             </div>
             <div class="col-md-6">
                 <label for="mount-payload-capacity" class="form-label">${i18n.t('equipment.form_payload_capacity')} *</label>
-                <input type="number" class="form-control" id="mount-payload-capacity" name="payload_capacity_kg" value="${mount?.payload_capacity_kg || ''}" required min="0.1" max="100" step="0.1">
+                <input type="number" class="form-control" id="mount-payload-capacity" name="payload_capacity_kg" value="${mount?.payload_capacity_kg || ''}" required min="0.1" max="100" step="0.1" inputmode="decimal">
             </div>
             <div class="col-md-6">
                 <label for="mount-tracking-accuracy" class="form-label">${i18n.t('equipment.form_tracking_accuracy')}</label>
-                <input type="number" class="form-control" id="mount-tracking-accuracy" name="tracking_accuracy_arcsec" value="${mount?.tracking_accuracy_arcsec || ''}" min="0.1" max="10" step="0.1">
+                <input type="number" class="form-control" id="mount-tracking-accuracy" name="tracking_accuracy_arcsec" value="${mount?.tracking_accuracy_arcsec || ''}" min="0.1" max="10" step="0.1" inputmode="decimal">
             </div>
             <div class="col-md-6">
                 <label for="mount-guiding-supported" class="form-label">${i18n.t('equipment.form_guiding_support')}</label>
@@ -1268,11 +1268,11 @@ async function showFilterModal(id = null) {
             </div>
             <div class="col-md-6">
                 <label for="filter-wavelength" class="form-label">${i18n.t('equipment.form_wavelength')}</label>
-                <input type="number" class="form-control" id="filter-wavelength" name="central_wavelength_nm" value="${filter?.central_wavelength_nm || ''}" min="300" max="2000">
+                <input type="number" class="form-control" id="filter-wavelength" name="central_wavelength_nm" value="${filter?.central_wavelength_nm || ''}" min="300" max="2000" inputmode="numeric">
             </div>
             <div class="col-md-6">
                 <label for="filter-bandwidth" class="form-label">${i18n.t('equipment.form_bandwidth')}</label>
-                <input type="number" class="form-control" id="filter-bandwidth" name="bandwidth_nm" value="${filter?.bandwidth_nm || ''}" min="1" max="1000">
+                <input type="number" class="form-control" id="filter-bandwidth" name="bandwidth_nm" value="${filter?.bandwidth_nm || ''}" min="1" max="1000" inputmode="numeric">
             </div>
             <div class="col-md-12">
                 <label for="filter-intended-use" class="form-label">${i18n.t('equipment.form_intended_use')}</label>
@@ -1367,7 +1367,7 @@ async function showAccessoryModal(id = null) {
                 </div>
                 <div class="col-md-6 mb-3">
                     <label for="accessory-weight" class="form-label">${i18n.t('equipment.form_weight')}</label>
-                    <input type="number" class="form-control" id="accessory-weight" name="weight_kg" value="${accessory?.weight_kg || ''}" min="0" max="50" step="0.1">
+                    <input type="number" class="form-control" id="accessory-weight" name="weight_kg" value="${accessory?.weight_kg || ''}" min="0" max="50" step="0.1" inputmode="decimal">
                 </div>
             </div>
             <div class="mb-3">

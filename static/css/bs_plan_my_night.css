@@ -23,6 +23,7 @@
 
 .plan-summary-graph-canvas-wrap {
     position: relative;
+    width: 100%;
     height: 250px;
 }
 
