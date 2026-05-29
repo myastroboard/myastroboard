@@ -240,7 +240,7 @@ def web_manifest():
 @app.route('/manifest.<lang>.webmanifest')
 def web_manifest_localized(lang):
     """Serve localized PWA web manifest"""
-    allowed = {'fr', 'es', 'de'}
+    allowed = {'fr', 'es', 'de', 'it', 'pt'}
     if lang not in allowed:
         return '', 404
     response = send_from_directory(STATIC_DIR, f'manifest.{lang}.webmanifest', mimetype='application/manifest+json')
