@@ -133,7 +133,7 @@ class AstroWeatherAnalyzer:
             try:
                 response = client.weather_api(URL_OPENMETEO, params=params)[0]
                 result = self._parse_extended_data(response, hourly_vars_full)
-                logger.info(f"Open-Meteo API: Successfully fetched {forecast_hours}h astro weather data {location_str} (with jet stream)")
+                logger.debug(f"Open-Meteo API: Successfully fetched {forecast_hours}h astro weather data {location_str} (with jet stream)")
                 return result
             except Exception as full_error:
                 # If full request fails (likely due to server load), retry with core variables
@@ -146,7 +146,7 @@ class AstroWeatherAnalyzer:
                 try:
                     response = client.weather_api(URL_OPENMETEO, params=params)[0]
                     result = self._parse_extended_data(response, hourly_vars_core)
-                    logger.info(f"Open-Meteo API: Successfully fetched {forecast_hours}h astro weather data {location_str} (core variables, jet stream uses estimations)")
+                    logger.debug(f"Open-Meteo API: Successfully fetched {forecast_hours}h astro weather data {location_str} (core variables, jet stream uses estimations)")
                     return result
                 except Exception as retry_error:
                     # If both full and core requests fail, return None and let cache fallback handle it
@@ -836,7 +836,7 @@ def get_astro_weather_analysis(hours: int = 24, language: str = "en") -> Optiona
             _store_last_successful_analysis(hours, language, analysis)
             # Clear any failure timestamp on success
             _ASTRO_ANALYSIS_LAST_FAILURE_TS.pop(cache_key, None)
-            logger.info(f"Fresh astro weather analysis retrieved successfully {cache_key}")
+            logger.debug(f"Fresh astro weather analysis retrieved successfully {cache_key}")
             return analysis
 
         # Fetch failed — record failure timestamp to trigger cooldown

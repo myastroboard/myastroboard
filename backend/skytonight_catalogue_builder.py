@@ -338,7 +338,7 @@ def _build_cross_ref_map() -> Dict[str, Dict[str, str]]:
 
     total_keys = len(cross_refs)
     catalogues_applied = sorted({cat for refs in cross_refs.values() for cat in refs})
-    logger.info(f'Cross-ref map built: {total_keys} NGC/IC keys, catalogues: {catalogues_applied}')
+    logger.debug(f'Cross-ref map built: {total_keys} NGC/IC keys, catalogues: {catalogues_applied}')
     return cross_refs
 
 
@@ -385,7 +385,7 @@ def _apply_cross_refs(
 
         result.append(target)
 
-    logger.info(f'Cross-ref injection: {enriched}/{len(result)} targets enriched')
+    logger.debug(f'Cross-ref injection: {enriched}/{len(result)} targets enriched')
     return result
 
 
@@ -472,7 +472,7 @@ def _load_pyongc_rows() -> List[PyOngcRow]:
             other_identifiers=[_normalize_identifier(value) for value in _coerce_identifier_list(identifiers[4] if len(identifiers) > 4 else [])],
         ))
 
-    logger.info(f'Loaded {len(rows)} PyOngc deep-sky rows for SkyTonight')
+    logger.debug(f'Loaded {len(rows)} PyOngc deep-sky rows for SkyTonight')
     return rows
 
 
@@ -591,7 +591,7 @@ def _build_standalone_targets_from_json(filename: str, catalogue_key: str) -> Li
 
     if skipped:
         logger.warning(f'{filename}: skipped {skipped} invalid entries')
-    logger.info(f'Loaded {len(targets)} standalone targets from {filename}')
+    logger.debug(f'Loaded {len(targets)} standalone targets from {filename}')
     return targets
 
 

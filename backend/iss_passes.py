@@ -32,7 +32,7 @@ logger = get_logger(__name__)
 SKYFIELD_CACHE_DIR = os.path.join(DATA_DIR_CACHE, 'skyfield')
 os.makedirs(SKYFIELD_CACHE_DIR, exist_ok=True)
 SKYFIELD_LOADER = Loader(SKYFIELD_CACHE_DIR)
-logger.info(f"Skyfield cache directory: {SKYFIELD_CACHE_DIR}")
+logger.debug(f"Skyfield cache directory: {SKYFIELD_CACHE_DIR}")
 
 # TLE sources in priority order.  Celestrak is authoritative but sources 2-3 are
 # independent aggregators that remain reachable when a Celestrak IP-block occurs.

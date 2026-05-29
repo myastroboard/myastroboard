@@ -310,7 +310,7 @@ def fetch_mpc_comets(timeout_seconds: int = 20) -> List[Dict[str, Any]]:
                        f'body_preview=\'{_response_preview(text)}\'')
         return []
 
-    logger.info(f'Parsed {len(raw_rows)} comet orbital elements from MPC CometEls.txt')
+    logger.debug(f'Parsed {len(raw_rows)} comet orbital elements from MPC CometEls.txt')
 
     obs_time = datetime.now(timezone.utc)
     earth_helio = _get_earth_heliocentric(obs_time)
@@ -339,7 +339,7 @@ def fetch_mpc_comets(timeout_seconds: int = 20) -> List[Dict[str, Any]]:
         if ra_h is not None:
             computed += 1
 
-    logger.info(f'Computed sky positions for {computed}/{len(rows)} comets')
+    logger.debug(f'Computed sky positions for {computed}/{len(rows)} comets')
     return rows
 
 

@@ -1228,7 +1228,7 @@ def run_calculations(
         _set_progress('bodies', processed_bodies, n_bodies)
 
     # Immediate partial save: bodies are available in the frontend while comets/DSOs compute
-    logger.info(f'Bodies done: {len(bodies_results)} visible. Writing bodies results...')
+    logger.debug(f'Bodies done: {len(bodies_results)} visible. Writing bodies results...')
     save_json_file(SKYTONIGHT_BODIES_RESULTS_FILE, {
         'metadata': {
             'calculated_at': datetime.now(timezone.utc).isoformat(),
@@ -1309,7 +1309,7 @@ def run_calculations(
         _set_progress('comets', processed_comets, n_comets)
 
     # Partial save: comets are now available while DSOs compute
-    logger.info(f'Comets done: {len(comets_results)} visible. Writing comets results...')
+    logger.debug(f'Comets done: {len(comets_results)} visible. Writing comets results...')
     save_json_file(SKYTONIGHT_COMETS_RESULTS_FILE, {
         'metadata': {
             'calculated_at': datetime.now(timezone.utc).isoformat(),

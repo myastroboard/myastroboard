@@ -105,7 +105,7 @@ class CacheScheduler:
                     logger.info("Running initial cache population...")
                     self._first_run = False
                 else:
-                    logger.info("Running scheduled cache update...")
+                    logger.debug("Running scheduled cache update...")
                 self.update_all_caches()
                 if not self.cache_ready_event.is_set():
                     self.cache_ready_event.set()
@@ -119,7 +119,7 @@ class CacheScheduler:
     def update_all_caches(self):
         """Update all caches by calling the calculation functions"""
         start_time = datetime.now()
-        logger.info("Starting cache update process...")
+        logger.debug("Starting cache update process...")
         try:
             fully_initialize_caches()
             duration = (datetime.now() - start_time).total_seconds()
