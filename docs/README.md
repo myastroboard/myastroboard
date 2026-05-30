@@ -27,6 +27,7 @@ Welcome to the comprehensive documentation for MyAstroBoard, the integrated astr
 - [Plan My Night](PLAN_MY_NIGHT.md) - Night planning workflow and permissions
 - [Cache System](CACHE_SYSTEM.md) - Understanding the caching architecture
 - [SkyTonight](SKYTONIGHT.md) - Skytonight calculation & astroscore description
+- [Exposure Calculator](EXPOSURE_CALC.md) - Formula and calibration for the Equipment exposure calculator
 - [Visual Tour](VISUAL_TOUR.md) - Screenshots and feature walkthrough
 
 ## 🚀 Quick Links
