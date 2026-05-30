@@ -9,25 +9,32 @@ This document describes features that could potentially be integrated into MyAst
 - Stabilization of critical bugs
 - Improved mobile interface (responsive)
 
-### Immediate — before calling v1.0 done
-1. **Tests for push backend** — `push_manager.py`, `push_scheduler.py` trigger logic, new API routes, User model round-trip.
-2. **End-to-end test on a real mobile device** - verify push subscriptions work on Android (Chrome) and iOS (Safari with limitations). The code is correct in theory but untested on hardware.
+### Short-term — self-contained additions to existing modules
 
-### Short-term — the most natural next feature
+These features extend what already exists without introducing new data models or storage.
 
-**Observation log** is the biggest missing piece for an astrophotography app. Users plan their night (Plan My Night), they observe, but there's nowhere to record what actually happened:
+| Feature | Why | Effort |
+|---------|-----|--------|
+| Moon phase calendar with Plan My Night | Visual planning across a month — which nights are dark enough | Low |
+| Seeing forecast tied to Plan My Night | "Best night this week to observe X" — 7Timer already cached | Medium |
+| Exposure calculator | Integration time by sensor+scope — Equipment model already has the fields | Medium |
 
-- What targets they captured
-- Actual exposure time / number of frames
-- Equipment used (already modelled)
-- Sky conditions that night (could pull from weather cache)
-- Notes / rating
-This closes the loop: Plan → Observe → Log → Astrodex (where captured objects are catalogued). The data model is already 80% there — Plan My Night has the target list, Equipment has the gear, Astrodex has the objects.
+### Medium-term — new standalone features
 
-### Medium-term
-| Feature	| Why | Effort |
-|----|-------|---------------|
-| Multi-location profiles	| Observers travel to dark sites | Medium |
-| Seeing forecast tied to Plan My Night | "Best night this week to observe X"	| Medium |
-| Exposure calculator	| Integration time for targets by sensor+scope | Medium |
-| Moon phase calendar with Plan My Night | Visual planning across a month	| Low |
+| Feature | Why | Effort |
+|---------|-----|--------|
+| Multi-location profiles | Observers travel to dark sites; location drives every calculation | Medium |
+| **Observation log** | Record what actually happened after a session (see below) | High |
+
+#### Observation log — realistic scope
+
+Closes the loop: **Plan → Observe → Log → Astrodex**. Users can record what they actually captured, not just what they planned.
+
+What needs to be built from scratch:
+- **Session concept** — date, observing site, equipment combo, start/end time, sky conditions (SQM, seeing, transparency)
+- **Per-target entries** — actual frame count, integration time, notes, rating (1–5), link to Astrodex
+- **New backend module** (`observation_sessions.py`) with per-user JSON storage, same pattern as `astrodex.py`
+- **Import from plan** — one-click to seed a session from tonight's Plan My Night targets
+- **New frontend** — session list, session detail, entry editor, i18n in 6 languages
+
+The equipment and object models (Equipment, Astrodex) are reusable as references, but the session and entry data model is entirely new. This is a full feature, not an incremental one.
