@@ -1,0 +1,2 @@
+- Change UI for select telescope in Plan My Night
+- Normalize CSV export for compatibility with other softwares

@@ -709,59 +709,107 @@ def get_plan_with_timeline(user_id: str, username: str, telescope_id: Optional[s
     }
 
 
+def _csv_normalize_ra(val) -> str:
+    """Normalize RA to HH:MM:SS (J2000 sexagesimal)."""
+    if val is None:
+        return ''
+    s = str(val).strip()
+    m = re.match(r'(\d+)\s*h\s*(\d+)\s*m\s*([\d.]+)\s*s?', s, re.IGNORECASE)
+    if m:
+        h, mn, sec = int(m.group(1)), int(m.group(2)), round(float(m.group(3)))
+        if sec == 60:
+            sec, mn = 0, mn + 1
+        return f'{h:02d}:{mn:02d}:{sec:02d}'
+    try:
+        total_h = float(s) / 15.0
+        h = int(total_h)
+        mn = int((total_h % 1) * 60)
+        sec = round(((total_h % 1) * 60 % 1) * 60)
+        if sec == 60:
+            sec, mn = 0, mn + 1
+        return f'{h:02d}:{mn:02d}:{sec:02d}'
+    except (ValueError, TypeError):
+        return s
+
+
+def _csv_normalize_dec(val) -> str:
+    """Normalize Dec to ±DD:MM:SS (J2000 sexagesimal)."""
+    if val is None:
+        return ''
+    s = str(val).strip().replace('Â°', '°').replace('Â', '')
+    m = re.match(r'([+-]?\s*\d+)\s*[°d]\s*(\d+)\s*[\'m]\s*([\d.]+)', s)
+    if m:
+        d = int(m.group(1).replace(' ', ''))
+        mn = int(m.group(2))
+        sec = round(float(m.group(3)))
+        if sec == 60:
+            sec, mn = 0, mn + 1
+        sign = '-' if d < 0 else '+'
+        return f'{sign}{abs(d):02d}:{mn:02d}:{sec:02d}'
+    try:
+        deg = float(s)
+        sign = '-' if deg < 0 else '+'
+        adeg = abs(deg)
+        d = int(adeg)
+        mn = int((adeg % 1) * 60)
+        sec = round(((adeg % 1) * 60 % 1) * 60)
+        if sec == 60:
+            sec, mn = 0, mn + 1
+        return f'{sign}{d:02d}:{mn:02d}:{sec:02d}'
+    except (ValueError, TypeError):
+        return s
+
+
+def _csv_fmt_local_hm(iso_str) -> str:
+    """Format an ISO datetime string as local HH:MM."""
+    if not iso_str:
+        return ''
+    try:
+        return datetime.fromisoformat(iso_str).strftime('%H:%M')
+    except (ValueError, TypeError):
+        return str(iso_str)
+
+
+def _csv_fmt_observable_pct(val) -> str:
+    """Format a 0-1 fraction as an integer percentage string."""
+    if val is None or val == '':
+        return ''
+    try:
+        return f'{float(val) * 100:.0f}%'
+    except (ValueError, TypeError):
+        return str(val)
+
+
 def serialize_plan_csv(plan_payload: Dict, labels: Optional[Dict[str, str]] = None) -> str:
     labels = labels or {}
     def _label(key: str, fallback: str) -> str:
         return str(labels.get(key) or fallback)
 
-    plan = plan_payload.get('plan')
-    if not plan:
-        output = io.StringIO()
-        writer = csv.writer(output)
-        writer.writerow([
-            _label('order', 'order'),
-            _label('name', 'name'),
-            _label('catalogue', 'catalogue'),
-            _label('target_name', 'target_name'),
-            _label('source_type', 'source_type'),
-            _label('type', 'type'),
-            _label('constellation', 'constellation'),
-            _label('ra', 'ra'),
-            _label('dec', 'dec'),
-            _label('mag', 'mag'),
-            _label('size', 'size'),
-            _label('foto', 'foto'),
-            _label('planned_duration', 'planned_duration'),
-            _label('planned_minutes', 'planned_minutes'),
-            _label('timeline_start', 'timeline_start'),
-            _label('timeline_end', 'timeline_end'),
-            _label('alttime_file', 'alttime_file'),
-            _label('done', 'done'),
-        ])
-        return output.getvalue()
-
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow([
+    header = [
         _label('order', 'order'),
         _label('name', 'name'),
         _label('catalogue', 'catalogue'),
         _label('target_name', 'target_name'),
-        _label('source_type', 'source_type'),
         _label('type', 'type'),
         _label('constellation', 'constellation'),
-        _label('ra', 'ra'),
-        _label('dec', 'dec'),
+        _label('ra', 'RA (J2000)'),
+        _label('dec', 'Dec (J2000)'),
         _label('mag', 'mag'),
-        _label('size', 'size'),
-        _label('foto', 'foto'),
-        _label('planned_duration', 'planned_duration'),
-        _label('planned_minutes', 'planned_minutes'),
-        _label('timeline_start', 'timeline_start'),
-        _label('timeline_end', 'timeline_end'),
-        _label('alttime_file', 'alttime_file'),
+        _label('size', 'size (\'\''),
+        _label('observable_pct', 'observable %'),
+        _label('planned_minutes', 'duration (min)'),
+        _label('timeline_start', 'start'),
+        _label('timeline_end', 'end'),
         _label('done', 'done'),
-    ])
+    ]
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(header)
+
+    plan = plan_payload.get('plan')
+    if not plan:
+        return output.getvalue()
 
     for index, entry in enumerate(plan.get('entries', []), start=1):
         writer.writerow([
@@ -769,19 +817,16 @@ def serialize_plan_csv(plan_payload: Dict, labels: Optional[Dict[str, str]] = No
             str(entry.get('name', '')),
             str(entry.get('catalogue', '')),
             str(entry.get('target_name', '')),
-            str(entry.get('source_type', '')),
             str(entry.get('type', '')),
             str(entry.get('constellation', '')),
-            str(entry.get('ra', '')),
-            str(entry.get('dec', '')),
+            _csv_normalize_ra(entry.get('ra')),
+            _csv_normalize_dec(entry.get('dec')),
             str(entry.get('mag', '')),
             str(entry.get('size', '')),
-            str(entry.get('foto', '')),
-            str(entry.get('planned_duration', '00:00')),
+            _csv_fmt_observable_pct(entry.get('foto')),
             str(entry.get('planned_minutes', '')),
-            str(entry.get('timeline_start', '')),
-            str(entry.get('timeline_end', '')),
-            str(entry.get('alttime_file', '')),
+            _csv_fmt_local_hm(entry.get('timeline_start')),
+            _csv_fmt_local_hm(entry.get('timeline_end')),
             _label('done_yes', 'yes') if entry.get('done') else _label('done_no', 'no'),
         ])
 
