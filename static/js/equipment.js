@@ -146,6 +146,7 @@ function findEquipmentById(type, id) {
 function renderAllEquipmentTabs() {
     renderCombinationsTab();
     renderFOVCalculatorTab();
+    renderExposureCalcTab();
     renderTelescopesTab();
     renderCamerasTab();
     renderMountsTab();
@@ -1632,6 +1633,286 @@ async function deleteEquipment(type, id) {
         showMessage('error', i18n.t('equipment.failed_to_delete_item'));
     }
 }
+
+// ── Exposure Calculator ────────────────────────────────────────────────────────
+
+// Bortle class → SQM (mag/arcsec², V-band)
+const BORTLE_SQM = {
+    1: 22.0, 2: 21.5, 3: 21.2, 4: 20.8, 5: 20.3,
+    6: 19.5, 7: 18.8, 8: 18.3, 9: 17.5
+};
+
+// Reference photon flux for 0-mag Vega in V-band at aperture (photons/m²/s/arcsec²)
+// Derived from Vega V-band flux ~9×10^9 photons/m²/s integrated, referenced to 1 arcsec².
+const VEGA_PHOTONS_M2_S_ARCSEC2 = 9e9;
+
+function _computeExposure({ aperture_mm, focal_length_mm, pixel_size_um, read_noise_e, qe, bortle, total_hours }) {
+    const sqm      = BORTLE_SQM[bortle] ?? 20.3;
+    const D_m      = aperture_mm / 1000;
+    const area_m2  = Math.PI / 4 * D_m * D_m;
+
+    // Plate scale (arcsec/px)
+    const plate_scale = 206.265 * pixel_size_um / focal_length_mm;
+
+    // Sky background photon rate (e/px/s) using SQM-referenced Vega flux
+    const sky_flux = VEGA_PHOTONS_M2_S_ARCSEC2 * Math.pow(10, -sqm / 2.5);
+    const B_sky    = sky_flux * qe * area_m2 * plate_scale * plate_scale;
+
+    // Optimal sub-exposure: sky contributes 5× more noise variance than read noise
+    // B × t = 5 × RN²  →  t = 5 × RN² / B
+    const t_sub_s = 5 * read_noise_e * read_noise_e / B_sky;
+
+    const total_s = total_hours * 3600;
+    const n_subs  = Math.max(1, Math.round(total_s / t_sub_s));
+    const actual_total_s = n_subs * t_sub_s;
+
+    return { plate_scale, sqm, B_sky, t_sub_s, n_subs, actual_total_s };
+}
+
+function _fmtDuration(seconds) {
+    if (seconds >= 3600) {
+        const h = Math.floor(seconds / 3600);
+        const m = Math.round((seconds % 3600) / 60);
+        return m > 0 ? `${h}h ${m}min` : `${h}h`;
+    }
+    if (seconds >= 60) {
+        const m = Math.floor(seconds / 60);
+        const s = Math.round(seconds % 60);
+        return s > 0 ? `${m}min ${s}s` : `${m}min`;
+    }
+    return `${Math.round(seconds)}s`;
+}
+
+function _expRow(label, value, note) {
+    const tr = document.createElement('tr');
+    const td1 = document.createElement('td');
+    td1.className = 'text-muted small';
+    td1.textContent = label;
+    const td2 = document.createElement('td');
+    td2.className = 'fw-semibold';
+    td2.textContent = value;
+    tr.appendChild(td1);
+    tr.appendChild(td2);
+    if (note) {
+        const td3 = document.createElement('td');
+        td3.className = 'text-muted small';
+        td3.textContent = note;
+        tr.appendChild(td3);
+    }
+    return tr;
+}
+
+function renderExposureCalcTab() {
+    const container = document.getElementById('equipment-exposure-calc-display');
+    if (!container) return;
+
+    const telescopes = [...equipmentData.telescopes, ...equipmentData.sharedTelescopes];
+    const cameras    = [...equipmentData.cameras,    ...equipmentData.sharedCameras];
+
+    DOMUtils.clear(container);
+
+    if (telescopes.length === 0 || cameras.length === 0) {
+        const alert = document.createElement('div');
+        alert.className = 'alert alert-info';
+        alert.textContent = i18n.t('equipment.exposure_calc_no_equipment');
+        container.appendChild(alert);
+        return;
+    }
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    const body = document.createElement('div');
+    body.className = 'card-body';
+
+    // ── Inputs ──────────────────────────────────────────────────────────────
+    const mkLabel = (forId, key) => {
+        const l = document.createElement('label');
+        l.className = 'form-label';
+        l.setAttribute('for', forId);
+        l.textContent = i18n.t(key);
+        return l;
+    };
+    const mkHelp = (key) => {
+        const d = document.createElement('div');
+        d.className = 'form-text';
+        d.textContent = i18n.t(key);
+        return d;
+    };
+
+    // Row 1: telescope + camera
+    const row1 = document.createElement('div');
+    row1.className = 'row g-3 mb-3';
+
+    const tCol = document.createElement('div');
+    tCol.className = 'col-md-6';
+    tCol.appendChild(mkLabel('exc-telescope', 'equipment.telescope'));
+    const tSel = document.createElement('select');
+    tSel.id = 'exc-telescope';
+    tSel.className = 'form-select';
+    const tDef = new Option(i18n.t('equipment.select_telescope'), '');
+    tSel.appendChild(tDef);
+    telescopes.forEach(t => {
+        const suffix = t.owner_username ? ` (${t.owner_username})` : '';
+        tSel.appendChild(new Option(`${t.name} — f/${t.effective_focal_ratio}  ${t.effective_focal_length}mm${suffix}`, t.id));
+    });
+    tCol.appendChild(tSel);
+    tCol.appendChild(mkHelp('equipment.exposure_calc_help_telescope'));
+
+    const cCol = document.createElement('div');
+    cCol.className = 'col-md-6';
+    cCol.appendChild(mkLabel('exc-camera', 'equipment.camera'));
+    const cSel = document.createElement('select');
+    cSel.id = 'exc-camera';
+    cSel.className = 'form-select';
+    const cDef = new Option(i18n.t('equipment.select_camera'), '');
+    cSel.appendChild(cDef);
+    cameras.forEach(c => {
+        const suffix = c.owner_username ? ` (${c.owner_username})` : '';
+        cSel.appendChild(new Option(`${c.name} — ${c.pixel_size_um}µm${suffix}`, c.id));
+    });
+    cCol.appendChild(cSel);
+    cCol.appendChild(mkHelp('equipment.exposure_calc_help_camera'));
+
+    row1.appendChild(tCol);
+    row1.appendChild(cCol);
+
+    // Row 2: read noise + QE
+    const row2 = document.createElement('div');
+    row2.className = 'row g-3 mb-3';
+
+    const rnCol = document.createElement('div');
+    rnCol.className = 'col-md-4';
+    rnCol.appendChild(mkLabel('exc-read-noise', 'equipment.exposure_calc_read_noise'));
+    const rnInput = document.createElement('input');
+    rnInput.type = 'number'; rnInput.id = 'exc-read-noise';
+    rnInput.className = 'form-control'; rnInput.min = '0.5'; rnInput.max = '30'; rnInput.step = '0.1';
+    rnInput.value = '4'; rnInput.inputMode = 'decimal';
+    rnCol.appendChild(rnInput);
+    rnCol.appendChild(mkHelp('equipment.exposure_calc_help_read_noise'));
+
+    const qeCol = document.createElement('div');
+    qeCol.className = 'col-md-4';
+    qeCol.appendChild(mkLabel('exc-qe', 'equipment.exposure_calc_qe'));
+    const qeInput = document.createElement('input');
+    qeInput.type = 'number'; qeInput.id = 'exc-qe';
+    qeInput.className = 'form-control'; qeInput.min = '10'; qeInput.max = '100'; qeInput.step = '1';
+    qeInput.value = '65'; qeInput.inputMode = 'decimal';
+    qeCol.appendChild(qeInput);
+    qeCol.appendChild(mkHelp('equipment.exposure_calc_help_qe'));
+
+    const hoursCol = document.createElement('div');
+    hoursCol.className = 'col-md-4';
+    hoursCol.appendChild(mkLabel('exc-hours', 'equipment.exposure_calc_total_hours'));
+    const hoursInput = document.createElement('input');
+    hoursInput.type = 'number'; hoursInput.id = 'exc-hours';
+    hoursInput.className = 'form-control'; hoursInput.min = '0.25'; hoursInput.max = '20'; hoursInput.step = '0.25';
+    hoursInput.value = '3'; hoursInput.inputMode = 'decimal';
+    hoursCol.appendChild(hoursInput);
+    hoursCol.appendChild(mkHelp('equipment.exposure_calc_help_hours'));
+
+    row2.appendChild(rnCol);
+    row2.appendChild(qeCol);
+    row2.appendChild(hoursCol);
+
+    // Row 3: Bortle + calculate button
+    const row3 = document.createElement('div');
+    row3.className = 'row g-3 mb-3';
+
+    const borCol = document.createElement('div');
+    borCol.className = 'col-md-6';
+    borCol.appendChild(mkLabel('exc-bortle', 'equipment.exposure_calc_bortle'));
+    const borSel = document.createElement('select');
+    borSel.id = 'exc-bortle';
+    borSel.className = 'form-select';
+    [
+        [1, 'Bortle 1 — 22.0 mag/arcsec²'], [2, 'Bortle 2 — 21.5'],
+        [3, 'Bortle 3 — 21.2'], [4, 'Bortle 4 — 20.8'],
+        [5, 'Bortle 5 — 20.3'], [6, 'Bortle 6 — 19.5'],
+        [7, 'Bortle 7 — 18.8'], [8, 'Bortle 8 — 18.3'],
+        [9, 'Bortle 9 — 17.5'],
+    ].forEach(([v, lbl]) => borSel.appendChild(new Option(lbl, v)));
+    borSel.value = '5';
+    borCol.appendChild(borSel);
+    borCol.appendChild(mkHelp('equipment.exposure_calc_help_bortle'));
+
+    const btnCol = document.createElement('div');
+    btnCol.className = 'col-md-6 d-flex align-items-end';
+    const calcBtn = document.createElement('button');
+    calcBtn.className = 'btn btn-success w-100';
+    calcBtn.innerHTML = `<i class="bi bi-calculator icon-inline" aria-hidden="true"></i>${i18n.t('equipment.exposure_calc_calculate')}`;
+    btnCol.appendChild(calcBtn);
+
+    row3.appendChild(borCol);
+    row3.appendChild(btnCol);
+
+    // Results placeholder
+    const results = document.createElement('div');
+    results.id = 'exc-results';
+
+    body.appendChild(row1);
+    body.appendChild(row2);
+    body.appendChild(row3);
+    body.appendChild(results);
+    card.appendChild(body);
+    container.appendChild(card);
+
+    // Auto-fill read noise when camera changes
+    cSel.addEventListener('change', () => {
+        const cam = [...equipmentData.cameras, ...equipmentData.sharedCameras].find(c => c.id === cSel.value);
+        if (cam?.read_noise_e != null) rnInput.value = cam.read_noise_e;
+    });
+
+    calcBtn.addEventListener('click', () => {
+        const tel = [...equipmentData.telescopes, ...equipmentData.sharedTelescopes].find(t => t.id === tSel.value);
+        const cam = [...equipmentData.cameras,    ...equipmentData.sharedCameras].find(c => c.id === cSel.value);
+        if (!tel || !cam) { showMessage('warning', i18n.t('equipment.please_select_telescope_camera')); return; }
+
+        const read_noise_e = parseFloat(rnInput.value);
+        const qe           = parseFloat(qeInput.value) / 100;
+        const total_hours  = parseFloat(hoursInput.value);
+        const bortle       = parseInt(borSel.value);
+
+        if (!Number.isFinite(read_noise_e) || read_noise_e <= 0) { showMessage('warning', i18n.t('equipment.exposure_calc_invalid_rn')); return; }
+
+        const r = _computeExposure({
+            aperture_mm:     tel.aperture_mm,
+            focal_length_mm: tel.effective_focal_length || tel.focal_length_mm,
+            pixel_size_um:   cam.pixel_size_um,
+            read_noise_e,
+            qe,
+            bortle,
+            total_hours,
+        });
+
+        DOMUtils.clear(results);
+        const hr = document.createElement('hr');
+        results.appendChild(hr);
+
+        const h6 = document.createElement('h6');
+        h6.className = 'fw-bold mb-3';
+        h6.textContent = i18n.t('equipment.exposure_calc_results');
+        results.appendChild(h6);
+
+        const table = document.createElement('table');
+        table.className = 'table table-sm mb-3';
+        const tbody = document.createElement('tbody');
+
+        tbody.appendChild(_expRow(i18n.t('equipment.exposure_calc_plate_scale'), `${r.plate_scale.toFixed(2)} "/px`));
+        tbody.appendChild(_expRow(i18n.t('equipment.exposure_calc_sky_bg'), `${r.B_sky.toFixed(3)} e⁻/px/s`, `SQM ${r.sqm.toFixed(1)}`));
+        tbody.appendChild(_expRow(i18n.t('equipment.exposure_calc_sub_exposure'), _fmtDuration(r.t_sub_s), i18n.t('equipment.exposure_calc_sub_note')));
+        tbody.appendChild(_expRow(i18n.t('equipment.exposure_calc_n_subs'), `${r.n_subs}`, `≈ ${_fmtDuration(r.actual_total_s)} ${i18n.t('equipment.exposure_calc_total')}`));
+
+        table.appendChild(tbody);
+        results.appendChild(table);
+
+        const note = document.createElement('p');
+        note.className = 'text-muted small';
+        note.textContent = i18n.t('equipment.exposure_calc_method_note');
+        results.appendChild(note);
+    });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 // Initialize when module loads
 document.addEventListener('DOMContentLoaded', initializeEquipment);
