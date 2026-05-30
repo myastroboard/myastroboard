@@ -93,6 +93,16 @@ function isSameOrigin(url) {
     return url.origin === self.location.origin;
 }
 
+async function _shouldCache() {
+    if (!navigator.storage?.estimate) return true;
+    try {
+        const { usage, quota } = await navigator.storage.estimate();
+        return quota > 0 && usage / quota < 0.8;
+    } catch (_) {
+        return true;
+    }
+}
+
 async function fetchWithTimeout(request, timeoutMs) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -206,8 +216,11 @@ self.addEventListener('fetch', (event) => {
 
                     // Do not cache auth redirects for protected routes, otherwise offline '/' becomes login.
                     if (!isAuthRedirect && networkResponse.ok) {
-                        const responseClone = networkResponse.clone();
-                        caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, responseClone));
+                        const responseClone = networkResponse.clone(); // clone synchronously before body is consumed
+                        _shouldCache().then((ok) => {
+                            if (!ok) return;
+                            caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, responseClone));
+                        });
                     }
                     return networkResponse;
                 })
@@ -247,8 +260,11 @@ self.addEventListener('fetch', (event) => {
                 try {
                     const networkResponse = await fetchWithTimeout(request, 4000);
                     if (networkResponse && networkResponse.status === 200) {
-                        const responseClone = networkResponse.clone();
-                        caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, responseClone));
+                        const responseClone = networkResponse.clone(); // clone synchronously before body is consumed
+                        _shouldCache().then((ok) => {
+                            if (!ok) return;
+                            caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, responseClone));
+                        });
                     }
                     return networkResponse;
                 } catch (_) {
