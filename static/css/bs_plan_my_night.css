@@ -235,6 +235,46 @@
     margin-right: 0.5rem;
 }
 
+/* Seeing Week strip */
+
+.plan-seeing-week-grid {
+    display: grid;
+    /* column count set dynamically via style attribute to match available data */
+    gap: 4px;
+}
+
+.plan-seeing-week-cell {
+    border-radius: 4px;
+    padding: 4px 2px 3px;
+    text-align: center;
+    cursor: default;
+}
+
+.plan-seeing-week-dow {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    opacity: 0.55;
+    line-height: 1.2;
+}
+
+.plan-seeing-week-score {
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-top: 1px;
+}
+
+.plan-seeing-week-quality {
+    font-size: 0.58rem;
+    opacity: 0.75;
+    line-height: 1.2;
+    margin-top: 1px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 /* Telescope picker modal buttons — card surface style for contrast on gradient modal */
 .btn-telescope-pick {
     background-color: var(--surface-card);

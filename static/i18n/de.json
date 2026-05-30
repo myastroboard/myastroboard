@@ -1095,8 +1095,9 @@
     "export_pdf": "PDF exportieren",
     "moon_calendar_title": "Mondkalender",
     "moon_calendar_legend_good": "≥4h dunkel",
-    "moon_calendar_legend_ok": "2–4h dunkel",
-    "moon_calendar_legend_bright": "Heller Mond"
+    "moon_calendar_legend_ok": "2-4h dunkel",
+    "moon_calendar_legend_bright": "Heller Mond",
+    "seeing_week_title": "Seeing-Vorhersage"
   },
   "users": {
     "user_management": "Benutzerverwaltung",

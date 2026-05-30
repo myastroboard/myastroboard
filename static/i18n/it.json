@@ -1095,8 +1095,9 @@
     "export_pdf": "Esporta PDF",
     "moon_calendar_title": "Calendario lunare",
     "moon_calendar_legend_good": "≥4h buio",
-    "moon_calendar_legend_ok": "2–4h buio",
-    "moon_calendar_legend_bright": "Luna luminosa"
+    "moon_calendar_legend_ok": "2-4h buio",
+    "moon_calendar_legend_bright": "Luna luminosa",
+    "seeing_week_title": "Previsione del seeing"
   },
   "users": {
     "user_management": "Gestione utenti",

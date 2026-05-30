@@ -62,3 +62,4 @@ Notification preferences are saved to your account and follow you across devices
 - Fix date issue when there is no dark night
 - Reduce verbose of INFO log
 - IERS earth orientation data is now managed by internal cache system.
+- Moon calendar in plan my night

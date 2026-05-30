@@ -300,9 +300,8 @@ class UserManager:
         if not isinstance(preferences, dict):
             return False, "Preferences must be a dictionary"
 
-        for key in preferences.keys():
-            if key not in DEFAULT_USER_PREFERENCES:
-                return False, f"Unknown preference key: {key}"
+        # Unknown keys are silently ignored — forward-compat when new prefs are added
+        # and old server code still runs for a moment before restart.
 
         startup_main_tab = preferences.get('startup_main_tab')
         if startup_main_tab is not None and startup_main_tab not in ALLOWED_STARTUP_MAIN_TABS:

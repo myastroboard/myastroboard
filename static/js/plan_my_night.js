@@ -278,6 +278,149 @@ async function loadMoonCalendar() {
     });
 }
 
+// ── Seeing strip ──────────────────────────────────────────────────────────────
+
+function _seeingLocalDateKey(utcDate, tz) {
+    return utcDate.toLocaleDateString('en-CA', { timeZone: tz }); // 'YYYY-MM-DD'
+}
+
+function _aggregateSeeingByDate(forecast, tz) {
+    // Groups all forecast points by local calendar date, keeps best (lowest) seeing per day.
+    // No nighttime filtering: 7Timer ASTRO seeing represents the atmospheric column quality
+    // for the whole day. Simpler and avoids timezone edge-cases with hour boundaries.
+    const map = new Map();
+    for (const point of (forecast || [])) {
+        const key = _seeingLocalDateKey(new Date(point.time), tz);
+        const current = map.get(key);
+        if (current === undefined || point.seeing < current) {
+            map.set(key, point.seeing);
+        }
+    }
+    return map;
+}
+
+async function loadSeeingWeek() {
+    const container = document.getElementById('plan-seeing-week');
+    if (!container) return;
+
+    DOMUtils.clear(container);
+
+    let data;
+    try {
+        data = await fetchJSON('/api/seeing-forecast');
+    } catch (_) {
+        return;
+    }
+
+    const seeingData = data?.seeing_forecast;
+    const forecast = seeingData?.forecast;
+    const tz = seeingData?.location?.timezone || 'UTC';
+    if (!forecast || forecast.length === 0) return;
+
+    const dateMap = _aggregateSeeingByDate(forecast, tz);
+    const locale = typeof i18n?.getCurrentLanguage === 'function' ? i18n.getCurrentLanguage() : navigator.language;
+
+    // Collect only the dates that have data, up to 7 days starting from today.
+    const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: tz });
+    const [ty, tm, td] = todayStr.split('-').map(Number);
+    const nights = [];
+    for (let i = 0; i < 7; i++) {
+        const utc = new Date(Date.UTC(ty, tm - 1, td + i));
+        const key = _seeingLocalDateKey(utc, tz);
+        if (dateMap.has(key)) nights.push({ key, utc });
+    }
+
+    // No data at all → skip rendering entirely
+    if (nights.length === 0) return;
+
+    const section = document.createElement('div');
+    section.className = 'plan-moon-calendar-section';
+
+    // Header
+    const header = document.createElement('div');
+    header.className = 'plan-moon-calendar-header';
+    const title = document.createElement('span');
+    title.className = 'fw-semibold small';
+    title.innerHTML = `<i class="bi bi-eye text-info icon-inline" aria-hidden="true"></i> ${i18n.t('plan_my_night.seeing_week_title')}`;
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'btn btn-link btn-sm p-0 ms-2 text-muted plan-moon-calendar-toggle';
+    toggle.setAttribute('aria-expanded', 'true');
+    toggle.innerHTML = '<i class="bi bi-chevron-up" aria-hidden="true"></i>';
+    header.appendChild(title);
+    header.appendChild(toggle);
+    section.appendChild(header);
+
+    const calBody = document.createElement('div');
+    calBody.className = 'plan-moon-calendar-body';
+
+    const grid = document.createElement('div');
+    grid.className = 'plan-seeing-week-grid';
+    // Adapt column count to however many nights have data (not always 7)
+    grid.style.gridTemplateColumns = `repeat(${nights.length}, 1fr)`;
+
+    nights.forEach(({ key, utc }, idx) => {
+        const isToday = idx === 0;
+        const bestSeeing = dateMap.get(key);
+
+        const cell = document.createElement('div');
+        cell.className = 'plan-seeing-week-cell';
+        if (isToday) cell.classList.add('plan-moon-cal-today');
+        if (bestSeeing <= 2) cell.classList.add('plan-moon-cal-good');
+        else if (bestSeeing <= 3) cell.classList.add('plan-moon-cal-ok');
+        else cell.classList.add('plan-moon-cal-bright');
+
+        // Weekday abbreviation
+        const dowEl = document.createElement('div');
+        dowEl.className = 'plan-seeing-week-dow';
+        dowEl.textContent = utc.toLocaleDateString(locale, { timeZone: tz, weekday: 'short' });
+
+        // Day number (+ month abbr on 1st)
+        const dayNum = parseInt(key.split('-')[2]);
+        const dayEl = document.createElement('div');
+        dayEl.className = 'plan-moon-cal-day';
+        if (dayNum === 1) {
+            const mo = document.createElement('span');
+            mo.className = 'plan-moon-cal-month-abbr';
+            mo.textContent = utc.toLocaleDateString(locale, { timeZone: tz, month: 'short' });
+            dayEl.appendChild(mo);
+        }
+        dayEl.appendChild(document.createTextNode(dayNum));
+
+        // Score (coloured)
+        const scoreEl = document.createElement('div');
+        scoreEl.className = `plan-seeing-week-score ${getSeeingBadgeClass(bestSeeing)}`;
+        scoreEl.textContent = bestSeeing;
+
+        // Quality label
+        const qualEl = document.createElement('div');
+        qualEl.className = 'plan-seeing-week-quality';
+        qualEl.textContent = getLocalizedSeeingQuality(bestSeeing, '');
+
+        cell.title = `${key} — ${i18n.t('seeing_forecast.current_seeing')}: ${bestSeeing}/8 — ${getLocalizedSeeingQuality(bestSeeing, '')}`;
+        cell.appendChild(dowEl);
+        cell.appendChild(dayEl);
+        cell.appendChild(scoreEl);
+        cell.appendChild(qualEl);
+        grid.appendChild(cell);
+    });
+
+    calBody.appendChild(grid);
+    section.appendChild(calBody);
+    container.appendChild(section);
+
+    toggle.addEventListener('click', () => {
+        const expanded = toggle.getAttribute('aria-expanded') === 'true';
+        toggle.setAttribute('aria-expanded', String(!expanded));
+        toggle.innerHTML = expanded
+            ? '<i class="bi bi-chevron-down" aria-hidden="true"></i>'
+            : '<i class="bi bi-chevron-up" aria-hidden="true"></i>';
+        calBody.style.display = expanded ? 'none' : '';
+    });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 async function loadPlanMyNight(options = {}) {
     const {
         silent = false,
