@@ -275,6 +275,22 @@
     white-space: nowrap;
 }
 
+/* Telescope selector badge buttons */
+.plan-telescope-badge {
+    font-size: 0.78rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 1rem;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
+.plan-telescope-shared-icon,
+.plan-telescope-orphan-icon {
+    font-size: 0.6em;
+    vertical-align: middle;
+    opacity: 0.85;
+}
+
 /* Telescope picker modal buttons — card surface style for contrast on gradient modal */
 .btn-telescope-pick {
     background-color: var(--surface-card);

@@ -1283,80 +1283,68 @@ function renderPlanMyNight(payload) {
     const toolbar = document.createElement('div');
     toolbar.className = 'd-flex gap-2 mb-3 flex-wrap align-items-center';
 
-    // Telescope selector (shown when 2+ telescopes exist)
+    // Telescope selector — colored badge buttons (1 telescope: static badge; 2+: clickable)
     const telescopeItems = planTelescopeList.filter(p => p.telescope_id !== null);
+
+    const _stateColor = (s) => s === 'current' ? 'success' : s === 'previous' ? 'warning' : 'secondary';
+
+    const _makeBadgeBtn = (t, clickable) => {
+        const color = _stateColor(t.state);
+        const isSelected = t.telescope_id === currentPlanTelescopeId;
+        const el = document.createElement(clickable ? 'button' : 'span');
+        if (clickable) {
+            el.type = 'button';
+            el.className = `btn btn-sm ${isSelected ? `btn-${color}` : `btn-outline-${color}`} plan-telescope-badge`;
+        } else {
+            el.className = `badge bg-${color}${color === 'warning' ? ' text-dark' : ''} plan-telescope-badge`;
+        }
+        let html = `<i class="bi bi-telescope icon-inline" aria-hidden="true"></i> ${t.telescope_name || t.telescope_id}`;
+        if (t.is_own === false) {
+            const ownerLabel = t.owner_username
+                ? i18n.t('equipment.shared_fov_suffix', { username: t.owner_username })
+                : '';
+            el.title = ownerLabel;
+            html += ` <i class="bi bi-share-fill plan-telescope-shared-icon" aria-label="${ownerLabel}"></i>`;
+        }
+        if (t.is_orphaned) html += ` <i class="bi bi-exclamation-triangle-fill plan-telescope-orphan-icon" aria-label="${i18n.t('plan_my_night.orphaned_telescope')}"></i>`;
+        el.innerHTML = html;
+        return el;
+    };
+
     if (telescopeItems.length >= 2) {
-        const selectorWrap = document.createElement('div');
-        selectorWrap.className = 'd-flex align-items-center gap-2 me-2';
-
-        const selectorLabel = document.createElement('label');
-        selectorLabel.className = 'form-label mb-0 small fw-semibold';
-        selectorLabel.textContent = i18n.t('plan_my_night.telescope_label');
-        selectorLabel.setAttribute('for', 'plan-telescope-selector');
-
-        const selector = document.createElement('select');
-        selector.id = 'plan-telescope-selector';
-        selector.className = 'form-select form-select-sm';
-        selector.style.maxWidth = '260px';
-
-        const ownItems     = telescopeItems.filter(t => t.is_own !== false && !t.is_orphaned);
-        const sharedItems  = telescopeItems.filter(t => t.is_own === false  && !t.is_orphaned);
-        const orphanItems  = telescopeItems.filter(t => t.is_orphaned);
-
-        const appendOption = (t) => {
-            const opt = document.createElement('option');
-            opt.value = t.telescope_id;
-            let label = t.telescope_name || t.telescope_id;
-            if (t.owner_username) label += ` ${i18n.t('equipment.shared_fov_suffix', { username: t.owner_username })}`;
-            if (t.is_orphaned)    label += ` ⚠ ${i18n.t('plan_my_night.orphaned_telescope')}`;
-            const stateLabel = t.state !== 'none'
-                ? ` (${i18n.t(`plan_my_night.plan_status_${t.state}`, {defaultValue: t.state})})`
-                : ` (${i18n.t('plan_my_night.plan_status_none', {defaultValue: 'no plan'})})`;
-            opt.textContent = label + stateLabel;
-            if (t.telescope_id === currentPlanTelescopeId) opt.selected = true;
-            selector.appendChild(opt);
-        };
-
-        ownItems.forEach(appendOption);
-
-        if (sharedItems.length > 0) {
-            const sep = document.createElement('option');
-            sep.disabled = true;
-            sep.textContent = '──────────────';
-            selector.appendChild(sep);
-            sharedItems.forEach(appendOption);
-        }
-
-        if (orphanItems.length > 0) {
-            const sep = document.createElement('option');
-            sep.disabled = true;
-            sep.textContent = '──────────────';
-            selector.appendChild(sep);
-            orphanItems.forEach(appendOption);
-        }
-
-        selector.addEventListener('change', async () => {
-            currentPlanTelescopeId = selector.value || null;
-            planMyNightStructureSnapshot = null;
-            await loadPlanMyNight();
+        // Sort: active first (all), then owned, then shared — alphabetically within each group
+        const sorted = [...telescopeItems].sort((a, b) => {
+            const groupA = a.state === 'current' ? 0 : (a.is_own !== false ? 1 : 2);
+            const groupB = b.state === 'current' ? 0 : (b.is_own !== false ? 1 : 2);
+            if (groupA !== groupB) return groupA - groupB;
+            return (a.telescope_name || '').localeCompare(b.telescope_name || '');
         });
 
-        selectorWrap.appendChild(selectorLabel);
-        selectorWrap.appendChild(selector);
-        toolbar.appendChild(selectorWrap);
+        const badgeWrap = document.createElement('div');
+        badgeWrap.className = 'd-flex flex-wrap gap-2 align-items-center me-2';
+
+        sorted.forEach(t => {
+            const btn = _makeBadgeBtn(t, true);
+            btn.addEventListener('click', async () => {
+                currentPlanTelescopeId = t.telescope_id || null;
+                planMyNightStructureSnapshot = null;
+                await loadPlanMyNight();
+            });
+            badgeWrap.appendChild(btn);
+        });
+
+        toolbar.appendChild(badgeWrap);
     } else if (telescopeItems.length === 1) {
-        // Show telescope name as plain text
-        const telescopeName = document.createElement('span');
-        telescopeName.className = 'badge bg-secondary me-2';
-        telescopeName.innerHTML = `<i class="bi bi-telescope icon-inline" aria-hidden="true"></i> ${telescopeItems[0].telescope_name || i18n.t('plan_my_night.no_telescope_created')}`;
-        toolbar.appendChild(telescopeName);
+        toolbar.appendChild(_makeBadgeBtn(telescopeItems[0], false));
     } else {
-        // No telescopes created
         const noTelescope = document.createElement('span');
         noTelescope.className = 'text-muted small me-2';
         noTelescope.textContent = i18n.t('plan_my_night.no_telescope_created');
         toolbar.appendChild(noTelescope);
     }
+
+    const actionsRow = document.createElement('div');
+    actionsRow.className = 'd-flex gap-2 mb-3 flex-wrap align-items-center';
 
     if (state !== 'none' && plan) {
         if (state === 'current') {
@@ -1390,8 +1378,8 @@ function renderPlanMyNight(payload) {
                 const tidParam = currentPlanTelescopeId ? `&telescope_id=${encodeURIComponent(currentPlanTelescopeId)}` : '';
                 _triggerDownload(`/api/plan-my-night/export.pdf?lang=${encodeURIComponent(lang)}${tidParam}`);
             });
-            toolbar.appendChild(exportPdfBtn);
-            toolbar.appendChild(exportCsvBtn);
+            actionsRow.appendChild(exportPdfBtn);
+            actionsRow.appendChild(exportCsvBtn);
         }
 
         const clearButton = makePlanActionButton('plan_my_night.clear_this_plan', 'btn btn-danger btn-sm', async () => {
@@ -1403,7 +1391,7 @@ function renderPlanMyNight(payload) {
             await loadPlanMyNight();
             await loadSkyTonightResultsTabs();
         });
-        toolbar.appendChild(clearButton);
+        actionsRow.appendChild(clearButton);
 
         // Show "Clear all plans" only when there are 2+ telescopes
         if (planTelescopeList.filter(p => p.telescope_id !== null).length >= 2) {
@@ -1417,12 +1405,15 @@ function renderPlanMyNight(payload) {
                 await loadPlanMyNight();
                 await loadSkyTonightResultsTabs();
             });
-            toolbar.appendChild(clearAllButton);
+            actionsRow.appendChild(clearAllButton);
         }
     }
 
     if (toolbar.children.length > 0) {
         container.appendChild(toolbar);
+    }
+    if (actionsRow.children.length > 0) {
+        container.appendChild(actionsRow);
     }
 
     if (state === 'none' || !plan) {
@@ -1462,9 +1453,14 @@ function renderPlanMyNight(payload) {
     // Show telescope name in the summary if one is selected
     const selectedTelescope = planTelescopeList.find(t => t.telescope_id === currentPlanTelescopeId);
     if (selectedTelescope && selectedTelescope.telescope_name) {
+        const color = _stateColor(selectedTelescope.state);
         const telescopeBadge = document.createElement('span');
-        telescopeBadge.className = 'badge bg-secondary ms-2 small';
-        telescopeBadge.innerHTML = `<i class="bi bi-telescope icon-inline" aria-hidden="true"></i> ${selectedTelescope.telescope_name}`;
+        telescopeBadge.className = `badge bg-${color}${color === 'warning' ? ' text-dark' : ''} ms-2 small`;
+        let badgeHtml = `<i class="bi bi-telescope icon-inline" aria-hidden="true"></i> ${selectedTelescope.telescope_name}`;
+        if (selectedTelescope.is_own === false && selectedTelescope.owner_username) {
+            badgeHtml += ` · ${selectedTelescope.owner_username}`;
+        }
+        telescopeBadge.innerHTML = badgeHtml;
         title.appendChild(telescopeBadge);
     }
 
