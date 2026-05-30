@@ -708,7 +708,10 @@
     "notifications_n7": "Aurora alert (Kp index)",
     "notifications_minutes": "min",
     "notifications_push_active": "Background push active",
-    "notifications_push_inapp_only": "In-app only — tab must be open"
+    "notifications_push_inapp_only": "In-app only — tab must be open",
+    "pref_first_day_of_week": "First day of week",
+    "pref_first_dow_monday": "Monday",
+    "pref_first_dow_sunday": "Sunday"
   },
   "astrodex": {
     "title": "Astrodex - Gotta Catch 'Em All!",
@@ -1089,7 +1092,11 @@
     "target_added": "Target added to Plan My Night",
     "failed_to_add_target": "Failed to add target to Plan My Night",
     "export_csv": "Export CSV",
-    "export_pdf": "Export PDF"
+    "export_pdf": "Export PDF",
+    "moon_calendar_title": "Moon Calendar",
+    "moon_calendar_legend_good": "≥4h dark",
+    "moon_calendar_legend_ok": "2–4h dark",
+    "moon_calendar_legend_bright": "Bright moon"
   },
   "users": {
     "user_management": "User Management",

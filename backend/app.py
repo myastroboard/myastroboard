@@ -65,6 +65,7 @@ from skytonight_storage import (
 from on_demand_translate import translate_text_on_demand
 from skytonight_calculator import load_calculation_results
 from sun_phases import SunService
+import moon_planner
 from cache_updater import (
     update_dark_window_cache,
     update_moon_report_cache,
@@ -1559,6 +1560,50 @@ def get_next_7_nights_api():
     except Exception as e:
         logger.error(f"Error getting Moon Planner cache: {e}")
         return jsonify({'error': 'Internal server error'}), 500
+
+
+_moon_calendar_cache: dict = {"timestamp": 0, "data": None}
+_MOON_CALENDAR_TTL = 3600  # 1 hour — recompute once per hour at most
+
+@app.route("/api/moon/month-calendar", methods=["GET"])
+@login_required
+def get_moon_month_calendar_api():
+    """Return next 30 nights moon/darkness data for the Plan My Night calendar widget."""
+    global _moon_calendar_cache
+    try:
+        import time as _time
+        now = _time.time()
+        if _moon_calendar_cache["data"] and (now - _moon_calendar_cache["timestamp"]) < _MOON_CALENDAR_TTL:
+            return jsonify(_moon_calendar_cache["data"])
+
+        cfg = load_config()
+        location = cfg.get("location", {})
+        lat = location.get("latitude")
+        lon = location.get("longitude")
+        tz  = location.get("timezone", cfg.get("timezone", "UTC"))
+        if lat is None or lon is None:
+            return jsonify({"error": "Location not configured"}), 400
+
+        planner = moon_planner.MoonPlanner(float(lat), float(lon), tz)
+        nights = planner.next_n_nights(30)
+        result = {
+            "nights": [
+                {
+                    "date": n["date"],
+                    "illumination_percent": n["moon"]["illumination_percent"],
+                    "strict_hours": n["dark_hours"]["strict"],
+                    "astrophoto_score": n["astrophoto_score"],
+                }
+                for n in nights
+            ]
+        }
+        _moon_calendar_cache["data"] = result
+        _moon_calendar_cache["timestamp"] = now
+        return jsonify(result)
+
+    except Exception as e:
+        logger.error(f"Error computing moon month calendar: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 
 @app.route("/api/aurora/predictions", methods=["GET"])

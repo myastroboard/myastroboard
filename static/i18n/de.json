@@ -708,7 +708,10 @@
     "notifications_n7": "Aurora-Alarm (Kp-Index)",
     "notifications_minutes": "min",
     "notifications_push_active": "Hintergrund-Push aktiv",
-    "notifications_push_inapp_only": "Nur In-App — Tab muss geöffnet sein"
+    "notifications_push_inapp_only": "Nur In-App — Tab muss geöffnet sein",
+    "pref_first_day_of_week": "Erster Wochentag",
+    "pref_first_dow_monday": "Montag",
+    "pref_first_dow_sunday": "Sonntag"
   },
   "astrodex": {
     "title": "Astrodex - Ich muss sie alle fangen!",
@@ -1089,7 +1092,11 @@
     "target_added": "Ziel zu Plan My Night hinzugefügt",
     "failed_to_add_target": "Ziel konnte nicht zu Plan My Night hinzugefügt werden",
     "export_csv": "CSV exportieren",
-    "export_pdf": "PDF exportieren"
+    "export_pdf": "PDF exportieren",
+    "moon_calendar_title": "Mondkalender",
+    "moon_calendar_legend_good": "≥4h dunkel",
+    "moon_calendar_legend_ok": "2–4h dunkel",
+    "moon_calendar_legend_bright": "Heller Mond"
   },
   "users": {
     "user_management": "Benutzerverwaltung",

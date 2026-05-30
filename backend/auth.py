@@ -47,6 +47,7 @@ ALLOWED_STARTUP_SUBTABS = {
 ALLOWED_TIME_FORMATS = {'auto', '12h', '24h'}
 ALLOWED_DENSITY_MODES = {'comfortable', 'compact'}
 ALLOWED_THEME_MODES = {'auto', 'light', 'dark', 'red'}
+ALLOWED_FIRST_DAY_OF_WEEK = {'monday', 'sunday'}
 
 DEFAULT_USER_PREFERENCES = {
     'startup_main_tab': 'forecast-astro',
@@ -54,6 +55,7 @@ DEFAULT_USER_PREFERENCES = {
     'time_format': 'auto',
     'density': 'comfortable',
     'theme_mode': 'auto',
+    'first_day_of_week': 'monday',
     'notifications': {
         'enabled': True,
         'permission_asked': False,
@@ -325,6 +327,10 @@ class UserManager:
         notifications = preferences.get('notifications')
         if notifications is not None and not isinstance(notifications, dict):
             return False, "Invalid notifications: must be a dictionary"
+
+        first_day_of_week = preferences.get('first_day_of_week')
+        if first_day_of_week is not None and first_day_of_week not in ALLOWED_FIRST_DAY_OF_WEEK:
+            return False, f"Invalid first_day_of_week: {first_day_of_week}"
 
         return True, ""
 

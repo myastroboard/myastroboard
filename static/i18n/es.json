@@ -708,7 +708,10 @@
     "notifications_n7": "Alerta aurora (índice Kp)",
     "notifications_minutes": "min",
     "notifications_push_active": "Push en segundo plano activo",
-    "notifications_push_inapp_only": "Solo en la aplicación — la pestaña debe estar abierta"
+    "notifications_push_inapp_only": "Solo en la aplicación — la pestaña debe estar abierta",
+    "pref_first_day_of_week": "Primer día de la semana",
+    "pref_first_dow_monday": "Lunes",
+    "pref_first_dow_sunday": "Domingo"
   },
   "astrodex": {
     "title": "Astrodex - ¡Tengo que atraparlos a todos!",
@@ -1089,7 +1092,11 @@
     "target_added": "Objetivo agregado a Plan My Night",
     "failed_to_add_target": "No se pudo agregar el objetivo a Plan My Night",
     "export_csv": "Exportar CSV",
-    "export_pdf": "Exportar PDF"
+    "export_pdf": "Exportar PDF",
+    "moon_calendar_title": "Calendario lunar",
+    "moon_calendar_legend_good": "≥4h oscuro",
+    "moon_calendar_legend_ok": "2–4h oscuro",
+    "moon_calendar_legend_bright": "Luna brillante"
   },
   "users": {
     "user_management": "Gestión de usuarios",

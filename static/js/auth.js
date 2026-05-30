@@ -15,6 +15,7 @@ const DEFAULT_USER_PREFERENCES = {
     time_format: 'auto',
     density: 'comfortable',
     theme_mode: 'auto',
+    first_day_of_week: 'monday',
     notifications: null,
 };
 
@@ -354,6 +355,8 @@ function populateCustomizeFormFromPreferences() {
     if (timeFormat) timeFormat.value = prefs.time_format;
     if (density) density.value = prefs.density;
     if (theme) theme.value = prefs.theme_mode;
+    const firstDow = document.getElementById('pref-first-day-of-week');
+    if (firstDow) firstDow.value = prefs.first_day_of_week || DEFAULT_USER_PREFERENCES.first_day_of_week;
 }
 
 async function saveUserPreferences(preferences) {
@@ -400,7 +403,8 @@ function setupCustomizeForm() {
             startup_subtab: document.getElementById('pref-startup-subtab')?.value || DEFAULT_USER_PREFERENCES.startup_subtab,
             time_format: document.getElementById('pref-time-format')?.value || DEFAULT_USER_PREFERENCES.time_format,
             density: document.getElementById('pref-density')?.value || DEFAULT_USER_PREFERENCES.density,
-            theme_mode: document.getElementById('pref-theme-mode')?.value || DEFAULT_USER_PREFERENCES.theme_mode
+            theme_mode: document.getElementById('pref-theme-mode')?.value || DEFAULT_USER_PREFERENCES.theme_mode,
+            first_day_of_week: document.getElementById('pref-first-day-of-week')?.value || DEFAULT_USER_PREFERENCES.first_day_of_week
         };
 
         try {

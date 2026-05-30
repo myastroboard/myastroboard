@@ -58,11 +58,14 @@ class MoonPlanner:
     # ============================================================
 
     def next_7_nights(self):
+        return self.next_n_nights(7)
+
+    def next_n_nights(self, n: int):
 
         today = datetime.datetime.now(self.timezone).date()
         results = []
 
-        for i in range(7):
+        for i in range(n):
             date = today + datetime.timedelta(days=i)
             night = self._night_data(date)
 
