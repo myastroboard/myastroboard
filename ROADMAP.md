@@ -10,7 +10,7 @@ This document describes features that could potentially be integrated into MyAst
 
 ### v1.1 and next - Introduce new features
 
-### Medium-term — new standalone features
+#### Medium-term — new standalone features
 
 | Feature | Why | Effort |
 |---------|-----|--------|
