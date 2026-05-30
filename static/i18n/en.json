@@ -1095,8 +1095,9 @@
     "export_pdf": "Export PDF",
     "moon_calendar_title": "Moon Calendar",
     "moon_calendar_legend_good": "≥4h dark",
-    "moon_calendar_legend_ok": "2–4h dark",
-    "moon_calendar_legend_bright": "Bright moon"
+    "moon_calendar_legend_ok": "2-4h dark",
+    "moon_calendar_legend_bright": "Bright moon",
+    "seeing_week_title": "Seeing Forecast"
   },
   "users": {
     "user_management": "User Management",

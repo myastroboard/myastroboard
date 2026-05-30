@@ -130,22 +130,19 @@ class SeeingForecastService:
                     # Skip undefined entries from 7Timer (-9999)
                     if seeing_value < 1 or seeing_value > 8:
                         continue
-                    
-                    # Only include data from now onwards
-                    if forecast_time >= now_utc:
-                        # Convert to ISO format
-                        iso_time = forecast_time.isoformat()
-                        
-                        # Get seeing description
-                        seeing_info = SEEING_SCALE.get(seeing_value, {})
-                        description = seeing_info.get("label", "Unknown")
-                        
-                        forecast_list.append({
-                            "time": iso_time,
-                            "seeing": seeing_value,
-                            "description": description,
-                            "conditions": seeing_info.get("conditions", "")
-                        })
+
+                    # Keep all valid timepoints from the init, including past ones.
+                    # Cutting at now_utc at cache time would discard the leading hours of
+                    # today's forecast on every cache refresh, reducing day coverage.
+                    # The frontend filters past points for display when needed.
+                    iso_time = forecast_time.isoformat()
+                    seeing_info = SEEING_SCALE.get(seeing_value, {})
+                    forecast_list.append({
+                        "time": iso_time,
+                        "seeing": seeing_value,
+                        "description": seeing_info.get("label", "Unknown"),
+                        "conditions": seeing_info.get("conditions", "")
+                    })
             
             if not forecast_list:
                 logger.info("7Timer returned no usable seeing values for this location/time window")
@@ -163,9 +160,13 @@ class SeeingForecastService:
                     "updated_at": now_utc.isoformat()
                 }
             
-            # Find current seeing (closest timepoint to now)
-            current_seeing = forecast_list[0]["seeing"] if forecast_list else None
-            current_description = forecast_list[0]["description"] if forecast_list else "Unknown"
+            # Find current seeing: closest timepoint to now (not necessarily the first)
+            current_point = min(
+                forecast_list,
+                key=lambda p: abs((datetime.fromisoformat(p["time"]) - now_utc).total_seconds())
+            ) if forecast_list else None
+            current_seeing = current_point["seeing"] if current_point else None
+            current_description = current_point["description"] if current_point else "Unknown"
             
             # Find best window (longest consecutive period with seeing <= 3, i.e., Good or better)
             best_window = self._find_best_window(forecast_list)

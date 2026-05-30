@@ -15,7 +15,6 @@ These features extend what already exists without introducing new data models or
 
 | Feature | Why | Effort |
 |---------|-----|--------|
-| Moon phase calendar with Plan My Night | Visual planning across a month — which nights are dark enough | Low |
 | Seeing forecast tied to Plan My Night | "Best night this week to observe X" — 7Timer already cached | Medium |
 | Exposure calculator | Integration time by sensor+scope — Equipment model already has the fields | Medium |
 
