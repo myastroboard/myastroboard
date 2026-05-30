@@ -236,6 +236,9 @@ async function initializeApp() {
 
     // Load initial page from user preferences (or fallback defaults)
     applyUserStartupPreferences();
+
+    // Start background notification poller (runs every 5 min, tab-independent)
+    if (typeof startNotificationPoller === 'function') startNotificationPoller();
 }
 
 function setupMainTabs() {

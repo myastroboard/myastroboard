@@ -1,5 +1,7 @@
 // Plan My Night frontend module
 
+const _planN2Notified = new Set(); // entry IDs already notified for N2 (in-memory, resets on page reload)
+
 let planMyNightPollTimer = null;
 let planMyNightStructureSnapshot = null;
 let currentPlanTelescopeId = null;   // null = no/default telescope
@@ -1574,3 +1576,55 @@ window.addEventListener('beforeunload', () => {
     clearPlanPollTimer();
     destroyPlanSummaryChart();
 });
+
+function _checkPlanNotifications(payload) {
+    if (typeof notificationManager === 'undefined') return;
+    const plan     = payload?.plan;
+    const timeline = payload?.timeline || {};
+    if (!plan) return;
+
+    const now    = Date.now();
+    const entries = Array.isArray(plan.entries) ? plan.entries : [];
+
+    // N1 — session starts soon (only before the night begins)
+    if (notificationManager.isTriggerEnabled('N1') && !timeline.is_inside_night) {
+        const nightStart = plan.night_start ? new Date(plan.night_start).getTime() : null;
+        if (nightStart) {
+            const msUntil = nightStart - now;
+            const leadMs  = notificationManager.getLeadMinutes('N1') * 60 * 1000;
+            if (msUntil > 0 && msUntil <= leadMs &&
+                !notificationManager.wasRecentlyNotified('N1', 2 * 60 * 60 * 1000)) {
+                const minutes = Math.round(msUntil / 60000);
+                notificationManager.notify(
+                    'N1',
+                    i18n.t('notifications.n1_title'),
+                    i18n.t('notifications.n1_body', { minutes }),
+                    { url: '#astrodex/plan-my-night' }
+                );
+            }
+        }
+    }
+
+    // N2 — next target starts soon (only while inside the night)
+    if (notificationManager.isTriggerEnabled('N2') && timeline.is_inside_night) {
+        const leadMs = notificationManager.getLeadMinutes('N2') * 60 * 1000;
+        for (const entry of entries) {
+            if (entry.done) continue;
+            const start = entry.timeline_start ? new Date(entry.timeline_start).getTime() : null;
+            if (!start || start <= now) continue;
+            if (start - now > leadMs) break; // entries are chronological, no need to keep looking
+            const entryId = entry.id || entry.target_name || entry.name;
+            if (_planN2Notified.has(entryId)) break;
+            _planN2Notified.add(entryId);
+            const minutes = Math.round((start - now) / 60000);
+            const name    = entry.name || entry.target_name || '?';
+            notificationManager.notify(
+                'N2',
+                i18n.t('notifications.n2_title'),
+                i18n.t('notifications.n2_body', { name, minutes }),
+                { url: '#astrodex/plan-my-night' }
+            );
+            break; // one at a time
+        }
+    }
+}

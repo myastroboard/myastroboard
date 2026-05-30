@@ -43,7 +43,7 @@ try:
     from constants import IERS_CACHE_FILE as _IERS_CACHE_FILE
     from astropy.utils.iers import IERS_Auto as _IERS_Auto, IERS_A as _IERS_A
     if os.path.exists(_IERS_CACHE_FILE):
-        _IERS_Auto.iers_table = _IERS_A.open(_IERS_CACHE_FILE)
+        _IERS_Auto.iers_table = _IERS_A.open(_IERS_CACHE_FILE)  # type: ignore[assignment]
 except Exception:
     pass  # No file yet; scheduler will download it on first cycle
 
@@ -449,6 +449,81 @@ def update_own_preferences():
         return jsonify({'error': 'Invalid request', 'error_key': error_key}), 400
     except Exception as e:
         logger.error(f"Error updating preferences for user {session.get('username')}: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+# ============================================================
+# Web Push API
+# ============================================================
+
+@app.route('/api/push/vapid-public-key', methods=['GET'])
+def get_vapid_public_key():
+    """Return the VAPID public key needed by the browser to subscribe."""
+    try:
+        from push_manager import get_vapid_public_key as _get_key
+        return jsonify({'public_key': _get_key()})
+    except Exception as e:
+        logger.error(f"Failed to get VAPID public key: {e}")
+        return jsonify({'error': 'Push not available'}), 503
+
+
+@app.route('/api/push/subscribe', methods=['POST'])
+@login_required
+def push_subscribe():
+    """Store a push subscription for the current user."""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify({'error': 'Authentication required'}), 401
+
+        data = request.json or {}
+        subscription = data.get('subscription')
+        if not isinstance(subscription, dict) or not subscription.get('endpoint'):
+            return jsonify({'error': 'Invalid subscription object'}), 400
+
+        endpoint = subscription['endpoint']
+        existing = current_user.push_subscriptions
+        if not any(s.get('endpoint') == endpoint for s in existing):
+            from datetime import datetime as _dt
+            existing.append({
+                'endpoint': endpoint,
+                'keys': subscription.get('keys', {}),
+                'created_at': _dt.now().isoformat(),
+            })
+            user_manager.save_users()
+            logger.info(f"Push subscription added for user {current_user.username}")
+
+        return jsonify({'status': 'subscribed'})
+    except Exception as e:
+        logger.error(f"Error storing push subscription: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@app.route('/api/push/unsubscribe', methods=['DELETE'])
+@login_required
+def push_unsubscribe():
+    """Remove a push subscription for the current user."""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify({'error': 'Authentication required'}), 401
+
+        data = request.json or {}
+        endpoint = data.get('endpoint')
+        if not endpoint:
+            return jsonify({'error': 'endpoint is required'}), 400
+
+        before = len(current_user.push_subscriptions)
+        current_user.push_subscriptions = [
+            s for s in current_user.push_subscriptions if s.get('endpoint') != endpoint
+        ]
+        if len(current_user.push_subscriptions) < before:
+            user_manager.save_users()
+            logger.info(f"Push subscription removed for user {current_user.username}")
+
+        return jsonify({'status': 'unsubscribed'})
+    except Exception as e:
+        logger.error(f"Error removing push subscription: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
 
@@ -4243,6 +4318,16 @@ try:
 except Exception as e:
     logger.error(f'Failed to initialize SkyTonight scheduler on startup: {e}', exc_info=True)
 
+try:
+    logger.info('Initializing push notification scheduler on application startup...')
+    import push_scheduler as _push_scheduler
+    _push_scheduler.start()
+    # Generate VAPID keys early so the first /api/push/vapid-public-key request is instant
+    from push_manager import load_or_generate_vapid_keys as _init_vapid
+    _init_vapid()
+except Exception as e:
+    logger.error(f'Failed to initialize push scheduler on startup: {e}', exc_info=True)
+
 # Ensure schedulers are stopped when the worker exits
 # (covers gunicorn workers that never reach the __main__ finally block)
 def _stop_schedulers_on_exit():
@@ -4258,6 +4343,11 @@ def _stop_schedulers_on_exit():
             cache_scheduler.stop()
         except Exception as e:
             logger.warning(f"Error stopping cache scheduler on exit: {e}")
+    try:
+        import push_scheduler as _ps
+        _ps.stop()
+    except Exception as e:
+        logger.warning(f"Error stopping push scheduler on exit: {e}")
 
 atexit.register(_stop_schedulers_on_exit)
 

@@ -706,7 +706,9 @@
     "notifications_n5": "Eclipse solar",
     "notifications_n6": "Inicio de la oscuridad astronómica",
     "notifications_n7": "Alerta aurora (índice Kp)",
-    "notifications_minutes": "min"
+    "notifications_minutes": "min",
+    "notifications_push_active": "Push en segundo plano activo",
+    "notifications_push_inapp_only": "Solo en la aplicación — la pestaña debe estar abierta"
   },
   "astrodex": {
     "title": "Astrodex - ¡Tengo que atraparlos a todos!",
@@ -1775,5 +1777,22 @@
     "source_wikipedia": "Descripción: Wikipedia",
     "source_skyview": "Imagen: DSS2 / SkyView (NASA GSFC)",
     "error_loading": "No se pudo cargar la información del objeto."
+  },
+  "notifications": {
+    "n1_body": "Tu sesion comienza en {minutes} min",
+    "n1_title": "Plan My Night",
+    "n2_body": "{name} comienza en {minutes} min",
+    "n2_title": "Proximo objetivo",
+    "n3_body_lunar": "Transito lunar ISS en {minutes} min",
+    "n3_body_solar": "Transito solar ISS en {minutes} min",
+    "n3_title": "Transito ISS",
+    "n4_body": "Totalidad en {minutes} min",
+    "n4_title": "Eclipse lunar",
+    "n5_body": "Maximo en {minutes} min",
+    "n5_title": "Eclipse solar",
+    "n6_body": "La noche comienza en {minutes} min — preparate",
+    "n6_title": "Oscuridad astronomica",
+    "n7_body": "Kp {kp} detectado — {visibility}",
+    "n7_title": "Alerta aurora"
   }
 }

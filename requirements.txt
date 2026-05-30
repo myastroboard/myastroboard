@@ -33,3 +33,6 @@ Flask-Login==0.6.3
 
 # Version comparison
 packaging==26.2
+
+# Web Push notifications
+pywebpush==2.3.0

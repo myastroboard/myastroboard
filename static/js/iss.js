@@ -554,3 +554,40 @@ async function loadIss() {
         links: sourceUrl ? [{ href: sourceUrl, label: sourceName }] : []
     });
 }
+
+function _checkIssN3(data) {
+    if (typeof notificationManager === 'undefined') return;
+    if (!notificationManager.isTriggerEnabled('N3')) return;
+
+    const leadMs = notificationManager.getLeadMinutes('N3') * 60 * 1000;
+    const now    = Date.now();
+
+    // Collect all upcoming transits (solar + lunar) with their type
+    const candidates = [];
+    for (const t of (data.solar_transits || [])) {
+        const ms = t.start_time ? new Date(t.start_time).getTime() : null;
+        if (ms && ms > now) candidates.push({ ms, type: 'solar' });
+    }
+    for (const t of (data.lunar_transits || [])) {
+        const ms = t.start_time ? new Date(t.start_time).getTime() : null;
+        if (ms && ms > now) candidates.push({ ms, type: 'lunar' });
+    }
+    if (!candidates.length) return;
+
+    // Take the soonest upcoming transit
+    candidates.sort((a, b) => a.ms - b.ms);
+    const next = candidates[0];
+    const msUntil = next.ms - now;
+
+    if (msUntil > leadMs) return;
+    if (notificationManager.wasRecentlyNotified('N3', 60 * 60 * 1000)) return; // 1 h cooldown
+
+    const minutes = Math.round(msUntil / 60000);
+    const bodyKey = next.type === 'solar' ? 'notifications.n3_body_solar' : 'notifications.n3_body_lunar';
+    notificationManager.notify(
+        'N3',
+        i18n.t('notifications.n3_title'),
+        i18n.t(bodyKey, { minutes }),
+        { url: '#spaceflight/iss' }
+    );
+}

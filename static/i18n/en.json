@@ -706,7 +706,9 @@
     "notifications_n5": "Solar eclipse",
     "notifications_n6": "Astronomical darkness begins",
     "notifications_n7": "Aurora alert (Kp index)",
-    "notifications_minutes": "min"
+    "notifications_minutes": "min",
+    "notifications_push_active": "Background push active",
+    "notifications_push_inapp_only": "In-app only — tab must be open"
   },
   "astrodex": {
     "title": "Astrodex - Gotta Catch 'Em All!",
@@ -1775,5 +1777,22 @@
     "source_wikipedia": "Description: Wikipedia",
     "source_skyview": "Image: DSS2 / SkyView (NASA GSFC)",
     "error_loading": "Failed to load object information."
+  },
+  "notifications": {
+    "n1_body": "Your session starts in {minutes} min",
+    "n1_title": "Plan My Night",
+    "n2_body": "{name} starts in {minutes} min",
+    "n2_title": "Next target",
+    "n3_body_lunar": "ISS lunar transit in {minutes} min",
+    "n3_body_solar": "ISS solar transit in {minutes} min",
+    "n3_title": "ISS Transit",
+    "n4_body": "Totality begins in {minutes} min",
+    "n4_title": "Lunar Eclipse",
+    "n5_body": "Maximum in {minutes} min",
+    "n5_title": "Solar Eclipse",
+    "n6_body": "Night begins in {minutes} min — time to get ready",
+    "n6_title": "Astronomical darkness",
+    "n7_body": "Kp {kp} detected — {visibility}",
+    "n7_title": "Aurora Alert"
   }
 }

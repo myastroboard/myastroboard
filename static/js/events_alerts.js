@@ -74,7 +74,6 @@ async function loadAndDisplayEvents() {
         const eventsData = await response.json();
         cachedEvents = eventsData;
         lastEventsUpdate = new Date().getTime();
-        
         displayEvents(eventsData);
     } catch (error) {
         console.error("Error loading events:", error);
@@ -435,3 +434,41 @@ window.addEventListener('i18nLanguageChanged', () => {
     clearEventsCache();
     loadAndDisplayEvents();
 });
+
+function _checkEclipseNotifications(eventsData) {
+    if (typeof notificationManager === 'undefined') return;
+    const events = eventsData?.events;
+    if (!Array.isArray(events)) return;
+
+    const now    = Date.now();
+
+    for (const event of events) {
+        const peakTime = event.peak_time ? new Date(event.peak_time).getTime() : null;
+        if (!peakTime || peakTime <= now) continue;
+
+        const type = event.event_type;
+        let triggerId, titleKey, bodyKey;
+
+        if (type === 'Lunar Eclipse' && notificationManager.isTriggerEnabled('N4')) {
+            triggerId = 'N4'; titleKey = 'notifications.n4_title'; bodyKey = 'notifications.n4_body';
+        } else if (type === 'Solar Eclipse' && notificationManager.isTriggerEnabled('N5')) {
+            triggerId = 'N5'; titleKey = 'notifications.n5_title'; bodyKey = 'notifications.n5_body';
+        } else {
+            continue;
+        }
+
+        const leadMs  = notificationManager.getLeadMinutes(triggerId) * 60 * 1000;
+        const msUntil = peakTime - now;
+        if (msUntil > leadMs) continue;
+        if (notificationManager.wasRecentlyNotified(triggerId, 4 * 60 * 60 * 1000)) continue;
+
+        const minutes = Math.round(msUntil / 60000);
+        notificationManager.notify(
+            triggerId,
+            i18n.t(titleKey),
+            i18n.t(bodyKey, { minutes }),
+            { url: '#forecast-astro/moon' }
+        );
+        break; // one eclipse notification per check cycle
+    }
+}
