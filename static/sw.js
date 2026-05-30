@@ -131,18 +131,29 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
-    const url = event.notification.data?.url || '/';
+
+    // Resolve the hash path to an absolute URL using the SW's own origin,
+    // so the navigation works regardless of which domain the app is installed on.
+    const rawUrl    = event.notification.data?.url || '/';
+    const targetUrl = rawUrl.startsWith('http')
+        ? rawUrl
+        : `${self.location.origin}${rawUrl.startsWith('/') ? '' : '/'}${rawUrl}`;
 
     event.waitUntil(
-        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (clientList) => {
             for (const client of clientList) {
                 if ('focus' in client) {
-                    // navigate() is async — chain focus so it fires after navigation completes.
-                    return client.navigate(url).then(() => client.focus());
+                    try {
+                        await client.navigate(targetUrl);
+                        return client.focus();
+                    } catch (_) {
+                        // Client was closed between matchAll and navigate — try next one.
+                    }
                 }
             }
+            // No existing window reachable — open a new one.
             if (clients.openWindow) {
-                return clients.openWindow(url);
+                return clients.openWindow(targetUrl);
             }
         })
     );
