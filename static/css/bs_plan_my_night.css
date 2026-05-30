@@ -119,6 +119,122 @@
     transform: translateX(-50%);
 }
 
+/* Moon Calendar */
+
+.plan-moon-calendar-section {
+    border: 1px solid var(--surface-border);
+    border-radius: var(--border-radius);
+    padding: 0.6rem 0.75rem 0.5rem;
+    background-color: var(--surface-card);
+}
+
+.plan-moon-calendar-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.plan-moon-calendar-toggle {
+    text-decoration: none;
+    line-height: 1;
+}
+
+.plan-moon-calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 3px;
+}
+
+.plan-moon-cal-weekday-header {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-align: center;
+    text-transform: uppercase;
+    opacity: 0.55;
+    padding-bottom: 2px;
+}
+
+.plan-moon-cal-cell {
+    border-radius: 4px;
+    padding: 4px 2px 3px;
+    text-align: center;
+    cursor: default;
+}
+
+.plan-moon-cal-blank {
+    visibility: hidden;
+}
+
+.plan-moon-cal-day {
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1.2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.plan-moon-cal-month-abbr {
+    font-size: 0.58rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    opacity: 0.7;
+    line-height: 1;
+    letter-spacing: 0.03em;
+}
+
+.plan-moon-cal-dark {
+    font-size: 0.65rem;
+    font-weight: 600;
+    line-height: 1.2;
+    margin-top: 1px;
+}
+
+.plan-moon-cal-illum {
+    font-size: 0.62rem;
+    opacity: 0.65;
+    line-height: 1.1;
+}
+
+.plan-moon-cal-today {
+    outline: 2px solid var(--bs-info);
+    outline-offset: -2px;
+}
+
+.plan-moon-cal-good {
+    background-color: color-mix(in srgb, var(--bs-success-bg-subtle) 70%, transparent);
+}
+
+.plan-moon-cal-ok {
+    background-color: color-mix(in srgb, var(--bs-warning-bg-subtle) 70%, transparent);
+}
+
+.plan-moon-cal-bright {
+    background-color: color-mix(in srgb, var(--bs-danger-bg-subtle) 50%, transparent);
+}
+
+.plan-moon-cal-legend {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 0.4rem;
+    font-size: 0.7rem;
+    opacity: 0.8;
+}
+
+.plan-moon-cal-legend-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+.plan-moon-cal-legend-label {
+    margin-right: 0.5rem;
+}
+
 /* Telescope picker modal buttons — card surface style for contrast on gradient modal */
 .btn-telescope-pick {
     background-color: var(--surface-card);

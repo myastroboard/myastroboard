@@ -136,6 +136,148 @@ function patchPlanMyNightView(payload) {
     return true;
 }
 
+async function loadMoonCalendar() {
+    const container = document.getElementById('plan-moon-calendar');
+    if (!container) return;
+
+    let data;
+    try {
+        data = await fetchJSON('/api/moon/month-calendar');
+    } catch (_) {
+        return;
+    }
+    if (!data || !data.nights || data.nights.length === 0) return;
+
+    // Re-render each time (preference may have changed); clear previous render
+    DOMUtils.clear(container);
+
+    const startOnMonday = (currentUserPreferences?.first_day_of_week || 'monday') === 'monday';
+    const locale = typeof i18n?.getCurrentLanguage === 'function' ? i18n.getCurrentLanguage() : navigator.language;
+
+    const section = document.createElement('div');
+    section.className = 'plan-moon-calendar-section';
+
+    // ── Header ──────────────────────────────────────────────────────────────
+    const header = document.createElement('div');
+    header.className = 'plan-moon-calendar-header';
+    const title = document.createElement('span');
+    title.className = 'fw-semibold small';
+    title.innerHTML = `<i class="bi bi-moon-stars-fill text-info icon-inline" aria-hidden="true"></i> ${i18n.t('plan_my_night.moon_calendar_title')}`;
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'btn btn-link btn-sm p-0 ms-2 text-muted plan-moon-calendar-toggle';
+    toggle.setAttribute('aria-expanded', 'true');
+    toggle.innerHTML = '<i class="bi bi-chevron-up" aria-hidden="true"></i>';
+    header.appendChild(title);
+    header.appendChild(toggle);
+    section.appendChild(header);
+
+    const calBody = document.createElement('div');
+    calBody.className = 'plan-moon-calendar-body';
+
+    // ── Grid ─────────────────────────────────────────────────────────────────
+    const grid = document.createElement('div');
+    grid.className = 'plan-moon-calendar-grid';
+
+    // Weekday header row
+    // Jan 5 2025 = Sunday (getDay()=0), Jan 6 = Monday (getDay()=1) ... Jan 11 = Saturday (getDay()=6)
+    // Column order: if startOnMonday → Mon(1) Tue(2) Wed(3) Thu(4) Fri(5) Sat(6) Sun(0)
+    //               if startOnSunday → Sun(0) Mon(1) Tue(2) Wed(3) Thu(4) Fri(5) Sat(6)
+    for (let col = 0; col < 7; col++) {
+        const dowIndex = startOnMonday ? (col + 1) % 7 : col; // 0=Sun,1=Mon..6=Sat
+        const refDate = new Date(2025, 0, 5 + dowIndex); // Jan 5 2025 = Sunday
+        const hdr = document.createElement('div');
+        hdr.className = 'plan-moon-cal-weekday-header';
+        hdr.textContent = refDate.toLocaleDateString(locale, { weekday: 'short' });
+        grid.appendChild(hdr);
+    }
+
+    // Blank cells before first night
+    const firstDate = new Date(data.nights[0].date + 'T12:00:00');
+    const firstDow = firstDate.getDay(); // 0=Sun..6=Sat
+    const offset = startOnMonday ? (firstDow + 6) % 7 : firstDow;
+    for (let b = 0; b < offset; b++) {
+        const blank = document.createElement('div');
+        blank.className = 'plan-moon-cal-cell plan-moon-cal-blank';
+        grid.appendChild(blank);
+    }
+
+    // Night cells
+    data.nights.forEach((night, idx) => {
+        const d = new Date(night.date + 'T12:00:00');
+        const dayNum = d.getDate();
+        const isToday = idx === 0;
+        const isFirstOfMonth = dayNum === 1;
+
+        const cell = document.createElement('div');
+        cell.className = 'plan-moon-cal-cell';
+        if (isToday) cell.classList.add('plan-moon-cal-today');
+        if (night.astrophoto_score >= 80) cell.classList.add('plan-moon-cal-good');
+        else if (night.astrophoto_score >= 50) cell.classList.add('plan-moon-cal-ok');
+        else cell.classList.add('plan-moon-cal-bright');
+
+        // Day number — prefix month abbreviation when it's the 1st
+        const dayEl = document.createElement('div');
+        dayEl.className = 'plan-moon-cal-day';
+        if (isFirstOfMonth) {
+            const monthAbbr = d.toLocaleDateString(locale, { month: 'short' });
+            const mo = document.createElement('span');
+            mo.className = 'plan-moon-cal-month-abbr';
+            mo.textContent = monthAbbr;
+            dayEl.appendChild(mo);
+        }
+        dayEl.appendChild(document.createTextNode(dayNum));
+
+        // Dark hours (strict)
+        const darkEl = document.createElement('div');
+        darkEl.className = 'plan-moon-cal-dark';
+        darkEl.textContent = `${night.strict_hours.toFixed(1)}h`;
+
+        // Moon illumination
+        const illumEl = document.createElement('div');
+        illumEl.className = 'plan-moon-cal-illum';
+        illumEl.textContent = `${Math.round(night.illumination_percent)}%`;
+
+        cell.title = `${night.date} — ${i18n.t('moon.illumination')}${Math.round(night.illumination_percent)}% — ${i18n.t('best_window.strict')}: ${night.strict_hours.toFixed(1)}h`;
+        cell.appendChild(dayEl);
+        cell.appendChild(darkEl);
+        cell.appendChild(illumEl);
+        grid.appendChild(cell);
+    });
+
+    calBody.appendChild(grid);
+
+    // ── Legend ────────────────────────────────────────────────────────────────
+    const legend = document.createElement('div');
+    legend.className = 'plan-moon-cal-legend';
+    [
+        ['plan-moon-cal-good',   i18n.t('plan_my_night.moon_calendar_legend_good')],
+        ['plan-moon-cal-ok',     i18n.t('plan_my_night.moon_calendar_legend_ok')],
+        ['plan-moon-cal-bright', i18n.t('plan_my_night.moon_calendar_legend_bright')],
+    ].forEach(([cls, label]) => {
+        const dot = document.createElement('span');
+        dot.className = `plan-moon-cal-legend-dot ${cls}`;
+        const txt = document.createElement('span');
+        txt.className = 'plan-moon-cal-legend-label';
+        txt.textContent = label;
+        legend.appendChild(dot);
+        legend.appendChild(txt);
+    });
+    calBody.appendChild(legend);
+
+    section.appendChild(calBody);
+    container.appendChild(section);
+
+    toggle.addEventListener('click', () => {
+        const expanded = toggle.getAttribute('aria-expanded') === 'true';
+        toggle.setAttribute('aria-expanded', String(!expanded));
+        toggle.innerHTML = expanded
+            ? '<i class="bi bi-chevron-down" aria-hidden="true"></i>'
+            : '<i class="bi bi-chevron-up" aria-hidden="true"></i>';
+        calBody.style.display = expanded ? 'none' : '';
+    });
+}
+
 async function loadPlanMyNight(options = {}) {
     const {
         silent = false,
@@ -1236,8 +1378,10 @@ function renderPlanMyNight(payload) {
     summary.appendChild(summaryBody);
     container.appendChild(summary);
 
-    buildPlanSummaryGraph(graphContainer, entries, plan, timeline)
-        .catch(err => console.error('Plan summary graph error:', err));
+    if (state !== 'previous') {
+        buildPlanSummaryGraph(graphContainer, entries, plan, timeline)
+            .catch(err => console.error('Plan summary graph error:', err));
+    }
 
     if (!entries.length) {
         const empty = document.createElement('div');
@@ -1538,7 +1682,7 @@ function renderPlanMyNight(payload) {
         }
 
         const hasAlttime = entry.alttime_file;
-        if (hasAlttime && typeof showAlttimePopup === 'function') {
+        if (hasAlttime && state !== 'previous' && typeof showAlttimePopup === 'function') {
             const alttimeButton = document.createElement('button');
             alttimeButton.type = 'button';
             alttimeButton.className = 'btn btn-info btn-sm mt-1';

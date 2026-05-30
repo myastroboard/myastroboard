@@ -425,8 +425,9 @@ function switchSubTab(parentTab, subtabName, options = {}) {
             loadSpaceflightEvents();
             break; // Spaceflight tab
         case 'plan-my-night':
+            loadMoonCalendar();
             loadPlanMyNight();
-            break; // Astrodex tab
+            break; // Plan My Night tab
         case 'notifications':
             if (typeof initNotificationSettingsUI === 'function') initNotificationSettingsUI();
             break; // My Settings tab
