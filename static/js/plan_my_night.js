@@ -459,12 +459,17 @@ async function loadPlanMyNight(options = {}) {
         planTelescopeList = telescopeListPayload?.plans || [];
         const telescopeItems = (telescopeListPayload?.telescope_count) || 0;
 
-        // Auto-select the first telescope if none selected yet and there are telescopes
+        // Auto-select the first telescope (by display sort order) if none selected yet
         if (currentPlanTelescopeId === null && telescopeItems > 0) {
-            const firstTelescope = planTelescopeList.find(p => p.telescope_id !== null);
-            if (firstTelescope) {
-                currentPlanTelescopeId = firstTelescope.telescope_id;
-            }
+            const sorted = planTelescopeList
+                .filter(p => p.telescope_id !== null)
+                .sort((a, b) => {
+                    const groupA = a.state === 'current' ? 0 : (a.is_own !== false ? 1 : 2);
+                    const groupB = b.state === 'current' ? 0 : (b.is_own !== false ? 1 : 2);
+                    if (groupA !== groupB) return groupA - groupB;
+                    return (a.telescope_name || '').localeCompare(b.telescope_name || '');
+                });
+            if (sorted.length > 0) currentPlanTelescopeId = sorted[0].telescope_id;
         }
 
         const telescopeIdParam = currentPlanTelescopeId
