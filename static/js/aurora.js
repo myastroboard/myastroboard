@@ -347,3 +347,19 @@ async function loadAurora() {
     }
 }
 
+function _checkAuroraN7(data) {
+    if (typeof notificationManager === 'undefined') return;
+    if (!notificationManager.isTriggerEnabled('N7')) return;
+
+    const kp = data?.current?.kp_index;
+    if (typeof kp !== 'number') return;
+    if (kp < notificationManager.getKpThreshold()) return;
+
+    const COOLDOWN_MS = 60 * 60 * 1000; // 1 hour — avoids re-notifying on every tab open
+    if (notificationManager.wasRecentlyNotified('N7', COOLDOWN_MS)) return;
+
+    const visibility = data?.current?.visibility_level ?? '';
+    const title = i18n.t('notifications.n7_title');
+    const body  = i18n.t('notifications.n7_body', { kp: kp.toFixed(1), visibility });
+    notificationManager.notify('N7', title, body, { url: '#forecast-astro/aurora' });
+}

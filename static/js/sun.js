@@ -116,3 +116,27 @@ async function loadSun() {
         container.appendChild(errorBox);
     }
 }
+
+function _checkSunN6(data) {
+    if (typeof notificationManager === 'undefined') return;
+    if (!notificationManager.isTriggerEnabled('N6')) return;
+
+    const duskIso = data?.sun?.astronomical_dusk;
+    if (!duskIso) return;
+
+    const dusk   = new Date(duskIso).getTime();
+    const now    = Date.now();
+    const msUntil = dusk - now;
+    const leadMs  = notificationManager.getLeadMinutes('N6') * 60 * 1000;
+
+    if (msUntil <= 0 || msUntil > leadMs) return;
+    if (notificationManager.wasRecentlyNotified('N6', 8 * 60 * 60 * 1000)) return; // once per day
+
+    const minutes = Math.round(msUntil / 60000);
+    notificationManager.notify(
+        'N6',
+        i18n.t('notifications.n6_title'),
+        i18n.t('notifications.n6_body', { minutes }),
+        { url: '#forecast-astro/astro-weather' }
+    );
+}

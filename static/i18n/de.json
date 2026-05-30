@@ -706,7 +706,9 @@
     "notifications_n5": "Sonnenfinsternis",
     "notifications_n6": "Astronomische Dunkelheit beginnt",
     "notifications_n7": "Aurora-Alarm (Kp-Index)",
-    "notifications_minutes": "min"
+    "notifications_minutes": "min",
+    "notifications_push_active": "Hintergrund-Push aktiv",
+    "notifications_push_inapp_only": "Nur In-App — Tab muss geöffnet sein"
   },
   "astrodex": {
     "title": "Astrodex - Ich muss sie alle fangen!",
@@ -1775,5 +1777,22 @@
     "source_wikipedia": "Beschreibung: Wikipedia",
     "source_skyview": "Bild: DSS2 / SkyView (NASA GSFC)",
     "error_loading": "Objektinformationen konnten nicht geladen werden."
+  },
+  "notifications": {
+    "n1_body": "Ihre Sitzung beginnt in {minutes} Min",
+    "n1_title": "Plan My Night",
+    "n2_body": "{name} beginnt in {minutes} Min",
+    "n2_title": "Naechstes Ziel",
+    "n3_body_lunar": "ISS Mondtransit in {minutes} Min",
+    "n3_body_solar": "ISS Sonnentransit in {minutes} Min",
+    "n3_title": "ISS-Transit",
+    "n4_body": "Totalitat in {minutes} Min",
+    "n4_title": "Mondfinsternis",
+    "n5_body": "Maximum in {minutes} Min",
+    "n5_title": "Sonnenfinsternis",
+    "n6_body": "Nacht beginnt in {minutes} Min — machen Sie sich bereit",
+    "n6_title": "Astronomische Nacht",
+    "n7_body": "Kp {kp} erkannt — {visibility}",
+    "n7_title": "Aurora-Alarm"
   }
 }

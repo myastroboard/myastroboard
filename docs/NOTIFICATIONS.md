@@ -4,35 +4,43 @@ Browser and push notification system for time-critical astrophotography events.
 
 ---
 
-## Architecture
-
-The notification system is split into three phases with increasing complexity and infrastructure requirements.
+## Architecture overview
 
 ```
-Phase A — Browser Notification API     (tab must be open)
-Phase B — Settings UI                  (user preferences, localStorage)
-Phase C — Web Push / background        (tab may be closed, requires VAPID backend)
+Phase A — NotificationManager + background poller    ✅ Done
+Phase B — Settings UI (My Settings → Notifications)  ✅ Done
+Phase C — Web Push / background (tab may be closed)  ✅ Done
 ```
 
-**Current status:** Phase A skeleton + Phase B settings UI complete. Triggers not yet wired.
+### Phase A — Browser Notification API
+- `notifications.js` — `NotificationManager` singleton + `startNotificationPoller()` (5 min interval)
+- Notifications fire when the tab is open; poller runs regardless of which tab is active
+
+### Phase B — Settings UI
+- My Settings → Notifications sub-tab (N1–N7 toggles, lead times, Kp threshold, test button)
+- Preferences stored server-side in `data/users.json` under `preferences.notifications`
+
+### Phase C — Web Push
+- Notifications fire even when the app tab is closed
+- VAPID key pair persisted in `data/vapid.json` (generated once on first startup)
+- Push subscriptions stored per-user in `data/users.json` under `push_subscriptions[]`
+- Background scheduler (`push_scheduler.py`) evaluates triggers every 5 minutes
 
 ---
 
 ## Trigger IDs
 
-Each notification type has a stable ID used throughout the codebase.
+| ID | Event | Default lead | Module (`_check_*` fn) |
+|----|-------|-------------|----------------------|
+| `N1` | Plan My Night session starts | 15 min | `plan_my_night.js` / `push_scheduler.py` |
+| `N2` | Plan My Night: next target | 5 min | `plan_my_night.js` / `push_scheduler.py` |
+| `N3` | ISS solar or lunar transit | 10 min | `iss.js` / `push_scheduler.py` |
+| `N4` | Lunar eclipse totality | 30 min | `events_alerts.js` / `push_scheduler.py` |
+| `N5` | Solar eclipse maximum | 30 min | `events_alerts.js` / `push_scheduler.py` |
+| `N6` | Astronomical darkness begins | 20 min | `sun.js` / `push_scheduler.py` |
+| `N7` | Aurora: Kp index ≥ threshold | immediate | `aurora.js` / `push_scheduler.py` |
 
-| ID | Event | Default lead | Configurable |
-|----|-------|-------------|--------------|
-| `N1` | Plan My Night session starts | 15 min | Yes |
-| `N2` | Plan My Night: next target | 5 min | Yes |
-| `N3` | ISS solar or lunar transit | 10 min | Yes |
-| `N4` | Lunar eclipse totality | 30 min | Yes |
-| `N5` | Solar eclipse maximum | 30 min | Yes |
-| `N6` | Astronomical darkness begins | 20 min | Yes |
-| `N7` | Aurora: Kp index ≥ threshold | immediate | Kp 3–9 |
-
-IDs are defined as `NOTIF_TRIGGERS` constants in `static/js/notifications.js`. Always reference triggers by ID (`N1`–`N7`), never by index or string literal.
+IDs are defined as `NOTIF_TRIGGERS` constants in `static/js/notifications.js` and referenced by string in `push_scheduler.py`.
 
 ---
 
@@ -40,10 +48,13 @@ IDs are defined as `NOTIF_TRIGGERS` constants in `static/js/notifications.js`. A
 
 | File | Role |
 |------|------|
-| `static/js/notifications.js` | `NotificationManager` class + settings UI logic |
+| `static/js/notifications.js` | `NotificationManager`, settings UI, background poller, Web Push subscription |
+| `backend/push_manager.py` | VAPID key generation/persistence, `send_push()` wrapper around pywebpush |
+| `backend/push_scheduler.py` | Background thread; evaluates N1–N7 server-side every 5 min; sends push |
 | `templates/index.html` | Notifications sub-tab (My Settings → Notifications) |
-| `static/i18n/*.json` | Translation keys under `settings.notifications_*` |
-| `static/sw.js` | Will receive `push` event listener in Phase C |
+| `static/sw.js` | `push` + `notificationclick` event listeners |
+| `static/i18n/*.json` | `notifications.*` namespace (N1–N7 titles/bodies) + `settings.notifications_*` |
+| `data/vapid.json` | Generated VAPID key pair — **never delete or regenerate** (invalidates all subscriptions) |
 
 ---
 
@@ -54,18 +65,17 @@ IDs are defined as `NOTIF_TRIGGERS` constants in `static/js/notifications.js`. A
 ### Permission
 
 ```javascript
-// Check support and current state
 notificationManager.isSupported       // boolean
 notificationManager.permission        // 'default' | 'granted' | 'denied' | 'unsupported'
 notificationManager.canNotify()       // true if granted AND master toggle enabled
 
-// Request permission (safe to call multiple times)
-const granted = await notificationManager.requestPermission(); // returns boolean
+const granted = await notificationManager.requestPermission();
+// Also calls _subscribeToPush() automatically on grant
 ```
 
 ### Preferences
 
-Preferences are stored in `localStorage` under key `myastroboard_notif_prefs`.
+Stored server-side in `users.json` under `preferences.notifications`. Read via `window.myastroboardUserPreferences.notifications`.
 
 ```javascript
 const prefs = notificationManager.getPrefs();
@@ -79,42 +89,139 @@ const prefs = notificationManager.getPrefs();
 //   }
 // }
 
-notificationManager.savePrefs(prefs);
-
-// Per-trigger accessors
-notificationManager.isTriggerEnabled('N7')     // boolean
-notificationManager.getLeadMinutes('N1')       // number (minutes)
-notificationManager.getKpThreshold()           // number (Kp value, N7 only)
+await notificationManager.savePrefs(prefs); // async — POSTs to /api/auth/preferences
+notificationManager.isTriggerEnabled('N7')
+notificationManager.getLeadMinutes('N1')
+notificationManager.getKpThreshold()
 ```
 
 ### Deduplication
 
-Prevents a polling loop from re-firing the same notification every cycle.
+In-memory, resets on page reload. The background poller uses server-side cooldowns in `push_scheduler.py`.
 
 ```javascript
-// Check if this trigger fired recently
-if (notificationManager.wasRecentlyNotified('N7', 30 * 60 * 1000)) return; // 30 min cooldown
-
-// Mark as notified (called automatically by notify())
-notificationManager.markNotified('N7');
+if (notificationManager.wasRecentlyNotified('N7', 30 * 60 * 1000)) return;
+notificationManager.markNotified('N7'); // called automatically by notify()
 ```
 
-### Firing a notification
+### Firing a notification (Phase A — tab open)
 
 ```javascript
-const shown = await notificationManager.notify(
-    'N7',                          // trigger ID
-    'Aurora Alert',                // title
-    'Kp 6 detected — good conditions',  // body
-    {
-        url: '#forecast-astro/aurora',  // hash to navigate on click
-        tag: 'aurora-kp6-2026-05-29',  // dedup tag (optional, auto-generated if omitted)
-    }
+await notificationManager.notify(
+    'N7',
+    i18n.t('notifications.n7_title'),
+    i18n.t('notifications.n7_body', { kp: '6.0', visibility: 'Good' }),
+    { url: '#forecast-astro/aurora' }
 );
-// shown: true if notification was displayed, false if blocked/disabled
 ```
 
-The `url` option maps to a hash fragment. The notification click handler calls `window.location.hash = url` and `window.focus()`.
+---
+
+## Background poller (Phase A)
+
+`startNotificationPoller()` starts a `setInterval` every 5 minutes after app init (`app.js → initializeApp()`). It fetches minimal API data for each enabled trigger and calls the same `_check*` functions defined in each feature module.
+
+```javascript
+// Called automatically — no manual invocation needed
+startNotificationPoller();  // wired in app.js initializeApp()
+stopNotificationPoller();   // available but not normally called
+```
+
+The `_check*` functions are defined at the bottom of their respective feature modules and are global-scope functions callable from anywhere.
+
+---
+
+## Web Push (Phase C)
+
+### VAPID keys
+
+Generated once on first startup by `push_manager.load_or_generate_vapid_keys()` and saved to `data/vapid.json`:
+
+```json
+{ "private_key": "-----BEGIN EC PRIVATE KEY-----\n...", "public_key": "BNxx...base64url..." }
+```
+
+**Never delete or regenerate `vapid.json`** — doing so invalidates all existing push subscriptions.
+
+### Push subscription flow
+
+1. User clicks "Enable notifications" → `requestPermission()` granted
+2. `_subscribeToPush()` fetches `GET /api/push/vapid-public-key`
+3. Browser calls `pushManager.subscribe({ applicationServerKey: publicKey })`
+4. Subscription POSTed to `POST /api/push/subscribe`
+5. Stored under user's `push_subscriptions[]` in `users.json`
+
+### API routes
+
+| Method | Route | Auth | Description |
+|--------|-------|------|-------------|
+| `GET` | `/api/push/vapid-public-key` | Public | Returns base64url public key for `applicationServerKey` |
+| `POST` | `/api/push/subscribe` | `@login_required` | Stores subscription (deduplicates by endpoint) |
+| `DELETE` | `/api/push/unsubscribe` | `@login_required` | Removes subscription by endpoint |
+
+### User model
+
+`push_subscriptions` is a top-level field on the user object (not inside `preferences`):
+
+```json
+{
+  "user_id": "...",
+  "preferences": { ... },
+  "push_subscriptions": [
+    { "endpoint": "https://fcm.googleapis.com/...", "keys": { "p256dh": "...", "auth": "..." }, "created_at": "..." }
+  ]
+}
+```
+
+### Push scheduler (`push_scheduler.py`)
+
+Daemon thread started at app startup. Polls every 5 minutes:
+
+- Loads cached data once per cycle (aurora, sun, ISS, solar/lunar eclipse)
+- Loads per-user plan data via `get_plan_with_timeline()`
+- Skips users with no push subscriptions or notifications disabled
+- Sends push via `push_manager.send_push()` (pywebpush)
+- Dead subscriptions (delivery failure) are automatically removed
+- In-memory cooldowns reset on server restart (acceptable: worst case one duplicate per restart)
+
+### sw.js handlers
+
+```javascript
+// push — fires when server sends a push
+self.addEventListener('push', event => { ... showNotification() ... });
+
+// notificationclick — focuses app window and navigates to data.url
+self.addEventListener('notificationclick', event => { ... });
+```
+
+### Push payload shape
+
+```json
+{
+  "title": "Plan My Night",
+  "body": "Your session starts in 14 min",
+  "icon": "/static/ico/android/launchericon-192x192.png",
+  "badge": "/static/ico/android/launchericon-72x72.png",
+  "tag": "N1-20260529",
+  "data": { "url": "/#astrodex/plan-my-night" }
+}
+```
+
+---
+
+## Settings UI elements
+
+| ID | Type | Role |
+|----|------|------|
+| `#notif-permission-banner` | `div.alert` | Permission state + push status (two lines when granted) |
+| `#notif-enable-btn` | `button.btn-warning` | Calls `requestPermission()` + `_subscribeToPush()`; hidden when granted/denied |
+| `#notif-master-toggle` | `input[checkbox]` | Master enable/disable |
+| `#notif-trigger-N1` … `#notif-trigger-N7` | `input[checkbox]` | Per-trigger toggle |
+| `#notif-lead-N1` … `#notif-lead-N6` | `select` | Lead time in minutes |
+| `#notif-kp-threshold` | `select` | Kp threshold (N7 only) |
+| `#notif-save-btn` | `button.btn-primary` | Async save to server |
+| `#notif-test-btn` | `button.btn-outline-secondary` | Fires a sample notification |
+| `#notif-save-message` | `div.alert` | Feedback (auto-hides after 3 s) |
 
 ---
 
@@ -122,99 +229,20 @@ The `url` option maps to a hash fragment. The notification click handler calls `
 
 1. Add the ID to `NOTIF_TRIGGERS` in `notifications.js`
 2. Add default prefs to `_NOTIF_DEFAULTS.triggers` in `notifications.js`
-3. Add a row to the settings UI in `index.html` (`#notif-triggers-list`)
-4. Add i18n key `settings.notifications_nX` to all 6 language files
-5. Add the detection logic in the relevant feature module (see below)
-6. Update the trigger table in this document
+3. Add a row to `#notif-triggers-list` in `templates/index.html`
+4. Add `notifications.nX_title` and `notifications.nX_body` keys to all 6 i18n files
+5. Add `_check_nX()` function in the relevant feature module (called by the background poller)
+6. Add the poller call in `_runNotificationChecks()` in `notifications.js`
+7. Add the server-side check in `push_scheduler.py`
+8. Update the trigger table in this document
 
 ---
 
-## Wiring triggers — implementation pattern
+## i18n namespaces
 
-Each trigger lives in the module that already owns the relevant data. The pattern is always:
+| Namespace | Content |
+|-----------|---------|
+| `settings.notifications_*` | UI strings: banner text, button labels, toggle labels, trigger labels |
+| `notifications.nX_title` / `notifications.nX_body` | Notification payload strings (title + body with `{placeholder}`) |
 
-```javascript
-// 1. After fetching/computing the relevant data...
-// 2. Check if the condition is met
-// 3. Guard with wasRecentlyNotified to prevent spam
-// 4. Call notify()
-
-// Example: N7 Aurora in aurora.js
-function _checkAuroraNotification(kpValue) {
-    if (!notificationManager.isTriggerEnabled('N7')) return;
-    if (kpValue < notificationManager.getKpThreshold()) return;
-    if (notificationManager.wasRecentlyNotified('N7', 30 * 60 * 1000)) return;
-
-    notificationManager.notify(
-        'N7',
-        i18n.t('notifications.aurora_title'),   // "Aurora Alert"
-        i18n.t('notifications.aurora_body', { kp: kpValue }),
-        { url: '#forecast-astro/aurora' }
-    );
-}
-```
-
-### Module assignments
-
-| Trigger | Module | Data source |
-|---------|--------|-------------|
-| `N1` | `plan_my_night.js` | `payload.timeline.start` (ISO string) |
-| `N2` | `plan_my_night.js` | `payload.plan.entries[].start_time` |
-| `N3` | `iss.js` | `data.solar_transits` / `data.lunar_transits` (next upcoming) |
-| `N4` | `lunar_eclipse.js` or `events_alerts.js` | Eclipse totality time from events API |
-| `N5` | `solar_eclipse.js` or `events_alerts.js` | Eclipse maximum time from events API |
-| `N6` | `sun.js` | `data.astronomical_twilight_end` |
-| `N7` | `aurora.js` | Current Kp index from aurora API |
-
----
-
-## Settings UI
-
-Located at **My Settings → Notifications** (`#notifications-subtab`).
-
-Initialized by `initNotificationSettingsUI()` (called from `app.js → switchSubTab`).
-
-### Elements
-
-| ID | Type | Role |
-|----|------|------|
-| `#notif-permission-banner` | `div.alert` | Shows current permission state |
-| `#notif-enable-btn` | `button` | Calls `requestPermission()`, hidden when granted/denied |
-| `#notif-master-toggle` | `input[type=checkbox]` | Master enable/disable |
-| `#notif-trigger-N1` … `#notif-trigger-N7` | `input[type=checkbox]` | Per-trigger toggle |
-| `#notif-lead-N1` … `#notif-lead-N6` | `select` | Lead time in minutes |
-| `#notif-kp-threshold` | `select` | Kp threshold (N7 only) |
-| `#notif-save-btn` | `button` | Saves prefs to localStorage |
-| `#notif-test-btn` | `button` | Fires a sample notification |
-| `#notif-save-message` | `div.alert` | Success/error feedback (auto-hides after 3 s) |
-
----
-
-## Phase C — Web Push (future)
-
-When implementing background push:
-
-1. Generate a VAPID key pair once at startup (never regenerate — invalidates all existing subscriptions)
-2. Expose the public key via `GET /api/push/vapid-public-key`
-3. After `requestPermission()` is granted, call `pushManager.subscribe()` and `POST /api/push/subscribe`
-4. Add `push` and `notificationclick` event listeners to `sw.js`
-5. Backend evaluates all triggers on a schedule and sends push to subscribed users
-
-Push payload shape (matches Phase A notification options):
-```json
-{
-  "title": "Plan starts in 15 min",
-  "body": "Your observation session begins at 22:30",
-  "icon": "/static/ico/android/launchericon-192x192.png",
-  "badge": "/static/ico/android/launchericon-72x72.png",
-  "data": { "url": "#plan-my-night" },
-  "tag": "N1-2026-05-29"
-}
-```
-
-DB table required:
-```sql
-push_subscriptions(id, user_id, endpoint TEXT UNIQUE, p256dh TEXT, auth TEXT, created_at)
-```
-
-Python dependency: `pywebpush`
+Keys in `notifications` namespace are ordered N1→N7 per trigger, `_title` before `_body`.

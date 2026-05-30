@@ -11,11 +11,8 @@ This document describes features that could potentially be integrated into MyAst
 
 ## New Features
 
-### User profile
-- Notification (when/if available in future)
+Nothing at the moment !
 
 ## Upgrade Features
 
-### PWA application
-**Objective: Real PWA application for mobile**
-- PWA notifications for improving conditions (weather, ... ?)
+Nothing at the moment !

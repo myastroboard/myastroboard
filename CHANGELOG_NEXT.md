@@ -25,6 +25,36 @@ You can now share your equipment with everyone on your MyAstroBoard instance —
 - Plan my night display now partial alttime graph instead of progressbar
 - PDF export is now more than a list. Better display, graph, ...
 
+#### Notifications
+
+MyAstroBoard can now alert you to time-critical astronomy events — even when the app is in the background or your phone is locked.
+
+**7 event triggers, fully configurable per user:**
+
+| Trigger | Default lead |
+|---------|-------------|
+| Plan My Night session starts | 15 min |
+| Plan My Night: next target | 5 min |
+| ISS solar or lunar transit | 10 min |
+| Lunar eclipse totality | 30 min |
+| Solar eclipse maximum | 30 min |
+| Astronomical darkness begins | 20 min |
+| Aurora: Kp index above your threshold | immediate |
+
+**Two notification modes:**
+- **In-app** — fires when the browser tab is open (any tab, not just the relevant one)
+- **Background push** — fires even when the app is closed or your screen is off, via Web Push
+
+**Smart polling:** the app checks every 5 minutes by default, switching automatically to every 1 minute during an active observation session or within 30 minutes of your plan starting — so short lead times (2–5 min) are never missed.
+
+**Per-user settings** (My Settings → Notifications):
+- Enable/disable all notifications or individual triggers
+- Adjust lead time per trigger
+- Set your personal Kp threshold for aurora alerts (3–9)
+- Test button to verify notifications work before your next session
+
+Notification preferences are saved to your account and follow you across devices.
+
 #### Various
 
 - Improve visualization of the moon with more realistic shadow

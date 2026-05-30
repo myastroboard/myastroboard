@@ -81,9 +81,11 @@ self.addEventListener('activate', (event) => {
                     }
                 })
             );
+
+            // Claim clients only after cache cleanup is complete.
+            await self.clients.claim();
         })()
     );
-    self.clients.claim();
 });
 
 function isSameOrigin(url) {
@@ -99,6 +101,73 @@ async function fetchWithTimeout(request, timeoutMs) {
         clearTimeout(timeoutId);
     }
 }
+
+self.addEventListener('push', (event) => {
+    let payload = {};
+    try { payload = event.data?.json() ?? {}; } catch (_) {}
+
+    const title   = payload.title  || 'MyAstroBoard';
+    const options = {
+        body:  payload.body  || '',
+        icon:  payload.icon  || '/static/ico/android/launchericon-192x192.png',
+        badge: payload.badge || '/static/ico/android/launchericon-72x72.png',
+        tag:   payload.tag   || 'mab-push',
+        data:  payload.data  || {},
+    };
+
+    event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+    const url = event.notification.data?.url || '/';
+
+    event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+            for (const client of clientList) {
+                if ('focus' in client) {
+                    // navigate() is async — chain focus so it fires after navigation completes.
+                    return client.navigate(url).then(() => client.focus());
+                }
+            }
+            if (clients.openWindow) {
+                return clients.openWindow(url);
+            }
+        })
+    );
+});
+
+// Fires when the browser silently rotates a push subscription (e.g. on expiry).
+// Re-subscribes and sends the new subscription to the server so push delivery continues.
+self.addEventListener('pushsubscriptionchange', (event) => {
+    event.waitUntil(
+        (async () => {
+            try {
+                const resp = await fetch('/api/push/vapid-public-key', { credentials: 'same-origin' });
+                if (!resp.ok) return;
+                const { public_key: publicKeyB64 } = await resp.json();
+                if (!publicKeyB64) return;
+
+                const padding   = '='.repeat((4 - (publicKeyB64.length % 4)) % 4);
+                const base64    = (publicKeyB64 + padding).replace(/-/g, '+').replace(/_/g, '/');
+                const raw       = atob(base64);
+                const publicKey = Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+
+                const newSub = await self.registration.pushManager.subscribe({
+                    userVisibleOnly:      true,
+                    applicationServerKey: publicKey,
+                });
+
+                await fetch('/api/push/subscribe', {
+                    method:      'POST',
+                    credentials: 'same-origin',
+                    headers:     { 'Content-Type': 'application/json' },
+                    body:        JSON.stringify({ subscription: newSub.toJSON() }),
+                });
+            } catch (_) {}
+        })()
+    );
+});
 
 self.addEventListener('fetch', (event) => {
     const { request } = event;

@@ -75,7 +75,7 @@ USERS_FILE = os.path.join(os.environ.get('DATA_DIR', '/app/data'), 'users.json')
 
 class User:
     """User model"""
-    def __init__(self, username, password_hash, role, user_id=None, created_at=None, last_login=None, preferences=None):
+    def __init__(self, username, password_hash, role, user_id=None, created_at=None, last_login=None, preferences=None, push_subscriptions=None):
         self.user_id = user_id or str(uuid.uuid4())
         self.username = username
         self.password_hash = password_hash
@@ -83,7 +83,8 @@ class User:
         self.created_at = created_at or datetime.now().isoformat()
         self.last_login = last_login
         self.preferences = preferences.copy() if isinstance(preferences, dict) else DEFAULT_USER_PREFERENCES.copy()
-        
+        self.push_subscriptions = push_subscriptions if isinstance(push_subscriptions, list) else []
+
     def to_dict(self):
         """Convert user to dictionary"""
         return {
@@ -93,7 +94,8 @@ class User:
             'role': self.role,
             'created_at': self.created_at,
             'last_login': self.last_login,
-            'preferences': self.preferences
+            'preferences': self.preferences,
+            'push_subscriptions': self.push_subscriptions,
         }
     
     @staticmethod
@@ -106,7 +108,8 @@ class User:
             role=data['role'],
             created_at=data.get('created_at'),
             last_login=data.get('last_login'),
-            preferences=data.get('preferences')
+            preferences=data.get('preferences'),
+            push_subscriptions=data.get('push_subscriptions'),
         )
     
     def check_password(self, password):

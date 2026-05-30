@@ -61,9 +61,13 @@ class NotificationManager {
     async requestPermission() {
         if (!this.isSupported)            return false;
         if (this.permission === 'denied') return false;
-        if (this.permission === 'granted') return true;
+        if (this.permission === 'granted') {
+            _subscribeToPush(); // ensure push sub exists for this device
+            return true;
+        }
         const result = await Notification.requestPermission();
         await this._patchPrefs({ permission_asked: true });
+        if (result === 'granted') _subscribeToPush();
         return result === 'granted';
     }
 
@@ -184,6 +188,156 @@ class NotificationManager {
 const notificationManager = new NotificationManager();
 
 // ======================
+// Web Push subscription
+// ======================
+
+function _urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+    const base64  = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const raw     = atob(base64);
+    return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
+async function _subscribeToPush() {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    try {
+        const reg = await navigator.serviceWorker.ready;
+        const existing = await reg.pushManager.getSubscription();
+        if (existing) return; // already subscribed on this device
+
+        const resp = await fetch('/api/push/vapid-public-key', { credentials: 'same-origin' });
+        if (!resp.ok) return;
+        const { public_key: publicKey } = await resp.json();
+        if (!publicKey) return;
+
+        const sub = await reg.pushManager.subscribe({
+            userVisibleOnly:      true,
+            applicationServerKey: _urlBase64ToUint8Array(publicKey),
+        });
+
+        await fetch('/api/push/subscribe', {
+            method:      'POST',
+            credentials: 'same-origin',
+            headers:     { 'Content-Type': 'application/json' },
+            body:        JSON.stringify({ subscription: sub.toJSON() }),
+        });
+    } catch (e) {
+        console.warn('Push subscription failed:', e);
+    }
+}
+
+async function _unsubscribeFromPush() {
+    if (!('serviceWorker' in navigator)) return;
+    try {
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (!sub) return;
+        await fetch('/api/push/unsubscribe', {
+            method:      'DELETE',
+            credentials: 'same-origin',
+            headers:     { 'Content-Type': 'application/json' },
+            body:        JSON.stringify({ endpoint: sub.endpoint }),
+        });
+        await sub.unsubscribe();
+    } catch (e) {
+        console.warn('Push unsubscription failed:', e);
+    }
+}
+
+// ======================
+// Background Poller
+// Runs every 5 min regardless of which tab is open.
+// Calls the same _check* functions defined in each feature module.
+// ======================
+
+const _NOTIF_POLL_MS_SLOW = 5 * 60 * 1000; // 5 min — default
+const _NOTIF_POLL_MS_FAST = 60 * 1000;     // 1 min — during/near active observation session
+let   _notifPollTimer  = null;
+let   _notifFastMode   = false;             // true when inside night or ≤30 min away
+
+async function _runNotificationChecks() {
+    if (!notificationManager.canNotify()) return;
+
+    const enabled = notificationManager.getPrefs().triggers;
+
+    // N7 — Aurora Kp
+    if (enabled?.N7?.enabled !== false) {
+        try {
+            const data = await fetch('/api/aurora/predictions', { credentials: 'same-origin' })
+                .then(r => r.ok ? r.json() : null);
+            if (data && typeof _checkAuroraN7 === 'function') _checkAuroraN7(data);
+        } catch (_) {}
+    }
+
+    // N1 + N2 — Plan My Night session / next target
+    if (enabled?.N1?.enabled !== false || enabled?.N2?.enabled !== false) {
+        try {
+            const data = await fetch('/api/plan-my-night', { credentials: 'same-origin' })
+                .then(r => r.ok ? r.json() : null);
+            if (data) {
+                // Activate fast mode during the night or within 30 min of night start
+                const isInsideNight = data?.timeline?.is_inside_night === true;
+                const nightStartMs  = data?.plan?.night_start ? new Date(data.plan.night_start).getTime() : null;
+                const nearStart     = nightStartMs && !isInsideNight
+                    && nightStartMs - Date.now() < 30 * 60 * 1000
+                    && nightStartMs - Date.now() > 0;
+                _notifFastMode = isInsideNight || !!nearStart;
+
+                if (typeof _checkPlanNotifications === 'function') _checkPlanNotifications(data);
+            }
+        } catch (_) {}
+    }
+
+    // N6 — Astronomical darkness
+    if (enabled?.N6?.enabled !== false) {
+        try {
+            const data = await fetch('/api/sun/today', { credentials: 'same-origin' })
+                .then(r => r.ok ? r.json() : null);
+            if (data && typeof _checkSunN6 === 'function') _checkSunN6(data);
+        } catch (_) {}
+    }
+
+    // N3 — ISS transit (data is cached 6 h server-side, no extra cost)
+    if (enabled?.N3?.enabled !== false) {
+        try {
+            const data = await fetch('/api/iss/passes?days=20', { credentials: 'same-origin' })
+                .then(r => r.ok ? r.json() : null);
+            if (data && typeof _checkIssN3 === 'function') _checkIssN3(data);
+        } catch (_) {}
+    }
+
+    // N4 + N5 — Eclipses (events_alerts.js also polls every 10 min, but only when calendar is open)
+    if (enabled?.N4?.enabled !== false || enabled?.N5?.enabled !== false) {
+        try {
+            const lang = (typeof i18n !== 'undefined') ? i18n.getCurrentLanguage() : 'en';
+            const data = await fetch(`/api/events/upcoming?lang=${encodeURIComponent(lang)}`, { credentials: 'same-origin' })
+                .then(r => r.ok ? r.json() : null);
+            if (data && typeof _checkEclipseNotifications === 'function') _checkEclipseNotifications(data);
+        } catch (_) {}
+    }
+}
+
+function _scheduleNextPoll() {
+    const delay = _notifFastMode ? _NOTIF_POLL_MS_FAST : _NOTIF_POLL_MS_SLOW;
+    _notifPollTimer = setTimeout(async () => {
+        await _runNotificationChecks();
+        _scheduleNextPoll();
+    }, delay);
+}
+
+function startNotificationPoller() {
+    if (_notifPollTimer !== null) return;
+    _runNotificationChecks().then(_scheduleNextPoll);
+}
+
+function stopNotificationPoller() {
+    if (_notifPollTimer !== null) {
+        clearTimeout(_notifPollTimer);
+        _notifPollTimer = null;
+    }
+}
+
+// ======================
 // Settings UI
 // ======================
 
@@ -192,21 +346,61 @@ function _notifPermissionBannerState() {
         return { cls: 'alert-warning', i18n: 'settings.notifications_unsupported', fallback: 'Your browser does not support notifications.' };
     }
     switch (notificationManager.permission) {
-        case 'granted':  return { cls: 'alert-success', i18n: 'settings.notifications_permission_granted',  fallback: 'Browser notifications are enabled.' };
+        case 'granted':  return { cls: 'alert-success', i18n: 'settings.notifications_permission_granted',  fallback: 'Browser notifications are enabled. To revoke, open your browser site settings.' };
         case 'denied':   return { cls: 'alert-danger',  i18n: 'settings.notifications_permission_denied',   fallback: 'Browser notifications are blocked. Enable them in your browser settings.' };
         default:         return { cls: 'alert-warning', i18n: 'settings.notifications_permission_default',  fallback: 'Browser notifications are not yet enabled.' };
     }
 }
 
-function _refreshPermissionBanner() {
+async function _getPushStatusSuffix() {
+    const t = (key, fallback) => {
+        if (typeof i18n === 'undefined') return fallback;
+        const v = i18n.t(key);
+        return (v && v !== key) ? v : fallback;
+    };
+
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        return t('settings.notifications_push_inapp_only', ' — In-app only (tab must be open)');
+    }
+    try {
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        return sub
+            ? t('settings.notifications_push_active',     ' — Background push active')
+            : t('settings.notifications_push_inapp_only', ' — In-app only (tab must be open)');
+    } catch (_) {
+        return '';
+    }
+}
+
+async function _refreshPermissionBanner() {
     const banner    = document.getElementById('notif-permission-banner');
     const enableBtn = document.getElementById('notif-enable-btn');
     if (!banner) return;
 
     const state = _notifPermissionBannerState();
     banner.className = `alert ${state.cls} mb-3`;
+
     const t = (typeof i18n !== 'undefined') ? i18n.t(state.i18n) : null;
-    banner.textContent = (t && t !== state.i18n) ? t : state.fallback;
+    const mainText = (t && t !== state.i18n) ? t : state.fallback;
+
+    while (banner.firstChild) banner.removeChild(banner.firstChild);
+
+    const mainSpan = document.createElement('span');
+    mainSpan.textContent = mainText;
+    banner.appendChild(mainSpan);
+
+    if (notificationManager.permission === 'granted') {
+        const suffix = await _getPushStatusSuffix();
+        if (suffix) {
+            banner.appendChild(document.createElement('br'));
+            const statusEl = document.createElement('small');
+            statusEl.className = 'opacity-75';
+            statusEl.textContent = suffix;
+            banner.appendChild(statusEl);
+        }
+    }
+
     banner.style.display = '';
 
     if (enableBtn) {
