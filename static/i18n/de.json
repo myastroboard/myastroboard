@@ -1578,6 +1578,7 @@
     "step_spaceflight_launches": "Raumflugstarts",
     "step_spaceflight_astronauts": "Astronauten im Weltall",
     "step_spaceflight_events": "Weltraumveranstaltungen",
+    "step_iers": "IERS Erdorientierungsdaten",
     "step_parallel_network": "Parallele Netzwerkanfragen"
   },
   "scheduler": {

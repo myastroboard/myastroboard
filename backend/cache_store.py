@@ -16,6 +16,7 @@ from constants import (
     CACHE_TTL_ISS_PASSES, CACHE_TTL_PLANETARY_EVENTS, CACHE_TTL_SPECIAL_PHENOMENA,
     CACHE_TTL_SOLAR_SYSTEM_EVENTS, CACHE_TTL_SIDEREAL_TIME, CACHE_TTL_SEEING_FORECAST,
     CACHE_TTL_SPACEFLIGHT_LAUNCHES, CACHE_TTL_SPACEFLIGHT_ASTRONAUTS, CACHE_TTL_SPACEFLIGHT_EVENTS,
+    CACHE_TTL_IERS,
 )
 
 # Windows-compatible file locking
@@ -52,6 +53,9 @@ _spaceflight_events_cache = {"timestamp": 0, "data": None}
 
 # Weather cache (separate TTL)
 _weather_cache = {"timestamp": 0, "data": None}
+
+# IERS-A Earth-orientation data cache (managed by scheduler, long TTL)
+_iers_cache = {"timestamp": 0, "data": None}
 
 # Version update check cache (separate TTL)
 _version_update_cache = {"timestamp": 0, "data": None}
@@ -200,6 +204,7 @@ def _write_all_astronomical_caches_to_shared():
             "spaceflight_launches": _spaceflight_launches_cache,
             "spaceflight_astronauts": _spaceflight_astronauts_cache,
             "spaceflight_events": _spaceflight_events_cache,
+            "iers": _iers_cache,
         })
         _write_shared_cache(shared_cache)
 
@@ -364,6 +369,7 @@ def _sync_all_from_shared():
         "spaceflight_astronauts":   _spaceflight_astronauts_cache,
         "spaceflight_events":       _spaceflight_events_cache,
         "weather_forecast":         _weather_cache,
+        "iers":                     _iers_cache,
     }
     for key, cache_entry in mapping.items():
         entry = shared.get(key)
@@ -441,6 +447,7 @@ def get_cache_init_status():
         "spaceflight_astronauts": is_cache_valid(_spaceflight_astronauts_cache, CACHE_TTL_SPACEFLIGHT_ASTRONAUTS),
         "spaceflight_events": is_cache_valid(_spaceflight_events_cache, CACHE_TTL_SPACEFLIGHT_EVENTS),
         "weather_forecast": is_cache_valid(_weather_cache, WEATHER_CACHE_TTL),
+        "iers": is_cache_valid(_iers_cache, CACHE_TTL_IERS),
         "all_ready": (
             is_cache_valid(_moon_report_cache, CACHE_TTL_MOON_REPORT) and
             is_cache_valid(_sun_report_cache, CACHE_TTL_SUN_REPORT) and
@@ -486,6 +493,7 @@ def get_cache_init_status():
             "spaceflight_astronauts": CACHE_TTL_SPACEFLIGHT_ASTRONAUTS,
             "spaceflight_events": CACHE_TTL_SPACEFLIGHT_EVENTS,
             "weather_forecast": WEATHER_CACHE_TTL,
+            "iers": CACHE_TTL_IERS,
         },
         "execution_metrics": get_cache_metrics(),
     }

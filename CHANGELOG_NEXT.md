@@ -31,3 +31,4 @@ You can now share your equipment with everyone on your MyAstroBoard instance —
 - Search on astrodex, add object, is done on multiple catalogues
 - Fix date issue when there is no dark night
 - Reduce verbose of INFO log
+- IERS earth orientation data is now managed by internal cache system.
