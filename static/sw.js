@@ -42,9 +42,10 @@ const APP_SHELL_URLS = [
 
 self.addEventListener('install', (event) => {
     event.waitUntil(
-        caches.open(SHELL_CACHE).then((cache) => cache.addAll(APP_SHELL_URLS))
+        caches.open(SHELL_CACHE)
+            .then((cache) => cache.addAll(APP_SHELL_URLS))
+            .then(() => self.skipWaiting())
     );
-    self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
@@ -143,6 +144,16 @@ self.addEventListener('pushsubscriptionchange', (event) => {
     event.waitUntil(
         (async () => {
             try {
+                // Remove the expired subscription from the server before re-subscribing.
+                if (event.oldSubscription?.endpoint) {
+                    await fetch('/api/push/unsubscribe', {
+                        method:      'DELETE',
+                        credentials: 'same-origin',
+                        headers:     { 'Content-Type': 'application/json' },
+                        body:        JSON.stringify({ endpoint: event.oldSubscription.endpoint }),
+                    }).catch(() => {});
+                }
+
                 const resp = await fetch('/api/push/vapid-public-key', { credentials: 'same-origin' });
                 if (!resp.ok) return;
                 const { public_key: publicKeyB64 } = await resp.json();
@@ -151,7 +162,7 @@ self.addEventListener('pushsubscriptionchange', (event) => {
                 const padding   = '='.repeat((4 - (publicKeyB64.length % 4)) % 4);
                 const base64    = (publicKeyB64 + padding).replace(/-/g, '+').replace(/_/g, '/');
                 const raw       = atob(base64);
-                const publicKey = Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+                const publicKey = Uint8Array.from(raw, (c) => c.charCodeAt(0));
 
                 const newSub = await self.registration.pushManager.subscribe({
                     userVisibleOnly:      true,
@@ -189,7 +200,7 @@ self.addEventListener('fetch', (event) => {
         event.respondWith(
             fetchWithTimeout(request, 2500)
                 .then((networkResponse) => {
-                    const requestPath = new URL(request.url).pathname;
+                    const requestPath  = url.pathname;
                     const responsePath = new URL(networkResponse.url).pathname;
                     const isAuthRedirect = networkResponse.redirected && responsePath === '/login' && requestPath !== '/login';
 
@@ -201,8 +212,8 @@ self.addEventListener('fetch', (event) => {
                     return networkResponse;
                 })
                 .catch(async () => {
-                    const requestPath = new URL(request.url).pathname;
-                    const cachedPage = await caches.match(request);
+                    const requestPath = url.pathname;
+                    const cachedPage  = await caches.match(request);
                     if (cachedPage) {
                         const responsePath = new URL(cachedPage.url).pathname;
                         const isAuthRedirect = responsePath === '/login' && requestPath !== '/login';
@@ -212,13 +223,14 @@ self.addEventListener('fetch', (event) => {
                     }
 
                     // Never serve login HTML as offline fallback for protected routes.
+                    const offlinePage = await caches.match('/offline.html');
                     if (requestPath === '/login') {
-                        return cachedPage || caches.match('/offline.html') || new Response('Offline', {
+                        return cachedPage || offlinePage || new Response('Offline', {
                             status: 503,
                             statusText: 'Offline'
                         });
                     }
-                    return caches.match('/offline.html') || new Response('Offline', {
+                    return offlinePage || new Response('Offline', {
                         status: 503,
                         statusText: 'Offline'
                     });
