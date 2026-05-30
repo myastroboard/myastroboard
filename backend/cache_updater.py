@@ -29,6 +29,7 @@ from constants import (
     CACHE_TTL_ISS_PASSES, CACHE_TTL_PLANETARY_EVENTS, CACHE_TTL_SPECIAL_PHENOMENA,
     CACHE_TTL_SOLAR_SYSTEM_EVENTS, CACHE_TTL_SIDEREAL_TIME, CACHE_TTL_SEEING_FORECAST,
     CACHE_TTL_SPACEFLIGHT_LAUNCHES, CACHE_TTL_SPACEFLIGHT_ASTRONAUTS, CACHE_TTL_SPACEFLIGHT_EVENTS,
+    CACHE_TTL_IERS,
 )
 
 # Initialize logger for this module
@@ -1021,6 +1022,47 @@ def update_spaceflight_events_cache():
         logger.error(f"Failed to update Spaceflight events cache: {e}", exc_info=True)
 
 
+def update_iers_cache():
+    """Download fresh IERS-A Earth-orientation data to data/cache/iers/finals2000A.all.
+
+    Downloads directly to a visible path (consistent with other app caches like skyfield)
+    rather than astropy's internal hash-addressed download cache.
+    Called by the scheduler every CACHE_TTL_IERS seconds (21 days).
+    """
+    import os
+    import requests
+    from astropy.utils import iers as _iers
+    from astropy.utils.iers import IERS_Auto
+    from astropy.time import Time
+    from constants import IERS_CACHE_FILE
+
+    try:
+        url = _iers.conf.iers_auto_url
+
+        os.makedirs(os.path.dirname(IERS_CACHE_FILE), exist_ok=True)
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+        with open(IERS_CACHE_FILE, 'wb') as f:
+            f.write(response.content)
+
+        from astropy.utils.iers import IERS_A
+        IERS_Auto.iers_table = None
+        table = IERS_A.open(IERS_CACHE_FILE)
+        IERS_Auto.iers_table = table
+
+        mjd_max = table['MJD'].max()
+        if hasattr(mjd_max, 'value'):
+            mjd_max = float(mjd_max.value)
+        valid_until = Time(float(mjd_max), format='mjd').iso[:10]
+
+        cache_store._iers_cache["data"] = {"valid_until": valid_until}
+        cache_store._iers_cache["timestamp"] = time.time()
+        cache_store.update_shared_cache_entry("iers", cache_store._iers_cache["data"], cache_store._iers_cache["timestamp"])
+        logger.info("IERS-A data downloaded to %s. Valid until %s.", IERS_CACHE_FILE, valid_until)
+    except Exception as e:
+        logger.error("Failed to refresh IERS-A data: %s. Will retry next scheduler cycle.", e)
+
+
 def fully_initialize_caches():
     """
     Selectively refreshes cache entries whose individual TTL has expired.
@@ -1072,6 +1114,7 @@ def fully_initialize_caches():
             ("spaceflight_events",    "spaceflight_events",    update_spaceflight_events_cache,                          CACHE_TTL_SPACEFLIGHT_EVENTS,      cache_store._spaceflight_events_cache,     False),
             ("best_window",           "best_window_strict",    partial(update_best_window_cache,         config=config), CACHE_TTL_BEST_WINDOW,             cache_store._best_window_cache["strict"],  True),
             ("weather_forecast",      None,                    update_weather_cache,                                     WEATHER_CACHE_TTL,                 cache_store._weather_cache,                False),
+            ("iers",                  "iers",                  update_iers_cache,                                        CACHE_TTL_IERS,                    cache_store._iers_cache,                   False),
         ]
 
         # Spaceflight image-integrity check jobs (cache_entry key -> name for logging)
@@ -1119,6 +1162,7 @@ def fully_initialize_caches():
             "spaceflight_launches",
             "spaceflight_astronauts",
             "spaceflight_events",
+            "iers",
         }
 
         sequential = [(n, fn, ttl) for n, fn, ttl in jobs_to_run if n not in PARALLELIZABLE_JOBS]

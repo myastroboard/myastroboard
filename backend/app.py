@@ -31,15 +31,21 @@ import shutil
 # Add backend to path for imports
 sys.path.insert(0, os.path.dirname(__file__))
 
-# Disable Astropy's automatic IERS Earth-orientation data download.
-# The bundled IERS-B table is sufficient for the arc-minute precision used here,
-# and the auto-download produces noisy timeout warnings in Docker containers.
-# When calculations fall outside the IERS data range (typically ~1 year ahead),
-# Astropy falls back to the 50-yr mean for polar motions — acceptable for our use.
 from astropy.utils import iers as _iers
+# Keep auto_download off; the cache scheduler downloads IERS-A to a known path
+# (data/cache/iers/finals2000A.all) every 21 days via update_iers_cache().
 _iers.conf.auto_download = False
-_iers.conf.auto_max_age = None          # suppress "IERS data is old" warnings
-_iers.conf.iers_degraded_accuracy = 'ignore'  # suppress "beyond IERS data range" warnings
+_iers.conf.auto_max_age = None
+
+# If IERS-A was previously downloaded, load it into this worker's memory from the
+# known path so all Gunicorn workers benefit without any network call at startup.
+try:
+    from constants import IERS_CACHE_FILE as _IERS_CACHE_FILE
+    from astropy.utils.iers import IERS_Auto as _IERS_Auto, IERS_A as _IERS_A
+    if os.path.exists(_IERS_CACHE_FILE):
+        _IERS_Auto.iers_table = _IERS_A.open(_IERS_CACHE_FILE)
+except Exception:
+    pass  # No file yet; scheduler will download it on first cycle
 
 from weather_openmeteo import get_hourly_forecast
 from events_aggregator import EventsAggregator

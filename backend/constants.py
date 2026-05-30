@@ -8,6 +8,7 @@ import os
 DEFAULT_DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data'))
 DATA_DIR = os.environ.get('DATA_DIR', DEFAULT_DATA_DIR)
 DATA_DIR_CACHE = os.path.join(DATA_DIR, 'cache')
+IERS_CACHE_FILE = os.path.join(DATA_DIR_CACHE, 'iers', 'finals2000A.all')
 SKYTONIGHT_DIR = os.environ.get('SKYTONIGHT_DIR', os.path.join(DATA_DIR, 'skytonight'))
 SKYTONIGHT_CATALOGUES_DIR = os.path.join(SKYTONIGHT_DIR, 'catalogues')
 SKYTONIGHT_DATASET_FILE = os.path.join(SKYTONIGHT_CATALOGUES_DIR, 'targets.json')
@@ -56,6 +57,9 @@ CACHE_TTL_SPECIAL_PHENOMENA   = 86400   # 24 hours — annual events (equinoxes,
 CACHE_TTL_SOLAR_SYSTEM_EVENTS = 86400   # 24 hours — annual events (meteor showers, etc.)
 CACHE_TTL_SIDEREAL_TIME       = 3600    # 1 hour  — hourly precision is sufficient
 CACHE_TTL_SEEING_FORECAST     = 21600   # 6 hours — 7Timer API resolution
+
+# IERS-A Earth-orientation data — covers ~1 year ahead from download date; 21-day TTL is well within that window
+CACHE_TTL_IERS                    = 1814400  # 21 days
 
 # Spaceflight cache TTLs (Launch Library 2 free tier: ~15 req/h — keep calls minimal)
 CACHE_TTL_SPACEFLIGHT_LAUNCHES    = 7200    # 2 hours — free tier ~15 req/h; 3 endpoints per cycle → max 2 cycles/h
