@@ -5,18 +5,10 @@ This document describes features that could potentially be integrated into MyAst
 ## 🗓️ Release Plan
 
 ### v1.0 - Stabilization & Overall Quality
-**Objective: First stable release + smooth user experience**
+**Objective: First stable release**
 - Stabilization of critical bugs
-- Improved mobile interface (responsive)
 
-### Short-term — self-contained additions to existing modules
-
-These features extend what already exists without introducing new data models or storage.
-
-| Feature | Why | Effort |
-|---------|-----|--------|
-| Seeing forecast tied to Plan My Night | "Best night this week to observe X" — 7Timer already cached | Medium |
-| Exposure calculator | Integration time by sensor+scope — Equipment model already has the fields | Medium |
+### v1.1 and next - Introduce new features
 
 ### Medium-term — new standalone features
 
