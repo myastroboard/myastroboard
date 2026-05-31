@@ -24,10 +24,8 @@ if _raw_contact:
     _VAPID_CLAIMS_EMAIL = _raw_contact if _raw_contact.startswith(('mailto:', 'https://')) else f'mailto:{_raw_contact}'
 else:
     _VAPID_CLAIMS_EMAIL = 'mailto:admin@localhost'
-    logger.warning(
-        "VAPID_CONTACT_EMAIL is not set. Push notifications may be rejected by Apple APNs. "
-        "Set VAPID_CONTACT_EMAIL to a real email address (e.g. you@example.com)."
-    )
+
+_VAPID_CONTACT_WARNING_EMITTED = False
 
 _vapid_keys: dict = {}
 
@@ -51,7 +49,13 @@ def _generate_keys() -> dict:
 
 def load_or_generate_vapid_keys() -> dict:
     """Return VAPID key dict, generating and persisting on first call."""
-    global _vapid_keys
+    global _vapid_keys, _VAPID_CONTACT_WARNING_EMITTED
+    if not _raw_contact and not _VAPID_CONTACT_WARNING_EMITTED:
+        _VAPID_CONTACT_WARNING_EMITTED = True
+        logger.warning(
+            "VAPID_CONTACT_EMAIL is not set. Push notifications may be rejected by push services. "
+            "Set VAPID_CONTACT_EMAIL to a real email address (e.g. you@example.com)."
+        )
     if _vapid_keys.get('private_key'):
         return _vapid_keys
 
@@ -96,20 +100,30 @@ def get_vapid_contact_status() -> dict:
     return {'ok': True}
 
 
-def send_push(subscription_info: dict, payload: dict) -> bool:
+def send_push(subscription_info: dict, payload: dict, ttl: int = 0, urgency: str = 'normal') -> bool:
     """
     Send a single Web Push notification.
 
     subscription_info: {"endpoint": "...", "keys": {"p256dh": "...", "auth": "..."}}
+    ttl:     seconds the push service keeps the message if the device is offline.
+             0 = discard immediately; pass the event countdown for time-sensitive alerts.
+    urgency: RFC 8030 delivery priority. 'normal' (default) respects device power
+             optimisation and never bypasses silent/DND mode. Use 'high' only for
+             very short time windows (N3 ISS transit, N7 aurora).
     Returns True on success, False on any delivery failure (expired/blocked subscription included).
     """
     try:
         from pywebpush import webpush
 
-        keys    = load_or_generate_vapid_keys()
+        keys     = load_or_generate_vapid_keys()
         endpoint = subscription_info.get('endpoint', '')
         parsed   = urlparse(endpoint)
         aud      = f"{parsed.scheme}://{parsed.netloc}"
+
+        logger.debug(
+            f"Sending push to {endpoint[:60]} | trigger={payload.get('tag','?')} "
+            f"ttl={ttl}s urgency={urgency}"
+        )
 
         webpush(
             subscription_info=subscription_info,
@@ -119,7 +133,11 @@ def send_push(subscription_info: dict, payload: dict) -> bool:
                 'sub': _VAPID_CLAIMS_EMAIL,
                 'aud': aud,
             },
+            ttl=ttl,
+            timeout=30,
+            headers={'urgency': urgency},
         )
+        logger.debug(f"Push delivered OK to {endpoint[:60]}")
         return True
 
     except Exception as e:

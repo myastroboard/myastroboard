@@ -239,6 +239,14 @@ async function initializeApp() {
 
     // Start background notification poller (runs every 5 min, tab-independent)
     if (typeof startNotificationPoller === 'function') startNotificationPoller();
+
+    // Re-register push subscription with server on every page load if permission is already
+    // granted. This recovers the dead-subscription state where the server purged an expired
+    // endpoint but the browser still holds the subscription object — without waiting for the
+    // user to open Settings.
+    if (typeof _subscribeToPush === 'function' && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        _subscribeToPush();
+    }
 }
 
 function setupMainTabs() {

@@ -54,8 +54,17 @@ def _mark_notified(user_id: str, trigger_id: str) -> None:
 # Push delivery
 # ---------------------------------------------------------------------------
 
-def _send(user: Any, trigger_id: str, title: str, body: str, url: str) -> None:
-    """Send push to all subscriptions of a user and mark as notified."""
+def _send(user: Any, trigger_id: str, title: str, body: str, url: str,
+          ttl: int = 0, urgency: str = 'normal') -> None:
+    """Send push to all subscriptions of a user and mark as notified.
+
+    ttl:     seconds the push service keeps the message if the device is offline.
+             Set to the trigger's lead time so offline devices still receive the
+             alert when they come back within the relevant window.
+    urgency: RFC 8030 urgency header. 'normal' (default) respects device Doze
+             batching. Use 'high' only for very short windows (N3, N7) where
+             immediate delivery matters and 'normal' might miss the event.
+    """
     if not user.push_subscriptions:
         return
 
@@ -76,7 +85,7 @@ def _send(user: Any, trigger_id: str, title: str, body: str, url: str) -> None:
     for sub in user.push_subscriptions:
         endpoint = sub.get('endpoint', '')
         subscription_info = {'endpoint': endpoint, 'keys': sub.get('keys', {})}
-        ok = send_push(subscription_info, payload)
+        ok = send_push(subscription_info, payload, ttl=ttl, urgency=urgency)
         if not ok:
             dead_endpoints.append(endpoint)
 
@@ -128,7 +137,8 @@ def _check_n7_aurora(user: Any, cache_data: Optional[dict]) -> None:
     _send(user, 'N7',
           'Aurora Alert',
           f'Kp {kp:.1f} detected - {visibility}',
-          '/#forecast-astro/aurora')
+          '/#forecast-astro/aurora',
+          ttl=3600, urgency='high')  # aurora: immediate delivery, can last ~1 h
 
 
 def _check_n1_plan_start(user: Any, plan_payload: Optional[dict]) -> None:
@@ -158,7 +168,8 @@ def _check_n1_plan_start(user: Any, plan_payload: Optional[dict]) -> None:
             _send(user, 'N1',
                   'Plan My Night',
                   f'Your session starts in {minutes} min',
-                  '/#astrodex/plan-my-night')
+                  '/#astrodex/plan-my-night',
+                  ttl=int(ms_until))
     except Exception as e:
         logger.debug(f"N1 check error for {user.username}: {e}")
 
@@ -204,7 +215,8 @@ def _check_n2_next_target(user: Any, plan_payload: Optional[dict]) -> None:
             _send(user, 'N2',
                   'Next target',
                   f'{name} starts in {minutes} min',
-                  '/#astrodex/plan-my-night')
+                  '/#astrodex/plan-my-night',
+                  ttl=int(ms_until))
             break
         except Exception as e:
             logger.debug(f"N2 entry check error for {user.username}: {e}")
@@ -233,7 +245,8 @@ def _check_n6_darkness(user: Any, cache_data: Optional[dict]) -> None:
             _send(user, 'N6',
                   'Astronomical darkness',
                   f'Night begins in {minutes} min - time to get ready',
-                  '/#forecast-astro/astro-weather')
+                  '/#forecast-astro/astro-weather',
+                  ttl=int(ms_until))
     except Exception as e:
         logger.debug(f"N6 check error for {user.username}: {e}")
 
@@ -286,7 +299,8 @@ def _check_n3_iss(user: Any, cache_data: Optional[dict]) -> None:
     minutes = round(ms_until / 60)
     body = (f'ISS solar transit in {minutes} min' if transit_type == 'solar'
             else f'ISS lunar transit in {minutes} min')
-    _send(user, 'N3', 'ISS Transit', body, '/#spaceflight/iss')
+    _send(user, 'N3', 'ISS Transit', body, '/#spaceflight/iss',
+          ttl=int(ms_until), urgency='high')  # short window (≤10 min): needs immediate delivery
 
 
 def _check_n4_n5_eclipse(user: Any, solar_data: Optional[dict], lunar_data: Optional[dict]) -> None:
@@ -314,7 +328,8 @@ def _check_n4_n5_eclipse(user: Any, solar_data: Optional[dict], lunar_data: Opti
                 minutes = round(ms_until / 60)
                 body = (f'Totality begins in {minutes} min' if trigger_id == 'N4'
                         else f'Maximum in {minutes} min')
-                _send(user, trigger_id, title, body, '/#forecast-astro/moon')
+                _send(user, trigger_id, title, body, '/#forecast-astro/moon',
+                      ttl=int(ms_until))
         except Exception as e:
             logger.debug(f"{trigger_id} check error for {user.username}: {e}")
 
