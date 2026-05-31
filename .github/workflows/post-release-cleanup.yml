@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to clean up (e.g. 0.8.1) — leave empty to use latest tag'
+        description: 'Version to clean up (e.g. 0.8.1) - leave empty to use latest tag'
         required: false
 
 jobs:
