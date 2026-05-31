@@ -6,8 +6,8 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to clean up (e.g. 0.8.1)'
-        required: true
+        description: 'Version to clean up (e.g. 0.8.1) — leave empty to use latest tag'
+        required: false
 
 jobs:
   clear-changelog:
@@ -23,12 +23,14 @@ jobs:
       - name: Determine version
         id: version
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
-          else
+          if [ "${{ github.event_name }}" = "release" ]; then
             TAG="${{ github.event.release.tag_name }}"
-            echo "VERSION=${TAG#v}" >> $GITHUB_OUTPUT
+          elif [ -n "${{ github.event.inputs.version }}" ]; then
+            TAG="v${{ github.event.inputs.version }}"
+          else
+            TAG=$(git tag --sort=-version:refname | head -1)
           fi
+          echo "VERSION=${TAG#v}" >> $GITHUB_OUTPUT
 
       - name: Create branch and PR to clear CHANGELOG_NEXT
         env:
