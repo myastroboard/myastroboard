@@ -82,17 +82,24 @@ def _send(user: Any, trigger_id: str, title: str, body: str, url: str,
     }
 
     dead_endpoints = []
+    delivered = 0
     for sub in user.push_subscriptions:
         endpoint = sub.get('endpoint', '')
         subscription_info = {'endpoint': endpoint, 'keys': sub.get('keys', {})}
         ok = send_push(subscription_info, payload, ttl=ttl, urgency=urgency)
-        if not ok:
+        if ok:
+            delivered += 1
+        else:
             dead_endpoints.append(endpoint)
 
     if dead_endpoints:
         _cleanup_dead_subscriptions(user, dead_endpoints)
 
-    _mark_notified(user.user_id, trigger_id)
+    # Only record the cooldown when at least one device actually received the push.
+    # If every subscription failed, skip marking so the next poll can retry once
+    # the user re-subscribes (page-load auto-resubscription).
+    if delivered > 0:
+        _mark_notified(user.user_id, trigger_id)
 
 
 def _cleanup_dead_subscriptions(user: Any, endpoints: list) -> None:

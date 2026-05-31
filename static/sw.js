@@ -142,10 +142,12 @@ self.addEventListener('notificationclick', (event) => {
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (clientList) => {
             for (const client of clientList) {
-                if ('focus' in client) {
+                if ('navigate' in client) {
                     try {
-                        await client.navigate(targetUrl);
-                        return client.focus();
+                        // navigate() returns the new WindowClient for the navigated page;
+                        // focus that reference, not the pre-navigation one (stale on Firefox/Edge).
+                        const navigated = await client.navigate(targetUrl);
+                        return (navigated || client).focus();
                     } catch (_) {
                         // Client was closed between matchAll and navigate - try next one.
                     }
