@@ -222,7 +222,7 @@ def test_unsubscribe_rejects_missing_endpoint_field(client_push_user):
 
 
 # ---------------------------------------------------------------------------
-# User model — push_subscriptions round-trip
+# User model - push_subscriptions round-trip
 # ---------------------------------------------------------------------------
 
 def test_user_defaults_push_subscriptions_to_empty_list():

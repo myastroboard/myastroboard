@@ -1,7 +1,7 @@
 // ======================
 // Notification Manager
 // Phase A: Browser Notification API (tab must be open)
-// Phase C: Web Push (background) — sw.js push handler required
+// Phase C: Web Push (background) - sw.js push handler required
 // ======================
 
 const NOTIF_TRIGGERS = Object.freeze({
@@ -55,7 +55,7 @@ class NotificationManager {
 
     /**
      * Ask the browser for notification permission.
-     * Safe to call multiple times — skips if already granted or denied.
+     * Safe to call multiple times - skips if already granted or denied.
      * Returns true if permission is (or becomes) granted.
      */
     async requestPermission() {
@@ -144,13 +144,13 @@ class NotificationManager {
     /**
      * Show a native browser notification for the given trigger.
      *
-     * @param {string} triggerId  — one of NOTIF_TRIGGERS (N1–N7)
+     * @param {string} triggerId  - one of NOTIF_TRIGGERS (N1–N7)
      * @param {string} title
      * @param {string} body
      * @param {object} [options]
-     * @param {string} [options.url]  — hash/path to navigate on click (e.g. '#plan-my-night')
-     * @param {string} [options.tag]  — explicit dedup tag; auto-generated if omitted
-     * @returns {Promise<boolean>}    — true if notification was shown
+     * @param {string} [options.url]  - hash/path to navigate on click (e.g. '#plan-my-night')
+     * @param {string} [options.tag]  - explicit dedup tag; auto-generated if omitted
+     * @returns {Promise<boolean>}    - true if notification was shown
      */
     async notify(triggerId, title, body, { url = '/', tag = null } = {}) {
         if (!this.canNotify())              return false;
@@ -203,7 +203,18 @@ async function _subscribeToPush() {
     try {
         const reg = await navigator.serviceWorker.ready;
         const existing = await reg.pushManager.getSubscription();
-        if (existing) return; // already subscribed on this device
+        if (existing) {
+            // Re-POST to server: the server may have purged this endpoint as dead (e.g. after
+            // an APNs delivery failure). The subscribe endpoint deduplicates by endpoint, so
+            // this is a no-op when the subscription is already stored server-side.
+            await fetch('/api/push/subscribe', {
+                method:      'POST',
+                credentials: 'same-origin',
+                headers:     { 'Content-Type': 'application/json' },
+                body:        JSON.stringify({ subscription: existing.toJSON() }),
+            });
+            return;
+        }
 
         const resp = await fetch('/api/push/vapid-public-key', { credentials: 'same-origin' });
         if (!resp.ok) return;
@@ -250,8 +261,8 @@ async function _unsubscribeFromPush() {
 // Calls the same _check* functions defined in each feature module.
 // ======================
 
-const _NOTIF_POLL_MS_SLOW = 5 * 60 * 1000; // 5 min — default
-const _NOTIF_POLL_MS_FAST = 60 * 1000;     // 1 min — during/near active observation session
+const _NOTIF_POLL_MS_SLOW = 5 * 60 * 1000; // 5 min - default
+const _NOTIF_POLL_MS_FAST = 60 * 1000;     // 1 min - during/near active observation session
 let   _notifPollTimer  = null;
 let   _notifFastMode   = false;             // true when inside night or ≤30 min away
 
@@ -260,7 +271,7 @@ async function _runNotificationChecks() {
 
     const enabled = notificationManager.getPrefs().triggers;
 
-    // N7 — Aurora Kp
+    // N7 - Aurora Kp
     if (enabled?.N7?.enabled !== false) {
         try {
             const data = await fetch('/api/aurora/predictions', { credentials: 'same-origin' })
@@ -269,7 +280,7 @@ async function _runNotificationChecks() {
         } catch (_) {}
     }
 
-    // N1 + N2 — Plan My Night session / next target
+    // N1 + N2 - Plan My Night session / next target
     if (enabled?.N1?.enabled !== false || enabled?.N2?.enabled !== false) {
         try {
             const data = await fetch('/api/plan-my-night', { credentials: 'same-origin' })
@@ -288,7 +299,7 @@ async function _runNotificationChecks() {
         } catch (_) {}
     }
 
-    // N6 — Astronomical darkness
+    // N6 - Astronomical darkness
     if (enabled?.N6?.enabled !== false) {
         try {
             const data = await fetch('/api/sun/today', { credentials: 'same-origin' })
@@ -297,7 +308,7 @@ async function _runNotificationChecks() {
         } catch (_) {}
     }
 
-    // N3 — ISS transit (data is cached 6 h server-side, no extra cost)
+    // N3 - ISS transit (data is cached 6 h server-side, no extra cost)
     if (enabled?.N3?.enabled !== false) {
         try {
             const data = await fetch('/api/iss/passes?days=20', { credentials: 'same-origin' })
@@ -306,7 +317,7 @@ async function _runNotificationChecks() {
         } catch (_) {}
     }
 
-    // N4 + N5 — Eclipses (events_alerts.js also polls every 10 min, but only when calendar is open)
+    // N4 + N5 - Eclipses (events_alerts.js also polls every 10 min, but only when calendar is open)
     if (enabled?.N4?.enabled !== false || enabled?.N5?.enabled !== false) {
         try {
             const lang = (typeof i18n !== 'undefined') ? i18n.getCurrentLanguage() : 'en';
@@ -360,17 +371,28 @@ async function _getPushStatusSuffix() {
     };
 
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-        return t('settings.notifications_push_inapp_only', ' — In-app only (tab must be open)');
+        return t('settings.notifications_push_inapp_only', ' - In-app only (tab must be open)');
     }
     try {
         const reg = await navigator.serviceWorker.ready;
         const sub = await reg.pushManager.getSubscription();
         return sub
-            ? t('settings.notifications_push_active',     ' — Background push active')
-            : t('settings.notifications_push_inapp_only', ' — In-app only (tab must be open)');
+            ? t('settings.notifications_push_active',     ' - Background push active')
+            : t('settings.notifications_push_inapp_only', ' - In-app only (tab must be open)');
     } catch (_) {
         return '';
     }
+}
+
+async function _refreshVapidWarning() {
+    const el = document.getElementById('notif-vapid-warning');
+    if (!el) return;
+    try {
+        const resp = await fetch('/api/push/vapid-config-status', { credentials: 'same-origin' });
+        if (!resp.ok) return;
+        const status = await resp.json();
+        el.style.display = status.ok ? 'none' : '';
+    } catch (_) {}
 }
 
 async function _refreshPermissionBanner() {
@@ -464,9 +486,10 @@ function _showNotifMessage(text, type = 'success') {
 function initNotificationSettingsUI() {
     notificationManager._prefs = null; // refresh from server state on each open
     _refreshPermissionBanner();
+    _refreshVapidWarning();
     _loadPrefsIntoUI();
 
-    // Enable button — requests permission then refreshes
+    // Enable button - requests permission then refreshes
     const enableBtn = document.getElementById('notif-enable-btn');
     if (enableBtn && !enableBtn._notifBound) {
         enableBtn._notifBound = true;

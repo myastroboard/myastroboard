@@ -18,7 +18,7 @@ from typing import Optional
 # Values are the midpoints of the SQM ranges defined in the World Atlas 2015
 # classification used by lightpollutionmap.info.
 BORTLE_SQM_MIDPOINTS: dict[int, float] = {
-    1: 22.00,   # >21.9 — pristine dark sky
+    1: 22.00,   # >21.9 - pristine dark sky
     2: 21.70,   # 21.5–21.9
     3: 21.40,   # 21.3–21.5
     4: 21.05,   # 20.8–21.3
@@ -26,7 +26,7 @@ BORTLE_SQM_MIDPOINTS: dict[int, float] = {
     6: 19.90,   # 19.5–20.3
     7: 19.00,   # 18.5–19.5
     8: 17.75,   # 17.0–18.5
-    9: 16.00,   # <17.0 — inner city
+    9: 16.00,   # <17.0 - inner city
 }
 
 # Human-readable Bortle descriptions (English).
@@ -100,8 +100,8 @@ def light_pollution_factor(sqm: float) -> float:
     dark skies above ~21.5 are nearly equivalent.
 
     Returns a value in [0.0, 1.0]:
-        1.0 — pristine dark sky (SQM ≥ 22)
-        0.0 — inner city (SQM ≤ 17)
+        1.0 - pristine dark sky (SQM ≥ 22)
+        0.0 - inner city (SQM ≤ 17)
     """
     normalized = max(0.0, min(1.0, (sqm - 17.0) / 5.0))
     return round(normalized ** 1.5, 4)
@@ -115,7 +115,7 @@ def object_lp_factor(sqm: float, object_type: Optional[str]) -> float:
     under heavy light pollution; highly sensitive objects (e.g. galaxies) take
     the full penalty.
 
-    Returns a value in [0.0, 1.0] — multiply sky_score by this value.
+    Returns a value in [0.0, 1.0] - multiply sky_score by this value.
     """
     base = light_pollution_factor(sqm)
     key = (object_type or "").lower().strip()

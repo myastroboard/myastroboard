@@ -37,8 +37,8 @@ This page lists the HTTP routes currently declared in `backend/app.py` and `back
 
 ## Backup & Restore
 
-- `GET /api/backup/download` — Download a ZIP archive (config.json, users.json, astrodex/, equipments/)
-- `POST /api/backup/restore` — Restore from a previously created backup ZIP (`multipart/form-data`, field `file`)
+- `GET /api/backup/download` - Download a ZIP archive (config.json, users.json, astrodex/, equipments/)
+- `POST /api/backup/restore` - Restore from a previously created backup ZIP (`multipart/form-data`, field `file`)
 
 ## Platform & Utility
 
@@ -46,7 +46,7 @@ This page lists the HTTP routes currently declared in `backend/app.py` and `back
 - `GET /api/logs`
 - `GET /api/logs/level`
 - `POST /api/logs/clear`
-- `GET /api/logs/export` — Download a ZIP archive of all log files (myastroboard.log + skytonight/logs/)
+- `GET /api/logs/export` - Download a ZIP archive of all log files (myastroboard.log + skytonight/logs/)
 - `POST /api/convert-coordinates`
 - `GET /api/timezones`
 - `GET /api/health`
@@ -90,7 +90,7 @@ This page lists the HTTP routes currently declared in `backend/app.py` and `back
 - `GET /api/moon/dark-window`
 - `GET /api/moon/next-7-nights`
 - `GET /api/aurora/predictions`
-- `GET /api/iss/passes` — Returns passes, solar transits, and lunar transits; all times in configured local TZ. Response includes `passes`, `solar_transits`, `lunar_transits`, `next_visible_passage`, `next_solar_transit`, `next_lunar_transit`, `total_passes`, `total_solar_transits`, `total_lunar_transits`.
+- `GET /api/iss/passes` - Returns passes, solar transits, and lunar transits; all times in configured local TZ. Response includes `passes`, `solar_transits`, `lunar_transits`, `next_visible_passage`, `next_solar_transit`, `next_lunar_transit`, `total_passes`, `total_solar_transits`, `total_lunar_transits`.
 - `GET /api/iss/location`
 - `GET /api/sun/today`
 - `GET /api/sun/next-eclipse`

@@ -563,7 +563,7 @@ class TestISSCalendarAggregation:
     def test_aggregate_all_events_iss_lunar_transit_outside_window_excluded(self):
         aggregator = EventsAggregator(45.5, -73.5, "America/Montreal")
 
-        # 10 days out — should be excluded
+        # 10 days out - should be excluded
         peak_time = (aggregator.local_now + timedelta(days=10)).replace(hour=21, minute=0, second=0, microsecond=0)
         iss_payload = {
             "lunar_transits": [

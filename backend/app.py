@@ -202,7 +202,7 @@ def set_cache_headers(response):
             response.headers['Expires'] = '0'
             return response
 
-        # Versioned assets (e.g. ?v=1.2.3) are content-addressed — safe to cache for 1 year
+        # Versioned assets (e.g. ?v=1.2.3) are content-addressed - safe to cache for 1 year
         if request.args.get('v'):
             response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
         elif request.path.startswith('/static/ico/'):
@@ -228,7 +228,7 @@ def index():
 
 @app.route('/login')
 def login_page():
-    """Render login page — redirect to dashboard if already authenticated"""
+    """Render login page - redirect to dashboard if already authenticated"""
     if 'username' in session:
         return redirect(url_for('index'))
     # Get version for cache busting
@@ -466,6 +466,18 @@ def get_vapid_public_key():
     except Exception as e:
         logger.error(f"Failed to get VAPID public key: {e}")
         return jsonify({'error': 'Push not available'}), 503
+
+
+@app.route('/api/push/vapid-config-status', methods=['GET'])
+@login_required
+def get_vapid_config_status():
+    """Return whether the VAPID contact email is properly configured."""
+    try:
+        from push_manager import get_vapid_contact_status
+        return jsonify(get_vapid_contact_status())
+    except Exception as e:
+        logger.error(f"Failed to get VAPID config status: {e}")
+        return jsonify({'ok': False, 'reason': 'error'}), 500
 
 
 @app.route('/api/push/subscribe', methods=['POST'])
@@ -813,7 +825,7 @@ def get_sky_quality_api():
     Return the configured sky quality (Bortle / SQM) for the current location.
 
     When neither bortle nor sqm is configured, sqm_source is "not_configured"
-    and all numeric fields are null — the LP integration is inactive.
+    and all numeric fields are null - the LP integration is inactive.
     """
     from sky_quality import (
         bortle_to_sqm, sqm_to_bortle, light_pollution_factor,
@@ -830,7 +842,7 @@ def get_sky_quality_api():
 
     if raw_sqm is not None and raw_bortle is not None:
         # Both provided (e.g. read from lightpollutionmap.info): trust as-is.
-        # Do not re-derive bortle from sqm — the two values come from the same
+        # Do not re-derive bortle from sqm - the two values come from the same
         # source and may use different boundary tables.
         try:
             sqm = float(raw_sqm)
@@ -1009,7 +1021,7 @@ def backup_restore_api():
                         json.loads(blob)
                     except Exception:
                         return jsonify({
-                            'error': f'{arc_path} is not valid JSON — archive may be corrupt'
+                            'error': f'{arc_path} is not valid JSON - archive may be corrupt'
                         }), 400
                     json_blobs[arc_path] = blob
 
@@ -1040,13 +1052,13 @@ def backup_restore_api():
 
         with zipfile.ZipFile(buf, 'r') as zf:
             for info, top_prefix, arc_path, rel_parts in recognised_entries:
-                # Reconstruct destination entirely from trusted sources — no tainted data used
+                # Reconstruct destination entirely from trusted sources - no tainted data used
                 base_dest = os.path.abspath(RESTORE_ALLOWED_PREFIXES[top_prefix])
                 safe_dest = os.path.join(base_dest, *rel_parts) if rel_parts else base_dest
                 os.makedirs(os.path.dirname(safe_dest), exist_ok=True)
 
                 if arc_path in json_blobs:
-                    # Already read and validated — write directly
+                    # Already read and validated - write directly
                     with open(safe_dest, 'wb') as dst:
                         dst.write(json_blobs[arc_path])
                 else:
@@ -1077,7 +1089,7 @@ def logs_export_api():
     Create and stream a ZIP archive of log files:
       - data/myastroboard.log (and rotated variants *.log.1 … *.log.5)
       - data/skytonight/logs/ (full directory)
-    Built in memory — no temporary file left on disk.
+    Built in memory - no temporary file left on disk.
     """
     # Evolutive list: each entry is (source_path, archive_folder, is_dir)
     LOG_EXPORT_ENTRIES = [
@@ -1359,7 +1371,7 @@ def get_hourly_forecast_api():
     try:
         cache_store.sync_cache_from_shared("weather_forecast", cache_store._weather_cache)
 
-        # Serve from app cache if valid — avoids a live API call on every page load
+        # Serve from app cache if valid - avoids a live API call on every page load
         if cache_store.is_cache_valid(cache_store._weather_cache, WEATHER_CACHE_TTL):
             return jsonify(cache_store._weather_cache["data"])
 
@@ -1563,7 +1575,7 @@ def get_next_7_nights_api():
 
 
 _moon_calendar_cache: dict = {"timestamp": 0, "data": None}
-_MOON_CALENDAR_TTL = 3600  # 1 hour — recompute once per hour at most
+_MOON_CALENDAR_TTL = 3600  # 1 hour - recompute once per hour at most
 
 @app.route("/api/moon/month-calendar", methods=["GET"])
 @login_required
@@ -1668,7 +1680,7 @@ def get_object_info_api(identifier):
     """Return metadata, image URL and localized description for a deep-sky object.
 
     Query parameters:
-      lang  (str, optional) — Wikipedia language code, default 'en'
+      lang  (str, optional) - Wikipedia language code, default 'en'
 
     Response (200):
     {
@@ -2438,10 +2450,10 @@ def get_sidereal_time_api():
             timezone=location.get("timezone", "UTC"),
         )
 
-        # current — always fresh, no cache needed
+        # current - always fresh, no cache needed
         current_info = svc.get_current_sidereal_info()
 
-        # hourly_forecast — from scheduler cache (day-sensitive, refreshed at day change)
+        # hourly_forecast - from scheduler cache (day-sensitive, refreshed at day change)
         hourly_forecast = None
         cached = cache_store._sidereal_time_cache
         if not cache_store.is_cache_valid_for_today(cached, CACHE_TTL_SIDEREAL_TIME):
@@ -2715,7 +2727,7 @@ def _compute_plan_fill_metrics(plan: dict) -> dict:
     night_minutes = 0
     if night_start and night_end and night_end > night_start:
         night_minutes = int((night_end - night_start).total_seconds() // 60)
-    # Subtract start delay — usable observing window is shorter
+    # Subtract start delay - usable observing window is shorter
     start_delay = max(0, int(plan.get('start_delay_minutes') or 0)) if isinstance(plan, dict) else 0
     night_minutes = max(0, night_minutes - start_delay)
 

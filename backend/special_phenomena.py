@@ -506,7 +506,7 @@ class SpecialPhenomenaService:
                     current_date += timedelta(days=1)
                     continue
 
-                # Check at 02:00 local time — representative deep-night hour
+                # Check at 02:00 local time - representative deep-night hour
                 check_dt = datetime(
                     current_date.year, current_date.month, current_date.day,
                     2, 0, 0, tzinfo=tz
@@ -559,7 +559,7 @@ class SpecialPhenomenaService:
                     current_date += timedelta(days=1)
                     continue
 
-                # --- Conditions met — deduplicate to one event per 14-day window ---
+                # --- Conditions met - deduplicate to one event per 14-day window ---
                 if last_event_date is not None and (current_date - last_event_date).days < 14:
                     current_date += timedelta(days=1)
                     continue

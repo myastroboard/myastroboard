@@ -4,7 +4,7 @@ This document provides comprehensive guidance for GitHub Copilot (or other AI as
 
 ## Project Overview
 
-MyAstroBoard is a web-based astronomy observation planning system with a fully built-in observability engine called **SkyTonight** that provides automated observation planning with a user-friendly dashboard — no external container dependency required.
+MyAstroBoard is a web-based astronomy observation planning system with a fully built-in observability engine called **SkyTonight** that provides automated observation planning with a user-friendly dashboard - no external container dependency required.
 
 ### Core Concept
 - Users configure their location via web dashboard
@@ -355,8 +355,8 @@ except Exception as e:
 
 ### 2. SkyTonight Target Dataset
 - **Source catalogues**: OpenNGC + OpenIC (via PyOngc), Messier (subset of OpenNGC), Caldwell (cross-referenced from PyOngc), Herschel 400 (static cross-ref), Pensack 500 (JSON cross-ref from `backend/catalogues/pensack500.json`), LBN (JSON cross-ref from `backend/catalogues/lbn.json`), GaryImm (JSON cross-ref `garyimm_crossrefs.json` + standalone `garyimm_standalone.json`), Arp (JSON cross-ref from `backend/catalogues/arp.json`), Sharpless/Barnard/vdB (full standalone catalogues from `backend/catalogues/`), Abell PNe (`abell_pne.json`, 71 objects from SIMBAD), Abell Clusters (`abell_clusters.json`, 2712 clusters from VizieR VII/110A ACO 1989), comets (MPC primary + JPL enrichment), solar-system bodies (Skyfield `de421.bsp`)
-- **Dataset file**: `data/skytonight/catalogues/targets.json` — generated offline by `scripts/build_skytonight_catalogue.py` or rebuilt on-demand via API
-- **Model**: `SkyTonightTarget` dataclass (`skytonight_models.py`) — immutable, with `target_id`, `category`, `object_type`, `preferred_name`, `catalogue_names` (dict), `coordinates`, `magnitude`, `size_arcmin`, `source_catalogues`
+- **Dataset file**: `data/skytonight/catalogues/targets.json` - generated offline by `scripts/build_skytonight_catalogue.py` or rebuilt on-demand via API
+- **Model**: `SkyTonightTarget` dataclass (`skytonight_models.py`) - immutable, with `target_id`, `category`, `object_type`, `preferred_name`, `catalogue_names` (dict), `coordinates`, `magnitude`, `size_arcmin`, `source_catalogues`
 - **Preferred name order**: `CommonName → Messier → OpenNGC → OpenIC → Caldwell → LBN → Herschel400 → Pensack500 → GaryImm → Arp → Sharpless → Barnard → vdB` (defined in `constants.SKYTONIGHT_PREFERRED_NAME_ORDER`)
 - **Cross-ref catalogues** (H400, Pensack500, LBN, GaryImm, Arp): injected as extra `catalogue_names` keys on existing NGC/IC records by `_build_cross_ref_map()` + `_apply_cross_refs()` in `skytonight_catalogue_builder.py`. These never change the preferred display name (OpenNGC/Messier/Caldwell always take priority) but they do populate `source_catalogues` and appear in the catalogue filter dropdown in the DSO report.
 - **Standalone catalogues** (GaryImm non-NGC/IC objects, Sharpless, Barnard, vdB): new records created by `_build_standalone_targets_from_json()` with coordinates from the JSON files. Objects in multiple catalogues use the `extra_catalogues` JSON field. NGC/IC key matching uses `_ngc_ic_match_key()` with zero-padding to 4 digits (e.g. "NGC 891" → key "ngc0891") to match PyOngc's internal format.
@@ -375,7 +375,7 @@ except Exception as e:
 
 ### 4. AstroScore
 - **Purpose**: Dimensionless [0, 1] ranking of astrophotography suitability for the configured location
-- **Calculation**: Weighted sum of 4 sub-scores — visibility (0.40), sky quality (0.25), object brightness (0.25), comfort (0.10)
+- **Calculation**: Weighted sum of 4 sub-scores - visibility (0.40), sky quality (0.25), object brightness (0.25), comfort (0.10)
 - **Bonuses**: +0.20 for planet at opposition, +0.05 for Messier objects; final value clamped to [0.0, 1.0]
 - **Full documentation**: `docs/SKYTONIGHT.md`
 - **Implementation**: `backend/skytonight_calculator.py`
@@ -479,7 +479,7 @@ Scheduler trigger (startup / smart schedule / manual)
 - **Why**: User-friendly input for astronomers familiar with DMS notation
 
 ### Chart.js Usage
-- **Never** use `resizeDelay` option — it schedules a `requestAnimationFrame → setTimeout` chain that crashes if `chart.destroy()` is called before it resolves (e.g., on tab switch)
+- **Never** use `resizeDelay` option - it schedules a `requestAnimationFrame → setTimeout` chain that crashes if `chart.destroy()` is called before it resolves (e.g., on tab switch)
 - Always call `chart.destroy()` before recreating a chart on the same canvas
 - Use `cleanupTransientCharts()` in `app.js` which is already called on every tab / sub-tab switch
 
@@ -610,7 +610,7 @@ Set `SKYTONIGHT_FALLBACK_INTERVAL_SECONDS` in `backend/skytonight_scheduler.py` 
 ## Security Considerations
 
 ### No Docker Socket Access
-- SkyTonight performs all calculations in-process (Python/Astropy) — no Docker-in-Docker, no privileged mode required
+- SkyTonight performs all calculations in-process (Python/Astropy) - no Docker-in-Docker, no privileged mode required
 - `docker-compose.yml` runs with `privileged: false`
 
 ### Input Validation
@@ -651,7 +651,7 @@ Set `SKYTONIGHT_FALLBACK_INTERVAL_SECONDS` in `backend/skytonight_scheduler.py` 
 - Check `data/skytonight/calculations/calculation_results.json` exists (signals all files complete)
 
 **Altitude-time popup crashes with "Cannot read properties of null (reading 'addEventListener')"**
-- This is caused by `resizeDelay` in Chart.js options — **never** add `resizeDelay` to any Chart.js config
+- This is caused by `resizeDelay` in Chart.js options - **never** add `resizeDelay` to any Chart.js config
 - The delayed resize fires after `chart.destroy()` is called on tab switch, accessing a null canvas
 
 **Targets not loading in UI**
@@ -1112,12 +1112,12 @@ return jsonify({
 
 ### Adding a New Language
 
-Every step below is mandatory — missing any one of them causes a partial or broken language integration.
+Every step below is mandatory - missing any one of them causes a partial or broken language integration.
 
 1. Add the language code to the `choices` list in `scripts/translate_i18n_values.py`
 2. Run the translation script: `python scripts/translate_i18n_values.py --lang XX`; review output carefully
 3. Add the language to `_TRANSLATION_FILENAMES` in `backend/i18n_utils.py`
-4. **Add the language code to the `allowed` set in `backend/app.py` → `web_manifest_localized()`** — omitting this returns 404 for the manifest and breaks the PWA service worker install
+4. **Add the language code to the `allowed` set in `backend/app.py` → `web_manifest_localized()`** - omitting this returns 404 for the manifest and breaks the PWA service worker install
 5. Add `'/manifest.XX.webmanifest'` and `'/static/i18n/XX.json'` to `APP_SHELL_URLS` in `static/sw.js`
 6. Add a `<option value="XX">` to the language selector in `templates/index.html`
 7. Add the language code to the `supported` array in the inline `<script>` block in `templates/index.html` (controls PWA manifest URL switching)
@@ -1175,19 +1175,19 @@ The background cache is **selective-refresh**: the scheduler polls every 25 min 
 - **Config loaded once per cycle**: `fully_initialize_caches()` calls `load_config()` once and passes the result to every update function via `functools.partial(fn, config=config)`. All `update_*_cache()` functions accept `config=None` and fall back to `load_config()` only when called directly.
 - **Moon caches merged**: `update_moon_caches(config=None)` in `cache_updater.py` instantiates `MoonService` and calls `get_report()` once, then writes both `moon_report` and `dark_window` caches. The individual `update_moon_report_cache()` / `update_dark_window_cache()` functions delegate to it and exist only for direct/test compatibility.
 - **Best-window single pass**: `AstroTonightService.best_windows_all_modes()` in `moon_astrotonight.py` runs one 12-hour night-scan loop, computing Astropy AltAz transforms once per step while evaluating all three modes simultaneously. `best_window_tonight(mode)` delegates to it.
-- Execution metrics for `moon_report` **and** `dark_window` are both recorded (same timing) because they are computed together — the `moon_report` job entry records both after success or failure.
+- Execution metrics for `moon_report` **and** `dark_window` are both recorded (same timing) because they are computed together - the `moon_report` job entry records both after success or failure.
 - **ISS pass event extraction early exit**: `events_aggregator._extract_iss_pass_events()` breaks out of the passes loop as soon as `days_until > 7` since passes are generated in chronological order by Skyfield's `find_events`.
 - **ISS lunar transit**: `iss_passes.ISSPassService` detects ISS transits across the **lunar** disk in addition to the solar disk. Detection requires the `de421.bsp` ephemeris (gracefully skipped if absent). The report includes `lunar_transits` (list), `next_lunar_transit`, and `total_lunar_transits`. Each entry carries `start_time`/`peak_time`/`end_time` in the configured local timezone, `minimum_separation_arcmin`, `lunar_radius_arcmin`, `moon_altitude_deg`, `moon_azimuth_deg`, `moon_illumination_pct`, `iss_altitude_deg`, `iss_azimuth_deg`. The `events_aggregator` converts these to `EventType.ISS_LUNAR_TRANSIT` events (importance: CRITICAL, score 9.0, icon `bi bi-moon-stars`, `structure_key="iss"`). All i18n keys (`events_api.iss_lunar_transit_title`, `events_api.iss_lunar_transit_description`) are provided for all 6 supported languages.
 
 ### Version Comparison
 - `version_checker.is_newer_version()` uses `packaging.version.parse()` (from the `packaging` library, declared in `requirements.txt`) for correct PEP 440 semantic version comparison. Do not revert to manual string parsing.
-- `version_checker._save_version_result(result)` is a private helper that writes a result dict to both the in-memory `_version_update_cache` and the shared on-disk cache — always use this helper instead of repeating the three-line save pattern.
+- `version_checker._save_version_result(result)` is a private helper that writes a result dict to both the in-memory `_version_update_cache` and the shared on-disk cache - always use this helper instead of repeating the three-line save pattern.
 
 ### utils.py Conventions
-- numpy is imported **once** at module level as `_np` with `_HAS_NUMPY` flag. Both `_NumpySafeEncoder` and `_sanitize_for_json` reference `_np` directly — never re-introduce per-call `import numpy` inside these functions.
+- numpy is imported **once** at module level as `_np` with `_HAS_NUMPY` flag. Both `_NumpySafeEncoder` and `_sanitize_for_json` reference `_np` directly - never re-introduce per-call `import numpy` inside these functions.
 
 ### Mandatory Rules for New Cache Jobs
-1. **Add a `CACHE_TTL_<NAME>` constant** in `constants.py` — never reuse the generic `CACHE_TTL`; choose TTL based on how frequently the underlying data actually changes
+1. **Add a `CACHE_TTL_<NAME>` constant** in `constants.py` - never reuse the generic `CACHE_TTL`; choose TTL based on how frequently the underlying data actually changes
 2. **Register** in `cache_updater.py` → `fully_initialize_caches()` `cache_jobs` list with `(name, shared_key, partial(fn, config=config), ttl, cache_entry_ref)`
 3. **Accept `config=None`** in the update function and guard with `if config is None: config = load_config()`
 4. **Add validity check** in `cache_store.is_astronomical_cache_ready()` and `get_cache_init_status()` using the job's own TTL constant
@@ -1234,7 +1234,7 @@ The background cache is **selective-refresh**: the scheduler polls every 25 min 
 
 ## License
 
-AGPL-3.0 License — See LICENSE file for details
+AGPL-3.0 License - See LICENSE file for details
 
 ---
 

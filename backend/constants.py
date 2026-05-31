@@ -40,31 +40,31 @@ URL_OPENMETEO = "https://api.open-meteo.com/v1/forecast"
 CACHE_TTL = 1800  # seconds (legacy default, prefer per-job TTLs below)
 CACHE_SCHEDULER_INTERVAL_SECONDS = 300  # 5 minutes
 
-# Per-job cache TTLs — each cache is refreshed only when its own TTL expires.
+# Per-job cache TTLs - each cache is refreshed only when its own TTL expires.
 # The scheduler polls every ~5 min but only runs a job if its TTL has elapsed.
-CACHE_TTL_MOON_REPORT         = 7200    # 2 hours — moon phase changes gradually (~0.5%/h)
-CACHE_TTL_DARK_WINDOW         = 7200    # 2 hours — derived from moon report (same TTL)
-CACHE_TTL_MOON_PLANNER        = 7200    # 2 hours — 7-night forecast, daily precision
-CACHE_TTL_SUN_REPORT          = 21600   # 6 hours — sunrise/sunset changes ~1 min/day
-CACHE_TTL_BEST_WINDOW         = 10800   # 3 hours — observation window changes slowly
-CACHE_TTL_SOLAR_ECLIPSE       = 86400   # 24 hours — next event is months away
-CACHE_TTL_LUNAR_ECLIPSE       = 86400   # 24 hours — next event is months away
-CACHE_TTL_HORIZON_GRAPH       = 21600   # 6 hours — daily arc computed for the full day
-CACHE_TTL_AURORA              = 3600    # 1 hour  — geomagnetic forecast updates hourly
-CACHE_TTL_ISS_PASSES          = 21600   # 6 hours — 20-day window, stable predictions
-CACHE_TTL_PLANETARY_EVENTS    = 86400   # 24 hours — 365-day planetary forecast
-CACHE_TTL_SPECIAL_PHENOMENA   = 86400   # 24 hours — annual events (equinoxes, etc.)
-CACHE_TTL_SOLAR_SYSTEM_EVENTS = 86400   # 24 hours — annual events (meteor showers, etc.)
-CACHE_TTL_SIDEREAL_TIME       = 3600    # 1 hour  — hourly precision is sufficient
-CACHE_TTL_SEEING_FORECAST     = 21600   # 6 hours — 7Timer API resolution
+CACHE_TTL_MOON_REPORT         = 7200    # 2 hours - moon phase changes gradually (~0.5%/h)
+CACHE_TTL_DARK_WINDOW         = 7200    # 2 hours - derived from moon report (same TTL)
+CACHE_TTL_MOON_PLANNER        = 7200    # 2 hours - 7-night forecast, daily precision
+CACHE_TTL_SUN_REPORT          = 21600   # 6 hours - sunrise/sunset changes ~1 min/day
+CACHE_TTL_BEST_WINDOW         = 10800   # 3 hours - observation window changes slowly
+CACHE_TTL_SOLAR_ECLIPSE       = 86400   # 24 hours - next event is months away
+CACHE_TTL_LUNAR_ECLIPSE       = 86400   # 24 hours - next event is months away
+CACHE_TTL_HORIZON_GRAPH       = 21600   # 6 hours - daily arc computed for the full day
+CACHE_TTL_AURORA              = 3600    # 1 hour  - geomagnetic forecast updates hourly
+CACHE_TTL_ISS_PASSES          = 21600   # 6 hours - 20-day window, stable predictions
+CACHE_TTL_PLANETARY_EVENTS    = 86400   # 24 hours - 365-day planetary forecast
+CACHE_TTL_SPECIAL_PHENOMENA   = 86400   # 24 hours - annual events (equinoxes, etc.)
+CACHE_TTL_SOLAR_SYSTEM_EVENTS = 86400   # 24 hours - annual events (meteor showers, etc.)
+CACHE_TTL_SIDEREAL_TIME       = 3600    # 1 hour  - hourly precision is sufficient
+CACHE_TTL_SEEING_FORECAST     = 21600   # 6 hours - 7Timer API resolution
 
-# IERS-A Earth-orientation data — covers ~1 year ahead from download date; 21-day TTL is well within that window
+# IERS-A Earth-orientation data - covers ~1 year ahead from download date; 21-day TTL is well within that window
 CACHE_TTL_IERS                    = 1814400  # 21 days
 
-# Spaceflight cache TTLs (Launch Library 2 free tier: ~15 req/h — keep calls minimal)
-CACHE_TTL_SPACEFLIGHT_LAUNCHES    = 7200    # 2 hours — free tier ~15 req/h; 3 endpoints per cycle → max 2 cycles/h
-CACHE_TTL_SPACEFLIGHT_ASTRONAUTS  = 21600   # 6 hours — crew changes are rare
-CACHE_TTL_SPACEFLIGHT_EVENTS      = 7200    # 2 hours — free tier budget; events timeline changes slowly
+# Spaceflight cache TTLs (Launch Library 2 free tier: ~15 req/h - keep calls minimal)
+CACHE_TTL_SPACEFLIGHT_LAUNCHES    = 7200    # 2 hours - free tier ~15 req/h; 3 endpoints per cycle → max 2 cycles/h
+CACHE_TTL_SPACEFLIGHT_ASTRONAUTS  = 21600   # 6 hours - crew changes are rare
+CACHE_TTL_SPACEFLIGHT_EVENTS      = 7200    # 2 hours - free tier budget; events timeline changes slowly
 
 # Weather API configuration
 WEATHER_CACHE_TTL = 3600  # seconds (1 hour)

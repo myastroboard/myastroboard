@@ -746,7 +746,7 @@ body.density-compact .alert {
     background-color: var(--surface-hover);
 }
 
-/* ── Bootstrap .text-bg-primary badge — dark / red theme overrides ── */
+/* ── Bootstrap .text-bg-primary badge - dark / red theme overrides ── */
 html[data-theme="dark"] .text-bg-primary,
 html[data-theme="red"] .text-bg-primary {
     background-color: var(--bs-primary) !important;

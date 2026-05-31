@@ -54,7 +54,7 @@ _MIN_STEPS = 2
 _DSO_LOG_INTERVAL = 500
 
 # A DSO passes the observability gate when it meets the fraction threshold
-# OR is visible for this many hours or more — prevents spring/fall targets from
+# OR is visible for this many hours or more - prevents spring/fall targets from
 # being excluded just because they transit before dusk or set shortly after it.
 _MIN_OBSERVABLE_HOURS_DSO = 1.0
 
@@ -139,7 +139,7 @@ def _clear_alttime_files() -> None:
         logger.debug(f'Failed to clear alttime files: {exc}')
 
 # ---------------------------------------------------------------------------
-# Module-level calculation progress — updated in-place during run_calculations
+# Module-level calculation progress - updated in-place during run_calculations
 # so the scheduler can surface live phase info while calculation runs.
 # ---------------------------------------------------------------------------
 _calculation_progress: Dict[str, Any] = {}
@@ -246,7 +246,7 @@ def _get_night_window(
     if dusk is None or dawn is None:
         return None
     if dawn <= dusk:
-        # Dusk already past — try tomorrow
+        # Dusk already past - try tomorrow
         report_tomorrow = sun_service.get_tomorrow_report()
         dusk = _parse_localtime(report_tomorrow.nautical_dusk, tz)
         dawn = _parse_localtime(report_tomorrow.nautical_dawn, tz)
@@ -538,7 +538,7 @@ def compute_astro_score(
         # Invert: lower surface-brightness number → brighter/easier → higher score
         obj_score = 1.0 - obj_score
     else:
-        # No magnitude/size data — neutral contribution
+        # No magnitude/size data - neutral contribution
         obj_score = 0.5
 
     # --- score_comfort ---
@@ -801,7 +801,7 @@ def _compute_body_result(
     when the body is not observable tonight.  The alt_deg array is used by the
     caller to persist the altitude-time graph JSON for the frontend chart.
 
-    Bodies do not have static coordinates — their positions are calculated from
+    Bodies do not have static coordinates - their positions are calculated from
     astropy's built-in ephemeris at each time step.  Constraints are relaxed
     compared to DSOs: no moon-separation filter (planets can be near the moon)
     and a lower observable-fraction threshold.
@@ -828,7 +828,7 @@ def _compute_body_result(
     # intentionally much lower than the DSO threshold: a planet visible for
     # even a short window during the night is worth showing.
     # We do NOT inherit fraction_of_time_observable_threshold from the DSO
-    # constraints — showing e.g. Jupiter only for 2 h out of a 7 h night is
+    # constraints - showing e.g. Jupiter only for 2 h out of a 7 h night is
     # perfectly valid and the user explicitly wants to see those bodies.
     _BODIES_MIN_FRACTION = 0.05  # ~22 min for a 7 h night
 
@@ -838,7 +838,7 @@ def _compute_body_result(
         alt_from_airmass = math.degrees(math.asin(min(1.0, 1.0 / airmass_constr)))
         alt_min = max(alt_min, alt_from_airmass)
 
-    # Don't apply alt_max clamp for bodies — planets can reach high altitudes
+    # Don't apply alt_max clamp for bodies - planets can reach high altitudes
     night_hours = (night_end - night_start).total_seconds() / 3600.0
     total_steps = len(alt_deg)
     if total_steps < _MIN_STEPS:
@@ -900,7 +900,7 @@ def _compute_body_result(
         )
         angular_distance_moon = ang_sep
 
-    # Solar elongation — angular separation between this body and the Sun at night midpoint.
+    # Solar elongation - angular separation between this body and the Sun at night midpoint.
     # Used to detect opposition (+0.20 AstroScore bonus) and to flag inner planets in solar glare.
     solar_elongation_deg: Optional[float] = None
     is_opposition = False
@@ -1180,7 +1180,7 @@ def run_calculations(
     _clear_alttime_files()
 
     # -----------------------------------------------------------------------
-    # Phase 1: Bodies (planets, Moon) — live ephemeris, fast, save immediately
+    # Phase 1: Bodies (planets, Moon) - live ephemeris, fast, save immediately
     # -----------------------------------------------------------------------
     _set_progress('bodies', 0, n_bodies)
     for target in all_targets:
@@ -1247,7 +1247,7 @@ def run_calculations(
     })
 
     # -----------------------------------------------------------------------
-    # Phase 2: Comets — individually (typically few targets)
+    # Phase 2: Comets - individually (typically few targets)
     # -----------------------------------------------------------------------
     _set_progress('comets', 0, n_comets)
     for target in all_targets:
@@ -1328,7 +1328,7 @@ def run_calculations(
     })
 
     # -----------------------------------------------------------------------
-    # Phase 3: Deep-sky objects — batched AltAz (vectorized over all targets per time step)
+    # Phase 3: Deep-sky objects - batched AltAz (vectorized over all targets per time step)
     # -----------------------------------------------------------------------
     dso_targets_with_coords = [
         t for t in all_targets
@@ -1355,12 +1355,12 @@ def run_calculations(
             for i in range(n_steps)
         ]
 
-        # LST array — computed once for all ~33 steps, replaces 13 000+ × 33 sidereal_time() calls
+        # LST array - computed once for all ~33 steps, replaces 13 000+ × 33 sidereal_time() calls
         lst_hours_arr = np.array(
             times.sidereal_time('apparent', longitude=location_obj.lon).hour
         )
 
-        # ISO strings computed once — reused for every alttime JSON write
+        # ISO strings computed once - reused for every alttime JSON write
         times_iso_list = [
             t.strftime('%Y-%m-%dT%H:%M:%S')
             for t in times.to_datetime(timezone=timezone.utc)
@@ -1479,7 +1479,7 @@ def run_calculations(
     save_json_file(SKYTONIGHT_BODIES_RESULTS_FILE, {'metadata': _final_meta, 'bodies': bodies_results})
     save_json_file(SKYTONIGHT_COMETS_RESULTS_FILE, {'metadata': _final_meta, 'comets': comets_results})
     save_json_file(SKYTONIGHT_DSO_RESULTS_FILE, {'metadata': _final_meta, 'deep_sky': deep_sky_results})
-    # Metadata-only summary — signals that all calculations are complete
+    # Metadata-only summary - signals that all calculations are complete
     save_json_file(SKYTONIGHT_RESULTS_FILE, {'metadata': _final_meta})
 
     # Write skymap trajectory data sorted by AstroScore descending, numbered 1..N
@@ -1690,7 +1690,7 @@ def compute_target_debug(name: str, config: Optional[Dict[str, Any]] = None) -> 
         ),
     }
 
-    # Bodies have no static coordinates (computed live from ephemeris) — skip coordinates check.
+    # Bodies have no static coordinates (computed live from ephemeris) - skip coordinates check.
     # For non-body targets, missing coordinates means we cannot compute anything.
     is_body = target.category == 'bodies'
     is_moon = is_body and (target.object_type or '').lower() == 'moon'

@@ -74,7 +74,7 @@ def test_mark_notified_is_per_user_and_trigger():
 
 
 # ---------------------------------------------------------------------------
-# N7 — Aurora
+# N7 - Aurora
 # ---------------------------------------------------------------------------
 
 def test_n7_sends_when_kp_meets_threshold(monkeypatch):
@@ -145,7 +145,7 @@ def test_n7_skips_when_cache_is_none(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# N1 — Plan start
+# N1 - Plan start
 # ---------------------------------------------------------------------------
 
 def test_n1_sends_when_night_starts_within_lead_window(monkeypatch):
@@ -221,7 +221,7 @@ def test_n1_respects_custom_lead_minutes(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# N2 — Next target
+# N2 - Next target
 # ---------------------------------------------------------------------------
 
 def test_n2_sends_for_upcoming_entry(monkeypatch):
@@ -316,7 +316,7 @@ def test_n2_uses_target_name_fallback_for_dedup(monkeypatch):
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a: send_calls.append(a))
 
-    # Entry without 'id' — uses target_name for dedup key
+    # Entry without 'id' - uses target_name for dedup key
     payload = {
         'state': 'active',
         'timeline': {'is_inside_night': True},
@@ -332,7 +332,7 @@ def test_n2_uses_target_name_fallback_for_dedup(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# N6 — Astronomical darkness
+# N6 - Astronomical darkness
 # ---------------------------------------------------------------------------
 
 def test_n6_sends_when_dusk_within_lead_window(monkeypatch):
@@ -370,7 +370,7 @@ def test_n6_skips_on_cooldown(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# N3 — ISS transits
+# N3 - ISS transits
 # ---------------------------------------------------------------------------
 
 def test_n3_sends_for_upcoming_solar_transit(monkeypatch):
@@ -438,7 +438,7 @@ def test_n3_skips_past_transits(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# N4/N5 — Eclipse notifications
+# N4/N5 - Eclipse notifications
 # ---------------------------------------------------------------------------
 
 def test_n4_sends_for_upcoming_lunar_eclipse_peak(monkeypatch):
@@ -486,7 +486,7 @@ def test_eclipse_skips_past_peak(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# _send — delivery and dead-subscription cleanup
+# _send - delivery and dead-subscription cleanup
 # ---------------------------------------------------------------------------
 
 def test_send_delivers_to_all_subscriptions_and_marks_notified(monkeypatch):

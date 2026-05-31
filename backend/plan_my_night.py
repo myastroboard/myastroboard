@@ -1063,7 +1063,7 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
                 color=C_BRAND, fontweight='bold', transform=ax.transAxes)
         title = t('plan_my_night.export_pdf_title') or 'My Observation Plan'
         if subtitle:
-            title += f'  —  {subtitle}'
+            title += f'  -  {subtitle}'
         ax.text(0.5, 0.5, title,
                 va='center', ha='center', fontsize=12,
                 color=C_WHITE, fontweight='bold', transform=ax.transAxes)
@@ -1075,7 +1075,7 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
         ax.axis('off')
         ax.set_facecolor(C_HDR_BG)
         ax.text(0.5, 0.5,
-                f"myastroboard.org  —  {t('common.title_html') or 'MyAstroBoard'}",
+                f"myastroboard.org  -  {t('common.title_html') or 'MyAstroBoard'}",
                 va='center', ha='center', fontsize=7.5,
                 color='#6a7a99', transform=ax.transAxes)
 
@@ -1315,7 +1315,7 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
                 ax_chart.yaxis.label.set_color(C_CHT_TXT)
                 ax_chart.xaxis.label.set_color(C_CHT_TXT)
                 ax_chart.grid(True, color=C_CHT_GRID, lw=0.5)
-                # title inside axes area — no risk of overlapping adjacent panels
+                # title inside axes area - no risk of overlapping adjacent panels
                 ax_chart.text(
                     0.01, 0.97,
                     t('skytonight.altitude_time_title') or 'Altitude vs Time',

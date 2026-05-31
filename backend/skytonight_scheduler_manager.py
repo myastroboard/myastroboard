@@ -112,7 +112,7 @@ def _run_skytonight_refresh() -> Dict[str, Any]:
         _append_skytonight_calculation_log('calculation_success', calc_result)
     except Exception as exc:
         _append_skytonight_calculation_log('calculation_error', {'error': str(exc)})
-        # Calculations failing is not fatal — the dataset is still usable.
+        # Calculations failing is not fatal - the dataset is still usable.
         logger.error(f'SkyTonight observability calculations failed: {exc}')
         calc_result = {}
 

@@ -216,7 +216,7 @@ async function loadMoonCalendar() {
         else if (night.astrophoto_score >= 50) cell.classList.add('plan-moon-cal-ok');
         else cell.classList.add('plan-moon-cal-bright');
 
-        // Day number — prefix month abbreviation when it's the 1st
+        // Day number - prefix month abbreviation when it's the 1st
         const dayEl = document.createElement('div');
         dayEl.className = 'plan-moon-cal-day';
         if (isFirstOfMonth) {
@@ -238,7 +238,7 @@ async function loadMoonCalendar() {
         illumEl.className = 'plan-moon-cal-illum';
         illumEl.textContent = `${Math.round(night.illumination_percent)}%`;
 
-        cell.title = `${night.date} — ${i18n.t('moon.illumination')}${Math.round(night.illumination_percent)}% — ${i18n.t('best_window.strict')}: ${night.strict_hours.toFixed(1)}h`;
+        cell.title = `${night.date} - ${i18n.t('moon.illumination')}${Math.round(night.illumination_percent)}% - ${i18n.t('best_window.strict')}: ${night.strict_hours.toFixed(1)}h`;
         cell.appendChild(dayEl);
         cell.appendChild(darkEl);
         cell.appendChild(illumEl);
@@ -397,7 +397,7 @@ async function loadSeeingWeek() {
         qualEl.className = 'plan-seeing-week-quality';
         qualEl.textContent = getLocalizedSeeingQuality(bestSeeing, '');
 
-        cell.title = `${key} — ${i18n.t('seeing_forecast.current_seeing')}: ${bestSeeing}/8 — ${getLocalizedSeeingQuality(bestSeeing, '')}`;
+        cell.title = `${key} - ${i18n.t('seeing_forecast.current_seeing')}: ${bestSeeing}/8 - ${getLocalizedSeeingQuality(bestSeeing, '')}`;
         cell.appendChild(dowEl);
         cell.appendChild(dayEl);
         cell.appendChild(scoreEl);
@@ -485,7 +485,7 @@ async function loadPlanMyNight(options = {}) {
             renderPlanMyNight(payload);
         } else if (shouldUsePatchOnly && !canPatchInPlace) {
             // Structure changed (e.g. reorder shifted timeline_start/end) but DOM was patched
-            // in place — rebuild only the summary graph with the updated entry order/times.
+            // in place - rebuild only the summary graph with the updated entry order/times.
             const graphContainer = document.getElementById('plan-summary-graph-container');
             if (graphContainer) {
                 buildPlanSummaryGraph(graphContainer, payload?.plan?.entries || [], payload?.plan, payload?.timeline || {})
@@ -762,7 +762,7 @@ function computePlannedCoverage(entries, plan) {
         nightMinutes = Math.round((nightEnd.getTime() - nightStart.getTime()) / 60000);
     }
 
-    // Subtract start delay — the usable observing window is shorter
+    // Subtract start delay - the usable observing window is shorter
     const startDelayMinutes = Math.max(0, parseInt(plan && plan.start_delay_minutes) || 0);
     nightMinutes = Math.max(0, nightMinutes - startDelayMinutes);
 
@@ -829,7 +829,7 @@ function _planClipAlttime(timesUtc, altitudes, azimuths, windowStartIso, windowE
     const weMs = new Date(windowEndIso).getTime();
     if (wsMs >= weMs || !timesUtc || !timesUtc.length) return [];
 
-    // times_utc values have no 'Z' suffix (bare ISO strings) — force UTC parsing,
+    // times_utc values have no 'Z' suffix (bare ISO strings) - force UTC parsing,
     // matching the same pattern used in skytonight.js: new Date(t + 'Z')
     const pts = timesUtc.map((t, i) => ({
         x:  new Date(t + 'Z').getTime(),
@@ -915,7 +915,7 @@ async function buildPlanSummaryGraph(container, entries, plan, timeline) {
         )
     );
 
-    if (myGen !== planSummaryGraphGen) return; // stale — a new render started
+    if (myGen !== planSummaryGraphGen) return; // stale - a new render started
 
     const alttimeMap = {};
     entriesWithAlt.forEach((e, i) => {
@@ -935,7 +935,7 @@ async function buildPlanSummaryGraph(container, entries, plan, timeline) {
     const timezone  = firstAlt?.timezone ?? null;
     const yMax      = altMax >= 85 ? altMax + 5 : altMax + 10;
 
-    // Resolve theme-aware chart colors — same CSS variables as skytonight.js
+    // Resolve theme-aware chart colors - same CSS variables as skytonight.js
     const rootStyle      = getComputedStyle(document.documentElement);
     const bsTheme        = (document.documentElement.getAttribute('data-bs-theme') || '').toLowerCase();
     const theme          = (document.documentElement.getAttribute('data-theme') || '').toLowerCase();
@@ -993,7 +993,7 @@ async function buildPlanSummaryGraph(container, entries, plan, timeline) {
         const clipped = _planClipAlttime(atd.times_utc, atd.altitudes, atd.azimuths, entry.timeline_start, clippedEndIso);
         if (!clipped.length) return;
 
-        // Altitude curve — consistent primary color for all targets
+        // Altitude curve - consistent primary color for all targets
         datasets.push({
             label:            entryName,
             data:             clipped.map(p => ({ x: p.x, y: p.y })),
@@ -1105,7 +1105,7 @@ async function buildPlanSummaryGraph(container, entries, plan, timeline) {
                 const x1 = Math.max(chartArea.left,  xScale.getPixelForValue(band.startMs));
                 const x2 = Math.min(chartArea.right, xScale.getPixelForValue(band.endMs));
                 if (x2 <= x1) continue;
-                // Border — rounded rect, no horizontal inset so adjacent bands share the edge pixel
+                // Border - rounded rect, no horizontal inset so adjacent bands share the edge pixel
                 ctx.strokeStyle = band.borderColor;
                 ctx.lineWidth   = 1.5;
                 ctx.setLineDash([]);
@@ -1250,7 +1250,7 @@ function updatePlanSummaryChart(timeline) {
     }
 
     // Update band border/bg colors based on current status
-    // (altitude curve colors remain constant — only the band boxes change)
+    // (altitude curve colors remain constant - only the band boxes change)
     for (const band of planSummaryTargetBands) {
         const status = _planBandStatus(band.entryId, band.endMs, currentTargetId);
         if (status !== band.status) {
@@ -1288,7 +1288,7 @@ function renderPlanMyNight(payload) {
     const toolbar = document.createElement('div');
     toolbar.className = 'd-flex gap-2 mb-3 flex-wrap align-items-center';
 
-    // Telescope selector — colored badge buttons (1 telescope: static badge; 2+: clickable)
+    // Telescope selector - colored badge buttons (1 telescope: static badge; 2+: clickable)
     const telescopeItems = planTelescopeList.filter(p => p.telescope_id !== null);
 
     const _stateColor = (s) => s === 'current' ? 'success' : s === 'previous' ? 'warning' : 'secondary';
@@ -1317,7 +1317,7 @@ function renderPlanMyNight(payload) {
     };
 
     if (telescopeItems.length >= 2) {
-        // Sort: active first (all), then owned, then shared — alphabetically within each group
+        // Sort: active first (all), then owned, then shared - alphabetically within each group
         const sorted = [...telescopeItems].sort((a, b) => {
             const groupA = a.state === 'current' ? 0 : (a.is_own !== false ? 1 : 2);
             const groupB = b.state === 'current' ? 0 : (b.is_own !== false ? 1 : 2);
@@ -1501,7 +1501,7 @@ function renderPlanMyNight(payload) {
     coverageHeader.appendChild(coverageLabel);
     coverageHeader.appendChild(coverageBadge);
 
-    // Graph container — replaces both the stacked coverage bar and the timeline progress bar
+    // Graph container - replaces both the stacked coverage bar and the timeline progress bar
     const graphContainer = document.createElement('div');
     graphContainer.id = 'plan-summary-graph-container';
     graphContainer.className = 'plan-summary-graph-wrap';
@@ -1874,7 +1874,7 @@ function _checkPlanNotifications(payload) {
     const now    = Date.now();
     const entries = Array.isArray(plan.entries) ? plan.entries : [];
 
-    // N1 — session starts soon (only before the night begins)
+    // N1 - session starts soon (only before the night begins)
     if (notificationManager.isTriggerEnabled('N1') && !timeline.is_inside_night) {
         const nightStart = plan.night_start ? new Date(plan.night_start).getTime() : null;
         if (nightStart) {
@@ -1893,7 +1893,7 @@ function _checkPlanNotifications(payload) {
         }
     }
 
-    // N2 — next target starts soon (only while inside the night)
+    // N2 - next target starts soon (only while inside the night)
     if (notificationManager.isTriggerEnabled('N2') && timeline.is_inside_night) {
         const leadMs = notificationManager.getLeadMinutes('N2') * 60 * 1000;
         for (const entry of entries) {

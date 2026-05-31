@@ -189,7 +189,7 @@ const CACHE_JOB_LABELS = {
 function getCacheJobLabel(jobKey) {
     const key = `cache.step_${jobKey}`;
     const translated = i18n.t(key);
-    // i18n.t returns the key itself when missing — fall back to the static map
+    // i18n.t returns the key itself when missing - fall back to the static map
     return (translated && translated !== key)
         ? translated
         : (CACHE_JOB_LABELS[jobKey] ?? jobKey);

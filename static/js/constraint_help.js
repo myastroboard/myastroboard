@@ -148,7 +148,7 @@
         ctx.fillStyle = domeGrad;
         ctx.fill();
 
-        // Blocked zone below cutoff — clip to dome
+        // Blocked zone below cutoff - clip to dome
         ctx.save();
         ctx.beginPath(); ctx.arc(cx, groundY, skyR, Math.PI, 0); ctx.closePath(); ctx.clip();
         const yLine = groundY - skyR * Math.sin(altCutRad);
@@ -404,7 +404,7 @@
         ctx.strokeStyle = c.observableLine; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.moveTo(xThr, barY - 5); ctx.lineTo(xThr, barY + barH + 5); ctx.stroke();
 
-        // Zone text labels (inside the night bar — sky background)
+        // Zone text labels (inside the night bar - sky background)
         ctx.font = '11px system-ui'; ctx.textAlign = 'center';
         if (xThr - ML > 40) {
             ctx.fillStyle = c.blockedLine;

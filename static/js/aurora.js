@@ -355,7 +355,7 @@ function _checkAuroraN7(data) {
     if (typeof kp !== 'number') return;
     if (kp < notificationManager.getKpThreshold()) return;
 
-    const COOLDOWN_MS = 60 * 60 * 1000; // 1 hour — avoids re-notifying on every tab open
+    const COOLDOWN_MS = 60 * 60 * 1000; // 1 hour - avoids re-notifying on every tab open
     if (notificationManager.wasRecentlyNotified('N7', COOLDOWN_MS)) return;
 
     const visibility = data?.current?.visibility_level ?? '';

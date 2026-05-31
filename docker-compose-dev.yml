@@ -38,6 +38,13 @@ services:
       # (for development, keep false)
       - SESSION_COOKIE_SECURE=false
 
+      # Push notifications - VAPID contact email
+      # Required for background push notifications (especially Apple APNs on iOS).
+      # Set to any real email address - it is sent to push services as a contact address,
+      # not shown to users. The domain does not need to match your app's domain.
+      # Without this, iOS push notifications will be silently rejected by Apple.
+      - VAPID_CONTACT_EMAIL=noreply@myastroboard.local
+
       # App
       - DATA_DIR=/app/data
 

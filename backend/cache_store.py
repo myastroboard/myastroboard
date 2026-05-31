@@ -84,7 +84,7 @@ def _ensure_data_dir():
 
 @contextmanager
 def _cache_file_read_lock():
-    """Cross-platform SHARED lock — multiple concurrent readers allowed."""
+    """Cross-platform SHARED lock - multiple concurrent readers allowed."""
     _ensure_data_dir()
     lock_file = open(_SHARED_CACHE_LOCK, "a+")
     try:
@@ -106,7 +106,7 @@ def _cache_file_read_lock():
 
 @contextmanager
 def _cache_file_write_lock():
-    """Cross-platform EXCLUSIVE lock — for writes only."""
+    """Cross-platform EXCLUSIVE lock - for writes only."""
     _ensure_data_dir()
     lock_file = open(_SHARED_CACHE_LOCK, "a+")
     try:
@@ -333,7 +333,7 @@ def is_cache_valid_for_today(cache_entry, ttl_seconds):
     """Like is_cache_valid, but also invalidates when the local calendar day has changed.
 
     Use this for caches that are computed for 'today' (sun report, horizon graph,
-    moon report, etc.) — a 6h TTL would otherwise serve stale day-N data well into
+    moon report, etc.) - a 6h TTL would otherwise serve stale day-N data well into
     day N+1 if the cache was last populated late in the evening.
     """
     if not is_cache_valid(cache_entry, ttl_seconds):

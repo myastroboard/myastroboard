@@ -109,7 +109,7 @@ class CacheScheduler:
                 self.update_all_caches()
                 if not self.cache_ready_event.is_set():
                     self.cache_ready_event.set()
-                    logger.info('Initial cache update complete — cache_ready_event set.')
+                    logger.info('Initial cache update complete - cache_ready_event set.')
             except Exception as e:
                 logger.error(f"Error updating caches: {e}", exc_info=True)
             

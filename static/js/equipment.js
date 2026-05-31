@@ -1753,7 +1753,7 @@ function renderExposureCalcTab() {
     tSel.appendChild(tDef);
     telescopes.forEach(t => {
         const suffix = t.owner_username ? ` (${t.owner_username})` : '';
-        tSel.appendChild(new Option(`${t.name} — f/${t.effective_focal_ratio}  ${t.effective_focal_length}mm${suffix}`, t.id));
+        tSel.appendChild(new Option(`${t.name} - f/${t.effective_focal_ratio}  ${t.effective_focal_length}mm${suffix}`, t.id));
     });
     tCol.appendChild(tSel);
     tCol.appendChild(mkHelp('equipment.exposure_calc_help_telescope'));
@@ -1768,7 +1768,7 @@ function renderExposureCalcTab() {
     cSel.appendChild(cDef);
     cameras.forEach(c => {
         const suffix = c.owner_username ? ` (${c.owner_username})` : '';
-        cSel.appendChild(new Option(`${c.name} — ${c.pixel_size_um}µm${suffix}`, c.id));
+        cSel.appendChild(new Option(`${c.name} - ${c.pixel_size_um}µm${suffix}`, c.id));
     });
     cCol.appendChild(cSel);
     cCol.appendChild(mkHelp('equipment.exposure_calc_help_camera'));
@@ -1825,11 +1825,11 @@ function renderExposureCalcTab() {
     borSel.id = 'exc-bortle';
     borSel.className = 'form-select';
     [
-        [1, 'Bortle 1 — 22.0 mag/arcsec²'], [2, 'Bortle 2 — 21.5'],
-        [3, 'Bortle 3 — 21.2'], [4, 'Bortle 4 — 20.8'],
-        [5, 'Bortle 5 — 20.3'], [6, 'Bortle 6 — 19.5'],
-        [7, 'Bortle 7 — 18.8'], [8, 'Bortle 8 — 18.3'],
-        [9, 'Bortle 9 — 17.5'],
+        [1, 'Bortle 1 - 22.0 mag/arcsec²'], [2, 'Bortle 2 - 21.5'],
+        [3, 'Bortle 3 - 21.2'], [4, 'Bortle 4 - 20.8'],
+        [5, 'Bortle 5 - 20.3'], [6, 'Bortle 6 - 19.5'],
+        [7, 'Bortle 7 - 18.8'], [8, 'Bortle 8 - 18.3'],
+        [9, 'Bortle 9 - 17.5'],
     ].forEach(([v, lbl]) => borSel.appendChild(new Option(lbl, v)));
     borSel.value = '5';
     borCol.appendChild(borSel);

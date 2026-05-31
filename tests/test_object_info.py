@@ -1,4 +1,4 @@
-"""Tests for object_info.py — pure functions and mocked-network paths."""
+"""Tests for object_info.py - pure functions and mocked-network paths."""
 
 import skytonight_targets as _st_module  # needed for patching the locally-imported get_lookup_entry
 
@@ -183,7 +183,7 @@ def test_get_dss_image_url_accepts_custom_fov():
 
 
 # ---------------------------------------------------------------------------
-# get_object_info — unsafe identifier
+# get_object_info - unsafe identifier
 # ---------------------------------------------------------------------------
 
 def test_get_object_info_rejects_unsafe_identifier():
@@ -195,7 +195,7 @@ def test_get_object_info_rejects_unsafe_identifier():
 
 
 # ---------------------------------------------------------------------------
-# get_object_info — not found (mocked SIMBAD returning None)
+# get_object_info - not found (mocked SIMBAD returning None)
 # ---------------------------------------------------------------------------
 
 def test_get_object_info_returns_not_found_when_simbad_empty(monkeypatch):
@@ -211,7 +211,7 @@ def test_get_object_info_returns_not_found_when_simbad_empty(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# get_object_info — found with coordinates (mocked full pipeline)
+# get_object_info - found with coordinates (mocked full pipeline)
 # ---------------------------------------------------------------------------
 
 def test_get_object_info_builds_image_url_when_coordinates_present(monkeypatch):
@@ -288,7 +288,7 @@ def test_simbad_variants_unknown_returns_empty():
 
 
 # ---------------------------------------------------------------------------
-# get_object_info — local dataset fallback when SIMBAD has no record
+# get_object_info - local dataset fallback when SIMBAD has no record
 # ---------------------------------------------------------------------------
 
 def test_get_object_info_local_fallback_when_simbad_fails(monkeypatch):

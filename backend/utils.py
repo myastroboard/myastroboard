@@ -12,7 +12,7 @@ import yaml
 from typing import Dict, Tuple, Optional
 from constants import CONFIG_FILE, DATA_DIR
 
-# Optional numpy dependency — imported once at module level
+# Optional numpy dependency - imported once at module level
 try:
     import numpy as _np
     _HAS_NUMPY = True

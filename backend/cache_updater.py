@@ -247,7 +247,7 @@ def update_sun_report_cache(config=None):
 def update_best_window_cache(config=None):
     """
     Updates all three best-window caches (strict, practical, illumination) in a single
-    night scan — altitudes are computed once per time-step instead of once per mode.
+    night scan - altitudes are computed once per time-step instead of once per mode.
     """
     try:
         logger.debug("Updating Best window cache...")
@@ -892,7 +892,7 @@ def update_spaceflight_launches_cache():
         past = get_past_launches(limit=10)
 
         if upcoming is None and past is None:
-            # API unavailable (rate-limited or down) — keep existing data but
+            # API unavailable (rate-limited or down) - keep existing data but
             # refresh the timestamp so the scheduler won't retry every cycle.
             # The backoff in spaceflight_tracker._get() already prevents real
             # HTTP calls until the backoff window expires.
@@ -1066,7 +1066,7 @@ def update_iers_cache():
 def fully_initialize_caches():
     """
     Selectively refreshes cache entries whose individual TTL has expired.
-    Each job has its own TTL (see constants.py) — heavy/slow jobs run far less
+    Each job has its own TTL (see constants.py) - heavy/slow jobs run far less
     frequently than time-sensitive ones, reducing CPU/memory pressure on startup
     and during periodic scheduler cycles.
 
@@ -1088,7 +1088,7 @@ def fully_initialize_caches():
         # because reset_all_caches() zeros all timestamps so every job will be stale
         check_and_handle_config_changes()
 
-        # Load config ONCE per refresh cycle — shared across all update functions
+        # Load config ONCE per refresh cycle - shared across all update functions
         config = load_config()
 
         # (name, shared_sync_key, update_fn, ttl_seconds, cache_entry_ref, day_sensitive)
@@ -1134,7 +1134,7 @@ def fully_initialize_caches():
                 from spaceflight_tracker import spaceflight_cache_images_intact
                 if not spaceflight_cache_images_intact(cache_entry["data"]):
                     logger.info(
-                        "Spaceflight cache '%s' has missing image files — forcing re-fetch",
+                        "Spaceflight cache '%s' has missing image files - forcing re-fetch",
                         job_name,
                     )
                     cache_entry["timestamp"] = 0
@@ -1150,7 +1150,7 @@ def fully_initialize_caches():
                 jobs_to_run.append((job_name, update_fn, ttl))
 
         if not jobs_to_run:
-            logger.debug("All caches are still valid — no refresh needed this cycle")
+            logger.debug("All caches are still valid - no refresh needed this cycle")
             return
 
         # Network-bound jobs that can run concurrently (pure API calls, no shared state).
@@ -1206,7 +1206,7 @@ def fully_initialize_caches():
                             step_name="parallel_network",
                         )
 
-        # --- Sequential compute jobs (Astropy — kept single-threaded for safety) ---
+        # --- Sequential compute jobs (Astropy - kept single-threaded for safety) ---
         for index, (job_name, update_fn, ttl) in enumerate(sequential, start=len(parallel) + 1):
             cache_store.set_cache_initialization_in_progress(
                 True,
@@ -1219,7 +1219,7 @@ def fully_initialize_caches():
                 update_fn()
                 duration = time.time() - job_start
                 cache_store.record_cache_execution(job_name, duration, True)
-                # moon_report and dark_window are computed together — mirror metrics
+                # moon_report and dark_window are computed together - mirror metrics
                 if job_name == "moon_report":
                     cache_store.record_cache_execution("dark_window", duration, True)
                 success_count += 1

@@ -446,7 +446,7 @@ def compute_combination_share_status(combination: Dict, user_id: str) -> Dict:
         elif eq_id in shared_by_id:
             pass  # still shared by owner, counts as shared
         else:
-            # Not found anywhere — previously accessible but now gone/unshared
+            # Not found anywhere - previously accessible but now gone/unshared
             is_shared = False
             has_broken_share = True
             broken_items.append(eq_id)

@@ -119,7 +119,7 @@ function applyUserStartupPreferences(force = false) {
     window.__myastroboardStartupApplied = true;
 }
 
-// Initialize the application — called by auth.js once authentication is confirmed.
+// Initialize the application - called by auth.js once authentication is confirmed.
 // This prevents any authenticated API calls (e.g. scheduler status) from firing
 // before the session is validated, which would generate spurious 401 warnings.
 async function initializeAuthenticatedApp() {
@@ -312,7 +312,7 @@ function switchMainTab(tabName, options = {}) {
     } else if (tabName === 'astrodex') {
         loadAstrodex();
     } else if (tabName === 'spaceflight') {
-        // nothing extra — subtab switch below handles initial load
+        // nothing extra - subtab switch below handles initial load
     } else if (tabName === 'forecast-weather') {
         loadWeather();
     }

@@ -9,7 +9,7 @@ The key design principle is **selective refresh**: the background scheduler poll
 ## Key Features
 
 ### Server-Side Only Management
-- **No browser-side refresh required** — F5 works normally
+- **No browser-side refresh required** - F5 works normally
 - All cache calculations happen on the server
 - Cache is automatically refreshed on schedule (selective per-job TTL)
 
@@ -37,7 +37,7 @@ Each cache job has an individual TTL defined in `backend/constants.py`:
 
 **Note on Weather Data:**
 - **UI Weather Forecast**: Cached for 1 hour (suitable for display)
-- **SkyTonight Conditions**: NOT cached — always fetches fresh real-time data
+- **SkyTonight Conditions**: NOT cached - always fetches fresh real-time data
   - SkyTonight requires accurate current conditions (temperature, pressure, humidity)
   - Each SkyTonight run bypasses cache to get live conditions from Open-Meteo API
 
@@ -46,7 +46,7 @@ Each cache job has an individual TTL defined in `backend/constants.py`:
 1. Syncs each in-memory cache entry from the shared JSON file (gets persisted timestamp)
 2. Checks each job's TTL individually
 3. **Skips jobs whose TTL has not yet expired**
-4. Only runs stale jobs — often just 2-4 jobs per poll cycle
+4. Only runs stale jobs - often just 2-4 jobs per poll cycle
 
 On a typical steady-state machine, a scheduler poll cycle at the 25-minute mark will skip all jobs because the shortest TTL is 1 hour. Only at the 1-hour mark will hourly jobs run; daily jobs run at most once every 24 hours.
 
@@ -68,37 +68,37 @@ When any of these location parameters change, **all astronomical caches are imme
 
 ### Components
 
-#### 1. **`cache_store.py`** — Cache Storage & Validation
+#### 1. **`cache_store.py`** - Cache Storage & Validation
 - Maintains in-memory cache entries with timestamps
 - Persists cache entries to `data/cache/astro_cache.json` for cross-worker visibility
 - Tracks location configuration changes
 - Provides TTL validation using per-job constants
-- **New**: `record_cache_execution(job_name, duration_s, success)` — persists per-job timing
-- **New**: `get_cache_metrics()` — returns per-job execution metrics from shared cache
+- **New**: `record_cache_execution(job_name, duration_s, success)` - persists per-job timing
+- **New**: `get_cache_metrics()` - returns per-job execution metrics from shared cache
 - Key functions:
-  - `is_cache_valid(cache_entry, ttl_seconds)` — check if cache is still fresh
-  - `is_astronomical_cache_ready()` — check if all caches are valid (uses per-job TTLs)
-  - `has_location_changed(location_config)` — detect location parameter changes
-  - `reset_all_caches()` — immediately reset all astronomical caches
-  - `get_cache_init_status()` — detailed cache status including `ttls` and `execution_metrics`
+  - `is_cache_valid(cache_entry, ttl_seconds)` - check if cache is still fresh
+  - `is_astronomical_cache_ready()` - check if all caches are valid (uses per-job TTLs)
+  - `has_location_changed(location_config)` - detect location parameter changes
+  - `reset_all_caches()` - immediately reset all astronomical caches
+  - `get_cache_init_status()` - detailed cache status including `ttls` and `execution_metrics`
 
-#### 2. **`cache_updater.py`** — Cache Calculation (Selective)
+#### 2. **`cache_updater.py`** - Cache Calculation (Selective)
 - Contains all individual cache update functions
-- `fully_initialize_caches()` — **selective**: syncs timestamps, skips valid caches, records per-job timing
-- `check_and_handle_config_changes()` — detects and resets caches on location change
+- `fully_initialize_caches()` - **selective**: syncs timestamps, skips valid caches, records per-job timing
+- `check_and_handle_config_changes()` - detects and resets caches on location change
 
-#### 3. **`cache_scheduler.py`** — Background Task Management
+#### 3. **`cache_scheduler.py`** - Background Task Management
 - `CacheScheduler` class polls at 1500-second interval
 - Uses file locking to prevent multiple instances
 - Calls `fully_initialize_caches()` which handles selective execution
 - Sets `cache_ready_event` after the first successful cycle
 
-#### 4. **`constants.py`** — TTL Constants
+#### 4. **`constants.py`** - TTL Constants
 - `CACHE_TTL_<JOB_NAME>` constants define the TTL for each job
 - `WEATHER_CACHE_TTL` = 3600s (1 hour) for weather
 - `CACHE_TTL` = 1800s kept for backward compatibility only (not used for job scheduling)
 
-#### 5. **`weather_utils.py`** — Dual Weather Client System
+#### 5. **`weather_utils.py`** - Dual Weather Client System
 - **Cached Client** (`create_weather_client()`): 1-hour HTTP-level cache for UI forecasts
 - **Fresh Client** (`create_fresh_weather_client()`): no caching, used by SkyTonight for real-time conditions
 
@@ -138,8 +138,8 @@ When location is updated via `/api/config` POST endpoint:
 
 ## API Endpoints
 
-### `/api/cache` — Cache Status (GET)
-**Purpose**: Informational — allows UI to display cache status and job metrics
+### `/api/cache` - Cache Status (GET)
+**Purpose**: Informational - allows UI to display cache status and job metrics
 **Returns**:
 ```json
 {
@@ -198,22 +198,22 @@ When location is updated via `/api/config` POST endpoint:
 }
 ```
 
-### `/api/config` — Configuration Update (POST)
+### `/api/config` - Configuration Update (POST)
 - Detects if latitude, longitude, elevation, or timezone changed
 - Immediately resets all caches (timestamps to 0)
 - Returns `"cache_reset": true` when location changed
 
 ### Data Endpoints (Astronomical Data)
 These endpoints return **from cache only**:
-- `GET /api/moon/report` — Moon report
-- `GET /api/moon/dark-window` — Dark window
-- `GET /api/moon/next-7-nights` — Moon planner
-- `GET /api/sun/today` — Sun report
-- `GET /api/tonight/best-window` — Best observation window
+- `GET /api/moon/report` - Moon report
+- `GET /api/moon/dark-window` - Dark window
+- `GET /api/moon/next-7-nights` - Moon planner
+- `GET /api/sun/today` - Sun report
+- `GET /api/tonight/best-window` - Best observation window
 
 **Response codes**:
 - `200`: Data returned (cache is valid)
-- `202`: Pending — cache being prepared (retry shortly)
+- `202`: Pending - cache being prepared (retry shortly)
 
 ## Metrics Dashboard (Cache Jobs section)
 
@@ -232,11 +232,11 @@ A "Failed" badge appears in the Duration column if the last execution threw an e
 ## Performance Impact
 
 ### Benefits
-- **No browser delays** — F5 is instant
-- **Low-resource friendly** — heavy jobs (eclipses, planetary events) run at most once a day instead of every 30 minutes
+- **No browser delays** - F5 is instant
+- **Low-resource friendly** - heavy jobs (eclipses, planetary events) run at most once a day instead of every 30 minutes
 - **Typical steady-state**: on a 25-min poll, 0 jobs run (all TTLs intact); on a 1-hour poll, ~10 hourly jobs run; daily jobs run ~once per day
-- **Automatic location handling** — no stale data when location changes
-- **Full observability** — per-job last run time and duration visible in Metrics tab
+- **Automatic location handling** - no stale data when location changes
+- **Full observability** - per-job last run time and duration visible in Metrics tab
 
 ### Cache Sizes (Typical)
 - Moon report: ~5-10 KB
@@ -261,11 +261,11 @@ A "Failed" badge appears in the Duration column if the last execution threw an e
 4. Wait for next scheduler poll (max 25 minutes)
 
 ### Multiple Cache Updates Running
-- Should not happen — file locking prevents it
+- Should not happen - file locking prevents it
 - If it does, check `data/cache/cache_scheduler.lock` for stale lock
 
 ### SkyTonight Getting Stale Weather Conditions
-- **This should NOT happen** — SkyTonight always fetches fresh data via `create_fresh_weather_client()`
+- **This should NOT happen** - SkyTonight always fetches fresh data via `create_fresh_weather_client()`
 - Each SkyTonight run bypasses the weather cache
 - If conditions seem old, check Open-Meteo API availability
 
@@ -276,7 +276,7 @@ A "Failed" badge appears in the Duration column if the last execution threw an e
 for job_name, shared_key, update_fn, ttl, cache_entry in cache_jobs:
     cache_store.sync_cache_from_shared(shared_key, cache_entry)
     if cache_store.is_cache_valid(cache_entry, ttl):
-        continue   # skip — still fresh
+        continue   # skip - still fresh
     # run the job and record timing
     t0 = time.time()
     update_fn()
@@ -312,7 +312,7 @@ new_signature = {
 ### Adding a New Cache Job
 1. Add a `CACHE_TTL_<NAME>` constant in `constants.py` with a justified value
 2. Add a `_<name>_cache` entry in `cache_store.py`
-3. Add `update_<name>_cache(config=None)` in `cache_updater.py` — guard with `if config is None: config = load_config()`
+3. Add `update_<name>_cache(config=None)` in `cache_updater.py` - guard with `if config is None: config = load_config()`
 4. Register it in the `cache_jobs` list in `fully_initialize_caches()` using `partial(update_<name>_cache, config=config)`
 5. Add it to `is_astronomical_cache_ready()` and `get_cache_init_status()` with its TTL constant
 6. Add it to `reset_all_caches()` and `_write_all_astronomical_caches_to_shared()`

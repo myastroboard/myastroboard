@@ -147,11 +147,11 @@ self.addEventListener('notificationclick', (event) => {
                         await client.navigate(targetUrl);
                         return client.focus();
                     } catch (_) {
-                        // Client was closed between matchAll and navigate — try next one.
+                        // Client was closed between matchAll and navigate - try next one.
                     }
                 }
             }
-            // No existing window reachable — open a new one.
+            // No existing window reachable - open a new one.
             if (clients.openWindow) {
                 return clients.openWindow(targetUrl);
             }

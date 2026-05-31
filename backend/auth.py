@@ -300,7 +300,7 @@ class UserManager:
         if not isinstance(preferences, dict):
             return False, "Preferences must be a dictionary"
 
-        # Unknown keys are silently ignored — forward-compat when new prefs are added
+        # Unknown keys are silently ignored - forward-compat when new prefs are added
         # and old server code still runs for a moment before restart.
 
         startup_main_tab = preferences.get('startup_main_tab')

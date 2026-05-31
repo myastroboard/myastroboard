@@ -34,7 +34,7 @@ _MINIMAL_CONFIG = {
 
 
 # ---------------------------------------------------------------------------
-# run_calculations — no night window
+# run_calculations - no night window
 # ---------------------------------------------------------------------------
 
 def test_run_calculations_no_night_returns_night_found_false(monkeypatch, tmp_path):
@@ -94,7 +94,7 @@ def test_run_calculations_no_night_counts_all_zero(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# run_calculations — empty dataset with night window
+# run_calculations - empty dataset with night window
 # ---------------------------------------------------------------------------
 
 class _FakeMoon:

@@ -54,7 +54,7 @@ def test_resolve_schedule_post_night_candidate_is_after_dawn():
 
     This demonstrates why a committed_next_run is required: the freshly-computed
     next_run is always in the future, so comparing server_time against it would
-    never fire — we must track the previously committed time.
+    never fire - we must track the previously committed time.
     """
     config = _base_config()
     just_past_six = datetime(2026, 4, 3, 6, 5, tzinfo=ZoneInfo('Europe/Paris'))

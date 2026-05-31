@@ -17,7 +17,7 @@ from solar_system_events import SolarSystemEventsService
 
 logger = get_logger(__name__)
 
-# MPC CometEls.txt — fixed-width orbital elements for all known comets
+# MPC CometEls.txt - fixed-width orbital elements for all known comets
 COMETS_TXT_URL = 'https://www.minorplanetcenter.net/iau/MPCORB/CometEls.txt'
 JPL_SBDB_ENDPOINT = 'https://ssd-api.jpl.nasa.gov/sbdb.api'
 
@@ -370,7 +370,7 @@ def _fetch_jpl_comet_snapshot(name: str, timeout_seconds: int = 8) -> Dict[str, 
 
 def enrich_with_jpl_fallback(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Fill missing fields from JPL when possible, preserving MPC rows as primary."""
-    # Only these fields are worth fetching from JPL — and MPC already provides
+    # Only these fields are worth fetching from JPL - and MPC already provides
     # them for virtually all comets.  Skip the HTTP call entirely when all of
     # them are already present so we don't make hundreds of unnecessary requests.
     _JPL_FILLS = ('absolute_magnitude', 'orbit_class')

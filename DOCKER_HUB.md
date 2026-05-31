@@ -2,7 +2,7 @@
 
 **A self-hosted astronomy dashboard for observation planning and astrophotography management.**
 
-MyAstroBoard combines weather analysis, automated sky calculations, and planning tools into a single Docker-first application — designed for amateur astronomers who want full control over their data.
+MyAstroBoard combines weather analysis, automated sky calculations, and planning tools into a single Docker-first application - designed for amateur astronomers who want full control over their data.
 
 ![Demo MyAstroBoard](https://raw.githubusercontent.com/WorldOfGZ/myastroboard/main/docs/img/overview.gif)
 
@@ -10,14 +10,14 @@ MyAstroBoard combines weather analysis, automated sky calculations, and planning
 
 ## ✨ Features
 
-- **SkyTonight** — Automated deep-sky object calculations based on your location and constraints, running twice daily (after astronomical dusk and before astronomical dawn)
-- **Weather & Conditions** — Observing condition analysis powered by Open-Meteo
-- **Astronomy Events** — Moon, sun, eclipses, aurora forecasts, ISS passes
-- **Astrodex** — Personal astrophotography catalog with image management
-- **Plan My Night** — Visual timeline builder with CSV/PDF export
-- **Equipment Profiles** — Field-of-view calculator per instrument
-- **Multi-user** — Authentication system with admin/user roles
-- **i18n** — English, French, and community translations
+- **SkyTonight** - Automated deep-sky object calculations based on your location and constraints, running twice daily (after astronomical dusk and before astronomical dawn)
+- **Weather & Conditions** - Observing condition analysis powered by Open-Meteo
+- **Astronomy Events** - Moon, sun, eclipses, aurora forecasts, ISS passes
+- **Astrodex** - Personal astrophotography catalog with image management
+- **Plan My Night** - Visual timeline builder with CSV/PDF export
+- **Equipment Profiles** - Field-of-view calculator per instrument
+- **Multi-user** - Authentication system with admin/user roles
+- **i18n** - English, French, and community translations
 
 ---
 
@@ -59,8 +59,8 @@ For complete installation instructions, see the [Installation Guide](https://git
 
 | Platform | Architecture |
 |----------|-------------|
-| `linux/amd64` | x86_64 — PC, server, most NAS (Synology Intel/AMD) |
-| `linux/arm64` | ARM 64-bit — Raspberry Pi 4/5, Apple Silicon |
+| `linux/amd64` | x86_64 - PC, server, most NAS (Synology Intel/AMD) |
+| `linux/arm64` | ARM 64-bit - Raspberry Pi 4/5, Apple Silicon |
 
 ---
 

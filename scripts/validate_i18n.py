@@ -157,14 +157,14 @@ def main() -> int:
 
     # --- Report ---
     if errors:
-        print(f"i18n validation FAILED — {len(errors)} error(s) found:\n")
+        print(f"i18n validation FAILED - {len(errors)} error(s) found:\n")
         for err in errors:
             print(f"  ✗ {err}")
         print()
         return 1
 
     print(
-        f"i18n validation OK — {len(json_languages)} language(s): "
+        f"i18n validation OK - {len(json_languages)} language(s): "
         f"{sorted(json_languages)}"
     )
     return 0

@@ -95,7 +95,7 @@ class MoonPlanner:
         Instead of calling _dark_hours 3 times (3 × 73 individual Astropy calls),
         we build an array of all time points and let Astropy transform the whole
         array at once.  That yields 2 vectorized calls (sun + moon) per night
-        instead of 146 individual ones — ~50× fewer coordinate transforms.
+        instead of 146 individual ones - ~50× fewer coordinate transforms.
         """
         start = datetime.datetime.combine(
             date,

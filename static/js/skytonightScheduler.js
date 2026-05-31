@@ -100,7 +100,7 @@ const SkyTonightScheduler = (() => {
                 const phaseLabel = i18n.t(`scheduler.phase_${p.phase}`, {}, p.phase);
                 if (p.phase_total > 0) {
                     els.progress().textContent =
-                        `${phaseLabel} — ${p.phase_processed}/${p.phase_total}${duration}`;
+                        `${phaseLabel} - ${p.phase_processed}/${p.phase_total}${duration}`;
                 } else {
                     els.progress().textContent = `${phaseLabel}${duration}`;
                 }
@@ -120,7 +120,7 @@ const SkyTonightScheduler = (() => {
         } else if (state.isExecuting) {
             _notExecutingCount++;
             if (_notExecutingCount >= 2) {
-                // Two consecutive false responses — execution genuinely finished.
+                // Two consecutive false responses - execution genuinely finished.
                 loadSkyTonightResultsTabs();
                 last_catalogue_executed = null;
                 state.isExecuting = false;
@@ -154,7 +154,7 @@ const SkyTonightScheduler = (() => {
             const status = await fetchStatus();
             render(status);
         } catch (e) {
-            // Keep polling — a transient error (server restart, brief network
+            // Keep polling - a transient error (server restart, brief network
             // hiccup) must not permanently kill the interval and leave the
             // banner stuck hidden for the rest of the page session.
             console.warn('SkyTonight scheduler poll failed (will retry):', e);

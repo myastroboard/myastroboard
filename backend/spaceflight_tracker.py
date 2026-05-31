@@ -1,5 +1,5 @@
 """
-Spaceflight data service — Launch Library 2 (The Space Devs)
+Spaceflight data service - Launch Library 2 (The Space Devs)
 Fetches upcoming/past launches, current astronauts in space, and space events.
 
 Free tier: ~15 requests/hour without auth key; caching keeps live calls minimal.
@@ -59,10 +59,10 @@ def _cache_image(url: Optional[str]) -> Optional[str]:
         return url  # graceful fallback to the original CDN URL
 
 
-# Per-path 429 backoff — after a rate-limit error, suppress calls to the same
+# Per-path 429 backoff - after a rate-limit error, suppress calls to the same
 # path for up to _BACKOFF_TTL seconds so the scheduler/API endpoints don't
 # hammer the free-tier quota while it recovers.
-_BACKOFF_TTL = 3600  # seconds — match the spaceflight launches TTL
+_BACKOFF_TTL = 3600  # seconds - match the spaceflight launches TTL
 _backoff_until: Dict[str, float] = {}
 
 
@@ -73,7 +73,7 @@ def _get(path: str, params: Optional[Dict[str, Any]] = None) -> Optional[Dict[st
     if backoff_exp:
         remaining = backoff_exp - time.time()
         if remaining > 0:
-            logger.debug("LL2 API backoff active for %s — skipping (%.0fs remaining)", path, remaining)
+            logger.debug("LL2 API backoff active for %s - skipping (%.0fs remaining)", path, remaining)
             return None
         else:
             _backoff_until.pop(path, None)
@@ -92,7 +92,7 @@ def _get(path: str, params: Optional[Dict[str, Any]] = None) -> Optional[Dict[st
             retry_after = int(exc.response.headers.get("Retry-After", _BACKOFF_TTL))
             backoff = min(max(retry_after, 60), _BACKOFF_TTL)
             _backoff_until[path] = time.time() + backoff
-            logger.warning("LL2 API 429 for %s — backing off for %ds", url, backoff)
+            logger.warning("LL2 API 429 for %s - backing off for %ds", url, backoff)
         else:
             logger.warning("LL2 API HTTP error %s for %s", exc.response.status_code, url)
     except Exception as exc:
@@ -101,7 +101,7 @@ def _get(path: str, params: Optional[Dict[str, Any]] = None) -> Optional[Dict[st
 
 
 # ---------------------------------------------------------------------------
-# Data normalizers — map raw LL2 objects to slim, serialisable dicts
+# Data normalizers - map raw LL2 objects to slim, serialisable dicts
 # ---------------------------------------------------------------------------
 
 def _normalise_launch(raw: Dict[str, Any]) -> Dict[str, Any]:
@@ -281,7 +281,7 @@ def get_upcoming_space_events(limit: int = 15) -> Optional[Dict[str, Any]]:
 
 
 # ---------------------------------------------------------------------------
-# Live vidURLs — lazy detail-endpoint fetch (free tier: ~15 req/hour)
+# Live vidURLs - lazy detail-endpoint fetch (free tier: ~15 req/hour)
 # Per-launch in-process cache with 5-minute TTL.
 # ---------------------------------------------------------------------------
 _VIDURLS_TTL = 300  # seconds
@@ -337,7 +337,7 @@ def get_launch_vidurls(launch_id: str) -> List[Dict[str, Any]]:
 
 
 # ---------------------------------------------------------------------------
-# Image cache pruning — remove files no longer referenced by active cache data
+# Image cache pruning - remove files no longer referenced by active cache data
 # ---------------------------------------------------------------------------
 
 def prune_image_cache(active_data: list) -> None:

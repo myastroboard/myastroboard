@@ -1,5 +1,5 @@
 /**
- * spaceflight.js — Spaceflight section: launches, astronauts, space events
+ * spaceflight.js - Spaceflight section: launches, astronauts, space events
  * Uses XSS-safe DOM APIs only (no innerHTML).
  * API data comes from the Launch Library 2 cache endpoints.
  */
@@ -42,7 +42,7 @@ function _sfCacheNotReady(container) {
  * Returns the original string if parsing fails.
  */
 function _sfFormatDate(isoStr) {
-    if (!isoStr) return '—';
+    if (!isoStr) return '-';
     try {
         return new Date(isoStr).toLocaleString(undefined, {
             year: 'numeric', month: 'short', day: 'numeric',
@@ -72,7 +72,7 @@ function _sfCountdown(isoStr) {
     return parts.join(' ');
 }
 
-// Live countdown ticker — updates every second for the next launch hero card
+// Live countdown ticker - updates every second for the next launch hero card
 let _sfCountdownTimer = null;
 const _sfTranslateCache = new Map();
 
@@ -204,7 +204,7 @@ function _sfShowLaunchModal(launch) {
     const bodyEl  = document.getElementById('sf-launch-modal-body');
     if (!titleEl || !bodyEl) return;
 
-    titleEl.textContent = launch.name || '—';
+    titleEl.textContent = launch.name || '-';
     DOMUtils.clear(bodyEl);
 
     // ---- Helper: extract YouTube video ID from any YT URL variant ----
@@ -272,7 +272,7 @@ function _sfShowLaunchModal(launch) {
             })
             .catch(() => { /* keep static image on error */ });
     } else {
-        // Not live — just show the static image
+        // Not live - just show the static image
         const imgEl = _buildStaticImage(false);
         if (imgEl) mediaSlot.appendChild(imgEl);
     }
@@ -507,7 +507,7 @@ function _renderLaunches(container, data) {
 
         const title = document.createElement('h3');
         title.className = 'card-title';
-        title.textContent = next.name || '—';
+        title.textContent = next.name || '-';
         body.appendChild(title);
 
         const meta = document.createElement('div');
@@ -615,7 +615,7 @@ function _makeLaunchCard(launch, isPast) {
     card.style.cursor = 'pointer';
     card.addEventListener('click', () => _sfShowLaunchModal(launch));
 
-    // Card image — left side, full card height
+    // Card image - left side, full card height
     if (launch.image_url) {
         const img = document.createElement('img');
         img.src = launch.image_url;
@@ -633,7 +633,7 @@ function _makeLaunchCard(launch, isPast) {
     // Title row
     const title = document.createElement('h6');
     title.className = 'card-title';
-    title.textContent = launch.name || '—';
+    title.textContent = launch.name || '-';
     body.appendChild(title);
 
     // Status + rocket + webcast badges
@@ -839,7 +839,7 @@ function _makeCrewCard(member) {
 
     const name = document.createElement('p');
     name.className = 'card-title small fw-semibold mb-1';
-    name.textContent = member.name || '—';
+    name.textContent = member.name || '-';
     body.appendChild(name);
 
     if (member.role) {
@@ -875,7 +875,7 @@ function _makeAstronautCard(ast) {
 
     const name = document.createElement('p');
     name.className = 'card-title small fw-semibold mb-1';
-    name.textContent = ast.name || '—';
+    name.textContent = ast.name || '-';
     body.appendChild(name);
 
     if (ast.nationality) {
@@ -984,7 +984,7 @@ function _makeEventCard(ev) {
     const titleWrap = document.createElement('div');
     const title = document.createElement('h6');
     title.className = 'card-title mb-1';
-    title.textContent = ev.name || '—';
+    title.textContent = ev.name || '-';
     titleWrap.appendChild(title);
 
     const meta = document.createElement('div');

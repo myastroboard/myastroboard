@@ -191,7 +191,7 @@ async function showObjectInfoModal(identifier) {
 
     const t = (key, fb) => (typeof i18n !== 'undefined' && i18n.has(key)) ? i18n.t(key) : fb;
 
-    titleEl.textContent = `${escapeHtml(identifier)} — ${t('object_info.title', 'Object Information')}`;
+    titleEl.textContent = `${escapeHtml(identifier)} - ${t('object_info.title', 'Object Information')}`;
 
     // Loading state
     DOMUtils.clear(bodyEl);

@@ -23,7 +23,7 @@ async function showPlanTelescopePickerModal(telescopeItems, row) {
     const existingModal = document.getElementById('plan-telescope-picker-modal');
     if (existingModal) existingModal.remove();
 
-    // Fetch ratings for the target row (non-blocking — render immediately, fill in ratings after)
+    // Fetch ratings for the target row (non-blocking - render immediately, fill in ratings after)
     let ratingsById = {};
     if (row) {
         try {
@@ -296,7 +296,7 @@ function _astroScoreTierKey(score) {
 
 /** Returns an HTML string: a coloured Bootstrap badge showing the score as %. */
 function _astroScoreBadgeHtml(score) {
-    if (score === null || score === undefined || score === '') return '—';
+    if (score === null || score === undefined || score === '') return '-';
     const num = parseFloat(score);
     if (isNaN(num)) return escapeHtml(String(score));
     const pct  = Math.round(num * 100);
@@ -308,15 +308,15 @@ function _astroScoreBadgeHtml(score) {
 /**
  * Returns a colour-coded badge for solar elongation (angular distance from the Sun).
  * Reuses the same quality CSS classes as the AstroScore badge for consistency.
- *   ≥ 90° → exceptional (green)  — opposition / quadrature zone
- *   45-89° → good (blue)         — well separated from the Sun
- *   20-44° → average (amber)     — twilight-affected, challenging
- *   < 20°  → poor (red)          — solar glare zone, effectively unobservable
+ *   ≥ 90° → exceptional (green)  - opposition / quadrature zone
+ *   45-89° → good (blue)         - well separated from the Sun
+ *   20-44° → average (amber)     - twilight-affected, challenging
+ *   < 20°  → poor (red)          - solar glare zone, effectively unobservable
  */
 function _elongationBadgeHtml(deg) {
-    if (deg === null || deg === undefined || deg === '') return '—';
+    if (deg === null || deg === undefined || deg === '') return '-';
     const num = parseFloat(deg);
-    if (isNaN(num)) return '—';
+    if (isNaN(num)) return '-';
     let cls;
     if (num >= 90) cls = 'astroscore-badge astroscore-badge-exceptional';
     else if (num >= 45) cls = 'astroscore-badge astroscore-badge-good';
@@ -337,7 +337,7 @@ function _astroScoreLegendHtml() {
     html += `<span class="text-muted fw-semibold">${escapeHtml(tSkyTonightCompat('astroscore_legend_title'))}:</span>`;
     tiers.forEach(({ key, cls, range }) => {
         const label = tSkyTonightCompat(key);
-        html += `<span class="badge ${cls}">${escapeHtml(range)} — ${escapeHtml(label)}</span>`;
+        html += `<span class="badge ${cls}">${escapeHtml(range)} - ${escapeHtml(label)}</span>`;
     });
     html += `</div>`;
     return html;
@@ -378,7 +378,7 @@ async function getSkyTonightDisplayAstrodex() {
  * for tonight, sized by AstroScore and coloured by object type.
  */
 async function _renderSkyMap(reports, container) {
-    // NOTE: do NOT clear 'container' here — the caller already inserted a loading indicator.
+    // NOTE: do NOT clear 'container' here - the caller already inserted a loading indicator.
     // We clear it only once we have data (or an error) to show.
 
     if (typeof Plotly === 'undefined') {
@@ -448,7 +448,7 @@ async function _renderSkyMap(reports, container) {
         const alt      = tgt.alt;
         const az       = tgt.az;
         const label    = String(tgt.n);
-        const scoreStr = tgt.score != null ? (tgt.score * 100).toFixed(0) + '%' : '—';
+        const scoreStr = tgt.score != null ? (tgt.score * 100).toFixed(0) + '%' : '-';
         const constLabel = tgt.constellation ? _translatedConstellation(tgt.constellation) : '';
         const tooltip  = `<b>${label}: ${escapeHtml(tgt.name)}</b><br>` +
                          `${escapeHtml(tSkyTonightType(tgt.type || tgt.category))}<br>` +
@@ -733,7 +733,7 @@ async function _renderSkyMap(reports, container) {
         messierBtn.type = 'button';
         messierBtn.className = 'btn btn-sm btn-outline-secondary sky-map-filter-btn';
         messierBtn.innerHTML = '<i class="bi bi-star icon-inline" aria-hidden="true"></i>Messier';
-        messierBtn.title = tSkyTonightCompat('sky_map_filter_dso') + ' — Messier only';
+        messierBtn.title = tSkyTonightCompat('sky_map_filter_dso') + ' - Messier only';
         messierBtn.addEventListener('click', () => {
             messierOnly = !messierOnly;
             if (messierOnly) {
@@ -875,7 +875,7 @@ async function _renderSkyMap(reports, container) {
 
     targets.forEach((tgt, i) => {
         const color    = PALETTE[i % PALETTE.length];
-        const scoreVal = tgt.score != null ? Math.round(tgt.score * 100) + '%' : '—';
+        const scoreVal = tgt.score != null ? Math.round(tgt.score * 100) + '%' : '-';
         const tableRow = tbody.insertRow();
         tableRow.dataset.cat   = tgt.category;
         tableRow.dataset.score = tgt.score != null ? tgt.score : '0';
@@ -885,7 +885,7 @@ async function _renderSkyMap(reports, container) {
             { text: tgt.name,                 colored: false },
             { text: tSkyTonightType(tgt.type || tgt.category), colored: false },
             { score: tgt.score },
-            { text: tgt.constellation ? _translatedConstellation(tgt.constellation) : '—', colored: false },
+            { text: tgt.constellation ? _translatedConstellation(tgt.constellation) : '-', colored: false },
         ].forEach(cell => {
             const td = tableRow.insertCell();
             if (cell.score !== undefined) {
@@ -896,7 +896,7 @@ async function _renderSkyMap(reports, container) {
                     badge.title = tSkyTonightCompat(_astroScoreTierKey(cell.score));
                     td.appendChild(badge);
                 } else {
-                    td.textContent = '—';
+                    td.textContent = '-';
                 }
             } else {
                 td.textContent = cell.text;
@@ -989,7 +989,7 @@ async function loadCatalogues() {
 // ======================
 
 /**
- * Main entry point — called when the SkyTonight tab is activated,
+ * Main entry point - called when the SkyTonight tab is activated,
  * after a calculation finishes, or after plan changes that need badge refresh.
  * Builds/refreshes the 5 section buttons and ensures content wrappers exist.
  */
@@ -1166,7 +1166,7 @@ async function _showSkyTonightLogSection(container) {
         header.appendChild(tsEl);
         card.appendChild(header);
 
-        // Body — key/value rows from payload
+        // Body - key/value rows from payload
         if (payload && typeof payload === 'object') {
             const body = document.createElement('div');
             body.className = 'card-body py-2 px-3 small';
@@ -1206,7 +1206,7 @@ async function _showSkyTonightLogSection(container) {
 }
 
 // ---------------------------------------------------------------------------
-// Debug section — "DSO not found?"
+// Debug section - "DSO not found?"
 // ---------------------------------------------------------------------------
 
 /** Chart instance used by the debug altitude-time chart; cleaned up on re-search or tab switch. */
@@ -1435,8 +1435,8 @@ function _renderDebugObjectCard(container, target) {
         [tSkyTonightCompat('table_name'), target.preferred_name],
         [tSkyTonightCompat('table_type'), target.object_type],
         [tSkyTonightCompat('table_constellation') || 'Constellation', target.constellation],
-        [tSkyTonightCompat('table_mag'), target.magnitude != null ? target.magnitude : '—'],
-        [tSkyTonightCompat('table_size'), target.size_arcmin != null ? `${target.size_arcmin} arcmin` : '—'],
+        [tSkyTonightCompat('table_mag'), target.magnitude != null ? target.magnitude : '-'],
+        [tSkyTonightCompat('table_size'), target.size_arcmin != null ? `${target.size_arcmin} arcmin` : '-'],
     ];
 
     if (target.catalogue_names && Object.keys(target.catalogue_names).length > 0) {
@@ -1452,7 +1452,7 @@ function _renderDebugObjectCard(container, target) {
         dt.textContent = label;
         const dd = document.createElement('dd');
         dd.className = 'col-7 mb-1';
-        dd.textContent = value ?? '—';
+        dd.textContent = value ?? '-';
         dl.appendChild(dt);
         dl.appendChild(dd);
     });
@@ -1483,13 +1483,13 @@ function _renderDebugNightCard(container, nightWindow, moon, tz) {
 
     const tzFmt = new Intl.DateTimeFormat([], { hour: '2-digit', minute: '2-digit', timeZone: tz || 'UTC', hour12: false });
     const fmtIso = (iso) => {
-        try { return tzFmt.format(new Date(iso)); } catch { return iso || '—'; }
+        try { return tzFmt.format(new Date(iso)); } catch { return iso || '-'; }
     };
 
     const rows = [];
     if (nightWindow.available) {
         rows.push([tSkyTonightCompat('altitude_time_night_window'), `${fmtIso(nightWindow.night_start)} – ${fmtIso(nightWindow.night_end)}`]);
-        rows.push([tSkyTonightCompat('target_debug_night_hours'), nightWindow.night_hours != null ? `${nightWindow.night_hours.toFixed(1)} h` : '—']);
+        rows.push([tSkyTonightCompat('target_debug_night_hours'), nightWindow.night_hours != null ? `${nightWindow.night_hours.toFixed(1)} h` : '-']);
     }
     if (moon) {
         rows.push([tSkyTonightCompat('target_debug_moon_phase'), `${moon.phase_pct}%`]);
@@ -1503,7 +1503,7 @@ function _renderDebugNightCard(container, nightWindow, moon, tz) {
         dt.textContent = label;
         const dd = document.createElement('dd');
         dd.className = 'col-6 mb-1';
-        dd.textContent = value ?? '—';
+        dd.textContent = value ?? '-';
         dl.appendChild(dt);
         dl.appendChild(dd);
     });
@@ -1594,15 +1594,15 @@ function _renderDebugChecksCard(container, checks, constraints) {
             const minHSuffix = check.min_observable_hours != null
                 ? ` or ${check.min_observable_hours.toFixed(1)}h`
                 : '';
-            tdValue.textContent = `${frac}% (${obsH}h) — min ${fracThresh}%${minHSuffix}`;
+            tdValue.textContent = `${frac}% (${obsH}h) - min ${fracThresh}%${minHSuffix}`;
         } else if (check.name === 'moon_separation') {
             const val = check.value != null ? `${check.value}°` : '?';
             const thr = check.threshold != null ? `${check.threshold}°` : '?';
             const moonPct = check.moon_phase_pct != null ? ` (moon ${check.moon_phase_pct}%)` : '';
-            tdValue.textContent = `${val} — min ${thr}${moonPct}`;
+            tdValue.textContent = `${val} - min ${thr}${moonPct}`;
         } else {
-            const val = check.value != null ? `${check.value}${check.unit || ''}` : (check.note || '—');
-            const thr = check.threshold != null ? ` — min ${check.threshold}${check.unit || ''}` : '';
+            const val = check.value != null ? `${check.value}${check.unit || ''}` : (check.note || '-');
+            const thr = check.threshold != null ? ` - min ${check.threshold}${check.unit || ''}` : '';
             tdValue.textContent = `${val}${thr}`;
         }
 
@@ -1654,7 +1654,7 @@ function _renderDebugAltimeChart(container, alttimeData, target) {
     hIcon.setAttribute('aria-hidden', 'true');
     cardTitle.appendChild(hIcon);
     const titleText = target && target.preferred_name
-        ? `${tSkyTonightCompat('target_debug_altitude_chart_title')} — ${target.preferred_name}`
+        ? `${tSkyTonightCompat('target_debug_altitude_chart_title')} - ${target.preferred_name}`
         : tSkyTonightCompat('target_debug_altitude_chart_title');
     cardTitle.appendChild(document.createTextNode(titleText));
     cardHeader.appendChild(cardTitle);
@@ -1884,7 +1884,7 @@ async function _showSkyTonightDataSection(sectionKey, container) {
             return;
         }
 
-        // Solar elongation info box — only on the Bodies sub-tab
+        // Solar elongation info box - only on the Bodies sub-tab
         if (sectionKey === 'bodies') {
             const infoBox = document.createElement('div');
             infoBox.className = 'alert alert-info d-flex flex-column gap-2 mb-3';
@@ -2199,14 +2199,14 @@ async function _reRenderTablePage(sectionKey, page) {
     const tableData = isFiltered ? _skytFilteredData[sectionKey] : cachedData[sectionKey];
 
     // Target only the table sub-div so the filter controls in skyt-ctrl-… are
-    // never cleared — the filter input keeps its DOM node, its value, and focus
+    // never cleared - the filter input keeps its DOM node, its value, and focus
     // across every filter/pagination re-render.
     const tableType = sectionKey === 'report' ? 'report' : sectionKey;
     const tblDiv = document.getElementById(`skyt-tbl-SkyTonight-${tableType}`);
     const targetDiv = tblDiv || dataDiv;
     DOMUtils.clear(targetDiv);
 
-    // Empty result from an active filter — show a message instead of leaving the old table
+    // Empty result from an active filter - show a message instead of leaving the old table
     if (!Array.isArray(tableData) || tableData.length === 0) {
         const msg = document.createElement('div');
         msg.className = 'alert alert-info mt-3';
@@ -2426,7 +2426,7 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
         html += `</div>`; // closes skyt-ctrl div
     }
 
-    // Table content container — replaced on every filter/pagination change.
+    // Table content container - replaced on every filter/pagination change.
     if (!isRerender) html += `<div id="skyt-tbl-${eCat}-${eType}">`;
     html += _astroScoreLegendHtml();
 
@@ -3107,7 +3107,7 @@ function showPlotPopup(title, src) {
     modal.show();
 }
 
-// Altitude-time Chart.js instance — stored so it can be destroyed when the modal closes.
+// Altitude-time Chart.js instance - stored so it can be destroyed when the modal closes.
 let _alttimeChartInstance = null;
 
 function _destroyAlttimeChart() {
@@ -3128,14 +3128,14 @@ function _horizonAltAtAz(az, profile) {
     const azNorm = ((az % 360) + 360) % 360;
     const idx = sorted.findIndex(p => p.az > azNorm);
     if (idx === -1) {
-        // azNorm is beyond all profile points — interpolate between last and first (wrapped)
+        // azNorm is beyond all profile points - interpolate between last and first (wrapped)
         const p0 = sorted[sorted.length - 1];
         const p1 = { az: sorted[0].az + 360, alt: sorted[0].alt };
         const t = (azNorm - p0.az) / (p1.az - p0.az);
         return p0.alt + t * (p1.alt - p0.alt);
     }
     if (idx === 0) {
-        // azNorm is before all profile points — interpolate between last (wrapped back) and first
+        // azNorm is before all profile points - interpolate between last (wrapped back) and first
         const p0 = { az: sorted[sorted.length - 1].az - 360, alt: sorted[sorted.length - 1].alt };
         const p1 = sorted[0];
         const t = (azNorm - p0.az) / (p1.az - p0.az);
@@ -3224,7 +3224,7 @@ async function showAlttimePopup(title, targetId) {
     const nightAstroEnd   = data.night_astro_end   ? new Date(data.night_astro_end)   : null;
     const nightAstroStartFmt = nightAstroStart ? tzFmt.format(nightAstroStart) : '';
     const nightAstroEndFmt   = nightAstroEnd   ? tzFmt.format(nightAstroEnd)   : '';
-    // UTC millisecond timestamps for each sample — used by the astro-night plugin
+    // UTC millisecond timestamps for each sample - used by the astro-night plugin
     // to find the chart x-index matching the astronomical twilight boundaries.
     const timesUtcMs = (data.times_utc || []).map(t => new Date(t + 'Z').getTime());
 
@@ -3261,7 +3261,7 @@ async function showAlttimePopup(title, targetId) {
     cardTitle.innerHTML = `<i class="bi bi-graph-up-arrow icon-inline text-primary" aria-hidden="true"></i>${escapeHtml(title)}`;
     cardHeader.appendChild(cardTitle);
 
-    // Card body — canvas fills the full width, explicit height like weather charts
+    // Card body - canvas fills the full width, explicit height like weather charts
     const cardBody = document.createElement('div');
     cardBody.className = 'card-body';
     const canvas = document.createElement('canvas');
@@ -3270,7 +3270,7 @@ async function showAlttimePopup(title, targetId) {
     canvas.style.height = '300px';
     cardBody.appendChild(canvas);
 
-    // Card footer — legend badges + night window info
+    // Card footer - legend badges + night window info
     const cardFooter = document.createElement('div');
     cardFooter.className = 'card-footer text-muted small';
     const footerRow = document.createElement('div');

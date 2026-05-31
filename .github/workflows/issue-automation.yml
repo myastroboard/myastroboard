@@ -195,6 +195,6 @@ jobs:
                 owner:        context.repo.owner,
                 repo:         context.repo.repo,
                 issue_number: issue.number,
-                body: `🌟 Welcome to **MyAstroBoard** @${author}! This is your first contribution to the project — thank you so much! We'll review your issue as soon as possible. ✨🔭`
+                body: `🌟 Welcome to **MyAstroBoard** @${author}! This is your first contribution to the project - thank you so much! We'll review your issue as soon as possible. ✨🔭`
               });
             }

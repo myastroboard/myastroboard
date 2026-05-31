@@ -10,8 +10,8 @@ The Exposure Calculator is a tool inside the **Equipment** tab that helps astrop
 
 | Field | Description | Default |
 |-------|-------------|---------|
-| Telescope | Select from your saved telescopes | — |
-| Camera | Select from your saved cameras | — |
+| Telescope | Select from your saved telescopes | - |
+| Camera | Select from your saved cameras | - |
 | Read noise (e⁻) | Auto-filled from camera profile if available | 4 e⁻ |
 | Quantum efficiency (%) | Sensor QE; 60–75% covers most modern CMOS cameras | 65% |
 | Total integration (h) | Planned session length | 3 h |
@@ -39,9 +39,9 @@ The sky photon rate per pixel per second is computed from the observed sky surfa
 $$B_\text{sky} = F_0 \times 10^{-\text{SQM}/2.5} \times \text{QE} \times \frac{\pi}{4} \times D_m^2 \times \text{plate\_scale}^2$$
 
 Where:
-- $F_0 = 9 \times 10^9$ photons/m²/s/arcsec² — Vega zero-point flux, V-band
-- $D_m$ — aperture in metres
-- $\text{plate\_scale}$ — in arcsec/px (so $\text{plate\_scale}^2$ is arcsec²/px)
+- $F_0 = 9 \times 10^9$ photons/m²/s/arcsec² - Vega zero-point flux, V-band
+- $D_m$ - aperture in metres
+- $\text{plate\_scale}$ - in arcsec/px (so $\text{plate\_scale}^2$ is arcsec²/px)
 
 ### Bortle → SQM mapping
 
@@ -74,7 +74,7 @@ $$n_\text{subs} = \text{round}\!\left(\frac{\text{total\_integration}}{t_\text{s
 The formula was validated against published empirical measurements:
 - ASI294MC Pro, f/7, 150 mm aperture, pixel = 4.63 µm, QE ≈ 75%, Bortle 5 (SQM 20.3)
 - Expected sky background from real data: ~0.83 e⁻/px/s
-- Formula result: ~1.0 e⁻/px/s — within the measurement uncertainty
+- Formula result: ~1.0 e⁻/px/s - within the measurement uncertainty
 
 ## Limitations
 

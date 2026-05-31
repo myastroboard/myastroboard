@@ -3,8 +3,8 @@ VAPID key management and Web Push delivery.
 
 Keys are generated once on first startup and persisted to DATA_DIR/vapid.json.
 Storage format:
-  private_key — PEM string (used by pywebpush's webpush())
-  public_key  — URL-safe base64url of the uncompressed EC point (65 bytes, no padding)
+  private_key - PEM string (used by pywebpush's webpush())
+  public_key  - URL-safe base64url of the uncompressed EC point (65 bytes, no padding)
                 sent to the browser as applicationServerKey
 """
 import base64
@@ -17,7 +17,17 @@ from logging_config import get_logger
 logger = get_logger(__name__)
 
 _VAPID_FILE = os.path.join(os.environ.get('DATA_DIR', '/app/data'), 'vapid.json')
-_VAPID_CLAIMS_EMAIL = 'mailto:noreply@myastroboard.local'
+
+_raw_contact = os.environ.get('VAPID_CONTACT_EMAIL', '').strip()
+if _raw_contact:
+    # Accept bare email or full mailto: URI
+    _VAPID_CLAIMS_EMAIL = _raw_contact if _raw_contact.startswith(('mailto:', 'https://')) else f'mailto:{_raw_contact}'
+else:
+    _VAPID_CLAIMS_EMAIL = 'mailto:admin@localhost'
+    logger.warning(
+        "VAPID_CONTACT_EMAIL is not set. Push notifications may be rejected by Apple APNs. "
+        "Set VAPID_CONTACT_EMAIL to a real email address (e.g. you@example.com)."
+    )
 
 _vapid_keys: dict = {}
 
@@ -71,6 +81,19 @@ def load_or_generate_vapid_keys() -> dict:
 
 def get_vapid_public_key() -> str:
     return load_or_generate_vapid_keys()['public_key']
+
+
+def get_vapid_contact_status() -> dict:
+    """Return whether the VAPID contact email is properly configured for push delivery."""
+    raw = os.environ.get('VAPID_CONTACT_EMAIL', '').strip()
+    if not raw:
+        return {'ok': False, 'reason': 'not_set'}
+    email = raw.removeprefix('mailto:')
+    domain = email.split('@')[-1].lower() if '@' in email else email.lower()
+    _bad_domains = {'.local', 'localhost', 'example.com', 'example.org', 'example.net'}
+    if any(domain == d or domain.endswith(d) for d in _bad_domains):
+        return {'ok': False, 'reason': 'invalid_domain', 'domain': domain}
+    return {'ok': True}
 
 
 def send_push(subscription_info: dict, payload: dict) -> bool:

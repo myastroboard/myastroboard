@@ -2,9 +2,9 @@
 Deep Sky Object metadata and image integration.
 
 Provides:
-  Phase 1 — Object resolution via SIMBAD TAP (identifier → name, type, RA/DEC, aliases)
-  Phase 2 — Image URL construction via SkyView/DSS (no download, link only)
-  Phase 3 — Localized description via Wikipedia REST API with language fallback chain
+  Phase 1 - Object resolution via SIMBAD TAP (identifier → name, type, RA/DEC, aliases)
+  Phase 2 - Image URL construction via SkyView/DSS (no download, link only)
+  Phase 3 - Localized description via Wikipedia REST API with language fallback chain
 """
 
 import re
@@ -33,7 +33,7 @@ _ALLOWED_LANGS: frozenset = frozenset([
 # Permits: letters, digits, space, +, -, ., *, /, '  (e.g. "NGC 2632", "alpha Cen")
 _IDENT_RE = re.compile(r"^[A-Za-z0-9 +\-_.*/']+$")
 
-# Pre-built Wikipedia base URLs keyed by lang code — the hostname is never
+# Pre-built Wikipedia base URLs keyed by lang code - the hostname is never
 # constructed from user input, which prevents SSRF (CodeQL CWE-918).
 _WIKIPEDIA_BASES: Dict[str, str] = {
     lang: f'https://{lang}.wikipedia.org/api/rest_v1/page/summary/'
@@ -65,7 +65,7 @@ def _sanitize_lang(lang: str) -> str:
 
 
 # ──────────────────────────────────────────────
-# Phase 1 — Object resolution (SIMBAD TAP)
+# Phase 1 - Object resolution (SIMBAD TAP)
 # ──────────────────────────────────────────────
 
 def _simbad_query(adql: str) -> Optional[Dict]:
@@ -177,7 +177,7 @@ def _resolve_via_simbad(identifier: str) -> Optional[Dict[str, Any]]:
     if alias_result and alias_result.get('data'):
         for alias_row in alias_result['data']:
             alias_val = str(alias_row[0]).strip()
-            # Exclude only the identifier the user searched for — it is already
+            # Exclude only the identifier the user searched for - it is already
             # the modal title, so showing it again as an alias is redundant.
             # Keep main_id even if it differs from identifier: it is a valid
             # "also known as" name (e.g. user clicked "M 100", main_id is "NGC 4258").
@@ -232,7 +232,7 @@ def resolve_identifier_for_catalogue_lookup(identifier: str) -> Optional[Dict[st
 
     Returns {'object_type', 'constellation', 'aliases'} or None.
     'constellation' is the full lowercase constellation name derived from RA/Dec via astropy
-    (e.g. 'cassiopeia', 'ursa major') — ready for the dropdown without further conversion.
+    (e.g. 'cassiopeia', 'ursa major') - ready for the dropdown without further conversion.
     'aliases' is a sorted list (most recognizable first).
     """
     safe_id = identifier.replace("'", "''")
@@ -287,7 +287,7 @@ def resolve_identifier_for_catalogue_lookup(identifier: str) -> Optional[Dict[st
 
 
 # ──────────────────────────────────────────────
-# Phase 2 — Image URL (SkyView / DSS)
+# Phase 2 - Image URL (SkyView / DSS)
 # ──────────────────────────────────────────────
 
 def _get_dss_image_url(ra: float, dec: float, size_deg: float = 0.5) -> str:
@@ -310,7 +310,7 @@ def _get_dss_image_url(ra: float, dec: float, size_deg: float = 0.5) -> str:
     return f"{HIPS2FITS_URL}?{urllib.parse.urlencode(params)}"
 
 # ──────────────────────────────────────────────
-# Phase 3 — Localized description (Wikipedia)
+# Phase 3 - Localized description (Wikipedia)
 # ──────────────────────────────────────────────
 
 # Regex matching SIMBAD catalog-style designations that Wikipedia will never have
@@ -360,7 +360,7 @@ def _get_wikipedia_summary(search_term: str, lang: str = 'en') -> Optional[Dict[
             return None
         resp.raise_for_status()
         data = resp.json()
-        # Skip disambiguation pages — they list unrelated topics sharing the same label
+        # Skip disambiguation pages - they list unrelated topics sharing the same label
         if data.get('type') == 'disambiguation':
             return None
         extract = data.get('extract', '').strip()
@@ -556,7 +556,7 @@ def get_object_info(identifier: str, lang: str = 'en') -> Dict[str, Any]:
     dec = resolved.get('dec')
 
     # Replace SIMBAD's raw otype_txt code (e.g. "OpC", "GlCl") with the human-readable
-    # object_type from the local dataset when available — the local type matches the
+    # object_type from the local dataset when available - the local type matches the
     # i18n keys used by tSkyTonightType() in the frontend (e.g. "Open Cluster" →
     # skytonight.type_open_cluster → "Amas ouvert").
     _local_entry = _get_local_entry('alias', identifier)
@@ -587,7 +587,7 @@ def get_object_info(identifier: str, lang: str = 'en') -> Dict[str, Any]:
         if _norm not in _seen:
             _seen.add(_norm)
             search_terms.append(_norm)
-        # For 'M 82' style names also try 'M82' (no space) — French Wikipedia needs it
+        # For 'M 82' style names also try 'M82' (no space) - French Wikipedia needs it
         _compact = _norm.replace(' ', '')
         if _compact != _norm and _compact not in _seen:
             _seen.add(_compact)

@@ -23,7 +23,7 @@ _CATALOGUES_DIR = os.path.join(os.path.dirname(__file__), 'catalogues')
 DEFAULT_CALDWELL_MAP: Dict[str, str] = {}
 IDENTIFIER_PATTERN = re.compile(r'\b(M\s*\d+|NGC\s*\d+|IC\s*\d+)\b', re.IGNORECASE)
 
-# ── Herschel 400 — Astronomical League program (NGC objects only) ─────────────
+# ── Herschel 400 - Astronomical League program (NGC objects only) ─────────────
 # Source: https://www.astroleague.org/herschel-400-observing-program/
 _HERSCHEL400_NGC: frozenset = frozenset({
      40,  129,  136,  157,  185,  188,  205,  225,  246,  247,
@@ -142,7 +142,7 @@ def _collect_catalogue_names(row: PyOngcRow, caldwell_map: Optional[Dict[str, st
             names['OpenNGC'] = _normalize_identifier(row.ic_names[0])
         names['OpenIC'] = _normalize_identifier(row.ic_names[0])
 
-    # PyOngc returns identifiers[1]/[2] as cross-references only — they are None
+    # PyOngc returns identifiers[1]/[2] as cross-references only - they are None
     # for the primary NGC/IC object itself.  Derive OpenNGC / OpenIC from the
     # canonical row name when the cross-reference columns were empty.
     norm_primary = _normalize_identifier(row.name)
@@ -298,7 +298,7 @@ def _build_cross_ref_map() -> Dict[str, Dict[str, str]]:
             if key:
                 cross_refs.setdefault(key, {})['Pensack500'] = raw_name.strip()
     else:
-        logger.warning('pensack500.json missing or invalid — Pensack 500 catalogue not applied')
+        logger.warning('pensack500.json missing or invalid - Pensack 500 catalogue not applied')
 
     # ── LBN cross-refs ────────────────────────────────────────────────────────
     lbn_data = _load_json_catalogue('lbn.json')
@@ -310,7 +310,7 @@ def _build_cross_ref_map() -> Dict[str, Dict[str, str]]:
             if key:
                 cross_refs.setdefault(key, {})['LBN'] = str(lbn_name).strip()
     else:
-        logger.warning('lbn.json missing or invalid — LBN cross-references not applied')
+        logger.warning('lbn.json missing or invalid - LBN cross-references not applied')
 
     # ── GaryImm cross-refs ────────────────────────────────────────────────────
     garyimm_data = _load_json_catalogue('garyimm_crossrefs.json')
@@ -322,7 +322,7 @@ def _build_cross_ref_map() -> Dict[str, Dict[str, str]]:
             if key:
                 cross_refs.setdefault(key, {})['GaryImm'] = raw_name.strip()
     else:
-        logger.warning('garyimm_crossrefs.json missing or invalid — GaryImm cross-refs not applied')
+        logger.warning('garyimm_crossrefs.json missing or invalid - GaryImm cross-refs not applied')
 
     # ── Arp cross-refs ────────────────────────────────────────────────────────
     arp_data = _load_json_catalogue('arp.json')
@@ -334,7 +334,7 @@ def _build_cross_ref_map() -> Dict[str, Dict[str, str]]:
             if key:
                 cross_refs.setdefault(key, {})['Arp'] = str(arp_name).strip()
     else:
-        logger.warning('arp.json missing or invalid — Arp cross-references not applied')
+        logger.warning('arp.json missing or invalid - Arp cross-references not applied')
 
     total_keys = len(cross_refs)
     catalogues_applied = sorted({cat for refs in cross_refs.values() for cat in refs})
@@ -493,7 +493,7 @@ def _build_standalone_targets_from_json(filename: str, catalogue_key: str) -> Li
       name, ra_hours, dec_degrees, size_arcmin, type, description, mag, constellation
 
     Optional field:
-      extra_catalogues  — list of additional catalogue keys to tag on this target
+      extra_catalogues  - list of additional catalogue keys to tag on this target
                           (e.g. ["GaryImm"] marks an object as part of Gary Imm's list)
 
     These are objects that have no NGC/IC identifier and therefore cannot be
@@ -501,10 +501,10 @@ def _build_standalone_targets_from_json(filename: str, catalogue_key: str) -> Li
     """
     data = _load_json_catalogue(filename)
     if not isinstance(data, list):
-        logger.warning(f'{filename} missing or invalid — {catalogue_key} standalone targets not loaded')
+        logger.warning(f'{filename} missing or invalid - {catalogue_key} standalone targets not loaded')
         return []
 
-    # Phase 1 — parse all valid entries into intermediate dicts
+    # Phase 1 - parse all valid entries into intermediate dicts
     parsed: List[Dict] = []
     skipped = 0
     for entry in data:
@@ -540,7 +540,7 @@ def _build_standalone_targets_from_json(filename: str, catalogue_key: str) -> Li
             'extra_cats': [str(c) for c in (entry.get('extra_catalogues') or []) if c],
         })
 
-    # Phase 2 — batch-compute constellations for entries that have none
+    # Phase 2 - batch-compute constellations for entries that have none
     missing_idx = [i for i, e in enumerate(parsed) if not e['constellation']]
     if missing_idx:
         try:
@@ -554,9 +554,9 @@ def _build_standalone_targets_from_json(filename: str, catalogue_key: str) -> Li
                 parsed[i]['constellation'] = str(con)
             logger.info(f'{filename}: resolved constellations for {len(missing_idx)} entries via astropy')
         except Exception as exc:
-            logger.warning(f'{filename}: constellation batch lookup failed — {exc}')
+            logger.warning(f'{filename}: constellation batch lookup failed - {exc}')
 
-    # Phase 3 — build SkyTonightTarget objects
+    # Phase 3 - build SkyTonightTarget objects
     targets: List[SkyTonightTarget] = []
     for e in parsed:
         catalogue_names: Dict[str, str] = {catalogue_key: e['name']}

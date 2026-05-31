@@ -359,7 +359,7 @@ function formatAltAz(altitudeDeg, azimuthCardinal, azimuthDeg) {
 
 // ---------------------------------------------------------------------------
 // SkyTonight / Catalogue shared translation helpers
-// Single canonical definitions — loaded before astrodex.js, plan_my_night.js,
+// Single canonical definitions - loaded before astrodex.js, plan_my_night.js,
 // and skytonight.js so all three can reference these without re-declaring them.
 // ---------------------------------------------------------------------------
 

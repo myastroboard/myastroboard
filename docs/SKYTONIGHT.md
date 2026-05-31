@@ -1,6 +1,6 @@
 # SkyTonight
 
-SkyTonight is the built-in observability calculator. It computes, for every target in the dataset, which objects are worth imaging tonight — ranked by **AstroScore** — and exposes the results through a cached JSON API.
+SkyTonight is the built-in observability calculator. It computes, for every target in the dataset, which objects are worth imaging tonight - ranked by **AstroScore** - and exposes the results through a cached JSON API.
 
 ---
 
@@ -44,16 +44,16 @@ Multiple Gunicorn workers are protected by a file-level lock so only one worker 
 | OpenIC | [PyOngc](https://github.com/mattiaverga/PyOngc) | IC objects |
 | Messier | subset of OpenNGC | flagged via `identifiers[0]` |
 | Caldwell | subset of OpenNGC | extracted from PyOngc `other_identifiers` |
-| Herschel 400 | static list in `skytonight_catalogue_builder.py` | Astronomical League H400 program — cross-ref tag injected on matching NGC records |
-| Pensack 500 | `backend/catalogues/pensack500.json` | 502 NGC/IC objects — cross-ref tag injected on matching records |
-| LBN | `backend/catalogues/lbn.json` | Lynds' Bright Nebulae — 94 cross-refs injected on matching NGC/IC records |
-| GaryImm | `backend/catalogues/garyimm_crossrefs.json` + `garyimm_standalone.json` | 206-object astrophotography list by Gary Imm — 133 cross-refs on existing records + 33 standalone objects with no NGC/IC ID (Arp groups, LBN/LDN standalone, etc.) |
-| Arp | `backend/catalogues/arp.json` | Arp Atlas of Peculiar Galaxies — 120 NGC/IC cross-refs injected on matching records |
-| Sharpless | `backend/catalogues/sharpless.json` | 313 HII emission nebulae (Sh2 catalogue, Sharpless 1959) — all standalone records |
-| Barnard | `backend/catalogues/barnard.json` | 343 dark nebulae (Barnard 1927 catalogue) — all standalone records |
-| vdB | `backend/catalogues/vdb.json` | 158 reflection nebulae (van den Bergh 1966 catalogue) — all standalone records |
-| Abell PNe | `backend/catalogues/abell_pne.json` | 71 large planetary nebulae (Abell 1966 catalogue) — all standalone records |
-| Abell Clusters | `backend/catalogues/abell_clusters.json` | 2,712 rich galaxy clusters (Abell, Corwin & Olowin 1989) — all standalone records, size bypassed (null) |
+| Herschel 400 | static list in `skytonight_catalogue_builder.py` | Astronomical League H400 program - cross-ref tag injected on matching NGC records |
+| Pensack 500 | `backend/catalogues/pensack500.json` | 502 NGC/IC objects - cross-ref tag injected on matching records |
+| LBN | `backend/catalogues/lbn.json` | Lynds' Bright Nebulae - 94 cross-refs injected on matching NGC/IC records |
+| GaryImm | `backend/catalogues/garyimm_crossrefs.json` + `garyimm_standalone.json` | 206-object astrophotography list by Gary Imm - 133 cross-refs on existing records + 33 standalone objects with no NGC/IC ID (Arp groups, LBN/LDN standalone, etc.) |
+| Arp | `backend/catalogues/arp.json` | Arp Atlas of Peculiar Galaxies - 120 NGC/IC cross-refs injected on matching records |
+| Sharpless | `backend/catalogues/sharpless.json` | 313 HII emission nebulae (Sh2 catalogue, Sharpless 1959) - all standalone records |
+| Barnard | `backend/catalogues/barnard.json` | 343 dark nebulae (Barnard 1927 catalogue) - all standalone records |
+| vdB | `backend/catalogues/vdb.json` | 158 reflection nebulae (van den Bergh 1966 catalogue) - all standalone records |
+| Abell PNe | `backend/catalogues/abell_pne.json` | 71 large planetary nebulae (Abell 1966 catalogue) - all standalone records |
+| Abell Clusters | `backend/catalogues/abell_clusters.json` | 2,712 rich galaxy clusters (Abell, Corwin & Olowin 1989) - all standalone records, size bypassed (null) |
 | Comets | [Minor Planet Center](https://minorplanetcenter.net/) / JPL SBDB | auto-refreshed |
 | Planets / Moon / Sun | Skyfield `de421.bsp` | already computed elsewhere |
 
@@ -93,7 +93,7 @@ All sub-scores use a linear clamp:
 
 $$\text{normalise}(x, x_{\min}, x_{\max}) = \max\!\left(0,\;\min\!\left(1,\;\frac{x - x_{\min}}{x_{\max} - x_{\min}}\right)\right)$$
 
-### 1 — Visibility score (weight 0.40)
+### 1 - Visibility score (weight 0.40)
 
 Measures how well-placed the target is in the sky:
 
@@ -105,7 +105,7 @@ $$\text{scoreVisibility} = 0.5 \cdot \text{normalise}(\text{altMax},\;20°,\;90�
 | `obs_hours` | Total hours within all constraints |
 | `alt_meridian` | Altitude at meridian transit (degrees) |
 
-### 2 — Sky quality score (weight 0.25)
+### 2 - Sky quality score (weight 0.25)
 
 Penalises Moon interference:
 
@@ -118,7 +118,7 @@ $$\text{scoreSky} = \max(0,\;1 - \text{moonImpact})$$
 | `moon_phase` | Illuminated fraction of Moon disk, 0 (new) - 1 (full) |
 | `angular_dist_moon` | Angular separation between target and Moon (degrees); defaults to 180° when unavailable |
 
-### 3 — Object score (weight 0.25)
+### 3 - Object score (weight 0.25)
 
 Rewards intrinsically bright, high-contrast targets using surface brightness:
 
@@ -136,7 +136,7 @@ Inverting the normalisation means a **low SB value** (brighter, easier to image)
 
 When magnitude or size data are unavailable, a neutral value of **0.5** is used.
 
-### 4 — Comfort score (weight 0.10)
+### 4 - Comfort score (weight 0.10)
 
 Rewards targets that are observable during convenient evening hours:
 
@@ -146,11 +146,11 @@ $$\text{scoreComfort} = 0.5 \times \text{normalise}(\text{obsHoursInWindow},\;0\
 
 `obs_hours_in_window` is the subset of observable hours that fall within the prime-time window, not the total observable hours.
 
-### 5 — Final weighted sum
+### 5 - Final weighted sum
 
 $$\text{astroScore} = 0.40 \times \text{scoreVisibility} + 0.25 \times \text{scoreSky} + 0.25 \times \text{scoreObject} + 0.10 \times \text{scoreComfort}$$
 
-### 6 — Bonuses
+### 6 - Bonuses
 
 Applied after the weighted sum, before final clamping:
 
@@ -165,10 +165,10 @@ The final value is clamped to **[0.0, 1.0]** and rounded to 4 decimal places.
 
 | AstroScore | Interpretation |
 |---|---|
-| 0.85 - 1.00 | Exceptional — ideal conditions |
-| 0.65 - 0.84 | Good — recommended target |
-| 0.45 - 0.64 | Average — worth imaging if nothing better |
-| < 0.45 | Poor — significant limitation (moon, low altitude, faint object) |
+| 0.85 - 1.00 | Exceptional - ideal conditions |
+| 0.65 - 0.84 | Good - recommended target |
+| 0.45 - 0.64 | Average - worth imaging if nothing better |
+| < 0.45 | Poor - significant limitation (moon, low altitude, faint object) |
 
 ---
 
@@ -197,7 +197,7 @@ All paths are relative to `/data/skytonight/`.
 | `POST` | `/api/skytonight/scheduler/trigger` | Manually trigger a recalculation (admin) |
 | `GET` | `/api/skytonight/dataset/status` | Dataset build status and catalogue counts |
 | `POST` | `/api/skytonight/dataset/rebuild` | Force a dataset rebuild |
-| `GET` | `/api/skytonight/data/dso` | Deep-sky results for the UI (reactive, per-section) — optional `?catalogue=` filter |
+| `GET` | `/api/skytonight/data/dso` | Deep-sky results for the UI (reactive, per-section) - optional `?catalogue=` filter |
 | `GET` | `/api/skytonight/data/bodies` | Solar-system body results (reactive, per-section) |
 | `GET` | `/api/skytonight/data/comets` | Comet results (reactive, per-section) |
 | `GET` | `/api/skytonight/alttime/<id>` | Altitude-time data for one target |
@@ -212,7 +212,7 @@ Full parameter details: [API_ENDPOINTS.md](API_ENDPOINTS.md)
 
 - **OpenNGC / OpenIC**: Mattia Verga, [PyOngc](https://github.com/mattiaverga/PyOngc), CC BY-SA 4.0
 - **Herschel 400**: [Astronomical League Herschel 400 Observing Program](https://www.astroleague.org/herschel-400-observing-program/)
-- **Pensack 500**: original list by Pensack, [Cloudy Nights — 500 Best DSO List](https://www.cloudynights.com/forums/topic/472872-500-best-dso-list)
+- **Pensack 500**: original list by Pensack, [Cloudy Nights - 500 Best DSO List](https://www.cloudynights.com/forums/topic/472872-500-best-dso-list)
 - **LBN cross-refs**: Lynds' Bright Nebulae catalogue, YAML source via [uptonight](https://github.com/mawinkler/uptonight)
 - **GaryImm**: astrophotography list compiled by Gary Imm, YAML source via [uptonight](https://github.com/mawinkler/uptonight)
 - **Arp Atlas of Peculiar Galaxies**: Halton Arp (1966); NGC/IC cross-refs from NASA/IPAC Extragalactic Database (NED)
@@ -230,7 +230,7 @@ Set your site's Bortle class in **Settings → Configuration → Sky Quality (Li
 - **Bortle Class** (dropdown 1–9): choose the class that matches your observing site. You can look up your location on [lightpollutionmap.info](https://www.lightpollutionmap.info) using the *World Atlas* layer.
 - **SQM** (optional, mag/arcsec²): enter if you have a real SQM-meter reading. This overrides the Bortle midpoint estimate and gives more precise weighting.
 
-Leaving both fields empty disables the feature entirely — AstroScore behaves exactly as before.
+Leaving both fields empty disables the feature entirely - AstroScore behaves exactly as before.
 
 ### How it affects AstroScore
 

@@ -316,7 +316,7 @@ async function loadAstronomicalCharts() {
         // Hide loading, show charts
         loadingDiv.style.display = 'none';
         
-        // Extract data for charts — skip entries already in the past
+        // Extract data for charts - skip entries already in the past
         const now = Date.now();
         const configuredTimezone = data?.location?.timezone || 'UTC';
         const futureHourly = data.hourly.filter(item => new Date(item.date).getTime() >= now);

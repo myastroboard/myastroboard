@@ -1,4 +1,4 @@
-# MyAstroBoard — Notifications
+# MyAstroBoard - Notifications
 
 Browser and push notification system for time-critical astrophotography events.
 
@@ -7,20 +7,20 @@ Browser and push notification system for time-critical astrophotography events.
 ## Architecture overview
 
 ```
-Phase A — NotificationManager + background poller    ✅ Done
-Phase B — Settings UI (My Settings → Notifications)  ✅ Done
-Phase C — Web Push / background (tab may be closed)  ✅ Done
+Phase A - NotificationManager + background poller    ✅ Done
+Phase B - Settings UI (My Settings → Notifications)  ✅ Done
+Phase C - Web Push / background (tab may be closed)  ✅ Done
 ```
 
-### Phase A — Browser Notification API
-- `notifications.js` — `NotificationManager` singleton + `startNotificationPoller()` (5 min interval)
+### Phase A - Browser Notification API
+- `notifications.js` - `NotificationManager` singleton + `startNotificationPoller()` (5 min interval)
 - Notifications fire when the tab is open; poller runs regardless of which tab is active
 
-### Phase B — Settings UI
+### Phase B - Settings UI
 - My Settings → Notifications sub-tab (N1–N7 toggles, lead times, Kp threshold, test button)
 - Preferences stored server-side in `data/users.json` under `preferences.notifications`
 
-### Phase C — Web Push
+### Phase C - Web Push
 - Notifications fire even when the app tab is closed
 - VAPID key pair persisted in `data/vapid.json` (generated once on first startup)
 - Push subscriptions stored per-user in `data/users.json` under `push_subscriptions[]`
@@ -54,7 +54,7 @@ IDs are defined as `NOTIF_TRIGGERS` constants in `static/js/notifications.js` an
 | `templates/index.html` | Notifications sub-tab (My Settings → Notifications) |
 | `static/sw.js` | `push` + `notificationclick` event listeners |
 | `static/i18n/*.json` | `notifications.*` namespace (N1–N7 titles/bodies) + `settings.notifications_*` |
-| `data/vapid.json` | Generated VAPID key pair — **never delete or regenerate** (invalidates all subscriptions) |
+| `data/vapid.json` | Generated VAPID key pair - **never delete or regenerate** (invalidates all subscriptions) |
 
 ---
 
@@ -89,7 +89,7 @@ const prefs = notificationManager.getPrefs();
 //   }
 // }
 
-await notificationManager.savePrefs(prefs); // async — POSTs to /api/auth/preferences
+await notificationManager.savePrefs(prefs); // async - POSTs to /api/auth/preferences
 notificationManager.isTriggerEnabled('N7')
 notificationManager.getLeadMinutes('N1')
 notificationManager.getKpThreshold()
@@ -104,7 +104,7 @@ if (notificationManager.wasRecentlyNotified('N7', 30 * 60 * 1000)) return;
 notificationManager.markNotified('N7'); // called automatically by notify()
 ```
 
-### Firing a notification (Phase A — tab open)
+### Firing a notification (Phase A - tab open)
 
 ```javascript
 await notificationManager.notify(
@@ -122,7 +122,7 @@ await notificationManager.notify(
 `startNotificationPoller()` starts a `setInterval` every 5 minutes after app init (`app.js → initializeApp()`). It fetches minimal API data for each enabled trigger and calls the same `_check*` functions defined in each feature module.
 
 ```javascript
-// Called automatically — no manual invocation needed
+// Called automatically - no manual invocation needed
 startNotificationPoller();  // wired in app.js initializeApp()
 stopNotificationPoller();   // available but not normally called
 ```
@@ -133,6 +133,14 @@ The `_check*` functions are defined at the bottom of their respective feature mo
 
 ## Web Push (Phase C)
 
+### iOS requirements
+
+Web Push on iOS requires **Safari 16.4+** and the app must be **installed as a PWA** (Add to Home Screen). Push is not delivered to a regular Safari browser tab.
+
+The `VAPID_CONTACT_EMAIL` environment variable must be set to a real email address. Apple APNs silently rejects pushes when the VAPID `sub` claim contains an invalid domain (e.g. `.local`). See [docs/1.INSTALLATION.md](1.INSTALLATION.md) for setup instructions.
+
+The in-app **Test** button fires a `new Notification()` directly - it works without push and does not confirm background delivery.
+
 ### VAPID keys
 
 Generated once on first startup by `push_manager.load_or_generate_vapid_keys()` and saved to `data/vapid.json`:
@@ -141,7 +149,7 @@ Generated once on first startup by `push_manager.load_or_generate_vapid_keys()` 
 { "private_key": "-----BEGIN EC PRIVATE KEY-----\n...", "public_key": "BNxx...base64url..." }
 ```
 
-**Never delete or regenerate `vapid.json`** — doing so invalidates all existing push subscriptions.
+**Never delete or regenerate `vapid.json`** - doing so invalidates all existing push subscriptions.
 
 ### Push subscription flow
 
@@ -187,10 +195,10 @@ Daemon thread started at app startup. Polls every 5 minutes:
 ### sw.js handlers
 
 ```javascript
-// push — fires when server sends a push
+// push - fires when server sends a push
 self.addEventListener('push', event => { ... showNotification() ... });
 
-// notificationclick — focuses app window and navigates to data.url
+// notificationclick - focuses app window and navigates to data.url
 self.addEventListener('notificationclick', event => { ... });
 ```
 

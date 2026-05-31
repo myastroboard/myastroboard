@@ -6,7 +6,7 @@ Evaluates N1-N7 trigger conditions using cached data, then sends Web Push
 to subscribed users whose notifications are enabled and cooldown has elapsed.
 
 Cooldown is tracked in-memory (resets on server restart, acceptable for a
-5-minute scheduler — the worst case is one duplicate notification per restart).
+5-minute scheduler - the worst case is one duplicate notification per restart).
 """
 
 import threading
@@ -18,14 +18,14 @@ from logging_config import get_logger
 
 logger = get_logger(__name__)
 
-POLL_INTERVAL_SLOW = 5 * 60  # 5 min — default
-POLL_INTERVAL_FAST = 60      # 1 min — during/near active observation sessions
+POLL_INTERVAL_SLOW = 5 * 60  # 5 min - default
+POLL_INTERVAL_FAST = 60      # 1 min - during/near active observation sessions
 
 # {user_id: {trigger_id: last_sent_epoch_seconds}}
 _last_sent: Dict[str, Dict[str, float]] = {}
 _lock = threading.Lock()
 
-# {user_id: set_of_entry_ids} — prevents re-sending N2 for the same plan entry
+# {user_id: set_of_entry_ids} - prevents re-sending N2 for the same plan entry
 _n2_notified: Dict[str, set] = {}
 
 # True when any user has an active or near (≤30 min) observation session
@@ -127,7 +127,7 @@ def _check_n7_aurora(user: Any, cache_data: Optional[dict]) -> None:
     visibility = cache_data.get('current', {}).get('visibility_level', '')
     _send(user, 'N7',
           'Aurora Alert',
-          f'Kp {kp:.1f} detected — {visibility}',
+          f'Kp {kp:.1f} detected - {visibility}',
           '/#forecast-astro/aurora')
 
 
@@ -232,7 +232,7 @@ def _check_n6_darkness(user: Any, cache_data: Optional[dict]) -> None:
             minutes = round(ms_until / 60)
             _send(user, 'N6',
                   'Astronomical darkness',
-                  f'Night begins in {minutes} min — time to get ready',
+                  f'Night begins in {minutes} min - time to get ready',
                   '/#forecast-astro/astro-weather')
     except Exception as e:
         logger.debug(f"N6 check error for {user.username}: {e}")
@@ -355,7 +355,7 @@ def _poll() -> None:
             if not user.push_subscriptions:
                 continue
 
-            # Plan data is per-user — load individually
+            # Plan data is per-user - load individually
             plan_payload = None
             try:
                 from plan_my_night import get_plan_with_timeline

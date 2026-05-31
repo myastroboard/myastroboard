@@ -304,7 +304,7 @@ def test_curated_fallback_rows_include_perihelion_date():
 
 
 # ---------------------------------------------------------------------------
-# enrich_with_jpl_fallback — additional edge cases
+# enrich_with_jpl_fallback - additional edge cases
 # ---------------------------------------------------------------------------
 
 def test_enrich_with_jpl_fallback_skips_when_all_fields_present(monkeypatch):
@@ -344,7 +344,7 @@ def test_enrich_with_jpl_fallback_skips_non_dict_rows(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# build_comet_targets — deduplication and source modes
+# build_comet_targets - deduplication and source modes
 # ---------------------------------------------------------------------------
 
 def test_build_comet_targets_deduplicates_by_target_id(monkeypatch):
@@ -380,7 +380,7 @@ def test_build_comet_targets_all_are_comets(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# fetch_mpc_comets — network layer
+# fetch_mpc_comets - network layer
 # ---------------------------------------------------------------------------
 
 def test_fetch_mpc_comets_returns_empty_on_network_error(monkeypatch):

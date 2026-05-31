@@ -291,7 +291,7 @@
     opacity: 0.85;
 }
 
-/* Telescope picker modal buttons — card surface style for contrast on gradient modal */
+/* Telescope picker modal buttons - card surface style for contrast on gradient modal */
 .btn-telescope-pick {
     background-color: var(--surface-card);
     color: var(--text-color);

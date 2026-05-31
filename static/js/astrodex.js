@@ -842,7 +842,7 @@ async function showAddAstrodexItemModal() {
                 feedbackEl.innerHTML = `<span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>${i18n.t('astrodex.catalogue_found')}</span>`;
                 feedbackEl.classList.remove('d-none');
             }
-        } catch (_) { /* silent — lookup is best-effort */ }
+        } catch (_) { /* silent - lookup is best-effort */ }
         finally {
             if (searchBtn) {
                 searchBtn.disabled = false;
@@ -1741,7 +1741,7 @@ function showPictureSlideshow(itemId) {
         document.addEventListener('keydown', keyHandler);
     }
     
-    // Create modal using existing Bootstrap structure — body has two stable sub-containers:
+    // Create modal using existing Bootstrap structure - body has two stable sub-containers:
     // #slideshow-content-wrapper (replaced on navigation) and #slideshow-object-info-wrapper (persistent)
     createModal(`${escapeHtml(item.name)} - ${i18n.t('astrodex.photos')}`, '', 'full');
 
@@ -1880,7 +1880,7 @@ async function initializeAstrodexEventListeners() {
 
     //Buttons 
 
-    //Init buttons — wait for translations to be loaded before setting labels
+    //Init buttons - wait for translations to be loaded before setting labels
     await i18n.ready;
     const buttonSort = document.getElementById('astrodex-sort-order');
     buttonSort.innerHTML = `<i class="bi bi-sort-up-alt icon-inline" aria-hidden="true"></i>${i18n.t('astrodex.sort_order_ascending')}`;
@@ -2097,7 +2097,7 @@ async function initializeAstrodexEventListeners() {
 // Bootstrap sets aria-hidden="true" on the modal element at the start of the
 // hide transition, but the focused element (e.g. the Close button) may still
 // be inside the modal at that point, triggering an accessibility warning.
-// Blurring it on `hide.bs.modal` — which fires before aria-hidden is applied —
+// Blurring it on `hide.bs.modal` - which fires before aria-hidden is applied -
 // moves focus to <body> first so the attribute change is clean.
 document.addEventListener('hide.bs.modal', (e) => {
     const focused = e.target.querySelector(':focus');
