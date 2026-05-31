@@ -45,6 +45,12 @@ jobs:
           git checkout -b "$BRANCH"
           truncate -s 0 CHANGELOG_NEXT.md
           git add CHANGELOG_NEXT.md
+
+          if git diff --staged --quiet; then
+            echo "CHANGELOG_NEXT.md is already empty, nothing to do."
+            exit 0
+          fi
+
           git commit -m "chore: clear CHANGELOG_NEXT after release v${VERSION}"
           git push origin "$BRANCH"
 
