@@ -81,6 +81,9 @@ def _send(user: Any, trigger_id: str, title: str, body: str, url: str,
         'data':  {'url': url},
     }
 
+    n_subs = len(user.push_subscriptions)
+    logger.info(f"[{trigger_id}] Sending push to {user.username} ({n_subs} sub(s)): {title} — {body}")
+
     dead_endpoints = []
     delivered = 0
     for sub in user.push_subscriptions:
@@ -91,6 +94,8 @@ def _send(user: Any, trigger_id: str, title: str, body: str, url: str,
             delivered += 1
         else:
             dead_endpoints.append(endpoint)
+
+    logger.info(f"[{trigger_id}] Delivered to {delivered}/{n_subs} subscription(s) for {user.username}")
 
     if dead_endpoints:
         _cleanup_dead_subscriptions(user, dead_endpoints)
@@ -370,12 +375,16 @@ def _poll() -> None:
         lunar_data   = _load_cache('lunar_eclipse')
 
         user_manager._reload_users_if_changed()
+        logger.debug(f"Poll cycle: {len(user_manager.users)} user(s) loaded")
         for user in user_manager.users.values():
             notif_prefs = user.preferences.get('notifications', {})
             if not notif_prefs.get('enabled', True):
+                logger.debug(f"Skipping {user.username}: notifications disabled")
                 continue
             if not user.push_subscriptions:
+                logger.debug(f"Skipping {user.username}: no push subscriptions")
                 continue
+            logger.debug(f"Evaluating {user.username}: {len(user.push_subscriptions)} subscription(s)")
 
             # Plan data is per-user - load individually
             plan_payload = None

@@ -201,25 +201,49 @@ function _urlBase64ToUint8Array(base64String) {
 async function _subscribeToPush() {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
     try {
-        const reg = await navigator.serviceWorker.ready;
-        const existing = await reg.pushManager.getSubscription();
-        if (existing) {
-            // Re-POST to server: the server may have purged this endpoint as dead (e.g. after
-            // an APNs delivery failure). The subscribe endpoint deduplicates by endpoint, so
-            // this is a no-op when the subscription is already stored server-side.
-            await fetch('/api/push/subscribe', {
-                method:      'POST',
-                credentials: 'same-origin',
-                headers:     { 'Content-Type': 'application/json' },
-                body:        JSON.stringify({ subscription: existing.toJSON() }),
-            });
-            return;
-        }
-
         const resp = await fetch('/api/push/vapid-public-key', { credentials: 'same-origin' });
         if (!resp.ok) return;
         const { public_key: publicKey } = await resp.json();
         if (!publicKey) return;
+
+        const reg = await navigator.serviceWorker.ready;
+        const existing = await reg.pushManager.getSubscription();
+
+        if (existing) {
+            // Detect VAPID key rotation: compare stored applicationServerKey to server's current key.
+            // If they differ the subscription is stale and will fail delivery — force re-subscribe.
+            const serverKeyBytes = _urlBase64ToUint8Array(publicKey);
+            const storedKeyBytes = existing.options?.applicationServerKey
+                ? new Uint8Array(existing.options.applicationServerKey)
+                : null;
+            const keyMismatch = storedKeyBytes && (
+                storedKeyBytes.length !== serverKeyBytes.length ||
+                !storedKeyBytes.every((b, i) => b === serverKeyBytes[i])
+            );
+
+            if (!keyMismatch) {
+                // Re-POST to server: the server may have purged this endpoint as dead (e.g. after
+                // an APNs delivery failure). The subscribe endpoint deduplicates by endpoint, so
+                // this is a no-op when the subscription is already stored server-side.
+                await fetch('/api/push/subscribe', {
+                    method:      'POST',
+                    credentials: 'same-origin',
+                    headers:     { 'Content-Type': 'application/json' },
+                    body:        JSON.stringify({ subscription: existing.toJSON() }),
+                });
+                return;
+            }
+
+            // Key mismatch: unsubscribe the stale subscription before creating a fresh one.
+            console.warn('Push: VAPID key changed, re-subscribing.');
+            await fetch('/api/push/unsubscribe', {
+                method:      'DELETE',
+                credentials: 'same-origin',
+                headers:     { 'Content-Type': 'application/json' },
+                body:        JSON.stringify({ endpoint: existing.endpoint }),
+            }).catch(() => {});
+            await existing.unsubscribe();
+        }
 
         const sub = await reg.pushManager.subscribe({
             userVisibleOnly:      true,
@@ -514,7 +538,7 @@ function initNotificationSettingsUI() {
         });
     }
 
-    // Test button
+    // Test button — uses server-side push so it works on iOS PWA too
     const testBtn = document.getElementById('notif-test-btn');
     if (testBtn && !testBtn._notifBound) {
         testBtn._notifBound = true;
@@ -523,18 +547,26 @@ function initNotificationSettingsUI() {
             _refreshPermissionBanner();
             if (!granted) return;
 
-            const title = (typeof i18n !== 'undefined') ? i18n.t('settings.notifications_test_title') : 'MyAstroBoard';
-            const body  = (typeof i18n !== 'undefined') ? i18n.t('settings.notifications_test_body')  : 'Notifications are working correctly.';
-            const n = new Notification(
-                (title && title !== 'settings.notifications_test_title') ? title : 'MyAstroBoard',
-                {
-                    body:  (body  && body  !== 'settings.notifications_test_body')  ? body  : 'Notifications are working correctly.',
-                    icon:  NOTIF_ICON,
-                    badge: NOTIF_BADGE,
-                    tag:   'mab-test',
+            try {
+                const res  = await fetch('/api/push/test', { method: 'POST', credentials: 'same-origin' });
+                const data = await res.json();
+                if (!res.ok) {
+                    _showNotifMessage(data.error || 'Push test failed.', 'danger');
+                    return;
                 }
-            );
-            n.onclick = () => { window.focus(); n.close(); };
+                if (data.delivered === 0) {
+                    _showNotifMessage('Push sent but delivery failed — check server logs.', 'warning');
+                    return;
+                }
+                // On iOS, the app must be backgrounded to display the notification.
+                const hint = /iPhone|iPad|iPod/.test(navigator.userAgent)
+                    ? ' Background or lock the app to see it.'
+                    : '';
+                const msg = (typeof i18n !== 'undefined') ? i18n.t('settings.notifications_test_body') : 'Notifications are working correctly.';
+                _showNotifMessage(((msg && msg !== 'settings.notifications_test_body') ? msg : 'Push sent!') + hint);
+            } catch (e) {
+                _showNotifMessage('Push test error: ' + e.message, 'danger');
+            }
         });
     }
 }

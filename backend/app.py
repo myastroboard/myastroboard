@@ -512,6 +512,52 @@ def push_subscribe():
         return jsonify({'error': 'Internal server error'}), 500
 
 
+@app.route('/api/push/test', methods=['POST'])
+@login_required
+def push_test():
+    """Send an immediate test push to the current user (all subscriptions)."""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify({'error': 'Authentication required'}), 401
+        if not current_user.push_subscriptions:
+            return jsonify({'error': 'No push subscriptions for this user'}), 400
+
+        from push_manager import send_push
+        n = len(current_user.push_subscriptions)
+        delivered = 0
+        dead_endpoints = []
+        for sub in current_user.push_subscriptions:
+            ok = send_push(
+                {'endpoint': sub['endpoint'], 'keys': sub.get('keys', {})},
+                {
+                    'title': 'MyAstroBoard test',
+                    'body': 'Push notifications are working!',
+                    'icon': '/static/ico/android/launchericon-192x192.png',
+                    'badge': '/static/ico/android/launchericon-72x72.png',
+                    'tag': 'push-test',
+                },
+                ttl=60,
+                urgency='high',
+            )
+            if ok:
+                delivered += 1
+            else:
+                dead_endpoints.append(sub['endpoint'])
+        if dead_endpoints:
+            current_user.push_subscriptions = [
+                s for s in current_user.push_subscriptions
+                if s.get('endpoint') not in dead_endpoints
+            ]
+            user_manager.save_users()
+            logger.info(f"Removed {len(dead_endpoints)} dead subscription(s) for {current_user.username}")
+        logger.info(f"Test push for {current_user.username}: {delivered}/{n} delivered")
+        return jsonify({'delivered': delivered, 'total': n, 'cleaned': len(dead_endpoints)})
+    except Exception as e:
+        logger.error(f"Error sending test push: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/push/unsubscribe', methods=['DELETE'])
 @login_required
 def push_unsubscribe():

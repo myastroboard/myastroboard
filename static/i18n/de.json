@@ -643,6 +643,7 @@
     "log_limit_1000": "Letzte 1000",
     "log_limit_5000": "Letzte 5000",
     "log_limit_all": "Alle",
+    "log_filter_placeholder": "Protokolle filtern…",
     "geolocation_btn_title": "Meinen Standort verwenden",
     "geolocation_unsupported": "Geolocation wird von Ihrem Browser nicht unterstützt.",
     "geolocation_error": "Standort konnte nicht abgerufen werden.",

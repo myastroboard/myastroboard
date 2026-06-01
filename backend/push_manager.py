@@ -3,7 +3,7 @@ VAPID key management and Web Push delivery.
 
 Keys are generated once on first startup and persisted to DATA_DIR/vapid.json.
 Storage format:
-  private_key - PEM string (used by pywebpush's webpush())
+  private_key - raw base64url-encoded 32-byte EC scalar (what py_vapid.from_string expects)
   public_key  - URL-safe base64url of the uncompressed EC point (65 bytes, no padding)
                 sent to the browser as applicationServerKey
 """
@@ -30,6 +30,18 @@ _VAPID_CONTACT_WARNING_EMITTED = False
 _vapid_keys: dict = {}
 
 
+def _pem_to_raw_b64(pem_str: str) -> str:
+    """Convert a PEM private key (PKCS#8 or SEC1) to raw base64url scalar.
+
+    py_vapid 1.9.4's from_string() expects the raw 32-byte EC private scalar
+    encoded as base64url — it does NOT parse PEM.
+    """
+    from cryptography.hazmat.primitives.serialization import load_pem_private_key  # type: ignore[import]
+    key = load_pem_private_key(pem_str.encode('utf-8'), password=None)
+    raw_bytes = key.private_numbers().private_value.to_bytes(32, 'big')
+    return base64.urlsafe_b64encode(raw_bytes).rstrip(b'=').decode('utf-8')
+
+
 def _generate_keys() -> dict:
     """Generate a new VAPID EC key pair using py_vapid (bundled with pywebpush)."""
     from py_vapid import Vapid
@@ -39,12 +51,14 @@ def _generate_keys() -> dict:
     vapid.generate_keys()
     assert vapid.public_key is not None, "generate_keys() must populate public_key"
 
-    private_pem = vapid.private_pem().decode('utf-8')
+    # Store the raw 32-byte scalar as base64url — the only format py_vapid.from_string accepts.
+    raw_bytes = vapid.private_key.private_numbers().private_value.to_bytes(32, 'big')
+    private_key_b64 = base64.urlsafe_b64encode(raw_bytes).rstrip(b'=').decode('utf-8')
 
     pub_bytes = vapid.public_key.public_bytes(Encoding.X962, PublicFormat.UncompressedPoint)
     public_key_b64 = base64.urlsafe_b64encode(pub_bytes).rstrip(b'=').decode('utf-8')
 
-    return {'private_key': private_pem, 'public_key': public_key_b64}
+    return {'private_key': private_key_b64, 'public_key': public_key_b64}
 
 
 def load_or_generate_vapid_keys() -> dict:
@@ -64,6 +78,12 @@ def load_or_generate_vapid_keys() -> dict:
             with open(_VAPID_FILE, 'r') as f:
                 keys = json.load(f)
             if keys.get('private_key') and keys.get('public_key'):
+                # Migrate PEM format (old storage) to raw base64url scalar.
+                if '-----' in keys['private_key']:
+                    keys['private_key'] = _pem_to_raw_b64(keys['private_key'])
+                    with open(_VAPID_FILE, 'w') as f:
+                        json.dump(keys, f, indent=2)
+                    logger.info("VAPID private key migrated from PEM to raw base64url format")
                 _vapid_keys = keys
                 logger.debug("VAPID keys loaded from disk")
                 return _vapid_keys
@@ -141,5 +161,6 @@ def send_push(subscription_info: dict, payload: dict, ttl: int = 0, urgency: str
         return True
 
     except Exception as e:
-        logger.warning(f"Push delivery failed [{subscription_info.get('endpoint', '?')[:60]}]: {e}")
+        err = str(e).replace('\n', ' ').replace('\r', '').strip()
+        logger.warning(f"Push delivery failed [{subscription_info.get('endpoint', '?')[:60]}]: {err}")
         return False

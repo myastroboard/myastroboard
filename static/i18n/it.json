@@ -643,6 +643,7 @@
     "log_limit_1000": "Ultimi 1000",
     "log_limit_5000": "Ultimi 5000",
     "log_limit_all": "Tutti",
+    "log_filter_placeholder": "Filtra i log…",
     "geolocation_btn_title": "Usa la mia posizione",
     "geolocation_unsupported": "La geolocalizzazione non è supportata dal tuo browser.",
     "geolocation_error": "Impossibile recuperare la tua posizione.",
