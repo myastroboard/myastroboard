@@ -26,13 +26,20 @@ jobs:
 
       - name: Determine version
         id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          WORKFLOW_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
-          if [ "${{ github.event_name }}" = "release" ]; then
-            TAG="${{ github.event.release.tag_name }}"
-          elif [ "${{ github.event_name }}" = "workflow_run" ] && [ -n "${{ github.event.workflow_run.head_branch }}" ]; then
-            TAG="${{ github.event.workflow_run.head_branch }}"
-          elif [ -n "${{ github.event.inputs.version }}" ]; then
-            TAG="v${{ github.event.inputs.version }}"
+          TAG=""
+
+          if [ "$EVENT_NAME" = "release" ] && printf '%s' "$RELEASE_TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            TAG="$RELEASE_TAG"
+          elif [ "$EVENT_NAME" = "workflow_run" ] && printf '%s' "$WORKFLOW_HEAD_BRANCH" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            TAG="$WORKFLOW_HEAD_BRANCH"
+          elif printf '%s' "$INPUT_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            TAG="v$INPUT_VERSION"
           else
             TAG=$(git tag --sort=-version:refname | head -1)
           fi
@@ -53,7 +60,18 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
           VERSION="${{ steps.version.outputs.VERSION }}"
+
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Invalid VERSION output: $VERSION"
+            exit 1
+          fi
+
           BRANCH="bot/post-release-v${VERSION}"
+
+          if ! printf '%s' "$BRANCH" | grep -Eq '^bot/post-release-v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Invalid branch name: $BRANCH"
+            exit 1
+          fi
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
