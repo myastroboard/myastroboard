@@ -1,3 +1,0 @@
-- Update notification service to have more log
-- Modify encoding for google notification
-- Add search on log to simplify search of specific error
