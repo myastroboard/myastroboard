@@ -3,7 +3,7 @@ services:
     # For development: build from source
     #build: .
     # For production: use published image
-    image: ghcr.io/worldofgz/myastroboard:latest
+    image: worldofgz/myastroboard:latest
     pull_policy: always
     container_name: myastroboard
 
