@@ -3,6 +3,9 @@ name: Post-Release Cleanup
 on:
   release:
     types: [published]
+  workflow_run:
+    workflows: ["Build and Publish Docker Image"]
+    types: [completed]
   workflow_dispatch:
     inputs:
       version:
@@ -11,6 +14,7 @@ on:
 
 jobs:
   clear-changelog:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -25,11 +29,23 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "release" ]; then
             TAG="${{ github.event.release.tag_name }}"
+          elif [ "${{ github.event_name }}" = "workflow_run" ] && [ -n "${{ github.event.workflow_run.head_branch }}" ]; then
+            TAG="${{ github.event.workflow_run.head_branch }}"
           elif [ -n "${{ github.event.inputs.version }}" ]; then
             TAG="v${{ github.event.inputs.version }}"
           else
             TAG=$(git tag --sort=-version:refname | head -1)
           fi
+
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            TAG=$(git tag --sort=-version:refname | head -1)
+          fi
+
+          if [ -z "$TAG" ]; then
+            echo "No valid release tag found."
+            exit 1
+          fi
+
           echo "VERSION=${TAG#v}" >> $GITHUB_OUTPUT
 
       - name: Create branch and PR to clear CHANGELOG_NEXT
