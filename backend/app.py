@@ -553,9 +553,9 @@ def push_test():
             logger.info(f"Removed {len(dead_endpoints)} dead subscription(s) for {current_user.username}")
         logger.info(f"Test push for {current_user.username}: {delivered}/{n} delivered")
         return jsonify({'delivered': delivered, 'total': n, 'cleaned': len(dead_endpoints)})
-    except Exception as e:
-        logger.error(f"Error sending test push: {e}")
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        logger.error("Error sending test push", exc_info=True)
+        return jsonify({'error': 'Internal server error'}), 500
 
 
 @app.route('/api/push/unsubscribe', methods=['DELETE'])
