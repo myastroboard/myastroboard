@@ -7,14 +7,25 @@ to subscribed users whose notifications are enabled and cooldown has elapsed.
 
 Cooldown is tracked in-memory (resets on server restart, acceptable for a
 5-minute scheduler - the worst case is one duplicate notification per restart).
+
+Multi-worker safety: a process-level lock file (push_scheduler.lock) ensures
+only one Gunicorn worker runs the scheduler. The OS releases the lock
+automatically when the worker process exits, letting another worker take over.
 """
 
+import os
+import sys
 import threading
 import time
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from logging_config import get_logger
+
+if sys.platform == 'win32':
+    import msvcrt
+else:
+    import fcntl
 
 logger = get_logger(__name__)
 
@@ -33,6 +44,7 @@ _any_active_night: bool = False
 
 _scheduler_thread: Optional[threading.Thread] = None
 _stop_event = threading.Event()
+_lock_file = None  # held open for the lifetime of the process that wins the lock
 
 
 # ---------------------------------------------------------------------------
@@ -131,18 +143,24 @@ def _get_notif_prefs(user: Any) -> dict:
 
 def _check_n7_aurora(user: Any, cache_data: Optional[dict]) -> None:
     if not cache_data:
+        logger.debug(f"N7 skip {user.username}: no aurora cache")
         return
     triggers = _get_notif_prefs(user)
     t = triggers.get('N7', {})
     if not t.get('enabled', True):
+        logger.debug(f"N7 skip {user.username}: trigger disabled")
         return
 
     kp = cache_data.get('current', {}).get('kp_index')
     if not isinstance(kp, (int, float)):
+        logger.debug(f"N7 skip {user.username}: kp_index missing or non-numeric ({kp!r})")
         return
-    if kp < t.get('kp_threshold', 5):
+    threshold = t.get('kp_threshold', 5)
+    if kp < threshold:
+        logger.debug(f"N7 skip {user.username}: kp={kp:.1f} below threshold={threshold}")
         return
     if _was_recently_notified(user.user_id, 'N7', 60 * 60):
+        logger.debug(f"N7 skip {user.username}: cooldown active")
         return
 
     visibility = cache_data.get('current', {}).get('visibility_level', '')
@@ -155,17 +173,21 @@ def _check_n7_aurora(user: Any, cache_data: Optional[dict]) -> None:
 
 def _check_n1_plan_start(user: Any, plan_payload: Optional[dict]) -> None:
     if not plan_payload or plan_payload.get('state') == 'none':
+        logger.debug(f"N1 skip {user.username}: no active plan")
         return
     triggers = _get_notif_prefs(user)
     t = triggers.get('N1', {})
     if not t.get('enabled', True):
+        logger.debug(f"N1 skip {user.username}: trigger disabled")
         return
     if plan_payload.get('timeline', {}).get('is_inside_night'):
-        return  # already started
+        logger.debug(f"N1 skip {user.username}: session already started")
+        return
 
     plan = plan_payload.get('plan') or {}
     night_start_str = plan.get('night_start')
     if not night_start_str:
+        logger.debug(f"N1 skip {user.username}: no night_start in plan")
         return
 
     try:
@@ -175,6 +197,7 @@ def _check_n1_plan_start(user: Any, plan_payload: Optional[dict]) -> None:
         now = datetime.now(timezone.utc)
         ms_until = (night_start - now).total_seconds()
         lead_s = t.get('lead_minutes', 15) * 60
+        logger.debug(f"N1 {user.username}: night_start in {ms_until:.0f}s, lead={lead_s}s")
         if 0 < ms_until <= lead_s and not _was_recently_notified(user.user_id, 'N1', 2 * 60 * 60):
             minutes = round(ms_until / 60)
             _send(user, 'N1',
@@ -188,12 +211,15 @@ def _check_n1_plan_start(user: Any, plan_payload: Optional[dict]) -> None:
 
 def _check_n2_next_target(user: Any, plan_payload: Optional[dict]) -> None:
     if not plan_payload or plan_payload.get('state') == 'none':
+        logger.debug(f"N2 skip {user.username}: no active plan")
         return
     if not plan_payload.get('timeline', {}).get('is_inside_night'):
+        logger.debug(f"N2 skip {user.username}: not inside night window")
         return
     triggers = _get_notif_prefs(user)
     t = triggers.get('N2', {})
     if not t.get('enabled', True):
+        logger.debug(f"N2 skip {user.username}: trigger disabled")
         return
 
     entries = (plan_payload.get('plan') or {}).get('entries', [])
@@ -202,6 +228,7 @@ def _check_n2_next_target(user: Any, plan_payload: Optional[dict]) -> None:
 
     notified_set = _n2_notified.setdefault(user.user_id, set())
 
+    notified = False
     for entry in entries:
         if entry.get('done'):
             continue
@@ -216,10 +243,14 @@ def _check_n2_next_target(user: Any, plan_payload: Optional[dict]) -> None:
             if ms_until <= 0:
                 continue
             if ms_until > lead_s:
+                logger.debug(f"N2 skip {user.username}: next undone target in {ms_until:.0f}s, outside lead={lead_s}s")
+                notified = True  # treated as handled — suppress the fallthrough log
                 break  # entries are chronological
 
             entry_id = entry.get('id') or entry.get('target_name') or entry.get('name', '?')
             if entry_id in notified_set:
+                logger.debug(f"N2 skip {user.username}: already notified for {entry_id!r}")
+                notified = True
                 break
             notified_set.add(entry_id)
             minutes = round(ms_until / 60)
@@ -229,21 +260,27 @@ def _check_n2_next_target(user: Any, plan_payload: Optional[dict]) -> None:
                   f'{name} starts in {minutes} min',
                   '/#astrodex/plan-my-night',
                   ttl=int(ms_until))
+            notified = True
             break
         except Exception as e:
             logger.debug(f"N2 entry check error for {user.username}: {e}")
+    if not notified:
+        logger.debug(f"N2 skip {user.username}: no undone targets with a future start time")
 
 
 def _check_n6_darkness(user: Any, cache_data: Optional[dict]) -> None:
     if not cache_data:
+        logger.debug(f"N6 skip {user.username}: no sun_report cache")
         return
     triggers = _get_notif_prefs(user)
     t = triggers.get('N6', {})
     if not t.get('enabled', True):
+        logger.debug(f"N6 skip {user.username}: trigger disabled")
         return
 
     dusk_str = cache_data.get('sun', {}).get('astronomical_dusk')
     if not dusk_str:
+        logger.debug(f"N6 skip {user.username}: no astronomical_dusk in cache")
         return
     try:
         dusk = datetime.fromisoformat(dusk_str)
@@ -252,6 +289,7 @@ def _check_n6_darkness(user: Any, cache_data: Optional[dict]) -> None:
         now = datetime.now(timezone.utc)
         ms_until = (dusk - now).total_seconds()
         lead_s = t.get('lead_minutes', 20) * 60
+        logger.debug(f"N6 {user.username}: dusk in {ms_until:.0f}s, lead={lead_s}s")
         if 0 < ms_until <= lead_s and not _was_recently_notified(user.user_id, 'N6', 8 * 60 * 60):
             minutes = round(ms_until / 60)
             _send(user, 'N6',
@@ -265,10 +303,12 @@ def _check_n6_darkness(user: Any, cache_data: Optional[dict]) -> None:
 
 def _check_n3_iss(user: Any, cache_data: Optional[dict]) -> None:
     if not cache_data:
+        logger.debug(f"N3 skip {user.username}: no iss_passes cache")
         return
     triggers = _get_notif_prefs(user)
     t = triggers.get('N3', {})
     if not t.get('enabled', True):
+        logger.debug(f"N3 skip {user.username}: trigger disabled")
         return
 
     lead_s = t.get('lead_minutes', 10) * 60
@@ -284,8 +324,8 @@ def _check_n3_iss(user: Any, cache_data: Optional[dict]) -> None:
                     dt = dt.replace(tzinfo=timezone.utc)
                 if dt > now:
                     candidates.append((dt, 'solar'))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"N3 {user.username}: bad solar transit timestamp {start_str!r}: {e}")
     for transit in cache_data.get('lunar_transits', []):
         start_str = transit.get('start_time')
         if start_str:
@@ -295,17 +335,20 @@ def _check_n3_iss(user: Any, cache_data: Optional[dict]) -> None:
                     dt = dt.replace(tzinfo=timezone.utc)
                 if dt > now:
                     candidates.append((dt, 'lunar'))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"N3 {user.username}: bad lunar transit timestamp {start_str!r}: {e}")
 
     if not candidates:
+        logger.debug(f"N3 skip {user.username}: no upcoming ISS transits")
         return
     candidates.sort(key=lambda x: x[0])
     next_dt, transit_type = candidates[0]
     ms_until = (next_dt - now).total_seconds()
+    logger.debug(f"N3 {user.username}: next {transit_type} transit in {ms_until:.0f}s, lead={lead_s}s")
     if ms_until > lead_s:
         return
     if _was_recently_notified(user.user_id, 'N3', 60 * 60):
+        logger.debug(f"N3 skip {user.username}: cooldown active")
         return
 
     minutes = round(ms_until / 60)
@@ -324,11 +367,16 @@ def _check_n4_n5_eclipse(user: Any, solar_data: Optional[dict], lunar_data: Opti
         ('N5', solar_data, 'Solar Eclipse'),
     ):
         t = triggers.get(trigger_id, {})
-        if not t.get('enabled', True) or not cache_data:
+        if not t.get('enabled', True):
+            logger.debug(f"{trigger_id} skip {user.username}: trigger disabled")
+            continue
+        if not cache_data:
+            logger.debug(f"{trigger_id} skip {user.username}: no cache data")
             continue
 
         peak_str = (cache_data.get('eclipse') or {}).get('peak_time')
         if not peak_str:
+            logger.debug(f"{trigger_id} skip {user.username}: no peak_time in cache")
             continue
         try:
             peak = datetime.fromisoformat(peak_str)
@@ -336,6 +384,7 @@ def _check_n4_n5_eclipse(user: Any, solar_data: Optional[dict], lunar_data: Opti
                 peak = peak.replace(tzinfo=timezone.utc)
             ms_until = (peak - now).total_seconds()
             lead_s = t.get('lead_minutes', 30) * 60
+            logger.debug(f"{trigger_id} {user.username}: peak in {ms_until:.0f}s, lead={lead_s}s")
             if 0 < ms_until <= lead_s and not _was_recently_notified(user.user_id, trigger_id, 4 * 60 * 60):
                 minutes = round(ms_until / 60)
                 body = (f'Totality begins in {minutes} min' if trigger_id == 'N4'
@@ -357,6 +406,62 @@ def _load_cache(key: str) -> Optional[dict]:
         return entry['data'] if entry else None
     except Exception:
         return None
+
+
+def _pick_active_plan(user_id: str, username: str) -> Optional[dict]:
+    """Return the most relevant plan payload across all of the user's plan files.
+
+    The scheduler must check every plan file (default and telescope-specific)
+    because plans are stored per telescope and the scheduler has no way to know
+    which telescope the user had selected when they built the plan.
+
+    Priority: plan where is_inside_night is True > any 'current' plan > first
+    non-'none' plan found.
+    """
+    try:
+        from plan_my_night import get_all_plan_files, get_plan_with_timeline
+    except Exception as e:
+        logger.debug(f"Could not import plan_my_night for {username}: {e}")
+        return None
+
+    plan_files = get_all_plan_files(user_id)
+    if not plan_files:
+        logger.debug(f"No plan files found for {username}")
+        return None
+
+    prefix = f'{user_id}_plan_'
+    suffix = '.json'
+
+    candidates = []
+    for file_path in plan_files:
+        fname = os.path.basename(file_path)
+        if not (fname.startswith(prefix) and fname.endswith(suffix)):
+            continue
+        raw_tid = fname[len(prefix):-len(suffix)]
+        telescope_id = None if raw_tid == 'my_night' else raw_tid
+        try:
+            payload = get_plan_with_timeline(user_id, username, telescope_id=telescope_id)
+            state = payload.get('state', 'none')
+            if state == 'none':
+                logger.debug(f"Plan (telescope={telescope_id}) for {username}: state=none, skipping")
+                continue
+            logger.debug(f"Plan (telescope={telescope_id}) for {username}: state={state}, "
+                         f"inside_night={payload.get('timeline', {}).get('is_inside_night')}")
+            candidates.append(payload)
+        except Exception as e:
+            logger.debug(f"Could not load plan (telescope={telescope_id}) for {username}: {e}")
+
+    if not candidates:
+        logger.debug(f"No active plan found for {username}")
+        return None
+
+    for p in candidates:
+        if p.get('timeline', {}).get('is_inside_night'):
+            return p
+    for p in candidates:
+        if p.get('state') == 'current':
+            return p
+    return candidates[0]
 
 
 def _poll() -> None:
@@ -386,13 +491,9 @@ def _poll() -> None:
                 continue
             logger.debug(f"Evaluating {user.username}: {len(user.push_subscriptions)} subscription(s)")
 
-            # Plan data is per-user - load individually
-            plan_payload = None
-            try:
-                from plan_my_night import get_plan_with_timeline
-                plan_payload = get_plan_with_timeline(user.user_id, user.username)
-            except Exception as e:
-                logger.debug(f"Could not load plan for {user.username}: {e}")
+            # Plan data is per-user - pick the most active plan across all
+            # telescope-specific plan files (not just the default one).
+            plan_payload = _pick_active_plan(user.user_id, user.username)
 
             # Fast-mode detection: active night OR night starting within 30 min
             if plan_payload and plan_payload.get('state') != 'none':
@@ -440,9 +541,54 @@ def _run() -> None:
 # Public interface
 # ---------------------------------------------------------------------------
 
+def _acquire_lock() -> bool:
+    """Try to acquire the push_scheduler lock file (non-blocking).
+
+    Returns True if this process now owns the scheduler lock.
+    The lock is held by keeping the file open; the OS releases it when the
+    process exits, allowing another worker to take over automatically.
+    """
+    global _lock_file
+    from constants import DATA_DIR_CACHE
+    lock_path = os.path.join(DATA_DIR_CACHE, 'push_scheduler.lock')
+    try:
+        _lock_file = open(lock_path, 'w')
+        if sys.platform == 'win32':
+            msvcrt.locking(_lock_file.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            fcntl.flock(_lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        _lock_file.write(str(os.getpid()))
+        _lock_file.flush()
+        return True
+    except (IOError, OSError):
+        if _lock_file:
+            _lock_file.close()
+            _lock_file = None
+        return False
+
+
+def _release_lock() -> None:
+    global _lock_file
+    if not _lock_file:
+        return
+    try:
+        if sys.platform == 'win32':
+            msvcrt.locking(_lock_file.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            fcntl.flock(_lock_file.fileno(), fcntl.LOCK_UN)
+        _lock_file.close()
+    except Exception as e:
+        logger.error(f"Error releasing push scheduler lock: {e}")
+    finally:
+        _lock_file = None
+
+
 def start() -> None:
     global _scheduler_thread
     if _scheduler_thread and _scheduler_thread.is_alive():
+        return
+    if not _acquire_lock():
+        logger.debug("Push scheduler already running in another worker — skipping")
         return
     _stop_event.clear()
     _scheduler_thread = threading.Thread(target=_run, name='push-scheduler', daemon=True)
@@ -451,3 +597,4 @@ def start() -> None:
 
 def stop() -> None:
     _stop_event.set()
+    _release_lock()
