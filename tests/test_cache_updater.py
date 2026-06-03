@@ -375,7 +375,13 @@ class TestAdditionalCachePaths:
 
         mock_load_config.return_value = mock_config
         mock_cache_store._sun_report_cache = {"data": None, "timestamp": 0}
-        mock_sun.return_value.get_today_report.return_value = types.SimpleNamespace(sunrise="06:00", sunset="20:00")
+        # Provide astronomical_dusk/dawn so _next_astronomical_dusk_utc can run
+        report = types.SimpleNamespace(
+            sunrise="06:00", sunset="20:00",
+            astronomical_dusk="Not found", astronomical_dawn="Not found",
+        )
+        mock_sun.return_value.get_today_report.return_value = report
+        mock_sun.return_value.get_tomorrow_report.return_value = report
 
         update_sun_report_cache()
         mock_cache_store.update_shared_cache_entry.assert_called()
