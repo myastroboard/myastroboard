@@ -11,6 +11,10 @@ If you used Reverse Proxy, and notification, you need to set new values via UI. 
 -  `VAPID_CONTACT_EMAIL`, `TRUST_PROXY_HEADERS`, and `SESSION_COOKIE_SECURE` have been removed from docker-compose and are now managed via the admin UI. This is the only 3 parameters you need to adapt if you already use it.
 - `TZ` default changed from `Europe/Paris` to `UTC` (better practice for server logs; observation timezone is already set in Parameters → Configuration).
 
+### First run, first installation
+
+With zero manual configuration on docker compose, a new modal appear in very first installation. Now you can set the main parameter directly at first connection, and MyAstroBoard will run very quickly and easily!
+
 ### Various change
 - **Parameters → Advanced**: two new admin sections:
   - **Notifications** — configure the VAPID contact email for push notification delivery.
