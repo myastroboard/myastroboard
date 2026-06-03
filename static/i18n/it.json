@@ -487,6 +487,21 @@
       "critical": "Eventi da non perdere"
     }
   },
+  "first_run": {
+    "title": "Benvenuto su MyAstroBoard",
+    "intro": "Prima di iniziare, indicaci da dove osservi. Tutti i calcoli dipendono dalla tua posizione.",
+    "latitude": "Latitudine (decimale):",
+    "latitude_placeholder": "es. 48.8667",
+    "longitude": "Longitudine (decimale):",
+    "longitude_placeholder": "es. 2.3333",
+    "elevation_optional": "Elevazione (metri, opzionale):",
+    "hint": "Puoi affinare tutte queste impostazioni in seguito in Parametri → Configurazione.",
+    "save": "Salva e continua",
+    "skip": "Salta per ora",
+    "lat_invalid": "La latitudine deve essere un numero compreso tra -90 e 90.",
+    "lon_invalid": "La longitudine deve essere un numero compreso tra -180 e 180.",
+    "default_location_name": "La mia posizione"
+  },
   "settings": {
     "customize": "Personalizza",
     "customize_info": "Personalizza le impostazioni predefinite della dashboard e le preferenze di visualizzazione. Queste impostazioni si applicano solo al tuo account.",
@@ -674,6 +689,7 @@
     "restore_no_file": "Seleziona un archivio di backup (.zip) da ripristinare.",
     "restore_confirm": "Sei sicuro di voler ripristinare questo backup? I dati correnti verranno sovrascritti e non potranno essere recuperati.",
     "restore_success": "Backup ripristinato correttamente.",
+    "restore_reloading": "Ricaricamento...",
     "restore_failed": "Impossibile ripristinare il backup.",
     "log_level_title": "Livello di registro corrente",
     "log_level_info": "Il livello di registro controlla la quantità di dettagli scritti nei file di registro. Per acquisire il maggior numero di dettagli per la risoluzione dei problemi, imposta il livello su DEBUG tramite la variabile di ambiente LOG_LEVEL, riavvia l'applicazione, riproduci il problema, quindi esporta i log di seguito.",

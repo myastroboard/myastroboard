@@ -487,6 +487,21 @@
       "critical": "Eventos imperdibles"
     }
   },
+  "first_run": {
+    "title": "Bienvenido a MyAstroBoard",
+    "intro": "Antes de comenzar, dinos desde dónde observas. Todos los cálculos dependen de tu ubicación.",
+    "latitude": "Latitud (decimal):",
+    "latitude_placeholder": "ej. 48.8667",
+    "longitude": "Longitud (decimal):",
+    "longitude_placeholder": "ej. 2.3333",
+    "elevation_optional": "Altitud (metros, opcional):",
+    "hint": "Puedes ajustar todos estos parámetros más tarde en Parámetros → Configuración.",
+    "save": "Guardar y continuar",
+    "skip": "Omitir por ahora",
+    "lat_invalid": "La latitud debe ser un número entre -90 y 90.",
+    "lon_invalid": "La longitud debe ser un número entre -180 y 180.",
+    "default_location_name": "Mi ubicación"
+  },
   "settings": {
     "customize": "Personalizar",
     "customize_info": "Personalice los valores predeterminados del panel y las preferencias de visualización. Esta configuración se aplica solo a su cuenta.",
@@ -674,6 +689,7 @@
     "restore_no_file": "Por favor, seleccione un archivo de copia de seguridad (.zip) para restaurar.",
     "restore_confirm": "¿Está seguro de que desea restaurar esta copia de seguridad? Los datos actuales serán sobrescritos y no podrán recuperarse.",
     "restore_success": "Copia de seguridad restaurada correctamente.",
+    "restore_reloading": "Recargando...",
     "restore_failed": "No se pudo restaurar la copia de seguridad.",
     "log_level_title": "Nivel de registro actual",
     "log_level_info": "El nivel de registro controla la cantidad de detalles que se escriben en los archivos de registro. Para capturar el máximo detalle para la resolución de problemas, establezca el nivel en DEBUG mediante la variable de entorno LOG_LEVEL, reinicie la aplicación, reproduzca el problema y luego exporte los registros.",

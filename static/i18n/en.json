@@ -487,6 +487,21 @@
       "critical": "Must-see events"
     }
   },
+  "first_run": {
+    "title": "Welcome to MyAstroBoard",
+    "intro": "Before we start, tell us where you observe from. All calculations depend on your location.",
+    "latitude": "Latitude (decimal):",
+    "latitude_placeholder": "e.g. 48.8667",
+    "longitude": "Longitude (decimal):",
+    "longitude_placeholder": "e.g. 2.3333",
+    "elevation_optional": "Elevation (meters, optional):",
+    "hint": "You can refine all these settings later in Parameters → Configuration.",
+    "save": "Save and continue",
+    "skip": "Skip for now",
+    "lat_invalid": "Latitude must be a number between -90 and 90.",
+    "lon_invalid": "Longitude must be a number between -180 and 180.",
+    "default_location_name": "My Location"
+  },
   "settings": {
     "customize": "Customize",
     "customize_info": "Personalize your dashboard defaults and display preferences. These settings apply only to your account.",
@@ -674,6 +689,7 @@
     "restore_no_file": "Please select a backup archive (.zip) to restore.",
     "restore_confirm": "Are you sure you want to restore this backup? Current data will be overwritten and cannot be recovered.",
     "restore_success": "Backup restored successfully.",
+    "restore_reloading": "Reloading...",
     "restore_failed": "Failed to restore backup.",
     "log_level_title": "Current Log Level",
     "log_level_info": "The log level controls how much detail is written to the log files. To capture the most detail for troubleshooting, set the level to DEBUG via the LOG_LEVEL environment variable, restart the application, reproduce the issue, then export the logs below.",

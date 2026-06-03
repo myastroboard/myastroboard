@@ -372,14 +372,15 @@ async function restoreBackup() {
         const data = await resp.json();
 
         if (resp.ok && data.status === 'success') {
-            _showInlineMessage(msgEl, 'success', data.message || i18n.t('settings.restore_success'));
+            _showInlineMessage(msgEl, 'success', (data.message || i18n.t('settings.restore_success')) + ' ' + i18n.t('settings.restore_reloading'));
+            setTimeout(() => window.location.reload(), 2000);
         } else {
             _showInlineMessage(msgEl, 'danger', data.error || i18n.t('settings.restore_failed'));
+            if (btn) btn.disabled = false;
         }
     } catch (error) {
         console.error('Error restoring backup:', error);
         _showInlineMessage(msgEl, 'danger', i18n.t('settings.restore_failed'));
-    } finally {
         if (btn) btn.disabled = false;
     }
 }

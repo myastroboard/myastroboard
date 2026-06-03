@@ -922,6 +922,10 @@ def update_config_api():
             return jsonify({"error": "location.sqm must be a positive float (mag/arcsec²)"}), 400
     config['location'] = new_location
 
+    # Preserve location_configured flag if not explicitly provided
+    if 'location_configured' not in config:
+        config['location_configured'] = old_config.get('location_configured', False)
+
     # Save the new config
     save_config(config)
     
