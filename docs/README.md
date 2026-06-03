@@ -3,9 +3,9 @@
 Welcome to the comprehensive documentation for MyAstroBoard, the integrated astronomy observation planning system.
 
 > [!NOTE]
-> Some part of the documentation can be generated with IA. 
+> Some parts of the documentation may be generated with AI.
 > 
-> Why ? Probably because this is one of the least interesting thing to do, but one of the most important part!
+> Why? Documentation is one of the least exciting tasks, but one of the most important.
 
 ## 📚 Documentation Index
 
@@ -19,14 +19,14 @@ Welcome to the comprehensive documentation for MyAstroBoard, the integrated astr
 
 ### For Maintainers
 - [Release Guide](4.RELEASE.md) - How to publish new versions and create releases
-- [Translation](7.TRANSLATIONS.md) - How to contribute in translation 
+- [Translation](7.TRANSLATIONS.md) - How to contribute translations
 
 ### Advanced Topics
 - [Organization](5.ORGANIZATION.md) - How the repo is organized
-- [API Endpoints](API_ENDPOINTS.md) - Complete route inventory from backend/app.py
+- [API Endpoints](API_ENDPOINTS.md) - Complete route inventory from backend/app.py and backend/skytonight_api.py
 - [Plan My Night](PLAN_MY_NIGHT.md) - Night planning workflow and permissions
 - [Cache System](CACHE_SYSTEM.md) - Understanding the caching architecture
-- [SkyTonight](SKYTONIGHT.md) - Skytonight calculation & astroscore description
+- [SkyTonight](SKYTONIGHT.md) - SkyTonight calculation and AstroScore description
 - [Exposure Calculator](EXPOSURE_CALC.md) - Formula and calibration for the Equipment exposure calculator
 - [Visual Tour](VISUAL_TOUR.md) - Screenshots and feature walkthrough
 

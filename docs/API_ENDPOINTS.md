@@ -21,12 +21,29 @@ This page lists the HTTP routes currently declared in `backend/app.py` and `back
 - `GET /api/auth/preferences`
 - `PUT /api/auth/preferences`
 
+## Push Notifications
+
+- `GET /api/push/vapid-public-key`
+- `GET /api/push/vapid-config-status`
+- `POST /api/push/subscribe`
+- `GET /api/push/subscriptions`
+- `DELETE /api/push/subscriptions`
+- `DELETE /api/push/unsubscribe`
+- `POST /api/push/test`
+- `POST /api/push/test/<trigger_id>`
+
 ## User Management (admin)
 
 - `GET /api/users`
 - `POST /api/users`
 - `PUT /api/users/<user_id>`
 - `DELETE /api/users/<user_id>`
+
+## Administration (admin)
+
+- `GET /api/admin/app-settings`
+- `POST /api/admin/app-settings`
+- `POST /api/admin/restart`
 
 ## Configuration
 
@@ -49,6 +66,7 @@ This page lists the HTTP routes currently declared in `backend/app.py` and `back
 - `GET /api/logs/export` - Download a ZIP archive of all log files (myastroboard.log + skytonight/logs/)
 - `POST /api/convert-coordinates`
 - `GET /api/timezones`
+- `POST /api/translate/on-demand`
 - `GET /api/health`
 - `GET /health`
 - `GET /api/cache`
@@ -78,6 +96,7 @@ This page lists the HTTP routes currently declared in `backend/app.py` and `back
 - `GET /api/skytonight/data/comets`
 - `GET /api/skytonight/logs/<catalogue>`
 - `GET /api/skytonight/logs/<catalogue>/exists`
+- `GET /api/skytonight/target-debug`
 
 ## Weather, Moon, Sun, and Astronomy
 
@@ -89,9 +108,11 @@ This page lists the HTTP routes currently declared in `backend/app.py` and `back
 - `GET /api/moon/report`
 - `GET /api/moon/dark-window`
 - `GET /api/moon/next-7-nights`
+- `GET /api/moon/month-calendar`
 - `GET /api/aurora/predictions`
 - `GET /api/iss/passes` - Returns passes, solar transits, and lunar transits; all times in configured local TZ. Response includes `passes`, `solar_transits`, `lunar_transits`, `next_visible_passage`, `next_solar_transit`, `next_lunar_transit`, `total_passes`, `total_solar_transits`, `total_lunar_transits`.
 - `GET /api/iss/location`
+- `POST /api/iss/celestrak/restart`
 - `GET /api/sun/today`
 - `GET /api/sun/next-eclipse`
 - `GET /api/moon/next-eclipse`

@@ -170,7 +170,9 @@ myastroboard/
 ├── CODEOWNERS                       # Repository ownership rules
 ├── CODE_OF_CONDUCT.md               # Community code of conduct
 ├── CONTRIBUTING.md                  # Contribution guidelines
-├── copilot-instructions.md          # AI assistant working guidelines
+├── .github/
+│   └── instructions/
+│       └── copilot.instructions.md  # AI assistant working guidelines
 ├── docker-compose-dev.yml           # Development deployment
 ├── docker-compose.debug.yml         # Debug compose overlay
 ├── docker-compose.yml               # Production deployment
@@ -404,12 +406,17 @@ except Exception as e:
   - `GET /api/skytonight/skymap`
   - `GET /api/skytonight/log`
 - **Other key feature endpoints** (`@login_required` unless noted):
+    - Push notifications: `GET /api/push/vapid-public-key`, `GET /api/push/vapid-config-status`, `POST /api/push/subscribe`, `GET/DELETE /api/push/subscriptions`, `DELETE /api/push/unsubscribe`, `POST /api/push/test`, `POST /api/push/test/<trigger_id>`
+    - Admin operations (`@admin_required`): `GET/POST /api/admin/app-settings`, `POST /api/admin/restart`
     - Seeing forecast: `GET /api/seeing-forecast`
-    - ISS tracking: `GET /api/iss/passes` (returns passes, solar transits **and lunar transits**, all times in configured local TZ), `GET /api/iss/location`
+    - ISS tracking: `GET /api/iss/passes` (returns passes, solar transits **and lunar transits**, all times in configured local TZ), `GET /api/iss/location`, `POST /api/iss/celestrak/restart` (`@admin_required`)
+    - Moon details: `GET /api/moon/month-calendar`
+    - On-demand translation: `POST /api/translate/on-demand`
     - Spaceflight: `GET /api/spaceflight/launches`, `GET /api/spaceflight/astronauts`, `GET /api/spaceflight/events`, `GET /api/spaceflight/img/<filename>`, `GET /api/spaceflight/launch/<launch_id>/vidurls`
     - Object lookup: `GET /api/object/<path:identifier>`
     - Astrodex helpers: `GET /api/astrodex/catalogue-lookup`
     - Plan My Night helpers: `GET /api/plan-my-night/list`, `PATCH /api/plan-my-night`, `DELETE /api/plan-my-night/clear-all`
+    - SkyTonight debug helper: `GET /api/skytonight/target-debug`
     - Localized manifest route: `GET /manifest.<lang>.webmanifest` (public)
 - **Error Handling**: Return appropriate HTTP status codes with JSON error objects
   - 401 Unauthorized - Not authenticated
@@ -1238,5 +1245,5 @@ AGPL-3.0 License - See LICENSE file for details
 
 ---
 
-**Last Updated**: 2026-05-19
+**Last Updated**: 2026-06-03
 **Maintainer**: WorldOfGZ
