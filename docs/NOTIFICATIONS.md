@@ -171,7 +171,8 @@ The private key is stored as a raw base64url-encoded 32-byte EC scalar (the form
 | `DELETE` | `/api/push/unsubscribe` | `@login_required` | Removes subscription by endpoint |
 | `GET`  | `/api/push/subscriptions` | `@login_required` | Lists subscriptions for the current user. Returns `{"subscriptions": [{index, provider, created_at, endpoint_tail}]}`. `provider` is one of `apple`, `google`, `mozilla`, `other`. Full endpoints are not exposed - only the last 20 chars as `endpoint_tail`. |
 | `DELETE` | `/api/push/subscriptions` | `@login_required` | Removes **all** server-side subscriptions for the current user. The UI also calls `pushManager.getSubscription().unsubscribe()` to clean the browser side. Returns `{"removed": N}`. |
-| `POST` | `/api/push/test` | `@login_required` | Sends an immediate test push to all subscriptions of the current user; removes dead (410/404) endpoints automatically. Returns `{"delivered": N, "total": N, "cleaned": N}` |
+| `POST` | `/api/push/test` | `@login_required` | Sends a generic test push to all subscriptions; removes dead endpoints. Returns `{"delivered": N, "total": N, "cleaned": N}` |
+| `POST` | `/api/push/test/<trigger_id>` | `@login_required` | Fires a realistic test push for a specific trigger (`N1`–`N7`) with hardcoded sample data, bypassing all condition/cooldown checks. Useful for end-to-end validation. Returns `{"trigger", "delivered", "total", "title", "body"}`. Fire all from console: `['N1','N2','N3','N4','N5','N6','N7'].forEach((n,i) => setTimeout(() => fetch('/api/push/test/'+n,{method:'POST'}).then(r=>r.json()).then(d=>console.log(n,d)), i*2000))` |
 
 ### User model
 
