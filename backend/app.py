@@ -113,36 +113,28 @@ app = Flask(__name__,
             template_folder=TEMPLATE_DIR,
             static_folder=STATIC_DIR)
 
-# Configure reverse proxy support (e.g., NGINX Proxy Manager with HTTPS termination)
-# When TRUST_PROXY_HEADERS=true, Flask will trust X-Forwarded-* headers from the proxy
-# This is REQUIRED when using NGINX/reverse proxy with HTTPS termination
-# Set TRUST_PROXY_HEADERS=true and SESSION_COOKIE_SECURE=true for production with HTTPS proxy
-if os.environ.get('TRUST_PROXY_HEADERS', 'False').lower() == 'true':
+# Load persistent app settings (replaces SECRET_KEY / TRUST_PROXY_HEADERS /
+# SESSION_COOKIE_SECURE / VAPID_CONTACT_EMAIL environment variables).
+import app_settings as _app_settings
+_startup_settings = _app_settings.get_app_settings()
+
+# Configure reverse proxy support — configurable via Parameters → Advanced → Reverse proxy
+if _startup_settings['trust_proxy_headers']:
     app.wsgi_app = ProxyFix(
         app.wsgi_app,
-        x_for=1,      # Trust X-Forwarded-For (client IP)
-        x_proto=1,    # Trust X-Forwarded-Proto (http/https) - CRITICAL for SESSION_COOKIE_SECURE
-        x_host=1,     # Trust X-Forwarded-Host
-        x_port=1,     # Trust X-Forwarded-Port
-        x_prefix=1    # Trust X-Forwarded-Prefix (for path-based proxying)
+        x_for=1,
+        x_proto=1,
+        x_host=1,
+        x_port=1,
+        x_prefix=1,
     )
-    logger.info("ProxyFix middleware enabled - trusting X-Forwarded-* headers from reverse proxy")
+    logger.info("ProxyFix middleware enabled (trust_proxy_headers=true in app_settings.json)")
 
 # Configure session
-secret_key = os.environ.get("SECRET_KEY")
-
-if not secret_key:
-    if app.debug:
-        secret_key = secrets.token_hex(32)
-        logger.warning("Generated temporary dev SECRET_KEY")
-    else:
-        logger.error("SECRET_KEY is not set. Refusing to start.")
-        raise RuntimeError("SECRET_KEY must be set in production")
-
-app.secret_key = secret_key
+app.secret_key = _app_settings.load_or_generate_secret_key()
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-app.config['SESSION_COOKIE_SECURE'] = os.environ.get('SESSION_COOKIE_SECURE', 'False').lower() == 'true'
+app.config['SESSION_COOKIE_SECURE'] = _startup_settings['session_cookie_secure']
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)  # 30 days for remember-me
 
 CORS(app, supports_credentials=True)
@@ -947,6 +939,75 @@ def update_config_api():
     })
 
 
+@app.route('/api/admin/app-settings', methods=['GET'])
+@admin_required
+def get_app_settings_api():
+    """Return current persistent app settings (excludes secret key)."""
+    settings = _app_settings.get_app_settings()
+    return jsonify({
+        'vapid_contact_email': settings.get('vapid_contact_email', ''),
+        'trust_proxy_headers': settings.get('trust_proxy_headers', False),
+        'session_cookie_secure': settings.get('session_cookie_secure', False),
+    })
+
+
+@app.route('/api/admin/app-settings', methods=['POST'])
+@admin_required
+def update_app_settings_api():
+    """Update persistent app settings. Returns requires_restart=True when proxy settings changed."""
+    data = request.get_json(silent=True) or {}
+    old_settings = _app_settings.get_app_settings()
+
+    new_settings = {
+        'vapid_contact_email': str(data.get('vapid_contact_email', old_settings.get('vapid_contact_email', ''))).strip(),
+        'trust_proxy_headers': bool(data.get('trust_proxy_headers', old_settings.get('trust_proxy_headers', False))),
+        'session_cookie_secure': bool(data.get('session_cookie_secure', old_settings.get('session_cookie_secure', False))),
+    }
+
+    _app_settings.save_app_settings(new_settings)
+
+    # SESSION_COOKIE_SECURE can be applied live without restart
+    app.config['SESSION_COOKIE_SECURE'] = new_settings['session_cookie_secure']
+
+    # trust_proxy_headers requires restart (ProxyFix is applied to wsgi_app at startup)
+    requires_restart = new_settings['trust_proxy_headers'] != old_settings.get('trust_proxy_headers', False)
+
+    logger.info(
+        f"App settings updated by {session.get('username', '?')}: "
+        f"vapid_email={'set' if new_settings['vapid_contact_email'] else 'empty'}, "
+        f"trust_proxy={new_settings['trust_proxy_headers']}, "
+        f"session_secure={new_settings['session_cookie_secure']}"
+    )
+    return jsonify({'status': 'success', 'requires_restart': requires_restart})
+
+
+@app.route('/api/admin/restart', methods=['POST'])
+@admin_required
+def restart_app_api():
+    """Gracefully restart the container process. Docker restart policy handles the relaunch."""
+    import signal as _signal
+    import threading
+    import time
+
+    # Capture session data before leaving the request context — threads have no context.
+    username = session.get('username', '?')
+
+    def _deferred_restart():
+        time.sleep(1.5)
+        logger.info(f"Container restart requested by {username} via admin UI")
+        if os.path.exists('/.dockerenv'):
+            # Inside Docker: kill PID 1 (gunicorn master / container entrypoint) so the
+            # container exits and Docker's restart policy brings it back up.
+            # Killing only the current worker PID would just cause gunicorn to replace it.
+            os.kill(1, _signal.SIGTERM)
+        else:
+            # Local / non-Docker run: kill the current process directly.
+            os.kill(os.getpid(), _signal.SIGTERM)
+
+    threading.Thread(target=_deferred_restart, daemon=True).start()
+    return jsonify({'status': 'restarting'})
+
+
 @app.route('/api/metrics', methods=['GET'])
 @admin_required
 def get_system_metrics():
@@ -1065,10 +1126,11 @@ def backup_download_api():
     """
     # Evolutive list: each entry is (source_path, archive_name, is_dir)
     BACKUP_ENTRIES = [
-        (os.path.join(DATA_DIR, 'config.json'),  'config.json',   False),
-        (os.path.join(DATA_DIR, 'users.json'),   'users.json',    False),
-        (os.path.join(DATA_DIR, 'astrodex'),     'astrodex',      True),
-        (os.path.join(DATA_DIR, 'equipments'),   'equipments',    True),
+        (os.path.join(DATA_DIR, 'config.json'),       'config.json',       False),
+        (os.path.join(DATA_DIR, 'users.json'),         'users.json',        False),
+        (os.path.join(DATA_DIR, 'app_settings.json'),  'app_settings.json', False),
+        (os.path.join(DATA_DIR, 'astrodex'),           'astrodex',          True),
+        (os.path.join(DATA_DIR, 'equipments'),         'equipments',        True),
     ]
     try:
         buf = io.BytesIO()
@@ -1129,15 +1191,16 @@ def backup_restore_api():
     # Format: normalized_prefix -> destination base path
     # Entries whose value is a directory will have that directory cleared first.
     RESTORE_ALLOWED_PREFIXES = {
-        'config.json':  os.path.join(DATA_DIR, 'config.json'),
-        'users.json':   os.path.join(DATA_DIR, 'users.json'),
-        'astrodex':     os.path.join(DATA_DIR, 'astrodex'),
-        'equipments':   os.path.join(DATA_DIR, 'equipments'),
+        'config.json':       os.path.join(DATA_DIR, 'config.json'),
+        'users.json':        os.path.join(DATA_DIR, 'users.json'),
+        'app_settings.json': os.path.join(DATA_DIR, 'app_settings.json'),
+        'astrodex':          os.path.join(DATA_DIR, 'astrodex'),
+        'equipments':        os.path.join(DATA_DIR, 'equipments'),
     }
     # Directories that must be cleared before restoring their contents
     RESTORE_CLEAR_DIRS = {'astrodex', 'equipments'}
     # JSON files whose content must be valid JSON
-    RESTORE_VALIDATE_JSON = {'config.json', 'users.json'}
+    RESTORE_VALIDATE_JSON = {'config.json', 'users.json', 'app_settings.json'}
 
     if 'file' not in request.files:
         return jsonify({'error': 'No file uploaded'}), 400
@@ -1199,7 +1262,7 @@ def backup_restore_api():
         if not recognised_entries:
             return jsonify({
                 'error': 'Archive contains no recognised backup entries '
-                         '(expected config.json, users.json, astrodex/ or equipments/)'
+                         '(expected config.json, users.json, app_settings.json, astrodex/ or equipments/)'
             }), 400
 
         # --- Phase 2: clear target directories ---
@@ -1234,6 +1297,11 @@ def backup_restore_api():
                     with zf.open(info) as src, open(safe_dest, 'wb') as dst:
                         shutil.copyfileobj(src, dst)
                 restored_files.append(arc_path)
+
+        # Reload app_settings cache if it was part of the restore
+        if any('app_settings.json' in f for f in restored_files):
+            _app_settings.reload_app_settings()
+            app.config['SESSION_COOKIE_SECURE'] = _app_settings.get_app_settings()['session_cookie_secure']
 
         logger.info(
             f"Backup restore completed: {len(restored_files)} files restored, "

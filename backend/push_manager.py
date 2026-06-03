@@ -18,14 +18,16 @@ logger = get_logger(__name__)
 
 _VAPID_FILE = os.path.join(os.environ.get('DATA_DIR', '/app/data'), 'vapid.json')
 
-_raw_contact = os.environ.get('VAPID_CONTACT_EMAIL', '').strip()
-if _raw_contact:
-    # Accept bare email or full mailto: URI
-    _VAPID_CLAIMS_EMAIL = _raw_contact if _raw_contact.startswith(('mailto:', 'https://')) else f'mailto:{_raw_contact}'
-else:
-    _VAPID_CLAIMS_EMAIL = 'mailto:admin@localhost'
-
 _VAPID_CONTACT_WARNING_EMITTED = False
+
+
+def get_vapid_claims_email() -> str:
+    """Return the VAPID contact URI, reading from persistent app settings."""
+    from app_settings import get_app_settings
+    raw = get_app_settings().get('vapid_contact_email', '').strip()
+    if not raw:
+        return 'mailto:admin@localhost'
+    return raw if raw.startswith(('mailto:', 'https://')) else f'mailto:{raw}'
 
 _vapid_keys: dict = {}
 
@@ -64,12 +66,14 @@ def _generate_keys() -> dict:
 def load_or_generate_vapid_keys() -> dict:
     """Return VAPID key dict, generating and persisting on first call."""
     global _vapid_keys, _VAPID_CONTACT_WARNING_EMITTED
-    if not _raw_contact and not _VAPID_CONTACT_WARNING_EMITTED:
-        _VAPID_CONTACT_WARNING_EMITTED = True
-        logger.warning(
-            "VAPID_CONTACT_EMAIL is not set. Push notifications may be rejected by push services. "
-            "Set VAPID_CONTACT_EMAIL to a real email address (e.g. you@example.com)."
-        )
+    if not _VAPID_CONTACT_WARNING_EMITTED:
+        from app_settings import get_app_settings
+        if not get_app_settings().get('vapid_contact_email', '').strip():
+            _VAPID_CONTACT_WARNING_EMITTED = True
+            logger.warning(
+                "VAPID contact email is not configured. Push notifications may be rejected by push services. "
+                "Set it in Parameters → Advanced → Notifications."
+            )
     if _vapid_keys.get('private_key'):
         return _vapid_keys
 
@@ -109,7 +113,8 @@ def get_vapid_public_key() -> str:
 
 def get_vapid_contact_status() -> dict:
     """Return whether the VAPID contact email is properly configured for push delivery."""
-    raw = os.environ.get('VAPID_CONTACT_EMAIL', '').strip()
+    from app_settings import get_app_settings
+    raw = get_app_settings().get('vapid_contact_email', '').strip()
     if not raw:
         return {'ok': False, 'reason': 'not_set'}
     email = raw.removeprefix('mailto:')
@@ -150,7 +155,7 @@ def send_push(subscription_info: dict, payload: dict, ttl: int = 0, urgency: str
             data=json.dumps(payload, ensure_ascii=False),
             vapid_private_key=keys['private_key'],
             vapid_claims={
-                'sub': _VAPID_CLAIMS_EMAIL,
+                'sub': get_vapid_claims_email(),
                 'aud': aud,
             },
             ttl=ttl,

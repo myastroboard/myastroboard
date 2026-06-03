@@ -119,13 +119,14 @@ class LunarEclipseService:
         if eclipse is None:
             return None
 
-        # Convert peak time to local
-        peak_utc = eclipse.peak.Utc()
+        # Convert peak time to local.
+        # Time.Utc() returns a NAIVE datetime — attach UTC tzinfo before converting.
+        peak_utc = eclipse.peak.Utc().replace(tzinfo=datetime.timezone.utc)
         peak_local = peak_utc.astimezone(self.timezone)
 
         # Convert eclipse times to local using semi-duration to calculate begin/end times
         # sd_penum, sd_partial, sd_total are in minutes
-        peak_time_utc = eclipse.peak.Utc()  # Convert to datetime for arithmetic
+        peak_time_utc = eclipse.peak.Utc().replace(tzinfo=datetime.timezone.utc)
         
         # Calculate partial begin/end from sd_partial
         if eclipse.sd_partial > 0:

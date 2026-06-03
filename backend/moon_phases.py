@@ -179,9 +179,9 @@ class MoonService:
         if astro_time_obj is None:
             return "Not found"
 
-        # Time.Utc() returns a datetime.datetime UTC object
-        dt_utc = astro_time_obj.Utc()
-        # convert to local timezone
+        # Time.Utc() returns a NAIVE datetime — attach UTC tzinfo before converting,
+        # otherwise Python interprets it as the system timezone on .astimezone().
+        dt_utc = astro_time_obj.Utc().replace(tzinfo=datetime.timezone.utc)
         dt_local = dt_utc.astimezone(self.timezone)
         return dt_local.isoformat(timespec='minutes')  # ex: "2026-02-03T20:28:00+01:00"
     

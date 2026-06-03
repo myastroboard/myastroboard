@@ -2,7 +2,7 @@ services:
   myastroboard:
     # Use local build instead of published image for development
     build: .
-    
+
     # Mount source code directories for live editing
     # Note: this static bind mount overrides the image-bundled minified assets.
     # Development therefore serves local source files from ./static instead of build-minified files.
@@ -11,23 +11,21 @@ services:
       - ./templates:/app/templates
       - ./backend:/app/backend
       - ./VERSION:/app/VERSION:ro
-    
+
     environment:
       FLASK_DEBUG: 1
       FLASK_ENV: development
-      # Keep sessions stable across debug reloads/restarts
-      SECRET_KEY: ${SECRET_KEY:-dev-insecure-secret-change-me-0123456789abcdef0123456789abcdef}
       # Enable Flask auto-reload for Python files
       FLASK_RUN_RELOAD: 1
       # Disable template caching for immediate updates
       TEMPLATES_AUTO_RELOAD: 1
       # Log level for more verbose output during development
       LOG_LEVEL: DEBUG
-    
+
     command: ["python", "backend/app.py"]
 
 # Usage: docker compose -f docker-compose-dev.yml -f docker-compose.debug.yml up --build
 # This enables live editing of:
-# - Static files (CSS, JS): ./static -> /app/static  
+# - Static files (CSS, JS): ./static -> /app/static
 # - HTML templates: ./templates -> /app/templates
 # - Python backend: ./backend -> /app/backend

@@ -206,46 +206,64 @@ function getHour12Option() {
     return undefined;
 }
 
+// Returns the configured observation timezone (e.g. "Europe/Paris") if available,
+// falling back to undefined so Intl uses the browser's local timezone.
+function _getObservationTimezone() {
+    return (typeof currentConfig !== 'undefined' && currentConfig?.location?.timezone)
+        ? currentConfig.location.timezone
+        : undefined;
+}
+
 // Helper function to format ISO date to local time string
+// Uses the configured observation timezone (Parameters → Configuration) so times are
+// always shown in the observer's location regardless of the browser's own timezone.
 // Example output: "9:30 PM (6/30)" in US locale, "21:30 (30/06)" in many European locales
 function formatTimeThenDate(isoString, locale = navigator.language) {
     if (!isoString || isoString === 'Not found') return 'N/A';
     const date = new Date(isoString);
     if (isNaN(date.getTime())) return 'N/A';
 
-    // Format the time
+    const tz = _getObservationTimezone();
+    const tzOpt = tz ? { timeZone: tz } : {};
+
     const timeFormatter = new Intl.DateTimeFormat(locale, {
         hour: '2-digit',
         minute: '2-digit',
-        hour12: getHour12Option()
+        hour12: getHour12Option(),
+        ...tzOpt
     });
 
-    // Format the date (month/day)
     const dateFormatter = new Intl.DateTimeFormat(locale, {
         month: 'numeric',
-        day: 'numeric'
+        day: 'numeric',
+        ...tzOpt
     });
 
     return `${timeFormatter.format(date)} (${dateFormatter.format(date)})`;
 }
 
-// Format time, then date with seconds
+// Format time, then date with seconds — same timezone handling as formatTimeThenDate.
 // Example output: "9:30:45 PM (6/30)" in US locale, "21:30:45 (30/06)" in many European locales
 function formatTimeThenDateWithSeconds(isoString, locale = navigator.language) {
     if (!isoString || isoString === 'Not found') return 'N/A';
     const date = new Date(isoString);
     if (isNaN(date.getTime())) return 'N/A';
 
+    const tz = _getObservationTimezone();
+    const tzOpt = tz ? { timeZone: tz } : {};
+
     const timeFormatter = new Intl.DateTimeFormat(locale, {
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit',
-        hour12: getHour12Option()
+        hour12: getHour12Option(),
+        ...tzOpt
     });
 
     const dateFormatter = new Intl.DateTimeFormat(locale, {
         month: 'numeric',
-        day: 'numeric'
+        day: 'numeric',
+        ...tzOpt
     });
 
     return `${timeFormatter.format(date)} (${dateFormatter.format(date)})`;
@@ -257,11 +275,12 @@ function formatDateFull(isoString, locale = navigator.language) {
     if (!isoString) return 'N/A';
     const date = new Date(isoString);
 
-    // Format the date
+    const tz = _getObservationTimezone();
     const dateFormatter = new Intl.DateTimeFormat(locale, {
         year: 'numeric',
         month: 'numeric',
-        day: 'numeric'
+        day: 'numeric',
+        ...(tz ? { timeZone: tz } : {})
     });
 
     return dateFormatter.format(date);
@@ -272,28 +291,32 @@ function formatDateFull(isoString, locale = navigator.language) {
 function formatDateTime(isoString, locale = navigator.language) {
     if (!isoString) return 'N/A';
     const date = new Date(isoString);
-    
+
+    const tz = _getObservationTimezone();
     const dateTimeFormatter = new Intl.DateTimeFormat(locale, {
         year: 'numeric',
         month: 'numeric',
         day: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
-        hour12: getHour12Option()
+        hour12: getHour12Option(),
+        ...(tz ? { timeZone: tz } : {})
     });
 
     return dateTimeFormatter.format(date);
 }
 
-// Helper function to format ISO date to localized date string HH:MM
+// Helper function to format ISO date to localized time string HH:MM
 // Example output: "21:30" in many locales
 function formatTimeOnly(isoString, locale = navigator.language) {
     if (!isoString) return 'N/A';
     const date = new Date(isoString);
+    const tz = _getObservationTimezone();
     const timeFormatter = new Intl.DateTimeFormat(locale, {
         hour: '2-digit',
         minute: '2-digit',
-        hour12: getHour12Option()
+        hour12: getHour12Option(),
+        ...(tz ? { timeZone: tz } : {})
     });
     return timeFormatter.format(date);
 }

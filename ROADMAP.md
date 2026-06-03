@@ -24,7 +24,7 @@ The Web Push infrastructure (VAPID keys, `push_manager.py`, `push_scheduler.py`,
 
 **Objective:** A clean, self-hostable release that a new user can install and use in under 15 minutes.
 
-- Docker `docker compose up` → usable without manual steps
+- [DONE] Docker `docker compose up` → usable without manual steps
 - All 6 i18n languages at 0 missing keys (`python scripts/validate_i18n.py` passes clean)
 - API routes stabilized - no breaking route changes after this point
 - Documentation reviewed: `1.INSTALLATION.md`, `docs/` up to date
