@@ -7,7 +7,7 @@ import json
 import os
 import sys
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from constants import (
     CACHE_TTL, WEATHER_CACHE_TTL, DATA_DIR_CACHE,
     CACHE_TTL_MOON_REPORT, CACHE_TTL_DARK_WINDOW, CACHE_TTL_MOON_PLANNER,
@@ -520,7 +520,7 @@ def record_cache_execution(job_name, duration_seconds, success):
         if "_cache_metrics" not in shared:
             shared["_cache_metrics"] = {}
         shared["_cache_metrics"][job_name] = {
-            "last_run_at": datetime.now().isoformat(),
+            "last_run_at": datetime.now(timezone.utc).isoformat(),
             "last_duration_s": round(duration_seconds, 3),
             "last_success": success,
         }
