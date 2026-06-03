@@ -7,7 +7,7 @@ import os
 import uuid
 import re
 import shutil
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import wraps
 from flask import session, jsonify, request
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -85,7 +85,7 @@ class User:
         self.username = username
         self.password_hash = password_hash
         self.role = role
-        self.created_at = created_at or datetime.now().isoformat()
+        self.created_at = created_at or datetime.now(timezone.utc).isoformat()
         self.last_login = last_login
         self.preferences = preferences.copy() if isinstance(preferences, dict) else DEFAULT_USER_PREFERENCES.copy()
         self.push_subscriptions = push_subscriptions if isinstance(push_subscriptions, list) else []
@@ -607,7 +607,7 @@ class UserManager:
         user = self.get_user_by_username(username)
         if user and user.check_password(password):
             # Update last login
-            user.last_login = datetime.now().isoformat()
+            user.last_login = datetime.now(timezone.utc).isoformat()
             self.save_users()
             logger.info(f"Successful authentication for user {username}")
             return user

@@ -6,7 +6,7 @@ import json
 import os
 import uuid
 import shutil
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, asdict
 from enum import Enum
@@ -528,7 +528,7 @@ def load_user_telescopes(user_id: str) -> Dict:
     if not os.path.exists(file_path):
         return {
             'user_id': user_id,
-            'created_at': datetime.now().isoformat(),
+            'created_at': datetime.now(timezone.utc).isoformat(),
             'items': []
         }
     
@@ -539,7 +539,7 @@ def load_user_telescopes(user_id: str) -> Dict:
         logger.error(f"Error loading telescopes for {user_id}: {e}")
         return {
             'user_id': user_id,
-            'created_at': datetime.now().isoformat(),
+            'created_at': datetime.now(timezone.utc).isoformat(),
             'items': []
         }
 
@@ -547,7 +547,7 @@ def load_user_telescopes(user_id: str) -> Dict:
 def save_user_telescopes(user_id: str, data: Dict) -> bool:
     """Save user's telescope profiles with safety checks"""
     file_path = get_user_equipment_file(user_id, 'telescopes')
-    data['updated_at'] = datetime.now().isoformat()
+    data['updated_at'] = datetime.now(timezone.utc).isoformat()
     return safe_save_equipment(file_path, data)
 
 
@@ -574,8 +574,8 @@ def create_telescope(user_id: str, telescope_data: Dict) -> Optional[Dict]:
             effective_focal_length=0.0,  # Will be calculated
             effective_focal_ratio=0.0,  # Will be calculated
             notes=telescope_data.get('notes', ''),
-            created_at=datetime.now().isoformat(),
-            updated_at=datetime.now().isoformat(),
+            created_at=datetime.now(timezone.utc).isoformat(),
+            updated_at=datetime.now(timezone.utc).isoformat(),
             is_shared=bool(telescope_data.get('is_shared', False))
         )
         
@@ -631,8 +631,8 @@ def update_telescope(user_id: str, telescope_id: str, telescope_data: Dict) -> O
                     effective_focal_length=0.0,
                     effective_focal_ratio=0.0,
                     notes=telescope_data.get('notes', ''),
-                    created_at=item.get('created_at', datetime.now().isoformat()),
-                    updated_at=datetime.now().isoformat(),
+                    created_at=item.get('created_at', datetime.now(timezone.utc).isoformat()),
+                    updated_at=datetime.now(timezone.utc).isoformat(),
                     is_shared=bool(telescope_data.get('is_shared', item.get('is_shared', False)))
                 )
                 
@@ -679,7 +679,7 @@ def load_user_cameras(user_id: str) -> Dict:
     if not os.path.exists(file_path):
         return {
             'user_id': user_id,
-            'created_at': datetime.now().isoformat(),
+            'created_at': datetime.now(timezone.utc).isoformat(),
             'items': []
         }
     
@@ -690,7 +690,7 @@ def load_user_cameras(user_id: str) -> Dict:
         logger.error(f"Error loading cameras for {user_id}: {e}")
         return {
             'user_id': user_id,
-            'created_at': datetime.now().isoformat(),
+            'created_at': datetime.now(timezone.utc).isoformat(),
             'items': []
         }
 
@@ -698,7 +698,7 @@ def load_user_cameras(user_id: str) -> Dict:
 def save_user_cameras(user_id: str, data: Dict) -> bool:
     """Save user's camera profiles with safety checks"""
     file_path = get_user_equipment_file(user_id, 'cameras')
-    data['updated_at'] = datetime.now().isoformat()
+    data['updated_at'] = datetime.now(timezone.utc).isoformat()
     return safe_save_equipment(file_path, data)
 
 
@@ -728,8 +728,8 @@ def create_camera(user_id: str, camera_data: Dict) -> Optional[Dict]:
             read_noise_e=get_float_or_none(camera_data.get('read_noise_e')),
             quantum_efficiency=get_float_or_none(camera_data.get('quantum_efficiency')),
             notes=camera_data.get('notes', ''),
-            created_at=datetime.now().isoformat(),
-            updated_at=datetime.now().isoformat(),
+            created_at=datetime.now(timezone.utc).isoformat(),
+            updated_at=datetime.now(timezone.utc).isoformat(),
             is_shared=bool(camera_data.get('is_shared', False))
         )
         
@@ -784,8 +784,8 @@ def update_camera(user_id: str, camera_id: str, camera_data: Dict) -> Optional[D
                     read_noise_e=get_float_or_none(camera_data.get('read_noise_e')),
                     quantum_efficiency=get_float_or_none(camera_data.get('quantum_efficiency')),
                     notes=camera_data.get('notes', ''),
-                    created_at=item.get('created_at', datetime.now().isoformat()),
-                    updated_at=datetime.now().isoformat(),
+                    created_at=item.get('created_at', datetime.now(timezone.utc).isoformat()),
+                    updated_at=datetime.now(timezone.utc).isoformat(),
                     is_shared=bool(camera_data.get('is_shared', item.get('is_shared', False)))
                 )
                 
@@ -824,7 +824,7 @@ def load_user_mounts(user_id: str) -> Dict:
     if not os.path.exists(file_path):
         return {
             'user_id': user_id,
-            'created_at': datetime.now().isoformat(),
+            'created_at': datetime.now(timezone.utc).isoformat(),
             'items': []
         }
     
@@ -835,7 +835,7 @@ def load_user_mounts(user_id: str) -> Dict:
         logger.error(f"Error loading mounts for {user_id}: {e}")
         return {
             'user_id': user_id,
-            'created_at': datetime.now().isoformat(),
+            'created_at': datetime.now(timezone.utc).isoformat(),
             'items': []
         }
 
@@ -843,7 +843,7 @@ def load_user_mounts(user_id: str) -> Dict:
 def save_user_mounts(user_id: str, data: Dict) -> bool:
     """Save user's mount profiles with safety checks"""
     file_path = get_user_equipment_file(user_id, 'mounts')
-    data['updated_at'] = datetime.now().isoformat()
+    data['updated_at'] = datetime.now(timezone.utc).isoformat()
     return safe_save_equipment(file_path, data)
 
 
@@ -860,8 +860,8 @@ def create_mount(user_id: str, mount_data: Dict) -> Optional[Dict]:
             tracking_accuracy_arcsec=float(mount_data['tracking_accuracy_arcsec']) if mount_data.get('tracking_accuracy_arcsec') else None,
             guiding_supported=mount_data.get('guiding_supported', False),
             notes=mount_data.get('notes', ''),
-            created_at=datetime.now().isoformat(),
-            updated_at=datetime.now().isoformat(),
+            created_at=datetime.now(timezone.utc).isoformat(),
+            updated_at=datetime.now(timezone.utc).isoformat(),
             is_shared=bool(mount_data.get('is_shared', False))
         )
         
@@ -904,8 +904,8 @@ def update_mount(user_id: str, mount_id: str, mount_data: Dict) -> Optional[Dict
                     guiding_supported=mount_data.get('guiding_supported', False),
                     is_shared=bool(mount_data.get('is_shared', item.get('is_shared', False))),
                     notes=mount_data.get('notes', ''),
-                    created_at=item.get('created_at', datetime.now().isoformat()),
-                    updated_at=datetime.now().isoformat()
+                    created_at=item.get('created_at', datetime.now(timezone.utc).isoformat()),
+                    updated_at=datetime.now(timezone.utc).isoformat()
                 )
                 
                 data['items'][i] = asdict(mount)
@@ -943,7 +943,7 @@ def load_user_filters(user_id: str) -> Dict:
     if not os.path.exists(file_path):
         return {
             'user_id': user_id,
-            'created_at': datetime.now().isoformat(),
+            'created_at': datetime.now(timezone.utc).isoformat(),
             'items': []
         }
     
@@ -954,7 +954,7 @@ def load_user_filters(user_id: str) -> Dict:
         logger.error(f"Error loading filters for {user_id}: {e}")
         return {
             'user_id': user_id,
-            'created_at': datetime.now().isoformat(),
+            'created_at': datetime.now(timezone.utc).isoformat(),
             'items': []
         }
 
@@ -962,7 +962,7 @@ def load_user_filters(user_id: str) -> Dict:
 def save_user_filters(user_id: str, data: Dict) -> bool:
     """Save user's filter profiles with safety checks"""
     file_path = get_user_equipment_file(user_id, 'filters')
-    data['updated_at'] = datetime.now().isoformat()
+    data['updated_at'] = datetime.now(timezone.utc).isoformat()
     return safe_save_equipment(file_path, data)
 
 
@@ -979,8 +979,8 @@ def create_filter(user_id: str, filter_data: Dict) -> Optional[Dict]:
             transmission_curve=filter_data.get('transmission_curve'),
             intended_use=filter_data.get('intended_use', ''),
             notes=filter_data.get('notes', ''),
-            created_at=datetime.now().isoformat(),
-            updated_at=datetime.now().isoformat(),
+            created_at=datetime.now(timezone.utc).isoformat(),
+            updated_at=datetime.now(timezone.utc).isoformat(),
             is_shared=bool(filter_data.get('is_shared', False))
         )
         
@@ -1022,8 +1022,8 @@ def update_filter(user_id: str, filter_id: str, filter_data: Dict) -> Optional[D
                     transmission_curve=filter_data.get('transmission_curve'),
                     intended_use=filter_data.get('intended_use', ''),
                     notes=filter_data.get('notes', ''),
-                    created_at=item.get('created_at', datetime.now().isoformat()),
-                    updated_at=datetime.now().isoformat(),
+                    created_at=item.get('created_at', datetime.now(timezone.utc).isoformat()),
+                    updated_at=datetime.now(timezone.utc).isoformat(),
                     is_shared=bool(filter_data.get('is_shared', item.get('is_shared', False)))
                 )
                 
@@ -1059,13 +1059,13 @@ def load_user_accessories(user_id: str) -> Dict:
     """Load user's accessory profiles"""
     file_path = get_user_equipment_file(user_id, 'accessories')
     if not os.path.exists(file_path):
-        return {'items': [], 'created_at': datetime.now().isoformat(), 'updated_at': datetime.now().isoformat()}
+        return {'items': [], 'created_at': datetime.now(timezone.utc).isoformat(), 'updated_at': datetime.now(timezone.utc).isoformat()}
     try:
         with open(file_path, 'r') as f:
             return json.load(f)
     except Exception as e:
         logger.error(f"Error loading accessories: {e}")
-        return {'items': [], 'created_at': datetime.now().isoformat(), 'updated_at': datetime.now().isoformat()}
+        return {'items': [], 'created_at': datetime.now(timezone.utc).isoformat(), 'updated_at': datetime.now(timezone.utc).isoformat()}
 
 
 def save_user_accessories(user_id: str, data: Dict) -> bool:
@@ -1090,8 +1090,8 @@ def create_accessory(user_id: str, accessory_data: Dict) -> Optional[Dict]:
             accessory_type=accessory_data.get('accessory_type', ''),
             weight_kg=get_float_or_none(accessory_data.get('weight_kg'), 0.0),
             notes=accessory_data.get('notes', ''),
-            created_at=datetime.now().isoformat(),
-            updated_at=datetime.now().isoformat(),
+            created_at=datetime.now(timezone.utc).isoformat(),
+            updated_at=datetime.now(timezone.utc).isoformat(),
             is_shared=bool(accessory_data.get('is_shared', False))
         )
         
@@ -1135,8 +1135,8 @@ def update_accessory(user_id: str, accessory_id: str, accessory_data: Dict) -> O
                     accessory_type=accessory_data.get('accessory_type', item.get('accessory_type', '')),
                     weight_kg=get_float_or_none(accessory_data.get('weight_kg'), item.get('weight_kg', 0.0)),
                     notes=accessory_data.get('notes', ''),
-                    created_at=item.get('created_at', datetime.now().isoformat()),
-                    updated_at=datetime.now().isoformat(),
+                    created_at=item.get('created_at', datetime.now(timezone.utc).isoformat()),
+                    updated_at=datetime.now(timezone.utc).isoformat(),
                     is_shared=bool(accessory_data.get('is_shared', item.get('is_shared', False)))
                 )
                 
@@ -1234,7 +1234,7 @@ def load_user_combinations(user_id: str) -> Dict:
     if not os.path.exists(file_path):
         return {
             'user_id': user_id,
-            'created_at': datetime.now().isoformat(),
+            'created_at': datetime.now(timezone.utc).isoformat(),
             'items': []
         }
     
@@ -1245,7 +1245,7 @@ def load_user_combinations(user_id: str) -> Dict:
         logger.error(f"Error loading combinations for {user_id}: {e}")
         return {
             'user_id': user_id,
-            'created_at': datetime.now().isoformat(),
+            'created_at': datetime.now(timezone.utc).isoformat(),
             'items': []
         }
 
@@ -1253,7 +1253,7 @@ def load_user_combinations(user_id: str) -> Dict:
 def save_user_combinations(user_id: str, data: Dict) -> bool:
     """Save user's equipment combinations with safety checks"""
     file_path = get_user_equipment_file(user_id, 'combinations')
-    data['updated_at'] = datetime.now().isoformat()
+    data['updated_at'] = datetime.now(timezone.utc).isoformat()
     return safe_save_equipment(file_path, data)
 
 
@@ -1274,8 +1274,8 @@ def create_combination(user_id: str, combination_data: Dict) -> Optional[Dict]:
             filter_ids=combination_data.get('filter_ids', []),
             accessory_ids=combination_data.get('accessory_ids', []),
             notes=combination_data.get('notes', ''),
-            created_at=datetime.now().isoformat(),
-            updated_at=datetime.now().isoformat()
+            created_at=datetime.now(timezone.utc).isoformat(),
+            updated_at=datetime.now(timezone.utc).isoformat()
         )
         
         data = load_user_combinations(user_id)
@@ -1320,8 +1320,8 @@ def update_combination(user_id: str, combination_id: str, combination_data: Dict
                     filter_ids=combination_data.get('filter_ids', []),
                     accessory_ids=combination_data.get('accessory_ids', []),
                     notes=combination_data.get('notes', ''),
-                    created_at=item.get('created_at', datetime.now().isoformat()),
-                    updated_at=datetime.now().isoformat()
+                    created_at=item.get('created_at', datetime.now(timezone.utc).isoformat()),
+                    updated_at=datetime.now(timezone.utc).isoformat()
                 )
                 
                 data['items'][i] = asdict(combination)

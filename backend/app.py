@@ -1139,7 +1139,7 @@ def backup_download_api():
     ]
     try:
         buf = io.BytesIO()
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
         zip_filename = f"myastroboard_backup_{timestamp}.zip"
 
         with zipfile.ZipFile(buf, mode='w', compression=zipfile.ZIP_DEFLATED) as zf:
@@ -1341,7 +1341,7 @@ def logs_export_api():
     ]
     try:
         buf = io.BytesIO()
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
         zip_filename = f"myastroboard_logs_{timestamp}.zip"
 
         with zipfile.ZipFile(buf, mode='w', compression=zipfile.ZIP_DEFLATED) as zf:
@@ -1538,13 +1538,13 @@ def get_timezones_api():
 @app.route('/api/health', methods=['GET'])
 def health_api():
     """Health check endpoint"""
-    return jsonify({"status": "healthy", "timestamp": datetime.now().isoformat()})
+    return jsonify({"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()})
 
 
 @app.route('/health', methods=['GET'])
 def health_simple_api():
     """Simple health check endpoint for Docker healthcheck"""
-    return jsonify({"status": "healthy", "timestamp": datetime.now().isoformat()})
+    return jsonify({"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()})
 
 
 @app.route('/api/cache', methods=['GET'])

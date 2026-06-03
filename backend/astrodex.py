@@ -8,7 +8,7 @@ import os
 import re
 import threading
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
 from logging_config import get_logger
 from constellation import Constellation
@@ -416,7 +416,7 @@ def load_user_astrodex(user_id: str, username: Optional[str] = None) -> Dict:
         return {
             'user_id': user_id,
             'username': username or 'unknown',
-            'created_at': datetime.now().isoformat(),
+            'created_at': datetime.now(timezone.utc).isoformat(),
             'items': []
         }
     
@@ -446,7 +446,7 @@ def load_user_astrodex(user_id: str, username: Optional[str] = None) -> Dict:
         return {
             'user_id': user_id,
             'username': username or 'unknown',
-            'created_at': datetime.now().isoformat(),
+            'created_at': datetime.now(timezone.utc).isoformat(),
             'items': []
         }
     except Exception as e:
@@ -454,7 +454,7 @@ def load_user_astrodex(user_id: str, username: Optional[str] = None) -> Dict:
         return {
             'user_id': user_id,
             'username': username or 'unknown',
-            'created_at': datetime.now().isoformat(),
+            'created_at': datetime.now(timezone.utc).isoformat(),
             'items': []
         }
 
@@ -536,7 +536,7 @@ def _save_user_astrodex_locked(
     backup_created = False
 
     try:
-        astrodex_data['updated_at'] = datetime.now().isoformat()
+        astrodex_data['updated_at'] = datetime.now(timezone.utc).isoformat()
         astrodex_data['user_id'] = user_id
         if username:
             astrodex_data['username'] = username
@@ -649,8 +649,8 @@ def create_astrodex_item(user_id: str, item_data: Dict, username: Optional[str] 
         'constellation': item_data.get('constellation', ''),
         'notes': item_data.get('notes', ''),
         'pictures': [],
-        'created_at': datetime.now().isoformat(),
-        'updated_at': datetime.now().isoformat()
+        'created_at': datetime.now(timezone.utc).isoformat(),
+        'updated_at': datetime.now(timezone.utc).isoformat()
     }
     
     astrodex['items'].append(new_item)
@@ -683,7 +683,7 @@ def update_astrodex_item(user_id: str, item_id: str, updates: Dict) -> Optional[
                 if field in updates:
                     item[field] = updates[field]
             
-            item['updated_at'] = datetime.now().isoformat()
+            item['updated_at'] = datetime.now(timezone.utc).isoformat()
             
             if save_user_astrodex(user_id, astrodex):
                 return item
@@ -761,7 +761,7 @@ def add_picture_to_item(user_id: str, item_id: str, picture_data: Dict) -> Optio
                 'frames': picture_data.get('frames', ''),
                 'notes': picture_data.get('notes', ''),
                 'is_main': False,  # New pictures are not main by default
-                'created_at': datetime.now().isoformat()
+                'created_at': datetime.now(timezone.utc).isoformat()
             }
             
             # If this is the first picture, make it main
@@ -769,7 +769,7 @@ def add_picture_to_item(user_id: str, item_id: str, picture_data: Dict) -> Optio
                 new_picture['is_main'] = True
             
             item['pictures'].append(new_picture)
-            item['updated_at'] = datetime.now().isoformat()
+            item['updated_at'] = datetime.now(timezone.utc).isoformat()
             
             if save_user_astrodex(user_id, astrodex):
                 return new_picture
@@ -792,7 +792,7 @@ def update_picture(user_id: str, item_id: str, picture_id: str, updates: Dict) -
                         if field in updates:
                             picture[field] = updates[field]
                     
-                    item['updated_at'] = datetime.now().isoformat()
+                    item['updated_at'] = datetime.now(timezone.utc).isoformat()
                     
                     if save_user_astrodex(user_id, astrodex):
                         return picture
@@ -827,7 +827,7 @@ def delete_picture(user_id: str, item_id: str, picture_id: str) -> bool:
                 item['pictures'][0]['is_main'] = True
             
             if len(item['pictures']) < original_count:
-                item['updated_at'] = datetime.now().isoformat()
+                item['updated_at'] = datetime.now(timezone.utc).isoformat()
                 
                 # Delete the physical file if it exists
                 if deleted_filename:
@@ -859,7 +859,7 @@ def set_main_picture(user_id: str, item_id: str, picture_id: str) -> bool:
             for picture in item['pictures']:
                 if picture['id'] == picture_id:
                     picture['is_main'] = True
-                    item['updated_at'] = datetime.now().isoformat()
+                    item['updated_at'] = datetime.now(timezone.utc).isoformat()
                     return save_user_astrodex(user_id, astrodex)
     
     return False
@@ -1044,7 +1044,7 @@ def switch_item_catalogue_name(user_id: str, item_id: str, target_catalogue: str
         else:
             item.pop('catalogue_aliases', None)
         item.pop('catalogue_group_id', None)
-        item['updated_at'] = datetime.now().isoformat()
+        item['updated_at'] = datetime.now(timezone.utc).isoformat()
 
         if save_user_astrodex(user_id, astrodex):
             return item
