@@ -651,6 +651,7 @@ def push_test():
                     'icon': '/static/ico/android/launchericon-192x192.png',
                     'badge': '/static/ico/android/launchericon-72x72.png',
                     'tag': 'push-test',
+                    'data': {'url': '/#my-settings/notifications'},
                 },
                 ttl=60,
                 urgency='high',
