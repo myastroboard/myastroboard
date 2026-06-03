@@ -99,7 +99,7 @@ RUN chmod +x /entrypoint.sh \
 # Expose port
 EXPOSE 5000
 
-# Entrypoint root → fix perms → drop user
+# Entrypoint root -> fix perms -> drop user
 ENTRYPOINT ["/entrypoint.sh"]
 
 # Default command

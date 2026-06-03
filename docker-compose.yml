@@ -14,7 +14,7 @@ services:
       - ./data:/app/data
 
     environment:
-      # Timezone (affects log timestamps only — set observation timezone in Parameters → Configuration)
+      # Timezone (affects log timestamps only - set observation timezone in Parameters -> Configuration)
       # UTC is recommended for server deployments
       - TZ=UTC
 
@@ -25,7 +25,7 @@ services:
       - DATA_DIR=/app/data
 
       # Security, reverse proxy, and push notification settings are managed
-      # through the admin UI: Parameters → Advanced
+      # through the admin UI: Parameters -> Advanced
       # They are stored in data/app_settings.json and persist across container rebuilds.
 
     restart: unless-stopped

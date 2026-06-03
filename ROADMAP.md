@@ -24,7 +24,7 @@ The Web Push infrastructure (VAPID keys, `push_manager.py`, `push_scheduler.py`,
 
 **Objective:** A clean, self-hostable release that a new user can install and use in under 15 minutes.
 
-- [DONE] Docker `docker compose up` → usable without manual steps
+- [DONE] Docker `docker compose up` -> usable without manual steps
 - All 6 i18n languages at 0 missing keys (`python scripts/validate_i18n.py` passes clean)
 - API routes stabilized - no breaking route changes after this point
 - Documentation reviewed: `1.INSTALLATION.md`, `docs/` up to date
@@ -106,7 +106,7 @@ What needs to be built:
 
 | | |
 |---|---|
-| **Why** | Closes the loop: **Plan → Observe → Log → Astrodex**. Positioned after v1.2 so that beginners are already onboarded and have sessions worth logging. |
+| **Why** | Closes the loop: **Plan -> Observe -> Log -> Astrodex**. Positioned after v1.2 so that beginners are already onboarded and have sessions worth logging. |
 | **Effort** | High |
 
 Users can record what they actually captured after a session, not just what they planned.
@@ -144,7 +144,7 @@ Multi-panel planning for targets that exceed the sensor FOV:
 
 - Configure panel grid (2×1, 2×2, 3×2…), overlap percentage, rotation angle
 - FOV overlay per equipment combination (reuses existing FOV calculator)
-- Output: list of RA/Dec center points per panel → one-click add each as a Plan My Night entry
+- Output: list of RA/Dec center points per panel -> one-click add each as a Plan My Night entry
 - Scope: planning-grade (not Telescopius-level interactive sky drag). The value is the Plan My Night integration.
 
 #### Meridian flip estimator
@@ -223,7 +223,7 @@ Scope: a planning-grade sky chart integrated with existing data - not a full Ste
 
 - Renders stars to ~magnitude 8, constellation lines, DSO markers from the SkyTonight catalog
 - Supports horizon-up (Alt/Az) and equatorial (RA/Dec) projection
-- Pan and zoom; click an object → opens its existing SkyTonight target card
+- Pan and zoom; click an object -> opens its existing SkyTonight target card
 - Time slider: scrub through the night to preview altitude evolution
 - Moon and planets overlaid
 
@@ -236,8 +236,8 @@ Scope: a planning-grade sky chart integrated with existing data - not a full Ste
 #### Plan My Night integration
 
 - Objects in tonight's plan highlighted with a colored ring on the chart
-- Click a plan entry in the sidebar → centers the chart on that target
-- Lasso-select a sky region → browse visible SkyTonight targets in that area
+- Click a plan entry in the sidebar -> centers the chart on that target
+- Lasso-select a sky region -> browse visible SkyTonight targets in that area
 
 #### Astrodex overlay
 
@@ -259,7 +259,7 @@ Scope: a planning-grade sky chart integrated with existing data - not a full Ste
 
 #### Public Astrodex profiles (opt-in)
 
-- User can set their Astrodex to public → accessible at `/u/<username>` without login
+- User can set their Astrodex to public -> accessible at `/u/<username>` without login
 - Shareable link; optionally password-protected
 - Profile shows: captured objects, equipment used, observation stats (from v1.5)
 
@@ -274,7 +274,7 @@ Export Plan My Night or SkyTonight results as:
 
 #### Community object of the month (admin-curated)
 
-- Admin pins a seasonal target list → appears as a special SkyTonight category for all users
+- Admin pins a seasonal target list -> appears as a special SkyTonight category for all users
 - Drives shared focus for club and family multi-user installs
 - No external server required - purely local admin action
 
@@ -289,16 +289,16 @@ Export Plan My Night or SkyTonight results as:
 | **Why** | Bridges MAB with the capture and guiding software that advanced imagers already run. Most niche audience - placed last. |
 | **Effort** | High |
 
-#### Plate solve (upload → coordinates)
+#### Plate solve (upload -> coordinates)
 
-- User uploads a FITS or JPEG → MAB calls the Astrometry.net public API → returns RA/Dec center, field scale, rotation angle
+- User uploads a FITS or JPEG -> MAB calls the Astrometry.net public API -> returns RA/Dec center, field scale, rotation angle
 - Result: auto-populates Astrodex item coordinates and cross-links to the matching SkyTonight target
 - Use case: "I just captured something - what exactly is it?"
 - No local solver required; the public API handles it
 
 #### PHD2 guiding log import
 
-- Upload a PHD2 `PHD2_GuideLog` file → MAB parses: total guide time, RMS error, drift trend
+- Upload a PHD2 `PHD2_GuideLog` file -> MAB parses: total guide time, RMS error, drift trend
 - Result attached to an Observation Log session (v1.3)
 - Session Analytics dashboard (v1.5) shows guiding quality trend per equipment combination over time
 
@@ -309,7 +309,7 @@ Export Plan My Night or SkyTonight results as:
 
 #### INDI/ASCOM GoTo *(stretch goal)*
 
-- Connect MAB to a running INDI server on the local network → send GoTo commands directly from Plan My Night
+- Connect MAB to a running INDI server on the local network -> send GoTo commands directly from Plan My Night
 - High complexity; included as a stretch goal only - pursue based on user demand after the rest of v2.2 ships
 
 **i18n in 6 languages.**
