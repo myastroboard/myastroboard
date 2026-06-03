@@ -14,39 +14,19 @@ services:
       - ./data:/app/data
 
     environment:
-      # Timezone
-      - TZ=Europe/Paris
+      # Timezone (affects log timestamps only — set observation timezone in Parameters → Configuration)
+      # UTC is recommended for server deployments
+      - TZ=UTC
 
       # Flask
-      - FLASK_DEBUG=0  # 1 en debug
+      - FLASK_DEBUG=0
 
-      # Security - Flask secret key for session management
-      # IMPORTANT: Generate a secure random key and set it here
-      # Generate using: python3 -c "import secrets; print(secrets.token_hex(32))"
-      # Or online: https://randomkeygen.com/jwt-secret (use "HS256 (256 bits), format Hexadecimal")
-      # If not set, sessions will be invalidated on container restart
-      - SECRET_KEY=your-secret-key-here-replace-with-random-64-character-hex-string
-      
-      # Reverse Proxy Configuration (NGINX Proxy Manager, Traefik, etc.)
-      # CRITICAL: Set TRUST_PROXY_HEADERS=true when using a reverse proxy with HTTPS termination
-      # This allows Flask to trust X-Forwarded-* headers from the proxy
-      # See docs/6.REVERSE_PROXY.md for complete setup guide
-      - TRUST_PROXY_HEADERS=true
-      
-      # Session cookie security (enable for HTTPS/production)
-      # Set to "true" when using HTTPS to prevent cookie theft over unencrypted connections
-      # When using reverse proxy with HTTPS, set both TRUST_PROXY_HEADERS=true and SESSION_COOKIE_SECURE=true
-      - SESSION_COOKIE_SECURE=false
-
-      # Push notifications - VAPID contact email
-      # Required for background push notifications (especially Apple APNs on iOS).
-      # Set to any real email address - it is sent to push services as a contact address,
-      # not shown to users. The domain does not need to match your app's domain.
-      # Without this, iOS push notifications will be silently rejected by Apple.
-      - VAPID_CONTACT_EMAIL=your-email@example.com
-
-      # App
+      # App data directory
       - DATA_DIR=/app/data
+
+      # Security, reverse proxy, and push notification settings are managed
+      # through the admin UI: Parameters → Advanced
+      # They are stored in data/app_settings.json and persist across container rebuilds.
 
     restart: unless-stopped
 

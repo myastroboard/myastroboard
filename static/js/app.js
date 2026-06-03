@@ -222,6 +222,7 @@ async function initializeApp() {
     setupSubTabs();
     await loadTimezones();
     await loadConfiguration();  // Wait for config to load before loading catalogues
+    if (typeof loadAppSettings === 'function' && currentUser?.role === 'admin') loadAppSettings();
     await loadCatalogues();  // Also await catalogues to ensure proper sequencing
     setupEventListeners();
     loadVersion();

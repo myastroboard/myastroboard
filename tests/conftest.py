@@ -16,8 +16,7 @@ if 'LOG_LEVEL' not in os.environ:
     os.environ['LOG_LEVEL'] = 'ERROR'
 if 'CONSOLE_LOG_LEVEL' not in os.environ:
     os.environ['CONSOLE_LOG_LEVEL'] = 'ERROR'
-if 'SECRET_KEY' not in os.environ:
-    os.environ['SECRET_KEY'] = 'test-secret-key'
+# SECRET_KEY is no longer an env var — it's auto-generated in DATA_DIR/secret_key.txt
 
 import pytest
 import sys
@@ -44,7 +43,6 @@ def setup_test_environment():
     os.environ['CONFIG_DIR'] = test_config_dir
     os.environ['LOG_LEVEL'] = 'ERROR'
     os.environ['CONSOLE_LOG_LEVEL'] = 'ERROR'
-    os.environ['SECRET_KEY'] = 'test-secret-key'
     
     yield {
         'data_dir': test_data_dir,
@@ -56,6 +54,22 @@ def setup_test_environment():
     shutil.rmtree(test_data_dir, ignore_errors=True)
     shutil.rmtree(test_output_dir, ignore_errors=True)
     shutil.rmtree(test_config_dir, ignore_errors=True)
+
+
+@pytest.fixture(autouse=True)
+def reset_app_settings_module_cache():
+    """Reset the app_settings module-level cache between tests."""
+    try:
+        import app_settings
+        app_settings._cache = None
+    except ImportError:
+        pass
+    yield
+    try:
+        import app_settings
+        app_settings._cache = None
+    except ImportError:
+        pass
 
 
 @pytest.fixture

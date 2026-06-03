@@ -117,15 +117,16 @@ class SolarEclipseService:
         if eclipse is None:
             return None
 
-        # Convert peak time to local
-        peak_utc = eclipse.peak.time.Utc()
+        # Convert peak time to local.
+        # Time.Utc() returns a NAIVE datetime — attach UTC tzinfo before converting.
+        peak_utc = eclipse.peak.time.Utc().replace(tzinfo=datetime.timezone.utc)
         peak_local = peak_utc.astimezone(self.timezone)
 
         # Convert eclipse times to local
-        partial_begin_utc = eclipse.partial_begin.time.Utc()
+        partial_begin_utc = eclipse.partial_begin.time.Utc().replace(tzinfo=datetime.timezone.utc)
         partial_begin_local = partial_begin_utc.astimezone(self.timezone)
 
-        partial_end_utc = eclipse.partial_end.time.Utc()
+        partial_end_utc = eclipse.partial_end.time.Utc().replace(tzinfo=datetime.timezone.utc)
         partial_end_local = partial_end_utc.astimezone(self.timezone)
 
         # Calculate altitude/azimuth at peak

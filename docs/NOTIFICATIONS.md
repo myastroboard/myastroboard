@@ -137,7 +137,7 @@ The `_check*` functions are defined at the bottom of their respective feature mo
 
 Web Push on iOS requires **Safari 16.4+** and the app must be **installed as a PWA** (Add to Home Screen). Push is not delivered to a regular Safari browser tab.
 
-The `VAPID_CONTACT_EMAIL` environment variable must be set to a real email address. Apple APNs silently rejects pushes when the VAPID `sub` claim contains an invalid domain (e.g. `.local`). See [docs/1.INSTALLATION.md](1.INSTALLATION.md) for setup instructions.
+The VAPID contact email must be set to a real email address. Apple APNs silently rejects pushes when the VAPID `sub` claim contains an invalid domain (e.g. `.local`). Set it in **Parameters → Advanced → Notifications** in the admin UI.
 
 The in-app **Test** button calls `POST /api/push/test`, which sends a real server-side push through the full VAPID → push service → service worker pipeline. On iOS, background the app immediately after tapping to see the notification appear.
 
@@ -166,7 +166,7 @@ The private key is stored as a raw base64url-encoded 32-byte EC scalar (the form
 | Method | Route | Auth | Description |
 |--------|-------|------|-------------|
 | `GET` | `/api/push/vapid-public-key` | Public | Returns base64url public key for `applicationServerKey` |
-| `GET` | `/api/push/vapid-config-status` | Public | Returns whether `VAPID_CONTACT_EMAIL` is correctly configured |
+| `GET` | `/api/push/vapid-config-status` | Public | Returns whether the VAPID contact email (set in admin UI) is correctly configured |
 | `POST` | `/api/push/subscribe` | `@login_required` | Stores subscription (deduplicates by endpoint) |
 | `DELETE` | `/api/push/unsubscribe` | `@login_required` | Removes subscription by endpoint |
 | `GET`  | `/api/push/subscriptions` | `@login_required` | Lists subscriptions for the current user. Returns `{"subscriptions": [{index, provider, created_at, endpoint_tail}]}`. `provider` is one of `apple`, `google`, `mozilla`, `other`. Full endpoints are not exposed - only the last 20 chars as `endpoint_tail`. |

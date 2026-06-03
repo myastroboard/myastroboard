@@ -982,7 +982,7 @@
                     <!-- VAPID misconfiguration warning (shown to all users when server email is invalid) -->
                     <div id="notif-vapid-warning" class="alert alert-warning mb-3" role="alert" style="display:none;">
                         <i class="bi bi-exclamation-triangle-fill icon-inline" aria-hidden="true"></i>
-                        <span data-i18n="settings.notifications_vapid_not_configured">Background push notifications may not work: the server administrator has not set a valid VAPID_CONTACT_EMAIL. Some devices may not receive push notifications until this is fixed.</span>
+                        <span data-i18n="settings.notifications_vapid_not_configured">Background push notifications may not work: the contact email is not configured. Administrators can set it in Parameters → Advanced → Notifications.</span>
                     </div>
 
                     <!-- Master toggle + enable button -->
@@ -1605,6 +1605,78 @@
                         </button>
                     </div>
                 </div>
+
+                <!-- Notifications (VAPID contact email) -->
+                <div class="shadow p-2 mb-3 rounded bg-sub-container">
+                    <h2>
+                        <i class="bi bi-bell text-info icon-inline" aria-hidden="true"></i>
+                        <span data-i18n="settings.app_settings_notifications_title">Notifications</span>
+                    </h2>
+                    <div class="alert alert-info" role="alert">
+                        <span data-i18n="settings.app_settings_notifications_desc">Configure the contact email used for VAPID push notification delivery. This email is sent to push services and is not shown to users.</span>
+                    </div>
+                    <div class="row g-3 mt-1 mb-2">
+                        <div class="col-md-6">
+                            <label for="app-setting-vapid-email" class="form-label" data-i18n="settings.app_settings_vapid_email_label">VAPID contact email</label>
+                            <input type="email" id="app-setting-vapid-email" class="form-control" data-i18n-placeholder="settings.app_settings_vapid_email_placeholder" placeholder="admin@your-domain.com">
+                        </div>
+                    </div>
+                    <div class="button-group mt-2">
+                        <button id="save-app-settings-notifications" class="btn btn-primary">
+                            <i class="bi bi-save icon-inline" aria-hidden="true"></i>
+                            <span data-i18n="settings.app_settings_save_btn">Save</span>
+                        </button>
+                        <span id="app-settings-notifications-feedback" class="ms-3 text-success" style="display:none;" data-i18n="settings.app_settings_saved">Settings saved.</span>
+                    </div>
+                </div>
+
+                <!-- Reverse Proxy -->
+                <div class="shadow p-2 mb-3 rounded bg-sub-container">
+                    <h2>
+                        <i class="bi bi-hdd-network text-secondary icon-inline" aria-hidden="true"></i>
+                        <span data-i18n="settings.app_settings_proxy_title">Reverse proxy</span>
+                    </h2>
+                    <div class="alert alert-warning" role="alert">
+                        <span data-i18n="settings.app_settings_proxy_desc">Enable these settings only if MyAstroBoard runs behind a reverse proxy (NGINX, Traefik, etc.) with HTTPS. A container restart is required to apply changes.</span>
+                    </div>
+                    <div class="row g-3 mt-1 mb-2">
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="app-setting-trust-proxy" role="switch">
+                                <label class="form-check-label" for="app-setting-trust-proxy" data-i18n="settings.app_settings_trust_proxy_label">Trust proxy headers (X-Forwarded-*)</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="app-setting-session-secure" role="switch">
+                                <label class="form-check-label" for="app-setting-session-secure" data-i18n="settings.app_settings_session_secure_label">HTTPS-only session cookie (Secure flag)</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="restart-required-banner" class="alert alert-warning d-flex align-items-center gap-3 mt-2" role="alert" style="display:none;">
+                        <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+                        <span data-i18n="settings.app_settings_restart_required">A container restart is required to apply proxy changes.</span>
+                        <button id="btn-restart-app" class="btn btn-sm btn-danger ms-auto">
+                            <i class="bi bi-arrow-clockwise icon-inline" aria-hidden="true"></i>
+                            <span data-i18n="settings.restart_now_btn">Restart container</span>
+                        </button>
+                    </div>
+
+                    <div class="button-group mt-2">
+                        <button id="save-app-settings-proxy" class="btn btn-primary">
+                            <i class="bi bi-save icon-inline" aria-hidden="true"></i>
+                            <span data-i18n="settings.app_settings_save_btn">Save</span>
+                        </button>
+                        <span id="app-settings-proxy-feedback" class="ms-3 text-success" style="display:none;" data-i18n="settings.app_settings_saved">Settings saved.</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Restarting overlay (fixed, full-screen) -->
+            <div id="restarting-overlay" class="position-fixed top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center" style="display:none!important; z-index:9999; background:rgba(0,0,0,0.8);">
+                <div class="spinner-border text-light mb-3" role="status" style="width:3rem;height:3rem;" aria-hidden="true"></div>
+                <p class="text-light fs-5" data-i18n="settings.restarting_wait">Restarting… please wait</p>
             </div>
 
             <!-- Logs Sub-tab -->
@@ -2610,6 +2682,7 @@
     <script src="/static/js/plan_my_night.js?v={{ version }}"></script>
     <script src="/static/js/equipment.js?v={{ version }}"></script>
     <script src="/static/js/config.js?v={{ version }}"></script>
+    <script src="/static/js/app-settings.js?v={{ version }}"></script>
     <script src="/static/js/skytonight.js?v={{ version }}"></script>
     <script src="/static/js/logs.js?v={{ version }}"></script>
     <script src="/static/js/metrics.js?v={{ version }}"></script>
