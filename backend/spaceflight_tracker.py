@@ -85,6 +85,7 @@ def _get(path: str, params: Optional[Dict[str, Any]] = None) -> Optional[Dict[st
         _backoff_until.pop(path, None)  # clear any stale backoff on success
         return resp.json()
     except requests.exceptions.Timeout:
+        _backoff_until[path] = time.time() + 900  # 15 min backoff on timeout
         logger.warning("LL2 API timeout for %s", url)
     except requests.exceptions.HTTPError as exc:
         sc = exc.response.status_code
@@ -94,8 +95,10 @@ def _get(path: str, params: Optional[Dict[str, Any]] = None) -> Optional[Dict[st
             _backoff_until[path] = time.time() + backoff
             logger.warning("LL2 API 429 for %s - backing off for %ds", url, backoff)
         else:
+            _backoff_until[path] = time.time() + 900  # 15 min backoff on HTTP errors
             logger.warning("LL2 API HTTP error %s for %s", exc.response.status_code, url)
     except Exception as exc:
+        _backoff_until[path] = time.time() + 900  # 15 min backoff on other failures
         logger.warning("LL2 API request failed for %s: %s", url, exc)
     return None
 

@@ -924,17 +924,6 @@ def update_spaceflight_launches_cache():
         past = get_past_launches(limit=10)
 
         if upcoming is None and past is None:
-            # API unavailable (rate-limited or down) - keep existing data but
-            # refresh the timestamp so the scheduler won't retry every cycle.
-            # The backoff in spaceflight_tracker._get() already prevents real
-            # HTTP calls until the backoff window expires.
-            if cache_store._spaceflight_launches_cache.get("data"):
-                cache_store._spaceflight_launches_cache["timestamp"] = time.time()
-                cache_store.update_shared_cache_entry(
-                    "spaceflight_launches",
-                    cache_store._spaceflight_launches_cache["data"],
-                    cache_store._spaceflight_launches_cache["timestamp"],
-                )
             logger.warning("Spaceflight launches fetch returned no data (kept existing cache)")
             return
 
@@ -965,13 +954,6 @@ def update_spaceflight_astronauts_cache():
         astronauts = get_astronauts_in_space()
 
         if iss_crew is None and astronauts is None:
-            if cache_store._spaceflight_astronauts_cache.get("data"):
-                cache_store._spaceflight_astronauts_cache["timestamp"] = time.time()
-                cache_store.update_shared_cache_entry(
-                    "spaceflight_astronauts",
-                    cache_store._spaceflight_astronauts_cache["data"],
-                    cache_store._spaceflight_astronauts_cache["timestamp"],
-                )
             logger.warning("Spaceflight astronauts fetch returned no data (kept existing cache)")
             return
 
@@ -1001,13 +983,6 @@ def update_spaceflight_events_cache():
         events = get_upcoming_space_events(limit=15)
 
         if events is None:
-            if cache_store._spaceflight_events_cache.get("data"):
-                cache_store._spaceflight_events_cache["timestamp"] = time.time()
-                cache_store.update_shared_cache_entry(
-                    "spaceflight_events",
-                    cache_store._spaceflight_events_cache["data"],
-                    cache_store._spaceflight_events_cache["timestamp"],
-                )
             logger.warning("Spaceflight events fetch returned no data (kept existing cache)")
             return
 
