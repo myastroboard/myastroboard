@@ -40,6 +40,10 @@ async function _saveAppSettings(partial, section) {
             : 'app-settings-proxy-feedback';
         _showFeedback(feedbackId);
 
+        if (section === 'notifications' && typeof _refreshVapidWarning === 'function') {
+            _refreshVapidWarning();
+        }
+
         if (result.requires_restart) {
             showRestartBanner();
         }
