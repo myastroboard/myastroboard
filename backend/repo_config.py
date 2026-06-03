@@ -5,7 +5,7 @@ from copy import deepcopy
 
 from constants import CONFIG_FILE
 from config_defaults import DEFAULT_CONFIG
-from utils import load_json_file, save_json_file
+from utils import load_json_file, save_json_file, safe_file_exists
 
 
 def _merge_defaults(config, defaults):
@@ -29,11 +29,17 @@ def _merge_defaults(config, defaults):
 
 def load_config():
     """Load configuration from file"""
-    config = load_json_file(CONFIG_FILE, deepcopy(DEFAULT_CONFIG))
-    merged = _merge_defaults(config, DEFAULT_CONFIG)
+    if not safe_file_exists(CONFIG_FILE):
+        # No config file yet — brand-new install, keep location_configured=False
+        return deepcopy(DEFAULT_CONFIG)
+    raw = load_json_file(CONFIG_FILE, {})
+    merged = _merge_defaults(raw, DEFAULT_CONFIG)
     # Strip legacy top-level 'constraints' key - constraints live exclusively
     # under skytonight.constraints from now on.
     merged.pop('constraints', None)
+    # Existing installs pre-date the location_configured flag; treat them as configured
+    if 'location_configured' not in raw:
+        merged['location_configured'] = True
     return merged
 
 

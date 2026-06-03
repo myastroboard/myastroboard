@@ -70,6 +70,7 @@ DEFAULT_SKYTONIGHT = {
 # Default complete configuration
 DEFAULT_CONFIG = {
     "location": DEFAULT_LOCATION,
+    "location_configured": False,
     "min_altitude": 30,
     "astrodex": DEFAULT_ASTRODEX,
     "skytonight": DEFAULT_SKYTONIGHT,

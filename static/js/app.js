@@ -225,6 +225,7 @@ async function initializeApp() {
     if (typeof loadAppSettings === 'function' && currentUser?.role === 'admin') loadAppSettings();
     await loadCatalogues();  // Also await catalogues to ensure proper sequencing
     setupEventListeners();
+    if (typeof initFirstRun === 'function') initFirstRun();
     loadVersion();
 
     // Init constraint visual guides
@@ -234,6 +235,9 @@ async function initializeApp() {
     SkyTonightScheduler.init();
 
     checkCacheStatus();
+
+    // Show first-run location setup if location has never been configured
+    if (typeof checkFirstRun === 'function') await checkFirstRun();
 
     // Load initial page from user preferences (or fallback defaults)
     applyUserStartupPreferences();

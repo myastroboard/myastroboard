@@ -2588,6 +2588,76 @@
         </div>
     </div>
 
+    <!-- First-run location setup modal -->
+    <div class="modal fade" id="first-run-modal" tabindex="-1"
+         data-bs-backdrop="static" data-bs-keyboard="false"
+         aria-labelledby="first-run-modal-title" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title" id="first-run-modal-title">
+                        <i class="bi bi-stars text-warning me-2" aria-hidden="true"></i>
+                        <span data-i18n="first_run.title">Welcome to MyAstroBoard</span>
+                    </h5>
+                </div>
+                <div class="modal-body pt-2">
+                    <p class="text-muted mb-3" data-i18n="first_run.intro">
+                        Before we start, tell us where you observe from. All calculations depend on your location.
+                    </p>
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label for="setup-location-name" class="form-label" data-i18n="settings.location_name">Location Name:</label>
+                            <input type="text" id="setup-location-name" class="form-control"
+                                   data-i18n-placeholder="settings.location_name_placeholder" placeholder="My Observatory">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="setup-latitude-input" class="form-label" data-i18n="first_run.latitude">Latitude (decimal):</label>
+                            <div class="input-group">
+                                <input type="number" id="setup-latitude-input" class="form-control"
+                                       step="0.000001" min="-90" max="90" inputmode="decimal"
+                                       data-i18n-placeholder="first_run.latitude_placeholder" placeholder="48.8667">
+                                <button class="btn btn-secondary" type="button" id="setup-geolocate-btn"
+                                        data-i18n-title="settings.geolocation_btn_title" title="Use my location">
+                                    <i class="bi bi-pin-map" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                            <div id="setup-lat-error" class="invalid-feedback"></div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="setup-longitude-input" class="form-label" data-i18n="first_run.longitude">Longitude (decimal):</label>
+                            <input type="number" id="setup-longitude-input" class="form-control"
+                                   step="0.000001" min="-180" max="180" inputmode="decimal"
+                                   data-i18n-placeholder="first_run.longitude_placeholder" placeholder="2.3333">
+                            <div id="setup-lon-error" class="invalid-feedback"></div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="setup-timezone" class="form-label" data-i18n="settings.timezone">Timezone:</label>
+                            <select id="setup-timezone" class="form-select">
+                                <option data-i18n="settings.timezone_loading">Loading timezones...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="setup-elevation" class="form-label" data-i18n="first_run.elevation_optional">Elevation (meters, optional):</label>
+                            <input type="number" id="setup-elevation" class="form-control"
+                                   step="1" min="0" inputmode="numeric"
+                                   data-i18n-placeholder="settings.elevation_placeholder" placeholder="10">
+                        </div>
+                    </div>
+                    <div class="mt-3 form-text" data-i18n="first_run.hint">
+                        You can refine all these settings later in Parameters → Configuration.
+                    </div>
+                </div>
+                <div class="modal-footer border-0 d-flex justify-content-between align-items-center">
+                    <a href="#" id="setup-skip-btn" class="text-muted small" data-i18n="first_run.skip">Skip for now</a>
+                    <button type="button" id="setup-save-btn" class="btn btn-primary">
+                        <i class="bi bi-check2-circle me-1" aria-hidden="true"></i>
+                        <span data-i18n="first_run.save">Save and continue</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Generic Modal Close Small -->
     <div class="modal fade" id="modal_sm_close" tabindex="-1" role="dialog" aria-labelledby="modalSmall">
         <div class="modal-dialog modal-dialog-scrollable modal-sm modal-dialog-centered" role="document">
@@ -2688,6 +2758,7 @@
     <script src="/static/js/metrics.js?v={{ version }}"></script>
     <script src="/static/js/pwa.js?v={{ version }}"></script>
     <script src="/static/js/constraint_help.js?v={{ version }}"></script>
+    <script src="/static/js/first-run.js?v={{ version }}"></script>
     <script src="/static/js/app.js?v={{ version }}"></script>
 </body>
 </html>

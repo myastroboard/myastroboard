@@ -487,6 +487,21 @@
       "critical": "Événements incontournables"
     }
   },
+  "first_run": {
+    "title": "Bienvenue sur MyAstroBoard",
+    "intro": "Avant de commencer, indiquez-nous votre lieu d'observation. Tous les calculs dépendent de votre localisation.",
+    "latitude": "Latitude (décimal) :",
+    "latitude_placeholder": "ex. 48.8667",
+    "longitude": "Longitude (décimal) :",
+    "longitude_placeholder": "ex. 2.3333",
+    "elevation_optional": "Altitude (mètres, optionnel) :",
+    "hint": "Vous pourrez affiner ces paramètres plus tard dans Paramètres → Configuration.",
+    "save": "Enregistrer et continuer",
+    "skip": "Ignorer pour l'instant",
+    "lat_invalid": "La latitude doit être un nombre entre -90 et 90.",
+    "lon_invalid": "La longitude doit être un nombre entre -180 et 180.",
+    "default_location_name": "Mon lieu d'observation"
+  },
   "settings": {
     "customize": "Personnaliser",
     "customize_info": "Personnalisez les valeurs par défaut du tableau de bord et les préférences d'affichage. Ces paramètres s'appliquent uniquement à votre compte.",
@@ -674,6 +689,7 @@
     "restore_no_file": "Veuillez sélectionner une archive de sauvegarde (.zip) à restaurer.",
     "restore_confirm": "Êtes-vous sûr de vouloir restaurer cette sauvegarde ? Les données actuelles seront écrasées et ne pourront pas être récupérées.",
     "restore_success": "Sauvegarde restaurée avec succès.",
+    "restore_reloading": "Rechargement...",
     "restore_failed": "Échec de la restauration de la sauvegarde.",
     "log_level_title": "Niveau de journal actuel",
     "log_level_info": "Le niveau de journal contrôle la quantité de détails écrits dans les fichiers de log. Pour capturer le maximum de détails pour le débogage, définissez le niveau sur DEBUG via la variable d'environnement LOG_LEVEL, redémarrez l'application, reproduisez le problème, puis exportez les journaux ci-dessous.",

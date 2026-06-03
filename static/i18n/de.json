@@ -487,6 +487,21 @@
       "critical": "Unbedingt zu sehen"
     }
   },
+  "first_run": {
+    "title": "Willkommen bei MyAstroBoard",
+    "intro": "Bevor wir beginnen, sagen Sie uns, wo Sie beobachten. Alle Berechnungen hängen von Ihrem Standort ab.",
+    "latitude": "Breitengrad (Dezimal):",
+    "latitude_placeholder": "z.B. 48.8667",
+    "longitude": "Längengrad (Dezimal):",
+    "longitude_placeholder": "z.B. 2.3333",
+    "elevation_optional": "Höhe (Meter, optional):",
+    "hint": "Sie können alle Einstellungen später unter Parameter → Konfiguration anpassen.",
+    "save": "Speichern und fortfahren",
+    "skip": "Vorerst überspringen",
+    "lat_invalid": "Breitengrad muss eine Zahl zwischen -90 und 90 sein.",
+    "lon_invalid": "Längengrad muss eine Zahl zwischen -180 und 180 sein.",
+    "default_location_name": "Mein Standort"
+  },
   "settings": {
     "customize": "Anpassen",
     "customize_info": "Personalisieren Sie Dashboard-Standards und Anzeigeeinstellungen. Diese Einstellungen gelten nur für Ihr Konto.",
@@ -674,6 +689,7 @@
     "restore_no_file": "Bitte wählen Sie ein Sicherungsarchiv (.zip) zur Wiederherstellung aus.",
     "restore_confirm": "Möchten Sie diese Sicherung wirklich wiederherstellen? Die aktuellen Daten werden überschrieben und können nicht wiederhergestellt werden.",
     "restore_success": "Sicherung erfolgreich wiederhergestellt.",
+    "restore_reloading": "Wird neu geladen...",
     "restore_failed": "Sicherung konnte nicht wiederhergestellt werden.",
     "log_level_title": "Aktueller Protokollierungsgrad",
     "log_level_info": "Der Protokollierungsgrad steuert, wie viele Details in die Protokolldateien geschrieben werden. Um für die Fehlerbehebung maximale Details zu erfassen, setzen Sie den Grad über die Umgebungsvariable LOG_LEVEL auf DEBUG, starten Sie die Anwendung neu, reproduzieren Sie das Problem und exportieren Sie dann die Protokolle.",
