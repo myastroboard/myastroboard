@@ -522,11 +522,16 @@ def push_list_subscriptions():
             return jsonify({'error': 'Authentication required'}), 401
 
         def _provider(endpoint):
-            if 'apple.com' in endpoint:
+            from urllib.parse import urlparse
+            try:
+                host = urlparse(endpoint).hostname or ''
+            except Exception:
+                host = ''
+            if host == 'web.push.apple.com' or host.endswith('.push.apple.com'):
                 return 'apple'
-            if 'googleapis.com' in endpoint or 'fcm.googleapis.com' in endpoint:
+            if host == 'fcm.googleapis.com' or host.endswith('.googleapis.com'):
                 return 'google'
-            if 'mozilla.com' in endpoint or 'push.services.mozilla.com' in endpoint:
+            if host == 'push.services.mozilla.com' or host.endswith('.mozilla.com'):
                 return 'mozilla'
             return 'other'
 
@@ -627,7 +632,7 @@ def push_test_trigger(trigger_id):
                         'title': payload['title'], 'body': payload['body']})
     except Exception as e:
         logger.error(f"Error sending test push [{trigger_id}]: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Internal server error'}), 500
 
 
 @app.route('/api/push/test', methods=['POST'])

@@ -541,32 +541,55 @@ async function _loadSubscriptionList() {
         }
 
         subs.forEach(sub => {
-            const icon  = _PROVIDER_ICONS[sub.provider] || _PROVIDER_ICONS.other;
-            const date  = sub.created_at ? new Date(sub.created_at).toLocaleDateString() : '-';
-            const item  = document.createElement('div');
+            const icon     = _PROVIDER_ICONS[sub.provider] || _PROVIDER_ICONS.other;
+            const date     = sub.created_at ? new Date(sub.created_at).toLocaleDateString() : '-';
+            const provider = sub.provider.charAt(0).toUpperCase() + sub.provider.slice(1);
+
+            const item = document.createElement('div');
             item.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center px-0 py-1 bg-transparent border-0';
-            item.innerHTML = `
-                <span class="text-muted">
-                    <i class="bi ${icon} me-1" aria-hidden="true"></i>
-                    ${sub.provider.charAt(0).toUpperCase() + sub.provider.slice(1)}
-                    <span class="font-monospace ms-1 opacity-50">…${sub.endpoint_tail}</span>
-                </span>
-                <span class="d-flex align-items-center gap-2">
-                    <span class="text-muted">${date}</span>
-                    <button class="btn btn-sm btn-outline-danger py-0 px-1" data-index="${sub.index}" title="${i18n?.t('settings.notif_remove_subscription') || 'Remove'}">
-                        <i class="bi bi-x" aria-hidden="true"></i>
-                    </button>
-                </span>`;
-            item.querySelector('button').addEventListener('click', async (e) => {
-                const btn = e.currentTarget;
-                btn.disabled = true;
-                const idx = parseInt(btn.dataset.index, 10);
+
+            // Build left side using DOM API so endpoint_tail never touches innerHTML
+            const leftSpan = document.createElement('span');
+            leftSpan.className = 'text-muted';
+            const iconEl = document.createElement('i');
+            iconEl.className = `bi ${icon} me-1`;
+            iconEl.setAttribute('aria-hidden', 'true');
+            const tailSpan = document.createElement('span');
+            tailSpan.className = 'font-monospace ms-1 opacity-50';
+            tailSpan.textContent = `…${sub.endpoint_tail}`;
+            leftSpan.appendChild(iconEl);
+            leftSpan.appendChild(document.createTextNode(` ${provider} `));
+            leftSpan.appendChild(tailSpan);
+
+            // Build right side (date + remove button)
+            const rightSpan = document.createElement('span');
+            rightSpan.className = 'd-flex align-items-center gap-2';
+            const dateSpan = document.createElement('span');
+            dateSpan.className = 'text-muted';
+            dateSpan.textContent = date;
+            const btn = document.createElement('button');
+            btn.className = 'btn btn-sm btn-outline-danger py-0 px-1';
+            btn.dataset.index = sub.index;
+            btn.title = i18n?.t('settings.notif_remove_subscription') || 'Remove';
+            const btnIcon = document.createElement('i');
+            btnIcon.className = 'bi bi-x';
+            btnIcon.setAttribute('aria-hidden', 'true');
+            btn.appendChild(btnIcon);
+            rightSpan.appendChild(dateSpan);
+            rightSpan.appendChild(btn);
+
+            item.appendChild(leftSpan);
+            item.appendChild(rightSpan);
+
+            btn.addEventListener('click', async (e) => {
+                const clickedBtn = e.currentTarget;
+                clickedBtn.disabled = true;
+                const idx = parseInt(clickedBtn.dataset.index, 10);
                 const endpoint = (await fetchJSON('/api/push/subscriptions')).subscriptions.find(s => s.index === idx);
                 // For individual removal we need the full endpoint - use the unsubscribe endpoint via re-fetch
                 // Instead, just remove all on server and re-subscribe this device
                 // Simpler: remove all then reload list
                 await fetch('/api/push/subscriptions', { method: 'DELETE', credentials: 'same-origin' });
-                // Re-subscribe the current device so it stays active
                 await _subscribeToPush();
                 _loadSubscriptionList();
             });
