@@ -564,6 +564,72 @@ def push_delete_all_subscriptions():
         return jsonify({'error': 'Internal server error'}), 500
 
 
+@app.route('/api/push/test/<trigger_id>', methods=['POST'])
+@login_required
+def push_test_trigger(trigger_id):
+    """Fire a realistic test push for a specific trigger (N1–N7), bypassing condition checks."""
+    _TRIGGER_PAYLOADS = {
+        'N1': ('push_n1_title', 'push_n1_body',  {'minutes': 14}, '/#astrodex/plan-my-night', 'normal'),
+        'N2': ('push_n2_title', 'push_n2_body',  {'name': 'M42',  'minutes': 4},  '/#astrodex/plan-my-night', 'normal'),
+        'N3': ('push_n3_title', 'push_n3_solar_body', {'minutes': 8},  '/#spaceflight/iss',       'high'),
+        'N4': ('push_n4_title', 'push_n4_body',  {'minutes': 28}, '/#forecast-astro/moon',    'normal'),
+        'N5': ('push_n5_title', 'push_n5_body',  {'minutes': 22}, '/#forecast-astro/sun',     'normal'),
+        'N6': ('push_n6_title', 'push_n6_body',  {'minutes': 18, 'time': '23:45'}, '/#forecast-astro/astro-weather', 'normal'),
+        'N7': ('push_n7_title', 'push_n7_body',  {'kp': '6.3', 'visibility': 'Good'}, '/#forecast-astro/aurora', 'high'),
+    }
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify({'error': 'Authentication required'}), 401
+        if trigger_id not in _TRIGGER_PAYLOADS:
+            return jsonify({'error': f'Unknown trigger. Valid: {list(_TRIGGER_PAYLOADS)}'}), 400
+        if not current_user.push_subscriptions:
+            return jsonify({'error': 'No push subscriptions for this user'}), 400
+
+        from push_manager import send_push
+        from i18n_utils import get_translated_message
+
+        lang = current_user.preferences.get('language', 'en')
+
+        def t(key, **params):
+            return get_translated_message(f'settings.{key}', language=lang, **params)
+
+        title_key, body_key, body_params, url, urgency = _TRIGGER_PAYLOADS[trigger_id]
+        payload = {
+            'title': t(title_key),
+            'body':  t(body_key, **body_params),
+            'icon':  '/static/ico/android/launchericon-192x192.png',
+            'badge': '/static/ico/android/launchericon-72x72.png',
+            'tag':   f'{trigger_id}-test',
+            'data':  {'url': url},
+        }
+
+        n = len(current_user.push_subscriptions)
+        delivered = 0
+        dead_endpoints = []
+        for sub in current_user.push_subscriptions:
+            ok = send_push({'endpoint': sub['endpoint'], 'keys': sub.get('keys', {})},
+                           payload, ttl=300, urgency=urgency)
+            if ok:
+                delivered += 1
+            else:
+                dead_endpoints.append(sub['endpoint'])
+
+        if dead_endpoints:
+            current_user.push_subscriptions = [
+                s for s in current_user.push_subscriptions
+                if s.get('endpoint') not in dead_endpoints
+            ]
+            user_manager.save_users()
+
+        logger.info(f"Test push [{trigger_id}] for {current_user.username}: {delivered}/{n} delivered — {payload['body']}")
+        return jsonify({'trigger': trigger_id, 'delivered': delivered, 'total': n,
+                        'title': payload['title'], 'body': payload['body']})
+    except Exception as e:
+        logger.error(f"Error sending test push [{trigger_id}]: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/push/test', methods=['POST'])
 @login_required
 def push_test():
