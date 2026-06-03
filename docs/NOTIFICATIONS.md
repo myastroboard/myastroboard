@@ -139,17 +139,19 @@ Web Push on iOS requires **Safari 16.4+** and the app must be **installed as a P
 
 The `VAPID_CONTACT_EMAIL` environment variable must be set to a real email address. Apple APNs silently rejects pushes when the VAPID `sub` claim contains an invalid domain (e.g. `.local`). See [docs/1.INSTALLATION.md](1.INSTALLATION.md) for setup instructions.
 
-The in-app **Test** button fires a `new Notification()` directly - it works without push and does not confirm background delivery.
+The in-app **Test** button calls `POST /api/push/test`, which sends a real server-side push through the full VAPID → push service → service worker pipeline. On iOS, background the app immediately after tapping to see the notification appear.
 
 ### VAPID keys
 
 Generated once on first startup by `push_manager.load_or_generate_vapid_keys()` and saved to `data/vapid.json`:
 
 ```json
-{ "private_key": "-----BEGIN EC PRIVATE KEY-----\n...", "public_key": "BNxx...base64url..." }
+{ "private_key": "<43-char base64url raw EC scalar>", "public_key": "<87-char base64url uncompressed point>" }
 ```
 
-**Never delete or regenerate `vapid.json`** - doing so invalidates all existing push subscriptions.
+The private key is stored as a raw base64url-encoded 32-byte EC scalar (the format expected by `py_vapid.Vapid.from_string()`). PEM format is **not** used — older `vapid.json` files containing `-----BEGIN ... KEY-----` are automatically migrated to the correct format on startup.
+
+**Never delete or regenerate `vapid.json`** - doing so invalidates all existing push subscriptions. `_subscribeToPush()` detects VAPID key rotation via `PushSubscription.options.applicationServerKey` comparison and forces a transparent re-subscribe if the key changed.
 
 ### Push subscription flow
 
@@ -164,8 +166,12 @@ Generated once on first startup by `push_manager.load_or_generate_vapid_keys()` 
 | Method | Route | Auth | Description |
 |--------|-------|------|-------------|
 | `GET` | `/api/push/vapid-public-key` | Public | Returns base64url public key for `applicationServerKey` |
+| `GET` | `/api/push/vapid-config-status` | Public | Returns whether `VAPID_CONTACT_EMAIL` is correctly configured |
 | `POST` | `/api/push/subscribe` | `@login_required` | Stores subscription (deduplicates by endpoint) |
 | `DELETE` | `/api/push/unsubscribe` | `@login_required` | Removes subscription by endpoint |
+| `GET`  | `/api/push/subscriptions` | `@login_required` | Lists subscriptions for the current user. Returns `{"subscriptions": [{index, provider, created_at, endpoint_tail}]}`. `provider` is one of `apple`, `google`, `mozilla`, `other`. Full endpoints are not exposed — only the last 20 chars as `endpoint_tail`. |
+| `DELETE` | `/api/push/subscriptions` | `@login_required` | Removes **all** server-side subscriptions for the current user. The UI also calls `pushManager.getSubscription().unsubscribe()` to clean the browser side. Returns `{"removed": N}`. |
+| `POST` | `/api/push/test` | `@login_required` | Sends an immediate test push to all subscriptions of the current user; removes dead (410/404) endpoints automatically. Returns `{"delivered": N, "total": N, "cleaned": N}` |
 
 ### User model
 
@@ -188,6 +194,7 @@ Daemon thread started at app startup. Polls every 5 minutes:
 - Loads cached data once per cycle (aurora, sun, ISS, solar/lunar eclipse)
 - Loads per-user plan data via `get_plan_with_timeline()`
 - Skips users with no push subscriptions or notifications disabled
+- Notification title/body are translated using the user's `preferences.language` field via `i18n_utils.get_translated_message()` (keys: `settings.push_n*`)
 - Sends push via `push_manager.send_push()` (pywebpush)
 - Dead subscriptions (delivery failure) are automatically removed
 - In-memory cooldowns reset on server restart (acceptable: worst case one duplicate per restart)

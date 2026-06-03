@@ -141,6 +141,13 @@ def _get_notif_prefs(user: Any) -> dict:
     return user.preferences.get('notifications', {}).get('triggers', {})
 
 
+def _t(user: Any, key: str, **params) -> str:
+    """Translate a push notification string using the user's preferred language."""
+    from i18n_utils import get_translated_message
+    lang = user.preferences.get('language', 'en')
+    return get_translated_message(f'settings.{key}', language=lang, **params)
+
+
 def _check_n7_aurora(user: Any, cache_data: Optional[dict]) -> None:
     if not cache_data:
         logger.debug(f"N7 skip {user.username}: no aurora cache")
@@ -165,8 +172,8 @@ def _check_n7_aurora(user: Any, cache_data: Optional[dict]) -> None:
 
     visibility = cache_data.get('current', {}).get('visibility_level', '')
     _send(user, 'N7',
-          'Aurora Alert',
-          f'Kp {kp:.1f} detected - {visibility}',
+          _t(user, 'push_n7_title'),
+          _t(user, 'push_n7_body', kp=f'{kp:.1f}', visibility=visibility),
           '/#forecast-astro/aurora',
           ttl=3600, urgency='high')  # aurora: immediate delivery, can last ~1 h
 
@@ -201,8 +208,8 @@ def _check_n1_plan_start(user: Any, plan_payload: Optional[dict]) -> None:
         if 0 < ms_until <= lead_s and not _was_recently_notified(user.user_id, 'N1', 2 * 60 * 60):
             minutes = round(ms_until / 60)
             _send(user, 'N1',
-                  'Plan My Night',
-                  f'Your session starts in {minutes} min',
+                  _t(user, 'push_n1_title'),
+                  _t(user, 'push_n1_body', minutes=minutes),
                   '/#astrodex/plan-my-night',
                   ttl=int(ms_until))
     except Exception as e:
@@ -256,8 +263,8 @@ def _check_n2_next_target(user: Any, plan_payload: Optional[dict]) -> None:
             minutes = round(ms_until / 60)
             name    = entry.get('name') or entry.get('target_name', '?')
             _send(user, 'N2',
-                  'Next target',
-                  f'{name} starts in {minutes} min',
+                  _t(user, 'push_n2_title'),
+                  _t(user, 'push_n2_body', name=name, minutes=minutes),
                   '/#astrodex/plan-my-night',
                   ttl=int(ms_until))
             notified = True
@@ -278,9 +285,12 @@ def _check_n6_darkness(user: Any, cache_data: Optional[dict]) -> None:
         logger.debug(f"N6 skip {user.username}: trigger disabled")
         return
 
-    dusk_str = cache_data.get('sun', {}).get('astronomical_dusk')
+    # Use the pre-computed UTC field to avoid timezone and cache-reset bugs.
+    # (astronomical_dusk in sun.* is naive local time and the cache can refresh
+    # after midnight UTC — before local dusk passes — resetting the countdown.)
+    dusk_str = cache_data.get('next_astronomical_dusk_utc')
     if not dusk_str:
-        logger.debug(f"N6 skip {user.username}: no astronomical_dusk in cache")
+        logger.debug(f"N6 skip {user.username}: no next_astronomical_dusk_utc in cache")
         return
     try:
         dusk = datetime.fromisoformat(dusk_str)
@@ -292,9 +302,15 @@ def _check_n6_darkness(user: Any, cache_data: Optional[dict]) -> None:
         logger.debug(f"N6 {user.username}: dusk in {ms_until:.0f}s, lead={lead_s}s")
         if 0 < ms_until <= lead_s and not _was_recently_notified(user.user_id, 'N6', 8 * 60 * 60):
             minutes = round(ms_until / 60)
+            try:
+                from zoneinfo import ZoneInfo
+                tz_name = cache_data.get('location', {}).get('timezone', 'UTC')
+                dusk_local_time = dusk.astimezone(ZoneInfo(tz_name)).strftime('%H:%M')
+            except Exception:
+                dusk_local_time = ''
             _send(user, 'N6',
-                  'Astronomical darkness',
-                  f'Night begins in {minutes} min - time to get ready',
+                  _t(user, 'push_n6_title'),
+                  _t(user, 'push_n6_body', minutes=minutes, time=dusk_local_time),
                   '/#forecast-astro/astro-weather',
                   ttl=int(ms_until))
     except Exception as e:
@@ -352,9 +368,11 @@ def _check_n3_iss(user: Any, cache_data: Optional[dict]) -> None:
         return
 
     minutes = round(ms_until / 60)
-    body = (f'ISS solar transit in {minutes} min' if transit_type == 'solar'
-            else f'ISS lunar transit in {minutes} min')
-    _send(user, 'N3', 'ISS Transit', body, '/#spaceflight/iss',
+    body_key = 'push_n3_solar_body' if transit_type == 'solar' else 'push_n3_lunar_body'
+    _send(user, 'N3',
+          _t(user, 'push_n3_title'),
+          _t(user, body_key, minutes=minutes),
+          '/#spaceflight/iss',
           ttl=int(ms_until), urgency='high')  # short window (≤10 min): needs immediate delivery
 
 
@@ -362,9 +380,9 @@ def _check_n4_n5_eclipse(user: Any, solar_data: Optional[dict], lunar_data: Opti
     triggers = _get_notif_prefs(user)
     now = datetime.now(timezone.utc)
 
-    for trigger_id, cache_data, title in (
-        ('N4', lunar_data, 'Lunar Eclipse'),
-        ('N5', solar_data, 'Solar Eclipse'),
+    for trigger_id, cache_data, title_key, body_key, url in (
+        ('N4', lunar_data, 'push_n4_title', 'push_n4_body', '/#forecast-astro/moon'),
+        ('N5', solar_data, 'push_n5_title', 'push_n5_body', '/#forecast-astro/sun'),
     ):
         t = triggers.get(trigger_id, {})
         if not t.get('enabled', True):
@@ -387,10 +405,10 @@ def _check_n4_n5_eclipse(user: Any, solar_data: Optional[dict], lunar_data: Opti
             logger.debug(f"{trigger_id} {user.username}: peak in {ms_until:.0f}s, lead={lead_s}s")
             if 0 < ms_until <= lead_s and not _was_recently_notified(user.user_id, trigger_id, 4 * 60 * 60):
                 minutes = round(ms_until / 60)
-                body = (f'Totality begins in {minutes} min' if trigger_id == 'N4'
-                        else f'Maximum in {minutes} min')
-                _send(user, trigger_id, title, body, '/#forecast-astro/moon',
-                      ttl=int(ms_until))
+                _send(user, trigger_id,
+                      _t(user, title_key),
+                      _t(user, body_key, minutes=minutes),
+                      url, ttl=int(ms_until))
         except Exception as e:
             logger.debug(f"{trigger_id} check error for {user.username}: {e}")
 

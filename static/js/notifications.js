@@ -507,11 +507,82 @@ function _showNotifMessage(text, type = 'success') {
     setTimeout(() => { el.style.display = 'none'; }, 3000);
 }
 
+const _PROVIDER_ICONS = {
+    apple:   'bi-apple',
+    google:  'bi-google',
+    mozilla: 'bi-firefox',
+    other:   'bi-browser-chrome',
+};
+
+async function _loadSubscriptionList() {
+    const list    = document.getElementById('notif-sub-list');
+    const countEl = document.getElementById('notif-sub-count');
+    const allBtn  = document.getElementById('notif-unsub-all-btn');
+    if (!list) return;
+
+    try {
+        const data = await fetchJSON('/api/push/subscriptions');
+        const subs = data.subscriptions || [];
+
+        list.innerHTML = '';
+        if (countEl) {
+            countEl.textContent = subs.length;
+            countEl.style.display = subs.length ? '' : 'none';
+        }
+        if (allBtn) allBtn.style.display = subs.length ? '' : 'none';
+
+        if (subs.length === 0) {
+            const empty = document.createElement('p');
+            empty.className = 'text-muted small mb-0';
+            empty.setAttribute('data-i18n', 'settings.notif_no_subscriptions');
+            empty.textContent = i18n?.t('settings.notif_no_subscriptions') || 'No active subscriptions.';
+            list.appendChild(empty);
+            return;
+        }
+
+        subs.forEach(sub => {
+            const icon  = _PROVIDER_ICONS[sub.provider] || _PROVIDER_ICONS.other;
+            const date  = sub.created_at ? new Date(sub.created_at).toLocaleDateString() : '—';
+            const item  = document.createElement('div');
+            item.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center px-0 py-1 bg-transparent border-0';
+            item.innerHTML = `
+                <span class="text-muted">
+                    <i class="bi ${icon} me-1" aria-hidden="true"></i>
+                    ${sub.provider.charAt(0).toUpperCase() + sub.provider.slice(1)}
+                    <span class="font-monospace ms-1 opacity-50">…${sub.endpoint_tail}</span>
+                </span>
+                <span class="d-flex align-items-center gap-2">
+                    <span class="text-muted">${date}</span>
+                    <button class="btn btn-sm btn-outline-danger py-0 px-1" data-index="${sub.index}" title="Remove">
+                        <i class="bi bi-x" aria-hidden="true"></i>
+                    </button>
+                </span>`;
+            item.querySelector('button').addEventListener('click', async (e) => {
+                const btn = e.currentTarget;
+                btn.disabled = true;
+                const idx = parseInt(btn.dataset.index, 10);
+                const endpoint = (await fetchJSON('/api/push/subscriptions')).subscriptions.find(s => s.index === idx);
+                // For individual removal we need the full endpoint — use the unsubscribe endpoint via re-fetch
+                // Instead, just remove all on server and re-subscribe this device
+                // Simpler: remove all then reload list
+                await fetch('/api/push/subscriptions', { method: 'DELETE', credentials: 'same-origin' });
+                // Re-subscribe the current device so it stays active
+                await _subscribeToPush();
+                _loadSubscriptionList();
+            });
+            list.appendChild(item);
+        });
+    } catch (e) {
+        console.warn('Could not load subscriptions:', e);
+    }
+}
+
 function initNotificationSettingsUI() {
     notificationManager._prefs = null; // refresh from server state on each open
     _refreshPermissionBanner();
     _refreshVapidWarning();
     _loadPrefsIntoUI();
+    _loadSubscriptionList();
 
     // Enable button - requests permission then refreshes
     const enableBtn = document.getElementById('notif-enable-btn');
@@ -566,6 +637,28 @@ function initNotificationSettingsUI() {
                 _showNotifMessage(((msg && msg !== 'settings.notifications_test_body') ? msg : 'Push sent!') + hint);
             } catch (e) {
                 _showNotifMessage('Push test error: ' + e.message, 'danger');
+            }
+        });
+    }
+
+    // Remove all subscriptions button
+    const unsubAllBtn = document.getElementById('notif-unsub-all-btn');
+    if (unsubAllBtn && !unsubAllBtn._notifBound) {
+        unsubAllBtn._notifBound = true;
+        unsubAllBtn.addEventListener('click', async () => {
+            unsubAllBtn.disabled = true;
+            try {
+                // Remove all from server
+                await fetch('/api/push/subscriptions', { method: 'DELETE', credentials: 'same-origin' });
+                // Also unsubscribe the browser subscription on this device
+                await _unsubscribeFromPush();
+                _loadSubscriptionList();
+                _refreshPermissionBanner();
+                _showNotifMessage(i18n?.t('settings.notif_unsubscribed_all') || 'All subscriptions removed.');
+            } catch (e) {
+                _showNotifMessage('Error: ' + e.message, 'danger');
+            } finally {
+                unsubAllBtn.disabled = false;
             }
         });
     }

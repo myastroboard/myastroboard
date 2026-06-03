@@ -12,6 +12,7 @@ from functools import wraps
 from flask import session, jsonify, request
 from werkzeug.security import generate_password_hash, check_password_hash
 from logging_config import get_logger
+from i18n_utils import SUPPORTED_LANGUAGES
 
 logger = get_logger(__name__)
 
@@ -48,6 +49,7 @@ ALLOWED_TIME_FORMATS = {'auto', '12h', '24h'}
 ALLOWED_DENSITY_MODES = {'comfortable', 'compact'}
 ALLOWED_THEME_MODES = {'auto', 'light', 'dark', 'red'}
 ALLOWED_FIRST_DAY_OF_WEEK = {'monday', 'sunday'}
+ALLOWED_LANGUAGES = set(SUPPORTED_LANGUAGES)
 
 DEFAULT_USER_PREFERENCES = {
     'startup_main_tab': 'forecast-astro',
@@ -56,6 +58,7 @@ DEFAULT_USER_PREFERENCES = {
     'density': 'comfortable',
     'theme_mode': 'auto',
     'first_day_of_week': 'monday',
+    'language': 'en',
     'notifications': {
         'enabled': True,
         'permission_asked': False,
@@ -330,6 +333,10 @@ class UserManager:
         first_day_of_week = preferences.get('first_day_of_week')
         if first_day_of_week is not None and first_day_of_week not in ALLOWED_FIRST_DAY_OF_WEEK:
             return False, f"Invalid first_day_of_week: {first_day_of_week}"
+
+        language = preferences.get('language')
+        if language is not None and language not in ALLOWED_LANGUAGES:
+            return False, f"Invalid language: {language}"
 
         return True, ""
 

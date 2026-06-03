@@ -110,7 +110,15 @@ class LanguageSelector {
         try {
             // Save language preference to localStorage
             localStorage.setItem('myastroboard_language', selectedLang);
-            
+
+            // Persist to server so push notifications use the correct language
+            fetch('/api/auth/preferences', {
+                method: 'PUT',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ preferences: { language: selectedLang } }),
+            }).catch(() => {});
+
             // Reload the page to apply the new language
             // This is more reliable than dynamically updating all elements
             location.reload();

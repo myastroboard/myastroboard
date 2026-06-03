@@ -512,6 +512,58 @@ def push_subscribe():
         return jsonify({'error': 'Internal server error'}), 500
 
 
+@app.route('/api/push/subscriptions', methods=['GET'])
+@login_required
+def push_list_subscriptions():
+    """List push subscriptions for the current user (safe summary, no full endpoints)."""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify({'error': 'Authentication required'}), 401
+
+        def _provider(endpoint):
+            if 'apple.com' in endpoint:
+                return 'apple'
+            if 'googleapis.com' in endpoint or 'fcm.googleapis.com' in endpoint:
+                return 'google'
+            if 'mozilla.com' in endpoint or 'push.services.mozilla.com' in endpoint:
+                return 'mozilla'
+            return 'other'
+
+        subs = [
+            {
+                'index':      i,
+                'provider':   _provider(s.get('endpoint', '')),
+                'created_at': s.get('created_at', ''),
+                'endpoint_tail': s.get('endpoint', '')[-20:],
+            }
+            for i, s in enumerate(current_user.push_subscriptions)
+        ]
+        return jsonify({'subscriptions': subs})
+    except Exception as e:
+        logger.error(f"Error listing push subscriptions: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@app.route('/api/push/subscriptions', methods=['DELETE'])
+@login_required
+def push_delete_all_subscriptions():
+    """Remove all server-side push subscriptions for the current user."""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify({'error': 'Authentication required'}), 401
+
+        count = len(current_user.push_subscriptions)
+        current_user.push_subscriptions = []
+        user_manager.save_users()
+        logger.info(f"All {count} push subscription(s) removed for {current_user.username}")
+        return jsonify({'removed': count})
+    except Exception as e:
+        logger.error(f"Error removing push subscriptions: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
 @app.route('/api/push/test', methods=['POST'])
 @login_required
 def push_test():

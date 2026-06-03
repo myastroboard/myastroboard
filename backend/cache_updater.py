@@ -197,6 +197,32 @@ def update_moon_planner_cache(config=None):
         logger.error(f"Failed to update Moon Planner cache: {e}")
 
 
+def _next_astronomical_dusk_utc(sun_service, tz_name: str) -> str | None:
+    """Return the next upcoming astronomical dusk as a UTC ISO string.
+
+    Looks at today's and tomorrow's reports so the value stays valid even
+    when the cache refreshes after midnight UTC (before local dusk has passed).
+    """
+    from zoneinfo import ZoneInfo
+    from datetime import datetime as _dt, timezone as _tz
+
+    tz = ZoneInfo(tz_name)
+    now_utc = _dt.now(_tz.utc)
+
+    for report in (sun_service.get_today_report(), sun_service.get_tomorrow_report()):
+        dusk_str = report.astronomical_dusk
+        if not dusk_str or dusk_str == 'Not found':
+            continue
+        try:
+            dusk_local = _dt.fromisoformat(dusk_str).replace(tzinfo=tz)
+            dusk_utc   = dusk_local.astimezone(_tz.utc)
+            if dusk_utc > now_utc:
+                return dusk_utc.isoformat()
+        except Exception:
+            continue
+    return None
+
+
 def update_sun_report_cache(config=None):
     """
     Updates the Sun report cache (today report)
@@ -220,9 +246,15 @@ def update_sun_report_cache(config=None):
 
         report = sun.get_today_report()
 
+        # Compute next upcoming astronomical dusk as a UTC ISO string.
+        # The report stores times as naive local strings, which would be misinterpreted
+        # as UTC by consumers. We resolve this once here and store an unambiguous value.
+        next_dusk_utc = _next_astronomical_dusk_utc(sun, location["timezone"])
+
         response = {
             "location": config["location"],
             "sun": report.__dict__,
+            "next_astronomical_dusk_utc": next_dusk_utc,
             "units": {
                 "times": "local timezone",
                 "true_night_hours": "hours"
