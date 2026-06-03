@@ -211,7 +211,7 @@ async function _subscribeToPush() {
 
         if (existing) {
             // Detect VAPID key rotation: compare stored applicationServerKey to server's current key.
-            // If they differ the subscription is stale and will fail delivery — force re-subscribe.
+            // If they differ the subscription is stale and will fail delivery - force re-subscribe.
             const serverKeyBytes = _urlBase64ToUint8Array(publicKey);
             const storedKeyBytes = existing.options?.applicationServerKey
                 ? new Uint8Array(existing.options.applicationServerKey)
@@ -542,7 +542,7 @@ async function _loadSubscriptionList() {
 
         subs.forEach(sub => {
             const icon  = _PROVIDER_ICONS[sub.provider] || _PROVIDER_ICONS.other;
-            const date  = sub.created_at ? new Date(sub.created_at).toLocaleDateString() : '—';
+            const date  = sub.created_at ? new Date(sub.created_at).toLocaleDateString() : '-';
             const item  = document.createElement('div');
             item.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center px-0 py-1 bg-transparent border-0';
             item.innerHTML = `
@@ -553,7 +553,7 @@ async function _loadSubscriptionList() {
                 </span>
                 <span class="d-flex align-items-center gap-2">
                     <span class="text-muted">${date}</span>
-                    <button class="btn btn-sm btn-outline-danger py-0 px-1" data-index="${sub.index}" title="Remove">
+                    <button class="btn btn-sm btn-outline-danger py-0 px-1" data-index="${sub.index}" title="${i18n?.t('settings.notif_remove_subscription') || 'Remove'}">
                         <i class="bi bi-x" aria-hidden="true"></i>
                     </button>
                 </span>`;
@@ -562,7 +562,7 @@ async function _loadSubscriptionList() {
                 btn.disabled = true;
                 const idx = parseInt(btn.dataset.index, 10);
                 const endpoint = (await fetchJSON('/api/push/subscriptions')).subscriptions.find(s => s.index === idx);
-                // For individual removal we need the full endpoint — use the unsubscribe endpoint via re-fetch
+                // For individual removal we need the full endpoint - use the unsubscribe endpoint via re-fetch
                 // Instead, just remove all on server and re-subscribe this device
                 // Simpler: remove all then reload list
                 await fetch('/api/push/subscriptions', { method: 'DELETE', credentials: 'same-origin' });
@@ -609,7 +609,7 @@ function initNotificationSettingsUI() {
         });
     }
 
-    // Test button — uses server-side push so it works on iOS PWA too
+    // Test button - uses server-side push so it works on iOS PWA too
     const testBtn = document.getElementById('notif-test-btn');
     if (testBtn && !testBtn._notifBound) {
         testBtn._notifBound = true;
@@ -626,7 +626,7 @@ function initNotificationSettingsUI() {
                     return;
                 }
                 if (data.delivered === 0) {
-                    _showNotifMessage('Push sent but delivery failed — check server logs.', 'warning');
+                    _showNotifMessage('Push sent but delivery failed - check server logs.', 'warning');
                     return;
                 }
                 // On iOS, the app must be backgrounded to display the notification.

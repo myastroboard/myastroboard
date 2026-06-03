@@ -94,7 +94,7 @@ def _send(user: Any, trigger_id: str, title: str, body: str, url: str,
     }
 
     n_subs = len(user.push_subscriptions)
-    logger.info(f"[{trigger_id}] Sending push to {user.username} ({n_subs} sub(s)): {title} — {body}")
+    logger.info(f"[{trigger_id}] Sending push to {user.username} ({n_subs} sub(s)): {title} - {body}")
 
     dead_endpoints = []
     delivered = 0
@@ -287,7 +287,7 @@ def _check_n6_darkness(user: Any, cache_data: Optional[dict]) -> None:
 
     # Use the pre-computed UTC field to avoid timezone and cache-reset bugs.
     # (astronomical_dusk in sun.* is naive local time and the cache can refresh
-    # after midnight UTC — before local dusk passes — resetting the countdown.)
+    # after midnight UTC - before local dusk passes - resetting the countdown.)
     dusk_str = cache_data.get('next_astronomical_dusk_utc')
     if not dusk_str:
         logger.debug(f"N6 skip {user.username}: no next_astronomical_dusk_utc in cache")

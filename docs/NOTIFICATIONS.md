@@ -149,7 +149,7 @@ Generated once on first startup by `push_manager.load_or_generate_vapid_keys()` 
 { "private_key": "<43-char base64url raw EC scalar>", "public_key": "<87-char base64url uncompressed point>" }
 ```
 
-The private key is stored as a raw base64url-encoded 32-byte EC scalar (the format expected by `py_vapid.Vapid.from_string()`). PEM format is **not** used — older `vapid.json` files containing `-----BEGIN ... KEY-----` are automatically migrated to the correct format on startup.
+The private key is stored as a raw base64url-encoded 32-byte EC scalar (the format expected by `py_vapid.Vapid.from_string()`). PEM format is **not** used - older `vapid.json` files containing `-----BEGIN ... KEY-----` are automatically migrated to the correct format on startup.
 
 **Never delete or regenerate `vapid.json`** - doing so invalidates all existing push subscriptions. `_subscribeToPush()` detects VAPID key rotation via `PushSubscription.options.applicationServerKey` comparison and forces a transparent re-subscribe if the key changed.
 
@@ -169,7 +169,7 @@ The private key is stored as a raw base64url-encoded 32-byte EC scalar (the form
 | `GET` | `/api/push/vapid-config-status` | Public | Returns whether `VAPID_CONTACT_EMAIL` is correctly configured |
 | `POST` | `/api/push/subscribe` | `@login_required` | Stores subscription (deduplicates by endpoint) |
 | `DELETE` | `/api/push/unsubscribe` | `@login_required` | Removes subscription by endpoint |
-| `GET`  | `/api/push/subscriptions` | `@login_required` | Lists subscriptions for the current user. Returns `{"subscriptions": [{index, provider, created_at, endpoint_tail}]}`. `provider` is one of `apple`, `google`, `mozilla`, `other`. Full endpoints are not exposed — only the last 20 chars as `endpoint_tail`. |
+| `GET`  | `/api/push/subscriptions` | `@login_required` | Lists subscriptions for the current user. Returns `{"subscriptions": [{index, provider, created_at, endpoint_tail}]}`. `provider` is one of `apple`, `google`, `mozilla`, `other`. Full endpoints are not exposed - only the last 20 chars as `endpoint_tail`. |
 | `DELETE` | `/api/push/subscriptions` | `@login_required` | Removes **all** server-side subscriptions for the current user. The UI also calls `pushManager.getSubscription().unsubscribe()` to clean the browser side. Returns `{"removed": N}`. |
 | `POST` | `/api/push/test` | `@login_required` | Sends an immediate test push to all subscriptions of the current user; removes dead (410/404) endpoints automatically. Returns `{"delivered": N, "total": N, "cleaned": N}` |
 

@@ -1181,22 +1181,27 @@
 
                     <div id="notif-save-message" class="alert mt-3" role="alert" style="display:none;"></div>
 
-                    <!-- Active subscriptions -->
-                    <hr class="mt-4">
+                </div>
+
+                <!-- Active subscriptions card -->
+                <div class="shadow p-2 mb-3 rounded bg-sub-container">
                     <div class="d-flex align-items-center justify-content-between mb-2">
-                        <h6 class="mb-0 text-muted">
-                            <i class="bi bi-phone icon-inline" aria-hidden="true"></i>
+                        <h2 class="mb-0">
+                            <i class="bi bi-phone text-info icon-inline" aria-hidden="true"></i>
                             <span data-i18n="settings.notif_subscriptions_title">Active subscriptions</span>
-                            <span id="notif-sub-count" class="badge bg-secondary ms-1" style="display:none;"></span>
-                        </h6>
+                            <span id="notif-sub-count" class="badge bg-secondary ms-1 fs-6" style="display:none;"></span>
+                        </h2>
                         <button type="button" class="btn btn-sm btn-outline-danger" id="notif-unsub-all-btn" style="display:none;">
                             <i class="bi bi-trash icon-inline" aria-hidden="true"></i>
                             <span data-i18n="settings.notif_unsubscribe_all">Remove all</span>
                         </button>
                     </div>
+                    <div class="alert alert-info small mb-2" role="alert" data-i18n="settings.notif_subscriptions_info">
+                        Each device that enables notifications registers a separate subscription. Removing all clears stale entries - your current device will automatically re-register on the next page load.
+                    </div>
                     <div id="notif-sub-list" class="list-group list-group-flush small"></div>
-
                 </div>
+
             </div>
 
             <!-- Security Sub-tab -->

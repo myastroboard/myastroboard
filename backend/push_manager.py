@@ -34,7 +34,7 @@ def _pem_to_raw_b64(pem_str: str) -> str:
     """Convert a PEM private key (PKCS#8 or SEC1) to raw base64url scalar.
 
     py_vapid 1.9.4's from_string() expects the raw 32-byte EC private scalar
-    encoded as base64url — it does NOT parse PEM.
+    encoded as base64url - it does NOT parse PEM.
     """
     from cryptography.hazmat.primitives.serialization import load_pem_private_key  # type: ignore[import]
     key = load_pem_private_key(pem_str.encode('utf-8'), password=None)
@@ -51,7 +51,7 @@ def _generate_keys() -> dict:
     vapid.generate_keys()
     assert vapid.public_key is not None, "generate_keys() must populate public_key"
 
-    # Store the raw 32-byte scalar as base64url — the only format py_vapid.from_string accepts.
+    # Store the raw 32-byte scalar as base64url - the only format py_vapid.from_string accepts.
     raw_bytes = vapid.private_key.private_numbers().private_value.to_bytes(32, 'big')
     private_key_b64 = base64.urlsafe_b64encode(raw_bytes).rstrip(b'=').decode('utf-8')
 
