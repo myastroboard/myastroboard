@@ -2,6 +2,7 @@
 Common utilities and helper functions for MyAstroBoard backend
 Provides reusable functionality to avoid code duplication
 """
+
 import os
 import re
 import json
@@ -15,6 +16,7 @@ from constants import CONFIG_FILE, DATA_DIR
 # Optional numpy dependency - imported once at module level
 try:
     import numpy as _np
+
     _HAS_NUMPY = True
 except ImportError:
     _np = None  # type: ignore[assignment]
@@ -67,6 +69,7 @@ def _sanitize_for_json(obj: object) -> object:
 # Custom YAML Dumper for proper indentation
 class IndentDumper(yaml.Dumper):
     """Custom YAML dumper that ensures proper indentation for lists"""
+
     def increase_indent(self, flow=False, indentless=False):
         return super(IndentDumper, self).increase_indent(flow, False)
 
@@ -74,7 +77,7 @@ class IndentDumper(yaml.Dumper):
 def ensure_directory_exists(path: str) -> None:
     """
     Ensure a directory exists, creating it if necessary
-    
+
     Args:
         path: Directory path to create
     """
@@ -92,10 +95,10 @@ def slugify_location_name(value: str, fallback: str = 'default-location') -> str
 def safe_file_exists(file_path: str) -> bool:
     """
     Safely check if a file exists
-    
+
     Args:
         file_path: Path to check
-        
+
     Returns:
         True if file exists, False otherwise
     """
@@ -108,35 +111,35 @@ def safe_file_exists(file_path: str) -> bool:
 def load_json_file(file_path: str, default: Optional[dict] = None) -> dict:
     """
     Safely load a JSON file with fallback to default value
-    
+
     Args:
         file_path: Path to JSON file
         default: Default value if file doesn't exist or is invalid
-        
+
     Returns:
         Loaded JSON data or default value
     """
     if default is None:
         default = {}
-        
+
     try:
         if safe_file_exists(file_path):
             with open(file_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
     except (json.JSONDecodeError, OSError, UnicodeDecodeError):
         pass
-    
+
     return default
 
 
 def save_json_file(file_path: str, data: dict) -> bool:
     """
     Safely save data to a JSON file
-    
+
     Args:
         file_path: Path to save to
         data: Data to save
-        
+
     Returns:
         True if successful, False otherwise
     """
@@ -151,9 +154,8 @@ def save_json_file(file_path: str, data: dict) -> bool:
         return True
     except Exception as exc:
         import logging
-        logging.getLogger(__name__).error(
-            f'save_json_file failed for {file_path}: {type(exc).__name__}: {exc}'
-        )
+
+        logging.getLogger(__name__).error(f'save_json_file failed for {file_path}: {type(exc).__name__}: {exc}')
         return False
 
 
@@ -164,10 +166,10 @@ DMS_PATTERN = re.compile(r"([+-]?\d+)[d°]\s*(\d+)[m']\s*([\d.]+)[s\"]?")
 def dms_to_decimal(dms_string: str) -> Optional[float]:
     """
     Convert DMS (Degrees Minutes Seconds) string to decimal degrees
-    
+
     Args:
         dms_string: DMS string like "48d38m36.16s" or "48°38'36.16\""
-        
+
     Returns:
         Decimal degrees or None if conversion fails
     """
@@ -175,11 +177,11 @@ def dms_to_decimal(dms_string: str) -> Optional[float]:
         match = DMS_PATTERN.match(dms_string.strip())
         if not match:
             return None
-            
+
         degrees = float(match.group(1))
         minutes = float(match.group(2))
         seconds = float(match.group(3))
-        
+
         # Handle negative degrees
         if degrees < 0:
             return degrees - (minutes / 60.0) - (seconds / 3600.0)
@@ -192,10 +194,10 @@ def dms_to_decimal(dms_string: str) -> Optional[float]:
 def decimal_to_dms(decimal_degrees: float) -> Tuple[int, int, float]:
     """
     Convert decimal degrees to DMS components
-    
+
     Args:
         decimal_degrees: Decimal degrees value
-        
+
     Returns:
         Tuple of (degrees, minutes, seconds)
     """
@@ -203,18 +205,18 @@ def decimal_to_dms(decimal_degrees: float) -> Tuple[int, int, float]:
     minutes_float = (abs(decimal_degrees) - abs(degrees)) * 60
     minutes = int(minutes_float)
     seconds = (minutes_float - minutes) * 60
-    
+
     return degrees, minutes, seconds
 
 
 def validate_coordinates(lat: float, lon: float) -> bool:
     """
     Validate latitude and longitude values
-    
+
     Args:
         lat: Latitude in decimal degrees
         lon: Longitude in decimal degrees
-        
+
     Returns:
         True if coordinates are valid, False otherwise
     """
@@ -227,10 +229,10 @@ def validate_coordinates(lat: float, lon: float) -> bool:
 def format_file_size(size_bytes: float) -> str:
     """
     Format file size in human-readable format
-    
+
     Args:
         size_bytes: Size in bytes
-        
+
     Returns:
         Formatted string like "1.5 MB"
     """
@@ -245,7 +247,7 @@ def format_file_size(size_bytes: float) -> str:
 def get_environment_info() -> Dict[str, str]:
     """
     Get useful environment information for debugging
-    
+
     Returns:
         Dictionary with environment details
     """
@@ -255,5 +257,5 @@ def get_environment_info() -> Dict[str, str]:
         'python_version': sys.version,
         'platform': os.name,
         'working_directory': os.getcwd(),
-        'docker_env': str(os.path.exists('/.dockerenv'))
+        'docker_env': str(os.path.exists('/.dockerenv')),
     }

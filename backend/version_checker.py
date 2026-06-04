@@ -2,6 +2,7 @@
 Version update checker with caching to avoid GitHub API rate limiting.
 Checks for new releases on GitHub and caches results.
 """
+
 import time
 import requests
 from packaging.version import parse as parse_version, InvalidVersion
@@ -113,7 +114,11 @@ def check_for_updates():
 
     except requests.Timeout:
         logger.warning("GitHub API request timed out")
-        result = {"current_version": get_repo_version().strip(), "update_available": False, "error": "Request timed out"}
+        result = {
+            "current_version": get_repo_version().strip(),
+            "update_available": False,
+            "error": "Request timed out",
+        }
         _save_version_result(result)
         return result
     except requests.RequestException as e:

@@ -30,7 +30,7 @@ else:
 logger = get_logger(__name__)
 
 POLL_INTERVAL_SLOW = 5 * 60  # 5 min - default
-POLL_INTERVAL_FAST = 60      # 1 min - during/near active observation sessions
+POLL_INTERVAL_FAST = 60  # 1 min - during/near active observation sessions
 
 # {user_id: {trigger_id: last_sent_epoch_seconds}}
 _last_sent: Dict[str, Dict[str, float]] = {}
@@ -51,6 +51,7 @@ _lock_file = None  # held open for the lifetime of the process that wins the loc
 # Cooldown helpers
 # ---------------------------------------------------------------------------
 
+
 def _was_recently_notified(user_id: str, trigger_id: str, cooldown_s: float) -> bool:
     with _lock:
         last = _last_sent.get(user_id, {}).get(trigger_id)
@@ -66,8 +67,8 @@ def _mark_notified(user_id: str, trigger_id: str) -> None:
 # Push delivery
 # ---------------------------------------------------------------------------
 
-def _send(user: Any, trigger_id: str, title: str, body: str, url: str,
-          ttl: int = 0, urgency: str = 'normal') -> None:
+
+def _send(user: Any, trigger_id: str, title: str, body: str, url: str, ttl: int = 0, urgency: str = 'normal') -> None:
     """Send push to all subscriptions of a user and mark as notified.
 
     ttl:     seconds the push service keeps the message if the device is offline.
@@ -82,15 +83,15 @@ def _send(user: Any, trigger_id: str, title: str, body: str, url: str,
 
     from push_manager import send_push
 
-    icon  = '/static/ico/android/launchericon-192x192.png'
+    icon = '/static/ico/android/launchericon-192x192.png'
     badge = '/static/ico/android/launchericon-72x72.png'
     payload = {
         'title': title,
-        'body':  body,
-        'icon':  icon,
+        'body': body,
+        'icon': icon,
         'badge': badge,
-        'tag':   trigger_id,
-        'data':  {'url': url},
+        'tag': trigger_id,
+        'data': {'url': url},
     }
 
     n_subs = len(user.push_subscriptions)
@@ -123,10 +124,8 @@ def _cleanup_dead_subscriptions(user: Any, endpoints: list) -> None:
     """Remove expired/invalid push subscriptions from the user."""
     try:
         from auth import user_manager
-        user.push_subscriptions = [
-            s for s in user.push_subscriptions
-            if s.get('endpoint') not in endpoints
-        ]
+
+        user.push_subscriptions = [s for s in user.push_subscriptions if s.get('endpoint') not in endpoints]
         user_manager.save_users()
     except Exception as e:
         logger.warning(f"Failed to clean dead subscriptions for {user.username}: {e}")
@@ -136,6 +135,7 @@ def _cleanup_dead_subscriptions(user: Any, endpoints: list) -> None:
 # Trigger evaluation (per-user)
 # ---------------------------------------------------------------------------
 
+
 def _get_notif_prefs(user: Any) -> dict:
     """Extract notification trigger config from user preferences."""
     return user.preferences.get('notifications', {}).get('triggers', {})
@@ -144,6 +144,7 @@ def _get_notif_prefs(user: Any) -> dict:
 def _t(user: Any, key: str, **params) -> str:
     """Translate a push notification string using the user's preferred language."""
     from i18n_utils import get_translated_message
+
     lang = user.preferences.get('language', 'en')
     return get_translated_message(f'settings.{key}', language=lang, **params)
 
@@ -171,11 +172,15 @@ def _check_n7_aurora(user: Any, cache_data: Optional[dict]) -> None:
         return
 
     visibility = cache_data.get('current', {}).get('visibility_level', '')
-    _send(user, 'N7',
-          _t(user, 'push_n7_title'),
-          _t(user, 'push_n7_body', kp=f'{kp:.1f}', visibility=visibility),
-          '/#forecast-astro/aurora',
-          ttl=3600, urgency='high')  # aurora: immediate delivery, can last ~1 h
+    _send(
+        user,
+        'N7',
+        _t(user, 'push_n7_title'),
+        _t(user, 'push_n7_body', kp=f'{kp:.1f}', visibility=visibility),
+        '/#forecast-astro/aurora',
+        ttl=3600,
+        urgency='high',
+    )  # aurora: immediate delivery, can last ~1 h
 
 
 def _check_n1_plan_start(user: Any, plan_payload: Optional[dict]) -> None:
@@ -207,11 +212,14 @@ def _check_n1_plan_start(user: Any, plan_payload: Optional[dict]) -> None:
         logger.debug(f"N1 {user.username}: night_start in {ms_until:.0f}s, lead={lead_s}s")
         if 0 < ms_until <= lead_s and not _was_recently_notified(user.user_id, 'N1', 2 * 60 * 60):
             minutes = round(ms_until / 60)
-            _send(user, 'N1',
-                  _t(user, 'push_n1_title'),
-                  _t(user, 'push_n1_body', minutes=minutes),
-                  '/#astrodex/plan-my-night',
-                  ttl=int(ms_until))
+            _send(
+                user,
+                'N1',
+                _t(user, 'push_n1_title'),
+                _t(user, 'push_n1_body', minutes=minutes),
+                '/#astrodex/plan-my-night',
+                ttl=int(ms_until),
+            )
     except Exception as e:
         logger.debug(f"N1 check error for {user.username}: {e}")
 
@@ -230,8 +238,8 @@ def _check_n2_next_target(user: Any, plan_payload: Optional[dict]) -> None:
         return
 
     entries = (plan_payload.get('plan') or {}).get('entries', [])
-    lead_s  = t.get('lead_minutes', 5) * 60
-    now     = datetime.now(timezone.utc)
+    lead_s = t.get('lead_minutes', 5) * 60
+    now = datetime.now(timezone.utc)
 
     notified_set = _n2_notified.setdefault(user.user_id, set())
 
@@ -261,12 +269,15 @@ def _check_n2_next_target(user: Any, plan_payload: Optional[dict]) -> None:
                 break
             notified_set.add(entry_id)
             minutes = round(ms_until / 60)
-            name    = entry.get('name') or entry.get('target_name', '?')
-            _send(user, 'N2',
-                  _t(user, 'push_n2_title'),
-                  _t(user, 'push_n2_body', name=name, minutes=minutes),
-                  '/#astrodex/plan-my-night',
-                  ttl=int(ms_until))
+            name = entry.get('name') or entry.get('target_name', '?')
+            _send(
+                user,
+                'N2',
+                _t(user, 'push_n2_title'),
+                _t(user, 'push_n2_body', name=name, minutes=minutes),
+                '/#astrodex/plan-my-night',
+                ttl=int(ms_until),
+            )
             notified = True
             break
         except Exception as e:
@@ -304,15 +315,19 @@ def _check_n6_darkness(user: Any, cache_data: Optional[dict]) -> None:
             minutes = round(ms_until / 60)
             try:
                 from zoneinfo import ZoneInfo
+
                 tz_name = cache_data.get('location', {}).get('timezone', 'UTC')
                 dusk_local_time = dusk.astimezone(ZoneInfo(tz_name)).strftime('%H:%M')
             except Exception:
                 dusk_local_time = ''
-            _send(user, 'N6',
-                  _t(user, 'push_n6_title'),
-                  _t(user, 'push_n6_body', minutes=minutes, time=dusk_local_time),
-                  '/#forecast-astro/astro-weather',
-                  ttl=int(ms_until))
+            _send(
+                user,
+                'N6',
+                _t(user, 'push_n6_title'),
+                _t(user, 'push_n6_body', minutes=minutes, time=dusk_local_time),
+                '/#forecast-astro/astro-weather',
+                ttl=int(ms_until),
+            )
     except Exception as e:
         logger.debug(f"N6 check error for {user.username}: {e}")
 
@@ -328,7 +343,7 @@ def _check_n3_iss(user: Any, cache_data: Optional[dict]) -> None:
         return
 
     lead_s = t.get('lead_minutes', 10) * 60
-    now    = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc)
 
     candidates = []
     for transit in cache_data.get('solar_transits', []):
@@ -369,11 +384,15 @@ def _check_n3_iss(user: Any, cache_data: Optional[dict]) -> None:
 
     minutes = round(ms_until / 60)
     body_key = 'push_n3_solar_body' if transit_type == 'solar' else 'push_n3_lunar_body'
-    _send(user, 'N3',
-          _t(user, 'push_n3_title'),
-          _t(user, body_key, minutes=minutes),
-          '/#spaceflight/iss',
-          ttl=int(ms_until), urgency='high')  # short window (≤10 min): needs immediate delivery
+    _send(
+        user,
+        'N3',
+        _t(user, 'push_n3_title'),
+        _t(user, body_key, minutes=minutes),
+        '/#spaceflight/iss',
+        ttl=int(ms_until),
+        urgency='high',
+    )  # short window (≤10 min): needs immediate delivery
 
 
 def _check_n4_n5_eclipse(user: Any, solar_data: Optional[dict], lunar_data: Optional[dict]) -> None:
@@ -405,10 +424,9 @@ def _check_n4_n5_eclipse(user: Any, solar_data: Optional[dict], lunar_data: Opti
             logger.debug(f"{trigger_id} {user.username}: peak in {ms_until:.0f}s, lead={lead_s}s")
             if 0 < ms_until <= lead_s and not _was_recently_notified(user.user_id, trigger_id, 4 * 60 * 60):
                 minutes = round(ms_until / 60)
-                _send(user, trigger_id,
-                      _t(user, title_key),
-                      _t(user, body_key, minutes=minutes),
-                      url, ttl=int(ms_until))
+                _send(
+                    user, trigger_id, _t(user, title_key), _t(user, body_key, minutes=minutes), url, ttl=int(ms_until)
+                )
         except Exception as e:
             logger.debug(f"{trigger_id} check error for {user.username}: {e}")
 
@@ -417,9 +435,11 @@ def _check_n4_n5_eclipse(user: Any, solar_data: Optional[dict], lunar_data: Opti
 # Main poll loop
 # ---------------------------------------------------------------------------
 
+
 def _load_cache(key: str) -> Optional[dict]:
     try:
         from cache_store import load_shared_cache_entry
+
         entry = load_shared_cache_entry(key)
         return entry['data'] if entry else None
     except Exception:
@@ -455,7 +475,7 @@ def _pick_active_plan(user_id: str, username: str) -> Optional[dict]:
         fname = os.path.basename(file_path)
         if not (fname.startswith(prefix) and fname.endswith(suffix)):
             continue
-        raw_tid = fname[len(prefix):-len(suffix)]
+        raw_tid = fname[len(prefix) : -len(suffix)]
         telescope_id = None if raw_tid == 'my_night' else raw_tid
         try:
             payload = get_plan_with_timeline(user_id, username, telescope_id=telescope_id)
@@ -463,8 +483,10 @@ def _pick_active_plan(user_id: str, username: str) -> Optional[dict]:
             if state == 'none':
                 logger.debug(f"Plan (telescope={telescope_id}) for {username}: state=none, skipping")
                 continue
-            logger.debug(f"Plan (telescope={telescope_id}) for {username}: state={state}, "
-                         f"inside_night={payload.get('timeline', {}).get('is_inside_night')}")
+            logger.debug(
+                f"Plan (telescope={telescope_id}) for {username}: state={state}, "
+                f"inside_night={payload.get('timeline', {}).get('is_inside_night')}"
+            )
             candidates.append(payload)
         except Exception as e:
             logger.debug(f"Could not load plan (telescope={telescope_id}) for {username}: {e}")
@@ -491,11 +513,11 @@ def _poll() -> None:
         from auth import user_manager
 
         # Load shared caches once per cycle
-        aurora_data  = _load_cache('aurora')
-        sun_data     = _load_cache('sun_report')
-        iss_data     = _load_cache('iss_passes')
-        solar_data   = _load_cache('solar_eclipse')
-        lunar_data   = _load_cache('lunar_eclipse')
+        aurora_data = _load_cache('aurora')
+        sun_data = _load_cache('sun_report')
+        iss_data = _load_cache('iss_passes')
+        solar_data = _load_cache('solar_eclipse')
+        lunar_data = _load_cache('lunar_eclipse')
 
         user_manager._reload_users_if_changed()
         logger.debug(f"Poll cycle: {len(user_manager.users)} user(s) loaded")
@@ -516,7 +538,7 @@ def _poll() -> None:
             # Fast-mode detection: active night OR night starting within 30 min
             if plan_payload and plan_payload.get('state') != 'none':
                 timeline = plan_payload.get('timeline', {})
-                plan     = plan_payload.get('plan') or {}
+                plan = plan_payload.get('plan') or {}
                 if timeline.get('is_inside_night'):
                     any_active = True
                 else:
@@ -524,6 +546,7 @@ def _poll() -> None:
                     if night_start_str:
                         try:
                             from datetime import timezone
+
                             ns = datetime.fromisoformat(night_start_str)
                             if ns.tzinfo is None:
                                 ns = ns.replace(tzinfo=timezone.utc)
@@ -559,6 +582,7 @@ def _run() -> None:
 # Public interface
 # ---------------------------------------------------------------------------
 
+
 def _acquire_lock() -> bool:
     """Try to acquire the push_scheduler lock file (non-blocking).
 
@@ -568,6 +592,7 @@ def _acquire_lock() -> bool:
     """
     global _lock_file
     from constants import DATA_DIR_CACHE
+
     lock_path = os.path.join(DATA_DIR_CACHE, 'push_scheduler.lock')
     try:
         _lock_file = open(lock_path, 'w')

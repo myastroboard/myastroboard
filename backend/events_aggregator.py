@@ -6,7 +6,7 @@ unified event information for dashboard alerts and sharing.
 
 Collects events from:
 - Solar eclipses
-- Lunar eclipses  
+- Lunar eclipses
 - Aurora predictions
 - Moon phases
 - Custom events
@@ -48,6 +48,7 @@ logger = get_logger(__name__)
 
 class EventType(Enum):
     """Enum for event types"""
+
     SOLAR_ECLIPSE = "Solar Eclipse"
     LUNAR_ECLIPSE = "Lunar Eclipse"
     AURORA = "Aurora"
@@ -71,30 +72,32 @@ class EventType(Enum):
 
 class EventImportance(Enum):
     """Event importance levels for alerting"""
+
     CRITICAL = "critical"  # Must-see events
-    HIGH = "high"          # Highly recommended
-    MEDIUM = "medium"      # Worth considering
-    LOW = "low"            # Nice to know
+    HIGH = "high"  # Highly recommended
+    MEDIUM = "medium"  # Worth considering
+    LOW = "low"  # Nice to know
 
 
 @dataclass
 class AstronomicalEvent:
     """Standardized astronomical event data"""
-    id: str                                    # Unique identifier
-    event_type: str                           # Type of event
-    icon_class: str                           # Bootstrap icon class (e.g. "bi bi-sun")
-    icon_color_class: str                     # Optional color class (e.g. "text-warning")
-    title: str                                # Short title
-    description: str                          # Description
-    start_time: Optional[str]                 # Start time (ISO format)
-    peak_time: Optional[str]                  # Peak/best time (ISO format)
-    end_time: Optional[str]                   # End time (ISO format)
-    days_until_event: int                     # Days until event happens
-    visibility: bool                          # Is event visible from location?
-    importance: str                           # Importance level
-    score: Optional[float]                    # Importance score (0-10)
-    raw_data: Dict[str, Any]                  # Original data for detailed view
-    structure_key: str                        # Stable frontend section key (moon, sun, ...)
+
+    id: str  # Unique identifier
+    event_type: str  # Type of event
+    icon_class: str  # Bootstrap icon class (e.g. "bi bi-sun")
+    icon_color_class: str  # Optional color class (e.g. "text-warning")
+    title: str  # Short title
+    description: str  # Description
+    start_time: Optional[str]  # Start time (ISO format)
+    peak_time: Optional[str]  # Peak/best time (ISO format)
+    end_time: Optional[str]  # End time (ISO format)
+    days_until_event: int  # Days until event happens
+    visibility: bool  # Is event visible from location?
+    importance: str  # Importance level
+    score: Optional[float]  # Importance score (0-10)
+    raw_data: Dict[str, Any]  # Original data for detailed view
+    structure_key: str  # Stable frontend section key (moon, sun, ...)
 
 
 class EventsAggregator:
@@ -106,7 +109,7 @@ class EventsAggregator:
     def __init__(self, latitude: float, longitude: float, timezone: str, language: str = "en"):
         """
         Initialize events aggregator
-        
+
         Args:
             latitude: Observer latitude
             longitude: Observer longitude
@@ -309,12 +312,16 @@ class EventsAggregator:
             )
         if event_key == "zodiacal_light":
             viewing_raw = str(event_data.get("viewing_type") or raw.get("viewing_type") or "").strip().lower()
-            viewing_type = self._t(
-                "events_api.special_phenomena.zodiacal_viewing_morning",
-                "Morning",
-            ) if viewing_raw == "morning" else self._t(
-                "events_api.special_phenomena.zodiacal_viewing_evening",
-                "Evening",
+            viewing_type = (
+                self._t(
+                    "events_api.special_phenomena.zodiacal_viewing_morning",
+                    "Morning",
+                )
+                if viewing_raw == "morning"
+                else self._t(
+                    "events_api.special_phenomena.zodiacal_viewing_evening",
+                    "Evening",
+                )
             )
             return (
                 self._t(
@@ -341,7 +348,7 @@ class EventsAggregator:
     ) -> Dict[str, Any]:
         """
         Aggregate all available events into a unified format.
-        
+
         Args:
             solar_eclipse_data: Data from sun_eclipse endpoint
             lunar_eclipse_data: Data from moon_eclipse endpoint
@@ -352,7 +359,7 @@ class EventsAggregator:
             special_phenomena_data: Data from special phenomena endpoint
             solar_system_events_data: Data from solar system events endpoint
             sidereal_time_data: Data from sidereal time endpoint
-            
+
         Returns:
             Unified events data with next event and filtered views
         """
@@ -381,7 +388,7 @@ class EventsAggregator:
                 events.extend(aurora_events)
             except Exception as e:
                 logger.warning(f"Error extracting aurora events: {e}")
-        
+
         # Add moon phases if available
         if moon_phases_data:
             try:
@@ -431,14 +438,8 @@ class EventsAggregator:
             "upcoming_events": [asdict(e) for e in events],
             "events_count": len(events),
             "next_event": asdict(events[0]) if events else None,
-            "events_next_7_days": [
-                asdict(e) for e in events 
-                if e.days_until_event <= 7
-            ],
-            "events_next_30_days": [
-                asdict(e) for e in events 
-                if e.days_until_event <= 30
-            ],
+            "events_next_7_days": [asdict(e) for e in events if e.days_until_event <= 7],
+            "events_next_30_days": [asdict(e) for e in events if e.days_until_event <= 30],
         }
 
         return result
@@ -512,7 +513,7 @@ class EventsAggregator:
 
         visible = lunar_eclipse.get("visible", False)
         peak_time_str = lunar_eclipse.get("peak_time")
-        
+
         if not peak_time_str:
             return events
 
@@ -520,7 +521,7 @@ class EventsAggregator:
         days_until = (peak_time.date() - self.local_now.date()).days
 
         eclipse_type = lunar_eclipse.get("type", "Penumbral")
-        
+
         # Lunar eclipses are usually visible from wide areas
         if eclipse_type == "Total":
             importance = EventImportance.HIGH.value
@@ -562,8 +563,8 @@ class EventsAggregator:
 
     def _extract_aurora_events(self, aurora_data: Dict[str, Any]) -> List[AstronomicalEvent]:
         """Return only the first strong aurora visibility event.
-           The aurora event is different because it is a forecast with multiple time slots (8 x 3h), 
-           so we will extract the most relevant one based on visibility likelihood and timing.
+        The aurora event is different because it is a forecast with multiple time slots (8 x 3h),
+        so we will extract the most relevant one based on visibility likelihood and timing.
         """
 
         if not aurora_data:
@@ -781,7 +782,8 @@ class EventsAggregator:
                 description=(
                     self._t(
                         "events_api.iss_description",
-                        f"ISS pass score {score:.0f}/100 ({visibility_day_night}). Peak altitude {float(iss_pass.get('peak_altitude_deg', 0)):.1f}°.",
+                        f"ISS pass score {score:.0f}/100 ({visibility_day_night})."
+                        f" Peak altitude {float(iss_pass.get('peak_altitude_deg', 0)):.1f}°.",
                         score=f"{score:.0f}",
                         visibility_day_night=visibility_period_localized,
                         peak_altitude_deg=f"{float(iss_pass.get('peak_altitude_deg', 0)):.1f}",
@@ -832,7 +834,9 @@ class EventsAggregator:
                 ),
                 description=self._t(
                     "events_api.iss_solar_transit_description",
-                    "ISS crosses the solar disk from your location. Minimum separation {minimum_separation_arcmin}′, estimated transit window {duration_seconds}s near {sun_altitude_deg}° solar altitude. Certified solar filter required.",
+                    "ISS crosses the solar disk from your location."
+                    " Minimum separation {minimum_separation_arcmin}′, estimated transit window {duration_seconds}s"
+                    " near {sun_altitude_deg}° solar altitude. Certified solar filter required.",
                     minimum_separation_arcmin=f"{min_sep_arcmin:.2f}",
                     duration_seconds=f"{duration_seconds:.1f}",
                     sun_altitude_deg=f"{sun_altitude_deg:.1f}",
@@ -884,7 +888,9 @@ class EventsAggregator:
                 ),
                 description=self._t(
                     "events_api.iss_lunar_transit_description",
-                    "ISS crosses the lunar disk from your location. Minimum separation {minimum_separation_arcmin}′, estimated transit window {duration_seconds}s near {moon_altitude_deg}° lunar altitude. Moon illumination {moon_illumination_pct}%.",
+                    "ISS crosses the lunar disk from your location."
+                    " Minimum separation {minimum_separation_arcmin}′, estimated transit window {duration_seconds}s"
+                    " near {moon_altitude_deg}° lunar altitude. Moon illumination {moon_illumination_pct}%.",
                     minimum_separation_arcmin=f"{min_sep_arcmin:.2f}",
                     duration_seconds=f"{duration_seconds:.1f}",
                     moon_altitude_deg=f"{moon_altitude_deg:.1f}",
@@ -941,30 +947,33 @@ class EventsAggregator:
     def _extract_planetary_events(self, planetary_data: Dict[str, Any]) -> List[AstronomicalEvent]:
         """Extract planetary events from raw data"""
         events = []
-        
+
         raw_events = planetary_data.get("events", [])
         if not isinstance(raw_events, list):
             return events
-        
+
         for event_data in raw_events:
             try:
                 peak_time_str = event_data.get("peak_time")
                 if not peak_time_str:
                     continue
-                
+
                 peak_time = self._parse_iso_time(peak_time_str)
                 days_until = (peak_time.date() - self.local_now.date()).days
-                
+
                 visibility = event_data.get("visibility", True)
                 importance = event_data.get("importance", "medium")
-                
+
                 event_type = event_data.get("event_type", "Planetary Event")
                 title, description = self._localize_planetary_text(event_data)
                 icon_class = event_data.get("icon_class") or self._infer_icon_class(event_type)
                 icon_color_class = event_data.get("icon_color_class") or self._importance_icon_color_class(importance)
 
                 event = AstronomicalEvent(
-                    id=f"planetary_{peak_time_str.replace(':', '').replace('-', '')}_{event_type.lower().replace(' ', '_')}",
+                    id=(
+                        f"planetary_{peak_time_str.replace(':', '').replace('-', '')}"
+                        f"_{event_type.lower().replace(' ', '_')}"
+                    ),
                     event_type=event_type,
                     icon_class=icon_class,
                     icon_color_class=icon_color_class,
@@ -983,36 +992,39 @@ class EventsAggregator:
                 events.append(event)
             except Exception as e:
                 logger.debug(f"Error extracting planetary event: {e}")
-        
+
         return events
 
     def _extract_special_phenomena_events(self, phenomena_data: Dict[str, Any]) -> List[AstronomicalEvent]:
         """Extract special phenomena events from raw data"""
         events = []
-        
+
         raw_events = phenomena_data.get("events", [])
         if not isinstance(raw_events, list):
             return events
-        
+
         for event_data in raw_events:
             try:
                 peak_time_str = event_data.get("peak_time")
                 if not peak_time_str:
                     continue
-                
+
                 peak_time = self._parse_iso_time(peak_time_str)
                 days_until = (peak_time.date() - self.local_now.date()).days
-                
+
                 visibility = event_data.get("visibility", True)
                 importance = event_data.get("importance", "medium")
-                
+
                 event_type = event_data.get("event_type", "Special Phenomenon")
                 title, description = self._localize_special_phenomena_text(event_data)
                 icon_class = event_data.get("icon_class") or self._infer_icon_class(event_type)
                 icon_color_class = event_data.get("icon_color_class") or self._importance_icon_color_class(importance)
 
                 event = AstronomicalEvent(
-                    id=f"phenomena_{peak_time_str.replace(':', '').replace('-', '')}_{event_type.lower().replace(' ', '_')}",
+                    id=(
+                        f"phenomena_{peak_time_str.replace(':', '').replace('-', '')}"
+                        f"_{event_type.lower().replace(' ', '_')}"
+                    ),
                     event_type=event_type,
                     icon_class=icon_class,
                     icon_color_class=icon_color_class,
@@ -1031,29 +1043,29 @@ class EventsAggregator:
                 events.append(event)
             except Exception as e:
                 logger.debug(f"Error extracting special phenomena event: {e}")
-        
+
         return events
 
     def _extract_solar_system_events(self, solsys_data: Dict[str, Any]) -> List[AstronomicalEvent]:
         """Extract solar system events (meteor showers, comets, occultations) from raw data"""
         events = []
-        
+
         raw_events = solsys_data.get("events", [])
         if not isinstance(raw_events, list):
             return events
-        
+
         for event_data in raw_events:
             try:
                 peak_time_str = event_data.get("peak_time")
                 if not peak_time_str:
                     continue
-                
+
                 peak_time = self._parse_iso_time(peak_time_str)
                 days_until = (peak_time.date() - self.local_now.date()).days
-                
+
                 visibility = event_data.get("visibility", True)
                 importance = event_data.get("importance", "medium")
-                
+
                 event_type = event_data.get("event_type", "Solar System Event")
                 title = event_data.get("title", "Solar System Event")
                 description = event_data.get("description", "")
@@ -1061,7 +1073,10 @@ class EventsAggregator:
                 icon_color_class = event_data.get("icon_color_class") or self._importance_icon_color_class(importance)
 
                 event = AstronomicalEvent(
-                    id=f"solsys_{peak_time_str.replace(':', '').replace('-', '')}_{event_type.lower().replace(' ', '_')}",
+                    id=(
+                        f"solsys_{peak_time_str.replace(':', '').replace('-', '')}"
+                        f"_{event_type.lower().replace(' ', '_')}"
+                    ),
                     event_type=event_type,
                     icon_class=icon_class,
                     icon_color_class=icon_color_class,
@@ -1080,5 +1095,5 @@ class EventsAggregator:
                 events.append(event)
             except Exception as e:
                 logger.debug(f"Error extracting solar system event: {e}")
-        
+
         return events

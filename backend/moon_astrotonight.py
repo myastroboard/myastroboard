@@ -28,7 +28,7 @@ Example output (on API call):
 import datetime
 from zoneinfo import ZoneInfo
 from dataclasses import dataclass
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import astropy.units as u
 from astropy.time import Time
@@ -36,10 +36,10 @@ from astropy.coordinates import EarthLocation, AltAz, get_sun, get_body
 
 from astroplan.moon import moon_illumination
 
-
 # ============================================================
 # Data structure
 # ============================================================
+
 
 @dataclass
 class BestWindow:
@@ -54,6 +54,7 @@ class BestWindow:
 # Main service
 # ============================================================
 
+
 class AstroTonightService:
 
     def __init__(self, latitude: float, longitude: float, timezone: str):
@@ -62,10 +63,7 @@ class AstroTonightService:
         self.longitude = longitude
         self.timezone = ZoneInfo(timezone)
 
-        self.location = EarthLocation(
-            lat=latitude * u.deg,
-            lon=longitude * u.deg
-        )
+        self.location = EarthLocation(lat=latitude * u.deg, lon=longitude * u.deg)
 
     # ============================================================
     # Public API
@@ -93,7 +91,7 @@ class AstroTonightService:
 
         # Night interval: 18:00 → 06:00 local
         start = datetime.datetime.combine(today, datetime.time(18, 0), tzinfo=self.timezone)
-        end   = datetime.datetime.combine(today + datetime.timedelta(days=1), datetime.time(6, 0), tzinfo=self.timezone)
+        end = datetime.datetime.combine(today + datetime.timedelta(days=1), datetime.time(6, 0), tzinfo=self.timezone)
 
         # Illumination computed once per night (used by 'illumination' mode)
         illumination = self._moon_illumination(start)
@@ -107,14 +105,14 @@ class AstroTonightService:
 
         # Single vectorized Astropy pass: one AltAz frame for all N time steps
         times_utc = [t.astimezone(datetime.timezone.utc) for t in times_local]
-        t_array   = Time(times_utc)
-        frame     = AltAz(obstime=t_array, location=self.location)
-        sun_alts  = cast(Any, get_sun(t_array).transform_to(frame).alt).to_value(u.deg)
+        t_array = Time(times_utc)
+        frame = AltAz(obstime=t_array, location=self.location)
+        sun_alts = cast(Any, get_sun(t_array).transform_to(frame).alt).to_value(u.deg)
         moon_alts = cast(Any, get_body("moon", t_array).transform_to(frame).alt).to_value(u.deg)
 
         modes = ["strict", "practical", "illumination"]
 
-        best_start    = {m: None for m in modes}
+        best_start = {m: None for m in modes}
         best_duration = {m: datetime.timedelta(0) for m in modes}
         current_start = {m: None for m in modes}
 
@@ -128,7 +126,7 @@ class AstroTonightService:
             return illumination < 15
 
         for i, dt in enumerate(times_local):
-            sun_alt  = float(sun_alts[i])
+            sun_alt = float(sun_alts[i])
             moon_alt = float(moon_alts[i])
 
             for m in modes:
@@ -142,7 +140,7 @@ class AstroTonightService:
                         duration = dt - cs
                         if duration > best_duration[m]:
                             best_duration[m] = duration
-                            best_start[m]    = cs
+                            best_start[m] = cs
                         current_start[m] = None
 
         # Close any still-open windows at end of scan
@@ -152,7 +150,7 @@ class AstroTonightService:
                 duration = end - cs
                 if duration > best_duration[m]:
                     best_duration[m] = duration
-                    best_start[m]    = cs
+                    best_start[m] = cs
 
         # Build result dict
         result = {}

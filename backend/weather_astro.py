@@ -10,6 +10,7 @@ Features:
 - Dew point and humidity alerts
 - Wind speed impact on tracking
 """
+
 import copy
 import time
 import threading
@@ -67,14 +68,15 @@ def _store_last_successful_analysis(hours: int, language: str, data: Dict[str, A
 def _is_openmeteo_concurrency_error(exc: Exception) -> bool:
     return "Too many concurrent requests" in str(exc)
 
+
 class AstroWeatherAnalyzer:
     """Advanced weather analysis for astrophotography"""
-    
+
     def __init__(self, language: str = "en"):
         self.config = load_config()
         self.location = self.config.get("location", {})
         self.language = language
-        
+
     def fetch_extended_weather_data(self, forecast_hours: int = 24) -> Optional[Dict]:
         """
         Fetch extended weather data with additional atmospheric variables
@@ -83,76 +85,107 @@ class AstroWeatherAnalyzer:
         try:
             client = create_weather_client()
             location_str = f"lat={int(self.location.get('latitude'))}, lon={int(self.location.get('longitude'))}"
-            
+
             # Full extended hourly variables for astrophotography (including jet stream data)
             hourly_vars_full = [
                 # Basic weather
-                "temperature_2m", "relative_humidity_2m", "dew_point_2m",
-                "wind_speed_10m", "wind_direction_10m", "wind_speed_80m", "wind_speed_120m",
-                "surface_pressure", "visibility",
-                
+                "temperature_2m",
+                "relative_humidity_2m",
+                "dew_point_2m",
+                "wind_speed_10m",
+                "wind_direction_10m",
+                "wind_speed_80m",
+                "wind_speed_120m",
+                "surface_pressure",
+                "visibility",
                 # Cloud layers
-                "cloud_cover", "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high",
-                
+                "cloud_cover",
+                "cloud_cover_low",
+                "cloud_cover_mid",
+                "cloud_cover_high",
                 # Atmospheric stability
-                "lifted_index", "convective_inhibition",
-                
+                "lifted_index",
+                "convective_inhibition",
                 # Precipitation
-                "precipitation", "precipitation_probability",
-                
+                "precipitation",
+                "precipitation_probability",
                 # Solar/UV
-                "is_day", "uv_index",
-                
+                "is_day",
+                "uv_index",
                 # Jet stream data (critical for astro analysis)
-                "geopotential_height_500hPa", "geopotential_height_850hPa",
-                "temperature_500hPa", "temperature_850hPa",
-                "wind_speed_500hPa", "wind_direction_500hPa"
+                "geopotential_height_500hPa",
+                "geopotential_height_850hPa",
+                "temperature_500hPa",
+                "temperature_850hPa",
+                "wind_speed_500hPa",
+                "wind_direction_500hPa",
             ]
-            
+
             # Fallback: core variables only (if full request fails)
             hourly_vars_core = [
-                "temperature_2m", "relative_humidity_2m", "dew_point_2m",
-                "wind_speed_10m", "wind_direction_10m", "wind_speed_80m", "wind_speed_120m",
-                "surface_pressure", "visibility",
-                "cloud_cover", "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high",
-                "lifted_index", "convective_inhibition",
-                "precipitation", "precipitation_probability",
-                "is_day", "uv_index"
+                "temperature_2m",
+                "relative_humidity_2m",
+                "dew_point_2m",
+                "wind_speed_10m",
+                "wind_direction_10m",
+                "wind_speed_80m",
+                "wind_speed_120m",
+                "surface_pressure",
+                "visibility",
+                "cloud_cover",
+                "cloud_cover_low",
+                "cloud_cover_mid",
+                "cloud_cover_high",
+                "lifted_index",
+                "convective_inhibition",
+                "precipitation",
+                "precipitation_probability",
+                "is_day",
+                "uv_index",
             ]
-            
-            logger.debug(f"Fetching astro weather: {location_str}, {forecast_hours}h, {len(hourly_vars_full)} variables (full with jet stream)")
-            
+
+            logger.debug(
+                f"Fetching astro weather: {location_str}, {forecast_hours}h,"
+                f" {len(hourly_vars_full)} variables (full with jet stream)"
+            )
+
             params = {
                 "latitude": self.location.get("latitude"),
                 "longitude": self.location.get("longitude"),
                 "timezone": self.location.get("timezone", "UTC"),
                 "hourly": hourly_vars_full,
-                "forecast_hours": forecast_hours
+                "forecast_hours": forecast_hours,
             }
-            
+
             try:
                 response = client.weather_api(URL_OPENMETEO, params=params)[0]
                 result = self._parse_extended_data(response, hourly_vars_full)
-                logger.debug(f"Open-Meteo API: Successfully fetched {forecast_hours}h astro weather data {location_str} (with jet stream)")
+                logger.debug(
+                    f"Open-Meteo API: Successfully fetched {forecast_hours}h astro weather data"
+                    f" {location_str} (with jet stream)"
+                )
                 return result
             except Exception as full_error:
                 # If full request fails (likely due to server load), retry with core variables
                 if _is_openmeteo_concurrency_error(full_error):
                     raise  # Don't retry on concurrency errors, let main handler deal with it
-                
-                logger.warning(f"Full astro weather request failed, retrying with core variables only")
+
+                logger.warning("Full astro weather request failed, retrying with core variables only")
                 params["hourly"] = hourly_vars_core
-                
+
                 try:
                     response = client.weather_api(URL_OPENMETEO, params=params)[0]
                     result = self._parse_extended_data(response, hourly_vars_core)
-                    logger.debug(f"Open-Meteo API: Successfully fetched {forecast_hours}h astro weather data {location_str} (core variables, jet stream uses estimations)")
+                    logger.debug(
+                        f"Open-Meteo API: Successfully fetched {forecast_hours}h astro weather data"
+                        f" {location_str} (core variables, jet stream uses estimations)"
+                    )
                     return result
-                except Exception as retry_error:
+                except Exception:
                     # If both full and core requests fail, return None and let cache fallback handle it
-                    logger.warning(f"Core astro weather request also failed - will use stale cache if available")
+                    logger.warning("Core astro weather request also failed - will use stale cache if available")
                     return None
-            
+
         except Exception as e:
             if _is_openmeteo_concurrency_error(e):
                 record_openmeteo_rate_limit()
@@ -163,367 +196,349 @@ class AstroWeatherAnalyzer:
                 logger.warning(f"Open-Meteo API: unexpected error fetching astro weather - {str(e)[:120]}")
                 logger.debug("Full traceback:", exc_info=True)
             return None
-    
+
     def _parse_extended_data(self, response, hourly_vars: List[str]) -> Dict:
         """Parse the extended weather response into organized data structure"""
         hourly = response.Hourly()
-        
+
         # Create time series
         dates = pd.date_range(
             start=pd.to_datetime(hourly.Time(), unit="s", utc=True),
             periods=len(hourly.Variables(0).ValuesAsNumpy()),
-            freq=pd.Timedelta(seconds=hourly.Interval())
+            freq=pd.Timedelta(seconds=hourly.Interval()),
         )
-        
+
         # Parse timezone
         timezone_str = response.Timezone()
         if isinstance(timezone_str, bytes):
             timezone_str = timezone_str.decode("utf-8")
-        
+
         # Build data dictionary
         data = {"datetime": dates.tz_convert(timezone_str)}
         for i, var_name in enumerate(hourly_vars):
             data[var_name] = hourly.Variables(i).ValuesAsNumpy()
-        
+
         df = pd.DataFrame(data)
-        
+
         return {
             "location": {
                 "name": self.location.get("name", "Unknown"),
                 "latitude": response.Latitude(),
                 "longitude": response.Longitude(),
                 "elevation": response.Elevation(),
-                "timezone": timezone_str
+                "timezone": timezone_str,
             },
-            "data": df
+            "data": df,
         }
-    
+
     def analyze_cloud_layers(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Analyze cloud altitude layers for astrophotography impact
-        
+
         Returns:
         - cloud_discrimination: Quality score based on cloud layer analysis
         - high_cloud_impact: Impact of high clouds on imaging
-        - mid_cloud_impact: Impact of mid clouds on imaging  
+        - mid_cloud_impact: Impact of mid clouds on imaging
         - low_cloud_impact: Impact of low clouds on imaging
         """
         result = df.copy()
-        
+
         # Cloud layer analysis
         high_clouds = result["cloud_cover_high"]
-        mid_clouds = result["cloud_cover_mid"] 
+        mid_clouds = result["cloud_cover_mid"]
         low_clouds = result["cloud_cover_low"]
-        
+
         # Cloud discrimination score (0-100%)
         # High clouds have least impact, low clouds have most impact
         cloud_discrimination = (
-            (100 - high_clouds) * 0.3 +  # High clouds less problematic
-            (100 - mid_clouds) * 0.4 +   # Mid clouds moderate impact
-            (100 - low_clouds) * 0.6     # Low clouds worst for astronomy
+            (100 - high_clouds) * 0.3  # High clouds less problematic
+            + (100 - mid_clouds) * 0.4  # Mid clouds moderate impact
+            + (100 - low_clouds) * 0.6  # Low clouds worst for astronomy
         ).clip(0, 100)
-        
+
         # Individual cloud layer impacts
         high_cloud_impact = self._calculate_cloud_impact(high_clouds, "high")
         mid_cloud_impact = self._calculate_cloud_impact(mid_clouds, "mid")
         low_cloud_impact = self._calculate_cloud_impact(low_clouds, "low")
-        
+
         result["cloud_discrimination"] = cloud_discrimination.round(1)
         result["high_cloud_impact"] = high_cloud_impact
         result["mid_cloud_impact"] = mid_cloud_impact
         result["low_cloud_impact"] = low_cloud_impact
-        
+
         return result
-    
+
     def _calculate_cloud_impact(self, cloud_cover: pd.Series, layer_type: str) -> pd.Series:
         """Calculate specific impact of cloud layer on astrophotography"""
         impact_factors = {
-            "high": 0.3,    # High clouds - cirrus, less impact
-            "mid": 0.6,     # Mid clouds - altostratus, moderate impact  
-            "low": 1.0      # Low clouds - cumulus/stratus, major impact
+            "high": 0.3,  # High clouds - cirrus, less impact
+            "mid": 0.6,  # Mid clouds - altostratus, moderate impact
+            "low": 1.0,  # Low clouds - cumulus/stratus, major impact
         }
-        
+
         factor = impact_factors.get(layer_type, 1.0)
-        
+
         # Convert cloud cover percentage to impact score
         impact = (cloud_cover * factor).clip(0, 100)
-        
+
         return impact.round(1)
-    
+
     def calculate_seeing_forecast(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Calculate seeing forecast using Pickering scale (1-10)
         Based on wind speed, atmospheric stability, and jet stream effects
         """
         result = df.copy()
-        
+
         # Wind factor (surface and upper level)
         surface_wind = result["wind_speed_10m"]
         upper_wind_80m = result.get("wind_speed_80m", surface_wind * 1.2)
-        upper_wind_120m = result.get("wind_speed_120m", surface_wind * 1.4)
-        
+
         # Wind seeing impact (lower is better for seeing)
         wind_seeing_score = self._wind_to_seeing_score(surface_wind, upper_wind_80m)
-        
+
         # Atmospheric stability from lifted index
         stability_score = self._stability_to_seeing_score(result["lifted_index"])
-        
+
         # Jet stream impact
         jet_stream_score = self._jet_stream_impact(
             result.get("wind_speed_500hPa", surface_wind * 2),
-            result.get("temperature_500hPa", result["temperature_2m"] - 30)
+            result.get("temperature_500hPa", result["temperature_2m"] - 30),
         )
-        
+
         # Combined seeing score (Pickering scale 1-10)
-        seeing_pickering = (
-            wind_seeing_score * 0.4 +
-            stability_score * 0.3 +
-            jet_stream_score * 0.3
-        ).clip(1, 10)
-        
+        seeing_pickering = (wind_seeing_score * 0.4 + stability_score * 0.3 + jet_stream_score * 0.3).clip(1, 10)
+
         result["seeing_pickering"] = seeing_pickering.round(1)
         result["wind_seeing_component"] = wind_seeing_score.round(1)
         result["stability_seeing_component"] = stability_score.round(1)
         result["jetstream_seeing_component"] = jet_stream_score.round(1)
-        
+
         return result
-    
+
     def _wind_to_seeing_score(self, surface_wind: pd.Series, upper_wind: pd.Series) -> pd.Series:
         """Convert wind speeds to seeing score component"""
         # Average wind effect
         avg_wind = (surface_wind + upper_wind) / 2
-        
+
         # Convert to Pickering scale component (1-10, higher = better seeing)
         # Calm conditions (0-5 km/h) = excellent seeing (8-10)
         # Light winds (5-15 km/h) = good seeing (6-8)
         # Moderate winds (15-25 km/h) = fair seeing (4-6)
         # Strong winds (25+ km/h) = poor seeing (1-4)
-        
+
         seeing_score = np.where(
-            avg_wind <= 5, 9,
-            np.where(avg_wind <= 15, 7,
-                np.where(avg_wind <= 25, 5,
-                    np.where(avg_wind <= 35, 3, 1)
-                )
-            )
+            avg_wind <= 5, 9, np.where(avg_wind <= 15, 7, np.where(avg_wind <= 25, 5, np.where(avg_wind <= 35, 3, 1)))
         )
-        
+
         return pd.Series(seeing_score, index=surface_wind.index)
-    
+
     def _stability_to_seeing_score(self, lifted_index: pd.Series) -> pd.Series:
         """Convert atmospheric stability (lifted index) to seeing score"""
         # Lifted Index interpretation:
         # > 2: Very stable (excellent seeing)
         # 0 to 2: Stable (good seeing)
-        # -2 to 0: Slightly unstable (fair seeing)  
+        # -2 to 0: Slightly unstable (fair seeing)
         # < -2: Unstable (poor seeing)
-        
+
         seeing_score = np.where(
-            lifted_index > 2, 9,
-            np.where(lifted_index > 0, 7,
-                np.where(lifted_index > -2, 5,
-                    np.where(lifted_index > -4, 3, 1)
-                )
-            )
+            lifted_index > 2,
+            9,
+            np.where(lifted_index > 0, 7, np.where(lifted_index > -2, 5, np.where(lifted_index > -4, 3, 1))),
         )
-        
+
         return pd.Series(seeing_score, index=lifted_index.index)
-    
+
     def _jet_stream_impact(self, wind_500hpa: pd.Series, temp_500hpa: pd.Series) -> pd.Series:
         """Calculate jet stream impact on seeing conditions"""
         # Strong jet stream winds indicate turbulence
         # Temperature gradient also affects stability
-        
+
         # Jet stream strength indicator
         jet_strength = wind_500hpa
-        
+
         # Convert to seeing impact (1-10 scale)
         seeing_score = np.where(
-            jet_strength <= 30, 9,  # Weak jet stream = good seeing
-            np.where(jet_strength <= 50, 7,  # Moderate jet stream
-                np.where(jet_strength <= 80, 5,  # Strong jet stream
-                    np.where(jet_strength <= 100, 3, 1)  # Very strong jet stream
-                )
-            )
+            jet_strength <= 30,
+            9,  # Weak jet stream = good seeing
+            np.where(
+                jet_strength <= 50,
+                7,  # Moderate jet stream
+                np.where(
+                    jet_strength <= 80,
+                    5,  # Strong jet stream
+                    np.where(jet_strength <= 100, 3, 1),  # Very strong jet stream
+                ),
+            ),
         )
-        
+
         return pd.Series(seeing_score, index=wind_500hpa.index)
-    
+
     def calculate_transparency_forecast(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Calculate transparency forecast with magnitude limit prediction
         Based on humidity, visibility, aerosols, and atmospheric conditions
         """
         result = df.copy()
-        
+
         # Base factors for transparency
         humidity = result["relative_humidity_2m"]
         visibility_m = result["visibility"]
-        
+
         # Humidity impact on transparency
         humidity_factor = self._humidity_to_transparency(humidity)
-        
+
         # Visibility impact
         visibility_factor = self._visibility_to_transparency(visibility_m)
-        
+
         # Atmospheric clarity (inverse of cloud cover)
         cloud_total = (
-            result["cloud_cover_high"] * 0.3 +
-            result["cloud_cover_mid"] * 0.6 +
-            result["cloud_cover_low"] * 1.0
+            result["cloud_cover_high"] * 0.3 + result["cloud_cover_mid"] * 0.6 + result["cloud_cover_low"] * 1.0
         ) / 1.9  # Normalize
-        
+
         clarity_factor = (100 - cloud_total) / 100
-        
+
         # Combined transparency score (0-100%)
-        transparency_score = (
-            humidity_factor * 0.4 +
-            visibility_factor * 0.4 +
-            clarity_factor * 0.2
-        ).clip(0, 100)
-        
+        transparency_score = (humidity_factor * 0.4 + visibility_factor * 0.4 + clarity_factor * 0.2).clip(0, 100)
+
         # Convert to limiting magnitude
         magnitude_limit = self._transparency_to_magnitude_limit(transparency_score)
-        
+
         result["transparency_score"] = transparency_score.round(1)
         result["limiting_magnitude"] = magnitude_limit.round(2)
         result["humidity_transparency"] = (humidity_factor * 100).round(1)
         result["visibility_transparency"] = (visibility_factor * 100).round(1)
-        
+
         return result
-    
+
     def _humidity_to_transparency(self, humidity: pd.Series) -> pd.Series:
         """Convert humidity percentage to transparency factor (0-1)"""
         # Lower humidity = better transparency
         # 30% humidity = excellent (1.0)
         # 50% humidity = good (0.8)
-        # 70% humidity = fair (0.6)  
+        # 70% humidity = fair (0.6)
         # 90% humidity = poor (0.2)
-        
+
         transparency = np.where(
-            humidity <= 30, 1.0,
-            np.where(humidity <= 50, 0.8,
-                np.where(humidity <= 70, 0.6,
-                    np.where(humidity <= 85, 0.4, 0.2)
-                )
-            )
+            humidity <= 30,
+            1.0,
+            np.where(humidity <= 50, 0.8, np.where(humidity <= 70, 0.6, np.where(humidity <= 85, 0.4, 0.2))),
         )
-        
+
         return pd.Series(transparency, index=humidity.index)
-    
+
     def _visibility_to_transparency(self, visibility_m: pd.Series) -> pd.Series:
         """Convert visibility distance to transparency factor (0-1)"""
         # Convert meters to km
         visibility_km = visibility_m / 1000
-        
+
         # Visibility impact on transparency
         # 50+ km = excellent (1.0)
         # 30+ km = good (0.8)
         # 20+ km = fair (0.6)
         # 10+ km = poor (0.4)
         # <10 km = very poor (0.2)
-        
+
         transparency = np.where(
-            visibility_km >= 50, 1.0,
-            np.where(visibility_km >= 30, 0.8,
-                np.where(visibility_km >= 20, 0.6,
-                    np.where(visibility_km >= 10, 0.4, 0.2)
-                )
-            )
+            visibility_km >= 50,
+            1.0,
+            np.where(
+                visibility_km >= 30, 0.8, np.where(visibility_km >= 20, 0.6, np.where(visibility_km >= 10, 0.4, 0.2))
+            ),
         )
-        
+
         return pd.Series(transparency, index=visibility_m.index)
-    
+
     def _transparency_to_magnitude_limit(self, transparency_score: pd.Series) -> pd.Series:
         """Convert transparency score to limiting magnitude"""
         # Scale transparency score (0-100) to magnitude limit
         magnitude_range = MAGNITUDE_LIMIT_ZENITH_MAX - MAGNITUDE_LIMIT_ZENITH_MIN
-        
-        magnitude_limit = (
-            MAGNITUDE_LIMIT_ZENITH_MIN + 
-            (transparency_score / 100) * magnitude_range
-        )
-        
+
+        magnitude_limit = MAGNITUDE_LIMIT_ZENITH_MIN + (transparency_score / 100) * magnitude_range
+
         return magnitude_limit
-    
+
     def analyze_dew_point_alerts(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Analyze dew point conditions and generate alerts for astrophotography
         """
         result = df.copy()
-        
+
         temperature = result["temperature_2m"]
         dew_point = result["dew_point_2m"]
-        
+
         # Calculate temperature-dew point spread
         dew_point_spread = temperature - dew_point
-        
+
         # Dew risk levels
         dew_risk = np.where(
-            dew_point_spread <= 1, "CRITICAL",  # Dew formation imminent
-            np.where(dew_point_spread <= 2, "HIGH",  # High risk of dew
-                np.where(dew_point_spread <= 4, "MODERATE",  # Moderate risk
-                    np.where(dew_point_spread <= 8, "LOW", "MINIMAL")  # Low/minimal risk
-                )
-            )
+            dew_point_spread <= 1,
+            "CRITICAL",  # Dew formation imminent
+            np.where(
+                dew_point_spread <= 2,
+                "HIGH",  # High risk of dew
+                np.where(
+                    dew_point_spread <= 4,
+                    "MODERATE",  # Moderate risk
+                    np.where(dew_point_spread <= 8, "LOW", "MINIMAL"),  # Low/minimal risk
+                ),
+            ),
         )
-        
+
         # Dew risk score (0-100, higher = less risk)
         dew_risk_score = np.where(
-            dew_point_spread <= 1, 10,
-            np.where(dew_point_spread <= 2, 30,
-                np.where(dew_point_spread <= 4, 50,
-                    np.where(dew_point_spread <= 8, 70, 90)
-                )
-            )
+            dew_point_spread <= 1,
+            10,
+            np.where(
+                dew_point_spread <= 2, 30, np.where(dew_point_spread <= 4, 50, np.where(dew_point_spread <= 8, 70, 90))
+            ),
         )
-        
+
         result["dew_point_spread"] = dew_point_spread.round(1)
         result["dew_risk_level"] = dew_risk
         result["dew_risk_score"] = dew_risk_score
-        
+
         return result
-    
+
     def analyze_wind_tracking_impact(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Analyze wind impact on telescope tracking and mount stability
         """
         result = df.copy()
-        
+
         wind_speed = result["wind_speed_10m"]
-        wind_direction = result["wind_direction_10m"]
-        
+
         # Wind impact on tracking
         tracking_impact = np.where(
-            wind_speed <= 5, "EXCELLENT",  # No impact
-            np.where(wind_speed <= 10, "GOOD",  # Minimal impact
-                np.where(wind_speed <= 15, "FAIR",  # Some impact
-                    np.where(wind_speed <= 25, "POOR",  # Significant impact
-                        "CRITICAL"  # Severe impact
-                    )
-                )
-            )
+            wind_speed <= 5,
+            "EXCELLENT",  # No impact
+            np.where(
+                wind_speed <= 10,
+                "GOOD",  # Minimal impact
+                np.where(
+                    wind_speed <= 15,
+                    "FAIR",  # Some impact
+                    np.where(wind_speed <= 25, "POOR", "CRITICAL"),  # Significant impact  # Severe impact
+                ),
+            ),
         )
-        
+
         # Tracking stability score (0-100)
         tracking_score = np.where(
-            wind_speed <= 5, 95,
-            np.where(wind_speed <= 10, 80,
-                np.where(wind_speed <= 15, 60,
-                    np.where(wind_speed <= 25, 30, 10)
-                )
-            )
+            wind_speed <= 5,
+            95,
+            np.where(wind_speed <= 10, 80, np.where(wind_speed <= 15, 60, np.where(wind_speed <= 25, 30, 10))),
         )
-        
+
         # Wind gusts estimation (simple model)
         estimated_gusts = wind_speed * 1.3
-        
+
         result["wind_tracking_impact"] = tracking_impact
         result["tracking_stability_score"] = tracking_score
         result["estimated_wind_gusts"] = estimated_gusts.round(1)
-        
+
         return result
-    
+
     def generate_comprehensive_analysis(self, forecast_hours: int = 24) -> Optional[Dict]:
         """
         Generate comprehensive astrophotography weather analysis
@@ -536,28 +551,26 @@ class AstroWeatherAnalyzer:
                 # No weather data available - will trigger 202 pending response
                 logger.warning("Could not fetch weather data")
                 return None
-            
+
             df = weather_data["data"]
-            
+
             # Apply all analysis methods
             df = self.analyze_cloud_layers(df)
             df = self.calculate_seeing_forecast(df)
             df = self.calculate_transparency_forecast(df)
             df = self.analyze_dew_point_alerts(df)
             df = self.analyze_wind_tracking_impact(df)
-            
+
             # Convert datetime for JSON serialization
             df_json = df.copy()
             dt_series = cast(pd.Series, pd.to_datetime(df_json["datetime"], errors="coerce"))
-            df_json["datetime"] = dt_series.map(
-                lambda x: x.strftime("%Y-%m-%dT%H:%M:%S%z") if pd.notna(x) else None
-            )
-            
+            df_json["datetime"] = dt_series.map(lambda x: x.strftime("%Y-%m-%dT%H:%M:%S%z") if pd.notna(x) else None)
+
             # Create summary statistics
             current_conditions = self._generate_current_summary(df.iloc[0] if len(df) > 0 else None)
             best_periods = self._find_best_observation_periods(df)
             alerts = self._generate_weather_alerts(df)
-            
+
             return {
                 "location": weather_data["location"],
                 "generated_at": datetime.now().isoformat(),
@@ -565,18 +578,18 @@ class AstroWeatherAnalyzer:
                 "current_conditions": current_conditions,
                 "best_observation_periods": best_periods,
                 "weather_alerts": alerts,
-                "hourly_data": df_json.to_dict(orient="records")
+                "hourly_data": df_json.to_dict(orient="records"),
             }
-            
-        except Exception as e:
+
+        except Exception:
             logger.exception("Failed to generate comprehensive analysis")
             return None
-    
+
     def _generate_current_summary(self, current_row: Optional[pd.Series]) -> Dict:
         """Generate summary of current conditions"""
         if current_row is None:
             return {"status": "No current data available"}
-        
+
         return {
             "seeing_pickering": float(current_row.get("seeing_pickering", 0)),
             "transparency_score": float(current_row.get("transparency_score", 0)),
@@ -585,7 +598,7 @@ class AstroWeatherAnalyzer:
             "dew_risk_level": current_row.get("dew_risk_level", "UNKNOWN"),
             "dew_point_spread": float(current_row.get("dew_point_spread", 0)),
             "wind_tracking_impact": current_row.get("wind_tracking_impact", "UNKNOWN"),
-            "tracking_stability_score": float(current_row.get("tracking_stability_score", 0))
+            "tracking_stability_score": float(current_row.get("tracking_stability_score", 0)),
         }
 
     def _resolve_astronomical_night_window(self) -> Optional[Tuple[pd.Timestamp, pd.Timestamp]]:
@@ -627,7 +640,7 @@ class AstroWeatherAnalyzer:
 
         # Clamp to a sane range to avoid outliers creating unrealistic durations.
         return max(0.25, min(slot_hours, 3.0))
-    
+
     def _find_best_observation_periods(self, df: pd.DataFrame) -> List[Dict]:
         """Find the best periods for astrophotography within the forecast"""
         if len(df) == 0:
@@ -641,10 +654,10 @@ class AstroWeatherAnalyzer:
 
         # Calculate overall quality score
         working_df["overall_quality"] = (
-            working_df["seeing_pickering"] * 10 +  # Convert to percentage scale
-            working_df["transparency_score"] +
-            working_df["cloud_discrimination"] +
-            working_df["tracking_stability_score"]
+            working_df["seeing_pickering"] * 10  # Convert to percentage scale
+            + working_df["transparency_score"]
+            + working_df["cloud_discrimination"]
+            + working_df["tracking_stability_score"]
         ) / 4
 
         # Filter to only nighttime hours (is_day == 0)
@@ -658,8 +671,7 @@ class AstroWeatherAnalyzer:
         if night_window is not None:
             night_start, night_end = night_window
             nighttime_df = nighttime_df[
-                (nighttime_df["datetime"] >= night_start) &
-                (nighttime_df["datetime"] < night_end)
+                (nighttime_df["datetime"] >= night_start) & (nighttime_df["datetime"] < night_end)
             ].copy()
 
         # Find periods with quality > 70%
@@ -679,18 +691,19 @@ class AstroWeatherAnalyzer:
         current_period_qualities: List[float] = []
 
         def _finalize_current_period() -> None:
-            nonlocal current_period_start, current_period_last_slot, current_period_qualities
             if current_period_start is None or current_period_last_slot is None or len(current_period_qualities) == 0:
                 return
 
             period_end = current_period_last_slot + slot_delta
             duration_hours = (period_end - current_period_start).total_seconds() / 3600.0
-            periods.append({
-                "start": current_period_start.isoformat(),
-                "end": period_end.isoformat(),
-                "duration_hours": round(duration_hours, 2),
-                "average_quality": round(float(np.mean(current_period_qualities)), 3),
-            })
+            periods.append(
+                {
+                    "start": current_period_start.isoformat(),
+                    "end": period_end.isoformat(),
+                    "duration_hours": round(duration_hours, 2),
+                    "average_quality": round(float(np.mean(current_period_qualities)), 3),
+                }
+            )
 
         for _, row in good_periods.iterrows():
             row_dt = row["datetime"]
@@ -717,24 +730,25 @@ class AstroWeatherAnalyzer:
 
         # Hide periods that are too short to be practically useful for observation/imaging.
         periods = [
-            period for period in periods
+            period
+            for period in periods
             if float(period.get("duration_hours", 0.0)) >= ASTRO_BEST_PERIOD_MIN_DURATION_HOURS
         ]
 
         # Sort by quality then by duration and return top 5
         periods.sort(key=lambda x: (x["average_quality"], x["duration_hours"]), reverse=True)
         return periods[:5]
-    
+
     def _generate_weather_alerts(self, df: pd.DataFrame) -> List[Dict]:
         """Generate weather alerts for astrophotography conditions"""
         alerts = []
-        
+
         if len(df) == 0:
             return alerts
-        
+
         # Check next 6 hours for critical conditions
         next_6h = df.head(6)
-        
+
         # Dew alerts
         critical_dew = next_6h[next_6h["dew_risk_level"] == "CRITICAL"]
         if len(critical_dew) > 0:
@@ -746,7 +760,7 @@ class AstroWeatherAnalyzer:
                     language=self.language,
                 )
             )
-        
+
         # High wind alerts
         critical_wind = next_6h[next_6h["wind_tracking_impact"] == "CRITICAL"]
         if len(critical_wind) > 0:
@@ -758,7 +772,7 @@ class AstroWeatherAnalyzer:
                     language=self.language,
                 )
             )
-        
+
         # Poor seeing alerts
         poor_seeing = next_6h[next_6h["seeing_pickering"] <= 3]
         if len(poor_seeing) > 0:
@@ -770,7 +784,7 @@ class AstroWeatherAnalyzer:
                     language=self.language,
                 )
             )
-        
+
         # Low transparency alerts
         poor_transparency = next_6h[next_6h["transparency_score"] <= 30]
         if len(poor_transparency) > 0:
@@ -782,7 +796,7 @@ class AstroWeatherAnalyzer:
                     language=self.language,
                 )
             )
-        
+
         return alerts
 
 
@@ -851,7 +865,9 @@ def get_astro_weather_analysis(hours: int = 24, language: str = "en") -> Optiona
         _ASTRO_ANALYSIS_LAST_FAILURE_TS[cache_key] = time.time()
         cached = _get_last_successful_analysis(hours, language)
         if cached is not None:
-            logger.warning(f"DEGRADED: Serving STALE astro weather analysis (exception occurred) {cache_key}: {str(e)[:80]}")
+            logger.warning(
+                f"DEGRADED: Serving STALE astro weather analysis (exception occurred) {cache_key}: {str(e)[:80]}"
+            )
             logger.debug("Exception traceback:", exc_info=True)
             return cached
         logger.error(f"CRITICAL: No astro weather analysis available (exception, no cache) {cache_key}")
@@ -871,6 +887,6 @@ def get_current_astro_conditions() -> Optional[Dict]:
         if analysis:
             return analysis["current_conditions"]
         return None
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to get current astro conditions")
         return None

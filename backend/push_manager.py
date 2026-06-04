@@ -7,6 +7,7 @@ Storage format:
   public_key  - URL-safe base64url of the uncompressed EC point (65 bytes, no padding)
                 sent to the browser as applicationServerKey
 """
+
 import base64
 import json
 import os
@@ -24,10 +25,12 @@ _VAPID_CONTACT_WARNING_EMITTED = False
 def get_vapid_claims_email() -> str:
     """Return the VAPID contact URI, reading from persistent app settings."""
     from app_settings import get_app_settings
+
     raw = get_app_settings().get('vapid_contact_email', '').strip()
     if not raw:
         return 'mailto:admin@localhost'
     return raw if raw.startswith(('mailto:', 'https://')) else f'mailto:{raw}'
+
 
 _vapid_keys: dict = {}
 
@@ -39,6 +42,7 @@ def _pem_to_raw_b64(pem_str: str) -> str:
     encoded as base64url - it does NOT parse PEM.
     """
     from cryptography.hazmat.primitives.serialization import load_pem_private_key  # type: ignore[import]
+
     key = load_pem_private_key(pem_str.encode('utf-8'), password=None)
     raw_bytes = key.private_numbers().private_value.to_bytes(32, 'big')
     return base64.urlsafe_b64encode(raw_bytes).rstrip(b'=').decode('utf-8')
@@ -68,6 +72,7 @@ def load_or_generate_vapid_keys() -> dict:
     global _vapid_keys, _VAPID_CONTACT_WARNING_EMITTED
     if not _VAPID_CONTACT_WARNING_EMITTED:
         from app_settings import get_app_settings
+
         if not get_app_settings().get('vapid_contact_email', '').strip():
             _VAPID_CONTACT_WARNING_EMITTED = True
             logger.warning(
@@ -114,6 +119,7 @@ def get_vapid_public_key() -> str:
 def get_vapid_contact_status() -> dict:
     """Return whether the VAPID contact email is properly configured for push delivery."""
     from app_settings import get_app_settings
+
     raw = get_app_settings().get('vapid_contact_email', '').strip()
     if not raw:
         return {'ok': False, 'reason': 'not_set'}
@@ -140,14 +146,13 @@ def send_push(subscription_info: dict, payload: dict, ttl: int = 0, urgency: str
     try:
         from pywebpush import webpush
 
-        keys     = load_or_generate_vapid_keys()
+        keys = load_or_generate_vapid_keys()
         endpoint = subscription_info.get('endpoint', '')
-        parsed   = urlparse(endpoint)
-        aud      = f"{parsed.scheme}://{parsed.netloc}"
+        parsed = urlparse(endpoint)
+        aud = f"{parsed.scheme}://{parsed.netloc}"
 
         logger.debug(
-            f"Sending push to {endpoint[:60]} | trigger={payload.get('tag','?')} "
-            f"ttl={ttl}s urgency={urgency}"
+            f"Sending push to {endpoint[:60]} | trigger={payload.get('tag', '?')} " f"ttl={ttl}s urgency={urgency}"
         )
 
         webpush(

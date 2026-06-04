@@ -1,4 +1,5 @@
 """Catalogue aliases resolver for cross-catalogue object matching."""
+
 import json
 import os
 import re

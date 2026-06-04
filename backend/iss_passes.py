@@ -26,7 +26,6 @@ from constants import CACHE_TTL, DATA_DIR_CACHE
 from logging_config import get_logger
 from utils import load_json_file, save_json_file
 
-
 logger = get_logger(__name__)
 
 SKYFIELD_CACHE_DIR = os.path.join(DATA_DIR_CACHE, 'skyfield')
@@ -252,11 +251,7 @@ class ISSPassService:
         self.longitude = longitude
         self.elevation_m = elevation_m
         self.timezone = ZoneInfo(timezone_str)
-        self.location = EarthLocation(
-            lat=latitude * u.deg,
-            lon=longitude * u.deg,
-            height=elevation_m * u.m
-        )
+        self.location = EarthLocation(lat=latitude * u.deg, lon=longitude * u.deg, height=elevation_m * u.m)
 
     def get_report(self, days: int = DEFAULT_FORECAST_DAYS) -> Dict[str, Any]:
         """Generate ISS pass report for the requested window."""
@@ -368,7 +363,8 @@ class ISSPassService:
                         source_url=tle_url,
                     )
                     raise RuntimeError(
-                        f"Celestrak returned HTTP {status_code}; stopping TLE queries and requiring manual investigation"
+                        f"Celestrak returned HTTP {status_code};"
+                        " stopping TLE queries and requiring manual investigation"
                     )
 
                 response.raise_for_status()
@@ -381,10 +377,9 @@ class ISSPassService:
             except Exception as exc:
                 if _is_celestrak_url(tle_url):
                     status_message = str(exc).upper()
-                    if (
-                        isinstance(exc, RuntimeError)
-                        and "CELESTRAK RETURNED HTTP" in status_message
-                    ) or ("403" in status_message):
+                    if (isinstance(exc, RuntimeError) and "CELESTRAK RETURNED HTTP" in status_message) or (
+                        "403" in status_message
+                    ):
                         _set_tle_error_timestamp()
                         _set_celestrak_block(
                             status_code=403 if "403" in status_message else 0,
@@ -484,7 +479,9 @@ class ISSPassService:
 
         raise ValueError("Could not parse ISS TLE from response payload")
 
-    def _build_passes(self, event_times, event_types, satellite: EarthSatellite, observer, ts, eph) -> List[Dict[str, Any]]:
+    def _build_passes(
+        self, event_times, event_types, satellite: EarthSatellite, observer, ts, eph
+    ) -> List[Dict[str, Any]]:
         """Build normalized pass objects from Skyfield rise/culminate/set events."""
         passes: List[Dict[str, Any]] = []
         current: Dict[str, Any] = {}
@@ -671,7 +668,8 @@ class ISSPassService:
         )
 
         candidate_indices = [
-            idx for idx, sample in enumerate(samples)
+            idx
+            for idx, sample in enumerate(samples)
             if sample["sun_altitude_deg"] >= SOLAR_TRANSIT_MIN_SUN_ALTITUDE_DEG
             and sample["iss_altitude_deg"] >= GEOMETRIC_PASS_MIN_ALTITUDE_DEG
             and sample["separation_deg"] <= sample["solar_radius_deg"]
@@ -696,7 +694,8 @@ class ISSPassService:
         )
 
         refined_candidates = [
-            sample for sample in refined_samples
+            sample
+            for sample in refined_samples
             if sample["sun_altitude_deg"] >= SOLAR_TRANSIT_MIN_SUN_ALTITUDE_DEG
             and sample["iss_altitude_deg"] >= GEOMETRIC_PASS_MIN_ALTITUDE_DEG
             and sample["separation_deg"] <= sample["solar_radius_deg"]
@@ -724,7 +723,9 @@ class ISSPassService:
             "is_visible": True,
         }
 
-    def _sample_time_range(self, start_utc: datetime, end_utc: datetime, step_seconds: float, sampler) -> List[Dict[str, Any]]:
+    def _sample_time_range(
+        self, start_utc: datetime, end_utc: datetime, step_seconds: float, sampler
+    ) -> List[Dict[str, Any]]:
         """Sample a time range inclusively with a fixed step."""
         if end_utc <= start_utc:
             return [sampler(start_utc)]
@@ -736,7 +737,9 @@ class ISSPassService:
             samples.append(sampler(end_utc))
         return samples
 
-    def _sample_solar_transit_observation(self, when_utc: datetime, satellite: EarthSatellite, observer, ts, eph) -> Dict[str, Any]:
+    def _sample_solar_transit_observation(
+        self, when_utc: datetime, satellite: EarthSatellite, observer, ts, eph
+    ) -> Dict[str, Any]:
         """Sample ISS/Sun geometry for solar-transit detection at one instant."""
         event_time = ts.from_datetime(when_utc)
         topocentric = (satellite - observer).at(event_time)
@@ -862,7 +865,8 @@ class ISSPassService:
         )
 
         candidate_indices = [
-            idx for idx, sample in enumerate(samples)
+            idx
+            for idx, sample in enumerate(samples)
             if sample["moon_altitude_deg"] >= LUNAR_TRANSIT_MIN_MOON_ALTITUDE_DEG
             and sample["iss_altitude_deg"] >= GEOMETRIC_PASS_MIN_ALTITUDE_DEG
             and sample["separation_deg"] <= sample["lunar_radius_deg"]
@@ -887,7 +891,8 @@ class ISSPassService:
         )
 
         refined_candidates = [
-            sample for sample in refined_samples
+            sample
+            for sample in refined_samples
             if sample["moon_altitude_deg"] >= LUNAR_TRANSIT_MIN_MOON_ALTITUDE_DEG
             and sample["iss_altitude_deg"] >= GEOMETRIC_PASS_MIN_ALTITUDE_DEG
             and sample["separation_deg"] <= sample["lunar_radius_deg"]
@@ -916,7 +921,9 @@ class ISSPassService:
             "is_visible": True,
         }
 
-    def _sample_lunar_transit_observation(self, when_utc: datetime, satellite: EarthSatellite, observer, ts, eph) -> Dict[str, Any]:
+    def _sample_lunar_transit_observation(
+        self, when_utc: datetime, satellite: EarthSatellite, observer, ts, eph
+    ) -> Dict[str, Any]:
         """Sample ISS/Moon geometry for lunar-transit detection at one instant."""
         event_time = ts.from_datetime(when_utc)
         topocentric = (satellite - observer).at(event_time)
@@ -940,8 +947,10 @@ class ISSPassService:
             moon_ra, moon_dec, _ = moon_astrometric.apparent().radec()
             sun_ra, sun_dec, _ = sun_astrometric.apparent().radec()
             elongation_deg = self._angular_separation_deg(
-                float(moon_dec.degrees), float(moon_ra.hours) * 15.0,
-                float(sun_dec.degrees), float(sun_ra.hours) * 15.0,
+                float(moon_dec.degrees),
+                float(moon_ra.hours) * 15.0,
+                float(sun_dec.degrees),
+                float(sun_ra.hours) * 15.0,
             )
             moon_illumination_pct = 50.0 * (1.0 - cos(radians(elongation_deg))) * 100.0 / 100.0
             moon_illumination_pct = max(0.0, min(100.0, moon_illumination_pct))
@@ -976,7 +985,9 @@ class ISSPassService:
             pass
         return LUNAR_ANGULAR_RADIUS_FALLBACK_DEG
 
-    def _angular_separation_deg(self, altitude1_deg: float, azimuth1_deg: float, altitude2_deg: float, azimuth2_deg: float) -> float:
+    def _angular_separation_deg(
+        self, altitude1_deg: float, azimuth1_deg: float, altitude2_deg: float, azimuth2_deg: float
+    ) -> float:
         """Compute angular separation in local alt/az coordinates."""
         alt1 = radians(altitude1_deg)
         alt2 = radians(altitude2_deg)
@@ -1043,10 +1054,22 @@ class ISSPassService:
     def _azimuth_to_cardinal(self, azimuth_deg: float) -> str:
         """Convert azimuth in degrees to 16-point compass direction."""
         labels = [
-            "N", "NNE", "NE", "ENE",
-            "E", "ESE", "SE", "SSE",
-            "S", "SSW", "SW", "WSW",
-            "W", "WNW", "NW", "NNW",
+            "N",
+            "NNE",
+            "NE",
+            "ENE",
+            "E",
+            "ESE",
+            "SE",
+            "SSE",
+            "S",
+            "SSW",
+            "SW",
+            "WSW",
+            "W",
+            "WNW",
+            "NW",
+            "NNW",
         ]
         normalized = azimuth_deg % 360.0
         index = int((normalized + 11.25) // 22.5) % 16
@@ -1094,7 +1117,9 @@ class ISSPassService:
             return "Twilight"
         return "Daylight"
 
-    def _compute_visibility_score(self, peak_altitude_deg: float, duration_minutes: float, sun_altitude_deg: float) -> float:
+    def _compute_visibility_score(
+        self, peak_altitude_deg: float, duration_minutes: float, sun_altitude_deg: float
+    ) -> float:
         """Compute a user-facing visibility score in range 0-100."""
         altitude_component = min(max((peak_altitude_deg - MIN_EVENT_ALTITUDE_DEG) / 70.0, 0.0), 1.0)
         duration_component = min(max(duration_minutes / 10.0, 0.0), 1.0)
@@ -1225,7 +1250,8 @@ def get_current_position(
             obs_earth_loc = EarthLocation(lat=latitude * u.deg, lon=longitude * u.deg, height=elevation_m * u.m)
             astro_time = AstroTime(now_utc)
             frame = AltAz(obstime=astro_time, location=obs_earth_loc)
-            sun_altitude_deg = float(cast(Angle, get_sun(astro_time).transform_to(frame).alt).deg)  # type: ignore[arg-type]
+            sun_alt = get_sun(astro_time).transform_to(frame).alt
+            sun_altitude_deg = float(cast(Angle, sun_alt).deg)  # type: ignore[arg-type]
             is_sunlit = True
 
         is_visible = (

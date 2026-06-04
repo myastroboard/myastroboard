@@ -98,7 +98,7 @@ def _trim_log_file(log_path: str, max_lines: int) -> None:
     """Keep only the last *max_lines* non-empty lines in *log_path*."""
     try:
         with open(log_path, 'r', encoding='utf-8') as f:
-            lines = [l for l in f.readlines() if l.strip()]
+            lines = [line for line in f.readlines() if line.strip()]
         if len(lines) > max_lines:
             with open(log_path, 'w', encoding='utf-8') as f:
                 f.writelines(lines[-max_lines:])

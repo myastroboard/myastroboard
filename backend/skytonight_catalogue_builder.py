@@ -7,14 +7,18 @@ from datetime import datetime, timezone
 import json
 import os
 import re
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from logging_config import get_logger
 from skytonight_bodies import build_body_targets
 from skytonight_comets import build_comet_targets
 from skytonight_models import SkyTonightCoordinates, SkyTonightTarget
-from skytonight_targets import normalize_catalogue_name, normalize_object_name, save_targets_dataset, choose_preferred_catalogue_name
-
+from skytonight_targets import (
+    normalize_catalogue_name,
+    normalize_object_name,
+    save_targets_dataset,
+    choose_preferred_catalogue_name,
+)
 
 logger = get_logger(__name__)
 
@@ -25,45 +29,375 @@ IDENTIFIER_PATTERN = re.compile(r'\b(M\s*\d+|NGC\s*\d+|IC\s*\d+)\b', re.IGNORECA
 
 # ── Herschel 400 - Astronomical League program (NGC objects only) ─────────────
 # Source: https://www.astroleague.org/herschel-400-observing-program/
-_HERSCHEL400_NGC: frozenset = frozenset({
-     40,  129,  136,  157,  185,  188,  205,  225,  246,  247,
-    253,  278,  288,  300,  404,  436,  457,  524,  559,  584,
-    596,  598,  613,  615,  628,  636,  650,  651,  654,  659,
-    663,  720,  752,  772,  779,  869,  884,  891,  908,  936,
-   1003, 1023, 1027, 1055, 1084, 1245, 1300, 1342, 1444, 1502,
-   1513, 1528, 1545, 1647, 1664, 1788, 1817, 1857, 1907, 1931,
-   1961, 2022, 2024, 2126, 2129, 2158, 2169, 2185, 2186, 2194,
-   2215, 2232, 2244, 2245, 2251, 2261, 2266, 2281, 2286, 2304,
-   2311, 2324, 2335, 2343, 2353, 2354, 2355, 2360, 2362, 2371,
-   2372, 2392, 2395, 2403, 2419, 2420, 2421, 2422, 2423, 2438,
-   2440, 2479, 2489, 2506, 2509, 2527, 2539, 2548, 2571, 2613,
-   2627, 2655, 2681, 2683, 2742, 2768, 2775, 2782, 2787, 2811,
-   2841, 2859, 2903, 2950, 2964, 2974, 2976, 2985, 3034, 3077,
-   3079, 3115, 3147, 3166, 3169, 3184, 3193, 3198, 3227, 3242,
-   3245, 3277, 3294, 3310, 3344, 3377, 3379, 3384, 3395, 3412,
-   3414, 3432, 3489, 3504, 3521, 3593, 3607, 3608, 3610, 3613,
-   3619, 3621, 3626, 3628, 3631, 3640, 3655, 3665, 3675, 3686,
-   3705, 3726, 3729, 3810, 3813, 3877, 3893, 3898, 3938, 3941,
-   3945, 3949, 3953, 3962, 3982, 3992, 3998, 4026, 4027, 4030,
-   4036, 4038, 4039, 4041, 4051, 4085, 4088, 4102, 4111, 4143,
-   4147, 4150, 4151, 4157, 4179, 4203, 4214, 4216, 4245, 4251,
-   4258, 4261, 4273, 4274, 4278, 4281, 4293, 4294, 4298, 4302,
-   4303, 4314, 4346, 4350, 4361, 4365, 4371, 4378, 4380, 4387,
-   4388, 4394, 4395, 4414, 4419, 4429, 4435, 4436, 4438, 4442,
-   4448, 4449, 4450, 4460, 4473, 4477, 4478, 4485, 4490, 4494,
-   4526, 4527, 4531, 4536, 4546, 4550, 4559, 4564, 4565, 4570,
-   4596, 4618, 4631, 4636, 4643, 4654, 4656, 4660, 4665, 4666,
-   4689, 4697, 4698, 4699, 4710, 4725, 4747, 4753, 4754, 4762,
-   4772, 4781, 4800, 4845, 4856, 4866, 4900, 4958, 4995, 5005,
-   5033, 5054, 5195, 5248, 5273, 5322, 5363, 5364, 5371, 5377,
-   5389, 5395, 5422, 5448, 5473, 5474, 5557, 5566, 5576, 5631,
-   5638, 5645, 5676, 5689, 5694, 5746, 5775, 5806, 5813, 5831,
-   5838, 5846, 5854, 5866, 5907, 5965, 6015, 6118, 6207, 6217,
-   6229, 6503, 6543, 6654, 6742, 6946, 6951, 7000, 7008, 7009,
-   7044, 7062, 7086, 7128, 7139, 7142, 7160, 7209, 7217, 7243,
-   7296, 7331, 7380, 7448, 7479, 7510, 7606, 7619, 7626, 7662,
-   7686, 7723, 7727, 7789, 7790,
-})
+_HERSCHEL400_NGC: frozenset = frozenset(
+    {
+        40,
+        129,
+        136,
+        157,
+        185,
+        188,
+        205,
+        225,
+        246,
+        247,
+        253,
+        278,
+        288,
+        300,
+        404,
+        436,
+        457,
+        524,
+        559,
+        584,
+        596,
+        598,
+        613,
+        615,
+        628,
+        636,
+        650,
+        651,
+        654,
+        659,
+        663,
+        720,
+        752,
+        772,
+        779,
+        869,
+        884,
+        891,
+        908,
+        936,
+        1003,
+        1023,
+        1027,
+        1055,
+        1084,
+        1245,
+        1300,
+        1342,
+        1444,
+        1502,
+        1513,
+        1528,
+        1545,
+        1647,
+        1664,
+        1788,
+        1817,
+        1857,
+        1907,
+        1931,
+        1961,
+        2022,
+        2024,
+        2126,
+        2129,
+        2158,
+        2169,
+        2185,
+        2186,
+        2194,
+        2215,
+        2232,
+        2244,
+        2245,
+        2251,
+        2261,
+        2266,
+        2281,
+        2286,
+        2304,
+        2311,
+        2324,
+        2335,
+        2343,
+        2353,
+        2354,
+        2355,
+        2360,
+        2362,
+        2371,
+        2372,
+        2392,
+        2395,
+        2403,
+        2419,
+        2420,
+        2421,
+        2422,
+        2423,
+        2438,
+        2440,
+        2479,
+        2489,
+        2506,
+        2509,
+        2527,
+        2539,
+        2548,
+        2571,
+        2613,
+        2627,
+        2655,
+        2681,
+        2683,
+        2742,
+        2768,
+        2775,
+        2782,
+        2787,
+        2811,
+        2841,
+        2859,
+        2903,
+        2950,
+        2964,
+        2974,
+        2976,
+        2985,
+        3034,
+        3077,
+        3079,
+        3115,
+        3147,
+        3166,
+        3169,
+        3184,
+        3193,
+        3198,
+        3227,
+        3242,
+        3245,
+        3277,
+        3294,
+        3310,
+        3344,
+        3377,
+        3379,
+        3384,
+        3395,
+        3412,
+        3414,
+        3432,
+        3489,
+        3504,
+        3521,
+        3593,
+        3607,
+        3608,
+        3610,
+        3613,
+        3619,
+        3621,
+        3626,
+        3628,
+        3631,
+        3640,
+        3655,
+        3665,
+        3675,
+        3686,
+        3705,
+        3726,
+        3729,
+        3810,
+        3813,
+        3877,
+        3893,
+        3898,
+        3938,
+        3941,
+        3945,
+        3949,
+        3953,
+        3962,
+        3982,
+        3992,
+        3998,
+        4026,
+        4027,
+        4030,
+        4036,
+        4038,
+        4039,
+        4041,
+        4051,
+        4085,
+        4088,
+        4102,
+        4111,
+        4143,
+        4147,
+        4150,
+        4151,
+        4157,
+        4179,
+        4203,
+        4214,
+        4216,
+        4245,
+        4251,
+        4258,
+        4261,
+        4273,
+        4274,
+        4278,
+        4281,
+        4293,
+        4294,
+        4298,
+        4302,
+        4303,
+        4314,
+        4346,
+        4350,
+        4361,
+        4365,
+        4371,
+        4378,
+        4380,
+        4387,
+        4388,
+        4394,
+        4395,
+        4414,
+        4419,
+        4429,
+        4435,
+        4436,
+        4438,
+        4442,
+        4448,
+        4449,
+        4450,
+        4460,
+        4473,
+        4477,
+        4478,
+        4485,
+        4490,
+        4494,
+        4526,
+        4527,
+        4531,
+        4536,
+        4546,
+        4550,
+        4559,
+        4564,
+        4565,
+        4570,
+        4596,
+        4618,
+        4631,
+        4636,
+        4643,
+        4654,
+        4656,
+        4660,
+        4665,
+        4666,
+        4689,
+        4697,
+        4698,
+        4699,
+        4710,
+        4725,
+        4747,
+        4753,
+        4754,
+        4762,
+        4772,
+        4781,
+        4800,
+        4845,
+        4856,
+        4866,
+        4900,
+        4958,
+        4995,
+        5005,
+        5033,
+        5054,
+        5195,
+        5248,
+        5273,
+        5322,
+        5363,
+        5364,
+        5371,
+        5377,
+        5389,
+        5395,
+        5422,
+        5448,
+        5473,
+        5474,
+        5557,
+        5566,
+        5576,
+        5631,
+        5638,
+        5645,
+        5676,
+        5689,
+        5694,
+        5746,
+        5775,
+        5806,
+        5813,
+        5831,
+        5838,
+        5846,
+        5854,
+        5866,
+        5907,
+        5965,
+        6015,
+        6118,
+        6207,
+        6217,
+        6229,
+        6503,
+        6543,
+        6654,
+        6742,
+        6946,
+        6951,
+        7000,
+        7008,
+        7009,
+        7044,
+        7062,
+        7086,
+        7128,
+        7139,
+        7142,
+        7160,
+        7209,
+        7217,
+        7243,
+        7296,
+        7331,
+        7380,
+        7448,
+        7479,
+        7510,
+        7606,
+        7619,
+        7626,
+        7662,
+        7686,
+        7723,
+        7727,
+        7789,
+        7790,
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -124,8 +458,6 @@ def _normalize_identifier(identifier: str) -> str:
     if upper.startswith('C') and upper[1:].strip().isdigit():
         return f'C {int(upper[1:].strip())}'
     return text
-
-
 
 
 def _collect_catalogue_names(row: PyOngcRow, caldwell_map: Optional[Dict[str, str]] = None) -> Dict[str, str]:
@@ -389,7 +721,9 @@ def _apply_cross_refs(
     return result
 
 
-def build_targets_from_rows(rows: Iterable[PyOngcRow], caldwell_map: Optional[Dict[str, str]] = None) -> List[SkyTonightTarget]:
+def build_targets_from_rows(
+    rows: Iterable[PyOngcRow], caldwell_map: Optional[Dict[str, str]] = None
+) -> List[SkyTonightTarget]:
     """Normalize PyOngc rows into deduplicated SkyTonight targets."""
     targets_by_key: Dict[Tuple[str, str], SkyTonightTarget] = {}
 
@@ -457,20 +791,36 @@ def _load_pyongc_rows() -> List[PyOngcRow]:
         magnitudes = getattr(dso, 'magnitudes', (None, None, None, None, None))
         identifiers = getattr(dso, 'identifiers', (None, None, None, None, None))
 
-        rows.append(PyOngcRow(
-            name=str(getattr(dso, 'name', '') or '').strip(),
-            object_type=str(getattr(dso, 'type', '') or '').strip(),
-            constellation=str(getattr(dso, 'constellation', '') or '').strip(),
-            ra_hours=ra_hours,
-            dec_degrees=dec_degrees,
-            magnitude=_safe_float(magnitudes[1] if len(magnitudes) > 1 else None) or _safe_float(magnitudes[0] if len(magnitudes) > 0 else None),
-            size_arcmin=_safe_float(dimensions[0] if len(dimensions) > 0 else None),
-            messier=_normalize_identifier(str(identifiers[0])) if len(identifiers) > 0 and identifiers[0] is not None else None,
-            ngc_names=[_normalize_identifier(value) for value in _coerce_identifier_list(identifiers[1] if len(identifiers) > 1 else [])],
-            ic_names=[_normalize_identifier(value) for value in _coerce_identifier_list(identifiers[2] if len(identifiers) > 2 else [])],
-            common_names=_coerce_identifier_list(identifiers[3] if len(identifiers) > 3 else []),
-            other_identifiers=[_normalize_identifier(value) for value in _coerce_identifier_list(identifiers[4] if len(identifiers) > 4 else [])],
-        ))
+        rows.append(
+            PyOngcRow(
+                name=str(getattr(dso, 'name', '') or '').strip(),
+                object_type=str(getattr(dso, 'type', '') or '').strip(),
+                constellation=str(getattr(dso, 'constellation', '') or '').strip(),
+                ra_hours=ra_hours,
+                dec_degrees=dec_degrees,
+                magnitude=_safe_float(magnitudes[1] if len(magnitudes) > 1 else None)
+                or _safe_float(magnitudes[0] if len(magnitudes) > 0 else None),
+                size_arcmin=_safe_float(dimensions[0] if len(dimensions) > 0 else None),
+                messier=(
+                    _normalize_identifier(str(identifiers[0]))
+                    if len(identifiers) > 0 and identifiers[0] is not None
+                    else None
+                ),
+                ngc_names=[
+                    _normalize_identifier(value)
+                    for value in _coerce_identifier_list(identifiers[1] if len(identifiers) > 1 else [])
+                ],
+                ic_names=[
+                    _normalize_identifier(value)
+                    for value in _coerce_identifier_list(identifiers[2] if len(identifiers) > 2 else [])
+                ],
+                common_names=_coerce_identifier_list(identifiers[3] if len(identifiers) > 3 else []),
+                other_identifiers=[
+                    _normalize_identifier(value)
+                    for value in _coerce_identifier_list(identifiers[4] if len(identifiers) > 4 else [])
+                ],
+            )
+        )
 
     logger.debug(f'Loaded {len(rows)} PyOngc deep-sky rows for SkyTonight')
     return rows
@@ -527,18 +877,20 @@ def _build_standalone_targets_from_json(filename: str, catalogue_key: str) -> Li
         if not canonical_name:
             skipped += 1
             continue
-        parsed.append({
-            'name': name,
-            'canonical_name': canonical_name,
-            'ra_h': ra_h,
-            'dec_d': dec_d,
-            'size_arcmin': _safe_float(entry.get('size_arcmin')),
-            'mag': _safe_float(entry.get('mag')),
-            'object_type': str(entry.get('type') or 'Unknown').strip(),
-            'description': str(entry.get('description') or '').strip(),
-            'constellation': str(entry.get('constellation') or '').strip(),
-            'extra_cats': [str(c) for c in (entry.get('extra_catalogues') or []) if c],
-        })
+        parsed.append(
+            {
+                'name': name,
+                'canonical_name': canonical_name,
+                'ra_h': ra_h,
+                'dec_d': dec_d,
+                'size_arcmin': _safe_float(entry.get('size_arcmin')),
+                'mag': _safe_float(entry.get('mag')),
+                'object_type': str(entry.get('type') or 'Unknown').strip(),
+                'description': str(entry.get('description') or '').strip(),
+                'constellation': str(entry.get('constellation') or '').strip(),
+                'extra_cats': [str(c) for c in (entry.get('extra_catalogues') or []) if c],
+            }
+        )
 
     # Phase 2 - batch-compute constellations for entries that have none
     missing_idx = [i for i, e in enumerate(parsed) if not e['constellation']]
@@ -546,8 +898,9 @@ def _build_standalone_targets_from_json(filename: str, catalogue_key: str) -> Li
         try:
             import numpy as np
             from astropy.coordinates import SkyCoord, get_constellation
-            ras  = np.array([parsed[i]['ra_h'] * 15.0 for i in missing_idx])
-            decs = np.array([parsed[i]['dec_d']       for i in missing_idx])
+
+            ras = np.array([parsed[i]['ra_h'] * 15.0 for i in missing_idx])
+            decs = np.array([parsed[i]['dec_d'] for i in missing_idx])
             coords = SkyCoord(ra=ras, dec=decs, unit='deg')
             names = get_constellation(coords)
             for i, con in zip(missing_idx, names):
@@ -573,21 +926,23 @@ def _build_standalone_targets_from_json(filename: str, catalogue_key: str) -> Li
 
         preferred_name = e['description'] if use_common_name else e['name']
         all_catalogues = sorted({catalogue_key, *e['extra_cats'], *catalogue_names.keys()})
-        targets.append(SkyTonightTarget(
-            target_id=f"dso-{catalogue_key.lower()}-{e['canonical_name']}",
-            category='deep_sky',
-            object_type=e['object_type'],
-            preferred_name=preferred_name,
-            catalogue_names=catalogue_names,
-            aliases=sorted({e['name'], e['description']} - {''}),
-            constellation=e['constellation'],
-            magnitude=e['mag'],
-            size_arcmin=e['size_arcmin'],
-            coordinates=SkyTonightCoordinates(ra_hours=e['ra_h'], dec_degrees=e['dec_d']),
-            source_catalogues=all_catalogues,
-            translation_key=f"skytonight.type_{normalize_object_name(e['object_type']) or 'unknown'}",
-            metadata={'source': catalogue_key},
-        ))
+        targets.append(
+            SkyTonightTarget(
+                target_id=f"dso-{catalogue_key.lower()}-{e['canonical_name']}",
+                category='deep_sky',
+                object_type=e['object_type'],
+                preferred_name=preferred_name,
+                catalogue_names=catalogue_names,
+                aliases=sorted({e['name'], e['description']} - {''}),
+                constellation=e['constellation'],
+                magnitude=e['mag'],
+                size_arcmin=e['size_arcmin'],
+                coordinates=SkyTonightCoordinates(ra_hours=e['ra_h'], dec_degrees=e['dec_d']),
+                source_catalogues=all_catalogues,
+                translation_key=f"skytonight.type_{normalize_object_name(e['object_type']) or 'unknown'}",
+                metadata={'source': catalogue_key},
+            )
+        )
 
     if skipped:
         logger.warning(f'{filename}: skipped {skipped} invalid entries')
@@ -607,27 +962,60 @@ def build_and_save_default_dataset(
 
     # Standalone targets: objects with no NGC/IC identifier.
     # Each catalogue has its own JSON; objects selected by Gary Imm are tagged via extra_catalogues.
-    standalone_garyimm       = _build_standalone_targets_from_json('garyimm_standalone.json', 'GaryImm')
-    standalone_sharpless     = _build_standalone_targets_from_json('sharpless.json', 'Sharpless')
-    standalone_barnard       = _build_standalone_targets_from_json('barnard.json', 'Barnard')
-    standalone_vdb           = _build_standalone_targets_from_json('vdb.json', 'vdB')
-    standalone_abell_pne     = _build_standalone_targets_from_json('abell_pne.json', 'AbellPNe')
+    standalone_garyimm = _build_standalone_targets_from_json('garyimm_standalone.json', 'GaryImm')
+    standalone_sharpless = _build_standalone_targets_from_json('sharpless.json', 'Sharpless')
+    standalone_barnard = _build_standalone_targets_from_json('barnard.json', 'Barnard')
+    standalone_vdb = _build_standalone_targets_from_json('vdb.json', 'vdB')
+    standalone_abell_pne = _build_standalone_targets_from_json('abell_pne.json', 'AbellPNe')
     standalone_abell_clusters = _build_standalone_targets_from_json('abell_clusters.json', 'AbellClusters')
     standalone_targets = [
-        *standalone_garyimm, *standalone_sharpless, *standalone_barnard, *standalone_vdb,
-        *standalone_abell_pne, *standalone_abell_clusters,
+        *standalone_garyimm,
+        *standalone_sharpless,
+        *standalone_barnard,
+        *standalone_vdb,
+        *standalone_abell_pne,
+        *standalone_abell_clusters,
     ]
 
     body_targets = build_body_targets()
     comet_targets = build_comet_targets(source_mode=comet_source_mode)
     all_targets = [*deep_sky_targets, *standalone_targets, *body_targets, *comet_targets]
 
-    comet_sources = sorted({str(target.metadata.get('source') or '') for target in comet_targets if isinstance(target.metadata, dict) and target.metadata.get('source')})
-    body_sources = sorted({str(target.metadata.get('source') or '') for target in body_targets if isinstance(target.metadata, dict) and target.metadata.get('source')})
+    comet_sources = sorted(
+        {
+            str(target.metadata.get('source') or '')
+            for target in comet_targets
+            if isinstance(target.metadata, dict) and target.metadata.get('source')
+        }
+    )
+    body_sources = sorted(
+        {
+            str(target.metadata.get('source') or '')
+            for target in body_targets
+            if isinstance(target.metadata, dict) and target.metadata.get('source')
+        }
+    )
     all_dso_targets = [*deep_sky_targets, *standalone_targets]
-    cross_ref_sources = sorted(cat for cat in ('AbellClusters', 'AbellPNe', 'Arp', 'Barnard', 'GaryImm', 'Herschel400', 'LBN', 'Pensack500', 'Sharpless', 'vdB') if any(cat in t.source_catalogues for t in all_dso_targets))
+    cross_ref_sources = sorted(
+        cat
+        for cat in (
+            'AbellClusters',
+            'AbellPNe',
+            'Arp',
+            'Barnard',
+            'GaryImm',
+            'Herschel400',
+            'LBN',
+            'Pensack500',
+            'Sharpless',
+            'vdB',
+        )
+        if any(cat in t.source_catalogues for t in all_dso_targets)
+    )
     source_values = [source_name, *body_sources, *comet_sources, *cross_ref_sources]
-    deduplicated_sources = [value for index, value in enumerate(source_values) if value and value not in source_values[:index]]
+    deduplicated_sources = [
+        value for index, value in enumerate(source_values) if value and value not in source_values[:index]
+    ]
 
     metadata = {
         'generated_at': datetime.now(timezone.utc).isoformat(),

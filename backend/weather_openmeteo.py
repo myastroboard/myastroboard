@@ -2,6 +2,7 @@
 Manage weather from Open-Meteo API
 https://open-meteo.com/en/docs
 """
+
 import json
 import os
 import threading
@@ -36,14 +37,23 @@ def _is_openmeteo_concurrency_error(exc: Exception) -> bool:
 def _is_openmeteo_transient_error(exc: Exception) -> bool:
     """Return True for well-known transient server/network errors that need no traceback."""
     msg = str(exc).lower()
-    return any(k in msg for k in (
-        "502", "503", "504",
-        "max retries exceeded",
-        "too many 502", "too many 503",
-        "timed out", "timeout",
-        "connection reset", "connection refused", "connection error",
-        "remote end closed",
-    ))
+    return any(
+        k in msg
+        for k in (
+            "502",
+            "503",
+            "504",
+            "max retries exceeded",
+            "too many 502",
+            "too many 503",
+            "timed out",
+            "timeout",
+            "connection reset",
+            "connection refused",
+            "connection error",
+            "remote end closed",
+        )
+    )
 
 
 def is_openmeteo_rate_limited() -> bool:
@@ -62,10 +72,11 @@ def clear_openmeteo_rate_limit() -> None:
     global _GLOBAL_CONCURRENCY_TS
     _GLOBAL_CONCURRENCY_TS = 0.0
 
+
 def fetch_weather(latitude, longitude, timezone, hourly_vars, forecast_hours=12, use_cache=True):
     """
     Call Open-Meteo API and return raw response
-    
+
     Args:
         latitude: Location latitude
         longitude: Location longitude
@@ -73,7 +84,7 @@ def fetch_weather(latitude, longitude, timezone, hourly_vars, forecast_hours=12,
         hourly_vars: List of variables to fetch
         forecast_hours: Number of hours to forecast (default 12)
         use_cache: If True, use cached client; If False, always fetch fresh data (default True)
-    
+
     Returns:
         Raw API response
     """
@@ -88,11 +99,12 @@ def fetch_weather(latitude, longitude, timezone, hourly_vars, forecast_hours=12,
         "longitude": longitude,
         "timezone": timezone,
         "hourly": hourly_vars,
-        "forecast_hours": forecast_hours
+        "forecast_hours": forecast_hours,
     }
 
     response = client.weather_api(URL_OPENMETEO, params=params)[0]
     return response
+
 
 def parse_hourly(response, hourly_vars, timezone_str: Optional[str] = "UTC"):
     """Transform raw response into pandas DataFrame, apply timezone"""
@@ -103,7 +115,7 @@ def parse_hourly(response, hourly_vars, timezone_str: Optional[str] = "UTC"):
     dates = pd.date_range(
         start=pd.to_datetime(hourly.Time(), unit="s", utc=True),
         periods=len(hourly.Variables(0).ValuesAsNumpy()),
-        freq=pd.Timedelta(seconds=hourly.Interval())
+        freq=pd.Timedelta(seconds=hourly.Interval()),
     )
 
     data = {"date": dates}
@@ -119,6 +131,7 @@ def parse_hourly(response, hourly_vars, timezone_str: Optional[str] = "UTC"):
         if timezone_str and timezone_str != "UTC":
             # Test if the timezone string is valid first
             import zoneinfo
+
             try:
                 zoneinfo.ZoneInfo(timezone_str)
                 df["date"] = pd.to_datetime(df["date"], utc=True).dt.tz_convert(timezone_str)
@@ -155,10 +168,7 @@ def parse_hourly(response, hourly_vars, timezone_str: Optional[str] = "UTC"):
     visibility_km = df["visibility"] / 1000
     visibility_factor = (visibility_km / 30 * 100).clip(0, 100)
 
-    transparency_percent = (
-        humidity_factor * 0.4 +
-        visibility_factor * 0.6
-    ).clip(0, 100)
+    transparency_percent = (humidity_factor * 0.4 + visibility_factor * 0.6).clip(0, 100)
 
     # -----------------------------
     # Calm (%)
@@ -179,11 +189,7 @@ def parse_hourly(response, hourly_vars, timezone_str: Optional[str] = "UTC"):
     # -----------------------------
     # Overall astro condition score
     # -----------------------------
-    condition_percent = (
-        df["cloudless"] * 0.5 +
-        seeing_percent * 0.25 +
-        transparency_percent * 0.25
-    ).clip(0, 100)
+    condition_percent = (df["cloudless"] * 0.5 + seeing_percent * 0.25 + transparency_percent * 0.25).clip(0, 100)
 
     # -----------------------------
     # Store final metrics
@@ -232,14 +238,14 @@ def get_hourly_forecast():
             "sunshine_duration",
             "is_day",
             "uv_index",
-            "surface_pressure"
+            "surface_pressure",
         ]
 
         response = fetch_weather(
             latitude=config["location"]["latitude"],
             longitude=config["location"]["longitude"],
             timezone=config["location"]["timezone"],
-            hourly_vars=hourly_vars
+            hourly_vars=hourly_vars,
         )
 
         location_info = {
@@ -247,7 +253,7 @@ def get_hourly_forecast():
             "latitude": response.Latitude(),
             "longitude": response.Longitude(),
             "elevation": response.Elevation(),
-            "timezone": response.Timezone()
+            "timezone": response.Timezone(),
         }
 
         # Because the timezone is returned as bytes
@@ -261,10 +267,7 @@ def get_hourly_forecast():
         # Clear failure timestamps on success
         _FORECAST_LAST_FAILURE_TS = 0.0
         clear_openmeteo_rate_limit()
-        return {
-            "location": location_info,
-            "hourly": hourly_df
-        }
+        return {"location": location_info, "hourly": hourly_df}
 
     except Exception as e:
         _FORECAST_LAST_FAILURE_TS = time.time()
@@ -289,11 +292,7 @@ def get_skytonight_conditions():
     try:
         config = load_config()
 
-        hourly_vars = [
-            "temperature_2m",
-            "relative_humidity_2m",
-            "surface_pressure"
-        ]
+        hourly_vars = ["temperature_2m", "relative_humidity_2m", "surface_pressure"]
 
         # Bypass cache for fresh SkyTonight conditions
         response = fetch_weather(
@@ -302,7 +301,7 @@ def get_skytonight_conditions():
             timezone=config["location"]["timezone"],
             hourly_vars=hourly_vars,
             forecast_hours=1,
-            use_cache=False  # Always fetch fresh data for SkyTonight
+            use_cache=False,  # Always fetch fresh data for SkyTonight
         )
 
         hourly = response.Hourly()
@@ -324,7 +323,7 @@ def get_skytonight_conditions():
         conditions = {
             "temperature": round(temperature, 1),
             "relative_humidity": round(humidity, 2),
-            "pressure": round(pressure, 3)
+            "pressure": round(pressure, 3),
         }
 
         # Save JSON
@@ -337,6 +336,3 @@ def get_skytonight_conditions():
     except Exception:
         logger.exception("Error while fetching SkyTonight conditions")
         return None
-
-
-

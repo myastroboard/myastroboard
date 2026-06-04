@@ -52,7 +52,7 @@ from astronomy import (
     Equator,
     Horizon,
     Refraction,
-    Direction
+    Direction,
 )
 
 from astropy.time import Time as AstroTime
@@ -88,10 +88,7 @@ class MoonService:
 
         self.observer = Observer(latitude, longitude, 0)
 
-        self.location = EarthLocation(
-            lat=latitude * u.deg,
-            lon=longitude * u.deg
-        )
+        self.location = EarthLocation(lat=latitude * u.deg, lon=longitude * u.deg)
 
     def get_report(self) -> MoonAstroPhotoInfo:
         # --- Now UTC & local ---
@@ -130,22 +127,18 @@ class MoonService:
             phase_name=phase_name,
             illumination_percent=round(illumination, 2),
             distance_km=round(distance_km, 0),
-
             altitude_deg=round(hor.altitude, 2),
             azimuth_deg=round(hor.azimuth, 2),
-
             next_moonrise=self._fmt(moonrise),
             next_moonset=self._fmt(moonset),
-
             next_full_moon=self._fmt(next_full),
             next_new_moon=self._fmt(next_new),
-
             next_dark_night_start=dark_start,
-            next_dark_night_end=dark_end
+            next_dark_night_end=dark_end,
         )
 
     def _phase_name(self, angle: float) -> str:
-        
+
         # Determine if waxing or waning
         if angle < 180:
             waxing = True
@@ -184,7 +177,7 @@ class MoonService:
         dt_utc = astro_time_obj.Utc().replace(tzinfo=datetime.timezone.utc)
         dt_local = dt_utc.astimezone(self.timezone)
         return dt_local.isoformat(timespec='minutes')  # ex: "2026-02-03T20:28:00+01:00"
-    
+
     def _fmt_time(self, dt_local: datetime.datetime) -> str:
         # s'assure que dt_local a tzinfo
         if dt_local.tzinfo is None:
@@ -224,14 +217,11 @@ class MoonService:
 
         # Build full coarse grid and compute all altitudes in one vectorized batch
         n_coarse = int((max_days * 24 * 60) / coarse_step_minutes)
-        coarse_times = [
-            start_local + datetime.timedelta(minutes=i * coarse_step_minutes)
-            for i in range(n_coarse)
-        ]
+        coarse_times = [start_local + datetime.timedelta(minutes=i * coarse_step_minutes) for i in range(n_coarse)]
         times_utc = [dt.astimezone(datetime.timezone.utc) for dt in coarse_times]
-        t_array   = AstroTime(times_utc)
-        frame     = AltAz(obstime=t_array, location=self.location)
-        sun_alts  = cast(Any, get_sun(t_array).transform_to(frame).alt).to_value(u.deg)
+        t_array = AstroTime(times_utc)
+        frame = AltAz(obstime=t_array, location=self.location)
+        sun_alts = cast(Any, get_sun(t_array).transform_to(frame).alt).to_value(u.deg)
         moon_alts = cast(Any, get_body("moon", t_array).transform_to(frame).alt).to_value(u.deg)
         coarse_dark = (sun_alts < -18) & (moon_alts < 0)
 
@@ -242,16 +232,13 @@ class MoonService:
 
             if is_dark:
                 if found_start is None:
-                    window_lo   = max(start_local, dt - datetime.timedelta(minutes=coarse_step_minutes))
+                    window_lo = max(start_local, dt - datetime.timedelta(minutes=coarse_step_minutes))
                     found_start = _refine_first_true(window_lo, dt)
             else:
                 if found_start is not None:
-                    window_lo   = max(found_start, dt - datetime.timedelta(minutes=coarse_step_minutes))
+                    window_lo = max(found_start, dt - datetime.timedelta(minutes=coarse_step_minutes))
                     refined_end = _refine_first_false(window_lo, dt)
-                    return (
-                        self._fmt_time(found_start),
-                        self._fmt_time(refined_end)
-                    )
+                    return (self._fmt_time(found_start), self._fmt_time(refined_end))
 
         return ("Not found", "Not found")
 

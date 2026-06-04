@@ -108,7 +108,7 @@ def _split_long_segment(segment: str, max_len: int) -> List[str]:
                 # If one token is still too long, hard-wrap it.
                 if len(word) > max_len:
                     for i in range(0, len(word), max_len):
-                        pieces.append(word[i:i + max_len])
+                        pieces.append(word[i : i + max_len])
                     line = ""
                 else:
                     line = word

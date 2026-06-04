@@ -12,14 +12,12 @@ DEFAULT_LOCATION = {
     "longitude": 2.33333,
     "elevation": 35,
     "timezone": "Europe/Paris",
-    "bortle": None,   # int 1–9, or null (light pollution integration inactive)
-    "sqm": None,      # float mag/arcsec², user-measured; takes priority over bortle
+    "bortle": None,  # int 1–9, or null (light pollution integration inactive)
+    "sqm": None,  # float mag/arcsec², user-measured; takes priority over bortle
 }
 
 # Default feature flags
-DEFAULT_ASTRODEX = {
-    "private": False
-}
+DEFAULT_ASTRODEX = {"private": False}
 
 
 # Default constraint values

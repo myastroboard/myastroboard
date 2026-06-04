@@ -30,7 +30,7 @@ class AuroraService:
     def __init__(self, latitude: float, longitude: float, timezone_str: str):
         """
         Initialize aurora service with observer location
-        
+
         Args:
             latitude: Observer latitude (-90 to 90)
             longitude: Observer longitude (-180 to 180)
@@ -43,7 +43,7 @@ class AuroraService:
     def fetch_current_kp_index(self) -> Optional[float]:
         """
         Fetch current Kp index from NOAA API
-        
+
         Returns:
             Latest Kp index value or None if fetch fails
         """
@@ -81,7 +81,7 @@ class AuroraService:
     def fetch_kp_forecast(self) -> Optional[List[Dict[str, Any]]]:
         """
         Fetch 3-day Kp index forecast from NOAA
-        
+
         Returns:
             List of forecast entries with timestamp and Kp value or None if fetch fails
         """
@@ -89,7 +89,7 @@ class AuroraService:
             response = requests.get(NOAA_3DAY_FORECAST, timeout=REQUEST_TIMEOUT)
             response.raise_for_status()
             data = response.json()
-            
+
             forecast_data = []
 
             # New format: list of dicts (key 'kp' lowercase)
@@ -99,10 +99,7 @@ class AuroraService:
                     if raw_kp is None:
                         continue
                     try:
-                        forecast_data.append({
-                            'timestamp': row.get('time_tag', ''),
-                            'kp': float(raw_kp)
-                        })
+                        forecast_data.append({'timestamp': row.get('time_tag', ''), 'kp': float(raw_kp)})
                     except (TypeError, ValueError):
                         continue
             # Legacy format: list of lists with header row
@@ -123,7 +120,7 @@ class AuroraService:
                         if time_idx is not None and len(row) > time_idx:
                             timestamp = row[time_idx]
                         forecast_data.append({'timestamp': timestamp, 'kp': kp_value})
-            
+
             logger.debug(f"Fetched Kp forecast: {len(forecast_data)} entries")
             return forecast_data if forecast_data else None
         except requests.RequestException as e:
@@ -136,10 +133,10 @@ class AuroraService:
     def calculate_aurora_probability(self, kp_index: float) -> float:
         """
         Calculate aurora visibility probability based on Kp index and observer latitude
-        
+
         Args:
             kp_index: Current geomagnetic Kp index (0-9)
-        
+
         Returns:
             Aurora probability 0-100%
         """
@@ -187,17 +184,17 @@ class AuroraService:
     def get_aurora_score(self, kp_index: float, forecast_timestamp: Optional[str] = None) -> Dict[str, Any]:
         """
         Calculate comprehensive aurora visibility score
-        
+
         Args:
             kp_index: Current geomagnetic Kp index (0-9)
             forecast_timestamp: ISO timestamp string from forecast (optional)
-        
+
         Returns:
             Dictionary with aurora score and details
         """
         probability = self.calculate_aurora_probability(kp_index)
         probability_level = self.get_probability_level(probability)
-        
+
         # Determine visibility level
         if kp_index < 3:
             visibility = "None"
@@ -220,10 +217,11 @@ class AuroraService:
         else:
             visibility = "Severe Storm"
             visibility_description = "Intense aurora activity, visible at lower latitudes"
-        
+
         # Get local timestamp for the report
         try:
             from zoneinfo import ZoneInfo
+
             tzinfo = ZoneInfo(self.timezone_str)
         except Exception:
             tzinfo = timezone.utc
@@ -252,7 +250,10 @@ class AuroraService:
             "best_viewing_window": {
                 "start_hour": AURORA_BEST_WINDOW_START,
                 "end_hour": AURORA_BEST_WINDOW_END,
-                "description": f"{AURORA_BEST_WINDOW_START:02d}:00 - {AURORA_BEST_WINDOW_END:02d}:00 local time (best aurora activity period)"
+                "description": (
+                    f"{AURORA_BEST_WINDOW_START:02d}:00 - {AURORA_BEST_WINDOW_END:02d}:00"
+                    " local time (best aurora activity period)"
+                ),
             },
             "color_description": self._get_aurora_color_description(kp_index),
         }
@@ -260,36 +261,36 @@ class AuroraService:
     def _get_aurora_color_description(self, kp_index: float) -> Dict[str, str]:
         """
         Describe expected aurora colors based on Kp index and altitude
-        
+
         Args:
             kp_index: Current geomagnetic Kp index
-        
+
         Returns:
             Dictionary with color information
         """
         colors = {}
-        
+
         # Green aurora (oxygen, 100-300 km) - most common
         colors["green"] = "Green (most common, 100-300 km altitude)"
-        
+
         # Red aurora (high altitude oxygen, >300 km)
         if kp_index >= 4:
             colors["red"] = "Red (high altitude, >300 km, with strong activity)"
-        
+
         # Blue/Purple aurora (nitrogen) - rare, only during severe storms
         if kp_index >= 8:
             colors["blue_purple"] = "Blue/Purple (nitrogen, rare, during severe storms)"
-        
+
         # Pink/Magenta (high altitude mix)
         if kp_index >= 6:
             colors["pink"] = "Pink/Magenta (high altitude, during strong activity)"
-        
+
         return colors
 
     def get_detailed_report(self) -> Optional[Dict[str, Any]]:
         """
         Generate comprehensive aurora report for observer location
-        
+
         Returns:
             Detailed aurora report with current and forecast data
         """
@@ -320,13 +321,14 @@ class AuroraService:
                     # Final fallback for NOAA outages.
                     current_kp = 3.0
                     logger.info("Current Kp unavailable; using default Kp index 3.0")
-            
+
             # Calculate aurora score
             aurora_score = self.get_aurora_score(current_kp)
-            
+
             # Convert timestamp to observer's local timezone
             try:
                 from zoneinfo import ZoneInfo
+
                 tzinfo = ZoneInfo(self.timezone_str)
             except Exception:
                 tzinfo = timezone.utc
@@ -335,25 +337,25 @@ class AuroraService:
             local_timestamp = now_local.isoformat()
 
             # Build report
-            aurora_score["best_viewing_window"]["description"] = f"{AURORA_BEST_WINDOW_START:02d}:00 - {AURORA_BEST_WINDOW_END:02d}:00 local time (best aurora activity period)"
+            aurora_score["best_viewing_window"]["description"] = (
+                f"{AURORA_BEST_WINDOW_START:02d}:00 - {AURORA_BEST_WINDOW_END:02d}:00"
+                " local time (best aurora activity period)"
+            )
             report = {
                 "timestamp": local_timestamp,
-                "location": {
-                    "latitude": self.latitude,
-                    "longitude": self.longitude,
-                    "timezone": self.timezone_str
-                },
+                "location": {"latitude": self.latitude, "longitude": self.longitude, "timezone": self.timezone_str},
                 "current": aurora_score,
                 "forecast": [],
-                "cache_ttl": CACHE_TTL
+                "cache_ttl": CACHE_TTL,
             }
-            
+
             # Try to fetch forecast
             if kp_forecast is None:
                 kp_forecast = self.fetch_kp_forecast()
             if kp_forecast:
                 try:
                     from zoneinfo import ZoneInfo
+
                     tzinfo = ZoneInfo(self.timezone_str)
                 except Exception:
                     tzinfo = timezone.utc
@@ -377,10 +379,10 @@ class AuroraService:
                 for dt_local, entry in filtered:
                     kp_val = entry.get('kp', 0)
                     report["forecast"].append(self.get_aurora_score(kp_val, entry.get('timestamp')))
-            
+
             logger.info(f"Generated aurora report for lat={int(self.latitude)}, lon={int(self.longitude)}, tz=***")
             return report
-            
+
         except Exception as e:
             logger.error(f"Error generating aurora report: {e}")
             return None
@@ -389,12 +391,12 @@ class AuroraService:
 def get_aurora_report(latitude: float, longitude: float, timezone_str: str) -> Optional[Dict[str, Any]]:
     """
     Convenience function to get aurora report for a location
-    
+
     Args:
         latitude: Observer latitude
         longitude: Observer longitude
         timezone_str: IANA timezone string
-    
+
     Returns:
         Aurora report or None if failed
     """

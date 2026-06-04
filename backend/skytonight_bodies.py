@@ -8,16 +8,15 @@ from typing import Dict, List
 from skytonight_models import SkyTonightTarget
 from skytonight_targets import normalize_object_name
 
-
 BODY_DEFINITIONS = [
-    {'name': 'Moon',    'object_type': 'Moon',   'aliases': ['Luna', 'Lune']},
-    {'name': 'Mercury', 'object_type': 'Planet',  'aliases': ['Mercure']},
-    {'name': 'Venus',   'object_type': 'Planet',  'aliases': ['Vénus']},
-    {'name': 'Mars',    'object_type': 'Planet',  'aliases': []},
-    {'name': 'Jupiter', 'object_type': 'Planet',  'aliases': []},
-    {'name': 'Saturn',  'object_type': 'Planet',  'aliases': ['Saturne']},
-    {'name': 'Uranus',  'object_type': 'Planet',  'aliases': []},
-    {'name': 'Neptune', 'object_type': 'Planet',  'aliases': []},
+    {'name': 'Moon', 'object_type': 'Moon', 'aliases': ['Luna', 'Lune']},
+    {'name': 'Mercury', 'object_type': 'Planet', 'aliases': ['Mercure']},
+    {'name': 'Venus', 'object_type': 'Planet', 'aliases': ['Vénus']},
+    {'name': 'Mars', 'object_type': 'Planet', 'aliases': []},
+    {'name': 'Jupiter', 'object_type': 'Planet', 'aliases': []},
+    {'name': 'Saturn', 'object_type': 'Planet', 'aliases': ['Saturne']},
+    {'name': 'Uranus', 'object_type': 'Planet', 'aliases': []},
+    {'name': 'Neptune', 'object_type': 'Planet', 'aliases': []},
 ]
 
 

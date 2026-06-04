@@ -3,11 +3,20 @@ MyAstroBoard - Flask Backend API
 Provides astronomy planning and configuration management
 """
 
-
 import atexit
-import secrets
 from datetime import timezone
-from flask import Flask, request, jsonify, render_template, send_file, send_from_directory, session, redirect, url_for, g
+from flask import (
+    Flask,
+    request,
+    jsonify,
+    render_template,
+    send_file,
+    send_from_directory,
+    session,
+    redirect,
+    url_for,
+    g,
+)
 from flask_compress import Compress
 from flask_cors import CORS
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -24,7 +33,6 @@ from dataclasses import asdict
 from typing import Optional, Dict, Any
 from zoneinfo import ZoneInfo, available_timezones
 
-import sys
 from werkzeug.utils import secure_filename
 import shutil
 
@@ -32,6 +40,7 @@ import shutil
 sys.path.insert(0, os.path.dirname(__file__))
 
 from astropy.utils import iers as _iers
+
 # Keep auto_download off; the cache scheduler downloads IERS-A to a known path
 # (data/cache/iers/finals2000A.all) every 21 days via update_iers_cache().
 _iers.conf.auto_download = False
@@ -42,6 +51,7 @@ _iers.conf.auto_max_age = None
 try:
     from constants import IERS_CACHE_FILE as _IERS_CACHE_FILE
     from astropy.utils.iers import IERS_Auto as _IERS_Auto, IERS_A as _IERS_A
+
     if os.path.exists(_IERS_CACHE_FILE):
         _IERS_Auto.iers_table = _IERS_A.open(_IERS_CACHE_FILE)  # type: ignore[assignment]
 except Exception:
@@ -52,10 +62,27 @@ from events_aggregator import EventsAggregator
 from i18n_utils import I18nManager
 from txtconf_loader import get_repo_version
 from repo_config import load_config, save_config
-from constants import DATA_DIR, DATA_DIR_CACHE, CONFIG_FILE, CACHE_TTL, WEATHER_CACHE_TTL, SKYTONIGHT_LOGS_DIR, SKYTONIGHT_SCHEDULER_STATUS_FILE, \
-    CACHE_TTL_MOON_PLANNER, CACHE_TTL_SOLAR_ECLIPSE, CACHE_TTL_LUNAR_ECLIPSE, CACHE_TTL_AURORA, \
-    CACHE_TTL_ISS_PASSES, CACHE_TTL_PLANETARY_EVENTS, CACHE_TTL_SPECIAL_PHENOMENA, CACHE_TTL_SOLAR_SYSTEM_EVENTS, \
-    CACHE_TTL_SPACEFLIGHT_LAUNCHES, CACHE_TTL_SPACEFLIGHT_ASTRONAUTS, CACHE_TTL_SPACEFLIGHT_EVENTS, CACHE_TTL_SIDEREAL_TIME
+from constants import (
+    DATA_DIR,
+    DATA_DIR_CACHE,
+    CONFIG_FILE,
+    CACHE_TTL,
+    WEATHER_CACHE_TTL,
+    SKYTONIGHT_LOGS_DIR,
+    SKYTONIGHT_SCHEDULER_STATUS_FILE,
+    CACHE_TTL_MOON_PLANNER,
+    CACHE_TTL_SOLAR_ECLIPSE,
+    CACHE_TTL_LUNAR_ECLIPSE,
+    CACHE_TTL_AURORA,
+    CACHE_TTL_ISS_PASSES,
+    CACHE_TTL_PLANETARY_EVENTS,
+    CACHE_TTL_SPECIAL_PHENOMENA,
+    CACHE_TTL_SOLAR_SYSTEM_EVENTS,
+    CACHE_TTL_SPACEFLIGHT_LAUNCHES,
+    CACHE_TTL_SPACEFLIGHT_ASTRONAUTS,
+    CACHE_TTL_SPACEFLIGHT_EVENTS,
+    CACHE_TTL_SIDEREAL_TIME,
+)
 from logging_config import get_logger
 from version_checker import check_for_updates
 from metrics_collector import collect_metrics
@@ -66,32 +93,17 @@ from on_demand_translate import translate_text_on_demand
 from skytonight_calculator import load_calculation_results
 from sun_phases import SunService
 import moon_planner
-from cache_updater import (
-    update_dark_window_cache,
-    update_moon_report_cache,
-    update_moon_planner_cache,
-    update_sun_report_cache,
-    update_best_window_cache,
-    update_solar_eclipse_cache,
-    update_lunar_eclipse_cache,
-    update_horizon_graph_cache,
-    update_aurora_cache,
-    update_iss_passes_cache,
-    update_planetary_events_cache,
-    update_special_phenomena_cache,
-    update_solar_system_events_cache,
-    update_sidereal_time_cache,
-    update_spaceflight_launches_cache,
-    update_spaceflight_astronauts_cache,
-    update_spaceflight_events_cache,
-)
 
-#Cache for heavy computations
+# Cache for heavy computations
 import cache_store
 
 # Authentication
 from auth import (
-    user_manager, login_required, admin_required, user_required, get_current_user,
+    user_manager,
+    login_required,
+    admin_required,
+    user_required,
+    get_current_user,
 )
 
 # Astrodex
@@ -109,13 +121,12 @@ logger = get_logger(__name__)
 STATIC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'static'))
 TEMPLATE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'templates'))
 
-app = Flask(__name__, 
-            template_folder=TEMPLATE_DIR,
-            static_folder=STATIC_DIR)
+app = Flask(__name__, template_folder=TEMPLATE_DIR, static_folder=STATIC_DIR)
 
 # Load persistent app settings (replaces SECRET_KEY / TRUST_PROXY_HEADERS /
 # SESSION_COOKIE_SECURE / VAPID_CONTACT_EMAIL environment variables).
 import app_settings as _app_settings
+
 _startup_settings = _app_settings.get_app_settings()
 
 # Configure reverse proxy support — configurable via Parameters → Advanced → Reverse proxy
@@ -145,19 +156,19 @@ Compress(app)
 # SkyTonight Blueprint (routes + scheduler management)
 from skytonight_api import skytonight_bp
 from skytonight_scheduler_manager import get_or_create_skytonight_scheduler
+
 app.register_blueprint(skytonight_bp)
 
 # Coordinate conversion regex pattern (module-level constant)
 # Matches DMS format: 48d38m36.16s or 48°38'36.16"
 # Pattern: optional sign, degrees, minutes, seconds
-DMS_PATTERN = re.compile(
-    r"^([+-]?\d{1,3})[d°]\s*(\d{1,2})[m']\s*(\d{1,2}(?:\.\d{1,6})?)[s\"]?$"
-)
+DMS_PATTERN = re.compile(r"^([+-]?\d{1,3})[d°]\s*(\d{1,2})[m']\s*(\d{1,2}(?:\.\d{1,6})?)[s\"]?$")
 
 
 # ============================================================
 # API Utils
 # ============================================================
+
 
 @app.before_request
 def log_session_restoration():
@@ -167,7 +178,7 @@ def log_session_restoration():
         if 'username' in session and not hasattr(g, 'session_logged'):
             # Mark that we've logged this session to avoid duplicate logs
             g.session_logged = True
-            
+
             # Check if this is a cookie restoration (not a fresh login)
             if request.endpoint not in ['login', 'auth_status']:
                 if not session.get('_session_restored_logged'):
@@ -187,7 +198,9 @@ def set_cache_headers(response):
     """Set long-term cache headers for versioned static assets."""
     if request.endpoint == 'static' or request.path.startswith('/static/'):
         # In development/debug, always bypass browser cache so frontend changes are visible immediately.
-        in_debug_mode = app.debug or os.environ.get('FLASK_DEBUG') == '1' or os.environ.get('FLASK_ENV') == 'development'
+        in_debug_mode = (
+            app.debug or os.environ.get('FLASK_DEBUG') == '1' or os.environ.get('FLASK_ENV') == 'development'
+        )
         if in_debug_mode:
             response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
             response.headers['Pragma'] = 'no-cache'
@@ -206,15 +219,16 @@ def set_cache_headers(response):
             response.headers['Cache-Control'] = 'public, max-age=3600, must-revalidate'
     return response
 
+
 @app.route('/')
 def index():
     """Render main dashboard or redirect to login"""
     if 'username' not in session:
         return redirect(url_for('login_page'))
-    
+
     # Get version for cache busting
     version = get_repo_version()
-    
+
     return render_template('index.html', version=version)
 
 
@@ -225,7 +239,7 @@ def login_page():
         return redirect(url_for('index'))
     # Get version for cache busting
     version = get_repo_version()
-    
+
     return render_template('login.html', version=version)
 
 
@@ -235,6 +249,7 @@ def web_manifest():
     response = send_from_directory(STATIC_DIR, 'manifest.webmanifest', mimetype='application/manifest+json')
     response.headers['Cache-Control'] = 'no-cache, must-revalidate'
     return response
+
 
 @app.route('/manifest.<lang>.webmanifest')
 def web_manifest_localized(lang):
@@ -273,6 +288,7 @@ def robots_txt():
 # Authentication API
 # ============================================================
 
+
 @app.route('/api/auth/login', methods=['POST'])
 def login():
     """Login endpoint"""
@@ -281,35 +297,42 @@ def login():
         username = data.get('username')
         password = data.get('password')
         remember_me = data.get('remember_me', False)
-        
+
         if not username or not password:
-            logger.warning(f"Login attempt with missing credentials")
-            return jsonify({'error': 'Username and password required', 'error_key': 'auth.enter_username_password'}), 400
-        
+            logger.warning("Login attempt with missing credentials")
+            return (
+                jsonify({'error': 'Username and password required', 'error_key': 'auth.enter_username_password'}),
+                400,
+            )
+
         user = user_manager.authenticate(username, password)
         if user:
             # Set session to permanent BEFORE setting session data
             # This ensures the cookie is created with the correct expiration
             session.permanent = remember_me
-            
+
             session['user_id'] = user.user_id
             session['username'] = user.username
             session['role'] = user.role
-            
+
             # Check if using default password
             using_default_password = user.is_using_default_password()
-            
+
             # Log successful login with remember_me status
-            logger.info(f"Successful login for user {username} " +
-                       f"(remember_me: {remember_me}, permanent_session: {session.permanent})")
-            
-            return jsonify({
-                'status': 'success',
-                'user_id': user.user_id,
-                'username': user.username,
-                'role': user.role,
-                'using_default_password': using_default_password
-            })
+            logger.info(
+                f"Successful login for user {username} "
+                + f"(remember_me: {remember_me}, permanent_session: {session.permanent})"
+            )
+
+            return jsonify(
+                {
+                    'status': 'success',
+                    'user_id': user.user_id,
+                    'username': user.username,
+                    'role': user.role,
+                    'using_default_password': using_default_password,
+                }
+            )
         else:
             logger.warning(f"Failed login attempt for username: {username}")
             return jsonify({'error': 'Invalid credentials', 'error_key': 'auth.invalid_credentials'}), 401
@@ -325,9 +348,9 @@ def logout():
     username = session.get('username')
     was_permanent = session.permanent
     session.clear()
-    
+
     logger.info(f"User {username} logged out (was_permanent: {was_permanent})")
-    
+
     # session.clear() handles cookie removal properly
     return jsonify({'status': 'success'})
 
@@ -338,13 +361,15 @@ def auth_status():
     if 'username' in session:
         user = get_current_user()
         if user:
-            return jsonify({
-                'authenticated': True,
-                'user_id': user.user_id,
-                'username': user.username,
-                'role': user.role,
-                'using_default_password': user.is_using_default_password()
-            })
+            return jsonify(
+                {
+                    'authenticated': True,
+                    'user_id': user.user_id,
+                    'username': user.username,
+                    'role': user.role,
+                    'using_default_password': user.is_using_default_password(),
+                }
+            )
     return jsonify({'authenticated': False})
 
 
@@ -358,10 +383,15 @@ def change_own_password():
         new_password = data.get('new_password')
 
         if not current_password or not new_password:
-            return jsonify({
-                'error': 'Current password and new password are required',
-                'error_key': 'users.password_change_missing_fields'
-            }), 400
+            return (
+                jsonify(
+                    {
+                        'error': 'Current password and new password are required',
+                        'error_key': 'users.password_change_missing_fields',
+                    }
+                ),
+                400,
+            )
 
         current_user = get_current_user()
         if not current_user:
@@ -449,11 +479,13 @@ def update_own_preferences():
 # Web Push API
 # ============================================================
 
+
 @app.route('/api/push/vapid-public-key', methods=['GET'])
 def get_vapid_public_key():
     """Return the VAPID public key needed by the browser to subscribe."""
     try:
         from push_manager import get_vapid_public_key as _get_key
+
         return jsonify({'public_key': _get_key()})
     except Exception as e:
         logger.error(f"Failed to get VAPID public key: {e}")
@@ -466,6 +498,7 @@ def get_vapid_config_status():
     """Return whether the VAPID contact email is properly configured."""
     try:
         from push_manager import get_vapid_contact_status
+
         return jsonify(get_vapid_contact_status())
     except Exception as e:
         logger.error(f"Failed to get VAPID config status: {e}")
@@ -490,11 +523,14 @@ def push_subscribe():
         existing = current_user.push_subscriptions
         if not any(s.get('endpoint') == endpoint for s in existing):
             from datetime import datetime as _dt
-            existing.append({
-                'endpoint': endpoint,
-                'keys': subscription.get('keys', {}),
-                'created_at': _dt.now().isoformat(),
-            })
+
+            existing.append(
+                {
+                    'endpoint': endpoint,
+                    'keys': subscription.get('keys', {}),
+                    'created_at': _dt.now().isoformat(),
+                }
+            )
             user_manager.save_users()
             logger.info(f"Push subscription added for user {current_user.username}")
 
@@ -515,6 +551,7 @@ def push_list_subscriptions():
 
         def _provider(endpoint):
             from urllib.parse import urlparse
+
             try:
                 host = urlparse(endpoint).hostname or ''
             except Exception:
@@ -529,8 +566,8 @@ def push_list_subscriptions():
 
         subs = [
             {
-                'index':      i,
-                'provider':   _provider(s.get('endpoint', '')),
+                'index': i,
+                'provider': _provider(s.get('endpoint', '')),
                 'created_at': s.get('created_at', ''),
                 'endpoint_tail': s.get('endpoint', '')[-20:],
             }
@@ -566,13 +603,19 @@ def push_delete_all_subscriptions():
 def push_test_trigger(trigger_id):
     """Fire a realistic test push for a specific trigger (N1–N7), bypassing condition checks."""
     _TRIGGER_PAYLOADS = {
-        'N1': ('push_n1_title', 'push_n1_body',  {'minutes': 14}, '/#astrodex/plan-my-night', 'normal'),
-        'N2': ('push_n2_title', 'push_n2_body',  {'name': 'M42',  'minutes': 4},  '/#astrodex/plan-my-night', 'normal'),
-        'N3': ('push_n3_title', 'push_n3_solar_body', {'minutes': 8},  '/#spaceflight/iss',       'high'),
-        'N4': ('push_n4_title', 'push_n4_body',  {'minutes': 28}, '/#forecast-astro/moon',    'normal'),
-        'N5': ('push_n5_title', 'push_n5_body',  {'minutes': 22}, '/#forecast-astro/sun',     'normal'),
-        'N6': ('push_n6_title', 'push_n6_body',  {'minutes': 18, 'time': '23:45'}, '/#forecast-astro/astro-weather', 'normal'),
-        'N7': ('push_n7_title', 'push_n7_body',  {'kp': '6.3', 'visibility': 'Good'}, '/#forecast-astro/aurora', 'high'),
+        'N1': ('push_n1_title', 'push_n1_body', {'minutes': 14}, '/#astrodex/plan-my-night', 'normal'),
+        'N2': ('push_n2_title', 'push_n2_body', {'name': 'M42', 'minutes': 4}, '/#astrodex/plan-my-night', 'normal'),
+        'N3': ('push_n3_title', 'push_n3_solar_body', {'minutes': 8}, '/#spaceflight/iss', 'high'),
+        'N4': ('push_n4_title', 'push_n4_body', {'minutes': 28}, '/#forecast-astro/moon', 'normal'),
+        'N5': ('push_n5_title', 'push_n5_body', {'minutes': 22}, '/#forecast-astro/sun', 'normal'),
+        'N6': (
+            'push_n6_title',
+            'push_n6_body',
+            {'minutes': 18, 'time': '23:45'},
+            '/#forecast-astro/astro-weather',
+            'normal',
+        ),
+        'N7': ('push_n7_title', 'push_n7_body', {'kp': '6.3', 'visibility': 'Good'}, '/#forecast-astro/aurora', 'high'),
     }
     try:
         current_user = get_current_user()
@@ -594,19 +637,20 @@ def push_test_trigger(trigger_id):
         title_key, body_key, body_params, url, urgency = _TRIGGER_PAYLOADS[trigger_id]
         payload = {
             'title': t(title_key),
-            'body':  t(body_key, **body_params),
-            'icon':  '/static/ico/android/launchericon-192x192.png',
+            'body': t(body_key, **body_params),
+            'icon': '/static/ico/android/launchericon-192x192.png',
             'badge': '/static/ico/android/launchericon-72x72.png',
-            'tag':   f'{trigger_id}-test',
-            'data':  {'url': url},
+            'tag': f'{trigger_id}-test',
+            'data': {'url': url},
         }
 
         n = len(current_user.push_subscriptions)
         delivered = 0
         dead_endpoints = []
         for sub in current_user.push_subscriptions:
-            ok = send_push({'endpoint': sub['endpoint'], 'keys': sub.get('keys', {})},
-                           payload, ttl=300, urgency=urgency)
+            ok = send_push(
+                {'endpoint': sub['endpoint'], 'keys': sub.get('keys', {})}, payload, ttl=300, urgency=urgency
+            )
             if ok:
                 delivered += 1
             else:
@@ -614,14 +658,22 @@ def push_test_trigger(trigger_id):
 
         if dead_endpoints:
             current_user.push_subscriptions = [
-                s for s in current_user.push_subscriptions
-                if s.get('endpoint') not in dead_endpoints
+                s for s in current_user.push_subscriptions if s.get('endpoint') not in dead_endpoints
             ]
             user_manager.save_users()
 
-        logger.info(f"Test push [{trigger_id}] for {current_user.username}: {delivered}/{n} delivered — {payload['body']}")
-        return jsonify({'trigger': trigger_id, 'delivered': delivered, 'total': n,
-                        'title': payload['title'], 'body': payload['body']})
+        logger.info(
+            f"Test push [{trigger_id}] for {current_user.username}: {delivered}/{n} delivered — {payload['body']}"
+        )
+        return jsonify(
+            {
+                'trigger': trigger_id,
+                'delivered': delivered,
+                'total': n,
+                'title': payload['title'],
+                'body': payload['body'],
+            }
+        )
     except Exception as e:
         logger.error(f"Error sending test push [{trigger_id}]: {e}")
         return jsonify({'error': 'Internal server error'}), 500
@@ -639,6 +691,7 @@ def push_test():
             return jsonify({'error': 'No push subscriptions for this user'}), 400
 
         from push_manager import send_push
+
         n = len(current_user.push_subscriptions)
         delivered = 0
         dead_endpoints = []
@@ -662,8 +715,7 @@ def push_test():
                 dead_endpoints.append(sub['endpoint'])
         if dead_endpoints:
             current_user.push_subscriptions = [
-                s for s in current_user.push_subscriptions
-                if s.get('endpoint') not in dead_endpoints
+                s for s in current_user.push_subscriptions if s.get('endpoint') not in dead_endpoints
             ]
             user_manager.save_users()
             logger.info(f"Removed {len(dead_endpoints)} dead subscription(s) for {current_user.username}")
@@ -689,9 +741,7 @@ def push_unsubscribe():
             return jsonify({'error': 'endpoint is required'}), 400
 
         before = len(current_user.push_subscriptions)
-        current_user.push_subscriptions = [
-            s for s in current_user.push_subscriptions if s.get('endpoint') != endpoint
-        ]
+        current_user.push_subscriptions = [s for s in current_user.push_subscriptions if s.get('endpoint') != endpoint]
         if len(current_user.push_subscriptions) < before:
             user_manager.save_users()
             logger.info(f"Push subscription removed for user {current_user.username}")
@@ -705,6 +755,7 @@ def push_unsubscribe():
 # ============================================================
 # User Management API (Admin only)
 # ============================================================
+
 
 @app.route('/api/users', methods=['GET'])
 @admin_required
@@ -723,22 +774,22 @@ def create_user():
         username = data.get('username')
         password = data.get('password')
         role = data.get('role')
-        
+
         if not username or not password or not role:
-            return jsonify({
-                'error': 'Username, password, and role required',
-                'error_key': 'users.required_username_password_role'
-            }), 400
-        
+            return (
+                jsonify(
+                    {
+                        'error': 'Username, password, and role required',
+                        'error_key': 'users.required_username_password_role',
+                    }
+                ),
+                400,
+            )
+
         user = user_manager.create_user(username, password, role)
-        return jsonify({
-            'status': 'success',
-            'user': {
-                'username': user.username,
-                'role': user.role,
-                'created_at': user.created_at
-            }
-        })
+        return jsonify(
+            {'status': 'success', 'user': {'username': user.username, 'role': user.role, 'created_at': user.created_at}}
+        )
     except ValueError as e:
         error_text = str(e)
         error_key = 'users.invalid_input'
@@ -764,23 +815,18 @@ def update_user(user_id):
         username = data.get('username')
         password = data.get('password')
         role = data.get('role')
-        
+
         if not username and not password and not role:
-            return jsonify({
-                'error': 'Username, password or role required',
-                'error_key': 'users.required_update_payload'
-            }), 400
-        
+            return (
+                jsonify({'error': 'Username, password or role required', 'error_key': 'users.required_update_payload'}),
+                400,
+            )
+
         logger.info(f"Updating user {user_id}, available users: {list(user_manager.users.keys())}")
         user = user_manager.update_user(user_id, username, password, role)
-        return jsonify({
-            'status': 'success',
-            'user': {
-                'user_id': user.user_id,
-                'username': user.username,
-                'role': user.role
-            }
-        })
+        return jsonify(
+            {'status': 'success', 'user': {'user_id': user.user_id, 'username': user.username, 'role': user.role}}
+        )
     except ValueError as e:
         error_text = str(e)
         error_key = 'users.invalid_input'
@@ -840,25 +886,23 @@ def update_config_api():
     Triggers cache reset when location parameters are modified.
     """
     config = request.json
-    
+
     # Load old config to detect changes
     old_config = load_config()
     old_location = old_config.get('location', {})
     new_location = config.get('location', {})
-    
+
     # Check if location parameters have changed
     location_changed = (
-        old_location.get('latitude') != new_location.get('latitude') or
-        old_location.get('longitude') != new_location.get('longitude') or
-        old_location.get('elevation') != new_location.get('elevation') or
-        old_location.get('timezone') != new_location.get('timezone')
+        old_location.get('latitude') != new_location.get('latitude')
+        or old_location.get('longitude') != new_location.get('longitude')
+        or old_location.get('elevation') != new_location.get('elevation')
+        or old_location.get('timezone') != new_location.get('timezone')
     )
 
     # Ensure Astrodex config exists with defaults
     if 'astrodex' not in config:
-        config['astrodex'] = {
-            "private": False
-        }
+        config['astrodex'] = {"private": False}
 
     # Migrate legacy top-level 'constraints' → skytonight.constraints
     legacy_constraints = config.pop('constraints', None)
@@ -887,7 +931,9 @@ def update_config_api():
     # array to overwrite a non-empty saved profile when the frontend explicitly
     # sent the _horizon_cleared flag (user pressed the Clear button).
     new_constraints = config['skytonight'].get('constraints', {})
-    incoming_constraints_raw = (incoming_skytonight or {}).get('constraints', {}) if isinstance(incoming_skytonight, dict) else {}
+    incoming_constraints_raw = (
+        (incoming_skytonight or {}).get('constraints', {}) if isinstance(incoming_skytonight, dict) else {}
+    )
     horizon_cleared = bool(incoming_constraints_raw.get('_horizon_cleared', False))
     old_horizon = old_skytonight.get('constraints', {}).get('horizon_profile', [])
     new_horizon = new_constraints.get('horizon_profile', [])
@@ -929,19 +975,21 @@ def update_config_api():
 
     # Save the new config
     save_config(config)
-    
+
     # If location changed, reset astronomical caches immediately
     if location_changed:
         logger.warning("Location parameters changed! Resetting astronomical caches immediately.")
         cache_store.reset_all_caches()
         cache_store.update_location_config(new_location)
-    
-    return jsonify({
-        "status": "success", 
-        "config": config,
-        "cache_reset": location_changed,
-        "message": "Configuration updated" + (" and cache reset" if location_changed else "")
-    })
+
+    return jsonify(
+        {
+            "status": "success",
+            "config": config,
+            "cache_reset": location_changed,
+            "message": "Configuration updated" + (" and cache reset" if location_changed else ""),
+        }
+    )
 
 
 @app.route('/api/admin/app-settings', methods=['GET'])
@@ -949,11 +997,13 @@ def update_config_api():
 def get_app_settings_api():
     """Return current persistent app settings (excludes secret key)."""
     settings = _app_settings.get_app_settings()
-    return jsonify({
-        'vapid_contact_email': settings.get('vapid_contact_email', ''),
-        'trust_proxy_headers': settings.get('trust_proxy_headers', False),
-        'session_cookie_secure': settings.get('session_cookie_secure', False),
-    })
+    return jsonify(
+        {
+            'vapid_contact_email': settings.get('vapid_contact_email', ''),
+            'trust_proxy_headers': settings.get('trust_proxy_headers', False),
+            'session_cookie_secure': settings.get('session_cookie_secure', False),
+        }
+    )
 
 
 @app.route('/api/admin/app-settings', methods=['POST'])
@@ -964,9 +1014,13 @@ def update_app_settings_api():
     old_settings = _app_settings.get_app_settings()
 
     new_settings = {
-        'vapid_contact_email': str(data.get('vapid_contact_email', old_settings.get('vapid_contact_email', ''))).strip(),
+        'vapid_contact_email': str(
+            data.get('vapid_contact_email', old_settings.get('vapid_contact_email', ''))
+        ).strip(),
         'trust_proxy_headers': bool(data.get('trust_proxy_headers', old_settings.get('trust_proxy_headers', False))),
-        'session_cookie_secure': bool(data.get('session_cookie_secure', old_settings.get('session_cookie_secure', False))),
+        'session_cookie_secure': bool(
+            data.get('session_cookie_secure', old_settings.get('session_cookie_secure', False))
+        ),
     }
 
     _app_settings.save_app_settings(new_settings)
@@ -1041,12 +1095,7 @@ def export_config_api():
         if not os.path.isfile(CONFIG_FILE):
             return jsonify({"error": "Config file not found"}), 404
 
-        return send_file(
-            CONFIG_FILE,
-            mimetype="application/json",
-            as_attachment=True,
-            download_name="config.json"
-        )
+        return send_file(CONFIG_FILE, mimetype="application/json", as_attachment=True, download_name="config.json")
 
     except Exception as e:
         logger.error(f"Error exporting config: {e}")
@@ -1063,9 +1112,12 @@ def get_sky_quality_api():
     and all numeric fields are null - the LP integration is inactive.
     """
     from sky_quality import (
-        bortle_to_sqm, sqm_to_bortle, light_pollution_factor,
+        bortle_to_sqm,
+        sqm_to_bortle,
+        light_pollution_factor,
         BORTLE_DESCRIPTIONS,
     )
+
     config = load_config()
     location = config.get('location', {})
     raw_sqm = location.get('sqm')
@@ -1101,21 +1153,25 @@ def get_sky_quality_api():
             pass
 
     if sqm is not None and bortle is not None:
-        return jsonify({
-            "bortle": bortle,
-            "sqm": round(sqm, 2),
-            "sqm_source": sqm_source,
-            "light_pollution_factor": light_pollution_factor(sqm),
-            "description": BORTLE_DESCRIPTIONS.get(bortle, ""),
-        })
+        return jsonify(
+            {
+                "bortle": bortle,
+                "sqm": round(sqm, 2),
+                "sqm_source": sqm_source,
+                "light_pollution_factor": light_pollution_factor(sqm),
+                "description": BORTLE_DESCRIPTIONS.get(bortle, ""),
+            }
+        )
 
-    return jsonify({
-        "bortle": None,
-        "sqm": None,
-        "sqm_source": "not_configured",
-        "light_pollution_factor": None,
-        "description": None,
-    })
+    return jsonify(
+        {
+            "bortle": None,
+            "sqm": None,
+            "sqm_source": "not_configured",
+            "light_pollution_factor": None,
+            "description": None,
+        }
+    )
 
 
 @app.route('/api/backup/download', methods=['GET'])
@@ -1131,11 +1187,11 @@ def backup_download_api():
     """
     # Evolutive list: each entry is (source_path, archive_name, is_dir)
     BACKUP_ENTRIES = [
-        (os.path.join(DATA_DIR, 'config.json'),       'config.json',       False),
-        (os.path.join(DATA_DIR, 'users.json'),         'users.json',        False),
-        (os.path.join(DATA_DIR, 'app_settings.json'),  'app_settings.json', False),
-        (os.path.join(DATA_DIR, 'astrodex'),           'astrodex',          True),
-        (os.path.join(DATA_DIR, 'equipments'),         'equipments',        True),
+        (os.path.join(DATA_DIR, 'config.json'), 'config.json', False),
+        (os.path.join(DATA_DIR, 'users.json'), 'users.json', False),
+        (os.path.join(DATA_DIR, 'app_settings.json'), 'app_settings.json', False),
+        (os.path.join(DATA_DIR, 'astrodex'), 'astrodex', True),
+        (os.path.join(DATA_DIR, 'equipments'), 'equipments', True),
     ]
     try:
         buf = io.BytesIO()
@@ -1157,12 +1213,7 @@ def backup_download_api():
 
         buf.seek(0)
         logger.info(f"Backup archive created: {zip_filename}")
-        return send_file(
-            buf,
-            mimetype='application/zip',
-            as_attachment=True,
-            download_name=zip_filename
-        )
+        return send_file(buf, mimetype='application/zip', as_attachment=True, download_name=zip_filename)
     except Exception as e:
         logger.error(f"Error creating backup archive: {e}")
         return jsonify({'error': 'Internal server error'}), 500
@@ -1196,11 +1247,11 @@ def backup_restore_api():
     # Format: normalized_prefix -> destination base path
     # Entries whose value is a directory will have that directory cleared first.
     RESTORE_ALLOWED_PREFIXES = {
-        'config.json':       os.path.join(DATA_DIR, 'config.json'),
-        'users.json':        os.path.join(DATA_DIR, 'users.json'),
+        'config.json': os.path.join(DATA_DIR, 'config.json'),
+        'users.json': os.path.join(DATA_DIR, 'users.json'),
         'app_settings.json': os.path.join(DATA_DIR, 'app_settings.json'),
-        'astrodex':          os.path.join(DATA_DIR, 'astrodex'),
-        'equipments':        os.path.join(DATA_DIR, 'equipments'),
+        'astrodex': os.path.join(DATA_DIR, 'astrodex'),
+        'equipments': os.path.join(DATA_DIR, 'equipments'),
     }
     # Directories that must be cleared before restoring their contents
     RESTORE_CLEAR_DIRS = {'astrodex', 'equipments'}
@@ -1222,8 +1273,8 @@ def backup_restore_api():
         buf.seek(0)
 
         # --- Phase 1: validation (no writes yet) ---
-        recognised_entries = []   # (info, top_prefix, arc_path, rel_parts)
-        json_blobs = {}            # arc_path -> bytes  (only for JSON-validated files)
+        recognised_entries = []  # (info, top_prefix, arc_path, rel_parts)
+        json_blobs = {}  # arc_path -> bytes  (only for JSON-validated files)
 
         with zipfile.ZipFile(buf, 'r') as zf:
             for info in zf.infolist():
@@ -1239,7 +1290,7 @@ def backup_restore_api():
                 for prefix in RESTORE_ALLOWED_PREFIXES:
                     if arc_path == prefix or arc_path.startswith(prefix + '/'):
                         top_prefix = prefix
-                        rel = arc_path[len(prefix):].lstrip('/')
+                        rel = arc_path[len(prefix) :].lstrip('/')
                         if rel:
                             parts = [secure_filename(p) for p in rel.split('/') if p]
                             if not all(parts):  # reject if any component empty after sanitization
@@ -1257,18 +1308,21 @@ def backup_restore_api():
                     try:
                         json.loads(blob)
                     except Exception:
-                        return jsonify({
-                            'error': f'{arc_path} is not valid JSON - archive may be corrupt'
-                        }), 400
+                        return jsonify({'error': f'{arc_path} is not valid JSON - archive may be corrupt'}), 400
                     json_blobs[arc_path] = blob
 
                 recognised_entries.append((info, top_prefix, arc_path, rel_parts))
 
         if not recognised_entries:
-            return jsonify({
-                'error': 'Archive contains no recognised backup entries '
-                         '(expected config.json, users.json, app_settings.json, astrodex/ or equipments/)'
-            }), 400
+            return (
+                jsonify(
+                    {
+                        'error': 'Archive contains no recognised backup entries '
+                        '(expected config.json, users.json, app_settings.json, astrodex/ or equipments/)'
+                    }
+                ),
+                400,
+            )
 
         # --- Phase 2: clear target directories ---
         buf.seek(0)
@@ -1312,12 +1366,14 @@ def backup_restore_api():
             f"Backup restore completed: {len(restored_files)} files restored, "
             f"{len(skipped_files)} skipped, dirs cleared: {sorted(cleared_dirs)}"
         )
-        return jsonify({
-            'status': 'success',
-            'restored': len(restored_files),
-            'skipped': len(skipped_files),
-            'message': f'{len(restored_files)} file(s) restored successfully'
-        })
+        return jsonify(
+            {
+                'status': 'success',
+                'restored': len(restored_files),
+                'skipped': len(skipped_files),
+                'message': f'{len(restored_files)} file(s) restored successfully',
+            }
+        )
 
     except Exception as e:
         logger.error(f"Error restoring backup: {e}")
@@ -1335,9 +1391,9 @@ def logs_export_api():
     """
     # Evolutive list: each entry is (source_path, archive_folder, is_dir)
     LOG_EXPORT_ENTRIES = [
-        (os.path.join(DATA_DIR, 'myastroboard.log'),  'logs',               False),
-        (SKYTONIGHT_LOGS_DIR,                         'skytonight/logs',    True),
-        (SKYTONIGHT_SCHEDULER_STATUS_FILE,            'skytonight/runtime', False),
+        (os.path.join(DATA_DIR, 'myastroboard.log'), 'logs', False),
+        (SKYTONIGHT_LOGS_DIR, 'skytonight/logs', True),
+        (SKYTONIGHT_SCHEDULER_STATUS_FILE, 'skytonight/runtime', False),
     ]
     try:
         buf = io.BytesIO()
@@ -1357,21 +1413,14 @@ def logs_export_api():
                     # Include rotated log files (e.g. myastroboard.log.1 … .5)
                     base_dir = os.path.dirname(source_path)
                     base_name = os.path.basename(source_path)
-                    candidates = [source_path] + [
-                        os.path.join(base_dir, f"{base_name}.{i}") for i in range(1, 6)
-                    ]
+                    candidates = [source_path] + [os.path.join(base_dir, f"{base_name}.{i}") for i in range(1, 6)]
                     for candidate in candidates:
                         if os.path.isfile(candidate):
                             zf.write(candidate, os.path.join(arc_folder, os.path.basename(candidate)))
 
         buf.seek(0)
         logger.info(f"Log export archive created: {zip_filename}")
-        return send_file(
-            buf,
-            mimetype='application/zip',
-            as_attachment=True,
-            download_name=zip_filename
-        )
+        return send_file(buf, mimetype='application/zip', as_attachment=True, download_name=zip_filename)
     except Exception as e:
         logger.error(f"Error creating log export archive: {e}")
         return jsonify({'error': 'Internal server error'}), 500
@@ -1382,6 +1431,7 @@ def logs_export_api():
 def get_log_level_api():
     """Return the current active log level for the file handler"""
     from logging_config import get_current_log_level
+
     return jsonify({'level': get_current_log_level()})
 
 
@@ -1391,17 +1441,17 @@ def get_logs_api():
     """Get application logs"""
     try:
         log_file = os.path.join(DATA_DIR, 'myastroboard.log')
-        
+
         # Read log file if it exists
         if os.path.exists(log_file):
             with open(log_file, 'r', encoding='utf-8') as f:
                 logs = f.readlines()
-            
+
             # Get parameters
             limit = int(request.args.get('limit', 500))
             level = request.args.get('level', 'all').upper()
             offset = int(request.args.get('offset', 0))
-            
+
             # Filter by level if specified
             if level != 'ALL':
                 filtered_logs = []
@@ -1411,7 +1461,7 @@ def get_logs_api():
                 logs = filtered_logs
             else:
                 logs = [log.strip() for log in logs]
-            
+
             # Apply pagination (limit=0 means return all)
             total_logs = len(logs)
             if limit <= 0:
@@ -1420,23 +1470,27 @@ def get_logs_api():
                 start_idx = max(0, total_logs - limit - offset)
                 end_idx = total_logs - offset
                 paginated_logs = logs[start_idx:end_idx] if end_idx > start_idx else []
-            
-            return jsonify({
-                "status": "success",
-                "logs": paginated_logs,
-                "total": total_logs,
-                "showing": len(paginated_logs),
-                "offset": offset
-            })
+
+            return jsonify(
+                {
+                    "status": "success",
+                    "logs": paginated_logs,
+                    "total": total_logs,
+                    "showing": len(paginated_logs),
+                    "offset": offset,
+                }
+            )
         else:
-            return jsonify({
-                "status": "success",
-                "logs": [],
-                "total": 0,
-                "showing": 0,
-                "offset": 0,
-                "message": "No log file found yet"
-            })
+            return jsonify(
+                {
+                    "status": "success",
+                    "logs": [],
+                    "total": 0,
+                    "showing": 0,
+                    "offset": 0,
+                    "message": "No log file found yet",
+                }
+            )
     except Exception as e:
         logger.error(f"Error reading logs: {e}")
         return jsonify({'error': 'Internal server error'}), 500
@@ -1453,10 +1507,7 @@ def clear_logs_api():
         if os.path.exists(log_file):
             open(log_file, "w").close()
 
-        return jsonify({
-            "status": "success",
-            "message": "Logs cleared"
-        })
+        return jsonify({"status": "success", "message": "Logs cleared"})
 
     except Exception as e:
         logger.error(f"Error clearing logs: {e}")
@@ -1474,39 +1525,29 @@ def convert_coordinates_api():
         if not isinstance(dms_str, str) or len(dms_str) > 50:
             logger.warning(f"Invalid DMS input: {dms_str}")
             return jsonify({"status": "error", "message": "Invalid input"}), 400
-        
+
         # Use module-level DMS_PATTERN constant
         match = DMS_PATTERN.match(dms_str.strip())
-        
+
         if match:
             degrees = int(match.group(1))
             minutes = int(match.group(2))
             seconds = float(match.group(3))
-            
+
             # Convert to decimal
-            decimal = abs(degrees) + minutes/60 + seconds/3600
+            decimal = abs(degrees) + minutes / 60 + seconds / 3600
             if degrees < 0:
                 decimal = -decimal
-            
+
             # Validate reasonable ranges (lat: -90 to 90, lon: -180 to 180)
             # Note: We don't know if this is lat or lon, so we use wider range
             if decimal < -180 or decimal > 180:
-                return jsonify({
-                    "status": "error",
-                    "message": "Coordinate value out of valid range (-180 to 180)"
-                }), 400
-            
-            return jsonify({
-                "status": "success",
-                "decimal": round(decimal, 6),
-                "dms": dms_str
-            })
+                return jsonify({"status": "error", "message": "Coordinate value out of valid range (-180 to 180)"}), 400
+
+            return jsonify({"status": "success", "decimal": round(decimal, 6), "dms": dms_str})
         else:
-            return jsonify({
-                "status": "error",
-                "message": "Invalid DMS format. Use format like: 48d38m36.16s"
-            }), 400
-            
+            return jsonify({"status": "error", "message": "Invalid DMS format. Use format like: 48d38m36.16s"}), 400
+
     except Exception as e:
         logger.error(f"Error converting coordinates: {e}")
         return jsonify({'error': 'Internal server error'}), 500
@@ -1519,18 +1560,11 @@ def get_timezones_api():
     result = []
 
     for tz in sorted(available_timezones()):
-        if not (
-            tz.startswith("posix/")
-            or tz.startswith("right/")
-            or tz == "localtime"
-        ):
+        if not (tz.startswith("posix/") or tz.startswith("right/") or tz == "localtime"):
             local_time = now.astimezone(ZoneInfo(tz))
             offset = local_time.strftime('%z')
 
-            result.append({
-                "name": tz,
-                "offset": offset
-            })
+            result.append({"name": tz, "offset": offset})
 
     return jsonify(result)
 
@@ -1556,15 +1590,17 @@ def cache_health_api():
     All cache management is server-side only.
     """
     status = cache_store.get_cache_init_status()
-    return jsonify({
-        "cache_status": status["all_ready"],
-        "in_progress": status["in_progress"],
-        "current_step": status.get("current_step", 0),
-        "total_steps": status.get("total_steps", 0),
-        "step_name": status.get("step_name", ""),
-        "progress_percent": status.get("progress_percent", 0),
-        "details": status
-    })
+    return jsonify(
+        {
+            "cache_status": status["all_ready"],
+            "in_progress": status["in_progress"],
+            "current_step": status.get("current_step", 0),
+            "total_steps": status.get("total_steps", 0),
+            "step_name": status.get("step_name", ""),
+            "progress_percent": status.get("progress_percent", 0),
+            "details": status,
+        }
+    )
 
 
 @app.route('/api/version', methods=['GET'])
@@ -1589,11 +1625,16 @@ def check_updates_api():
         return jsonify(update_info)
     except Exception:
         logger.error("Error in check updates API")
-        return jsonify({
-            "current_version": get_repo_version().strip(),
-            "update_available": False,
-            "error": "Internal server error"
-        }), 500
+        return (
+            jsonify(
+                {
+                    "current_version": get_repo_version().strip(),
+                    "update_available": False,
+                    "error": "Internal server error",
+                }
+            ),
+            500,
+        )
 
 
 # ============================================================
@@ -1601,10 +1642,10 @@ def check_updates_api():
 # ============================================================
 
 
-
 # ============================================================
 # API Weather
 # ============================================================
+
 
 @app.route('/api/weather/forecast', methods=['GET'])
 @login_required
@@ -1624,7 +1665,12 @@ def get_hourly_forecast_api():
             if cache_store._weather_cache.get("data"):
                 logger.warning("[WARNING] Weather API unavailable, serving stale cache")
                 return jsonify(cache_store._weather_cache["data"])
-            return jsonify({"status": "pending", "message": "Weather data is temporarily unavailable. Please retry shortly."}), 202
+            return (
+                jsonify(
+                    {"status": "pending", "message": "Weather data is temporarily unavailable. Please retry shortly."}
+                ),
+                202,
+            )
 
         df = forecast["hourly"].copy()
         df["date"] = df["date"].dt.strftime("%Y-%m-%dT%H:%M:%S%z")
@@ -1652,6 +1698,7 @@ def get_hourly_forecast_api():
         logger.error(f"Error getting hourly forecast: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
+
 @app.route('/api/weather/astro-analysis', methods=['GET'])
 @login_required
 def get_astro_weather_analysis_api():
@@ -1663,23 +1710,31 @@ def get_astro_weather_analysis_api():
         requested_language = requested_language.split(",")[0].split("-")[0].lower()
         supported_languages = I18nManager.get_supported_languages()
         language = requested_language if requested_language in supported_languages else "en"
-        
+
         # Get optional hours parameter (default 24)
         hours = request.args.get('hours', 24, type=int)
         hours = min(max(hours, 1), 72)  # Limit between 1-72 hours
-        
+
         analysis = get_astro_weather_analysis(hours, language=language)
         if analysis is None:
-            return jsonify({
-                "status": "pending",
-                "message": "Astrophotography weather analysis is temporarily unavailable. Please retry shortly."
-            }), 202
-        
+            return (
+                jsonify(
+                    {
+                        "status": "pending",
+                        "message": (
+                            "Astrophotography weather analysis is temporarily unavailable. Please retry shortly."
+                        ),
+                    }
+                ),
+                202,
+            )
+
         return jsonify(analysis)
-        
+
     except Exception as e:
         logger.error(f"Error getting astro weather analysis: {e}")
         return jsonify({'error': 'Internal server error'}), 500
+
 
 @app.route('/api/weather/astro-current', methods=['GET'])
 @login_required
@@ -1687,16 +1742,17 @@ def get_current_astro_conditions_api():
     """Get current astrophotography conditions summary"""
     try:
         from weather_astro import get_current_astro_conditions
-        
+
         conditions = get_current_astro_conditions()
         if conditions is None:
             return jsonify({"error": "Failed to fetch current astrophotography conditions"}), 500
-        
+
         return jsonify(conditions)
-        
+
     except Exception as e:
         logger.error(f"Error getting current astro conditions: {e}")
         return jsonify({'error': 'Internal server error'}), 500
+
 
 @app.route('/api/weather/alerts', methods=['GET'])
 @login_required
@@ -1709,24 +1765,28 @@ def get_weather_alerts_api():
         requested_language = requested_language.split(",")[0].split("-")[0].lower()
         supported_languages = I18nManager.get_supported_languages()
         language = requested_language if requested_language in supported_languages else "en"
-        
+
         analysis = get_astro_weather_analysis(6, language=language)  # Next 6 hours for alerts
         if analysis is None:
             return jsonify({"alerts": [], "status": "pending"}), 200
-        
-        return jsonify({
-            "alerts": analysis.get("weather_alerts", []),
-            "generated_at": analysis.get("generated_at"),
-            "location": analysis.get("location")
-        })
-        
+
+        return jsonify(
+            {
+                "alerts": analysis.get("weather_alerts", []),
+                "generated_at": analysis.get("generated_at"),
+                "location": analysis.get("location"),
+            }
+        )
+
     except Exception as e:
         logger.error(f"Error getting weather alerts: {e}")
         return jsonify({'error': 'Internal server error'}), 500
-    
+
+
 # ============================================================
 # API Moon & Sun
 # ============================================================
+
 
 @app.route("/api/moon/report", methods=["GET"])
 @login_required
@@ -1748,10 +1808,10 @@ def get_moon_report_api():
             return jsonify(stale_data)
 
         # Cache not ready yet (scheduler will refresh in background).
-        return jsonify({
-            "status": "pending",
-            "message": "Moon report cache is not ready yet. Please try again shortly."
-        }), 202
+        return (
+            jsonify({"status": "pending", "message": "Moon report cache is not ready yet. Please try again shortly."}),
+            202,
+        )
 
     except Exception as e:
         logger.error(f"Error getting Moon report cache: {e}")
@@ -1778,10 +1838,10 @@ def get_next_dark_window_api():
             return jsonify(stale_data)
 
         # Cache not ready yet (scheduler will refresh in background).
-        return jsonify({
-            "status": "pending",
-            "message": "Dark window cache is not ready yet. Please try again shortly."
-        }), 202
+        return (
+            jsonify({"status": "pending", "message": "Dark window cache is not ready yet. Please try again shortly."}),
+            202,
+        )
 
     except Exception as e:
         logger.error(f"Error getting Dark Window cache: {e}")
@@ -1806,10 +1866,10 @@ def get_next_7_nights_api():
             return jsonify(stale_data)
 
         # Cache non disponible
-        return jsonify({
-            "status": "pending",
-            "message": "Moon Planner cache is not ready yet. Please try again shortly."
-        }), 202
+        return (
+            jsonify({"status": "pending", "message": "Moon Planner cache is not ready yet. Please try again shortly."}),
+            202,
+        )
 
     except Exception as e:
         logger.error(f"Error getting Moon Planner cache: {e}")
@@ -1819,13 +1879,14 @@ def get_next_7_nights_api():
 _moon_calendar_cache: dict = {"timestamp": 0, "data": None}
 _MOON_CALENDAR_TTL = 3600  # 1 hour - recompute once per hour at most
 
+
 @app.route("/api/moon/month-calendar", methods=["GET"])
 @login_required
 def get_moon_month_calendar_api():
     """Return next 30 nights moon/darkness data for the Plan My Night calendar widget."""
-    global _moon_calendar_cache
     try:
         import time as _time
+
         now = _time.time()
         if _moon_calendar_cache["data"] and (now - _moon_calendar_cache["timestamp"]) < _MOON_CALENDAR_TTL:
             return jsonify(_moon_calendar_cache["data"])
@@ -1834,7 +1895,7 @@ def get_moon_month_calendar_api():
         location = cfg.get("location", {})
         lat = location.get("latitude")
         lon = location.get("longitude")
-        tz  = location.get("timezone", cfg.get("timezone", "UTC"))
+        tz = location.get("timezone", cfg.get("timezone", "UTC"))
         if lat is None or lon is None:
             return jsonify({"error": "Location not configured"}), 400
 
@@ -1878,10 +1939,12 @@ def get_aurora_predictions_api():
             return jsonify(stale_data)
 
         # Cache not available
-        return jsonify({
-            "status": "pending",
-            "message": "Aurora predictions cache is not ready yet. Please try again shortly."
-        }), 202
+        return (
+            jsonify(
+                {"status": "pending", "message": "Aurora predictions cache is not ready yet. Please try again shortly."}
+            ),
+            202,
+        )
 
     except Exception as e:
         logger.error(f"Error getting Aurora predictions cache: {e}")
@@ -1906,10 +1969,12 @@ def get_seeing_forecast_api():
             return jsonify(stale_data)
 
         # Cache not available
-        return jsonify({
-            "status": "pending",
-            "message": "Seeing forecast cache is not ready yet. Please try again shortly."
-        }), 202
+        return (
+            jsonify(
+                {"status": "pending", "message": "Seeing forecast cache is not ready yet. Please try again shortly."}
+            ),
+            202,
+        )
 
     except Exception as e:
         logger.error(f"Error getting Seeing forecast cache: {e}")
@@ -1968,6 +2033,7 @@ def get_object_info_api(identifier):
 def get_iss_passes_api():
     """Return ISS passes report, from cache only"""
     try:
+
         def _with_celestrak_status(payload: Dict[str, Any]) -> Dict[str, Any]:
             merged = dict(payload)
             merged["celestrak_status"] = iss_passes.get_celestrak_status()
@@ -1988,10 +2054,10 @@ def get_iss_passes_api():
                 if isinstance(cached_data, dict) and cached_data.get("window_days") == days:
                     return jsonify(_with_celestrak_status(cached_data))
 
-        return jsonify({
-            "status": "pending",
-            "message": "ISS passes cache is not ready yet. Please try again shortly."
-        }), 202
+        return (
+            jsonify({"status": "pending", "message": "ISS passes cache is not ready yet. Please try again shortly."}),
+            202,
+        )
 
     except Exception as e:
         logger.error(f"Error getting ISS passes cache: {e}")
@@ -2014,7 +2080,7 @@ def get_iss_location_api():
             elevation_m=elev,
         )
         return jsonify(position)
-    except RuntimeError as exc:
+    except RuntimeError:
         logger.exception("Runtime error computing ISS location")
         return jsonify({'error': 'Service temporarily unavailable'}), 503
     except Exception as exc:
@@ -2028,11 +2094,13 @@ def restart_iss_celestrak_crawl_api():
     """Clear Celestrak block flag after explicit operator confirmation in UI."""
     try:
         status = iss_passes.clear_celestrak_block_flag()
-        return jsonify({
-            "status": "ok",
-            "message": "Celestrak block flag cleared. Next crawl may query Celestrak again.",
-            "celestrak_status": status,
-        })
+        return jsonify(
+            {
+                "status": "ok",
+                "message": "Celestrak block flag cleared. Next crawl may query Celestrak again.",
+                "celestrak_status": status,
+            }
+        )
     except Exception as exc:
         logger.error(f"Error resetting Celestrak block flag: {exc}")
         return jsonify({'error': 'Internal server error'}), 500
@@ -2109,6 +2177,7 @@ def spaceflight_image(filename):
     on the fly so stale cache entries pointing to deleted files self-heal.
     """
     import re
+
     if not re.match(r'^[a-f0-9]{32}\.(jpg|jpeg|png|webp|gif)$', filename):
         return jsonify({"error": "Invalid filename"}), 400
     img_dir = os.path.realpath(os.path.join(DATA_DIR_CACHE, 'spaceflight_images'))
@@ -2123,6 +2192,7 @@ def spaceflight_image(filename):
                 with open(sidecar, 'r', encoding='utf-8') as sf:
                     original_url = sf.read().strip()
                 import requests as _req
+
                 resp = _req.get(original_url, timeout=15, stream=True)
                 resp.raise_for_status()
                 os.makedirs(img_dir, exist_ok=True)
@@ -2145,10 +2215,12 @@ def get_spaceflight_launch_vidurls(launch_id):
     Results are cached in-process for 5 minutes to protect the free-tier rate limit.
     Only call this for launches where webcast_live=true."""
     import re
+
     if not re.match(r'^[0-9a-f-]{36}$', launch_id):
         return jsonify({"error": "Invalid launch ID"}), 400
     try:
         from spaceflight_tracker import get_launch_vidurls
+
         vidurls = get_launch_vidurls(launch_id)
         return jsonify({"vidURLs": vidurls})
     except Exception as exc:
@@ -2205,10 +2277,10 @@ def get_sun_today_api():
             return jsonify(stale_data)
 
         # Cache non disponible
-        return jsonify({
-            "status": "pending",
-            "message": "Sun report cache is not ready yet. Please try again shortly."
-        }), 202
+        return (
+            jsonify({"status": "pending", "message": "Sun report cache is not ready yet. Please try again shortly."}),
+            202,
+        )
 
     except Exception as e:
         logger.error(f"Error getting Sun report cache: {e}")
@@ -2233,10 +2305,12 @@ def get_solar_eclipse_api():
             return jsonify(stale_data)
 
         # Cache non disponible
-        return jsonify({
-            "status": "pending",
-            "message": "Solar eclipse cache is not ready yet. Please try again shortly."
-        }), 202
+        return (
+            jsonify(
+                {"status": "pending", "message": "Solar eclipse cache is not ready yet. Please try again shortly."}
+            ),
+            202,
+        )
 
     except Exception as e:
         logger.error(f"Error getting Solar Eclipse cache: {e}")
@@ -2261,10 +2335,12 @@ def get_lunar_eclipse_api():
             return jsonify(stale_data)
 
         # Cache non disponible
-        return jsonify({
-            "status": "pending",
-            "message": "Lunar eclipse cache is not ready yet. Please try again shortly."
-        }), 202
+        return (
+            jsonify(
+                {"status": "pending", "message": "Lunar eclipse cache is not ready yet. Please try again shortly."}
+            ),
+            202,
+        )
 
     except Exception as e:
         logger.error(f"Error getting Lunar Eclipse cache: {e}")
@@ -2397,10 +2473,15 @@ def get_planetary_events_api():
         if stale_data:
             return jsonify(stale_data)
 
-        return jsonify({
-            "status": "pending",
-            "message": "Planetary events cache is not ready yet. Please try again shortly.",
-        }), 202
+        return (
+            jsonify(
+                {
+                    "status": "pending",
+                    "message": "Planetary events cache is not ready yet. Please try again shortly.",
+                }
+            ),
+            202,
+        )
 
     except Exception as e:
         logger.error(f"Error retrieving planetary events: {e}")
@@ -2431,10 +2512,15 @@ def get_special_phenomena_api():
         if stale_data:
             return jsonify(_translate_special_phenomena_events(stale_data, language))
 
-        return jsonify({
-            "status": "pending",
-            "message": "Special phenomena cache is not ready yet. Please try again shortly.",
-        }), 202
+        return (
+            jsonify(
+                {
+                    "status": "pending",
+                    "message": "Special phenomena cache is not ready yet. Please try again shortly.",
+                }
+            ),
+            202,
+        )
 
     except Exception as e:
         logger.error(f"Error retrieving special phenomena: {e}")
@@ -2451,7 +2537,7 @@ def get_solar_system_events_api():
         requested_language = requested_language.split(",")[0].split("-")[0].lower()
         supported_languages = I18nManager.get_supported_languages()
         language = requested_language if requested_language in supported_languages else "en"
-        
+
         if cache_store.is_cache_valid(cache_store._solar_system_events_cache, CACHE_TTL):
             data = cache_store._solar_system_events_cache["data"]
             return jsonify(_translate_solar_system_events(data, language))
@@ -2466,10 +2552,15 @@ def get_solar_system_events_api():
         if stale_data:
             return jsonify(_translate_solar_system_events(stale_data, language))
 
-        return jsonify({
-            "status": "pending",
-            "message": "Solar system events cache is not ready yet. Please try again shortly.",
-        }), 202
+        return (
+            jsonify(
+                {
+                    "status": "pending",
+                    "message": "Solar system events cache is not ready yet. Please try again shortly.",
+                }
+            ),
+            202,
+        )
 
     except Exception as e:
         logger.error(f"Error retrieving solar system events: {e}")
@@ -2479,37 +2570,37 @@ def get_solar_system_events_api():
 def _translate_solar_system_events(data: Dict[str, Any], language: str) -> Dict[str, Any]:
     """
     Translate solar system event descriptions based on language
-    
+
     Args:
         data: Solar system events cache data
         language: Target language code
-    
+
     Returns:
         Data with translated event descriptions
     """
     if language == "en":
         # English is default, no translation needed
         return data
-    
+
     # Create a copy to avoid modifying cache
     translated_data = data.copy() if isinstance(data, dict) else {"events": []}
     events = translated_data.get("events", [])
-    
+
     if not isinstance(events, list):
         return translated_data
-    
+
     # Translate each event's title and description
     i18n = I18nManager(language)
     translated_events = []
-    
+
     for event in events:
         if not isinstance(event, dict):
             translated_events.append(event)
             continue
-        
+
         translated_event = event.copy()
         event_type = event.get("event_type", "")
-        
+
         try:
             # Translate based on event type
             if event_type == "Meteor Shower":
@@ -2517,40 +2608,42 @@ def _translate_solar_system_events(data: Dict[str, Any], language: str) -> Dict[
                 shower_name = raw_data.get("shower", "")
                 zenith_hourly_rate = event.get("zenith_hourly_rate", "")
                 parent_body = event.get("parent_body", "")
-                
+
                 if shower_name and zenith_hourly_rate and parent_body:
                     title = i18n.t('events_api.solar_system.meteor_shower_title', shower_name=shower_name)
-                    description = i18n.t('events_api.solar_system.meteor_shower_description',
-                                        zenith_hourly_rate=zenith_hourly_rate,
-                                        parent_body=parent_body)
+                    description = i18n.t(
+                        'events_api.solar_system.meteor_shower_description',
+                        zenith_hourly_rate=zenith_hourly_rate,
+                        parent_body=parent_body,
+                    )
                     translated_event["title"] = title
                     translated_event["description"] = description
-            
+
             elif event_type == "Comet Appearance":
                 magnitude = event.get("magnitude", "")
                 visibility = event.get("equipment_needed", "")
                 raw_data = event.get("raw_data", {})
                 comet_name = raw_data.get("comet", "")
-                
+
                 if comet_name and magnitude and visibility:
                     title = i18n.t('events_api.solar_system.comet_title', comet_name=comet_name)
-                    description = i18n.t('events_api.solar_system.comet_description',
-                                        magnitude=magnitude,
-                                        visibility=visibility)
+                    description = i18n.t(
+                        'events_api.solar_system.comet_description', magnitude=magnitude, visibility=visibility
+                    )
                     translated_event["title"] = title
                     translated_event["description"] = description
-            
+
             elif event_type == "Asteroid Occultation":
                 title = i18n.t('events_api.solar_system.asteroid_occultation_title')
                 description = i18n.t('events_api.solar_system.asteroid_occultation_description')
                 translated_event["title"] = title
                 translated_event["description"] = description
-        
+
         except Exception as e:
             logger.debug(f"Error translating solar system event: {e}")
-        
+
         translated_events.append(translated_event)
-    
+
     translated_data["events"] = translated_events
     return translated_data
 
@@ -2592,38 +2685,52 @@ def _translate_special_phenomena_events(data: Dict[str, Any], language: str) -> 
             if event_key == "spring_equinox":
                 translated_event["title"] = _t(
                     'events_api.special_phenomena.spring_equinox_title',
-                    str(event.get("title", "Vernal Equinox (Spring)"))
+                    str(event.get("title", "Vernal Equinox (Spring)")),
                 )
                 translated_event["description"] = _t(
                     'events_api.special_phenomena.spring_equinox_description',
-                    str(event.get("description", "First day of spring. Equal day and night length. Sun directly above equator."))
+                    str(
+                        event.get(
+                            "description",
+                            "First day of spring. Equal day and night length. Sun directly above equator.",
+                        )
+                    ),
                 )
             elif event_key == "summer_solstice":
                 translated_event["title"] = _t(
-                    'events_api.special_phenomena.summer_solstice_title',
-                    str(event.get("title", "Summer Solstice"))
+                    'events_api.special_phenomena.summer_solstice_title', str(event.get("title", "Summer Solstice"))
                 )
                 translated_event["description"] = _t(
                     'events_api.special_phenomena.summer_solstice_description',
-                    str(event.get("description", "First day of summer. Longest day of the year in Northern Hemisphere."))
+                    str(
+                        event.get("description", "First day of summer. Longest day of the year in Northern Hemisphere.")
+                    ),
                 )
             elif event_key == "autumn_equinox":
                 translated_event["title"] = _t(
                     'events_api.special_phenomena.autumn_equinox_title',
-                    str(event.get("title", "Autumnal Equinox (Fall)"))
+                    str(event.get("title", "Autumnal Equinox (Fall)")),
                 )
                 translated_event["description"] = _t(
                     'events_api.special_phenomena.autumn_equinox_description',
-                    str(event.get("description", "First day of autumn. Equal day and night length. Sun directly above equator."))
+                    str(
+                        event.get(
+                            "description",
+                            "First day of autumn. Equal day and night length. Sun directly above equator.",
+                        )
+                    ),
                 )
             elif event_key == "winter_solstice":
                 translated_event["title"] = _t(
-                    'events_api.special_phenomena.winter_solstice_title',
-                    str(event.get("title", "Winter Solstice"))
+                    'events_api.special_phenomena.winter_solstice_title', str(event.get("title", "Winter Solstice"))
                 )
                 translated_event["description"] = _t(
                     'events_api.special_phenomena.winter_solstice_description',
-                    str(event.get("description", "First day of winter. Shortest day of the year in Northern Hemisphere."))
+                    str(
+                        event.get(
+                            "description", "First day of winter. Shortest day of the year in Northern Hemisphere."
+                        )
+                    ),
                 )
             elif event_key == "zodiacal_light":
                 viewing_raw = str(event.get("viewing_type", "")).strip().lower()
@@ -2635,11 +2742,17 @@ def _translate_special_phenomena_events(data: Dict[str, Any], language: str) -> 
                 translated_event["title"] = _t(
                     'events_api.special_phenomena.zodiacal_light_title',
                     str(event.get("title", "Zodiacal Light Visible ({viewing_type})")),
-                    viewing_type=viewing_label
+                    viewing_type=viewing_label,
                 )
                 translated_event["description"] = _t(
                     'events_api.special_phenomena.zodiacal_light_description',
-                    str(event.get("description", "Faint cone of light from interplanetary dust visible during twilight. Best viewed in dark skies."))
+                    str(
+                        event.get(
+                            "description",
+                            "Faint cone of light from interplanetary dust visible during twilight."
+                            " Best viewed in dark skies.",
+                        )
+                    ),
                 )
                 translated_event["viewing_type"] = viewing_label
             elif event_type == "Milky Way Core Visibility":
@@ -2654,12 +2767,18 @@ def _translate_special_phenomena_events(data: Dict[str, Any], language: str) -> 
                     altitude_text = f"{float(gc_altitude):.0f}"
                     translated_event["title"] = _t(
                         'events_api.special_phenomena.milky_way_title',
-                        str(event.get("title", "Milky Way Core Visible"))
+                        str(event.get("title", "Milky Way Core Visible")),
                     )
                     translated_event["description"] = _t(
                         'events_api.special_phenomena.milky_way_description',
-                        str(event.get("description", "Galactic center visible at {gc_altitude}° altitude. Excellent night for wide-field astrophotography.")),
-                        gc_altitude=altitude_text
+                        str(
+                            event.get(
+                                "description",
+                                "Galactic center visible at {gc_altitude}° altitude."
+                                " Excellent night for wide-field astrophotography.",
+                            )
+                        ),
+                        gc_altitude=altitude_text,
                     )
         except Exception as e:
             logger.debug(f"Error translating special phenomenon event: {e}")
@@ -2685,6 +2804,7 @@ def get_sidereal_time_api():
             return jsonify({'error': 'Location not configured'}), 400
 
         from sidereal_time import SiderealTimeService
+
         svc = SiderealTimeService(
             latitude=location["latitude"],
             longitude=location["longitude"],
@@ -2703,16 +2823,18 @@ def get_sidereal_time_api():
         if cache_store.is_cache_valid_for_today(cached, CACHE_TTL_SIDEREAL_TIME) and cached.get("data"):
             hourly_forecast = cached["data"].get("hourly_forecast")
 
-        return jsonify({
-            "location": location,
-            "current": current_info,
-            "hourly_forecast": hourly_forecast,
-            "units": {
-                "sidereal_time": "hours (0-24, where 24h = 1 sidereal day = 23h56m4s solar time)",
-                "coordinates": "degrees",
-                "elevation": "meters"
+        return jsonify(
+            {
+                "location": location,
+                "current": current_info,
+                "hourly_forecast": hourly_forecast,
+                "units": {
+                    "sidereal_time": "hours (0-24, where 24h = 1 sidereal day = 23h56m4s solar time)",
+                    "coordinates": "degrees",
+                    "elevation": "meters",
+                },
             }
-        })
+        )
 
     except Exception as e:
         logger.error(f"Error retrieving sidereal time: {e}")
@@ -2737,10 +2859,12 @@ def get_horizon_graph_api():
             return jsonify(stale_data)
 
         # Cache not available
-        return jsonify({
-            "status": "pending",
-            "message": "Horizon graph cache is not ready yet. Please try again shortly."
-        }), 202
+        return (
+            jsonify(
+                {"status": "pending", "message": "Horizon graph cache is not ready yet. Please try again shortly."}
+            ),
+            202,
+        )
 
     except Exception as e:
         logger.error(f"Error getting Horizon Graph cache: {e}")
@@ -2785,9 +2909,8 @@ def best_window_api():
                 results[current_mode] = {
                     "status": "pending",
                     "message": (
-                        f"Best window cache for mode '{current_mode}' is not ready yet. "
-                        "Please try again shortly."
-                    )
+                        f"Best window cache for mode '{current_mode}' is not ready yet. " "Please try again shortly."
+                    ),
                 }
 
             return jsonify({"modes": results})
@@ -2811,10 +2934,15 @@ def best_window_api():
             return jsonify(cache_entry["data"])
 
         # Cache non disponible
-        return jsonify({
-            "status": "pending",
-            "message": f"Best window cache for mode '{mode}' is not ready yet. Please try again shortly."
-        }), 202
+        return (
+            jsonify(
+                {
+                    "status": "pending",
+                    "message": f"Best window cache for mode '{mode}' is not ready yet. Please try again shortly.",
+                }
+            ),
+            202,
+        )
 
     except Exception as e:
         logger.error(f"Error getting Best Window cache: {e}")
@@ -3001,6 +3129,7 @@ def list_plan_my_night():
             return jsonify({'error': 'User not authenticated'}), 401
 
         import equipment_profiles as _ep
+
         telescopes_data = _ep.load_user_telescopes(user.user_id)
         own = [{**t, 'is_own': True, 'owner_username': None} for t in telescopes_data.get('items', [])]
         shared = [{**t, 'is_own': False} for t in _ep.load_all_shared_equipment('telescopes', user.user_id)]
@@ -3024,11 +3153,13 @@ def get_plan_my_night():
         telescope_id = request.args.get('telescope_id') or None
         plan_payload = plan_my_night.get_plan_with_timeline(user.user_id, user.username, telescope_id=telescope_id)
         plan_payload = _enrich_plan_entries_with_astrodex_status(plan_payload, user.user_id)
-        return jsonify({
-            'role': user.role,
-            'can_edit': user.is_admin() or user.is_user(),
-            **plan_payload,
-        })
+        return jsonify(
+            {
+                'role': user.role,
+                'can_edit': user.is_admin() or user.is_user(),
+                **plan_payload,
+            }
+        )
     except Exception as error:
         logger.error(f'Error loading Plan My Night: {error}')
         return jsonify({'error': 'Internal server error'}), 500
@@ -3080,12 +3211,14 @@ def add_target_to_plan_my_night():
                 return jsonify({'error': 'Invalid night window'}), 409
             return jsonify({'error': 'Failed to add target'}), 500
 
-        return jsonify({
-            'status': 'success',
-            'reason': reason,
-            'entry': entry,
-            'plan': plan_my_night.get_plan_with_timeline(user.user_id, user.username, telescope_id=telescope_id),
-        })
+        return jsonify(
+            {
+                'status': 'success',
+                'reason': reason,
+                'entry': entry,
+                'plan': plan_my_night.get_plan_with_timeline(user.user_id, user.username, telescope_id=telescope_id),
+            }
+        )
     except Exception as error:
         logger.error(f'Error adding target to Plan My Night: {error}')
         return jsonify({'error': 'Internal server error'}), 500
@@ -3106,10 +3239,12 @@ def patch_plan_my_night():
         if updated is None:
             return jsonify({'error': 'Plan not found or locked'}), 404
 
-        return jsonify({
-            'status': 'success',
-            'plan': plan_my_night.get_plan_with_timeline(user.user_id, user.username, telescope_id=telescope_id),
-        })
+        return jsonify(
+            {
+                'status': 'success',
+                'plan': plan_my_night.get_plan_with_timeline(user.user_id, user.username, telescope_id=telescope_id),
+            }
+        )
     except Exception as error:
         logger.error(f'Error patching Plan My Night meta: {error}')
         return jsonify({'error': 'Internal server error'}), 500
@@ -3130,11 +3265,13 @@ def update_plan_my_night_target(entry_id):
         if not updated:
             return jsonify({'error': 'Target not found or plan locked'}), 404
 
-        return jsonify({
-            'status': 'success',
-            'entry': updated,
-            'plan': plan_my_night.get_plan_with_timeline(user.user_id, user.username, telescope_id=telescope_id),
-        })
+        return jsonify(
+            {
+                'status': 'success',
+                'entry': updated,
+                'plan': plan_my_night.get_plan_with_timeline(user.user_id, user.username, telescope_id=telescope_id),
+            }
+        )
     except Exception as error:
         logger.error(f'Error updating Plan My Night target {entry_id}: {error}')
         return jsonify({'error': 'Internal server error'}), 500
@@ -3155,14 +3292,18 @@ def reorder_plan_my_night_target(entry_id):
             return jsonify({'error': 'new_index is required'}), 400
         telescope_id = data.get('telescope_id') or None
 
-        success = plan_my_night.reorder_target(user.user_id, user.username, entry_id, int(new_index), telescope_id=telescope_id)
+        success = plan_my_night.reorder_target(
+            user.user_id, user.username, entry_id, int(new_index), telescope_id=telescope_id
+        )
         if not success:
             return jsonify({'error': 'Failed to reorder target'}), 404
 
-        return jsonify({
-            'status': 'success',
-            'plan': plan_my_night.get_plan_with_timeline(user.user_id, user.username, telescope_id=telescope_id),
-        })
+        return jsonify(
+            {
+                'status': 'success',
+                'plan': plan_my_night.get_plan_with_timeline(user.user_id, user.username, telescope_id=telescope_id),
+            }
+        )
     except Exception as error:
         logger.error(f'Error reordering Plan My Night target {entry_id}: {error}')
         return jsonify({'error': 'Internal server error'}), 500
@@ -3182,10 +3323,12 @@ def delete_plan_my_night_target(entry_id):
         if not success:
             return jsonify({'error': 'Target not found or plan locked'}), 404
 
-        return jsonify({
-            'status': 'success',
-            'plan': plan_my_night.get_plan_with_timeline(user.user_id, user.username, telescope_id=telescope_id),
-        })
+        return jsonify(
+            {
+                'status': 'success',
+                'plan': plan_my_night.get_plan_with_timeline(user.user_id, user.username, telescope_id=telescope_id),
+            }
+        )
     except Exception as error:
         logger.error(f'Error deleting Plan My Night target {entry_id}: {error}')
         return jsonify({'error': 'Internal server error'}), 500
@@ -3286,8 +3429,9 @@ def export_plan_my_night_csv():
         if not user:
             return jsonify({'error': 'User not authenticated'}), 401
 
-        payload = plan_my_night.get_plan_with_timeline(user.user_id, user.username,
-                                                       telescope_id=request.args.get('telescope_id') or None)
+        payload = plan_my_night.get_plan_with_timeline(
+            user.user_id, user.username, telescope_id=request.args.get('telescope_id') or None
+        )
         language = _resolve_requested_language()
         i18n = I18nManager(language)
         csv_labels = {
@@ -3317,12 +3461,7 @@ def export_plan_my_night_csv():
         _csv_scope = re.sub(r'[^\w\-]', '_', (_plan_meta.get('telescope_name') or '').strip()) or None
         _csv_name = f'plan-my-night_{_csv_date}_{_csv_scope}.csv' if _csv_scope else f'plan-my-night_{_csv_date}.csv'
 
-        return send_file(
-            buffer,
-            as_attachment=True,
-            mimetype='text/csv',
-            download_name=_csv_name
-        )
+        return send_file(buffer, as_attachment=True, mimetype='text/csv', download_name=_csv_name)
     except Exception as error:
         logger.error(f'Error exporting Plan My Night CSV: {error}')
         return jsonify({'error': 'Internal server error'}), 500
@@ -3338,25 +3477,25 @@ def export_plan_my_night_pdf():
             return jsonify({'error': 'User not authenticated'}), 401
 
         language = _resolve_requested_language()
-        i18n     = I18nManager(language)
-        payload  = plan_my_night.get_plan_with_timeline(
-            user.user_id, user.username,
+        i18n = I18nManager(language)
+        payload = plan_my_night.get_plan_with_timeline(
+            user.user_id,
+            user.username,
             telescope_id=request.args.get('telescope_id') or None,
         )
         metrics = _compute_plan_fill_metrics(payload.get('plan') or {})
-        buffer  = plan_my_night.generate_plan_pdf(payload, metrics, i18n)
+        buffer = plan_my_night.generate_plan_pdf(payload, metrics, i18n)
 
-        plan       = payload.get('plan')
-        _pdf_date  = (plan.get('plan_date') or '').replace('-', '') if plan else 'unknown'
+        plan = payload.get('plan')
+        _pdf_date = (plan.get('plan_date') or '').replace('-', '') if plan else 'unknown'
         _pdf_scope = re.sub(r'[^\w\-]', '_', (plan.get('telescope_name') or '').strip()) if plan else None
-        _pdf_name  = (f'plan-my-night_{_pdf_date}_{_pdf_scope}.pdf' if _pdf_scope
-                      else f'plan-my-night_{_pdf_date}.pdf')
+        _pdf_name = f'plan-my-night_{_pdf_date}_{_pdf_scope}.pdf' if _pdf_scope else f'plan-my-night_{_pdf_date}.pdf'
 
-        return send_file(buffer, as_attachment=True, mimetype='application/pdf',
-                         download_name=_pdf_name)
+        return send_file(buffer, as_attachment=True, mimetype='application/pdf', download_name=_pdf_name)
     except Exception as error:
         logger.error(f'Error exporting Plan My Night PDF: {error}')
         return jsonify({'error': 'Internal server error'}), 500
+
 
 @app.route('/api/astrodex', methods=['GET'])
 @login_required
@@ -3381,17 +3520,19 @@ def get_astrodex():
             current_user_id=user_id,
             current_username=user.username,
             private_mode=private_mode,
-            usernames_by_id=usernames_by_id
+            usernames_by_id=usernames_by_id,
         )
-        
-        return jsonify({
-            'items': astrodex_data.get('items', []),
-            'stats': astrodex_data.get('stats', {}),
-            'created_at': astrodex_data.get('created_at'),
-            'updated_at': astrodex_data.get('updated_at'),
-            'private_mode': astrodex_data.get('private_mode', private_mode),
-            'current_user_id': user_id
-        })
+
+        return jsonify(
+            {
+                'items': astrodex_data.get('items', []),
+                'stats': astrodex_data.get('stats', {}),
+                'created_at': astrodex_data.get('created_at'),
+                'updated_at': astrodex_data.get('updated_at'),
+                'private_mode': astrodex_data.get('private_mode', private_mode),
+                'current_user_id': user_id,
+            }
+        )
     except Exception as e:
         logger.error(f"Error getting astrodex: {e}")
         return jsonify({'error': 'Internal server error'}), 500
@@ -3406,23 +3547,20 @@ def add_astrodex_item():
         user_id = user.user_id if user else None
         if not user_id or not user:
             return jsonify({'error': 'User not authenticated'}), 401
-            
+
         item_data = request.json
-        
+
         if not item_data.get('name'):
             return jsonify({'error': 'Item name is required'}), 400
-        
+
         # Check if item already exists (exact name or catalogue aliases)
         if astrodex.is_item_in_astrodex(user_id, item_data['name'], item_data.get('catalogue', '')):
             return jsonify({'error': 'Item already exists in Astrodex'}), 400
-        
+
         new_item = astrodex.create_astrodex_item(user_id, item_data, user.username)
-        
+
         if new_item:
-            return jsonify({
-                'status': 'success',
-                'item': new_item
-            })
+            return jsonify({'status': 'success', 'item': new_item})
         else:
             return jsonify({'error': 'Failed to create item'}), 500
     except Exception as e:
@@ -3468,9 +3606,9 @@ def get_astrodex_item_api(item_id):
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-            
+
         item = astrodex.get_astrodex_item(user_id, item_id)
-        
+
         if item:
             return jsonify(item)
         else:
@@ -3489,16 +3627,13 @@ def update_astrodex_item_api(item_id):
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-            
+
         updates = request.json
-        
+
         updated_item = astrodex.update_astrodex_item(user_id, item_id, updates)
-        
+
         if updated_item:
-            return jsonify({
-                'status': 'success',
-                'item': updated_item
-            })
+            return jsonify({'status': 'success', 'item': updated_item})
         else:
             return jsonify({'error': 'Item not found'}), 404
     except Exception as e:
@@ -3515,7 +3650,7 @@ def delete_astrodex_item_api(item_id):
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        
+
         if astrodex.delete_astrodex_item(user_id, item_id):
             return jsonify({'status': 'success'})
         else:
@@ -3534,16 +3669,13 @@ def add_picture_to_astrodex_item(item_id):
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-            
+
         picture_data = request.json
-        
+
         new_picture = astrodex.add_picture_to_item(user_id, item_id, picture_data)
-        
+
         if new_picture:
-            return jsonify({
-                'status': 'success',
-                'picture': new_picture
-            })
+            return jsonify({'status': 'success', 'picture': new_picture})
         else:
             return jsonify({'error': 'Item not found or failed to add picture'}), 404
     except Exception as e:
@@ -3560,16 +3692,13 @@ def update_picture_api(item_id, picture_id):
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-            
+
         updates = request.json
-        
+
         updated_picture = astrodex.update_picture(user_id, item_id, picture_id, updates)
-        
+
         if updated_picture:
-            return jsonify({
-                'status': 'success',
-                'picture': updated_picture
-            })
+            return jsonify({'status': 'success', 'picture': updated_picture})
         else:
             return jsonify({'error': 'Picture not found'}), 404
     except Exception as e:
@@ -3586,7 +3715,7 @@ def delete_picture_api(item_id, picture_id):
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        
+
         if astrodex.delete_picture(user_id, item_id, picture_id):
             return jsonify({'status': 'success'})
         else:
@@ -3605,7 +3734,7 @@ def set_main_picture_api(item_id, picture_id):
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        
+
         if astrodex.set_main_picture(user_id, item_id, picture_id):
             return jsonify({'status': 'success'})
         else:
@@ -3650,9 +3779,8 @@ def upload_astrodex_image():
                 logger.warning("User not authenticated for file upload")
                 return jsonify({'error': 'User not authenticated'}), 401
 
-        
         except (TypeError, ValueError):
-            logger.warning(f"Invalid user ID")
+            logger.warning("Invalid user ID")
             return jsonify({'error': 'Invalid user ID'}), 400
 
         # Generate safe unique filename
@@ -3672,10 +3800,7 @@ def upload_astrodex_image():
         # Save file
         file.save(file_path)
 
-        return jsonify({
-            'status': 'success',
-            'filename': unique_filename
-        })
+        return jsonify({'status': 'success', 'filename': unique_filename})
 
     except Exception:
         logger.exception("Error uploading astrodex image")
@@ -3720,13 +3845,12 @@ def check_item_in_astrodex(item_name):
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
         is_in_astrodex = astrodex.is_item_in_astrodex(user_id, item_name)
-        
-        return jsonify({
-            'in_astrodex': is_in_astrodex
-        })
+
+        return jsonify({'in_astrodex': is_in_astrodex})
     except Exception as e:
         logger.error(f"Error checking astrodex: {e}")
         return jsonify({'error': 'Internal server error'}), 500
+
 
 @app.route('/api/astrodex/constellations', methods=['GET'])
 @login_required
@@ -3734,9 +3858,7 @@ def get_constellations():
     """Get list of constellation names"""
     try:
         constellations = astrodex.get_constellations_list()
-        return jsonify({
-            'constellations': constellations
-        })
+        return jsonify({'constellations': constellations})
     except Exception as e:
         logger.error(f"Error getting constellations: {e}")
         return jsonify({'error': 'Internal server error'}), 500
@@ -3753,12 +3875,14 @@ def astrodex_catalogue_lookup():
     try:
         from constellation import Constellation
         import re as _re
+
         # Build a one-time abbr→full-name mapping (e.g. 'Cnc' -> 'Cancer',
         # 'UMa' -> 'Ursa Major').  c.name is the Python enum member name
         # (e.g. 'UrsaMajor') so we apply the same humanize() logic used in
         # astrodex.get_constellations_list() to insert spaces before capitals.
         def _humanize(name: str) -> str:
             return _re.sub(r'(?<!^)(?=[A-Z])', ' ', name)
+
         _abbr_to_name = {c.abbr: _humanize(c.name) for c in Constellation}
 
         name = request.args.get('name', '').strip()
@@ -3772,13 +3896,15 @@ def astrodex_catalogue_lookup():
         if entry:
             raw_constellation = entry.get('constellation') or ''
             full_constellation = (_abbr_to_name.get(raw_constellation, raw_constellation) or '').lower()
-            return jsonify({
-                'found': True,
-                'preferred_name': entry.get('preferred_name', ''),
-                'object_type': entry.get('object_type', ''),
-                'constellation': full_constellation,
-                'catalogue_names': entry.get('aliases', {}),
-            })
+            return jsonify(
+                {
+                    'found': True,
+                    'preferred_name': entry.get('preferred_name', ''),
+                    'object_type': entry.get('object_type', ''),
+                    'constellation': full_constellation,
+                    'catalogue_names': entry.get('aliases', {}),
+                }
+            )
 
         # Fallback: query SIMBAD TAP to support extended catalogs (HIP, HD, SAO, TYC…)
         from object_info import (
@@ -3786,6 +3912,7 @@ def astrodex_catalogue_lookup():
             build_catalogue_names_from_aliases,
             is_safe_identifier,
         )
+
         if is_safe_identifier(name):
             simbad = resolve_identifier_for_catalogue_lookup(name)
             if simbad:
@@ -3796,22 +3923,26 @@ def astrodex_catalogue_lookup():
                     preferred_name = name
                 else:
                     preferred_name = simbad['aliases'][0] if simbad['aliases'] else name
-                return jsonify({
-                    'found': True,
-                    'preferred_name': preferred_name,
-                    'object_type': simbad['object_type'],
-                    'constellation': simbad['constellation'],
-                    'catalogue_names': catalogue_names,
-                })
+                return jsonify(
+                    {
+                        'found': True,
+                        'preferred_name': preferred_name,
+                        'object_type': simbad['object_type'],
+                        'constellation': simbad['constellation'],
+                        'catalogue_names': catalogue_names,
+                    }
+                )
 
         return jsonify({'found': False})
     except Exception as e:
         logger.error(f"Error in catalogue lookup: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
+
 # ============================================================
 # Equipment Profiles API
 # ============================================================
+
 
 # Telescopes
 @app.route('/api/equipment/telescopes', methods=['GET'])
@@ -3823,15 +3954,17 @@ def get_telescopes():
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        
+
         data = equipment_profiles.load_user_telescopes(user_id)
         shared = equipment_profiles.load_all_shared_equipment('telescopes', user_id)
-        return jsonify({
-            'data': data.get('items', []),
-            'shared_from_others': shared,
-            'created_at': data.get('created_at'),
-            'updated_at': data.get('updated_at')
-        })
+        return jsonify(
+            {
+                'data': data.get('items', []),
+                'shared_from_others': shared,
+                'created_at': data.get('created_at'),
+                'updated_at': data.get('updated_at'),
+            }
+        )
     except Exception as e:
         logger.error(f"Error getting telescopes: {e}")
         return jsonify({'error': 'Internal server error'}), 500
@@ -3846,15 +3979,12 @@ def create_telescope():
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        
+
         telescope_data = request.json
         new_telescope = equipment_profiles.create_telescope(user_id, telescope_data)
-        
+
         if new_telescope:
-            return jsonify({
-                'status': 'success',
-                'data': new_telescope
-            }), 201
+            return jsonify({'status': 'success', 'data': new_telescope}), 201
         else:
             return jsonify({'error': 'Failed to create telescope'}), 500
     except Exception as e:
@@ -3871,9 +4001,9 @@ def get_telescope(telescope_id):
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        
+
         telescope = equipment_profiles.get_telescope(user_id, telescope_id)
-        
+
         if telescope:
             return jsonify(telescope)
         else:
@@ -3892,7 +4022,7 @@ def update_telescope(telescope_id):
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        
+
         telescope_data = request.json
         shared = equipment_profiles.load_all_shared_equipment('telescopes', user_id)
         if any(t['id'] == telescope_id for t in shared):
@@ -3900,10 +4030,7 @@ def update_telescope(telescope_id):
         updated_telescope = equipment_profiles.update_telescope(user_id, telescope_id, telescope_data)
 
         if updated_telescope:
-            return jsonify({
-                'status': 'success',
-                'data': updated_telescope
-            })
+            return jsonify({'status': 'success', 'data': updated_telescope})
         else:
             return jsonify({'error': 'Telescope not found or update failed'}), 404
     except Exception as e:
@@ -3920,9 +4047,9 @@ def delete_telescope(telescope_id):
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        
+
         success = equipment_profiles.delete_telescope(user_id, telescope_id)
-        
+
         if success:
             return jsonify({'status': 'success'})
         else:
@@ -3942,15 +4069,17 @@ def get_cameras():
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        
+
         data = equipment_profiles.load_user_cameras(user_id)
         shared = equipment_profiles.load_all_shared_equipment('cameras', user_id)
-        return jsonify({
-            'data': data.get('items', []),
-            'shared_from_others': shared,
-            'created_at': data.get('created_at'),
-            'updated_at': data.get('updated_at')
-        })
+        return jsonify(
+            {
+                'data': data.get('items', []),
+                'shared_from_others': shared,
+                'created_at': data.get('created_at'),
+                'updated_at': data.get('updated_at'),
+            }
+        )
     except Exception as e:
         logger.error(f"Error getting cameras: {e}")
         return jsonify({'error': 'Internal server error'}), 500
@@ -3965,15 +4094,12 @@ def create_camera():
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        
+
         camera_data = request.json
         new_camera = equipment_profiles.create_camera(user_id, camera_data)
-        
+
         if new_camera:
-            return jsonify({
-                'status': 'success',
-                'data': new_camera
-            }), 201
+            return jsonify({'status': 'success', 'data': new_camera}), 201
         else:
             return jsonify({'error': 'Failed to create camera'}), 500
     except Exception as e:
@@ -3990,9 +4116,9 @@ def get_camera(camera_id):
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        
+
         camera = equipment_profiles.get_camera(user_id, camera_id)
-        
+
         if camera:
             return jsonify(camera)
         else:
@@ -4011,7 +4137,7 @@ def update_camera(camera_id):
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        
+
         camera_data = request.json
         shared = equipment_profiles.load_all_shared_equipment('cameras', user_id)
         if any(c['id'] == camera_id for c in shared):
@@ -4019,10 +4145,7 @@ def update_camera(camera_id):
         updated_camera = equipment_profiles.update_camera(user_id, camera_id, camera_data)
 
         if updated_camera:
-            return jsonify({
-                'status': 'success',
-                'data': updated_camera
-            })
+            return jsonify({'status': 'success', 'data': updated_camera})
         else:
             return jsonify({'error': 'Camera not found or update failed'}), 404
     except Exception as e:
@@ -4039,9 +4162,9 @@ def delete_camera(camera_id):
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        
+
         success = equipment_profiles.delete_camera(user_id, camera_id)
-        
+
         if success:
             return jsonify({'status': 'success'})
         else:
@@ -4061,15 +4184,17 @@ def get_mounts():
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        
+
         data = equipment_profiles.load_user_mounts(user_id)
         shared = equipment_profiles.load_all_shared_equipment('mounts', user_id)
-        return jsonify({
-            'data': data.get('items', []),
-            'shared_from_others': shared,
-            'created_at': data.get('created_at'),
-            'updated_at': data.get('updated_at')
-        })
+        return jsonify(
+            {
+                'data': data.get('items', []),
+                'shared_from_others': shared,
+                'created_at': data.get('created_at'),
+                'updated_at': data.get('updated_at'),
+            }
+        )
     except Exception as e:
         logger.error(f"Error getting mounts: {e}")
         return jsonify({'error': 'Internal server error'}), 500
@@ -4084,15 +4209,12 @@ def create_mount():
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        
+
         mount_data = request.json
         new_mount = equipment_profiles.create_mount(user_id, mount_data)
-        
+
         if new_mount:
-            return jsonify({
-                'status': 'success',
-                'data': new_mount
-            }), 201
+            return jsonify({'status': 'success', 'data': new_mount}), 201
         else:
             return jsonify({'error': 'Failed to create mount'}), 500
     except Exception as e:
@@ -4109,9 +4231,9 @@ def get_mount(mount_id):
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        
+
         mount = equipment_profiles.get_mount(user_id, mount_id)
-        
+
         if mount:
             return jsonify(mount)
         else:
@@ -4130,7 +4252,7 @@ def update_mount(mount_id):
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        
+
         mount_data = request.json
         shared = equipment_profiles.load_all_shared_equipment('mounts', user_id)
         if any(m['id'] == mount_id for m in shared):
@@ -4138,10 +4260,7 @@ def update_mount(mount_id):
         updated_mount = equipment_profiles.update_mount(user_id, mount_id, mount_data)
 
         if updated_mount:
-            return jsonify({
-                'status': 'success',
-                'data': updated_mount
-            })
+            return jsonify({'status': 'success', 'data': updated_mount})
         else:
             return jsonify({'error': 'Mount not found or update failed'}), 404
     except Exception as e:
@@ -4158,9 +4277,9 @@ def delete_mount(mount_id):
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        
+
         success = equipment_profiles.delete_mount(user_id, mount_id)
-        
+
         if success:
             return jsonify({'status': 'success'})
         else:
@@ -4180,15 +4299,17 @@ def get_filters():
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        
+
         data = equipment_profiles.load_user_filters(user_id)
         shared = equipment_profiles.load_all_shared_equipment('filters', user_id)
-        return jsonify({
-            'data': data.get('items', []),
-            'shared_from_others': shared,
-            'created_at': data.get('created_at'),
-            'updated_at': data.get('updated_at')
-        })
+        return jsonify(
+            {
+                'data': data.get('items', []),
+                'shared_from_others': shared,
+                'created_at': data.get('created_at'),
+                'updated_at': data.get('updated_at'),
+            }
+        )
     except Exception as e:
         logger.error(f"Error getting filters: {e}")
         return jsonify({'error': 'Internal server error'}), 500
@@ -4203,15 +4324,12 @@ def create_filter():
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        
+
         filter_data = request.json
         new_filter = equipment_profiles.create_filter(user_id, filter_data)
-        
+
         if new_filter:
-            return jsonify({
-                'status': 'success',
-                'data': new_filter
-            }), 201
+            return jsonify({'status': 'success', 'data': new_filter}), 201
         else:
             return jsonify({'error': 'Failed to create filter'}), 500
     except Exception as e:
@@ -4228,9 +4346,9 @@ def get_filter(filter_id):
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        
+
         filter_obj = equipment_profiles.get_filter(user_id, filter_id)
-        
+
         if filter_obj:
             return jsonify(filter_obj)
         else:
@@ -4249,7 +4367,7 @@ def update_filter(filter_id):
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        
+
         filter_data = request.json
         shared = equipment_profiles.load_all_shared_equipment('filters', user_id)
         if any(f['id'] == filter_id for f in shared):
@@ -4257,10 +4375,7 @@ def update_filter(filter_id):
         updated_filter = equipment_profiles.update_filter(user_id, filter_id, filter_data)
 
         if updated_filter:
-            return jsonify({
-                'status': 'success',
-                'data': updated_filter
-            })
+            return jsonify({'status': 'success', 'data': updated_filter})
         else:
             return jsonify({'error': 'Filter not found or update failed'}), 404
     except Exception as e:
@@ -4277,9 +4392,9 @@ def delete_filter(filter_id):
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        
+
         success = equipment_profiles.delete_filter(user_id, filter_id)
-        
+
         if success:
             return jsonify({'status': 'success'})
         else:
@@ -4299,15 +4414,17 @@ def get_accessories():
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        
+
         data = equipment_profiles.load_user_accessories(user_id)
         shared = equipment_profiles.load_all_shared_equipment('accessories', user_id)
-        return jsonify({
-            'data': data.get('items', []),
-            'shared_from_others': shared,
-            'created_at': data.get('created_at'),
-            'updated_at': data.get('updated_at')
-        })
+        return jsonify(
+            {
+                'data': data.get('items', []),
+                'shared_from_others': shared,
+                'created_at': data.get('created_at'),
+                'updated_at': data.get('updated_at'),
+            }
+        )
     except Exception as e:
         logger.error(f"Error getting accessories: {e}")
         return jsonify({'error': 'Internal server error'}), 500
@@ -4322,15 +4439,12 @@ def create_accessory():
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        
+
         accessory_data = request.json
         new_accessory = equipment_profiles.create_accessory(user_id, accessory_data)
-        
+
         if new_accessory:
-            return jsonify({
-                'status': 'success',
-                'data': new_accessory
-            }), 201
+            return jsonify({'status': 'success', 'data': new_accessory}), 201
         else:
             return jsonify({'error': 'Failed to create accessory'}), 500
     except Exception as e:
@@ -4347,9 +4461,9 @@ def get_accessory(accessory_id):
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        
+
         accessory = equipment_profiles.get_accessory(user_id, accessory_id)
-        
+
         if accessory:
             return jsonify(accessory)
         else:
@@ -4368,7 +4482,7 @@ def update_accessory(accessory_id):
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        
+
         accessory_data = request.json
         shared = equipment_profiles.load_all_shared_equipment('accessories', user_id)
         if any(a['id'] == accessory_id for a in shared):
@@ -4376,10 +4490,7 @@ def update_accessory(accessory_id):
         updated_accessory = equipment_profiles.update_accessory(user_id, accessory_id, accessory_data)
 
         if updated_accessory:
-            return jsonify({
-                'status': 'success',
-                'data': updated_accessory
-            })
+            return jsonify({'status': 'success', 'data': updated_accessory})
         else:
             return jsonify({'error': 'Failed to update accessory'}), 500
     except Exception as e:
@@ -4396,9 +4507,9 @@ def delete_accessory(accessory_id):
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        
+
         success = equipment_profiles.delete_accessory(user_id, accessory_id)
-        
+
         if success:
             return jsonify({'status': 'success'})
         else:
@@ -4418,19 +4529,21 @@ def get_combinations():
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        
+
         data = equipment_profiles.load_user_combinations(user_id)
         items_with_status = []
         for combo in data.get('items', []):
             status = equipment_profiles.compute_combination_share_status(combo, user_id)
             items_with_status.append({**combo, **status})
         shared_with_status = equipment_profiles.load_all_shared_combinations(user_id)
-        return jsonify({
-            'data': items_with_status,
-            'shared_from_others': shared_with_status,
-            'created_at': data.get('created_at'),
-            'updated_at': data.get('updated_at')
-        })
+        return jsonify(
+            {
+                'data': items_with_status,
+                'shared_from_others': shared_with_status,
+                'created_at': data.get('created_at'),
+                'updated_at': data.get('updated_at'),
+            }
+        )
     except Exception as e:
         logger.error(f"Error getting combinations: {e}")
         return jsonify({'error': 'Internal server error'}), 500
@@ -4445,17 +4558,17 @@ def create_combination():
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        
+
         combination_data = request.json
         new_combination = equipment_profiles.create_combination(user_id, combination_data)
-        
+
         if new_combination:
-            return jsonify({
-                'status': 'success',
-                'data': new_combination
-            }), 201
+            return jsonify({'status': 'success', 'data': new_combination}), 201
         else:
-            return jsonify({'error': 'Failed to create combination. At minimum a telescope or camera must be selected.'}), 400
+            return (
+                jsonify({'error': 'Failed to create combination. At minimum a telescope or camera must be selected.'}),
+                400,
+            )
     except Exception as e:
         logger.error(f"Error creating combination: {e}")
         return jsonify({'error': 'Internal server error'}), 500
@@ -4470,7 +4583,7 @@ def get_combination(combination_id):
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        
+
         combination = equipment_profiles.get_combination(user_id, combination_id)
 
         if combination:
@@ -4492,15 +4605,12 @@ def update_combination(combination_id):
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        
+
         combination_data = request.json
         updated_combination = equipment_profiles.update_combination(user_id, combination_id, combination_data)
-        
+
         if updated_combination:
-            return jsonify({
-                'status': 'success',
-                'data': updated_combination
-            })
+            return jsonify({'status': 'success', 'data': updated_combination})
         else:
             return jsonify({'error': 'Combination not found or update failed'}), 404
     except Exception as e:
@@ -4517,9 +4627,9 @@ def delete_combination(combination_id):
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        
+
         success = equipment_profiles.delete_combination(user_id, combination_id)
-        
+
         if success:
             return jsonify({'status': 'success'})
         else:
@@ -4536,15 +4646,15 @@ def calculate_fov():
     """Calculate Field of View for given parameters"""
     try:
         data = request.json
-        
+
         fov_calculation = equipment_profiles.calculate_fov(
             telescope_focal_length_mm=float(data['telescope_focal_length_mm']),
             camera_sensor_width_mm=float(data['camera_sensor_width_mm']),
             camera_sensor_height_mm=float(data['camera_sensor_height_mm']),
             camera_pixel_size_um=float(data['camera_pixel_size_um']),
-            seeing_arcsec=float(data.get('seeing_arcsec', 2.0))
+            seeing_arcsec=float(data.get('seeing_arcsec', 2.0)),
         )
-        
+
         return jsonify(asdict(fov_calculation))
     except Exception as e:
         logger.error(f"Error calculating FOV: {e}")
@@ -4561,7 +4671,7 @@ def get_equipment_summary():
         user_id = user.user_id if user else None
         if not user_id:
             return jsonify({'error': 'User not authenticated'}), 401
-        
+
         summary = equipment_profiles.get_all_equipment_summary(user_id)
         return jsonify(summary)
     except Exception as e:
@@ -4573,12 +4683,14 @@ def get_equipment_summary():
 # Scheduler Management
 # ============================================================
 
+
 def get_or_create_cache_scheduler():
     """Get the cache scheduler instance, creating it if necessary"""
     if 'cache_scheduler' not in app.config:
         logger.debug("Creating cache scheduler instance...")
         try:
             from cache_scheduler import CacheScheduler
+
             cache_scheduler = CacheScheduler()
             # Store the instance regardless of whether it started
             # (it may already be running in another process)
@@ -4591,6 +4703,7 @@ def get_or_create_cache_scheduler():
             logger.error(f"Failed to create cache scheduler: {e}")
             return None
     return app.config.get('cache_scheduler')
+
 
 # ============================================================
 # Application Startup Initialization
@@ -4608,8 +4721,7 @@ try:
     logger.info('Initializing SkyTonight scheduler on application startup...')
     _cache_sched = app.config.get('cache_scheduler')
     get_or_create_skytonight_scheduler(
-        app,
-        cache_ready_event=_cache_sched.cache_ready_event if _cache_sched is not None else None
+        app, cache_ready_event=_cache_sched.cache_ready_event if _cache_sched is not None else None
     )
 except Exception as e:
     logger.error(f'Failed to initialize SkyTonight scheduler on startup: {e}', exc_info=True)
@@ -4617,12 +4729,15 @@ except Exception as e:
 try:
     logger.info('Initializing push notification scheduler on application startup...')
     import push_scheduler as _push_scheduler
+
     _push_scheduler.start()
     # Generate VAPID keys early so the first /api/push/vapid-public-key request is instant
     from push_manager import load_or_generate_vapid_keys as _init_vapid
+
     _init_vapid()
 except Exception as e:
     logger.error(f'Failed to initialize push scheduler on startup: {e}', exc_info=True)
+
 
 # Ensure schedulers are stopped when the worker exits
 # (covers gunicorn workers that never reach the __main__ finally block)
@@ -4641,9 +4756,11 @@ def _stop_schedulers_on_exit():
             logger.warning(f"Error stopping cache scheduler on exit: {e}")
     try:
         import push_scheduler as _ps
+
         _ps.stop()
     except Exception as e:
         logger.warning(f"Error stopping push scheduler on exit: {e}")
+
 
 atexit.register(_stop_schedulers_on_exit)
 
@@ -4669,7 +4786,7 @@ except Exception:
 if __name__ == '__main__':
     # Running directly with Flask development server
     in_debug_mode = os.environ.get('FLASK_DEBUG') == '1'
-    
+
     try:
         # Run Flask app
         app.run(host='0.0.0.0', port=5000, debug=in_debug_mode, use_reloader=in_debug_mode)
@@ -4693,7 +4810,7 @@ if __name__ == '__main__':
         if scheduler:
             scheduler.stop()
             logger.info("Scheduler stopped.")
-            
+
             # Clean up lock file if we have it
             lock_file = app.config.get('scheduler_lock_file')
             if lock_file:
@@ -4703,9 +4820,8 @@ if __name__ == '__main__':
                     logger.info("Scheduler lock file cleaned up.")
                 except Exception as e:
                     logger.warning(f"Failed to clean up lock file: {e}")
-                    
-        cache_scheduler = app.config.get('cache_scheduler') 
+
+        cache_scheduler = app.config.get('cache_scheduler')
         if cache_scheduler:
             cache_scheduler.stop()
             logger.info("Cache scheduler stopped.")
-

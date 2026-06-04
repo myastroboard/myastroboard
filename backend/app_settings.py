@@ -7,6 +7,7 @@ The SECRET_KEY is stored separately in DATA_DIR/secret_key.txt (generated once, 
 This replaces the following environment variables that were previously required in docker-compose:
   SECRET_KEY, TRUST_PROXY_HEADERS, SESSION_COOKIE_SECURE, VAPID_CONTACT_EMAIL
 """
+
 import json
 import os
 import secrets
@@ -102,8 +103,11 @@ def reload_app_settings() -> dict:
 
 def _warn_deprecated_env_vars() -> None:
     """Log a one-time warning if legacy env vars are detected."""
-    deprecated = [v for v in ('SECRET_KEY', 'TRUST_PROXY_HEADERS', 'SESSION_COOKIE_SECURE', 'VAPID_CONTACT_EMAIL')
-                  if os.environ.get(v)]
+    deprecated = [
+        v
+        for v in ('SECRET_KEY', 'TRUST_PROXY_HEADERS', 'SESSION_COOKIE_SECURE', 'VAPID_CONTACT_EMAIL')
+        if os.environ.get(v)
+    ]
     if deprecated:
         logger.warning(
             f"Deprecated environment variables detected and ignored: {', '.join(deprecated)}. "

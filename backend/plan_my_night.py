@@ -132,7 +132,13 @@ def get_all_plan_files(user_id: str) -> list:
     ensure_plan_directory()
     result = []
     for fname in os.listdir(PLAN_DIR):
-        if fname.startswith(f'{user_id}_plan') and fname.endswith('.json') and '.corrupted.' not in fname and '.backup' not in fname and fname != f'{user_id}_plan_my_night.json.tmp':
+        if (
+            fname.startswith(f'{user_id}_plan')
+            and fname.endswith('.json')
+            and '.corrupted.' not in fname
+            and '.backup' not in fname
+            and fname != f'{user_id}_plan_my_night.json.tmp'
+        ):
             try:
                 resolved = _safe_plan_path(os.path.join(PLAN_DIR, fname))
                 result.append(resolved)
@@ -244,7 +250,9 @@ def validate_plan_json(file_path: str) -> Tuple[bool, str]:
         return False, f'Validation failed: {error}'
 
 
-def save_user_plan(user_id: str, payload: Dict, username: Optional[str] = None, telescope_id: Optional[str] = None) -> bool:
+def save_user_plan(
+    user_id: str, payload: Dict, username: Optional[str] = None, telescope_id: Optional[str] = None
+) -> bool:
     file_path = get_user_plan_file(user_id, telescope_id)
     temp_path = file_path + '.tmp'
     backup_path = file_path + '.backup'
@@ -371,7 +379,9 @@ def is_target_in_entries(plan_entries: list, catalogue: str, name: str) -> bool:
     return False
 
 
-def is_target_in_current_plan(user_id: str, username: str, catalogue: str, name: str, telescope_id: Optional[str] = None) -> bool:
+def is_target_in_current_plan(
+    user_id: str, username: str, catalogue: str, name: str, telescope_id: Optional[str] = None
+) -> bool:
     payload = load_user_plan(user_id, username, telescope_id=telescope_id)
     plan = payload.get('plan')
     if not plan:
@@ -553,7 +563,9 @@ def remove_target(user_id: str, username: str, entry_id: str, telescope_id: Opti
     return save_user_plan(user_id, payload, username=username, telescope_id=telescope_id)
 
 
-def update_target(user_id: str, username: str, entry_id: str, updates: Dict, telescope_id: Optional[str] = None) -> Optional[Dict]:
+def update_target(
+    user_id: str, username: str, entry_id: str, updates: Dict, telescope_id: Optional[str] = None
+) -> Optional[Dict]:
     payload = load_user_plan(user_id, username, telescope_id=telescope_id)
     plan = payload.get('plan')
     if not plan:
@@ -617,7 +629,9 @@ def update_plan_meta(user_id: str, username: str, updates: Dict, telescope_id: O
     return plan
 
 
-def reorder_target(user_id: str, username: str, entry_id: str, new_index: int, telescope_id: Optional[str] = None) -> bool:
+def reorder_target(
+    user_id: str, username: str, entry_id: str, new_index: int, telescope_id: Optional[str] = None
+) -> bool:
     payload = load_user_plan(user_id, username, telescope_id=telescope_id)
     plan = payload.get('plan')
     if not plan:
@@ -782,6 +796,7 @@ def _csv_fmt_observable_pct(val) -> str:
 
 def serialize_plan_csv(plan_payload: Dict, labels: Optional[Dict[str, str]] = None) -> str:
     labels = labels or {}
+
     def _label(key: str, fallback: str) -> str:
         return str(labels.get(key) or fallback)
 
@@ -812,23 +827,25 @@ def serialize_plan_csv(plan_payload: Dict, labels: Optional[Dict[str, str]] = No
         return output.getvalue()
 
     for index, entry in enumerate(plan.get('entries', []), start=1):
-        writer.writerow([
-            index,
-            str(entry.get('name', '')),
-            str(entry.get('catalogue', '')),
-            str(entry.get('target_name', '')),
-            str(entry.get('type', '')),
-            str(entry.get('constellation', '')),
-            _csv_normalize_ra(entry.get('ra')),
-            _csv_normalize_dec(entry.get('dec')),
-            str(entry.get('mag', '')),
-            str(entry.get('size', '')),
-            _csv_fmt_observable_pct(entry.get('foto')),
-            str(entry.get('planned_minutes', '')),
-            _csv_fmt_local_hm(entry.get('timeline_start')),
-            _csv_fmt_local_hm(entry.get('timeline_end')),
-            _label('done_yes', 'yes') if entry.get('done') else _label('done_no', 'no'),
-        ])
+        writer.writerow(
+            [
+                index,
+                str(entry.get('name', '')),
+                str(entry.get('catalogue', '')),
+                str(entry.get('target_name', '')),
+                str(entry.get('type', '')),
+                str(entry.get('constellation', '')),
+                _csv_normalize_ra(entry.get('ra')),
+                _csv_normalize_dec(entry.get('dec')),
+                str(entry.get('mag', '')),
+                str(entry.get('size', '')),
+                _csv_fmt_observable_pct(entry.get('foto')),
+                str(entry.get('planned_minutes', '')),
+                _csv_fmt_local_hm(entry.get('timeline_start')),
+                _csv_fmt_local_hm(entry.get('timeline_end')),
+                _label('done_yes', 'yes') if entry.get('done') else _label('done_no', 'no'),
+            ]
+        )
 
     return output.getvalue()
 
@@ -845,14 +862,16 @@ def get_all_plan_states(user_id: str, username: str, telescopes: list) -> list:
         payload = load_user_plan(user_id, username, telescope_id=None)
         plan = payload.get('plan')
         state = get_plan_state(plan)
-        result.append({
-            'telescope_id': None,
-            'telescope_name': None,
-            'state': state,
-            'entries_count': len(plan.get('entries', [])) if plan else 0,
-            'night_start': plan.get('night_start') if plan else None,
-            'night_end': plan.get('night_end') if plan else None,
-        })
+        result.append(
+            {
+                'telescope_id': None,
+                'telescope_name': None,
+                'state': state,
+                'entries_count': len(plan.get('entries', [])) if plan else 0,
+                'night_start': plan.get('night_start') if plan else None,
+                'night_end': plan.get('night_end') if plan else None,
+            }
+        )
 
     known_ids: set = set()
     for telescope in telescopes:
@@ -864,17 +883,19 @@ def get_all_plan_states(user_id: str, username: str, telescopes: list) -> list:
         payload = load_user_plan(user_id, username, telescope_id=tid)
         plan = payload.get('plan')
         state = get_plan_state(plan)
-        result.append({
-            'telescope_id': tid,
-            'telescope_name': tname,
-            'state': state,
-            'entries_count': len(plan.get('entries', [])) if plan else 0,
-            'night_start': plan.get('night_start') if plan else None,
-            'night_end': plan.get('night_end') if plan else None,
-            'is_own': is_own,
-            'owner_username': owner_username,
-            'is_orphaned': False,
-        })
+        result.append(
+            {
+                'telescope_id': tid,
+                'telescope_name': tname,
+                'state': state,
+                'entries_count': len(plan.get('entries', [])) if plan else 0,
+                'night_start': plan.get('night_start') if plan else None,
+                'night_end': plan.get('night_end') if plan else None,
+                'is_own': is_own,
+                'owner_username': owner_username,
+                'is_orphaned': False,
+            }
+        )
 
     # Detect orphaned plans: plan files exist but their telescope is no longer accessible
     # (shared telescope was removed or unshared by its owner)
@@ -884,24 +905,26 @@ def get_all_plan_states(user_id: str, username: str, telescopes: list) -> list:
         fname = os.path.basename(plan_file)
         if not (fname.startswith(prefix) and fname.endswith(suffix)):
             continue
-        tid = fname[len(prefix):-len(suffix)]
+        tid = fname[len(prefix) : -len(suffix)]
         if tid == 'my_night' or tid in known_ids:
             continue
         payload = load_user_plan(user_id, username, telescope_id=tid)
         plan = payload.get('plan')
         orphaned_name = (plan.get('telescope_name') if plan else None) or tid
         state = get_plan_state(plan)
-        result.append({
-            'telescope_id': tid,
-            'telescope_name': orphaned_name,
-            'state': state,
-            'entries_count': len(plan.get('entries', [])) if plan else 0,
-            'night_start': plan.get('night_start') if plan else None,
-            'night_end': plan.get('night_end') if plan else None,
-            'is_own': True,
-            'owner_username': None,
-            'is_orphaned': True,
-        })
+        result.append(
+            {
+                'telescope_id': tid,
+                'telescope_name': orphaned_name,
+                'state': state,
+                'entries_count': len(plan.get('entries', [])) if plan else 0,
+                'night_start': plan.get('night_start') if plan else None,
+                'night_end': plan.get('night_end') if plan else None,
+                'is_own': True,
+                'owner_username': None,
+                'is_orphaned': True,
+            }
+        )
 
     return result
 
@@ -909,6 +932,7 @@ def get_all_plan_states(user_id: str, username: str, telescopes: list) -> list:
 # ---------------------------------------------------------------------------
 # PDF export
 # ---------------------------------------------------------------------------
+
 
 def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
     """Render the observation plan as a print-friendly A4 PDF.
@@ -928,27 +952,36 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
     import re as _re
     from constants import SKYTONIGHT_OUTPUT_DIR
 
-    plan    = payload.get('plan')
+    plan = payload.get('plan')
     entries = plan.get('entries', []) if plan else []
 
-    t = i18n_manager.t   # shorthand
+    t = i18n_manager.t  # shorthand
 
     # ── colour palette (high-contrast, print-friendly) ──────────────────────
     PALETTE = [
-        '#1565c0', '#c62828', '#2e7d32', '#6a1b9a',
-        '#e65100', '#00838f', '#558b2f', '#ad1457',
-        '#4527a0', '#e65100', '#0277bd', '#6d4c41',
+        '#1565c0',
+        '#c62828',
+        '#2e7d32',
+        '#6a1b9a',
+        '#e65100',
+        '#00838f',
+        '#558b2f',
+        '#ad1457',
+        '#4527a0',
+        '#e65100',
+        '#0277bd',
+        '#6d4c41',
     ]
 
     # ── print-friendly colours ───────────────────────────────────────────────
-    C_HDR_BG   = '#1a1f35'
-    C_WHITE    = '#ffffff'
-    C_TXT_DRK  = '#212121'
-    C_TXT_MID  = '#616161'
-    C_GRID     = '#e0e0e0'
-    C_BAR_BG   = '#e0e7ff'
-    C_BRAND    = '#4e9af1'
-    C_CHT_TXT  = '#424242'
+    C_HDR_BG = '#1a1f35'
+    C_WHITE = '#ffffff'
+    C_TXT_DRK = '#212121'
+    C_TXT_MID = '#616161'
+    C_GRID = '#e0e0e0'
+    C_BAR_BG = '#e0e7ff'
+    C_BRAND = '#4e9af1'
+    C_CHT_TXT = '#424242'
     C_CHT_GRID = '#eeeeee'
     C_CHT_ZONE = '#e8f5e9'
     C_CHT_ZONE_BORDER = '#66bb6a'
@@ -988,7 +1021,7 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
             return None
 
     _local_tz: Any = timezone.utc  # updated after alttime_map is loaded
-    _tz_name  = 'UTC'
+    _tz_name = 'UTC'
 
     def _fmt_hm(iso_str: str | None) -> str:
         dt = _parse_utc(iso_str)
@@ -1024,7 +1057,7 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
         out = []
         for i, p in enumerate(pts):
             prev = pts[i - 1] if i > 0 else None
-            nxt  = pts[i + 1] if i < len(pts) - 1 else None
+            nxt = pts[i + 1] if i < len(pts) - 1 else None
             if prev and prev[0] < start_dt < p[0]:
                 out.append(_lerp(prev, p, start_dt))
             if start_dt <= p[0] <= end_dt:
@@ -1047,99 +1080,121 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
 
     # ── resolve local timezone from alttime data (matches browser display) ───
     from zoneinfo import ZoneInfo as _ZoneInfo
-    _tz_name  = (next(iter(alttime_map.values()), None) or {}).get('timezone') or 'UTC'
+
+    _tz_name = (next(iter(alttime_map.values()), None) or {}).get('timezone') or 'UTC'
     try:
         _local_tz = _ZoneInfo(_tz_name)
     except Exception:
         _local_tz = timezone.utc
-        _tz_name  = 'UTC'
+        _tz_name = 'UTC'
 
     # ── shared header / footer ───────────────────────────────────────────────
     def _render_header(ax, subtitle: str = '') -> None:
         ax.axis('off')
         ax.set_facecolor(C_HDR_BG)
-        ax.text(0.015, 0.5, 'myastroboard',
-                va='center', ha='left', fontsize=10,
-                color=C_BRAND, fontweight='bold', transform=ax.transAxes)
+        ax.text(
+            0.015,
+            0.5,
+            'myastroboard',
+            va='center',
+            ha='left',
+            fontsize=10,
+            color=C_BRAND,
+            fontweight='bold',
+            transform=ax.transAxes,
+        )
         title = t('plan_my_night.export_pdf_title') or 'My Observation Plan'
         if subtitle:
             title += f'  -  {subtitle}'
-        ax.text(0.5, 0.5, title,
-                va='center', ha='center', fontsize=12,
-                color=C_WHITE, fontweight='bold', transform=ax.transAxes)
-        ax.text(0.985, 0.5, 'myastroboard.org',
-                va='center', ha='right', fontsize=8,
-                color='#8898cc', transform=ax.transAxes)
+        ax.text(
+            0.5,
+            0.5,
+            title,
+            va='center',
+            ha='center',
+            fontsize=12,
+            color=C_WHITE,
+            fontweight='bold',
+            transform=ax.transAxes,
+        )
+        ax.text(
+            0.985, 0.5, 'myastroboard.org', va='center', ha='right', fontsize=8, color='#8898cc', transform=ax.transAxes
+        )
 
     def _render_footer(ax) -> None:
         ax.axis('off')
         ax.set_facecolor(C_HDR_BG)
-        ax.text(0.5, 0.5,
-                f"myastroboard.org  -  {t('common.title_html') or 'MyAstroBoard'}",
-                va='center', ha='center', fontsize=7.5,
-                color='#6a7a99', transform=ax.transAxes)
+        ax.text(
+            0.5,
+            0.5,
+            f"myastroboard.org  -  {t('common.title_html') or 'MyAstroBoard'}",
+            va='center',
+            ha='center',
+            fontsize=7.5,
+            color='#6a7a99',
+            transform=ax.transAxes,
+        )
 
     # ── column layout ────────────────────────────────────────────────────────
     COL_X = [0.00, 0.38, 0.54, 0.66, 0.80]
     COL_H = [
-        t('plan_my_night.export_pdf_col_target')    or 'Target',
-        t('plan_my_night.export_pdf_slot')          or 'Slot',
-        t('plan_my_night.export_pdf_duration')      or 'Duration',
-        t('plan_my_night.export_pdf_type')          or 'Type',
+        t('plan_my_night.export_pdf_col_target') or 'Target',
+        t('plan_my_night.export_pdf_slot') or 'Slot',
+        t('plan_my_night.export_pdf_duration') or 'Duration',
+        t('plan_my_night.export_pdf_type') or 'Type',
         t('plan_my_night.export_pdf_constellation') or 'Constellation',
     ]
 
     def _render_col_headers(ax, y: float) -> float:
         for cx, cl in zip(COL_X, COL_H):
-            ax.text(cx, y, cl, va='top', ha='left', fontsize=7,
-                    color=C_TXT_MID, fontweight='bold', transform=ax.transAxes)
+            ax.text(
+                cx, y, cl, va='top', ha='left', fontsize=7, color=C_TXT_MID, fontweight='bold', transform=ax.transAxes
+            )
         y -= 0.013
-        ax.plot([0.0, 1.0], [y + 0.005, y + 0.005],
-                color=C_GRID, lw=0.7, transform=ax.transAxes)
+        ax.plot([0.0, 1.0], [y + 0.005, y + 0.005], color=C_GRID, lw=0.7, transform=ax.transAxes)
         return y - 0.004
 
-    ROW_H = 0.030   # compact fixed row height
+    ROW_H = 0.030  # compact fixed row height
 
     def _render_entry_row(ax, abs_idx: int, entry: Dict, y: float) -> None:
-        color  = PALETTE[abs_idx % len(PALETTE)]
-        done   = bool(entry.get('done'))
-        name   = (entry.get('name') or entry.get('target_name') or '?')[:26]
-        cat    = entry.get('catalogue') or ''
-        ts     = _fmt_hm(entry.get('timeline_start'))
-        te     = _fmt_hm(entry.get('timeline_end'))
-        dur    = entry.get('planned_duration') or '--:--'
-        typ    = (entry.get('type') or '')[:16]
-        const  = (entry.get('constellation') or '')[:13]
+        color = PALETTE[abs_idx % len(PALETTE)]
+        done = bool(entry.get('done'))
+        name = (entry.get('name') or entry.get('target_name') or '?')[:26]
+        cat = entry.get('catalogue') or ''
+        ts = _fmt_hm(entry.get('timeline_start'))
+        te = _fmt_hm(entry.get('timeline_end'))
+        dur = entry.get('planned_duration') or '--:--'
+        typ = (entry.get('type') or '')[:16]
+        const = (entry.get('constellation') or '')[:13]
 
         row_bg = '#f5f7fc' if abs_idx % 2 == 0 else C_WHITE
-        ax.add_patch(Rectangle((0.0, y - ROW_H), 1.0, ROW_H,
-                                transform=ax.transAxes,
-                                facecolor=row_bg, edgecolor='none'))
+        ax.add_patch(
+            Rectangle((0.0, y - ROW_H), 1.0, ROW_H, transform=ax.transAxes, facecolor=row_bg, edgecolor='none')
+        )
         mid_y = y - ROW_H / 2
-        ax.plot(0.007, mid_y, 'o', color=color,
-                markersize=4.5, transform=ax.transAxes, zorder=5)
+        ax.plot(0.007, mid_y, 'o', color=color, markersize=4.5, transform=ax.transAxes, zorder=5)
 
-        check    = '✓' if done else '○'
+        check = '✓' if done else '○'
         name_txt = f"{abs_idx + 1}. {check}  {name}"
         if cat:
             name_txt += f' ({cat})'
-        ax.text(0.018, mid_y, name_txt,
-                va='center', ha='left', fontsize=7.5,
-                color=C_TXT_MID if done else C_TXT_DRK,
-                fontstyle='italic' if done else 'normal',
-                transform=ax.transAxes)
-        ax.text(COL_X[1], mid_y, f"{ts}→{te}",
-                va='center', ha='left', fontsize=7.5,
-                color=C_TXT_DRK, transform=ax.transAxes)
-        ax.text(COL_X[2], mid_y, dur,
-                va='center', ha='left', fontsize=7.5,
-                color=C_TXT_DRK, transform=ax.transAxes)
-        ax.text(COL_X[3], mid_y, typ,
-                va='center', ha='left', fontsize=7,
-                color=C_TXT_DRK, transform=ax.transAxes)
-        ax.text(COL_X[4], mid_y, const,
-                va='center', ha='left', fontsize=7,
-                color=C_TXT_DRK, transform=ax.transAxes)
+        ax.text(
+            0.018,
+            mid_y,
+            name_txt,
+            va='center',
+            ha='left',
+            fontsize=7.5,
+            color=C_TXT_MID if done else C_TXT_DRK,
+            fontstyle='italic' if done else 'normal',
+            transform=ax.transAxes,
+        )
+        ax.text(
+            COL_X[1], mid_y, f"{ts}→{te}", va='center', ha='left', fontsize=7.5, color=C_TXT_DRK, transform=ax.transAxes
+        )
+        ax.text(COL_X[2], mid_y, dur, va='center', ha='left', fontsize=7.5, color=C_TXT_DRK, transform=ax.transAxes)
+        ax.text(COL_X[3], mid_y, typ, va='center', ha='left', fontsize=7, color=C_TXT_DRK, transform=ax.transAxes)
+        ax.text(COL_X[4], mid_y, const, va='center', ha='left', fontsize=7, color=C_TXT_DRK, transform=ax.transAxes)
 
     def _setup_list_ax(ax) -> None:
         ax.set_facecolor(C_WHITE)
@@ -1148,8 +1203,8 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
         ax.set_ylim(0, 1)
 
     # ── build PDF pages ──────────────────────────────────────────────────────
-    buffer   = io.BytesIO()
-    MAX_P1   = 10
+    buffer = io.BytesIO()
+    MAX_P1 = 10
     PER_PAGE = 28
 
     with PdfPages(buffer) as pdf:
@@ -1160,11 +1215,15 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
 
         # rows: header | info | chart | spacer | list | footer
         gs = gridspec.GridSpec(
-            6, 1, figure=fig,
+            6,
+            1,
+            figure=fig,
             height_ratios=[0.065, 0.095, 0.355, 0.015, 0.445, 0.025],
             hspace=0.01,
-            left=0.10, right=0.90,
-            top=0.985, bottom=0.015,
+            left=0.10,
+            right=0.90,
+            top=0.985,
+            bottom=0.015,
         )
 
         _render_header(fig.add_subplot(gs[0]))
@@ -1177,62 +1236,98 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
         ax_info.set_ylim(0, 1)
 
         if not plan:
-            ax_info.text(0.5, 0.55,
-                         t('plan_my_night.export_pdf_no_plan') or 'No plan available.',
-                         va='center', ha='center', fontsize=11,
-                         color=C_TXT_MID, transform=ax_info.transAxes)
+            ax_info.text(
+                0.5,
+                0.55,
+                t('plan_my_night.export_pdf_no_plan') or 'No plan available.',
+                va='center',
+                ha='center',
+                fontsize=11,
+                color=C_TXT_MID,
+                transform=ax_info.transAxes,
+            )
         else:
             date_str = _fmt_date(plan.get('night_start'))
-            ns_str   = _fmt_hm(plan.get('night_start'))
-            ne_str   = _fmt_hm(plan.get('night_end'))
-            scope    = (plan.get('telescope_name') or '').strip()
-            n_tgts   = len(entries)
+            ns_str = _fmt_hm(plan.get('night_start'))
+            ne_str = _fmt_hm(plan.get('night_end'))
+            scope = (plan.get('telescope_name') or '').strip()
+            n_tgts = len(entries)
             fill_pct = metrics.get('fill_percent', 0.0)
-            planned  = _fmt_min(metrics.get('planned_minutes', 0))
-            night_d  = _fmt_min(metrics.get('night_minutes', 0))
-            delay    = int(plan.get('start_delay_minutes') or 0)
-            delay_s  = f'  (+{delay} min)' if delay else ''
+            planned = _fmt_min(metrics.get('planned_minutes', 0))
+            night_d = _fmt_min(metrics.get('night_minutes', 0))
+            delay = int(plan.get('start_delay_minutes') or 0)
+            delay_s = f'  (+{delay} min)' if delay else ''
 
-            ax_info.text(0.01, 0.88,
-                         f"{t('plan_my_night.export_pdf_date') or 'Date'}:  {date_str}",
-                         va='top', ha='left', fontsize=9.5,
-                         color=C_TXT_DRK, transform=ax_info.transAxes)
+            ax_info.text(
+                0.01,
+                0.88,
+                f"{t('plan_my_night.export_pdf_date') or 'Date'}:  {date_str}",
+                va='top',
+                ha='left',
+                fontsize=9.5,
+                color=C_TXT_DRK,
+                transform=ax_info.transAxes,
+            )
             if scope:
-                ax_info.text(0.50, 0.88,
-                             f"{t('plan_my_night.export_pdf_telescope') or 'Telescope'}:"
-                             f"  {scope}",
-                             va='top', ha='left', fontsize=9.5,
-                             color=C_TXT_DRK, transform=ax_info.transAxes)
-            ax_info.text(0.01, 0.58,
-                         f"{t('plan_my_night.export_pdf_night_window') or 'Night window'}:"
-                         f"  {ns_str} → {ne_str}{delay_s}",
-                         va='top', ha='left', fontsize=9.5,
-                         color=C_TXT_DRK, transform=ax_info.transAxes)
-            ax_info.text(0.50, 0.58,
-                         f"{t('plan_my_night.export_pdf_targets') or 'Targets'}:  {n_tgts}",
-                         va='top', ha='left', fontsize=9.5,
-                         color=C_TXT_DRK, transform=ax_info.transAxes)
+                ax_info.text(
+                    0.50,
+                    0.88,
+                    f"{t('plan_my_night.export_pdf_telescope') or 'Telescope'}:" f"  {scope}",
+                    va='top',
+                    ha='left',
+                    fontsize=9.5,
+                    color=C_TXT_DRK,
+                    transform=ax_info.transAxes,
+                )
+            ax_info.text(
+                0.01,
+                0.58,
+                f"{t('plan_my_night.export_pdf_night_window') or 'Night window'}:" f"  {ns_str} → {ne_str}{delay_s}",
+                va='top',
+                ha='left',
+                fontsize=9.5,
+                color=C_TXT_DRK,
+                transform=ax_info.transAxes,
+            )
+            ax_info.text(
+                0.50,
+                0.58,
+                f"{t('plan_my_night.export_pdf_targets') or 'Targets'}:  {n_tgts}",
+                va='top',
+                ha='left',
+                fontsize=9.5,
+                color=C_TXT_DRK,
+                transform=ax_info.transAxes,
+            )
 
             bx, by, bw, bh = 0.01, 0.07, 0.98, 0.20
-            fill_w    = min(1.0, fill_pct / 100.0) * bw
+            fill_w = min(1.0, fill_pct / 100.0) * bw
             bar_color = C_BRAND if fill_pct <= 100 else '#e53935'
-            ax_info.add_patch(Rectangle((bx, by), bw, bh,
-                                        transform=ax_info.transAxes,
-                                        facecolor=C_BAR_BG, edgecolor='none'))
+            ax_info.add_patch(
+                Rectangle((bx, by), bw, bh, transform=ax_info.transAxes, facecolor=C_BAR_BG, edgecolor='none')
+            )
             if fill_w > 0.01:
-                ax_info.add_patch(Rectangle((bx, by), fill_w, bh,
-                                            transform=ax_info.transAxes,
-                                            facecolor=bar_color, edgecolor='none'))
+                ax_info.add_patch(
+                    Rectangle((bx, by), fill_w, bh, transform=ax_info.transAxes, facecolor=bar_color, edgecolor='none')
+                )
             overflow = metrics.get('overflow_minutes', 0)
-            cov_lbl  = (f"{t('plan_my_night.export_pdf_planned_coverage') or 'Coverage'}:"
-                        f"  {fill_pct:.0f}%   ({planned} / {night_d})")
+            cov_lbl = (
+                f"{t('plan_my_night.export_pdf_planned_coverage') or 'Coverage'}:"
+                f"  {fill_pct:.0f}%   ({planned} / {night_d})"
+            )
             if overflow > 0:
-                cov_lbl += (f"   {t('plan_my_night.export_pdf_overflow') or 'Overflow'}:"
-                            f" +{_fmt_min(overflow)}")
-            ax_info.text(bx + bw / 2, by + bh / 2, cov_lbl,
-                         va='center', ha='center', fontsize=8.5,
-                         color=C_WHITE if fill_pct > 12 else C_TXT_DRK,
-                         fontweight='bold', transform=ax_info.transAxes)
+                cov_lbl += f"   {t('plan_my_night.export_pdf_overflow') or 'Overflow'}:" f" +{_fmt_min(overflow)}"
+            ax_info.text(
+                bx + bw / 2,
+                by + bh / 2,
+                cov_lbl,
+                va='center',
+                ha='center',
+                fontsize=8.5,
+                color=C_WHITE if fill_pct > 12 else C_TXT_DRK,
+                fontweight='bold',
+                transform=ax_info.transAxes,
+            )
 
         # altitude-time chart
         ax_chart = fig.add_subplot(gs[2])
@@ -1253,19 +1348,17 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
                 alt_max = first_data.get('altitude_constraint_max', 80)
 
                 ax_chart.axhspan(alt_min, alt_max, color=C_CHT_ZONE, alpha=0.8, zorder=1)
-                ax_chart.axhline(y=alt_min, color=C_CHT_ZONE_BORDER,
-                                 lw=0.8, ls='--', alpha=0.8, zorder=2)
-                ax_chart.axhline(y=alt_max, color=C_CHT_ZONE_BORDER,
-                                 lw=0.8, ls='--', alpha=0.8, zorder=2)
+                ax_chart.axhline(y=alt_min, color=C_CHT_ZONE_BORDER, lw=0.8, ls='--', alpha=0.8, zorder=2)
+                ax_chart.axhline(y=alt_max, color=C_CHT_ZONE_BORDER, lw=0.8, ls='--', alpha=0.8, zorder=2)
 
                 for i, entry in enumerate(entries):
-                    eid     = entry.get('id')
-                    adata   = alttime_map.get(eid)
+                    eid = entry.get('id')
+                    adata = alttime_map.get(eid)
                     if not adata:
                         continue
-                    color   = PALETTE[i % len(PALETTE)]
+                    color = PALETTE[i % len(PALETTE)]
                     t_start = _parse_utc(entry.get('timeline_start'))
-                    t_end   = _parse_utc(entry.get('timeline_end'))
+                    t_end = _parse_utc(entry.get('timeline_end'))
                     if not t_start or not t_end:
                         continue
                     t_end = min(t_end, ne_dt)  # cap at night end, mirrors JS Math.min(rawEndMs, nightEndMs)
@@ -1275,22 +1368,29 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
                     xs, ys = _clip_alttime(
                         adata.get('times_utc', []),
                         adata.get('altitudes', []),
-                        t_start, t_end,
+                        t_start,
+                        t_end,
                     )
                     if not xs:
                         continue
 
                     ax_chart.plot(xs, ys, color=color, lw=1.8, zorder=4)
-                    ax_chart.fill_between(xs, 0, ys,
-                                          color=color, alpha=0.07, zorder=3)
+                    ax_chart.fill_between(xs, 0, ys, color=color, alpha=0.07, zorder=3)
 
                     peak_idx = ys.index(max(ys))
-                    label    = (entry.get('name') or entry.get('target_name') or '')[:14]
+                    label = (entry.get('name') or entry.get('target_name') or '')[:14]
                     ax_chart.annotate(
-                        label, xy=(xs[peak_idx], ys[peak_idx]),
-                        xytext=(0, 5), textcoords='offset points',
-                        fontsize=6.5, color=color, fontweight='bold',
-                        ha='center', va='bottom', zorder=6, clip_on=True,
+                        label,
+                        xy=(xs[peak_idx], ys[peak_idx]),
+                        xytext=(0, 5),
+                        textcoords='offset points',
+                        fontsize=6.5,
+                        color=color,
+                        fontweight='bold',
+                        ha='center',
+                        va='bottom',
+                        zorder=6,
+                        clip_on=True,
                     )
 
                 ns_num = float(mdates.date2num(ns_dt))
@@ -1306,32 +1406,45 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
                 ax_chart.tick_params(axis='y', colors=C_CHT_TXT)
                 ax_chart.set_ylabel(
                     t('skytonight.altitude_time_y_axis') or 'Altitude (°)',
-                    color=C_CHT_TXT, fontsize=8,
+                    color=C_CHT_TXT,
+                    fontsize=8,
                 )
                 ax_chart.set_xlabel(
                     f"{t('skytonight.altitude_time_x_axis') or 'Time'} ({_tz_name})",
-                    color=C_CHT_TXT, fontsize=8,
+                    color=C_CHT_TXT,
+                    fontsize=8,
                 )
                 ax_chart.yaxis.label.set_color(C_CHT_TXT)
                 ax_chart.xaxis.label.set_color(C_CHT_TXT)
                 ax_chart.grid(True, color=C_CHT_GRID, lw=0.5)
                 # title inside axes area - no risk of overlapping adjacent panels
                 ax_chart.text(
-                    0.01, 0.97,
+                    0.01,
+                    0.97,
                     t('skytonight.altitude_time_title') or 'Altitude vs Time',
-                    va='top', ha='left', fontsize=8,
-                    color=C_TXT_MID, fontstyle='italic',
-                    transform=ax_chart.transAxes, zorder=7,
+                    va='top',
+                    ha='left',
+                    fontsize=8,
+                    color=C_TXT_MID,
+                    fontstyle='italic',
+                    transform=ax_chart.transAxes,
+                    zorder=7,
                 )
 
         if not chart_ok:
             ax_chart.axis('off')
             ax_chart.text(
-                0.5, 0.5,
-                (t('skytonight.altitude_time_title') or 'Altitude vs Time') + '\n'
+                0.5,
+                0.5,
+                (t('skytonight.altitude_time_title') or 'Altitude vs Time')
+                + '\n'
                 + (t('skytonight.altitude_time_load_error') or 'No data available'),
-                va='center', ha='center', fontsize=9,
-                color=C_TXT_MID, linespacing=1.7, transform=ax_chart.transAxes,
+                va='center',
+                ha='center',
+                fontsize=9,
+                color=C_TXT_MID,
+                linespacing=1.7,
+                transform=ax_chart.transAxes,
             )
 
         # explicit spacer between chart and target list
@@ -1342,16 +1455,29 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
         _setup_list_ax(ax_list)
 
         if not entries:
-            ax_list.text(0.5, 0.55,
-                         t('plan_my_night.export_pdf_no_plan') or 'No targets.',
-                         va='center', ha='center', fontsize=10,
-                         color=C_TXT_MID, transform=ax_list.transAxes)
+            ax_list.text(
+                0.5,
+                0.55,
+                t('plan_my_night.export_pdf_no_plan') or 'No targets.',
+                va='center',
+                ha='center',
+                fontsize=10,
+                color=C_TXT_MID,
+                transform=ax_list.transAxes,
+            )
         else:
             y = 0.975
-            ax_list.text(0.0, y,
-                         t('plan_my_night.export_pdf_section_targets') or 'Planned targets',
-                         va='top', ha='left', fontsize=9,
-                         color=C_TXT_DRK, fontweight='bold', transform=ax_list.transAxes)
+            ax_list.text(
+                0.0,
+                y,
+                t('plan_my_night.export_pdf_section_targets') or 'Planned targets',
+                va='top',
+                ha='left',
+                fontsize=9,
+                color=C_TXT_DRK,
+                fontweight='bold',
+                transform=ax_list.transAxes,
+            )
             y -= 0.032
             y = _render_col_headers(ax_list, y)
 
@@ -1360,10 +1486,16 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
                 y -= ROW_H
 
             if len(entries) > MAX_P1:
-                ax_list.text(0.5, 0.005,
-                             f'+ {len(entries) - MAX_P1} targets continued on next page',
-                             va='bottom', ha='center', fontsize=7,
-                             color=C_TXT_MID, transform=ax_list.transAxes)
+                ax_list.text(
+                    0.5,
+                    0.005,
+                    f'+ {len(entries) - MAX_P1} targets continued on next page',
+                    va='bottom',
+                    ha='center',
+                    fontsize=7,
+                    color=C_TXT_MID,
+                    transform=ax_list.transAxes,
+                )
 
         _render_footer(fig.add_subplot(gs[5]))
         pdf.savefig(fig)
@@ -1372,21 +1504,23 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
         # ─── OVERFLOW PAGES ──────────────────────────────────────────────────
         if entries and len(entries) > MAX_P1:
             remaining = entries[MAX_P1:]
-            chunks    = [remaining[i:i + PER_PAGE]
-                         for i in range(0, len(remaining), PER_PAGE)]
+            chunks = [remaining[i : i + PER_PAGE] for i in range(0, len(remaining), PER_PAGE)]
 
             for chunk_idx, chunk in enumerate(chunks):
                 fig2 = plt.figure(figsize=(8.27, 11.69))
                 fig2.patch.set_facecolor(C_WHITE)
                 gs2 = gridspec.GridSpec(
-                    3, 1, figure=fig2,
+                    3,
+                    1,
+                    figure=fig2,
                     height_ratios=[0.065, 0.910, 0.025],
                     hspace=0.01,
-                    left=0.10, right=0.90,
-                    top=0.985, bottom=0.015,
+                    left=0.10,
+                    right=0.90,
+                    top=0.985,
+                    bottom=0.015,
                 )
-                _render_header(fig2.add_subplot(gs2[0]),
-                               subtitle=f'Page {chunk_idx + 2}')
+                _render_header(fig2.add_subplot(gs2[0]), subtitle=f'Page {chunk_idx + 2}')
 
                 ax_t = fig2.add_subplot(gs2[1])
                 _setup_list_ax(ax_t)

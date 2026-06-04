@@ -1,0 +1,12 @@
+[tool.black]
+line-length = 120
+skip-string-normalization = true
+exclude = '''
+/(
+    venv
+  | \.venv
+  | \.git
+  | __pycache__
+  | data
+)/
+'''

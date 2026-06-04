@@ -2,8 +2,8 @@
 SkyTonight API Blueprint
 All /api/skytonight/* and /api/catalogues routes, plus the payload-builder helpers.
 """
+
 import json
-import math
 import os
 import re
 from typing import Any, Dict, Optional
@@ -50,12 +50,13 @@ skytonight_bp = Blueprint('skytonight', __name__)
 # Constellation abbreviation → full name map
 # ---------------------------------------------------------------------------
 
+
 def _humanize_const_name(name: str) -> str:
     return re.sub(r'(?<!^)(?=[A-Z])', ' ', name)
 
+
 _CONSTELLATION_ABBR_MAP: Dict[str, str] = {
-    str(c.abbr): _humanize_const_name(c.name) for c in _Constellation
-    if c.abbr is not None
+    str(c.abbr): _humanize_const_name(c.name) for c in _Constellation if c.abbr is not None
 }
 # PyOngc uses Se1/Se2 for the two halves of Serpens (not in the IAU enum).
 _CONSTELLATION_ABBR_MAP['Se1'] = 'Serpens Caput'
@@ -65,6 +66,7 @@ _CONSTELLATION_ABBR_MAP['Se2'] = 'Serpens Cauda'
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
+
 
 def _target_attr(target: object, key: str, default=None):
     if isinstance(target, dict):
@@ -192,6 +194,7 @@ def _alttime_json_path(target_id: str) -> str:
 # Payload builders
 # ---------------------------------------------------------------------------
 
+
 def _build_skytonight_reports_payload(catalogue: Optional[str], user_id: str, username: str) -> Dict[str, Any]:
     """Build the SkyTonight reports payload served to the frontend.
 
@@ -267,7 +270,11 @@ def _build_skytonight_reports_payload(catalogue: Optional[str], user_id: str, us
                 'meridian transit': observation.get('meridian_transit'),
                 'antimeridian transit': observation.get('antimeridian_transit'),
                 'catalogue_names': calc_catalogue_names,
-                'alttime_file': calc_item.get('target_id', '') if os.path.isfile(_alttime_json_path(calc_item.get('target_id', ''))) else '',
+                'alttime_file': (
+                    calc_item.get('target_id', '')
+                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', '')))
+                    else ''
+                ),
                 'source_type': 'calculated',
                 'plan_state': plan_state,
             }
@@ -295,7 +302,11 @@ def _build_skytonight_reports_payload(catalogue: Optional[str], user_id: str, us
                 'hmsdms': f"{ra_hms} / {dec_dms}" if ra_hms and dec_dms else None,
                 'observable_hours': observation.get('observable_hours'),
                 'solar elongation': calc_item.get('solar_elongation_deg'),
-                'alttime_file': calc_item.get('target_id', '') if os.path.isfile(_alttime_json_path(calc_item.get('target_id', ''))) else '',
+                'alttime_file': (
+                    calc_item.get('target_id', '')
+                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', '')))
+                    else ''
+                ),
                 'source_type': 'calculated',
                 'plan_state': plan_state,
             }
@@ -328,7 +339,11 @@ def _build_skytonight_reports_payload(catalogue: Optional[str], user_id: str, us
                 'declination': dec_dms,
                 'hmsdms': f"{ra_hms} / {dec_dms}" if ra_hms and dec_dms else None,
                 'observable_hours': observation.get('observable_hours'),
-                'alttime_file': calc_item.get('target_id', '') if os.path.isfile(_alttime_json_path(calc_item.get('target_id', ''))) else '',
+                'alttime_file': (
+                    calc_item.get('target_id', '')
+                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', '')))
+                    else ''
+                ),
                 'source_type': 'calculated',
                 'plan_state': plan_state,
             }
@@ -458,12 +473,20 @@ def _build_bodies_section_payload(user_id: str, username: str) -> Dict[str, Any]
                 'hmsdms': f"{ra_hms} / {dec_dms}" if ra_hms and dec_dms else None,
                 'solar elongation': calc_item.get('solar_elongation_deg'),
                 'observable_hours': observation.get('observable_hours'),
-                'alttime_file': calc_item.get('target_id', '') if os.path.isfile(_alttime_json_path(calc_item.get('target_id', ''))) else '',
+                'alttime_file': (
+                    calc_item.get('target_id', '')
+                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', '')))
+                    else ''
+                ),
                 'source_type': 'calculated',
                 'plan_state': plan_state,
             }
             _annotate_skytonight_item(
-                row, user_id, username, 'Bodies', plan_state,
+                row,
+                user_id,
+                username,
+                'Bodies',
+                plan_state,
                 _preloaded_astrodex=_preloaded_astrodex,
                 _preloaded_plan_entries=_preloaded_plan_entries,
             )
@@ -492,12 +515,22 @@ def _build_bodies_section_payload(user_id: str, username: str) -> Dict[str, Any]
             'source_type': 'dataset',
         }
         _annotate_skytonight_item(
-            row, user_id, username, 'Bodies', plan_state,
+            row,
+            user_id,
+            username,
+            'Bodies',
+            plan_state,
             _preloaded_astrodex=_preloaded_astrodex,
             _preloaded_plan_entries=_preloaded_plan_entries,
         )
         rows.append(row)
-    return {'bodies': rows, 'night_metadata': {}, 'available': bool(rows), 'in_progress': False, 'source_type': 'dataset'}
+    return {
+        'bodies': rows,
+        'night_metadata': {},
+        'available': bool(rows),
+        'in_progress': False,
+        'source_type': 'dataset',
+    }
 
 
 def _build_comets_section_payload(user_id: str, username: str) -> Dict[str, Any]:
@@ -538,12 +571,20 @@ def _build_comets_section_payload(user_id: str, username: str) -> Dict[str, Any]
                 'declination': dec_dms,
                 'hmsdms': f"{ra_hms} / {dec_dms}" if ra_hms and dec_dms else None,
                 'observable_hours': observation.get('observable_hours'),
-                'alttime_file': calc_item.get('target_id', '') if os.path.isfile(_alttime_json_path(calc_item.get('target_id', ''))) else '',
+                'alttime_file': (
+                    calc_item.get('target_id', '')
+                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', '')))
+                    else ''
+                ),
                 'source_type': 'calculated',
                 'plan_state': plan_state,
             }
             _annotate_skytonight_item(
-                row, user_id, username, 'Comets', plan_state,
+                row,
+                user_id,
+                username,
+                'Comets',
+                plan_state,
                 _preloaded_astrodex=_preloaded_astrodex,
                 _preloaded_plan_entries=_preloaded_plan_entries,
             )
@@ -576,12 +617,22 @@ def _build_comets_section_payload(user_id: str, username: str) -> Dict[str, Any]
             'source_type': 'dataset',
         }
         _annotate_skytonight_item(
-            row, user_id, username, 'Comets', plan_state,
+            row,
+            user_id,
+            username,
+            'Comets',
+            plan_state,
             _preloaded_astrodex=_preloaded_astrodex,
             _preloaded_plan_entries=_preloaded_plan_entries,
         )
         rows.append(row)
-    return {'comets': rows, 'night_metadata': {}, 'available': bool(rows), 'in_progress': False, 'source_type': 'dataset'}
+    return {
+        'comets': rows,
+        'night_metadata': {},
+        'available': bool(rows),
+        'in_progress': False,
+        'source_type': 'dataset',
+    }
 
 
 def _build_dso_section_payload(catalogue: Optional[str], user_id: str, username: str) -> Dict[str, Any]:
@@ -639,12 +690,20 @@ def _build_dso_section_payload(catalogue: Optional[str], user_id: str, username:
                 'meridian transit': observation.get('meridian_transit'),
                 'antimeridian transit': observation.get('antimeridian_transit'),
                 'catalogue_names': calc_catalogue_names,
-                'alttime_file': calc_item.get('target_id', '') if os.path.isfile(_alttime_json_path(calc_item.get('target_id', ''))) else '',
+                'alttime_file': (
+                    calc_item.get('target_id', '')
+                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', '')))
+                    else ''
+                ),
                 'source_type': 'calculated',
                 'plan_state': plan_state,
             }
             _annotate_skytonight_item(
-                row, user_id, username, source_catalogue, plan_state,
+                row,
+                user_id,
+                username,
+                source_catalogue,
+                plan_state,
                 _preloaded_astrodex=_preloaded_astrodex,
                 _preloaded_plan_entries=_preloaded_plan_entries,
             )
@@ -699,7 +758,11 @@ def _build_dso_section_payload(catalogue: Optional[str], user_id: str, username:
         }
         if catalogue:
             _annotate_skytonight_item(
-                row, user_id, username, source_catalogue, plan_state,
+                row,
+                user_id,
+                username,
+                source_catalogue,
+                plan_state,
                 _preloaded_astrodex=_preloaded_astrodex,
                 _preloaded_plan_entries=_preloaded_plan_entries,
             )
@@ -788,7 +851,9 @@ def _speed_score(f_ratio: float, object_type: str) -> float:
     return 3.5
 
 
-def _recommend_telescopes_for_target(target_payload: Dict[str, Any], telescopes: list[Dict[str, Any]]) -> list[Dict[str, Any]]:
+def _recommend_telescopes_for_target(
+    target_payload: Dict[str, Any], telescopes: list[Dict[str, Any]]
+) -> list[Dict[str, Any]]:
     size_arcmin = _to_float(target_payload.get('size'))
     magnitude = _to_float(target_payload.get('mag'))
     object_type = str(target_payload.get('type') or target_payload.get('object_type') or '')
@@ -809,21 +874,23 @@ def _recommend_telescopes_for_target(target_payload: Dict[str, Any], telescopes:
         speed_sc = _speed_score(f_ratio, object_type)
         final_score = int(round(max(1.0, min(5.0, (0.50 * focal_score) + (0.35 * aperture_sc) + (0.15 * speed_sc)))))
 
-        recommendations.append({
-            'telescope_id': str(scope.get('id') or ''),
-            'name': str(scope.get('name') or ''),
-            'manufacturer': str(scope.get('manufacturer') or ''),
-            'aperture_mm': round(aperture_mm, 1),
-            'effective_focal_length': round(focal_length, 1),
-            'effective_focal_ratio': round(f_ratio, 2),
-            'ideal_focal_min': int(ideal_f_min),
-            'ideal_focal_max': int(ideal_f_max),
-            'target_magnitude': round(magnitude, 2) if magnitude is not None else None,
-            'target_size_arcmin': round(size_arcmin, 1) if size_arcmin is not None else None,
-            'rating_1_to_5': final_score,
-            'is_shared': bool(scope.get('is_shared', False)),
-            'owner_username': scope.get('owner_username'),
-        })
+        recommendations.append(
+            {
+                'telescope_id': str(scope.get('id') or ''),
+                'name': str(scope.get('name') or ''),
+                'manufacturer': str(scope.get('manufacturer') or ''),
+                'aperture_mm': round(aperture_mm, 1),
+                'effective_focal_length': round(focal_length, 1),
+                'effective_focal_ratio': round(f_ratio, 2),
+                'ideal_focal_min': int(ideal_f_min),
+                'ideal_focal_max': int(ideal_f_max),
+                'target_magnitude': round(magnitude, 2) if magnitude is not None else None,
+                'target_size_arcmin': round(size_arcmin, 1) if size_arcmin is not None else None,
+                'rating_1_to_5': final_score,
+                'is_shared': bool(scope.get('is_shared', False)),
+                'owner_username': scope.get('owner_username'),
+            }
+        )
 
     recommendations.sort(
         key=lambda row: (
@@ -839,6 +906,7 @@ def _recommend_telescopes_for_target(target_payload: Dict[str, Any], telescopes:
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
+
 
 @skytonight_bp.route('/api/catalogues', methods=['GET'])
 @login_required
@@ -885,23 +953,25 @@ def skytonight_scheduler_status_api():
         return jsonify(get_remote_skytonight_scheduler_status())
     if sched:
         return jsonify(sched.get_status())
-    return jsonify({
-        'running': False,
-        'enabled': bool(load_config().get('skytonight', {}).get('enabled', False)),
-        'last_run': None,
-        'next_run': None,
-        'is_executing': False,
-        'mode': 'idle',
-        'reason': 'SkyTonight scheduler not running',
-        'server_time_valid': False,
-        'server_time': None,
-        'timezone': str(load_config().get('location', {}).get('timezone') or 'UTC'),
-        'last_error': None,
-        'last_result': {},
-        'progress': {
-            'execution_duration_seconds': None,
-        },
-    })
+    return jsonify(
+        {
+            'running': False,
+            'enabled': bool(load_config().get('skytonight', {}).get('enabled', False)),
+            'last_run': None,
+            'next_run': None,
+            'is_executing': False,
+            'mode': 'idle',
+            'reason': 'SkyTonight scheduler not running',
+            'server_time_valid': False,
+            'server_time': None,
+            'timezone': str(load_config().get('location', {}).get('timezone') or 'UTC'),
+            'last_error': None,
+            'last_result': {},
+            'progress': {
+                'execution_duration_seconds': None,
+            },
+        }
+    )
 
 
 @skytonight_bp.route('/api/skytonight/scheduler/trigger', methods=['POST'])
@@ -946,25 +1016,27 @@ def skytonight_dataset_status_api():
         if str(category or '').strip() == 'deep_sky':
             deep_sky_count += 1
 
-    return jsonify({
-        'enabled': bool(load_config().get('skytonight', {}).get('enabled', False)),
-        'loaded': bool(dataset.get('loaded', False)),
-        'dataset_file': str(dataset.get('dataset_file', '')),
-        'metadata': metadata if isinstance(metadata, dict) else {},
-        'computed_counts': {
-            'targets_total': len(targets),
-            'deep_sky': deep_sky_count,
-        },
-        'calculations_cached': has_calculation_results(),
-        'scheduler': {
-            'running': scheduler_status.get('running', False),
-            'is_executing': scheduler_status.get('is_executing', False),
-            'last_run': scheduler_status.get('last_run'),
-            'next_run': scheduler_status.get('next_run'),
-            'mode': scheduler_status.get('mode'),
-            'reason': scheduler_status.get('reason'),
-        },
-    })
+    return jsonify(
+        {
+            'enabled': bool(load_config().get('skytonight', {}).get('enabled', False)),
+            'loaded': bool(dataset.get('loaded', False)),
+            'dataset_file': str(dataset.get('dataset_file', '')),
+            'metadata': metadata if isinstance(metadata, dict) else {},
+            'computed_counts': {
+                'targets_total': len(targets),
+                'deep_sky': deep_sky_count,
+            },
+            'calculations_cached': has_calculation_results(),
+            'scheduler': {
+                'running': scheduler_status.get('running', False),
+                'is_executing': scheduler_status.get('is_executing', False),
+                'last_run': scheduler_status.get('last_run'),
+                'next_run': scheduler_status.get('next_run'),
+                'mode': scheduler_status.get('mode'),
+                'reason': scheduler_status.get('reason'),
+            },
+        }
+    )
 
 
 @skytonight_bp.route('/api/skytonight/dataset/rebuild', methods=['POST'])
@@ -1086,11 +1158,13 @@ def get_skytonight_telescope_recommendations_api():
         shared_telescopes = equipment_profiles.load_all_shared_equipment('telescopes', user_id)
         telescopes = telescopes + shared_telescopes
         if not telescopes:
-            return jsonify({
-                'has_telescopes': False,
-                'target': target_payload,
-                'recommendations': [],
-            })
+            return jsonify(
+                {
+                    'has_telescopes': False,
+                    'target': target_payload,
+                    'recommendations': [],
+                }
+            )
 
         mag_value = target_payload.get('mag')
         if mag_value is None:
@@ -1105,11 +1179,13 @@ def get_skytonight_telescope_recommendations_api():
         }
         recommendations = _recommend_telescopes_for_target(normalized_target, telescopes)
 
-        return jsonify({
-            'has_telescopes': bool(telescopes),
-            'target': normalized_target,
-            'recommendations': recommendations,
-        })
+        return jsonify(
+            {
+                'has_telescopes': bool(telescopes),
+                'target': normalized_target,
+                'recommendations': recommendations,
+            }
+        )
     except Exception:
         logger.exception('Error computing telescope recommendations')
         return jsonify({'error': 'Internal server error'}), 500
@@ -1134,10 +1210,7 @@ def get_skytonight_skymap_api():
 
         # Backfill the messier flag for skymap files written before this field was added.
         # Cross-reference against dso_results.json (already loaded; O(n) pass).
-        needs_enrichment = any(
-            tgt.get('category') == 'deep_sky' and 'messier' not in tgt
-            for tgt in targets
-        )
+        needs_enrichment = any(tgt.get('category') == 'deep_sky' and 'messier' not in tgt for tgt in targets)
         if needs_enrichment and os.path.isfile(SKYTONIGHT_DSO_RESULTS_FILE):
             dso_data = load_json_file(SKYTONIGHT_DSO_RESULTS_FILE, default={})
             messier_ids = {
@@ -1151,13 +1224,15 @@ def get_skytonight_skymap_api():
         # Include constraints so the frontend can draw horizon lines on the map
         cfg = load_config()
         constraints = cfg.get('skytonight', {}).get('constraints', {})
-        return jsonify({
-            'targets': targets,
-            'constraints': {
-                'altitude_constraint_min': float(constraints.get('altitude_constraint_min', 30)),
-                'horizon_profile': constraints.get('horizon_profile', []),
-            },
-        })
+        return jsonify(
+            {
+                'targets': targets,
+                'constraints': {
+                    'altitude_constraint_min': float(constraints.get('altitude_constraint_min', 30)),
+                    'horizon_profile': constraints.get('horizon_profile', []),
+                },
+            }
+        )
     except Exception:
         logger.exception('Error reading skymap data file')
         return jsonify({'error': 'Internal server error'}), 500
@@ -1232,11 +1307,13 @@ def get_catalogue_log(catalogue):
         with open(log_file, 'r', encoding='utf-8') as f:
             log_content = f.read()
 
-        return jsonify({
-            "catalogue": "skytonight",
-            "log_content": log_content,
-            "file_size": os.path.getsize(log_file),
-        })
+        return jsonify(
+            {
+                "catalogue": "skytonight",
+                "log_content": log_content,
+                "file_size": os.path.getsize(log_file),
+            }
+        )
 
     except Exception as e:
         logger.error(f"Error getting catalogue log: {e}")
@@ -1255,10 +1332,12 @@ def check_catalogue_log_exists(catalogue):
         ensure_skytonight_directories()
         log_file = SKYTONIGHT_CALCULATION_LOG_FILE
         log_exists = os.path.exists(log_file) and os.path.getsize(log_file) > 0
-        return jsonify({
-            "catalogue": "skytonight",
-            "log_exists": log_exists,
-        })
+        return jsonify(
+            {
+                "catalogue": "skytonight",
+                "log_exists": log_exists,
+            }
+        )
 
     except Exception:
         logger.exception("Error checking if catalogue log exists")

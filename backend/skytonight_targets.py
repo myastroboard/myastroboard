@@ -9,7 +9,6 @@ from logging_config import get_logger
 from skytonight_models import SkyTonightTarget
 from utils import load_json_file, save_json_file
 
-
 logger = get_logger(__name__)
 
 _dataset_cache: Dict[str, Any] = {}
@@ -64,7 +63,9 @@ def choose_preferred_catalogue_name(catalogue_names: Dict[str, str], order: Opti
 
 
 def _build_lookup_entry(target: SkyTonightTarget) -> Dict[str, Any]:
-    aliases = {normalize_catalogue_name(key): str(value) for key, value in target.catalogue_names.items() if str(value).strip()}
+    aliases = {
+        normalize_catalogue_name(key): str(value) for key, value in target.catalogue_names.items() if str(value).strip()
+    }
     group_id = target.target_id
     coords = target.coordinates
     return {
@@ -80,7 +81,9 @@ def _build_lookup_entry(target: SkyTonightTarget) -> Dict[str, Any]:
     }
 
 
-def _append_lookup_name(lookup: Dict[str, Dict[str, Any]], catalogue: str, object_name: str, entry: Dict[str, Any]) -> None:
+def _append_lookup_name(
+    lookup: Dict[str, Dict[str, Any]], catalogue: str, object_name: str, entry: Dict[str, Any]
+) -> None:
     normalized_catalogue = normalize_catalogue_name(catalogue)
     normalized_name = normalize_object_name(object_name)
     if not normalized_catalogue or not normalized_name:
@@ -148,7 +151,9 @@ def load_targets_dataset(force_reload: bool = False, dataset_file: Optional[str]
     return _dataset_cache
 
 
-def save_targets_dataset(targets: List[SkyTonightTarget], metadata: Optional[Dict[str, Any]] = None, dataset_file: Optional[str] = None) -> bool:
+def save_targets_dataset(
+    targets: List[SkyTonightTarget], metadata: Optional[Dict[str, Any]] = None, dataset_file: Optional[str] = None
+) -> bool:
     """Persist a normalized SkyTonight dataset to disk."""
     target_dataset_file = dataset_file or SKYTONIGHT_DATASET_FILE
     payload = {

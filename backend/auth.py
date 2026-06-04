@@ -2,6 +2,7 @@
 Authentication and User Management Module
 Handles user authentication, authorization, and session management
 """
+
 import json
 import os
 import uuid
@@ -34,16 +35,38 @@ ALLOWED_STARTUP_MAIN_TABS = {
     'astrodex',
     'equipment',
     'my-settings',
-    'parameters'
+    'parameters',
 }
 ALLOWED_STARTUP_SUBTABS = {
-    'astro-weather', 'window', 'moon', 'sun', 'aurora', 'calendar',
-    'weather', 'seeing', 'trend',
-    'launches', 'astronauts', 'space-events', 'iss',
-    'astrodex', 'plan-my-night',
-    'combinations', 'fov', 'telescopes', 'cameras', 'mounts', 'filters', 'accessories',
-    'customize', 'security',
-    'configuration', 'advanced', 'logs', 'users', 'metrics'
+    'astro-weather',
+    'window',
+    'moon',
+    'sun',
+    'aurora',
+    'calendar',
+    'weather',
+    'seeing',
+    'trend',
+    'launches',
+    'astronauts',
+    'space-events',
+    'iss',
+    'astrodex',
+    'plan-my-night',
+    'combinations',
+    'fov',
+    'telescopes',
+    'cameras',
+    'mounts',
+    'filters',
+    'accessories',
+    'customize',
+    'security',
+    'configuration',
+    'advanced',
+    'logs',
+    'users',
+    'metrics',
 }
 ALLOWED_TIME_FORMATS = {'auto', '12h', '24h'}
 ALLOWED_DENSITY_MODES = {'comfortable', 'compact'}
@@ -70,8 +93,8 @@ DEFAULT_USER_PREFERENCES = {
             'N5': {'enabled': True, 'lead_minutes': 30},
             'N6': {'enabled': True, 'lead_minutes': 20},
             'N7': {'enabled': True, 'kp_threshold': 5},
-        }
-    }
+        },
+    },
 }
 
 # Users storage file
@@ -80,7 +103,18 @@ USERS_FILE = os.path.join(os.environ.get('DATA_DIR', '/app/data'), 'users.json')
 
 class User:
     """User model"""
-    def __init__(self, username, password_hash, role, user_id=None, created_at=None, last_login=None, preferences=None, push_subscriptions=None):
+
+    def __init__(
+        self,
+        username,
+        password_hash,
+        role,
+        user_id=None,
+        created_at=None,
+        last_login=None,
+        preferences=None,
+        push_subscriptions=None,
+    ):
         self.user_id = user_id or str(uuid.uuid4())
         self.username = username
         self.password_hash = password_hash
@@ -102,7 +136,7 @@ class User:
             'preferences': self.preferences,
             'push_subscriptions': self.push_subscriptions,
         }
-    
+
     @staticmethod
     def from_dict(data):
         """Create user from dictionary"""
@@ -116,23 +150,23 @@ class User:
             preferences=data.get('preferences'),
             push_subscriptions=data.get('push_subscriptions'),
         )
-    
+
     def check_password(self, password):
         """Check if password matches"""
         return check_password_hash(self.password_hash, password)
-    
+
     def is_admin(self):
         """Check if user is admin"""
         return self.role == ROLE_ADMIN
-    
+
     def is_user(self):
         """Check if user is a regular user"""
         return self.role == ROLE_USER
-    
+
     def is_read_only(self):
         """Check if user is read-only"""
         return self.role == ROLE_READ_ONLY
-    
+
     def is_using_default_password(self):
         """Check if user is still using default password"""
         if self.username == DEFAULT_ADMIN_USERNAME:
@@ -142,12 +176,12 @@ class User:
 
 class UserManager:
     """Manages user storage and operations"""
-    
+
     def __init__(self):
         self.users = {}
         self._users_mtime = None
         self.load_users()
-    
+
     def load_users(self):
         """Load users from file"""
         if os.path.exists(USERS_FILE):
@@ -157,10 +191,7 @@ class UserManager:
                     is_valid, error_msg = self.validate_users_json_data(data)
                     if not is_valid:
                         raise ValueError(f"Invalid users data: {error_msg}")
-                    self.users = {
-                        key: User.from_dict(user_data)
-                        for key, user_data in data.items()
-                    }
+                    self.users = {key: User.from_dict(user_data) for key, user_data in data.items()}
                 self._users_mtime = os.path.getmtime(USERS_FILE)
                 logger.debug(f"Loaded {len(self.users)} users from {USERS_FILE}")
             except Exception as e:
@@ -188,7 +219,7 @@ class UserManager:
                 self.load_users()
         except Exception as e:
             logger.warning(f"Failed to check users file freshness: {e}")
-    
+
     def save_users(self):
         """Save users to file using atomic write and JSON validation."""
         temp_path = USERS_FILE + '.tmp'
@@ -199,10 +230,7 @@ class UserManager:
             # Ensure data directory exists
             os.makedirs(os.path.dirname(USERS_FILE), exist_ok=True)
 
-            data = {
-                user_id: user.to_dict()
-                for user_id, user in self.users.items()
-            }
+            data = {user_id: user.to_dict() for user_id, user in self.users.items()}
 
             # Keep a backup of current file before replacing it.
             if os.path.exists(USERS_FILE):
@@ -349,38 +377,30 @@ class UserManager:
                 if key in merged:
                     merged[key] = value
         return merged
-    
+
     def ensure_default_admin(self):
         """Ensure default admin user exists"""
         # Check by username, not by key
         if not self.get_user_by_username(DEFAULT_ADMIN_USERNAME):
             logger.info("Creating default admin user")
-            self.create_user(
-                DEFAULT_ADMIN_USERNAME,
-                DEFAULT_ADMIN_PASSWORD,
-                ROLE_ADMIN
-            )
-    
+            self.create_user(DEFAULT_ADMIN_USERNAME, DEFAULT_ADMIN_PASSWORD, ROLE_ADMIN)
+
     def create_user(self, username, password, role):
         """Create a new user"""
         self._reload_users_if_changed()
 
         if self.get_user_by_username(username):
             raise ValueError(f"User {username} already exists")
-        
+
         if role not in [ROLE_ADMIN, ROLE_USER, ROLE_READ_ONLY]:
             raise ValueError(f"Invalid role: {role}")
-        
-        user = User(
-            username=username,
-            password_hash=generate_password_hash(password),
-            role=role
-        )
+
+        user = User(username=username, password_hash=generate_password_hash(password), role=role)
         self.users[user.user_id] = user
         self.save_users()
         logger.info(f"Created user {username} (ID: {user.user_id}) with role {role}")
         return user
-    
+
     def get_user_by_username(self, username):
         """Get user by username"""
         self._reload_users_if_changed()
@@ -388,23 +408,23 @@ class UserManager:
             if user.username == username:
                 return user
         return None
-    
+
     def get_user_by_id(self, user_id):
         """Get user by UUID"""
         self._reload_users_if_changed()
         return self.users.get(user_id)
-    
+
     def get_user(self, username):
         """Get user by username (for backwards compatibility)"""
         return self.get_user_by_username(username)
-    
+
     def update_user(self, user_id, username=None, password=None, role=None):
         """Update user username, password and/or role"""
         self._reload_users_if_changed()
         user = self.get_user_by_id(user_id)
         if not user:
             raise ValueError(f"User with ID {user_id} not found")
-        
+
         # If changing username, check for conflicts
         if username and username != user.username:
             existing_user = self.get_user_by_username(username)
@@ -412,15 +432,15 @@ class UserManager:
                 raise ValueError(f"Username {username} already taken")
             logger.info(f"Changing username from {user.username} to {username}")
             user.username = username
-        
+
         if password:
             user.password_hash = generate_password_hash(password)
-        
+
         if role:
             if role not in [ROLE_ADMIN, ROLE_USER, ROLE_READ_ONLY]:
                 raise ValueError(f"Invalid role: {role}")
             user.role = role
-        
+
         self.save_users()
         logger.info(f"Updated user {user.username} (ID: {user_id})")
         return user
@@ -488,7 +508,7 @@ class UserManager:
 
         logger.info(f"Updated preferences for user {user.username} (ID: {user_id})")
         return user.preferences.copy()
-    
+
     def delete_user(self, user_id, current_user_id=None):
         """Delete a user and safely clean related astrodex data"""
 
@@ -519,9 +539,7 @@ class UserManager:
             base_astrodex_dir = os.path.abspath(ASTRODEX_DIR)
             base_images_dir = os.path.abspath(ASTRODEX_IMAGES_DIR)
 
-            astrodex_file = os.path.normpath(
-                os.path.join(base_astrodex_dir, f"{user_id}_astrodex.json")
-            )
+            astrodex_file = os.path.normpath(os.path.join(base_astrodex_dir, f"{user_id}_astrodex.json"))
 
             # Ensure confinement
             if not astrodex_file.startswith(base_astrodex_dir):
@@ -546,9 +564,7 @@ class UserManager:
 
             # Delete referenced images safely
             for filename in image_filenames:
-                file_path = os.path.normpath(
-                    os.path.join(base_images_dir, filename)
-                )
+                file_path = os.path.normpath(os.path.join(base_images_dir, filename))
 
                 if not file_path.startswith(base_images_dir):
                     continue
@@ -557,27 +573,19 @@ class UserManager:
                     try:
                         os.remove(file_path)
                     except Exception as remove_error:
-                        logger.warning(
-                            f"Failed to delete astrodex image {filename}: {remove_error}"
-                        )
+                        logger.warning(f"Failed to delete astrodex image {filename}: {remove_error}")
 
             # Delete remaining images matching user_id prefix
             if os.path.exists(base_images_dir):
                 for filename in os.listdir(base_images_dir):
-                    if filename.startswith(f"{user_id}_") and re.match(
-                        r"^[a-zA-Z0-9_.-]+$", filename
-                    ):
-                        file_path = os.path.normpath(
-                            os.path.join(base_images_dir, filename)
-                        )
+                    if filename.startswith(f"{user_id}_") and re.match(r"^[a-zA-Z0-9_.-]+$", filename):
+                        file_path = os.path.normpath(os.path.join(base_images_dir, filename))
 
                         if file_path.startswith(base_images_dir):
                             try:
                                 os.remove(file_path)
                             except Exception as remove_error:
-                                logger.warning(
-                                    f"Failed to delete astrodex image {filename}: {remove_error}"
-                                )
+                                logger.warning(f"Failed to delete astrodex image {filename}: {remove_error}")
 
             # Delete astrodex file itself
             if os.path.exists(astrodex_file):
@@ -586,7 +594,7 @@ class UserManager:
 
         except Exception as e:
             logger.warning(f"Failed to delete astrodex data for user {user_id}: {e}")
-    
+
     def list_users(self):
         """List all users (without password hashes)"""
         self._reload_users_if_changed()
@@ -596,11 +604,11 @@ class UserManager:
                 'username': user.username,
                 'role': user.role,
                 'created_at': user.created_at,
-                'last_login': user.last_login
+                'last_login': user.last_login,
             }
             for user in self.users.values()
         ]
-    
+
     def authenticate(self, username, password):
         """Authenticate user"""
         self._reload_users_if_changed()
@@ -624,6 +632,7 @@ user_manager = UserManager()
 # Is read-only role, can only access GET endpoints (enforced in route handlers)
 def login_required(f):
     """Decorator to require authentication"""
+
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'username' not in session:
@@ -632,44 +641,56 @@ def login_required(f):
             logger.warning(f"Unauthorized access attempt to {request.path} from {client_ip} (no valid session cookie)")
             return jsonify({'error': 'Authentication required'}), 401
         return f(*args, **kwargs)
+
     return decorated_function
+
 
 # If user role is user, can access non-admin endpoints (enforced in route handlers)
 def user_required(f):
     """Decorator to require user or admin role"""
+
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'username' not in session:
             client_ip = request.remote_addr
             logger.warning(f"Unauthorized access attempt to {request.path} from {client_ip} (no valid session cookie)")
             return jsonify({'error': 'Authentication required'}), 401
-        
+
         user = user_manager.get_user(session['username'])
         if not user or not (user.is_admin() or user.is_user()):
             client_ip = request.remote_addr
-            logger.warning(f"User {session.get('username')} from {client_ip} attempted to access {request.path} without sufficient permissions")
+            logger.warning(
+                f"User {session.get('username')} from {client_ip} attempted to access"
+                f" {request.path} without sufficient permissions"
+            )
             return jsonify({'error': 'User access required'}), 403
-        
+
         return f(*args, **kwargs)
+
     return decorated_function
+
 
 # Only admin role can access
 def admin_required(f):
     """Decorator to require admin role"""
+
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'username' not in session:
             client_ip = request.remote_addr
             logger.warning(f"Unauthorized access attempt to {request.path} from {client_ip} (no valid session cookie)")
             return jsonify({'error': 'Authentication required'}), 401
-        
+
         user = user_manager.get_user(session['username'])
         if not user or not user.is_admin():
             client_ip = request.remote_addr
-            logger.warning(f"Non-admin user {session.get('username')} from {client_ip} attempted to access {request.path}")
+            logger.warning(
+                f"Non-admin user {session.get('username')} from {client_ip} attempted to access {request.path}"
+            )
             return jsonify({'error': 'Admin access required'}), 403
-        
+
         return f(*args, **kwargs)
+
     return decorated_function
 
 

@@ -52,14 +52,15 @@ from astropy.time import Time as AstroTime
 from astropy.coordinates import EarthLocation, AltAz, get_sun
 import astropy.units as u
 
-
 # =============================
 # Data structures
 # =============================
 
+
 @dataclass
 class EclipsePoint:
     """Data point for altitude vs time"""
+
     time: str  # "HH:MM" local time
     altitude_deg: float
     azimuth_deg: float
@@ -86,6 +87,7 @@ class SolarEclipseInfo:
 # Service
 # =============================
 
+
 class SolarEclipseService:
     """Calculate solar eclipse information for astrophotography"""
 
@@ -95,10 +97,7 @@ class SolarEclipseService:
         self.timezone = ZoneInfo(timezone)
 
         self.observer = Observer(latitude, longitude, 0)
-        self.location = EarthLocation(
-            lat=latitude * u.deg,
-            lon=longitude * u.deg
-        )
+        self.location = EarthLocation(lat=latitude * u.deg, lon=longitude * u.deg)
 
     # =============================
     # Public API
@@ -106,7 +105,7 @@ class SolarEclipseService:
 
     def get_next_eclipse(self) -> Optional[SolarEclipseInfo]:
         """Get next solar eclipse from now"""
-        
+
         # astronomy.Time expects UTC time
         now_utc = datetime.datetime.now(datetime.timezone.utc)
         t_start_str = now_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -169,7 +168,7 @@ class SolarEclipseService:
             duration_minutes=duration_minutes,
             astrophotography_score=round(score, 1),
             score_classification=classification,
-            altitude_vs_time=altitude_vs_time
+            altitude_vs_time=altitude_vs_time,
         )
 
     # =============================
@@ -180,7 +179,7 @@ class SolarEclipseService:
         """Determine eclipse type from eclipse object"""
         # Check the eclipse kind
         kind_name = str(eclipse.kind).lower()
-        
+
         if 'total' in kind_name:
             return "Total"
         elif 'annular' in kind_name:
@@ -211,14 +210,12 @@ class SolarEclipseService:
             return None
 
     def _generate_altitude_vs_time(
-        self,
-        start_local: datetime.datetime,
-        end_local: datetime.datetime
+        self, start_local: datetime.datetime, end_local: datetime.datetime
     ) -> List[EclipsePoint]:
         """Generate altitude vs time points for the eclipse"""
-        
+
         points = []
-        
+
         # Generate points every 5 minutes
         current = start_local
         step = datetime.timedelta(minutes=5)
@@ -233,32 +230,23 @@ class SolarEclipseService:
 
             alt = self._coord_attribute(sun_transformed, "alt")
             az = self._coord_attribute(sun_transformed, "az")
-            
+
             alt = alt if alt is not None else 0.0
             az = az if az is not None else 0.0
 
             time_str = current.strftime("%H:%M")
-            points.append(EclipsePoint(
-                time=time_str,
-                altitude_deg=round(alt, 1),
-                azimuth_deg=round(az, 1)
-            ))
+            points.append(EclipsePoint(time=time_str, altitude_deg=round(alt, 1), azimuth_deg=round(az, 1)))
 
             current += step
 
         return points
 
     def _calculate_astrophotography_score(
-        self,
-        eclipse_type: str,
-        visible: bool,
-        obscuration: float,
-        peak_altitude: float,
-        duration_minutes: int
+        self, eclipse_type: str, visible: bool, obscuration: float, peak_altitude: float, duration_minutes: int
     ) -> tuple[float, str]:
         """
         Calculate astrophotography score (0-10) based on various factors.
-        
+
         Scoring factors:
         - Type: Total (10) > Annular (8) > Partial (5)
         - Visibility: -5 if below horizon
@@ -266,7 +254,7 @@ class SolarEclipseService:
         - Duration: Longer shooting window is better
         - Magnitude: Higher obscuration is better for partial/annular
         """
-        
+
         if not visible:
             return 0.0, "not_visible"
 
