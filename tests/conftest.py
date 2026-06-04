@@ -2,7 +2,23 @@
 Shared pytest fixtures and configuration for all tests
 """
 import os
+import sys
+import signal
 import tempfile
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """Reset SIGTERM to a clean exit before pytest tears down.
+
+    app.py registers a SIGTERM handler that re-raises the signal with the
+    default handler restored. On Windows, the default SIGTERM handler exits
+    with code 15. This hook replaces it with a clean sys.exit(0) so the
+    test suite always exits with the real pass/fail code.
+    """
+    try:
+        signal.signal(signal.SIGTERM, lambda s, f: sys.exit(0))
+    except (OSError, ValueError):
+        pass
 
 # Set up environment variables BEFORE any imports from backend
 # This prevents permission errors when modules try to create directories
@@ -54,6 +70,7 @@ def setup_test_environment():
     shutil.rmtree(test_data_dir, ignore_errors=True)
     shutil.rmtree(test_output_dir, ignore_errors=True)
     shutil.rmtree(test_config_dir, ignore_errors=True)
+
 
 
 @pytest.fixture(autouse=True)

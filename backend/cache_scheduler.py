@@ -86,7 +86,10 @@ class CacheScheduler:
                 if os.path.exists(lock_file_path):
                     os.unlink(lock_file_path)
             except Exception as e:
-                logger.error(f"Error releasing cache scheduler lock: {e}")
+                try:
+                    logger.error(f"Error releasing cache scheduler lock: {e}")
+                except (ValueError, OSError):
+                    pass  # Log stream already closed during process shutdown
             finally:
                 self._lock_file = None
                 self._has_lock = False

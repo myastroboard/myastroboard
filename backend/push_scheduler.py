@@ -621,7 +621,10 @@ def _release_lock() -> None:
             fcntl.flock(_lock_file.fileno(), fcntl.LOCK_UN)
         _lock_file.close()
     except Exception as e:
-        logger.error(f"Error releasing push scheduler lock: {e}")
+        try:
+            logger.error(f"Error releasing push scheduler lock: {e}")
+        except (ValueError, OSError):
+            pass  # Log stream already closed during process shutdown
     finally:
         _lock_file = None
 
