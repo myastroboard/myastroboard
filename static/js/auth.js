@@ -200,6 +200,19 @@ async function loadUserPreferences() {
             timeoutMs: 10000
         });
         currentUserPreferences = normalizePreferences(data.preferences || {});
+
+        // Apply language from server preference so it overrides browser/localStorage defaults.
+        // This ensures the language stored in the user profile is always used on login,
+        // even on a fresh browser or device where localStorage has no language set.
+        const serverLang = currentUserPreferences.language;
+        if (serverLang && typeof i18n !== 'undefined' && serverLang !== i18n.getCurrentLanguage()) {
+            localStorage.setItem('myastroboard_language', serverLang);
+            await i18n.setLanguage(serverLang);
+            if (window.languageSelector) {
+                window.languageSelector.setCurrentLanguage();
+                window.languageSelector.updatePageTranslations();
+            }
+        }
     } catch (error) {
         console.error('Error loading user preferences:', error);
         currentUserPreferences = { ...DEFAULT_USER_PREFERENCES };

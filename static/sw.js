@@ -222,7 +222,7 @@ self.addEventListener('fetch', (event) => {
 
     if (request.mode === 'navigate') {
         event.respondWith(
-            fetchWithTimeout(request, 2500)
+            fetchWithTimeout(request, 8000)
                 .then((networkResponse) => {
                     const requestPath  = url.pathname;
                     const responsePath = new URL(networkResponse.url).pathname;

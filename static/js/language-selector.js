@@ -111,16 +111,19 @@ class LanguageSelector {
             // Save language preference to localStorage
             localStorage.setItem('myastroboard_language', selectedLang);
 
-            // Persist to server so push notifications use the correct language
-            fetch('/api/auth/preferences', {
+            // Persist to server and await completion before reloading.
+            // Firing-and-forgetting then immediately calling location.reload() causes the
+            // browser to cancel the in-flight PUT on page unload. In single-threaded Flask
+            // the partial PUT can block the subsequent navigation GET past the service worker's
+            // 2500 ms timeout, which makes the SW fall through to the offline page in PWA mode.
+            await fetch('/api/auth/preferences', {
                 method: 'PUT',
                 credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ preferences: { language: selectedLang } }),
             }).catch(() => {});
 
-            // Reload the page to apply the new language
-            // This is more reliable than dynamically updating all elements
+            // Reload the page to apply the new language across all dynamically-rendered content.
             location.reload();
         } catch (error) {
             console.error('[LanguageSelector] Error changing language:', error);
