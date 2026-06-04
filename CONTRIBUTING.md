@@ -47,8 +47,8 @@ Before you begin, make sure you have:
    docker-compose -f docker-compose-dev.yml up --build
    
    # Option 2: Local Python environment
-   python -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
    pip install -r requirements-dev.txt
    ```
 
@@ -63,6 +63,7 @@ Please read through our documentation before contributing:
 - [Quick Start](docs/2.QUICKSTART.md)
 - [Organization](docs/5.ORGANIZATION.md)
 - [Cache System](docs/CACHE_SYSTEM.md)
+- [Translations](docs/7.TRANSLATIONS.md)
 
 ## Development Process
 
@@ -355,6 +356,7 @@ def test_parse_coordinates_invalid_format():
 2. **Run tests and linting**
    ```bash
    pytest
+   black backend/
    flake8 backend/
    ```
 
@@ -374,7 +376,7 @@ def test_parse_coordinates_invalid_format():
    - Link related issues
    - Provide clear description of changes
    - Add screenshots for UI changes
-   - Ensure CI checks pass
+   - Ensure CI checks pass (`validate-i18n`, `docker-publish`)
 
 3. **Address Review Comments**:
    - Respond to all feedback
@@ -424,6 +426,7 @@ Contributors will be acknowledged in:
 - Add type hints to function signatures
 - Follow existing patterns for API endpoints
 - Update relevant tests in `tests/`
+- If you add or modify user-facing text, update the translation files — see [docs/7.TRANSLATIONS.md](docs/7.TRANSLATIONS.md)
 
 ### Frontend (`static/js/`, `static/css/`, `templates/`)
 - Maintain vanilla JavaScript (no frameworks)
@@ -443,8 +446,8 @@ Contributors will be acknowledged in:
 - Add integration tests for new features
 - Mock external dependencies
 
-### Target Catalogues (`targets/`)
-- Follow YAML format of existing catalogues
+### Target Catalogues (`backend/catalogues/`)
+- Follow JSON format of existing catalogues
 - Include comprehensive README updates
 - Validate catalogue data
 
