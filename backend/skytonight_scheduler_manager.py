@@ -2,6 +2,7 @@
 SkyTonight Scheduler Management
 Handles the SkyTonight scheduler lifecycle, including creation, status, and refresh logic.
 """
+
 import json
 import os
 import sys
@@ -33,6 +34,7 @@ logger = get_logger(__name__)
 # Log helpers
 # ============================================================
 
+
 def _append_skytonight_calculation_log(status: str, payload: Dict[str, Any]) -> None:
     """Append a single line to the SkyTonight calculation log."""
     ensure_skytonight_directories()
@@ -53,7 +55,7 @@ def _trim_calculation_log(log_path: str, max_runs: int = 5) -> None:
     """Keep only the last *max_runs* runs (2 lines each) in the calculation log."""
     try:
         with open(log_path, 'r', encoding='utf-8') as f:
-            lines = [l for l in f.readlines() if l.strip()]
+            lines = [line for line in f.readlines() if line.strip()]
         max_lines = max_runs * 2
         if len(lines) > max_lines:
             with open(log_path, 'w', encoding='utf-8') as f:
@@ -65,6 +67,7 @@ def _trim_calculation_log(log_path: str, max_runs: int = 5) -> None:
 # ============================================================
 # Refresh pipeline
 # ============================================================
+
 
 def _run_skytonight_refresh() -> Dict[str, Any]:
     """Run the current SkyTonight refresh pipeline.
@@ -82,6 +85,7 @@ def _run_skytonight_refresh() -> Dict[str, Any]:
     # --- Phase 1: catalogue dataset ---
     try:
         from skytonight_calculator import _set_progress as _calc_set_progress
+
         _calc_set_progress('build_dataset')
     except Exception:
         pass
@@ -123,6 +127,7 @@ def _run_skytonight_refresh() -> Dict[str, Any]:
 # Scheduler lifecycle
 # ============================================================
 
+
 def get_or_create_skytonight_scheduler(app, cache_ready_event=None):
     """Get the SkyTonight scheduler instance, creating it if necessary.
 
@@ -139,7 +144,9 @@ def get_or_create_skytonight_scheduler(app, cache_ready_event=None):
                     msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
                 except OSError:
                     if not app.config.get('skytonight_scheduler_lock_logged'):
-                        logger.debug('SkyTonight scheduler already running in another worker process, skipping creation')
+                        logger.debug(
+                            'SkyTonight scheduler already running in another worker process, skipping creation'
+                        )
                         app.config['skytonight_scheduler_lock_logged'] = True
                     app.config['is_skytonight_scheduler_worker'] = False
                     lock_file.close()
@@ -179,6 +186,7 @@ def get_or_create_skytonight_scheduler(app, cache_ready_event=None):
 def get_skytonight_scheduler_for_api():
     """Get SkyTonight scheduler for API endpoints (call inside a request context)."""
     from flask import current_app
+
     scheduler = get_or_create_skytonight_scheduler(current_app)
     if scheduler:
         return scheduler

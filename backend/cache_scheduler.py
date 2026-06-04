@@ -15,6 +15,7 @@ else:
 # Initialize logger for this module
 logger = get_logger(__name__)
 
+
 class CacheScheduler:
     def __init__(self, interval_seconds=CACHE_SCHEDULER_INTERVAL_SECONDS):
         """
@@ -46,7 +47,7 @@ class CacheScheduler:
         try:
             lock_file_path = os.path.join(DATA_DIR_CACHE, 'cache_scheduler.lock')
             self._lock_file = open(lock_file_path, 'w')
-            
+
             if sys.platform == "win32":
                 # Windows file locking
                 try:
@@ -58,7 +59,7 @@ class CacheScheduler:
             else:
                 # Unix file locking
                 fcntl.flock(self._lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-            
+
             self._lock_file.write(str(os.getpid()))
             self._lock_file.flush()
             self._has_lock = True
@@ -79,7 +80,7 @@ class CacheScheduler:
                 else:
                     # Unix file unlocking
                     fcntl.flock(self._lock_file.fileno(), fcntl.LOCK_UN)
-                
+
                 self._lock_file.close()
                 lock_file_path = os.path.join(DATA_DIR_CACHE, 'cache_scheduler.lock')
                 if os.path.exists(lock_file_path):
@@ -112,7 +113,7 @@ class CacheScheduler:
                     logger.info('Initial cache update complete - cache_ready_event set.')
             except Exception as e:
                 logger.error(f"Error updating caches: {e}", exc_info=True)
-            
+
             if self._stop_event.wait(self.interval):
                 break  # Exit if stop event is set during sleep
 

@@ -48,10 +48,7 @@ class MoonPlanner:
         self.longitude = longitude
         self.timezone = ZoneInfo(timezone)
 
-        self.location = EarthLocation(
-            lat=latitude * u.deg,
-            lon=longitude * u.deg
-        )
+        self.location = EarthLocation(lat=latitude * u.deg, lon=longitude * u.deg)
 
     # ============================================================
     # Public API
@@ -69,19 +66,21 @@ class MoonPlanner:
             date = today + datetime.timedelta(days=i)
             night = self._night_data(date)
 
-            results.append({
-                "date": str(date),
-                "dark_hours": {
-                    "strict": round(night["hours_strict"], 2),
-                    "practical": round(night["hours_practical"], 2),
-                    "illumination": round(night["hours_illumination"], 2),
-                },
-                "moon": {
-                    "max_altitude": round(night["moon_max_alt"], 1),
-                    "illumination_percent": round(night["illumination"], 1)
-                },
-                "astrophoto_score": self._score(night["hours_strict"])
-            })
+            results.append(
+                {
+                    "date": str(date),
+                    "dark_hours": {
+                        "strict": round(night["hours_strict"], 2),
+                        "practical": round(night["hours_practical"], 2),
+                        "illumination": round(night["hours_illumination"], 2),
+                    },
+                    "moon": {
+                        "max_altitude": round(night["moon_max_alt"], 1),
+                        "illumination_percent": round(night["illumination"], 1),
+                    },
+                    "astrophoto_score": self._score(night["hours_strict"]),
+                }
+            )
 
         return results
 
@@ -97,16 +96,8 @@ class MoonPlanner:
         array at once.  That yields 2 vectorized calls (sun + moon) per night
         instead of 146 individual ones - ~50× fewer coordinate transforms.
         """
-        start = datetime.datetime.combine(
-            date,
-            datetime.time(18, 0),
-            tzinfo=self.timezone
-        )
-        end = datetime.datetime.combine(
-            date + datetime.timedelta(days=1),
-            datetime.time(6, 0),
-            tzinfo=self.timezone
-        )
+        start = datetime.datetime.combine(date, datetime.time(18, 0), tzinfo=self.timezone)
+        end = datetime.datetime.combine(date + datetime.timedelta(days=1), datetime.time(6, 0), tzinfo=self.timezone)
 
         step_minutes = 10
         step = datetime.timedelta(minutes=step_minutes)
@@ -131,9 +122,7 @@ class MoonPlanner:
         astro_night = sun_alts < -18
         hours_strict = float(np.sum(astro_night & (moon_alts < 0)) * step_minutes / 60)
         hours_practical = float(np.sum(astro_night & (moon_alts < 5)) * step_minutes / 60)
-        hours_illumination = (
-            float(np.sum(astro_night) * step_minutes / 60) if illum_percent < 15 else 0.0
-        )
+        hours_illumination = float(np.sum(astro_night) * step_minutes / 60) if illum_percent < 15 else 0.0
 
         return {
             "hours_strict": hours_strict,

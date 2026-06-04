@@ -14,7 +14,6 @@ from skytonight_models import SkyTonightCoordinates, SkyTonightTarget
 from skytonight_targets import normalize_object_name
 from solar_system_events import SolarSystemEventsService
 
-
 logger = get_logger(__name__)
 
 # MPC CometEls.txt - fixed-width orbital elements for all known comets
@@ -37,6 +36,7 @@ def _response_preview(text: str, limit: int = 180) -> str:
 # ---------------------------------------------------------------------------
 # Keplerian orbit helpers
 # ---------------------------------------------------------------------------
+
 
 def _solve_kepler_elliptic(M: float, e: float) -> float:
     """Solve Kepler's equation E - e*sin(E) = M for eccentric anomaly E."""
@@ -73,6 +73,7 @@ def _get_earth_heliocentric(obs_time: datetime) -> Tuple[float, float, float]:
         from astropy.time import Time
         from astropy.coordinates import CartesianRepresentation, get_body_barycentric
         from astropy import units as u
+
         t = Time(obs_time)
         e_bary = cast(CartesianRepresentation, get_body_barycentric('earth', t))
         s_bary = cast(CartesianRepresentation, get_body_barycentric('sun', t))
@@ -90,8 +91,14 @@ def _get_earth_heliocentric(obs_time: datetime) -> Tuple[float, float, float]:
 
 
 def _comet_ra_dec(
-    q: float, e: float, omega_deg: float, Omega_deg: float, i_deg: float,
-    peri_year: int, peri_month: int, peri_day: float,
+    q: float,
+    e: float,
+    omega_deg: float,
+    Omega_deg: float,
+    i_deg: float,
+    peri_year: int,
+    peri_month: int,
+    peri_day: float,
     obs_time: datetime,
     earth_helio: Tuple[float, float, float],
 ) -> Tuple[Optional[float], Optional[float], Optional[float], Optional[float]]:
@@ -110,35 +117,33 @@ def _comet_ra_dec(
         # Perihelion JD (days from J2000.0 = 2451545.0)
         day_int = int(peri_day)
         day_frac = peri_day - day_int
-        peri_dt = datetime(peri_year, peri_month, max(1, day_int),
-                           tzinfo=timezone.utc)
+        peri_dt = datetime(peri_year, peri_month, max(1, day_int), tzinfo=timezone.utc)
         peri_jd = peri_dt.timestamp() / 86400.0 + 2440587.5 + day_frac
         obs_jd = obs_time.timestamp() / 86400.0 + 2440587.5
         dt = obs_jd - peri_jd  # days since perihelion
 
         # Solve for true anomaly (f) and heliocentric distance (r)
         if abs(e - 1.0) < 0.005:  # approximately parabolic
-            W = (3.0 / math.sqrt(2.0)) * _GAUSS_K * dt / (q ** 1.5)
+            W = (3.0 / math.sqrt(2.0)) * _GAUSS_K * dt / (q**1.5)
             Y = math.copysign(
                 abs(W + math.sqrt(W * W + 1.0)) ** (1.0 / 3.0),
                 W + math.sqrt(W * W + 1.0),
             )
             tan_half_f = Y - 1.0 / Y
             f = 2.0 * math.atan(tan_half_f)
-            r = q * (1.0 + tan_half_f ** 2)
+            r = q * (1.0 + tan_half_f**2)
         elif e < 1.0:  # elliptic
             a = q / (1.0 - e)
-            n = _GAUSS_K / (a ** 1.5)
+            n = _GAUSS_K / (a**1.5)
             M = n * dt
             E = _solve_kepler_elliptic(M, e)
             r = a * (1.0 - e * math.cos(E))
             cos_f = (math.cos(E) - e) / (1.0 - e * math.cos(E))
-            sin_f = (math.sqrt(max(0.0, 1.0 - e * e)) * math.sin(E)
-                     / (1.0 - e * math.cos(E)))
+            sin_f = math.sqrt(max(0.0, 1.0 - e * e)) * math.sin(E) / (1.0 - e * math.cos(E))
             f = math.atan2(sin_f, cos_f)
         else:  # hyperbolic
             a = q / (e - 1.0)
-            n = _GAUSS_K / (a ** 1.5)
+            n = _GAUSS_K / (a**1.5)
             N_h = n * dt
             F = _solve_kepler_hyperbolic(N_h, e)
             r = a * (e * math.cosh(F) - 1.0)
@@ -258,8 +263,15 @@ def _to_comet_target(row: Dict[str, Any], source: str) -> Optional[SkyTonightTar
         'source': source,
         'updated_at': datetime.now(timezone.utc).isoformat(),
     }
-    for key in ('perihelion_date', 'orbit_class', 'epoch', 'uncertainty',
-                 'distance_sun_au', 'distance_earth_au', 'absolute_magnitude'):
+    for key in (
+        'perihelion_date',
+        'orbit_class',
+        'epoch',
+        'uncertainty',
+        'distance_sun_au',
+        'distance_earth_au',
+        'absolute_magnitude',
+    ):
         if row.get(key) not in (None, ''):
             metadata[key] = row.get(key)
 
@@ -306,8 +318,9 @@ def fetch_mpc_comets(timeout_seconds: int = 20) -> List[Dict[str, Any]]:
             raw_rows.append(parsed)
 
     if not raw_rows:
-        logger.warning('MPC CometEls.txt returned no parseable comet data; '
-                       f'body_preview=\'{_response_preview(text)}\'')
+        logger.warning(
+            'MPC CometEls.txt returned no parseable comet data; ' f'body_preview=\'{_response_preview(text)}\''
+        )
         return []
 
     logger.debug(f'Parsed {len(raw_rows)} comet orbital elements from MPC CometEls.txt')
@@ -319,9 +332,16 @@ def fetch_mpc_comets(timeout_seconds: int = 20) -> List[Dict[str, Any]]:
     computed = 0
     for raw in raw_rows:
         ra_h, dec_d, dist_sun, dist_earth = _comet_ra_dec(
-            raw['q'], raw['e'], raw['omega'], raw['Omega'], raw['inclination'],
-            raw['perihelion_year'], raw['perihelion_month'], raw['perihelion_day'],
-            obs_time, earth_helio,
+            raw['q'],
+            raw['e'],
+            raw['omega'],
+            raw['Omega'],
+            raw['inclination'],
+            raw['perihelion_year'],
+            raw['perihelion_month'],
+            raw['perihelion_day'],
+            obs_time,
+            earth_helio,
         )
         row = dict(raw)
         row['ra_hours'] = ra_h
@@ -329,9 +349,7 @@ def fetch_mpc_comets(timeout_seconds: int = 20) -> List[Dict[str, Any]]:
         row['distance_sun_au'] = dist_sun
         row['distance_earth_au'] = dist_earth
         row['perihelion_date'] = (
-            f"{raw['perihelion_year']:04d}-"
-            f"{raw['perihelion_month']:02d}-"
-            f"{int(raw['perihelion_day']):02d}"
+            f"{raw['perihelion_year']:04d}-" f"{raw['perihelion_month']:02d}-" f"{int(raw['perihelion_day']):02d}"
         )
         row['orbit_class'] = raw['orbit_type']
         row['uncertainty'] = None
@@ -386,9 +404,7 @@ def enrich_with_jpl_fallback(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]
         name = str(current.get('name') or current.get('designation') or '').strip()
 
         needs_jpl = (
-            name
-            and jpl_requests_made < _MAX_JPL_REQUESTS
-            and any(current.get(key) in (None, '') for key in _JPL_FILLS)
+            name and jpl_requests_made < _MAX_JPL_REQUESTS and any(current.get(key) in (None, '') for key in _JPL_FILLS)
         )
 
         if needs_jpl:
@@ -417,7 +433,11 @@ def _curated_fallback_rows() -> List[Dict[str, Any]]:
             {
                 'name': name,
                 'magnitude': values.get('magnitude'),
-                'perihelion_date': f"{values.get('perihelion_year', ''):04d}-{values.get('perihelion_month', 1):02d}-{values.get('perihelion_day', 1):02d}",
+                'perihelion_date': (
+                    f"{values.get('perihelion_year', ''):04d}"
+                    f"-{values.get('perihelion_month', 1):02d}"
+                    f"-{values.get('perihelion_day', 1):02d}"
+                ),
             }
         )
     return rows

@@ -1,0 +1,14 @@
+[flake8]
+max-line-length = 120
+# E203: black formats slices as arr[a : b] — conflicts with flake8, silence it
+extend-ignore = E203
+exclude =
+    venv/,
+    .venv/,
+    .git/,
+    __pycache__/,
+    .pytest_cache/,
+    data/
+per-file-ignores =
+    # Flask requires sys.path manipulation before local imports
+    backend/app.py: E402

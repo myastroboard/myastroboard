@@ -22,7 +22,6 @@ from skytonight_storage import (
 from skytonight_calculator import load_calculation_results
 from sun_phases import SunService
 
-
 logger = get_logger(__name__)
 
 SKYTONIGHT_FALLBACK_INTERVAL_SECONDS = 6 * 60 * 60
@@ -106,11 +105,13 @@ def resolve_schedule(config: Dict[str, Any], now: Optional[datetime] = None) -> 
 
     if not candidates:
         # Fallback if location is not configured or no dawn/dusk times are available
-        candidates.append((
-            'fallback-6h',
-            current_time + timedelta(seconds=SKYTONIGHT_FALLBACK_INTERVAL_SECONDS),
-            'No twilight times available; using 6-hour fallback cadence.',
-        ))
+        candidates.append(
+            (
+                'fallback-6h',
+                current_time + timedelta(seconds=SKYTONIGHT_FALLBACK_INTERVAL_SECONDS),
+                'No twilight times available; using 6-hour fallback cadence.',
+            )
+        )
 
     selected_mode, selected_time, reason = min(candidates, key=lambda item: item[1])
     return SkyTonightSchedule(
@@ -303,17 +304,15 @@ class SkyTonightScheduler:
             should_run = manual_trigger or self.last_run is None
             if not should_run and not has_calculation_results():
                 logger.info(
-                    'SkyTonight calculation results are missing; '
-                    'triggering run regardless of last_run timestamp.'
+                    'SkyTonight calculation results are missing; ' 'triggering run regardless of last_run timestamp.'
                 )
                 should_run = True
             # Use the committed next_run (set in a previous iteration when it
             # was still in the future) instead of the freshly-computed one so
             # the comparison can actually become True once time advances past it.
             if not should_run and self._committed_next_run is not None:
-                should_run = (
-                    schedule.server_time >= self._committed_next_run
-                    and (self.last_run is None or self.last_run < self._committed_next_run)
+                should_run = schedule.server_time >= self._committed_next_run and (
+                    self.last_run is None or self.last_run < self._committed_next_run
                 )
 
             # Advance the committed run time only once the previous run has
@@ -325,8 +324,7 @@ class SkyTonightScheduler:
             # disappears from resolve_schedule results after midnight.
             if schedule.next_run is not None:
                 if self._committed_next_run is None or (
-                    self.last_run is not None
-                    and self.last_run >= self._committed_next_run
+                    self.last_run is not None and self.last_run >= self._committed_next_run
                 ):
                     previous_next_run = self._committed_next_run
                     self._committed_next_run = schedule.next_run
@@ -348,15 +346,10 @@ class SkyTonightScheduler:
                     and not self._cache_ready_event.is_set()
                 ):
                     self._cache_ready_waited = True
-                    logger.info(
-                        'Waiting up to 5 minutes for initial cache update '
-                        'before first SkyTonight run...'
-                    )
+                    logger.info('Waiting up to 5 minutes for initial cache update ' 'before first SkyTonight run...')
                     ready = self._cache_ready_event.wait(timeout=300)
                     if not ready:
-                        logger.warning(
-                            'Cache ready timeout exceeded; proceeding with SkyTonight run anyway.'
-                        )
+                        logger.warning('Cache ready timeout exceeded; proceeding with SkyTonight run anyway.')
                 elif not self._cache_ready_waited:
                     self._cache_ready_waited = True
                 # Set is_executing optimistically before the thread lands so the
@@ -413,9 +406,7 @@ class SkyTonightScheduler:
                 self.current_mode = 'manual' if manual_trigger else 'scheduled'
                 self._triggered_mode = None
                 self._triggered_reason = None
-                append_scheduler_log(
-                    f"[{self.last_run.isoformat()}] SkyTonight run completed: {self.last_result}\n"
-                )
+                append_scheduler_log(f"[{self.last_run.isoformat()}] SkyTonight run completed: {self.last_result}\n")
                 logger.info('SkyTonight execution cycle completed successfully')
             except Exception as error:
                 self.last_error = str(error)
@@ -457,6 +448,7 @@ class SkyTonightScheduler:
 
         try:
             from skytonight_calculator import get_calculation_progress
+
             calc_progress = get_calculation_progress()
         except Exception:
             calc_progress = {}

@@ -2,6 +2,7 @@
 Centralized logging configuration for MyAstroBoard backend
 Provides consistent logging setup across all modules with configurable log levels
 """
+
 import json
 import logging
 import os
@@ -36,6 +37,7 @@ class _ConfiguredTzFormatter(logging.Formatter):
         cls._tz_resolved = True
         try:
             from zoneinfo import ZoneInfo
+
             data_dir = os.environ.get('DATA_DIR', '/app/data')
             config_path = os.path.join(data_dir, 'config.json')
             with open(config_path, 'r', encoding='utf-8') as fh:
@@ -60,7 +62,7 @@ def _get_log_level():
         'INFO': logging.INFO,
         'WARNING': logging.WARNING,
         'ERROR': logging.ERROR,
-        'CRITICAL': logging.CRITICAL
+        'CRITICAL': logging.CRITICAL,
     }
     return levels.get(LOG_LEVEL, logging.INFO)
 
@@ -68,38 +70,33 @@ def _get_log_level():
 def setup_logger(name: str, include_console: bool = True, console_level: Optional[str] = None) -> logging.Logger:
     """
     Set up a logger with standard configuration for MyAstroBoard
-    
+
     Args:
         name: Logger name (typically __name__)
         include_console: Whether to include console output (default: True)
         console_level: Override console log level (DEBUG, INFO, WARNING, ERROR)
-        
+
     Returns:
         Configured logger instance
     """
     # Return existing logger if already configured
     if name in _loggers:
         return _loggers[name]
-    
+
     # Create logger
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)  # Set to DEBUG to capture all levels
-    
+
     # Clear any existing handlers
     logger.handlers.clear()
-    
+
     # Ensure log directory exists
     os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
-    
+
     # File handler with rotation - always captures all levels based on LOG_LEVEL
-    file_handler = RotatingFileHandler(
-        LOG_FILE, 
-        maxBytes=LOG_MAX_BYTES, 
-        backupCount=LOG_BACKUP_COUNT,
-        encoding='utf-8'
-    )
+    file_handler = RotatingFileHandler(LOG_FILE, maxBytes=LOG_MAX_BYTES, backupCount=LOG_BACKUP_COUNT, encoding='utf-8')
     file_handler.setLevel(_get_log_level())
-    
+
     # Enhanced formatter with module name and function
     file_formatter = _ConfiguredTzFormatter(
         '%(asctime)s - %(name)s - %(levelname)s - [%(funcName)s:%(lineno)d] - %(message)s'
@@ -115,30 +112,28 @@ def setup_logger(name: str, include_console: bool = True, console_level: Optiona
         console_log_level = console_level or os.environ.get('CONSOLE_LOG_LEVEL', 'WARNING')
         console_handler.setLevel(getattr(logging, console_log_level.upper(), logging.WARNING))
 
-        console_formatter = _ConfiguredTzFormatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
+        console_formatter = _ConfiguredTzFormatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         console_handler.setFormatter(console_formatter)
         logger.addHandler(console_handler)
-    
+
     # Prevent propagation to root logger
     logger.propagate = False
-    
+
     # Register logger
     _loggers[name] = logger
-    
+
     return logger
 
 
 def get_logger(name: str, include_console: bool = True, console_level: Optional[str] = None) -> logging.Logger:
     """
     Get or create a logger with standard configuration
-    
+
     Args:
         name: Logger name (typically __name__)
         include_console: Whether to include console output (default: True)
         console_level: Override console log level (DEBUG, INFO, WARNING, ERROR)
-        
+
     Returns:
         Configured logger instance
     """
@@ -148,14 +143,14 @@ def get_logger(name: str, include_console: bool = True, console_level: Optional[
 def set_global_log_level(level: str):
     """
     Change log level for all existing loggers
-    
+
     Args:
         level: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
     """
     global LOG_LEVEL
     LOG_LEVEL = level.upper()
     new_level = _get_log_level()
-    
+
     for logger in _loggers.values():
         for handler in logger.handlers:
             if isinstance(handler, RotatingFileHandler):

@@ -107,6 +107,7 @@ def _get(path: str, params: Optional[Dict[str, Any]] = None) -> Optional[Dict[st
 # Data normalizers - map raw LL2 objects to slim, serialisable dicts
 # ---------------------------------------------------------------------------
 
+
 def _normalise_launch(raw: Dict[str, Any]) -> Dict[str, Any]:
     """Slim representation of a launch object."""
     status = raw.get("status") or {}
@@ -121,11 +122,11 @@ def _normalise_launch(raw: Dict[str, Any]) -> Dict[str, Any]:
         "id": raw.get("id"),
         "name": raw.get("name"),
         "slug": raw.get("slug"),
-        "net": raw.get("net"),                       # ISO 8601 NET launch date
+        "net": raw.get("net"),  # ISO 8601 NET launch date
         "window_start": raw.get("window_start"),
         "window_end": raw.get("window_end"),
         "status_id": status.get("id"),
-        "status_abbrev": status.get("abbrev"),       # Go / Hold / TBC / etc.
+        "status_abbrev": status.get("abbrev"),  # Go / Hold / TBC / etc.
         "status_name": status.get("name"),
         "status_description": status.get("description"),
         "rocket_name": config.get("full_name") or config.get("name"),
@@ -140,9 +141,12 @@ def _normalise_launch(raw: Dict[str, Any]) -> Dict[str, Any]:
         "agency_name": agency.get("name"),
         "agency_abbrev": agency.get("abbrev"),
         "agency_type": agency.get("type"),
-        "image_url": _cache_image(raw.get("image") if isinstance(raw.get("image"), str) else (raw.get("image") or {}).get("image_url")),
+        "image_url": _cache_image(
+            raw.get("image") if isinstance(raw.get("image"), str) else (raw.get("image") or {}).get("image_url")
+        ),
         "webcast_live": raw.get("webcast_live", False),
-        "video_url": raw.get("vidURL") or next((v.get("url") for v in (raw.get("vidURLs") or []) if v.get("url")), None),
+        "video_url": raw.get("vidURL")
+        or next((v.get("url") for v in (raw.get("vidURLs") or []) if v.get("url")), None),
         "info_url": raw.get("infoURL"),
     }
 
@@ -171,14 +175,16 @@ def _normalise_expedition(raw: Dict[str, Any]) -> Dict[str, Any]:
     for cr in raw.get("crew", []):
         ast = cr.get("astronaut") or {}
         agency = ast.get("agency") or {}
-        crew.append({
-            "name": ast.get("name"),
-            "nationality": ast.get("nationality"),
-            "agency_name": agency.get("name"),
-            "agency_abbrev": agency.get("abbrev"),
-            "role": cr.get("role", {}).get("role") if cr.get("role") else None,
-            "profile_image": _cache_image(ast.get("profile_image")),
-        })
+        crew.append(
+            {
+                "name": ast.get("name"),
+                "nationality": ast.get("nationality"),
+                "agency_name": agency.get("name"),
+                "agency_abbrev": agency.get("abbrev"),
+                "role": cr.get("role", {}).get("role") if cr.get("role") else None,
+                "profile_image": _cache_image(ast.get("profile_image")),
+            }
+        )
     return {
         "id": raw.get("id"),
         "name": raw.get("name"),
@@ -207,13 +213,18 @@ def _normalise_event(raw: Dict[str, Any]) -> Dict[str, Any]:
         "webcast_live": raw.get("webcast_live", False),
         "news_url": raw.get("news_url"),
         "programs": programs,
-        "image_url": raw.get("feature_image") if isinstance(raw.get("feature_image"), str) else (raw.get("feature_image") or {}).get("image_url"),
+        "image_url": (
+            raw.get("feature_image")
+            if isinstance(raw.get("feature_image"), str)
+            else (raw.get("feature_image") or {}).get("image_url")
+        ),
     }
 
 
 # ---------------------------------------------------------------------------
 # Public fetch functions
 # ---------------------------------------------------------------------------
+
 
 def get_upcoming_launches(limit: int = 12) -> Optional[Dict[str, Any]]:
     """Fetch upcoming launches (NET ≥ now)."""
@@ -343,6 +354,7 @@ def get_launch_vidurls(launch_id: str) -> List[Dict[str, Any]]:
 # Image cache pruning - remove files no longer referenced by active cache data
 # ---------------------------------------------------------------------------
 
+
 def prune_image_cache(active_data: list) -> None:
     """
     Delete images from the local spaceflight_images directory that are no longer
@@ -377,7 +389,8 @@ def prune_image_cache(active_data: list) -> None:
     if removed:
         logger.info(
             "Pruned %d stale spaceflight image(s), freed %.1f KB",
-            removed, freed / 1024,
+            removed,
+            freed / 1024,
         )
 
 

@@ -61,13 +61,21 @@ class SkyTonightTarget:
             category=str(data.get('category', '') or '').strip(),
             object_type=str(data.get('object_type', '') or '').strip(),
             preferred_name=str(data.get('preferred_name', '') or '').strip(),
-            catalogue_names={str(key): str(value) for key, value in catalogue_names.items()} if isinstance(catalogue_names, dict) else {},
+            catalogue_names=(
+                {str(key): str(value) for key, value in catalogue_names.items()}
+                if isinstance(catalogue_names, dict)
+                else {}
+            ),
             aliases=[str(value) for value in aliases if str(value).strip()] if isinstance(aliases, list) else [],
             constellation=str(data.get('constellation', '') or '').strip(),
             magnitude=float(data['magnitude']) if data.get('magnitude') is not None else None,
             size_arcmin=float(data['size_arcmin']) if data.get('size_arcmin') is not None else None,
             coordinates=coordinates,
-            source_catalogues=[str(value) for value in source_catalogues if str(value).strip()] if isinstance(source_catalogues, list) else [],
+            source_catalogues=(
+                [str(value) for value in source_catalogues if str(value).strip()]
+                if isinstance(source_catalogues, list)
+                else []
+            ),
             translation_key=str(data.get('translation_key', '') or '').strip(),
             metadata=metadata if isinstance(metadata, dict) else {},
         )

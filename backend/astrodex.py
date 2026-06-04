@@ -2,6 +2,7 @@
 Astrodex Module - Pokédex-style collection system for astrophotography objects
 Manages user collections of celestial objects they have photographed
 """
+
 import copy
 import json
 import os
@@ -151,7 +152,7 @@ def _sanitize_item_for_persistence(item: Dict) -> None:
     if not isinstance(item, dict):
         return
 
-    for field_name in (TRANSIENT_ITEM_FIELDS | UNUSED_ITEM_FIELDS):
+    for field_name in TRANSIENT_ITEM_FIELDS | UNUSED_ITEM_FIELDS:
         item.pop(field_name, None)
 
 
@@ -174,11 +175,7 @@ def _get_item_merge_key(item: Dict) -> str:
     if group_id:
         return f"group:{group_id.lower()}"
 
-    alias_names = {
-        _normalize_name(alias_name)
-        for alias_name in aliases.values()
-        if alias_name
-    }
+    alias_names = {_normalize_name(alias_name) for alias_name in aliases.values() if alias_name}
     alias_names.discard('')
     if alias_names:
         return f"alias:{sorted(alias_names)[0]}"
@@ -190,12 +187,7 @@ def _get_item_merge_key(item: Dict) -> str:
     return f"id:{item.get('id', '')}"
 
 
-def _attach_picture_owner_metadata(
-    item: Dict,
-    owner_user_id: str,
-    owner_username: str,
-    current_user_id: str
-) -> None:
+def _attach_picture_owner_metadata(item: Dict, owner_user_id: str, owner_username: str, current_user_id: str) -> None:
     """Attach ownership metadata to all pictures of an item for UI permissions."""
     pictures = item.get('pictures', [])
     if not isinstance(pictures, list):
@@ -226,7 +218,7 @@ def _build_stats_from_items(items: List[Dict]) -> Dict:
         'items_with_pictures': items_with_pictures,
         'items_without_pictures': total_items - items_with_pictures,
         'total_pictures': total_pictures,
-        'types': types_count
+        'types': types_count,
     }
 
 
@@ -242,16 +234,18 @@ def load_all_users_astrodex(usernames_by_id: Optional[Dict[str, str]] = None) ->
         if not filename.endswith(suffix):
             continue
 
-        user_id = filename[:-len(suffix)]
+        user_id = filename[: -len(suffix)]
         username = usernames_by_id.get(user_id)
         data = load_user_astrodex(user_id, username)
-        collections.append({
-            'user_id': user_id,
-            'username': data.get('username') or username or 'unknown',
-            'created_at': data.get('created_at'),
-            'updated_at': data.get('updated_at'),
-            'items': data.get('items', [])
-        })
+        collections.append(
+            {
+                'user_id': user_id,
+                'username': data.get('username') or username or 'unknown',
+                'created_at': data.get('created_at'),
+                'updated_at': data.get('updated_at'),
+                'items': data.get('items', []),
+            }
+        )
 
     return collections
 
@@ -260,7 +254,7 @@ def get_visible_astrodex(
     current_user_id: str,
     current_username: Optional[str] = None,
     private_mode: bool = False,
-    usernames_by_id: Optional[Dict[str, str]] = None
+    usernames_by_id: Optional[Dict[str, str]] = None,
 ) -> Dict:
     """
     Return astrodex payload visible to current user.
@@ -279,12 +273,7 @@ def get_visible_astrodex(
             item['owner_user_id'] = current_user_id
             item['owner_username'] = current_user.get('username', current_username or 'unknown')
             item['is_owned_by_current_user'] = True
-            _attach_picture_owner_metadata(
-                item,
-                current_user_id,
-                item['owner_username'],
-                current_user_id
-            )
+            _attach_picture_owner_metadata(item, current_user_id, item['owner_username'], current_user_id)
             item['own_pictures'] = copy.deepcopy(item.get('pictures', []))
             item['own_pictures_count'] = len(item['own_pictures'])
             item['total_pictures'] = len(item.get('pictures', []))
@@ -295,7 +284,7 @@ def get_visible_astrodex(
             'stats': _build_stats_from_items(visible_items),
             'created_at': current_user.get('created_at'),
             'updated_at': current_user.get('updated_at'),
-            'private_mode': True
+            'private_mode': True,
         }
 
     usernames_by_id = usernames_by_id or {}
@@ -332,7 +321,7 @@ def get_visible_astrodex(
                 picture_key = (
                     str(picture.get('owner_user_id', source_item.get('owner_user_id', ''))),
                     str(picture.get('id', '')),
-                    str(picture.get('filename', ''))
+                    str(picture.get('filename', '')),
                 )
                 if picture_key in seen_picture_keys:
                     continue
@@ -345,10 +334,9 @@ def get_visible_astrodex(
         merged_item['own_pictures'] = own_pictures
         merged_item['own_pictures_count'] = len(own_pictures)
         merged_item['total_pictures'] = len(merged_pictures)
-        merged_item['shared_owner_usernames'] = sorted({
-            str(item.get('owner_username') or 'unknown')
-            for item in source_items
-        })
+        merged_item['shared_owner_usernames'] = sorted(
+            {str(item.get('owner_username') or 'unknown') for item in source_items}
+        )
 
         merged_items.append(merged_item)
 
@@ -359,15 +347,12 @@ def get_visible_astrodex(
         'stats': _build_stats_from_items(merged_items),
         'created_at': current_user.get('created_at'),
         'updated_at': current_user.get('updated_at'),
-        'private_mode': False
+        'private_mode': False,
     }
 
 
 def can_user_view_image(
-    user_id: str,
-    filename: str,
-    private_mode: bool,
-    usernames_by_id: Optional[Dict[str, str]] = None
+    user_id: str, filename: str, private_mode: bool, usernames_by_id: Optional[Dict[str, str]] = None
 ) -> bool:
     """Check if user can access an astrodex image according to privacy mode."""
     if not filename:
@@ -405,21 +390,21 @@ def get_user_astrodex_file(user_id: str) -> str:
 
 def load_user_astrodex(user_id: str, username: Optional[str] = None) -> Dict:
     """Load a user's astrodex data using user UUID
-    
+
     Args:
         user_id: User's UUID
         username: Optional username for metadata
     """
     file_path = get_user_astrodex_file(user_id)
-    
+
     if not os.path.exists(file_path):
         return {
             'user_id': user_id,
             'username': username or 'unknown',
             'created_at': datetime.now(timezone.utc).isoformat(),
-            'items': []
+            'items': [],
         }
-    
+
     try:
         with open(file_path, 'r') as f:
             data = json.load(f)
@@ -431,23 +416,24 @@ def load_user_astrodex(user_id: str, username: Optional[str] = None) -> Dict:
     except json.JSONDecodeError as e:
         # JSON is corrupted - try to recover or reset
         logger.error(f"Error loading astrodex for {username}: {e}")
-        logger.error(f"Corrupted file will be backed up and reset")
-        
+        logger.error("Corrupted file will be backed up and reset")
+
         # Create backup of corrupted file
         backup_path = file_path + '.corrupted.' + datetime.now().strftime('%Y%m%d_%H%M%S')
         try:
             import shutil
+
             shutil.copy2(file_path, backup_path)
             logger.info(f"Backed up corrupted file to {backup_path}")
         except Exception as backup_error:
             logger.error(f"Failed to backup corrupted file: {backup_error}")
-        
+
         # Return fresh astrodex (file will be overwritten on next save)
         return {
             'user_id': user_id,
             'username': username or 'unknown',
             'created_at': datetime.now(timezone.utc).isoformat(),
-            'items': []
+            'items': [],
         }
     except Exception as e:
         logger.error(f"Error loading astrodex for user {user_id}: {e}")
@@ -455,43 +441,43 @@ def load_user_astrodex(user_id: str, username: Optional[str] = None) -> Dict:
             'user_id': user_id,
             'username': username or 'unknown',
             'created_at': datetime.now(timezone.utc).isoformat(),
-            'items': []
+            'items': [],
         }
 
 
 def validate_astrodex_json(file_path: str) -> tuple[bool, str]:
     """
     Validate that a file contains valid astrodex JSON
-    
+
     Args:
         file_path: Path to JSON file to validate
-    
+
     Returns:
         Tuple of (is_valid, error_message)
     """
     try:
         with open(file_path, 'r') as f:
             data = json.load(f)
-        
+
         # Check required top-level fields
         if not isinstance(data, dict):
             return False, "JSON root is not a dictionary"
-        
+
         if 'username' not in data:
             return False, "Missing 'username' field"
-        
+
         if 'items' not in data or not isinstance(data['items'], list):
             return False, "Missing or invalid 'items' field"
-        
+
         # Validate each item has required fields
         for idx, item in enumerate(data['items']):
             if 'id' not in item:
                 return False, f"Item {idx} missing 'id' field"
             if 'name' not in item:
                 return False, f"Item {idx} missing 'name' field"
-        
+
         return True, ""
-    
+
     except json.JSONDecodeError as e:
         return False, f"Invalid JSON: {e}"
     except Exception as e:
@@ -501,18 +487,18 @@ def validate_astrodex_json(file_path: str) -> tuple[bool, str]:
 def save_user_astrodex(user_id: str, astrodex_data: Dict, username: Optional[str] = None) -> bool:
     """
     Save a user's astrodex data with backup and recovery mechanism
-    
+
     Process:
     1. Create backup of existing file (if exists)
     2. Write new data to temporary file
     3. Validate the temporary file
     4. Atomically replace original with temp file
     5. Delete backup on success, restore on failure
-    
+
     Args:
         user_id: User's UUID
         astrodex_data: Astrodex data to save
-    
+
     Returns:
         True on success, False on failure
     """
@@ -542,33 +528,34 @@ def _save_user_astrodex_locked(
             astrodex_data['username'] = username
 
         _sanitize_astrodex_for_persistence(astrodex_data)
-        
+
         # Step 1: Create backup of existing file
         if os.path.exists(file_path):
             try:
                 import shutil
+
                 shutil.copy2(file_path, backup_path)
                 backup_created = True
                 logger.debug(f"Created backup: {backup_path}")
             except Exception as backup_error:
                 logger.error(f"Failed to create backup for user {user_id}: {backup_error}")
                 # Continue anyway - atomic write still provides some safety
-        
+
         # Step 2: Write to temporary file
         with open(temp_path, 'w') as f:
             json.dump(astrodex_data, f, indent=2)
         logger.debug(f"Wrote temporary file: {temp_path}")
-        
+
         # Step 3: Validate the temporary file
         is_valid, error_msg = validate_astrodex_json(temp_path)
         if not is_valid:
             raise ValueError(f"JSON validation failed: {error_msg}")
-        logger.debug(f"Validated temporary file successfully")
-        
+        logger.debug("Validated temporary file successfully")
+
         # Step 4: Atomic rename (on POSIX systems, this is atomic)
         os.replace(temp_path, file_path)
         logger.info(f"Successfully saved astrodex for user {user_id}")
-        
+
         # Step 5: Clean up backup on success
         if backup_created and os.path.exists(backup_path):
             try:
@@ -577,42 +564,43 @@ def _save_user_astrodex_locked(
             except Exception as cleanup_error:
                 logger.warning(f"Failed to remove backup: {cleanup_error}")
                 # Not critical - backup will be overwritten next time
-        
+
         return True
-        
+
     except Exception as e:
         logger.error(f"Error saving astrodex for user {user_id}: {e}")
-        
+
         # Restore from backup if it exists
         if backup_created and os.path.exists(backup_path):
             try:
                 import shutil
+
                 shutil.copy2(backup_path, file_path)
                 logger.info(f"Restored astrodex from backup for user {user_id}")
             except Exception as restore_error:
                 logger.error(f"Failed to restore from backup: {restore_error}")
-        
+
         # Clean up temporary file if it exists
         if os.path.exists(temp_path):
             try:
                 os.remove(temp_path)
             except Exception as cleanup_error:
                 logger.warning(f"Failed to remove temp file: {cleanup_error}")
-        
+
         # Clean up backup file
         if backup_created and os.path.exists(backup_path):
             try:
                 os.remove(backup_path)
             except Exception as cleanup_error:
                 logger.warning(f"Failed to remove backup file: {cleanup_error}")
-        
+
         return False
 
 
 def create_astrodex_item(user_id: str, item_data: Dict, username: Optional[str] = None) -> Optional[Dict]:
     """
     Create a new item in user's astrodex
-    
+
     Args:
         user_id: User's UUID
         item_data: Dictionary containing item information:
@@ -621,18 +609,18 @@ def create_astrodex_item(user_id: str, item_data: Dict, username: Optional[str] 
             - catalogue: Source catalogue
             - constellation: Constellation
             - notes: User notes
-    
+
     Returns:
         Created item with ID, or None on error
     """
     astrodex = load_user_astrodex(user_id, username)
-    
+
     # Check if item already exists (by name)
     item_name = item_data.get('name', '').strip()
     if not item_name:
         logger.error("Item name is required")
         return None
-    
+
     source_catalogue = item_data.get('catalogue', '')
 
     # Check for duplicate (same exact name OR same cross-catalogue object)
@@ -650,11 +638,11 @@ def create_astrodex_item(user_id: str, item_data: Dict, username: Optional[str] 
         'notes': item_data.get('notes', ''),
         'pictures': [],
         'created_at': datetime.now(timezone.utc).isoformat(),
-        'updated_at': datetime.now(timezone.utc).isoformat()
+        'updated_at': datetime.now(timezone.utc).isoformat(),
     }
-    
+
     astrodex['items'].append(new_item)
-    
+
     if save_user_astrodex(user_id, astrodex, username=username):
         return new_item
     return None
@@ -663,18 +651,18 @@ def create_astrodex_item(user_id: str, item_data: Dict, username: Optional[str] 
 def get_astrodex_item(user_id: str, item_id: str) -> Optional[Dict]:
     """Get a specific item from user's astrodex"""
     astrodex = load_user_astrodex(user_id)
-    
+
     for item in astrodex['items']:
         if item['id'] == item_id:
             return item
-    
+
     return None
 
 
 def update_astrodex_item(user_id: str, item_id: str, updates: Dict) -> Optional[Dict]:
     """Update an existing item in user's astrodex"""
     astrodex = load_user_astrodex(user_id)
-    
+
     for item in astrodex['items']:
         if item['id'] == item_id:
             # Update allowed fields
@@ -682,27 +670,27 @@ def update_astrodex_item(user_id: str, item_id: str, updates: Dict) -> Optional[
             for field in allowed_fields:
                 if field in updates:
                     item[field] = updates[field]
-            
+
             item['updated_at'] = datetime.now(timezone.utc).isoformat()
-            
+
             if save_user_astrodex(user_id, astrodex):
                 return item
             return None
-    
+
     return None
 
 
 def delete_astrodex_item(user_id: str, item_id: str) -> bool:
     """Delete an astrodex item"""
     astrodex = load_user_astrodex(user_id)
-    
+
     # Find the item to delete and get all picture filenames
     item_to_delete = None
     for item in astrodex['items']:
         if item['id'] == item_id:
             item_to_delete = item
             break
-    
+
     # Delete all associated image files
     if item_to_delete and 'pictures' in item_to_delete:
         for picture in item_to_delete['pictures']:
@@ -716,21 +704,21 @@ def delete_astrodex_item(user_id: str, item_id: str) -> bool:
                 except (OSError, IOError) as e:
                     logger.error(f"Error deleting image file {filename}: {e}")
                     # Continue anyway - the metadata will still be removed
-    
+
     # Remove the item from the list
     original_count = len(astrodex['items'])
     astrodex['items'] = [item for item in astrodex['items'] if item['id'] != item_id]
-    
+
     if len(astrodex['items']) < original_count:
         return save_user_astrodex(user_id, astrodex)
-    
+
     return False
 
 
 def add_picture_to_item(user_id: str, item_id: str, picture_data: Dict) -> Optional[Dict]:
     """
     Add a picture to an astrodex item
-    
+
     Args:
         user_id: User's UUID
         item_id: Item ID
@@ -741,12 +729,12 @@ def add_picture_to_item(user_id: str, item_id: str, picture_data: Dict) -> Optio
             - device: Device/telescope used
             - filters: Filters used
             - notes: Picture notes
-    
+
     Returns:
         Created picture with ID, or None on error
     """
     astrodex = load_user_astrodex(user_id)
-    
+
     for item in astrodex['items']:
         if item['id'] == item_id:
             # Create new picture entry
@@ -761,27 +749,27 @@ def add_picture_to_item(user_id: str, item_id: str, picture_data: Dict) -> Optio
                 'frames': picture_data.get('frames', ''),
                 'notes': picture_data.get('notes', ''),
                 'is_main': False,  # New pictures are not main by default
-                'created_at': datetime.now(timezone.utc).isoformat()
+                'created_at': datetime.now(timezone.utc).isoformat(),
             }
-            
+
             # If this is the first picture, make it main
             if not item['pictures']:
                 new_picture['is_main'] = True
-            
+
             item['pictures'].append(new_picture)
             item['updated_at'] = datetime.now(timezone.utc).isoformat()
-            
+
             if save_user_astrodex(user_id, astrodex):
                 return new_picture
             return None
-    
+
     return None
 
 
 def update_picture(user_id: str, item_id: str, picture_id: str, updates: Dict) -> Optional[Dict]:
     """Update a picture in an astrodex item"""
     astrodex = load_user_astrodex(user_id)
-    
+
     for item in astrodex['items']:
         if item['id'] == item_id:
             for picture in item['pictures']:
@@ -791,26 +779,26 @@ def update_picture(user_id: str, item_id: str, picture_id: str, updates: Dict) -
                     for field in allowed_fields:
                         if field in updates:
                             picture[field] = updates[field]
-                    
+
                     item['updated_at'] = datetime.now(timezone.utc).isoformat()
-                    
+
                     if save_user_astrodex(user_id, astrodex):
                         return picture
                     return None
-    
+
     return None
 
 
 def delete_picture(user_id: str, item_id: str, picture_id: str) -> bool:
     """Delete a picture from an astrodex item"""
     astrodex = load_user_astrodex(user_id)
-    
+
     for item in astrodex['items']:
         if item['id'] == item_id:
             original_count = len(item['pictures'])
             was_main = False
             deleted_filename = None
-            
+
             # Check if deleted picture was main and get filename
             for pic in item['pictures']:
                 if pic['id'] == picture_id:
@@ -818,17 +806,17 @@ def delete_picture(user_id: str, item_id: str, picture_id: str) -> bool:
                         was_main = True
                     deleted_filename = pic.get('filename')
                     break
-            
+
             # Remove the picture from the list
             item['pictures'] = [pic for pic in item['pictures'] if pic['id'] != picture_id]
-            
+
             # If we deleted the main picture and there are other pictures, make the first one main
             if was_main and item['pictures']:
                 item['pictures'][0]['is_main'] = True
-            
+
             if len(item['pictures']) < original_count:
                 item['updated_at'] = datetime.now(timezone.utc).isoformat()
-                
+
                 # Delete the physical file if it exists
                 if deleted_filename:
                     try:
@@ -839,29 +827,29 @@ def delete_picture(user_id: str, item_id: str, picture_id: str) -> bool:
                     except (OSError, IOError) as e:
                         logger.error(f"Error deleting image file {deleted_filename}: {e}")
                         # Continue anyway - the metadata is still removed
-                
+
                 return save_user_astrodex(user_id, astrodex)
-    
+
     return False
 
 
 def set_main_picture(user_id: str, item_id: str, picture_id: str) -> bool:
     """Set a picture as the main picture for an item"""
     astrodex = load_user_astrodex(user_id)
-    
+
     for item in astrodex['items']:
         if item['id'] == item_id:
             # First, unset all pictures as main
             for picture in item['pictures']:
                 picture['is_main'] = False
-            
+
             # Then set the specified picture as main
             for picture in item['pictures']:
                 if picture['id'] == picture_id:
                     picture['is_main'] = True
                     item['updated_at'] = datetime.now(timezone.utc).isoformat()
                     return save_user_astrodex(user_id, astrodex)
-    
+
     return False
 
 
@@ -869,12 +857,12 @@ def get_main_picture(item: Dict) -> Optional[Dict]:
     """Get the main picture for an item, or None if no pictures"""
     if not item.get('pictures'):
         return None
-    
+
     # Find main picture
     for picture in item['pictures']:
         if picture.get('is_main', False):
             return picture
-    
+
     # If no main picture is set, return first picture
     return item['pictures'][0] if item['pictures'] else None
 
@@ -885,9 +873,7 @@ def is_item_in_astrodex_with_catalogue(user_id: str, item_name: str, catalogue: 
 
     requested_candidates = _extract_name_candidates(item_name)
     requested_normalized_names = {
-        _normalize_name(candidate)
-        for candidate in requested_candidates
-        if _normalize_name(candidate)
+        _normalize_name(candidate) for candidate in requested_candidates if _normalize_name(candidate)
     }
 
     requested_group_ids = set()
@@ -897,11 +883,7 @@ def is_item_in_astrodex_with_catalogue(user_id: str, item_name: str, catalogue: 
         if group_id:
             requested_group_ids.add(group_id)
         if aliases:
-            requested_alias_names.update(
-                _normalize_name(value)
-                for value in aliases.values()
-                if value
-            )
+            requested_alias_names.update(_normalize_name(value) for value in aliases.values() if value)
 
     requested_alias_names.discard('')
 
@@ -916,11 +898,7 @@ def is_item_in_astrodex_with_catalogue(user_id: str, item_name: str, catalogue: 
             return True
 
         if requested_alias_names:
-            existing_alias_names = {
-                _normalize_name(value)
-                for value in existing_aliases.values()
-                if value
-            }
+            existing_alias_names = {_normalize_name(value) for value in existing_aliases.values() if value}
             if existing_alias_names and (requested_alias_names & existing_alias_names):
                 return True
             if existing_name_normalized in requested_alias_names:
@@ -930,7 +908,7 @@ def is_item_in_astrodex_with_catalogue(user_id: str, item_name: str, catalogue: 
             alias_name = _get_alias_for_catalogue(existing_aliases, catalogue)
             if alias_name and _normalize_name(alias_name) in requested_normalized_names:
                 return True
-    
+
     return False
 
 
@@ -949,9 +927,7 @@ def is_item_in_preloaded_astrodex(astrodex_data: dict, item_name: str, catalogue
 
     requested_candidates = _extract_name_candidates(item_name)
     requested_normalized_names = {
-        _normalize_name(candidate)
-        for candidate in requested_candidates
-        if _normalize_name(candidate)
+        _normalize_name(candidate) for candidate in requested_candidates if _normalize_name(candidate)
     }
 
     requested_group_ids: set = set()
@@ -961,11 +937,7 @@ def is_item_in_preloaded_astrodex(astrodex_data: dict, item_name: str, catalogue
         if group_id:
             requested_group_ids.add(group_id)
         if aliases:
-            requested_alias_names.update(
-                _normalize_name(value)
-                for value in aliases.values()
-                if value
-            )
+            requested_alias_names.update(_normalize_name(value) for value in aliases.values() if value)
 
     requested_alias_names.discard('')
 
@@ -980,11 +952,7 @@ def is_item_in_preloaded_astrodex(astrodex_data: dict, item_name: str, catalogue
             return True
 
         if requested_alias_names:
-            existing_alias_names = {
-                _normalize_name(value)
-                for value in existing_aliases.values()
-                if value
-            }
+            existing_alias_names = {_normalize_name(value) for value in existing_aliases.values() if value}
             if existing_alias_names and (requested_alias_names & existing_alias_names):
                 return True
             if existing_name_normalized in requested_alias_names:
@@ -1061,8 +1029,9 @@ def get_astrodex_stats(user_id: str) -> Dict:
 
 def get_constellations_list() -> List[str]:
     """Get a human-readable list of constellation names from the Constellation enum"""
+
     def humanize(name: str) -> str:
         # Add a space before each capital letter (except the first one) to humanize the name
         return re.sub(r'(?<!^)(?=[A-Z])', ' ', name)
-    
+
     return [humanize(constellation.name) for constellation in Constellation]

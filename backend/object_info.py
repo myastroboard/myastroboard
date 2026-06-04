@@ -24,10 +24,30 @@ logger = get_logger(__name__)
 REQUEST_TIMEOUT = 10  # seconds
 
 # Whitelist of Wikipedia language codes that the endpoint accepts.
-_ALLOWED_LANGS: frozenset = frozenset([
-    'en', 'fr', 'de', 'es', 'it', 'pt', 'nl', 'ru', 'ja', 'zh',
-    'pl', 'sv', 'uk', 'ar', 'cs', 'ko', 'hu', 'fi', 'no', 'da',
-])
+_ALLOWED_LANGS: frozenset = frozenset(
+    [
+        'en',
+        'fr',
+        'de',
+        'es',
+        'it',
+        'pt',
+        'nl',
+        'ru',
+        'ja',
+        'zh',
+        'pl',
+        'sv',
+        'uk',
+        'ar',
+        'cs',
+        'ko',
+        'hu',
+        'fi',
+        'no',
+        'da',
+    ]
+)
 
 # Allowed characters in an astronomical object identifier.
 # Permits: letters, digits, space, +, -, ., *, /, '  (e.g. "NGC 2632", "alpha Cen")
@@ -38,8 +58,26 @@ _IDENT_RE = re.compile(r"^[A-Za-z0-9 +\-_.*/']+$")
 _WIKIPEDIA_BASES: Dict[str, str] = {
     lang: f'https://{lang}.wikipedia.org/api/rest_v1/page/summary/'
     for lang in [
-        'en', 'fr', 'de', 'es', 'it', 'pt', 'nl', 'ru', 'ja', 'zh',
-        'pl', 'sv', 'uk', 'ar', 'cs', 'ko', 'hu', 'fi', 'no', 'da',
+        'en',
+        'fr',
+        'de',
+        'es',
+        'it',
+        'pt',
+        'nl',
+        'ru',
+        'ja',
+        'zh',
+        'pl',
+        'sv',
+        'uk',
+        'ar',
+        'cs',
+        'ko',
+        'hu',
+        'fi',
+        'no',
+        'da',
     ]
 }
 SIMBAD_TAP_URL = 'https://simbad.cds.unistra.fr/simbad/sim-tap/sync'
@@ -50,13 +88,10 @@ HIPS2FITS_URL = 'https://alasky.cds.unistra.fr/hips-image-services/hips2fits'
 # Input validation
 # ──────────────────────────────────────────────
 
+
 def is_safe_identifier(identifier: str) -> bool:
     """Return True only if *identifier* contains safe characters for an object name."""
-    return (
-        bool(identifier)
-        and len(identifier) <= 64
-        and bool(_IDENT_RE.match(identifier))
-    )
+    return bool(identifier) and len(identifier) <= 64 and bool(_IDENT_RE.match(identifier))
 
 
 def _sanitize_lang(lang: str) -> str:
@@ -67,6 +102,7 @@ def _sanitize_lang(lang: str) -> str:
 # ──────────────────────────────────────────────
 # Phase 1 - Object resolution (SIMBAD TAP)
 # ──────────────────────────────────────────────
+
 
 def _simbad_query(adql: str) -> Optional[Dict]:
     """Execute an ADQL query against the SIMBAD TAP endpoint and return the JSON payload."""
@@ -103,15 +139,36 @@ def _sort_aliases(aliases: List[str]) -> List[str]:
       5 - Known noisy survey prefixes (NVSS, TGSS, Gaia, 2MASS, SDSS, WISE, …)
     """
     _SURVEY_PREFIXES = (
-        '2MASS', '2MASX', 'NVSS', 'TGSS', 'TGSSADR',
-        'GAIA', 'SDSS', 'WISE', 'IRAS', 'ROSAT', 'XMM',
-        'CHANDRA', 'FIRST', 'WENSS', 'SUMSS', 'GLEAM',
-        'LOTSS', 'RACS', 'VLASS',
+        '2MASS',
+        '2MASX',
+        'NVSS',
+        'TGSS',
+        'TGSSADR',
+        'GAIA',
+        'SDSS',
+        'WISE',
+        'IRAS',
+        'ROSAT',
+        'XMM',
+        'CHANDRA',
+        'FIRST',
+        'WENSS',
+        'SUMSS',
+        'GLEAM',
+        'LOTSS',
+        'RACS',
+        'VLASS',
     )
     _KNOWN_PREFIXES = (
-        ('M ',  0), ('NGC ', 1), ('IC ',  1),
-        ('C ',  2), ('UGC ', 3), ('MCG ', 3), ('PGC ', 3),
-        ('LMC',  3), ('SMC', 3),
+        ('M ', 0),
+        ('NGC ', 1),
+        ('IC ', 1),
+        ('C ', 2),
+        ('UGC ', 3),
+        ('MCG ', 3),
+        ('PGC ', 3),
+        ('LMC', 3),
+        ('SMC', 3),
     )
 
     def _priority(alias: str) -> tuple:
@@ -167,10 +224,7 @@ def _resolve_via_simbad(identifier: str) -> Optional[Dict[str, Any]]:
     # Fetch all alternative identifiers
     safe_main = main_id.replace("'", "''")
     alias_query = (
-        "SELECT i.id "
-        "FROM ident AS i "
-        "JOIN ident AS ref ON i.oidref = ref.oidref "
-        f"WHERE ref.id = '{safe_main}'"
+        "SELECT i.id " "FROM ident AS i " "JOIN ident AS ref ON i.oidref = ref.oidref " f"WHERE ref.id = '{safe_main}'"
     )
     alias_result = _simbad_query(alias_query)
     raw_aliases: List[str] = []
@@ -260,6 +314,7 @@ def resolve_identifier_for_catalogue_lookup(identifier: str) -> Optional[Dict[st
     if ra_raw is not None and dec_raw is not None:
         try:
             from astropy.coordinates import SkyCoord, get_constellation
+
             coord = SkyCoord(ra=float(ra_raw), dec=float(dec_raw), unit='deg')
             constellation = str(get_constellation(coord)).lower()
         except Exception:
@@ -267,9 +322,7 @@ def resolve_identifier_for_catalogue_lookup(identifier: str) -> Optional[Dict[st
 
     safe_main = main_id.replace("'", "''")
     alias_query = (
-        "SELECT i.id FROM ident AS i "
-        "JOIN ident AS ref ON i.oidref = ref.oidref "
-        f"WHERE ref.id = '{safe_main}'"
+        "SELECT i.id FROM ident AS i " "JOIN ident AS ref ON i.oidref = ref.oidref " f"WHERE ref.id = '{safe_main}'"
     )
     alias_result = _simbad_query(alias_query)
     raw_aliases: List[str] = []
@@ -290,6 +343,7 @@ def resolve_identifier_for_catalogue_lookup(identifier: str) -> Optional[Dict[st
 # Phase 2 - Image URL (SkyView / DSS)
 # ──────────────────────────────────────────────
 
+
 def _get_dss_image_url(ra: float, dec: float, size_deg: float = 0.5) -> str:
     """
     Construct a CDS hips2fits URL for a DSS2 Red image at the given coordinates.
@@ -308,6 +362,7 @@ def _get_dss_image_url(ra: float, dec: float, size_deg: float = 0.5) -> str:
         'format': 'jpg',
     }
     return f"{HIPS2FITS_URL}?{urllib.parse.urlencode(params)}"
+
 
 # ──────────────────────────────────────────────
 # Phase 3 - Localized description (Wikipedia)
@@ -403,10 +458,10 @@ def _wikipedia_with_fallback(aliases: List[str], lang: str) -> Optional[Dict[str
 
 # Mapping from our identifier formats to the formats SIMBAD uses internally.
 # SIMBAD identifiers are case-sensitive and use specific spacing conventions.
-_VDB_RE      = re.compile(r'^vdB\s+(\d+)$', re.I)
-_SH2_RE      = re.compile(r'^Sh2-(\d+)$', re.I)
-_BARNARD_RE  = re.compile(r'^Barnard\s+(\d+)$', re.I)
-_ABELL_RE    = re.compile(r'^Abell\s+(\d+)$', re.I)
+_VDB_RE = re.compile(r'^vdB\s+(\d+)$', re.I)
+_SH2_RE = re.compile(r'^Sh2-(\d+)$', re.I)
+_BARNARD_RE = re.compile(r'^Barnard\s+(\d+)$', re.I)
+_ABELL_RE = re.compile(r'^Abell\s+(\d+)$', re.I)
 
 
 def _simbad_identifier_variants(identifier: str) -> List[str]:
@@ -443,6 +498,7 @@ def _simbad_identifier_variants(identifier: str) -> List[str]:
 # Public API
 # ──────────────────────────────────────────────
 
+
 def _translate_object_type(object_type: str, lang: str) -> str:
     """Return a localized object type using the skytonight i18n keys.
 
@@ -453,6 +509,7 @@ def _translate_object_type(object_type: str, lang: str) -> str:
     if not object_type or lang == 'en':
         return object_type
     from i18n_utils import I18nManager
+
     key_suffix = re.sub(r'[^a-z0-9]+', '_', object_type.lower()).strip('_')
     i18n_key = f'skytonight.type_{key_suffix}'
     translated = I18nManager(lang).t(i18n_key)
@@ -517,10 +574,10 @@ def get_object_info(identifier: str, lang: str = 'en') -> Dict[str, Any]:
         if not _local_entry:
             _local_entry = _get_local_entry('preferred', identifier)
         if _local_entry and _local_entry.get('ra_deg') is not None:
-            _ra  = float(_local_entry['ra_deg'])
+            _ra = float(_local_entry['ra_deg'])
             _dec = float(_local_entry['dec_deg'])
             _local_type = str(_local_entry.get('object_type') or '').strip()
-            _preferred  = str(_local_entry.get('preferred_name') or identifier).strip()
+            _preferred = str(_local_entry.get('preferred_name') or identifier).strip()
             _image = {'url': _get_dss_image_url(_ra, _dec), 'credit': 'DSS2 Red / CDS HiPS'}
             _seen: set = set()
             _search_terms: List[str] = []

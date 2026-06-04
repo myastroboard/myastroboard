@@ -149,10 +149,12 @@ class SolarSystemEventsService:
         },
     }
 
-    def __init__(self, latitude: float, longitude: float, elevation: float = 0, timezone: str = "UTC", language: str = "en"):
+    def __init__(
+        self, latitude: float, longitude: float, elevation: float = 0, timezone: str = "UTC", language: str = "en"
+    ):
         """
         Initialize solar system events service.
-        
+
         Args:
             latitude: Observer latitude in degrees
             longitude: Observer longitude in degrees
@@ -166,27 +168,23 @@ class SolarSystemEventsService:
         self.timezone = ZoneInfo(timezone)
         self.language = language
         self.i18n = I18nManager(language)
-        self.location = EarthLocation(
-            lat=latitude * u.deg,
-            lon=longitude * u.deg,
-            height=elevation * u.m
-        )
+        self.location = EarthLocation(lat=latitude * u.deg, lon=longitude * u.deg, height=elevation * u.m)
         # Determine hemisphere
         self.hemisphere = 'Northern' if latitude >= 0 else 'Southern'
 
     def get_solar_system_events(self, days_ahead: int = 365) -> List[Dict[str, Any]]:
         """
         Get all solar system events for the next N days.
-        
+
         Args:
             days_ahead: Number of days to calculate ahead (default 365)
-            
+
         Returns:
             List of solar system events, sorted by date
         """
         events = []
         today = datetime.now(tz=ZoneInfo("UTC")).date()
-        
+
         try:
             # Get meteor shower events
             meteor_events = self._find_meteor_shower_peaks(today, days_ahead)
@@ -206,7 +204,7 @@ class SolarSystemEventsService:
 
         # Sort by time
         events.sort(key=lambda x: x.get('peak_time', x.get('start_time')))
-        
+
         return events
 
     def _find_meteor_shower_peaks(self, start_date: date, days_ahead: int) -> List[Dict[str, Any]]:
@@ -214,7 +212,7 @@ class SolarSystemEventsService:
         events = []
         current_year = start_date.year
         end_date = start_date + timedelta(days=days_ahead)
-        
+
         for shower_name, shower_data in self.METEOR_SHOWERS.items():
             try:
                 # Check if this shower is visible from this hemisphere
@@ -222,72 +220,76 @@ class SolarSystemEventsService:
                     continue
                 elif shower_data['hemisphere'] == 'Southern' and self.hemisphere == 'Northern':
                     continue
-                
+
                 # Calculate peak day for this year
                 peak_month = shower_data['peak_month']
                 peak_day_start = shower_data['peak_day_start']
                 peak_day_end = shower_data['peak_day_end']
                 peak_day = (peak_day_start + peak_day_end) // 2
-                
+
                 peak_date = datetime(current_year, peak_month, peak_day, 12, 0, 0, tzinfo=ZoneInfo("UTC"))
-                
+
                 if start_date <= peak_date.date() <= end_date:
                     # Check if radiant is visible
                     peak_time = Time(peak_date)
                     is_visible = self._is_radiant_visible(
-                        shower_data['radiant_ra'],
-                        shower_data['radiant_dec'],
-                        peak_time
+                        shower_data['radiant_ra'], shower_data['radiant_dec'], peak_time
                     )
-                    
+
                     # Get translated title and description
                     title = self.i18n.t('events_api.solar_system.meteor_shower_title', shower_name=shower_name)
-                    description = self.i18n.t('events_api.solar_system.meteor_shower_description',
-                                             zenith_hourly_rate=shower_data['zenith_hourly_rate'],
-                                             parent_body=shower_data['parent_body'])
+                    description = self.i18n.t(
+                        'events_api.solar_system.meteor_shower_description',
+                        zenith_hourly_rate=shower_data['zenith_hourly_rate'],
+                        parent_body=shower_data['parent_body'],
+                    )
 
                     # Score 0-10: ZHR drives 70 %, radiant visibility drives 30 %
                     zhr = shower_data['zenith_hourly_rate']
                     score = round(min(10.0, (zhr / 100.0) * 7.0 + (3.0 if is_visible else 0.0)), 1)
 
-                    events.append({
-                        'event_type': 'Meteor Shower',
-                        'title': title,
-                        'description': description,
-                        'icon_class': 'bi bi-comet',
-                        'peak_time': self._to_local_iso(peak_time),
-                        'start_time': self._to_local_iso(peak_time - (2 * u.day)),  # Peak activity is 2 days before to 2 days after
-                        'end_time': self._to_local_iso(peak_time + (2 * u.day)),
-                        'visibility_range': f'{start_date} to {end_date}',
-                        'radiant_coordinates': {
-                            'ra_degrees': shower_data['radiant_ra'],
-                            'dec_degrees': shower_data['radiant_dec'],
-                        },
-                        'zenith_hourly_rate': shower_data['zenith_hourly_rate'],
-                        'parent_body': shower_data['parent_body'],
-                        'best_viewing_time': 'After midnight (local time)',
-                        'visibility': is_visible,
-                        'importance': self._rate_meteor_shower_importance(shower_data['zenith_hourly_rate']),
-                        'score': score,
-                        'raw_data': {
-                            'shower': shower_name,
-                            'peak_month': peak_month,
-                            'peak_day': peak_day,
-                            'radiant_ra': shower_data['radiant_ra'],
-                            'radiant_dec': shower_data['radiant_dec'],
+                    events.append(
+                        {
+                            'event_type': 'Meteor Shower',
+                            'title': title,
+                            'description': description,
+                            'icon_class': 'bi bi-comet',
+                            'peak_time': self._to_local_iso(peak_time),
+                            'start_time': self._to_local_iso(
+                                peak_time - (2 * u.day)
+                            ),  # Peak activity is 2 days before to 2 days after
+                            'end_time': self._to_local_iso(peak_time + (2 * u.day)),
+                            'visibility_range': f'{start_date} to {end_date}',
+                            'radiant_coordinates': {
+                                'ra_degrees': shower_data['radiant_ra'],
+                                'dec_degrees': shower_data['radiant_dec'],
+                            },
+                            'zenith_hourly_rate': shower_data['zenith_hourly_rate'],
+                            'parent_body': shower_data['parent_body'],
+                            'best_viewing_time': 'After midnight (local time)',
+                            'visibility': is_visible,
+                            'importance': self._rate_meteor_shower_importance(shower_data['zenith_hourly_rate']),
+                            'score': score,
+                            'raw_data': {
+                                'shower': shower_name,
+                                'peak_month': peak_month,
+                                'peak_day': peak_day,
+                                'radiant_ra': shower_data['radiant_ra'],
+                                'radiant_dec': shower_data['radiant_dec'],
+                            },
                         }
-                    })
-            
+                    )
+
             except Exception as e:
                 logger.debug(f"Error calculating meteor shower {shower_name}: {e}")
-        
+
         return events
 
     def _find_comet_visibility_windows(self, start_date: date, days_ahead: int) -> List[Dict[str, Any]]:
         """Find comet visibility windows based on perihelion dates."""
         events = []
         end_date = start_date + timedelta(days=days_ahead)
-        
+
         for comet_name, comet_data in self.NOTABLE_COMETS.items():
             try:
                 # Calculate perihelion date
@@ -295,86 +297,72 @@ class SolarSystemEventsService:
                     comet_data['perihelion_year'],
                     comet_data['perihelion_month'],
                     comet_data['perihelion_day'],
-                    12, 0, 0,
-                    tzinfo=ZoneInfo("UTC")
+                    12,
+                    0,
+                    0,
+                    tzinfo=ZoneInfo("UTC"),
                 )
-                
+
                 # Comets are typically visible within ~30 days of perihelion
                 visibility_start = perihelion_date - timedelta(days=30)
                 visibility_end = perihelion_date + timedelta(days=30)
-                
+
                 # Check if this window overlaps with our search period
                 if visibility_start.date() <= end_date and visibility_end.date() >= start_date:
                     # Calculate magnitude at different points
                     visibility_type = self._estimate_comet_visibility(comet_data['magnitude'])
-                    
+
                     # Get translated title and description
                     title = self.i18n.t('events_api.solar_system.comet_title', comet_name=comet_name)
-                    description = self.i18n.t('events_api.solar_system.comet_description',
-                                             magnitude=comet_data['magnitude'],
-                                             visibility=comet_data['visibility'])
-                    
-                    events.append({
-                        'event_type': 'Comet Appearance',
-                        'title': title,
-                        'description': description,
-                        'icon_class': 'bi bi-comet',
-                        'peak_time': self._to_local_iso(Time(perihelion_date)),
-                        'start_time': self._to_local_iso(Time(visibility_start)),
-                        'end_time': self._to_local_iso(Time(visibility_end)),
-                        'perihelion_date': perihelion_date.isoformat(),
-                        'magnitude': comet_data['magnitude'],
-                        'visibility': visibility_type,
-                        'equipment_needed': comet_data['visibility'],
-                        'importance': self._rate_comet_importance(comet_data['magnitude']),
-                        'raw_data': {
-                            'comet': comet_name,
-                            'perihelion': perihelion_date.isoformat(),
+                    description = self.i18n.t(
+                        'events_api.solar_system.comet_description',
+                        magnitude=comet_data['magnitude'],
+                        visibility=comet_data['visibility'],
+                    )
+
+                    events.append(
+                        {
+                            'event_type': 'Comet Appearance',
+                            'title': title,
+                            'description': description,
+                            'icon_class': 'bi bi-comet',
+                            'peak_time': self._to_local_iso(Time(perihelion_date)),
+                            'start_time': self._to_local_iso(Time(visibility_start)),
+                            'end_time': self._to_local_iso(Time(visibility_end)),
+                            'perihelion_date': perihelion_date.isoformat(),
                             'magnitude': comet_data['magnitude'],
+                            'visibility': visibility_type,
+                            'equipment_needed': comet_data['visibility'],
+                            'importance': self._rate_comet_importance(comet_data['magnitude']),
+                            'raw_data': {
+                                'comet': comet_name,
+                                'perihelion': perihelion_date.isoformat(),
+                                'magnitude': comet_data['magnitude'],
+                            },
                         }
-                    })
-            
+                    )
+
             except Exception as e:
                 logger.debug(f"Error calculating comet visibility for {comet_name}: {e}")
-        
+
         return events
 
     def _find_asteroid_occultations(self, start_date: date, days_ahead: int) -> List[Dict[str, Any]]:
         """
         Find asteroid occultation events.
-        
+
         Note: This would require a database of known occultations.
         For now, we provide a template for how this would work.
         In a production system, this would query IOTA or similar databases.
         """
         events = []
-        
+
         # Example structure for an asteroid occultation
         # In production, this would be queried from IOTA/IOD database
         # https://www.occultations.org/
-        
-        # For demonstration, include a template event
-        title = self.i18n.t('events_api.solar_system.asteroid_occultation_title')
-        description = self.i18n.t('events_api.solar_system.asteroid_occultation_description')
-        
-        example_occultation = {
-            'event_type': 'Asteroid Occultation',
-            'title': title,
-            'description': description,
-            'icon_class': 'bi bi-comet',
-            'start_time': None,
-            'peak_time': None,
-            'end_time': None,
-            'visibility': False,
-            'importance': 'medium',
-            'raw_data': {
-                'note': 'Check https://www.occultations.org/ for current predictions',
-                'data_source': 'International Occultation Timing Association',
-            }
-        }
-        
+
         logger.debug("Asteroid occultation data would be fetched from IOTA/IOD database")
-        
+
         return events
 
     def _is_radiant_visible(self, radiant_ra: float, radiant_dec: float, time: Time) -> bool:
@@ -382,17 +370,17 @@ class SolarSystemEventsService:
         try:
             radiant = SkyCoord(ra=radiant_ra * u.deg, dec=radiant_dec * u.deg, frame=ICRS)
             altaz = radiant.transform_to(AltAz(obstime=time, location=self.location))
-            
+
             if altaz is None:
                 return False
-            
+
             # Radiant should be above horizon
             alt_val = altaz.alt.degree  # type: ignore
             if isinstance(alt_val, (np.ndarray, complex)):
                 altitude = float(np.real(np.atleast_1d(alt_val).flat[0]))
             else:
                 altitude = float(alt_val)  # type: ignore
-            
+
             return altitude > 10
         except Exception:
             return False
@@ -423,5 +411,6 @@ class SolarSystemEventsService:
     def _to_local_iso(self, time: Time) -> str:
         """Convert Astropy Time to configured local timezone ISO string with offset."""
         from datetime import datetime
+
         dt = time.to_datetime(timezone=self.timezone)
         return dt.isoformat() if isinstance(dt, datetime) else str(dt)

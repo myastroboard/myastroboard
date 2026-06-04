@@ -12,7 +12,7 @@ All calculations account for observer location and timezone.
 """
 
 from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from zoneinfo import ZoneInfo
 from logging_config import get_logger
 
@@ -58,7 +58,7 @@ class PlanetaryEventsService:
     def __init__(self, latitude: float, longitude: float, elevation: float = 0, timezone: str = "UTC"):
         """
         Initialize planetary events service.
-        
+
         Args:
             latitude: Observer latitude in degrees
             longitude: Observer longitude in degrees
@@ -69,19 +69,15 @@ class PlanetaryEventsService:
         self.longitude = longitude
         self.elevation = elevation
         self.timezone = ZoneInfo(timezone)
-        self.location = EarthLocation(
-            lat=latitude * u.deg,
-            lon=longitude * u.deg,
-            height=elevation * u.m
-        )
+        self.location = EarthLocation(lat=latitude * u.deg, lon=longitude * u.deg, height=elevation * u.m)
 
     def get_planetary_events(self, days_ahead: int = 365) -> List[Dict[str, Any]]:
         """
         Get all planetary events for the next N days.
-        
+
         Args:
             days_ahead: Number of days to calculate ahead (default 365)
-            
+
         Returns:
             List of planetary events, sorted by date
         """
@@ -138,31 +134,33 @@ class PlanetaryEventsService:
         n = len(t_arr)
 
         for i, planet1 in enumerate(planet_list):
-            for planet2 in planet_list[i + 1:]:
+            for planet2 in planet_list[i + 1 :]:
                 try:
                     seps = np.asarray(coords[planet1].separation(coords[planet2]).degree)
                     for s, e in self._find_runs(seps < 5.0):
                         min_idx = s + int(np.argmin(seps[s:e]))
                         min_sep = float(seps[min_idx])
                         peak_time = t_arr[min_idx]
-                        events.append({
-                            'event_type': 'Planetary Conjunction',
-                            'title': f'{planet1} - {planet2} Conjunction',
-                            'description': f'{planet1} and {planet2} appear very close in the sky',
-                            'star_emoji': PLANET_SYMBOLS.get(planet1, '○'),
-                            'secondary_emoji': PLANET_SYMBOLS.get(planet2, '○'),
-                            'peak_time': self._to_local_iso(peak_time),
-                            'start_time': self._to_local_iso(t_arr[s]),
-                            'end_time': self._to_local_iso(t_arr[min(e, n - 1)]),
-                            'min_separation_degrees': min_sep,
-                            'visibility': self._is_event_visible(planet1, planet2, peak_time),
-                            'importance': self._rate_importance(planet1, planet2, min_sep),
-                            'raw_data': {
-                                'planet1': planet1,
-                                'planet2': planet2,
-                                'separation_degrees': min_sep,
+                        events.append(
+                            {
+                                'event_type': 'Planetary Conjunction',
+                                'title': f'{planet1} - {planet2} Conjunction',
+                                'description': f'{planet1} and {planet2} appear very close in the sky',
+                                'star_emoji': PLANET_SYMBOLS.get(planet1, '○'),
+                                'secondary_emoji': PLANET_SYMBOLS.get(planet2, '○'),
+                                'peak_time': self._to_local_iso(peak_time),
+                                'start_time': self._to_local_iso(t_arr[s]),
+                                'end_time': self._to_local_iso(t_arr[min(e, n - 1)]),
+                                'min_separation_degrees': min_sep,
+                                'visibility': self._is_event_visible(planet1, planet2, peak_time),
+                                'importance': self._rate_importance(planet1, planet2, min_sep),
+                                'raw_data': {
+                                    'planet1': planet1,
+                                    'planet2': planet2,
+                                    'separation_degrees': min_sep,
+                                },
                             }
-                        })
+                        )
                 except Exception as ex:
                     logger.debug(f"Error finding conjunction {planet1}-{planet2}: {ex}")
 
@@ -187,23 +185,25 @@ class PlanetaryEventsService:
                     window = seps[s:e]
                     peak_idx = s + int(np.argmin(np.abs(window - 180.0)))
                     peak_time = t_arr[peak_idx]
-                    events.append({
-                        'event_type': 'Planetary Opposition',
-                        'title': f'{planet} at Opposition',
-                        'description': f'{planet} is at opposition (best visibility). Optimal for observation.',
-                        'emoji': PLANET_SYMBOLS.get(planet, '○'),
-                        'peak_time': self._to_local_iso(peak_time),
-                        'start_time': self._to_local_iso(t_arr[s]),
-                        'end_time': self._to_local_iso(t_arr[min(e, n - 1)]),
-                        'elongation_degrees': 180.0,
-                        'visibility': True,
-                        'importance': 'high',
-                        'raw_data': {
-                            'planet': planet,
-                            'elongation': 180.0,
-                            'best_viewing_time': self._to_local_iso(peak_time),
+                    events.append(
+                        {
+                            'event_type': 'Planetary Opposition',
+                            'title': f'{planet} at Opposition',
+                            'description': f'{planet} is at opposition (best visibility). Optimal for observation.',
+                            'emoji': PLANET_SYMBOLS.get(planet, '○'),
+                            'peak_time': self._to_local_iso(peak_time),
+                            'start_time': self._to_local_iso(t_arr[s]),
+                            'end_time': self._to_local_iso(t_arr[min(e, n - 1)]),
+                            'elongation_degrees': 180.0,
+                            'visibility': True,
+                            'importance': 'high',
+                            'raw_data': {
+                                'planet': planet,
+                                'elongation': 180.0,
+                                'best_viewing_time': self._to_local_iso(peak_time),
+                            },
                         }
-                    })
+                    )
             except Exception as ex:
                 logger.debug(f"Error finding opposition for {planet}: {ex}")
 
@@ -224,38 +224,36 @@ class PlanetaryEventsService:
                 elong = np.asarray(coords[planet].separation(coords['sun']).degree)
                 min_elong = PLANETS[planet]['min_elong']
                 # Local maxima: higher than both neighbours, and above visibility threshold
-                peak_mask = (
-                    (elong[1:-1] > elong[:-2]) &
-                    (elong[1:-1] > elong[2:]) &
-                    (elong[1:-1] >= min_elong)
-                )
+                peak_mask = (elong[1:-1] > elong[:-2]) & (elong[1:-1] > elong[2:]) & (elong[1:-1] >= min_elong)
                 for raw_idx in np.where(peak_mask)[0]:
                     peak_idx = int(raw_idx) + 1  # offset from slicing
                     max_elong_val = float(elong[peak_idx])
                     peak_time = t_arr[peak_idx]
-                    events.append({
-                        'event_type': 'Planetary Elongation',
-                        'title': f'{planet} at Maximum Elongation',
-                        'description': f'{planet} reaches maximum elongation ({max_elong_val:.1f}°). Best viewing time.',
-                        'emoji': PLANET_SYMBOLS.get(planet, '○'),
-                        'peak_time': self._to_local_iso(peak_time),
-                        'elongation_degrees': max_elong_val,
-                        'visibility': True,
-                        'importance': 'medium',
-                        'raw_data': {
-                            'planet': planet,
-                            'elongation': max_elong_val,
-                            'occurs_at': self._to_local_iso(peak_time),
+                    events.append(
+                        {
+                            'event_type': 'Planetary Elongation',
+                            'title': f'{planet} at Maximum Elongation',
+                            'description': (
+                                f'{planet} reaches maximum elongation ({max_elong_val:.1f}°). Best viewing time.'
+                            ),
+                            'emoji': PLANET_SYMBOLS.get(planet, '○'),
+                            'peak_time': self._to_local_iso(peak_time),
+                            'elongation_degrees': max_elong_val,
+                            'visibility': True,
+                            'importance': 'medium',
+                            'raw_data': {
+                                'planet': planet,
+                                'elongation': max_elong_val,
+                                'occurs_at': self._to_local_iso(peak_time),
+                            },
                         }
-                    })
+                    )
             except Exception as ex:
                 logger.debug(f"Error finding elongation for {planet}: {ex}")
 
         return events
 
-    def _find_retrograde_periods(
-        self, start_date: Time, end_date: Time
-    ) -> List[Dict[str, Any]]:
+    def _find_retrograde_periods(self, start_date: Time, end_date: Time) -> List[Dict[str, Any]]:
         """Find retrograde motion using pre-computed vectorized RA arrays."""
         coords = getattr(self, '_coords', None)
         t_arr = getattr(self, '_t_arr', None)
@@ -276,21 +274,23 @@ class PlanetaryEventsService:
                     duration_days = float(e - s)  # 1-day steps
                     start_time = t_arr[s]
                     end_time = t_arr[min(e, n - 1)]
-                    events.append({
-                        'event_type': 'Planetary Retrograde',
-                        'title': f'{planet} Retrograde Motion',
-                        'description': f'{planet} appears to move backward for ~{duration_days:.0f} days.',
-                        'emoji': PLANET_SYMBOLS.get(planet, '○'),
-                        'start_time': self._to_local_iso(start_time),
-                        'end_time': self._to_local_iso(end_time),
-                        'duration_days': duration_days,
-                        'visibility': self._is_planet_visible(planet, start_time),
-                        'importance': 'medium',
-                        'raw_data': {
-                            'planet': planet,
+                    events.append(
+                        {
+                            'event_type': 'Planetary Retrograde',
+                            'title': f'{planet} Retrograde Motion',
+                            'description': f'{planet} appears to move backward for ~{duration_days:.0f} days.',
+                            'emoji': PLANET_SYMBOLS.get(planet, '○'),
+                            'start_time': self._to_local_iso(start_time),
+                            'end_time': self._to_local_iso(end_time),
                             'duration_days': duration_days,
+                            'visibility': self._is_planet_visible(planet, start_time),
+                            'importance': 'medium',
+                            'raw_data': {
+                                'planet': planet,
+                                'duration_days': duration_days,
+                            },
                         }
-                    })
+                    )
             except Exception as ex:
                 logger.debug(f"Error finding retrograde for {planet}: {ex}")
 
@@ -301,7 +301,7 @@ class PlanetaryEventsService:
         try:
             p1 = get_body(planet1, time, self.location)
             p2 = get_body(planet2, time, self.location)
-            
+
             sep = p1.separation(p2)
             # Handle both scalar and array returns from Astropy
             sep_val = sep.degree
@@ -320,7 +320,7 @@ class PlanetaryEventsService:
         try:
             planet_obj = get_body(planet, time, self.location)
             sun_obj = get_body('sun', time, self.location)
-            
+
             elongation = planet_obj.separation(sun_obj)
             # Handle both scalar and array returns from Astropy
             elong_val = elongation.degree
@@ -339,34 +339,34 @@ class PlanetaryEventsService:
         try:
             p1 = get_body(planet1, time, self.location)
             p2 = get_body(planet2, time, self.location)
-            
+
             if p1 is None or p2 is None:
                 return False
-            
+
             altaz_p1 = p1.transform_to(AltAz(obstime=time, location=self.location))
             altaz_p2 = p2.transform_to(AltAz(obstime=time, location=self.location))
-            
+
             if altaz_p1 is None or altaz_p2 is None:
                 return False
-            
+
             # Both planets must be above horizon for conjunction to be visible
             alt1_val = altaz_p1.alt.degree  # type: ignore
             alt2_val = altaz_p2.alt.degree  # type: ignore
-            
+
             if isinstance(alt1_val, np.ndarray):
                 alt1 = float(np.real(alt1_val.flat[0]))
             elif isinstance(alt1_val, complex):
                 alt1 = float(np.real(alt1_val))
             else:
                 alt1 = float(np.real(alt1_val))  # type: ignore
-                
+
             if isinstance(alt2_val, np.ndarray):
                 alt2 = float(np.real(alt2_val.flat[0]))
             elif isinstance(alt2_val, complex):
                 alt2 = float(np.real(alt2_val))
             else:
                 alt2 = float(np.real(alt2_val))  # type: ignore
-                
+
             return alt1 > 5 and alt2 > 5
         except Exception:
             return False
@@ -377,16 +377,16 @@ class PlanetaryEventsService:
             planet_obj = get_body(planet, time, self.location)
             if planet_obj is None:
                 return False
-                
+
             altaz = planet_obj.transform_to(AltAz(obstime=time, location=self.location))
             if altaz is None:
                 return False
-            
+
             # Planet is visible if above horizon and not too close to Sun
             sun_obj = get_body('sun', time, self.location)
             if sun_obj is None:
                 return False
-            
+
             # Handle both scalar and array returns
             elong_val = planet_obj.separation(sun_obj).degree
             if isinstance(elong_val, np.ndarray):
@@ -395,7 +395,7 @@ class PlanetaryEventsService:
                 elongation = float(np.real(elong_val))
             else:
                 elongation = float(np.real(elong_val))  # type: ignore
-                
+
             alt_val = altaz.alt.degree  # type: ignore
             if isinstance(alt_val, np.ndarray):
                 altitude = float(np.real(alt_val.flat[0]))
@@ -403,7 +403,7 @@ class PlanetaryEventsService:
                 altitude = float(np.real(alt_val))
             else:
                 altitude = float(np.real(alt_val))  # type: ignore
-            
+
             return altitude > 5 and elongation > 10
         except Exception:
             return False
@@ -418,7 +418,7 @@ class PlanetaryEventsService:
         # Major planets: Jupiter and Saturn
         major_planets = {'Jupiter', 'Saturn'}
         is_major = (planet1 in major_planets) or (planet2 in major_planets)
-        
+
         # Closer conjunctions are more impressive
         if separation < 0.5:
             return 'high' if is_major else 'medium'

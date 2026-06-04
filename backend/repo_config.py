@@ -1,6 +1,7 @@
 """
 Manage configuration loading and saving
 """
+
 from copy import deepcopy
 
 from constants import CONFIG_FILE

@@ -37,10 +37,10 @@ from astropy.time import Time as AstroTime
 from astropy.coordinates import EarthLocation, AltAz, get_sun
 import astropy.units as u
 
-
 # -----------------------------
 # Data structure
 # -----------------------------
+
 
 @dataclass
 class SunAstroInfo:
@@ -63,6 +63,7 @@ class SunAstroInfo:
 # Service
 # -----------------------------
 
+
 class SunService:
 
     def __init__(self, latitude, longitude, timezone):
@@ -70,10 +71,7 @@ class SunService:
         self.longitude = longitude
         self.timezone = ZoneInfo(timezone)
 
-        self.location = EarthLocation(
-            lat=latitude * u.deg,
-            lon=longitude * u.deg
-        )
+        self.location = EarthLocation(lat=latitude * u.deg, lon=longitude * u.deg)
 
     # -----------------------------
     # Public API
@@ -83,7 +81,7 @@ class SunService:
 
         today = datetime.date.today()
         return self._compute_day(today)
-    
+
     def get_tomorrow_report(self):
         tomorrow = datetime.date.today() + datetime.timedelta(days=1)
         return self._compute_day(tomorrow)
@@ -118,14 +116,14 @@ class SunService:
                 return None
             return start + datetime.timedelta(minutes=(int(indices[0]) + 1) * step_minutes)
 
-        sunset    = find_crossing(0,   "down")
-        sunrise   = find_crossing(0,   "up")
-        civil_dusk    = find_crossing(-6,  "down")
-        civil_dawn    = find_crossing(-6,  "up")
+        sunset = find_crossing(0, "down")
+        sunrise = find_crossing(0, "up")
+        civil_dusk = find_crossing(-6, "down")
+        civil_dawn = find_crossing(-6, "up")
         nautical_dusk = find_crossing(-12, "down")
         nautical_dawn = find_crossing(-12, "up")
-        astro_dusk    = find_crossing(-18, "down")
-        astro_dawn    = find_crossing(-18, "up")
+        astro_dusk = find_crossing(-18, "down")
+        astro_dawn = find_crossing(-18, "up")
 
         night_hours = 0
         if astro_dusk and astro_dawn:
@@ -140,7 +138,7 @@ class SunService:
             nautical_dawn=self._fmt(nautical_dawn),
             astronomical_dusk=self._fmt(astro_dusk),
             astronomical_dawn=self._fmt(astro_dawn),
-            true_night_hours=round(night_hours, 2)
+            true_night_hours=round(night_hours, 2),
         )
 
     def _sun_altitude(self, dt_local):

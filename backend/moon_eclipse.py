@@ -53,14 +53,15 @@ from astropy.time import Time as AstroTime
 from astropy.coordinates import EarthLocation, AltAz, get_body
 import astropy.units as u
 
-
 # =============================
 # Data structures
 # =============================
 
+
 @dataclass
 class EclipsePoint:
     """Data point for altitude vs time"""
+
     time: str  # "HH:MM" local time
     altitude_deg: float
     azimuth_deg: float
@@ -88,6 +89,7 @@ class LunarEclipseInfo:
 # Service
 # =============================
 
+
 class LunarEclipseService:
     """Calculate lunar eclipse information for astrophotography"""
 
@@ -97,10 +99,7 @@ class LunarEclipseService:
         self.timezone = ZoneInfo(timezone)
 
         self.observer = Observer(latitude, longitude, 0)
-        self.location = EarthLocation(
-            lat=latitude * u.deg,
-            lon=longitude * u.deg
-        )
+        self.location = EarthLocation(lat=latitude * u.deg, lon=longitude * u.deg)
 
     # =============================
     # Public API
@@ -108,7 +107,7 @@ class LunarEclipseService:
 
     def get_next_eclipse(self) -> Optional[LunarEclipseInfo]:
         """Get next lunar eclipse from now"""
-        
+
         # astronomy.Time expects UTC time
         now_utc = datetime.datetime.now(datetime.timezone.utc)
         t_start_str = now_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -127,7 +126,7 @@ class LunarEclipseService:
         # Convert eclipse times to local using semi-duration to calculate begin/end times
         # sd_penum, sd_partial, sd_total are in minutes
         peak_time_utc = eclipse.peak.Utc().replace(tzinfo=datetime.timezone.utc)
-        
+
         # Calculate partial begin/end from sd_partial
         if eclipse.sd_partial > 0:
             delta_minutes = datetime.timedelta(minutes=eclipse.sd_partial)
@@ -199,7 +198,7 @@ class LunarEclipseService:
             partial_duration_minutes=partial_duration_minutes,
             astrophotography_score=round(score, 1),
             score_classification=classification,
-            altitude_vs_time=altitude_vs_time
+            altitude_vs_time=altitude_vs_time,
         )
 
     # =============================
@@ -210,7 +209,7 @@ class LunarEclipseService:
         """Determine eclipse type from eclipse object"""
         # Check the eclipse kind
         kind_name = str(eclipse.kind).lower()
-        
+
         if 'total' in kind_name:
             return "Total"
         elif 'partial' in kind_name:
@@ -228,7 +227,7 @@ class LunarEclipseService:
 
         alt = self._coord_attribute(moon_transformed, "alt")
         az = self._coord_attribute(moon_transformed, "az")
-        
+
         alt = alt if alt is not None else 0.0
         az = az if az is not None else 0.0
         return alt, az
@@ -245,14 +244,12 @@ class LunarEclipseService:
             return None
 
     def _generate_altitude_vs_time(
-        self,
-        start_local: datetime.datetime,
-        end_local: datetime.datetime
+        self, start_local: datetime.datetime, end_local: datetime.datetime
     ) -> List[EclipsePoint]:
         """Generate altitude vs time points for the eclipse"""
-        
+
         points = []
-        
+
         # Generate points every 5 minutes
         current = start_local
         step = datetime.timedelta(minutes=5)
@@ -267,16 +264,12 @@ class LunarEclipseService:
 
             alt = self._coord_attribute(moon_transformed, "alt")
             az = self._coord_attribute(moon_transformed, "az")
-            
+
             alt = alt if alt is not None else 0.0
             az = az if az is not None else 0.0
 
             time_str = current.strftime("%H:%M")
-            points.append(EclipsePoint(
-                time=time_str,
-                altitude_deg=round(alt, 1),
-                azimuth_deg=round(az, 1)
-            ))
+            points.append(EclipsePoint(time=time_str, altitude_deg=round(alt, 1), azimuth_deg=round(az, 1)))
 
             current += step
 
@@ -288,11 +281,11 @@ class LunarEclipseService:
         visible: bool,
         peak_altitude: float,
         partial_duration_minutes: int,
-        total_duration_minutes: int
+        total_duration_minutes: int,
     ) -> tuple[float, str]:
         """
         Calculate astrophotography score (0-10) based on various factors.
-        
+
         Scoring factors:
         - Type: Total (10) > Partial (7) > Penumbral (3)
         - Visibility: -5 if below horizon
@@ -300,7 +293,7 @@ class LunarEclipseService:
         - Duration: Longer observation window is better
         - Total eclipse duration: If present, adds significant value
         """
-        
+
         if not visible:
             return 0.0, "not_visible"
 
