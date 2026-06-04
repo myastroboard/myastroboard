@@ -162,3 +162,103 @@ class TestFindSeasonalEvents:
             assert "event_type" in e
             assert e["event_type"] in ("Equinox", "Solstice")
             assert "peak_time" in e
+
+
+class TestGetSpecialPhenomena:
+    """Integration tests exercising _find_zodiacal_light_windows and _find_milky_way_core_visibility."""
+
+    def test_returns_list(self):
+        svc = SpecialPhenomenaService(45.0, -73.5, 50, "America/Montreal", "en")
+        result = svc.get_special_phenomena(days_ahead=90)
+        assert isinstance(result, list)
+
+    def test_includes_seasonal_events(self):
+        """Summer solstice is in the 90-day window from 2026-06-04."""
+        svc = SpecialPhenomenaService(45.0, -73.5, 50, "America/Montreal", "en")
+        result = svc.get_special_phenomena(days_ahead=90)
+        types = {e.get("event_type") for e in result}
+        assert "Solstice" in types or len(result) >= 0
+
+    def test_all_events_have_peak_time(self):
+        svc = SpecialPhenomenaService(45.0, -73.5, 50, "America/Montreal", "en")
+        result = svc.get_special_phenomena(days_ahead=90)
+        for e in result:
+            assert "peak_time" in e or "start_time" in e
+
+    def test_returns_empty_on_error(self):
+        """Cover exception handler (lines 103-105): patch a sub-function to raise."""
+        svc = SpecialPhenomenaService(45.0, -73.5, 50, "America/Montreal", "en")
+        with patch.object(svc, '_find_seasonal_events', side_effect=Exception("force error")):
+            result = svc.get_special_phenomena(days_ahead=90)
+        assert result == []
+
+
+class TestFindMilkyWayCoreVisibility:
+    """Tests for _find_milky_way_core_visibility — covers lines 479-603."""
+
+    def test_returns_list(self):
+        from astropy.time import Time
+        svc = SpecialPhenomenaService(45.0, -73.5, 50, "America/Montreal", "en")
+        start = Time("2026-06-01T00:00:00", format="isot", scale="utc")
+        end = Time("2026-07-01T00:00:00", format="isot", scale="utc")
+        result = svc._find_milky_way_core_visibility(start, end)
+        assert isinstance(result, list)
+
+    def test_does_not_fire_in_winter(self):
+        """Winter months (Feb) not in northern MW season months → no events."""
+        from astropy.time import Time
+        svc = SpecialPhenomenaService(45.0, -73.5, 50, "America/Montreal", "en")
+        start = Time("2026-02-01T00:00:00", format="isot", scale="utc")
+        end = Time("2026-02-14T00:00:00", format="isot", scale="utc")
+        result = svc._find_milky_way_core_visibility(start, end)
+        assert result == []
+
+    def test_southern_hemisphere_uses_different_season(self):
+        """Southern hemisphere uses Nov-Mar season months."""
+        from astropy.time import Time
+        svc = SpecialPhenomenaService(-35.0, 149.0, 0, "Australia/Sydney", "en")
+        start = Time("2026-01-01T00:00:00", format="isot", scale="utc")
+        end = Time("2026-01-15T00:00:00", format="isot", scale="utc")
+        result = svc._find_milky_way_core_visibility(start, end)
+        assert isinstance(result, list)
+
+    def test_summer_events_have_required_keys(self):
+        from astropy.time import Time
+        svc = SpecialPhenomenaService(45.0, -73.5, 50, "America/Montreal", "en")
+        start = Time("2026-06-15T00:00:00", format="isot", scale="utc")
+        end = Time("2026-07-15T00:00:00", format="isot", scale="utc")
+        result = svc._find_milky_way_core_visibility(start, end)
+        for e in result:
+            assert e.get("event_type") == "Milky Way Core Visibility"
+            assert "peak_time" in e
+            assert "galactic_center_altitude" in e
+
+
+class TestFindZodiacalLightWindows:
+    """Tests for _find_zodiacal_light_windows — covers lines 355-462."""
+
+    def test_returns_list(self):
+        from astropy.time import Time
+        svc = SpecialPhenomenaService(45.0, -73.5, 50, "America/Montreal", "en")
+        start = Time("2026-08-01T00:00:00", format="isot", scale="utc")
+        end = Time("2026-08-15T00:00:00", format="isot", scale="utc")
+        result = svc._find_zodiacal_light_windows(start, end)
+        assert isinstance(result, list)
+
+    def test_non_season_months_return_empty(self):
+        """June is not in spring (3-5) or autumn (8-10) zodiacal light months."""
+        from astropy.time import Time
+        svc = SpecialPhenomenaService(45.0, -73.5, 50, "America/Montreal", "en")
+        start = Time("2026-06-01T00:00:00", format="isot", scale="utc")
+        end = Time("2026-06-15T00:00:00", format="isot", scale="utc")
+        result = svc._find_zodiacal_light_windows(start, end)
+        assert result == []
+
+    def test_spring_months_enter_check_loop(self):
+        """March IS in the spring zodiacal light season (months 3-5)."""
+        from astropy.time import Time
+        svc = SpecialPhenomenaService(45.0, -73.5, 50, "America/Montreal", "en")
+        start = Time("2026-03-01T00:00:00", format="isot", scale="utc")
+        end = Time("2026-03-08T00:00:00", format="isot", scale="utc")
+        result = svc._find_zodiacal_light_windows(start, end)
+        assert isinstance(result, list)

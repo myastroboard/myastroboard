@@ -350,3 +350,342 @@ def test_get_object_info_no_image_when_coordinates_absent(monkeypatch):
 
     assert result['image'] is None
     assert result['coordinates'] is None
+
+
+# ---------------------------------------------------------------------------
+# _simbad_query — covers lines 109-125
+# ---------------------------------------------------------------------------
+
+from unittest.mock import patch, MagicMock
+import requests as _req_module
+
+
+class TestSimbadQuery:
+    """Direct tests for _simbad_query with mocked HTTP."""
+
+    def test_returns_json_on_success(self):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "data": [["M 31", "Galaxy", 10.68, 41.27]],
+            "metadata": [{"name": "main_id"}, {"name": "otype_txt"}, {"name": "ra"}, {"name": "dec"}],
+        }
+        mock_resp.raise_for_status.return_value = None
+
+        with patch("object_info.requests.get", return_value=mock_resp):
+            result = oi._simbad_query("SELECT * FROM basic")
+
+        assert result is not None
+        assert "data" in result
+
+    def test_returns_none_on_request_exception(self):
+        with patch("object_info.requests.get", side_effect=_req_module.RequestException("timeout")):
+            result = oi._simbad_query("SELECT * FROM basic")
+
+        assert result is None
+
+
+# ---------------------------------------------------------------------------
+# _resolve_via_simbad — covers lines 203-241
+# ---------------------------------------------------------------------------
+
+
+class TestResolveViaSimbad:
+    """Direct tests for _resolve_via_simbad with mocked _simbad_query."""
+
+    def test_returns_none_when_simbad_fails(self):
+        with patch("object_info._simbad_query", return_value=None):
+            assert oi._resolve_via_simbad("M31") is None
+
+    def test_returns_none_when_data_empty(self):
+        with patch("object_info._simbad_query", return_value={"data": [], "metadata": []}):
+            assert oi._resolve_via_simbad("M31") is None
+
+    def test_returns_resolved_dict(self):
+        main_result = {
+            "data": [["M 31", "Galaxy", 10.684, 41.269]],
+            "metadata": [
+                {"name": "main_id"}, {"name": "otype_txt"}, {"name": "ra"}, {"name": "dec"}
+            ],
+        }
+        alias_result = {
+            "data": [["M 31"], ["NGC 224"], ["Andromeda Galaxy"]],
+            "metadata": [{"name": "id"}],
+        }
+
+        call_count = [0]
+
+        def mock_query(q):
+            call_count[0] += 1
+            return main_result if call_count[0] == 1 else alias_result
+
+        with patch("object_info._simbad_query", side_effect=mock_query):
+            result = oi._resolve_via_simbad("M31")
+
+        assert result is not None
+        assert result["id"] == "M 31"
+        assert result["type"] == "Galaxy"
+        assert "NGC 224" in result["aliases"] or "M 31" in result["aliases"]
+
+    def test_handles_none_alias_result(self):
+        main_result = {
+            "data": [["Some Star", "Star", None, None]],
+            "metadata": [
+                {"name": "main_id"}, {"name": "otype_txt"}, {"name": "ra"}, {"name": "dec"}
+            ],
+        }
+        call_count = [0]
+
+        def mock_query(q):
+            call_count[0] += 1
+            return main_result if call_count[0] == 1 else None
+
+        with patch("object_info._simbad_query", side_effect=mock_query):
+            result = oi._resolve_via_simbad("SomeStar")
+
+        assert result is not None
+        assert result["ra"] is None
+        assert result["dec"] is None
+
+
+# ---------------------------------------------------------------------------
+# resolve_identifier_for_catalogue_lookup — covers lines 292-335
+# ---------------------------------------------------------------------------
+
+
+class TestResolveIdentifierForCatalogueLookup:
+    """Tests for resolve_identifier_for_catalogue_lookup."""
+
+    def test_returns_none_when_simbad_returns_none(self):
+        with patch("object_info._simbad_query", return_value=None):
+            assert oi.resolve_identifier_for_catalogue_lookup("M31") is None
+
+    def test_returns_none_when_data_empty(self):
+        with patch("object_info._simbad_query", return_value={"data": [], "metadata": []}):
+            assert oi.resolve_identifier_for_catalogue_lookup("M31") is None
+
+    def test_returns_dict_with_required_keys(self):
+        main_result = {
+            "data": [["M 31", "Galaxy", 10.684, 41.269]],
+            "metadata": [
+                {"name": "main_id"}, {"name": "otype_txt"}, {"name": "ra"}, {"name": "dec"}
+            ],
+        }
+        alias_result = {
+            "data": [["M 31"], ["NGC 224"]],
+            "metadata": [{"name": "id"}],
+        }
+        call_count = [0]
+
+        def mock_query(q):
+            call_count[0] += 1
+            return main_result if call_count[0] == 1 else alias_result
+
+        with patch("object_info._simbad_query", side_effect=mock_query):
+            result = oi.resolve_identifier_for_catalogue_lookup("M31")
+
+        assert result is not None
+        assert "object_type" in result
+        assert "constellation" in result
+        assert "aliases" in result
+        assert result["object_type"] == "Galaxy"
+
+    def test_handles_none_coordinates(self):
+        main_result = {
+            "data": [["Some Obj", "Star", None, None]],
+            "metadata": [
+                {"name": "main_id"}, {"name": "otype_txt"}, {"name": "ra"}, {"name": "dec"}
+            ],
+        }
+        with patch("object_info._simbad_query", return_value=main_result):
+            result = oi.resolve_identifier_for_catalogue_lookup("SomeStar")
+
+        assert result is not None
+        assert result["constellation"] == ''
+
+
+# ---------------------------------------------------------------------------
+# _get_wikipedia_summary — covers lines 400-431
+# ---------------------------------------------------------------------------
+
+
+class TestGetWikipediaSummary:
+    """Tests for _get_wikipedia_summary with mocked HTTP."""
+
+    def test_returns_dict_on_success(self):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.raise_for_status.return_value = None
+        mock_resp.json.return_value = {
+            "type": "standard",
+            "title": "Andromeda Galaxy",
+            "description": "Galaxy in constellation Andromeda",
+            "extract": "The Andromeda Galaxy is a large spiral galaxy.",
+        }
+
+        with patch("object_info.requests.get", return_value=mock_resp):
+            result = oi._get_wikipedia_summary("Andromeda Galaxy")
+
+        assert result is not None
+        assert result["title"] == "Andromeda Galaxy"
+        assert "spiral" in result["extract"]
+
+    def test_returns_none_on_404(self):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 404
+
+        with patch("object_info.requests.get", return_value=mock_resp):
+            result = oi._get_wikipedia_summary("NonExistentObject99999")
+
+        assert result is None
+
+    def test_returns_none_on_403(self):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 403
+
+        with patch("object_info.requests.get", return_value=mock_resp):
+            result = oi._get_wikipedia_summary("SomeThing")
+
+        assert result is None
+
+    def test_returns_none_for_disambiguation_page(self):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.raise_for_status.return_value = None
+        mock_resp.json.return_value = {"type": "disambiguation"}
+
+        with patch("object_info.requests.get", return_value=mock_resp):
+            result = oi._get_wikipedia_summary("Andromeda")
+
+        assert result is None
+
+    def test_returns_none_when_extract_is_empty(self):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.raise_for_status.return_value = None
+        mock_resp.json.return_value = {"type": "standard", "extract": "   "}
+
+        with patch("object_info.requests.get", return_value=mock_resp):
+            result = oi._get_wikipedia_summary("EmptyPage")
+
+        assert result is None
+
+    def test_returns_none_on_request_exception(self):
+        with patch("object_info.requests.get", side_effect=_req_module.RequestException("network err")):
+            result = oi._get_wikipedia_summary("M31")
+
+        assert result is None
+
+    def test_uses_requested_language(self):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.raise_for_status.return_value = None
+        mock_resp.json.return_value = {
+            "type": "standard",
+            "title": "Galaxie d'Andromède",
+            "description": "galaxie spirale",
+            "extract": "La galaxie d'Andromède est une grande galaxie spirale.",
+        }
+
+        with patch("object_info.requests.get", return_value=mock_resp) as mock_get:
+            result = oi._get_wikipedia_summary("Andromeda Galaxy", lang="fr")
+
+        assert result is not None
+        # Ensure the French Wikipedia URL was called
+        call_url = mock_get.call_args[0][0]
+        assert "fr.wikipedia" in call_url
+
+
+# ---------------------------------------------------------------------------
+# _wikipedia_with_fallback — covers lines 439-452
+# ---------------------------------------------------------------------------
+
+
+class TestWikipediaWithFallback:
+    """Tests for _wikipedia_with_fallback."""
+
+    def test_returns_first_found_result(self):
+        found = {"title": "M 31", "description": "Galaxy", "extract": "A galaxy."}
+        call_count = [0]
+
+        def mock_summary(term, lang='en'):
+            call_count[0] += 1
+            if term == "M 31":
+                return found
+            return None
+
+        with patch("object_info._get_wikipedia_summary", side_effect=mock_summary):
+            result = oi._wikipedia_with_fallback(["M 31", "NGC 224"], "en")
+
+        assert result is not None
+        assert result["title"] == "M 31"
+
+    def test_falls_back_to_english_when_lang_fails(self):
+        en_result = {"title": "M 31", "description": "Galaxy", "extract": "A galaxy."}
+
+        def mock_summary(term, lang='en'):
+            if lang == 'fr':
+                return None
+            return en_result
+
+        with patch("object_info._get_wikipedia_summary", side_effect=mock_summary):
+            result = oi._wikipedia_with_fallback(["M 31"], "fr")
+
+        assert result is not None
+
+    def test_returns_none_when_all_fail(self):
+        with patch("object_info._get_wikipedia_summary", return_value=None):
+            result = oi._wikipedia_with_fallback(["UnknownObj1", "UnknownObj2"], "en")
+
+        assert result is None
+
+
+# ---------------------------------------------------------------------------
+# _translate_object_type — covers lines 511-516
+# ---------------------------------------------------------------------------
+
+
+def test_translate_object_type_english_passthrough():
+    from object_info import _translate_object_type
+    assert _translate_object_type("Galaxy", lang="en") == "Galaxy"
+
+
+def test_translate_object_type_empty_passthrough():
+    from object_info import _translate_object_type
+    assert _translate_object_type("", lang="fr") == ""
+
+
+def test_translate_object_type_non_english_returns_string():
+    from object_info import _translate_object_type
+    result = _translate_object_type("Galaxy", lang="fr")
+    assert isinstance(result, str)
+    assert len(result) > 0
+
+
+# ---------------------------------------------------------------------------
+# get_object_info — cover branches 620->623, 625 (_local_entry fallback)
+# ---------------------------------------------------------------------------
+
+
+def test_get_object_info_uses_local_type_when_available(monkeypatch):
+    """Cover lines 620-625: _local_entry found by SIMBAD main_id."""
+    monkeypatch.setattr(oi, '_resolve_via_simbad', lambda identifier: {
+        'id': 'NGC 224',
+        'name': 'NGC 224',
+        'type': 'Sb',  # raw SIMBAD type
+        'ra': 10.684,
+        'dec': 41.269,
+        'aliases': ['M 31'],
+    })
+    monkeypatch.setattr(oi, '_wikipedia_with_fallback', lambda terms, lang: None)
+
+    def local_lookup(kind, name):
+        if name in ('NGC 224', 'M 31'):
+            return {'preferred_name': 'NGC 224', 'object_type': 'Galaxy', 'ra_deg': 10.684, 'dec_deg': 41.269}
+        return None
+
+    monkeypatch.setattr(_st_module, 'get_lookup_entry', local_lookup)
+
+    result = get_object_info('NGC 224')
+
+    assert 'error' not in result
+    assert result['type'] == 'Galaxy'

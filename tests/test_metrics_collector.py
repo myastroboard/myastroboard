@@ -260,3 +260,164 @@ class TestGetEnvironmentProcesses:
         lower_name = "python"
         is_container_related = any(hint in lower_name for hint in CONTAINER_PROCESS_HINTS)
         assert is_container_related is False
+
+    def test_get_environment_processes_returns_list(self):
+        """Cover lines 152-204 by calling get_environment_processes with mocked psutil."""
+        import metrics_collector as mc
+
+        mock_proc = MagicMock()
+        mock_proc.info = {
+            'pid': 1234,
+            'name': 'test_process',
+            'status': 'running',
+            'username': 'testuser',
+            'create_time': 1700000000.0,
+            'memory_info': MagicMock(rss=1024 * 1024),
+            'memory_percent': 0.5,
+            'cpu_times': MagicMock(user=1.0, system=0.5),
+            'cmdline': ['test_process', '--flag'],
+        }
+
+        with patch.object(mc.psutil, 'process_iter', create=True, return_value=[mock_proc]):
+            with patch.object(mc.psutil, 'cpu_count', create=True, return_value=4):
+                result = mc.get_environment_processes()
+
+        assert isinstance(result, list)
+        assert len(result) == 1
+
+    def test_get_environment_processes_entries_have_required_keys(self):
+        """Each process entry has the expected fields."""
+        import metrics_collector as mc
+
+        mock_proc = MagicMock()
+        mock_proc.info = {
+            'pid': 42,
+            'name': 'worker',
+            'status': 'sleeping',
+            'username': 'root',
+            'create_time': 1700000000.0,
+            'memory_info': MagicMock(rss=2 * 1024 * 1024),
+            'memory_percent': 1.2,
+            'cpu_times': MagicMock(user=2.0, system=1.0),
+            'cmdline': ['worker'],
+        }
+
+        with patch.object(mc.psutil, 'process_iter', create=True, return_value=[mock_proc]):
+            with patch.object(mc.psutil, 'cpu_count', create=True, return_value=2):
+                result = mc.get_environment_processes()
+
+        assert len(result) == 1
+        proc = result[0]
+        for key in ("pid", "name", "cpu_percent", "memory_rss", "uptime_seconds"):
+            assert key in proc
+
+
+
+class TestGetDiskSpaceDetailsMocked:
+    """Cover lines 104-132 in get_disk_space_details by mocking psutil."""
+
+    def test_full_body_with_mocked_disk(self, tmp_path):
+        """psutil.disk_usage('/') may fail on Windows; mock it to cover lines 104-132."""
+        import metrics_collector as mc
+
+        mock_disk = MagicMock()
+        mock_disk.total = 100 * 1024 ** 3
+        mock_disk.used = 50 * 1024 ** 3
+        mock_disk.free = 50 * 1024 ** 3
+        mock_disk.percent = 50.0
+
+        with patch.object(mc.psutil, 'disk_usage', create=True, return_value=mock_disk):
+            result = mc.get_disk_space_details()
+
+        assert "root" in result
+        assert result["root"]["total"] == mock_disk.total
+        assert result["root"]["percent"] == 50.0
+        assert "folders" in result
+        assert "total_tracked" in result
+
+    def test_returns_error_dict_on_exception(self):
+        """Confirm the except branch returns a safe error structure."""
+        import metrics_collector as mc
+
+        with patch.object(mc.psutil, 'disk_usage', create=True, side_effect=Exception("disk error")):
+            result = mc.get_disk_space_details()
+
+        assert "root" in result
+        assert result["root"]["total"] == 0
+
+
+class TestCollectMetricsMocked:
+    """Cover lines 241-277 by mocking psutil calls that may fail on this platform."""
+
+    def _mock_psutil(self, monkeypatch):
+        mock_cpu_freq = MagicMock()
+        mock_cpu_freq.current = 2400.0
+        mock_cpu_freq.min = 800.0
+        mock_cpu_freq.max = 3600.0
+
+        mock_mem = MagicMock()
+        mock_mem.total = 8 * 1024 ** 3
+        mock_mem.available = 4 * 1024 ** 3
+        mock_mem.used = 4 * 1024 ** 3
+        mock_mem.percent = 50.0
+        mock_mem.free = 4 * 1024 ** 3
+
+        mock_swap = MagicMock()
+        mock_swap.total = 2 * 1024 ** 3
+        mock_swap.used = 0
+        mock_swap.free = 2 * 1024 ** 3
+        mock_swap.percent = 0.0
+
+        mock_disk = MagicMock()
+        mock_disk.total = 100 * 1024 ** 3
+        mock_disk.used = 50 * 1024 ** 3
+        mock_disk.free = 50 * 1024 ** 3
+        mock_disk.percent = 50.0
+
+        mock_net = MagicMock()
+        mock_net.bytes_sent = 1000
+        mock_net.bytes_recv = 2000
+        mock_net.packets_sent = 10
+        mock_net.packets_recv = 20
+
+        import metrics_collector as mc
+        # raising=False allows setting attrs that don't exist on the stub psutil
+        monkeypatch.setattr(mc.psutil, "cpu_percent", lambda interval=None: 10.0, raising=False)
+        monkeypatch.setattr(mc.psutil, "cpu_count", lambda logical=True: 4, raising=False)
+        monkeypatch.setattr(mc.psutil, "cpu_freq", lambda: mock_cpu_freq, raising=False)
+        monkeypatch.setattr(mc.psutil, "virtual_memory", lambda: mock_mem, raising=False)
+        monkeypatch.setattr(mc.psutil, "swap_memory", lambda: mock_swap, raising=False)
+        monkeypatch.setattr(mc.psutil, "disk_usage", lambda path: mock_disk, raising=False)
+        monkeypatch.setattr(mc.psutil, "pids", lambda: [1, 2, 3], raising=False)
+        monkeypatch.setattr(mc.psutil, "boot_time", lambda: 1700000000.0, raising=False)
+        monkeypatch.setattr(mc.psutil, "net_io_counters", lambda: mock_net, raising=False)
+        monkeypatch.setattr(mc, "get_environment_processes", lambda: [])
+
+    def test_collect_metrics_full_body(self, monkeypatch):
+        """Cover lines 241-277 with mocked psutil."""
+        self._mock_psutil(monkeypatch)
+        import metrics_collector as mc
+        result = mc.collect_metrics()
+        assert "cpu" in result
+        assert "memory" in result
+        assert "disk" in result
+        assert "network" in result
+        assert "platform" in result
+        assert "uptime" in result
+        assert "process" in result
+
+    def test_collect_metrics_cpu_frequency_present(self, monkeypatch):
+        self._mock_psutil(monkeypatch)
+        import metrics_collector as mc
+        result = mc.collect_metrics()
+        if "cpu" in result and result["cpu"].get("frequency"):
+            assert "current" in result["cpu"]["frequency"]
+
+    def test_collect_metrics_cpu_freq_none(self, monkeypatch):
+        """Cover the 'if cpu_freq else None' branch when cpu_freq is None."""
+        self._mock_psutil(monkeypatch)
+        import metrics_collector as mc
+        monkeypatch.setattr(mc.psutil, "cpu_freq", lambda: None, raising=False)
+        result = mc.collect_metrics()
+        if "cpu" in result:
+            assert result["cpu"]["frequency"] is None

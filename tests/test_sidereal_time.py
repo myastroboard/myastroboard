@@ -157,3 +157,79 @@ class TestGetHourlySiderealTimes:
         result = svc.get_hourly_sidereal_times(date(2026, 6, 1), num_hours=3)
         for i, entry in enumerate(result):
             assert entry.get("hour") == i
+
+
+class TestGetBestObservationTimes:
+    """Tests for get_best_observation_times — covers lines 253-322."""
+
+    def test_returns_dict(self):
+        svc = SiderealTimeService(45.0, -73.5, timezone="America/Montreal")
+        result = svc.get_best_observation_times(6.0, 45.0, date(2026, 6, 15))
+        assert isinstance(result, dict)
+
+    def test_has_required_keys(self):
+        svc = SiderealTimeService(45.0, -73.5, timezone="America/Montreal")
+        result = svc.get_best_observation_times(6.0, 45.0, date(2026, 6, 15))
+        if result:
+            assert "best_time_utc" in result
+            assert "best_altitude_degrees" in result
+            assert "visible" in result
+            assert "target_ra_hours" in result
+            assert "target_dec_degrees" in result
+
+    def test_best_altitude_is_float(self):
+        svc = SiderealTimeService(45.0, -73.5)
+        result = svc.get_best_observation_times(12.0, 30.0, date(2026, 6, 15))
+        if result:
+            assert isinstance(result["best_altitude_degrees"], float)
+
+    def test_observation_date_preserved(self):
+        svc = SiderealTimeService(45.0, -73.5)
+        target = date(2026, 7, 4)
+        result = svc.get_best_observation_times(6.0, 20.0, target)
+        if result:
+            assert result["observation_date"] == target.isoformat()
+
+    def test_min_altitude_used_for_visibility(self):
+        svc = SiderealTimeService(45.0, -73.5)
+        result = svc.get_best_observation_times(6.0, 45.0, date(2026, 6, 15), min_altitude=80.0)
+        if result:
+            assert result["min_altitude_requirement"] == 80.0
+
+    def test_ra_and_dec_preserved_in_result(self):
+        svc = SiderealTimeService(45.0, -73.5)
+        result = svc.get_best_observation_times(8.0, 35.0, date(2026, 6, 15))
+        if result:
+            assert result["target_ra_hours"] == pytest.approx(8.0)
+            assert result["target_dec_degrees"] == pytest.approx(35.0)
+
+    def test_best_altitude_within_valid_range(self):
+        svc = SiderealTimeService(45.0, -73.5)
+        result = svc.get_best_observation_times(6.0, 45.0, date(2026, 6, 15))
+        if result:
+            alt = result["best_altitude_degrees"]
+            assert -90.0 <= alt <= 90.0
+
+    def test_rise_and_set_times_are_isoformat_or_none(self):
+        svc = SiderealTimeService(45.0, -73.5)
+        result = svc.get_best_observation_times(6.0, 45.0, date(2026, 6, 15))
+        if result:
+            if result.get("rise_time_utc"):
+                assert "T" in result["rise_time_utc"]
+            if result.get("set_time_utc"):
+                assert "T" in result["set_time_utc"]
+
+    def test_observation_window_none_when_never_rises(self):
+        """From high northern latitude, a far-south object may never rise."""
+        svc = SiderealTimeService(80.0, 0.0)
+        result = svc.get_best_observation_times(12.0, -89.0, date(2026, 6, 15))
+        if result:
+            # Object at dec -89 is near south pole — should not be visible from lat 80N
+            assert result["visible"] is False
+
+    def test_equatorial_observer_broad_visibility(self):
+        """From equator, most objects should reach a reasonable altitude."""
+        svc = SiderealTimeService(0.0, 0.0)
+        result = svc.get_best_observation_times(0.0, 0.0, date(2026, 6, 15))
+        if result:
+            assert result["best_altitude_degrees"] > 0
