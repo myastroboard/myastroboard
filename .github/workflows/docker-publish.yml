@@ -8,7 +8,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  DOCKERHUB_IMAGE: worldofgz/myastroboard
+  DOCKERHUB_IMAGE: myastroboard/myastroboard
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
@@ -74,11 +74,11 @@ jobs:
           labels: |
             org.opencontainers.image.title=MyAstroBoard
             org.opencontainers.image.description=Self-hosted astronomy dashboard for observation planning and astrophotography
-            org.opencontainers.image.url=https://github.com/WorldOfGZ/myastroboard
-            org.opencontainers.image.source=https://github.com/WorldOfGZ/myastroboard
+            org.opencontainers.image.url=https://github.com/myastroboard/myastroboard
+            org.opencontainers.image.source=https://github.com/myastroboard/myastroboard
             org.opencontainers.image.licenses=AGPL-3.0
-            io.artifacthub.package.readme-url=https://raw.githubusercontent.com/WorldOfGZ/myastroboard/main/DOCKER_HUB.md
-            io.artifacthub.package.logo-url=https://raw.githubusercontent.com/WorldOfGZ/myastroboard/main/static/ico/ios/512.png
+            io.artifacthub.package.readme-url=https://raw.githubusercontent.com/myastroboard/myastroboard/main/DOCKER_HUB.md
+            io.artifacthub.package.logo-url=https://raw.githubusercontent.com/myastroboard/myastroboard/main/static/ico/ios/512.png
             io.artifacthub.package.keywords=astronomy,astrophotography,self-hosted,dashboard,skytonight
             io.artifacthub.package.maintainers=[{"name":"WorldOfGZ","email":"myastroboard@outlook.com"}]
             io.artifacthub.package.license=AGPL-3.0
@@ -169,14 +169,14 @@ jobs:
           ANNOTATIONS=(
             --annotation "index:org.opencontainers.image.title=MyAstroBoard"
             --annotation "index:org.opencontainers.image.description=$DESC"
-            --annotation "index:org.opencontainers.image.url=https://github.com/WorldOfGZ/myastroboard"
-            --annotation "index:org.opencontainers.image.source=https://github.com/WorldOfGZ/myastroboard"
+            --annotation "index:org.opencontainers.image.url=https://github.com/myastroboard/myastroboard"
+            --annotation "index:org.opencontainers.image.source=https://github.com/myastroboard/myastroboard"
             --annotation "index:org.opencontainers.image.licenses=AGPL-3.0"
             --annotation "index:org.opencontainers.image.version=$VERSION"
             --annotation "manifest-descriptor:org.opencontainers.image.title=MyAstroBoard"
             --annotation "manifest-descriptor:org.opencontainers.image.description=$DESC"
-            --annotation "manifest-descriptor:org.opencontainers.image.url=https://github.com/WorldOfGZ/myastroboard"
-            --annotation "manifest-descriptor:org.opencontainers.image.source=https://github.com/WorldOfGZ/myastroboard"
+            --annotation "manifest-descriptor:org.opencontainers.image.url=https://github.com/myastroboard/myastroboard"
+            --annotation "manifest-descriptor:org.opencontainers.image.source=https://github.com/myastroboard/myastroboard"
             --annotation "manifest-descriptor:org.opencontainers.image.licenses=AGPL-3.0"
             --annotation "manifest-descriptor:org.opencontainers.image.version=$VERSION"
           )
@@ -247,8 +247,8 @@ jobs:
           echo "" >> release_notes.md
           echo "### Docker Hub" >> release_notes.md
           echo '```bash' >> release_notes.md
-          echo "docker pull worldofgz/myastroboard:${{ steps.version.outputs.VERSION }}" >> release_notes.md
-          echo "docker pull worldofgz/myastroboard:latest" >> release_notes.md
+          echo "docker pull myastroboard/myastroboard:${{ steps.version.outputs.VERSION }}" >> release_notes.md
+          echo "docker pull myastroboard/myastroboard:latest" >> release_notes.md
           echo '```' >> release_notes.md
           echo "" >> release_notes.md
           echo "### Supported platforms" >> release_notes.md

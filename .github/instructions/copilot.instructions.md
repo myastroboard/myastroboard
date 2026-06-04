@@ -1236,8 +1236,8 @@ The background cache is **selective-refresh**: the scheduler polls every 25 min 
 
 ## Contact & Support
 
-- **GitHub Issues**: https://github.com/WorldOfGZ/myastroboard/issues
-- **Documentation**: https://github.com/WorldOfGZ/myastroboard/tree/main/docs
+- **GitHub Issues**: https://github.com/myastroboard/myastroboard/issues
+- **Documentation**: https://github.com/myastroboard/myastroboard/tree/main/docs
 
 ## License
 

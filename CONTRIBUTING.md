@@ -38,7 +38,7 @@ Before you begin, make sure you have:
 
 2. **Add Upstream Remote**
    ```bash
-   git remote add upstream https://github.com/WorldOfGZ/myastroboard.git
+   git remote add upstream https://github.com/myastroboard/myastroboard.git
    ```
 
 3. **Set Up Development Environment**

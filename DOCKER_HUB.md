@@ -4,7 +4,7 @@
 
 MyAstroBoard combines weather analysis, automated sky calculations, and planning tools into a single Docker-first application - designed for amateur astronomers who want full control over their data.
 
-![Demo MyAstroBoard](https://raw.githubusercontent.com/WorldOfGZ/myastroboard/main/docs/img/overview.gif)
+![Demo MyAstroBoard](https://raw.githubusercontent.com/myastroboard/myastroboard/main/docs/img/overview.gif)
 
 ---
 
@@ -24,7 +24,7 @@ MyAstroBoard combines weather analysis, automated sky calculations, and planning
 ## 🚀 Quick Start
 
 ```bash
-docker pull worldofgz/myastroboard:latest
+docker pull myastroboard/myastroboard:latest
 ```
 
 Full setup with Docker Compose:
@@ -32,7 +32,7 @@ Full setup with Docker Compose:
 ```yaml
 services:
   myastroboard:
-    image: worldofgz/myastroboard:latest
+    image: myastroboard/myastroboard:latest
     ports:
       - "5000:5000"
     volumes:
@@ -40,7 +40,7 @@ services:
     restart: unless-stopped
 ```
 
-For complete installation instructions, see the [Installation Guide](https://github.com/WorldOfGZ/myastroboard/blob/main/docs/1.INSTALLATION.md).
+For complete installation instructions, see the [Installation Guide](https://github.com/myastroboard/myastroboard/blob/main/docs/1.INSTALLATION.md).
 
 ---
 
@@ -73,20 +73,20 @@ For complete installation instructions, see the [Installation Guide](https://git
 
 ## 📚 Documentation
 
-- [Installation Guide](https://github.com/WorldOfGZ/myastroboard/blob/main/docs/1.INSTALLATION.md)
-- [Quick Start](https://github.com/WorldOfGZ/myastroboard/blob/main/docs/2.QUICKSTART.md)
-- [Update Guide](https://github.com/WorldOfGZ/myastroboard/blob/main/docs/3.UPDATE.md)
-- [Reverse Proxy Setup](https://github.com/WorldOfGZ/myastroboard/blob/main/docs/6.REVERSE_PROXY.md)
-- [API Endpoints](https://github.com/WorldOfGZ/myastroboard/blob/main/docs/API_ENDPOINTS.md)
-- [Visual Tour](https://github.com/WorldOfGZ/myastroboard/blob/main/docs/VISUAL_TOUR.md)
+- [Installation Guide](https://github.com/myastroboard/myastroboard/blob/main/docs/1.INSTALLATION.md)
+- [Quick Start](https://github.com/myastroboard/myastroboard/blob/main/docs/2.QUICKSTART.md)
+- [Update Guide](https://github.com/myastroboard/myastroboard/blob/main/docs/3.UPDATE.md)
+- [Reverse Proxy Setup](https://github.com/myastroboard/myastroboard/blob/main/docs/6.REVERSE_PROXY.md)
+- [API Endpoints](https://github.com/myastroboard/myastroboard/blob/main/docs/API_ENDPOINTS.md)
+- [Visual Tour](https://github.com/myastroboard/myastroboard/blob/main/docs/VISUAL_TOUR.md)
 
 ---
 
 ## 🐛 Support
 
-Issues and feature requests: [GitHub Issues](https://github.com/WorldOfGZ/myastroboard/issues)
+Issues and feature requests: [GitHub Issues](https://github.com/myastroboard/myastroboard/issues)
 
 ## 📄 License
 
-Licensed under [AGPL-3.0](https://github.com/WorldOfGZ/myastroboard/blob/main/LICENSE).
-Source code available at: [github.com/WorldOfGZ/myastroboard](https://github.com/WorldOfGZ/myastroboard)
+Licensed under [AGPL-3.0](https://github.com/myastroboard/myastroboard/blob/main/LICENSE).
+Source code available at: [github.com/myastroboard/myastroboard](https://github.com/myastroboard/myastroboard)

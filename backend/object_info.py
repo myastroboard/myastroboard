@@ -408,7 +408,7 @@ def _get_wikipedia_summary(search_term: str, lang: str = 'en') -> Optional[Dict[
             timeout=REQUEST_TIMEOUT,
             headers={
                 'Accept': 'application/json',
-                'User-Agent': 'MyAstroBoard/1.0 (https://github.com/WorldOfGZ/myastroboard)',
+                'User-Agent': 'MyAstroBoard/1.0 (https://github.com/myastroboard/myastroboard)',
             },
         )
         if resp.status_code in (404, 403):

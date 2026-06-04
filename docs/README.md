@@ -35,8 +35,8 @@ Welcome to the comprehensive documentation for MyAstroBoard, the integrated astr
 - **Installation**: `docker compose up -d`
 - **Access Dashboard**: http://localhost:5000
 - **Update**: `docker compose pull && docker compose up -d`
-- **GitHub Repository**: https://github.com/WorldOfGZ/myastroboard
-- **Report Issues**: https://github.com/WorldOfGZ/myastroboard/issues
+- **GitHub Repository**: https://github.com/myastroboard/myastroboard
+- **Report Issues**: https://github.com/myastroboard/myastroboard/issues
 
 ## 📄 License
 
@@ -44,5 +44,5 @@ MyAstroBoard is open source software licensed under the AGPL-3.0 License.
 Copyright (C) 2025-2026 WorldOfGZ and contributors.
 
 In accordance with AGPL-3.0 requirements for network use, the corresponding source code for deployed versions is available in this repository:
-https://github.com/WorldOfGZ/myastroboard
+https://github.com/myastroboard/myastroboard
 

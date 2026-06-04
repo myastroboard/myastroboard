@@ -13,7 +13,7 @@ from txtconf_loader import get_repo_version
 
 logger = get_logger(__name__)
 
-GITHUB_API_RELEASES_URL = "https://api.github.com/repos/WorldOfGZ/myastroboard/releases/latest"
+GITHUB_API_RELEASES_URL = "https://api.github.com/repos/myastroboard/myastroboard/releases/latest"
 REQUEST_TIMEOUT = 10  # seconds
 
 

@@ -245,7 +245,7 @@ Example security scan:
 ```bash
 # Scan Docker image for vulnerabilities
 docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-  aquasec/trivy image worldofgz/myastroboard:latest
+  aquasec/trivy image myastroboard/myastroboard:latest
 
 # Scan Python code for security issues
 bandit -r backend/

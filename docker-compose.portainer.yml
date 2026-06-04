@@ -1,6 +1,6 @@
 services:
   myastroboard:
-    image: worldofgz/myastroboard:latest
+    image: myastroboard/myastroboard:latest
     pull_policy: always
     container_name: myastroboard
 
