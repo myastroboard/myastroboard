@@ -123,7 +123,7 @@ def check_for_updates():
         return result
     except requests.RequestException as e:
         logger.error(f"Error checking for updates from GitHub: {e}")
-        result = {"current_version": get_repo_version().strip(), "update_available": False, "error": str(e)}
+        result = {"current_version": get_repo_version().strip(), "update_available": False, "error": "Request failed"}
         _save_version_result(result)
         return result
     except Exception as e:
