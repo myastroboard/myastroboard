@@ -72,7 +72,7 @@ All constraints are always active (no on/off toggle).
 | `altitude_constraint_min` | 30° | Minimum altitude above horizon |
 | `altitude_constraint_max` | 80° | Maximum altitude (avoids zenith blind spot) |
 | `airmass_constraint` | 2.0 | ≈ 30°+ elevation |
-| `size_constraint_min` | 10 arcmin | Minimum angular size (DSOs only) |
+| `size_constraint_min` | 0 arcmin | Minimum angular size (DSOs only); 0 = no lower limit |
 | `size_constraint_max` | 300 arcmin | Maximum angular size (DSOs only) |
 | `moon_separation_min` | 45° | Minimum angular distance from Moon |
 | `moon_separation_use_illumination` | true | When enabled, overrides `moon_separation_min` with Moon illumination % → degrees (1 % = 1°) |
