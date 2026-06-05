@@ -1,0 +1,1 @@
+- Notification for aurora with better localization and cooldown.

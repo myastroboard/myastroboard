@@ -127,7 +127,13 @@ self.addEventListener('push', (event) => {
         renotify: true,
     };
 
-    event.waitUntil(self.registration.showNotification(title, options));
+    // Explicitly close existing notifications with the same tag before showing the new one.
+    // iOS Web Push does not reliably replace notifications via tag alone.
+    event.waitUntil(
+        self.registration.getNotifications({ tag: options.tag })
+            .then(existing => existing.forEach(n => n.close()))
+            .then(() => self.registration.showNotification(title, options))
+    );
 });
 
 self.addEventListener('notificationclick', (event) => {

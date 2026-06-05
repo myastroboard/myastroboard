@@ -734,7 +734,7 @@
     "notifications_n4": "Éclipse lunaire",
     "notifications_n5": "Éclipse solaire",
     "notifications_n6": "Début de la nuit astronomique",
-    "notifications_n7": "Alerte aurora (indice Kp)",
+    "notifications_n7": "Alerte aurore (indice Kp)",
     "push_n1_title": "Plan My Night",
     "push_n1_body": "Votre session commence dans {minutes} min",
     "push_n2_title": "Prochain objet",
@@ -750,6 +750,13 @@
     "push_n6_body": "La nuit commence à {time} (dans {minutes} min) - préparez-vous",
     "push_n7_title": "Alerte aurore",
     "push_n7_body": "Kp {kp} détecté - {visibility}",
+    "push_kp_visibility_none": "Aucune",
+    "push_kp_visibility_very_low": "Très faible",
+    "push_kp_visibility_low": "Faible",
+    "push_kp_visibility_moderate": "Modérée",
+    "push_kp_visibility_good": "Bonne",
+    "push_kp_visibility_excellent": "Excellente",
+    "push_kp_visibility_severe_storm": "Tempête sévère",
     "notifications_minutes": "min",
     "notifications_push_active": "Push en arrière-plan actif",
     "notifications_push_inapp_only": "Dans l'application uniquement - l'onglet doit être ouvert",
@@ -1880,6 +1887,6 @@
     "n6_body": "La nuit commence dans {minutes} min - preparez-vous",
     "n6_title": "Nuit astronomique",
     "n7_body": "Kp {kp} détecté - {visibility}",
-    "n7_title": "Alerte aurora"
+    "n7_title": "Alerte aurore"
   }
 }

@@ -167,11 +167,14 @@ def _check_n7_aurora(user: Any, cache_data: Optional[dict]) -> None:
     if kp < threshold:
         logger.debug(f"N7 skip {user.username}: kp={kp:.1f} below threshold={threshold}")
         return
-    if _was_recently_notified(user.user_id, 'N7', 60 * 60):
+    if _was_recently_notified(user.user_id, 'N7', 4 * 60 * 60):
         logger.debug(f"N7 skip {user.username}: cooldown active")
         return
 
-    visibility = cache_data.get('current', {}).get('visibility_level', '')
+    visibility_raw = cache_data.get('current', {}).get('visibility_level', '')
+    vis_key = f'push_kp_visibility_{visibility_raw.lower().replace(" ", "_")}'
+    translated_vis = _t(user, vis_key)
+    visibility = visibility_raw if translated_vis.startswith('settings.') else translated_vis
     _send(
         user,
         'N7',

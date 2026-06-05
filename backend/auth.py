@@ -92,7 +92,7 @@ DEFAULT_USER_PREFERENCES = {
             'N4': {'enabled': True, 'lead_minutes': 30},
             'N5': {'enabled': True, 'lead_minutes': 30},
             'N6': {'enabled': True, 'lead_minutes': 20},
-            'N7': {'enabled': True, 'kp_threshold': 5},
+            'N7': {'enabled': True, 'kp_threshold': 6},
         },
     },
 }

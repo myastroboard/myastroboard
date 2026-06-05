@@ -27,7 +27,7 @@ const _NOTIF_DEFAULTS = Object.freeze({
         N4: Object.freeze({ enabled: true, lead_minutes: 30 }),
         N5: Object.freeze({ enabled: true, lead_minutes: 30 }),
         N6: Object.freeze({ enabled: true, lead_minutes: 20 }),
-        N7: Object.freeze({ enabled: true, kp_threshold: 5  }),
+        N7: Object.freeze({ enabled: true, kp_threshold: 6  }),
     }),
 });
 
@@ -121,7 +121,7 @@ class NotificationManager {
     }
 
     getKpThreshold() {
-        return this.getPrefs().triggers?.N7?.kp_threshold ?? 5;
+        return this.getPrefs().triggers?.N7?.kp_threshold ?? 6;
     }
 
     // ── Deduplication (in-memory, resets on page reload) ─────────────────

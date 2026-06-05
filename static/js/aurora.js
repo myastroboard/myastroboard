@@ -355,10 +355,13 @@ function _checkAuroraN7(data) {
     if (typeof kp !== 'number') return;
     if (kp < notificationManager.getKpThreshold()) return;
 
-    const COOLDOWN_MS = 60 * 60 * 1000; // 1 hour - avoids re-notifying on every tab open
+    const COOLDOWN_MS = 4 * 60 * 60 * 1000; // 4 hours - avoids re-notifying during sustained events
     if (notificationManager.wasRecentlyNotified('N7', COOLDOWN_MS)) return;
 
-    const visibility = data?.current?.visibility_level ?? '';
+    const visibilityRaw = data?.current?.visibility_level ?? '';
+    const visKey = `settings.push_kp_visibility_${visibilityRaw.toLowerCase().replace(/ /g, '_')}`;
+    const visTranslated = i18n.t(visKey);
+    const visibility = visTranslated === visKey ? visibilityRaw : visTranslated;
     const title = i18n.t('notifications.n7_title');
     const body  = i18n.t('notifications.n7_body', { kp: kp.toFixed(1), visibility });
     notificationManager.notify('N7', title, body, { url: '#forecast-astro/aurora' });
