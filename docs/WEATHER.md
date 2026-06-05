@@ -89,7 +89,7 @@ The seeing estimate is derived from wind speed at multiple altitudes and atmosph
 
 Transparency is estimated from cloud cover, humidity, and visibility:
 
-$$\text{mag\_limit} = \text{mag\_limit\_zenith} - \Delta(\text{cloud},\, \text{humidity},\, \text{visibility})$$
+$$m_\text{lim} = m_{\text{lim,zenith}} - \Delta(\text{cloud},\, \text{humidity},\, \text{visibility})$$
 
 | mag/arcsec² | Sky quality |
 |-------------|-------------|

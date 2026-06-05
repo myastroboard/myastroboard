@@ -113,17 +113,17 @@ A combination is flagged **Shared** only when **every component** in it is indiv
 
 #### Image scale (arcsec/pixel)
 
-$$\text{image\_scale} = \frac{206.265 \times \text{pixel\_size}\ [\mu m]}{\text{focal\_length}\ [mm]} \quad [\text{arcsec/px}]$$
+$$\text{image scale} = \frac{206.265 \times \text{pixel size}\ [\mu m]}{\text{focal length}\ [mm]} \quad [\text{arcsec/px}]$$
 
 The constant 206 265 arcsec ≈ 1 radian.
 
 #### Field of view (degrees)
 
-$$\text{FOV}_\text{h} = \frac{57.3 \times \text{sensor\_width}\ [mm]}{\text{focal\_length}\ [mm]}$$
+$$\text{FOV}_\text{h} = \frac{57.3 \times \text{sensor width}\ [mm]}{\text{focal length}\ [mm]}$$
 
-$$\text{FOV}_\text{v} = \frac{57.3 \times \text{sensor\_height}\ [mm]}{\text{focal\_length}\ [mm]}$$
+$$\text{FOV}_\text{v} = \frac{57.3 \times \text{sensor height}\ [mm]}{\text{focal length}\ [mm]}$$
 
-$$\text{FOV}_\text{diag} = \frac{57.3 \times \sqrt{\text{width}^2 + \text{height}^2}}{\text{focal\_length}}$$
+$$\text{FOV}_\text{diag} = \frac{57.3 \times \sqrt{\text{width}^2 + \text{height}^2}}{\text{focal length}}$$
 
 The constant 57.3° ≈ 1 radian (small-angle approximation valid for typical FOV values).
 
@@ -131,8 +131,8 @@ The constant 57.3° ≈ 1 radian (small-angle approximation valid for typical FO
 
 The optimal sampling range is **2–3 pixels per FWHM** of the seeing disk:
 
-$$\text{optimal\_min} = \frac{\text{seeing}}{3}\quad[\text{arcsec/px}]$$
-$$\text{optimal\_max} = \frac{\text{seeing}}{2}\quad[\text{arcsec/px}]$$
+$$\text{optimal min} = \frac{\text{seeing}}{3}\quad[\text{arcsec/px}]$$
+$$\text{optimal max} = \frac{\text{seeing}}{2}\quad[\text{arcsec/px}]$$
 
 | Result | Condition |
 |--------|-----------|

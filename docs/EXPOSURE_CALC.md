@@ -30,18 +30,18 @@ The Exposure Calculator is a tool inside the **Equipment** tab that helps astrop
 
 ### Plate scale
 
-$$\text{plate\_scale} = \frac{206.265 \times \text{pixel\_size}\ [\mu m]}{\text{focal\_length}\ [mm]} \quad [\text{arcsec/px}]$$
+$$\text{plate scale} = \frac{206.265 \times \text{pixel size}\ [\mu m]}{\text{focal length}\ [mm]} \quad [\text{arcsec/px}]$$
 
 ### Sky background rate
 
 The sky photon rate per pixel per second is computed from the observed sky surface brightness (SQM value derived from the Bortle class), the telescope aperture, and the plate scale:
 
-$$B_\text{sky} = F_0 \times 10^{-\text{SQM}/2.5} \times \text{QE} \times \frac{\pi}{4} \times D_m^2 \times \text{plate\_scale}^2$$
+$$B_\text{sky} = F_0 \times 10^{-\text{SQM}/2.5} \times \text{QE} \times \frac{\pi}{4} \times D_m^2 \times \text{plate scale}^2$$
 
 Where:
 - $F_0 = 9 \times 10^9$ photons/m²/s/arcsec² - Vega zero-point flux, V-band
 - $D_m$ - aperture in metres
-- $\text{plate\_scale}$ - in arcsec/px (so $\text{plate\_scale}^2$ is arcsec²/px)
+- $\text{plate scale}$ - in arcsec/px (so $\text{plate scale}^2$ is arcsec²/px)
 
 ### Bortle → SQM mapping
 
@@ -67,7 +67,7 @@ This is the standard "sky-limited" criterion used in amateur astrophotography. E
 
 ### Number of subs
 
-$$n_\text{subs} = \text{round}\!\left(\frac{\text{total\_integration}}{t_\text{sub}}\right)$$
+$$n_\text{subs} = \text{round}\!\left(\frac{\text{total integration}}{t_\text{sub}}\right)$$
 
 ## Calibration
 
