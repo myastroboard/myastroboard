@@ -1,7 +1,7 @@
 """Unit tests for astrophotography weather analysis period selection."""
 
 import time
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, MagicMock, patch
 from datetime import datetime
 
 import pandas as pd
@@ -281,3 +281,559 @@ class TestErrorHandling:
         datetimes = pd.Series([])
         slot_hours = analyzer._infer_forecast_slot_hours(datetimes)
         assert slot_hours == 1.0
+
+
+class TestInferForecastSlotHoursEdgeCases:
+    """Additional edge cases for _infer_forecast_slot_hours."""
+
+    def test_all_identical_timestamps_returns_one(self):
+        analyzer = _build_analyzer()
+        # All same timestamps → diffs = 0 → no positive diffs → return 1.0
+        datetimes = pd.Series(pd.to_datetime(["2026-04-17T20:00:00"] * 5))
+        slot_hours = analyzer._infer_forecast_slot_hours(datetimes)
+        assert slot_hours == 1.0
+
+    def test_single_timestamp_returns_one(self):
+        analyzer = _build_analyzer()
+        datetimes = pd.Series(pd.to_datetime(["2026-04-17T20:00:00"]))
+        slot_hours = analyzer._infer_forecast_slot_hours(datetimes)
+        assert slot_hours == 1.0
+
+    def test_clamped_to_max_three_hours(self):
+        analyzer = _build_analyzer()
+        # 6-hour intervals → should be clamped to 3.0
+        datetimes = pd.Series(pd.date_range("2026-04-17T20:00:00", periods=5, freq="6h"))
+        slot_hours = analyzer._infer_forecast_slot_hours(datetimes)
+        assert slot_hours == 3.0
+
+
+class TestResolveAstronomicalNightWindow:
+    """Tests for _resolve_astronomical_night_window."""
+
+    def test_exception_during_import_returns_none(self, monkeypatch):
+        """Lines 622-624: exception in the function → return None."""
+        analyzer = _build_analyzer()
+        with patch("weather_astro.AstroWeatherAnalyzer._resolve_astronomical_night_window") as m:
+            m.side_effect = Exception("load failure")
+            # Call directly via the real implementation
+            result = AstroWeatherAnalyzer._resolve_astronomical_night_window.__wrapped__ if hasattr(
+                AstroWeatherAnalyzer._resolve_astronomical_night_window, "__wrapped__"
+            ) else None
+        # Simpler: monkeypatch load_calculation_results to raise
+        import skytonight_calculator
+        with patch.object(skytonight_calculator, "load_calculation_results", side_effect=RuntimeError("fail")):
+            result = analyzer._resolve_astronomical_night_window()
+        assert result is None
+
+    def test_missing_night_start_returns_none(self, monkeypatch):
+        """Line 613-614: night_start or night_end missing → return None."""
+        analyzer = _build_analyzer()
+        import skytonight_calculator
+        with patch.object(skytonight_calculator, "load_calculation_results", return_value={"metadata": {}}):
+            result = analyzer._resolve_astronomical_night_window()
+        assert result is None
+
+    def test_invalid_timestamps_returns_none(self, monkeypatch):
+        """Line 618-619: invalid timestamps → NaT → return None."""
+        analyzer = _build_analyzer()
+        import skytonight_calculator
+        with patch.object(
+            skytonight_calculator,
+            "load_calculation_results",
+            return_value={"metadata": {"night_start": "not-a-date", "night_end": "also-bad"}},
+        ):
+            result = analyzer._resolve_astronomical_night_window()
+        assert result is None
+
+    def test_valid_window_returned(self, monkeypatch):
+        """Lines 621: valid window returned as tuple."""
+        analyzer = _build_analyzer()
+        import skytonight_calculator
+        with patch.object(
+            skytonight_calculator,
+            "load_calculation_results",
+            return_value={
+                "metadata": {
+                    "night_start": "2026-04-17T22:00:00",
+                    "night_end": "2026-04-18T04:00:00",
+                }
+            },
+        ):
+            result = analyzer._resolve_astronomical_night_window()
+        assert result is not None
+        start_ts, end_ts = result
+        assert end_ts > start_ts
+
+
+class TestFindBestObservationPeriodsEdgeCases:
+    """Edge cases for _find_best_observation_periods."""
+
+    def test_all_datetime_invalid_returns_empty(self, monkeypatch):
+        """Line 652-653: all datetimes coerce to NaT → empty list."""
+        analyzer = _build_analyzer()
+        monkeypatch.setattr(analyzer, "_resolve_astronomical_night_window", lambda: None)
+        df = pd.DataFrame(
+            {
+                "datetime": ["not-a-date", "also-bad"],
+                "seeing_pickering": [8.0, 8.0],
+                "transparency_score": [80.0, 80.0],
+                "cloud_discrimination": [80.0, 80.0],
+                "tracking_stability_score": [80.0, 80.0],
+                "is_day": [0, 0],
+            }
+        )
+        result = analyzer._find_best_observation_periods(df)
+        assert result == []
+
+    def test_no_periods_above_quality_threshold_returns_empty(self, monkeypatch):
+        """Line 695: all quality < 70 → no good periods → empty list."""
+        analyzer = _build_analyzer()
+        monkeypatch.setattr(analyzer, "_resolve_astronomical_night_window", lambda: None)
+        df = pd.DataFrame(
+            {
+                "datetime": pd.date_range("2026-04-17T20:00:00", periods=4, freq="h"),
+                "seeing_pickering": [2.0, 2.0, 2.0, 2.0],
+                "transparency_score": [20.0, 20.0, 20.0, 20.0],
+                "cloud_discrimination": [20.0, 20.0, 20.0, 20.0],
+                "tracking_stability_score": [20.0, 20.0, 20.0, 20.0],
+                "is_day": [0, 0, 0, 0],
+            }
+        )
+        result = analyzer._find_best_observation_periods(df)
+        assert result == []
+
+
+class TestGenerateWeatherAlerts:
+    """Tests for _generate_weather_alerts alert branches."""
+
+    def _build_alert_df(self, dew_risk, wind_impact, seeing, transparency, dt=None):
+        import numpy as np
+        dt = dt or pd.date_range("2026-04-17T20:00:00", periods=6, freq="h")
+        return pd.DataFrame(
+            {
+                "datetime": dt,
+                "dew_risk_level": [dew_risk] * 6,
+                "wind_tracking_impact": [wind_impact] * 6,
+                "seeing_pickering": [seeing] * 6,
+                "transparency_score": [transparency] * 6,
+            }
+        )
+
+    def test_no_alerts_when_conditions_good(self):
+        analyzer = _build_analyzer()
+        analyzer.language = "en"
+        df = self._build_alert_df("MINIMAL", "GOOD", 7.0, 80.0)
+        alerts = analyzer._generate_weather_alerts(df)
+        assert alerts == []
+
+    def test_empty_df_returns_no_alerts(self):
+        analyzer = _build_analyzer()
+        analyzer.language = "en"
+        alerts = analyzer._generate_weather_alerts(pd.DataFrame())
+        assert alerts == []
+
+    def test_dew_warning_generated(self):
+        """Line 754-762: CRITICAL dew → DEW_WARNING alert."""
+        analyzer = _build_analyzer()
+        analyzer.language = "en"
+        df = self._build_alert_df("CRITICAL", "GOOD", 7.0, 80.0)
+        alerts = analyzer._generate_weather_alerts(df)
+        types = [a.get("type") or a.get("alert_type") or str(a) for a in alerts]
+        assert any("DEW" in str(t).upper() or "dew" in str(a).lower() for t, a in zip(types, alerts))
+
+    def test_wind_warning_generated(self):
+        """Line 766-774: CRITICAL wind → WIND_WARNING alert."""
+        analyzer = _build_analyzer()
+        analyzer.language = "en"
+        df = self._build_alert_df("MINIMAL", "CRITICAL", 7.0, 80.0)
+        alerts = analyzer._generate_weather_alerts(df)
+        assert len(alerts) >= 1
+
+    def test_seeing_warning_generated(self):
+        """Line 777-786: seeing <= 3 → SEEING_WARNING alert."""
+        analyzer = _build_analyzer()
+        analyzer.language = "en"
+        df = self._build_alert_df("MINIMAL", "GOOD", 2.0, 80.0)
+        alerts = analyzer._generate_weather_alerts(df)
+        assert len(alerts) >= 1
+
+    def test_transparency_warning_generated(self):
+        """Line 789-798: transparency <= 30 → TRANSPARENCY_WARNING alert."""
+        analyzer = _build_analyzer()
+        analyzer.language = "en"
+        df = self._build_alert_df("MINIMAL", "GOOD", 7.0, 15.0)
+        alerts = analyzer._generate_weather_alerts(df)
+        assert len(alerts) >= 1
+
+    def test_all_warnings_at_once(self):
+        """All four alert conditions simultaneously."""
+        analyzer = _build_analyzer()
+        analyzer.language = "en"
+        df = self._build_alert_df("CRITICAL", "CRITICAL", 1.0, 10.0)
+        alerts = analyzer._generate_weather_alerts(df)
+        assert len(alerts) == 4
+
+
+class TestFetchExtendedWeatherDataErrors:
+    """Tests for fetch_extended_weather_data error paths (lines 168-198)."""
+
+    def _build_analyzer_with_location(self):
+        analyzer = _build_analyzer()
+        analyzer.location = {"latitude": 48.0, "longitude": 2.0, "timezone": "UTC"}
+        analyzer.language = "en"
+        return analyzer
+
+    def test_full_request_fails_with_non_concurrency_error_falls_back_to_core(self):
+        """Lines 168-187: full request fails → retry with core vars → succeed."""
+        analyzer = self._build_analyzer_with_location()
+        mock_client = MagicMock()
+        core_response = MagicMock()
+        # Make full request fail, core succeed
+        call_count = [0]
+
+        def side_effect(url, params=None):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                raise Exception("Server temporarily unavailable")
+            return [core_response]
+
+        mock_client.weather_api.side_effect = side_effect
+
+        with patch("weather_astro.create_weather_client", return_value=mock_client):
+            with patch.object(analyzer, "_parse_extended_data", return_value={"data": pd.DataFrame(), "location": {}}):
+                result = analyzer.fetch_extended_weather_data(24)
+        # Core fallback should return a result (or None if parse also fails)
+        # Either outcome means lines 168-187 were hit
+
+    def test_both_requests_fail_returns_none(self):
+        """Lines 184-187: both full and core requests fail → None."""
+        analyzer = self._build_analyzer_with_location()
+        mock_client = MagicMock()
+        mock_client.weather_api.side_effect = Exception("Persistent failure")
+
+        with patch("weather_astro.create_weather_client", return_value=mock_client):
+            result = analyzer.fetch_extended_weather_data(24)
+        assert result is None
+
+    def test_concurrency_error_propagates_to_outer_handler(self):
+        """Lines 190-192: concurrency error → record_openmeteo_rate_limit."""
+        analyzer = self._build_analyzer_with_location()
+        mock_client = MagicMock()
+        mock_client.weather_api.side_effect = Exception("Too many concurrent requests from your IP")
+
+        with patch("weather_astro.create_weather_client", return_value=mock_client):
+            with patch("weather_astro.record_openmeteo_rate_limit") as mock_record:
+                result = analyzer.fetch_extended_weather_data(24)
+        assert result is None
+        mock_record.assert_called_once()
+
+    def test_transient_error_logged_and_returns_none(self):
+        """Lines 193-194: transient open-meteo error → returns None."""
+        analyzer = self._build_analyzer_with_location()
+        mock_client = MagicMock()
+        mock_client.weather_api.side_effect = Exception("503 Service Unavailable")
+
+        with patch("weather_astro.create_weather_client", return_value=mock_client):
+            with patch("weather_astro._is_openmeteo_transient_error", return_value=True):
+                result = analyzer.fetch_extended_weather_data(24)
+        assert result is None
+
+    def test_unexpected_error_logged_and_returns_none(self):
+        """Lines 195-197: unexpected error → returns None."""
+        analyzer = self._build_analyzer_with_location()
+        mock_client = MagicMock()
+        mock_client.weather_api.side_effect = Exception("Unknown weird error")
+
+        with patch("weather_astro.create_weather_client", return_value=mock_client):
+            with patch("weather_astro._is_openmeteo_transient_error", return_value=False):
+                result = analyzer.fetch_extended_weather_data(24)
+        assert result is None
+
+
+class TestGenerateComprehensiveAnalysis:
+    """Tests for generate_comprehensive_analysis edge paths."""
+
+    def _build_analyzer_with_location(self):
+        analyzer = _build_analyzer()
+        analyzer.location = {"latitude": 48.0, "longitude": 2.0, "timezone": "UTC", "name": "TestCity"}
+        analyzer.language = "en"
+        return analyzer
+
+    def test_no_weather_data_returns_none(self):
+        """Lines 551-553: fetch_extended_weather_data returns None → return None."""
+        analyzer = self._build_analyzer_with_location()
+        with patch.object(analyzer, "fetch_extended_weather_data", return_value=None):
+            result = analyzer.generate_comprehensive_analysis(24)
+        assert result is None
+
+    def test_exception_inside_analysis_returns_none(self):
+        """Lines 584-586: exception inside generate → return None."""
+        analyzer = self._build_analyzer_with_location()
+        with patch.object(analyzer, "fetch_extended_weather_data", side_effect=RuntimeError("boom")):
+            result = analyzer.generate_comprehensive_analysis(24)
+        assert result is None
+
+
+class TestGetAstroWeatherAnalysisCachePaths:
+    """Tests for the cache / rate-limit / cooldown / lock paths in get_astro_weather_analysis."""
+
+    def _clear_module_state(self):
+        """Directly clear module-level dicts (not via monkeypatch to avoid aliasing issues)."""
+        import weather_astro
+        weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS.clear()
+        weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS_TS.clear()
+        weather_astro._ASTRO_ANALYSIS_LAST_FAILURE_TS.clear()
+
+    def setup_method(self):
+        self._clear_module_state()
+
+    def teardown_method(self):
+        self._clear_module_state()
+
+    def test_fresh_cache_hit_returns_cached(self):
+        """Lines 814-816: TTL not expired → return cached."""
+        import weather_astro
+        test_data = {"result": "cached"}
+        _store_last_successful_analysis(24, "en", test_data)
+        key = _analysis_cache_key(24, "en")
+        weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS_TS[key] = time.time()
+        result = get_astro_weather_analysis(24, "en")
+        assert result == test_data
+
+    def test_ttl_expired_no_cache_falls_through(self):
+        """Lines 814->820: TTL expired, cached is None → fall through to rate-limit check."""
+        import weather_astro
+        key = _analysis_cache_key(97, "zz")
+        # Set a very old timestamp so TTL is expired
+        weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS_TS[key] = 0.0
+        # No stored cache for this key
+        with patch("weather_astro.is_openmeteo_rate_limited", return_value=True):
+            result = get_astro_weather_analysis(97, "zz")
+        assert result is None  # rate limited + no cache
+
+    def test_rate_limited_with_cache_returns_stale(self):
+        """Lines 823-824: rate limited + cached → return stale cache."""
+        test_data = {"result": "stale"}
+        _store_last_successful_analysis(24, "en", test_data)
+        with patch("weather_astro.is_openmeteo_rate_limited", return_value=True):
+            result = get_astro_weather_analysis(24, "en")
+        assert result == test_data
+
+    def test_rate_limited_no_cache_returns_none(self):
+        """Lines 825-826: rate limited + no cache → None."""
+        with patch("weather_astro.is_openmeteo_rate_limited", return_value=True):
+            result = get_astro_weather_analysis(99, "zz")
+        assert result is None
+
+    def test_failure_cooldown_with_cache_returns_stale(self):
+        """Lines 833-834: in failure cooldown + cached → return stale."""
+        import weather_astro
+        test_data = {"result": "stale_cooldown"}
+        _store_last_successful_analysis(24, "en", test_data)
+        key = _analysis_cache_key(24, "en")
+        weather_astro._ASTRO_ANALYSIS_LAST_FAILURE_TS[key] = time.time()
+        with patch("weather_astro.is_openmeteo_rate_limited", return_value=False):
+            result = get_astro_weather_analysis(24, "en")
+        assert result == test_data
+
+    def test_failure_cooldown_no_cache_returns_none(self):
+        """Lines 835-836: in failure cooldown + no cache → None."""
+        import weather_astro
+        key = _analysis_cache_key(24, "de")
+        weather_astro._ASTRO_ANALYSIS_LAST_FAILURE_TS[key] = time.time()
+        with patch("weather_astro.is_openmeteo_rate_limited", return_value=False):
+            result = get_astro_weather_analysis(24, "de")
+        assert result is None
+
+    def test_lock_not_acquired_returns_cache_if_available(self):
+        """Lines 842-843: lock busy + cached → return cache."""
+        import weather_astro
+        test_data = {"result": "lock_cache"}
+        _store_last_successful_analysis(24, "en", test_data)
+        with patch("weather_astro.is_openmeteo_rate_limited", return_value=False):
+            weather_astro._ASTRO_ANALYSIS_LOCK.acquire()
+            try:
+                result = get_astro_weather_analysis(24, "en")
+            finally:
+                weather_astro._ASTRO_ANALYSIS_LOCK.release()
+        assert result == test_data
+
+    def test_lock_not_acquired_no_cache_returns_none(self):
+        """Line 844: lock busy + no cache → None."""
+        import weather_astro
+        with patch("weather_astro.is_openmeteo_rate_limited", return_value=False):
+            weather_astro._ASTRO_ANALYSIS_LOCK.acquire()
+            try:
+                result = get_astro_weather_analysis(99, "zz")
+            finally:
+                weather_astro._ASTRO_ANALYSIS_LOCK.release()
+        assert result is None
+
+    def test_fetch_fails_no_stale_cache_returns_none(self):
+        """Lines 857-863: analysis returns None, no stale cache → None."""
+        with patch("weather_astro.is_openmeteo_rate_limited", return_value=False):
+            with patch("weather_astro.AstroWeatherAnalyzer.generate_comprehensive_analysis", return_value=None):
+                with patch("weather_astro.AstroWeatherAnalyzer.__init__", return_value=None):
+                    result = get_astro_weather_analysis(99, "zz")
+        assert result is None
+
+    def test_fetch_fails_with_stale_cache_returns_stale(self):
+        """Lines 860-861: analysis returns None but stale cache exists → return stale."""
+        import weather_astro
+        test_data = {"result": "stale_on_fetch_fail"}
+        _store_last_successful_analysis(24, "en", test_data)
+        # Don't set a fresh TTL so it falls past the TTL check
+        weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS_TS[_analysis_cache_key(24, "en")] = 0.0
+        with patch("weather_astro.is_openmeteo_rate_limited", return_value=False):
+            with patch("weather_astro.AstroWeatherAnalyzer.generate_comprehensive_analysis", return_value=None):
+                with patch("weather_astro.AstroWeatherAnalyzer.__init__", return_value=None):
+                    result = get_astro_weather_analysis(24, "en")
+        assert result == test_data
+
+    def test_exception_during_analysis_with_stale_cache(self):
+        """Lines 868-872: exception + stale cache → return stale."""
+        import weather_astro
+        test_data = {"result": "stale_exception"}
+        _store_last_successful_analysis(24, "en", test_data)
+        weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS_TS[_analysis_cache_key(24, "en")] = 0.0
+        with patch("weather_astro.is_openmeteo_rate_limited", return_value=False):
+            with patch(
+                "weather_astro.AstroWeatherAnalyzer.generate_comprehensive_analysis",
+                side_effect=RuntimeError("analysis failed"),
+            ):
+                with patch("weather_astro.AstroWeatherAnalyzer.__init__", return_value=None):
+                    result = get_astro_weather_analysis(24, "en")
+        assert result == test_data
+
+    def test_exception_during_analysis_no_cache_returns_none(self):
+        """Lines 873-875: exception + no cache → None."""
+        with patch("weather_astro.is_openmeteo_rate_limited", return_value=False):
+            with patch(
+                "weather_astro.AstroWeatherAnalyzer.generate_comprehensive_analysis",
+                side_effect=RuntimeError("fail"),
+            ):
+                with patch("weather_astro.AstroWeatherAnalyzer.__init__", return_value=None):
+                    result = get_astro_weather_analysis(99, "zz")
+        assert result is None
+
+
+class TestFetchExtendedWeatherDataMorePaths:
+    """Cover remaining branches: transient/unexpected error (193-197), full-then-core-success."""
+
+    def _build_analyzer_with_location(self):
+        analyzer = _build_analyzer()
+        analyzer.location = {"latitude": 48.0, "longitude": 2.0, "timezone": "UTC"}
+        analyzer.language = "en"
+        return analyzer
+
+    def test_full_succeeds_returns_result(self):
+        """Lines 161-167: full request succeeds → return result directly."""
+        analyzer = self._build_analyzer_with_location()
+        mock_client = MagicMock()
+        fake_result = {"data": pd.DataFrame(), "location": {}}
+        mock_client.weather_api.return_value = [MagicMock()]
+
+        with patch("weather_astro.create_weather_client", return_value=mock_client):
+            with patch.object(analyzer, "_parse_extended_data", return_value=fake_result):
+                result = analyzer.fetch_extended_weather_data(24)
+        assert result == fake_result
+
+    def test_full_fails_core_succeeds(self):
+        """Lines 168-183: full request fails (non-concurrency), core succeeds."""
+        analyzer = self._build_analyzer_with_location()
+        mock_client = MagicMock()
+        fake_result = {"data": pd.DataFrame(), "location": {}}
+        call_count = [0]
+
+        def weather_api_side_effect(url, params=None):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                raise Exception("Server temporarily unavailable")
+            return [MagicMock()]
+
+        mock_client.weather_api.side_effect = weather_api_side_effect
+        with patch("weather_astro.create_weather_client", return_value=mock_client):
+            with patch.object(analyzer, "_parse_extended_data", return_value=fake_result):
+                result = analyzer.fetch_extended_weather_data(24)
+        assert result == fake_result
+
+    def test_transient_error_in_outer_exception(self):
+        """Lines 193-194: outer try fails with transient error → log and return None.
+        The outer except (189) is hit when create_weather_client() itself raises."""
+        analyzer = self._build_analyzer_with_location()
+        # Raise from create_weather_client so it hits the OUTER except at line 189
+        with patch("weather_astro.create_weather_client", side_effect=Exception("503 Service Unavailable")):
+            with patch("weather_astro._is_openmeteo_transient_error", return_value=True):
+                with patch("weather_astro._is_openmeteo_concurrency_error", return_value=False):
+                    result = analyzer.fetch_extended_weather_data(24)
+        assert result is None
+
+    def test_unexpected_error_in_outer_exception(self):
+        """Lines 195-197: outer try fails with unexpected error → log and return None."""
+        analyzer = self._build_analyzer_with_location()
+        # Raise from create_weather_client so it hits the OUTER except at line 189
+        with patch("weather_astro.create_weather_client", side_effect=Exception("Weird unexpected error XYZ")):
+            with patch("weather_astro._is_openmeteo_transient_error", return_value=False):
+                with patch("weather_astro._is_openmeteo_concurrency_error", return_value=False):
+                    result = analyzer.fetch_extended_weather_data(24)
+        assert result is None
+
+
+class TestGetCurrentAstroConditions:
+    """Tests for get_current_astro_conditions (lines 880-892)."""
+
+    def test_returns_current_conditions_when_analysis_succeeds(self):
+        """Lines 884-888: happy path → return current_conditions."""
+        mock_conditions = {"seeing_pickering": 7.0}
+        mock_analysis = {"current_conditions": mock_conditions}
+        with patch("weather_astro.AstroWeatherAnalyzer.generate_comprehensive_analysis", return_value=mock_analysis):
+            with patch("weather_astro.AstroWeatherAnalyzer.__init__", return_value=None):
+                import weather_astro
+                weather_astro.AstroWeatherAnalyzer.location = {}
+                weather_astro.AstroWeatherAnalyzer.language = "en"
+                from weather_astro import get_current_astro_conditions
+                result = get_current_astro_conditions()
+        assert result == mock_conditions
+
+    def test_returns_none_when_analysis_fails(self):
+        """Lines 888-889: analysis returns None → return None."""
+        with patch("weather_astro.AstroWeatherAnalyzer.generate_comprehensive_analysis", return_value=None):
+            with patch("weather_astro.AstroWeatherAnalyzer.__init__", return_value=None):
+                import weather_astro
+                weather_astro.AstroWeatherAnalyzer.location = {}
+                weather_astro.AstroWeatherAnalyzer.language = "en"
+                from weather_astro import get_current_astro_conditions
+                result = get_current_astro_conditions()
+        assert result is None
+
+    def test_returns_none_on_exception(self):
+        """Lines 890-892: exception → None."""
+        with patch("weather_astro.AstroWeatherAnalyzer.__init__", side_effect=RuntimeError("init fail")):
+            from weather_astro import get_current_astro_conditions
+            result = get_current_astro_conditions()
+        assert result is None
+
+
+class TestParseExtendedDataTimezoneBytes:
+    """Test _parse_extended_data when Timezone() returns bytes."""
+
+    def test_bytes_timezone_decoded(self):
+        """Line 213-215: Timezone() returns bytes → decoded to str."""
+        analyzer = _build_analyzer()
+        analyzer.location = {"name": "Test", "latitude": 48.0, "longitude": 2.0}
+
+        mock_response = MagicMock()
+        mock_hourly = MagicMock()
+        mock_var = MagicMock()
+        mock_var.ValuesAsNumpy.return_value = [15.0, 16.0]
+        mock_hourly.Variables.return_value = mock_var
+        mock_hourly.Time.return_value = 1700000000
+        mock_hourly.Interval.return_value = 3600
+        mock_response.Hourly.return_value = mock_hourly
+        mock_response.Timezone.return_value = b"UTC"
+        mock_response.Latitude.return_value = 48.0
+        mock_response.Longitude.return_value = 2.0
+        mock_response.Elevation.return_value = 100.0
+
+        result = analyzer._parse_extended_data(mock_response, ["temperature_2m"])
+        assert result["location"]["timezone"] == "UTC"

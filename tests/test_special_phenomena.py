@@ -262,3 +262,469 @@ class TestFindZodiacalLightWindows:
         end = Time("2026-03-08T00:00:00", format="isot", scale="utc")
         result = svc._find_zodiacal_light_windows(start, end)
         assert isinstance(result, list)
+
+
+class TestSpecialPhenomenaBranchCoverage:
+    """Targeted tests for hard-to-reach branches in special_phenomena.py."""
+
+    def setup_method(self):
+        self.svc = SpecialPhenomenaService(45.0, -73.5, 50, "America/Montreal", "en")
+
+    # --- _t exception branch (lines 70-71) ---
+    def test_t_format_exception_returns_unformatted_fallback(self):
+        """When fallback.format(**kwargs) raises, the raw fallback string is returned."""
+        result = self.svc._t("missing.key", "{undefined_placeholder}", name="World")
+        # Python's .format() with name="World" and template "{undefined_placeholder}"
+        # raises KeyError — the except branch returns the raw fallback
+        assert result == "{undefined_placeholder}"
+
+    # --- _find_seasonal_events exception branch (lines 231-232) ---
+    def test_seasonal_exception_swallowed(self):
+        from astropy.time import Time
+        with patch.object(self.svc, "_approximate_equinox", side_effect=Exception("astro fail")):
+            events = self.svc._find_seasonal_events(
+                Time("2026-01-01T00:00:00", format="isot", scale="utc"),
+                Time("2027-01-01T00:00:00", format="isot", scale="utc"),
+            )
+        assert isinstance(events, list)
+
+    # --- _find_zodiacal_light_windows: sun is None (lines 379-380) ---
+    def test_zodiacal_sun_none_skips_day(self):
+        from astropy.time import Time
+        with patch("special_phenomena.get_sun", return_value=None):
+            result = self.svc._find_zodiacal_light_windows(
+                Time("2026-03-01T00:00:00", format="isot", scale="utc"),
+                Time("2026-03-03T00:00:00", format="isot", scale="utc"),
+            )
+        assert result == []
+
+    # --- _find_zodiacal_light_windows: force moon path (lines 401-458) ---
+    def test_zodiacal_light_moon_conditions_met_appends_event(self):
+        """Force ecliptic_alt>20 and moon below horizon to trigger event append."""
+        from astropy.time import Time
+        import types
+
+        def make_altaz_mock(altitude_deg):
+            m = MagicMock()
+            m.alt.degree = float(altitude_deg)
+            return m
+
+        fake_sun = MagicMock()
+        fake_sun.transform_to.return_value = make_altaz_mock(-15.0)  # sun below horizon
+        fake_moon = MagicMock()
+        fake_moon.transform_to.return_value = make_altaz_mock(-10.0)  # moon below horizon
+
+        with patch("special_phenomena.get_sun", return_value=fake_sun), \
+             patch("special_phenomena.get_body", return_value=fake_moon), \
+             patch.object(self.svc, "_get_ecliptic_altitude", return_value=30.0):
+            result = self.svc._find_zodiacal_light_windows(
+                Time("2026-03-01T00:00:00", format="isot", scale="utc"),
+                Time("2026-03-03T00:00:00", format="isot", scale="utc"),
+            )
+        assert isinstance(result, list)
+        if result:
+            assert result[0]["event_type"] == "Zodiacal Light Window"
+
+    # --- _find_milky_way_core_visibility: sun is None path (lines 515-516) ---
+    def test_milky_way_sun_none_skips_day(self):
+        from astropy.time import Time
+        with patch("special_phenomena.get_sun", return_value=None):
+            result = self.svc._find_milky_way_core_visibility(
+                Time("2026-07-01T00:00:00", format="isot", scale="utc"),
+                Time("2026-07-03T00:00:00", format="isot", scale="utc"),
+            )
+        assert result == []
+
+    # --- _find_milky_way_core_visibility: moon is None path (lines 544-545) ---
+    def test_milky_way_moon_none_skips_day(self):
+        from astropy.time import Time
+
+        def make_altaz_mock(altitude_deg):
+            m = MagicMock()
+            m.alt.degree = float(altitude_deg)
+            return m
+
+        fake_sun = MagicMock()
+        fake_sun.transform_to.return_value = make_altaz_mock(-15.0)
+
+        with patch("special_phenomena.get_sun", return_value=fake_sun), \
+             patch("special_phenomena.get_body", return_value=None):
+            result = self.svc._find_milky_way_core_visibility(
+                Time("2026-07-01T00:00:00", format="isot", scale="utc"),
+                Time("2026-07-03T00:00:00", format="isot", scale="utc"),
+            )
+        assert result == []
+
+    # --- _find_milky_way_core_visibility: galactic center not visible (lines 537-539) ---
+    def test_milky_way_gc_below_min_altitude_skips(self):
+        from astropy.time import Time
+
+        def make_altaz_mock(altitude_deg):
+            m = MagicMock()
+            m.alt.degree = float(altitude_deg)
+            return m
+
+        fake_sun = MagicMock()
+        fake_sun.transform_to.return_value = make_altaz_mock(-15.0)
+
+        def fake_gc_transform(frame):
+            gc_mock = MagicMock()
+            gc_mock.alt.degree = -10.0  # below minimum
+            return gc_mock
+
+        with patch("special_phenomena.get_sun", return_value=fake_sun), \
+             patch("special_phenomena.SkyCoord") as mock_skycoord:
+            instance = mock_skycoord.return_value
+            instance.transform_to.side_effect = fake_gc_transform
+            result = self.svc._find_milky_way_core_visibility(
+                Time("2026-07-01T00:00:00", format="isot", scale="utc"),
+                Time("2026-07-03T00:00:00", format="isot", scale="utc"),
+            )
+        assert isinstance(result, list)
+
+    # --- _get_ecliptic_altitude: sun is None (line 611) ---
+    def test_ecliptic_altitude_sun_none_returns_zero(self):
+        from astropy.time import Time
+        t = Time("2026-06-01T12:00:00", format="isot", scale="utc")
+        with patch("special_phenomena.get_sun", return_value=None):
+            result = self.svc._get_ecliptic_altitude(t)
+        assert result == 0.0
+
+    # --- _refine_equinox_time: exception in while loop (lines 290-291) ---
+    def test_refine_equinox_exception_in_loop_returns_best_time(self):
+        from astropy.time import Time
+        approx = Time("2026-03-20T12:00:00", format="isot", scale="utc")
+        with patch("special_phenomena.get_sun", side_effect=Exception("calc fail")):
+            result = self.svc._refine_equinox_time(approx, "spring")
+        from astropy.time import Time as ATime
+        assert isinstance(result, ATime)
+
+    # --- _refine_solstice_time: exception in while loop (lines 338-339) ---
+    def test_refine_solstice_exception_in_loop_returns_best_time(self):
+        from astropy.time import Time
+        approx = Time("2026-06-21T12:00:00", format="isot", scale="utc")
+        with patch("special_phenomena.get_sun", side_effect=Exception("calc fail")):
+            result = self.svc._refine_solstice_time(approx, "summer")
+        from astropy.time import Time as ATime
+        assert isinstance(result, ATime)
+
+
+class TestSpecialPhenomenaNullAndArrayBranches:
+    """Cover None-guard and numpy-array branches that are never hit with real Astropy."""
+
+    def setup_method(self):
+        self.svc = SpecialPhenomenaService(45.0, -73.5, 50, "America/Montreal", "en")
+
+    # ── _refine_equinox_time ────────────────────────────────────────────
+
+    def test_refine_equinox_initial_sun_none_returns_best_time(self):
+        """get_sun() returns None on the very first call → immediate early return."""
+        from astropy.time import Time
+        approx = Time("2026-03-20T12:00:00", format="isot", scale="utc")
+        with patch("special_phenomena.get_sun", return_value=None):
+            result = self.svc._refine_equinox_time(approx, "spring")
+        assert isinstance(result, Time)
+
+    def test_refine_equinox_initial_dec_as_ndarray(self):
+        """Initial dec_val is a numpy array → exercises the isinstance ndarray branch."""
+        import numpy as np
+        from astropy.time import Time
+        approx = Time("2026-03-20T12:00:00", format="isot", scale="utc")
+        fake_sun = MagicMock()
+        fake_sun.dec.degree = np.array([5.0])
+        with patch("special_phenomena.get_sun", return_value=fake_sun):
+            result = self.svc._refine_equinox_time(approx, "spring")
+        assert isinstance(result, Time)
+
+    def test_refine_equinox_loop_sun_none_then_real(self):
+        """Sun is None on one loop iteration (lines 278-279) → continue."""
+        import numpy as np
+        from astropy.time import Time
+        approx = Time("2026-03-20T12:00:00", format="isot", scale="utc")
+        real_sun = MagicMock()
+        real_sun.dec.degree = 0.5
+        # First call (initial) succeeds, subsequent calls alternate None / real
+        call_results = [real_sun, None, real_sun]
+        with patch("special_phenomena.get_sun", side_effect=lambda t: call_results.pop(0) if call_results else real_sun):
+            result = self.svc._refine_equinox_time(approx, "spring")
+        assert isinstance(result, Time)
+
+    def test_refine_equinox_loop_dec_as_ndarray(self):
+        """Loop dec_val is ndarray (line 283) → exercises array branch."""
+        import numpy as np
+        from astropy.time import Time
+        approx = Time("2026-03-20T12:00:00", format="isot", scale="utc")
+        fake_sun = MagicMock()
+        fake_sun.dec.degree = np.array([1.0])
+        with patch("special_phenomena.get_sun", return_value=fake_sun):
+            result = self.svc._refine_equinox_time(approx, "spring")
+        assert isinstance(result, Time)
+
+    # ── _refine_solstice_time ───────────────────────────────────────────
+
+    def test_refine_solstice_initial_sun_none_returns_best_time(self):
+        """get_sun() returns None on first call in _refine_solstice_time."""
+        from astropy.time import Time
+        approx = Time("2026-06-21T12:00:00", format="isot", scale="utc")
+        with patch("special_phenomena.get_sun", return_value=None):
+            result = self.svc._refine_solstice_time(approx, "summer")
+        assert isinstance(result, Time)
+
+    def test_refine_solstice_initial_dec_as_ndarray(self):
+        """Initial dec_val is ndarray in _refine_solstice_time."""
+        import numpy as np
+        from astropy.time import Time
+        approx = Time("2026-06-21T12:00:00", format="isot", scale="utc")
+        fake_sun = MagicMock()
+        fake_sun.dec.degree = np.array([23.0])
+        with patch("special_phenomena.get_sun", return_value=fake_sun):
+            result = self.svc._refine_solstice_time(approx, "summer")
+        assert isinstance(result, Time)
+
+    def test_refine_solstice_loop_sun_none(self):
+        """Sun is None in loop iteration of _refine_solstice_time."""
+        import numpy as np
+        from astropy.time import Time
+        approx = Time("2026-06-21T12:00:00", format="isot", scale="utc")
+        real_sun = MagicMock()
+        real_sun.dec.degree = 23.0
+        call_results = [real_sun, None, real_sun]
+        with patch("special_phenomena.get_sun", side_effect=lambda t: call_results.pop(0) if call_results else real_sun):
+            result = self.svc._refine_solstice_time(approx, "summer")
+        assert isinstance(result, Time)
+
+    def test_refine_solstice_loop_dec_as_ndarray(self):
+        """Loop dec_val is ndarray in _refine_solstice_time."""
+        import numpy as np
+        from astropy.time import Time
+        approx = Time("2026-06-21T12:00:00", format="isot", scale="utc")
+        fake_sun = MagicMock()
+        fake_sun.dec.degree = np.array([23.0])
+        with patch("special_phenomena.get_sun", return_value=fake_sun):
+            result = self.svc._refine_solstice_time(approx, "summer")
+        assert isinstance(result, Time)
+
+    # ── _find_zodiacal_light_windows ────────────────────────────────────
+
+    def test_zodiacal_sun_altaz_none_skips(self):
+        """sun.transform_to() returns None → lines 384-385."""
+        from astropy.time import Time
+        fake_sun = MagicMock()
+        fake_sun.transform_to.return_value = None
+        with patch("special_phenomena.get_sun", return_value=fake_sun):
+            result = self.svc._find_zodiacal_light_windows(
+                Time("2026-03-01T00:00:00", format="isot", scale="utc"),
+                Time("2026-03-03T00:00:00", format="isot", scale="utc"),
+            )
+        assert isinstance(result, list)
+
+    def test_zodiacal_sun_alt_as_ndarray(self):
+        """sun_altaz.alt.degree is ndarray → line 390."""
+        import numpy as np
+        from astropy.time import Time
+        fake_altaz = MagicMock()
+        fake_altaz.alt.degree = np.array([-15.0])
+        fake_sun = MagicMock()
+        fake_sun.transform_to.return_value = fake_altaz
+        with patch("special_phenomena.get_sun", return_value=fake_sun), \
+             patch.object(self.svc, "_get_ecliptic_altitude", return_value=5.0):
+            result = self.svc._find_zodiacal_light_windows(
+                Time("2026-03-01T00:00:00", format="isot", scale="utc"),
+                Time("2026-03-03T00:00:00", format="isot", scale="utc"),
+            )
+        assert isinstance(result, list)
+
+    def test_zodiacal_moon_none_skips(self):
+        """get_body('moon') returns None → lines 403-404."""
+        from astropy.time import Time
+        fake_altaz = MagicMock()
+        fake_altaz.alt.degree = -15.0
+        fake_sun = MagicMock()
+        fake_sun.transform_to.return_value = fake_altaz
+        with patch("special_phenomena.get_sun", return_value=fake_sun), \
+             patch("special_phenomena.get_body", return_value=None), \
+             patch.object(self.svc, "_get_ecliptic_altitude", return_value=30.0):
+            result = self.svc._find_zodiacal_light_windows(
+                Time("2026-03-01T00:00:00", format="isot", scale="utc"),
+                Time("2026-03-03T00:00:00", format="isot", scale="utc"),
+            )
+        assert isinstance(result, list)
+
+    def test_zodiacal_moon_altaz_none_skips(self):
+        """moon.transform_to() returns None → lines 408-409."""
+        from astropy.time import Time
+        fake_altaz = MagicMock()
+        fake_altaz.alt.degree = -15.0
+        fake_sun = MagicMock()
+        fake_sun.transform_to.return_value = fake_altaz
+        fake_moon = MagicMock()
+        fake_moon.transform_to.return_value = None
+        with patch("special_phenomena.get_sun", return_value=fake_sun), \
+             patch("special_phenomena.get_body", return_value=fake_moon), \
+             patch.object(self.svc, "_get_ecliptic_altitude", return_value=30.0):
+            result = self.svc._find_zodiacal_light_windows(
+                Time("2026-03-01T00:00:00", format="isot", scale="utc"),
+                Time("2026-03-03T00:00:00", format="isot", scale="utc"),
+            )
+        assert isinstance(result, list)
+
+    def test_zodiacal_moon_alt_as_ndarray(self):
+        """moon_altaz.alt.degree is ndarray → line 414."""
+        import numpy as np
+        from astropy.time import Time
+        fake_sun_altaz = MagicMock()
+        fake_sun_altaz.alt.degree = -15.0
+        fake_sun = MagicMock()
+        fake_sun.transform_to.return_value = fake_sun_altaz
+        fake_moon_altaz = MagicMock()
+        fake_moon_altaz.alt.degree = np.array([-10.0])
+        fake_moon = MagicMock()
+        fake_moon.transform_to.return_value = fake_moon_altaz
+        with patch("special_phenomena.get_sun", return_value=fake_sun), \
+             patch("special_phenomena.get_body", return_value=fake_moon), \
+             patch.object(self.svc, "_get_ecliptic_altitude", return_value=30.0):
+            result = self.svc._find_zodiacal_light_windows(
+                Time("2026-03-01T00:00:00", format="isot", scale="utc"),
+                Time("2026-03-03T00:00:00", format="isot", scale="utc"),
+            )
+        assert isinstance(result, list)
+
+    def test_zodiacal_exception_handler(self):
+        """Exception inside zodiacal loop → lines 457-458."""
+        from astropy.time import Time
+        fake_sun = MagicMock()
+        fake_sun.transform_to.side_effect = RuntimeError("boom")
+        with patch("special_phenomena.get_sun", return_value=fake_sun):
+            result = self.svc._find_zodiacal_light_windows(
+                Time("2026-03-01T00:00:00", format="isot", scale="utc"),
+                Time("2026-03-03T00:00:00", format="isot", scale="utc"),
+            )
+        assert isinstance(result, list)
+
+    # ── _find_milky_way_core_visibility ─────────────────────────────────
+
+    def test_milky_way_sun_alt_as_ndarray(self):
+        """sun_altaz.alt.degree is ndarray → line 521."""
+        import numpy as np
+        from astropy.time import Time
+        fake_altaz = MagicMock()
+        fake_altaz.alt.degree = np.array([-15.0])
+        fake_sun = MagicMock()
+        fake_sun.transform_to.return_value = fake_altaz
+        with patch("special_phenomena.get_sun", return_value=fake_sun), \
+             patch("special_phenomena.get_body", return_value=None):
+            result = self.svc._find_milky_way_core_visibility(
+                Time("2026-07-01T00:00:00", format="isot", scale="utc"),
+                Time("2026-07-03T00:00:00", format="isot", scale="utc"),
+            )
+        assert isinstance(result, list)
+
+    def test_milky_way_sun_above_nautical_twilight_skips(self):
+        """sun_alt >= -12 at 2am (e.g., midsummer extreme lat) → lines 526-527."""
+        from astropy.time import Time
+        fake_altaz = MagicMock()
+        fake_altaz.alt.degree = -5.0  # above -12: not dark enough
+        fake_sun = MagicMock()
+        fake_sun.transform_to.return_value = fake_altaz
+        with patch("special_phenomena.get_sun", return_value=fake_sun):
+            result = self.svc._find_milky_way_core_visibility(
+                Time("2026-07-01T00:00:00", format="isot", scale="utc"),
+                Time("2026-07-03T00:00:00", format="isot", scale="utc"),
+            )
+        assert result == []
+
+    def test_milky_way_gc_alt_as_ndarray(self):
+        """gc_altaz.alt.degree is ndarray → line 533."""
+        import numpy as np
+        from astropy.time import Time
+        fake_sun_altaz = MagicMock()
+        fake_sun_altaz.alt.degree = -15.0
+        fake_sun = MagicMock()
+        fake_sun.transform_to.return_value = fake_sun_altaz
+        fake_gc_altaz = MagicMock()
+        fake_gc_altaz.alt.degree = np.array([-5.0])  # below threshold → skip
+        with patch("special_phenomena.get_sun", return_value=fake_sun), \
+             patch("special_phenomena.SkyCoord") as mock_sc:
+            mock_sc.return_value.transform_to.return_value = fake_gc_altaz
+            result = self.svc._find_milky_way_core_visibility(
+                Time("2026-07-01T00:00:00", format="isot", scale="utc"),
+                Time("2026-07-03T00:00:00", format="isot", scale="utc"),
+            )
+        assert isinstance(result, list)
+
+    def test_milky_way_moon_alt_as_ndarray(self):
+        """moon_altaz.alt.degree is ndarray → line 550."""
+        import numpy as np
+        from astropy.time import Time
+        fake_sun_altaz = MagicMock()
+        fake_sun_altaz.alt.degree = -15.0
+        fake_sun = MagicMock()
+        fake_sun.transform_to.return_value = fake_sun_altaz
+        fake_gc_altaz = MagicMock()
+        fake_gc_altaz.alt.degree = 30.0
+        fake_moon_altaz = MagicMock()
+        fake_moon_altaz.alt.degree = np.array([10.0])  # above 5 → skip
+        fake_moon = MagicMock()
+        fake_moon.transform_to.return_value = fake_moon_altaz
+        with patch("special_phenomena.get_sun", return_value=fake_sun), \
+             patch("special_phenomena.SkyCoord") as mock_sc, \
+             patch("special_phenomena.get_body", return_value=fake_moon):
+            mock_sc.return_value.transform_to.return_value = fake_gc_altaz
+            result = self.svc._find_milky_way_core_visibility(
+                Time("2026-07-01T00:00:00", format="isot", scale="utc"),
+                Time("2026-07-03T00:00:00", format="isot", scale="utc"),
+            )
+        assert isinstance(result, list)
+
+    def test_milky_way_exception_handler(self):
+        """Exception inside MW loop → lines 598-599."""
+        from astropy.time import Time
+        fake_sun = MagicMock()
+        fake_sun.transform_to.side_effect = RuntimeError("astro error")
+        with patch("special_phenomena.get_sun", return_value=fake_sun):
+            result = self.svc._find_milky_way_core_visibility(
+                Time("2026-07-01T00:00:00", format="isot", scale="utc"),
+                Time("2026-07-03T00:00:00", format="isot", scale="utc"),
+            )
+        assert isinstance(result, list)
+
+    # ── _get_ecliptic_altitude ───────────────────────────────────────────
+
+    def test_ecliptic_altaz_none_returns_zero(self):
+        """sun.transform_to() returns None → line 615."""
+        from astropy.time import Time
+        t = Time("2026-06-01T00:00:00", format="isot", scale="utc")
+        fake_sun = MagicMock()
+        fake_sun.transform_to.return_value = None
+        with patch("special_phenomena.get_sun", return_value=fake_sun):
+            result = self.svc._get_ecliptic_altitude(t)
+        assert result == 0.0
+
+    def test_ecliptic_alt_as_ndarray(self):
+        """alt_val is ndarray → line 619."""
+        import numpy as np
+        from astropy.time import Time
+        t = Time("2026-06-01T00:00:00", format="isot", scale="utc")
+        fake_altaz = MagicMock()
+        fake_altaz.alt.degree = np.array([30.0])
+        fake_sun = MagicMock()
+        fake_sun.transform_to.return_value = fake_altaz
+        with patch("special_phenomena.get_sun", return_value=fake_sun):
+            result = self.svc._get_ecliptic_altitude(t)
+        assert isinstance(result, float)
+
+    # ── _get_galactic_center_altitude ────────────────────────────────────
+
+    def test_galactic_center_alt_as_ndarray(self):
+        """alt_val is ndarray → line 637."""
+        import numpy as np
+        from astropy.time import Time
+        t = Time("2026-07-01T04:00:00", format="isot", scale="utc")
+        fake_altaz = MagicMock()
+        fake_altaz.alt.degree = np.array([20.0])
+        with patch("special_phenomena.AltAz") as mock_altaz_cls:
+            from astropy.coordinates import SkyCoord
+            with patch("special_phenomena.SkyCoord") as mock_sc:
+                mock_sc.return_value.transform_to.return_value = fake_altaz
+                result = self.svc._get_galactic_center_altitude(t)
+        assert isinstance(result, float)

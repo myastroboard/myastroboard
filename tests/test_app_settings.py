@@ -247,3 +247,94 @@ def test_vapid_contact_status_valid(monkeypatch):
     status = push_manager.get_vapid_contact_status()
 
     assert status['ok'] is True
+
+
+# ---------------------------------------------------------------------------
+# load_or_generate_secret_key — edge-case branches
+# ---------------------------------------------------------------------------
+
+def test_secret_key_regenerated_when_file_empty(tmp_path, monkeypatch):
+    """Line 41->47: file exists but stripped key is empty → regenerate."""
+    import app_settings
+    key_file = tmp_path / 'secret_key.txt'
+    key_file.write_text('   ')  # whitespace only → strip() gives ''
+    monkeypatch.setattr(app_settings, '_DATA_DIR', str(tmp_path))
+    monkeypatch.setattr(app_settings, '_SECRET_KEY_FILE', str(key_file))
+
+    key = app_settings.load_or_generate_secret_key()
+
+    assert len(key) == 64  # newly generated 32-byte hex
+
+
+def test_secret_key_read_exception_regenerates(tmp_path, monkeypatch):
+    """Lines 44-45: PermissionError reading key file → regenerate."""
+    import app_settings
+    import builtins
+
+    key_file = tmp_path / 'secret_key.txt'
+    key_file.write_text('EXISTING')
+    monkeypatch.setattr(app_settings, '_DATA_DIR', str(tmp_path))
+    monkeypatch.setattr(app_settings, '_SECRET_KEY_FILE', str(key_file))
+
+    real_open = builtins.open
+    call_count = [0]
+
+    def mock_open(path, *args, **kw):
+        call_count[0] += 1
+        if call_count[0] == 1:
+            raise PermissionError("denied by test")
+        return real_open(path, *args, **kw)
+
+    monkeypatch.setattr(builtins, 'open', mock_open)
+    key = app_settings.load_or_generate_secret_key()
+
+    assert len(key) == 64
+
+
+def test_secret_key_write_exception_still_returns_key(tmp_path, monkeypatch):
+    """Lines 52-53: PermissionError writing key file → key returned from memory."""
+    import app_settings
+    import builtins
+
+    # No key file → skip to generate path
+    monkeypatch.setattr(app_settings, '_DATA_DIR', str(tmp_path))
+    monkeypatch.setattr(app_settings, '_SECRET_KEY_FILE', str(tmp_path / 'secret_key.txt'))
+
+    real_open = builtins.open
+
+    def mock_open(path, *args, **kw):
+        mode = args[0] if args else kw.get('mode', 'r')
+        if 'w' in str(mode):
+            raise PermissionError("read-only fs")
+        return real_open(path, *args, **kw)
+
+    monkeypatch.setattr(builtins, 'open', mock_open)
+    key = app_settings.load_or_generate_secret_key()
+
+    assert len(key) == 64  # generated but not persisted
+
+
+def test_load_app_settings_json_exception_uses_defaults(tmp_path, monkeypatch):
+    """Lines 70-71: malformed JSON in settings file → return defaults."""
+    import app_settings
+    settings_file = tmp_path / 'app_settings.json'
+    settings_file.write_text('{ INVALID JSON }}}')
+    monkeypatch.setattr(app_settings, '_APP_SETTINGS_FILE', str(settings_file))
+
+    settings = app_settings.load_app_settings()
+
+    assert settings == dict(app_settings._DEFAULTS)
+
+
+def test_warn_deprecated_env_vars_logs_warning(monkeypatch):
+    """Line 112: deprecated env var present → warning is logged."""
+    import app_settings
+
+    monkeypatch.setenv('SECRET_KEY', 'old_key_in_env')
+    logged = []
+    monkeypatch.setattr(app_settings.logger, 'warning', lambda msg, *a, **kw: logged.append(msg))
+
+    app_settings._warn_deprecated_env_vars()
+
+    assert logged
+    assert 'Deprecated' in logged[0]

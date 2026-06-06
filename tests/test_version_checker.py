@@ -152,3 +152,77 @@ def test_check_for_updates_request_exception(monkeypatch):
 
     assert result["error"] == "Request failed"
     assert result["update_available"] is False
+
+
+def test_check_for_updates_version_changed_invalidates_cache(monkeypatch):
+    """Line 64: cache is valid but installed version changed → refetch."""
+    cached = {"current_version": "0.9.0", "update_available": False}
+    module.cache_store._version_update_cache = {"timestamp": 100, "data": cached}
+
+    monkeypatch.setattr(module.cache_store, "is_cache_valid", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(module, "get_repo_version", lambda: "1.0.0")  # different version
+    monkeypatch.setattr(module.time, "time", lambda: 200.0)
+    monkeypatch.setattr(module.cache_store, "update_shared_cache_entry", lambda *_args, **_kwargs: None)
+
+    class Response:
+        status_code = 200
+
+        @staticmethod
+        def raise_for_status():
+            return None
+
+        @staticmethod
+        def json():
+            return {"tag_name": "v1.0.0", "html_url": "", "name": "", "published_at": ""}
+
+    monkeypatch.setattr(module.requests, "get", lambda *_args, **_kwargs: Response())
+
+    result = module.check_for_updates()
+
+    # Should have fetched fresh data (not returned the 0.9.0 cache)
+    assert result["current_version"] == "1.0.0"
+
+
+def test_check_for_updates_no_update_available_logs_correctly(monkeypatch):
+    """Line 111: update_available=False → 'No update available' log path."""
+    monkeypatch.setattr(module.cache_store, "is_cache_valid", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(module, "get_repo_version", lambda: "1.2.0")
+    monkeypatch.setattr(module.time, "time", lambda: 130.0)
+    monkeypatch.setattr(module.cache_store, "update_shared_cache_entry", lambda *_args, **_kwargs: None)
+
+    class Response:
+        status_code = 200
+
+        @staticmethod
+        def raise_for_status():
+            return None
+
+        @staticmethod
+        def json():
+            # latest same as current → no update
+            return {"tag_name": "v1.2.0", "html_url": "", "name": "", "published_at": ""}
+
+    monkeypatch.setattr(module.requests, "get", lambda *_args, **_kwargs: Response())
+
+    result = module.check_for_updates()
+
+    assert result["update_available"] is False
+    assert result["current_version"] == "1.2.0"
+
+
+def test_check_for_updates_unexpected_exception(monkeypatch):
+    """Lines 129-133: unexpected non-requests exception → Internal error result."""
+    monkeypatch.setattr(module.cache_store, "is_cache_valid", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(module, "get_repo_version", lambda: "1.0.0")
+    monkeypatch.setattr(module.time, "time", lambda: 131.0)
+    monkeypatch.setattr(module.cache_store, "update_shared_cache_entry", lambda *_args, **_kwargs: None)
+
+    def _raise_unexpected(*_args, **_kwargs):
+        raise ValueError("unexpected internal error")
+
+    monkeypatch.setattr(module.requests, "get", _raise_unexpected)
+
+    result = module.check_for_updates()
+
+    assert result["error"] == "Internal error"
+    assert result["update_available"] is False

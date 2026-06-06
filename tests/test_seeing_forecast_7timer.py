@@ -218,6 +218,108 @@ class TestGetSeeingForecastWrapper:
             # If no exception, the service was created correctly
 
 
+class TestSeeingForecastBranchCoverage:
+    """Targeted tests for uncovered branches in seeing_forecast_7timer.py."""
+
+    @pytest.fixture
+    def service(self):
+        return SeeingForecastService(48.866667, 2.333333, "Europe/Paris")
+
+    def test_find_best_window_improves_within_window(self, service):
+        """Second consecutive good point has lower seeing → line 225."""
+        now_utc = datetime.now(timezone.utc)
+        forecast_list = [
+            {"time": now_utc.isoformat(), "seeing": 3, "description": "OK", "conditions": "OK"},
+            {"time": (now_utc + timedelta(hours=3)).isoformat(), "seeing": 1, "description": "Excellent", "conditions": "Perfect"},
+            {"time": (now_utc + timedelta(hours=6)).isoformat(), "seeing": 5, "description": "Poor", "conditions": "Bad"},
+        ]
+        result = service._find_best_window(forecast_list)
+        assert result is not None
+        assert result["seeing"] == 1  # lower seeing was tracked
+
+    @patch('seeing_forecast_7timer.requests.get')
+    def test_fetch_bad_init_string_uses_fallback(self, mock_get, service):
+        """Malformed init string falls back to requested_init (lines 113-114)."""
+        mock_response = Mock()
+        mock_response.json.return_value = {
+            "init": "BADFORMAT",
+            "dataseries": [{"timepoint": 3, "seeing": 2}],
+        }
+        mock_get.return_value = mock_response
+        result = service.fetch_tonight_seeing()
+        # Should succeed with fallback init time
+        assert result is not None
+
+    @patch('seeing_forecast_7timer.requests.get')
+    def test_fetch_bad_timepoint_is_skipped(self, mock_get, service):
+        """Bad timepoint/seeing values are skipped via continue (lines 131-132)."""
+        now_utc = datetime.now(timezone.utc)
+        init_time = now_utc.replace(minute=0, second=0, microsecond=0)
+        mock_response = Mock()
+        mock_response.json.return_value = {
+            "init": init_time.strftime("%Y%m%d%H"),
+            "dataseries": [
+                {"timepoint": "bad", "seeing": 2},     # bad timepoint → skip
+                {"timepoint": 3, "seeing": "bad"},     # bad seeing → skip
+                {"timepoint": 6, "seeing": 2},         # valid
+            ],
+        }
+        mock_get.return_value = mock_response
+        result = service.fetch_tonight_seeing()
+        assert result is not None
+        # Only the valid entry should be in forecast
+        assert any(p["seeing"] == 2 for p in result.get("forecast", []))
+
+    @patch('seeing_forecast_7timer.requests.get')
+    def test_fetch_out_of_range_seeing_skipped(self, mock_get, service):
+        """Seeing values outside 1-8 are skipped (line 136)."""
+        now_utc = datetime.now(timezone.utc)
+        init_time = now_utc.replace(minute=0, second=0, microsecond=0)
+        mock_response = Mock()
+        mock_response.json.return_value = {
+            "init": init_time.strftime("%Y%m%d%H"),
+            "dataseries": [
+                {"timepoint": 3, "seeing": -9999},   # out of range → skip
+                {"timepoint": 6, "seeing": 9},        # out of range → skip
+                {"timepoint": 9, "seeing": 2},        # valid
+            ],
+        }
+        mock_get.return_value = mock_response
+        result = service.fetch_tonight_seeing()
+        assert result is not None
+        # Only valid entry should appear
+        valid_points = [p for p in result.get("forecast", []) if p["seeing"] in (2,)]
+        assert len(valid_points) >= 1
+
+    @patch('seeing_forecast_7timer.requests.get')
+    def test_fetch_all_seeing_out_of_range_returns_empty_struct(self, mock_get, service):
+        """When all seeing values are out of range, returns empty forecast struct (lines 154-155)."""
+        now_utc = datetime.now(timezone.utc)
+        init_time = now_utc.replace(minute=0, second=0, microsecond=0)
+        mock_response = Mock()
+        mock_response.json.return_value = {
+            "init": init_time.strftime("%Y%m%d%H"),
+            "dataseries": [
+                {"timepoint": 3, "seeing": -9999},
+                {"timepoint": 6, "seeing": 0},
+            ],
+        }
+        mock_get.return_value = mock_response
+        result = service.fetch_tonight_seeing()
+        assert result is not None
+        assert result["forecast"] == []
+        assert result["now"] is None
+
+    @patch('seeing_forecast_7timer.requests.get')
+    def test_fetch_generic_exception_returns_none(self, mock_get, service):
+        """Generic Exception during processing returns None (lines 192-194)."""
+        mock_response = Mock()
+        mock_response.json.side_effect = ValueError("bad JSON")
+        mock_get.return_value = mock_response
+        result = service.fetch_tonight_seeing()
+        assert result is None
+
+
 class TestSeeingForecastIntegration:
     """Integration tests for seeing forecast with cache."""
 

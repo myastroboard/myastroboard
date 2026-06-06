@@ -233,3 +233,65 @@ class TestGetBestObservationTimes:
         result = svc.get_best_observation_times(0.0, 0.0, date(2026, 6, 15))
         if result:
             assert result["best_altitude_degrees"] > 0
+
+
+class TestExceptionHandlerBranches:
+    """Covers exception handler lines: 61-63, 78-80, 109-110, 171-173, 234-236, 320-322."""
+
+    def test_get_current_sidereal_info_exception_returns_empty(self, monkeypatch):
+        """Lines 61-63: exception in Time.now() → empty dict."""
+        from astropy.time import Time
+        monkeypatch.setattr(Time, 'now', staticmethod(lambda: (_ for _ in ()).throw(RuntimeError("time error"))))
+        svc = SiderealTimeService(45.0, -73.5)
+        result = svc.get_current_sidereal_info()
+        assert result == {}
+
+    def test_get_sidereal_info_for_time_exception_returns_empty(self, monkeypatch):
+        """Lines 78-80: invalid input that raises → empty dict."""
+        svc = SiderealTimeService(45.0, -73.5)
+        result = svc.get_sidereal_info_for_time("not-a-datetime")  # type: ignore
+        assert result == {}
+
+    def test_get_hourly_sidereal_times_exception_returns_empty_list(self, monkeypatch):
+        """Lines 109-110: exception in loop → empty list returned."""
+        from astropy.time import Time
+        svc = SiderealTimeService(45.0, -73.5)
+        monkeypatch.setattr(svc, '_calculate_sidereal_info', lambda t: (_ for _ in ()).throw(RuntimeError("calc error")))
+        result = svc.get_hourly_sidereal_times(date(2026, 6, 1), num_hours=1)
+        assert result == []
+
+    def test_get_object_lst_for_transit_exception_returns_empty(self, monkeypatch):
+        """Lines 171-173: exception in calculation → empty dict."""
+        svc = SiderealTimeService(45.0, -73.5)
+        monkeypatch.setattr(svc, '_calculate_sidereal_info', lambda t: (_ for _ in ()).throw(RuntimeError("calc error")))
+        result = svc.get_object_lst_for_transit(180.0, date(2026, 6, 15))
+        assert result == {}
+
+    def test_calculate_sidereal_info_exception_returns_empty(self, monkeypatch):
+        """Lines 234-236: exception in _calculate_sidereal_info → empty dict."""
+        from astropy.time import Time
+        svc = SiderealTimeService(45.0, -73.5)
+        t = Time(datetime(2026, 6, 1, 0, 0, 0, tzinfo=ZoneInfo("UTC")))
+        monkeypatch.setattr(t, 'sidereal_time', lambda *a, **kw: (_ for _ in ()).throw(ValueError("bad")))
+        result = svc._calculate_sidereal_info(t)
+        assert result == {}
+
+    def test_get_best_observation_times_exception_returns_empty(self, monkeypatch):
+        """Lines 320-322: exception in SkyCoord → empty dict."""
+        svc = SiderealTimeService(45.0, -73.5)
+        monkeypatch.setattr(svc, '_calculate_sidereal_info', lambda t: (_ for _ in ()).throw(RuntimeError("calc error")))
+        # Pass an invalid date type to trigger exception
+        result = svc.get_best_observation_times(6.0, 45.0, "not-a-date")  # type: ignore
+        assert result == {}
+
+
+class TestNormalizationBranches:
+    """Covers normalization while-loop lines: 140."""
+
+    def test_gst_normalization_negative(self):
+        """Line 140: gst_at_transit < 0 → += 24 triggered by east longitude."""
+        # longitude=135, ra=0 → lst_at_transit=0, lon_hours=9 → gst=-9 < 0
+        svc = SiderealTimeService(35.0, 135.0)  # Japan longitude
+        result = svc.get_object_lst_for_transit(0.0, date(2026, 6, 15))
+        # Should succeed (no exception) and gst normalization happened internally
+        assert isinstance(result, dict)

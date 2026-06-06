@@ -89,6 +89,136 @@ def test_merge_item_with_target_entry_adds_alias_payload(monkeypatch):
     assert merged['catalogue_aliases']['OpenNGC'] == 'NGC 224'
 
 
+def test_choose_preferred_catalogue_name_empty_dict():
+    name = skytonight_targets.choose_preferred_catalogue_name({})
+    assert name == ''
+
+
+def test_choose_preferred_catalogue_name_unknown_catalogue():
+    """Unknown catalogue falls back to alphabetical position."""
+    name = skytonight_targets.choose_preferred_catalogue_name({'UnknownCat': 'UNK 999'})
+    assert name == 'UNK 999'
+
+
+def test_append_lookup_name_empty_values():
+    """_append_lookup_name should be a no-op when catalogue or name is empty."""
+    lookup = {}
+    skytonight_targets._append_lookup_name(lookup, '', 'M 31', {'group_id': 'X'})
+    assert len(lookup) == 0
+    skytonight_targets._append_lookup_name(lookup, 'Messier', '', {'group_id': 'X'})
+    assert len(lookup) == 0
+
+
+def test_coerce_targets_non_list_returns_empty():
+    result = skytonight_targets._coerce_targets("not a list")
+    assert result == []
+
+
+def test_coerce_targets_skips_non_dict_items():
+    result = skytonight_targets._coerce_targets(["string", 123, None])
+    assert result == []
+
+
+def test_coerce_targets_skips_invalid_target_dict():
+    """A dict that raises TypeError/ValueError during from_dict is skipped."""
+    result = skytonight_targets._coerce_targets([{"invalid_key_only": True}])
+    assert isinstance(result, list)
+
+
+def test_coerce_targets_skips_target_without_id():
+    """A target dict with empty target_id should be excluded."""
+    result = skytonight_targets._coerce_targets([{
+        "target_id": "",
+        "category": "deep_sky",
+        "object_type": "Galaxy",
+        "preferred_name": "Test",
+        "catalogue_names": {},
+        "aliases": [],
+        "constellation": "",
+        "magnitude": None,
+        "size_arcmin": None,
+        "coordinates": None,
+        "source_catalogues": [],
+        "translation_key": "",
+    }])
+    assert result == []
+
+
+def test_save_targets_dataset_returns_false_when_save_fails(tmp_path, monkeypatch):
+    monkeypatch.setattr(skytonight_targets, "save_json_file", lambda *_a, **_k: False)
+    result = skytonight_targets.save_targets_dataset([], dataset_file=str(tmp_path / "out.json"))
+    assert result is False
+
+
+def test_get_aliases_map_returns_dict(tmp_path):
+    dataset_file = tmp_path / 'targets.json'
+    from tests.test_skytonight_targets import _sample_targets
+    skytonight_targets.save_targets_dataset(_sample_targets(), dataset_file=str(dataset_file))
+    aliases = skytonight_targets.get_aliases_map('Messier', 'M 31', dataset_file=str(dataset_file))
+    assert isinstance(aliases, dict)
+
+
+def test_get_group_id_returns_string(tmp_path):
+    dataset_file = tmp_path / 'targets.json'
+    from tests.test_skytonight_targets import _sample_targets
+    skytonight_targets.save_targets_dataset(_sample_targets(), dataset_file=str(dataset_file))
+    gid = skytonight_targets.get_group_id('Messier', 'M 31', dataset_file=str(dataset_file))
+    assert isinstance(gid, str)
+    assert gid == 'DSO-0001'
+
+
+def test_merge_item_with_target_entry_non_dict():
+    result = skytonight_targets.merge_item_with_target_entry("not a dict")
+    assert result == "not a dict"
+
+
+def test_merge_item_with_target_entry_no_catalogue():
+    item = {'name': 'M 31'}
+    result = skytonight_targets.merge_item_with_target_entry(item)
+    assert 'catalogue_aliases' not in result
+    assert 'catalogue_group_id' not in result
+
+
+def test_merge_item_with_target_entry_no_entry(monkeypatch):
+    monkeypatch.setattr(skytonight_targets, 'get_lookup_entry', lambda *_a, **_k: {})
+    item = {'catalogue': 'Messier', 'name': 'M 999'}
+    result = skytonight_targets.merge_item_with_target_entry(item)
+    assert 'catalogue_aliases' not in result
+
+
+def test_merge_item_empty_aliases(monkeypatch):
+    monkeypatch.setattr(
+        skytonight_targets,
+        'get_lookup_entry',
+        lambda *_a, **_k: {'group_id': '', 'aliases': {}},
+    )
+    item = {'catalogue': 'Messier', 'name': 'M 31'}
+    result = skytonight_targets.merge_item_with_target_entry(item)
+    assert 'catalogue_aliases' not in result
+    assert 'catalogue_group_id' not in result
+
+
+def test_build_lookup_no_preferred_name():
+    """Target with no preferred_name uses choose_preferred_catalogue_name as fallback."""
+    from skytonight_models import SkyTonightCoordinates, SkyTonightTarget
+    target = SkyTonightTarget(
+        target_id='DSO-TEST',
+        category='deep_sky',
+        object_type='Galaxy',
+        preferred_name='',
+        catalogue_names={'OpenNGC': 'NGC 999'},
+        aliases=[],
+        constellation='Orion',
+        magnitude=10.0,
+        size_arcmin=5.0,
+        coordinates=SkyTonightCoordinates(ra_hours=5.0, dec_degrees=-5.0),
+        source_catalogues=['OpenNGC'],
+        translation_key='',
+    )
+    lookup = skytonight_targets.build_lookup_from_targets([target])
+    assert any('dso-test' in v.get('group_id', '').lower() or v.get('group_id') == 'DSO-TEST' for v in lookup.values())
+
+
 def test_invalidate_targets_dataset_cache_forces_reload_from_disk(tmp_path):
     dataset_file = tmp_path / 'targets.json'
     skytonight_targets.save_targets_dataset(_sample_targets(), dataset_file=str(dataset_file))

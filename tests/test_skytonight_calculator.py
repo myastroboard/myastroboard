@@ -1087,3 +1087,1351 @@ class TestBodyAliasMap:
         result = _find_body_entry_by_localized_name('lune', lookup)
         assert result is not None
         assert result['target_id'] == 'body-moon'
+
+
+# ---------------------------------------------------------------------------
+# Additional tests to improve branch/line coverage
+# ---------------------------------------------------------------------------
+
+
+class TestSaveAlttimeJsonBranches:
+    """Cover _save_alttime_json optional-field branches."""
+
+    def test_save_alttime_with_astro_night_and_azimuth(self):
+        """Covers astro_night_start/end + az_degrees branches (lines 112-116)."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.object(calc, 'SKYTONIGHT_OUTPUT_DIR', tmp):
+                night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
+                night_end = night_start + timedelta(hours=8)
+                ok = _save_alttime_json(
+                    target_id='ngc-test',
+                    name='NGC Test',
+                    times=None,
+                    altitudes=np.array([35.0, 45.0]),
+                    night_start=night_start,
+                    night_end=night_end,
+                    constraints={'altitude_constraint_min': 20, 'altitude_constraint_max': 80},
+                    precomputed_times_iso=['2026-04-17T21:00:00', '2026-04-17T21:15:00'],
+                    az_degrees=np.array([100.0, 120.0]),
+                    astro_night_start=night_start + timedelta(minutes=30),
+                    astro_night_end=night_end - timedelta(minutes=30),
+                )
+                assert ok is True
+
+    def test_save_alttime_with_horizon_profile(self):
+        """Covers horizon_profile branch in _save_alttime_json (line 118-119)."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.object(calc, 'SKYTONIGHT_OUTPUT_DIR', tmp):
+                night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
+                ok = _save_alttime_json(
+                    target_id='ngc-horizon',
+                    name='NGC Horizon',
+                    times=None,
+                    altitudes=np.array([35.0]),
+                    night_start=night_start,
+                    night_end=night_start + timedelta(hours=6),
+                    constraints={
+                        'altitude_constraint_min': 20,
+                        'altitude_constraint_max': 80,
+                        'horizon_profile': [{'az': 0.0, 'alt': 10.0}, {'az': 180.0, 'alt': 15.0}],
+                    },
+                    precomputed_times_iso=['2026-04-17T21:00:00'],
+                )
+                assert ok is True
+
+    def test_save_alttime_exception_returns_false(self):
+        """Covers exception handler branch (lines 122-124)."""
+        with patch('skytonight_calculator.ensure_directory_exists', side_effect=RuntimeError('disk full')):
+            ok = _save_alttime_json(
+                target_id='fail',
+                name='Fail',
+                times=None,
+                altitudes=np.array([30.0]),
+                night_start=datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc),
+                night_end=datetime(2026, 4, 18, 5, 0, tzinfo=timezone.utc),
+                constraints={},
+                precomputed_times_iso=['2026-04-17T21:00:00'],
+            )
+            assert ok is False
+
+    def test_save_alttime_with_times_object(self):
+        """Covers the else branch where times is not None (lines 96-99)."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.object(calc, 'SKYTONIGHT_OUTPUT_DIR', tmp):
+                night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
+                # Create a fake times object whose to_datetime() returns list of datetimes
+                fake_times = MagicMock()
+                fake_dt_list = [
+                    datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc),
+                    datetime(2026, 4, 17, 21, 15, tzinfo=timezone.utc),
+                ]
+                # to_datetime should return objects with strftime
+                fake_times.to_datetime.return_value = fake_dt_list
+                ok = _save_alttime_json(
+                    target_id='m42',
+                    name='M42',
+                    times=fake_times,
+                    altitudes=np.array([40.0, 45.0]),
+                    night_start=night_start,
+                    night_end=night_start + timedelta(hours=6),
+                    constraints={'altitude_constraint_min': 20, 'altitude_constraint_max': 80},
+                    precomputed_times_iso=None,  # Force the times branch
+                )
+                assert ok is True
+
+
+class TestClearAlttimeFilesEdgeCases:
+    """Cover _clear_alttime_files exception path."""
+
+    def test_clear_alttime_files_handles_remove_error(self):
+        """Covers the inner except block when os.remove fails (line 135-136)."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            # Create an alttime JSON file
+            fname = os.path.join(tmp, 'test_alttime.json')
+            with open(fname, 'w') as f:
+                f.write('{}')
+            with patch.object(calc, 'SKYTONIGHT_OUTPUT_DIR', tmp):
+                with patch('os.remove', side_effect=PermissionError('no permission')):
+                    # Should not raise; silently swallows the error
+                    _clear_alttime_files()
+
+    def test_clear_alttime_files_outer_exception(self):
+        """Covers the outer except block (lines 137-138)."""
+        with patch('skytonight_calculator.ensure_directory_exists', side_effect=OSError('fail')):
+            _clear_alttime_files()  # must not raise
+
+
+class TestGetAstroNightWindow:
+    """Cover _get_astro_night_window branches."""
+
+    @patch('skytonight_calculator.SunService')
+    def test_get_astro_night_window_today(self, mock_sun_service):
+        from types import SimpleNamespace
+        fake = MagicMock()
+        fake.get_today_report.return_value = SimpleNamespace(
+            astronomical_dusk='2026-04-17 22:00',
+            astronomical_dawn='2026-04-18 04:00',
+        )
+        mock_sun_service.return_value = fake
+        from skytonight_calculator import _get_astro_night_window
+        window = _get_astro_night_window(45.0, -75.0, 'UTC')
+        assert window is not None
+        assert window[0] < window[1]
+
+    @patch('skytonight_calculator.SunService')
+    def test_get_astro_night_window_falls_back_to_tomorrow(self, mock_sun_service):
+        from types import SimpleNamespace
+        fake = MagicMock()
+        # Today: dawn <= dusk (forces fallback to tomorrow)
+        fake.get_today_report.return_value = SimpleNamespace(
+            astronomical_dusk='2026-04-18 22:00',
+            astronomical_dawn='2026-04-18 04:00',
+        )
+        fake.get_tomorrow_report.return_value = SimpleNamespace(
+            astronomical_dusk='2026-04-18 22:00',
+            astronomical_dawn='2026-04-19 04:00',
+        )
+        mock_sun_service.return_value = fake
+        from skytonight_calculator import _get_astro_night_window
+        window = _get_astro_night_window(45.0, -75.0, 'UTC')
+        assert window is not None
+
+    @patch('skytonight_calculator.SunService')
+    def test_get_astro_night_window_returns_none_when_unavailable(self, mock_sun_service):
+        from types import SimpleNamespace
+        fake = MagicMock()
+        fake.get_today_report.return_value = SimpleNamespace(
+            astronomical_dusk='Not found',
+            astronomical_dawn='Not found',
+        )
+        fake.get_tomorrow_report.return_value = SimpleNamespace(
+            astronomical_dusk='Not found',
+            astronomical_dawn='Not found',
+        )
+        mock_sun_service.return_value = fake
+        from skytonight_calculator import _get_astro_night_window
+        window = _get_astro_night_window(45.0, -75.0, 'UTC')
+        assert window is None
+
+
+class TestGetNightWindowEdgeCases:
+    """Cover remaining _get_night_window branches."""
+
+    @patch('skytonight_calculator.SunService')
+    def test_get_night_window_returns_none_when_tomorrow_also_fails(self, mock_sun_service):
+        from types import SimpleNamespace
+        fake = MagicMock()
+        # Force dawn <= dusk today (triggers tomorrow lookup)
+        fake.get_today_report.return_value = SimpleNamespace(
+            nautical_dusk='2026-04-18 22:00',
+            nautical_dawn='2026-04-18 04:00',
+        )
+        # Tomorrow also bad
+        fake.get_tomorrow_report.return_value = SimpleNamespace(
+            nautical_dusk='Not found',
+            nautical_dawn='Not found',
+        )
+        mock_sun_service.return_value = fake
+        window = _get_night_window(45.0, -75.0, 'UTC')
+        assert window is None
+
+    @patch('skytonight_calculator.SunService')
+    def test_get_night_window_none_when_today_none(self, mock_sun_service):
+        from types import SimpleNamespace
+        fake = MagicMock()
+        fake.get_today_report.return_value = SimpleNamespace(
+            nautical_dusk=None,
+            nautical_dawn=None,
+        )
+        mock_sun_service.return_value = fake
+        window = _get_night_window(45.0, -75.0, 'UTC')
+        assert window is None
+
+
+class TestMoonInfoExceptionPath:
+    """Cover _MoonInfo._compute exception branch (lines 465-466)."""
+
+    def test_moon_info_graceful_on_exception(self):
+        with patch('skytonight_calculator.moon_illumination', side_effect=RuntimeError('ephemeris fail')):
+            times = [object()]
+            info = _MoonInfo(times, object())
+            # phase defaults to 0.0 on error
+            assert info.phase == 0.0
+            assert info.ra_deg is None
+            assert info.dec_deg is None
+
+
+class TestMeridianTransitExceptionPaths:
+    """Cover exception paths in meridian/antimeridian transit functions."""
+
+    def test_meridian_transit_fast_exception(self):
+        """Covers lines 424-426: exception in _meridian_transit_fast."""
+        # Pass bad data that will cause an exception inside numpy operations
+        result = _meridian_transit_fast(5.0, None, [])  # type: ignore
+        assert result is None
+
+    def test_antimeridian_transit_fast_exception(self):
+        """Covers lines 442-444: exception in _antimeridian_transit_fast."""
+        result = _antimeridian_transit_fast(5.0, None, [])  # type: ignore
+        assert result is None
+
+    @patch('skytonight_calculator.EarthLocation')
+    @patch('skytonight_calculator.Time')
+    def test_meridian_transit_time_exception(self, mock_time, mock_location):
+        """Covers exception handler in _meridian_transit_time (lines 373-376)."""
+        mock_time.side_effect = Exception('time broken')
+        start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
+        end = start + timedelta(hours=1)
+        result = _meridian_transit_time(5.0, start, end, 45.0, -75.0)
+        assert result is None
+
+    @patch('skytonight_calculator.EarthLocation')
+    @patch('skytonight_calculator.Time')
+    def test_antimeridian_transit_time_exception(self, mock_time, mock_location):
+        """Covers exception handler in _antimeridian_transit_time (lines 406-409)."""
+        mock_time.side_effect = Exception('time broken')
+        start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
+        end = start + timedelta(hours=1)
+        result = _antimeridian_transit_time(5.0, start, end, 45.0, -75.0)
+        assert result is None
+
+
+class TestComputeTargetResultEdgeCases:
+    """Cover uncovered branches in _compute_target_result."""
+
+    def _base_target(self):
+        from types import SimpleNamespace
+        return SimpleNamespace(
+            target_id='m42',
+            preferred_name='M42',
+            catalogue_names={'Messier': 'M42'},
+            category='deep_sky',
+            object_type='nebula',
+            constellation='Orion',
+            magnitude=4.0,
+            size_arcmin=65.0,
+            coordinates=SimpleNamespace(ra_hours=5.58, dec_degrees=-5.39),
+            source_catalogues=['Messier'],
+            metadata={},
+        )
+
+    def _base_constraints(self, **overrides):
+        c = {
+            'altitude_constraint_min': 20,
+            'altitude_constraint_max': 80,
+            'moon_separation_min': 45,
+            'size_constraint_min': 5,
+            'size_constraint_max': 300,
+            'fraction_of_time_observable_threshold': 0.2,
+            'moon_separation_use_illumination': False,
+            'airmass_constraint': 2.0,
+        }
+        c.update(overrides)
+        return c
+
+    def test_returns_none_when_coordinates_is_none(self):
+        from types import SimpleNamespace
+        target = self._base_target()
+        target.coordinates = None
+        result = _compute_target_result(
+            target=target,
+            times=None,
+            altaz_values=np.array([30.0, 40.0]),
+            location=object(),
+            moon=SimpleNamespace(phase=0.1, ra_deg=None, dec_deg=None),
+            constraints=self._base_constraints(),
+            night_start=datetime(2026, 4, 17, 21, 0),
+            night_end=datetime(2026, 4, 18, 5, 0),
+            lat=45.0, lon=-75.0,
+        )
+        assert result is None
+
+    def test_returns_none_when_too_few_steps(self):
+        from types import SimpleNamespace
+        target = self._base_target()
+        result = _compute_target_result(
+            target=target,
+            times=None,
+            altaz_values=np.array([35.0]),  # Only 1 step < _MIN_STEPS=2
+            location=object(),
+            moon=SimpleNamespace(phase=0.1, ra_deg=None, dec_deg=None),
+            constraints=self._base_constraints(),
+            night_start=datetime(2026, 4, 17, 21, 0),
+            night_end=datetime(2026, 4, 18, 5, 0),
+            lat=45.0, lon=-75.0,
+        )
+        assert result is None
+
+    def test_moon_separation_illumination_mode(self):
+        """Covers the moon_use_illum branch (lines 630-631)."""
+        from types import SimpleNamespace
+        target = self._base_target()
+        # Moon at same position as target → will fail moon separation
+        moon = SimpleNamespace(phase=0.8, ra_deg=5.58 * 15.0, dec_deg=-5.39)
+        result = _compute_target_result(
+            target=target,
+            times=None,
+            altaz_values=np.array([35.0, 45.0, 50.0, 40.0]),
+            location=object(),
+            moon=moon,
+            constraints=self._base_constraints(moon_separation_use_illumination=True),
+            night_start=datetime(2026, 4, 17, 21, 0),
+            night_end=datetime(2026, 4, 18, 5, 0),
+            lat=45.0, lon=-75.0,
+        )
+        # With 80% illumination → effective min sep = 80°; target near moon → filtered
+        assert result is None
+
+    def test_north_to_east_ccw_azimuth(self):
+        """Covers north_to_east_ccw branch for azimuth computation (line 682)."""
+        from types import SimpleNamespace
+        target = self._base_target()
+        moon = SimpleNamespace(phase=0.1, ra_deg=None, dec_deg=None)
+        result = _compute_target_result(
+            target=target,
+            times=None,
+            altaz_values=np.array([35.0, 45.0, 50.0, 40.0]),
+            location=object(),
+            moon=moon,
+            constraints=self._base_constraints(north_to_east_ccw=True),
+            night_start=datetime(2026, 4, 17, 21, 0),
+            night_end=datetime(2026, 4, 18, 5, 0),
+            lat=45.0, lon=-75.0,
+            az_values=np.array([90.0, 120.0, 150.0, 180.0]),
+        )
+        assert result is not None
+        # azimuth should be CCW: (360 - az_cw) % 360
+        # peak at idx 2 → az_cw=150 → CCW = (360-150)%360 = 210
+        assert result['observation']['azimuth'] == 210.0
+
+    def test_fallback_az_computation_without_az_values(self):
+        """Covers the else branch computing az from SkyCoord when az_values is None (lines 677-681)."""
+        from types import SimpleNamespace
+        target = self._base_target()
+        moon = SimpleNamespace(phase=0.1, ra_deg=None, dec_deg=None)
+
+        # Provide a fake times array that supports slicing
+        mock_times = MagicMock()
+        mock_slice = MagicMock()
+        mock_times.__getitem__ = MagicMock(return_value=mock_slice)
+
+        with patch('skytonight_calculator.SkyCoord') as mock_skycoord, \
+             patch('skytonight_calculator.AltAz') as mock_altaz:
+            mock_altaz_inst = MagicMock()
+            mock_altaz_inst.az.deg = [120.0]
+            mock_coord_inst = MagicMock()
+            mock_coord_inst.transform_to.return_value = mock_altaz_inst
+            mock_skycoord.return_value = mock_coord_inst
+
+            result = _compute_target_result(
+                target=target,
+                times=mock_times,
+                altaz_values=np.array([35.0, 45.0, 50.0, 40.0]),
+                location=object(),
+                moon=moon,
+                constraints=self._base_constraints(),
+                night_start=datetime(2026, 4, 17, 21, 0),
+                night_end=datetime(2026, 4, 18, 5, 0),
+                lat=45.0, lon=-75.0,
+                az_values=None,  # Force the fallback branch
+                lst_hours=np.array([0.5, 0.7, 0.9, 1.1]),
+                times_local=[
+                    datetime(2026, 4, 17, 21, 0),
+                    datetime(2026, 4, 17, 21, 15),
+                    datetime(2026, 4, 17, 21, 30),
+                    datetime(2026, 4, 17, 21, 45),
+                ],
+            )
+        assert result is not None
+
+    def test_horizon_profile_applies_floor(self):
+        """Covers horizon_profile branch in observable fraction (lines 644-647)."""
+        from types import SimpleNamespace
+        target = self._base_target()
+        moon = SimpleNamespace(phase=0.1, ra_deg=None, dec_deg=None)
+        # Profile sets very high floor → target never visible → returns None
+        profile = [{'az': 0.0, 'alt': 80.0}, {'az': 180.0, 'alt': 80.0}, {'az': 360.0, 'alt': 80.0}]
+        result = _compute_target_result(
+            target=target,
+            times=None,
+            altaz_values=np.array([35.0, 45.0, 50.0, 40.0]),
+            location=object(),
+            moon=moon,
+            constraints=self._base_constraints(
+                horizon_profile=profile,
+                fraction_of_time_observable_threshold=0.5,
+            ),
+            night_start=datetime(2026, 4, 17, 21, 0),
+            night_end=datetime(2026, 4, 18, 5, 0),
+            lat=45.0, lon=-75.0,
+            az_values=np.array([90.0, 120.0, 150.0, 180.0]),
+        )
+        assert result is None
+
+    def test_preferred_name_order_applied(self):
+        """Covers preferred_name_order branch in result building (lines 746-753)."""
+        from types import SimpleNamespace
+        target = self._base_target()
+        moon = SimpleNamespace(phase=0.1, ra_deg=None, dec_deg=None)
+        result = _compute_target_result(
+            target=target,
+            times=None,
+            altaz_values=np.array([35.0, 45.0, 50.0, 40.0]),
+            location=object(),
+            moon=moon,
+            constraints=self._base_constraints(),
+            night_start=datetime(2026, 4, 17, 21, 0),
+            night_end=datetime(2026, 4, 18, 5, 0),
+            lat=45.0, lon=-75.0,
+            az_values=np.array([90.0, 120.0, 150.0, 180.0]),
+            preferred_name_order=['Messier'],
+        )
+        assert result is not None
+        # preferred_name_order=['Messier'] → picks from catalogue_names['Messier'] = 'M42'
+        assert result['preferred_name'] == 'M42'
+
+    def test_rise_set_times_without_times_local(self):
+        """Covers the else branch for rise/set time when times_local is None (lines 696-710)."""
+        from types import SimpleNamespace
+        target = self._base_target()
+        moon = SimpleNamespace(phase=0.1, ra_deg=None, dec_deg=None)
+        # No times_local → use timedelta arithmetic
+        result = _compute_target_result(
+            target=target,
+            times=None,
+            altaz_values=np.array([35.0, 45.0, 50.0, 40.0]),
+            location=object(),
+            moon=moon,
+            constraints=self._base_constraints(),
+            night_start=datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc),
+            night_end=datetime(2026, 4, 18, 5, 0, tzinfo=timezone.utc),
+            lat=45.0, lon=-75.0,
+            az_values=np.array([90.0, 120.0, 150.0, 180.0]),
+            lst_hours=None,
+            times_local=None,  # Forces the fallback code path
+        )
+        assert result is not None
+        obs = result['observation']
+        assert obs['rise_time'] is not None
+        assert obs['set_time'] is not None
+
+    def test_sqm_applies_light_pollution_factor(self):
+        """Covers the sqm branch in compute_astro_score via _compute_target_result (line 527-529)."""
+        from types import SimpleNamespace
+        target = self._base_target()
+        moon = SimpleNamespace(phase=0.1, ra_deg=None, dec_deg=None)
+        result = _compute_target_result(
+            target=target,
+            times=None,
+            altaz_values=np.array([35.0, 45.0, 50.0, 40.0]),
+            location=object(),
+            moon=moon,
+            constraints=self._base_constraints(),
+            night_start=datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc),
+            night_end=datetime(2026, 4, 18, 5, 0, tzinfo=timezone.utc),
+            lat=45.0, lon=-75.0,
+            az_values=np.array([90.0, 120.0, 150.0, 180.0]),
+            sqm=21.5,  # Triggers the sqm branch in compute_astro_score
+        )
+        assert result is not None
+        assert 0.0 <= result['astro_score'] <= 1.0
+
+
+class TestComputeBodyResultEdgeCases:
+    """Cover uncovered branches in _compute_body_result."""
+
+    def _base_body_target(self, name='Jupiter', obj_type='Planet'):
+        from types import SimpleNamespace
+        return SimpleNamespace(
+            target_id=f'body-{name.lower()}',
+            preferred_name=name,
+            catalogue_names={'Bodies': name},
+            category='bodies',
+            object_type=obj_type,
+            magnitude=-2.0,
+            source_catalogues=['Bodies'],
+            metadata={},
+        )
+
+    @patch('skytonight_calculator._compute_body_altaz_series')
+    @patch('skytonight_calculator._antimeridian_transit_time')
+    @patch('skytonight_calculator._meridian_transit_time')
+    def test_body_result_with_north_to_east_ccw(self, mock_mer, mock_antimer, mock_series):
+        """Covers north_to_east_ccw branch for body azimuth (line 860)."""
+        mock_series.return_value = (
+            np.array([25.0, 40.0, 35.0]),
+            np.array([90.0, 120.0, 150.0]),
+            5.0, 20.0,
+        )
+        mock_mer.return_value = '22:00'
+        mock_antimer.return_value = '04:00'
+        target = self._base_body_target()
+        from types import SimpleNamespace
+        moon = SimpleNamespace(phase=0.2, ra_deg=10.0, dec_deg=5.0)
+        result, alt, az = _compute_body_result(
+            target=target,
+            times=[object(), object(), object()],
+            location=object(),
+            moon=moon,
+            constraints={'altitude_constraint_min': 20, 'airmass_constraint': 2.0, 'north_to_east_ccw': True},
+            night_start=datetime(2026, 4, 17, 21, 0),
+            night_end=datetime(2026, 4, 18, 5, 0),
+            lat=45.0, lon=-75.0,
+        )
+        assert result is not None
+        # CCW azimuth: peak at idx 1 → az_cw=120 → CCW = (360-120)%360 = 240
+        assert result['observation']['azimuth'] == 240.0
+
+    @patch('skytonight_calculator._compute_body_altaz_series')
+    def test_body_result_returns_none_when_series_raises(self, mock_series):
+        """Covers exception path in _compute_body_result (lines 808-810)."""
+        mock_series.side_effect = RuntimeError('ephemeris broken')
+        target = self._base_body_target()
+        from types import SimpleNamespace
+        moon = SimpleNamespace(phase=0.1, ra_deg=None, dec_deg=None)
+        result, alt, az = _compute_body_result(
+            target=target,
+            times=[object()],
+            location=object(),
+            moon=moon,
+            constraints={'altitude_constraint_min': 20, 'airmass_constraint': 2.0},
+            night_start=datetime(2026, 4, 17, 21, 0),
+            night_end=datetime(2026, 4, 18, 5, 0),
+            lat=45.0, lon=-75.0,
+        )
+        assert result is None
+        assert alt is None
+        assert az is None
+
+    @patch('skytonight_calculator._compute_body_altaz_series')
+    @patch('skytonight_calculator._antimeridian_transit_time')
+    @patch('skytonight_calculator._meridian_transit_time')
+    def test_body_result_moon_always_included_below_alt(self, mock_mer, mock_antimer, mock_series):
+        """Covers is_moon always-included logic (lines 850-855)."""
+        # Moon alt below alt_min all night → but still returned
+        mock_series.return_value = (
+            np.array([5.0, 8.0, 3.0]),   # all below alt_min=20
+            np.array([90.0, 120.0, 150.0]),
+            5.0, 20.0,
+        )
+        mock_mer.return_value = None
+        mock_antimer.return_value = None
+        target = self._base_body_target('Moon', 'Moon')
+        from types import SimpleNamespace
+        moon = SimpleNamespace(phase=0.05, ra_deg=None, dec_deg=None)
+        result, alt, az = _compute_body_result(
+            target=target,
+            times=[object(), object(), object()],
+            location=object(),
+            moon=moon,
+            constraints={'altitude_constraint_min': 20, 'airmass_constraint': 2.0},
+            night_start=datetime(2026, 4, 17, 21, 0),
+            night_end=datetime(2026, 4, 18, 5, 0),
+            lat=45.0, lon=-75.0,
+        )
+        assert result is not None  # Moon always returned
+
+    @patch('skytonight_calculator._compute_body_altaz_series')
+    @patch('skytonight_calculator._antimeridian_transit_time')
+    @patch('skytonight_calculator._meridian_transit_time')
+    @patch('skytonight_calculator.get_body')
+    def test_body_result_opposition_detected(self, mock_get_body, mock_mer, mock_antimer, mock_series):
+        """Covers is_opposition detection branch (line 911) and solar elongation."""
+        from types import SimpleNamespace as NS
+        mock_series.return_value = (
+            np.array([50.0, 60.0, 55.0]),
+            np.array([90.0, 120.0, 150.0]),
+            12.0, -10.0,
+        )
+        mock_mer.return_value = '22:00'
+        mock_antimer.return_value = '04:00'
+        # Sun at opposite direction: ra ≈ 0 degrees vs target at 12h*15=180 degrees → ~180° separation
+        sun_coord = NS(ra=NS(deg=0.0), dec=NS(deg=0.0))
+        mock_get_body.return_value = sun_coord
+
+        target = self._base_body_target('Mars', 'Planet')
+        moon = NS(phase=0.2, ra_deg=10.0, dec_deg=5.0)
+        result, alt, az = _compute_body_result(
+            target=target,
+            times=[object(), object(), object()],
+            location=object(),
+            moon=moon,
+            constraints={'altitude_constraint_min': 20, 'airmass_constraint': 2.0},
+            night_start=datetime(2026, 4, 17, 21, 0),
+            night_end=datetime(2026, 4, 18, 5, 0),
+            lat=45.0, lon=-75.0,
+        )
+        assert result is not None
+        assert result['solar_elongation_deg'] is not None
+
+    @patch('skytonight_calculator._compute_body_altaz_series')
+    def test_body_result_returns_none_for_too_few_steps(self, mock_series):
+        """Covers early return when total_steps < _MIN_STEPS (lines 838-839)."""
+        mock_series.return_value = (
+            np.array([50.0]),   # Only 1 step
+            np.array([90.0]),
+            5.0, 20.0,
+        )
+        target = self._base_body_target()
+        from types import SimpleNamespace
+        moon = SimpleNamespace(phase=0.1, ra_deg=None, dec_deg=None)
+        result, alt, az = _compute_body_result(
+            target=target,
+            times=[object()],
+            location=object(),
+            moon=moon,
+            constraints={'altitude_constraint_min': 20, 'airmass_constraint': 2.0},
+            night_start=datetime(2026, 4, 17, 21, 0),
+            night_end=datetime(2026, 4, 18, 5, 0),
+            lat=45.0, lon=-75.0,
+        )
+        assert result is None
+
+    @patch('skytonight_calculator._compute_body_altaz_series')
+    @patch('skytonight_calculator._antimeridian_transit_time')
+    @patch('skytonight_calculator._meridian_transit_time')
+    def test_body_result_with_horizon_profile(self, mock_mer, mock_antimer, mock_series):
+        """Covers horizon_profile branch in _compute_body_result (lines 842-844)."""
+        mock_series.return_value = (
+            np.array([50.0, 60.0, 55.0]),
+            np.array([90.0, 120.0, 150.0]),
+            5.0, 20.0,
+        )
+        mock_mer.return_value = '22:00'
+        mock_antimer.return_value = '04:00'
+        target = self._base_body_target()
+        from types import SimpleNamespace
+        moon = SimpleNamespace(phase=0.2, ra_deg=10.0, dec_deg=5.0)
+        result, alt, az = _compute_body_result(
+            target=target,
+            times=[object(), object(), object()],
+            location=object(),
+            moon=moon,
+            constraints={
+                'altitude_constraint_min': 20,
+                'airmass_constraint': 2.0,
+                'horizon_profile': [{'az': 0.0, 'alt': 10.0}, {'az': 180.0, 'alt': 10.0}],
+            },
+            night_start=datetime(2026, 4, 17, 21, 0),
+            night_end=datetime(2026, 4, 18, 5, 0),
+            lat=45.0, lon=-75.0,
+        )
+        assert result is not None
+
+
+class TestCleanupCalculationMemory:
+    """Cover _cleanup_calculation_memory (lines 1002-1012)."""
+
+    def test_cleanup_clears_all_lists(self):
+        from skytonight_calculator import _cleanup_calculation_memory
+        a = [1, 2]
+        b = [3, 4]
+        c = [5]
+        d = [6]
+        e = [7]
+        f = [8]
+        ti = ['2026-01-01']
+        tl = [datetime(2026, 1, 1, tzinfo=timezone.utc)]
+        _cleanup_calculation_memory(
+            deep_sky_results=a,
+            bodies_results=b,
+            comets_results=c,
+            skymap_entries=d,
+            all_targets=e,
+            dso_targets_with_coords=f,
+            times_iso_list=ti,
+            times_local=tl,
+        )
+        assert a == []
+        assert b == []
+        assert ti == []
+        assert tl == []
+
+    def test_cleanup_handles_none_optional_lists(self):
+        from skytonight_calculator import _cleanup_calculation_memory
+        # Should not raise when times_iso_list/times_local are None
+        _cleanup_calculation_memory(
+            deep_sky_results=[],
+            bodies_results=[],
+            comets_results=[],
+            skymap_entries=[],
+            all_targets=[],
+            dso_targets_with_coords=[],
+            times_iso_list=None,
+            times_local=None,
+        )
+
+
+class TestLoadCalculationResults:
+    """Cover load_calculation_results (lines 1514-1534)."""
+
+    def test_load_calculation_results_merges_files(self):
+        from skytonight_calculator import load_calculation_results
+        meta = {'metadata': {'calculated_at': '2026-01-01', 'counts': {}}}
+        dso = {'metadata': {}, 'deep_sky': [{'target_id': 'ngc1'}]}
+        bodies = {'metadata': {}, 'bodies': [{'target_id': 'jupiter'}]}
+        comets = {'metadata': {}, 'comets': []}
+        with patch('skytonight_calculator.load_json_file', side_effect=[meta, dso, bodies, comets]):
+            result = load_calculation_results()
+        assert result['metadata']['calculated_at'] == '2026-01-01'
+        assert result['deep_sky'] == [{'target_id': 'ngc1'}]
+        assert result['bodies'] == [{'target_id': 'jupiter'}]
+        assert result['comets'] == []
+
+    def test_load_calculation_results_falls_back_to_dso_metadata(self):
+        from skytonight_calculator import load_calculation_results
+        # Summary file has no metadata → should fall back to dso_file metadata
+        meta = {}
+        dso = {'metadata': {'from': 'dso'}, 'deep_sky': []}
+        bodies = {'metadata': {}, 'bodies': []}
+        comets = {'metadata': {}, 'comets': []}
+        with patch('skytonight_calculator.load_json_file', side_effect=[meta, dso, bodies, comets]):
+            result = load_calculation_results()
+        assert result['metadata'] == {'from': 'dso'}
+
+
+class TestRunCalculationsNoNight:
+    """Cover run_calculations when _get_night_window returns None (lines 1101-1121)."""
+
+    @patch('skytonight_calculator.ensure_skytonight_directories')
+    @patch('skytonight_calculator.load_config')
+    @patch('skytonight_calculator._get_night_window', return_value=None)
+    @patch('skytonight_calculator.save_json_file')
+    def test_run_calculations_no_night_returns_no_night_found(
+        self, mock_save, mock_night, mock_config, mock_dirs
+    ):
+        from skytonight_calculator import run_calculations
+        mock_config.return_value = {
+            'location': {'latitude': 45.0, 'longitude': -75.0, 'timezone': 'UTC'},
+            'skytonight': {},
+        }
+        result = run_calculations()
+        assert result['night_found'] is False
+        assert result['counts'] == {'deep_sky': 0, 'bodies': 0, 'comets': 0}
+        # Should have saved 4 empty files (bodies, comets, dso, main)
+        assert mock_save.call_count >= 4
+
+
+class TestRunCalculationsWithData:
+    """Cover run_calculations with a minimal dataset (lines 1038-1511)."""
+
+    def _make_dso_target(self):
+        from skytonight_models import SkyTonightTarget, SkyTonightCoordinates
+        return SkyTonightTarget(
+            target_id='dso-1',
+            category='deep_sky',
+            object_type='Galaxy',
+            preferred_name='Test Galaxy',
+            catalogue_names={'OpenNGC': 'Test Galaxy'},
+            constellation='Orion',
+            magnitude=8.0,
+            size_arcmin=30.0,
+            coordinates=SkyTonightCoordinates(ra_hours=5.5, dec_degrees=45.0),
+            source_catalogues=['OpenNGC'],
+        )
+
+    def _make_body_target(self):
+        from skytonight_models import SkyTonightTarget
+        return SkyTonightTarget(
+            target_id='body-jupiter',
+            category='bodies',
+            object_type='Planet',
+            preferred_name='Jupiter',
+            catalogue_names={'Bodies': 'Jupiter'},
+            source_catalogues=['Bodies'],
+            metadata={'source': 'builtin-solar-system'},
+        )
+
+    @patch('skytonight_calculator.ensure_skytonight_directories')
+    @patch('skytonight_calculator.save_json_file')
+    @patch('skytonight_calculator._get_astro_night_window', return_value=None)
+    @patch('skytonight_calculator._clear_alttime_files')
+    @patch('skytonight_calculator._MoonInfo')
+    @patch('skytonight_calculator.EarthLocation')
+    @patch('skytonight_calculator._sample_times')
+    @patch('skytonight_calculator._get_night_window')
+    @patch('skytonight_calculator.load_targets_dataset')
+    @patch('skytonight_calculator.load_config')
+    def test_run_calculations_with_empty_dataset(
+        self, mock_config, mock_dataset, mock_night, mock_times,
+        mock_location, mock_moon, mock_clear, mock_astro, mock_save, mock_dirs
+    ):
+        """Cover run_calculations through the no-targets path."""
+        from skytonight_calculator import run_calculations
+        from types import SimpleNamespace
+
+        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
+        night_end = datetime(2026, 4, 18, 5, 0, tzinfo=timezone.utc)
+
+        mock_config.return_value = {
+            'location': {'latitude': 45.0, 'longitude': -75.0, 'timezone': 'UTC'},
+            'skytonight': {},
+        }
+        mock_dataset.return_value = {'targets': [], 'lookup': {}}
+        mock_night.return_value = (night_start, night_end)
+
+        mock_times_obj = MagicMock()
+        mock_times_obj.__len__ = MagicMock(return_value=33)
+        mock_times_obj.sidereal_time.return_value = MagicMock(hour=np.zeros(33))
+        mock_times_obj.to_datetime.return_value = [
+            night_start + timedelta(minutes=i * 15) for i in range(33)
+        ]
+        mock_times.return_value = mock_times_obj
+
+        moon_inst = SimpleNamespace(phase=0.2, ra_deg=10.0, dec_deg=5.0)
+        mock_moon.return_value = moon_inst
+
+        result = run_calculations()
+        assert result['night_found'] is True
+        assert result['counts'] == {'deep_sky': 0, 'bodies': 0, 'comets': 0}
+
+    @patch('skytonight_calculator.ensure_skytonight_directories')
+    @patch('skytonight_calculator.save_json_file')
+    @patch('skytonight_calculator._get_astro_night_window', return_value=None)
+    @patch('skytonight_calculator._clear_alttime_files')
+    @patch('skytonight_calculator._MoonInfo')
+    @patch('skytonight_calculator.EarthLocation')
+    @patch('skytonight_calculator._sample_times')
+    @patch('skytonight_calculator._get_night_window')
+    @patch('skytonight_calculator.load_targets_dataset')
+    @patch('skytonight_calculator.load_config')
+    def test_run_calculations_with_sqm_from_bortle(
+        self, mock_config, mock_dataset, mock_night, mock_times,
+        mock_location, mock_moon, mock_clear, mock_astro, mock_save, mock_dirs
+    ):
+        """Cover the sqm/bortle derivation path (lines 1056-1067)."""
+        from skytonight_calculator import run_calculations
+        from types import SimpleNamespace
+
+        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
+        night_end = datetime(2026, 4, 18, 5, 0, tzinfo=timezone.utc)
+
+        mock_config.return_value = {
+            'location': {
+                'latitude': 45.0, 'longitude': -75.0, 'timezone': 'UTC',
+                'bortle': 5,  # triggers the bortle → sqm path
+            },
+            'skytonight': {},
+        }
+        mock_dataset.return_value = {'targets': [], 'lookup': {}}
+        mock_night.return_value = (night_start, night_end)
+
+        mock_times_obj = MagicMock()
+        mock_times_obj.__len__ = MagicMock(return_value=2)
+        mock_times_obj.sidereal_time.return_value = MagicMock(hour=np.zeros(2))
+        mock_times_obj.to_datetime.return_value = [night_start, night_end]
+        mock_times.return_value = mock_times_obj
+
+        moon_inst = SimpleNamespace(phase=0.2, ra_deg=10.0, dec_deg=5.0)
+        mock_moon.return_value = moon_inst
+
+        result = run_calculations()
+        assert result['night_found'] is True
+
+    @patch('skytonight_calculator.ensure_skytonight_directories')
+    @patch('skytonight_calculator.save_json_file')
+    @patch('skytonight_calculator._get_astro_night_window', return_value=None)
+    @patch('skytonight_calculator._clear_alttime_files')
+    @patch('skytonight_calculator._compute_body_result')
+    @patch('skytonight_calculator._MoonInfo')
+    @patch('skytonight_calculator.EarthLocation')
+    @patch('skytonight_calculator._sample_times')
+    @patch('skytonight_calculator._get_night_window')
+    @patch('skytonight_calculator.load_targets_dataset')
+    @patch('skytonight_calculator.load_config')
+    def test_run_calculations_with_body_target(
+        self, mock_config, mock_dataset, mock_night, mock_times,
+        mock_location, mock_moon, mock_body_result, mock_clear, mock_astro, mock_save, mock_dirs
+    ):
+        """Cover the bodies loop in run_calculations (lines 1187-1231)."""
+        from skytonight_calculator import run_calculations
+        from types import SimpleNamespace
+
+        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
+        night_end = datetime(2026, 4, 18, 5, 0, tzinfo=timezone.utc)
+
+        mock_config.return_value = {
+            'location': {'latitude': 45.0, 'longitude': -75.0, 'timezone': 'UTC'},
+            'skytonight': {},
+        }
+        body = self._make_body_target()
+        mock_dataset.return_value = {'targets': [body], 'lookup': {}}
+        mock_night.return_value = (night_start, night_end)
+
+        mock_times_obj = MagicMock()
+        mock_times_obj.__len__ = MagicMock(return_value=2)
+        mock_times_obj.sidereal_time.return_value = MagicMock(hour=np.zeros(2))
+        mock_times_obj.to_datetime.return_value = [night_start, night_end]
+        mock_times.return_value = mock_times_obj
+
+        moon_inst = SimpleNamespace(phase=0.2, ra_deg=10.0, dec_deg=5.0)
+        mock_moon.return_value = moon_inst
+
+        alt_arr = np.array([35.0, 45.0])
+        az_arr = np.array([90.0, 120.0])
+        body_result_dict = {
+            'target_id': 'body-jupiter',
+            'preferred_name': 'Jupiter',
+            'astro_score': 0.7,
+            'object_type': 'Planet',
+            'constellation': '',
+        }
+        mock_body_result.return_value = (body_result_dict, alt_arr, az_arr)
+
+        result = run_calculations()
+        assert result['night_found'] is True
+        assert result['counts']['bodies'] == 1
+
+    def _make_body_target(self):
+        from skytonight_models import SkyTonightTarget
+        return SkyTonightTarget(
+            target_id='body-jupiter',
+            category='bodies',
+            object_type='Planet',
+            preferred_name='Jupiter',
+            catalogue_names={'Bodies': 'Jupiter'},
+            source_catalogues=['Bodies'],
+            metadata={'source': 'builtin-solar-system'},
+        )
+
+
+class TestComputeAstroScoreWithSqm:
+    """Cover the sqm branch in compute_astro_score (lines 526-529)."""
+
+    def test_sqm_branch_with_known_object_type(self):
+        """Covers sqm + object_type → object_lp_factor call."""
+        with patch('sky_quality.object_lp_factor', return_value=0.8) as mock_lp:
+            score = compute_astro_score(
+                max_altitude=60.0,
+                observable_hours=4.0,
+                meridian_altitude=55.0,
+                moon_phase=0.2,
+                angular_distance_moon=90.0,
+                magnitude=8.0,
+                size_arcmin=20.0,
+                observable_hours_in_window=4.0,
+                window_start_hour=22,
+                is_messier=False,
+                is_planet=False,
+                is_opposition=False,
+                sqm=20.5,
+                object_type='Galaxy',
+            )
+            assert 0.0 <= score <= 1.0
+            mock_lp.assert_called_once()
+
+
+class TestComputeAstroScoreTimeBonusBranches:
+    """Cover the remaining time_bonus branches in compute_astro_score."""
+
+    def test_time_bonus_early_morning_window(self):
+        """Covers the 1 < window_start_hour <= 3 branch (line 545)."""
+        score = compute_astro_score(
+            max_altitude=50.0,
+            observable_hours=3.0,
+            meridian_altitude=45.0,
+            moon_phase=0.1,
+            angular_distance_moon=120.0,
+            magnitude=9.0,
+            size_arcmin=15.0,
+            observable_hours_in_window=3.0,
+            window_start_hour=2,  # triggers 0.5 time_bonus
+            is_messier=False,
+            is_planet=False,
+            is_opposition=False,
+        )
+        assert 0.0 <= score <= 1.0
+
+    def test_time_bonus_daytime_window(self):
+        """Covers the else branch (time_bonus=0) when window_start_hour is 4-20."""
+        score = compute_astro_score(
+            max_altitude=50.0,
+            observable_hours=3.0,
+            meridian_altitude=45.0,
+            moon_phase=0.1,
+            angular_distance_moon=120.0,
+            magnitude=9.0,
+            size_arcmin=15.0,
+            observable_hours_in_window=3.0,
+            window_start_hour=10,  # triggers time_bonus=0.0
+            is_messier=False,
+            is_planet=False,
+            is_opposition=False,
+        )
+        assert 0.0 <= score <= 1.0
+
+
+# ---------------------------------------------------------------------------
+# Targeted branch coverage additions
+# ---------------------------------------------------------------------------
+
+
+class TestComputeTargetResultWindowStartHourFallback:
+    """Line 700: window_start_hour = night_start.hour when first_obs_idx is None."""
+
+    def test_no_observable_steps_sets_window_start_to_night_start(self):
+        """alt_max < alt_min → no obs steps; frac_threshold=0 bypasses early return."""
+        target = SimpleNamespace(
+            target_id='m42', preferred_name='M42', catalogue_names={'Messier': 'M42'},
+            category='deep_sky', object_type='nebula', constellation='Orion',
+            magnitude=4.0, size_arcmin=65.0,
+            coordinates=SimpleNamespace(ra_hours=5.58, dec_degrees=-5.39),
+            source_catalogues=['Messier'], metadata={},
+        )
+        constraints = {
+            'altitude_constraint_min': 60,
+            'altitude_constraint_max': 10,  # alt_max < alt_min → in_window_mask all False
+            'fraction_of_time_observable_threshold': 0,  # bypass fraction check
+            'moon_separation_min': 45,
+            'size_constraint_min': 5,
+            'size_constraint_max': 300,
+            'moon_separation_use_illumination': False,
+            'airmass_constraint': 2.0,
+        }
+        altaz_values = np.array([65.0, 70.0, 68.0, 66.0, 65.0])
+        moon = SimpleNamespace(phase=0.1, ra_deg=None, dec_deg=None)
+        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
+        night_end = datetime(2026, 4, 18, 5, 0, tzinfo=timezone.utc)
+        result = _compute_target_result(
+            target=target,
+            times=None,
+            altaz_values=altaz_values,
+            location=object(),
+            moon=moon,
+            constraints=constraints,
+            night_start=night_start,
+            night_end=night_end,
+            lat=45.0, lon=-75.0,
+        )
+        # Must not raise; result may be None or a dict
+        assert result is None or isinstance(result, dict)
+
+
+class TestRunCalculationsSqmBortle:
+    """Cover lines 1057-1067: exception branches for sqm/bortle parsing in run_calculations."""
+
+    @patch('skytonight_calculator.ensure_skytonight_directories')
+    @patch('skytonight_calculator.load_config')
+    @patch('skytonight_calculator._get_night_window', return_value=None)
+    @patch('skytonight_calculator.save_json_file')
+    def test_sqm_bad_value_is_swallowed(self, mock_save, mock_night, mock_config, mock_dirs):
+        """sqm='bad' triggers TypeError/ValueError, swallowed by except (lines 1059-1060)."""
+        from skytonight_calculator import run_calculations
+        mock_config.return_value = {
+            'location': {
+                'latitude': 45.0, 'longitude': -75.0, 'timezone': 'UTC',
+                'sqm': 'notAFloat',
+            },
+            'skytonight': {},
+        }
+        result = run_calculations()
+        assert result['night_found'] is False
+
+    @patch('skytonight_calculator.ensure_skytonight_directories')
+    @patch('skytonight_calculator.load_config')
+    @patch('skytonight_calculator._get_night_window', return_value=None)
+    @patch('skytonight_calculator.save_json_file')
+    def test_bortle_bad_value_is_swallowed(self, mock_save, mock_night, mock_config, mock_dirs):
+        """bortle='bad' (with no sqm) triggers except in bortle branch (lines 1063-1067)."""
+        from skytonight_calculator import run_calculations
+        mock_config.return_value = {
+            'location': {
+                'latitude': 45.0, 'longitude': -75.0, 'timezone': 'UTC',
+                'bortle': 'notInt',
+            },
+            'skytonight': {},
+        }
+        result = run_calculations()
+        assert result['night_found'] is False
+
+
+class TestRunCalculationsDictTargetFromDictException:
+    """Lines 1141-1147: dict-based target that fails from_dict is silently skipped."""
+
+    @patch('skytonight_calculator.ensure_skytonight_directories')
+    @patch('skytonight_calculator.save_json_file')
+    @patch('skytonight_calculator._get_astro_night_window', return_value=None)
+    @patch('skytonight_calculator._clear_alttime_files')
+    @patch('skytonight_calculator._MoonInfo')
+    @patch('skytonight_calculator.EarthLocation')
+    @patch('skytonight_calculator._sample_times')
+    @patch('skytonight_calculator._get_night_window')
+    @patch('skytonight_calculator.load_targets_dataset')
+    @patch('skytonight_calculator.load_config')
+    def test_dict_target_from_dict_exception_is_skipped(
+        self, mock_config, mock_dataset, mock_night, mock_times,
+        mock_location, mock_moon, mock_clear, mock_astro, mock_save, mock_dirs
+    ):
+        """Dataset contains a malformed dict target → from_dict raises, target is skipped."""
+        from skytonight_calculator import run_calculations
+        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
+        night_end = datetime(2026, 4, 18, 5, 0, tzinfo=timezone.utc)
+        mock_config.return_value = {
+            'location': {'latitude': 45.0, 'longitude': -75.0, 'timezone': 'UTC'},
+            'skytonight': {},
+        }
+        # Provide a bad dict that cannot be converted to SkyTonightTarget
+        mock_dataset.return_value = {
+            'targets': [{'this_key_does_not_exist': True}],
+            'lookup': {},
+        }
+        mock_night.return_value = (night_start, night_end)
+        mock_times.return_value = MagicMock()
+        mock_moon.return_value = SimpleNamespace(phase=0.5, ra_deg=None, dec_deg=None)
+        mock_location.return_value = object()
+        result = run_calculations()
+        # Should complete without error; no targets processed
+        assert result is not None
+
+
+class TestRunCalculationsCometAltazException:
+    """Lines 1271-1273: comet altaz computation exception causes continue."""
+
+    @patch('skytonight_calculator.ensure_skytonight_directories')
+    @patch('skytonight_calculator.save_json_file')
+    @patch('skytonight_calculator._get_astro_night_window', return_value=None)
+    @patch('skytonight_calculator._clear_alttime_files')
+    @patch('skytonight_calculator._MoonInfo')
+    @patch('skytonight_calculator.EarthLocation')
+    @patch('skytonight_calculator._sample_times')
+    @patch('skytonight_calculator._get_night_window')
+    @patch('skytonight_calculator.load_targets_dataset')
+    @patch('skytonight_calculator.load_config')
+    def test_comet_altaz_exception_is_swallowed(
+        self, mock_config, mock_dataset, mock_night, mock_times,
+        mock_location, mock_moon, mock_clear, mock_astro, mock_save, mock_dirs
+    ):
+        """Comet with bad coords: _compute_altaz_series raises, target is skipped (line 1271-1273)."""
+        from skytonight_calculator import run_calculations
+        from skytonight_models import SkyTonightTarget, SkyTonightCoordinates
+        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
+        night_end = datetime(2026, 4, 18, 5, 0, tzinfo=timezone.utc)
+        comet = SkyTonightTarget(
+            target_id='comet-1',
+            category='comets',
+            object_type='Comet',
+            preferred_name='Comet Test',
+            catalogue_names={},
+            source_catalogues=['comets'],
+            coordinates=SkyTonightCoordinates(ra_hours=6.0, dec_degrees=20.0),
+        )
+        mock_config.return_value = {
+            'location': {'latitude': 45.0, 'longitude': -75.0, 'timezone': 'UTC'},
+            'skytonight': {},
+        }
+        mock_dataset.return_value = {'targets': [comet], 'lookup': {}}
+        mock_night.return_value = (night_start, night_end)
+        mock_times.return_value = MagicMock()
+        mock_moon.return_value = SimpleNamespace(phase=0.5, ra_deg=None, dec_deg=None)
+        mock_location.return_value = object()
+        with patch('skytonight_calculator._compute_altaz_series',
+                   side_effect=RuntimeError('altaz failed for comet')):
+            result = run_calculations()
+        assert result is not None
+
+
+class TestBodyAliasMapBranchCoverage:
+    """Lines 1559 and 1565-1566: branches in _build_body_alias_map."""
+
+    def setup_method(self):
+        calc._body_alias_map_cache = None
+
+    def test_non_string_localized_name_is_skipped(self):
+        """Line 1559: continue when localized_name is not a str or is empty."""
+        with patch('i18n_utils.I18nManager') as MockI18n:
+            mock_mgr = MagicMock()
+            # Return a namespace where some values are non-str or empty
+            mock_mgr.get_namespace.return_value = {
+                'moon': 123,         # non-str → skip
+                'sun': '',           # empty str → skip
+                'mars': '  ',        # whitespace only → skip
+                'jupiter': 'Jupiter',  # valid
+            }
+            MockI18n.return_value = mock_mgr
+            result = _build_body_alias_map()
+        assert isinstance(result, dict)
+
+    def test_get_namespace_exception_is_swallowed(self):
+        """Lines 1565-1566: exception from get_namespace is swallowed per lang."""
+        with patch('i18n_utils.I18nManager') as MockI18n:
+            mock_mgr = MagicMock()
+            mock_mgr.get_namespace.side_effect = Exception('i18n broken')
+            MockI18n.return_value = mock_mgr
+            result = _build_body_alias_map()
+        # Should return empty dict without raising
+        assert isinstance(result, dict)
+
+
+class TestComputeTargetDebugExtraBranches:
+    """Cover additional branches in compute_target_debug."""
+
+    def _run_with_dataset(self, dataset, name, config_overrides=None):
+        config = {
+            'location': {'latitude': 48.0, 'longitude': 2.0, 'elevation': 100.0, 'timezone': 'UTC'},
+            'skytonight': {'constraints': {
+                'altitude_constraint_min': 30,
+                'altitude_constraint_max': 80,
+                'airmass_constraint': 2.0,
+                'size_constraint_min': 10,
+                'size_constraint_max': 300,
+                'moon_separation_min': 45,
+                'fraction_of_time_observable_threshold': 0.5,
+                'moon_separation_use_illumination': False,
+                'horizon_profile': [],
+                **(config_overrides or {}),
+            }},
+        }
+        return compute_target_debug(name, config=config)
+
+    def test_lookup_fallback_iteration_matches_custom_prefix(self):
+        """Lines 1617-1619 + 1617→1616: lookup key with custom prefix found via iteration."""
+        target = _debug_dso()
+        norm = normalize_object_name(target.preferred_name)
+        dataset = {
+            'targets': [target],
+            # Use a non-standard prefix so preferred:: and alias:: lookups miss.
+            # Include a non-matching entry FIRST so the loop continues (1617→1616 branch)
+            'lookup': {
+                'other::some_other_name': {'target_id': 'other'},  # won't match → loop continues
+                f'custom::{norm}': {'target_id': target.target_id},  # matches → break
+            },
+        }
+        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
+        night_end = datetime(2026, 4, 18, 5, 0, tzinfo=timezone.utc)
+        alt_arr = np.array([35.0, 45.0, 60.0, 55.0, 40.0])
+        with patch('skytonight_calculator.load_targets_dataset', return_value=dataset), \
+             patch('skytonight_calculator._get_night_window', return_value=(night_start, night_end)), \
+             patch('skytonight_calculator._get_astro_night_window', return_value=None), \
+             patch('skytonight_calculator.EarthLocation'), \
+             patch('skytonight_calculator._MoonInfo',
+                   return_value=SimpleNamespace(phase=0.2, ra_deg=100.0, dec_deg=-10.0)), \
+             patch('skytonight_calculator._sample_times', return_value=MagicMock(
+                 to_datetime=lambda **kw: [night_start + timedelta(minutes=i * 15) for i in range(5)])), \
+             patch('skytonight_calculator._compute_altaz_series', return_value=(alt_arr, alt_arr)):
+            result = self._run_with_dataset(dataset, target.preferred_name)
+        assert result['found'] is True
+
+    def test_lookup_entry_target_id_not_in_all_targets_returns_not_found(self):
+        """Line 1634: entry points to a target_id that doesn't match any target in all_targets."""
+        dataset = {
+            'targets': [],  # empty — no target with target_id 'missing-target'
+            'lookup': {'preferred::ngc224': {'target_id': 'missing-target'}},
+        }
+        with patch('skytonight_calculator.load_targets_dataset', return_value=dataset), \
+             patch('skytonight_calculator._get_night_window',
+                   return_value=(
+                       datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc),
+                       datetime(2026, 4, 18, 5, 0, tzinfo=timezone.utc),
+                   )):
+            result = self._run_with_dataset(dataset, 'NGC 224')
+        assert result == {'found': False}
+
+    def test_altaz_computation_exception_returns_error(self):
+        """Lines 1742-1744: altaz computation exception returns found=True with overall='error'."""
+        target = _debug_dso()
+        dataset = _debug_dataset(target)
+        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
+        night_end = datetime(2026, 4, 18, 5, 0, tzinfo=timezone.utc)
+        with patch('skytonight_calculator.load_targets_dataset', return_value=dataset), \
+             patch('skytonight_calculator._get_night_window', return_value=(night_start, night_end)), \
+             patch('skytonight_calculator._get_astro_night_window', return_value=None), \
+             patch('skytonight_calculator.EarthLocation'), \
+             patch('skytonight_calculator._MoonInfo',
+                   return_value=SimpleNamespace(phase=0.2, ra_deg=None, dec_deg=None)), \
+             patch('skytonight_calculator._sample_times', return_value=MagicMock()), \
+             patch('skytonight_calculator._compute_altaz_series',
+                   side_effect=RuntimeError('altaz boom')):
+            result = self._run_with_dataset(dataset, target.preferred_name)
+        assert result['found'] is True
+        assert result['overall'] == 'error'
+
+    def test_dso_without_size_data_skips_size_filter(self):
+        """Lines 1792-1793: DSO with size_arcmin=None gets 'No size data, filter skipped' check."""
+        target = _debug_dso(size_arcmin=None)
+        dataset = _debug_dataset(target)
+        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
+        night_end = datetime(2026, 4, 18, 5, 0, tzinfo=timezone.utc)
+        alt_arr = np.array([35.0, 45.0, 60.0, 55.0, 40.0])
+        with patch('skytonight_calculator.load_targets_dataset', return_value=dataset), \
+             patch('skytonight_calculator._get_night_window', return_value=(night_start, night_end)), \
+             patch('skytonight_calculator._get_astro_night_window', return_value=None), \
+             patch('skytonight_calculator.EarthLocation'), \
+             patch('skytonight_calculator._MoonInfo',
+                   return_value=SimpleNamespace(phase=0.2, ra_deg=100.0, dec_deg=-10.0)), \
+             patch('skytonight_calculator._sample_times', return_value=MagicMock(
+                 to_datetime=lambda **kw: [night_start + timedelta(minutes=i * 15) for i in range(5)])), \
+             patch('skytonight_calculator._compute_altaz_series', return_value=(alt_arr, alt_arr)):
+            result = self._run_with_dataset(dataset, target.preferred_name)
+        assert result['found'] is True
+        check_names = [c['name'] for c in result.get('checks', [])]
+        assert 'size_min' in check_names
+        size_check = next(c for c in result['checks'] if c['name'] == 'size_min')
+        assert size_check.get('note') == 'No size data, filter skipped'
+
+    def test_moon_use_illum_true_uses_phase_for_threshold(self):
+        """Line 1800: moon_use_illum=True sets effective_min_sep to moon.phase * 100."""
+        target = _debug_dso()
+        dataset = _debug_dataset(target)
+        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
+        night_end = datetime(2026, 4, 18, 5, 0, tzinfo=timezone.utc)
+        alt_arr = np.array([35.0, 45.0, 60.0, 55.0, 40.0])
+        with patch('skytonight_calculator.load_targets_dataset', return_value=dataset), \
+             patch('skytonight_calculator._get_night_window', return_value=(night_start, night_end)), \
+             patch('skytonight_calculator._get_astro_night_window', return_value=None), \
+             patch('skytonight_calculator.EarthLocation'), \
+             patch('skytonight_calculator._MoonInfo',
+                   return_value=SimpleNamespace(phase=0.8, ra_deg=100.0, dec_deg=-10.0)), \
+             patch('skytonight_calculator._sample_times', return_value=MagicMock(
+                 to_datetime=lambda **kw: [night_start + timedelta(minutes=i * 15) for i in range(5)])), \
+             patch('skytonight_calculator._compute_altaz_series', return_value=(alt_arr, alt_arr)):
+            result = self._run_with_dataset(dataset, target.preferred_name,
+                                            config_overrides={'moon_separation_use_illumination': True})
+        assert result['found'] is True
+        moon_check = next((c for c in result.get('checks', []) if c['name'] == 'moon_separation'), None)
+        if moon_check:
+            # threshold should be moon.phase * 100 = 80.0
+            assert abs(moon_check['threshold'] - 80.0) < 1.0

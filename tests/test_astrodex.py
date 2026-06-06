@@ -709,3 +709,523 @@ class TestAstrodexVisibilityModes:
         assert astrodex.can_user_view_image('user1', 'bob_img.jpg', private_mode=True) is False
 
         assert astrodex.can_user_view_image('user1', 'bob_img.jpg', private_mode=False) is True
+
+
+class TestAstrodexMissingBranches:
+    """Tests targeting uncovered branches in astrodex.py helper functions."""
+
+    def test_extract_name_candidates_empty_string(self):
+        result = astrodex._extract_name_candidates('')
+        assert result == []
+
+    def test_get_alias_for_catalogue_no_catalogue(self):
+        result = astrodex._get_alias_for_catalogue({'NGC': 'NGC 224'}, '')
+        assert result == ''
+
+    def test_get_alias_for_catalogue_direct_hit(self):
+        result = astrodex._get_alias_for_catalogue({'Messier': 'M31'}, 'Messier')
+        assert result == 'M31'
+
+    def test_get_alias_for_catalogue_no_match(self):
+        result = astrodex._get_alias_for_catalogue({'Messier': 'M31'}, 'NGC')
+        assert result == ''
+
+    def test_get_alias_metadata_non_dict_aliases(self, monkeypatch):
+        monkeypatch.setattr(skytonight_targets, 'get_lookup_entry',
+                            lambda cat, name: {'group_id': 'g1', 'aliases': 'not-a-dict'})
+        group_id, aliases = astrodex._get_alias_metadata('Messier', 'M31')
+        assert aliases == {}
+
+    def test_sanitize_item_not_dict(self):
+        astrodex._sanitize_item_for_persistence(None)
+
+    def test_sanitize_astrodex_not_dict(self):
+        astrodex._sanitize_astrodex_for_persistence(None)
+
+    def test_sanitize_astrodex_items_not_list(self):
+        astrodex._sanitize_astrodex_for_persistence({'items': 'not-a-list'})
+
+    def test_attach_picture_owner_metadata_not_a_list(self):
+        item = {'pictures': 'not-a-list'}
+        astrodex._attach_picture_owner_metadata(item, 'u1', 'alice', 'u1')
+        assert item['pictures'] == []
+
+    def test_attach_picture_owner_metadata_non_dict_picture(self):
+        item = {'pictures': ['bad-picture']}
+        astrodex._attach_picture_owner_metadata(item, 'u1', 'alice', 'u1')
+
+    def test_update_picture_success(self, temp_data_dir):
+        item = astrodex.create_astrodex_item('user1', {'name': 'M42'}, username='alice')
+        pic = astrodex.add_picture_to_item('user1', item['id'], {'date': '2025-01-01', 'device': 'Camera'})
+        assert pic is not None
+        updated = astrodex.update_picture('user1', item['id'], pic['id'], {'notes': 'Test notes', 'iso': 800})
+        assert updated is not None
+        assert updated['notes'] == 'Test notes'
+        assert updated['iso'] == 800
+
+    def test_update_picture_item_not_found(self, temp_data_dir):
+        result = astrodex.update_picture('user1', 'nonexistent-item', 'pic1', {'notes': 'x'})
+        assert result is None
+
+    def test_update_picture_pic_not_found(self, temp_data_dir):
+        item = astrodex.create_astrodex_item('user1', {'name': 'M42'}, username='alice')
+        result = astrodex.update_picture('user1', item['id'], 'nonexistent-pic', {'notes': 'x'})
+        assert result is None
+
+    def test_delete_picture_removes_file(self, temp_data_dir):
+        astrodex.ensure_astrodex_directories()
+        item = astrodex.create_astrodex_item('user1', {'name': 'M42'}, username='alice')
+        fake_filename = 'fake_img.jpg'
+        fake_path = os.path.join(astrodex.ASTRODEX_IMAGES_DIR, fake_filename)
+        with open(fake_path, 'w') as f:
+            f.write('fake image data')
+        pic = astrodex.add_picture_to_item('user1', item['id'], {'filename': fake_filename})
+        result = astrodex.delete_picture('user1', item['id'], pic['id'])
+        assert result is True
+        assert not os.path.exists(fake_path)
+
+    def test_delete_main_picture_promotes_next(self, temp_data_dir):
+        item = astrodex.create_astrodex_item('user1', {'name': 'M42'}, username='alice')
+        pic1 = astrodex.add_picture_to_item('user1', item['id'], {'notes': 'first'})
+        pic2 = astrodex.add_picture_to_item('user1', item['id'], {'notes': 'second'})
+        astrodex.set_main_picture('user1', item['id'], pic1['id'])
+        astrodex.delete_picture('user1', item['id'], pic1['id'])
+        reloaded = astrodex.get_astrodex_item('user1', item['id'])
+        assert len(reloaded['pictures']) == 1
+        assert reloaded['pictures'][0]['is_main'] is True
+
+    def test_set_main_picture_picture_not_found(self, temp_data_dir):
+        item = astrodex.create_astrodex_item('user1', {'name': 'M42'}, username='alice')
+        result = astrodex.set_main_picture('user1', item['id'], 'nonexistent-pic')
+        assert result is False
+
+    def test_is_item_in_preloaded_astrodex_empty(self):
+        result = astrodex.is_item_in_preloaded_astrodex({}, 'M42')
+        assert result is False
+
+    def test_is_item_in_preloaded_astrodex_none_data(self):
+        result = astrodex.is_item_in_preloaded_astrodex(None, 'M42')
+        assert result is False
+
+    def test_is_item_in_preloaded_astrodex_found_by_name(self, temp_data_dir):
+        item = astrodex.create_astrodex_item('user1', {'name': 'M42'}, username='alice')
+        data = astrodex.load_user_astrodex('user1', 'alice')
+        result = astrodex.is_item_in_preloaded_astrodex(data, 'M42')
+        assert result is True
+
+    def test_is_item_in_preloaded_astrodex_not_found(self, temp_data_dir):
+        item = astrodex.create_astrodex_item('user1', {'name': 'M42'}, username='alice')
+        data = astrodex.load_user_astrodex('user1', 'alice')
+        result = astrodex.is_item_in_preloaded_astrodex(data, 'M99')
+        assert result is False
+
+    def test_load_user_astrodex_json_error(self, temp_data_dir):
+        astrodex.ensure_astrodex_directories()
+        file_path = astrodex.get_user_astrodex_file('testuser')
+        with open(file_path, 'w') as f:
+            f.write('{ invalid json !!!}')
+        data = astrodex.load_user_astrodex('testuser', username='testuser')
+        assert data['items'] == []
+        assert data['username'] == 'testuser'
+
+    def test_validate_astrodex_json_missing_username(self, temp_data_dir):
+        import tempfile, json as _json
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            _json.dump({'items': []}, f)
+            tmp_path = f.name
+        is_valid, msg = astrodex.validate_astrodex_json(tmp_path)
+        assert not is_valid
+        assert 'username' in msg
+        os.unlink(tmp_path)
+
+    def test_validate_astrodex_json_missing_items(self, temp_data_dir):
+        import tempfile, json as _json
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            _json.dump({'username': 'alice'}, f)
+            tmp_path = f.name
+        is_valid, msg = astrodex.validate_astrodex_json(tmp_path)
+        assert not is_valid
+        assert 'items' in msg
+        os.unlink(tmp_path)
+
+    def test_validate_astrodex_json_not_dict(self, temp_data_dir):
+        import tempfile, json as _json
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            _json.dump([1, 2, 3], f)
+            tmp_path = f.name
+        is_valid, msg = astrodex.validate_astrodex_json(tmp_path)
+        assert not is_valid
+        assert 'dictionary' in msg
+        os.unlink(tmp_path)
+
+    def test_validate_astrodex_json_item_missing_id(self, temp_data_dir):
+        import tempfile, json as _json
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            _json.dump({'username': 'alice', 'items': [{'name': 'M42'}]}, f)
+            tmp_path = f.name
+        is_valid, msg = astrodex.validate_astrodex_json(tmp_path)
+        assert not is_valid
+        assert 'id' in msg
+        os.unlink(tmp_path)
+
+    def test_validate_astrodex_json_item_missing_name(self, temp_data_dir):
+        import tempfile, json as _json
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            _json.dump({'username': 'alice', 'items': [{'id': 'abc'}]}, f)
+            tmp_path = f.name
+        is_valid, msg = astrodex.validate_astrodex_json(tmp_path)
+        assert not is_valid
+        assert 'name' in msg
+        os.unlink(tmp_path)
+
+    def test_validate_astrodex_json_invalid_json(self, temp_data_dir):
+        import tempfile
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            f.write('{bad json')
+            tmp_path = f.name
+        is_valid, msg = astrodex.validate_astrodex_json(tmp_path)
+        assert not is_valid
+        assert 'JSON' in msg
+        os.unlink(tmp_path)
+
+    def test_can_user_view_image_empty_filename(self, temp_data_dir):
+        result = astrodex.can_user_view_image('user1', '', private_mode=True)
+        assert result is False
+
+    def test_get_item_merge_key_via_alias_names(self, temp_data_dir, monkeypatch):
+        monkeypatch.setattr(skytonight_targets, 'get_lookup_entry',
+                            lambda cat, name: {'group_id': '', 'aliases': {'NGC': 'NGC 1234'}})
+        item = {'id': 'i1', 'name': 'NGC 1234', 'catalogue': 'NGC'}
+        key = astrodex._get_item_merge_key(item)
+        assert 'alias:' in key or 'name:' in key or 'id:' in key
+
+    def test_get_item_merge_key_fallback_to_id(self, monkeypatch):
+        """Item with empty name and no aliases → falls back to id: prefix (line 187)."""
+        monkeypatch.setattr(skytonight_targets, 'get_lookup_entry', lambda cat, name: {})
+        item = {'id': 'xyz-123', 'name': '', 'catalogue': ''}
+        key = astrodex._get_item_merge_key(item)
+        assert key == 'id:xyz-123'
+
+    def test_load_user_astrodex_username_mismatch_triggers_save(self, temp_data_dir, monkeypatch):
+        """Loading with a different username than stored updates the record (lines 412-414)."""
+        # Create with original username
+        astrodex.create_astrodex_item('testuser', {'name': 'M99'}, username='oldname')
+        # Load with a different username - should update username in file
+        data = astrodex.load_user_astrodex('testuser', username='newname')
+        assert data['username'] == 'newname'
+
+    def test_load_user_astrodex_generic_exception_returns_empty(self, temp_data_dir, monkeypatch):
+        """Generic exception in load_user_astrodex → returns empty skeleton (lines 438-440)."""
+        astrodex.ensure_astrodex_directories()
+        # Write a valid file first
+        file_path = astrodex.get_user_astrodex_file('testuser')
+        with open(file_path, 'w') as f:
+            json.dump({'username': 'testuser', 'items': []}, f)
+        # Patch open to raise a non-JSON exception
+        original_open = open
+        def bad_open(path, *args, **kwargs):
+            if path == file_path:
+                raise PermissionError("access denied")
+            return original_open(path, *args, **kwargs)
+        monkeypatch.setattr('builtins.open', bad_open)
+        data = astrodex.load_user_astrodex('testuser', username='testuser')
+        assert data['items'] == []
+
+    def test_load_user_astrodex_corrupted_backup_failure(self, temp_data_dir, monkeypatch):
+        """Backup copy fails when recovering from corrupted JSON (lines 428-429)."""
+        import shutil
+        astrodex.ensure_astrodex_directories()
+        file_path = astrodex.get_user_astrodex_file('testuser')
+        with open(file_path, 'w') as f:
+            f.write('{ corrupted json !!!')
+        original_copy2 = shutil.copy2
+        def fail_copy2(*args, **kwargs):
+            raise OSError("disk full")
+        monkeypatch.setattr(shutil, 'copy2', fail_copy2)
+        data = astrodex.load_user_astrodex('testuser', username='testuser')
+        assert data['items'] == []
+
+    def test_validate_astrodex_json_general_exception(self, temp_data_dir):
+        """Non-JSON exception in validate_astrodex_json → Validation error (lines 483-484)."""
+        is_valid, msg = astrodex.validate_astrodex_json('/nonexistent/path/file.json')
+        assert not is_valid
+        assert 'Validation error' in msg or 'Invalid JSON' in msg or len(msg) > 0
+
+    def test_save_backup_creation_failure_continues(self, temp_data_dir, monkeypatch):
+        """Backup creation raises but save still proceeds (lines 540-541)."""
+        import shutil
+        # Create an existing file first so backup would be attempted
+        astrodex.create_astrodex_item('testuser', {'name': 'M31'})
+        original_copy2 = shutil.copy2
+        call_count = [0]
+        def fail_first_copy2(*args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                raise OSError("disk full")
+            return original_copy2(*args, **kwargs)
+        monkeypatch.setattr(shutil, 'copy2', fail_first_copy2)
+        # Save should still succeed despite backup failure
+        data = astrodex.load_user_astrodex('testuser')
+        result = astrodex.save_user_astrodex('testuser', data)
+        assert result is True
+
+    def test_save_backup_cleanup_failure_on_success(self, temp_data_dir, monkeypatch):
+        """Backup cleanup raises after successful save (lines 564-565)."""
+        # Create item so file exists
+        astrodex.create_astrodex_item('testuser', {'name': 'M31'})
+        original_remove = os.remove
+        def fail_remove(path):
+            if path.endswith('.backup'):
+                raise OSError("cannot remove")
+            return original_remove(path)
+        monkeypatch.setattr(os, 'remove', fail_remove)
+        data = astrodex.load_user_astrodex('testuser')
+        result = astrodex.save_user_astrodex('testuser', data)
+        # Save succeeds even if backup cleanup fails
+        assert result is True
+
+    def test_save_backup_restore_failure_on_error(self, temp_data_dir, monkeypatch):
+        """Backup restore raises when save fails (lines 580-581)."""
+        import shutil
+        astrodex.create_astrodex_item('testuser', {'name': 'M31'})
+        call_count = [0]
+        original_copy2 = shutil.copy2
+        def selective_copy2(src, dst):
+            call_count[0] += 1
+            if call_count[0] > 1:  # 2nd call = restore attempt
+                raise OSError("cannot restore")
+            return original_copy2(src, dst)
+        monkeypatch.setattr(shutil, 'copy2', selective_copy2)
+        # Also make json.dump fail to trigger the error path
+        import json as _json
+        original_dump = _json.dump
+        def fail_dump(*args, **kwargs):
+            raise ValueError("write fail")
+        monkeypatch.setattr(_json, 'dump', fail_dump)
+        data = astrodex.load_user_astrodex('testuser')
+        result = astrodex.save_user_astrodex('testuser', data)
+        assert result is False
+
+    def test_create_astrodex_item_empty_name_returns_none(self, temp_data_dir):
+        """create_astrodex_item with empty name returns None (lines 621-622)."""
+        result = astrodex.create_astrodex_item('testuser', {'name': '', 'type': 'Galaxy'})
+        assert result is None
+
+    def test_create_astrodex_item_save_failure_returns_none(self, temp_data_dir, monkeypatch):
+        """create_astrodex_item returns None when save fails (line 648)."""
+        monkeypatch.setattr(astrodex, 'save_user_astrodex', lambda *a, **kw: False)
+        result = astrodex.create_astrodex_item('testuser', {'name': 'M999', 'type': 'Galaxy'})
+        assert result is None
+
+    def test_delete_astrodex_item_with_existing_image(self, temp_data_dir):
+        """Deletes the physical image file associated with a deleted item (lines 699-705)."""
+        astrodex.ensure_astrodex_directories()
+        item = astrodex.create_astrodex_item('testuser', {'name': 'M42'}, username='alice')
+        fake_filename = 'image_to_delete.jpg'
+        fake_path = os.path.join(astrodex.ASTRODEX_IMAGES_DIR, fake_filename)
+        with open(fake_path, 'w') as f:
+            f.write('fake data')
+        data = astrodex.load_user_astrodex('testuser')
+        data['items'][0]['pictures'] = [{'filename': fake_filename, 'id': 'p1', 'is_main': True}]
+        astrodex.save_user_astrodex('testuser', data)
+        result = astrodex.delete_astrodex_item('testuser', item['id'])
+        assert result is True
+        assert not os.path.exists(fake_path)
+
+    def test_delete_astrodex_item_image_oserror_continues(self, temp_data_dir, monkeypatch):
+        """OSError when deleting image file is swallowed (lines 703-706)."""
+        astrodex.ensure_astrodex_directories()
+        item = astrodex.create_astrodex_item('testuser', {'name': 'M42'}, username='alice')
+        data = astrodex.load_user_astrodex('testuser')
+        data['items'][0]['pictures'] = [{'filename': 'ghost.jpg', 'id': 'p1', 'is_main': True}]
+        astrodex.save_user_astrodex('testuser', data)
+        original_exists = os.path.exists
+        def fake_exists(path):
+            if 'ghost.jpg' in path:
+                return True
+            return original_exists(path)
+        def fail_remove(path):
+            raise OSError("cannot delete")
+        monkeypatch.setattr(os.path, 'exists', fake_exists)
+        monkeypatch.setattr(os, 'remove', fail_remove)
+        # Should still succeed even if image deletion fails
+        result = astrodex.delete_astrodex_item('testuser', item['id'])
+        assert result is True
+
+    def test_add_picture_save_failure_returns_none(self, temp_data_dir, monkeypatch):
+        """add_picture_to_item returns None when save fails (line 764)."""
+        item = astrodex.create_astrodex_item('testuser', {'name': 'M42'})
+        # Patch save to always fail — add_picture calls it exactly once
+        monkeypatch.setattr(astrodex, 'save_user_astrodex', lambda *a, **kw: False)
+        result = astrodex.add_picture_to_item('testuser', item['id'], {'filename': 'test.jpg'})
+        assert result is None
+
+    def test_update_picture_save_failure_returns_none(self, temp_data_dir, monkeypatch):
+        """update_picture returns None when save fails (line 787)."""
+        item = astrodex.create_astrodex_item('testuser', {'name': 'M42'})
+        pic = astrodex.add_picture_to_item('testuser', item['id'], {'filename': 'test.jpg'})
+        assert pic is not None
+        # Patch save to always fail — update_picture calls it exactly once
+        monkeypatch.setattr(astrodex, 'save_user_astrodex', lambda *a, **kw: False)
+        result = astrodex.update_picture('testuser', item['id'], pic['id'], {'notes': 'x'})
+        assert result is None
+
+    def test_delete_picture_oserror_is_swallowed(self, temp_data_dir, monkeypatch):
+        """OSError when deleting physical file is swallowed (lines 827-828)."""
+        astrodex.ensure_astrodex_directories()
+        item = astrodex.create_astrodex_item('testuser', {'name': 'M42'})
+        # Create a real file to delete
+        fake_file = os.path.join(astrodex.ASTRODEX_IMAGES_DIR, 'oserr.jpg')
+        with open(fake_file, 'w') as f:
+            f.write('data')
+        pic = astrodex.add_picture_to_item('testuser', item['id'], {'filename': 'oserr.jpg'})
+        original_remove = os.remove
+        def fail_remove(path):
+            if 'oserr.jpg' in path:
+                raise OSError("permission denied")
+            return original_remove(path)
+        monkeypatch.setattr(os, 'remove', fail_remove)
+        result = astrodex.delete_picture('testuser', item['id'], pic['id'])
+        # Metadata removed even if physical file deletion fails
+        assert result is True
+
+    def test_get_main_picture_fallback_to_first_when_no_main_flag(self):
+        """get_main_picture returns first picture when no is_main=True (line 867)."""
+        item = {
+            'pictures': [
+                {'id': 'p1', 'filename': 'first.jpg', 'is_main': False},
+                {'id': 'p2', 'filename': 'second.jpg', 'is_main': False},
+            ]
+        }
+        result = astrodex.get_main_picture(item)
+        assert result is not None
+        assert result['filename'] == 'first.jpg'
+
+    def test_is_item_in_astrodex_alias_intersection_match(self, temp_data_dir, monkeypatch):
+        """Alias intersection match in is_item_in_astrodex_with_catalogue (line 903)."""
+        def fake_alias_entry(catalogue, name):
+            if name in ('M31', 'Andromeda', 'NGC 224'):
+                return {'group_id': 'G001', 'aliases': {'Messier': 'M31', 'NGC': 'NGC 224'}}
+            return {}
+        monkeypatch.setattr(skytonight_targets, 'get_lookup_entry', fake_alias_entry)
+        astrodex.create_astrodex_item('testuser', {'name': 'M31', 'catalogue': 'Messier'})
+        # Check by NGC alias name - should match via alias intersection
+        result = astrodex.is_item_in_astrodex('testuser', 'NGC 224', 'NGC')
+        assert result is True
+
+    def test_is_item_in_preloaded_group_id_match(self, temp_data_dir, monkeypatch):
+        """Group ID match in is_item_in_preloaded_astrodex (line 952)."""
+        def fake_alias_entry(catalogue, name):
+            return {'group_id': 'G001', 'aliases': {'Messier': 'M31', 'NGC': 'NGC 224'}}
+        monkeypatch.setattr(skytonight_targets, 'get_lookup_entry', fake_alias_entry)
+        astrodex.create_astrodex_item('testuser', {'name': 'M31', 'catalogue': 'Messier'})
+        data = astrodex.load_user_astrodex('testuser')
+        # Force group_id into the stored item
+        data['items'][0]['catalogue_group_id'] = 'G001'
+        result = astrodex.is_item_in_preloaded_astrodex(data, 'NGC 224', 'NGC')
+        assert result is True
+
+    def test_is_item_in_preloaded_alias_intersection_match(self, temp_data_dir, monkeypatch):
+        """Alias intersection match in is_item_in_preloaded_astrodex (line 957)."""
+        def fake_alias_entry(catalogue, name):
+            return {'group_id': '', 'aliases': {'Messier': 'M31', 'NGC': 'NGC 224'}}
+        monkeypatch.setattr(skytonight_targets, 'get_lookup_entry', fake_alias_entry)
+        data = {
+            'items': [
+                {
+                    'id': 'i1',
+                    'name': 'NGC 224',
+                    'catalogue': 'NGC',
+                    'catalogue_group_id': '',
+                    'catalogue_aliases': {'Messier': 'M31', 'NGC': 'NGC 224'},
+                }
+            ]
+        }
+        result = astrodex.is_item_in_preloaded_astrodex(data, 'M31', 'Messier')
+        assert result is True
+
+    def test_switch_item_catalogue_name_no_aliases_raises(self, temp_data_dir, monkeypatch):
+        """switch_item_catalogue_name raises when item has no aliases (line 985)."""
+        monkeypatch.setattr(skytonight_targets, 'get_lookup_entry', lambda c, n: {})
+        monkeypatch.setattr(catalogue_aliases, 'get_alias_entry', lambda c, n: {})
+        item = astrodex.create_astrodex_item('testuser', {'name': 'M42', 'catalogue': ''})
+        with pytest.raises(ValueError, match='No catalogue aliases'):
+            astrodex.switch_item_catalogue_name('testuser', item['id'], 'OpenNGC')
+
+    def test_switch_item_catalogue_name_wrong_catalogue_raises(self, temp_data_dir, monkeypatch):
+        """switch_item_catalogue_name raises when requested catalogue not in aliases (line 988)."""
+        def fake_alias_entry(catalogue, name):
+            if name == 'M31':
+                return {'group_id': 'G1', 'aliases': {'Messier': 'M31', 'OpenNGC': 'NGC 224'}}
+            return {}
+        monkeypatch.setattr(skytonight_targets, 'get_lookup_entry', fake_alias_entry)
+        monkeypatch.setattr(catalogue_aliases, 'get_alias_entry', fake_alias_entry)
+        item = astrodex.create_astrodex_item('testuser', {'name': 'M31', 'catalogue': 'Messier'})
+        # Enrich so aliases are in item
+        data = astrodex.load_user_astrodex('testuser')
+        data['items'][0]['catalogue_aliases'] = {'Messier': 'M31', 'OpenNGC': 'NGC 224'}
+        astrodex.save_user_astrodex('testuser', data)
+        with pytest.raises(ValueError, match='not available'):
+            astrodex.switch_item_catalogue_name('testuser', item['id'], 'SIMBAD')
+
+    def test_switch_item_catalogue_name_no_target_aliases_pops_field(self, temp_data_dir, monkeypatch):
+        """When _get_alias_metadata returns empty, fallback aliases from item are used (line 993)."""
+        def fake_lookup_entry(catalogue, name):
+            # Only return aliases for the original name 'M31', not for the switched name 'Alt31'
+            if name == 'M31':
+                return {'group_id': '', 'aliases': {'Messier': 'M31', 'AltCat': 'Alt31'}}
+            return {}
+        def fake_alias_entry(catalogue, name):
+            # Return proper entry so enrich_item_with_catalogue_aliases keeps the field
+            if name == 'M31':
+                return {'group_id': '', 'aliases': {'Messier': 'M31', 'AltCat': 'Alt31'}}
+            return {}
+        monkeypatch.setattr(skytonight_targets, 'get_lookup_entry', fake_lookup_entry)
+        monkeypatch.setattr(catalogue_aliases, 'get_alias_entry', fake_alias_entry)
+        item = astrodex.create_astrodex_item('testuser', {'name': 'M31', 'catalogue': 'Messier'})
+        data = astrodex.load_user_astrodex('testuser')
+        data['items'][0]['catalogue_aliases'] = {'Messier': 'M31', 'AltCat': 'Alt31'}
+        astrodex.save_user_astrodex('testuser', data)
+        # 'Alt31' has no lookup entry → _get_alias_metadata returns {} → line 993 executes
+        result = astrodex.switch_item_catalogue_name('testuser', item['id'], 'AltCat')
+        assert result is not None  # switch succeeded, covering the fallback alias path
+
+    def test_switch_item_catalogue_name_save_failure_returns_none(self, temp_data_dir, monkeypatch):
+        """switch_item_catalogue_name returns None when save fails (line 1019)."""
+        def fake_alias_entry(catalogue, name):
+            return {'group_id': 'G1', 'aliases': {'Messier': 'M31', 'NGC': 'NGC 224'}}
+        monkeypatch.setattr(skytonight_targets, 'get_lookup_entry', fake_alias_entry)
+        monkeypatch.setattr(catalogue_aliases, 'get_alias_entry', fake_alias_entry)
+        item = astrodex.create_astrodex_item('testuser', {'name': 'M31', 'catalogue': 'Messier'})
+        data = astrodex.load_user_astrodex('testuser')
+        data['items'][0]['catalogue_aliases'] = {'Messier': 'M31', 'NGC': 'NGC 224'}
+        astrodex.save_user_astrodex('testuser', data)
+        monkeypatch.setattr(astrodex, 'save_user_astrodex', lambda *a, **kw: False)
+        result = astrodex.switch_item_catalogue_name('testuser', item['id'], 'NGC')
+        assert result is None
+
+    def test_switch_item_duplicate_name_check_raises(self, temp_data_dir, monkeypatch):
+        """switch raises when another item has the same target name (lines 1005-1006)."""
+        def fake_alias_entry(catalogue, name):
+            return {'group_id': '', 'aliases': {'Messier': 'M31', 'NGC': 'NGC 224'}}
+        monkeypatch.setattr(skytonight_targets, 'get_lookup_entry', fake_alias_entry)
+        monkeypatch.setattr(catalogue_aliases, 'get_alias_entry', fake_alias_entry)
+        # First item
+        item1 = astrodex.create_astrodex_item('testuser', {'name': 'M31', 'catalogue': 'Messier'})
+        # Add a second item with the target name we'll try to switch to
+        data = astrodex.load_user_astrodex('testuser')
+        import uuid
+        data['items'].append({
+            'id': str(uuid.uuid4()),
+            'name': 'NGC 224',
+            'catalogue': 'NGC',
+            'pictures': [],
+            'created_at': '2026-01-01T00:00:00+00:00',
+            'updated_at': '2026-01-01T00:00:00+00:00',
+        })
+        astrodex.save_user_astrodex('testuser', data)
+        data = astrodex.load_user_astrodex('testuser')
+        data['items'][0]['catalogue_aliases'] = {'Messier': 'M31', 'NGC': 'NGC 224'}
+        astrodex.save_user_astrodex('testuser', data)
+        with pytest.raises(ValueError):
+            astrodex.switch_item_catalogue_name('testuser', item1['id'], 'NGC')

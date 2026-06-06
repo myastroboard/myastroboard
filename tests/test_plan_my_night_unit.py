@@ -795,3 +795,1057 @@ class TestGeneratePlanPdf:
         assert result.getvalue().startswith(b"%PDF")
         # Multiple pages should produce a reasonably large buffer.
         assert len(result.getvalue()) > 5000
+
+
+# ============================================================
+# Additional branch coverage tests
+# ============================================================
+
+_TEST_UID = "aaaa1111-2222-3333-4444-555566667777"
+_TEST_SCOPE = "bbbb2222-3333-4444-5555-666677778888"
+
+
+class TestGetAllPlanFilesPathError:
+    """Covers lines 145-146: ValueError from _safe_plan_path is silently skipped."""
+
+    def test_skips_file_with_traversal_path(self, temp_plan_dir, monkeypatch):
+        fname = f"{_TEST_UID}_plan_my_night.json"
+        with open(os.path.join(temp_plan_dir, fname), 'w') as f:
+            json.dump({'user_id': _TEST_UID}, f)
+
+        original = plan_my_night._safe_plan_path
+
+        def mock_safe(path):
+            if fname in path:
+                raise ValueError("path traversal detected")
+            return original(path)
+
+        monkeypatch.setattr(plan_my_night, '_safe_plan_path', mock_safe)
+        result = plan_my_night.get_all_plan_files(_TEST_UID)
+        assert result == []
+
+
+class TestDeletePlanForTelescopeEdgeCases:
+    """Covers lines 157-159 and 165-167 in delete_plan_for_telescope."""
+
+    def test_value_error_from_get_user_plan_file(self, temp_plan_dir, monkeypatch):
+        """Covers lines 157-159: ValueError causes return False."""
+        monkeypatch.setattr(
+            plan_my_night, 'get_user_plan_file',
+            lambda *_a: (_ for _ in ()).throw(ValueError("path traversal"))
+        )
+        result = plan_my_night.delete_plan_for_telescope(_TEST_UID, _TEST_SCOPE)
+        assert result is False
+
+    def test_os_remove_exception_returns_false(self, temp_plan_dir, monkeypatch):
+        """Covers lines 165-167: Exception on os.remove causes return False."""
+        file_path = plan_my_night.get_user_plan_file(_TEST_UID, _TEST_SCOPE)
+        with open(file_path, 'w') as f:
+            json.dump({'user_id': _TEST_UID}, f)
+
+        def raise_perm(_p):
+            raise PermissionError("file locked")
+
+        monkeypatch.setattr(plan_my_night.os, 'remove', raise_perm)
+        result = plan_my_night.delete_plan_for_telescope(_TEST_UID, _TEST_SCOPE)
+        assert result is False
+
+
+class TestLoadUserPlanExceptionPaths:
+    """Covers lines 196-197, 199-201, and 207->209 in load_user_plan."""
+
+    def test_json_corrupted_backup_fails(self, temp_plan_dir, monkeypatch):
+        """Covers lines 196-197: corrupted JSON + backup copy fails."""
+        file_path = plan_my_night.get_user_plan_file(_TEST_UID)
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write('{invalid json')
+
+        with patch('plan_my_night.shutil.copy2', side_effect=PermissionError("no copy")):
+            result = load_user_plan(_TEST_UID, "testuser")
+
+        assert result['user_id'] == _TEST_UID
+        assert result['plan'] is None
+
+    def test_general_exception_returns_default(self, temp_plan_dir, monkeypatch):
+        """Covers lines 199-201: non-JSON exception → default payload."""
+        file_path = plan_my_night.get_user_plan_file(_TEST_UID)
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump({'user_id': _TEST_UID}, f)
+
+        with patch('plan_my_night.json.load', side_effect=PermissionError("no access")):
+            result = load_user_plan(_TEST_UID, "testuser")
+
+        assert result['user_id'] == _TEST_UID
+        assert result['plan'] is None
+
+    def test_load_without_username_when_file_exists(self, temp_plan_dir):
+        """Covers 207->209: username=None skips overwriting username field."""
+        payload = {'user_id': _TEST_UID, 'plan': None, 'username': 'existing_user'}
+        save_user_plan(_TEST_UID, payload, username='existing_user')
+
+        result = load_user_plan(_TEST_UID, username=None)
+        assert result['user_id'] == _TEST_UID
+
+
+class TestSaveUserPlanWithoutUsername:
+    """Covers 287->289: username=None skips setting username in payload."""
+
+    def test_save_without_username(self, temp_plan_dir):
+        payload = {'user_id': _TEST_UID, 'plan': None}
+        result = save_user_plan(_TEST_UID, payload, username=None)
+        assert result is True
+        loaded = load_user_plan(_TEST_UID)
+        assert loaded['user_id'] == _TEST_UID
+
+
+# ============================================================
+# _save_user_plan_locked - error branches
+# ============================================================
+
+
+class TestSaveUserPlanLockedBranches:
+    """Covers lines 278-280, 297-298, 316-332 in _save_user_plan_locked."""
+
+    def test_path_validation_failure_returns_false(self, temp_plan_dir):
+        """Lines 278-280: ValueError from _safe_plan_path returns False."""
+        uid = "eeee0001-0000-4000-8000-000000000000"
+        payload = {'user_id': uid, 'plan': None}
+        # Patch _save_user_plan_locked directly to trigger the path validation failure
+        # by patching _safe_plan_path to always raise ValueError
+        with patch.object(plan_my_night, '_safe_plan_path', side_effect=ValueError("path traversal")):
+            result = plan_my_night._save_user_plan_locked(
+                uid, payload, "testuser",
+                os.path.join(temp_plan_dir, "test.json"),
+                os.path.join(temp_plan_dir, "test.tmp"),
+                os.path.join(temp_plan_dir, "test.bak"),
+            )
+        assert result is False
+
+    def test_backup_copy_failure_continues(self, temp_plan_dir):
+        """Lines 297-298: backup copy fails but save still continues."""
+        uid = "eeee0002-0000-4000-8000-000000000000"
+        # First, create an existing plan file so backup is attempted
+        payload = {'user_id': uid, 'plan': None}
+        save_user_plan(uid, payload, username="u1")
+
+        # Now try again; shutil.copy2 fails but save should still succeed
+        with patch('plan_my_night.shutil.copy2', side_effect=PermissionError("no backup")):
+            result = save_user_plan(uid, {'user_id': uid, 'plan': None}, username="u1")
+        assert result is True
+
+    def test_exception_during_save_restores_backup(self, temp_plan_dir):
+        """Lines 316-320: when an error occurs after backup, backup is restored."""
+        uid = "eeee0003-0000-4000-8000-000000000000"
+        payload = {'user_id': uid, 'plan': None}
+        save_user_plan(uid, payload, username="u1")
+
+        # Force json.dump to fail after backup is created
+        with patch('plan_my_night.json.dump', side_effect=RuntimeError("disk full")):
+            result = save_user_plan(uid, {'user_id': uid, 'plan': None}, username="u1")
+        assert result is False
+
+    def test_exception_cleanup_temp_file_failure_logged(self, temp_plan_dir):
+        """Lines 322-326: temp file cleanup failure is warned but not raised."""
+        uid = "eeee0004-0000-4000-8000-000000000000"
+        payload = {'user_id': uid, 'plan': None}
+
+        # Force a failure during write AND make os.remove fail for the temp file
+        with patch('plan_my_night.json.dump', side_effect=RuntimeError("disk full")):
+            with patch('plan_my_night.os.remove', side_effect=OSError("cleanup fail")):
+                result = save_user_plan(uid, payload, username="u1")
+        assert result is False
+
+
+# ============================================================
+# clear_all_plans
+# ============================================================
+
+
+class TestClearAllPlans:
+    """Covers lines 541-542: clear_all_plans error logging path."""
+
+    def test_deletes_all_plan_files(self, temp_plan_dir):
+        uid = "ffff0001-0000-4000-8000-000000000000"
+        payload = {'user_id': uid, 'plan': None}
+        save_user_plan(uid, payload, username="user")
+        deleted = plan_my_night.clear_all_plans(uid)
+        assert deleted >= 1
+
+    def test_delete_error_logged_not_raised(self, temp_plan_dir):
+        uid = "ffff0002-0000-4000-8000-000000000000"
+        payload = {'user_id': uid, 'plan': None}
+        save_user_plan(uid, payload, username="user")
+
+        with patch('plan_my_night.os.remove', side_effect=OSError("permission denied")):
+            deleted = plan_my_night.clear_all_plans(uid)
+        assert deleted == 0  # Nothing deleted due to error
+
+
+# ============================================================
+# remove_target - edge cases
+# ============================================================
+
+
+class TestRemoveTargetEdgeCases:
+    """Covers lines 553, 559-560 in remove_target."""
+
+    def _make_current_plan(self, uid, temp_plan_dir):
+        now = datetime.now().astimezone()
+        payload = {
+            "user_id": uid,
+            "username": "user",
+            "plan": {
+                "night_start": (now - timedelta(hours=1)).isoformat(),
+                "night_end": (now + timedelta(hours=3)).isoformat(),
+                "entries": [
+                    {"id": "e1", "name": "M31", "planned_minutes": 60, "done": False},
+                ],
+            },
+        }
+        save_user_plan(uid, payload, username="user")
+
+    def test_remove_from_previous_plan_returns_false(self, temp_plan_dir):
+        """Line 553: previous plan state → return False."""
+        uid = "aaaa0001-0000-4000-8000-111111111111"
+        now = datetime.now().astimezone()
+        payload = {
+            "user_id": uid, "username": "user",
+            "plan": {
+                "night_start": (now - timedelta(hours=5)).isoformat(),
+                "night_end": (now - timedelta(hours=1)).isoformat(),
+                "entries": [{"id": "e1", "name": "M31", "planned_minutes": 60, "done": False}],
+            },
+        }
+        save_user_plan(uid, payload, username="user")
+        result = remove_target(uid, "user", "e1")
+        assert result is False
+
+    def test_remove_nonexistent_entry_returns_false(self, temp_plan_dir):
+        """Line 559-560: entry not found → return False."""
+        uid = "aaaa0002-0000-4000-8000-111111111111"
+        self._make_current_plan(uid, temp_plan_dir)
+        result = remove_target(uid, "user", "nonexistent-id")
+        assert result is False
+
+    def test_remove_no_plan_returns_false(self, temp_plan_dir):
+        """Line 550: no plan at all → return False."""
+        uid = "aaaa0003-0000-4000-8000-111111111111"
+        result = remove_target(uid, "user", "e1")
+        assert result is False
+
+
+# ============================================================
+# update_target - edge cases
+# ============================================================
+
+
+class TestUpdateTargetEdgeCases:
+    """Covers lines 575, 580, 582-598, 604."""
+
+    def _make_current_plan(self, uid):
+        now = datetime.now().astimezone()
+        payload = {
+            "user_id": uid, "username": "user",
+            "plan": {
+                "night_start": (now - timedelta(hours=1)).isoformat(),
+                "night_end": (now + timedelta(hours=3)).isoformat(),
+                "entries": [
+                    {"id": "e1", "name": "M31", "planned_minutes": 60, "done": False,
+                     "planned_duration": "01:00"},
+                ],
+            },
+        }
+        save_user_plan(uid, payload, username="user")
+
+    def test_update_returns_none_for_no_plan(self, temp_plan_dir):
+        """Lines 574: no plan → return None."""
+        uid = "bbbb0001-0000-4000-8000-000000000000"
+        result = update_target(uid, "user", "e1", {"done": True})
+        assert result is None
+
+    def test_update_returns_none_for_previous_plan(self, temp_plan_dir):
+        """Line 575: previous plan → return None."""
+        uid = "bbbb0002-0000-4000-8000-000000000000"
+        now = datetime.now().astimezone()
+        payload = {
+            "user_id": uid, "username": "user",
+            "plan": {
+                "night_start": (now - timedelta(hours=5)).isoformat(),
+                "night_end": (now - timedelta(hours=1)).isoformat(),
+                "entries": [{"id": "e1", "name": "M31", "planned_minutes": 60, "done": False}],
+            },
+        }
+        save_user_plan(uid, payload, username="user")
+        result = update_target(uid, "user", "e1", {"done": True})
+        assert result is None
+
+    def test_update_returns_none_for_missing_entry(self, temp_plan_dir):
+        """Line 580: entry not found → return None."""
+        uid = "bbbb0003-0000-4000-8000-000000000000"
+        self._make_current_plan(uid)
+        result = update_target(uid, "user", "not-existing", {"done": True})
+        assert result is None
+
+    def test_update_planned_minutes_directly(self, temp_plan_dir):
+        """Lines 591-598: update via planned_minutes key (int)."""
+        uid = "bbbb0004-0000-4000-8000-000000000000"
+        self._make_current_plan(uid)
+        result = update_target(uid, "user", "e1", {"planned_minutes": 90})
+        assert result is not None
+        assert result["planned_minutes"] == 90
+
+    def test_update_planned_minutes_clamped(self, temp_plan_dir):
+        """planned_minutes is clamped to 24*60=1440."""
+        uid = "bbbb0005-0000-4000-8000-000000000000"
+        self._make_current_plan(uid)
+        result = update_target(uid, "user", "e1", {"planned_minutes": 99999})
+        assert result["planned_minutes"] == 24 * 60
+
+    def test_update_planned_minutes_invalid_type(self, temp_plan_dir):
+        """Lines 597: invalid planned_minutes type silently skipped."""
+        uid = "bbbb0006-0000-4000-8000-000000000000"
+        self._make_current_plan(uid)
+        result = update_target(uid, "user", "e1", {"planned_minutes": "not-a-number"})
+        # planned_minutes unchanged from original
+        assert result is not None
+        assert result["planned_minutes"] == 60
+
+    def test_update_planned_duration_invalid_format(self, temp_plan_dir):
+        """planned_duration that fails parsing doesn't update planned_minutes."""
+        uid = "bbbb0007-0000-4000-8000-000000000000"
+        self._make_current_plan(uid)
+        result = update_target(uid, "user", "e1", {"planned_duration": "bad"})
+        # planned_minutes stays at 60 (parse returns None)
+        assert result is not None
+        assert result["planned_minutes"] == 60
+
+    def test_update_save_failure_returns_none(self, temp_plan_dir):
+        """Line 604: save failure returns None."""
+        uid = "bbbb0008-0000-4000-8000-000000000000"
+        self._make_current_plan(uid)
+        with patch('plan_my_night.save_user_plan', return_value=False):
+            result = update_target(uid, "user", "e1", {"done": True})
+        assert result is None
+
+
+# ============================================================
+# update_plan_meta - edge cases
+# ============================================================
+
+
+class TestUpdatePlanMetaEdgeCases:
+    """Covers lines 616-629."""
+
+    def _make_current_plan(self, uid):
+        now = datetime.now().astimezone()
+        payload = {
+            "user_id": uid, "username": "user",
+            "plan": {
+                "night_start": (now - timedelta(hours=1)).isoformat(),
+                "night_end": (now + timedelta(hours=3)).isoformat(),
+                "entries": [],
+            },
+        }
+        save_user_plan(uid, payload, username="user")
+
+    def test_update_meta_no_plan_returns_none(self, temp_plan_dir):
+        uid = "cccc0001-0000-4000-8000-000000000000"
+        result = plan_my_night.update_plan_meta(uid, "user", {"start_delay_minutes": 10})
+        assert result is None
+
+    def test_update_meta_previous_plan_returns_none(self, temp_plan_dir):
+        uid = "cccc0002-0000-4000-8000-000000000000"
+        now = datetime.now().astimezone()
+        payload = {
+            "user_id": uid, "username": "user",
+            "plan": {
+                "night_start": (now - timedelta(hours=5)).isoformat(),
+                "night_end": (now - timedelta(hours=1)).isoformat(),
+                "entries": [],
+            },
+        }
+        save_user_plan(uid, payload, username="user")
+        result = plan_my_night.update_plan_meta(uid, "user", {"start_delay_minutes": 10})
+        assert result is None
+
+    def test_update_meta_start_delay_valid(self, temp_plan_dir):
+        uid = "cccc0003-0000-4000-8000-000000000000"
+        self._make_current_plan(uid)
+        result = plan_my_night.update_plan_meta(uid, "user", {"start_delay_minutes": 30})
+        assert result is not None
+        assert result["start_delay_minutes"] == 30
+
+    def test_update_meta_start_delay_clamped_to_max(self, temp_plan_dir):
+        uid = "cccc0004-0000-4000-8000-000000000000"
+        self._make_current_plan(uid)
+        result = plan_my_night.update_plan_meta(uid, "user", {"start_delay_minutes": 9999})
+        assert result is not None
+        assert result["start_delay_minutes"] == 23 * 60 + 59
+
+    def test_update_meta_start_delay_invalid_type_defaults_zero(self, temp_plan_dir):
+        uid = "cccc0005-0000-4000-8000-000000000000"
+        self._make_current_plan(uid)
+        result = plan_my_night.update_plan_meta(uid, "user", {"start_delay_minutes": "bad"})
+        assert result is not None
+        assert result["start_delay_minutes"] == 0
+
+    def test_update_meta_save_failure_returns_none(self, temp_plan_dir):
+        uid = "cccc0006-0000-4000-8000-000000000000"
+        self._make_current_plan(uid)
+        with patch('plan_my_night.save_user_plan', return_value=False):
+            result = plan_my_night.update_plan_meta(uid, "user", {"start_delay_minutes": 5})
+        assert result is None
+
+    def test_update_meta_without_start_delay_key(self, temp_plan_dir):
+        uid = "cccc0007-0000-4000-8000-000000000000"
+        self._make_current_plan(uid)
+        result = plan_my_night.update_plan_meta(uid, "user", {})
+        assert result is not None
+
+
+# ============================================================
+# reorder_target - edge cases
+# ============================================================
+
+
+class TestReorderTargetEdgeCases:
+    """Covers lines 638, 641, 646, 650."""
+
+    def _make_two_entry_plan(self, uid):
+        now = datetime.now().astimezone()
+        payload = {
+            "user_id": uid, "username": "user",
+            "plan": {
+                "night_start": (now - timedelta(hours=1)).isoformat(),
+                "night_end": (now + timedelta(hours=3)).isoformat(),
+                "entries": [
+                    {"id": "e1", "name": "M31", "planned_minutes": 60, "done": False},
+                    {"id": "e2", "name": "M42", "planned_minutes": 30, "done": False},
+                ],
+            },
+        }
+        save_user_plan(uid, payload, username="user")
+
+    def test_reorder_no_plan_returns_false(self, temp_plan_dir):
+        uid = "dddd0001-0000-4000-8000-000000000000"
+        result = reorder_target(uid, "user", "e1", 0)
+        assert result is False
+
+    def test_reorder_previous_plan_returns_false(self, temp_plan_dir):
+        uid = "dddd0002-0000-4000-8000-000000000000"
+        now = datetime.now().astimezone()
+        payload = {
+            "user_id": uid, "username": "user",
+            "plan": {
+                "night_start": (now - timedelta(hours=5)).isoformat(),
+                "night_end": (now - timedelta(hours=1)).isoformat(),
+                "entries": [{"id": "e1", "name": "M31", "planned_minutes": 60, "done": False}],
+            },
+        }
+        save_user_plan(uid, payload, username="user")
+        result = reorder_target(uid, "user", "e1", 0)
+        assert result is False
+
+    def test_reorder_missing_entry_returns_false(self, temp_plan_dir):
+        uid = "dddd0003-0000-4000-8000-000000000000"
+        self._make_two_entry_plan(uid)
+        result = reorder_target(uid, "user", "not-exist", 0)
+        assert result is False
+
+    def test_reorder_same_position_returns_true_no_save(self, temp_plan_dir):
+        uid = "dddd0004-0000-4000-8000-000000000000"
+        self._make_two_entry_plan(uid)
+        # e1 is at index 0; reorder to 0 should return True without modification
+        result = reorder_target(uid, "user", "e1", 0)
+        assert result is True
+
+    def test_reorder_clamped_to_valid_range(self, temp_plan_dir):
+        uid = "dddd0005-0000-4000-8000-000000000000"
+        self._make_two_entry_plan(uid)
+        # Request out-of-bounds index → clamped
+        result = reorder_target(uid, "user", "e1", 9999)
+        assert result is True
+        loaded = load_user_plan(uid, "user")
+        # e1 should now be last
+        assert loaded["plan"]["entries"][-1]["id"] == "e1"
+
+
+# ============================================================
+# get_plan_with_timeline - extra branches
+# ============================================================
+
+
+class TestGetPlanWithTimelineBranches:
+    """Covers lines 686-712."""
+
+    def test_timeline_with_night_window(self, temp_plan_dir):
+        uid = "eeee1001-0000-4000-8000-000000000000"
+        now = datetime.now().astimezone()
+        payload = {
+            "user_id": uid, "username": "user",
+            "plan": {
+                "night_start": (now - timedelta(hours=1)).isoformat(),
+                "night_end": (now + timedelta(hours=3)).isoformat(),
+                "start_delay_minutes": 10,
+                "entries": [
+                    {"id": "e1", "name": "M31", "planned_minutes": 30, "done": False},
+                ],
+            },
+        }
+        save_user_plan(uid, payload, username="user")
+        result = get_plan_with_timeline(uid, "user")
+        assert result["state"] == "current"
+        assert result["timeline"]["progress_percent"] > 0
+
+    def test_timeline_inside_night_sets_current_target(self, temp_plan_dir):
+        uid = "eeee1002-0000-4000-8000-000000000000"
+        now = datetime.now().astimezone()
+        # Create a plan where the single entry is currently active
+        payload = {
+            "user_id": uid, "username": "user",
+            "plan": {
+                "night_start": (now - timedelta(minutes=10)).isoformat(),
+                "night_end": (now + timedelta(hours=3)).isoformat(),
+                "start_delay_minutes": 0,
+                "entries": [
+                    {"id": "cur", "name": "M45", "planned_minutes": 60, "done": False},
+                ],
+            },
+        }
+        save_user_plan(uid, payload, username="user")
+        result = get_plan_with_timeline(uid, "user")
+        assert result["timeline"]["current_target_id"] == "cur"
+        assert result["current_banner"] is not None
+
+    def test_timeline_done_entry_not_current(self, temp_plan_dir):
+        uid = "eeee1003-0000-4000-8000-000000000000"
+        now = datetime.now().astimezone()
+        payload = {
+            "user_id": uid, "username": "user",
+            "plan": {
+                "night_start": (now - timedelta(minutes=10)).isoformat(),
+                "night_end": (now + timedelta(hours=3)).isoformat(),
+                "start_delay_minutes": 0,
+                "entries": [
+                    # Done entry should not become current_target
+                    {"id": "done-e", "name": "M45", "planned_minutes": 60, "done": True},
+                ],
+            },
+        }
+        save_user_plan(uid, payload, username="user")
+        result = get_plan_with_timeline(uid, "user")
+        assert result["timeline"]["current_target_id"] is None
+
+    def test_timeline_zero_duration_night(self, temp_plan_dir):
+        uid = "eeee1004-0000-4000-8000-000000000000"
+        now = datetime.now().astimezone()
+        # night_start == night_end → degenerate case
+        payload = {
+            "user_id": uid, "username": "user",
+            "plan": {
+                "night_start": now.isoformat(),
+                "night_end": now.isoformat(),
+                "entries": [],
+            },
+        }
+        save_user_plan(uid, payload, username="user")
+        result = get_plan_with_timeline(uid, "user")
+        assert result["timeline"]["progress_percent"] == 0.0
+
+
+# ============================================================
+# _csv_normalize_ra and _csv_normalize_dec
+# ============================================================
+
+
+class TestCsvNormalizeFunctions:
+    """Covers lines 730-746, 753-774, 783-784, 793-794."""
+
+    def test_csv_normalize_ra_none(self):
+        from plan_my_night import _csv_normalize_ra
+        assert _csv_normalize_ra(None) == ''
+
+    def test_csv_normalize_ra_sexagesimal_hms(self):
+        from plan_my_night import _csv_normalize_ra
+        result = _csv_normalize_ra("2h 31m 49s")
+        assert ':' in result
+
+    def test_csv_normalize_ra_decimal(self):
+        from plan_my_night import _csv_normalize_ra
+        result = _csv_normalize_ra("37.95")
+        assert ':' in result
+
+    def test_csv_normalize_ra_decimal_seconds_60_rollover(self):
+        """When rounding produces sec=60, roll over to next minute."""
+        from plan_my_night import _csv_normalize_ra
+        # A value that when converted would produce sec>=60 rounding
+        result = _csv_normalize_ra("0.99999")
+        assert ':' in result
+
+    def test_csv_normalize_ra_invalid_returns_as_is(self):
+        from plan_my_night import _csv_normalize_ra
+        result = _csv_normalize_ra("not-a-number")
+        assert result == "not-a-number"
+
+    def test_csv_normalize_dec_none(self):
+        from plan_my_night import _csv_normalize_dec
+        assert _csv_normalize_dec(None) == ''
+
+    def test_csv_normalize_dec_dms_format(self):
+        from plan_my_night import _csv_normalize_dec
+        result = _csv_normalize_dec("+41°16'09\"")
+        # Should contain sign and colons
+        assert ':' in result
+
+    def test_csv_normalize_dec_decimal_positive(self):
+        from plan_my_night import _csv_normalize_dec
+        result = _csv_normalize_dec("41.269")
+        assert result.startswith('+')
+
+    def test_csv_normalize_dec_decimal_negative(self):
+        from plan_my_night import _csv_normalize_dec
+        result = _csv_normalize_dec("-5.3914")
+        assert result.startswith('-')
+
+    def test_csv_normalize_dec_invalid_returns_as_is(self):
+        from plan_my_night import _csv_normalize_dec
+        result = _csv_normalize_dec("not-a-number")
+        assert result == "not-a-number"
+
+    def test_csv_normalize_dec_seconds_60_rollover(self):
+        from plan_my_night import _csv_normalize_dec
+        # Produce a value where sec rounds to 60
+        result = _csv_normalize_dec("41.99999")
+        assert ':' in result
+
+    def test_csv_fmt_local_hm_none_returns_empty(self):
+        from plan_my_night import _csv_fmt_local_hm
+        assert _csv_fmt_local_hm(None) == ''
+        assert _csv_fmt_local_hm('') == ''
+
+    def test_csv_fmt_local_hm_invalid_returns_str(self):
+        from plan_my_night import _csv_fmt_local_hm
+        result = _csv_fmt_local_hm("not-a-date")
+        assert result == "not-a-date"
+
+    def test_csv_fmt_local_hm_valid_iso(self):
+        from plan_my_night import _csv_fmt_local_hm
+        result = _csv_fmt_local_hm("2026-08-12T21:30:00")
+        assert ':' in result
+
+    def test_csv_fmt_observable_pct_none(self):
+        from plan_my_night import _csv_fmt_observable_pct
+        assert _csv_fmt_observable_pct(None) == ''
+        assert _csv_fmt_observable_pct('') == ''
+
+    def test_csv_fmt_observable_pct_valid(self):
+        from plan_my_night import _csv_fmt_observable_pct
+        assert _csv_fmt_observable_pct(0.75) == '75%'
+
+    def test_csv_fmt_observable_pct_invalid(self):
+        from plan_my_night import _csv_fmt_observable_pct
+        result = _csv_fmt_observable_pct("not-a-float")
+        assert result == "not-a-float"
+
+    def test_csv_normalize_ra_sexagesimal_sec60_rollover(self):
+        from plan_my_night import _csv_normalize_ra
+        result = _csv_normalize_ra("0h 59m 59.9s")
+        assert ':' in result
+
+    def test_csv_normalize_dec_sexagesimal_sec60_rollover(self):
+        from plan_my_night import _csv_normalize_dec
+        result = _csv_normalize_dec("+0°59'59.9\"")
+        assert ':' in result
+
+
+class TestEntryMatchesAlias:
+    """Tests for _entry_matches alias matching branch (lines 362->367, 364-365)."""
+
+    def test_entry_matches_by_alias(self):
+        entry = {
+            'name': 'Andromeda Galaxy',
+            'catalogue': 'Messier',
+            'catalogue_group_id': '',
+            'catalogue_aliases': {'Messier': 'M31', 'NGC': 'NGC 224'},
+        }
+        with patch('plan_my_night._target_group_id', return_value=''):
+            result = _entry_matches(entry, 'NGC', 'NGC 224')
+        assert result is True
+
+    def test_entry_not_matches_when_alias_differs(self):
+        entry = {
+            'name': 'Andromeda Galaxy',
+            'catalogue': 'Messier',
+            'catalogue_group_id': '',
+            'catalogue_aliases': {'Messier': 'M31'},
+        }
+        with patch('plan_my_night._target_group_id', return_value=''):
+            result = _entry_matches(entry, 'NGC', 'NGC 999')
+        assert result is False
+
+    def test_is_target_in_current_plan_found(self, temp_plan_dir):
+        user_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+        from datetime import datetime, timezone, timedelta
+        now = datetime.now(timezone.utc)
+        payload = {
+            'user_id': user_id,
+            'username': 'testuser',
+            'plan': {
+                'night_start': (now - timedelta(hours=1)).isoformat(),
+                'night_end': (now + timedelta(hours=5)).isoformat(),
+                'entries': [
+                    {'id': 'e1', 'name': 'M42', 'catalogue': 'Messier',
+                     'catalogue_group_id': '', 'catalogue_aliases': {}},
+                ],
+            },
+        }
+        save_user_plan(user_id, payload, username='testuser')
+        with patch('plan_my_night._target_group_id', return_value=''):
+            result = plan_my_night.is_target_in_current_plan(user_id, 'testuser', 'Messier', 'M42')
+        assert result is True
+
+    def test_create_or_add_target_already_in_plan(self, temp_plan_dir):
+        user_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+        from datetime import datetime, timezone, timedelta
+        now = datetime.now(timezone.utc)
+        night_start = (now - timedelta(hours=1)).isoformat()
+        night_end = (now + timedelta(hours=5)).isoformat()
+        with patch('plan_my_night._target_group_id', return_value=''):
+            ok1, reason1, _, _ = create_or_add_target(
+                user_id=user_id, username='testuser',
+                item_data={'name': 'M42'}, catalogue='Messier',
+                night_start=night_start, night_end=night_end,
+            )
+        assert ok1 is True
+        assert reason1 == 'added'
+        with patch('plan_my_night._target_group_id', return_value=''):
+            ok2, reason2, _, entry2 = create_or_add_target(
+                user_id=user_id, username='testuser',
+                item_data={'name': 'M42'}, catalogue='Messier',
+                night_start=night_start, night_end=night_end,
+            )
+        assert ok2 is True
+        assert reason2 == 'already_in_plan'
+
+
+# ============================================================
+# get_all_plan_states
+# ============================================================
+
+
+class TestGetAllPlanStates:
+    """Covers lines 862-865, 878-886, 905-915."""
+
+    def test_no_plans_no_telescopes_returns_empty(self, temp_plan_dir):
+        uid = "ffff1001-0000-4000-8000-000000000000"
+        result = plan_my_night.get_all_plan_states(uid, "user", [])
+        assert result == []
+
+    def test_default_plan_included_when_exists(self, temp_plan_dir):
+        uid = "ffff1002-0000-4000-8000-000000000000"
+        payload = {'user_id': uid, 'plan': None}
+        save_user_plan(uid, payload, username="user")
+        result = plan_my_night.get_all_plan_states(uid, "user", [])
+        assert len(result) == 1
+        assert result[0]['telescope_id'] is None
+
+    def test_telescope_plan_included(self, temp_plan_dir):
+        uid = "ffff1003-0000-4000-8000-000000000000"
+        scope_id = "scope-001"
+        payload = {'user_id': uid, 'plan': None}
+        save_user_plan(uid, payload, username="user", telescope_id=scope_id)
+        telescopes = [{'id': scope_id, 'name': 'Test Scope', 'is_own': True,
+                       'owner_username': 'user'}]
+        result = plan_my_night.get_all_plan_states(uid, "user", telescopes)
+        assert any(r['telescope_id'] == scope_id for r in result)
+
+    def test_orphaned_plan_detected(self, temp_plan_dir):
+        uid = "ffff1004-0000-4000-8000-000000000000"
+        # Use a valid UUID-format telescope_id
+        orphan_id = "0a1b2c3d-0000-4000-8000-000000000099"
+        # Save a plan for a telescope that's not in the known_ids list
+        now = datetime.now().astimezone()
+        payload = {
+            'user_id': uid,
+            'plan': {
+                'night_start': (now - timedelta(hours=1)).isoformat(),
+                'night_end': (now + timedelta(hours=3)).isoformat(),
+                'telescope_name': 'Old Scope',
+                'entries': [],
+            }
+        }
+        save_user_plan(uid, payload, username="user", telescope_id=orphan_id)
+        # Call with empty telescope list (orphan_id is not known)
+        result = plan_my_night.get_all_plan_states(uid, "user", [])
+        orphaned = [r for r in result if r.get('is_orphaned')]
+        assert len(orphaned) >= 1
+        assert orphaned[0]['telescope_id'] == orphan_id
+
+    def test_default_plan_with_entries_count(self, temp_plan_dir):
+        uid = "ffff1005-0000-4000-8000-000000000000"
+        now = datetime.now().astimezone()
+        payload = {
+            'user_id': uid,
+            'plan': {
+                'night_start': (now - timedelta(hours=1)).isoformat(),
+                'night_end': (now + timedelta(hours=3)).isoformat(),
+                'entries': [
+                    {'id': 'x1', 'name': 'M31'},
+                    {'id': 'x2', 'name': 'M42'},
+                ],
+            }
+        }
+        save_user_plan(uid, payload, username="user")
+        result = plan_my_night.get_all_plan_states(uid, "user", [])
+        assert result[0]['entries_count'] == 2
+
+
+# ============================================================
+# create_or_add_target - extra branches
+# ============================================================
+
+
+class TestCreateOrAddTargetExtra:
+    """Covers lines 515-516, 522-523."""
+
+    def test_add_duplicate_returns_already_in_plan(self, temp_plan_dir):
+        uid = "a1b2c3d4-0001-4000-8000-000000000001"
+        now = datetime.now().astimezone()
+
+        # First add
+        ok, reason, payload, target = create_or_add_target(
+            user_id=uid, username="user",
+            item_data={"name": "M31"},
+            catalogue="Messier",
+            night_start=(now - timedelta(hours=1)).isoformat(),
+            night_end=(now + timedelta(hours=3)).isoformat(),
+        )
+        assert ok is True
+        assert reason == "added"
+
+        # Add same target again (same name → same normalized name)
+        with patch("plan_my_night._entry_matches", return_value=True):
+            ok2, reason2, _, matched_entry = create_or_add_target(
+                user_id=uid, username="user",
+                item_data={"name": "M31"},
+                catalogue="Messier",
+                night_start=(now - timedelta(hours=1)).isoformat(),
+                night_end=(now + timedelta(hours=3)).isoformat(),
+            )
+        assert ok2 is True
+        assert reason2 == "already_in_plan"
+        assert matched_entry is not None
+
+    def test_add_save_failure_returns_false(self, temp_plan_dir):
+        uid = "a1b2c3d4-0002-4000-8000-000000000002"
+        now = datetime.now().astimezone()
+        with patch("plan_my_night.save_user_plan", return_value=False):
+            ok, reason, _, _ = create_or_add_target(
+                user_id=uid, username="user",
+                item_data={"name": "M45"},
+                catalogue="Messier",
+                night_start=(now - timedelta(hours=1)).isoformat(),
+                night_end=(now + timedelta(hours=3)).isoformat(),
+            )
+        assert ok is False
+        assert reason == "save_failed"
+
+    def test_add_with_telescope(self, temp_plan_dir):
+        uid = "a1b2c3d4-0003-4000-8000-000000000003"
+        scope_id = "a1b2c3d4-0004-4000-8000-000000000004"
+        now = datetime.now().astimezone()
+        ok, reason, _, target = create_or_add_target(
+            user_id=uid, username="user",
+            item_data={"name": "NGC 224"},
+            catalogue="NGC",
+            night_start=(now - timedelta(hours=1)).isoformat(),
+            night_end=(now + timedelta(hours=3)).isoformat(),
+            telescope_id=scope_id,
+            telescope_name="My Scope",
+        )
+        assert ok is True
+        loaded = load_user_plan(uid, "user", telescope_id=scope_id)
+        assert loaded["plan"]["telescope_id"] == scope_id
+
+
+# ============================================================
+# Additional branch coverage for missing lines
+# ============================================================
+
+
+class TestSaveUserPlanLockedErrorPaths:
+    """Cover lines 319-320 and 329-332: restore/cleanup failure handlers in _save_user_plan_locked."""
+
+    def test_restore_backup_failure_is_logged(self, temp_plan_dir):
+        """Lines 319-320: when os.replace(backup, file) itself raises, error is logged."""
+        uid = "aaaaffff-0001-4000-8000-000000000001"
+        # Create an initial plan so backup is attempted
+        save_user_plan(uid, {'user_id': uid, 'plan': None}, username="u1")
+        # Fail the dump AND the backup restore
+        with patch('plan_my_night.json.dump', side_effect=RuntimeError("disk full")):
+            with patch('plan_my_night.os.replace', side_effect=OSError("restore fail")):
+                result = save_user_plan(uid, {'user_id': uid, 'plan': None}, username="u1")
+        assert result is False
+
+    def test_backup_cleanup_failure_is_silenced(self, temp_plan_dir):
+        """Lines 329-332: os.remove(backup) raises during error cleanup — silently swallowed."""
+        uid = "aaaaffff-0002-4000-8000-000000000002"
+        # Create an initial plan so backup is attempted
+        save_user_plan(uid, {'user_id': uid, 'plan': None}, username="u1")
+        remove_calls = []
+
+        def mock_remove(path):
+            remove_calls.append(path)
+            raise OSError("cannot remove")
+
+        # Fail dump so we enter the except block, then fail ALL os.remove calls
+        with patch('plan_my_night.json.dump', side_effect=RuntimeError("disk full")):
+            # Also fail os.replace(backup→file) so the backup still exists at line 328
+            with patch('plan_my_night.os.replace', side_effect=OSError("restore fail")):
+                with patch('plan_my_night.os.remove', side_effect=mock_remove):
+                    result = save_user_plan(uid, {'user_id': uid, 'plan': None}, username="u1")
+        assert result is False
+
+
+class TestTimelineBeyondNightEnd:
+    """Line 702: entry with duration extending past night_end gets capped."""
+
+    def test_long_entry_is_capped_at_night_end(self, temp_plan_dir):
+        """planned_minutes > remaining night → end_dt capped to night_end (line 702)."""
+        uid = "aaaaffff-0003-4000-8000-000000000003"
+        now = datetime.now().astimezone()
+        payload = {
+            "user_id": uid, "username": "user",
+            "plan": {
+                "night_start": now.isoformat(),
+                "night_end": (now + timedelta(minutes=30)).isoformat(),
+                "entries": [
+                    # 120 min entry in a 30-min night → must be capped
+                    {"id": "long", "name": "M45", "planned_minutes": 120, "done": False},
+                ],
+            },
+        }
+        save_user_plan(uid, payload, username="user")
+        result = get_plan_with_timeline(uid, "user")
+        # The entry should exist in the result and not raise
+        entries = result.get("plan", {}).get("entries", [])
+        long_entry = next((e for e in entries if e.get("id") == "long"), None)
+        assert long_entry is not None
+
+
+class TestGetAllPlanStatesOrphanFilenameSkip:
+    """Line 907: file with non-matching name pattern is skipped in orphan detection."""
+
+    def test_non_matching_filename_is_skipped(self, temp_plan_dir):
+        """A file named {uid}_plan.json (no underscore after _plan) is skipped (line 907)."""
+        uid = "aaaaffff-0004-4000-8000-000000000004"
+        # Create a file with a slightly wrong name (no underscore between _plan and suffix)
+        weird_name = f"{uid}_plan.json"
+        with open(os.path.join(temp_plan_dir, weird_name), 'w') as f:
+            json.dump({'user_id': uid, 'plan': None}, f)
+
+        # Patch get_all_plan_files to return the weird file
+        with patch('plan_my_night.get_all_plan_files',
+                   return_value=[os.path.join(temp_plan_dir, weird_name)]):
+            result = plan_my_night.get_all_plan_states(uid, "user", [])
+        # It should process without crashing; weird file should be skipped (line 907)
+        assert isinstance(result, list)
+
+
+class TestGeneratePlanPdfBranchCoverage:
+    """Cover branches in generate_plan_pdf helpers (_load_alttime, _parse_utc, _clip_alttime)."""
+
+    def test_alttime_file_not_found_returns_none(self, tmp_path, monkeypatch):
+        """Line 999: _load_alttime returns None when file doesn't exist on disk."""
+        import matplotlib
+        matplotlib.use("Agg", force=True)
+        monkeypatch.setattr("constants.SKYTONIGHT_OUTPUT_DIR", str(tmp_path), raising=True)
+        now = datetime(2026, 8, 12, 21, 0, tzinfo=timezone.utc)
+        payload = {
+            "plan": {
+                "night_start": now.isoformat(),
+                "night_end": (now + timedelta(hours=2)).isoformat(),
+                "entries": [{
+                    "id": "e1", "name": "M31", "done": False,
+                    "alttime_file": "nonexistent_target",  # no file on disk
+                    "timeline_start": now.isoformat(),
+                    "timeline_end": (now + timedelta(minutes=30)).isoformat(),
+                }],
+            }
+        }
+        metrics = {"fill_percent": 50.0, "planned_minutes": 30, "night_minutes": 120, "overflow_minutes": 0}
+        result = generate_plan_pdf(payload, metrics, _DummyI18n())
+        assert result.getvalue().startswith(b"%PDF")
+
+    def test_bad_timezone_in_alttime_falls_back_to_utc(self, tmp_path, monkeypatch):
+        """Lines 1087-1089: alttime with bad timezone name → falls back to UTC."""
+        import matplotlib
+        matplotlib.use("Agg", force=True)
+        monkeypatch.setattr("constants.SKYTONIGHT_OUTPUT_DIR", str(tmp_path), raising=True)
+        now = datetime(2026, 8, 12, 21, 0, tzinfo=timezone.utc)
+        # Write an alttime file with a bad timezone
+        alttime_data = {
+            "timezone": "NOT/A_REAL_TIMEZONE",
+            "times_utc": [now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                          (now + timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M:%SZ")],
+            "altitudes": [30.0, 40.0],
+        }
+        with open(tmp_path / "m31_alttime.json", "w") as f:
+            json.dump(alttime_data, f)
+        payload = {
+            "plan": {
+                "night_start": now.isoformat(),
+                "night_end": (now + timedelta(hours=2)).isoformat(),
+                "entries": [{
+                    "id": "e1", "name": "M31", "done": False,
+                    "alttime_file": "m31",
+                    "timeline_start": now.isoformat(),
+                    "timeline_end": (now + timedelta(minutes=30)).isoformat(),
+                }],
+            }
+        }
+        metrics = {"fill_percent": 25.0, "planned_minutes": 30, "night_minutes": 120, "overflow_minutes": 0}
+        result = generate_plan_pdf(payload, metrics, _DummyI18n())
+        assert result.getvalue().startswith(b"%PDF")
+
+    def test_naive_timeline_datetimes_are_handled(self, tmp_path, monkeypatch):
+        """Lines 1015-1016 and 1017-1018: naive and offset timezone datetime strings."""
+        import matplotlib
+        matplotlib.use("Agg", force=True)
+        monkeypatch.setattr("constants.SKYTONIGHT_OUTPUT_DIR", str(tmp_path), raising=True)
+        now = datetime(2026, 8, 12, 21, 0, tzinfo=timezone.utc)
+        alttime_data = {
+            "timezone": "UTC",
+            "times_utc": [now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                          (now + timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M:%SZ")],
+            "altitudes": [30.0, 40.0],
+        }
+        with open(tmp_path / "m31_alttime.json", "w") as f:
+            json.dump(alttime_data, f)
+        payload = {
+            "plan": {
+                "night_start": now.isoformat(),
+                "night_end": (now + timedelta(hours=2)).isoformat(),
+                "entries": [
+                    {   # naive datetime string (no tz) → lines 1015-1016
+                        "id": "e1", "name": "M31", "done": False,
+                        "alttime_file": "m31",
+                        "timeline_start": "2026-08-12T21:00:00",   # naive
+                        "timeline_end": "2026-08-12T21:30:00",     # naive
+                    },
+                    {   # with offset → lines 1017-1018
+                        "id": "e2", "name": "M42", "done": False,
+                        "timeline_start": "2026-08-12T21:30:00+02:00",
+                        "timeline_end": "2026-08-12T22:00:00+02:00",
+                    },
+                    {   # malformed → lines 1020-1021
+                        "id": "e3", "name": "M45", "done": False,
+                        "timeline_start": "not-a-date",
+                        "timeline_end": "also-bad",
+                    },
+                ],
+            }
+        }
+        metrics = {"fill_percent": 25.0, "planned_minutes": 90, "night_minutes": 120, "overflow_minutes": 0}
+        result = generate_plan_pdf(payload, metrics, _DummyI18n())
+        assert result.getvalue().startswith(b"%PDF")

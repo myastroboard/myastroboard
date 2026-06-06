@@ -102,3 +102,37 @@ def test_merge_item_with_alias_entry_adds_or_removes_aliases():
 
 def test_merge_item_with_alias_entry_non_dict_passthrough():
     assert merge_item_with_alias_entry("raw") == "raw"
+
+
+def test_load_aliases_table_exception_returns_empty(monkeypatch):
+    """Lines 51-53: exception during file open → return empty dict."""
+    module._aliases_cache = {}
+    module._aliases_mtime = None
+    with patch("catalogue_aliases.os.path.exists", return_value=True), \
+         patch("catalogue_aliases.os.path.getmtime", return_value=99.0), \
+         patch("builtins.open", side_effect=IOError("disk error")):
+        result = load_aliases_table(force_reload=True)
+    assert result == {}
+
+
+def test_merge_item_no_catalogue_removes_aliases_key():
+    """Lines 95-96: missing catalogue → pop catalogue_aliases and return item."""
+    item = {'name': 'M31', 'catalogue_aliases': {'x': 'y'}}
+    result = merge_item_with_alias_entry(item)
+    assert 'catalogue_aliases' not in result
+    assert result['name'] == 'M31'
+
+
+def test_merge_item_no_name_removes_aliases_key():
+    """Lines 95-96: missing name → pop catalogue_aliases and return item."""
+    item = {'catalogue': 'Messier', 'catalogue_aliases': {'x': 'y'}}
+    result = merge_item_with_alias_entry(item)
+    assert 'catalogue_aliases' not in result
+
+
+def test_merge_item_empty_aliases_dict_removes_aliases_key():
+    """Line 108: aliases is empty dict → pop catalogue_aliases from item."""
+    item = {'catalogue': 'Messier', 'name': 'M31', 'catalogue_aliases': {'old': 'data'}}
+    with patch("catalogue_aliases.get_alias_entry", return_value={"aliases": {}}):
+        result = merge_item_with_alias_entry(item)
+    assert 'catalogue_aliases' not in result

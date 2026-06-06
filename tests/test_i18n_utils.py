@@ -4,7 +4,13 @@ import pytest
 from unittest.mock import mock_open, patch
 
 import i18n_utils as module
-from i18n_utils import I18nManager, _is_safe_path, create_translated_alert, get_translated_message
+from i18n_utils import (
+    I18nManager,
+    _is_safe_path,
+    create_translated_alert,
+    get_translated_message,
+    init_i18n_for_request,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -110,3 +116,82 @@ def test_create_translated_alert_invalid_time_keeps_original_string():
         )
 
     manager_instance.t.assert_called_once_with("weather_alerts.section_title", time="not-a-time")
+
+
+# ---------------------------------------------------------------------------
+# Additional tests for missing coverage
+# ---------------------------------------------------------------------------
+
+def test_is_safe_path_different_drives_returns_false(monkeypatch):
+    """Lines 48-50: ValueError from os.path.commonpath on different drives → False."""
+    def _raise_value_error(paths):
+        raise ValueError("Paths are on different drives")
+
+    monkeypatch.setattr(module.os.path, "commonpath", _raise_value_error)
+    result = _is_safe_path("C:\\base", "D:\\other")
+    assert result is False
+
+
+def test_load_translation_file_cache_hit(tmp_path):
+    """Line 69: second call for same language uses cached result."""
+    module._translation_cache.clear()
+    payload = '{"x": "y"}'
+    with patch("i18n_utils.os.path.exists", return_value=True), patch(
+        "builtins.open", mock_open(read_data=payload)
+    ):
+        first = module._load_translation_file("en")
+        # Inject a sentinel to prove the cache is used on the second call
+        module._translation_cache["en"]["sentinel"] = True
+        second = module._load_translation_file("en")
+
+    assert second.get("sentinel") is True  # same dict object from cache
+
+
+def test_load_translation_file_json_decode_error_returns_empty(tmp_path):
+    """Lines 99-101: JSONDecodeError → empty dict returned."""
+    module._translation_cache.clear()
+    with patch("i18n_utils.os.path.exists", return_value=True), patch(
+        "builtins.open", mock_open(read_data="INVALID JSON {{{")
+    ):
+        result = module._load_translation_file("en")
+
+    assert result == {}
+
+
+def test_t_key_found_in_main_translations_loop_exits_normally():
+    """Line 146->161: all keys found in main translations → loop exits normally → line 161 executed."""
+    with patch("i18n_utils._load_translation_file", return_value={"ns": {"key": "value"}}):
+        manager = I18nManager("en")
+    result = manager.t("ns.key")
+    assert result == "value"
+
+
+def test_t_key_resolves_to_non_string_returns_key():
+    """Line 162: key resolves to a dict (not str) → return key."""
+    with patch("i18n_utils._load_translation_file", return_value={"ns": {"sub": "v"}}):
+        manager = I18nManager("en")
+    # Key "ns" alone resolves to a dict, not a str
+    result = manager.t("ns")
+    assert result == "ns"
+
+
+def test_set_language_valid_language_updates_state():
+    """Lines 181-182: set_language with a supported language updates self.language."""
+    with patch("i18n_utils._load_translation_file", return_value={}):
+        manager = I18nManager("en")
+        manager.set_language("fr")
+    assert manager.get_language() == "fr"
+
+
+def test_get_namespace_missing_returns_empty():
+    """Line 202: namespace not in translations → return {}."""
+    with patch("i18n_utils._load_translation_file", return_value={"other": {}}):
+        manager = I18nManager("en")
+    assert manager.get_namespace("nonexistent") == {}
+
+
+def test_init_i18n_for_request_returns_manager():
+    """Line 283: init_i18n_for_request returns an I18nManager instance."""
+    with patch("i18n_utils._load_translation_file", return_value={}):
+        result = init_i18n_for_request("en")
+    assert isinstance(result, I18nManager)

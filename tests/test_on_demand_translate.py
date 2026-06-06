@@ -181,3 +181,113 @@ class TestChunkTextForProvider:
         # Each paragraph is 50 chars, fits within 60 per chunk
         for chunk in result:
             assert len(chunk) <= 60
+
+    def test_blank_lines_preserved_as_empty_chunks(self):
+        """Text with blank lines should produce empty string chunks (max_len forces split)."""
+        text = "Para1\n\nPara2"
+        result = _chunk_text_for_provider(text, 3)  # small max_len forces chunking path
+        assert "" in result
+
+
+class TestTranslateWithMymemory:
+    """Direct tests for _translate_with_mymemory."""
+
+    @patch("on_demand_translate.requests.get")
+    def test_successful_response(self, mock_get):
+        mock_resp = MagicMock()
+        mock_resp.ok = True
+        mock_resp.json.return_value = {"responseData": {"translatedText": "Bonjour"}}
+        mock_get.return_value = mock_resp
+        from on_demand_translate import _translate_with_mymemory
+        result = _translate_with_mymemory("Hello", "en", "fr")
+        assert result == "Bonjour"
+
+    @patch("on_demand_translate.requests.get")
+    def test_non_ok_response_returns_none(self, mock_get):
+        mock_resp = MagicMock()
+        mock_resp.ok = False
+        mock_get.return_value = mock_resp
+        from on_demand_translate import _translate_with_mymemory
+        result = _translate_with_mymemory("Hello", "en", "fr")
+        assert result is None
+
+    @patch("on_demand_translate.requests.get")
+    def test_non_string_translated_returns_none(self, mock_get):
+        mock_resp = MagicMock()
+        mock_resp.ok = True
+        mock_resp.json.return_value = {"responseData": {"translatedText": 123}}
+        mock_get.return_value = mock_resp
+        from on_demand_translate import _translate_with_mymemory
+        result = _translate_with_mymemory("Hello", "en", "fr")
+        assert result is None
+
+    @patch("on_demand_translate.requests.get")
+    def test_empty_translated_returns_none(self, mock_get):
+        mock_resp = MagicMock()
+        mock_resp.ok = True
+        mock_resp.json.return_value = {"responseData": {"translatedText": "   "}}
+        mock_get.return_value = mock_resp
+        from on_demand_translate import _translate_with_mymemory
+        result = _translate_with_mymemory("Hello", "en", "fr")
+        assert result is None
+
+    @patch("on_demand_translate.requests.get", side_effect=Exception("network error"))
+    def test_exception_returns_none(self, mock_get):
+        from on_demand_translate import _translate_with_mymemory
+        result = _translate_with_mymemory("Hello", "en", "fr")
+        assert result is None
+
+    @patch("on_demand_translate.requests.get")
+    def test_html_entities_unescaped(self, mock_get):
+        mock_resp = MagicMock()
+        mock_resp.ok = True
+        mock_resp.json.return_value = {"responseData": {"translatedText": "Bonjour &amp; monde"}}
+        mock_get.return_value = mock_resp
+        from on_demand_translate import _translate_with_mymemory
+        result = _translate_with_mymemory("Hello & world", "en", "fr")
+        assert result == "Bonjour & monde"
+
+
+class TestTranslateWithMymemoryChunked:
+    """Tests for _translate_with_mymemory_chunked including blank-line passthrough."""
+
+    @patch("on_demand_translate._chunk_text_for_provider")
+    @patch("on_demand_translate._translate_with_mymemory")
+    def test_blank_chunks_pass_through_without_translation(self, mock_translate, mock_chunk):
+        """Empty chunks (blank lines) should be kept without calling the provider."""
+        mock_chunk.return_value = ["Hello", "", "World"]
+        mock_translate.return_value = "Traduit"
+        from on_demand_translate import _translate_with_mymemory_chunked
+        result = _translate_with_mymemory_chunked("Hello\n\nWorld", "en", "fr")
+        # Blank line should be preserved; provider called only for non-empty chunks
+        assert result is not None
+        assert "\n" in result
+        assert mock_translate.call_count == 2  # only non-empty chunks translated
+
+    @patch("on_demand_translate._translate_with_mymemory")
+    def test_provider_failure_on_any_chunk_returns_none(self, mock_translate):
+        mock_translate.return_value = None
+        from on_demand_translate import _translate_with_mymemory_chunked
+        result = _translate_with_mymemory_chunked("Hello", "en", "fr")
+        assert result is None
+
+
+class TestSplitLongSegmentWordLevel:
+    """Additional tests for word-level splitting in _split_long_segment."""
+
+    def test_multiple_short_words_split_at_max_len(self):
+        """Words that individually fit but combined exceed max_len."""
+        text = "Hello World How Are You Doing"
+        result = _split_long_segment(text, 12)
+        assert len(result) > 1
+        for chunk in result:
+            assert len(chunk) <= 12
+
+    def test_empty_parts_in_sentence_split(self):
+        """Sentence split that produces empty parts is handled gracefully."""
+        # re.split on a string like "Hello.  World" won't produce empty parts,
+        # but create a scenario where current is non-empty when we overflow.
+        text = "First sentence. This is a very long second sentence that exceeds limits."
+        result = _split_long_segment(text, 20)
+        assert isinstance(result, list)
+        assert len(result) >= 1

@@ -4,6 +4,7 @@ Unit tests for backend utilities (utils.py)
 import pytest
 import os
 import json
+import math
 import tempfile
 import yaml
 from pathlib import Path
@@ -12,6 +13,8 @@ from pathlib import Path
 # Import the functions to test
 from utils import (
     IndentDumper,
+    _NumpySafeEncoder,
+    _sanitize_for_json,
     ensure_directory_exists,
     slugify_location_name,
     safe_file_exists,
@@ -258,20 +261,20 @@ class TestFileSizeFormatting:
 
 class TestEnvironmentInfo:
     """Test environment info gathering"""
-    
+
     def test_get_environment_info_returns_dict(self):
         """Test that environment info returns a dictionary"""
         info = get_environment_info()
         assert isinstance(info, dict)
-    
+
     def test_get_environment_info_contains_expected_keys(self):
         """Test that expected keys are present"""
         info = get_environment_info()
-        expected_keys = ['data_dir', 'config_file_exists', 'python_version', 
+        expected_keys = ['data_dir', 'config_file_exists', 'python_version',
                         'platform', 'working_directory', 'docker_env']
         for key in expected_keys:
             assert key in info
-    
+
     def test_get_environment_info_data_types(self):
         """Test that values have correct types"""
         info = get_environment_info()
@@ -279,3 +282,73 @@ class TestEnvironmentInfo:
         assert isinstance(info['python_version'], str)
         assert isinstance(info['platform'], str)
         assert isinstance(info['working_directory'], str)
+
+
+class TestNumpySafeEncoder:
+    """Test the JSON encoder with numpy types (covers lines 35-44, 50-65)."""
+
+    def test_integer_type(self):
+        import numpy as np
+        result = json.dumps({'v': np.int64(7)}, cls=_NumpySafeEncoder)
+        assert '"v": 7' in result
+
+    def test_floating_type_normal(self):
+        import numpy as np
+        result = json.dumps({'v': np.float64(2.5)}, cls=_NumpySafeEncoder)
+        assert '"v": 2.5' in result
+
+    def test_floating_type_nan_becomes_null(self):
+        import numpy as np
+        # np.float32 is NOT a Python float subclass, so default() is called
+        result = json.dumps({'v': np.float32(float('nan'))}, cls=_NumpySafeEncoder)
+        assert '"v": null' in result
+
+    def test_floating_type_inf_becomes_null(self):
+        import numpy as np
+        result = json.dumps({'v': np.float32(float('inf'))}, cls=_NumpySafeEncoder)
+        assert '"v": null' in result
+
+    def test_ndarray_becomes_list(self):
+        import numpy as np
+        result = json.dumps({'v': np.array([1, 2, 3])}, cls=_NumpySafeEncoder)
+        assert '[1, 2, 3]' in result
+
+    def test_bool_type(self):
+        import numpy as np
+        result = json.dumps({'v': np.bool_(True)}, cls=_NumpySafeEncoder)
+        assert '"v": true' in result
+
+    def test_sanitize_numpy_integer(self):
+        import numpy as np
+        assert _sanitize_for_json(np.int64(10)) == 10
+
+    def test_sanitize_numpy_float_normal(self):
+        import numpy as np
+        assert _sanitize_for_json(np.float64(1.5)) == pytest.approx(1.5)
+
+    def test_sanitize_numpy_float_nan(self):
+        import numpy as np
+        assert _sanitize_for_json(np.float64(float('nan'))) is None
+
+    def test_sanitize_numpy_bool(self):
+        import numpy as np
+        assert _sanitize_for_json(np.bool_(False)) is False
+
+    def test_sanitize_numpy_array(self):
+        import numpy as np
+        assert _sanitize_for_json(np.array([4, 5])) == [4, 5]
+
+    def test_sanitize_float_nan(self):
+        assert _sanitize_for_json(float('nan')) is None
+
+    def test_sanitize_float_inf(self):
+        assert _sanitize_for_json(float('inf')) is None
+
+    def test_sanitize_tuple_becomes_list(self):
+        assert _sanitize_for_json((1, 2, 3)) == [1, 2, 3]
+
+    def test_sanitize_nested_dict(self):
+        import numpy as np
+        data = {'a': {'b': np.int64(5)}}
+        result = _sanitize_for_json(data)
+        assert result == {'a': {'b': 5}}

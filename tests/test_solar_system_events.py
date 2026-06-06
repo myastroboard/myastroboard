@@ -159,3 +159,110 @@ class TestFindCometVisibilityWindows:
             assert "event_type" in e
             assert e["event_type"] == "Comet Appearance"
             assert "magnitude" in e
+
+    def test_no_comet_events_when_date_range_too_early(self):
+        """When date range is before any comet perihelion, no events should be returned."""
+        svc = SolarSystemEventsService(45.0, -73.5)
+        from datetime import date
+        # Use a date range long before any known comets
+        events = svc._find_comet_visibility_windows(date(2000, 1, 1), 10)
+        assert isinstance(events, list)
+        # Should find no comets (none have perihelion around 2000-01-01)
+        assert len(events) == 0
+
+
+class TestGetSolarSystemEvents:
+    """Tests for the main get_solar_system_events method."""
+
+    def test_returns_sorted_list(self):
+        svc = SolarSystemEventsService(45.0, -73.5, timezone="America/Montreal")
+        events = svc.get_solar_system_events(days_ahead=365)
+        assert isinstance(events, list)
+        # Should be sorted by peak_time or start_time
+        times = [e.get("peak_time", e.get("start_time")) for e in events]
+        assert times == sorted(times)
+
+    def test_returns_empty_on_exception(self):
+        """When an exception occurs internally, returns empty list."""
+        svc = SolarSystemEventsService(45.0, -73.5)
+        with patch.object(svc, "_find_meteor_shower_peaks", side_effect=Exception("boom")):
+            events = svc.get_solar_system_events()
+        assert events == []
+
+    def test_contains_event_types(self):
+        svc = SolarSystemEventsService(45.0, -73.5, timezone="America/Montreal")
+        events = svc.get_solar_system_events(days_ahead=400)
+        event_types = {e["event_type"] for e in events}
+        # Should have at least meteor showers or comets
+        assert len(event_types) >= 1
+
+
+class TestFindAsteroidOccultations:
+    """Tests for _find_asteroid_occultations."""
+
+    def test_returns_empty_list(self):
+        svc = SolarSystemEventsService(45.0, -73.5)
+        from datetime import date
+        events = svc._find_asteroid_occultations(date(2026, 1, 1), 365)
+        assert events == []
+
+    def test_returns_list_type(self):
+        svc = SolarSystemEventsService(45.0, -73.5)
+        from datetime import date
+        events = svc._find_asteroid_occultations(date(2026, 6, 1), 30)
+        assert isinstance(events, list)
+
+
+class TestFindMeteorShowerPeaksEdgeCases:
+    """Additional edge cases for _find_meteor_shower_peaks."""
+
+    def test_no_events_when_range_excludes_all_peaks(self):
+        """A very narrow date range excluding all peaks returns empty list."""
+        svc = SolarSystemEventsService(45.0, -73.5, timezone="America/Montreal")
+        from datetime import date
+        # February has no meteor shower peaks in the METEOR_SHOWERS data
+        events = svc._find_meteor_shower_peaks(date(2026, 2, 1), 5)
+        assert isinstance(events, list)
+        assert len(events) == 0
+
+    def test_southern_only_shower_excluded_for_northern_observer(self):
+        """A Southern-hemisphere-only shower should be skipped for Northern observer."""
+        svc = SolarSystemEventsService(45.0, -73.5, timezone="America/Montreal")
+        orig = svc.METEOR_SHOWERS.copy()
+        svc.METEOR_SHOWERS = {
+            'TestSouthern': {
+                'peak_month': 6,
+                'peak_day_start': 1,
+                'peak_day_end': 10,
+                'radiant_ra': 0,
+                'radiant_dec': -60,
+                'zenith_hourly_rate': 10,
+                'parent_body': 'test',
+                'hemisphere': 'Southern',
+            }
+        }
+        from datetime import date
+        try:
+            events = svc._find_meteor_shower_peaks(date(2026, 1, 1), 365)
+            assert len(events) == 0
+        finally:
+            svc.METEOR_SHOWERS = orig
+
+
+class TestIsRadiantVisible:
+    """Tests for _is_radiant_visible."""
+
+    def test_returns_bool(self):
+        from astropy.time import Time
+        svc = SolarSystemEventsService(45.0, -73.5)
+        t = Time("2026-08-12T02:00:00", format="isot", scale="utc")
+        result = svc._is_radiant_visible(48, 58, t)
+        assert isinstance(result, bool)
+
+    def test_returns_false_on_exception(self):
+        from astropy.time import Time
+        svc = SolarSystemEventsService(45.0, -73.5)
+        t = Time("2026-08-12T02:00:00", format="isot", scale="utc")
+        with patch("solar_system_events.SkyCoord", side_effect=Exception("bad")):
+            result = svc._is_radiant_visible(48, 58, t)
+        assert result is False

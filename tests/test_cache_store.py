@@ -410,3 +410,118 @@ class TestCacheInitStatus:
         # With no data, caches should not be ready
         reset_all_caches()
         assert is_astronomical_cache_ready() is False
+
+
+class TestReadSharedCacheMissingFile:
+    """Line 145: _read_shared_cache returns {} when shared cache file doesn't exist."""
+
+    def test_returns_empty_dict_when_file_absent(self, monkeypatch):
+        import cache_store
+        monkeypatch.setattr(cache_store, '_SHARED_CACHE_FILE', '/nonexistent/path/astro_cache.json')
+        result = cache_store._read_shared_cache()
+        assert result == {}
+
+
+class TestLoadSharedCacheEntryMissingKeys:
+    """Line 177: load_shared_cache_entry returns None when entry is a dict missing timestamp/data."""
+
+    def test_entry_missing_timestamp(self, monkeypatch):
+        import cache_store
+        monkeypatch.setattr(cache_store, '_read_shared_cache', lambda: {"mykey": {"data": "foo"}})
+        result = cache_store.load_shared_cache_entry("mykey")
+        assert result is None
+
+    def test_entry_missing_data(self, monkeypatch):
+        import cache_store
+        monkeypatch.setattr(cache_store, '_read_shared_cache', lambda: {"mykey": {"timestamp": 123}})
+        result = cache_store.load_shared_cache_entry("mykey")
+        assert result is None
+
+
+class TestLoadLocationCacheReadsFile:
+    """Lines 229-233: _load_location_cache reads file contents or swallows exceptions."""
+
+    def test_load_location_cache_from_existing_file(self, tmp_path, monkeypatch):
+        import cache_store, json
+        location_data = {"latitude": 51.5, "longitude": -0.12, "elevation": 10, "timezone": "Europe/London"}
+        loc_file = tmp_path / 'location_cache.json'
+        loc_file.write_text(json.dumps(location_data))
+        monkeypatch.setattr(cache_store, '_LOCATION_CACHE_FILE', str(loc_file))
+        cache_store._load_location_cache()
+        assert cache_store._last_known_location_config["latitude"] == 51.5
+        assert cache_store._last_known_location_config["timezone"] == "Europe/London"
+
+    def test_load_location_cache_corrupted_file_swallows_exception(self, tmp_path, monkeypatch):
+        """Lines 231-233: json.JSONDecodeError → except block executed, no exception raised."""
+        import cache_store
+        loc_file = tmp_path / 'location_cache.json'
+        loc_file.write_text("NOT VALID JSON {{{{")
+        monkeypatch.setattr(cache_store, '_LOCATION_CACHE_FILE', str(loc_file))
+        cache_store._load_location_cache()  # must not raise
+
+
+class TestSaveLocationCacheException:
+    """Lines 242-244: _save_location_cache swallows write exceptions silently."""
+
+    def test_save_exception_is_silently_ignored(self, monkeypatch):
+        import cache_store, builtins
+        original_open = builtins.open
+
+        def raising_open(path, mode='r', **kwargs):
+            if 'w' in mode and 'location_cache' in str(path):
+                raise PermissionError("no write access")
+            return original_open(path, mode, **kwargs)
+
+        monkeypatch.setattr(builtins, 'open', raising_open)
+        cache_store._save_location_cache()  # must not propagate the exception
+
+
+class TestHasLocationChangedNoneConfig:
+    """Line 269: has_location_changed returns True when new config is None."""
+
+    def test_none_config_treated_as_changed(self):
+        result = has_location_changed(None)
+        assert result is True
+
+
+class TestUpdateLocationConfigNone:
+    """Line 288->exit: update_location_config is a no-op when signature is None."""
+
+    def test_none_config_leaves_state_unchanged(self):
+        import cache_store
+        before = cache_store._last_known_location_config.copy()
+        update_location_config(None)
+        assert cache_store._last_known_location_config == before
+
+
+class TestResetWeatherCache:
+    """Line 330: reset_weather_cache resets _weather_cache to its zero state."""
+
+    def test_reset_weather_cache_clears_data(self):
+        import cache_store
+        from cache_store import reset_weather_cache
+        cache_store._weather_cache = {"timestamp": 99999, "data": {"temperature": 20}}
+        reset_weather_cache()
+        assert cache_store._weather_cache == {"timestamp": 0, "data": None}
+
+
+class TestIsCacheValidForToday:
+    """Lines 351-354: is_cache_valid_for_today checks both TTL and calendar date."""
+
+    def test_fresh_cache_from_today_is_valid(self):
+        from cache_store import is_cache_valid_for_today
+        cache_entry = {"timestamp": time.time(), "data": {"some": "data"}}
+        assert is_cache_valid_for_today(cache_entry, 3600) is True
+
+    def test_expired_cache_is_invalid(self):
+        from cache_store import is_cache_valid_for_today
+        cache_entry = {"timestamp": time.time() - 7200, "data": {"some": "data"}}
+        assert is_cache_valid_for_today(cache_entry, 3600) is False
+
+    def test_stale_day_cache_is_invalid(self, monkeypatch):
+        from cache_store import is_cache_valid_for_today
+        from datetime import datetime, date
+        yesterday_ts = time.time() - 86400
+        cache_entry = {"timestamp": yesterday_ts, "data": {"some": "data"}}
+        # Use a large TTL so it would pass TTL check but fail date check
+        assert is_cache_valid_for_today(cache_entry, 200000) is False
