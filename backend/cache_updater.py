@@ -1010,7 +1010,7 @@ def update_iers_cache():
     from constants import IERS_CACHE_FILE
 
     try:
-        url = _iers.conf.iers_auto_url
+        url = str(_iers.conf.iers_auto_url)
 
         os.makedirs(os.path.dirname(IERS_CACHE_FILE), exist_ok=True)
         response = requests.get(url, timeout=30)
@@ -1020,11 +1020,10 @@ def update_iers_cache():
 
         from astropy.utils.iers import IERS_A
 
-        IERS_Auto.iers_table = None
         table = IERS_A.open(IERS_CACHE_FILE)
-        IERS_Auto.iers_table = table
+        IERS_Auto.iers_table = table  # type: ignore[assignment]  # atomic swap — never passes through None
 
-        mjd_max = table['MJD'].max()
+        mjd_max = table['MJD'].max()  # type: ignore[union-attr]
         if hasattr(mjd_max, 'value'):
             mjd_max = float(mjd_max.value)
         valid_until = Time(float(mjd_max), format='mjd').iso[:10]
@@ -1267,7 +1266,24 @@ def fully_initialize_caches():
         parallel = [(n, fn, ttl) for n, fn, ttl in jobs_to_run if n in PARALLELIZABLE_JOBS]
 
         total_steps = len(jobs_to_run)
+        n_parallel = len(parallel)   # saved before any pre-phase removal
         success_count = 0
+
+        # If the IERS table is not yet loaded in this process, run the IERS download
+        # synchronously *before* launching parallel jobs.  Parallel jobs like ISS passes
+        # use astropy AltAz; without a current IERS table they would trigger the
+        # "polar motions after IERS data is valid" warning on every first-boot cycle.
+        from astropy.utils.iers import IERS_Auto as _iers_auto_check
+        if _iers_auto_check.iers_table is None:
+            iers_parallel = next(((n, fn, ttl) for n, fn, ttl in parallel if n == 'iers'), None)
+            if iers_parallel is not None:
+                logger.info("IERS table absent; downloading synchronously before parallel phase to avoid stale-data warnings")
+                try:
+                    iers_parallel[1]()
+                    success_count += 1
+                except Exception as _iers_pre_err:
+                    logger.error("Pre-parallel IERS download failed: %s", _iers_pre_err)
+                parallel = [(n, fn, ttl) for n, fn, ttl in parallel if n != 'iers']
 
         # --- Parallel network jobs ---
         if parallel:
@@ -1334,7 +1350,7 @@ def fully_initialize_caches():
             "Cache refresh cycle: %d/%d jobs ran (%d parallel, %d sequential), %d/%d succeeded in %.2fs",
             total_steps,
             len(cache_jobs),
-            len(parallel),
+            n_parallel,
             len(sequential),
             success_count,
             total_steps,
