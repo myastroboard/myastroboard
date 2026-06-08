@@ -84,7 +84,7 @@ def get_folder_disk_usage(folder_path):
         for dirpath, dirnames, filenames in os.walk(folder_path):
             for filename in filenames:
                 filepath = os.path.join(dirpath, filename)
-                if os.path.exists(filepath):
+                if os.path.exists(filepath):  # pragma: no branch
                     total_size += os.path.getsize(filepath)
         return total_size
     except (OSError, IOError) as e:

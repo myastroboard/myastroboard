@@ -1098,6 +1098,78 @@ def test_start_skips_when_thread_already_alive(monkeypatch):
     assert not acquire_calls  # Lock not acquired because thread already alive
 
 
+def test_poll_no_night_start_skips_active_check(monkeypatch):
+    """Line 549->562: is_inside_night=False and no night_start → False branch."""
+    import push_scheduler
+
+    calls = []
+    monkeypatch.setattr(push_scheduler, '_check_n7_aurora', lambda *a, **k: calls.append('n7'))
+    monkeypatch.setattr(push_scheduler, '_check_n1_plan_start', lambda *a, **k: None)
+    monkeypatch.setattr(push_scheduler, '_check_n2_next_target', lambda *a, **k: None)
+    monkeypatch.setattr(push_scheduler, '_check_n6_darkness', lambda *a, **k: None)
+    monkeypatch.setattr(push_scheduler, '_check_n3_iss', lambda *a, **k: None)
+    monkeypatch.setattr(push_scheduler, '_check_n4_n5_eclipse', lambda *a, **k: None)
+    monkeypatch.setattr(push_scheduler, '_load_cache', lambda _k: {})
+    monkeypatch.setattr(
+        push_scheduler, '_pick_active_plan',
+        lambda _uid, _name: {
+            'state': 'current',
+            'timeline': {'is_inside_night': False},
+            'plan': {},  # no night_start key
+        },
+    )
+    user = _make_user(user_id='u1', username='alice')
+    fake_um = types.SimpleNamespace(users={'u1': user}, _reload_users_if_changed=lambda: None)
+    monkeypatch.setitem(sys.modules, 'auth', types.SimpleNamespace(user_manager=fake_um))
+
+    push_scheduler._poll()
+
+    assert calls.count('n7') == 1
+    assert push_scheduler._any_active_night is False
+
+
+def test_run_calls_poll_once_then_exits(monkeypatch):
+    """Lines 576-581: _run() executes loop body once then exits when stop event set."""
+    import push_scheduler
+
+    push_scheduler._stop_event.clear()
+    poll_calls = []
+
+    def _poll_and_stop():
+        poll_calls.append(1)
+        push_scheduler._stop_event.set()
+
+    monkeypatch.setattr(push_scheduler, '_poll', _poll_and_stop)
+    push_scheduler._run()
+    push_scheduler._stop_event.clear()
+
+    assert poll_calls == [1]
+
+
+def test_acquire_lock_open_fails_returns_false(monkeypatch, tmp_path):
+    """Line 610->613: open() raises → _lock_file stays None → if block skipped → return False."""
+    import push_scheduler
+    import builtins
+
+    push_scheduler._lock_file = None
+
+    real_open = builtins.open
+
+    def _failing_open(path, *args, **kwargs):
+        if 'push_scheduler.lock' in str(path):
+            raise OSError('permission denied')
+        return real_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, 'open', _failing_open)
+    fake_constants = types.SimpleNamespace(DATA_DIR_CACHE=str(tmp_path))
+    monkeypatch.setitem(sys.modules, 'constants', fake_constants)
+
+    result = push_scheduler._acquire_lock()
+
+    assert result is False
+    assert push_scheduler._lock_file is None
+
+
 def test_poll_fast_mode_via_pending_night(monkeypatch):
     """Poll detects a plan with night starting within 30 min and sets any_active."""
     import push_scheduler

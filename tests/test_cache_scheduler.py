@@ -383,3 +383,20 @@ def test_run_exception_in_update_all_caches_is_logged(monkeypatch):
     scheduler._run()  # must not propagate the exception
 
     assert calls[0] == 1
+
+
+def test_acquire_lock_write_raises_covers_lines_69_70(monkeypatch, tmp_path):
+    """Lines 69-70: open succeeds (lock_file set) but write raises IOError → outer except closes file."""
+    scheduler = module.CacheScheduler(interval_seconds=1)
+
+    class WriteFailFile(DummyFile):
+        def write(self, _value):
+            raise IOError("disk full")
+
+    monkeypatch.setattr(module, "DATA_DIR_CACHE", str(tmp_path))
+    monkeypatch.setattr(module.sys, "platform", "win32")
+    monkeypatch.setattr("builtins.open", lambda *_a, **_k: WriteFailFile())
+    monkeypatch.setattr(module.msvcrt, "locking", lambda *_a, **_k: None)
+
+    assert scheduler._acquire_lock() is False
+    assert scheduler._lock_file is None

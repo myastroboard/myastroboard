@@ -644,6 +644,23 @@ class TestGetAuroraScoreTzAwareForecastTimestamp:
         assert result["timestamp"] is not None
 
 
+class TestFetchKpForecastUnmatchedFormat:
+    """Line 106->124: data is neither list-of-dicts nor list-of-lists."""
+
+    def setup_method(self):
+        self.svc = AuroraService(60.0, 25.0, "UTC")
+
+    @patch("aurora_predictions.requests.get")
+    def test_unmatched_data_format_returns_none(self, mock_get):
+        """Line 106->124: data is list of scalars → neither elif branch taken → returns None."""
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = [42, 43, 44]  # list of ints: not dicts, not lists
+        mock_resp.raise_for_status.return_value = None
+        mock_get.return_value = mock_resp
+        result = self.svc.fetch_kp_forecast()
+        assert result is None
+
+
 class TestGetAuroraReport:
     """Tests for the module-level get_aurora_report convenience function."""
 

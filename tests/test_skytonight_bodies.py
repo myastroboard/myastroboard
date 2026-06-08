@@ -44,3 +44,17 @@ def test_venus_has_vnus_alias():
 def test_saturn_has_saturne_alias():
     targets = build_body_targets()
     assert 'Saturne' in _get_aliases(targets, 'Saturn')
+
+
+def test_empty_name_body_is_skipped():
+    import skytonight_bodies
+    from unittest.mock import patch
+
+    defs_with_empty = list(skytonight_bodies.BODY_DEFINITIONS) + [
+        {'name': '', 'object_type': 'Planet', 'aliases': []}
+    ]
+    with patch.object(skytonight_bodies, 'BODY_DEFINITIONS', defs_with_empty):
+        targets = skytonight_bodies.build_body_targets()
+
+    assert all(t.preferred_name != '' for t in targets)
+    assert len(targets) == len(skytonight_bodies.BODY_DEFINITIONS)

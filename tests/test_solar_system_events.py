@@ -266,3 +266,88 @@ class TestIsRadiantVisible:
         with patch("solar_system_events.SkyCoord", side_effect=Exception("bad")):
             result = svc._is_radiant_visible(48, 58, t)
         assert result is False
+
+    def test_altaz_none_returns_false(self):
+        """Line 375: if altaz is None → return False."""
+        import numpy as np
+        from astropy.time import Time
+        from astropy.coordinates import SkyCoord
+
+        svc = SolarSystemEventsService(45.0, -73.5)
+        t = Time("2026-08-12T02:00:00", format="isot", scale="utc")
+
+        with patch.object(SkyCoord, 'transform_to', return_value=None):
+            result = svc._is_radiant_visible(48, 58, t)
+        assert result is False
+
+    def test_ndarray_altitude_branch(self):
+        """Line 380: alt_val is ndarray → float(np.real(...)) extraction."""
+        import numpy as np
+        from astropy.time import Time
+        from astropy.coordinates import SkyCoord
+        from unittest.mock import MagicMock
+
+        svc = SolarSystemEventsService(45.0, -73.5)
+        t = Time("2026-08-12T02:00:00", format="isot", scale="utc")
+
+        original_transform = SkyCoord.transform_to
+
+        def patched_transform(self_coord, frame):
+            mock_altaz = MagicMock()
+            mock_alt = MagicMock()
+            mock_alt.degree = np.array([45.0])  # ndarray → triggers line 380
+            mock_altaz.alt = mock_alt
+            return mock_altaz
+
+        with patch.object(SkyCoord, 'transform_to', patched_transform):
+            result = svc._is_radiant_visible(48, 58, t)
+        assert isinstance(result, bool)
+
+
+class TestMeteorShowerExceptionHandler:
+    """Cover lines 283-284 (exception in meteor shower loop)."""
+
+    def test_exception_in_shower_loop_is_swallowed(self):
+        """Lines 283-284: exception inside the per-shower try block is caught and logged."""
+        svc = SolarSystemEventsService(45.0, -73.5, timezone="America/Montreal")
+        from datetime import date
+
+        # Patch _is_radiant_visible to raise for the first shower processed
+        original_is_radiant = svc._is_radiant_visible
+        call_count = [0]
+
+        def raising_is_radiant(*args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                raise RuntimeError("simulated radiant error")
+            return original_is_radiant(*args, **kwargs)
+
+        svc._is_radiant_visible = raising_is_radiant
+        # Must not raise; exception is swallowed by except block
+        events = svc._find_meteor_shower_peaks(date(2026, 8, 1), 365)
+        assert isinstance(events, list)
+
+
+class TestCometExceptionHandler:
+    """Cover lines 345-346 (exception in comet visibility loop)."""
+
+    def test_exception_in_comet_loop_is_swallowed(self):
+        """Lines 345-346: exception inside the per-comet try block is caught and logged."""
+        from datetime import date
+        import solar_system_events as module
+
+        svc = SolarSystemEventsService(45.0, -73.5)
+
+        # Patch timedelta to raise on first call (inside the comet loop)
+        original_timedelta = module.timedelta
+        call_count = [0]
+
+        def raising_timedelta(*args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] == 2:
+                raise ValueError("simulated timedelta error")
+            return original_timedelta(*args, **kwargs)
+
+        with patch.object(module, 'timedelta', raising_timedelta):
+            events = svc._find_comet_visibility_windows(date(2026, 1, 1), 365)
+        assert isinstance(events, list)

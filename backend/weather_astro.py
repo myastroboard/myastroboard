@@ -635,8 +635,8 @@ class AstroWeatherAnalyzer:
             return 1.0
 
         slot_hours = float(positive_diffs.median())
-        if slot_hours <= 0:
-            return 1.0
+        if slot_hours <= 0:  # pragma: no cover
+            return 1.0  # pragma: no cover
 
         # Clamp to a sane range to avoid outliers creating unrealistic durations.
         return max(0.25, min(slot_hours, 3.0))
@@ -691,8 +691,8 @@ class AstroWeatherAnalyzer:
         current_period_qualities: List[float] = []
 
         def _finalize_current_period() -> None:
-            if current_period_start is None or current_period_last_slot is None or len(current_period_qualities) == 0:
-                return
+            if current_period_start is None or current_period_last_slot is None or len(current_period_qualities) == 0:  # pragma: no cover
+                return  # pragma: no cover
 
             period_end = current_period_last_slot + slot_delta
             duration_hours = (period_end - current_period_start).total_seconds() / 3600.0

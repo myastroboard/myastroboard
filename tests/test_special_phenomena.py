@@ -716,15 +716,39 @@ class TestSpecialPhenomenaNullAndArrayBranches:
     # ── _get_galactic_center_altitude ────────────────────────────────────
 
     def test_galactic_center_alt_as_ndarray(self):
-        """alt_val is ndarray → line 637."""
+        """alt_val is ndarray → line 637 (patch astropy.coordinates directly)."""
         import numpy as np
         from astropy.time import Time
         t = Time("2026-07-01T04:00:00", format="isot", scale="utc")
         fake_altaz = MagicMock()
         fake_altaz.alt.degree = np.array([20.0])
-        with patch("special_phenomena.AltAz") as mock_altaz_cls:
-            from astropy.coordinates import SkyCoord
-            with patch("special_phenomena.SkyCoord") as mock_sc:
-                mock_sc.return_value.transform_to.return_value = fake_altaz
-                result = self.svc._get_galactic_center_altitude(t)
+        fake_gc = MagicMock()
+        fake_gc.transform_to.return_value = fake_altaz
+        with patch("astropy.coordinates.SkyCoord", return_value=fake_gc), \
+             patch("special_phenomena.AltAz"):
+            result = self.svc._get_galactic_center_altitude(t)
         assert isinstance(result, float)
+        assert result == pytest.approx(20.0)
+
+    def test_zodiacal_moon_above_5_skips_event(self):
+        """Line 420->460: moon_alt >= 5 → is_moon_ok=False → event not appended."""
+        from astropy.time import Time
+
+        def make_altaz_mock(altitude_deg):
+            m = MagicMock()
+            m.alt.degree = float(altitude_deg)
+            return m
+
+        fake_sun = MagicMock()
+        fake_sun.transform_to.return_value = make_altaz_mock(-15.0)  # sun below horizon
+        fake_moon = MagicMock()
+        fake_moon.transform_to.return_value = make_altaz_mock(10.0)  # moon above 5° → is_moon_ok=False
+
+        with patch("special_phenomena.get_sun", return_value=fake_sun), \
+             patch("special_phenomena.get_body", return_value=fake_moon), \
+             patch.object(self.svc, "_get_ecliptic_altitude", return_value=30.0):
+            result = self.svc._find_zodiacal_light_windows(
+                Time("2026-03-01T00:00:00", format="isot", scale="utc"),
+                Time("2026-03-03T00:00:00", format="isot", scale="utc"),
+            )
+        assert result == []

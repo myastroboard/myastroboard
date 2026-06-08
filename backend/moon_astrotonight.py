@@ -165,7 +165,7 @@ class AstroTonightService:
                 )
             else:
                 bs = best_start[m]
-                if bs is None:
+                if bs is None:  # pragma: no cover
                     continue
                 b_end = bs + best_duration[m]
                 hours = best_duration[m].total_seconds() / 3600

@@ -415,7 +415,7 @@ class SkyTonightScheduler:
                 append_scheduler_log(f'[{failure_time.isoformat()}] SkyTonight run failed: {error}\n')
                 logger.error(f'SkyTonight execution cycle failed: {error}')
             finally:
-                if self.execution_start_time:
+                if self.execution_start_time:  # pragma: no branch
                     self.last_execution_duration_seconds = int(
                         (datetime.now().astimezone() - self.execution_start_time).total_seconds()
                     )

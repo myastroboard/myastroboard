@@ -74,3 +74,43 @@ def test_set_global_log_level_updates_file_handlers(monkeypatch):
     assert len(file_handlers) == 1
     assert file_handlers[0].level == logging.ERROR
     assert module.get_current_log_level() == "ERROR"
+
+
+def test_configured_tz_formatter_loads_tz_from_config(monkeypatch, tmp_path):
+    """Lines 44-46: _get_tz() successfully reads timezone from config.json."""
+    import json
+    from logging_config import _ConfiguredTzFormatter
+
+    config_data = {"location": {"timezone": "Europe/Paris"}}
+    config_file = tmp_path / "config.json"
+    config_file.write_text(json.dumps(config_data), encoding="utf-8")
+
+    # Reset class state so the lazy loader runs again
+    _ConfiguredTzFormatter._tz = None
+    _ConfiguredTzFormatter._tz_resolved = False
+
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+
+    tz = _ConfiguredTzFormatter._get_tz()
+    assert tz is not None
+    assert str(tz) == "Europe/Paris"
+
+    # Restore class state so other tests are not affected
+    _ConfiguredTzFormatter._tz = None
+    _ConfiguredTzFormatter._tz_resolved = False
+
+
+def test_format_time_with_datefmt():
+    """Line 54: formatTime returns strftime-formatted string when datefmt is provided."""
+    import time
+    from logging_config import _ConfiguredTzFormatter
+
+    formatter = _ConfiguredTzFormatter()
+    record = logging.LogRecord(
+        name="test", level=logging.INFO, pathname="", lineno=0,
+        msg="hello", args=(), exc_info=None,
+    )
+    result = formatter.formatTime(record, datefmt="%Y/%m/%d")
+    # Should be a date string in YYYY/MM/DD format
+    assert "/" in result
+    assert len(result) == 10

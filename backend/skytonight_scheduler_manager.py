@@ -24,7 +24,7 @@ from skytonight_storage import (
 # Windows-compatible file locking
 if sys.platform == 'win32':
     import msvcrt
-else:
+else:  # pragma: no cover
     import fcntl
 
 logger = get_logger(__name__)
@@ -151,7 +151,7 @@ def get_or_create_skytonight_scheduler(app, cache_ready_event=None):
                     app.config['is_skytonight_scheduler_worker'] = False
                     lock_file.close()
                     return None
-            else:
+            else:  # pragma: no cover
                 fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
 
             logger.debug('Creating SkyTonight scheduler instance (acquired lock)...')
@@ -202,7 +202,7 @@ def get_skytonight_scheduler_for_api():
                     return None
                 except OSError:
                     return 'remote_scheduler'
-            else:
+            else:  # pragma: no cover
                 fcntl.flock(test_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
                 return None
         except (IOError, OSError):

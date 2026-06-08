@@ -343,7 +343,25 @@ class TestPlanetaryFindMethodExceptionHandlers:
         assert isinstance(result, list)
 
     def test_find_retrograde_exception_per_planet_swallowed(self):
-        svc, now, end = self._make_svc_with_bad_coords()
+        from astropy.time import Time
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        svc = PlanetaryEventsService(45.0, -73.5)
+        now = Time(datetime(2026, 1, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
+        end = Time(datetime(2026, 12, 31, 0, 0, tzinfo=ZoneInfo("UTC")))
+        svc._prefetch_coords(now, 365)
+
+        class _BadRa:
+            @property
+            def degree(self):
+                raise Exception("boom ra.degree")
+
+        class _BadCoords:
+            ra = _BadRa()
+
+        for body in list(svc._coords.keys()):
+            svc._coords[body] = _BadCoords()
+
         result = svc._find_retrograde_periods(now, end)
         assert isinstance(result, list)
 

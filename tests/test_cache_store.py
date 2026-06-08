@@ -525,3 +525,164 @@ class TestIsCacheValidForToday:
         cache_entry = {"timestamp": yesterday_ts, "data": {"some": "data"}}
         # Use a large TTL so it would pass TTL check but fail date check
         assert is_cache_valid_for_today(cache_entry, 200000) is False
+
+
+class TestReadSharedCacheCorrupt:
+    """Cover lines 149-151: corrupted shared cache file returns empty dict."""
+
+    def test_corrupt_json_returns_empty(self, tmp_path, monkeypatch):
+        import cache_store as cs
+        bad_file = tmp_path / "bad_cache.json"
+        bad_file.write_text("{ broken json <<<", encoding="utf-8")
+        monkeypatch.setattr(cs, '_SHARED_CACHE_FILE', str(bad_file))
+        monkeypatch.setattr(cs, '_SHARED_CACHE_LOCK', str(tmp_path / "astro.lock"))
+        result = cs._read_shared_cache()
+        assert result == {}
+
+
+class TestUpdateAndLoadSharedCacheEntry:
+    """Cover lines 163-166 (update_shared_cache_entry) and 175,178 (load_shared_cache_entry)."""
+
+    def test_update_then_load_roundtrip(self, tmp_path, monkeypatch):
+        import cache_store as cs
+        monkeypatch.setattr(cs, '_SHARED_CACHE_FILE', str(tmp_path / "cache.json"))
+        monkeypatch.setattr(cs, '_SHARED_CACHE_LOCK', str(tmp_path / "cache.lock"))
+        ts = time.time()
+        cs.update_shared_cache_entry("test_key", {"value": 42}, ts)
+        entry = cs.load_shared_cache_entry("test_key")
+        assert entry is not None
+        assert entry["data"]["value"] == 42
+        assert entry["timestamp"] == ts
+
+    def test_load_missing_key_returns_none(self, tmp_path, monkeypatch):
+        import cache_store as cs
+        monkeypatch.setattr(cs, '_SHARED_CACHE_FILE', str(tmp_path / "cache2.json"))
+        monkeypatch.setattr(cs, '_SHARED_CACHE_LOCK', str(tmp_path / "cache2.lock"))
+        result = cs.load_shared_cache_entry("no_such_key")
+        assert result is None
+
+    def test_load_entry_not_dict_returns_none(self, tmp_path, monkeypatch):
+        """Line 175: if entry is not a dict → return None."""
+        import json
+        import cache_store as cs
+        cache_file = tmp_path / "cache3.json"
+        cache_file.write_text(json.dumps({"test_key": "not_a_dict"}), encoding="utf-8")
+        monkeypatch.setattr(cs, '_SHARED_CACHE_FILE', str(cache_file))
+        monkeypatch.setattr(cs, '_SHARED_CACHE_LOCK', str(tmp_path / "cache3.lock"))
+        result = cs.load_shared_cache_entry("test_key")
+        assert result is None
+
+    def test_load_entry_missing_timestamp_returns_none(self, tmp_path, monkeypatch):
+        """Line 178: entry dict but missing 'timestamp' → return None."""
+        import json
+        import cache_store as cs
+        cache_file = tmp_path / "cache4.json"
+        cache_file.write_text(json.dumps({"test_key": {"data": 42}}), encoding="utf-8")
+        monkeypatch.setattr(cs, '_SHARED_CACHE_FILE', str(cache_file))
+        monkeypatch.setattr(cs, '_SHARED_CACHE_LOCK', str(tmp_path / "cache4.lock"))
+        result = cs.load_shared_cache_entry("test_key")
+        assert result is None
+
+
+class TestSyncCacheFromShared:
+    """Cover lines 183-188: sync_cache_from_shared."""
+
+    def test_sync_updates_in_memory_entry(self, tmp_path, monkeypatch):
+        """Lines 186-188: sync returns True and updates cache_entry."""
+        import cache_store as cs
+        monkeypatch.setattr(cs, '_SHARED_CACHE_FILE', str(tmp_path / "sync.json"))
+        monkeypatch.setattr(cs, '_SHARED_CACHE_LOCK', str(tmp_path / "sync.lock"))
+        ts = time.time()
+        cs.update_shared_cache_entry("moon_report", {"phase": "full"}, ts)
+        local_entry = {"timestamp": 0, "data": None}
+        result = cs.sync_cache_from_shared("moon_report", local_entry)
+        assert result is True
+        assert local_entry["data"] == {"phase": "full"}
+        assert local_entry["timestamp"] == ts
+
+    def test_sync_returns_false_when_no_data(self, tmp_path, monkeypatch):
+        """Lines 184-185: entry missing or data is None → return False."""
+        import cache_store as cs
+        monkeypatch.setattr(cs, '_SHARED_CACHE_FILE', str(tmp_path / "sync2.json"))
+        monkeypatch.setattr(cs, '_SHARED_CACHE_LOCK', str(tmp_path / "sync2.lock"))
+        local_entry = {"timestamp": 0, "data": None}
+        result = cs.sync_cache_from_shared("nonexistent_key", local_entry)
+        assert result is False
+
+
+class TestGetCacheStatusProgressPercent:
+    """Cover line 438: progress_percent calculation when total_steps > 0."""
+
+    def test_progress_percent_computed_from_shared_cache(self, tmp_path, monkeypatch):
+        """Line 438: progress_percent = int((current_step / total_steps) * 100)."""
+        import json
+        import cache_store as cs
+        shared = {
+            "_cache_in_progress": {
+                "status": True,
+                "current_step": 3,
+                "total_steps": 10,
+                "step_name": "computing",
+            }
+        }
+        cache_file = tmp_path / "status_cache.json"
+        cache_file.write_text(json.dumps(shared), encoding="utf-8")
+        monkeypatch.setattr(cs, '_SHARED_CACHE_FILE', str(cache_file))
+        monkeypatch.setattr(cs, '_SHARED_CACHE_LOCK', str(tmp_path / "status.lock"))
+        result = cs.get_cache_init_status()
+        assert result.get("in_progress") is True
+        assert result.get("progress_percent") == 30
+
+
+class TestLoadLocationCacheFileAbsent:
+    """Line 228->exit: _load_location_cache is a no-op when file doesn't exist."""
+
+    def test_missing_file_leaves_state_unchanged(self, tmp_path, monkeypatch):
+        import cache_store as cs
+        absent_path = str(tmp_path / "nonexistent_location.json")
+        monkeypatch.setattr(cs, '_LOCATION_CACHE_FILE', absent_path)
+        before = dict(cs._last_known_location_config)
+        cs._load_location_cache()
+        assert cs._last_known_location_config == before
+
+
+class TestCacheInitStatusNoCacheInProgress:
+    """Line 431->440: get_cache_init_status with no _cache_in_progress in shared cache."""
+
+    def test_no_cache_in_progress_key(self, tmp_path, monkeypatch):
+        import json
+        import cache_store as cs
+        shared = {"some_other_key": {"timestamp": 0, "data": None}}
+        cache_file = tmp_path / "no_progress.json"
+        cache_file.write_text(json.dumps(shared), encoding="utf-8")
+        monkeypatch.setattr(cs, '_SHARED_CACHE_FILE', str(cache_file))
+        monkeypatch.setattr(cs, '_SHARED_CACHE_LOCK', str(tmp_path / "no_progress.lock"))
+        result = cs.get_cache_init_status()
+        assert result.get("in_progress") is False
+        assert result.get("progress_percent") == 0
+
+
+class TestRecordCacheExecution:
+    """Cover lines 530-539: record_cache_execution."""
+
+    def test_record_then_get_metrics(self, tmp_path, monkeypatch):
+        """Lines 530-539: writes per-job metrics and get_cache_metrics reads them back."""
+        import cache_store as cs
+        monkeypatch.setattr(cs, '_SHARED_CACHE_FILE', str(tmp_path / "metrics.json"))
+        monkeypatch.setattr(cs, '_SHARED_CACHE_LOCK', str(tmp_path / "metrics.lock"))
+        cs.record_cache_execution("moon_report", 1.234, True)
+        metrics = cs.get_cache_metrics()
+        assert "moon_report" in metrics
+        assert metrics["moon_report"]["last_success"] is True
+        assert metrics["moon_report"]["last_duration_s"] == 1.234
+
+    def test_second_record_updates_existing_metrics(self, tmp_path, monkeypatch):
+        """Line 532->534: second record_cache_execution call hits the False branch."""
+        import cache_store as cs
+        monkeypatch.setattr(cs, '_SHARED_CACHE_FILE', str(tmp_path / "metrics2.json"))
+        monkeypatch.setattr(cs, '_SHARED_CACHE_LOCK', str(tmp_path / "metrics2.lock"))
+        cs.record_cache_execution("sun_report", 0.5, True)
+        cs.record_cache_execution("sun_report", 1.0, False)  # updates existing _cache_metrics
+        metrics = cs.get_cache_metrics()
+        assert metrics["sun_report"]["last_success"] is False
+        assert metrics["sun_report"]["last_duration_s"] == 1.0

@@ -158,6 +158,27 @@ class TestCacheUpdateFunctionsBasic:
 
         assert mock_cache_store._weather_cache["data"] is not None
 
+    @patch("cache_updater.cache_store")
+    @patch("cache_updater.get_hourly_forecast")
+    def test_update_weather_cache_object_dtype_column(self, mock_get_hourly_forecast, mock_cache_store):
+        """Line 334: bytes decode path for object-dtype DataFrame columns."""
+        from cache_updater import update_weather_cache
+
+        mock_cache_store._weather_cache = {"data": None, "timestamp": 0}
+        mock_get_hourly_forecast.return_value = {
+            "hourly": pd.DataFrame(
+                {
+                    "date": pd.to_datetime(["2026-04-17T21:00:00Z"]),
+                    "description": ["Clear"],  # object dtype triggers line 334
+                }
+            ),
+            "location": {"name": "Test"},
+        }
+
+        update_weather_cache()
+
+        assert mock_cache_store._weather_cache["data"] is not None
+
 
 class TestCacheUpdateErrorHandling:
     """Tests for error handling in cache updates."""
@@ -504,6 +525,78 @@ class TestFullInitialization:
         fully_initialize_caches()
 
         # Final reset call must still happen
+        mock_cache_store.set_cache_initialization_in_progress.assert_called_with(False)
+
+    @patch("cache_updater.cache_store")
+    @patch("cache_updater.update_weather_cache")
+    @patch("cache_updater.update_best_window_cache")
+    @patch("cache_updater.update_sidereal_time_cache")
+    @patch("cache_updater.update_solar_system_events_cache")
+    @patch("cache_updater.update_special_phenomena_cache")
+    @patch("cache_updater.update_planetary_events_cache")
+    @patch("cache_updater.update_iss_passes_cache")
+    @patch("cache_updater.update_aurora_cache")
+    @patch("cache_updater.update_horizon_graph_cache")
+    @patch("cache_updater.update_lunar_eclipse_cache")
+    @patch("cache_updater.update_solar_eclipse_cache")
+    @patch("cache_updater.update_sun_report_cache")
+    @patch("cache_updater.update_moon_planner_cache")
+    @patch("cache_updater.update_moon_caches")
+    @patch("cache_updater.check_and_handle_config_changes")
+    def test_fully_initialize_parallel_failure_and_sequential_moon_report(
+        self,
+        _check, _moon_caches, _planner, _sun, _solar, _lunar,
+        _horizon, _aurora, _iss, _planetary, _special, _solsys,
+        _sidereal, _best, _weather, mock_cache_store,
+    ):
+        """Lines 1310-1313 (parallel failure), 1338 (moon_report success mirrors dark_window)."""
+        from cache_updater import fully_initialize_caches
+
+        mock_cache_store.is_cache_valid.return_value = False
+        mock_cache_store.is_cache_valid_for_today.return_value = False
+        mock_cache_store.sync_cache_from_shared.return_value = None
+        mock_cache_store.record_cache_execution = MagicMock()
+        # Make a parallel job fail
+        _aurora.side_effect = RuntimeError("aurora down")
+
+        fully_initialize_caches()
+
+        mock_cache_store.set_cache_initialization_in_progress.assert_called_with(False)
+
+    @patch("cache_updater.cache_store")
+    @patch("cache_updater.update_weather_cache")
+    @patch("cache_updater.update_best_window_cache")
+    @patch("cache_updater.update_sidereal_time_cache")
+    @patch("cache_updater.update_solar_system_events_cache")
+    @patch("cache_updater.update_special_phenomena_cache")
+    @patch("cache_updater.update_planetary_events_cache")
+    @patch("cache_updater.update_iss_passes_cache")
+    @patch("cache_updater.update_aurora_cache")
+    @patch("cache_updater.update_horizon_graph_cache")
+    @patch("cache_updater.update_lunar_eclipse_cache")
+    @patch("cache_updater.update_solar_eclipse_cache")
+    @patch("cache_updater.update_sun_report_cache")
+    @patch("cache_updater.update_moon_planner_cache")
+    @patch("cache_updater.update_moon_caches")
+    @patch("cache_updater.check_and_handle_config_changes")
+    def test_fully_initialize_sequential_non_moon_report_failure(
+        self,
+        _check, _moon_caches, _planner, _sun, _solar, _lunar,
+        _horizon, _aurora, _iss, _planetary, _special, _solsys,
+        _sidereal, _best, _weather, mock_cache_store,
+    ):
+        """Line 1344->1346: sequential non-moon_report job fails → False branch of if job_name=='moon_report'."""
+        from cache_updater import fully_initialize_caches
+
+        mock_cache_store.is_cache_valid.return_value = False
+        mock_cache_store.is_cache_valid_for_today.return_value = False
+        mock_cache_store.sync_cache_from_shared.return_value = None
+        mock_cache_store.record_cache_execution = MagicMock()
+        # Make a non-moon_report sequential job fail
+        _planetary.side_effect = RuntimeError("planetary down")
+
+        fully_initialize_caches()
+
         mock_cache_store.set_cache_initialization_in_progress.assert_called_with(False)
 
 

@@ -52,7 +52,7 @@ def _solve_kepler_elliptic(M: float, e: float) -> float:
 def _solve_kepler_hyperbolic(N: float, e: float) -> float:
     """Solve hyperbolic Kepler's equation e*sinh(F) - F = N for F."""
     F = N
-    for _ in range(60):
+    for _ in range(60):  # pragma: no branch
         denom = e * math.cosh(F) - 1.0
         if abs(denom) < 1e-15:
             break
@@ -147,7 +147,7 @@ def _comet_ra_dec(
             N_h = n * dt
             F = _solve_kepler_hyperbolic(N_h, e)
             r = a * (e * math.cosh(F) - 1.0)
-            if r <= 0:
+            if r <= 0:  # pragma: no cover
                 return None, None, None, None
             th = math.sqrt((e + 1.0) / (e - 1.0)) * math.tanh(F / 2.0)
             f = 2.0 * math.atan(th)

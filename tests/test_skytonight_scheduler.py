@@ -946,3 +946,500 @@ class TestRunLoopBranches:
         sched.stop()
         # After loop runs, committed_next_run should have been advanced to future_run
         assert sched._committed_next_run == future_run
+
+
+class TestSchedulerInitFromStoredStatus:
+    """Cover missing lines in __init__ status-restore branches."""
+
+    def test_last_error_non_empty_string_is_stored(self, monkeypatch):
+        """Line 172: last_error is a non-empty string → self.last_error = stored_last_error."""
+        stored = {'last_error': 'something went wrong'}
+        monkeypatch.setattr('skytonight_scheduler.load_scheduler_status', lambda default=None: stored)
+        monkeypatch.setattr('skytonight_scheduler.ensure_skytonight_directories', lambda: None)
+        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda: {})
+        sched = SkyTonightScheduler(config_loader=lambda: {}, runner=lambda: {})
+        assert sched.last_error == 'something went wrong'
+
+    def test_last_error_non_string_non_none_is_converted(self, monkeypatch):
+        """Line 176: last_error is non-None non-str → str(stored_last_error)."""
+        stored = {'last_error': 42}
+        monkeypatch.setattr('skytonight_scheduler.load_scheduler_status', lambda default=None: stored)
+        monkeypatch.setattr('skytonight_scheduler.ensure_skytonight_directories', lambda: None)
+        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda: {})
+        sched = SkyTonightScheduler(config_loader=lambda: {}, runner=lambda: {})
+        assert sched.last_error == '42'
+
+    def test_invalid_duration_is_none(self, monkeypatch):
+        """Lines 188-189: stored duration raises TypeError/ValueError → last_execution_duration_seconds = None."""
+        stored = {'progress': {'last_execution_duration_seconds': 'not_a_number'}}
+        monkeypatch.setattr('skytonight_scheduler.load_scheduler_status', lambda default=None: stored)
+        monkeypatch.setattr('skytonight_scheduler.ensure_skytonight_directories', lambda: None)
+        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda: {})
+        sched = SkyTonightScheduler(config_loader=lambda: {}, runner=lambda: {})
+        assert sched.last_execution_duration_seconds is None
+
+    def test_backfill_exception_is_swallowed(self, monkeypatch):
+        """Lines 212-213: exception in backfill → pass (no crash)."""
+        stored = {}  # empty → enters backfill try block
+        monkeypatch.setattr('skytonight_scheduler.load_scheduler_status', lambda default=None: stored)
+        monkeypatch.setattr('skytonight_scheduler.ensure_skytonight_directories', lambda: None)
+        monkeypatch.setattr(
+            'skytonight_scheduler.load_calculation_results',
+            lambda: (_ for _ in ()).throw(RuntimeError("disk error"))
+        )
+        # Should not raise
+        sched = SkyTonightScheduler(config_loader=lambda: {}, runner=lambda: {})
+        assert sched.last_result == {}
+
+
+class TestSchedulerStopWithNoThread:
+    """Cover lines 234->236: stop() when thread is None (scheduler never started)."""
+
+    def test_stop_without_start_does_not_crash(self, monkeypatch):
+        """Line 234->236: if self.thread is False/None, thread.join is skipped."""
+        monkeypatch.setattr('skytonight_scheduler.load_scheduler_status', lambda default=None: {})
+        monkeypatch.setattr('skytonight_scheduler.ensure_skytonight_directories', lambda: None)
+        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda: {})
+        monkeypatch.setattr('skytonight_scheduler.save_scheduler_status', lambda _: None)
+        monkeypatch.setattr('skytonight_scheduler.resolve_schedule', lambda _: SkyTonightSchedule(
+            mode='disabled', next_run=None, server_time_valid=False,
+            reason='', server_time=datetime.now(), timezone='UTC',
+        ))
+        sched = SkyTonightScheduler(config_loader=lambda: {}, runner=lambda: {})
+        assert sched.thread is None
+        sched.stop()  # Should not raise; thread is None so join is skipped
+
+
+class TestResolveSchedulePastCandidates:
+    """Cover 92->97 and 101->87: when candidate times are in the past."""
+
+    def test_all_candidates_in_past_uses_fallback(self):
+        """92->97 and 101->87: all dawn/dusk candidates ≤ current_time → fallback."""
+        config = _base_config()
+        # Use a time far in the future so all computed dawn/dusk candidates are in the past
+        far_future = datetime(2099, 7, 15, 20, 0, tzinfo=ZoneInfo('Europe/Paris'))
+        schedule = resolve_schedule(config, now=far_future)
+        assert schedule.mode == 'fallback-6h'
+
+
+class TestRunLoopMissedRunFalseBranch:
+    """Cover 260->280: missed-run recovery condition False (slot is in the future)."""
+
+    def test_no_recovery_when_slot_is_in_future(self, monkeypatch):
+        """260->280: night_end is set but missed_slot is in the future → condition False."""
+        import time as _time
+
+        future_next_run = datetime.now(ZoneInfo('Europe/Paris')) + timedelta(hours=4)
+        last_run = datetime.now(ZoneInfo('Europe/Paris')) - timedelta(hours=6)
+        # night_end is 3 hours in the future → missed_slot = 4h from now → in future
+        night_end = datetime.now(ZoneInfo('Europe/Paris')) + timedelta(hours=3)
+
+        stored_status = {
+            'last_run': last_run.isoformat(),
+            'next_run': future_next_run.isoformat(),
+            'last_result': {'calculation': {'night_end': night_end.isoformat()}},
+        }
+
+        def _load_status(default=None):
+            return dict(stored_status)
+
+        def _save_status(payload):
+            stored_status.clear()
+            stored_status.update(payload)
+
+        stopped_event = threading.Event()
+
+        call_count = [0]
+
+        def mock_resolve(config):
+            call_count[0] += 1
+            if call_count[0] >= 2:
+                # Stop after second resolve call
+                sched.running = False
+                stopped_event.set()
+            return SkyTonightSchedule(
+                mode='pre-nautical-night',
+                next_run=future_next_run,
+                server_time_valid=True,
+                reason='test',
+                server_time=datetime.now(ZoneInfo('Europe/Paris')),
+                timezone='Europe/Paris',
+            )
+
+        monkeypatch.setattr('skytonight_scheduler.save_scheduler_status', _save_status)
+        monkeypatch.setattr('skytonight_scheduler.load_scheduler_status', _load_status)
+        monkeypatch.setattr('skytonight_scheduler.has_calculation_results', lambda: True)
+        monkeypatch.setattr('skytonight_scheduler.ensure_skytonight_directories', lambda: None)
+        monkeypatch.setattr('skytonight_scheduler.get_scheduler_trigger_file', lambda: '/tmp/nonexistent_st2')
+        monkeypatch.setattr('skytonight_scheduler.append_scheduler_log', lambda msg: None)
+        monkeypatch.setattr('skytonight_scheduler.resolve_schedule', mock_resolve)
+        monkeypatch.setattr('skytonight_scheduler.time', MagicMock(sleep=lambda _: None))
+
+        sched = SkyTonightScheduler(
+            config_loader=lambda: {'location': {'timezone': 'Europe/Paris'}, 'skytonight': {'enabled': True}},
+            runner=lambda: {'result': 'ok'},
+        )
+        sched.start()
+        stopped_event.wait(timeout=5)
+        sched.stop()
+        # Recovery was NOT triggered since slot is in the future
+        assert sched._committed_next_run != last_run  # Not restored to missed slot
+
+
+class TestRunLoopTriggerFileException:
+    """Cover 297-298: exception when removing trigger file."""
+
+    def test_trigger_file_remove_exception_is_logged(self, monkeypatch, tmp_path):
+        """Lines 297-298: os.remove raises → error logged, scheduler continues."""
+        trigger_file = tmp_path / "skt.trigger"
+        trigger_file.touch()
+
+        def _save_status(payload):
+            pass
+
+        stopped_event = threading.Event()
+        call_count = [0]
+
+        def mock_resolve(config):
+            call_count[0] += 1
+            if call_count[0] >= 2:
+                sched.running = False
+                stopped_event.set()
+            return SkyTonightSchedule(
+                mode='pre-nautical-night',
+                next_run=datetime.now(ZoneInfo('UTC')) + timedelta(hours=4),
+                server_time_valid=True,
+                reason='test',
+                server_time=datetime.now(ZoneInfo('UTC')),
+                timezone='UTC',
+            )
+
+        original_remove = __import__('os').remove
+
+        def failing_remove(path):
+            if str(path) == str(trigger_file):
+                raise PermissionError("simulated remove failure")
+            return original_remove(path)
+
+        monkeypatch.setattr('skytonight_scheduler.save_scheduler_status', _save_status)
+        monkeypatch.setattr('skytonight_scheduler.load_scheduler_status', lambda default=None: {})
+        monkeypatch.setattr('skytonight_scheduler.has_calculation_results', lambda: True)
+        monkeypatch.setattr('skytonight_scheduler.ensure_skytonight_directories', lambda: None)
+        monkeypatch.setattr('skytonight_scheduler.get_scheduler_trigger_file', lambda: str(trigger_file))
+        monkeypatch.setattr('skytonight_scheduler.append_scheduler_log', lambda msg: None)
+        monkeypatch.setattr('skytonight_scheduler.resolve_schedule', mock_resolve)
+        monkeypatch.setattr('skytonight_scheduler.os.remove', failing_remove)
+        monkeypatch.setattr('skytonight_scheduler.time', MagicMock(sleep=lambda _: None))
+
+        sched = SkyTonightScheduler(
+            config_loader=lambda: {'location': {'timezone': 'UTC'}, 'skytonight': {'enabled': True}},
+            runner=lambda: {'result': 'ok'},
+        )
+        sched.last_run = datetime.now()  # prevent auto-run
+        sched.start()
+        stopped_event.wait(timeout=5)
+        sched.stop()
+        assert call_count[0] >= 1  # loop ran at least once
+
+
+class TestRunLoopMissedRunRecoveryException:
+    """Cover 277-278: exception in startup missed-run recovery block."""
+
+    def test_exception_in_load_status_is_swallowed(self, monkeypatch):
+        """Lines 277-278: load_scheduler_status raises inside try → warning logged, loop continues."""
+        future_next_run = datetime.now(ZoneInfo('UTC')) + timedelta(hours=4)
+        last_run = datetime.now(ZoneInfo('UTC')) - timedelta(hours=6)
+
+        stored_status = {
+            'last_run': last_run.isoformat(),
+            'next_run': future_next_run.isoformat(),
+            'last_result': {'calculation': {}},
+        }
+        call_count = [0]
+
+        def _load_status(default=None):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                return dict(stored_status)  # First call (in __init__) succeeds
+            raise RuntimeError("simulated disk error in loop")  # Second call (in _run_loop) raises
+
+        stopped_event = threading.Event()
+        resolve_calls = [0]
+
+        def mock_resolve(config):
+            resolve_calls[0] += 1
+            if resolve_calls[0] >= 1:
+                sched.running = False
+                stopped_event.set()
+            return SkyTonightSchedule(
+                mode='pre-nautical-night',
+                next_run=future_next_run,
+                server_time_valid=True,
+                reason='test',
+                server_time=datetime.now(ZoneInfo('UTC')),
+                timezone='UTC',
+            )
+
+        monkeypatch.setattr('skytonight_scheduler.save_scheduler_status', lambda _: None)
+        monkeypatch.setattr('skytonight_scheduler.load_scheduler_status', _load_status)
+        monkeypatch.setattr('skytonight_scheduler.has_calculation_results', lambda: True)
+        monkeypatch.setattr('skytonight_scheduler.ensure_skytonight_directories', lambda: None)
+        monkeypatch.setattr('skytonight_scheduler.get_scheduler_trigger_file', lambda: '/tmp/nonexistent_st3')
+        monkeypatch.setattr('skytonight_scheduler.append_scheduler_log', lambda msg: None)
+        monkeypatch.setattr('skytonight_scheduler.resolve_schedule', mock_resolve)
+        monkeypatch.setattr('skytonight_scheduler.time', MagicMock(sleep=lambda _: None))
+
+        sched = SkyTonightScheduler(
+            config_loader=lambda: {'location': {'timezone': 'UTC'}, 'skytonight': {'enabled': True}},
+            runner=lambda: {'result': 'ok'},
+        )
+        sched.start()
+        stopped_event.wait(timeout=5)
+        sched.stop()
+        assert resolve_calls[0] >= 1
+
+
+class TestRunLoopScheduleNextRunNone:
+    """Cover 325->339: schedule.next_run is None branch."""
+
+    def test_next_run_none_skips_committed_update(self, monkeypatch):
+        """325->339: when schedule.next_run is None, the committed_next_run update is skipped."""
+        stopped_event = threading.Event()
+        resolve_calls = [0]
+
+        def mock_resolve(config):
+            resolve_calls[0] += 1
+            if resolve_calls[0] >= 2:
+                sched.running = False
+                stopped_event.set()
+            return SkyTonightSchedule(
+                mode='disabled',
+                next_run=None,  # ← Triggers 325->339 (False branch)
+                server_time_valid=True,
+                reason='disabled',
+                server_time=datetime.now(ZoneInfo('UTC')),
+                timezone='UTC',
+            )
+
+        monkeypatch.setattr('skytonight_scheduler.save_scheduler_status', lambda _: None)
+        monkeypatch.setattr('skytonight_scheduler.load_scheduler_status', lambda default=None: {})
+        monkeypatch.setattr('skytonight_scheduler.has_calculation_results', lambda: True)
+        monkeypatch.setattr('skytonight_scheduler.ensure_skytonight_directories', lambda: None)
+        monkeypatch.setattr('skytonight_scheduler.get_scheduler_trigger_file', lambda: '/tmp/nonexistent_st4')
+        monkeypatch.setattr('skytonight_scheduler.append_scheduler_log', lambda msg: None)
+        monkeypatch.setattr('skytonight_scheduler.resolve_schedule', mock_resolve)
+        monkeypatch.setattr('skytonight_scheduler.time', MagicMock(sleep=lambda _: None))
+
+        sched = SkyTonightScheduler(
+            config_loader=lambda: {'location': {'timezone': 'UTC'}, 'skytonight': {'enabled': True}},
+            runner=lambda: {'result': 'ok'},
+        )
+        sched.last_run = datetime.now()  # prevent auto-run (not None)
+        sched.start()
+        stopped_event.wait(timeout=5)
+        sched.stop()
+        assert resolve_calls[0] >= 1
+        assert sched._committed_next_run is None  # Was never updated since next_run was always None
+
+
+class TestRunLoopCommittedNextRunUnchanged:
+    """Cover 331->339: previous_next_run == _committed_next_run (no change to log)."""
+
+    def test_no_debug_log_when_next_run_unchanged(self, monkeypatch):
+        """331->339: committed_next_run already equals schedule.next_run → no debug log."""
+        specific_time = datetime.now(ZoneInfo('UTC')) + timedelta(hours=4)
+
+        stopped_event = threading.Event()
+        resolve_calls = [0]
+
+        def mock_resolve(config):
+            resolve_calls[0] += 1
+            if resolve_calls[0] >= 2:
+                sched.running = False
+                stopped_event.set()
+            return SkyTonightSchedule(
+                mode='pre-nautical-night',
+                next_run=specific_time,  # Same as committed_next_run → 331->339
+                server_time_valid=True,
+                reason='test',
+                server_time=datetime.now(ZoneInfo('UTC')),
+                timezone='UTC',
+            )
+
+        monkeypatch.setattr('skytonight_scheduler.save_scheduler_status', lambda _: None)
+        monkeypatch.setattr('skytonight_scheduler.load_scheduler_status', lambda default=None: {})
+        monkeypatch.setattr('skytonight_scheduler.has_calculation_results', lambda: True)
+        monkeypatch.setattr('skytonight_scheduler.ensure_skytonight_directories', lambda: None)
+        monkeypatch.setattr('skytonight_scheduler.get_scheduler_trigger_file', lambda: '/tmp/nonexistent_st5')
+        monkeypatch.setattr('skytonight_scheduler.append_scheduler_log', lambda msg: None)
+        monkeypatch.setattr('skytonight_scheduler.resolve_schedule', mock_resolve)
+        monkeypatch.setattr('skytonight_scheduler.time', MagicMock(sleep=lambda _: None))
+
+        sched = SkyTonightScheduler(
+            config_loader=lambda: {'location': {'timezone': 'UTC'}, 'skytonight': {'enabled': True}},
+            runner=lambda: {'result': 'ok'},
+        )
+        sched.last_run = specific_time  # last_run >= committed_next_run → inner if is True
+        sched._committed_next_run = specific_time  # Same as what resolve returns
+        sched.start()
+        stopped_event.wait(timeout=5)
+        sched.stop()
+        assert resolve_calls[0] >= 1
+        assert sched._committed_next_run == specific_time  # Unchanged (331->339 taken)
+
+
+class TestRunLoopCacheReadyElseBranch:
+    """Cover 353->357: elif not self._cache_ready_waited branch."""
+
+    def test_cache_ready_elif_branch_manual_trigger(self, monkeypatch, tmp_path):
+        """Lines 353-354: manual trigger → not waiting for cache event → elif sets _cache_ready_waited."""
+        trigger_file = tmp_path / "skt2.trigger"
+        trigger_file.touch()
+
+        run_event = threading.Event()
+        run_calls = []
+
+        def runner():
+            run_calls.append('ran')
+            run_event.set()
+            return {'result': 'ok'}
+
+        cache_event = threading.Event()
+        cache_event.set()  # already set → "cache ready"
+
+        stopped_event = threading.Event()
+        resolve_calls = [0]
+
+        def mock_resolve(config):
+            resolve_calls[0] += 1
+            if resolve_calls[0] > 3:
+                sched.running = False
+                stopped_event.set()
+            return SkyTonightSchedule(
+                mode='pre-nautical-night',
+                next_run=datetime.now(ZoneInfo('UTC')) + timedelta(hours=4),
+                server_time_valid=True,
+                reason='test',
+                server_time=datetime.now(ZoneInfo('UTC')),
+                timezone='UTC',
+            )
+
+        monkeypatch.setattr('skytonight_scheduler.save_scheduler_status', lambda _: None)
+        monkeypatch.setattr('skytonight_scheduler.load_scheduler_status', lambda default=None: {})
+        monkeypatch.setattr('skytonight_scheduler.has_calculation_results', lambda: True)
+        monkeypatch.setattr('skytonight_scheduler.ensure_skytonight_directories', lambda: None)
+        monkeypatch.setattr('skytonight_scheduler.get_scheduler_trigger_file', lambda: str(trigger_file))
+        monkeypatch.setattr('skytonight_scheduler.append_scheduler_log', lambda msg: None)
+        monkeypatch.setattr('skytonight_scheduler.resolve_schedule', mock_resolve)
+        monkeypatch.setattr('skytonight_scheduler.time', MagicMock(sleep=lambda _: None))
+
+        sched = SkyTonightScheduler(
+            config_loader=lambda: {'location': {'timezone': 'UTC'}, 'skytonight': {'enabled': True}},
+            runner=runner,
+            cache_ready_event=cache_event,
+        )
+        sched.start()
+        run_event.wait(timeout=5)
+        sched.stop()
+        assert len(run_calls) >= 1
+
+
+class TestRunLoopCacheReadyTimeoutAndAlreadyWaited:
+    """Cover lines 348-352 (cache event wait timeout) and 353->357 (already waited)."""
+
+    def _common_patches(self, monkeypatch):
+        monkeypatch.setattr('skytonight_scheduler.save_scheduler_status', lambda _: None)
+        monkeypatch.setattr('skytonight_scheduler.load_scheduler_status', lambda default=None: {})
+        monkeypatch.setattr('skytonight_scheduler.has_calculation_results', lambda: True)
+        monkeypatch.setattr('skytonight_scheduler.ensure_skytonight_directories', lambda: None)
+        monkeypatch.setattr('skytonight_scheduler.append_scheduler_log', lambda msg: None)
+        monkeypatch.setattr('skytonight_scheduler.get_scheduler_trigger_file',
+                            lambda: '/tmp/nonexistent_trigger_skt_x99')
+
+    def test_cache_ready_wait_times_out_then_run_proceeds(self, monkeypatch):
+        """Lines 348-352: _cache_ready_event.wait returns False (timeout) → warning logged, run proceeds."""
+        self._common_patches(monkeypatch)
+
+        run_event = threading.Event()
+        run_calls = []
+
+        def runner():
+            run_calls.append('ran')
+            run_event.set()
+            return {'result': 'ok'}
+
+        class _TimedOutEvent:
+            def is_set(self): return False
+            def wait(self, timeout=None): return False
+
+        iter_count = [0]
+
+        def mock_resolve(config):
+            iter_count[0] += 1
+            if iter_count[0] > 5:
+                sched.running = False
+            return SkyTonightSchedule(
+                mode='pre-nautical-night',
+                next_run=datetime.now(ZoneInfo('UTC')) + timedelta(hours=4),
+                server_time_valid=True,
+                reason='test',
+                server_time=datetime.now(ZoneInfo('UTC')),
+                timezone='UTC',
+            )
+
+        monkeypatch.setattr('skytonight_scheduler.resolve_schedule', mock_resolve)
+        monkeypatch.setattr('skytonight_scheduler.time', MagicMock(sleep=lambda _: None))
+
+        sched = SkyTonightScheduler(
+            config_loader=lambda: {'location': {'timezone': 'UTC'}, 'skytonight': {'enabled': True}},
+            runner=runner,
+            cache_ready_event=_TimedOutEvent(),
+        )
+        sched.start()
+        run_event.wait(timeout=5)
+        sched.stop()
+        assert len(run_calls) >= 1
+
+    def test_already_waited_skips_both_branches(self, monkeypatch):
+        """Lines 353->357: _cache_ready_waited=True → elif is False → no-op, run proceeds."""
+        self._common_patches(monkeypatch)
+
+        run_event = threading.Event()
+        run_calls = []
+
+        def runner():
+            run_calls.append('ran')
+            run_event.set()
+            return {'result': 'ok'}
+
+        cache_event = threading.Event()
+        cache_event.set()
+
+        iter_count = [0]
+
+        def mock_resolve(config):
+            iter_count[0] += 1
+            if iter_count[0] > 5:
+                sched.running = False
+            return SkyTonightSchedule(
+                mode='pre-nautical-night',
+                next_run=datetime.now(ZoneInfo('UTC')) + timedelta(hours=4),
+                server_time_valid=True,
+                reason='test',
+                server_time=datetime.now(ZoneInfo('UTC')),
+                timezone='UTC',
+            )
+
+        monkeypatch.setattr('skytonight_scheduler.resolve_schedule', mock_resolve)
+        monkeypatch.setattr('skytonight_scheduler.time', MagicMock(sleep=lambda _: None))
+
+        sched = SkyTonightScheduler(
+            config_loader=lambda: {'location': {'timezone': 'UTC'}, 'skytonight': {'enabled': True}},
+            runner=runner,
+            cache_ready_event=cache_event,
+        )
+        sched._cache_ready_waited = True
+        sched.start()
+        run_event.wait(timeout=5)
+        sched.stop()
+        assert len(run_calls) >= 1

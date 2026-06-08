@@ -371,3 +371,33 @@ class TestGetSkytonightConditions:
 
         result = wom.get_skytonight_conditions()
         assert result is None
+
+    def test_returns_none_when_hourly_variables_none(self, monkeypatch):
+        """Line 317: hourly not None but Variables(0) returns None → ValueError → None."""
+        response = MagicMock()
+        hourly = MagicMock()
+        hourly.Variables.return_value = None  # all Variables(n) return None
+        response.Hourly.return_value = hourly
+
+        monkeypatch.setattr(wom, 'fetch_weather', lambda **kw: response)
+        monkeypatch.setattr(
+            wom, 'load_config',
+            lambda: {'location': {'latitude': 45.5, 'longitude': -73.5, 'timezone': 'UTC', 'name': 'Test'}},
+        )
+
+        result = wom.get_skytonight_conditions()
+        assert result is None
+
+
+class TestParseHourlyTimezoneExceptionBranch:
+    """Lines 142-143: outer except in parse_hourly timezone conversion."""
+
+    def test_generic_exception_in_tz_convert_keeps_utc(self, monkeypatch):
+        """Lines 142-143: non-ZoneInfoNotFoundError in inner block → outer except."""
+        response = _make_parse_hourly_response()
+        # Patch zoneinfo.ZoneInfo to raise a generic Exception (not ZoneInfoNotFoundError)
+        # so it propagates out of the inner try (which only catches ZoneInfoNotFoundError)
+        # and is caught by the outer except at line 142.
+        monkeypatch.setattr('zoneinfo.ZoneInfo', lambda tz: (_ for _ in ()).throw(Exception("zoneinfo fail")))
+        result = wom.parse_hourly(response, _FULL_HOURLY_VARS, timezone_str="America/Montreal")
+        assert result is not None  # falls back to UTC, still returns dataframe

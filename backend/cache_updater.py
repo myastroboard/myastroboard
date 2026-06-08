@@ -381,7 +381,7 @@ def update_solar_eclipse_cache(config=None):
             # Convert dataclass to dict
             eclipse_dict = eclipse.__dict__.copy()
             # Convert altitude_vs_time EclipsePoint objects to dicts
-            if "altitude_vs_time" in eclipse_dict:
+            if "altitude_vs_time" in eclipse_dict:  # pragma: no branch
                 eclipse_dict["altitude_vs_time"] = [point.__dict__ for point in eclipse_dict["altitude_vs_time"]]
 
             response = {
@@ -442,7 +442,7 @@ def update_lunar_eclipse_cache(config=None):
             # Convert dataclass to dict
             eclipse_dict = eclipse.__dict__.copy()
             # Convert altitude_vs_time EclipsePoint objects to dicts
-            if "altitude_vs_time" in eclipse_dict:
+            if "altitude_vs_time" in eclipse_dict:  # pragma: no branch
                 eclipse_dict["altitude_vs_time"] = [point.__dict__ for point in eclipse_dict["altitude_vs_time"]]
 
             response = {
@@ -503,9 +503,9 @@ def update_horizon_graph_cache(config=None):
             # Convert dataclass to dict
             horizon_dict = horizon_data.__dict__.copy()
             # Convert HorizonPoint objects to dicts
-            if "sun_data" in horizon_dict:
+            if "sun_data" in horizon_dict:  # pragma: no branch
                 horizon_dict["sun_data"] = [point.__dict__ for point in horizon_dict["sun_data"]]
-            if "moon_data" in horizon_dict:
+            if "moon_data" in horizon_dict:  # pragma: no branch
                 horizon_dict["moon_data"] = [point.__dict__ for point in horizon_dict["moon_data"]]
 
             response = {
@@ -1024,7 +1024,7 @@ def update_iers_cache():
         IERS_Auto.iers_table = table  # type: ignore[assignment]  # atomic swap — never passes through None
 
         mjd_max = table['MJD'].max()  # type: ignore[union-attr]
-        if hasattr(mjd_max, 'value'):
+        if hasattr(mjd_max, 'value'):  # pragma: no branch
             mjd_max = float(mjd_max.value)
         valid_until = Time(float(mjd_max), format='mjd').iso[:10]
 

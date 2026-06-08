@@ -219,6 +219,39 @@ def test_build_lookup_no_preferred_name():
     assert any('dso-test' in v.get('group_id', '').lower() or v.get('group_id') == 'DSO-TEST' for v in lookup.values())
 
 
+def test_build_lookup_no_preferred_name_and_no_catalogues():
+    """Line 108->98: preferred_name='' and catalogue_names={} → if preferred_name: False."""
+    from skytonight_models import SkyTonightCoordinates, SkyTonightTarget
+    target = SkyTonightTarget(
+        target_id='DSO-EMPTY',
+        category='deep_sky',
+        object_type='Galaxy',
+        preferred_name='',
+        catalogue_names={},
+        aliases=[],
+        constellation='',
+        magnitude=None,
+        size_arcmin=None,
+        coordinates=None,
+        source_catalogues=[],
+        translation_key='',
+    )
+    lookup = skytonight_targets.build_lookup_from_targets([target])
+    assert isinstance(lookup, dict)
+
+
+def test_coerce_targets_from_dict_raises_skipped():
+    """Lines 123-125: from_dict raises ValueError → except block executed."""
+    result = skytonight_targets._coerce_targets([{'magnitude': 'not_a_float'}])
+    assert result == []
+
+
+def test_get_lookup_entry_empty_catalogue_returns_empty():
+    """Line 177: empty catalogue → return {}."""
+    result = skytonight_targets.get_lookup_entry('', 'M 31')
+    assert result == {}
+
+
 def test_invalidate_targets_dataset_cache_forces_reload_from_disk(tmp_path):
     dataset_file = tmp_path / 'targets.json'
     skytonight_targets.save_targets_dataset(_sample_targets(), dataset_file=str(dataset_file))

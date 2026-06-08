@@ -689,3 +689,46 @@ def test_get_object_info_uses_local_type_when_available(monkeypatch):
 
     assert 'error' not in result
     assert result['type'] == 'Galaxy'
+
+
+class TestResolveIdentifierSkyCoordException:
+    """Lines 320-321: exception in astropy SkyCoord → constellation stays empty."""
+
+    def test_skycoord_raises_constellation_defaults_to_empty(self):
+        main_result = {
+            "data": [["M 31", "Galaxy", 10.684, 41.269]],
+            "metadata": [
+                {"name": "main_id"}, {"name": "otype_txt"}, {"name": "ra"}, {"name": "dec"}
+            ],
+        }
+        alias_result = {"data": [], "metadata": [{"name": "id"}]}
+        call_count = [0]
+
+        def mock_query(q):
+            call_count[0] += 1
+            return main_result if call_count[0] == 1 else alias_result
+
+        with patch("object_info._simbad_query", side_effect=mock_query):
+            with patch("astropy.coordinates.SkyCoord", side_effect=RuntimeError("coords failed")):
+                result = oi.resolve_identifier_for_catalogue_lookup("M31")
+
+        assert result is not None
+        assert result["constellation"] == ""
+
+
+class TestWikipediaWithFallbackNonCandidates:
+    """Lines 441, 448: SIMBAD-style aliases skipped as non-Wikipedia candidates."""
+
+    def test_simbad_style_alias_skipped_in_first_loop(self):
+        """Line 441: term starting with '[' fails _is_wikipedia_candidate → continue."""
+        with patch("object_info._get_wikipedia_summary") as mock_wiki:
+            result = oi._wikipedia_with_fallback(["[HB89] 0951+699"], "en")
+        assert result is None
+        mock_wiki.assert_not_called()
+
+    def test_simbad_style_alias_skipped_in_second_loop(self):
+        """Line 448: term skipped in English fallback loop when lang != 'en'."""
+        with patch("object_info._get_wikipedia_summary") as mock_wiki:
+            result = oi._wikipedia_with_fallback(["[HB89] 0951+699"], "fr")
+        assert result is None
+        mock_wiki.assert_not_called()

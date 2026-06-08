@@ -320,6 +320,69 @@ class TestSeeingForecastBranchCoverage:
         assert result is None
 
 
+class TestSeeingForecastRemainingBranches:
+    """Cover lines 126->122, 234->239, 248->253."""
+
+    @pytest.fixture
+    def service(self):
+        return SeeingForecastService(48.866667, 2.333333, "Europe/Paris")
+
+    @patch('seeing_forecast_7timer.requests.get')
+    def test_none_timepoint_skipped(self, mock_get, service):
+        """Line 126->122: data point with None timepoint → skip (if body not entered)."""
+        now_utc = datetime.now(timezone.utc)
+        init_time = (now_utc + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
+        mock_response = Mock()
+        mock_response.json.return_value = {
+            "init": init_time.strftime("%Y%m%d%H"),
+            "dataseries": [
+                {"timepoint": None, "seeing": 2},  # timepoint is None → skip
+                {"timepoint": 3, "seeing": 2},       # valid
+            ],
+        }
+        mock_get.return_value = mock_response
+        result = service.fetch_tonight_seeing()
+        assert result is not None
+        assert len(result.get("forecast", [])) == 1
+
+    def test_find_best_window_shorter_mid_window_does_not_replace(self, service):
+        """Line 234->239: mid-scan window shorter than best → False branch."""
+        now_utc = datetime.now(timezone.utc)
+        # Window 1: 4 good points (12h) → best_duration=12
+        # Bad seeing (closes window 1)
+        # Window 2: 1 good point (3h) → 3 > 12 is False → 234->239
+        # Bad seeing (closes window 2)
+        forecast_list = [
+            {"time": now_utc.isoformat(), "seeing": 1, "description": "Excellent", "conditions": "Perfect"},
+            {"time": (now_utc + timedelta(hours=3)).isoformat(), "seeing": 2, "description": "Good", "conditions": "Very good"},
+            {"time": (now_utc + timedelta(hours=6)).isoformat(), "seeing": 2, "description": "Good", "conditions": "Very good"},
+            {"time": (now_utc + timedelta(hours=9)).isoformat(), "seeing": 1, "description": "Excellent", "conditions": "Perfect"},
+            {"time": (now_utc + timedelta(hours=12)).isoformat(), "seeing": 5, "description": "Poor", "conditions": "Bad"},
+            {"time": (now_utc + timedelta(hours=15)).isoformat(), "seeing": 1, "description": "Excellent", "conditions": "Perfect"},
+            {"time": (now_utc + timedelta(hours=18)).isoformat(), "seeing": 5, "description": "Poor", "conditions": "Bad"},
+        ]
+        result = service._find_best_window(forecast_list)
+        assert result is not None
+        assert result["duration_hours"] == 12  # window 1 wins
+
+    def test_find_best_window_shorter_end_window(self, service):
+        """Line 248->253: end-of-list window shorter than best → False branch."""
+        now_utc = datetime.now(timezone.utc)
+        # Window 1: 4 good points (12h) → best_duration=12 (closes via bad seeing)
+        # Window 2: 1 good point (3h) at end → 3 > 12 is False → 248->253 False
+        forecast_list = [
+            {"time": now_utc.isoformat(), "seeing": 1, "description": "Excellent", "conditions": "Perfect"},
+            {"time": (now_utc + timedelta(hours=3)).isoformat(), "seeing": 2, "description": "Good", "conditions": "Very good"},
+            {"time": (now_utc + timedelta(hours=6)).isoformat(), "seeing": 2, "description": "Good", "conditions": "Very good"},
+            {"time": (now_utc + timedelta(hours=9)).isoformat(), "seeing": 1, "description": "Excellent", "conditions": "Perfect"},
+            {"time": (now_utc + timedelta(hours=12)).isoformat(), "seeing": 5, "description": "Poor", "conditions": "Bad"},
+            {"time": (now_utc + timedelta(hours=15)).isoformat(), "seeing": 2, "description": "Good", "conditions": "Very good"},
+        ]
+        result = service._find_best_window(forecast_list)
+        assert result is not None
+        assert result["duration_hours"] == 12  # window 1 wins, end window (3h) doesn't replace
+
+
 class TestSeeingForecastIntegration:
     """Integration tests for seeing forecast with cache."""
 

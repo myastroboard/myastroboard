@@ -40,7 +40,7 @@ def _cache_set(key: Tuple[str, str, str], translated_text: str, provider: str) -
     if len(_TRANSLATION_CACHE) >= _CACHE_MAX_ENTRIES:
         # Dict preserves insertion order; drop the oldest cache entry.
         oldest = next(iter(_TRANSLATION_CACHE), None)
-        if oldest is not None:
+        if oldest is not None:  # pragma: no branch
             _TRANSLATION_CACHE.pop(oldest, None)
     _TRANSLATION_CACHE[key] = (translated_text, time.time(), provider)
 

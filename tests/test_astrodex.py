@@ -1229,3 +1229,143 @@ class TestAstrodexMissingBranches:
         astrodex.save_user_astrodex('testuser', data)
         with pytest.raises(ValueError):
             astrodex.switch_item_catalogue_name('testuser', item1['id'], 'NGC')
+
+
+class TestAstrodexyRemainingBranches:
+    """Cover remaining uncovered branches in astrodex.py."""
+
+    def test_get_item_merge_key_plain_name(self, monkeypatch):
+        """Line 185: item with name but no catalogue aliases → 'name:...' key."""
+        monkeypatch.setattr(skytonight_targets, 'get_lookup_entry', lambda *_: {})
+        item = {'id': 'xyz', 'name': 'Custom Object', 'catalogue': ''}
+        key = astrodex._get_item_merge_key(item)
+        assert key.startswith('name:')
+
+    def test_save_failure_cleanup_no_backup_no_temp(self, temp_data_dir, monkeypatch):
+        """Lines 574->584, 584->591, 591->597: save fails before temp file created (no backup)."""
+        def bad_sanitize(data):
+            raise ValueError("sanitize failed")
+        monkeypatch.setattr(astrodex, '_sanitize_astrodex_for_persistence', bad_sanitize)
+        data = {'user_id': 'newuser', 'username': 'alice', 'items': []}
+        result = astrodex.save_user_astrodex('newuser', data)
+        assert result is False
+
+    def test_delete_item_picture_file_not_on_disk(self, temp_data_dir):
+        """Line 701->696: item has picture filename but image file doesn't exist."""
+        astrodex.ensure_astrodex_directories()
+        item = astrodex.create_astrodex_item('user1', {'name': 'M42'}, username='alice')
+        raw = astrodex.load_user_astrodex('user1')
+        raw['items'][0]['pictures'] = [{'id': 'p1', 'filename': 'ghost.jpg', 'is_main': True}]
+        astrodex.save_user_astrodex('user1', raw)
+        result = astrodex.delete_astrodex_item('user1', item['id'])
+        assert result is True
+
+    def test_delete_second_nonmain_picture(self, temp_data_dir):
+        """Lines 804->803, 805->807: delete non-main picture (first pic doesn't match)."""
+        astrodex.ensure_astrodex_directories()
+        item = astrodex.create_astrodex_item('user1', {'name': 'M42'}, username='alice')
+        pic1 = astrodex.add_picture_to_item('user1', item['id'], {'notes': 'first'})
+        pic2 = astrodex.add_picture_to_item('user1', item['id'], {'notes': 'second'})
+        result = astrodex.delete_picture('user1', item['id'], pic2['id'])
+        assert result is True
+        updated = astrodex.get_astrodex_item('user1', item['id'])
+        assert len(updated['pictures']) == 1
+        assert updated['pictures'][0]['id'] == pic1['id']
+
+    def test_delete_picture_not_found_in_item(self, temp_data_dir):
+        """Lines 803->811, 817->796: delete_picture with non-existent picture_id."""
+        astrodex.ensure_astrodex_directories()
+        item = astrodex.create_astrodex_item('user1', {'name': 'M42'}, username='alice')
+        astrodex.add_picture_to_item('user1', item['id'], {'notes': 'only'})
+        result = astrodex.delete_picture('user1', item['id'], 'no-such-pic-id')
+        assert result is False
+
+    def test_is_item_in_astrodex_alias_name_match(self, temp_data_dir, monkeypatch):
+        """Lines 901-905: requested_alias_names set → existing item matched by alias name."""
+        def fake_lookup(catalogue, name):
+            return {'group_id': '', 'aliases': {'Messier': 'M31', 'NGC': 'NGC 224'}}
+        monkeypatch.setattr(skytonight_targets, 'get_lookup_entry', fake_lookup)
+        astrodex.create_astrodex_item('testuser', {'name': 'NGC 224', 'catalogue': 'NGC'})
+        result = astrodex.is_item_in_astrodex_with_catalogue('testuser', 'M31', 'Messier')
+        assert result is True
+
+    def test_is_item_in_astrodex_catalogue_alias_false_branch(self, temp_data_dir, monkeypatch):
+        """Line 909->890: catalogue alias doesn't match → False branch, loop continues."""
+        def fake_lookup(catalogue, name):
+            if catalogue == 'CatB' and name == 'BName':
+                return {'group_id': '', 'aliases': {'CatA': 'OtherName', 'CatB': 'BName'}}
+            return {}
+        monkeypatch.setattr(skytonight_targets, 'get_lookup_entry', fake_lookup)
+        astrodex.create_astrodex_item('testuser', {'name': 'BName', 'catalogue': 'CatB'})
+        result = astrodex.is_item_in_astrodex_with_catalogue('testuser', 'SomeItem', 'CatA')
+        assert result is False
+
+    def test_preloaded_existing_name_in_alias_names(self, monkeypatch):
+        """Lines 958-959: item name is in requested alias names (no alias intersection)."""
+        def fake_lookup(catalogue, name):
+            if catalogue == 'Messier' and name == 'M31':
+                return {'group_id': '', 'aliases': {'Messier': 'M31', 'PopName': 'Andromeda'}}
+            return {}
+        monkeypatch.setattr(skytonight_targets, 'get_lookup_entry', fake_lookup)
+        data = {'items': [{'id': 'i1', 'name': 'Andromeda', 'catalogue': ''}]}
+        result = astrodex.is_item_in_preloaded_astrodex(data, 'M31', 'Messier')
+        assert result is True
+
+    def test_preloaded_catalogue_alias_match(self, monkeypatch):
+        """Lines 962-964: catalogue alias in existing item matches requested normalized names."""
+        def fake_lookup(catalogue, name):
+            if catalogue == 'Messier' and name == 'M42':
+                return {'group_id': '', 'aliases': {'Messier': 'M42', 'NGC': 'NGC 1976'}}
+            return {}
+        monkeypatch.setattr(skytonight_targets, 'get_lookup_entry', fake_lookup)
+        data = {'items': [{'id': 'i1', 'name': 'M42', 'catalogue': 'Messier'}]}
+        result = astrodex.is_item_in_preloaded_astrodex(data, 'NGC 1976', 'NGC')
+        assert result is True
+
+    def test_update_picture_second_picture_match(self, temp_data_dir):
+        """Line 776->775: for loop iterates past first non-matching picture to find the second."""
+        item = astrodex.create_astrodex_item('testuser', {'name': 'M31'})
+        pic1 = astrodex.add_picture_to_item('testuser', item['id'], {'filename': 'a.jpg'})
+        pic2 = astrodex.add_picture_to_item('testuser', item['id'], {'filename': 'b.jpg'})
+        assert pic1 is not None and pic2 is not None
+        result = astrodex.update_picture('testuser', item['id'], pic2['id'], {'notes': 'second'})
+        assert result is not None
+        assert result['notes'] == 'second'
+
+    def test_is_item_in_astrodex_name_in_alias_names(self, temp_data_dir, monkeypatch):
+        """Lines 904-905: item name is in requested_alias_names (no alias intersection)."""
+        def fake_lookup(catalogue, name):
+            if catalogue == 'Messier' and name == 'M31':
+                return {'group_id': '', 'aliases': {'Messier': 'M31', 'PopName': 'M31pop'}}
+            return {}
+        monkeypatch.setattr(skytonight_targets, 'get_lookup_entry', fake_lookup)
+        astrodex.create_astrodex_item('testuser', {'name': 'M31pop', 'catalogue': ''})
+        result = astrodex.is_item_in_astrodex_with_catalogue('testuser', 'M31', 'Messier')
+        assert result is True
+
+    def test_preloaded_both_false_branches(self, monkeypatch):
+        """Lines 958->961 (False) and 963->944 (False): no match in either alias check."""
+        def fake_lookup(catalogue, name):
+            if catalogue == 'Messier' and name == 'M31':
+                return {'group_id': '', 'aliases': {'Messier': 'M31', 'PopName': 'Andromeda'}}
+            if catalogue == 'SomeCat' and name == 'SomeObject':
+                return {'group_id': '', 'aliases': {'SomeCat': 'SomeObject', 'OtherCat': 'OtherName'}}
+            return {}
+        monkeypatch.setattr(skytonight_targets, 'get_lookup_entry', fake_lookup)
+        data = {'items': [{'id': 'i1', 'name': 'SomeObject', 'catalogue': 'SomeCat'}]}
+        result = astrodex.is_item_in_preloaded_astrodex(data, 'M31', 'Messier')
+        assert result is False
+
+    def test_switch_item_name_check_false_branch(self, temp_data_dir, monkeypatch):
+        """Line 1005->996: existing item name != target_name → loop continues."""
+        def fake_lookup(catalogue, name):
+            if catalogue == 'NGC' and name == 'NGC 224':
+                return {'group_id': '', 'aliases': {'Messier': 'M31', 'NGC': 'NGC 224'}}
+            return {}
+        monkeypatch.setattr(skytonight_targets, 'get_lookup_entry', fake_lookup)
+        item1 = astrodex.create_astrodex_item('testuser', {'name': 'Other Object', 'catalogue': ''})
+        item2 = astrodex.create_astrodex_item('testuser', {'name': 'NGC 224', 'catalogue': 'NGC'})
+        assert item2 is not None
+        monkeypatch.setattr(astrodex, 'enrich_item_with_catalogue_aliases', lambda i: i.update({'catalogue_aliases': {'Messier': 'M31', 'NGC': 'NGC 224'}}) or i)
+        result = astrodex.switch_item_catalogue_name('testuser', item2['id'], 'Messier')
+        assert result is not None

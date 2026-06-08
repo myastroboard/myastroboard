@@ -177,6 +177,74 @@ class TestGetBestObservationTimes:
             assert "target_ra_hours" in result
             assert "target_dec_degrees" in result
 
+    def test_altaz_none_path_is_handled(self):
+        """Line 280: altaz is None → continue (defensive guard in the hourly loop)."""
+        import numpy as np
+        from unittest.mock import MagicMock, patch
+        from astropy.coordinates import SkyCoord
+
+        svc = SiderealTimeService(45.0, -73.5, timezone="America/Montreal")
+        observation_date = date(2026, 6, 15)
+
+        real_altaz_call_count = [0]
+
+        original_transform_to = SkyCoord.transform_to
+
+        def patched_transform_to(self_coord, frame):
+            real_altaz_call_count[0] += 1
+            if real_altaz_call_count[0] == 1:
+                return None  # First call returns None → exercises line 280
+            return original_transform_to(self_coord, frame)
+
+        with patch.object(SkyCoord, 'transform_to', patched_transform_to):
+            result = svc.get_best_observation_times(6.0, 45.0, observation_date)
+
+        assert isinstance(result, dict)
+
+    def test_ndarray_alt_val_branch(self):
+        """Line 285: alt_val is ndarray → float extraction via np.real/atleast_1d."""
+        import numpy as np
+        from unittest.mock import MagicMock, patch
+        from astropy.coordinates import SkyCoord
+
+        svc = SiderealTimeService(45.0, -73.5, timezone="America/Montreal")
+        observation_date = date(2026, 6, 15)
+
+        def patched_transform_to(self_coord, frame):
+            mock_altaz = MagicMock()
+            mock_alt = MagicMock()
+            mock_alt.degree = np.array([42.0])  # ndarray → triggers line 285
+            mock_altaz.alt = mock_alt
+            return mock_altaz
+
+        with patch.object(SkyCoord, 'transform_to', patched_transform_to):
+            result = svc.get_best_observation_times(6.0, 45.0, observation_date)
+
+        assert isinstance(result, dict)
+
+
+class TestCalculateSiderealInfoNdarrayBranch:
+    """Line 182: gst.hour returns ndarray → float extraction via np.real/atleast_1d."""
+
+    def test_ndarray_gst_hour_is_handled(self):
+        import numpy as np
+        from unittest.mock import MagicMock
+        from zoneinfo import ZoneInfo
+
+        svc = SiderealTimeService(48.85, 2.35, timezone="Europe/Paris")
+
+        mock_time = MagicMock()
+        mock_gst = MagicMock()
+        mock_gst.hour = np.array([12.5])  # ndarray → triggers line 182
+
+        mock_time.sidereal_time.return_value = mock_gst
+        mock_time.jd = 2460676.0
+        mock_time.to_datetime.return_value = datetime(2026, 1, 1, 12, 0, 0, tzinfo=ZoneInfo('UTC'))
+
+        result = svc._calculate_sidereal_info(mock_time)
+        assert isinstance(result, dict)
+        assert result.get("greenwich_sidereal_time_hours") == 12.5
+
     def test_best_altitude_is_float(self):
         svc = SiderealTimeService(45.0, -73.5)
         result = svc.get_best_observation_times(12.0, 30.0, date(2026, 6, 15))

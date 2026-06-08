@@ -12,6 +12,7 @@ from skytonight_storage import (
     ensure_skytonight_directories,
     get_location_directory,
     get_dataset_file,
+    get_results_file,
     get_scheduler_status_file,
     get_scheduler_lock_file,
     get_scheduler_trigger_file,
@@ -161,3 +162,32 @@ class TestHasResultsHelpers:
         results_file.write_text(json.dumps({"metadata": {"in_progress": True}}), encoding="utf-8")
         with patch("skytonight_storage.SKYTONIGHT_RESULTS_FILE", str(results_file)):
             assert has_calculation_results() is False
+
+
+class TestAppendSchedulerLogNewlineBranch:
+    """Tests for the message-ends-with-newline branch (line 91->93)."""
+
+    def test_message_already_ends_with_newline_is_not_doubled(self, tmp_path):
+        import skytonight_storage
+        with patch.object(skytonight_storage, 'SKYTONIGHT_LOGS_DIR', str(tmp_path)):
+            log_path = append_scheduler_log("already newline\n", file_name="nl_test.log")
+        content = open(log_path, encoding="utf-8").read()
+        assert content.count("\n") == 1
+
+
+class TestTrimLogFileException:
+    """Test that _trim_log_file silently handles unreadable files (lines 105-106)."""
+
+    def test_trim_log_file_ignores_exception_on_missing_path(self):
+        # FileNotFoundError when opening a non-existent path triggers except Exception: pass
+        _trim_log_file("/nonexistent/path/that/does/not/exist.log", max_lines=5)
+        # No exception raised = pass
+
+
+class TestGetResultsFile:
+    """Test get_results_file returns the expected path (lines 111-112)."""
+
+    def test_get_results_file_returns_string(self):
+        result = get_results_file()
+        assert isinstance(result, str)
+        assert len(result) > 0

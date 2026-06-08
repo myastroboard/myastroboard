@@ -159,3 +159,46 @@ class TestCoordAltitudeDeg:
 
         result = self.svc._coord_altitude_deg(mock_coord, frame)
         assert result is None
+
+
+class TestNextAstronomicalDarkWindow:
+    """Cover lines 199, 208, 216 in _next_astronomical_dark_window closures."""
+
+    def test_refine_exhausts_when_coord_alt_returns_none(self):
+        """
+        Lines 199 (_is_dark_moonless returns None), 208 (_refine_first_true exhausts),
+        and 216 (_refine_first_false exhausts) are reached when _coord_altitude_deg
+        always returns None during fine-grained refinement.
+
+        The coarse grid is mocked so that the first 3 slots are 'dark' and the rest are not,
+        forcing one call to _refine_first_true and one call to _refine_first_false.
+        """
+        import numpy as np
+        from unittest.mock import MagicMock, patch
+
+        n_coarse = int((10 * 24 * 60) / 15)  # 960 points (10 days × 15-min grid)
+        sun_alts = np.full(n_coarse, 5.0)
+        sun_alts[:3] = -20.0  # first 3 slots → astronomical night
+        moon_alts = np.full(n_coarse, -5.0)  # moon always below horizon
+
+        def _make_alt_mock(alts_array):
+            alt_mock = MagicMock()
+            alt_mock.to_value.return_value = alts_array
+            transformed = MagicMock()
+            transformed.alt = alt_mock
+            coord = MagicMock()
+            coord.transform_to.return_value = transformed
+            return coord
+
+        svc = MoonService(48.85, 2.35, 'Europe/Paris')
+        start = datetime.datetime(2026, 1, 1, 22, 0, 0, tzinfo=ZoneInfo('Europe/Paris'))
+
+        with patch('moon_phases.AstroTime', return_value=MagicMock()), \
+             patch('moon_phases.AltAz', return_value=MagicMock()), \
+             patch('moon_phases.get_sun', return_value=_make_alt_mock(sun_alts)), \
+             patch('moon_phases.get_body', return_value=_make_alt_mock(moon_alts)), \
+             patch.object(MoonService, '_coord_altitude_deg', return_value=None):
+            result = svc._next_astronomical_dark_window(start)
+
+        assert isinstance(result, tuple)
+        assert len(result) == 2

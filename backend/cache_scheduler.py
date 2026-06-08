@@ -9,7 +9,7 @@ from constants import DATA_DIR_CACHE, CACHE_SCHEDULER_INTERVAL_SECONDS
 # Windows-compatible file locking
 if sys.platform == "win32":
     import msvcrt
-else:
+else:  # pragma: no cover
     import fcntl
 
 # Initialize logger for this module
@@ -56,7 +56,7 @@ class CacheScheduler:
                     self._lock_file.close()
                     self._lock_file = None
                     return False
-            else:
+            else:  # pragma: no cover
                 # Unix file locking
                 fcntl.flock(self._lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
 
@@ -77,7 +77,7 @@ class CacheScheduler:
                 if sys.platform == "win32":
                     # Windows file unlocking
                     msvcrt.locking(self._lock_file.fileno(), msvcrt.LK_UNLCK, 1)
-                else:
+                else:  # pragma: no cover
                     # Unix file unlocking
                     fcntl.flock(self._lock_file.fileno(), fcntl.LOCK_UN)
 

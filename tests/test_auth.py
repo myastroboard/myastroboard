@@ -1061,6 +1061,66 @@ class TestSaveUsersCleanupPaths:
         # File should still exist (restored from backup)
         assert users_file.exists()
 
+    def test_save_users_restore_replace_fails(self, tmp_path, monkeypatch):
+        """Lines 264-265: os.replace raises during backup restore."""
+        users_file = tmp_path / 'users.json'
+        monkeypatch.setattr(auth, 'USERS_FILE', str(users_file))
+        manager = UserManager()
+        manager.create_user('alice', 'pass', ROLE_USER)
+
+        monkeypatch.setattr(UserManager, 'validate_users_json_file',
+                            classmethod(lambda cls, fp: (False, 'fail')))
+
+        def _fail_replace(src, dst):
+            raise OSError('replace denied')
+
+        monkeypatch.setattr(auth.os, 'replace', _fail_replace)
+        with pytest.raises(Exception):
+            manager.save_users()
+
+    def test_save_users_temp_remove_fails(self, tmp_path, monkeypatch):
+        """Lines 270-271: os.remove raises on temp file cleanup."""
+        users_file = tmp_path / 'users.json'
+        monkeypatch.setattr(auth, 'USERS_FILE', str(users_file))
+        manager = UserManager()
+        manager.create_user('alice', 'pass', ROLE_USER)
+
+        monkeypatch.setattr(UserManager, 'validate_users_json_file',
+                            classmethod(lambda cls, fp: (False, 'fail')))
+
+        original_remove = auth.os.remove
+
+        def _fail_tmp_remove(path):
+            if str(path).endswith('.tmp'):
+                raise OSError('cannot remove tmp')
+            original_remove(path)
+
+        monkeypatch.setattr(auth.os, 'remove', _fail_tmp_remove)
+        with pytest.raises(Exception):
+            manager.save_users()
+
+    def test_save_users_backup_cleanup_fails_after_restore_failure(self, tmp_path, monkeypatch):
+        """Lines 264-265 and 274-277: restore replace fails AND backup remove fails."""
+        users_file = tmp_path / 'users.json'
+        monkeypatch.setattr(auth, 'USERS_FILE', str(users_file))
+        manager = UserManager()
+        manager.create_user('alice', 'pass', ROLE_USER)
+
+        monkeypatch.setattr(UserManager, 'validate_users_json_file',
+                            classmethod(lambda cls, fp: (False, 'fail')))
+
+        def _fail_replace(src, dst):
+            raise OSError('replace denied')
+
+        def _fail_backup_remove(path):
+            if str(path).endswith('.backup'):
+                raise OSError('cannot remove backup')
+
+        monkeypatch.setattr(auth.os, 'replace', _fail_replace)
+        monkeypatch.setattr(auth.os, 'remove', _fail_backup_remove)
+        with pytest.raises(Exception):
+            manager.save_users()
+
 
 class TestUserRequiredDecorator:
     """Covers lines 654-668: user_required decorator - tested directly via decorator logic."""
@@ -1391,5 +1451,41 @@ class TestDeleteUserImageTraversalGuard:
         monkeypatch.setattr(os.path, 'normpath', patched_normpath)
 
         # Should complete without error - traversal paths are skipped
+        manager.delete_user(user_id, current_user_id=admin.user_id)
+        assert manager.get_user_by_id(user_id) is None
+
+
+class TestDeleteUserListdirRemoveFails:
+    """Lines 587-588: os.remove raises in the listdir loop."""
+
+    def test_delete_user_listdir_remove_fails(self, isolated_user_manager, tmp_path, monkeypatch):
+        """Lines 587-588: os.remove on a listdir-found image raises → warning logged."""
+        manager = isolated_user_manager
+        admin = manager.get_user_by_username(DEFAULT_ADMIN_USERNAME)
+        alice = manager.create_user('alice', 'pass', ROLE_USER)
+        user_id = alice.user_id
+
+        astrodex_dir = tmp_path / 'astrodex'
+        images_dir = tmp_path / 'astrodex_images'
+        astrodex_dir.mkdir()
+        images_dir.mkdir()
+
+        # No astrodex JSON → image_filenames is empty, first loop is no-op
+        # Create an image matching the user_id prefix for the listdir loop
+        img_filename = f'{user_id}_pic.jpg'
+        img_file = images_dir / img_filename
+        img_file.write_bytes(b'data')
+
+        monkeypatch.setattr('astrodex.ASTRODEX_DIR', str(astrodex_dir))
+        monkeypatch.setattr('astrodex.ASTRODEX_IMAGES_DIR', str(images_dir))
+
+        original_remove = os.remove
+
+        def _fail_remove(path):
+            if img_filename in str(path):
+                raise OSError('cannot remove')
+            original_remove(path)
+
+        monkeypatch.setattr(os, 'remove', _fail_remove)
         manager.delete_user(user_id, current_user_id=admin.user_id)
         assert manager.get_user_by_id(user_id) is None

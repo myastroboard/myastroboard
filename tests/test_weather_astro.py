@@ -837,3 +837,106 @@ class TestParseExtendedDataTimezoneBytes:
 
         result = analyzer._parse_extended_data(mock_response, ["temperature_2m"])
         assert result["location"]["timezone"] == "UTC"
+
+
+class TestAstroWeatherAnalyzerInit:
+    """Lines 76-78: AstroWeatherAnalyzer.__init__ runs normally."""
+
+    def test_init_loads_config_and_sets_attributes(self):
+        with patch("weather_astro.load_config", return_value={"location": {"latitude": 48.0}}):
+            analyzer = AstroWeatherAnalyzer(language="fr")
+        assert analyzer.location == {"latitude": 48.0}
+        assert analyzer.language == "fr"
+
+
+class TestGenerateComprehensiveAnalysisSuccess:
+    """Lines 555-574: generate_comprehensive_analysis with real weather data."""
+
+    def test_returns_dict_when_data_available(self):
+        analyzer = AstroWeatherAnalyzer.__new__(AstroWeatherAnalyzer)
+        analyzer.location = {"name": "Test", "latitude": 48.0, "longitude": 2.0}
+        analyzer.language = "en"
+
+        mock_df = _build_sample_dataframe()
+        mock_weather = {"data": mock_df, "location": {"name": "Test"}}
+
+        with patch.object(analyzer, "fetch_extended_weather_data", return_value=mock_weather), \
+             patch.object(analyzer, "analyze_cloud_layers", return_value=mock_df), \
+             patch.object(analyzer, "calculate_seeing_forecast", return_value=mock_df), \
+             patch.object(analyzer, "calculate_transparency_forecast", return_value=mock_df), \
+             patch.object(analyzer, "analyze_dew_point_alerts", return_value=mock_df), \
+             patch.object(analyzer, "analyze_wind_tracking_impact", return_value=mock_df), \
+             patch.object(analyzer, "_find_best_observation_periods", return_value=[]), \
+             patch.object(analyzer, "_generate_weather_alerts", return_value=[]):
+            result = analyzer.generate_comprehensive_analysis(24)
+
+        assert result is not None
+        assert "hourly_data" in result
+        assert "best_observation_periods" in result
+        assert "current_conditions" in result
+
+
+class TestGetAstroWeatherAnalysisMissingPaths:
+    """Covers lines 823-824, 833-834, 842-843, 850-854 that need expired TTL."""
+
+    def _clear_state(self):
+        import weather_astro
+        weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS.clear()
+        weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS_TS.clear()
+        weather_astro._ASTRO_ANALYSIS_LAST_FAILURE_TS.clear()
+
+    def setup_method(self):
+        self._clear_state()
+
+    def teardown_method(self):
+        self._clear_state()
+
+    def test_rate_limited_with_stale_cache_returns_stale(self):
+        """Lines 823-824: TTL expired + rate limited + cache exists → return stale."""
+        import weather_astro
+        key = _analysis_cache_key(24, "en")
+        test_data = {"result": "stale_rate_limited"}
+        weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS[key] = test_data
+        weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS_TS[key] = 0.0  # expired
+        with patch("weather_astro.is_openmeteo_rate_limited", return_value=True):
+            result = get_astro_weather_analysis(24, "en")
+        assert result is not None
+
+    def test_failure_cooldown_with_stale_cache_returns_stale(self):
+        """Lines 833-834: TTL expired + failure cooldown + cache exists → return stale."""
+        import weather_astro
+        key = _analysis_cache_key(24, "en")
+        test_data = {"result": "stale_cooldown"}
+        weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS[key] = test_data
+        weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS_TS[key] = 0.0  # expired TTL
+        weather_astro._ASTRO_ANALYSIS_LAST_FAILURE_TS[key] = time.time()  # recent failure
+        with patch("weather_astro.is_openmeteo_rate_limited", return_value=False):
+            result = get_astro_weather_analysis(24, "en")
+        assert result is not None
+
+    def test_lock_busy_with_stale_cache_returns_stale(self):
+        """Lines 842-843: TTL expired + lock busy + cache exists → return stale."""
+        import weather_astro
+        key = _analysis_cache_key(24, "en")
+        test_data = {"result": "stale_lock"}
+        weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS[key] = test_data
+        weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS_TS[key] = 0.0  # expired TTL
+        weather_astro._ASTRO_ANALYSIS_LOCK.acquire()
+        try:
+            with patch("weather_astro.is_openmeteo_rate_limited", return_value=False):
+                result = get_astro_weather_analysis(24, "en")
+        finally:
+            weather_astro._ASTRO_ANALYSIS_LOCK.release()
+        assert result is not None
+
+    def test_analysis_success_stores_and_returns(self):
+        """Lines 850-854: analysis returns non-None → store and return."""
+        fresh_data = {"result": "fresh_analysis"}
+        with patch("weather_astro.is_openmeteo_rate_limited", return_value=False):
+            with patch(
+                "weather_astro.AstroWeatherAnalyzer.generate_comprehensive_analysis",
+                return_value=fresh_data,
+            ):
+                with patch("weather_astro.AstroWeatherAnalyzer.__init__", return_value=None):
+                    result = get_astro_weather_analysis(97, "en")
+        assert result == fresh_data

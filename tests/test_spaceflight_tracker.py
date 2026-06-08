@@ -825,6 +825,20 @@ class TestPruneImageCacheOsError:
                 # Should not raise
                 prune_image_cache([])
 
+    def test_non_matching_paths_skipped_in_in_use_build(self, tmp_path):
+        """Line 373->372: active_data paths not starting with /api/spaceflight/img/ → skipped."""
+        img_dir = tmp_path / "images"
+        img_dir.mkdir()
+        (img_dir / "active.jpg").write_bytes(b"x")
+
+        with patch("spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(img_dir)):
+            prune_image_cache([
+                None,
+                42,
+                "/other/path/active.jpg",
+            ])
+        assert (img_dir / "active.jpg").exists() is False
+
 
 # ---------------------------------------------------------------------------
 # spaceflight_cache_images_intact - tuple branch

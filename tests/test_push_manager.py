@@ -320,3 +320,22 @@ def test_save_vapid_keys_disk_error_logs_and_returns_keys(tmp_path, monkeypatch)
 
     assert keys == fake_keys
     assert errors_logged
+
+
+def test_vapid_contact_email_configured_skips_warning(tmp_path, monkeypatch):
+    """Line 76->82: VAPID contact email IS set → skip the warning block."""
+    import push_manager
+    import app_settings
+
+    push_manager._VAPID_CONTACT_WARNING_EMITTED = False
+
+    monkeypatch.setattr(app_settings, 'get_app_settings', lambda: {'vapid_contact_email': 'admin@example.com'})
+
+    vapid_file = tmp_path / 'vapid.json'
+    vapid_file.write_text(json.dumps({'private_key': 'PRIV', 'public_key': 'PUB'}))
+    monkeypatch.setattr(push_manager, '_VAPID_FILE', str(vapid_file))
+
+    keys = push_manager.load_or_generate_vapid_keys()
+
+    assert keys.get('private_key') == 'PRIV'
+    assert not push_manager._VAPID_CONTACT_WARNING_EMITTED

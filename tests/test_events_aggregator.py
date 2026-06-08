@@ -1088,6 +1088,13 @@ class TestExtractIssPassEvents:
         events = aggregator._extract_iss_pass_events({"lunar_transits": [None, 42]})
         assert events == []
 
+    def test_lunar_transit_out_of_range_skipped(self, aggregator):
+        """Line 869: lunar transit more than 7 days away is skipped."""
+        peak = (aggregator.local_now + timedelta(days=10)).isoformat()
+        transit = {"peak_time": peak, "minimum_separation_arcmin": 0.3}
+        events = aggregator._extract_iss_pass_events({"lunar_transits": [transit]})
+        assert events == []
+
 
 class TestExtractPlanetaryEvents:
     """Tests for _extract_planetary_events."""
@@ -1295,6 +1302,23 @@ class TestExtractSpecialPhenomenaEvents:
         assert len(events) == 1
         assert events[0].title == "My Custom Event"
 
+    def test_malformed_event_hits_except_handler(self, aggregator):
+        """Lines 1044-1045: non-dict entry triggers AttributeError → except handler."""
+        peak = (aggregator.local_now + timedelta(days=1)).isoformat()
+        data = {
+            "events": [
+                None,
+                {
+                    "peak_time": peak,
+                    "event_type": "Equinox",
+                    "title": "Spring Equinox",
+                    "description": "Equal day and night",
+                },
+            ]
+        }
+        result = aggregator._extract_special_phenomena_events(data)
+        assert len(result) == 1
+
 
 class TestExtractSolarSystemEvents:
     """Tests for _extract_solar_system_events."""
@@ -1369,6 +1393,23 @@ class TestExtractSolarSystemEvents:
         events = aggregator._extract_solar_system_events(data)
         assert events[0].icon_class == "bi bi-circle-fill"
         assert events[0].icon_color_class == "text-warning"
+
+    def test_malformed_event_hits_except_handler(self, aggregator):
+        """Lines 1096-1097: non-dict entry triggers AttributeError → except handler."""
+        peak = (aggregator.local_now + timedelta(days=2)).isoformat()
+        data = {
+            "events": [
+                None,
+                {
+                    "peak_time": peak,
+                    "event_type": "Meteor Shower",
+                    "title": "Perseids",
+                    "description": "Peak night",
+                },
+            ]
+        }
+        result = aggregator._extract_solar_system_events(data)
+        assert len(result) == 1
 
 
 class TestAggregateAllEventsExceptionPaths:

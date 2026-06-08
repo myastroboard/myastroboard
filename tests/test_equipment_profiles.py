@@ -1572,3 +1572,169 @@ class TestAnalyzeCombination:
         assert result is not None
         # No payload comparison made, so no mount-related suitability message
         assert not any("within recommended" in s for s in result.suitability)
+
+
+class TestSafeSaveRecoveryBranches:
+    """Lines 364->372, 368-369, 372->378, 375-376: error-recovery paths in safe_save_equipment."""
+
+    def test_no_backup_exists_on_move_failure_skips_restore(self, tmp_path, monkeypatch):
+        """Line 364->372: new file, no backup, shutil.move fails → if backup: False → skip to 372."""
+        new_file = str(tmp_path / 'new_equip.json')
+        monkeypatch.setattr(equipment_profiles.shutil, 'move',
+                            lambda *a: (_ for _ in ()).throw(IOError("disk full")))
+        ok = equipment_profiles.safe_save_equipment(new_file, {'items': []})
+        assert ok is False
+
+    def test_restore_copy2_fails_logs_error(self, tmp_path, monkeypatch):
+        """Lines 368-369: existing file, backup created, move fails, restore copy2 also fails."""
+        target = tmp_path / 'equip.json'
+        target.write_text(json.dumps({'items': []}), encoding='utf-8')
+        copy2_calls = [0]
+        real_copy2 = equipment_profiles.shutil.copy2
+        def _copy2(src, dst):
+            copy2_calls[0] += 1
+            if copy2_calls[0] >= 2:
+                raise IOError("restore failed")
+            return real_copy2(src, dst)  # first call (backup) actually copies
+        monkeypatch.setattr(equipment_profiles.shutil, 'copy2', _copy2)
+        monkeypatch.setattr(equipment_profiles.shutil, 'move',
+                            lambda *a: (_ for _ in ()).throw(IOError("disk full")))
+        ok = equipment_profiles.safe_save_equipment(str(target), {'items': []})
+        assert ok is False
+
+    def test_no_temp_file_on_open_failure(self, tmp_path, monkeypatch):
+        """Line 372->378: exception before temp created (step 2 fails) → temp doesn't exist."""
+        import builtins
+        target = tmp_path / 'equip.json'
+        target.write_text(json.dumps({'items': []}), encoding='utf-8')
+        real_open = builtins.open
+        def _fail_temp(path, *args, **kwargs):
+            if str(path).endswith('.tmp'):
+                raise IOError("disk full")
+            return real_open(path, *args, **kwargs)
+        monkeypatch.setattr(builtins, 'open', _fail_temp)
+        ok = equipment_profiles.safe_save_equipment(str(target), {'items': []})
+        assert ok is False
+
+    def test_temp_remove_fails_is_swallowed(self, tmp_path, monkeypatch):
+        """Lines 375-376: temp cleanup raises → swallowed → still returns False."""
+        target = tmp_path / 'equip.json'
+        target.write_text(json.dumps({'items': []}), encoding='utf-8')
+        monkeypatch.setattr(equipment_profiles.shutil, 'move',
+                            lambda *a: (_ for _ in ()).throw(IOError("disk full")))
+        real_remove = equipment_profiles.os.remove
+        def _fail_remove(path):
+            if str(path).endswith('.tmp'):
+                raise OSError("cannot remove")
+            return real_remove(path)
+        monkeypatch.setattr(equipment_profiles.os, 'remove', _fail_remove)
+        ok = equipment_profiles.safe_save_equipment(str(target), {'items': []})
+        assert ok is False
+
+
+class TestSharedEquipmentAdditionalBranches:
+    """Lines 411->410, 464, 482-483, 516, 521-522, 526->523, 531-532."""
+
+    def test_load_shared_equipment_item_not_shared_skipped(self, temp_data_dir, monkeypatch):
+        """Line 411->410: item in file has is_shared=False → not added to result."""
+        fake_auth = types.SimpleNamespace(
+            user_manager=types.SimpleNamespace(
+                list_users=lambda: [{'user_id': 'owner1', 'username': 'alice'}]
+            )
+        )
+        monkeypatch.setitem(sys.modules, 'auth', fake_auth)
+        equipment_profiles.ensure_equipment_directories()
+        tel_file = os.path.join(equipment_profiles.EQUIPMENT_DIR, 'owner1_telescopes.json')
+        with open(tel_file, 'w', encoding='utf-8') as f:
+            json.dump({'items': [{'id': 't1', 'name': 'Scope', 'is_shared': False}]}, f)
+        result = equipment_profiles.load_all_shared_equipment('telescopes', exclude_user_id='other')
+        assert result == []
+
+    def test_compute_share_status_item_in_shared_by_id(self, temp_data_dir, monkeypatch):
+        """Lines 464, 482-483: equipment item referenced from shared_by_id (other user's shared pool)."""
+        owner_id = 'sharer'
+        viewer_id = 'viewer'
+        fake_auth = types.SimpleNamespace(
+            user_manager=types.SimpleNamespace(
+                list_users=lambda: [
+                    {'user_id': owner_id, 'username': 'alice'},
+                    {'user_id': viewer_id, 'username': 'bob'},
+                ]
+            )
+        )
+        monkeypatch.setitem(sys.modules, 'auth', fake_auth)
+        equipment_profiles.ensure_equipment_directories()
+        tel_file = equipment_profiles.get_user_equipment_file(owner_id, 'telescopes')
+        with open(tel_file, 'w', encoding='utf-8') as f:
+            json.dump({'items': [{'id': 't1', 'name': 'SharedScope', 'is_shared': True}]}, f)
+        # viewer references owner's shared telescope: t1 is in shared_by_id, not own_by_id
+        status = equipment_profiles.compute_combination_share_status(
+            {'telescope_id': 't1', 'camera_id': None, 'mount_id': None,
+             'filter_ids': [], 'accessory_ids': []},
+            viewer_id,  # viewer doesn't own t1
+        )
+        assert status['is_shared'] is True
+        assert 't1' in status['items_share_info']
+
+    def test_load_shared_combinations_excludes_owner(self, temp_data_dir, monkeypatch):
+        """Line 516: combo file belongs to excluded user → skipped."""
+        fake_auth = types.SimpleNamespace(
+            user_manager=types.SimpleNamespace(
+                list_users=lambda: [{'user_id': 'excludeme', 'username': 'excluded'}]
+            )
+        )
+        monkeypatch.setitem(sys.modules, 'auth', fake_auth)
+        equipment_profiles.ensure_equipment_directories()
+        combo_file = os.path.join(equipment_profiles.EQUIPMENT_DIR, 'excludeme_combinations.json')
+        with open(combo_file, 'w', encoding='utf-8') as f:
+            json.dump({'items': [{'id': 'c1', 'telescope_id': None, 'camera_id': None,
+                                   'mount_id': None, 'filter_ids': [], 'accessory_ids': [],
+                                   'is_shared': True}]}, f)
+        result = equipment_profiles.load_all_shared_combinations(exclude_user_id='excludeme')
+        assert result == []
+
+    def test_load_shared_combinations_invalid_json_continues(self, temp_data_dir, monkeypatch):
+        """Lines 521-522: bad JSON in combo file → exception caught → continue."""
+        fake_auth = types.SimpleNamespace(
+            user_manager=types.SimpleNamespace(
+                list_users=lambda: [{'user_id': 'owner1', 'username': 'alice'}]
+            )
+        )
+        monkeypatch.setitem(sys.modules, 'auth', fake_auth)
+        equipment_profiles.ensure_equipment_directories()
+        combo_file = os.path.join(equipment_profiles.EQUIPMENT_DIR, 'owner1_combinations.json')
+        with open(combo_file, 'w', encoding='utf-8') as f:
+            f.write('{invalid json}')
+        result = equipment_profiles.load_all_shared_combinations(exclude_user_id='other')
+        assert result == []
+
+    def test_load_shared_combinations_not_shared_excluded(self, temp_data_dir, monkeypatch):
+        """Line 526->523: combination status is_shared=False → not added."""
+        owner_id = 'owner1'
+        fake_auth = types.SimpleNamespace(
+            user_manager=types.SimpleNamespace(
+                list_users=lambda: [{'user_id': owner_id, 'username': 'alice'}]
+            )
+        )
+        monkeypatch.setitem(sys.modules, 'auth', fake_auth)
+        equipment_profiles.ensure_equipment_directories()
+        combo_file = os.path.join(equipment_profiles.EQUIPMENT_DIR, f'{owner_id}_combinations.json')
+        with open(combo_file, 'w', encoding='utf-8') as f:
+            json.dump({'items': [{'id': 'c1', 'telescope_id': 'missing',
+                                   'camera_id': None, 'mount_id': None,
+                                   'filter_ids': [], 'accessory_ids': []}]}, f)
+        result = equipment_profiles.load_all_shared_combinations(exclude_user_id='other')
+        assert result == []
+
+    def test_load_shared_combinations_outer_exception_returns_empty(self, temp_data_dir, monkeypatch):
+        """Lines 531-532: os.listdir raises → outer except → return []."""
+        fake_auth = types.SimpleNamespace(
+            user_manager=types.SimpleNamespace(
+                list_users=lambda: []
+            )
+        )
+        monkeypatch.setitem(sys.modules, 'auth', fake_auth)
+        monkeypatch.setattr(equipment_profiles.os, 'listdir',
+                            lambda _: (_ for _ in ()).throw(Exception("listdir fail")))
+        result = equipment_profiles.load_all_shared_combinations(exclude_user_id='other')
+        assert result == []

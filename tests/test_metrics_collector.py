@@ -10,6 +10,8 @@ from unittest.mock import patch, MagicMock
 from metrics_collector import (
     is_running_in_container,
     get_folder_disk_usage,
+    get_disk_space_details,
+    get_environment_processes,
     detect_docker_in_docker,
     collect_metrics,
     CONTAINER_PROCESS_HINTS,
@@ -421,3 +423,140 @@ class TestCollectMetricsMocked:
         result = mc.collect_metrics()
         if "cpu" in result:
             assert result["cpu"]["frequency"] is None
+
+
+class TestIsRunningInContainerBranchCoverage:
+    """Cover lines 57->63 and 66->71 (cgroup/cpuinfo readable but no pattern matches)."""
+
+    @patch("metrics_collector.os.path.exists", return_value=False)
+    def test_cgroup_no_pattern_and_cpuinfo_no_hypervisor_returns_false(self, mock_exists):
+        """
+        Lines 57->63: cgroup read but 'systemd-nspawn' absent → falls to cpuinfo block.
+        Lines 66->71: cpuinfo read but 'hypervisor' absent → returns (False, None).
+        """
+        def open_side_effect(path, *args, **kwargs):
+            mock_file = MagicMock()
+            mock_file.__enter__ = MagicMock(return_value=mock_file)
+            mock_file.__exit__ = MagicMock(return_value=False)
+            if '1/cgroup' in str(path):
+                mock_file.read.return_value = "12:devices:/unrelated/system"
+            elif 'cpuinfo' in str(path):
+                mock_file.read.return_value = "processor: 0\nvendor_id: GenuineIntel\nflags: sse2"
+            else:
+                raise FileNotFoundError
+            return mock_file
+
+        with patch("builtins.open", side_effect=open_side_effect):
+            result, container_type = is_running_in_container()
+
+        assert result is False
+        assert container_type is None
+
+
+class TestGetDiskSpaceDetailsFolderNone:
+    """Cover line 130: get_folder_disk_usage returns None for folders that don't exist."""
+
+    def test_folder_size_none_falls_into_else_branch(self):
+        import metrics_collector as mc
+
+        mock_disk = MagicMock()
+        mock_disk.total = 100 * 1024 ** 3
+        mock_disk.used = 50 * 1024 ** 3
+        mock_disk.free = 50 * 1024 ** 3
+        mock_disk.percent = 50.0
+
+        with patch.object(mc.psutil, 'disk_usage', create=True, return_value=mock_disk), \
+             patch('metrics_collector.get_folder_disk_usage', return_value=None):
+            result = mc.get_disk_space_details()
+
+        assert "folders" in result
+        for folder_info in result["folders"].values():
+            assert folder_info["bytes"] == 0
+            assert folder_info["percent_of_root"] == 0
+
+
+class TestGetEnvironmentProcessesBranchCoverage:
+    """Cover lines 169->171, 172->175, 198-201."""
+
+    def _ensure_psutil_exceptions(self, mc):
+        for exc_name in ('NoSuchProcess', 'AccessDenied', 'ZombieProcess'):
+            if not hasattr(mc.psutil, exc_name):
+                setattr(mc.psutil, exc_name, type(exc_name, (Exception,), {}))
+
+    def test_process_with_cpu_times_none_skips_cpu_total(self):
+        """Lines 169->171: cpu_times is None → cpu_total stays 0.0."""
+        import metrics_collector as mc
+
+        mock_proc = MagicMock()
+        mock_proc.info = {
+            'pid': 1, 'name': 'worker', 'status': 'running', 'username': 'user',
+            'create_time': 1700000000.0,
+            'memory_info': MagicMock(rss=1024), 'memory_percent': 0.1,
+            'cpu_times': None,
+            'cmdline': [],
+        }
+        with patch.object(mc.psutil, 'process_iter', create=True, return_value=[mock_proc]), \
+             patch.object(mc.psutil, 'cpu_count', create=True, return_value=4):
+            result = mc.get_environment_processes()
+
+        assert result[0]['cpu_percent'] == 0.0
+
+    def test_process_with_no_create_time_zero_uptime(self):
+        """Lines 172->175: create_time is None → uptime_seconds=0 → cpu_percent stays 0.0."""
+        import metrics_collector as mc
+
+        mock_proc = MagicMock()
+        mock_proc.info = {
+            'pid': 2, 'name': 'worker', 'status': 'running', 'username': 'user',
+            'create_time': None,
+            'memory_info': MagicMock(rss=1024), 'memory_percent': 0.1,
+            'cpu_times': MagicMock(user=1.0, system=0.5),
+            'cmdline': [],
+        }
+        with patch.object(mc.psutil, 'process_iter', create=True, return_value=[mock_proc]), \
+             patch.object(mc.psutil, 'cpu_count', create=True, return_value=4):
+            result = mc.get_environment_processes()
+
+        assert result[0]['cpu_percent'] == 0.0
+        assert result[0]['created_at'] is None
+
+    def test_nosuchprocess_exception_skips_process(self):
+        """Lines 198-199: psutil.NoSuchProcess → process is skipped via continue."""
+        import metrics_collector as mc
+        from unittest.mock import PropertyMock
+
+        self._ensure_psutil_exceptions(mc)
+
+        mock_bad_proc = MagicMock()
+        type(mock_bad_proc).info = PropertyMock(side_effect=mc.psutil.NoSuchProcess())
+
+        mock_good_proc = MagicMock()
+        mock_good_proc.info = {
+            'pid': 1, 'name': 'ok', 'status': 'running', 'username': 'user',
+            'create_time': 1700000000.0,
+            'memory_info': MagicMock(rss=1024), 'memory_percent': 0.1,
+            'cpu_times': None, 'cmdline': [],
+        }
+
+        with patch.object(mc.psutil, 'process_iter', create=True, return_value=[mock_bad_proc, mock_good_proc]), \
+             patch.object(mc.psutil, 'cpu_count', create=True, return_value=4):
+            result = mc.get_environment_processes()
+
+        assert len(result) == 1
+        assert result[0]['name'] == 'ok'
+
+    def test_generic_exception_in_process_loop_is_swallowed(self):
+        """Lines 200-201: generic Exception → logged, process is skipped."""
+        import metrics_collector as mc
+        from unittest.mock import PropertyMock
+
+        self._ensure_psutil_exceptions(mc)
+
+        mock_bad_proc = MagicMock()
+        type(mock_bad_proc).info = PropertyMock(side_effect=RuntimeError("unexpected error"))
+
+        with patch.object(mc.psutil, 'process_iter', create=True, return_value=[mock_bad_proc]), \
+             patch.object(mc.psutil, 'cpu_count', create=True, return_value=4):
+            result = mc.get_environment_processes()
+
+        assert result == []

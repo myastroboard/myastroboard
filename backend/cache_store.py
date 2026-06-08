@@ -36,7 +36,7 @@ from constants import (
 # Windows-compatible file locking
 if sys.platform == "win32":
     import msvcrt
-else:
+else:  # pragma: no cover
     import fcntl
 
 # Cache entries with timestamp for TTL tracking
@@ -100,14 +100,14 @@ def _cache_file_read_lock():
         if sys.platform == "win32":
             # msvcrt has no native shared lock; fall back to exclusive on Windows.
             msvcrt.locking(lock_file.fileno(), msvcrt.LK_LOCK, 1)
-        else:
+        else:  # pragma: no cover
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_SH)
         yield
     finally:
         try:
             if sys.platform == "win32":
                 msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
-            else:
+            else:  # pragma: no cover
                 fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
         finally:
             lock_file.close()
@@ -121,14 +121,14 @@ def _cache_file_write_lock():
     try:
         if sys.platform == "win32":
             msvcrt.locking(lock_file.fileno(), msvcrt.LK_LOCK, 1)
-        else:
+        else:  # pragma: no cover
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
         yield
     finally:
         try:
             if sys.platform == "win32":
                 msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
-            else:
+            else:  # pragma: no cover
                 fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
         finally:
             lock_file.close()

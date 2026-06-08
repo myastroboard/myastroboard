@@ -24,7 +24,7 @@ from logging_config import get_logger
 
 if sys.platform == 'win32':
     import msvcrt
-else:
+else:  # pragma: no cover
     import fcntl
 
 logger = get_logger(__name__)
@@ -601,7 +601,7 @@ def _acquire_lock() -> bool:
         _lock_file = open(lock_path, 'w')
         if sys.platform == 'win32':
             msvcrt.locking(_lock_file.fileno(), msvcrt.LK_NBLCK, 1)
-        else:
+        else:  # pragma: no cover
             fcntl.flock(_lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         _lock_file.write(str(os.getpid()))
         _lock_file.flush()
@@ -620,7 +620,7 @@ def _release_lock() -> None:
     try:
         if sys.platform == 'win32':
             msvcrt.locking(_lock_file.fileno(), msvcrt.LK_UNLCK, 1)
-        else:
+        else:  # pragma: no cover
             fcntl.flock(_lock_file.fileno(), fcntl.LOCK_UN)
         _lock_file.close()
     except Exception as e:

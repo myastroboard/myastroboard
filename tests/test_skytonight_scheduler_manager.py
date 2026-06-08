@@ -568,3 +568,28 @@ class TestGetSkytonigtSchedulerForApi:
                     with app.app_context():
                         result = get_skytonight_scheduler_for_api()
         assert result == "remote_scheduler"
+
+
+class TestGetOrCreateSchedulerLockLoggedBranch:
+    """Cover line 146->151: already-logged OSError branch."""
+
+    def test_second_lock_failure_skips_debug_log(self, tmp_path):
+        """Line 146->151: when skytonight_scheduler_lock_logged is True,
+        the if-block body is skipped and we jump directly to line 151."""
+        import skytonight_scheduler_manager as module
+        from skytonight_scheduler_manager import get_or_create_skytonight_scheduler
+
+        mock_app = MagicMock()
+        mock_app.config = {
+            'skytonight_scheduler_lock_logged': True,  # already logged → False branch at 146
+        }
+
+        lock_path = str(tmp_path / "test.lock")
+
+        with patch.object(module, 'get_skytonight_scheduler_lock_file', return_value=lock_path), \
+             patch.object(module.sys, 'platform', 'win32'), \
+             patch.object(module.msvcrt, 'locking', side_effect=OSError("locked")):
+            result = get_or_create_skytonight_scheduler(mock_app)
+
+        assert result is None
+        assert mock_app.config.get('is_skytonight_scheduler_worker') is False

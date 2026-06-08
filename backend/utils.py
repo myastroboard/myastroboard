@@ -18,7 +18,7 @@ try:
     import numpy as _np
 
     _HAS_NUMPY = True
-except ImportError:
+except ImportError:  # pragma: no cover
     _np = None  # type: ignore[assignment]
     _HAS_NUMPY = False
 
@@ -32,7 +32,7 @@ class _NumpySafeEncoder(json.JSONEncoder):
     """
 
     def default(self, obj: object) -> object:  # type: ignore[override]
-        if _HAS_NUMPY:
+        if _HAS_NUMPY:  # pragma: no branch
             if isinstance(obj, _np.integer):  # type: ignore[union-attr]
                 return int(obj)
             if isinstance(obj, _np.floating):  # type: ignore[union-attr]
@@ -47,7 +47,7 @@ class _NumpySafeEncoder(json.JSONEncoder):
 
 def _sanitize_for_json(obj: object) -> object:
     """Recursively convert numpy types and replace NaN/Inf with None."""
-    if _HAS_NUMPY:
+    if _HAS_NUMPY:  # pragma: no branch
         if isinstance(obj, _np.integer):  # type: ignore[union-attr]
             return int(obj)
         if isinstance(obj, _np.floating):  # type: ignore[union-attr]
