@@ -699,6 +699,82 @@ def test_build_standalone_targets_skips_entries_missing_ra_dec(monkeypatch):
     assert result[0].preferred_name == 'Valid'
 
 
+# ---------------------------------------------------------------------------
+# _collect_catalogue_names — OpenNGC already set when IC row processed (line 485)
+# ---------------------------------------------------------------------------
+
+def test_collect_catalogue_names_ic_row_with_ngc_names_skips_openngc_fallback():
+    """Line 485 False branch: IC-named row already has OpenNGC set from ngc_names."""
+    row = _make_row(name='IC1234', ngc_names=['NGC 224'], ic_names=[])
+    names = _collect_catalogue_names(row)
+    assert names.get('OpenNGC') == 'NGC 224'
+    assert names.get('OpenIC') == 'IC 1234'
+
+
+# ---------------------------------------------------------------------------
+# _build_cross_ref_map — if key: False branches (lines 630, 642, 654, 666)
+# ---------------------------------------------------------------------------
+
+def test_build_cross_ref_map_pensack_skips_empty_key(monkeypatch):
+    """Line 630 False branch: Pensack entry normalizes to empty key -> skipped."""
+    pensack_data = ['---', 'NGC 5128']
+
+    def fake_load(filename):
+        if filename == 'pensack500.json':
+            return pensack_data
+        return None
+
+    monkeypatch.setattr('skytonight_catalogue_builder._load_json_catalogue', fake_load)
+    cross_refs = _build_cross_ref_map()
+    ngc5128_key = _ngc_ic_match_key('NGC 5128')
+    assert 'Pensack500' in cross_refs.get(ngc5128_key, {})
+
+
+def test_build_cross_ref_map_lbn_skips_empty_key(monkeypatch):
+    """Line 642 False branch: LBN entry raw_ngc_name normalizes to empty key -> skipped."""
+    lbn_data = {'---': 'LBN 999', 'NGC 5128': 'LBN 357'}
+
+    def fake_load(filename):
+        if filename == 'lbn.json':
+            return lbn_data
+        return None
+
+    monkeypatch.setattr('skytonight_catalogue_builder._load_json_catalogue', fake_load)
+    cross_refs = _build_cross_ref_map()
+    ngc5128_key = _ngc_ic_match_key('NGC 5128')
+    assert 'LBN' in cross_refs.get(ngc5128_key, {})
+
+
+def test_build_cross_ref_map_garyimm_skips_empty_key(monkeypatch):
+    """Line 654 False branch: GaryImm entry normalizes to empty key -> skipped."""
+    garyimm_data = ['---', 'NGC 5128']
+
+    def fake_load(filename):
+        if filename == 'garyimm_crossrefs.json':
+            return garyimm_data
+        return None
+
+    monkeypatch.setattr('skytonight_catalogue_builder._load_json_catalogue', fake_load)
+    cross_refs = _build_cross_ref_map()
+    ngc5128_key = _ngc_ic_match_key('NGC 5128')
+    assert 'GaryImm' in cross_refs.get(ngc5128_key, {})
+
+
+def test_build_cross_ref_map_arp_skips_empty_key(monkeypatch):
+    """Line 666 False branch: Arp entry raw_ngc_name normalizes to empty key -> skipped."""
+    arp_data = {'---': 'Arp 999', 'NGC 2': 'Arp 2'}
+
+    def fake_load(filename):
+        if filename == 'arp.json':
+            return arp_data
+        return None
+
+    monkeypatch.setattr('skytonight_catalogue_builder._load_json_catalogue', fake_load)
+    cross_refs = _build_cross_ref_map()
+    ngc2_key = _ngc_ic_match_key('NGC 2')
+    assert 'Arp' in cross_refs.get(ngc2_key, {})
+
+
 def test_build_standalone_targets_skips_non_dict_entries(monkeypatch):
     data = ['not-a-dict', None, 42, {'name': 'Valid', 'ra_hours': 5.5, 'dec_degrees': -5.0,
                                      'type': 'Unknown', 'description': '', 'constellation': 'Ori'}]

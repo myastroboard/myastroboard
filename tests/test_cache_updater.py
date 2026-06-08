@@ -162,14 +162,16 @@ class TestCacheUpdateFunctionsBasic:
     @patch("cache_updater.get_hourly_forecast")
     def test_update_weather_cache_object_dtype_column(self, mock_get_hourly_forecast, mock_cache_store):
         """Line 334: bytes decode path for object-dtype DataFrame columns."""
+        import numpy as np
         from cache_updater import update_weather_cache
 
         mock_cache_store._weather_cache = {"data": None, "timestamp": 0}
+        # Use explicit dtype=object with bytes values to force the bytes decode branch
         mock_get_hourly_forecast.return_value = {
             "hourly": pd.DataFrame(
                 {
                     "date": pd.to_datetime(["2026-04-17T21:00:00Z"]),
-                    "description": ["Clear"],  # object dtype triggers line 334
+                    "raw": pd.array([b"encoded_bytes"], dtype=object),
                 }
             ),
             "location": {"name": "Test"},
@@ -178,6 +180,8 @@ class TestCacheUpdateFunctionsBasic:
         update_weather_cache()
 
         assert mock_cache_store._weather_cache["data"] is not None
+        decoded_records = mock_cache_store._weather_cache["data"]["hourly"]
+        assert decoded_records[0]["raw"] == "encoded_bytes"
 
 
 class TestCacheUpdateErrorHandling:
@@ -1367,6 +1371,38 @@ class TestUpdateSpaceflightEventsCache:
 
         mock_cache_store.update_shared_cache_entry.assert_called()
 
+    @patch("cache_updater.cache_store")
+    def test_collect_images_ignores_non_prefix_strings(self, mock_cache_store):
+        """Line 977->exit: _collect_images skips strings not starting with /api/spaceflight/img/."""
+        from cache_updater import update_spaceflight_events_cache
+
+        mock_cache_store._spaceflight_events_cache = {"data": None, "timestamp": 0}
+
+        fake_prune = MagicMock()
+        fake_module = types.SimpleNamespace(
+            get_upcoming_space_events=MagicMock(return_value={"results": []}),
+            prune_image_cache=fake_prune,
+        )
+
+        mock_cache_store.load_shared_cache_entry.side_effect = lambda key: {
+            "spaceflight_launches": {
+                "data": {
+                    "name": "Mission X",  # non-prefix string → hits 977->exit
+                    "image_url": "/api/spaceflight/img/launch.jpg",
+                }
+            },
+            "spaceflight_astronauts": None,
+            "spaceflight_events": None,
+        }.get(key)
+
+        with patch.dict(sys.modules, {"spaceflight_tracker": fake_module}):
+            update_spaceflight_events_cache()
+
+        fake_prune.assert_called_once()
+        active_images = fake_prune.call_args.args[0]
+        assert "/api/spaceflight/img/launch.jpg" in active_images
+        assert "Mission X" not in active_images
+
 
 class TestUpdateIersCacheAdditional:
     """Tests for update_iers_cache."""
@@ -1563,3 +1599,48 @@ class TestFullyInitializeCachesAdditional:
 
         # Timestamp should have been zeroed, forcing a refetch
         assert launches_cache["timestamp"] == 0
+
+    @patch("astropy.utils.iers.IERS_Auto.iers_table", new=None)
+    @patch("cache_updater.cache_store")
+    @patch("cache_updater.load_config")
+    @patch("cache_updater.check_and_handle_config_changes")
+    def test_only_sequential_jobs_skips_parallel_block(self, _check, mock_load_config, mock_cache_store):
+        """Lines 1279->1289 and 1289->1324: when parallel is empty both branches are taken."""
+        from cache_updater import fully_initialize_caches
+
+        mock_load_config.return_value = {"location": {"latitude": 48.85, "longitude": 2.35, "timezone": "Europe/Paris"}}
+        # All day_sensitive=False jobs valid (skipped) → no parallel jobs
+        mock_cache_store.is_cache_valid.return_value = True
+        # All day_sensitive=True jobs stale → sequential-only jobs_to_run
+        mock_cache_store.is_cache_valid_for_today.return_value = False
+        mock_cache_store.sync_cache_from_shared.return_value = None
+        # Prevent spaceflight image-integrity check from importing spaceflight_tracker
+        mock_cache_store._spaceflight_launches_cache = {"data": None, "timestamp": 0}
+        mock_cache_store._spaceflight_astronauts_cache = {"data": None, "timestamp": 0}
+
+        fully_initialize_caches()  # Should complete without error
+
+        # Only sequential jobs ran → set_cache_initialization_in_progress(False) must be called
+        mock_cache_store.set_cache_initialization_in_progress.assert_called_with(False)
+
+    @patch("cache_updater.update_iers_cache", side_effect=RuntimeError("iers pre-download failed"))
+    @patch("astropy.utils.iers.IERS_Auto.iers_table", new=None)
+    @patch("cache_updater.cache_store")
+    @patch("cache_updater.load_config")
+    @patch("cache_updater.check_and_handle_config_changes")
+    def test_iers_pre_parallel_exception_is_caught(self, _check, mock_load_config, mock_cache_store, _iers_fn):
+        """Lines 1284-1285: exception in pre-parallel IERS download is caught and logged."""
+        from cache_updater import fully_initialize_caches
+
+        mock_load_config.return_value = {"location": {"latitude": 48.85, "longitude": 2.35, "timezone": "Europe/Paris"}}
+        # All day_sensitive=False jobs stale → iers is in parallel → pre-download fires
+        mock_cache_store.is_cache_valid.return_value = False
+        # Skip day_sensitive=True jobs to keep test fast
+        mock_cache_store.is_cache_valid_for_today.return_value = True
+        mock_cache_store.sync_cache_from_shared.return_value = None
+        mock_cache_store._spaceflight_launches_cache = {"data": None, "timestamp": 0}
+        mock_cache_store._spaceflight_astronauts_cache = {"data": None, "timestamp": 0}
+
+        fully_initialize_caches()  # Should not raise despite iers failure
+
+        mock_cache_store.set_cache_initialization_in_progress.assert_called_with(False)
