@@ -160,7 +160,7 @@ def _write_shared_cache(shared_cache):
 
 def update_shared_cache_entry(key, data, timestamp):
     """Update a single shared cache entry"""
-    with _cache_file_write_lock():
+    with _cache_file_lock():
         shared_cache = _read_shared_cache()
         shared_cache[key] = {"timestamp": timestamp, "data": data}
         _write_shared_cache(shared_cache)
@@ -186,6 +186,11 @@ def sync_cache_from_shared(key, cache_entry):
     cache_entry["data"] = entry.get("data")
     cache_entry["timestamp"] = entry.get("timestamp", 0)
     return True
+
+
+def get_version_update_cache_entry():
+    """Return the mutable cache entry used by version checker."""
+    return _version_update_cache
 
 
 def _write_all_astronomical_caches_to_shared():

@@ -8,23 +8,23 @@ import json
 import tempfile
 import pytest
 from unittest.mock import patch
-from skytonight_storage import (
-    ensure_skytonight_directories,
-    get_location_directory,
-    get_dataset_file,
-    get_results_file,
-    get_scheduler_status_file,
-    get_scheduler_lock_file,
-    get_scheduler_trigger_file,
-    load_scheduler_status,
-    save_scheduler_status,
-    append_scheduler_log,
-    _trim_log_file,
-    has_calculation_results,
-    has_bodies_results,
-    has_comets_results,
-    has_dso_results,
-)
+import skytonight_storage
+
+ensure_skytonight_directories = skytonight_storage.ensure_skytonight_directories
+get_location_directory = skytonight_storage.get_location_directory
+get_dataset_file = skytonight_storage.get_dataset_file
+get_results_file = skytonight_storage.get_results_file
+get_scheduler_status_file = skytonight_storage.get_scheduler_status_file
+get_scheduler_lock_file = skytonight_storage.get_scheduler_lock_file
+get_scheduler_trigger_file = skytonight_storage.get_scheduler_trigger_file
+load_scheduler_status = skytonight_storage.load_scheduler_status
+save_scheduler_status = skytonight_storage.save_scheduler_status
+append_scheduler_log = skytonight_storage.append_scheduler_log
+_trim_log_file = skytonight_storage._trim_log_file
+has_calculation_results = skytonight_storage.has_calculation_results
+has_bodies_results = skytonight_storage.has_bodies_results
+has_comets_results = skytonight_storage.has_comets_results
+has_dso_results = skytonight_storage.has_dso_results
 
 
 class TestEnsureSkytonigtDirectories:
@@ -168,10 +168,10 @@ class TestAppendSchedulerLogNewlineBranch:
     """Tests for the message-ends-with-newline branch (line 91->93)."""
 
     def test_message_already_ends_with_newline_is_not_doubled(self, tmp_path):
-        import skytonight_storage
         with patch.object(skytonight_storage, 'SKYTONIGHT_LOGS_DIR', str(tmp_path)):
             log_path = append_scheduler_log("already newline\n", file_name="nl_test.log")
-        content = open(log_path, encoding="utf-8").read()
+        with open(log_path, encoding="utf-8") as file_obj:
+            content = file_obj.read()
         assert content.count("\n") == 1
 
 

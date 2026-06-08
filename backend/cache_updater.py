@@ -1010,13 +1010,26 @@ def update_iers_cache():
     from constants import IERS_CACHE_FILE
 
     try:
-        url = str(_iers.conf.iers_auto_url)
+        urls = [str(_iers.conf.iers_auto_url)]
+        mirror_url = getattr(_iers.conf, 'iers_auto_url_mirror', None)
+        if mirror_url:
+            urls.append(str(mirror_url))
 
         os.makedirs(os.path.dirname(IERS_CACHE_FILE), exist_ok=True)
-        response = requests.get(url, timeout=30)
-        response.raise_for_status()
-        with open(IERS_CACHE_FILE, 'wb') as f:
-            f.write(response.content)
+
+        last_error = None
+        for url in urls:
+            try:
+                response = requests.get(url, timeout=30)
+                response.raise_for_status()
+                with open(IERS_CACHE_FILE, 'wb') as f:
+                    f.write(response.content)
+                break
+            except Exception as dl_err:
+                last_error = dl_err
+                logger.warning("IERS download failed from %s: %s", url, dl_err)
+        else:
+            raise RuntimeError(f"All IERS download URLs failed: {last_error}")
 
         from astropy.utils.iers import IERS_A
 
@@ -1246,6 +1259,32 @@ def fully_initialize_caches():
             else:
                 jobs_to_run.append((job_name, update_fn, ttl))
 
+        # If a table is already loaded in memory but is beyond (or very close to)
+        # its validity horizon, force an immediate IERS refresh before any other
+        # astropy jobs run to avoid degraded-accuracy startup warnings.
+        iers_stale_or_near_expiry = False
+        try:
+            from astropy.time import Time as _Time
+            from astropy.utils.iers import IERS_Auto as _IERS_Auto
+
+            iers_table = _IERS_Auto.iers_table
+            if iers_table is not None:
+                mjd_max = iers_table['MJD'].max()  # type: ignore[index, union-attr]
+                if hasattr(mjd_max, 'value'):
+                    mjd_max = float(mjd_max.value)
+                else:
+                    mjd_max = float(mjd_max)
+
+                # Keep a small forward cushion so startup does not run right at the
+                # edge of table validity and emit warnings under normal workload.
+                iers_stale_or_near_expiry = mjd_max <= (_Time.now().mjd + 2.0)
+        except Exception as _iers_state_err:
+            logger.warning("Unable to evaluate loaded IERS table validity: %s", _iers_state_err)
+
+        if iers_stale_or_near_expiry and not any(n == 'iers' for n, _, _ in jobs_to_run):
+            logger.info("Loaded IERS table is stale/near expiry; forcing immediate refresh")
+            jobs_to_run.append(('iers', update_iers_cache, CACHE_TTL_IERS))
+
         if not jobs_to_run:
             logger.debug("All caches are still valid - no refresh needed this cycle")
             return
@@ -1274,10 +1313,12 @@ def fully_initialize_caches():
         # use astropy AltAz; without a current IERS table they would trigger the
         # "polar motions after IERS data is valid" warning on every first-boot cycle.
         from astropy.utils.iers import IERS_Auto as _iers_auto_check
-        if _iers_auto_check.iers_table is None:
+        if _iers_auto_check.iers_table is None or iers_stale_or_near_expiry:
             iers_parallel = next(((n, fn, ttl) for n, fn, ttl in parallel if n == 'iers'), None)
             if iers_parallel is not None:
-                logger.info("IERS table absent; downloading synchronously before parallel phase to avoid stale-data warnings")
+                logger.info(
+                    "IERS table absent/stale; downloading synchronously before parallel phase to avoid stale-data warnings"
+                )
                 try:
                     iers_parallel[1]()
                     success_count += 1

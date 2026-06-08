@@ -8,22 +8,21 @@ import requests
 import pytest
 
 import spaceflight_tracker
-from spaceflight_tracker import (
-    _cache_image,
-    _get,
-    _normalise_astronaut,
-    _normalise_event,
-    _normalise_expedition,
-    _normalise_launch,
-    get_upcoming_launches,
-    get_past_launches,
-    get_iss_crew,
-    get_astronauts_in_space,
-    get_upcoming_space_events,
-    get_launch_vidurls,
-    prune_image_cache,
-    spaceflight_cache_images_intact,
-)
+
+_cache_image = spaceflight_tracker._cache_image
+_get = spaceflight_tracker._get
+_normalise_astronaut = spaceflight_tracker._normalise_astronaut
+_normalise_event = spaceflight_tracker._normalise_event
+_normalise_expedition = spaceflight_tracker._normalise_expedition
+_normalise_launch = spaceflight_tracker._normalise_launch
+get_upcoming_launches = spaceflight_tracker.get_upcoming_launches
+get_past_launches = spaceflight_tracker.get_past_launches
+get_iss_crew = spaceflight_tracker.get_iss_crew
+get_astronauts_in_space = spaceflight_tracker.get_astronauts_in_space
+get_upcoming_space_events = spaceflight_tracker.get_upcoming_space_events
+get_launch_vidurls = spaceflight_tracker.get_launch_vidurls
+prune_image_cache = spaceflight_tracker.prune_image_cache
+spaceflight_cache_images_intact = spaceflight_tracker.spaceflight_cache_images_intact
 
 
 @contextmanager

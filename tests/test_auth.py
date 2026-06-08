@@ -10,16 +10,15 @@ import pytest
 from werkzeug.security import check_password_hash, generate_password_hash
 
 import auth
-from auth import (
-    ROLE_ADMIN,
-    ROLE_USER,
-    ROLE_READ_ONLY,
-    UserManager,
-    User,
-    DEFAULT_ADMIN_USERNAME,
-    DEFAULT_ADMIN_PASSWORD,
-    DEFAULT_USER_PREFERENCES,
-)
+
+ROLE_ADMIN = auth.ROLE_ADMIN
+ROLE_USER = auth.ROLE_USER
+ROLE_READ_ONLY = auth.ROLE_READ_ONLY
+UserManager = auth.UserManager
+User = auth.User
+DEFAULT_ADMIN_USERNAME = auth.DEFAULT_ADMIN_USERNAME
+DEFAULT_ADMIN_PASSWORD = auth.DEFAULT_ADMIN_PASSWORD
+DEFAULT_USER_PREFERENCES = auth.DEFAULT_USER_PREFERENCES
 
 
 @pytest.fixture

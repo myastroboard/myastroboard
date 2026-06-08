@@ -47,6 +47,7 @@ def load_aliases_table(force_reload: bool = False) -> Dict:
 
         _aliases_cache = data if isinstance(data, dict) else {}
         _aliases_mtime = current_mtime
+        logger.debug(f"Catalogue aliases cache refreshed at mtime={_aliases_mtime}")
         return _aliases_cache
     except Exception as error:
         logger.error(f"Error loading catalogue aliases table: {error}")

@@ -539,10 +539,11 @@ def compute_astro_score(
         obj_score = 0.5
 
     # --- score_comfort ---
-    # Reward targets that transit during prime evening hours (21:00-01:00)
-    if 21 <= window_start_hour or window_start_hour <= 1:
+    # Reward targets that transit during prime evening hours (21:00-01:00).
+    # Use explicit hour buckets to keep logic clear and avoid wraparound comparisons.
+    if window_start_hour in (21, 22, 23, 0, 1):
         time_bonus = 1.0
-    elif 1 < window_start_hour <= 3:
+    elif window_start_hour in (2, 3):
         time_bonus = 0.5
     else:
         time_bonus = 0.0

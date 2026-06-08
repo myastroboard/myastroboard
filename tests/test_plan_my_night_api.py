@@ -18,7 +18,7 @@ import app as app_module  # type: ignore[import-not-found]
 import astrodex  # type: ignore[import-not-found]
 import plan_my_night  # type: ignore[import-not-found]
 import skytonight_targets  # type: ignore[import-not-found]
-from app import app  # type: ignore[import-not-found]
+app = app_module.app
 from auth import user_manager  # type: ignore[import-not-found]
 
 

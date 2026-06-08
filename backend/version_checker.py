@@ -33,12 +33,13 @@ def is_newer_version(current_version: str, latest_version: str) -> bool:
 
 def _save_version_result(result: dict) -> None:
     """Persist a version-check result to the in-memory and shared cache."""
-    cache_store._version_update_cache["data"] = result
-    cache_store._version_update_cache["timestamp"] = time.time()
+    cache_entry = cache_store.get_version_update_cache_entry()
+    cache_entry["data"] = result
+    cache_entry["timestamp"] = time.time()
     cache_store.update_shared_cache_entry(
         "version_update",
-        cache_store._version_update_cache["data"],
-        cache_store._version_update_cache["timestamp"],
+        cache_entry["data"],
+        cache_entry["timestamp"],
     )
 
 
@@ -49,13 +50,14 @@ def check_for_updates():
     Returns dict with update information or None if check failed.
     """
     # Sync from shared cache first (for multi-worker support)
-    cache_store.sync_cache_from_shared("version_update", cache_store._version_update_cache)
+    cache_entry = cache_store.get_version_update_cache_entry()
+    cache_store.sync_cache_from_shared("version_update", cache_entry)
 
     current_version = get_repo_version().strip()
 
     # Check cache first
-    if cache_store.is_cache_valid(cache_store._version_update_cache, VERSION_UPDATE_CACHE_TTL):
-        cached_data = cache_store._version_update_cache.get("data") or {}
+    if cache_store.is_cache_valid(cache_entry, VERSION_UPDATE_CACHE_TTL):
+        cached_data = cache_entry.get("data") or {}
         cached_current = str(cached_data.get("current_version") or "").strip()
         if cached_current == current_version:
             logger.debug("Returning cached version update information")

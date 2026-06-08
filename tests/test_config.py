@@ -6,22 +6,25 @@ import os
 
 import pytest
 
-from repo_config import load_config, save_config, _merge_defaults
-from config_defaults import (
-    DEFAULT_LOCATION,
-    DEFAULT_ASTRODEX,
-    DEFAULT_CONSTRAINTS,
-    DEFAULT_SKYTONIGHT,
-    DEFAULT_SKYTONIGHT_SCHEDULER,
-    DEFAULT_SKYTONIGHT_DATASETS,
-    DEFAULT_CONFIG,
-)
+import repo_config
+import config_defaults
+
+load_config = repo_config.load_config
+save_config = repo_config.save_config
+_merge_defaults = repo_config._merge_defaults
+
+DEFAULT_LOCATION = config_defaults.DEFAULT_LOCATION
+DEFAULT_ASTRODEX = config_defaults.DEFAULT_ASTRODEX
+DEFAULT_CONSTRAINTS = config_defaults.DEFAULT_CONSTRAINTS
+DEFAULT_SKYTONIGHT = config_defaults.DEFAULT_SKYTONIGHT
+DEFAULT_SKYTONIGHT_SCHEDULER = config_defaults.DEFAULT_SKYTONIGHT_SCHEDULER
+DEFAULT_SKYTONIGHT_DATASETS = config_defaults.DEFAULT_SKYTONIGHT_DATASETS
+DEFAULT_CONFIG = config_defaults.DEFAULT_CONFIG
 
 
 def _set_config_file(monkeypatch, path):
     """Patch CONFIG_FILE in both constants and repo_config modules."""
     import constants
-    import repo_config
     monkeypatch.setattr(constants, "CONFIG_FILE", path)
     monkeypatch.setattr(repo_config, "CONFIG_FILE", path)
 

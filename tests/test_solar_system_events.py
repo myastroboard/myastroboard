@@ -5,7 +5,9 @@ Covers pure-logic rating methods, constants, and mocked event finders.
 
 import pytest
 from unittest.mock import patch, MagicMock
-from solar_system_events import SolarSystemEventsService
+import solar_system_events as module
+
+SolarSystemEventsService = module.SolarSystemEventsService
 
 
 class TestSolarSystemEventsInit:
@@ -334,7 +336,6 @@ class TestCometExceptionHandler:
     def test_exception_in_comet_loop_is_swallowed(self):
         """Lines 345-346: exception inside the per-comet try block is caught and logged."""
         from datetime import date
-        import solar_system_events as module
 
         svc = SolarSystemEventsService(45.0, -73.5)
 

@@ -14,15 +14,13 @@ if 'psutil' not in sys.modules:
     sys.modules['psutil'] = types.ModuleType('psutil')
 
 import skytonight_api as _skytonight_api_mod
-from skytonight_api import (
-    _annotate_skytonight_item,
-    _get_catalogue_alias_payload,
-    _humanize_const_name,
-    _preload_all_current_plan_entries,
-    _resolve_source_catalogue,
-    _target_attr,
-    _target_catalogue_names,
-)
+_annotate_skytonight_item = _skytonight_api_mod._annotate_skytonight_item
+_get_catalogue_alias_payload = _skytonight_api_mod._get_catalogue_alias_payload
+_humanize_const_name = _skytonight_api_mod._humanize_const_name
+_preload_all_current_plan_entries = _skytonight_api_mod._preload_all_current_plan_entries
+_resolve_source_catalogue = _skytonight_api_mod._resolve_source_catalogue
+_target_attr = _skytonight_api_mod._target_attr
+_target_catalogue_names = _skytonight_api_mod._target_catalogue_names
 from app import app
 from auth import user_manager
 
@@ -746,19 +744,17 @@ class TestSkytonightTargetDebug:
 # ---------------------------------------------------------------------------
 
 
-from skytonight_api import (
-    _to_float,
-    _score_in_range,
-    _ideal_focal_range,
-    _aperture_score,
-    _speed_score,
-    _recommend_telescopes_for_target,
-    _alttime_json_path,
-    _build_skytonight_reports_payload,
-    _build_bodies_section_payload,
-    _build_comets_section_payload,
-    _build_dso_section_payload,
-)
+_to_float = _skytonight_api_mod._to_float
+_score_in_range = _skytonight_api_mod._score_in_range
+_ideal_focal_range = _skytonight_api_mod._ideal_focal_range
+_aperture_score = _skytonight_api_mod._aperture_score
+_speed_score = _skytonight_api_mod._speed_score
+_recommend_telescopes_for_target = _skytonight_api_mod._recommend_telescopes_for_target
+_alttime_json_path = _skytonight_api_mod._alttime_json_path
+_build_skytonight_reports_payload = _skytonight_api_mod._build_skytonight_reports_payload
+_build_bodies_section_payload = _skytonight_api_mod._build_bodies_section_payload
+_build_comets_section_payload = _skytonight_api_mod._build_comets_section_payload
+_build_dso_section_payload = _skytonight_api_mod._build_dso_section_payload
 
 
 class TestToFloat:
@@ -1035,15 +1031,13 @@ class TestRecommendTelescopesForTarget:
 class TestAlttimeJsonPath:
 
     def test_sanitizes_special_chars(self, monkeypatch):
-        import skytonight_api as _mod
-        monkeypatch.setattr(_mod, 'OUTPUT_DIR', '/data/output')
+        monkeypatch.setattr(_skytonight_api_mod, 'OUTPUT_DIR', '/data/output')
         path = _alttime_json_path('NGC 1976')
         assert ' ' not in path
         assert path.endswith('_alttime.json')
 
     def test_lowercased(self, monkeypatch):
-        import skytonight_api as _mod
-        monkeypatch.setattr(_mod, 'OUTPUT_DIR', '/data/output')
+        monkeypatch.setattr(_skytonight_api_mod, 'OUTPUT_DIR', '/data/output')
         path = _alttime_json_path('Jupiter')
         assert 'jupiter' in path
 
@@ -1917,10 +1911,9 @@ class TestAlttimeEndpointAdditionalBranches:
 
     def test_alttime_path_traversal_rejected(self, client_admin, monkeypatch, tmp_path):
         """Path traversal guard — file_path not under OUTPUT_DIR → 400."""
-        import skytonight_api as _mod
-        monkeypatch.setattr(_mod, 'OUTPUT_DIR', str(tmp_path))
-        monkeypatch.setattr(_mod, '_alttime_json_path', lambda _id: '/etc/passwd')
-        monkeypatch.setattr(_mod.os.path, 'isfile', lambda p: True)
+        monkeypatch.setattr(_skytonight_api_mod, 'OUTPUT_DIR', str(tmp_path))
+        monkeypatch.setattr(_skytonight_api_mod, '_alttime_json_path', lambda _id: '/etc/passwd')
+        monkeypatch.setattr(_skytonight_api_mod.os.path, 'isfile', lambda p: True)
 
         resp = client_admin.get('/api/skytonight/alttime/valid_id')
         assert resp.status_code == 400

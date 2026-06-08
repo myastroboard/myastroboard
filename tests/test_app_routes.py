@@ -958,7 +958,6 @@ class TestSuccessfulLogin:
     @pytest.fixture
     def temp_user_credentials(self):
         """Create a fresh test user for login tests then delete it."""
-        from auth import user_manager
         import uuid
         username = f'test_login_{uuid.uuid4().hex[:8]}'
         password = 'TestLogin99!'
@@ -1852,8 +1851,7 @@ class TestUserCrudErrors:
         assert resp.status_code == 400
 
     def test_delete_own_account_returns_400(self, client_admin):
-        from auth import user_manager as _um
-        admin_user = _um.get_user_by_username('admin')
+        admin_user = user_manager.get_user_by_username('admin')
         resp = client_admin.delete(f'/api/users/{admin_user.user_id}')
         assert resp.status_code == 400
 
@@ -1870,25 +1868,22 @@ class TestPreferencesErrors:
         assert resp.status_code == 400
 
     def test_update_preferences_invalid_tab_returns_400(self, client_admin, monkeypatch):
-        from auth import user_manager as _um
-        original = _um.update_user_preferences
+        original = user_manager.update_user_preferences
 
         def _raise(user_id, prefs):
             raise ValueError('Invalid startup_main_tab: invalid_tab')
 
-        monkeypatch.setattr(_um, 'update_user_preferences', _raise)
+        monkeypatch.setattr(user_manager, 'update_user_preferences', _raise)
         resp = client_admin.put('/api/auth/preferences', json={'preferences': {'startup_main_tab': 'invalid_tab'}})
         assert resp.status_code == 400
         data = resp.get_json()
         assert data['error_key'] == 'settings.pref_invalid_startup_main_tab'
 
     def test_update_preferences_invalid_theme_returns_400(self, client_admin, monkeypatch):
-        from auth import user_manager as _um
-
         def _raise(user_id, prefs):
             raise ValueError('Invalid theme_mode: x')
 
-        monkeypatch.setattr(_um, 'update_user_preferences', _raise)
+        monkeypatch.setattr(user_manager, 'update_user_preferences', _raise)
         resp = client_admin.put('/api/auth/preferences', json={'preferences': {'theme_mode': 'x'}})
         assert resp.status_code == 400
         data = resp.get_json()
@@ -1903,12 +1898,10 @@ class TestPreferencesErrors:
 class TestPasswordChangeErrors:
 
     def test_change_password_short_new_password_returns_400(self, client_admin, monkeypatch):
-        from auth import user_manager as _um
-
         def _raise(user_id, current, new):
             raise ValueError('New password must be at least 6 characters')
 
-        monkeypatch.setattr(_um, 'change_own_password', _raise)
+        monkeypatch.setattr(user_manager, 'change_own_password', _raise)
         resp = client_admin.post(
             '/api/auth/change-password',
             json={'current_password': 'Admin123!', 'new_password': 'ab'},
@@ -1918,12 +1911,10 @@ class TestPasswordChangeErrors:
         assert data['error_key'] == 'users.password_too_short'
 
     def test_change_password_same_as_current_returns_400(self, client_admin, monkeypatch):
-        from auth import user_manager as _um
-
         def _raise(user_id, current, new):
             raise ValueError('New password must be different from current password')
 
-        monkeypatch.setattr(_um, 'change_own_password', _raise)
+        monkeypatch.setattr(user_manager, 'change_own_password', _raise)
         resp = client_admin.post(
             '/api/auth/change-password',
             json={'current_password': 'Admin123!', 'new_password': 'Admin123!'},
@@ -2929,8 +2920,7 @@ class TestAstrodexItemLifecycle:
 class TestPushTestWithSubscriptions:
 
     def test_push_test_legacy_with_subscription_and_mock(self, client_admin, monkeypatch):
-        from auth import user_manager as _um
-        admin_user = _um.get_user_by_username('admin')
+        admin_user = user_manager.get_user_by_username('admin')
         original_subs = list(admin_user.push_subscriptions)
 
         admin_user.push_subscriptions = [
@@ -2949,11 +2939,10 @@ class TestPushTestWithSubscriptions:
             assert resp.status_code in (200, 400, 500)
         finally:
             admin_user.push_subscriptions = original_subs
-            _um.save_users()
+            user_manager.save_users()
 
     def test_push_test_trigger_with_subscription_and_mock(self, client_admin, monkeypatch):
-        from auth import user_manager as _um
-        admin_user = _um.get_user_by_username('admin')
+        admin_user = user_manager.get_user_by_username('admin')
         original_subs = list(admin_user.push_subscriptions)
 
         admin_user.push_subscriptions = [
@@ -2972,11 +2961,10 @@ class TestPushTestWithSubscriptions:
             assert resp.status_code in (200, 400, 500)
         finally:
             admin_user.push_subscriptions = original_subs
-            _um.save_users()
+            user_manager.save_users()
 
     def test_push_test_trigger_with_dead_endpoint(self, client_admin, monkeypatch):
-        from auth import user_manager as _um
-        admin_user = _um.get_user_by_username('admin')
+        admin_user = user_manager.get_user_by_username('admin')
         original_subs = list(admin_user.push_subscriptions)
 
         admin_user.push_subscriptions = [
@@ -2995,7 +2983,7 @@ class TestPushTestWithSubscriptions:
             assert resp.status_code in (200, 400, 500)
         finally:
             admin_user.push_subscriptions = original_subs
-            _um.save_users()
+            user_manager.save_users()
 
 
 # ---------------------------------------------------------------------------
@@ -3077,8 +3065,7 @@ class TestPushSubscribeIdempotent:
 
     def test_subscribe_same_endpoint_twice_returns_200(self, client_admin, monkeypatch):
         endpoint = 'https://push.mozilla.com/push/idempotent-test-12345'
-        from auth import user_manager as _um
-        admin_user = _um.get_user_by_username('admin')
+        admin_user = user_manager.get_user_by_username('admin')
         original_subs = list(admin_user.push_subscriptions)
 
         # Pre-add subscription
@@ -3099,7 +3086,7 @@ class TestPushSubscribeIdempotent:
             assert resp.status_code == 200
         finally:
             admin_user.push_subscriptions = original_subs
-            _um.save_users()
+            user_manager.save_users()
 
 
 # ---------------------------------------------------------------------------
@@ -3540,8 +3527,7 @@ class TestAuthErrorHandlers:
 
     def test_change_password_generic_value_error_uses_default_key(self, client_admin, monkeypatch):
         """Lines 411->414: ValueError with unrecognised message → default error_key."""
-        import auth as _a
-        monkeypatch.setattr(_a.user_manager, 'change_own_password',
+        monkeypatch.setattr(user_manager, 'change_own_password',
                             lambda *_a, **_k: (_ for _ in ()).throw(ValueError("Something else")))
         resp = client_admin.post('/api/auth/change-password', json={
             'current_password': 'x', 'new_password': 'y'
@@ -3551,8 +3537,7 @@ class TestAuthErrorHandlers:
 
     def test_change_password_unexpected_exception_returns_500(self, client_admin, monkeypatch):
         """Lines 416-418: unexpected exception in change_own_password → 500."""
-        import auth as _a
-        monkeypatch.setattr(_a.user_manager, 'change_own_password',
+        monkeypatch.setattr(user_manager, 'change_own_password',
                             lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("db down")))
         resp = client_admin.post('/api/auth/change-password', json={
             'current_password': 'x', 'new_password': 'y'
@@ -3561,8 +3546,7 @@ class TestAuthErrorHandlers:
 
     def test_preferences_get_unexpected_exception_returns_500(self, client_admin, monkeypatch):
         """Lines 432-437: exception in get_user_preferences → 500."""
-        import auth as _a
-        monkeypatch.setattr(_a.user_manager, 'get_user_preferences',
+        monkeypatch.setattr(user_manager, 'get_user_preferences',
                             lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("db error")))
         resp = client_admin.get('/api/auth/preferences')
         assert resp.status_code == 500
@@ -3574,8 +3558,7 @@ class TestAuthErrorHandlers:
 
     def test_preferences_put_invalid_subtab_returns_400(self, client_admin, monkeypatch):
         """Line 463: Invalid startup_subtab → 400 with specific error_key."""
-        import auth as _a
-        monkeypatch.setattr(_a.user_manager, 'update_user_preferences',
+        monkeypatch.setattr(user_manager, 'update_user_preferences',
                             lambda *_a, **_k: (_ for _ in ()).throw(ValueError("Invalid startup_subtab: x")))
         resp = client_admin.put('/api/auth/preferences', json={'preferences': {}})
         assert resp.status_code == 400
@@ -3583,8 +3566,7 @@ class TestAuthErrorHandlers:
 
     def test_preferences_put_invalid_time_format_returns_400(self, client_admin, monkeypatch):
         """Line 465: Invalid time_format → 400 with specific error_key."""
-        import auth as _a
-        monkeypatch.setattr(_a.user_manager, 'update_user_preferences',
+        monkeypatch.setattr(user_manager, 'update_user_preferences',
                             lambda *_a, **_k: (_ for _ in ()).throw(ValueError("Invalid time_format: x")))
         resp = client_admin.put('/api/auth/preferences', json={'preferences': {}})
         assert resp.status_code == 400
@@ -3592,8 +3574,7 @@ class TestAuthErrorHandlers:
 
     def test_preferences_put_invalid_density_returns_400(self, client_admin, monkeypatch):
         """Line 467: Invalid density → 400 with specific error_key."""
-        import auth as _a
-        monkeypatch.setattr(_a.user_manager, 'update_user_preferences',
+        monkeypatch.setattr(user_manager, 'update_user_preferences',
                             lambda *_a, **_k: (_ for _ in ()).throw(ValueError("Invalid density: x")))
         resp = client_admin.put('/api/auth/preferences', json={'preferences': {}})
         assert resp.status_code == 400
@@ -3601,8 +3582,7 @@ class TestAuthErrorHandlers:
 
     def test_preferences_put_generic_value_error_returns_400(self, client_admin, monkeypatch):
         """Lines 468->471: ValueError with unrecognised text → default error_key."""
-        import auth as _a
-        monkeypatch.setattr(_a.user_manager, 'update_user_preferences',
+        monkeypatch.setattr(user_manager, 'update_user_preferences',
                             lambda *_a, **_k: (_ for _ in ()).throw(ValueError("Some unknown error")))
         resp = client_admin.put('/api/auth/preferences', json={'preferences': {}})
         assert resp.status_code == 400
@@ -3610,8 +3590,7 @@ class TestAuthErrorHandlers:
 
     def test_preferences_put_unexpected_exception_returns_500(self, client_admin, monkeypatch):
         """Lines 473-475: unexpected exception in update_user_preferences → 500."""
-        import auth as _a
-        monkeypatch.setattr(_a.user_manager, 'update_user_preferences',
+        monkeypatch.setattr(user_manager, 'update_user_preferences',
                             lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("crash")))
         resp = client_admin.put('/api/auth/preferences', json={'preferences': {}})
         assert resp.status_code == 500
@@ -4047,7 +4026,7 @@ class TestEquipmentApiRoutes:
         resp = client_admin.get('/api/equipment/summary')
         assert resp.status_code == 200
 
-    def test_equipment_summary_exception_returns_500(self, client_admin, monkeypatch):
+    def test_equipment_summary_exception_returns_500_duplicate(self, client_admin, monkeypatch):
         monkeypatch.setattr(_app_mod.equipment_profiles, 'get_all_equipment_summary',
                             lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
         resp = client_admin.get('/api/equipment/summary')

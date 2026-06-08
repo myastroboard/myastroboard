@@ -79,6 +79,8 @@ def load_or_generate_vapid_keys() -> dict:
                 "VAPID contact email is not configured. Push notifications may be rejected by push services. "
                 "Set it in Parameters → Advanced → Notifications."
             )
+    _ = _VAPID_CONTACT_WARNING_EMITTED
+
     if _vapid_keys.get('private_key'):
         return _vapid_keys
 
@@ -109,7 +111,7 @@ def load_or_generate_vapid_keys() -> dict:
         logger.error(f"Failed to persist VAPID keys: {e}")
 
     _vapid_keys = keys
-    return keys
+    return _vapid_keys
 
 
 def get_vapid_public_key() -> str:

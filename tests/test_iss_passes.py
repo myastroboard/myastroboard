@@ -5,7 +5,10 @@ from requests import HTTPError
 import pytest
 
 import iss_passes as iss_module
-from iss_passes import ISSPassService, get_iss_passes_report
+
+ISSPassService = iss_module.ISSPassService
+get_iss_passes_report = iss_module.get_iss_passes_report
+LUNAR_ANGULAR_RADIUS_FALLBACK_DEG = iss_module.LUNAR_ANGULAR_RADIUS_FALLBACK_DEG
 from events_aggregator import EventsAggregator
 
 
@@ -285,7 +288,6 @@ class TestISSPassServiceTleFallback:
     def test_fetch_iss_tle_uses_alternative_source_when_celestrak_blocked(self, monkeypatch):
         """Alternative JSON sources are tried after Celestrak timeout/block."""
         import json as _json
-        import iss_passes as iss_module
         service = ISSPassService(45.5, -73.5, 30, "America/Montreal")
 
         line1_str = "1 25544U 98067A   26100.00000000  .00010000  00000+0  18000-3 0  9991"
@@ -779,7 +781,6 @@ class TestISSPassServiceLunarTransit:
                 raise ValueError("no distance")
 
         radius = service._lunar_angular_radius_deg(_BadApparent())
-        from iss_passes import LUNAR_ANGULAR_RADIUS_FALLBACK_DEG
         assert radius == LUNAR_ANGULAR_RADIUS_FALLBACK_DEG
 
     def test_get_report_includes_lunar_transit_keys(self, monkeypatch):
@@ -808,7 +809,6 @@ class TestISSPassServiceLunarTransit:
             def timescale(self):
                 return self
 
-        import iss_passes as iss_module
         fake_ts = _FakeTS()
         monkeypatch.setattr(iss_module, "SKYFIELD_LOADER", type("L", (), {
             "timescale": lambda self: fake_ts,

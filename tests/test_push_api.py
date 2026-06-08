@@ -12,8 +12,11 @@ if backend_path not in sys.path:
 if 'psutil' not in sys.modules:
     sys.modules['psutil'] = types.ModuleType('psutil')
 
+import auth  # type: ignore[import-not-found]
 from app import app  # type: ignore[import-not-found]
-from auth import User, user_manager  # type: ignore[import-not-found]
+
+User = auth.User
+user_manager = auth.user_manager
 
 
 # ---------------------------------------------------------------------------
@@ -285,8 +288,6 @@ def test_user_round_trip_preserves_push_subscriptions():
 
 
 def test_user_manager_persists_push_subscriptions(tmp_path, monkeypatch):
-    import auth
-
     users_file = tmp_path / 'users.json'
     monkeypatch.setattr(auth, 'USERS_FILE', str(users_file))
 

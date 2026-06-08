@@ -135,6 +135,7 @@ def get_or_create_skytonight_scheduler(app, cache_ready_event=None):
     """
     if 'skytonight_scheduler' not in app.config:
         lock_file_path = get_skytonight_scheduler_lock_file()
+        lock_file = None
 
         try:
             lock_file = open(lock_file_path, 'w')
@@ -174,8 +175,18 @@ def get_or_create_skytonight_scheduler(app, cache_ready_event=None):
                 logger.debug('SkyTonight scheduler already running in another worker process, skipping creation')
                 app.config['skytonight_scheduler_lock_logged'] = True
             app.config['is_skytonight_scheduler_worker'] = False
+            if lock_file is not None:
+                try:
+                    lock_file.close()
+                except Exception:
+                    pass
             return None
         except Exception as e:
+            if lock_file is not None:
+                try:
+                    lock_file.close()
+                except Exception:
+                    pass
             logger.error(f'Failed to create SkyTonight scheduler: {e}')
             app.config['is_skytonight_scheduler_worker'] = False
             return None

@@ -2004,18 +2004,18 @@ def get_object_info_api(identifier):
     If the object is not found, returns 404 with {"error": "not_found"}.
     If the identifier is invalid, returns 400 with {"error": "invalid_identifier"}.
     """
-    import object_info as _object_info
+    from object_info import is_safe_identifier as _oi_safe, get_object_info as _oi_get
 
     lang = request.args.get('lang', 'en', type=str)
     # Sanitize lang to a safe value
     lang = str(lang).strip()[:8]
 
     # Validate identifier characters before any processing
-    if not _object_info.is_safe_identifier(identifier):
+    if not _oi_safe(identifier):
         return jsonify({'error': 'invalid_identifier'}), 400
 
     try:
-        data = _object_info.get_object_info(identifier, lang=lang)
+        data = _oi_get(identifier, lang=lang)
     except Exception as exc:
         logger.error(f'Error fetching object info for {identifier!r}: {exc}')
         return jsonify({'error': 'Internal server error'}), 500

@@ -2,16 +2,15 @@
 
 from unittest.mock import mock_open, patch
 
-from catalogue_aliases import (
-    get_alias_entry,
-    get_aliases_map,
-    get_group_id,
-    load_aliases_table,
-    make_lookup_key,
-    merge_item_with_alias_entry,
-    normalize_object_name,
-)
 import catalogue_aliases as module
+
+get_alias_entry = module.get_alias_entry
+get_aliases_map = module.get_aliases_map
+get_group_id = module.get_group_id
+load_aliases_table = module.load_aliases_table
+make_lookup_key = module.make_lookup_key
+merge_item_with_alias_entry = module.merge_item_with_alias_entry
+normalize_object_name = module.normalize_object_name
 
 
 def test_normalize_object_name_handles_empty_and_symbols():

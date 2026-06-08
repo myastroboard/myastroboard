@@ -152,7 +152,6 @@ def test_save_targets_dataset_returns_false_when_save_fails(tmp_path, monkeypatc
 
 def test_get_aliases_map_returns_dict(tmp_path):
     dataset_file = tmp_path / 'targets.json'
-    from tests.test_skytonight_targets import _sample_targets
     skytonight_targets.save_targets_dataset(_sample_targets(), dataset_file=str(dataset_file))
     aliases = skytonight_targets.get_aliases_map('Messier', 'M 31', dataset_file=str(dataset_file))
     assert isinstance(aliases, dict)
@@ -160,7 +159,6 @@ def test_get_aliases_map_returns_dict(tmp_path):
 
 def test_get_group_id_returns_string(tmp_path):
     dataset_file = tmp_path / 'targets.json'
-    from tests.test_skytonight_targets import _sample_targets
     skytonight_targets.save_targets_dataset(_sample_targets(), dataset_file=str(dataset_file))
     gid = skytonight_targets.get_group_id('Messier', 'M 31', dataset_file=str(dataset_file))
     assert isinstance(gid, str)

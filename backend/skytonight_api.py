@@ -737,7 +737,6 @@ def _build_dso_section_payload(catalogue: Optional[str], user_id: str, username:
             source_catalogue = catalogue
         else:
             display_name = preferred_name
-            source_catalogue = _resolve_source_catalogue(catalogue_names, display_name)
         const = str(_target_attr(target, 'constellation', '') or '')
         const_full = _CONSTELLATION_ABBR_MAP.get(const, const)
         row = {

@@ -93,7 +93,7 @@ class WeatherAlertsSystem {
     updateHeaderAlertIndicator() {
         //Empty id weather-notifications
         let container = document.getElementById('weather-notifications');
-        clearContainer(container)
+        clearContainer(container);
         container.className = 'nav-item';
 
         const activeAlerts = this.alerts.filter(alert => this.isAlertActive(alert));

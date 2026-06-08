@@ -39,13 +39,6 @@ async function loadLunarEclipse() {
 
         const eclipse = data.lunar_eclipse;        
 
-        let visibilityBadge = '';
-        if (!eclipse.visible) {
-            visibilityBadge = `<span class="badge bg-danger">${i18n.t('moon.not_visible')}</span>`;
-        } else {
-            visibilityBadge = `<span class="badge bg-success">${i18n.t('moon.visible')}</span>`;
-        }
-
         let scoreColor = 'secondary';
         if (eclipse.astrophotography_score >= 9) scoreColor = 'success';
         else if (eclipse.astrophotography_score >= 7.5) scoreColor = 'info';

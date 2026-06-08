@@ -8,6 +8,7 @@ Docs:      https://thespacedevs.com/llapi
 """
 
 import hashlib
+import json
 import os
 import time
 import urllib.parse
@@ -23,6 +24,7 @@ logger = get_logger(__name__)
 _LL2_BASE = "https://ll.thespacedevs.com/2.2.0"
 _REQUEST_TIMEOUT = 15
 _SPACEFLIGHT_IMAGES_DIR = os.path.join(DATA_DIR_CACHE, 'spaceflight_images')
+_SPACEFLIGHT_BACKOFF_FILE = os.path.join(DATA_DIR_CACHE, 'spaceflight_backoff.json')
 
 
 def _cache_image(url: Optional[str]) -> Optional[str]:
@@ -66,8 +68,48 @@ _BACKOFF_TTL = 3600  # seconds - match the spaceflight launches TTL
 _backoff_until: Dict[str, float] = {}
 
 
+def _load_backoff_state() -> Dict[str, float]:
+    """Load persisted per-path LL2 backoff expirations from disk."""
+    try:
+        if not os.path.exists(_SPACEFLIGHT_BACKOFF_FILE):
+            return {}
+        with open(_SPACEFLIGHT_BACKOFF_FILE, 'r', encoding='utf-8') as fh:
+            raw = json.load(fh)
+        now_ts = time.time()
+        state = {}
+        for path, exp in (raw or {}).items():
+            try:
+                exp_val = float(exp)
+            except (TypeError, ValueError):
+                continue
+            if exp_val > now_ts:
+                state[str(path)] = exp_val
+        return state
+    except Exception as exc:
+        logger.debug("Failed to read LL2 backoff state: %s", exc)
+        return {}
+
+
+def _save_backoff_state() -> None:
+    """Persist active LL2 backoff expirations to disk for cross-worker reuse."""
+    try:
+        os.makedirs(DATA_DIR_CACHE, exist_ok=True)
+        now_ts = time.time()
+        active = {k: v for k, v in _backoff_until.items() if v > now_ts}
+        with open(_SPACEFLIGHT_BACKOFF_FILE, 'w', encoding='utf-8') as fh:
+            json.dump(active, fh)
+    except Exception as exc:
+        logger.debug("Failed to persist LL2 backoff state: %s", exc)
+
+
+_backoff_until = _load_backoff_state()
+
+
 def _get(path: str, params: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
     """Execute a GET request against the LL2 API and return the JSON response."""
+    # Re-load shared backoff state so restarts/other workers don't re-hit rate limits.
+    _backoff_until.update(_load_backoff_state())
+
     # Respect 429 backoff: return None early without making a network call
     backoff_exp = _backoff_until.get(path)
     if backoff_exp:
@@ -77,28 +119,36 @@ def _get(path: str, params: Optional[Dict[str, Any]] = None) -> Optional[Dict[st
             return None
         else:
             _backoff_until.pop(path, None)
+            _save_backoff_state()
 
     url = f"{_LL2_BASE}{path}"
     try:
         resp = requests.get(url, params=params, timeout=_REQUEST_TIMEOUT)
         resp.raise_for_status()
         _backoff_until.pop(path, None)  # clear any stale backoff on success
+        _save_backoff_state()
         return resp.json()
     except requests.exceptions.Timeout:
         _backoff_until[path] = time.time() + 900  # 15 min backoff on timeout
+        _save_backoff_state()
         logger.warning("LL2 API timeout for %s", url)
     except requests.exceptions.HTTPError as exc:
-        sc = exc.response.status_code
+        response = exc.response
+        sc = response.status_code if response is not None else 0
         if sc == 429:
-            retry_after = int(exc.response.headers.get("Retry-After", _BACKOFF_TTL))
+            retry_after_header = response.headers.get("Retry-After", _BACKOFF_TTL) if response is not None else _BACKOFF_TTL
+            retry_after = int(retry_after_header)
             backoff = min(max(retry_after, 60), _BACKOFF_TTL)
             _backoff_until[path] = time.time() + backoff
+            _save_backoff_state()
             logger.warning("LL2 API 429 for %s - backing off for %ds", url, backoff)
         else:
             _backoff_until[path] = time.time() + 900  # 15 min backoff on HTTP errors
-            logger.warning("LL2 API HTTP error %s for %s", exc.response.status_code, url)
+            _save_backoff_state()
+            logger.warning("LL2 API HTTP error %s for %s", sc, url)
     except Exception as exc:
         _backoff_until[path] = time.time() + 900  # 15 min backoff on other failures
+        _save_backoff_state()
         logger.warning("LL2 API request failed for %s: %s", url, exc)
     return None
 

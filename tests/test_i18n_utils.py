@@ -4,13 +4,12 @@ import pytest
 from unittest.mock import mock_open, patch
 
 import i18n_utils as module
-from i18n_utils import (
-    I18nManager,
-    _is_safe_path,
-    create_translated_alert,
-    get_translated_message,
-    init_i18n_for_request,
-)
+
+I18nManager = module.I18nManager
+_is_safe_path = module._is_safe_path
+create_translated_alert = module.create_translated_alert
+get_translated_message = module.get_translated_message
+init_i18n_for_request = module.init_i18n_for_request
 
 
 @pytest.fixture(autouse=True)

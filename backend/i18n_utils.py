@@ -227,7 +227,10 @@ def get_translated_message(key: str, language: str = DEFAULT_LANGUAGE, **params)
         message = get_translated_message('weather_alerts.critical_dew_risk', 'en', time='14:30')
     """
     manager = I18nManager(language)
-    return manager.t(key, **params)
+    translated = manager.t(key, **params)
+    if translated == key and language == DEFAULT_LANGUAGE:
+        return _default_manager.t(key, **params)
+    return translated
 
 
 def create_translated_alert(

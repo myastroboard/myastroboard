@@ -1874,18 +1874,6 @@ class TestRunCalculationsWithData:
             source_catalogues=['OpenNGC'],
         )
 
-    def _make_body_target(self):
-        from skytonight_models import SkyTonightTarget
-        return SkyTonightTarget(
-            target_id='body-jupiter',
-            category='bodies',
-            object_type='Planet',
-            preferred_name='Jupiter',
-            catalogue_names={'Bodies': 'Jupiter'},
-            source_catalogues=['Bodies'],
-            metadata={'source': 'builtin-solar-system'},
-        )
-
     @patch('skytonight_calculator.ensure_skytonight_directories')
     @patch('skytonight_calculator.save_json_file')
     @patch('skytonight_calculator._get_astro_night_window', return_value=None)

@@ -7,15 +7,15 @@ import os
 import tempfile
 import pytest
 from unittest.mock import patch, MagicMock
-from metrics_collector import (
-    is_running_in_container,
-    get_folder_disk_usage,
-    get_disk_space_details,
-    get_environment_processes,
-    detect_docker_in_docker,
-    collect_metrics,
-    CONTAINER_PROCESS_HINTS,
-)
+import metrics_collector as mc
+
+is_running_in_container = mc.is_running_in_container
+get_folder_disk_usage = mc.get_folder_disk_usage
+get_disk_space_details = mc.get_disk_space_details
+get_environment_processes = mc.get_environment_processes
+detect_docker_in_docker = mc.detect_docker_in_docker
+collect_metrics = mc.collect_metrics
+CONTAINER_PROCESS_HINTS = mc.CONTAINER_PROCESS_HINTS
 
 
 class TestIsRunningInContainer:
@@ -226,17 +226,14 @@ class TestGetDiskSpaceDetails:
     """Tests for get_disk_space_details."""
 
     def test_returns_dict(self):
-        from metrics_collector import get_disk_space_details
         result = get_disk_space_details()
         assert isinstance(result, dict)
 
     def test_has_root_key(self):
-        from metrics_collector import get_disk_space_details
         result = get_disk_space_details()
         assert "root" in result
 
     def test_root_has_total(self):
-        from metrics_collector import get_disk_space_details
         result = get_disk_space_details()
         if "root" in result:
             assert "total" in result["root"]
@@ -265,8 +262,6 @@ class TestGetEnvironmentProcesses:
 
     def test_get_environment_processes_returns_list(self):
         """Cover lines 152-204 by calling get_environment_processes with mocked psutil."""
-        import metrics_collector as mc
-
         mock_proc = MagicMock()
         mock_proc.info = {
             'pid': 1234,
@@ -289,8 +284,6 @@ class TestGetEnvironmentProcesses:
 
     def test_get_environment_processes_entries_have_required_keys(self):
         """Each process entry has the expected fields."""
-        import metrics_collector as mc
-
         mock_proc = MagicMock()
         mock_proc.info = {
             'pid': 42,
@@ -320,8 +313,6 @@ class TestGetDiskSpaceDetailsMocked:
 
     def test_full_body_with_mocked_disk(self, tmp_path):
         """psutil.disk_usage('/') may fail on Windows; mock it to cover lines 104-132."""
-        import metrics_collector as mc
-
         mock_disk = MagicMock()
         mock_disk.total = 100 * 1024 ** 3
         mock_disk.used = 50 * 1024 ** 3
@@ -339,8 +330,6 @@ class TestGetDiskSpaceDetailsMocked:
 
     def test_returns_error_dict_on_exception(self):
         """Confirm the except branch returns a safe error structure."""
-        import metrics_collector as mc
-
         with patch.object(mc.psutil, 'disk_usage', create=True, side_effect=Exception("disk error")):
             result = mc.get_disk_space_details()
 
@@ -382,7 +371,6 @@ class TestCollectMetricsMocked:
         mock_net.packets_sent = 10
         mock_net.packets_recv = 20
 
-        import metrics_collector as mc
         # raising=False allows setting attrs that don't exist on the stub psutil
         monkeypatch.setattr(mc.psutil, "cpu_percent", lambda interval=None: 10.0, raising=False)
         monkeypatch.setattr(mc.psutil, "cpu_count", lambda logical=True: 4, raising=False)
@@ -398,7 +386,6 @@ class TestCollectMetricsMocked:
     def test_collect_metrics_full_body(self, monkeypatch):
         """Cover lines 241-277 with mocked psutil."""
         self._mock_psutil(monkeypatch)
-        import metrics_collector as mc
         result = mc.collect_metrics()
         assert "cpu" in result
         assert "memory" in result
@@ -410,7 +397,6 @@ class TestCollectMetricsMocked:
 
     def test_collect_metrics_cpu_frequency_present(self, monkeypatch):
         self._mock_psutil(monkeypatch)
-        import metrics_collector as mc
         result = mc.collect_metrics()
         if "cpu" in result and result["cpu"].get("frequency"):
             assert "current" in result["cpu"]["frequency"]
@@ -418,7 +404,6 @@ class TestCollectMetricsMocked:
     def test_collect_metrics_cpu_freq_none(self, monkeypatch):
         """Cover the 'if cpu_freq else None' branch when cpu_freq is None."""
         self._mock_psutil(monkeypatch)
-        import metrics_collector as mc
         monkeypatch.setattr(mc.psutil, "cpu_freq", lambda: None, raising=False)
         result = mc.collect_metrics()
         if "cpu" in result:
@@ -457,8 +442,6 @@ class TestGetDiskSpaceDetailsFolderNone:
     """Cover line 130: get_folder_disk_usage returns None for folders that don't exist."""
 
     def test_folder_size_none_falls_into_else_branch(self):
-        import metrics_collector as mc
-
         mock_disk = MagicMock()
         mock_disk.total = 100 * 1024 ** 3
         mock_disk.used = 50 * 1024 ** 3
@@ -485,8 +468,6 @@ class TestGetEnvironmentProcessesBranchCoverage:
 
     def test_process_with_cpu_times_none_skips_cpu_total(self):
         """Lines 169->171: cpu_times is None → cpu_total stays 0.0."""
-        import metrics_collector as mc
-
         mock_proc = MagicMock()
         mock_proc.info = {
             'pid': 1, 'name': 'worker', 'status': 'running', 'username': 'user',
@@ -503,8 +484,6 @@ class TestGetEnvironmentProcessesBranchCoverage:
 
     def test_process_with_no_create_time_zero_uptime(self):
         """Lines 172->175: create_time is None → uptime_seconds=0 → cpu_percent stays 0.0."""
-        import metrics_collector as mc
-
         mock_proc = MagicMock()
         mock_proc.info = {
             'pid': 2, 'name': 'worker', 'status': 'running', 'username': 'user',
@@ -522,7 +501,6 @@ class TestGetEnvironmentProcessesBranchCoverage:
 
     def test_nosuchprocess_exception_skips_process(self):
         """Lines 198-199: psutil.NoSuchProcess → process is skipped via continue."""
-        import metrics_collector as mc
         from unittest.mock import PropertyMock
 
         self._ensure_psutil_exceptions(mc)
@@ -547,7 +525,6 @@ class TestGetEnvironmentProcessesBranchCoverage:
 
     def test_generic_exception_in_process_loop_is_swallowed(self):
         """Lines 200-201: generic Exception → logged, process is skipped."""
-        import metrics_collector as mc
         from unittest.mock import PropertyMock
 
         self._ensure_psutil_exceptions(mc)

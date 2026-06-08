@@ -306,7 +306,7 @@ class TestAuthStatusStaleSess:
 
     def test_auth_status_stale_username_in_session(self, monkeypatch):
         """Username in session but no matching user → authenticated=False."""
-        from app import app as _app
+        _app = _app_mod.app
         monkeypatch.setattr(_app_mod, 'get_current_user', lambda: None)
         with _app.test_client() as c:
             with c.session_transaction() as sess:

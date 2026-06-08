@@ -740,7 +740,7 @@ class TestDataclassBranchCoverage:
     """Covers __post_init__ FALSE branches."""
 
     def test_telescope_zero_aperture_skips_calculations(self):
-        from equipment_profiles import Telescope
+        Telescope = equipment_profiles.Telescope
         t = Telescope(
             id='t1', name='Zero', manufacturer='', telescope_type='Refractor',
             aperture_mm=0, focal_length_mm=500, native_focal_ratio=0.0,
@@ -750,18 +750,18 @@ class TestDataclassBranchCoverage:
         assert t.effective_focal_ratio == 0.0
 
     def test_mount_zero_payload_skips_calculation(self):
-        from equipment_profiles import Mount
+        Mount = equipment_profiles.Mount
         m = Mount(id='m1', name='No Payload', payload_capacity_kg=0)
         assert m.recommended_payload_kg == 0.0
 
     def test_equipment_combination_none_lists_set_to_empty(self):
-        from equipment_profiles import EquipmentCombination
+        EquipmentCombination = equipment_profiles.EquipmentCombination
         combo = EquipmentCombination(id='c1', name='Test')
         assert combo.filter_ids == []
         assert combo.accessory_ids == []
 
     def test_combination_analysis_none_values_set_to_empty(self):
-        from equipment_profiles import CombinationAnalysis
+        CombinationAnalysis = equipment_profiles.CombinationAnalysis
         analysis = CombinationAnalysis(combination_id='c1')
         assert analysis.filters == []
         assert analysis.accessories == []

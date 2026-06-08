@@ -266,11 +266,14 @@ def get_hourly_forecast():
         hourly_df = parse_hourly(response, hourly_vars, timezone_str=timezone_str)
         # Clear failure timestamps on success
         _FORECAST_LAST_FAILURE_TS = 0.0
+        last_failure_ts = _FORECAST_LAST_FAILURE_TS
         clear_openmeteo_rate_limit()
+        logger.debug(f"Weather forecast failure timestamp reset to {last_failure_ts}")
         return {"location": location_info, "hourly": hourly_df}
 
     except Exception as e:
         _FORECAST_LAST_FAILURE_TS = time.time()
+        cooldown_until = _FORECAST_LAST_FAILURE_TS + _FORECAST_FAILURE_COOLDOWN
         if _is_openmeteo_concurrency_error(e):
             record_openmeteo_rate_limit()
             logger.warning("Weather forecast: Open-Meteo concurrency limit reached, will retry after cooldown")
@@ -279,6 +282,7 @@ def get_hourly_forecast():
         else:
             logger.warning(f"Weather forecast: unexpected error - {str(e)[:120]}")
             logger.debug("Weather forecast exception detail:", exc_info=True)
+        logger.debug(f"Weather forecast cooldown active until {cooldown_until}")
         return None
     finally:
         _FORECAST_LOCK.release()

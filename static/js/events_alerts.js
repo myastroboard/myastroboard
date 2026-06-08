@@ -408,23 +408,21 @@ function scrollToEventDetails(eventType, structureKey = null) {
         mainTabName = 'spaceflight';
     }
 
-    if (subTabName) {
-        // First, make sure the target main tab is active
-        const mainTab = document.querySelector(`[data-tab="${mainTabName}"]`);
-        if (mainTab) {
-            mainTab.click();
-        }
-        
-        // Then trigger the sub-tab switch
-        setTimeout(() => {
-            const subTab = document.querySelector(`[data-subtab="${subTabName}"]`);
-            if (subTab) {
-                subTab.click();
-                // Scroll to top after tab switch
-                setTimeout(() => window.scrollTo(0, 0), 100);
-            }
-        }, 100);
+    // First, make sure the target main tab is active
+    const mainTab = document.querySelector(`[data-tab="${mainTabName}"]`);
+    if (mainTab) {
+        mainTab.click();
     }
+    
+    // Then trigger the sub-tab switch
+    setTimeout(() => {
+        const subTab = document.querySelector(`[data-subtab="${subTabName}"]`);
+        if (subTab) {
+            subTab.click();
+            // Scroll to top after tab switch
+            setTimeout(() => window.scrollTo(0, 0), 100);
+        }
+    }, 100);
 }
 
 // Initialize when document is ready

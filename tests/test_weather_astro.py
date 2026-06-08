@@ -310,16 +310,10 @@ class TestInferForecastSlotHoursEdgeCases:
 class TestResolveAstronomicalNightWindow:
     """Tests for _resolve_astronomical_night_window."""
 
-    def test_exception_during_import_returns_none(self, monkeypatch):
+    def test_exception_during_import_returns_none(self):
         """Lines 622-624: exception in the function → return None."""
         analyzer = _build_analyzer()
-        with patch("weather_astro.AstroWeatherAnalyzer._resolve_astronomical_night_window") as m:
-            m.side_effect = Exception("load failure")
-            # Call directly via the real implementation
-            result = AstroWeatherAnalyzer._resolve_astronomical_night_window.__wrapped__ if hasattr(
-                AstroWeatherAnalyzer._resolve_astronomical_night_window, "__wrapped__"
-            ) else None
-        # Simpler: monkeypatch load_calculation_results to raise
+        # Force the internal data load to fail to cover the exception path.
         import skytonight_calculator
         with patch.object(skytonight_calculator, "load_calculation_results", side_effect=RuntimeError("fail")):
             result = analyzer._resolve_astronomical_night_window()

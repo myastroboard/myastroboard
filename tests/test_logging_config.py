@@ -6,6 +6,8 @@ import pytest
 
 import logging_config as module
 
+_ConfiguredTzFormatter = module._ConfiguredTzFormatter
+
 
 class DummyRotatingHandler(logging.Handler):
     """Minimal rotating handler replacement for tests."""
@@ -79,7 +81,6 @@ def test_set_global_log_level_updates_file_handlers(monkeypatch):
 def test_configured_tz_formatter_loads_tz_from_config(monkeypatch, tmp_path):
     """Lines 44-46: _get_tz() successfully reads timezone from config.json."""
     import json
-    from logging_config import _ConfiguredTzFormatter
 
     config_data = {"location": {"timezone": "Europe/Paris"}}
     config_file = tmp_path / "config.json"
@@ -103,7 +104,6 @@ def test_configured_tz_formatter_loads_tz_from_config(monkeypatch, tmp_path):
 def test_format_time_with_datefmt():
     """Line 54: formatTime returns strftime-formatted string when datefmt is provided."""
     import time
-    from logging_config import _ConfiguredTzFormatter
 
     formatter = _ConfiguredTzFormatter()
     record = logging.LogRecord(

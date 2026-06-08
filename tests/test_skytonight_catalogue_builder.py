@@ -1083,7 +1083,7 @@ def test_build_standalone_targets_constellation_lookup_failure_fallback(monkeypa
     # Patch numpy to raise on import or usage
     class _RaisingModule(types.ModuleType):
         def __getattr__(self, item):
-            raise ImportError('numpy not available')
+            raise AttributeError('numpy not available')
 
     monkeypatch.setitem(sys.modules, 'numpy', _RaisingModule('numpy'))
 

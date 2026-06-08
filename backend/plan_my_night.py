@@ -1021,7 +1021,6 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
             return None
 
     _local_tz: Any = timezone.utc  # updated after alttime_map is loaded
-    _tz_name = 'UTC'
 
     def _fmt_hm(iso_str: str | None) -> str:
         dt = _parse_utc(iso_str)

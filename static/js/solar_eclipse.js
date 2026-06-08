@@ -37,13 +37,6 @@ async function loadSolarEclipse() {
 
         const eclipse = data.solar_eclipse;
 
-        let visibilityBadge = '';
-        if (!eclipse.visible) {
-            visibilityBadge = `<span class="badge bg-danger">${i18n.t('sun.not_visible')}</span>`;
-        } else {
-            visibilityBadge = `<span class="badge bg-success">${i18n.t('sun.visible')}</span>`;
-        }
-
         let scoreColor = 'secondary';
         if (eclipse.astrophotography_score >= 8.5) scoreColor = 'success';
         else if (eclipse.astrophotography_score >= 7) scoreColor = 'info';

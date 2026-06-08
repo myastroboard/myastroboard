@@ -3,17 +3,17 @@
 import skytonight_targets as _st_module  # needed for patching the locally-imported get_lookup_entry
 
 import object_info as oi
-from object_info import (
-    _get_dss_image_url,
-    _is_wikipedia_candidate,
-    _normalize_wikipedia_term,
-    _sanitize_lang,
-    _simbad_identifier_variants,
-    _sort_aliases,
-    build_catalogue_names_from_aliases,
-    get_object_info,
-    is_safe_identifier,
-)
+
+_get_dss_image_url = oi._get_dss_image_url
+_is_wikipedia_candidate = oi._is_wikipedia_candidate
+_normalize_wikipedia_term = oi._normalize_wikipedia_term
+_sanitize_lang = oi._sanitize_lang
+_simbad_identifier_variants = oi._simbad_identifier_variants
+_sort_aliases = oi._sort_aliases
+_translate_object_type = oi._translate_object_type
+build_catalogue_names_from_aliases = oi.build_catalogue_names_from_aliases
+get_object_info = oi.get_object_info
+is_safe_identifier = oi.is_safe_identifier
 
 
 # ---------------------------------------------------------------------------
@@ -645,18 +645,15 @@ class TestWikipediaWithFallback:
 
 
 def test_translate_object_type_english_passthrough():
-    from object_info import _translate_object_type
-    assert _translate_object_type("Galaxy", lang="en") == "Galaxy"
+assert _translate_object_type("Galaxy", lang="en") == "Galaxy"
 
 
 def test_translate_object_type_empty_passthrough():
-    from object_info import _translate_object_type
-    assert _translate_object_type("", lang="fr") == ""
+assert _translate_object_type("", lang="fr") == ""
 
 
 def test_translate_object_type_non_english_returns_string():
-    from object_info import _translate_object_type
-    result = _translate_object_type("Galaxy", lang="fr")
+result = _translate_object_type("Galaxy", lang="fr")
     assert isinstance(result, str)
     assert len(result) > 0
 

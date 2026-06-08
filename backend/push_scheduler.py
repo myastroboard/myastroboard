@@ -597,19 +597,24 @@ def _acquire_lock() -> bool:
     from constants import DATA_DIR_CACHE
 
     lock_path = os.path.join(DATA_DIR_CACHE, 'push_scheduler.lock')
+    lock_file = None
     try:
-        _lock_file = open(lock_path, 'w')
+        lock_file = open(lock_path, 'w')
         if sys.platform == 'win32':
-            msvcrt.locking(_lock_file.fileno(), msvcrt.LK_NBLCK, 1)
+            msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
         else:  # pragma: no cover
-            fcntl.flock(_lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        _lock_file.write(str(os.getpid()))
-        _lock_file.flush()
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        lock_file.write(str(os.getpid()))
+        lock_file.flush()
+        _lock_file = lock_file
         return True
-    except (IOError, OSError):
-        if _lock_file:
-            _lock_file.close()
-            _lock_file = None
+    except Exception:
+        if lock_file is not None:
+            try:
+                lock_file.close()
+            except Exception:
+                pass
+        _lock_file = None
         return False
 
 

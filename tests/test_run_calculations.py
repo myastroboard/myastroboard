@@ -7,7 +7,9 @@ from datetime import datetime, timezone
 import pytest
 
 import skytonight_calculator as calc
-from skytonight_calculator import load_calculation_results, run_calculations
+
+load_calculation_results = calc.load_calculation_results
+run_calculations = calc.run_calculations
 
 
 # ---------------------------------------------------------------------------
