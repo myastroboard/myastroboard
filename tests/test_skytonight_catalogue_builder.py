@@ -1037,3 +1037,82 @@ def test_build_and_save_default_dataset_raises_on_save_failure(monkeypatch):
 
     with pytest.raises(RuntimeError):
         build_and_save_default_dataset()
+
+
+# ---------------------------------------------------------------------------
+# _build_cross_ref_map — skip guards (lines 652, 664)
+# ---------------------------------------------------------------------------
+
+def test_build_cross_ref_map_garyimm_skips_non_string_and_empty(monkeypatch):
+    """Line 652: non-string and empty entries in garyimm list are skipped."""
+    garyimm_data = [42, '', 'NGC 5128']
+
+    def fake_load(filename):
+        if filename == 'garyimm_crossrefs.json':
+            return garyimm_data
+        return None
+
+    monkeypatch.setattr('skytonight_catalogue_builder._load_json_catalogue', fake_load)
+    cross_refs = _build_cross_ref_map()
+    ngc5128_key = _ngc_ic_match_key('NGC 5128')
+    assert 'GaryImm' in cross_refs.get(ngc5128_key, {})
+
+
+def test_build_cross_ref_map_arp_skips_empty_key_or_value(monkeypatch):
+    """Line 664: falsy dict key or falsy value in arp data are skipped."""
+    arp_data = {'': 'Arp 1', 'NGC 1': None, 'NGC 2': 'Arp 2'}
+
+    def fake_load(filename):
+        if filename == 'arp.json':
+            return arp_data
+        return None
+
+    monkeypatch.setattr('skytonight_catalogue_builder._load_json_catalogue', fake_load)
+    cross_refs = _build_cross_ref_map()
+    ngc2_key = _ngc_ic_match_key('NGC 2')
+    assert 'Arp' in cross_refs.get(ngc2_key, {})
+
+
+# ---------------------------------------------------------------------------
+# build_targets_from_rows — empty canonical_name skip (line 740)
+# ---------------------------------------------------------------------------
+
+def test_build_targets_from_rows_skips_row_with_empty_canonical_name(monkeypatch):
+    """Line 740: when _canonical_key returns empty canonical_name the row is skipped."""
+    monkeypatch.setattr(
+        'skytonight_catalogue_builder._canonical_key',
+        lambda names, fallback: ('OpenNGC', ''),
+    )
+    rows = [_make_row(ngc_names=['NGC 999'])]
+    targets = build_targets_from_rows(rows)
+    assert len(targets) == 0
+
+
+# ---------------------------------------------------------------------------
+# _build_standalone_targets_from_json — non-normalizable name (lines 878-879)
+# ---------------------------------------------------------------------------
+
+def test_build_standalone_targets_skips_name_normalizing_to_empty(monkeypatch):
+    """Lines 878-879: normalize_object_name returns '' for punctuation-only name → skipped."""
+    data = [
+        {
+            'name': '---',
+            'ra_hours': 5.5,
+            'dec_degrees': -5.0,
+            'type': 'Nebula',
+            'description': '',
+            'constellation': 'Ori',
+        },
+        {
+            'name': 'Valid',
+            'ra_hours': 5.5,
+            'dec_degrees': -5.0,
+            'type': 'Nebula',
+            'description': '',
+            'constellation': 'Ori',
+        },
+    ]
+    monkeypatch.setattr('skytonight_catalogue_builder._load_json_catalogue', lambda f: data)
+    result = _build_standalone_targets_from_json('test.json', 'TestCat')
+    assert len(result) == 1
+    assert result[0].preferred_name == 'Valid'
