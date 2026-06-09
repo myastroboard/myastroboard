@@ -28,7 +28,14 @@ class TestWeatherClientCreation:
         # Call the function
         result = create_weather_client()
         
-        # Verify the client was created
+        # Verify full client creation flow and returned client
+        mock_cached_session.assert_called_once()
+        mock_retry.assert_called_once_with(
+            mock_session,
+            retries=RETRY_COUNT,
+            backoff_factor=BACKOFF_FACTOR
+        )
+        mock_client.assert_called_once_with(session=mock_retry_session)
         assert result == mock_client_instance
     
     @patch('weather_utils.openmeteo_requests.Client')
