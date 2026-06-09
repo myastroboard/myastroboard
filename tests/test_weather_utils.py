@@ -67,8 +67,8 @@ class TestWeatherClientCreation:
         call_args = mock_retry.call_args
         assert call_args[0][0] == mock_session
         # Check retry parameters
-        assert 'retries' in call_args[1]
-        assert 'backoff_factor' in call_args[1]
+        assert call_args[1]['retries'] == RETRY_COUNT
+        assert call_args[1]['backoff_factor'] == BACKOFF_FACTOR
     
     @patch('weather_utils.openmeteo_requests.Client')
     @patch('weather_utils.retry')
