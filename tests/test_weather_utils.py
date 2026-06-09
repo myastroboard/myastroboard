@@ -7,11 +7,12 @@ from unittest.mock import Mock, patch
 # Import the function to test
 from weather_utils import create_weather_client, create_fresh_weather_client
 
+RETRY_COUNT = 2
+BACKOFF_FACTOR = 0.5
+
 
 class TestWeatherClientCreation:
     """Test weather client creation"""
-    RETRY_COUNT = 2
-    BACKOFF_FACTOR = 0.5
     
     @patch('weather_utils.openmeteo_requests.Client')
     @patch('weather_utils.retry')
@@ -89,8 +90,8 @@ class TestWeatherClientCreation:
         mock_cached_session.assert_called_once()
         mock_retry.assert_called_once_with(
             mock_session,
-            retries=self.RETRY_COUNT,
-            backoff_factor=self.BACKOFF_FACTOR
+            retries=RETRY_COUNT,
+            backoff_factor=BACKOFF_FACTOR
         )
         mock_client.assert_called_once_with(session=mock_retry_session)
         assert result == mock_client_instance
