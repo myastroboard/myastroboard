@@ -2,9 +2,6 @@
 
 import json
 import os
-import tempfile
-import types
-import sys
 
 import pytest
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -306,7 +303,6 @@ class TestUserManagerReloadIfChanged:
         monkeypatch.setattr(auth, 'USERS_FILE', str(users_file))
         manager = UserManager()
         # Manually create another user and rewrite the file externally
-        original_mtime = manager._users_mtime
         # Force different mtime by changing the mtime attribute
         manager._users_mtime = 0  # pretend file is stale
         # Next call should trigger reload
@@ -535,10 +531,6 @@ class TestUserManagerDeleteUser:
         manager = isolated_user_manager
         admin = manager.get_user_by_username(DEFAULT_ADMIN_USERNAME)
         alice = manager.create_user('alice', 'pass', ROLE_USER)
-
-        # Make astrodex import fail silently by making the path invalid
-        def bad_import(*args, **kwargs):
-            raise ImportError('astrodex module not found')
 
         # Just ensure delete doesn't raise even if cleanup fails
         manager.delete_user(alice.user_id, current_user_id=admin.user_id)
@@ -834,7 +826,6 @@ class TestAuthDecorators:
         with flask_app.test_request_context('/'):
             from flask import session
             from auth import get_current_user
-            admin = auth.user_manager.get_user_by_username(DEFAULT_ADMIN_USERNAME)
             session['username'] = DEFAULT_ADMIN_USERNAME
             user = get_current_user()
             assert user is not None
@@ -867,15 +858,6 @@ class TestSaveUsersFailurePaths:
         manager = UserManager()
 
         # Patch validate_users_json_file to fail, triggering backup restore
-        original_validate = UserManager.validate_users_json_file
-
-        call_count = [0]
-        def patched_validate(cls_or_self, file_path):
-            call_count[0] += 1
-            if call_count[0] > 2:  # first calls are OK (during load/create)
-                return False, 'Simulated validation failure'
-            return original_validate(file_path)
-
         monkeypatch.setattr(UserManager, 'validate_users_json_file', classmethod(lambda cls, fp: (False, 'fail')))
 
         # This should raise and restore backup
@@ -1048,8 +1030,6 @@ class TestSaveUsersCleanupPaths:
 
         # Ensure file exists before we try to fail
         manager.create_user('alice', 'pass', ROLE_USER)
-        original_content = users_file.read_text()
-
         # Make validate always fail to trigger backup restore path
         monkeypatch.setattr(UserManager, 'validate_users_json_file',
                             classmethod(lambda cls, fp: (False, 'simulated failure')))
@@ -1157,7 +1137,7 @@ class TestUserRequiredDecorator:
             from flask import jsonify
             return jsonify({'ok': True})
 
-        ro_user = isolated_user_manager.create_user('viewer', 'pass', ROLE_READ_ONLY)
+        isolated_user_manager.create_user('viewer', 'pass', ROLE_READ_ONLY)
         with mini_app.test_client() as c:
             with c.session_transaction() as sess:
                 sess['username'] = 'viewer'
@@ -1198,7 +1178,7 @@ class TestUserRequiredDecorator:
             from flask import jsonify
             return jsonify({'ok': True})
 
-        user = isolated_user_manager.create_user('regular', 'pass', ROLE_USER)
+        isolated_user_manager.create_user('regular', 'pass', ROLE_USER)
         with mini_app.test_client() as c:
             with c.session_transaction() as sess:
                 sess['username'] = 'regular'
@@ -1327,7 +1307,7 @@ class TestAdminRequiredDecoratorUnauthenticated:
             from flask import jsonify
             return jsonify({'ok': True})
 
-        user = isolated_user_manager.create_user('reguser', 'pass', ROLE_USER)
+        isolated_user_manager.create_user('reguser', 'pass', ROLE_USER)
         with mini_app.test_client() as c:
             with c.session_transaction() as sess:
                 sess['username'] = 'reguser'

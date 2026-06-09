@@ -6,7 +6,7 @@ Tests event aggregation, filtering, sorting, and translation logic.
 import pytest
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import patch
 
 from events_aggregator import (
     EventType,
@@ -535,20 +535,20 @@ class TestDaysUntilEventCalculation:
 
     def test_calculate_days_until_future_event(self):
         """Test calculating days until a future event."""
-        agg = EventsAggregator(45.0, -75.0, "America/Toronto", "en")
+        _agg = EventsAggregator(45.0, -75.0, "America/Toronto", "en")
 
         # Create a test event 10 days in future
-        future_date = datetime.now(tz=ZoneInfo("America/Toronto")) + timedelta(days=10)
+        _future_date = datetime.now(tz=ZoneInfo("America/Toronto")) + timedelta(days=10)
 
         # The aggregator should calculate this correctly
         # Implementation depends on the actual method used
 
     def test_calculate_days_until_past_event(self):
         """Test calculating days until a past event returns negative."""
-        agg = EventsAggregator(45.0, -75.0, "America/Toronto", "en")
+        _agg = EventsAggregator(45.0, -75.0, "America/Toronto", "en")
 
         # Create a test event 5 days in past
-        past_date = datetime.now(tz=ZoneInfo("America/Toronto")) - timedelta(days=5)
+        _past_date = datetime.now(tz=ZoneInfo("America/Toronto")) - timedelta(days=5)
 
         # The aggregator should handle this correctly
 

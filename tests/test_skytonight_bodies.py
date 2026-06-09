@@ -1,6 +1,8 @@
 """Tests for SkyTonight bodies ingestion."""
 
-from skytonight_bodies import build_body_targets
+import skytonight_bodies
+
+build_body_targets = skytonight_bodies.build_body_targets
 
 
 def test_build_body_targets_contains_major_bodies():
@@ -47,7 +49,6 @@ def test_saturn_has_saturne_alias():
 
 
 def test_empty_name_body_is_skipped():
-    import skytonight_bodies
     from unittest.mock import patch
 
     defs_with_empty = list(skytonight_bodies.BODY_DEFINITIONS) + [

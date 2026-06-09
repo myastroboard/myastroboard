@@ -133,7 +133,7 @@ def _clear_alttime_files() -> None:
                 try:
                     os.remove(os.path.join(SKYTONIGHT_OUTPUT_DIR, filename))
                 except Exception:
-                    pass
+                    pass  # best-effort stale file cleanup; non-fatal
     except Exception as exc:
         logger.debug(f'Failed to clear alttime files: {exc}')
 
@@ -682,7 +682,7 @@ def _compute_target_result(
             az_cw = float(peak_altaz.az.deg[0])  # type: ignore[index]
         peak_az_deg = round((360.0 - az_cw) % 360.0 if north_to_east_ccw else az_cw, 1)
     except Exception:
-        pass
+        pass  # astropy AltAz transform failed — peak_az_deg stays None
 
     # Find first/last observable indices using NumPy (avoids O(n) Python generator loops)
     obs_indices = np.nonzero(in_window_mask)[0]
@@ -1058,14 +1058,14 @@ def run_calculations(
         try:
             _sqm_for_run = float(_raw_sqm)
         except (TypeError, ValueError):
-            pass
+            pass  # malformed config value — _sqm_for_run stays None
     elif _raw_bortle is not None:
         try:
             from sky_quality import bortle_to_sqm as _bortle_to_sqm
 
             _sqm_for_run = _bortle_to_sqm(int(_raw_bortle))
         except (TypeError, ValueError):
-            pass
+            pass  # malformed config value — _sqm_for_run stays None
 
     skytonight_cfg = config.get('skytonight', {}) if isinstance(config, dict) else {}
     constraints: Dict[str, Any] = skytonight_cfg.get('constraints', {})
@@ -1145,7 +1145,7 @@ def run_calculations(
 
                 all_targets.append(ST.from_dict(raw))
             except Exception:
-                pass
+                pass  # malformed target dict — skip this entry
 
     if not all_targets:
         logger.warning('SkyTonight dataset is empty; no calculations to perform.')
@@ -1564,7 +1564,7 @@ def _build_body_alias_map() -> Dict[str, str]:
                 if norm:
                     result[norm] = canonical
         except Exception:
-            pass
+            pass  # i18n translation unavailable for this locale — skip section
     return result
 
 

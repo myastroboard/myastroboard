@@ -456,7 +456,7 @@ class ISSPassService:
             if line1.startswith("1 ") and line2.startswith("2 "):
                 return line1, line2
         except (json.JSONDecodeError, AttributeError, TypeError):
-            pass
+            pass  # response is not JSON — fall through to plain-text TLE parse below
 
         # Fall back to plain-text TLE format (Celestrak)
         lines = [line.strip() for line in response_text.splitlines() if line.strip()]
@@ -783,7 +783,7 @@ class ISSPassService:
             if distance_km > SOLAR_RADIUS_KM:
                 return degrees(asin(SOLAR_RADIUS_KM / distance_km))
         except Exception:
-            pass
+            pass  # Skyfield geometry unavailable — caller uses the fallback constant
         return SOLAR_ANGULAR_RADIUS_FALLBACK_DEG
 
     def _find_lunar_transits(
@@ -982,7 +982,7 @@ class ISSPassService:
             if distance_km > LUNAR_RADIUS_KM:
                 return degrees(asin(LUNAR_RADIUS_KM / distance_km))
         except Exception:
-            pass
+            pass  # Skyfield geometry unavailable — caller uses the fallback constant
         return LUNAR_ANGULAR_RADIUS_FALLBACK_DEG
 
     def _angular_separation_deg(
@@ -1237,7 +1237,7 @@ def get_current_position(
         try:
             eph = SKYFIELD_LOADER('de421.bsp')
         except Exception:
-            pass
+            pass  # ephemeris file unavailable — solar/lunar checks are skipped below
 
         if eph is not None:
             earth = eph["earth"]

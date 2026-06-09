@@ -4,8 +4,6 @@ Focuses on pure-logic helpers that are easy to unit-test.
 """
 
 import json
-import os
-import tempfile
 import pytest
 from unittest.mock import patch, MagicMock
 from skytonight_scheduler_manager import _trim_calculation_log
@@ -342,7 +340,6 @@ class TestRunSkytonigtRefresh:
                             with patch("skytonight_scheduler_manager._append_skytonight_calculation_log"):
                                 # Patch so the import inside the function fails
                                 import sys
-                                saved = sys.modules.get("skytonight_calculator")
                                 # We can't easily make "from skytonight_calculator import _set_progress" fail
                                 # but the try/except means failure is safe anyway
                                 result = _run_skytonight_refresh()
@@ -448,7 +445,7 @@ class TestRunSkytonigtRefreshProgressException:
                     original_cls = getattr(_sts_mod, "SkyTonightScheduler", None)
                     _sts_mod.SkyTonightScheduler = MagicMock(return_value=mock_scheduler)
                     try:
-                        result = get_or_create_skytonight_scheduler(mock_app)
+                        get_or_create_skytonight_scheduler(mock_app)
                     finally:
                         if original_cls is not None:
                             _sts_mod.SkyTonightScheduler = original_cls
@@ -576,7 +573,8 @@ class TestGetOrCreateSchedulerLockLoggedBranch:
     def test_second_lock_failure_skips_debug_log(self, tmp_path):
         """Line 146->151: when skytonight_scheduler_lock_logged is True,
         the if-block body is skipped and we jump directly to line 151."""
-        import skytonight_scheduler_manager as module
+        import sys
+        module = sys.modules['skytonight_scheduler_manager']
         from skytonight_scheduler_manager import get_or_create_skytonight_scheduler
 
         mock_app = MagicMock()

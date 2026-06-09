@@ -65,12 +65,6 @@ class WeatherAlertsSystem {
     }
     
     processNewAlerts(newAlerts) {
-        // Filter for high priority alerts we haven't shown yet
-        const highPriorityAlerts = newAlerts.filter(alert => 
-            alert.severity === 'HIGH' && 
-            !this.alerts.some(existing => existing.type === alert.type && existing.time === alert.time)
-        );
-        
         // Update alerts array
         this.alerts = newAlerts;
         

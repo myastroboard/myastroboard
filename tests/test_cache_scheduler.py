@@ -1,7 +1,5 @@
 """Unit tests for backend cache scheduler (cache_scheduler.py)."""
 
-import types
-
 import pytest
 
 import cache_scheduler as module

@@ -1,6 +1,6 @@
 """Tests for weather_openmeteo.py — rate-limit helpers and forecast functions."""
 import time
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 

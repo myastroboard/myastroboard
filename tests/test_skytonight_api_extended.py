@@ -109,7 +109,7 @@ class TestSkytonightDatasetStatus:
         monkeypatch.setattr(
             _skytonight_api_mod.skytonight_targets,
             'load_targets_dataset',
-            lambda: _empty_dataset(),
+            _empty_dataset,
         )
         monkeypatch.setattr(_skytonight_api_mod, 'has_calculation_results', lambda: False)
         monkeypatch.setattr(_skytonight_api_mod, 'get_skytonight_scheduler_for_api', lambda: None)
@@ -450,7 +450,6 @@ class TestPreloadAllCurrentPlanEntries:
         assert result == []
 
     def test_returns_entries_from_current_plan(self, monkeypatch, tmp_path):
-        import json as _json
         import plan_my_night as pmn
         import uuid
         from datetime import datetime, timezone, timedelta
@@ -468,7 +467,6 @@ class TestPreloadAllCurrentPlanEntries:
         assert result[0]['id'] == 'e1'
 
     def test_skips_previous_plans(self, monkeypatch, tmp_path):
-        import json as _json
         import plan_my_night as pmn
         import uuid
         from datetime import datetime, timezone, timedelta
@@ -508,7 +506,6 @@ class TestPreloadAllCurrentPlanEntries:
         assert result == []  # exception silenced, returns empty list
 
     def test_deduplicates_entries_across_telescopes(self, monkeypatch, tmp_path):
-        import json as _json
         import plan_my_night as pmn
         import uuid
         from datetime import datetime, timezone, timedelta
@@ -1125,7 +1122,7 @@ class TestBuildSkytonightReportsPayloadCalculated:
 
     def test_calculated_path_returns_report_bodies_comets(self, monkeypatch):
         monkeypatch.setattr(_skytonight_api_mod, 'has_calculation_results', lambda: True)
-        monkeypatch.setattr(_skytonight_api_mod, 'load_calculation_results', lambda: self._make_calc_results())
+        monkeypatch.setattr(_skytonight_api_mod, 'load_calculation_results', self._make_calc_results)
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'})
         monkeypatch.setattr(_skytonight_api_mod.astrodex, 'is_item_in_astrodex', lambda *a, **k: False)
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'is_target_in_current_plan', lambda *a, **k: False)
@@ -1145,7 +1142,7 @@ class TestBuildSkytonightReportsPayloadCalculated:
 
     def test_calculated_path_with_catalogue_filter(self, monkeypatch):
         monkeypatch.setattr(_skytonight_api_mod, 'has_calculation_results', lambda: True)
-        monkeypatch.setattr(_skytonight_api_mod, 'load_calculation_results', lambda: self._make_calc_results())
+        monkeypatch.setattr(_skytonight_api_mod, 'load_calculation_results', self._make_calc_results)
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'})
         monkeypatch.setattr(_skytonight_api_mod.astrodex, 'is_item_in_astrodex', lambda *a, **k: False)
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'is_target_in_current_plan', lambda *a, **k: False)
@@ -1492,9 +1489,6 @@ class TestBuildCometsSectionPayload:
     def test_fallback_comet_metadata_not_dict(self, monkeypatch):
         from skytonight_models import SkyTonightTarget
 
-        class BadMeta(SkyTonightTarget):
-            pass
-
         target = SkyTonightTarget(
             target_id='comet-bad2',
             category='comets',
@@ -1780,7 +1774,6 @@ class TestSkymapEndpointBranches:
 class TestSchedulerStatusAdditionalBranches:
 
     def test_scheduler_is_object_calls_get_status(self, client_admin, monkeypatch):
-        mock_sched = _json  # any object with get_status
         mock_sched_obj = type('Sched', (), {'get_status': lambda self: {'running': True, 'is_executing': False}})()
         monkeypatch.setattr(_skytonight_api_mod, 'get_skytonight_scheduler_for_api', lambda: mock_sched_obj)
         resp = client_admin.get('/api/skytonight/scheduler/status')

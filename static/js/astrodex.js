@@ -922,13 +922,6 @@ async function showAstrodexItemDetail(itemId) {
         ? `/api/astrodex/images/${escapeHtml(mainPicture.filename)}`
         : '/static/img/default_astro_object.svg';
     
-    // Escape values for safe HTML insertion
-    const escapedName = escapeHtml(item.name);
-    const escapedImageUrl = escapeHtml(imageUrl);
-    
-    // Escape for JavaScript context
-    const jsEscapedName = escapeForJs(item.name);
-    const jsEscapedImageUrl = escapeForJs(imageUrl);
     const catalogueAliasesSection = renderCatalogueAliasesSection(item);
     const ownPicturesCount = Array.isArray(item.own_pictures)
         ? item.own_pictures.length
@@ -938,7 +931,7 @@ async function showAstrodexItemDetail(itemId) {
         ? i18n.t('astrodex.my_photos', { ownPicturesCount, totalPicturesCount })
         : i18n.t('astrodex.all_photos', { ownPicturesCount });
     
-    const modal = createModal(item.name, `                    
+    createModal(item.name, `
         <h3>${i18n.t('astrodex.object_info')}</h3>
         <form id="edit-item-form-${escapeHtml(item.id)}" class="form row g-3">
             <div class="col-md-6">
@@ -1050,15 +1043,9 @@ function renderPicturesGrid(item) {
     }
     
     return editablePictures.map(picture => {
-        // Escape values for safe HTML insertion
-        const escapedName = escapeHtml(item.name);
         const imageUrl = `/api/astrodex/images/${picture.filename}`;
         const escapedImageUrl = escapeHtml(imageUrl);
-        
-        // Escape for JavaScript context
-        const jsEscapedName = escapeForJs(item.name);
-        const jsEscapedImageUrl = escapeForJs(imageUrl);
-        
+
         return `
             <div class="col">
                 <div class="card h-100">
@@ -1971,8 +1958,7 @@ async function initializeAstrodexEventListeners() {
         // Handle buttons with data-action (tab-specific)
         if (button) {
             const action = button.getAttribute('data-action');
-            const itemId = button.getAttribute('data-item-id');
-            
+
             switch(action) {
                 case 'add-astrodex-item':
                     e.preventDefault();
@@ -2017,8 +2003,7 @@ async function initializeAstrodexEventListeners() {
         if (e.key === 'Enter' || e.key === ' ') {
             const cardImage = target.closest('.astrodex-card-image');
             const cardBody = target.closest('.astrodex-card-body');
-            const pictureImg = target.closest('[data-picture-url]');
-            
+
             if (cardImage) {
                 e.preventDefault();
                 const itemId = cardImage.getAttribute('data-item-id');

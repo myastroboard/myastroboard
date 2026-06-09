@@ -159,7 +159,6 @@ async function loadWeather() {
         const configuredTimezone = data?.location?.timezone || 'UTC';
         // We receive up to 12 hours of data; skip entries that are already in the past
         data.hourly.filter(forecast => new Date(forecast.date).getTime() >= now).forEach(forecast => {
-            const date = new Date(forecast.date);
             const cloudCover = Math.round(forecast.cloud_cover);
             const cloudCoverL = Math.round(forecast.cloud_cover_low);
             const cloudCoverM = Math.round(forecast.cloud_cover_mid);

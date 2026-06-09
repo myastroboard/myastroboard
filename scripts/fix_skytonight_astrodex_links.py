@@ -17,7 +17,7 @@ import json
 import os
 import sys
 from datetime import datetime
-from typing import Dict, Iterable, List, Tuple
+from typing import Dict, Iterable, Tuple
 
 
 def _backend_import_path() -> str:

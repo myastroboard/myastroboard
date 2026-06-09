@@ -944,10 +944,8 @@ async function buildPlanSummaryGraph(container, entries, plan, timeline) {
     const primaryRgb     = cssVar('--bs-primary-rgb', '13, 110, 253');
     const gridColor      = isDark ? 'rgba(255,255,255,0.16)' : 'rgba(15,23,42,0.12)';
     const altLineColor   = `rgba(${primaryRgb}, 0.92)`;
-    const altFillColor   = `rgba(${primaryRgb}, 0.18)`;
     const constColor     = 'rgba(20,110,40,0.8)';
     const horizLineColor = 'rgba(200,80,0,0.75)';
-    const horizFillColor = isDark ? 'rgba(200,80,0,0.16)' : 'rgba(200,80,0,0.07)';
 
     const tzFmt = timezone
         ? new Intl.DateTimeFormat([], { hour: '2-digit', minute: '2-digit', timeZone: timezone, hour12: false })

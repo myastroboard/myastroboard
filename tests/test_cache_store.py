@@ -7,7 +7,7 @@ import time
 import os
 import cache_store
 import cache_store as cs
-from constants import CACHE_TTL, WEATHER_CACHE_TTL, DATA_DIR_CACHE
+from constants import CACHE_TTL, DATA_DIR_CACHE
 
 _moon_report_cache = cache_store._moon_report_cache
 _sun_report_cache = cache_store._sun_report_cache

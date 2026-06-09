@@ -557,7 +557,7 @@ def _poll() -> None:
                             if 0 < secs_until < 30 * 60:
                                 any_active = True
                         except Exception:
-                            pass
+                            pass  # malformed night_start timestamp — skip this entry
 
             _check_n7_aurora(user, aurora_data)
             _check_n1_plan_start(user, plan_payload)

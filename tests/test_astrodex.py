@@ -190,9 +190,9 @@ class TestAstrodexPictures:
         item = astrodex.create_astrodex_item('testuser', item_data)
         
         # Add two pictures
-        pic1 = astrodex.add_picture_to_item('testuser', item['id'], {'filename': 'pic1.jpg'})
+        astrodex.add_picture_to_item('testuser', item['id'], {'filename': 'pic1.jpg'})
         pic2 = astrodex.add_picture_to_item('testuser', item['id'], {'filename': 'pic2.jpg'})
-        
+
         # Set second picture as main
         result = astrodex.set_main_picture('testuser', item['id'], pic2['id'])
         assert result is True
@@ -209,8 +209,8 @@ class TestAstrodexPictures:
         
         # Add pictures
         pic1 = astrodex.add_picture_to_item('testuser', item['id'], {'filename': 'pic1.jpg'})
-        pic2 = astrodex.add_picture_to_item('testuser', item['id'], {'filename': 'pic2.jpg'})
-        
+        astrodex.add_picture_to_item('testuser', item['id'], {'filename': 'pic2.jpg'})
+
         # Delete first picture (which is main)
         result = astrodex.delete_picture('testuser', item['id'], pic1['id'])
         assert result is True
@@ -230,9 +230,9 @@ class TestAstrodexPictures:
         assert main_pic is None
         
         # Add pictures
-        pic1 = astrodex.add_picture_to_item('testuser', item['id'], {'filename': 'pic1.jpg'})
-        pic2 = astrodex.add_picture_to_item('testuser', item['id'], {'filename': 'pic2.jpg'})
-        
+        astrodex.add_picture_to_item('testuser', item['id'], {'filename': 'pic1.jpg'})
+        astrodex.add_picture_to_item('testuser', item['id'], {'filename': 'pic2.jpg'})
+
         updated_item = astrodex.get_astrodex_item('testuser', item['id'])
         main_pic = astrodex.get_main_picture(updated_item)
         
@@ -283,8 +283,8 @@ class TestAstrodexBackupMechanism:
         """Test validation of valid astrodex JSON"""
         # Create a valid astrodex file
         item_data = {'name': 'M31', 'type': 'Galaxy'}
-        item = astrodex.create_astrodex_item('testuser', item_data)
-        
+        astrodex.create_astrodex_item('testuser', item_data)
+
         file_path = astrodex.get_user_astrodex_file('testuser')
         is_valid, error_msg = astrodex.validate_astrodex_json(file_path)
         
@@ -425,7 +425,7 @@ class TestAstrodexBackupMechanism:
     def test_save_works_for_new_user(self, temp_data_dir):
         """Test that save works correctly for new user with no existing file"""
         item_data = {'name': 'M31', 'type': 'Galaxy'}
-        item = astrodex.create_astrodex_item('newuser', item_data)
+        astrodex.create_astrodex_item('newuser', item_data)
 
 
 class TestAstrodexAliases:
@@ -787,7 +787,7 @@ class TestAstrodexMissingBranches:
     def test_delete_main_picture_promotes_next(self, temp_data_dir):
         item = astrodex.create_astrodex_item('user1', {'name': 'M42'}, username='alice')
         pic1 = astrodex.add_picture_to_item('user1', item['id'], {'notes': 'first'})
-        pic2 = astrodex.add_picture_to_item('user1', item['id'], {'notes': 'second'})
+        astrodex.add_picture_to_item('user1', item['id'], {'notes': 'second'})
         astrodex.set_main_picture('user1', item['id'], pic1['id'])
         astrodex.delete_picture('user1', item['id'], pic1['id'])
         reloaded = astrodex.get_astrodex_item('user1', item['id'])
@@ -808,13 +808,13 @@ class TestAstrodexMissingBranches:
         assert result is False
 
     def test_is_item_in_preloaded_astrodex_found_by_name(self, temp_data_dir):
-        item = astrodex.create_astrodex_item('user1', {'name': 'M42'}, username='alice')
+        astrodex.create_astrodex_item('user1', {'name': 'M42'}, username='alice')
         data = astrodex.load_user_astrodex('user1', 'alice')
         result = astrodex.is_item_in_preloaded_astrodex(data, 'M42')
         assert result is True
 
     def test_is_item_in_preloaded_astrodex_not_found(self, temp_data_dir):
-        item = astrodex.create_astrodex_item('user1', {'name': 'M42'}, username='alice')
+        astrodex.create_astrodex_item('user1', {'name': 'M42'}, username='alice')
         data = astrodex.load_user_astrodex('user1', 'alice')
         result = astrodex.is_item_in_preloaded_astrodex(data, 'M99')
         assert result is False
@@ -938,7 +938,6 @@ class TestAstrodexMissingBranches:
         file_path = astrodex.get_user_astrodex_file('testuser')
         with open(file_path, 'w') as f:
             f.write('{ corrupted json !!!')
-        original_copy2 = shutil.copy2
         def fail_copy2(*args, **kwargs):
             raise OSError("disk full")
         monkeypatch.setattr(shutil, 'copy2', fail_copy2)
@@ -998,7 +997,6 @@ class TestAstrodexMissingBranches:
         monkeypatch.setattr(shutil, 'copy2', selective_copy2)
         # Also make json.dump fail to trigger the error path
         import json as _json
-        original_dump = _json.dump
         def fail_dump(*args, **kwargs):
             raise ValueError("write fail")
         monkeypatch.setattr(_json, 'dump', fail_dump)
@@ -1363,7 +1361,7 @@ class TestAstrodexyRemainingBranches:
                 return {'group_id': '', 'aliases': {'Messier': 'M31', 'NGC': 'NGC 224'}}
             return {}
         monkeypatch.setattr(skytonight_targets, 'get_lookup_entry', fake_lookup)
-        item1 = astrodex.create_astrodex_item('testuser', {'name': 'Other Object', 'catalogue': ''})
+        astrodex.create_astrodex_item('testuser', {'name': 'Other Object', 'catalogue': ''})
         item2 = astrodex.create_astrodex_item('testuser', {'name': 'NGC 224', 'catalogue': 'NGC'})
         assert item2 is not None
         monkeypatch.setattr(astrodex, 'enrich_item_with_catalogue_aliases', lambda i: i.update({'catalogue_aliases': {'Messier': 'M31', 'NGC': 'NGC 224'}}) or i)

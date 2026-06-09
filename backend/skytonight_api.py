@@ -118,7 +118,7 @@ def _preload_all_current_plan_entries(user_id: str, username: str) -> list:
                     all_entries.append(entry)
                     seen_ids.add(eid)
         except Exception:
-            pass
+            pass  # malformed plan file for this user/telescope — skip it
     return all_entries
 
 

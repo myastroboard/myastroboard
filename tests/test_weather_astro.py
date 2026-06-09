@@ -1,21 +1,18 @@
 """Unit tests for astrophotography weather analysis period selection."""
 
 import time
-from unittest.mock import Mock, MagicMock, patch
-from datetime import datetime
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
-import pytest
 
-from weather_astro import (
-    AstroWeatherAnalyzer,
-    get_astro_weather_analysis,
-    get_current_astro_conditions,
-    _analysis_cache_key,
-    _get_last_successful_analysis,
-    _store_last_successful_analysis,
-    _is_openmeteo_concurrency_error,
-)
+import weather_astro
+AstroWeatherAnalyzer = weather_astro.AstroWeatherAnalyzer
+get_astro_weather_analysis = weather_astro.get_astro_weather_analysis
+get_current_astro_conditions = weather_astro.get_current_astro_conditions
+_analysis_cache_key = weather_astro._analysis_cache_key
+_get_last_successful_analysis = weather_astro._get_last_successful_analysis
+_store_last_successful_analysis = weather_astro._store_last_successful_analysis
+_is_openmeteo_concurrency_error = weather_astro._is_openmeteo_concurrency_error
 
 
 def _build_analyzer() -> AstroWeatherAnalyzer:
@@ -217,7 +214,6 @@ class TestCacheLogic:
 
     def test_cache_storage_and_retrieval(self, monkeypatch):
         # Clear internal cache state
-        import weather_astro
         monkeypatch.setattr(weather_astro, '_ASTRO_ANALYSIS_LAST_SUCCESS', {})
 
         test_data = {"test": "data", "hours": 24}
@@ -230,7 +226,6 @@ class TestCacheLogic:
         assert "modified" not in _get_last_successful_analysis(24, "en")
 
     def test_cache_miss_returns_none(self, monkeypatch):
-        import weather_astro
         monkeypatch.setattr(weather_astro, '_ASTRO_ANALYSIS_LAST_SUCCESS', {})
         retrieved = _get_last_successful_analysis(48, "fr")
         assert retrieved is None
@@ -495,7 +490,7 @@ class TestFetchExtendedWeatherDataErrors:
 
         with patch("weather_astro.create_weather_client", return_value=mock_client):
             with patch.object(analyzer, "_parse_extended_data", return_value={"data": pd.DataFrame(), "location": {}}):
-                result = analyzer.fetch_extended_weather_data(24)
+                analyzer.fetch_extended_weather_data(24)
         # Core fallback should return a result (or None if parse also fails)
         # Either outcome means lines 168-187 were hit
 
@@ -573,7 +568,6 @@ class TestGetAstroWeatherAnalysisCachePaths:
 
     def _clear_module_state(self):
         """Directly clear module-level dicts (not via monkeypatch to avoid aliasing issues)."""
-        import weather_astro
         weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS.clear()
         weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS_TS.clear()
         weather_astro._ASTRO_ANALYSIS_LAST_FAILURE_TS.clear()
@@ -586,7 +580,6 @@ class TestGetAstroWeatherAnalysisCachePaths:
 
     def test_fresh_cache_hit_returns_cached(self):
         """Lines 814-816: TTL not expired → return cached."""
-        import weather_astro
         test_data = {"result": "cached"}
         _store_last_successful_analysis(24, "en", test_data)
         key = _analysis_cache_key(24, "en")
@@ -596,7 +589,6 @@ class TestGetAstroWeatherAnalysisCachePaths:
 
     def test_ttl_expired_no_cache_falls_through(self):
         """Lines 814->820: TTL expired, cached is None → fall through to rate-limit check."""
-        import weather_astro
         key = _analysis_cache_key(97, "zz")
         # Set a very old timestamp so TTL is expired
         weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS_TS[key] = 0.0
@@ -621,7 +613,6 @@ class TestGetAstroWeatherAnalysisCachePaths:
 
     def test_failure_cooldown_with_cache_returns_stale(self):
         """Lines 833-834: in failure cooldown + cached → return stale."""
-        import weather_astro
         test_data = {"result": "stale_cooldown"}
         _store_last_successful_analysis(24, "en", test_data)
         key = _analysis_cache_key(24, "en")
@@ -632,7 +623,6 @@ class TestGetAstroWeatherAnalysisCachePaths:
 
     def test_failure_cooldown_no_cache_returns_none(self):
         """Lines 835-836: in failure cooldown + no cache → None."""
-        import weather_astro
         key = _analysis_cache_key(24, "de")
         weather_astro._ASTRO_ANALYSIS_LAST_FAILURE_TS[key] = time.time()
         with patch("weather_astro.is_openmeteo_rate_limited", return_value=False):
@@ -641,7 +631,6 @@ class TestGetAstroWeatherAnalysisCachePaths:
 
     def test_lock_not_acquired_returns_cache_if_available(self):
         """Lines 842-843: lock busy + cached → return cache."""
-        import weather_astro
         test_data = {"result": "lock_cache"}
         _store_last_successful_analysis(24, "en", test_data)
         with patch("weather_astro.is_openmeteo_rate_limited", return_value=False):
@@ -654,7 +643,6 @@ class TestGetAstroWeatherAnalysisCachePaths:
 
     def test_lock_not_acquired_no_cache_returns_none(self):
         """Line 844: lock busy + no cache → None."""
-        import weather_astro
         with patch("weather_astro.is_openmeteo_rate_limited", return_value=False):
             weather_astro._ASTRO_ANALYSIS_LOCK.acquire()
             try:
@@ -673,7 +661,6 @@ class TestGetAstroWeatherAnalysisCachePaths:
 
     def test_fetch_fails_with_stale_cache_returns_stale(self):
         """Lines 860-861: analysis returns None but stale cache exists → return stale."""
-        import weather_astro
         test_data = {"result": "stale_on_fetch_fail"}
         _store_last_successful_analysis(24, "en", test_data)
         # Don't set a fresh TTL so it falls past the TTL check
@@ -686,7 +673,6 @@ class TestGetAstroWeatherAnalysisCachePaths:
 
     def test_exception_during_analysis_with_stale_cache(self):
         """Lines 868-872: exception + stale cache → return stale."""
-        import weather_astro
         test_data = {"result": "stale_exception"}
         _store_last_successful_analysis(24, "en", test_data)
         weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS_TS[_analysis_cache_key(24, "en")] = 0.0
@@ -782,10 +768,8 @@ class TestGetCurrentAstroConditions:
         mock_analysis = {"current_conditions": mock_conditions}
         with patch("weather_astro.AstroWeatherAnalyzer.generate_comprehensive_analysis", return_value=mock_analysis):
             with patch("weather_astro.AstroWeatherAnalyzer.__init__", return_value=None):
-                import weather_astro
                 weather_astro.AstroWeatherAnalyzer.location = {}
                 weather_astro.AstroWeatherAnalyzer.language = "en"
-                from weather_astro import get_current_astro_conditions
                 result = get_current_astro_conditions()
         assert result == mock_conditions
 
@@ -793,17 +777,14 @@ class TestGetCurrentAstroConditions:
         """Lines 888-889: analysis returns None → return None."""
         with patch("weather_astro.AstroWeatherAnalyzer.generate_comprehensive_analysis", return_value=None):
             with patch("weather_astro.AstroWeatherAnalyzer.__init__", return_value=None):
-                import weather_astro
                 weather_astro.AstroWeatherAnalyzer.location = {}
                 weather_astro.AstroWeatherAnalyzer.language = "en"
-                from weather_astro import get_current_astro_conditions
                 result = get_current_astro_conditions()
         assert result is None
 
     def test_returns_none_on_exception(self):
         """Lines 890-892: exception → None."""
         with patch("weather_astro.AstroWeatherAnalyzer.__init__", side_effect=RuntimeError("init fail")):
-            from weather_astro import get_current_astro_conditions
             result = get_current_astro_conditions()
         assert result is None
 
@@ -874,7 +855,6 @@ class TestGetAstroWeatherAnalysisMissingPaths:
     """Covers lines 823-824, 833-834, 842-843, 850-854 that need expired TTL."""
 
     def _clear_state(self):
-        import weather_astro
         weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS.clear()
         weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS_TS.clear()
         weather_astro._ASTRO_ANALYSIS_LAST_FAILURE_TS.clear()
@@ -887,7 +867,6 @@ class TestGetAstroWeatherAnalysisMissingPaths:
 
     def test_rate_limited_with_stale_cache_returns_stale(self):
         """Lines 823-824: TTL expired + rate limited + cache exists → return stale."""
-        import weather_astro
         key = _analysis_cache_key(24, "en")
         test_data = {"result": "stale_rate_limited"}
         weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS[key] = test_data
@@ -898,7 +877,6 @@ class TestGetAstroWeatherAnalysisMissingPaths:
 
     def test_failure_cooldown_with_stale_cache_returns_stale(self):
         """Lines 833-834: TTL expired + failure cooldown + cache exists → return stale."""
-        import weather_astro
         key = _analysis_cache_key(24, "en")
         test_data = {"result": "stale_cooldown"}
         weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS[key] = test_data
@@ -910,7 +888,6 @@ class TestGetAstroWeatherAnalysisMissingPaths:
 
     def test_lock_busy_with_stale_cache_returns_stale(self):
         """Lines 842-843: TTL expired + lock busy + cache exists → return stale."""
-        import weather_astro
         key = _analysis_cache_key(24, "en")
         test_data = {"result": "stale_lock"}
         weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS[key] = test_data

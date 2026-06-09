@@ -103,7 +103,7 @@ def _trim_log_file(log_path: str, max_lines: int) -> None:
             with open(log_path, 'w', encoding='utf-8') as f:
                 f.writelines(lines[-max_lines:])
     except Exception:
-        pass
+        pass  # log rotation is best-effort; failure must not abort the caller
 
 
 def get_results_file() -> str:

@@ -9,7 +9,6 @@ import tempfile
 import json
 from datetime import datetime, timedelta, timezone
 from threading import Thread
-import time
 from unittest.mock import patch
 
 import pytest
@@ -18,27 +17,29 @@ backend_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, backend_path)
 
 import plan_my_night
-from plan_my_night import (
-    _parse_datetime,
-    validate_plan_json,
-    _normalize_name,
-    _entry_matches,
-    is_target_in_entries,
-    _parse_hhmm_to_minutes,
-    _minutes_to_hhmm,
-    get_plan_state,
-    _build_target_payload,
-    save_user_plan,
-    load_user_plan,
-    create_or_add_target,
-    clear_plan,
-    remove_target,
-    update_target,
-    reorder_target,
-    get_plan_with_timeline,
-    serialize_plan_csv,
-    generate_plan_pdf,
-)
+_parse_datetime = plan_my_night._parse_datetime
+validate_plan_json = plan_my_night.validate_plan_json
+_normalize_name = plan_my_night._normalize_name
+_entry_matches = plan_my_night._entry_matches
+is_target_in_entries = plan_my_night.is_target_in_entries
+_parse_hhmm_to_minutes = plan_my_night._parse_hhmm_to_minutes
+_minutes_to_hhmm = plan_my_night._minutes_to_hhmm
+get_plan_state = plan_my_night.get_plan_state
+_build_target_payload = plan_my_night._build_target_payload
+save_user_plan = plan_my_night.save_user_plan
+load_user_plan = plan_my_night.load_user_plan
+create_or_add_target = plan_my_night.create_or_add_target
+clear_plan = plan_my_night.clear_plan
+remove_target = plan_my_night.remove_target
+update_target = plan_my_night.update_target
+reorder_target = plan_my_night.reorder_target
+get_plan_with_timeline = plan_my_night.get_plan_with_timeline
+serialize_plan_csv = plan_my_night.serialize_plan_csv
+generate_plan_pdf = plan_my_night.generate_plan_pdf
+_csv_normalize_ra = plan_my_night._csv_normalize_ra
+_csv_normalize_dec = plan_my_night._csv_normalize_dec
+_csv_fmt_local_hm = plan_my_night._csv_fmt_local_hm
+_csv_fmt_observable_pct = plan_my_night._csv_fmt_observable_pct
 
 
 @pytest.fixture
@@ -271,7 +272,7 @@ class TestEntryMatches:
 
     def test_entry_matches_by_name(self):
         """Test matching by normalized name."""
-        entry = {
+        _entry = {
             "name": "M31",
             "catalogue_group_id": "",
             "catalogue_aliases": {}
@@ -488,7 +489,7 @@ class TestSaveAndLoadUserPlan:
             }
         }
         
-        result = save_user_plan(user_id, payload, username="testuser")
+        save_user_plan(user_id, payload, username="testuser")
         # Should add user_id, so might succeed - implementation dependent
         # Just verify it completes without crashing
 
@@ -513,7 +514,7 @@ class TestIsTargetInEntries:
             }
         ]
         
-        result = is_target_in_entries(entries, "Messier", "M31")
+        is_target_in_entries(entries, "Messier", "M31")
         # Result depends on matching implementation
 
     def test_target_not_in_entries(self):
@@ -1362,98 +1363,79 @@ class TestCsvNormalizeFunctions:
     """Covers lines 730-746, 753-774, 783-784, 793-794."""
 
     def test_csv_normalize_ra_none(self):
-        from plan_my_night import _csv_normalize_ra
         assert _csv_normalize_ra(None) == ''
 
     def test_csv_normalize_ra_sexagesimal_hms(self):
-        from plan_my_night import _csv_normalize_ra
         result = _csv_normalize_ra("2h 31m 49s")
         assert ':' in result
 
     def test_csv_normalize_ra_decimal(self):
-        from plan_my_night import _csv_normalize_ra
         result = _csv_normalize_ra("37.95")
         assert ':' in result
 
     def test_csv_normalize_ra_decimal_seconds_60_rollover(self):
         """When rounding produces sec=60, roll over to next minute."""
-        from plan_my_night import _csv_normalize_ra
         # A value that when converted would produce sec>=60 rounding
         result = _csv_normalize_ra("0.99999")
         assert ':' in result
 
     def test_csv_normalize_ra_invalid_returns_as_is(self):
-        from plan_my_night import _csv_normalize_ra
         result = _csv_normalize_ra("not-a-number")
         assert result == "not-a-number"
 
     def test_csv_normalize_dec_none(self):
-        from plan_my_night import _csv_normalize_dec
         assert _csv_normalize_dec(None) == ''
 
     def test_csv_normalize_dec_dms_format(self):
-        from plan_my_night import _csv_normalize_dec
         result = _csv_normalize_dec("+41°16'09\"")
         # Should contain sign and colons
         assert ':' in result
 
     def test_csv_normalize_dec_decimal_positive(self):
-        from plan_my_night import _csv_normalize_dec
         result = _csv_normalize_dec("41.269")
         assert result.startswith('+')
 
     def test_csv_normalize_dec_decimal_negative(self):
-        from plan_my_night import _csv_normalize_dec
         result = _csv_normalize_dec("-5.3914")
         assert result.startswith('-')
 
     def test_csv_normalize_dec_invalid_returns_as_is(self):
-        from plan_my_night import _csv_normalize_dec
         result = _csv_normalize_dec("not-a-number")
         assert result == "not-a-number"
 
     def test_csv_normalize_dec_seconds_60_rollover(self):
-        from plan_my_night import _csv_normalize_dec
         # Produce a value where sec rounds to 60
         result = _csv_normalize_dec("41.99999")
         assert ':' in result
 
     def test_csv_fmt_local_hm_none_returns_empty(self):
-        from plan_my_night import _csv_fmt_local_hm
         assert _csv_fmt_local_hm(None) == ''
         assert _csv_fmt_local_hm('') == ''
 
     def test_csv_fmt_local_hm_invalid_returns_str(self):
-        from plan_my_night import _csv_fmt_local_hm
         result = _csv_fmt_local_hm("not-a-date")
         assert result == "not-a-date"
 
     def test_csv_fmt_local_hm_valid_iso(self):
-        from plan_my_night import _csv_fmt_local_hm
         result = _csv_fmt_local_hm("2026-08-12T21:30:00")
         assert ':' in result
 
     def test_csv_fmt_observable_pct_none(self):
-        from plan_my_night import _csv_fmt_observable_pct
         assert _csv_fmt_observable_pct(None) == ''
         assert _csv_fmt_observable_pct('') == ''
 
     def test_csv_fmt_observable_pct_valid(self):
-        from plan_my_night import _csv_fmt_observable_pct
         assert _csv_fmt_observable_pct(0.75) == '75%'
 
     def test_csv_fmt_observable_pct_invalid(self):
-        from plan_my_night import _csv_fmt_observable_pct
         result = _csv_fmt_observable_pct("not-a-float")
         assert result == "not-a-float"
 
     def test_csv_normalize_ra_sexagesimal_sec60_rollover(self):
-        from plan_my_night import _csv_normalize_ra
         result = _csv_normalize_ra("0h 59m 59.9s")
         assert ':' in result
 
     def test_csv_normalize_dec_sexagesimal_sec60_rollover(self):
-        from plan_my_night import _csv_normalize_dec
         result = _csv_normalize_dec("+0°59'59.9\"")
         assert ':' in result
 

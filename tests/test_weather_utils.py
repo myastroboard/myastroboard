@@ -1,7 +1,6 @@
 """
 Unit tests for weather utilities (weather_utils.py)
 """
-import pytest
 from unittest.mock import Mock, patch
 
 

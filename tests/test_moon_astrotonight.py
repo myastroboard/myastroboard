@@ -4,7 +4,7 @@ Focuses on pure-logic _score, BestWindow dataclass, and mocked best_windows_all_
 """
 
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from moon_astrotonight import AstroTonightService, BestWindow
 
 

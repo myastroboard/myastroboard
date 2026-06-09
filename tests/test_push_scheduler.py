@@ -3,7 +3,6 @@
 import sys
 import time
 import types
-import os
 from datetime import datetime, timezone, timedelta
 from unittest.mock import MagicMock
 

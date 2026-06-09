@@ -10,7 +10,6 @@ Calibration: ASI294MC Pro, 150mm f/7, Bortle 5 → ~0.83 e⁻/px/s (empirical).
 """
 
 import math
-import pytest
 
 
 # ── Mirror of the JS _computeExposure logic ───────────────────────────────────

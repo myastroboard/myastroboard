@@ -11,7 +11,6 @@ backend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'backend
 sys.path.insert(0, backend_path)
 
 import astrodex  # type: ignore[import-not-found]
-import catalogue_aliases  # type: ignore[import-not-found]
 import skytonight_targets  # type: ignore[import-not-found]
 from auth import user_manager  # type: ignore[import-not-found]
 

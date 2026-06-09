@@ -211,40 +211,6 @@ const SkyTonightScheduler = (() => {
         startPolling(3000); // Detect scheduled runs
     }
 
-    function genericMessageLoadingDiv(catalogue) {
-        //If subtab exists
-        const subtabElement = document.getElementById(`catalogue-${catalogue}-subtab`);
-        if(subtabElement) {
-            DOMUtils.clear(subtabElement);
-            const wrapper = document.createElement('div');
-            wrapper.className = 'shadow p-2 mb-3 rounded bg-sub-container';
-
-            const title = document.createElement('h2');
-            title.innerHTML = `<i class="bi bi-journal-bookmark icon-inline" aria-hidden="true"></i>${i18n.t('scheduler.results_title', { catalogue })}`;
-
-            const tabs = document.createElement('ul');
-            tabs.className = 'nav nav-pills sub-tabs';
-            tabs.id = `catalogue-${catalogue}-type-buttons`;
-
-            const content = document.createElement('div');
-            content.id = `catalogue-${catalogue}-content`;
-            content.className = 'loading';
-            content.textContent = i18n.t('scheduler.currently_loading_catalogue', { catalogue });
-
-            wrapper.appendChild(title);
-            wrapper.appendChild(tabs);
-            wrapper.appendChild(content);
-            subtabElement.appendChild(wrapper);
-            return;
-        }
-
-
-        const div = document.createElement('div');
-        div.className = 'loading-message';
-        div.textContent = i18n.t('scheduler.loading_results_for', { catalogue });
-        return div;
-    }
-
     return {
         init,
         trigger,

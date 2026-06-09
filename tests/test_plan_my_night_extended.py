@@ -7,21 +7,19 @@ from datetime import datetime, timezone, timedelta
 import pytest
 
 import plan_my_night
-from plan_my_night import (
-    _build_target_payload,
-    _is_valid_telescope_id,
-    _is_valid_user_id,
-    _minutes_to_hhmm,
-    _parse_datetime,
-    _parse_hhmm_to_minutes,
-    delete_plan_for_telescope,
-    get_all_plan_files,
-    get_plan_state,
-    is_target_in_current_plan,
-    load_user_plan,
-    save_user_plan,
-    validate_plan_json,
-)
+_build_target_payload = plan_my_night._build_target_payload
+_is_valid_telescope_id = plan_my_night._is_valid_telescope_id
+_is_valid_user_id = plan_my_night._is_valid_user_id
+_minutes_to_hhmm = plan_my_night._minutes_to_hhmm
+_parse_datetime = plan_my_night._parse_datetime
+_parse_hhmm_to_minutes = plan_my_night._parse_hhmm_to_minutes
+delete_plan_for_telescope = plan_my_night.delete_plan_for_telescope
+get_all_plan_files = plan_my_night.get_all_plan_files
+get_plan_state = plan_my_night.get_plan_state
+is_target_in_current_plan = plan_my_night.is_target_in_current_plan
+load_user_plan = plan_my_night.load_user_plan
+save_user_plan = plan_my_night.save_user_plan
+validate_plan_json = plan_my_night.validate_plan_json
 
 
 # ---------------------------------------------------------------------------
@@ -266,8 +264,7 @@ class TestGetPlanState:
 class TestValidatePlanJson:
 
     def _write_plan(self, tmp_path, monkeypatch, payload):
-        import plan_my_night as pmn
-        monkeypatch.setattr(pmn, "PLAN_DIR", str(tmp_path))
+        monkeypatch.setattr(plan_my_night, "PLAN_DIR", str(tmp_path))
         fname = str(tmp_path / "valid_plan.json")
         with open(fname, "w") as f:
             json.dump(payload, f)
@@ -308,8 +305,7 @@ class TestValidatePlanJson:
         assert "id" in msg
 
     def test_invalid_json_returns_false(self, tmp_path, monkeypatch):
-        import plan_my_night as pmn
-        monkeypatch.setattr(pmn, "PLAN_DIR", str(tmp_path))
+        monkeypatch.setattr(plan_my_night, "PLAN_DIR", str(tmp_path))
         fname = str(tmp_path / "bad.json")
         with open(fname, "w") as f:
             f.write("{not valid json")
@@ -318,8 +314,7 @@ class TestValidatePlanJson:
         assert "JSON" in msg
 
     def test_nonexistent_file_returns_false(self, tmp_path, monkeypatch):
-        import plan_my_night as pmn
-        monkeypatch.setattr(pmn, "PLAN_DIR", str(tmp_path))
+        monkeypatch.setattr(plan_my_night, "PLAN_DIR", str(tmp_path))
         fname = str(tmp_path / "ghost.json")
         ok, msg = validate_plan_json(fname)
         assert ok is False
@@ -333,16 +328,14 @@ class TestValidatePlanJson:
 class TestLoadUserPlan:
 
     def test_returns_default_when_no_file(self, tmp_path, monkeypatch):
-        import plan_my_night as pmn
-        monkeypatch.setattr(pmn, "PLAN_DIR", str(tmp_path))
+        monkeypatch.setattr(plan_my_night, "PLAN_DIR", str(tmp_path))
         user_id = str(uuid.uuid4())
         result = load_user_plan(user_id, "alice")
         assert result["user_id"] == user_id
         assert result["plan"] is None
 
     def test_loads_existing_plan(self, tmp_path, monkeypatch):
-        import plan_my_night as pmn
-        monkeypatch.setattr(pmn, "PLAN_DIR", str(tmp_path))
+        monkeypatch.setattr(plan_my_night, "PLAN_DIR", str(tmp_path))
         user_id = str(uuid.uuid4())
         plan_file = tmp_path / f"{user_id}_plan_my_night.json"
         payload = {"user_id": user_id, "plan": None}
@@ -359,8 +352,7 @@ class TestLoadUserPlan:
 class TestSaveUserPlan:
 
     def test_saves_plan_successfully(self, tmp_path, monkeypatch):
-        import plan_my_night as pmn
-        monkeypatch.setattr(pmn, "PLAN_DIR", str(tmp_path))
+        monkeypatch.setattr(plan_my_night, "PLAN_DIR", str(tmp_path))
         user_id = str(uuid.uuid4())
         payload = {"user_id": user_id, "plan": None}
         result = save_user_plan(user_id, payload, username="alice")
@@ -369,8 +361,7 @@ class TestSaveUserPlan:
         assert plan_file.exists()
 
     def test_saves_with_telescope_id(self, tmp_path, monkeypatch):
-        import plan_my_night as pmn
-        monkeypatch.setattr(pmn, "PLAN_DIR", str(tmp_path))
+        monkeypatch.setattr(plan_my_night, "PLAN_DIR", str(tmp_path))
         user_id = str(uuid.uuid4())
         tel_id = str(uuid.uuid4())
         payload = {"user_id": user_id, "plan": None}
@@ -430,16 +421,14 @@ class TestGetAllPlanFiles:
         assert get_all_plan_files("not-a-uuid") == []
 
     def test_returns_existing_plan_files(self, tmp_path, monkeypatch):
-        import plan_my_night as pmn
-        monkeypatch.setattr(pmn, "PLAN_DIR", str(tmp_path))
+        monkeypatch.setattr(plan_my_night, "PLAN_DIR", str(tmp_path))
         user_id = str(uuid.uuid4())
         (tmp_path / f"{user_id}_plan_my_night.json").write_text("{}")
         files = get_all_plan_files(user_id)
         assert len(files) == 1
 
     def test_ignores_backup_files(self, tmp_path, monkeypatch):
-        import plan_my_night as pmn
-        monkeypatch.setattr(pmn, "PLAN_DIR", str(tmp_path))
+        monkeypatch.setattr(plan_my_night, "PLAN_DIR", str(tmp_path))
         user_id = str(uuid.uuid4())
         (tmp_path / f"{user_id}_plan_my_night.json").write_text("{}")
         (tmp_path / f"{user_id}_plan_my_night.json.backup").write_text("{}")
@@ -447,8 +436,7 @@ class TestGetAllPlanFiles:
         assert len(files) == 1
 
     def test_returns_multiple_telescope_plans(self, tmp_path, monkeypatch):
-        import plan_my_night as pmn
-        monkeypatch.setattr(pmn, "PLAN_DIR", str(tmp_path))
+        monkeypatch.setattr(plan_my_night, "PLAN_DIR", str(tmp_path))
         user_id = str(uuid.uuid4())
         tel_id = str(uuid.uuid4())
         (tmp_path / f"{user_id}_plan_my_night.json").write_text("{}")
@@ -457,8 +445,7 @@ class TestGetAllPlanFiles:
         assert len(files) == 2
 
     def test_other_user_files_ignored(self, tmp_path, monkeypatch):
-        import plan_my_night as pmn
-        monkeypatch.setattr(pmn, "PLAN_DIR", str(tmp_path))
+        monkeypatch.setattr(plan_my_night, "PLAN_DIR", str(tmp_path))
         user_id = str(uuid.uuid4())
         other_id = str(uuid.uuid4())
         (tmp_path / f"{user_id}_plan_my_night.json").write_text("{}")
@@ -481,16 +468,14 @@ class TestDeletePlanForTelescope:
         assert delete_plan_for_telescope(str(uuid.uuid4()), "bad-telescope") is False
 
     def test_nonexistent_file_returns_true(self, tmp_path, monkeypatch):
-        import plan_my_night as pmn
-        monkeypatch.setattr(pmn, "PLAN_DIR", str(tmp_path))
+        monkeypatch.setattr(plan_my_night, "PLAN_DIR", str(tmp_path))
         user_id = str(uuid.uuid4())
         tel_id = str(uuid.uuid4())
         result = delete_plan_for_telescope(user_id, tel_id)
         assert result is True
 
     def test_existing_file_deleted(self, tmp_path, monkeypatch):
-        import plan_my_night as pmn
-        monkeypatch.setattr(pmn, "PLAN_DIR", str(tmp_path))
+        monkeypatch.setattr(plan_my_night, "PLAN_DIR", str(tmp_path))
         user_id = str(uuid.uuid4())
         tel_id = str(uuid.uuid4())
         plan_file = tmp_path / f"{user_id}_plan_{tel_id}.json"
@@ -500,8 +485,7 @@ class TestDeletePlanForTelescope:
         assert not plan_file.exists()
 
     def test_default_telescope_id_returns_true(self, tmp_path, monkeypatch):
-        import plan_my_night as pmn
-        monkeypatch.setattr(pmn, "PLAN_DIR", str(tmp_path))
+        monkeypatch.setattr(plan_my_night, "PLAN_DIR", str(tmp_path))
         user_id = str(uuid.uuid4())
         result = delete_plan_for_telescope(user_id, "default")
         assert result is True
@@ -515,8 +499,7 @@ class TestDeletePlanForTelescope:
 class TestLoadUserPlanErrors:
 
     def test_corrupted_json_returns_default(self, tmp_path, monkeypatch):
-        import plan_my_night as pmn
-        monkeypatch.setattr(pmn, "PLAN_DIR", str(tmp_path))
+        monkeypatch.setattr(plan_my_night, "PLAN_DIR", str(tmp_path))
         user_id = str(uuid.uuid4())
         plan_file = tmp_path / f"{user_id}_plan_my_night.json"
         plan_file.write_text("{invalid json{{")
@@ -525,8 +508,7 @@ class TestLoadUserPlanErrors:
         assert result["user_id"] == user_id
 
     def test_non_dict_root_returns_default(self, tmp_path, monkeypatch):
-        import plan_my_night as pmn
-        monkeypatch.setattr(pmn, "PLAN_DIR", str(tmp_path))
+        monkeypatch.setattr(plan_my_night, "PLAN_DIR", str(tmp_path))
         user_id = str(uuid.uuid4())
         plan_file = tmp_path / f"{user_id}_plan_my_night.json"
         plan_file.write_text("[1, 2, 3]")
@@ -542,16 +524,14 @@ class TestLoadUserPlanErrors:
 class TestIsTargetInCurrentPlan:
 
     def test_no_plan_returns_false(self, tmp_path, monkeypatch):
-        import plan_my_night as pmn
-        monkeypatch.setattr(pmn, "PLAN_DIR", str(tmp_path))
+        monkeypatch.setattr(plan_my_night, "PLAN_DIR", str(tmp_path))
         user_id = str(uuid.uuid4())
         result = is_target_in_current_plan(user_id, "alice", "Messier", "M42")
         assert result is False
 
     def test_empty_entries_returns_false(self, tmp_path, monkeypatch):
-        import plan_my_night as pmn
         from datetime import timezone, timedelta
-        monkeypatch.setattr(pmn, "PLAN_DIR", str(tmp_path))
+        monkeypatch.setattr(plan_my_night, "PLAN_DIR", str(tmp_path))
         user_id = str(uuid.uuid4())
         future = (datetime.now(timezone.utc) + timedelta(hours=5)).isoformat()
         payload = {
@@ -564,9 +544,8 @@ class TestIsTargetInCurrentPlan:
         assert result is False
 
     def test_previous_plan_returns_false(self, tmp_path, monkeypatch):
-        import plan_my_night as pmn
         from datetime import timezone, timedelta
-        monkeypatch.setattr(pmn, "PLAN_DIR", str(tmp_path))
+        monkeypatch.setattr(plan_my_night, "PLAN_DIR", str(tmp_path))
         user_id = str(uuid.uuid4())
         past = (datetime.now(timezone.utc) - timedelta(hours=5)).isoformat()
         payload = {
@@ -587,8 +566,7 @@ class TestIsTargetInCurrentPlan:
 class TestSaveUserPlanEdgeCases:
 
     def test_save_creates_backup_of_existing_file(self, tmp_path, monkeypatch):
-        import plan_my_night as pmn
-        monkeypatch.setattr(pmn, "PLAN_DIR", str(tmp_path))
+        monkeypatch.setattr(plan_my_night, "PLAN_DIR", str(tmp_path))
         user_id = str(uuid.uuid4())
         # Save once to create the file
         save_user_plan(user_id, {"user_id": user_id, "plan": None}, username="alice")
@@ -597,8 +575,7 @@ class TestSaveUserPlanEdgeCases:
         assert result is True
 
     def test_save_with_telescope_creates_correct_filename(self, tmp_path, monkeypatch):
-        import plan_my_night as pmn
-        monkeypatch.setattr(pmn, "PLAN_DIR", str(tmp_path))
+        monkeypatch.setattr(plan_my_night, "PLAN_DIR", str(tmp_path))
         user_id = str(uuid.uuid4())
         tel_id = str(uuid.uuid4())
         result = save_user_plan(user_id, {"user_id": user_id}, username="bob", telescope_id=tel_id)
@@ -615,8 +592,7 @@ class TestSaveUserPlanEdgeCases:
 class TestValidatePlanJsonExtended:
 
     def test_entry_missing_name_returns_false(self, tmp_path, monkeypatch):
-        import plan_my_night as pmn
-        monkeypatch.setattr(pmn, "PLAN_DIR", str(tmp_path))
+        monkeypatch.setattr(plan_my_night, "PLAN_DIR", str(tmp_path))
         fname = str(tmp_path / "entry_no_name.json")
         with open(fname, "w") as f:
             json.dump({
@@ -628,8 +604,7 @@ class TestValidatePlanJsonExtended:
         assert "name" in msg
 
     def test_plan_entries_not_list_returns_false(self, tmp_path, monkeypatch):
-        import plan_my_night as pmn
-        monkeypatch.setattr(pmn, "PLAN_DIR", str(tmp_path))
+        monkeypatch.setattr(plan_my_night, "PLAN_DIR", str(tmp_path))
         fname = str(tmp_path / "bad_entries.json")
         with open(fname, "w") as f:
             json.dump({
@@ -640,8 +615,7 @@ class TestValidatePlanJsonExtended:
         assert ok is False
 
     def test_entry_not_dict_returns_false(self, tmp_path, monkeypatch):
-        import plan_my_night as pmn
-        monkeypatch.setattr(pmn, "PLAN_DIR", str(tmp_path))
+        monkeypatch.setattr(plan_my_night, "PLAN_DIR", str(tmp_path))
         fname = str(tmp_path / "entry_not_dict.json")
         with open(fname, "w") as f:
             json.dump({
@@ -661,15 +635,13 @@ class TestValidatePlanJsonExtended:
 class TestGetUserPlanFile:
 
     def test_invalid_user_id_raises(self, tmp_path, monkeypatch):
-        import plan_my_night as pmn
-        monkeypatch.setattr(pmn, "PLAN_DIR", str(tmp_path))
+        monkeypatch.setattr(plan_my_night, "PLAN_DIR", str(tmp_path))
         with pytest.raises(ValueError, match="Invalid user_id"):
-            pmn.get_user_plan_file("not-a-uuid")
+            plan_my_night.get_user_plan_file("not-a-uuid")
 
     def test_valid_user_id_returns_path(self, tmp_path, monkeypatch):
-        import plan_my_night as pmn
-        monkeypatch.setattr(pmn, "PLAN_DIR", str(tmp_path))
-        path = pmn.get_user_plan_file(str(uuid.uuid4()))
+        monkeypatch.setattr(plan_my_night, "PLAN_DIR", str(tmp_path))
+        path = plan_my_night.get_user_plan_file(str(uuid.uuid4()))
         assert "plan_my_night.json" in path
 
 
@@ -681,8 +653,7 @@ class TestGetUserPlanFile:
 class TestLoadUserPlanPlanNotDict:
 
     def test_plan_field_not_dict_is_reset_to_none(self, tmp_path, monkeypatch):
-        import plan_my_night as pmn
-        monkeypatch.setattr(pmn, "PLAN_DIR", str(tmp_path))
+        monkeypatch.setattr(plan_my_night, "PLAN_DIR", str(tmp_path))
         user_id = str(uuid.uuid4())
         plan_file = tmp_path / f"{user_id}_plan_my_night.json"
         plan_file.write_text(json.dumps({

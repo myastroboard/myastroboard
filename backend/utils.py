@@ -127,7 +127,7 @@ def load_json_file(file_path: str, default: Optional[dict] = None) -> dict:
             with open(file_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
     except (json.JSONDecodeError, OSError, UnicodeDecodeError):
-        pass
+        pass  # corrupt or unreadable file — return the caller-supplied default
 
     return default
 

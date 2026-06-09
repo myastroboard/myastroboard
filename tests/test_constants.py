@@ -3,9 +3,6 @@ Unit tests for constants (constants.py)
 """
 from urllib.parse import urlparse
 
-import pytest
-import os
-
 
 # Import constants to test
 from constants import (

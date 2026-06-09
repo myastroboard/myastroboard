@@ -103,7 +103,7 @@ function setupEquipmentEventListeners() {
 async function loadAllEquipment() {
    
     try {
-        const response = await fetchJSON('/api/equipment/summary');
+        await fetchJSON('/api/equipment/summary');
         
         // Load each equipment type
         await loadEquipmentType('telescopes');

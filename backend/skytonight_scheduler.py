@@ -210,13 +210,13 @@ class SkyTonightScheduler:
                         },
                     }
             except Exception:
-                pass
+                pass  # stale or malformed results cache — leave last_result unset
         next_run_text = str(stored_status.get('next_run') or '').strip()
         if next_run_text:
             try:
                 self._committed_next_run = datetime.fromisoformat(next_run_text)
             except ValueError:
-                pass
+                pass  # malformed ISO timestamp in stored status — ignore it
 
     def start(self):
         if self._scheduler_started:

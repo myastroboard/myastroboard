@@ -57,7 +57,7 @@ def is_running_in_container():
             if 'systemd-nspawn' in cgroup:
                 return True, 'systemd-nspawn'
     except (FileNotFoundError, IOError):
-        pass
+        pass  # /proc/1/cgroup not present (non-Linux or restricted environment)
 
     # Check for hypervisor (VM detection)
     try:
@@ -66,7 +66,7 @@ def is_running_in_container():
             if 'hypervisor' in cpuinfo:
                 return True, 'Virtual Machine'
     except (FileNotFoundError, IOError):
-        pass
+        pass  # /proc/cpuinfo not present (non-Linux or restricted environment)
 
     return False, None
 

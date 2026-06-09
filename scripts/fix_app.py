@@ -1,6 +1,4 @@
 """Remove orphaned SkyTonight routes from app.py."""
-import re
-
 filepath = 'd:/Code/myastroboard/backend/app.py'
 
 with open(filepath, encoding='utf-8') as f:

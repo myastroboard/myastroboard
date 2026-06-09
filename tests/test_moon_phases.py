@@ -4,7 +4,7 @@ import sys
 import os
 import datetime
 from zoneinfo import ZoneInfo
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 backend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'backend')
 if backend_path not in sys.path:

@@ -4,9 +4,7 @@ Tests core cache update functions and exception handling.
 """
 
 import pytest
-from unittest.mock import Mock, MagicMock, patch, call
-from datetime import datetime
-import time
+from unittest.mock import Mock, MagicMock, patch
 import sys
 import types
 import pandas as pd

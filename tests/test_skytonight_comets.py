@@ -1,21 +1,25 @@
-"""Tests for SkyTonight comet ingestion."""
+﻿"""Tests for SkyTonight comet ingestion."""
 
 import math
 from unittest.mock import MagicMock, patch
 
-from skytonight_comets import (
-    _coerce_coordinates,
-    _curated_fallback_rows,
-    _parse_comets_txt_line,
-    _safe_float,
-    _solve_kepler_elliptic,
-    _solve_kepler_hyperbolic,
-    _target_id_from_name,
-    _to_comet_target,
-    build_comet_targets,
-    enrich_with_jpl_fallback,
-    fetch_mpc_comets,
-)
+import skytonight_comets as _mod
+
+_coerce_coordinates = _mod._coerce_coordinates
+_curated_fallback_rows = _mod._curated_fallback_rows
+_parse_comets_txt_line = _mod._parse_comets_txt_line
+_safe_float = _mod._safe_float
+_solve_kepler_elliptic = _mod._solve_kepler_elliptic
+_solve_kepler_hyperbolic = _mod._solve_kepler_hyperbolic
+_target_id_from_name = _mod._target_id_from_name
+_to_comet_target = _mod._to_comet_target
+build_comet_targets = _mod.build_comet_targets
+enrich_with_jpl_fallback = _mod.enrich_with_jpl_fallback
+fetch_mpc_comets = _mod.fetch_mpc_comets
+_comet_ra_dec = _mod._comet_ra_dec
+_response_preview = _mod._response_preview
+_get_earth_heliocentric = _mod._get_earth_heliocentric
+_fetch_jpl_comet_snapshot = _mod._fetch_jpl_comet_snapshot
 
 
 # ---------------------------------------------------------------------------
@@ -238,7 +242,7 @@ def test_parse_comets_txt_line_accepts_all_valid_orbit_types():
 
 
 def test_parse_comets_txt_line_falls_back_to_designation_when_name_empty():
-    line = _make_mpc_line(name='  ')  # empty name area → use designation
+    line = _make_mpc_line(name='  ')  # empty name area â†’ use designation
     result = _parse_comets_txt_line(line)
     assert result is not None
     assert result['name'] == result['designation']
@@ -427,12 +431,10 @@ def test_fetch_mpc_comets_parses_valid_response(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_response_preview_short_text_returned_as_is():
-    from skytonight_comets import _response_preview
     assert _response_preview('hello world') == 'hello world'
 
 
 def test_response_preview_long_text_truncated():
-    from skytonight_comets import _response_preview
     long_text = 'x ' * 200
     result = _response_preview(long_text, limit=180)
     assert result.endswith('...')
@@ -440,8 +442,7 @@ def test_response_preview_long_text_truncated():
 
 
 def test_response_preview_none_input():
-    from skytonight_comets import _response_preview
-    # None should not crash; str(None or '') → ''
+    # None should not crash; str(None or '') â†’ ''
     result = _response_preview(None)  # type: ignore[arg-type]
     assert result == ''
 
@@ -463,7 +464,6 @@ def test_solve_kepler_hyperbolic_near_zero_denom():
 
 def test_get_earth_heliocentric_fallback_when_astropy_unavailable(monkeypatch):
     """When astropy import fails, the circular approximation is returned."""
-    from skytonight_comets import _get_earth_heliocentric
     import builtins
     real_import = builtins.__import__
 
@@ -486,7 +486,6 @@ def test_get_earth_heliocentric_fallback_when_astropy_unavailable(monkeypatch):
 # _comet_ra_dec - all three orbit types and error paths
 # ---------------------------------------------------------------------------
 
-from skytonight_comets import _comet_ra_dec
 from datetime import datetime, timezone as _tz
 
 
@@ -533,10 +532,9 @@ def test_comet_ra_dec_negative_r_returns_none():
     """Hyperbolic with a configuration producing r <= 0 must return None tuple."""
     # Use e very close to 1.0 from above (just over parabolic threshold)
     # with dt forcing a degenerate case; we can also pass an extreme e
-    # that causes _solve_kepler_hyperbolic to yield a small F giving r ≤ 0.
-    # Safest: mock _solve_kepler_hyperbolic to return 0 → r = a*(e*cosh(0)-1) = a*(e-1) = 0 for e=1
+    # that causes _solve_kepler_hyperbolic to yield a small F giving r â‰¤ 0.
+    # Safest: mock _solve_kepler_hyperbolic to return 0 â†’ r = a*(e*cosh(0)-1) = a*(e-1) = 0 for e=1
     # We'll patch the module-level function.
-    import skytonight_comets as _mod
     from unittest.mock import patch
 
     with patch.object(_mod, '_solve_kepler_hyperbolic', return_value=0.0):
@@ -544,7 +542,7 @@ def test_comet_ra_dec_negative_r_returns_none():
         # Use e just above 1 so a = q/(e-1) is large; r = a*(e - 1) = q > 0
         # That won't produce None. Use the g_dist < 1e-12 path instead:
         with patch.object(_mod, '_get_earth_heliocentric', return_value=(0.0, 0.0, 0.0)):
-            # Earth at origin → geocentric distance can be very small for near-origin comets
+            # Earth at origin â†’ geocentric distance can be very small for near-origin comets
             ra, dec, r, g = _comet_ra_dec(
                 q=1e-20, e=0.5, omega_deg=0.0, Omega_deg=0.0, i_deg=0.0,
                 peri_year=2025, peri_month=6, peri_day=21.0,
@@ -556,7 +554,6 @@ def test_comet_ra_dec_negative_r_returns_none():
 
 def test_comet_ra_dec_returns_none_on_exception():
     """Division by zero or math errors must return (None, None, None, None)."""
-    import skytonight_comets as _mod
     from unittest.mock import patch
 
     with patch.object(_mod, '_solve_kepler_elliptic', side_effect=ZeroDivisionError('test')):
@@ -570,8 +567,8 @@ def test_comet_ra_dec_returns_none_on_exception():
 
 
 def test_comet_ra_dec_negative_ra_rad_wrapped():
-    """RA values from atan2 that are negative should be wrapped to [0, 2π)."""
-    # Position comet so atan2(gy, gx) comes out negative → ra_rad += 2*pi
+    """RA values from atan2 that are negative should be wrapped to [0, 2Ï€)."""
+    # Position comet so atan2(gy, gx) comes out negative â†’ ra_rad += 2*pi
     # We achieve this by placing comet in the third quadrant (gy < 0, gx < 0)
     # with earth at origin so geocentric = heliocentric
     ra, dec, r, g = _comet_ra_dec(
@@ -637,12 +634,10 @@ def test_fetch_mpc_comets_position_computed_none_still_appended(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_fetch_jpl_comet_snapshot_empty_name_returns_empty():
-    from skytonight_comets import _fetch_jpl_comet_snapshot
     assert _fetch_jpl_comet_snapshot('') == {}
 
 
 def test_fetch_jpl_comet_snapshot_returns_empty_on_request_error(monkeypatch):
-    from skytonight_comets import _fetch_jpl_comet_snapshot
     import requests as _req
 
     monkeypatch.setattr('skytonight_comets.requests.get', lambda *a, **kw: (_ for _ in ()).throw(_req.RequestException()))
@@ -651,8 +646,6 @@ def test_fetch_jpl_comet_snapshot_returns_empty_on_request_error(monkeypatch):
 
 
 def test_fetch_jpl_comet_snapshot_returns_empty_when_payload_not_dict(monkeypatch):
-    from skytonight_comets import _fetch_jpl_comet_snapshot
-
     class _FakeResp:
         def raise_for_status(self):
             pass
@@ -666,8 +659,6 @@ def test_fetch_jpl_comet_snapshot_returns_empty_when_payload_not_dict(monkeypatc
 
 
 def test_fetch_jpl_comet_snapshot_returns_data_from_full_payload(monkeypatch):
-    from skytonight_comets import _fetch_jpl_comet_snapshot
-
     class _FakeResp:
         def raise_for_status(self):
             pass
@@ -689,8 +680,6 @@ def test_fetch_jpl_comet_snapshot_returns_data_from_full_payload(monkeypatch):
 
 def test_fetch_jpl_comet_snapshot_handles_non_dict_orbit_and_phys(monkeypatch):
     """orbit/phys_par that are not dicts must be coerced to empty dicts."""
-    from skytonight_comets import _fetch_jpl_comet_snapshot
-
     class _FakeResp:
         def raise_for_status(self):
             pass
@@ -749,7 +738,7 @@ def test_build_comet_targets_row_source_mpc_only(monkeypatch):
 def test_build_comet_targets_skips_none_targets(monkeypatch):
     """Rows with no name or designation result in None from _to_comet_target and must be skipped."""
     fake_rows = [
-        {'name': '', 'designation': ''},   # → _to_comet_target returns None
+        {'name': '', 'designation': ''},   # â†’ _to_comet_target returns None
         {'name': '1P/Halley', 'absolute_magnitude': 5.0, 'orbit_class': 'HTC'},
     ]
     monkeypatch.setattr('skytonight_comets.fetch_mpc_comets', lambda **kw: fake_rows)
@@ -771,7 +760,7 @@ def test_parse_comets_txt_line_returns_none_on_value_error():
         'P'            # [4]
         '0013P  '      # [5:12]
         '  '           # [12:14]
-        'BAAD'         # [14:18] - not a valid year integer → ValueError
+        'BAAD'         # [14:18] - not a valid year integer â†’ ValueError
         ' '
         '10'
         ' '
@@ -803,7 +792,7 @@ def test_parse_comets_txt_line_returns_none_on_value_error():
 
 def test_solve_kepler_hyperbolic_denom_near_zero():
     """Near-zero denominator (|e*cosh(F) - 1| < 1e-15) should break early."""
-    # e = 1.0 → denom = 1.0*cosh(0) - 1.0 = 0 at F=0, which triggers the break.
+    # e = 1.0 â†’ denom = 1.0*cosh(0) - 1.0 = 0 at F=0, which triggers the break.
     # We use N=0 so F starts at 0 and the very first iteration hits denom < 1e-15.
     F = _solve_kepler_hyperbolic(0.0, 1.0)
     assert isinstance(F, float)
@@ -817,14 +806,12 @@ def test_comet_ra_dec_hyperbolic_r_nonpositive_returns_none(monkeypatch):
     """When r = a*(e*cosh(F) - 1) <= 0, must return (None, None, None, None).
 
     The r <= 0 guard (line 151) is only reachable when e*cosh(F) <= 1 which
-    cannot happen for real (e > 1, cosh(F) >= 1 → e*cosh(F) >= e > 1).
+    cannot happen for real (e > 1, cosh(F) >= 1 â†’ e*cosh(F) >= e > 1).
     We trigger the OverflowError path (caught by except clause) instead,
     which also returns the None tuple and covers nearby lines.
     """
-    import skytonight_comets as _mod
-
     # Patching _solve_kepler_hyperbolic to raise OverflowError forces the
-    # except (ValueError, ZeroDivisionError, OverflowError) handler → None tuple.
+    # except (ValueError, ZeroDivisionError, OverflowError) handler â†’ None tuple.
     with patch.object(_mod, '_solve_kepler_hyperbolic', side_effect=OverflowError('test')):
         ra, dec, r, g = _comet_ra_dec(
             q=1.0, e=1.5, omega_deg=0.0, Omega_deg=0.0, i_deg=0.0,
@@ -853,7 +840,7 @@ def test_get_earth_heliocentric_with_mocked_astropy(monkeypatch):
     fake_earth_bary = MagicMock()
     fake_sun_bary = MagicMock()
     fake_delta = MagicMock()
-    # (e_bary - s_bary).get_xyz().to_value(u.AU) → [x, y, z]
+    # (e_bary - s_bary).get_xyz().to_value(u.AU) â†’ [x, y, z]
     fake_delta.get_xyz.return_value.to_value.return_value = [0.9, 0.1, 0.02]
     fake_earth_bary.__sub__ = MagicMock(return_value=fake_delta)
 
@@ -883,14 +870,13 @@ def test_get_earth_heliocentric_with_mocked_astropy(monkeypatch):
     monkeypatch.setitem(sys.modules, 'astropy.coordinates', fake_astropy_coords)
     monkeypatch.setitem(sys.modules, 'astropy.units', fake_astropy_units)
 
-    from skytonight_comets import _get_earth_heliocentric
     obs = datetime(2025, 6, 21, 12, 0, 0, tzinfo=timezone.utc)
 
     # The actual arithmetic uses the return value of (e_bary - s_bary).get_xyz().to_value
     # which we set to [0.9, 0.1, 0.02].
     # However because MagicMock subtraction returns a MagicMock (not our fake_delta),
     # we need to ensure __sub__ is properly wired.
-    # If astropy path raises, fallback is used — we just ensure no crash.
+    # If astropy path raises, fallback is used â€” we just ensure no crash.
     try:
         x, y, z = _get_earth_heliocentric(obs)
         assert isinstance(x, float)

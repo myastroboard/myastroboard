@@ -3,8 +3,6 @@ Tests for moon_planner.py
 Focuses on pure-logic (score) and mocked _night_data for next_n_nights.
 """
 
-import pytest
-from unittest.mock import patch, MagicMock
 from moon_planner import MoonPlanner
 
 

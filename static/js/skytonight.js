@@ -875,7 +875,6 @@ async function _renderSkyMap(reports, container) {
 
     targets.forEach((tgt, i) => {
         const color    = PALETTE[i % PALETTE.length];
-        const scoreVal = tgt.score != null ? Math.round(tgt.score * 100) + '%' : '-';
         const tableRow = tbody.insertRow();
         tableRow.dataset.cat   = tgt.category;
         tableRow.dataset.score = tgt.score != null ? tgt.score : '0';

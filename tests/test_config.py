@@ -4,8 +4,6 @@ Unit tests for configuration management (repo_config.py, config_defaults.py)
 import json
 import os
 
-import pytest
-
 import repo_config
 import config_defaults
 
