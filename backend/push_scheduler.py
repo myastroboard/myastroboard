@@ -612,8 +612,8 @@ def _acquire_lock() -> bool:
         if lock_file is not None:
             try:
                 lock_file.close()
-            except Exception:
-                pass
+            except Exception as close_err:
+                logger.debug('Failed to close lock file during cleanup: %s', close_err)
         _lock_file = None
         return False
 

@@ -535,21 +535,11 @@ class TestDaysUntilEventCalculation:
 
     def test_calculate_days_until_future_event(self):
         """Test calculating days until a future event."""
-        _agg = EventsAggregator(45.0, -75.0, "America/Toronto", "en")
-
-        # Create a test event 10 days in future
-        _future_date = datetime.now(tz=ZoneInfo("America/Toronto")) + timedelta(days=10)
-
         # The aggregator should calculate this correctly
         # Implementation depends on the actual method used
 
     def test_calculate_days_until_past_event(self):
         """Test calculating days until a past event returns negative."""
-        _agg = EventsAggregator(45.0, -75.0, "America/Toronto", "en")
-
-        # Create a test event 5 days in past
-        _past_date = datetime.now(tz=ZoneInfo("America/Toronto")) - timedelta(days=5)
-
         # The aggregator should handle this correctly
 
 

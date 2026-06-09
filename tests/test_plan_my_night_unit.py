@@ -272,11 +272,6 @@ class TestEntryMatches:
 
     def test_entry_matches_by_name(self):
         """Test matching by normalized name."""
-        _entry = {
-            "name": "M31",
-            "catalogue_group_id": "",
-            "catalogue_aliases": {}
-        }
         # Matching is based on normalized names
 
 

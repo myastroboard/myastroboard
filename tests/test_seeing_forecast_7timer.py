@@ -58,8 +58,7 @@ class TestSeeingForecastService:
     def test_find_best_window_with_good_seeing(self, service):
         """Test _find_best_window finds excellent/good seeing window."""
         now_utc = datetime.now(timezone.utc)
-        _init_time = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
-        
+
         forecast_list = [
             {"time": (now_utc).isoformat(), "seeing": 1, "description": "Excellent", "conditions": "Perfect"},
             {"time": (now_utc + timedelta(hours=2)).isoformat(), "seeing": 2, "description": "Good", "conditions": "Very good"},
@@ -77,8 +76,7 @@ class TestSeeingForecastService:
     def test_find_best_window_multiple_windows(self, service):
         """Test _find_best_window selects longest window."""
         now_utc = datetime.now(timezone.utc)
-        _init_time = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
-        
+
         # Short good window (2 hours), then longer good window (6 hours)
         forecast_list = [
             {"time": (now_utc).isoformat(), "seeing": 1, "description": "Excellent", "conditions": "Perfect"},
