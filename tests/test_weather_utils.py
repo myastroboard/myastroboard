@@ -3,8 +3,6 @@ Unit tests for weather utilities (weather_utils.py)
 """
 from unittest.mock import Mock, patch
 
-
-# Import the function to test
 from weather_utils import create_weather_client, create_fresh_weather_client
 
 RETRY_COUNT = 2
