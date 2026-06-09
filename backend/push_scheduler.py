@@ -622,19 +622,18 @@ def _release_lock() -> None:
     global _lock_file
     if not _lock_file:
         return
+    lf, _lock_file = _lock_file, None
     try:
         if sys.platform == 'win32':
-            msvcrt.locking(_lock_file.fileno(), msvcrt.LK_UNLCK, 1)
+            msvcrt.locking(lf.fileno(), msvcrt.LK_UNLCK, 1)
         else:  # pragma: no cover
-            fcntl.flock(_lock_file.fileno(), fcntl.LOCK_UN)
-        _lock_file.close()
+            fcntl.flock(lf.fileno(), fcntl.LOCK_UN)
+        lf.close()
     except Exception as e:
         try:
             logger.error(f"Error releasing push scheduler lock: {e}")
         except (ValueError, OSError):
             pass  # Log stream already closed during process shutdown
-    finally:
-        _lock_file = None
 
 
 def start() -> None:

@@ -917,11 +917,6 @@ async function showAstrodexItemDetail(itemId) {
     // Get list of constellations for select options
     const constellations = await getConstellationsList();
     
-    const mainPicture = getMainPicture(item);
-    const imageUrl = mainPicture 
-        ? `/api/astrodex/images/${escapeHtml(mainPicture.filename)}`
-        : '/static/img/default_astro_object.svg';
-    
     const catalogueAliasesSection = renderCatalogueAliasesSection(item);
     const ownPicturesCount = Array.isArray(item.own_pictures)
         ? item.own_pictures.length

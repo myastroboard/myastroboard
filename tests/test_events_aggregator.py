@@ -4,7 +4,7 @@ Tests event aggregation, filtering, sorting, and translation logic.
 """
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import timedelta
 from zoneinfo import ZoneInfo
 from unittest.mock import patch
 
