@@ -61,7 +61,7 @@ def _trim_calculation_log(log_path: str, max_runs: int = 5) -> None:
             with open(log_path, 'w', encoding='utf-8') as f:
                 f.writelines(lines[-max_lines:])
     except Exception:
-        pass
+        pass  # log rotation is best-effort; failure must not abort the scheduler
 
 
 # ============================================================
@@ -88,7 +88,7 @@ def _run_skytonight_refresh() -> Dict[str, Any]:
 
         _calc_set_progress('build_dataset')
     except Exception:
-        pass
+        pass  # progress reporting is optional — build proceeds regardless
 
     try:
         dataset_result = build_and_save_default_dataset(comet_source_mode=comet_source_mode)
@@ -258,7 +258,7 @@ def get_remote_skytonight_scheduler_status() -> Dict[str, Any]:
                                 }
                             }
                     except Exception:
-                        pass
+                        pass  # stale or malformed results cache — leave last_result unset
 
                 progress = status.get('progress')
                 if not isinstance(progress, dict):

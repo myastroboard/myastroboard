@@ -1,10 +1,7 @@
 """Tests for skytonight_calculator.run_calculations() and load_calculation_results()."""
 
-import json
 import os
 from datetime import datetime, timezone
-
-import pytest
 
 import skytonight_calculator as calc
 

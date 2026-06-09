@@ -3,7 +3,6 @@ Tests for planetary_events.py (PlanetaryEventsService).
 Covers pure-logic rating, constants, and vectorized find_runs helper.
 """
 
-import pytest
 import numpy as np
 from planetary_events import PlanetaryEventsService, PLANETS, PLANET_SYMBOLS
 

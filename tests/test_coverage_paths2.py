@@ -2,7 +2,6 @@
 # ---------------------------------------------------------------------------
 # Coverage boost — second batch: sync-False arcs, config, backup, etc.
 # ---------------------------------------------------------------------------
-import pytest
 import app as _app_mod
 import cache_store as _cache_store
 

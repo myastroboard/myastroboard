@@ -584,11 +584,6 @@ async function _loadSubscriptionList() {
             btn.addEventListener('click', async (e) => {
                 const clickedBtn = e.currentTarget;
                 clickedBtn.disabled = true;
-                const idx = parseInt(clickedBtn.dataset.index, 10);
-                const endpoint = (await fetchJSON('/api/push/subscriptions')).subscriptions.find(s => s.index === idx);
-                // For individual removal we need the full endpoint - use the unsubscribe endpoint via re-fetch
-                // Instead, just remove all on server and re-subscribe this device
-                // Simpler: remove all then reload list
                 await fetch('/api/push/subscriptions', { method: 'DELETE', credentials: 'same-origin' });
                 await _subscribeToPush();
                 _loadSubscriptionList();

@@ -1,14 +1,12 @@
 """Tests for SkyTonight catalogue dataset building."""
 
 import json
-import os
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 
 from skytonight_catalogue_builder import (
     PyOngcRow,
-    _load_deep_sky_rows,
     build_targets_from_rows,
     _safe_float,
     _coerce_identifier_list,
@@ -22,7 +20,6 @@ from skytonight_catalogue_builder import (
     _build_cross_ref_map,
     _apply_cross_refs,
     _build_standalone_targets_from_json,
-    _CATALOGUES_DIR,
 )
 from skytonight_models import SkyTonightCoordinates, SkyTonightTarget
 

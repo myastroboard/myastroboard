@@ -5,24 +5,11 @@ Supplements the existing 26-test file to push coverage above 50%.
 
 import pytest
 import json
-import time
-import os
-from unittest.mock import patch, MagicMock
 from iss_passes import (
     ISSPassService,
     _source_name_from_url,
     _is_celestrak_url,
-    get_celestrak_status,
-    clear_celestrak_block_flag,
-    get_iss_tle_source_info,
     _is_celestrak_timeout_error,
-    _get_cached_tle,
-    _set_cached_tle,
-    _set_cached_tle_with_source,
-    _utc_timestamp,
-    ISS_TLE_URLS,
-    MIN_EVENT_ALTITUDE_DEG,
-    MAX_VISIBLE_SKY_SUN_ALTITUDE_DEG,
 )
 
 

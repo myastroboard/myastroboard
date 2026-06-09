@@ -131,7 +131,7 @@ def test_get_report_clamps_days_and_filters_visibility(monkeypatch):
     svc = mod.ISSPassService(45.5, -73.5, 10, "UTC")
 
     monkeypatch.setattr(svc, "_fetch_iss_tle", lambda: ("1 25544 X", "2 25544 Y"))
-    monkeypatch.setattr(svc, "_load_ephemeris", lambda: object())
+    monkeypatch.setattr(svc, "_load_ephemeris", object)
 
     class _TS:
         def from_datetime(self, dt):
@@ -1115,13 +1115,6 @@ def test_observer_visibility_false_when_not_sunlit(monkeypatch):
 
         def __call__(self, *_args, **_kwargs):
             return {"earth": _Earth(), "sun": object()}
-
-    class _Topo:
-        def altaz(self):
-            return _Deg(50.0), _Deg(180.0), None
-
-        def is_sunlit(self, _eph):
-            return False
 
     class _Sat:
         def __init__(self, *_args, **_kwargs):

@@ -18,7 +18,7 @@ def pytest_sessionfinish(session, exitstatus):
     try:
         signal.signal(signal.SIGTERM, lambda s, f: sys.exit(0))
     except (OSError, ValueError):
-        pass
+        pass  # signal registration unsupported in this environment (e.g. non-main thread)
 
 # Set up environment variables BEFORE any imports from backend
 # This prevents permission errors when modules try to create directories
@@ -38,7 +38,6 @@ import pytest
 import sys
 import shutil
 import json
-from pathlib import Path
 
 # Add backend to Python path
 backend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'backend')
@@ -80,13 +79,13 @@ def reset_app_settings_module_cache():
         import app_settings
         app_settings._cache = None
     except ImportError:
-        pass
+        pass  # app_settings not available in all test configurations
     yield
     try:
         import app_settings
         app_settings._cache = None
     except ImportError:
-        pass
+        pass  # app_settings not available in all test configurations
 
 
 @pytest.fixture
@@ -106,7 +105,7 @@ def temp_file():
     try:
         os.remove(path)
     except FileNotFoundError:
-        pass
+        pass  # already removed by the test itself
 
 
 @pytest.fixture

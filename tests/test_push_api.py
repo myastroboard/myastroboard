@@ -45,14 +45,14 @@ def push_user():
         try:
             user_manager.delete_user(existing.user_id, current_user_id=admin.user_id)
         except Exception:
-            pass
+            pass  # best-effort cleanup of leftover user from a prior test run
     u = user_manager.create_user('_push_api_test', 'pw123', 'user')
     yield u
     admin = user_manager.get_user_by_username('admin')
     try:
         user_manager.delete_user(u.user_id, current_user_id=admin.user_id)
     except Exception:
-        pass
+        pass  # best-effort teardown; non-fatal if user was already removed
 
 
 @pytest.fixture

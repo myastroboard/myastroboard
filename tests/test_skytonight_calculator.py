@@ -5,43 +5,44 @@ and time conversions.
 """
 
 import pytest
-import math
 import numpy as np
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 import tempfile
 import os
 from types import SimpleNamespace
 
 import skytonight_calculator as calc
-from skytonight_calculator import (
-    _normalise,
-    _angular_separation_deg,
-    _surface_brightness,
-    _parse_localtime,
-    _sample_times,
-    compute_astro_score,
-    _horizon_floor_array,
-    _alttime_json_path,
-    _set_progress,
-    get_calculation_progress,
-    _get_night_window,
-    _meridian_transit_fast,
-    _antimeridian_transit_fast,
-    _meridian_transit_time,
-    _antimeridian_transit_time,
-    _save_alttime_json,
-    _clear_alttime_files,
-    _MoonInfo,
-    _compute_target_result,
-    _compute_body_result,
-    _hours_to_hms,
-    _degrees_to_dms,
-    compute_target_debug,
-    _build_body_alias_map,
-    _find_body_entry_by_localized_name,
-)
+_normalise = calc._normalise
+_angular_separation_deg = calc._angular_separation_deg
+_surface_brightness = calc._surface_brightness
+_parse_localtime = calc._parse_localtime
+_sample_times = calc._sample_times
+compute_astro_score = calc.compute_astro_score
+_horizon_floor_array = calc._horizon_floor_array
+_alttime_json_path = calc._alttime_json_path
+_set_progress = calc._set_progress
+get_calculation_progress = calc.get_calculation_progress
+_get_night_window = calc._get_night_window
+_meridian_transit_fast = calc._meridian_transit_fast
+_antimeridian_transit_fast = calc._antimeridian_transit_fast
+_meridian_transit_time = calc._meridian_transit_time
+_antimeridian_transit_time = calc._antimeridian_transit_time
+_save_alttime_json = calc._save_alttime_json
+_clear_alttime_files = calc._clear_alttime_files
+_MoonInfo = calc._MoonInfo
+_compute_target_result = calc._compute_target_result
+_compute_body_result = calc._compute_body_result
+_hours_to_hms = calc._hours_to_hms
+_degrees_to_dms = calc._degrees_to_dms
+compute_target_debug = calc.compute_target_debug
+_build_body_alias_map = calc._build_body_alias_map
+_find_body_entry_by_localized_name = calc._find_body_entry_by_localized_name
+_get_astro_night_window = calc._get_astro_night_window
+_cleanup_calculation_memory = calc._cleanup_calculation_memory
+load_calculation_results = calc.load_calculation_results
+run_calculations = calc.run_calculations
 from skytonight_models import SkyTonightTarget, SkyTonightCoordinates
 from skytonight_targets import normalize_object_name
 
@@ -1217,7 +1218,6 @@ class TestGetAstroNightWindow:
             astronomical_dawn='2026-04-18 04:00',
         )
         mock_sun_service.return_value = fake
-        from skytonight_calculator import _get_astro_night_window
         window = _get_astro_night_window(45.0, -75.0, 'UTC')
         assert window is not None
         assert window[0] < window[1]
@@ -1236,7 +1236,6 @@ class TestGetAstroNightWindow:
             astronomical_dawn='2026-04-19 04:00',
         )
         mock_sun_service.return_value = fake
-        from skytonight_calculator import _get_astro_night_window
         window = _get_astro_night_window(45.0, -75.0, 'UTC')
         assert window is not None
 
@@ -1253,7 +1252,6 @@ class TestGetAstroNightWindow:
             astronomical_dawn='Not found',
         )
         mock_sun_service.return_value = fake
-        from skytonight_calculator import _get_astro_night_window
         window = _get_astro_night_window(45.0, -75.0, 'UTC')
         assert window is None
 
@@ -1767,7 +1765,6 @@ class TestCleanupCalculationMemory:
     """Cover _cleanup_calculation_memory (lines 1002-1012)."""
 
     def test_cleanup_clears_all_lists(self):
-        from skytonight_calculator import _cleanup_calculation_memory
         a = [1, 2]
         b = [3, 4]
         c = [5]
@@ -1792,7 +1789,6 @@ class TestCleanupCalculationMemory:
         assert tl == []
 
     def test_cleanup_handles_none_optional_lists(self):
-        from skytonight_calculator import _cleanup_calculation_memory
         # Should not raise when times_iso_list/times_local are None
         _cleanup_calculation_memory(
             deep_sky_results=[],
@@ -1810,7 +1806,6 @@ class TestLoadCalculationResults:
     """Cover load_calculation_results (lines 1514-1534)."""
 
     def test_load_calculation_results_merges_files(self):
-        from skytonight_calculator import load_calculation_results
         meta = {'metadata': {'calculated_at': '2026-01-01', 'counts': {}}}
         dso = {'metadata': {}, 'deep_sky': [{'target_id': 'ngc1'}]}
         bodies = {'metadata': {}, 'bodies': [{'target_id': 'jupiter'}]}
@@ -1823,7 +1818,6 @@ class TestLoadCalculationResults:
         assert result['comets'] == []
 
     def test_load_calculation_results_falls_back_to_dso_metadata(self):
-        from skytonight_calculator import load_calculation_results
         # Summary file has no metadata → should fall back to dso_file metadata
         meta = {}
         dso = {'metadata': {'from': 'dso'}, 'deep_sky': []}
@@ -1844,7 +1838,6 @@ class TestRunCalculationsNoNight:
     def test_run_calculations_no_night_returns_no_night_found(
         self, mock_save, mock_night, mock_config, mock_dirs
     ):
-        from skytonight_calculator import run_calculations
         mock_config.return_value = {
             'location': {'latitude': 45.0, 'longitude': -75.0, 'timezone': 'UTC'},
             'skytonight': {},
@@ -1889,7 +1882,6 @@ class TestRunCalculationsWithData:
         mock_location, mock_moon, mock_clear, mock_astro, mock_save, mock_dirs
     ):
         """Cover run_calculations through the no-targets path."""
-        from skytonight_calculator import run_calculations
         from types import SimpleNamespace
 
         night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
@@ -1932,7 +1924,6 @@ class TestRunCalculationsWithData:
         mock_location, mock_moon, mock_clear, mock_astro, mock_save, mock_dirs
     ):
         """Cover the sqm/bortle derivation path (lines 1056-1067)."""
-        from skytonight_calculator import run_calculations
         from types import SimpleNamespace
 
         night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
@@ -1976,7 +1967,6 @@ class TestRunCalculationsWithData:
         mock_location, mock_moon, mock_body_result, mock_clear, mock_astro, mock_save, mock_dirs
     ):
         """Cover the bodies loop in run_calculations (lines 1187-1231)."""
-        from skytonight_calculator import run_calculations
         from types import SimpleNamespace
 
         night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
@@ -2148,7 +2138,6 @@ class TestRunCalculationsSqmBortle:
     @patch('skytonight_calculator.save_json_file')
     def test_sqm_bad_value_is_swallowed(self, mock_save, mock_night, mock_config, mock_dirs):
         """sqm='bad' triggers TypeError/ValueError, swallowed by except (lines 1059-1060)."""
-        from skytonight_calculator import run_calculations
         mock_config.return_value = {
             'location': {
                 'latitude': 45.0, 'longitude': -75.0, 'timezone': 'UTC',
@@ -2165,7 +2154,6 @@ class TestRunCalculationsSqmBortle:
     @patch('skytonight_calculator.save_json_file')
     def test_bortle_bad_value_is_swallowed(self, mock_save, mock_night, mock_config, mock_dirs):
         """bortle='bad' (with no sqm) triggers except in bortle branch (lines 1063-1067)."""
-        from skytonight_calculator import run_calculations
         mock_config.return_value = {
             'location': {
                 'latitude': 45.0, 'longitude': -75.0, 'timezone': 'UTC',
@@ -2195,7 +2183,6 @@ class TestRunCalculationsDictTargetFromDictException:
         mock_location, mock_moon, mock_clear, mock_astro, mock_save, mock_dirs
     ):
         """Dataset contains a malformed dict target → from_dict raises, target is skipped."""
-        from skytonight_calculator import run_calculations
         night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
         night_end = datetime(2026, 4, 18, 5, 0, tzinfo=timezone.utc)
         mock_config.return_value = {
@@ -2234,7 +2221,6 @@ class TestRunCalculationsCometAltazException:
         mock_location, mock_moon, mock_clear, mock_astro, mock_save, mock_dirs
     ):
         """Comet with bad coords: _compute_altaz_series raises, target is skipped (line 1271-1273)."""
-        from skytonight_calculator import run_calculations
         from skytonight_models import SkyTonightTarget, SkyTonightCoordinates
         night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
         night_end = datetime(2026, 4, 18, 5, 0, tzinfo=timezone.utc)

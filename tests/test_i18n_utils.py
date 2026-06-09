@@ -138,7 +138,7 @@ def test_load_translation_file_cache_hit(tmp_path):
     with patch("i18n_utils.os.path.exists", return_value=True), patch(
         "builtins.open", mock_open(read_data=payload)
     ):
-        first = module._load_translation_file("en")
+        module._load_translation_file("en")
         # Inject a sentinel to prove the cache is used on the second call
         module._translation_cache["en"]["sentinel"] = True
         second = module._load_translation_file("en")

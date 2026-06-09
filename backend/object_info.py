@@ -318,7 +318,7 @@ def resolve_identifier_for_catalogue_lookup(identifier: str) -> Optional[Dict[st
             coord = SkyCoord(ra=float(ra_raw), dec=float(dec_raw), unit='deg')
             constellation = str(get_constellation(coord)).lower()
         except Exception:
-            pass
+            pass  # astropy unavailable or coordinates out of range — constellation stays None
 
     safe_main = main_id.replace("'", "''")
     alias_query = (

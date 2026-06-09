@@ -645,15 +645,15 @@ class TestWikipediaWithFallback:
 
 
 def test_translate_object_type_english_passthrough():
-assert _translate_object_type("Galaxy", lang="en") == "Galaxy"
+    assert _translate_object_type("Galaxy", lang="en") == "Galaxy"
 
 
 def test_translate_object_type_empty_passthrough():
-assert _translate_object_type("", lang="fr") == ""
+    assert _translate_object_type("", lang="fr") == ""
 
 
 def test_translate_object_type_non_english_returns_string():
-result = _translate_object_type("Galaxy", lang="fr")
+    result = _translate_object_type("Galaxy", lang="fr")
     assert isinstance(result, str)
     assert len(result) > 0
 

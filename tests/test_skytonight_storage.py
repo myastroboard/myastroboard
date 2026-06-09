@@ -5,8 +5,6 @@ Covers directory creation, file helpers, and trimming.
 
 import os
 import json
-import tempfile
-import pytest
 from unittest.mock import patch
 import skytonight_storage
 

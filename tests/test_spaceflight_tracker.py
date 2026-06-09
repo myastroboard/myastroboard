@@ -1,11 +1,8 @@
 """Tests for spaceflight_tracker.py — pure normaliser functions and helpers."""
-import os
 import time
 from contextlib import contextmanager
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch, MagicMock
 import requests
-
-import pytest
 
 import spaceflight_tracker
 

@@ -3,8 +3,7 @@ Tests for solar_system_events.py (SolarSystemEventsService).
 Covers pure-logic rating methods, constants, and mocked event finders.
 """
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 import solar_system_events as module
 
 SolarSystemEventsService = module.SolarSystemEventsService
@@ -291,8 +290,6 @@ class TestIsRadiantVisible:
 
         svc = SolarSystemEventsService(45.0, -73.5)
         t = Time("2026-08-12T02:00:00", format="isot", scale="utc")
-
-        original_transform = SkyCoord.transform_to
 
         def patched_transform(self_coord, frame):
             mock_altaz = MagicMock()

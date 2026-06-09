@@ -3,7 +3,6 @@
 Covers static-file routes, auth endpoints, config, cache/report endpoints,
 admin endpoints, and various API utility routes.
 """
-import json as _json
 import os
 import sys
 import tempfile
@@ -968,7 +967,7 @@ class TestSuccessfulLogin:
             if u:
                 user_manager.delete_user(u.user_id)
         except Exception:
-            pass
+            pass  # best-effort teardown; test isolation still holds if deletion fails
 
     def test_login_with_correct_credentials_returns_200(self, client, temp_user_credentials):
         username, password = temp_user_credentials
@@ -1868,8 +1867,6 @@ class TestPreferencesErrors:
         assert resp.status_code == 400
 
     def test_update_preferences_invalid_tab_returns_400(self, client_admin, monkeypatch):
-        original = user_manager.update_user_preferences
-
         def _raise(user_id, prefs):
             raise ValueError('Invalid startup_main_tab: invalid_tab')
 
@@ -2646,12 +2643,7 @@ class TestAstrodexUploadValidation:
         import astrodex as _ad
         monkeypatch.setattr(_ad, 'ensure_astrodex_directories', lambda: None)
 
-        # Mock file.save to avoid actually writing to disk
-        def _fake_save(path):
-            pass
-
         import werkzeug.datastructures as _wd
-        original_save = _wd.FileStorage.save
 
         def _patched_save(self, dst, buffer_size=16384):
             pass
@@ -4601,9 +4593,9 @@ class TestTranslateSolarSystemEvents:
         data = {'events': [{'event_type': 'Meteor Shower', 'raw_data': {
             'shower': 'Perseids'}, 'zenith_hourly_rate': '100', 'parent_body': 'Comet'}]}
         try:
-            result = self._fn(data, 'de')
+            self._fn(data, 'de')
         except RuntimeError:
-            pass
+            pass  # test verifies the exception is raised or swallowed — either is acceptable
 
 
 class TestTranslateSpecialPhenomenaEvents:
@@ -4646,9 +4638,9 @@ class TestTranslateSpecialPhenomenaEvents:
                             lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
         data = {'events': [{'event_type': 'Spring Equinox', 'raw_data': {'event': 'spring_equinox'}}]}
         try:
-            result = self._fn(data, 'de')
+            self._fn(data, 'de')
         except RuntimeError:
-            pass
+            pass  # test verifies the exception is raised or swallowed — either is acceptable
 
 
 # ---------------------------------------------------------------------------
@@ -4859,26 +4851,26 @@ class TestAstrodexCrudRoutes:
     """Tests for astrodex item CRUD routes."""
 
     def test_add_item_no_name_returns_400(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', lambda: type('U', (), {'user_id': 'u1', 'username': 'admin'})())
+        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         resp = client_admin.post('/api/astrodex/items', json={'type': 'Galaxy'})
         assert resp.status_code == 400
 
     def test_add_item_already_exists_returns_400(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', lambda: type('U', (), {'user_id': 'u1', 'username': 'admin'})())
+        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'is_item_in_astrodex', lambda *_a, **_k: True)
         resp = client_admin.post('/api/astrodex/items', json={'name': 'M42'})
         assert resp.status_code == 400
         assert 'already exists' in resp.get_json()['error']
 
     def test_add_item_create_fails_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', lambda: type('U', (), {'user_id': 'u1', 'username': 'admin'})())
+        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'is_item_in_astrodex', lambda *_a, **_k: False)
         monkeypatch.setattr(_app_mod.astrodex, 'create_astrodex_item', lambda *_a, **_k: None)
         resp = client_admin.post('/api/astrodex/items', json={'name': 'M42'})
         assert resp.status_code == 500
 
     def test_add_item_success_returns_200(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', lambda: type('U', (), {'user_id': 'u1', 'username': 'admin'})())
+        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'is_item_in_astrodex', lambda *_a, **_k: False)
         monkeypatch.setattr(_app_mod.astrodex, 'create_astrodex_item', lambda *_a, **_k: {'id': 'new1', 'name': 'M42'})
         resp = client_admin.post('/api/astrodex/items', json={'name': 'M42'})
@@ -4886,163 +4878,163 @@ class TestAstrodexCrudRoutes:
         assert resp.get_json()['status'] == 'success'
 
     def test_add_item_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', lambda: type('U', (), {'user_id': 'u1', 'username': 'admin'})())
+        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'is_item_in_astrodex',
                             lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
         resp = client_admin.post('/api/astrodex/items', json={'name': 'M42'})
         assert resp.status_code == 500
 
     def test_switch_catalogue_name_no_catalogue_returns_400(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', lambda: type('U', (), {'user_id': 'u1', 'username': 'admin'})())
+        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         resp = client_admin.post('/api/astrodex/items/item1/catalogue-name', json={})
         assert resp.status_code == 400
 
     def test_switch_catalogue_name_not_found_returns_404(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', lambda: type('U', (), {'user_id': 'u1', 'username': 'admin'})())
+        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'switch_item_catalogue_name', lambda *_a, **_k: None)
         resp = client_admin.post('/api/astrodex/items/item1/catalogue-name', json={'catalogue': 'NGC'})
         assert resp.status_code == 404
 
     def test_switch_catalogue_name_value_error_returns_400(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', lambda: type('U', (), {'user_id': 'u1', 'username': 'admin'})())
+        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'switch_item_catalogue_name',
                             lambda *_a, **_k: (_ for _ in ()).throw(ValueError('bad')))
         resp = client_admin.post('/api/astrodex/items/item1/catalogue-name', json={'catalogue': 'NGC'})
         assert resp.status_code == 400
 
     def test_get_item_found_returns_200(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', lambda: type('U', (), {'user_id': 'u1', 'username': 'admin'})())
+        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'get_astrodex_item', lambda *_a, **_k: {'id': 'item1', 'name': 'M42'})
         resp = client_admin.get('/api/astrodex/items/item1')
         assert resp.status_code == 200
         assert resp.get_json()['name'] == 'M42'
 
     def test_get_item_not_found_returns_404(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', lambda: type('U', (), {'user_id': 'u1', 'username': 'admin'})())
+        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'get_astrodex_item', lambda *_a, **_k: None)
         resp = client_admin.get('/api/astrodex/items/item1')
         assert resp.status_code == 404
 
     def test_get_item_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', lambda: type('U', (), {'user_id': 'u1', 'username': 'admin'})())
+        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'get_astrodex_item',
                             lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
         resp = client_admin.get('/api/astrodex/items/item1')
         assert resp.status_code == 500
 
     def test_update_item_success_returns_200(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', lambda: type('U', (), {'user_id': 'u1', 'username': 'admin'})())
+        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'update_astrodex_item', lambda *_a, **_k: {'id': 'item1', 'notes': 'test'})
         resp = client_admin.put('/api/astrodex/items/item1', json={'notes': 'test'})
         assert resp.status_code == 200
         assert resp.get_json()['status'] == 'success'
 
     def test_update_item_not_found_returns_404(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', lambda: type('U', (), {'user_id': 'u1', 'username': 'admin'})())
+        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'update_astrodex_item', lambda *_a, **_k: None)
         resp = client_admin.put('/api/astrodex/items/item1', json={'notes': 'test'})
         assert resp.status_code == 404
 
     def test_update_item_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', lambda: type('U', (), {'user_id': 'u1', 'username': 'admin'})())
+        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'update_astrodex_item',
                             lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
         resp = client_admin.put('/api/astrodex/items/item1', json={'notes': 'test'})
         assert resp.status_code == 500
 
     def test_delete_item_success_returns_200(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', lambda: type('U', (), {'user_id': 'u1', 'username': 'admin'})())
+        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'delete_astrodex_item', lambda *_a, **_k: True)
         resp = client_admin.delete('/api/astrodex/items/item1')
         assert resp.status_code == 200
         assert resp.get_json()['status'] == 'success'
 
     def test_delete_item_not_found_returns_404(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', lambda: type('U', (), {'user_id': 'u1', 'username': 'admin'})())
+        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'delete_astrodex_item', lambda *_a, **_k: False)
         resp = client_admin.delete('/api/astrodex/items/item1')
         assert resp.status_code == 404
 
     def test_delete_item_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', lambda: type('U', (), {'user_id': 'u1', 'username': 'admin'})())
+        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'delete_astrodex_item',
                             lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
         resp = client_admin.delete('/api/astrodex/items/item1')
         assert resp.status_code == 500
 
     def test_add_picture_success_returns_200(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', lambda: type('U', (), {'user_id': 'u1', 'username': 'admin'})())
+        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'add_picture_to_item', lambda *_a, **_k: {'id': 'pic1'})
         resp = client_admin.post('/api/astrodex/items/item1/pictures', json={'url': 'http://example.com/img.jpg'})
         assert resp.status_code == 200
         assert resp.get_json()['status'] == 'success'
 
     def test_add_picture_not_found_returns_404(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', lambda: type('U', (), {'user_id': 'u1', 'username': 'admin'})())
+        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'add_picture_to_item', lambda *_a, **_k: None)
         resp = client_admin.post('/api/astrodex/items/item1/pictures', json={'url': 'http://example.com/img.jpg'})
         assert resp.status_code == 404
 
     def test_add_picture_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', lambda: type('U', (), {'user_id': 'u1', 'username': 'admin'})())
+        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'add_picture_to_item',
                             lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
         resp = client_admin.post('/api/astrodex/items/item1/pictures', json={})
         assert resp.status_code == 500
 
     def test_update_picture_success_returns_200(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', lambda: type('U', (), {'user_id': 'u1', 'username': 'admin'})())
+        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'update_picture', lambda *_a, **_k: {'id': 'pic1', 'caption': 'test'})
         resp = client_admin.put('/api/astrodex/items/item1/pictures/pic1', json={'caption': 'test'})
         assert resp.status_code == 200
         assert resp.get_json()['status'] == 'success'
 
     def test_update_picture_not_found_returns_404(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', lambda: type('U', (), {'user_id': 'u1', 'username': 'admin'})())
+        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'update_picture', lambda *_a, **_k: None)
         resp = client_admin.put('/api/astrodex/items/item1/pictures/pic1', json={'caption': 'test'})
         assert resp.status_code == 404
 
     def test_update_picture_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', lambda: type('U', (), {'user_id': 'u1', 'username': 'admin'})())
+        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'update_picture',
                             lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
         resp = client_admin.put('/api/astrodex/items/item1/pictures/pic1', json={})
         assert resp.status_code == 500
 
     def test_delete_picture_success_returns_200(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', lambda: type('U', (), {'user_id': 'u1', 'username': 'admin'})())
+        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'delete_picture', lambda *_a, **_k: True)
         resp = client_admin.delete('/api/astrodex/items/item1/pictures/pic1')
         assert resp.status_code == 200
 
     def test_delete_picture_not_found_returns_404(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', lambda: type('U', (), {'user_id': 'u1', 'username': 'admin'})())
+        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'delete_picture', lambda *_a, **_k: False)
         resp = client_admin.delete('/api/astrodex/items/item1/pictures/pic1')
         assert resp.status_code == 404
 
     def test_delete_picture_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', lambda: type('U', (), {'user_id': 'u1', 'username': 'admin'})())
+        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'delete_picture',
                             lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
         resp = client_admin.delete('/api/astrodex/items/item1/pictures/pic1')
         assert resp.status_code == 500
 
     def test_set_main_picture_success_returns_200(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', lambda: type('U', (), {'user_id': 'u1', 'username': 'admin'})())
+        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'set_main_picture', lambda *_a, **_k: True)
         resp = client_admin.post('/api/astrodex/items/item1/pictures/pic1/main')
         assert resp.status_code == 200
 
     def test_set_main_picture_not_found_returns_404(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', lambda: type('U', (), {'user_id': 'u1', 'username': 'admin'})())
+        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'set_main_picture', lambda *_a, **_k: False)
         resp = client_admin.post('/api/astrodex/items/item1/pictures/pic1/main')
         assert resp.status_code == 404
 
     def test_set_main_picture_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', lambda: type('U', (), {'user_id': 'u1', 'username': 'admin'})())
+        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'set_main_picture',
                             lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
         resp = client_admin.post('/api/astrodex/items/item1/pictures/pic1/main')
@@ -5055,7 +5047,7 @@ class TestAstrodexCrudRoutes:
         assert resp.status_code == 500
 
     def test_astrodex_image_exception_returns_404(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', lambda: type('U', (), {'user_id': 'u1', 'username': 'admin'})())
+        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod, 'load_config',
                             lambda: (_ for _ in ()).throw(RuntimeError('fail')))
         resp = client_admin.get('/api/astrodex/images/somefile.jpg')

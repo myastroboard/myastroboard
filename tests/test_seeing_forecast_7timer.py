@@ -1,7 +1,7 @@
 """Unit tests for 7Timer atmospheric seeing forecast service."""
 
 from datetime import datetime, timezone, timedelta
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 import pytest
 import requests
 
@@ -58,7 +58,7 @@ class TestSeeingForecastService:
     def test_find_best_window_with_good_seeing(self, service):
         """Test _find_best_window finds excellent/good seeing window."""
         now_utc = datetime.now(timezone.utc)
-        init_time = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
+        _init_time = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
         
         forecast_list = [
             {"time": (now_utc).isoformat(), "seeing": 1, "description": "Excellent", "conditions": "Perfect"},
@@ -77,7 +77,7 @@ class TestSeeingForecastService:
     def test_find_best_window_multiple_windows(self, service):
         """Test _find_best_window selects longest window."""
         now_utc = datetime.now(timezone.utc)
-        init_time = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
+        _init_time = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
         
         # Short good window (2 hours), then longer good window (6 hours)
         forecast_list = [
@@ -147,7 +147,7 @@ class TestSeeingForecastService:
         """Test fetch handles empty dataseries."""
         now_utc = datetime.now(timezone.utc)
         init_time = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
-        
+
         mock_response = Mock()
         mock_response.json.return_value = {
             "init": init_time.strftime("%Y%m%d%H"),
@@ -391,7 +391,7 @@ class TestSeeingForecastIntegration:
         """Test the complete response structure is correct."""
         now_utc = datetime.now(timezone.utc)
         init_time = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
-        
+
         mock_response = Mock()
         mock_response.json.return_value = {
             "init": init_time.strftime("%Y%m%d%H"),

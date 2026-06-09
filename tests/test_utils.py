@@ -4,10 +4,7 @@ Unit tests for backend utilities (utils.py)
 import pytest
 import os
 import json
-import math
-import tempfile
 import yaml
-from pathlib import Path
 
 
 # Import the functions to test

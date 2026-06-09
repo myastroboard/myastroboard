@@ -373,7 +373,7 @@ def safe_save_equipment(file_path: str, data: Dict) -> bool:
             try:
                 os.remove(temp_path)
             except Exception:
-                pass
+                pass  # best-effort temp-file cleanup; failure is non-fatal
 
         return False
 

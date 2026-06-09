@@ -288,7 +288,7 @@ class SpecialPhenomenaService:
                     min_declination = declination
                     best_time = current
             except Exception:
-                pass
+                pass  # astropy ephemeris error for this timestep — skip it
 
             current = current + step_hours  # Step by 1 hour
 
@@ -336,7 +336,7 @@ class SpecialPhenomenaService:
                     max_declination = declination
                     best_time = current
             except Exception:
-                pass
+                pass  # astropy ephemeris error for this timestep — skip it
 
             current = current + step_hours  # Step by 1 hour
 

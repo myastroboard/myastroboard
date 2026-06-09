@@ -1136,21 +1136,21 @@ def get_sky_quality_api():
             bortle = int(raw_bortle)
             sqm_source = "user_measured"
         except (TypeError, ValueError):
-            pass
+            pass  # malformed config value — leave sqm/bortle as None, endpoint returns 404
     elif raw_sqm is not None:
         try:
             sqm = float(raw_sqm)
             bortle = sqm_to_bortle(sqm)
             sqm_source = "user_measured"
         except (TypeError, ValueError):
-            pass
+            pass  # malformed config value — leave sqm/bortle as None
     elif raw_bortle is not None:
         try:
             bortle = int(raw_bortle)
             sqm = bortle_to_sqm(bortle)
             sqm_source = "bortle_midpoint"
         except (TypeError, ValueError):
-            pass
+            pass  # malformed config value — leave sqm/bortle as None
 
     if sqm is not None and bortle is not None:
         return jsonify(
@@ -2176,8 +2176,6 @@ def spaceflight_image(filename):
     If the image file is missing but a .url sidecar exists, re-download it
     on the fly so stale cache entries pointing to deleted files self-heal.
     """
-    import re
-
     if not re.match(r'^[a-f0-9]{32}\.(jpg|jpeg|png|webp|gif)$', filename):
         return jsonify({"error": "Invalid filename"}), 400
     img_dir = os.path.realpath(os.path.join(DATA_DIR_CACHE, 'spaceflight_images'))
@@ -2214,8 +2212,6 @@ def get_spaceflight_launch_vidurls(launch_id):
     """Return live video URLs for a specific launch from the LL2 detail endpoint.
     Results are cached in-process for 5 minutes to protect the free-tier rate limit.
     Only call this for launches where webcast_live=true."""
-    import re
-
     if not re.match(r'^[0-9a-f-]{36}$', launch_id):
         return jsonify({"error": "Invalid launch ID"}), 400
     try:
@@ -3089,7 +3085,7 @@ def _compute_plan_fill_metrics(plan: dict) -> dict:
             planned_minutes += max(0, int(str(planned_raw)))
             continue
         except (TypeError, ValueError):
-            pass
+            pass  # planned_minutes is not a plain integer — fall through to duration string parse
         planned_minutes += _parse_duration_minutes(entry.get('planned_duration'))
 
     night_start = plan_my_night._parse_datetime(plan.get('night_start')) if isinstance(plan, dict) else None

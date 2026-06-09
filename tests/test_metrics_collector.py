@@ -4,8 +4,6 @@ Covers pure-logic functions and mocked file/system calls.
 """
 
 import os
-import tempfile
-import pytest
 from unittest.mock import patch, MagicMock
 import metrics_collector as mc
 

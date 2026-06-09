@@ -3,7 +3,6 @@ Tests for on_demand_translate.py
 Covers pure-logic branches and mocked HTTP calls.
 """
 
-import pytest
 from unittest.mock import patch, MagicMock
 import on_demand_translate as odt
 
@@ -205,7 +204,7 @@ class TestTranslateWithMymemory:
         mock_resp.ok = True
         mock_resp.json.return_value = {"responseData": {"translatedText": "Bonjour"}}
         mock_get.return_value = mock_resp
-result = _translate_with_mymemory("Hello", "en", "fr")
+        result = _translate_with_mymemory("Hello", "en", "fr")
         assert result == "Bonjour"
 
     @patch("on_demand_translate.requests.get")
@@ -213,7 +212,7 @@ result = _translate_with_mymemory("Hello", "en", "fr")
         mock_resp = MagicMock()
         mock_resp.ok = False
         mock_get.return_value = mock_resp
-result = _translate_with_mymemory("Hello", "en", "fr")
+        result = _translate_with_mymemory("Hello", "en", "fr")
         assert result is None
 
     @patch("on_demand_translate.requests.get")
@@ -222,7 +221,7 @@ result = _translate_with_mymemory("Hello", "en", "fr")
         mock_resp.ok = True
         mock_resp.json.return_value = {"responseData": {"translatedText": 123}}
         mock_get.return_value = mock_resp
-result = _translate_with_mymemory("Hello", "en", "fr")
+        result = _translate_with_mymemory("Hello", "en", "fr")
         assert result is None
 
     @patch("on_demand_translate.requests.get")
@@ -231,12 +230,12 @@ result = _translate_with_mymemory("Hello", "en", "fr")
         mock_resp.ok = True
         mock_resp.json.return_value = {"responseData": {"translatedText": "   "}}
         mock_get.return_value = mock_resp
-result = _translate_with_mymemory("Hello", "en", "fr")
+        result = _translate_with_mymemory("Hello", "en", "fr")
         assert result is None
 
     @patch("on_demand_translate.requests.get", side_effect=Exception("network error"))
     def test_exception_returns_none(self, mock_get):
-result = _translate_with_mymemory("Hello", "en", "fr")
+        result = _translate_with_mymemory("Hello", "en", "fr")
         assert result is None
 
     @patch("on_demand_translate.requests.get")
@@ -245,7 +244,7 @@ result = _translate_with_mymemory("Hello", "en", "fr")
         mock_resp.ok = True
         mock_resp.json.return_value = {"responseData": {"translatedText": "Bonjour &amp; monde"}}
         mock_get.return_value = mock_resp
-result = _translate_with_mymemory("Hello & world", "en", "fr")
+        result = _translate_with_mymemory("Hello & world", "en", "fr")
         assert result == "Bonjour & monde"
 
 
@@ -258,7 +257,7 @@ class TestTranslateWithMymemoryChunked:
         """Empty chunks (blank lines) should be kept without calling the provider."""
         mock_chunk.return_value = ["Hello", "", "World"]
         mock_translate.return_value = "Traduit"
-result = _translate_with_mymemory_chunked("Hello\n\nWorld", "en", "fr")
+        result = _translate_with_mymemory_chunked("Hello\n\nWorld", "en", "fr")
         # Blank line should be preserved; provider called only for non-empty chunks
         assert result is not None
         assert "\n" in result
@@ -267,7 +266,7 @@ result = _translate_with_mymemory_chunked("Hello\n\nWorld", "en", "fr")
     @patch("on_demand_translate._translate_with_mymemory")
     def test_provider_failure_on_any_chunk_returns_none(self, mock_translate):
         mock_translate.return_value = None
-result = _translate_with_mymemory_chunked("Hello", "en", "fr")
+        result = _translate_with_mymemory_chunked("Hello", "en", "fr")
         assert result is None
 
 

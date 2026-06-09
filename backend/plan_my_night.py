@@ -143,7 +143,7 @@ def get_all_plan_files(user_id: str) -> list:
                 resolved = _safe_plan_path(os.path.join(PLAN_DIR, fname))
                 result.append(resolved)
             except ValueError:
-                pass
+                pass  # filename failed path-traversal check — skip it
     return result
 
 
@@ -329,7 +329,7 @@ def _save_user_plan_locked(
             try:
                 os.remove(backup_path)
             except Exception:
-                pass
+                pass  # best-effort backup cleanup on save failure; non-fatal
 
         return False
 
@@ -595,7 +595,7 @@ def update_target(
             target_entry['planned_minutes'] = max(0, min(parsed_minutes, 24 * 60))
             target_entry['planned_duration'] = _minutes_to_hhmm(target_entry['planned_minutes'])
         except (TypeError, ValueError):
-            pass
+            pass  # non-integer planned_minutes — leave field unchanged
 
     target_entry['updated_at'] = _to_iso(_now())
     plan['updated_at'] = _to_iso(_now())

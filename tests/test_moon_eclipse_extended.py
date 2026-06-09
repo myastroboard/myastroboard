@@ -5,7 +5,7 @@ Supplements the existing 2-test file to push coverage above 50%.
 
 import pytest
 import datetime
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 from moon_eclipse import LunarEclipseService, LunarEclipseInfo, EclipsePoint
 
 

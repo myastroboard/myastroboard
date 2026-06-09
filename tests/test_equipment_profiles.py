@@ -5,7 +5,6 @@ import pytest
 import os
 import json
 import tempfile
-from datetime import datetime
 import sys
 import types
 

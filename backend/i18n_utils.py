@@ -263,7 +263,7 @@ def create_translated_alert(
     try:
         display_time = datetime.fromisoformat(time).strftime('%H:%M')
     except Exception:
-        pass
+        pass  # non-ISO time string — display as-is
 
     # Get translated message
     message_key = alert_message_keys.get(alert_type, 'weather_alerts.section_title')

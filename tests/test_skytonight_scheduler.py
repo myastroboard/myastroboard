@@ -892,7 +892,6 @@ class TestRunLoopBranches:
 
             monkeypatch.setattr('skytonight_scheduler.save_scheduler_status', _save)
 
-            stored_status = {}
             monkeypatch.setattr('skytonight_scheduler.load_scheduler_status', lambda default=None: {})
             monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda: {})
 
@@ -942,7 +941,7 @@ class TestRunLoopBranches:
         # since last_run >= committed_next_run, the loop should advance to future_run
         # and then also fire (committed was in past → server_time >= committed)
         sched.start()
-        fired = done_event.wait(timeout=5)
+        done_event.wait(timeout=5)
         sched.stop()
         # After loop runs, committed_next_run should have been advanced to future_run
         assert sched._committed_next_run == future_run
