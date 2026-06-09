@@ -97,8 +97,6 @@ class TestWeatherClientCreation:
 
 class TestFreshWeatherClientCreation:
     """Test fresh weather client creation (no cache)"""
-    RETRY_COUNT = 2
-    BACKOFF_FACTOR = 0.5
 
     @patch('weather_utils.openmeteo_requests.Client')
     @patch('weather_utils.retry')
@@ -115,7 +113,7 @@ class TestFreshWeatherClientCreation:
         result = create_fresh_weather_client()
 
         mock_session_cls.assert_called_once_with()
-        mock_retry.assert_called_once_with(mock_session, retries=self.RETRY_COUNT, backoff_factor=self.BACKOFF_FACTOR)
+        mock_retry.assert_called_once_with(mock_session, retries=RETRY_COUNT, backoff_factor=BACKOFF_FACTOR)
         mock_client.assert_called_once_with(session=mock_retry_session)
         assert result == mock_client_instance
 
