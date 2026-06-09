@@ -2739,11 +2739,6 @@ class TestAltazSeriesFunctions:
         mock_body_coord = MagicMock()
         mock_body_coord.transform_to.return_value = mock_altaz
 
-        def _get_body_mock(name, t, loc):
-            if hasattr(t, '__iter__') or isinstance(t, MagicMock):
-                return mock_mid_coord
-            return mock_body_coord
-
         with patch.object(calc, 'AltAz', return_value=MagicMock()), \
              patch.object(calc, 'get_body', side_effect=lambda n, t, loc: mock_body_coord if t is times else mock_mid_coord):
             # Patch times indexing for mid_coord lookup

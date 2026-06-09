@@ -5805,7 +5805,6 @@ class TestAddPlanTargetToAstrodexBranches:
         import plan_my_night as _pmn
         import astrodex as _ad
 
-        admin = user_manager.get_user_by_username('admin')
         entry_id = 'test-search-loop-entry'
 
         monkeypatch.setattr(_pmn, 'get_plan_with_timeline',
@@ -6079,7 +6078,6 @@ class TestAddPlanTargetDefaultAndMultiPlan:
         import plan_my_night as _pmn
         import astrodex as _ad
 
-        admin = user_manager.get_user_by_username('admin')
         entry_id = 'test-default-plan-entry'
 
         monkeypatch.setattr(_pmn, 'get_plan_with_timeline',
@@ -6103,7 +6101,6 @@ class TestAddPlanTargetDefaultAndMultiPlan:
         import plan_my_night as _pmn
         import astrodex as _ad
 
-        admin = user_manager.get_user_by_username('admin')
         entry_id = 'test-second-plan-entry'
 
         monkeypatch.setattr(_pmn, 'get_plan_with_timeline',

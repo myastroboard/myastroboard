@@ -355,6 +355,7 @@ class TestCacheUpdaterIersBranches:
             def __getitem__(self, key):
                 if key == "MJD":
                     return _FakeMJD()
+                return None
 
         with patch("cache_updater.cache_store") as mock_cs:
             with patch("cache_updater.load_config") as mock_cfg:
@@ -382,7 +383,7 @@ class TestCacheUpdaterIersBranches:
 
         class _BadTable:
             def __getitem__(self, key):
-                raise RuntimeError("table access error")
+                raise KeyError("table access error")
 
         with patch("cache_updater.cache_store") as mock_cs:
             with patch("cache_updater.load_config") as mock_cfg:
@@ -408,6 +409,7 @@ class TestCacheUpdaterIersBranches:
             def __getitem__(self, key):
                 if key == "MJD":
                     return _MJDWithValue()
+                raise KeyError(key)
 
         class _MJDWithValue:
             def max(self):
