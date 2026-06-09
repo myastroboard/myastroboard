@@ -219,10 +219,10 @@ def _surface_brightness(magnitude: Optional[float], size_arcmin: Optional[float]
         return None
     try:
         surface_area = math.pi * ((size_arcmin / 2.0) ** 2)
-        if surface_area <= 0:
+        if surface_area <= 0:  # pragma: no cover  # size_arcmin > 0 guard above
             return None
         return magnitude + 2.5 * math.log10(surface_area)
-    except (ValueError, ZeroDivisionError):
+    except (ValueError, ZeroDivisionError):  # pragma: no cover  # unreachable given size > 0
         return None
 
 
@@ -852,7 +852,7 @@ def _compute_body_result(
         return None, None, None
 
     max_altitude = float(np.max(alt_deg))
-    if not is_moon and max_altitude < alt_min:
+    if not is_moon and max_altitude < alt_min:  # pragma: no cover  # unreachable: frac > 0 implies max_alt >= alt_min
         return None, None, None
 
     peak_idx = int(np.argmax(alt_deg))

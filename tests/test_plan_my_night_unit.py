@@ -1826,3 +1826,314 @@ class TestGeneratePlanPdfBranchCoverage:
         metrics = {"fill_percent": 25.0, "planned_minutes": 90, "night_minutes": 120, "overflow_minutes": 0}
         result = generate_plan_pdf(payload, metrics, _DummyI18n())
         assert result.getvalue().startswith(b"%PDF")
+
+
+# ---------------------------------------------------------------------------
+# Additional plan_my_night coverage — non-PDF functions
+# ---------------------------------------------------------------------------
+
+class TestPlanMyNightMiscBranches:
+    """Cover missing branches in plan_my_night functions."""
+
+    def test_entry_matches_aliases_not_dict_returns_false(self):
+        """Branch 362->367: catalogue_aliases is not a dict → skip alias loop, return False."""
+        entry = {
+            'name': 'M31',
+            'catalogue_aliases': ['list', 'not', 'dict'],  # list, not dict
+        }
+        result = _entry_matches(entry, 'Messier', 'M42')
+        assert result is False
+
+    def test_is_target_in_current_plan_loop_continues_past_nonmatch(self, tmp_path, monkeypatch):
+        """Branch 393->392: first entry doesn't match → loop continues to find the second."""
+        monkeypatch.setattr(plan_my_night, 'PLAN_DIR', str(tmp_path))
+        user_id = "aabbccdd-1234-4aaa-8aaa-aabbccddaabb"
+        now = datetime.now().astimezone()
+        plan = {
+            'night_start': (now - timedelta(hours=2)).isoformat(),
+            'night_end': (now + timedelta(hours=2)).isoformat(),
+            'entries': [
+                {'name': 'M31', 'catalogue': 'Messier', 'id': 'e1'},
+                {'name': 'M42', 'catalogue': 'Messier', 'id': 'e2'},
+            ],
+        }
+        plan_my_night.save_user_plan(user_id, {'plan': plan}, username='user')
+        result = plan_my_night.is_target_in_current_plan(user_id, 'user', 'Messier', 'M42')
+        # M31 doesn't match → loop continues (branch 393→392) → M42 matches
+        assert result is True
+
+    def test_create_or_add_target_loop_continues_past_nonmatch(self, tmp_path, monkeypatch):
+        """Branch 515->514: existing entry doesn't match → loop continues, new entry added."""
+        monkeypatch.setattr(plan_my_night, 'PLAN_DIR', str(tmp_path))
+        user_id = "bbccddee-1234-4bbb-8bbb-bbccddeebbcc"
+        now = datetime.now().astimezone()
+        plan = {
+            'night_start': (now - timedelta(hours=1)).isoformat(),
+            'night_end': (now + timedelta(hours=3)).isoformat(),
+            'entries': [{'name': 'M31', 'catalogue': 'Messier', 'id': 'e1'}],
+        }
+        plan_my_night.save_user_plan(user_id, {'plan': plan}, username='user')
+        # Add M42 → loop iterates past M31 (branch 515→514) → M42 is new, gets added
+        ok, reason, _, _ = plan_my_night.create_or_add_target(
+            user_id=user_id, username='user',
+            item_data={'name': 'M42'},
+            catalogue='Messier',
+            night_start=plan['night_start'],
+            night_end=plan['night_end'],
+            duration_hours=1.0,
+        )
+        assert ok is True
+        assert reason == 'added'
+
+    def test_get_plan_with_timeline_zero_planned_minutes(self, tmp_path, monkeypatch):
+        """Branch 699->701: planned_minutes=0 → end_dt stays equal to start_dt."""
+        monkeypatch.setattr(plan_my_night, 'PLAN_DIR', str(tmp_path))
+        user_id = "ccddeeaa-1234-4ccc-8ccc-ccddeeaaccdd"
+        now = datetime.now().astimezone()
+        plan = {
+            'night_start': (now - timedelta(hours=1)).isoformat(),
+            'night_end': (now + timedelta(hours=3)).isoformat(),
+            'entries': [{'name': 'M31', 'id': 'e1', 'planned_minutes': 0}],
+        }
+        plan_my_night.save_user_plan(user_id, {'plan': plan}, username='user')
+        result = plan_my_night.get_plan_with_timeline(user_id, 'user')
+        entry = result['plan']['entries'][0]
+        # With planned_minutes=0, end_dt = cursor = start_dt → timeline_start == timeline_end
+        assert entry['timeline_start'] == entry['timeline_end']
+
+    def test_save_user_plan_temp_file_missing_during_error_recovery(self, tmp_path, monkeypatch):
+        """Branch 322->328: exception before temp file created → os.path.exists(temp_path) is False.
+
+        ensure_plan_directory is called twice: once in get_user_plan_file (must succeed)
+        and once in _save_user_plan_locked (where we raise to trigger the error path).
+        """
+        monkeypatch.setattr(plan_my_night, 'PLAN_DIR', str(tmp_path))
+        user_id = "ddeeffaa-1234-4ddd-8ddd-ddeeffaaddee"
+
+        call_count = [0]
+
+        def _ensure_dir_fail_on_second_call():
+            call_count[0] += 1
+            if call_count[0] >= 2:
+                raise OSError("mkdir failed on second call")
+
+        with patch.object(plan_my_night, 'ensure_plan_directory',
+                          side_effect=_ensure_dir_fail_on_second_call):
+            result = plan_my_night.save_user_plan(
+                user_id, {'plan': {'entries': []}}, username='user'
+            )
+        assert result is False
+
+
+# ---------------------------------------------------------------------------
+# Additional generate_plan_pdf branch coverage
+# ---------------------------------------------------------------------------
+
+class TestGeneratePlanPdfAdditionalBranches:
+    """Cover remaining missing branches in generate_plan_pdf."""
+
+    def test_json_parse_error_in_load_alttime(self, tmp_path, monkeypatch):
+        """Lines 1003-1004: invalid JSON in alttime file → exception caught, return None."""
+        import matplotlib
+        matplotlib.use("Agg", force=True)
+        monkeypatch.setattr("constants.SKYTONIGHT_OUTPUT_DIR", str(tmp_path), raising=True)
+        # Write invalid JSON
+        (tmp_path / "m31_alttime.json").write_text("{invalid json", encoding="utf-8")
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        payload = {
+            "plan": {
+                "night_start": now.isoformat(),
+                "night_end": (now + timedelta(hours=2)).isoformat(),
+                "entries": [{
+                    "id": "e1", "name": "M31", "done": False,
+                    "alttime_file": "m31",
+                    "timeline_start": now.isoformat(),
+                    "timeline_end": (now + timedelta(minutes=30)).isoformat(),
+                }],
+            }
+        }
+        metrics = {"fill_percent": 50.0, "planned_minutes": 30, "night_minutes": 120, "overflow_minutes": 0}
+        result = generate_plan_pdf(payload, metrics, _DummyI18n())
+        assert result.getvalue().startswith(b"%PDF")
+
+    def test_telescope_name_and_fill_zero_and_overflow(self, tmp_path, monkeypatch):
+        """Line 1271 (telescope name), 1308->1312 (fill_w<=0.01), 1318 (overflow>0)."""
+        import matplotlib
+        matplotlib.use("Agg", force=True)
+        monkeypatch.setattr("constants.SKYTONIGHT_OUTPUT_DIR", str(tmp_path), raising=True)
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        payload = {
+            "plan": {
+                "night_start": now.isoformat(),
+                "night_end": (now + timedelta(hours=2)).isoformat(),
+                "telescope_name": "Celestron 8\"",
+                "entries": [],
+            }
+        }
+        # fill_percent=0.0 → fill_w = 0 ≤ 0.01 → branch 1308->1312
+        # overflow_minutes=30 > 0 → line 1318
+        metrics = {"fill_percent": 0.0, "planned_minutes": 0, "night_minutes": 120, "overflow_minutes": 30}
+        result = generate_plan_pdf(payload, metrics, _DummyI18n())
+        assert result.getvalue().startswith(b"%PDF")
+
+    def test_chart_skipped_when_no_night_times_in_plan(self, tmp_path, monkeypatch):
+        """Branch 1343->1433: alttime_map exists but plan has no night_start/end → skip chart.
+           Also covers line 1008 via _fmt_hm/_fmt_date called with None."""
+        import matplotlib
+        matplotlib.use("Agg", force=True)
+        monkeypatch.setattr("constants.SKYTONIGHT_OUTPUT_DIR", str(tmp_path), raising=True)
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        alttime_data = {
+            "timezone": "UTC",
+            "times_utc": [now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                          (now + timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M:%SZ")],
+            "altitudes": [30.0, 40.0],
+            "altitude_constraint_min": 30,
+            "altitude_constraint_max": 80,
+        }
+        (tmp_path / "m31_alttime.json").write_text(json.dumps(alttime_data), encoding="utf-8")
+        payload = {
+            "plan": {
+                # NO night_start / night_end → ns_dt = None → branch 1343->1433
+                "entries": [{
+                    "id": "e1", "name": "M31", "done": False,
+                    "alttime_file": "m31",
+                    "timeline_start": now.isoformat(),
+                    "timeline_end": (now + timedelta(minutes=30)).isoformat(),
+                }],
+            }
+        }
+        metrics = {"fill_percent": 50.0, "planned_minutes": 30, "night_minutes": 120, "overflow_minutes": 0}
+        result = generate_plan_pdf(payload, metrics, _DummyI18n())
+        assert result.getvalue().startswith(b"%PDF")
+
+    def test_chart_entry_skips_with_invalid_and_zero_range_times(self, tmp_path, monkeypatch):
+        """Lines 1362, 1365, 1374: entries without start/end, reversed range, empty clip result."""
+        import matplotlib
+        matplotlib.use("Agg", force=True)
+        monkeypatch.setattr("constants.SKYTONIGHT_OUTPUT_DIR", str(tmp_path), raising=True)
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        alttime_data = {
+            "timezone": "UTC",
+            "times_utc": [now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                          (now + timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M:%SZ")],
+            "altitudes": [30.0, 40.0],
+            "altitude_constraint_min": 30,
+            "altitude_constraint_max": 80,
+        }
+        (tmp_path / "m31_alttime.json").write_text(json.dumps(alttime_data), encoding="utf-8")
+        night_start = now
+        night_end = now + timedelta(hours=2)
+        payload = {
+            "plan": {
+                "night_start": night_start.isoformat(),
+                "night_end": night_end.isoformat(),
+                "entries": [
+                    {   # line 1362: no timeline_start → _parse_utc returns None → continue
+                        "id": "e1", "name": "M31", "done": False,
+                        "alttime_file": "m31",
+                        # No timeline_start or timeline_end
+                    },
+                    {   # line 1365: t_end <= t_start → continue
+                        "id": "e2", "name": "M42", "done": False,
+                        "alttime_file": "m31",
+                        "timeline_start": (now + timedelta(hours=1)).isoformat(),
+                        "timeline_end": now.isoformat(),  # end BEFORE start
+                    },
+                    {   # line 1374: _clip_alttime returns empty xs → continue
+                        "id": "e3", "name": "M45", "done": False,
+                        "alttime_file": "m31",
+                        # Alttime data is at 'now' to 'now+30min', but entry window is far future
+                        "timeline_start": (now + timedelta(hours=5)).isoformat(),
+                        "timeline_end": (now + timedelta(hours=6)).isoformat(),
+                    },
+                ],
+            }
+        }
+        metrics = {"fill_percent": 20.0, "planned_minutes": 60, "night_minutes": 120, "overflow_minutes": 0}
+        result = generate_plan_pdf(payload, metrics, _DummyI18n())
+        assert result.getvalue().startswith(b"%PDF")
+
+    def test_clip_alttime_empty_inputs(self, tmp_path, monkeypatch):
+        """Line 1040: _clip_alttime with empty times_utc → returns [], [].
+           Also covers 1044->1042 (None dt) and 1047 (no valid pts)."""
+        import matplotlib
+        matplotlib.use("Agg", force=True)
+        monkeypatch.setattr("constants.SKYTONIGHT_OUTPUT_DIR", str(tmp_path), raising=True)
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        # Empty times_utc → _clip_alttime([], altitudes, ...) → line 1040 → return [], []
+        alttime_empty = {
+            "timezone": "UTC",
+            "times_utc": [],
+            "altitudes": [],
+            "altitude_constraint_min": 30,
+            "altitude_constraint_max": 80,
+        }
+        (tmp_path / "m31empty_alttime.json").write_text(json.dumps(alttime_empty), encoding="utf-8")
+        # Invalid timestamps → _parse_utc returns None → dt is None → line 1044->1042 skip
+        # All invalid → no valid pts → line 1047 return [], []
+        alttime_bad_ts = {
+            "timezone": "UTC",
+            "times_utc": ["NOT-A-DATE", "ALSO-BAD"],
+            "altitudes": [30.0, 40.0],
+        }
+        (tmp_path / "m31badts_alttime.json").write_text(json.dumps(alttime_bad_ts), encoding="utf-8")
+        night_start = now
+        night_end = now + timedelta(hours=2)
+        payload = {
+            "plan": {
+                "night_start": night_start.isoformat(),
+                "night_end": night_end.isoformat(),
+                "entries": [
+                    {
+                        "id": "e1", "name": "M31", "done": False,
+                        "alttime_file": "m31empty",  # empty times_utc → line 1040
+                        "timeline_start": now.isoformat(),
+                        "timeline_end": (now + timedelta(minutes=30)).isoformat(),
+                    },
+                    {
+                        "id": "e2", "name": "M42", "done": False,
+                        "alttime_file": "m31badts",  # invalid timestamps → 1044->1042, 1047
+                        "timeline_start": now.isoformat(),
+                        "timeline_end": (now + timedelta(minutes=30)).isoformat(),
+                    },
+                ],
+            }
+        }
+        metrics = {"fill_percent": 30.0, "planned_minutes": 60, "night_minutes": 120, "overflow_minutes": 0}
+        result = generate_plan_pdf(payload, metrics, _DummyI18n())
+        assert result.getvalue().startswith(b"%PDF")
+
+    def test_clip_alttime_no_pts_in_window(self, tmp_path, monkeypatch):
+        """Line 1067: _clip_alttime with points all before the window → out=[] → return [], []."""
+        import matplotlib
+        matplotlib.use("Agg", force=True)
+        monkeypatch.setattr("constants.SKYTONIGHT_OUTPUT_DIR", str(tmp_path), raising=True)
+        early = datetime(2026, 1, 1, 20, 0, 0, tzinfo=timezone.utc)
+        late = datetime(2026, 1, 1, 23, 0, 0, tzinfo=timezone.utc)
+        # alttime data: two points at early hours (20:00 and 20:30)
+        alttime_data = {
+            "timezone": "UTC",
+            "times_utc": [early.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                          (early + timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M:%SZ")],
+            "altitudes": [30.0, 35.0],
+            "altitude_constraint_min": 30,
+            "altitude_constraint_max": 80,
+        }
+        (tmp_path / "m31early_alttime.json").write_text(json.dumps(alttime_data), encoding="utf-8")
+        # entry window is AFTER the alttime data: 23:00-23:30 → all points before window → out=[]
+        payload = {
+            "plan": {
+                "night_start": late.isoformat(),
+                "night_end": (late + timedelta(hours=1)).isoformat(),
+                "entries": [{
+                    "id": "e1", "name": "M31", "done": False,
+                    "alttime_file": "m31early",
+                    "timeline_start": late.isoformat(),
+                    "timeline_end": (late + timedelta(minutes=30)).isoformat(),
+                }],
+            }
+        }
+        metrics = {"fill_percent": 10.0, "planned_minutes": 30, "night_minutes": 60, "overflow_minutes": 0}
+        result = generate_plan_pdf(payload, metrics, _DummyI18n())
+        assert result.getvalue().startswith(b"%PDF")

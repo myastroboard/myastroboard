@@ -2409,3 +2409,626 @@ class TestComputeTargetDebugExtraBranches:
         if moon_check:
             # threshold should be moon.phase * 100 = 80.0
             assert abs(moon_check['threshold'] - 80.0) < 1.0
+
+
+# ---------------------------------------------------------------------------
+# Branch 608->613: airmass_constr < 1.0 in _compute_target_result
+# ---------------------------------------------------------------------------
+
+class TestComputeTargetResultAirmassLow:
+    """Branch 608->613: airmass_constr < 1.0 → skip airmass-derived alt floor."""
+
+    def test_airmass_below_1_skips_floor_calculation(self):
+        target = SimpleNamespace(
+            target_id='m42', preferred_name='M42',
+            catalogue_names={'Messier': 'M42'},
+            category='deep_sky', object_type='nebula',
+            constellation='Orion', magnitude=4.0, size_arcmin=65.0,
+            coordinates=SimpleNamespace(ra_hours=5.58, dec_degrees=-5.39),
+            source_catalogues=['Messier'], metadata={},
+        )
+        moon = SimpleNamespace(phase=0.1, ra_deg=None, dec_deg=None)
+        result = _compute_target_result(
+            target=target, times=None,
+            altaz_values=np.array([35.0, 45.0, 50.0, 40.0]),
+            location=object(), moon=moon,
+            constraints={
+                'altitude_constraint_min': 20, 'altitude_constraint_max': 80,
+                'moon_separation_min': 45, 'size_constraint_min': 5,
+                'size_constraint_max': 300,
+                'fraction_of_time_observable_threshold': 0.2,
+                'moon_separation_use_illumination': False,
+                'airmass_constraint': 0.5,
+            },
+            night_start=datetime(2026, 4, 17, 21, 0),
+            night_end=datetime(2026, 4, 18, 5, 0),
+            lat=45.0, lon=-75.0,
+        )
+        assert result is not None
+
+
+# ---------------------------------------------------------------------------
+# Line 666: max_altitude < alt_min when fraction check is bypassed
+# ---------------------------------------------------------------------------
+
+class TestComputeTargetResultMaxAltFilter:
+    """Line 666: max_altitude < alt_min returns None when frac_threshold=0 bypasses line 661."""
+
+    def test_max_altitude_below_alt_min_returns_none(self):
+        target = SimpleNamespace(
+            target_id='m42', preferred_name='M42',
+            catalogue_names={'Messier': 'M42'},
+            category='deep_sky', object_type='nebula',
+            constellation='Orion', magnitude=4.0, size_arcmin=65.0,
+            coordinates=SimpleNamespace(ra_hours=5.58, dec_degrees=-5.39),
+            source_catalogues=['Messier'], metadata={},
+        )
+        moon = SimpleNamespace(phase=0.1, ra_deg=None, dec_deg=None)
+        # frac_threshold=0.0 means fraction check (line 661) is False → don't return early
+        # all altitudes < alt_min=30 → max_altitude=28 < 30 → return None at line 666
+        result = _compute_target_result(
+            target=target, times=None,
+            altaz_values=np.array([25.0, 28.0, 27.0, 24.0]),
+            location=object(), moon=moon,
+            constraints={
+                'altitude_constraint_min': 30, 'altitude_constraint_max': 80,
+                'moon_separation_min': 45, 'size_constraint_min': 5,
+                'size_constraint_max': 300,
+                'fraction_of_time_observable_threshold': 0.0,
+                'moon_separation_use_illumination': False,
+                'airmass_constraint': 2.0,
+            },
+            night_start=datetime(2026, 4, 17, 21, 0),
+            night_end=datetime(2026, 4, 18, 5, 0),
+            lat=45.0, lon=-75.0,
+        )
+        assert result is None
+
+
+# ---------------------------------------------------------------------------
+# Branch 832->837: airmass_constr < 1.0 in _compute_body_result
+# ---------------------------------------------------------------------------
+
+class TestComputeBodyResultAirmassLow:
+    """Branch 832->837: airmass_constr < 1.0 → skip airmass-derived alt floor for bodies."""
+
+    @patch('skytonight_calculator._compute_body_altaz_series')
+    @patch('skytonight_calculator._antimeridian_transit_time')
+    @patch('skytonight_calculator._meridian_transit_time')
+    def test_airmass_below_1_skips_floor_calculation(self, mock_mer, mock_antimer, mock_series):
+        mock_series.return_value = (
+            np.array([35.0, 45.0, 55.0, 50.0, 40.0]),
+            np.array([100.0, 110.0, 120.0, 130.0, 140.0]),
+            5.0, 20.0,
+        )
+        mock_mer.return_value = '22:00'
+        mock_antimer.return_value = '04:00'
+        target = SimpleNamespace(
+            target_id='body-jupiter', preferred_name='Jupiter',
+            catalogue_names={'Bodies': 'Jupiter'},
+            category='bodies', object_type='Planet',
+            magnitude=-2.0, source_catalogues=['Bodies'], metadata={},
+        )
+        moon = SimpleNamespace(phase=0.1, ra_deg=None, dec_deg=None)
+        result, alt, az = _compute_body_result(
+            target=target,
+            times=[object()] * 5,
+            location=object(), moon=moon,
+            constraints={
+                'altitude_constraint_min': 20,
+                'airmass_constraint': 0.5,
+                'north_to_east_ccw': False,
+            },
+            night_start=datetime(2026, 4, 17, 21, 0),
+            night_end=datetime(2026, 4, 18, 5, 0),
+            lat=45.0, lon=-75.0,
+        )
+        assert result is not None
+
+
+# ---------------------------------------------------------------------------
+# Branches 1142->1139, 1147-1148, 1204->1217, 1217->1231 in run_calculations
+# ---------------------------------------------------------------------------
+
+class TestRunCalculationsMiscBranches:
+    """Cover non-dict/non-target skip and body with None altitudes."""
+
+    def _setup(self, monkeypatch):
+        night_start = datetime(2026, 5, 28, 21, 0, 0, tzinfo=timezone.utc)
+        night_end = datetime(2026, 5, 28, 22, 0, 0, tzinfo=timezone.utc)
+        monkeypatch.setattr(calc, 'ensure_skytonight_directories', lambda: None)
+        monkeypatch.setattr(calc, '_get_night_window', lambda *a: (night_start, night_end))
+        monkeypatch.setattr(calc, '_get_astro_night_window', lambda *a: None)
+        monkeypatch.setattr(calc, '_clear_alttime_files', lambda: None)
+        monkeypatch.setattr(calc, 'save_json_file', lambda *a, **kw: None)
+        mock_times = MagicMock()
+        mock_times.__len__ = MagicMock(return_value=2)
+        mock_times.sidereal_time.return_value = MagicMock(hour=np.zeros(2))
+        mock_times.to_datetime.return_value = [night_start, night_end]
+        monkeypatch.setattr(calc, '_sample_times', lambda *a: mock_times)
+        monkeypatch.setattr(calc, '_MoonInfo',
+                            lambda *a: SimpleNamespace(phase=0.2, ra_deg=10.0, dec_deg=5.0))
+        monkeypatch.setattr(calc, 'EarthLocation', MagicMock())
+
+    _CONFIG = {
+        'location': {'latitude': 45.5, 'longitude': -73.5, 'timezone': 'UTC'},
+        'skytonight': {'constraints': {}},
+    }
+
+    def test_non_dict_non_target_in_dataset_is_skipped(self, monkeypatch):
+        """Branch 1142->1139: raw is a string (not SkyTonightTarget, not dict) → skip."""
+        self._setup(monkeypatch)
+        monkeypatch.setattr(calc, 'load_targets_dataset',
+                            lambda: {'targets': ['not-a-target'], 'lookup': {}})
+        result = run_calculations(self._CONFIG)
+        assert result['counts'] == {'deep_sky': 0, 'bodies': 0, 'comets': 0}
+
+    def test_malformed_dict_in_dataset_is_skipped(self, monkeypatch):
+        """Lines 1147-1148: from_dict raises ValueError for invalid magnitude → except+pass."""
+        self._setup(monkeypatch)
+        monkeypatch.setattr(calc, 'load_targets_dataset',
+                            lambda: {'targets': [{'magnitude': 'bad'}], 'lookup': {}})
+        result = run_calculations(self._CONFIG)
+        assert result['counts'] == {'deep_sky': 0, 'bodies': 0, 'comets': 0}
+
+    def test_body_with_none_alt_skips_skymap_and_alttime(self, monkeypatch):
+        """Branches 1204->1217, 1217->1231: _compute_body_result returns (result, None, None)."""
+        self._setup(monkeypatch)
+        from skytonight_models import SkyTonightTarget as ST
+        body = ST(
+            target_id='body-jupiter', category='bodies', object_type='Planet',
+            preferred_name='Jupiter', catalogue_names={'Bodies': 'Jupiter'},
+            source_catalogues=['Bodies'], metadata={},
+        )
+        monkeypatch.setattr(calc, 'load_targets_dataset',
+                            lambda: {'targets': [body], 'lookup': {}})
+        body_result_dict = {
+            'target_id': 'body-jupiter', 'preferred_name': 'Jupiter',
+            'astro_score': 0.7, 'object_type': 'Planet', 'constellation': '',
+        }
+        monkeypatch.setattr(calc, '_compute_body_result',
+                            lambda *a, **kw: (body_result_dict, None, None))
+        result = run_calculations(self._CONFIG)
+        assert result['counts']['bodies'] == 1
+
+
+# ---------------------------------------------------------------------------
+# Branch 1564->1558: normalize_object_name returns '' for a localized planet name
+# ---------------------------------------------------------------------------
+
+class TestBuildBodyAliasMapNormFalsy:
+    """Branch 1564->1558: norm is '' → entry is skipped."""
+
+    def test_empty_norm_skips_entry(self):
+        import i18n_utils
+
+        class _FakeI18n:
+            def __init__(self, lang):
+                pass
+
+            def get_namespace(self, ns):
+                if ns == 'planets':
+                    return {'moon': '---'}  # '---' → normalize_object_name → ''
+                return {}
+
+        orig_cache = calc._body_alias_map_cache
+        try:
+            calc._body_alias_map_cache = None
+            with patch.object(i18n_utils, 'I18nManager', _FakeI18n), \
+                 patch.object(i18n_utils, 'SUPPORTED_LANGUAGES', ['en']):
+                result = _build_body_alias_map()
+        finally:
+            calc._body_alias_map_cache = orig_cache
+
+        assert '' not in result
+
+
+# ---------------------------------------------------------------------------
+# Line 1594: compute_target_debug with config=None calls load_config()
+# Branch 1650->1654: airmass_constraint < 1.0 → skip effective_alt_min update
+# Lines 1878, 1880: astro_night_start/end not None → written to alttime
+# ---------------------------------------------------------------------------
+
+class TestComputeTargetDebugExtraCoverage:
+    """Cover the remaining missed branches/lines in compute_target_debug."""
+
+    def test_config_none_calls_load_config(self, monkeypatch):
+        """Line 1594: config=None → load_config() is called to get the config."""
+        monkeypatch.setattr(calc, 'load_config', lambda: {
+            'location': {'latitude': 48.0, 'longitude': 2.0, 'elevation': 100.0, 'timezone': 'UTC'},
+            'skytonight': {'constraints': {}},
+        })
+        with patch('skytonight_calculator.load_targets_dataset',
+                   return_value={'targets': [], 'lookup': {}}):
+            result = compute_target_debug('UnknownXYZ', config=None)
+        assert result == {'found': False}
+
+    def test_airmass_below_1_skips_floor_update(self):
+        """Branch 1650->1654: airmass < 1.0 → effective_alt_min stays at alt_min."""
+        target = _debug_dso()
+        config = _debug_config(airmass_constraint=0.5)
+        dataset = _debug_dataset(target)
+        alt_arr = np.array([35.0, 45.0, 60.0, 55.0, 40.0])
+        az_arr = np.array([100.0, 120.0, 150.0, 180.0, 200.0])
+        mock_times = MagicMock()
+        mock_times.to_datetime.return_value = [
+            _DEBUG_NIGHT_START + timedelta(minutes=i * 15) for i in range(5)
+        ]
+        with patch('skytonight_calculator.load_targets_dataset', return_value=dataset), \
+             patch('skytonight_calculator._get_night_window',
+                   return_value=(_DEBUG_NIGHT_START, _DEBUG_NIGHT_END)), \
+             patch('skytonight_calculator._get_astro_night_window', return_value=None), \
+             patch('skytonight_calculator.EarthLocation'), \
+             patch('skytonight_calculator._MoonInfo',
+                   return_value=SimpleNamespace(phase=0.2, ra_deg=100.0, dec_deg=-10.0)), \
+             patch('skytonight_calculator._sample_times', return_value=mock_times), \
+             patch('skytonight_calculator._compute_altaz_series', return_value=(alt_arr, az_arr)):
+            result = compute_target_debug(target.preferred_name, config=config)
+        assert result['found'] is True
+        # effective_alt_min should equal alt_min (30) because airmass < 1.0 skips the update
+        assert result['constraints']['effective_alt_min'] == 30.0
+
+    def test_astro_night_start_end_included_in_alttime(self):
+        """Lines 1878, 1880: astro window non-None → alttime includes night_astro_start/end."""
+        target = _debug_dso()
+        config = _debug_config()
+        dataset = _debug_dataset(target)
+        night_start = _DEBUG_NIGHT_START
+        night_end = _DEBUG_NIGHT_END
+        astro_start = night_start + timedelta(minutes=30)
+        astro_end = night_end - timedelta(minutes=30)
+        alt_arr = np.array([35.0, 45.0, 60.0, 55.0, 40.0])
+        az_arr = np.array([100.0, 120.0, 150.0, 180.0, 200.0])
+        mock_times = MagicMock()
+        mock_times.to_datetime.return_value = [
+            night_start + timedelta(minutes=i * 15) for i in range(5)
+        ]
+        with patch('skytonight_calculator.load_targets_dataset', return_value=dataset), \
+             patch('skytonight_calculator._get_night_window',
+                   return_value=(night_start, night_end)), \
+             patch('skytonight_calculator._get_astro_night_window',
+                   return_value=(astro_start, astro_end)), \
+             patch('skytonight_calculator.EarthLocation'), \
+             patch('skytonight_calculator._MoonInfo',
+                   return_value=SimpleNamespace(phase=0.2, ra_deg=100.0, dec_deg=-10.0)), \
+             patch('skytonight_calculator._sample_times', return_value=mock_times), \
+             patch('skytonight_calculator._compute_altaz_series', return_value=(alt_arr, az_arr)):
+            result = compute_target_debug(target.preferred_name, config=config)
+        assert result['found'] is True
+        assert 'night_astro_start' in result['alttime']
+        assert 'night_astro_end' in result['alttime']
+
+
+# ---------------------------------------------------------------------------
+# Lines 310-313: _compute_altaz_series body (needs real astropy call to cover)
+# Lines 326-338: _compute_body_altaz_series body
+# ---------------------------------------------------------------------------
+
+
+class TestAltazSeriesFunctions:
+    """Cover the bodies of _compute_altaz_series and _compute_body_altaz_series."""
+
+    def test_compute_altaz_series_calls_skycoord_altaz(self):
+        """Lines 310-313: SkyCoord + AltAz transform path."""
+        mock_altaz = MagicMock()
+        mock_altaz.alt.deg = np.array([30.0, 40.0, 50.0])
+        mock_altaz.az.deg = np.array([100.0, 110.0, 120.0])
+        mock_coord = MagicMock()
+        mock_coord.transform_to.return_value = mock_altaz
+
+        with patch.object(calc, 'SkyCoord', return_value=mock_coord), \
+             patch.object(calc, 'AltAz', return_value=MagicMock()):
+            alt, az = calc._compute_altaz_series(5.0, 30.0, MagicMock(), MagicMock())
+
+        np.testing.assert_array_equal(alt, np.array([30.0, 40.0, 50.0]))
+        np.testing.assert_array_equal(az, np.array([100.0, 110.0, 120.0]))
+
+    def test_compute_body_altaz_series_calls_get_body(self):
+        """Lines 326-338: get_body + AltAz transform path."""
+        times = MagicMock()
+        times.__len__ = MagicMock(return_value=3)
+
+        mock_altaz = MagicMock()
+        mock_altaz.alt.deg = np.array([35.0, 45.0, 55.0])
+        mock_altaz.az.deg = np.array([180.0, 190.0, 200.0])
+
+        mock_mid_coord = MagicMock()
+        mock_mid_coord.ra.hour = 6.0
+        mock_mid_coord.dec.deg = 22.0
+
+        mock_body_coord = MagicMock()
+        mock_body_coord.transform_to.return_value = mock_altaz
+
+        def _get_body_mock(name, t, loc):
+            if hasattr(t, '__iter__') or isinstance(t, MagicMock):
+                return mock_mid_coord
+            return mock_body_coord
+
+        with patch.object(calc, 'AltAz', return_value=MagicMock()), \
+             patch.object(calc, 'get_body', side_effect=lambda n, t, loc: mock_body_coord if t is times else mock_mid_coord):
+            # Patch times indexing for mid_coord lookup
+            times.__getitem__ = MagicMock(return_value=MagicMock())
+            mock_body_coord.transform_to.return_value = mock_altaz
+            mid_body = MagicMock()
+            mid_body.ra.hour = 6.0
+            mid_body.dec.deg = 22.0
+
+            def _get_body(name, t, loc):
+                if t is times:
+                    return mock_body_coord
+                return mid_body
+
+            with patch.object(calc, 'get_body', side_effect=_get_body):
+                alt, az, ra_mid, dec_mid = calc._compute_body_altaz_series('Jupiter', times, MagicMock())
+
+        np.testing.assert_array_equal(alt, np.array([35.0, 45.0, 55.0]))
+        assert isinstance(ra_mid, float)
+
+
+# ---------------------------------------------------------------------------
+# Branch 613->618: _compute_target_result with non-deep_sky target
+# ---------------------------------------------------------------------------
+
+
+class TestComputeTargetResultNonDSO:
+    """Cover 613->618: category != 'deep_sky' skips size filter."""
+
+    def test_bodies_target_skips_size_filter(self):
+        target = SimpleNamespace(
+            target_id='body-jupiter', preferred_name='Jupiter',
+            catalogue_names={'Bodies': 'Jupiter'},
+            category='bodies',
+            object_type='Planet',
+            constellation='Tau',
+            magnitude=-2.0,
+            size_arcmin=None,
+            coordinates=SimpleNamespace(ra_hours=5.0, dec_degrees=22.0),
+            source_catalogues=['Bodies'],
+            metadata={},
+        )
+        moon = SimpleNamespace(phase=0.1, ra_deg=None, dec_deg=None)
+        constraints = {
+            'altitude_constraint_min': 10,
+            'altitude_constraint_max': 80,
+            'moon_separation_min': 30,
+            'size_constraint_min': 5,
+            'size_constraint_max': 300,
+            'fraction_of_time_observable_threshold': 0.2,
+            'moon_separation_use_illumination': False,
+            'airmass_constraint': 2.0,
+            'north_to_east_ccw': False,
+        }
+        alt = np.array([30.0, 40.0, 50.0, 45.0], dtype=np.float32)
+        az = np.array([100.0, 120.0, 150.0, 180.0], dtype=np.float32)
+        lst = np.array([5.0, 5.1, 5.2, 5.3])
+        times_local = [
+            datetime(2026, 4, 17, 21, i * 15) for i in range(4)
+        ]
+
+        result = _compute_target_result(
+            target=target,
+            times=None,
+            altaz_values=alt,
+            location=object(),
+            moon=moon,
+            constraints=constraints,
+            night_start=datetime(2026, 4, 17, 21, 0),
+            night_end=datetime(2026, 4, 18, 5, 0),
+            lat=45.0, lon=-75.0,
+            az_values=az,
+            lst_hours=lst,
+            times_local=times_local,
+        )
+        assert result is not None
+        assert result['target_id'] == 'body-jupiter'
+
+
+# ---------------------------------------------------------------------------
+# Line 852: _compute_body_result returns (None, None, None) when fraction < threshold
+# ---------------------------------------------------------------------------
+
+
+class TestComputeBodyResultLowFraction:
+    """Cover line 852: observable_fraction < _BODIES_MIN_FRACTION → return None."""
+
+    @patch('skytonight_calculator._compute_body_altaz_series')
+    @patch('skytonight_calculator._antimeridian_transit_time')
+    @patch('skytonight_calculator._meridian_transit_time')
+    def test_all_altitudes_below_min_returns_none(self, mock_mer, mock_antimer, mock_series):
+        mock_series.return_value = (
+            np.array([5.0, 3.0, 2.0, 1.0, 4.0]),  # all below alt_min=30
+            np.array([100.0, 110.0, 120.0, 130.0, 140.0]),
+            5.0, 20.0,
+        )
+        mock_mer.return_value = None
+        mock_antimer.return_value = None
+        target = SimpleNamespace(
+            target_id='body-jupiter', preferred_name='Jupiter',
+            catalogue_names={'Bodies': 'Jupiter'},
+            category='bodies', object_type='Planet',
+            magnitude=-2.0, source_catalogues=['Bodies'], metadata={},
+        )
+        moon = SimpleNamespace(phase=0.1, ra_deg=None, dec_deg=None)
+        result, alt, az = _compute_body_result(
+            target=target,
+            times=[object()] * 5,
+            location=object(), moon=moon,
+            constraints={'altitude_constraint_min': 30, 'airmass_constraint': 2.0, 'north_to_east_ccw': False},
+            night_start=datetime(2026, 4, 17, 21, 0),
+            night_end=datetime(2026, 4, 18, 5, 0),
+            lat=45.0, lon=-75.0,
+        )
+        assert result is None
+        assert alt is None
+        assert az is None
+
+
+# ---------------------------------------------------------------------------
+# Branch 1202->1231: body_result is None
+# Lines 1275-1318: comet result not None → appended and alttime saved
+# Lines 1357-1445: DSO batch processing (n_dso_batch > 0)
+# ---------------------------------------------------------------------------
+
+
+class TestRunCalcMissingBranches:
+    """Cover missing branches in run_calculations: body None, comet result, DSO batch."""
+
+    def _setup(self, monkeypatch):
+        night_start = datetime(2026, 5, 28, 21, 0, 0, tzinfo=timezone.utc)
+        night_end = datetime(2026, 5, 28, 22, 0, 0, tzinfo=timezone.utc)
+        monkeypatch.setattr(calc, 'ensure_skytonight_directories', lambda: None)
+        monkeypatch.setattr(calc, '_get_night_window', lambda *a: (night_start, night_end))
+        monkeypatch.setattr(calc, '_get_astro_night_window', lambda *a: None)
+        monkeypatch.setattr(calc, '_clear_alttime_files', lambda: None)
+        monkeypatch.setattr(calc, 'save_json_file', lambda *a, **kw: None)
+        mock_times = MagicMock()
+        mock_times.__len__ = MagicMock(return_value=2)
+        mock_times.sidereal_time.return_value = MagicMock(hour=np.zeros(2))
+        mock_times.to_datetime.return_value = [night_start, night_end]
+        monkeypatch.setattr(calc, '_sample_times', lambda *a: mock_times)
+        monkeypatch.setattr(calc, '_MoonInfo',
+                            lambda *a: SimpleNamespace(phase=0.2, ra_deg=10.0, dec_deg=5.0))
+        monkeypatch.setattr(calc, 'EarthLocation', MagicMock())
+        return night_start, night_end, mock_times
+
+    _CONFIG = {
+        'location': {'latitude': 45.5, 'longitude': -73.5, 'timezone': 'UTC'},
+        'skytonight': {'constraints': {}},
+    }
+
+    def test_body_result_none_skips_append(self, monkeypatch):
+        """Branch 1202->1231: _compute_body_result returns (None, None, None) → skip."""
+        self._setup(monkeypatch)
+        body = SkyTonightTarget(
+            target_id='body-jupiter', category='bodies', object_type='Planet',
+            preferred_name='Jupiter', catalogue_names={'Bodies': 'Jupiter'},
+            source_catalogues=['Bodies'], metadata={},
+        )
+        monkeypatch.setattr(calc, 'load_targets_dataset',
+                            lambda: {'targets': [body], 'lookup': {}})
+        monkeypatch.setattr(calc, '_compute_body_result',
+                            lambda *a, **kw: (None, None, None))
+        result = run_calculations(self._CONFIG)
+        assert result['counts']['bodies'] == 0
+
+    def test_comet_result_not_none_appended(self, monkeypatch):
+        """Lines 1275-1318: comet with non-None result → appended to comets_results."""
+        self._setup(monkeypatch)
+        comet = SkyTonightTarget(
+            target_id='comet-c2023', category='comets', object_type='comet',
+            preferred_name='C/2023 A1',
+            coordinates=SkyTonightCoordinates(ra_hours=6.0, dec_degrees=20.0),
+            source_catalogues=['comets'], metadata={},
+        )
+        monkeypatch.setattr(calc, 'load_targets_dataset',
+                            lambda: {'targets': [comet], 'lookup': {}})
+        comet_alt = np.array([45.0, 50.0], dtype=np.float32)
+        comet_az = np.array([120.0, 130.0], dtype=np.float32)
+        monkeypatch.setattr(calc, '_compute_altaz_series',
+                            lambda *a, **kw: (comet_alt, comet_az))
+        comet_result_dict = {
+            'target_id': 'comet-c2023', 'preferred_name': 'C/2023 A1',
+            'astro_score': 0.6, 'object_type': 'comet', 'constellation': '',
+        }
+        monkeypatch.setattr(calc, '_compute_target_result',
+                            lambda *a, **kw: comet_result_dict)
+        monkeypatch.setattr(calc, '_save_alttime_json', lambda *a, **kw: None)
+        result = run_calculations(self._CONFIG)
+        assert result['counts']['comets'] == 1
+
+    def test_dso_batch_processing(self, monkeypatch):
+        """Lines 1357-1445: n_dso_batch > 0 → batch AltAz and per-target scoring."""
+        self._setup(monkeypatch)
+        dso = SkyTonightTarget(
+            target_id='dso-m31', category='deep_sky', object_type='galaxy',
+            preferred_name='M31', magnitude=4.5, size_arcmin=30.0,
+            coordinates=SkyTonightCoordinates(ra_hours=0.7, dec_degrees=41.3),
+            source_catalogues=['Messier'], metadata={},
+        )
+        monkeypatch.setattr(calc, 'load_targets_dataset',
+                            lambda: {'targets': [dso], 'lookup': {}})
+
+        n_dso = 1
+        mock_altaz_batch = MagicMock()
+        mock_altaz_batch.alt.deg = np.full(n_dso, 45.0, dtype=np.float32)
+        mock_altaz_batch.az.deg = np.full(n_dso, 120.0, dtype=np.float32)
+        mock_coord = MagicMock()
+        mock_coord.transform_to.return_value = mock_altaz_batch
+        monkeypatch.setattr(calc, 'SkyCoord', MagicMock(return_value=mock_coord))
+        monkeypatch.setattr(calc, 'AltAz', MagicMock(return_value=MagicMock()))
+
+        dso_result_dict = {
+            'target_id': 'dso-m31', 'preferred_name': 'M31',
+            'astro_score': 0.8, 'object_type': 'galaxy', 'constellation': 'Andromeda',
+        }
+        monkeypatch.setattr(calc, '_compute_target_result',
+                            lambda *a, **kw: dso_result_dict)
+        monkeypatch.setattr(calc, '_save_alttime_json', lambda *a, **kw: None)
+        result = run_calculations(self._CONFIG)
+        assert result['counts']['deep_sky'] == 1
+
+    def test_comet_result_none_skips_append(self, monkeypatch):
+        """Branch 1290->1317: comet _compute_target_result returns None → skip append."""
+        self._setup(monkeypatch)
+        comet = SkyTonightTarget(
+            target_id='comet-none', category='comets', object_type='comet',
+            preferred_name='C/2023 X1',
+            coordinates=SkyTonightCoordinates(ra_hours=3.0, dec_degrees=10.0),
+            source_catalogues=['comets'], metadata={},
+        )
+        monkeypatch.setattr(calc, 'load_targets_dataset',
+                            lambda: {'targets': [comet], 'lookup': {}})
+        comet_alt = np.array([45.0, 50.0], dtype=np.float32)
+        comet_az = np.array([120.0, 130.0], dtype=np.float32)
+        monkeypatch.setattr(calc, '_compute_altaz_series',
+                            lambda *a, **kw: (comet_alt, comet_az))
+        monkeypatch.setattr(calc, '_compute_target_result', lambda *a, **kw: None)
+        result = run_calculations(self._CONFIG)
+        assert result['counts']['comets'] == 0
+
+    def test_dso_result_none_skips_append(self, monkeypatch):
+        """Branch 1412->1442: DSO _compute_target_result returns None → skip append."""
+        self._setup(monkeypatch)
+        dso = SkyTonightTarget(
+            target_id='dso-none', category='deep_sky', object_type='galaxy',
+            preferred_name='NGC 0001', magnitude=12.0, size_arcmin=5.0,
+            coordinates=SkyTonightCoordinates(ra_hours=1.0, dec_degrees=20.0),
+            source_catalogues=['NGC'], metadata={},
+        )
+        monkeypatch.setattr(calc, 'load_targets_dataset',
+                            lambda: {'targets': [dso], 'lookup': {}})
+        mock_altaz_batch = MagicMock()
+        mock_altaz_batch.alt.deg = np.full(1, 45.0, dtype=np.float32)
+        mock_altaz_batch.az.deg = np.full(1, 120.0, dtype=np.float32)
+        mock_coord = MagicMock()
+        mock_coord.transform_to.return_value = mock_altaz_batch
+        monkeypatch.setattr(calc, 'SkyCoord', MagicMock(return_value=mock_coord))
+        monkeypatch.setattr(calc, 'AltAz', MagicMock(return_value=MagicMock()))
+        monkeypatch.setattr(calc, '_compute_target_result', lambda *a, **kw: None)
+        monkeypatch.setattr(calc, '_save_alttime_json', lambda *a, **kw: None)
+        result = run_calculations(self._CONFIG)
+        assert result['counts']['deep_sky'] == 0
+
+    def test_dso_log_interval_fires(self, monkeypatch):
+        """Line 1444: patch _DSO_LOG_INTERVAL to 1 so debug log fires on first DSO."""
+        self._setup(monkeypatch)
+        dso = SkyTonightTarget(
+            target_id='dso-log', category='deep_sky', object_type='galaxy',
+            preferred_name='NGC 0002', magnitude=11.0, size_arcmin=8.0,
+            coordinates=SkyTonightCoordinates(ra_hours=2.0, dec_degrees=30.0),
+            source_catalogues=['NGC'], metadata={},
+        )
+        monkeypatch.setattr(calc, 'load_targets_dataset',
+                            lambda: {'targets': [dso], 'lookup': {}})
+        mock_altaz_batch = MagicMock()
+        mock_altaz_batch.alt.deg = np.full(1, 45.0, dtype=np.float32)
+        mock_altaz_batch.az.deg = np.full(1, 120.0, dtype=np.float32)
+        mock_coord = MagicMock()
+        mock_coord.transform_to.return_value = mock_altaz_batch
+        monkeypatch.setattr(calc, 'SkyCoord', MagicMock(return_value=mock_coord))
+        monkeypatch.setattr(calc, 'AltAz', MagicMock(return_value=MagicMock()))
+        monkeypatch.setattr(calc, '_DSO_LOG_INTERVAL', 1)
+        monkeypatch.setattr(calc, '_compute_target_result', lambda *a, **kw: None)
+        monkeypatch.setattr(calc, '_save_alttime_json', lambda *a, **kw: None)
+        result = run_calculations(self._CONFIG)
+        assert result['counts']['deep_sky'] == 0

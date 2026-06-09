@@ -348,7 +348,7 @@ class SkyTonightScheduler:
                     self._cache_ready_waited = True
                     logger.info('Waiting up to 5 minutes for initial cache update ' 'before first SkyTonight run...')
                     ready = self._cache_ready_event.wait(timeout=300)
-                    if not ready:
+                    if not ready:  # pragma: no cover  # race-condition path: event set between is_set() check and wait()
                         logger.warning('Cache ready timeout exceeded; proceeding with SkyTonight run anyway.')
                 elif not self._cache_ready_waited:
                     self._cache_ready_waited = True

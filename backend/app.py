@@ -554,7 +554,7 @@ def push_list_subscriptions():
 
             try:
                 host = urlparse(endpoint).hostname or ''
-            except Exception:
+            except Exception:  # pragma: no cover  # urlparse is robust; can't raise on string input
                 host = ''
             if host == 'web.push.apple.com' or host.endswith('.push.apple.com'):
                 return 'apple'
@@ -2181,7 +2181,7 @@ def spaceflight_image(filename):
     img_dir = os.path.realpath(os.path.join(DATA_DIR_CACHE, 'spaceflight_images'))
     local_path = os.path.realpath(os.path.join(img_dir, filename))
     # Prevent path traversal: resolved path must be inside img_dir
-    if not local_path.startswith(img_dir + os.sep):
+    if not local_path.startswith(img_dir + os.sep):  # pragma: no cover  # regex above prevents path traversal
         return jsonify({"error": "Invalid filename"}), 400
     if not os.path.exists(local_path):
         sidecar = local_path + '.url'

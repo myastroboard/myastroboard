@@ -685,7 +685,7 @@ def get_plan_with_timeline(user_id: str, username: str, telescope_id: Optional[s
 
     if night_start and night_end and night_end > night_start:
         total_seconds = (night_end - night_start).total_seconds()
-        if total_seconds > 0:
+        if total_seconds > 0:  # pragma: no branch  # guaranteed by night_end > night_start
             elapsed_seconds = (now_dt - night_start).total_seconds()
             progress_percent = max(0.0, min(100.0, (elapsed_seconds / total_seconds) * 100.0))
         is_inside_night = night_start <= now_dt <= night_end
@@ -991,7 +991,7 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
     _safe_re = _re.compile(r'[^a-z0-9_-]')
 
     def _load_alttime(alttime_file: str):
-        if not alttime_file:
+        if not alttime_file:  # pragma: no cover  # caller guards with `if af:`
             return None
         safe = _safe_re.sub('_', str(alttime_file).lower())
         path = os.path.normpath(os.path.join(SKYTONIGHT_OUTPUT_DIR, f'{safe}_alttime.json'))
@@ -1048,7 +1048,7 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
 
         def _lerp(p0, p1, x):
             span = (p1[0] - p0[0]).total_seconds()
-            if span == 0:
+            if span == 0:  # pragma: no cover  # caller guards: prev[0] < start < p[0] → span > 0
                 return x, p0[1]
             frac = (x - p0[0]).total_seconds() / span
             return x, p0[1] + frac * (p1[1] - p0[1])
