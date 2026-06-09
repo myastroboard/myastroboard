@@ -178,15 +178,15 @@ def get_or_create_skytonight_scheduler(app, cache_ready_event=None):
             if lock_file is not None:
                 try:
                     lock_file.close()
-                except Exception:
-                    pass
+                except Exception as close_err:
+                    logger.debug('Failed to close lock file during cleanup: %s', close_err)
             return None
         except Exception as e:
             if lock_file is not None:
                 try:
                     lock_file.close()
-                except Exception:
-                    pass
+                except Exception as close_err:
+                    logger.debug('Failed to close lock file during cleanup: %s', close_err)
             logger.error(f'Failed to create SkyTonight scheduler: {e}')
             app.config['is_skytonight_scheduler_worker'] = False
             return None
