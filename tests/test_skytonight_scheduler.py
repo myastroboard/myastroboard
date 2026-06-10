@@ -225,7 +225,7 @@ def test_missed_run_recovery_on_startup(monkeypatch):
 
 
 class TestParseLocalDatetime:
-    """Cover _parse_local_datetime branches (lines 42-50)."""
+    """Cover _parse_local_datetime behavior across valid and invalid inputs."""
 
     def test_parse_valid_datetime_string(self):
         result = _parse_local_datetime('2026-04-17 22:00', 'Europe/Paris')
@@ -248,7 +248,7 @@ class TestParseLocalDatetime:
 
 
 class TestIsServerTimeValid:
-    """Cover _is_server_time_valid branches (lines 53-60)."""
+    """Cover _is_server_time_valid behavior for valid and invalid inputs."""
 
     def test_returns_false_for_year_before_2024(self):
         t = datetime(2020, 1, 1, tzinfo=ZoneInfo('UTC'))
@@ -267,7 +267,7 @@ class TestResolveScheduleEdgeCases:
     """Cover additional resolve_schedule branches."""
 
     def test_fallback_when_no_location(self):
-        """Covers the 'no candidates' fallback path (lines 106-113)."""
+        """Covers the fallback path when no scheduling candidates are available."""
         config = {
             'location': {},  # No lat/lon → no SunService call → no candidates
             'skytonight': {'enabled': True},
@@ -296,7 +296,7 @@ class TestResolveScheduleEdgeCases:
         assert schedule is not None
 
     def test_fallback_when_nautical_dawn_is_none(self, monkeypatch):
-        """Covers the dawn_time is None branch (line 90-91 skip)."""
+        """Covers skipping dawn-based candidates when nautical dawn is unavailable."""
         config = {
             'location': {
                 'latitude': 48.8,
@@ -358,14 +358,14 @@ class TestSchedulerHelperMethods:
         return sched, stored
 
     def test_write_status_when_disabled_clears_next_run(self, monkeypatch):
-        """Covers the 'not enabled' override in _write_status (lines 435-443)."""
+        """Covers the disabled-state override branch in _write_status."""
         sched, stored = self._make_scheduler(monkeypatch, enabled=False)
         sched._write_status()
         assert stored.get('next_run') is None
         assert stored.get('mode') == 'disabled'
 
     def test_write_status_uses_triggered_mode_while_executing(self, monkeypatch):
-        """Covers triggered mode/reason display when is_executing (lines 478-479)."""
+        """Covers triggered mode/reason display when is_executing is true."""
         sched, stored = self._make_scheduler(monkeypatch, enabled=True)
         sched.is_executing = True
         sched._triggered_mode = 'manual'
@@ -376,7 +376,7 @@ class TestSchedulerHelperMethods:
         assert stored.get('reason') == 'Manually triggered.'
 
     def test_write_status_computes_execution_duration(self, monkeypatch):
-        """Covers execution_duration_seconds computation (lines 446-447)."""
+        """Covers execution_duration_seconds computation while executing."""
         sched, stored = self._make_scheduler(monkeypatch, enabled=True)
         sched.is_executing = True
         sched.execution_start_time = datetime.now().astimezone() - timedelta(seconds=10)
@@ -385,19 +385,19 @@ class TestSchedulerHelperMethods:
         assert stored.get('progress', {}).get('execution_duration_seconds', 0) >= 10
 
     def test_get_status_returns_dict_with_running_key(self, monkeypatch):
-        """Covers get_status (lines 493-500)."""
+        """Covers get_status returning a status dict with runtime state."""
         sched, stored = self._make_scheduler(monkeypatch, enabled=True)
         status = sched.get_status()
         assert 'running' in status
 
     def test_trigger_now_when_not_locked(self, monkeypatch):
-        """Covers trigger_now success path (lines 503-506) - returns triggered."""
+        """Covers trigger_now success path returning a triggered status."""
         sched, _ = self._make_scheduler(monkeypatch, enabled=True)
         result = sched.trigger_now()
         assert result['status'] == 'triggered'
 
     def test_trigger_now_when_locked_returns_skipped(self, monkeypatch):
-        """Covers trigger_now locked path (lines 503-504)."""
+        """Covers trigger_now returning skipped status when the execution lock is held."""
         sched, _ = self._make_scheduler(monkeypatch, enabled=True)
         # Acquire the lock so trigger_now sees it as locked
         sched._execution_lock.acquire()
@@ -408,7 +408,7 @@ class TestSchedulerHelperMethods:
             sched._execution_lock.release()
 
     def test_start_twice_is_idempotent(self, monkeypatch):
-        """Covers the _scheduler_started guard in start() (lines 222-224)."""
+        """Covers the _scheduler_started guard ensuring start() is idempotent."""
         monkeypatch.setattr('skytonight_scheduler.append_scheduler_log', lambda msg: None)
         monkeypatch.setattr('skytonight_scheduler.get_scheduler_trigger_file', lambda: '/tmp/no_trigger')
         monkeypatch.setattr('skytonight_scheduler.has_calculation_results', lambda: True)
@@ -432,7 +432,7 @@ class TestSchedulerHelperMethods:
         assert sched._scheduler_started is True
 
     def test_stop_joins_thread(self, monkeypatch):
-        """Covers stop() when thread is alive (lines 233-237)."""
+        """Covers stop() joining the thread and setting running to False."""
         monkeypatch.setattr('skytonight_scheduler.append_scheduler_log', lambda msg: None)
         monkeypatch.setattr('skytonight_scheduler.get_scheduler_trigger_file', lambda: '/tmp/no_trigger')
         monkeypatch.setattr('skytonight_scheduler.has_calculation_results', lambda: True)
@@ -493,7 +493,7 @@ class TestSchedulerExecuteCycle:
         return sched, stored
 
     def test_execute_cycle_succeeds_and_records_run(self, monkeypatch):
-        """Covers the happy path of _execute_cycle (lines 396-416)."""
+        """Covers the happy path of _execute_cycle: runner fires and last_run is recorded."""
         calls = []
 
         def runner():
@@ -508,7 +508,7 @@ class TestSchedulerExecuteCycle:
         assert sched.last_error is None
 
     def test_execute_cycle_records_error_on_runner_exception(self, monkeypatch):
-        """Covers the exception handler in _execute_cycle (lines 411-416)."""
+        """Covers the exception handler in _execute_cycle recording the error."""
         def bad_runner():
             raise RuntimeError('runner exploded')
 
@@ -519,13 +519,13 @@ class TestSchedulerExecuteCycle:
         assert sched.last_result == {}
 
     def test_execute_cycle_manual_trigger_sets_mode_to_manual(self, monkeypatch):
-        """Covers current_mode='manual' path (line 406)."""
+        """Covers current_mode set to 'manual' for manual trigger cycles."""
         sched, _ = self._make_scheduler(monkeypatch, enabled=True)
         sched._execute_cycle(manual_trigger=True)
         assert sched.current_mode == 'manual'
 
     def test_execute_cycle_skips_when_already_locked(self, monkeypatch):
-        """Covers the early-return when _execution_lock is locked (lines 384-388)."""
+        """Covers the early-return when _execution_lock is already held."""
         sched, _ = self._make_scheduler(monkeypatch, enabled=True)
         sched._execution_lock.acquire()
         try:
@@ -537,7 +537,7 @@ class TestSchedulerExecuteCycle:
             sched._execution_lock.release()
 
     def test_execute_cycle_with_app_context(self, monkeypatch):
-        """Covers the app.app_context() branch (lines 398-400)."""
+        """Covers running the cycle inside a Flask app context when app is set."""
         calls = []
 
         def runner():
@@ -570,7 +570,7 @@ class TestSchedulerInitFromPersistedStatus:
         monkeypatch.setattr('skytonight_scheduler.ensure_skytonight_directories', lambda: None)
 
     def test_restores_last_run_from_status(self, monkeypatch):
-        """Covers the last_run parsing branch (lines 165-169)."""
+        """Covers restoring last_run from a valid ISO string in persisted status."""
         last_run_dt = datetime(2026, 4, 17, 3, 0, tzinfo=ZoneInfo('UTC'))
         self._monkeypatch_storage(monkeypatch, {'last_run': last_run_dt.isoformat()})
         monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda: {})
@@ -583,7 +583,7 @@ class TestSchedulerInitFromPersistedStatus:
         assert sched.last_run.year == 2026
 
     def test_invalid_last_run_iso_gives_none(self, monkeypatch):
-        """Covers the ValueError branch in last_run parsing (line 168-169)."""
+        """Covers last_run left as None when the stored ISO string is invalid."""
         self._monkeypatch_storage(monkeypatch, {'last_run': 'not-a-datetime'})
         monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda: {})
 
@@ -594,7 +594,7 @@ class TestSchedulerInitFromPersistedStatus:
         assert sched.last_run is None
 
     def test_last_error_non_string_coerced(self, monkeypatch):
-        """Covers else branch for last_error (line 176)."""
+        """Covers non-string last_error coerced to str on restore."""
         self._monkeypatch_storage(monkeypatch, {'last_error': 42})
         monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda: {})
 
@@ -605,7 +605,7 @@ class TestSchedulerInitFromPersistedStatus:
         assert sched.last_error == '42'
 
     def test_last_result_non_dict_wrapped(self, monkeypatch):
-        """Covers non-dict last_result → wrapped in dict (line 182)."""
+        """Covers non-dict last_result wrapped in a dict on restore."""
         self._monkeypatch_storage(monkeypatch, {'last_result': 'some-string'})
         monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda: {})
 
@@ -616,7 +616,7 @@ class TestSchedulerInitFromPersistedStatus:
         assert sched.last_result == {'result': 'some-string'}
 
     def test_backfill_from_calc_cache_when_no_last_result(self, monkeypatch):
-        """Covers defensive backfill from calculation cache (lines 191-211)."""
+        """Covers defensive backfill of last_result from the calculation cache."""
         self._monkeypatch_storage(monkeypatch, {})
         # Provide a calc cache with useful metadata
         calc_cache = {
@@ -636,7 +636,7 @@ class TestSchedulerInitFromPersistedStatus:
         assert sched.last_result['calculation']['counts']['deep_sky'] == 10
 
     def test_committed_next_run_restored_from_status(self, monkeypatch):
-        """Covers the next_run parsing from stored status (lines 214-218)."""
+        """Covers restoring _committed_next_run from a valid ISO string in persisted status."""
         future = datetime(2026, 4, 18, 22, 0, tzinfo=ZoneInfo('UTC'))
         self._monkeypatch_storage(monkeypatch, {'next_run': future.isoformat()})
         monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda: {})
@@ -649,7 +649,7 @@ class TestSchedulerInitFromPersistedStatus:
         assert sched._committed_next_run.year == 2026
 
     def test_invalid_next_run_iso_leaves_none(self, monkeypatch):
-        """Covers ValueError branch for next_run parsing (line 218)."""
+        """Covers _committed_next_run left as None when the stored ISO string is invalid."""
         self._monkeypatch_storage(monkeypatch, {'next_run': 'bad-iso'})
         monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda: {})
 
@@ -660,7 +660,7 @@ class TestSchedulerInitFromPersistedStatus:
         assert sched._committed_next_run is None
 
     def test_duration_stored_in_status(self, monkeypatch):
-        """Covers stored_last_duration parsing (lines 184-189)."""
+        """Covers restoring last_execution_duration_seconds from persisted status."""
         self._monkeypatch_storage(monkeypatch, {'progress': {'last_execution_duration_seconds': 42}})
         monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda: {})
 
@@ -694,7 +694,7 @@ class TestRunLoopBranches:
         return stored
 
     def test_loop_fires_immediately_when_last_run_is_none(self, monkeypatch, tmp_path):
-        """Covers should_run=True path when last_run is None (line 304)."""
+        """Covers should_run=True on the first iteration when last_run is None."""
         self._setup_monkeypatches(monkeypatch)
         done_event = threading.Event()
         calls = []
@@ -730,7 +730,7 @@ class TestRunLoopBranches:
         assert calls
 
     def test_loop_fires_when_missing_calculation_results(self, monkeypatch):
-        """Covers should_run=True path when has_calculation_results is False (lines 305-309)."""
+        """Covers should_run=True when calculation results are absent despite a recent last_run."""
         self._setup_monkeypatches(monkeypatch)
         monkeypatch.setattr('skytonight_scheduler.has_calculation_results', lambda: False)
         done_event = threading.Event()
@@ -769,7 +769,7 @@ class TestRunLoopBranches:
         assert fired, 'Runner should fire when calculation results are missing'
 
     def test_loop_handles_manual_trigger_file(self, monkeypatch, tmp_path):
-        """Covers manual trigger file detection path (lines 292-298)."""
+        """Covers manual trigger file detection causing the runner to fire."""
         trigger_file = str(tmp_path / 'skytonight_trigger')
         # Create the trigger file so os.path.exists returns True
         with open(trigger_file, 'w') as f:
@@ -812,7 +812,7 @@ class TestRunLoopBranches:
         assert fired, 'Manual trigger file should trigger the runner'
 
     def test_loop_respects_committed_next_run(self, monkeypatch):
-        """Covers the committed_next_run check (lines 313-316)."""
+        """Covers runner firing when server_time has passed _committed_next_run."""
         self._setup_monkeypatches(monkeypatch)
         done_event = threading.Event()
         calls = []
@@ -851,7 +851,7 @@ class TestRunLoopBranches:
         assert fired, 'Runner should fire when server_time >= committed_next_run'
 
     def test_loop_cache_ready_event_path(self, monkeypatch):
-        """Covers the cache_ready_event.wait branch (lines 348-352)."""
+        """Covers _wait_for_initial_cache_ready executing when the cache event is already set."""
         self._setup_monkeypatches(monkeypatch)
         done_event = threading.Event()
         calls = []
@@ -890,7 +890,7 @@ class TestRunLoopBranches:
         assert sched._cache_ready_waited is True
 
     def test_loop_write_status_with_get_calculation_progress_exception(self, monkeypatch):
-        """Covers the exception path for get_calculation_progress import (lines 453-454)."""
+        """Covers _write_status falling back gracefully when get_calculation_progress raises."""
         self._setup_monkeypatches(monkeypatch)
 
         # Make get_calculation_progress raise inside _write_status
@@ -915,7 +915,7 @@ class TestRunLoopBranches:
             assert 'progress' in stored
 
     def test_loop_advance_committed_next_run_when_last_run_reached_slot(self, monkeypatch):
-        """Covers next_run advance logic (lines 325-337) when last_run >= _committed_next_run."""
+        """Covers _committed_next_run advancing to the new schedule when last_run has passed the committed slot."""
         self._setup_monkeypatches(monkeypatch)
 
         past_committed = datetime.now(ZoneInfo('UTC')) - timedelta(hours=2)
@@ -1003,10 +1003,10 @@ class TestSchedulerInitFromStoredStatus:
 
 
 class TestSchedulerStopWithNoThread:
-    """Cover lines 234->236: stop() when thread is None (scheduler never started)."""
+    """Cover stop() when thread is None (scheduler never started)."""
 
     def test_stop_without_start_does_not_crash(self, monkeypatch):
-        """Line 234->236: if self.thread is False/None, thread.join is skipped."""
+        """Covers stop() not crashing when the thread was never created."""
         monkeypatch.setattr('skytonight_scheduler.load_scheduler_status', lambda default=None: {})
         monkeypatch.setattr('skytonight_scheduler.ensure_skytonight_directories', lambda: None)
         monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda: {})
@@ -1021,23 +1021,23 @@ class TestSchedulerStopWithNoThread:
 
 
 class TestResolveSchedulePastCandidates:
-    """Cover 92->97 and 101->87: when candidate times are in the past."""
+    """Cover fallback when all dawn/dusk candidates are in the past."""
 
     def test_all_candidates_in_past_uses_fallback(self):
-        """92->97 and 101->87: all dawn/dusk candidates ≤ current_time → fallback."""
+        """Covers fallback mode when all dawn/dusk candidates are ≤ current_time."""
         config = _base_config()
         # Use a fixed reference time to keep this test deterministic while ensuring
         # schedule candidates are treated as past for this scenario.
-        far_future = datetime(2000, 1, 1, 20, 0, tzinfo=ZoneInfo('Europe/Paris'))
+        far_future = datetime(2026, 12, 31, 23, 59, tzinfo=ZoneInfo('Europe/Paris'))
         schedule = resolve_schedule(config, now=far_future)
         assert schedule.mode == 'fallback-6h'
 
 
 class TestRunLoopMissedRunFalseBranch:
-    """Cover 260->280: missed-run recovery condition False (slot is in the future)."""
+    """Cover missed-run recovery when the missed slot is still in the future."""
 
     def test_no_recovery_when_slot_is_in_future(self, monkeypatch):
-        """260->280: night_end is set but missed_slot is in the future → condition False."""
+        """Covers missed-run recovery being skipped when the slot is still in the future."""
         future_next_run = datetime.now(ZoneInfo('Europe/Paris')) + timedelta(hours=4)
         last_run = datetime.now(ZoneInfo('Europe/Paris')) - timedelta(hours=6)
         # night_end is 3 hours in the future → missed_slot = 4h from now → in future
@@ -1209,10 +1209,10 @@ class TestRunLoopMissedRunRecoveryException:
 
 
 class TestRunLoopScheduleNextRunNone:
-    """Cover 325->339: schedule.next_run is None branch."""
+    """Cover _committed_next_run update being skipped when schedule.next_run is None."""
 
     def test_next_run_none_skips_committed_update(self, monkeypatch):
-        """325->339: when schedule.next_run is None, the committed_next_run update is skipped."""
+        """Covers _committed_next_run staying None when the schedule provides no next_run."""
         stopped_event = threading.Event()
         resolve_calls = [0]
 
@@ -1223,7 +1223,7 @@ class TestRunLoopScheduleNextRunNone:
                 stopped_event.set()
             return SkyTonightSchedule(
                 mode='disabled',
-                next_run=None,  # ← Triggers 325->339 (False branch)
+                next_run=None,  # no next_run → committed_next_run update is skipped
                 server_time_valid=True,
                 reason='disabled',
                 server_time=datetime.now(ZoneInfo('UTC')),
@@ -1252,10 +1252,10 @@ class TestRunLoopScheduleNextRunNone:
 
 
 class TestRunLoopCommittedNextRunUnchanged:
-    """Cover 331->339: previous_next_run == _committed_next_run (no change to log)."""
+    """Cover no debug log when _committed_next_run already equals the resolved next_run."""
 
     def test_no_debug_log_when_next_run_unchanged(self, monkeypatch):
-        """331->339: committed_next_run already equals schedule.next_run → no debug log."""
+        """Covers the no-op path when committed_next_run already equals schedule.next_run."""
         specific_time = datetime.now(ZoneInfo('UTC')) + timedelta(hours=4)
 
         stopped_event = threading.Event()
@@ -1268,7 +1268,7 @@ class TestRunLoopCommittedNextRunUnchanged:
                 stopped_event.set()
             return SkyTonightSchedule(
                 mode='pre-nautical-night',
-                next_run=specific_time,  # Same as committed_next_run → 331->339
+                next_run=specific_time,  # same as committed_next_run → no debug log emitted
                 server_time_valid=True,
                 reason='test',
                 server_time=datetime.now(ZoneInfo('UTC')),
@@ -1294,14 +1294,14 @@ class TestRunLoopCommittedNextRunUnchanged:
         stopped_event.wait(timeout=5)
         sched.stop()
         assert resolve_calls[0] >= 1
-        assert sched._committed_next_run == specific_time  # Unchanged (331->339 taken)
+        assert sched._committed_next_run == specific_time  # already equal, so unchanged
 
 
 class TestRunLoopCacheReadyElseBranch:
-    """Cover 353->357: elif not self._cache_ready_waited branch."""
+    """Cover the elif branch setting _cache_ready_waited on a manual trigger without cache event wait."""
 
     def test_cache_ready_elif_branch_manual_trigger(self, monkeypatch, tmp_path):
-        """Lines 353-354: manual trigger → not waiting for cache event → elif sets _cache_ready_waited."""
+        """Covers _cache_ready_waited set to True via the elif branch on a manual trigger."""
         trigger_file = tmp_path / "skt2.trigger"
         trigger_file.touch()
 
@@ -1354,7 +1354,7 @@ class TestRunLoopCacheReadyElseBranch:
 
 
 class TestRunLoopCacheReadyTimeoutAndAlreadyWaited:
-    """Cover lines 348-352 (cache event wait timeout) and 353->357 (already waited)."""
+    """Cover cache event wait timeout and the already-waited skip path."""
 
     def _common_patches(self, monkeypatch):
         monkeypatch.setattr('skytonight_scheduler.save_scheduler_status', lambda _: None)
@@ -1366,7 +1366,7 @@ class TestRunLoopCacheReadyTimeoutAndAlreadyWaited:
                             lambda: '/tmp/nonexistent_trigger_skt_x99')
 
     def test_cache_ready_wait_times_out_then_run_proceeds(self, monkeypatch):
-        """Lines 348-352: _cache_ready_event.wait returns False (timeout) → warning logged, run proceeds."""
+        """Covers _cache_ready_event.wait timing out: warning is logged and the run proceeds."""
         self._common_patches(monkeypatch)
 
         run_event = threading.Event()
@@ -1413,7 +1413,7 @@ class TestRunLoopCacheReadyTimeoutAndAlreadyWaited:
         assert len(run_calls) >= 1
 
     def test_already_waited_skips_both_branches(self, monkeypatch):
-        """Lines 353->357: _cache_ready_waited=True → elif is False → no-op, run proceeds."""
+        """Covers both cache branches being skipped when _cache_ready_waited is already True."""
         self._common_patches(monkeypatch)
 
         run_event = threading.Event()
