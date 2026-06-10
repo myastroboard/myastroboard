@@ -123,8 +123,6 @@ def test_missed_run_recovery_on_startup(monkeypatch):
       - expected: _committed_next_run is restored to 06:20 so the loop check
         (server_time >= committed) fires immediately.
     """
-    import threading
-
     # The missed slot is 30 seconds in the past so the recovery check fires.
     past_slot = datetime.now(ZoneInfo('Europe/Paris')) - timedelta(seconds=30)
     night_end = past_slot - timedelta(hours=1)  # night_end = missed_slot - 1h
@@ -1026,8 +1024,6 @@ class TestRunLoopMissedRunFalseBranch:
 
     def test_no_recovery_when_slot_is_in_future(self, monkeypatch):
         """260->280: night_end is set but missed_slot is in the future → condition False."""
-        import time as _time
-
         future_next_run = datetime.now(ZoneInfo('Europe/Paris')) + timedelta(hours=4)
         last_run = datetime.now(ZoneInfo('Europe/Paris')) - timedelta(hours=6)
         # night_end is 3 hours in the future → missed_slot = 4h from now → in future
