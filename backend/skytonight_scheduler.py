@@ -24,8 +24,10 @@ from sun_phases import SunService
 
 logger = get_logger(__name__)
 
-SKYTONIGHT_FALLBACK_INTERVAL_SECONDS = 6 * 60 * 60
-SKYTONIGHT_CACHE_READY_TIMEOUT_SECONDS = 600
+SKYTONIGHT_FALLBACK_INTERVAL = timedelta(hours=6)
+SKYTONIGHT_CACHE_READY_TIMEOUT_SECONDS = 10 * 60
+SKYTONIGHT_SCHEDULER_SHUTDOWN_TIMEOUT_SECONDS = 3
+SKYTONIGHT_SCHEDULER_POLL_INTERVAL_SECONDS = 5
 SKYTONIGHT_PRE_NIGHT_OFFSET = timedelta(hours=1)
 SKYTONIGHT_POST_NIGHT_OFFSET = timedelta(hours=1)
 
@@ -72,7 +74,7 @@ def resolve_schedule(config: Dict[str, Any], now: Optional[datetime] = None) -> 
     if not valid_time:
         return SkyTonightSchedule(
             mode='fallback-6h',
-            next_run=current_time + timedelta(seconds=SKYTONIGHT_FALLBACK_INTERVAL_SECONDS),
+            next_run=current_time + SKYTONIGHT_FALLBACK_INTERVAL,
             server_time_valid=False,
             reason='Server time or timezone is not trusted; using 6-hour fallback cadence.',
             server_time=current_time,
@@ -109,7 +111,7 @@ def resolve_schedule(config: Dict[str, Any], now: Optional[datetime] = None) -> 
         candidates.append(
             (
                 'fallback-6h',
-                current_time + timedelta(seconds=SKYTONIGHT_FALLBACK_INTERVAL_SECONDS),
+                current_time + SKYTONIGHT_FALLBACK_INTERVAL,
                 'No twilight times available; using 6-hour fallback cadence.',
             )
         )
@@ -233,7 +235,7 @@ class SkyTonightScheduler:
     def stop(self):
         self.running = False
         if self.thread:
-            self.thread.join(timeout=3)
+            self.thread.join(timeout=SKYTONIGHT_SCHEDULER_SHUTDOWN_TIMEOUT_SECONDS)
         logger.info('SkyTonight scheduler stopped')
         self._write_status()
 
@@ -285,7 +287,7 @@ class SkyTonightScheduler:
                 self.current_mode = 'disabled'
                 self.current_reason = 'SkyTonight is disabled in configuration.'
                 self._write_status()
-                time.sleep(5)
+                time.sleep(SKYTONIGHT_SCHEDULER_POLL_INTERVAL_SECONDS)
                 continue
 
             trigger_file = get_scheduler_trigger_file()
@@ -366,7 +368,7 @@ class SkyTonightScheduler:
             # Always write status every loop iteration so progress duration
             # stays live in the status file while execution is running.
             self._write_status(schedule=schedule)
-            time.sleep(5)
+            time.sleep(SKYTONIGHT_SCHEDULER_POLL_INTERVAL_SECONDS)
 
     def _wait_for_initial_cache_ready(self) -> None:
         if self._cache_ready_event is None:
