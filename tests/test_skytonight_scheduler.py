@@ -232,8 +232,8 @@ class TestParseLocalDatetime:
     def test_parse_invalid_format_returns_none(self):
         assert _parse_local_datetime('not-a-date', 'UTC') is None
 
-    def test_parse_none_value_returns_none(self):
-        assert _parse_local_datetime(None, 'UTC') is None  # type: ignore
+    def test_parse_whitespace_value_returns_none(self):
+        assert _parse_local_datetime('   ', 'UTC') is None
 
 
 class TestIsServerTimeValid:
@@ -978,12 +978,13 @@ class TestSchedulerInitFromStoredStatus:
     def test_backfill_exception_is_swallowed(self, monkeypatch):
         """Lines 212-213: exception in backfill → pass (no crash)."""
         stored = {}  # empty → enters backfill try block
+
+        def _raise_disk_error():
+            raise RuntimeError("disk error")
+
         monkeypatch.setattr('skytonight_scheduler.load_scheduler_status', lambda default=None: stored)
         monkeypatch.setattr('skytonight_scheduler.ensure_skytonight_directories', lambda: None)
-        monkeypatch.setattr(
-            'skytonight_scheduler.load_calculation_results',
-            lambda: (_ for _ in ()).throw(RuntimeError("disk error"))
-        )
+        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', _raise_disk_error)
         # Should not raise
         sched = SkyTonightScheduler(config_loader=lambda: {}, runner=lambda: {})
         assert sched.last_result == {}
