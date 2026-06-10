@@ -25,7 +25,7 @@ from sun_phases import SunService
 logger = get_logger(__name__)
 
 SKYTONIGHT_FALLBACK_INTERVAL_SECONDS = 6 * 60 * 60
-SKYTONIGHT_CACHE_READY_TIMEOUT_SECONDS = 300
+SKYTONIGHT_CACHE_READY_TIMEOUT_SECONDS = 600
 SKYTONIGHT_PRE_NIGHT_OFFSET = timedelta(hours=1)
 SKYTONIGHT_POST_NIGHT_OFFSET = timedelta(hours=1)
 
@@ -373,7 +373,7 @@ class SkyTonightScheduler:
     def _wait_for_initial_cache_ready(self) -> None:
         if self._cache_ready_event is None:
             return
-        logger.info('Waiting up to 5 minutes for initial cache update before first SkyTonight run...')
+        logger.info('Waiting up to 10 minutes for initial cache update before first SkyTonight run...')
         ready = self._cache_ready_event.wait(timeout=SKYTONIGHT_CACHE_READY_TIMEOUT_SECONDS)
         if not ready:
             logger.warning('Cache ready timeout exceeded; proceeding with SkyTonight run anyway.')
