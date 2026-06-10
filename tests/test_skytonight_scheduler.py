@@ -894,7 +894,7 @@ class TestRunLoopBranches:
         self._setup_monkeypatches(monkeypatch)
 
         # Make get_calculation_progress raise inside _write_status
-        with patch('skytonight_calculator.get_calculation_progress', side_effect=Exception('calc broken')):
+        with patch('skytonight_scheduler.get_calculation_progress', side_effect=Exception('calc broken')):
             stored = {}
 
             def _save(payload):
@@ -1026,12 +1026,9 @@ class TestResolveSchedulePastCandidates:
     def test_all_candidates_in_past_uses_fallback(self):
         """92->97 and 101->87: all dawn/dusk candidates ≤ current_time → fallback."""
         config = _base_config()
-        # Use a far-future offset so dawn/dusk candidates computed by resolve_schedule
-        # are reliably behind current_time; 75 years gives a large safety margin.
-        YEARS_TO_ENSURE_PAST_CANDIDATES = 75
-        far_future = (
-            datetime.now(ZoneInfo('Europe/Paris')) + timedelta(days=365 * YEARS_TO_ENSURE_PAST_CANDIDATES)
-        ).replace(hour=20, minute=0, second=0, microsecond=0)
+        # Use a fixed reference time to keep this test deterministic while ensuring
+        # schedule candidates are treated as past for this scenario.
+        far_future = datetime(2000, 1, 1, 20, 0, tzinfo=ZoneInfo('Europe/Paris'))
         schedule = resolve_schedule(config, now=far_future)
         assert schedule.mode == 'fallback-6h'
 
@@ -1476,6 +1473,7 @@ class TestWaitForInitialCacheReady:
     def test_no_event_returns_immediately(self, monkeypatch):
         sched = self._make_scheduler(monkeypatch, cache_ready_event=None)
         sched._wait_for_initial_cache_ready()  # must not block or raise
+        assert sched._cache_ready_waited is True
 
     def test_event_already_set_no_warning(self, monkeypatch):
         event = threading.Event()
@@ -1484,6 +1482,7 @@ class TestWaitForInitialCacheReady:
         with patch('skytonight_scheduler.logger') as mock_log:
             sched._wait_for_initial_cache_ready()
             mock_log.warning.assert_not_called()
+        assert sched._cache_ready_waited is True
 
     def test_timeout_logs_warning(self, monkeypatch):
         event = threading.Event()  # never set → will time out
@@ -1494,6 +1493,7 @@ class TestWaitForInitialCacheReady:
                 mock_log.warning.assert_called_once_with(
                     'Cache ready timeout exceeded; proceeding with SkyTonight run anyway.'
                 )
+        assert sched._cache_ready_waited is True
 
     def test_event_set_before_call_no_warning(self, monkeypatch):
         event = threading.Event()
@@ -1502,3 +1502,4 @@ class TestWaitForInitialCacheReady:
         with patch('skytonight_scheduler.logger') as mock_log:
             sched._wait_for_initial_cache_ready()
             mock_log.warning.assert_not_called()
+        assert sched._cache_ready_waited is True
