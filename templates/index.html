@@ -141,6 +141,12 @@
                                 <i class="bi bi-person icon-inline text-primary" aria-hidden="true"></i><span id="username-display"></span>
                             </a>
                             <ul class="dropdown-menu">
+                                <li id="observatory-nav-item" style="display:none;">
+                                    <a class="dropdown-item main-tab-btn" href="#" data-tab="observatory">
+                                        <i class="bi bi-camera-video icon-inline text-info" aria-hidden="true"></i>
+                                        <span data-i18n="navbar.observatory">Observatory</span>
+                                    </a>
+                                </li>
                                 <li>
                                     <a class="dropdown-item main-tab-btn" href="#" data-tab="equipment">
                                         <i class="bi bi-binoculars icon-inline" aria-hidden="true"></i>
@@ -567,6 +573,18 @@
                         <i class="bi bi-iss icon-inline" aria-hidden="true"></i> <span data-i18n="iss.passes">ISS Passes</span>
                     </h2>
                     <div id="iss-display" class="iss-info-card rounded"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Observatory Section -->
+        <div id="observatory-tab" class="main-tab-content">
+            <div class="shadow p-3 mb-3 rounded bg-sub-container">
+                <div id="allsky-observatory">
+                    <div class="text-muted text-center py-4">
+                        <div class="spinner-border spinner-border-sm me-2"></div>
+                        <span data-i18n="observatory.loading">Loading observatory data…</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1287,6 +1305,11 @@
                     <li class="nav-item">
                         <a class="nav-link sub-tab-btn" href="#" data-subtab="log-export">
                             <i class="bi bi-file-zip text-danger icon-inline" aria-hidden="true"></i> <span data-i18n="settings.log_export">Log Export</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link sub-tab-btn" href="#" data-subtab="connectors">
+                            <i class="bi bi-plug text-info icon-inline" aria-hidden="true"></i> <span data-i18n="settings.connectors">Connectors</span>
                         </a>
                     </li>
                 </ul>
@@ -2389,6 +2412,24 @@
                 </div>
             </div>
 
+            <!-- Connectors Sub-tab -->
+            <div id="connectors-subtab" class="sub-tab-content">
+                <div class="shadow p-2 mb-3 rounded bg-sub-container">
+                    <h2>
+                        <i class="bi bi-plug text-info icon-inline" aria-hidden="true"></i>
+                        <span data-i18n="settings.connectors_title">External Connectors</span>
+                    </h2>
+                    <div class="alert alert-info" role="alert" data-i18n="settings.connectors_info">
+                        Connect external tools to display their data in the Observatory tab. Each connector can have individual modules enabled or disabled.
+                    </div>
+                    <div id="connectors-store" class="row g-3">
+                        <div class="text-muted text-center py-3">
+                            <div class="spinner-border spinner-border-sm"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
 
         <!-- About Section -->
@@ -2869,6 +2910,8 @@
     <script src="/static/js/pwa.js?v={{ version }}"></script>
     <script src="/static/js/constraint_help.js?v={{ version }}"></script>
     <script src="/static/js/first_run.js?v={{ version }}"></script>
+    <script src="/static/js/connectors/allsky.js?v={{ version }}"></script>
+    <script src="/static/js/connectors/connectors.js?v={{ version }}"></script>
     <script src="/static/js/app.js?v={{ version }}"></script>
 </body>
 </html>

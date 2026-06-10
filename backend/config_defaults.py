@@ -65,6 +65,27 @@ DEFAULT_SKYTONIGHT = {
     "datasets": deepcopy(DEFAULT_SKYTONIGHT_DATASETS),
 }
 
+DEFAULT_ALLSKY_CONNECTOR = {
+    "enabled": False,
+    "url": "",
+    "label": "My AllSky Camera",
+    "image_path": "current/tmp",
+    "image_filename": "image.jpg",
+    "export_json_path": "allskydata.json",
+    "modules": {
+        "live_image":      {"enabled": True},
+        "sensor_data":     {"enabled": False},
+        "keogram":         {"enabled": True},
+        "startrails":      {"enabled": False},
+        "daily_timelapse": {"enabled": False},
+        "mini_timelapse":  {"enabled": False},
+    },
+}
+
+DEFAULT_CONNECTORS = {
+    "allsky": deepcopy(DEFAULT_ALLSKY_CONNECTOR),
+}
+
 # Default complete configuration
 DEFAULT_CONFIG = {
     "location": DEFAULT_LOCATION,
@@ -72,4 +93,5 @@ DEFAULT_CONFIG = {
     "min_altitude": 30,
     "astrodex": DEFAULT_ASTRODEX,
     "skytonight": DEFAULT_SKYTONIGHT,
+    "connectors": DEFAULT_CONNECTORS,
 }

@@ -31,6 +31,8 @@ from constants import (
     CACHE_TTL_SPACEFLIGHT_ASTRONAUTS,
     CACHE_TTL_SPACEFLIGHT_EVENTS,
     CACHE_TTL_IERS,
+    CACHE_TTL_ALLSKY_SENSOR,
+    CACHE_TTL_ALLSKY_HEALTH,
 )
 
 # Windows-compatible file locking
@@ -73,6 +75,10 @@ _iers_cache = {"timestamp": 0, "data": None}
 
 # Version update check cache (separate TTL)
 _version_update_cache = {"timestamp": 0, "data": None}
+
+# Connector caches
+_allsky_sensor_cache = {"timestamp": 0, "data": None}
+_allsky_health_cache = {"timestamp": 0, "data": None}
 
 # Track the last known location config to detect changes
 # This is loaded from disk to survive restarts
