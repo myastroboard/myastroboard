@@ -41,6 +41,7 @@ from constants import (
     CACHE_TTL_SPACEFLIGHT_ASTRONAUTS,
     CACHE_TTL_SPACEFLIGHT_EVENTS,
     CACHE_TTL_IERS,
+    CACHE_TTL_ALLSKY_SENSOR,
 )
 
 # Initialize logger for this module
@@ -1055,6 +1056,26 @@ def update_iers_cache():
         logger.error("Failed to refresh IERS-A data: %s. Will retry next scheduler cycle.", e)
 
 
+def update_allsky_sensor_cache(config=None):
+    """Fetches live sensor data from the AllSky Export JSON and stores it in cache."""
+    if config is None:
+        config = load_config()
+
+    allsky_cfg = config.get("connectors", {}).get("allsky", {})
+    if not allsky_cfg.get("enabled") or not allsky_cfg.get("url"):
+        return
+    if not allsky_cfg.get("modules", {}).get("sensor_data", {}).get("enabled"):
+        return
+
+    from connectors.allsky_connector import AllSkyConnector
+    connector = AllSkyConnector(allsky_cfg)
+    data = connector.fetch_sensor_data()
+    now_ts = time.time()
+    cache_store._allsky_sensor_cache["data"] = data
+    cache_store._allsky_sensor_cache["timestamp"] = now_ts
+    logger.debug("AllSky sensor cache updated")
+
+
 def fully_initialize_caches():
     """
     Selectively refreshes cache entries whose individual TTL has expired.
@@ -1228,6 +1249,22 @@ def fully_initialize_caches():
             ("weather_forecast", None, update_weather_cache, WEATHER_CACHE_TTL, cache_store._weather_cache, False),
             ("iers", "iers", update_iers_cache, CACHE_TTL_IERS, cache_store._iers_cache, False),
         ]
+
+        # Add AllSky sensor job only when the connector is enabled
+        allsky_cfg = config.get("connectors", {}).get("allsky", {})
+        if (
+            allsky_cfg.get("enabled")
+            and allsky_cfg.get("url")
+            and allsky_cfg.get("modules", {}).get("sensor_data", {}).get("enabled")
+        ):
+            cache_jobs.append((
+                "allsky_sensor",
+                None,
+                partial(update_allsky_sensor_cache, config=config),
+                CACHE_TTL_ALLSKY_SENSOR,
+                cache_store._allsky_sensor_cache,
+                False,
+            ))
 
         # Spaceflight image-integrity check jobs (cache_entry key -> name for logging)
         _SPACEFLIGHT_IMAGE_JOBS = {

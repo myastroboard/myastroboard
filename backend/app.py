@@ -16,6 +16,9 @@ from flask import (
     redirect,
     url_for,
     g,
+    Response,
+    stream_with_context,
+    abort,
 )
 from flask_compress import Compress
 from flask_cors import CORS
@@ -994,6 +997,150 @@ def update_config_api():
             "cache_reset": location_changed,
             "message": "Configuration updated" + (" and cache reset" if location_changed else ""),
         }
+    )
+
+
+@app.route('/api/connectors', methods=['GET'])
+@login_required
+def list_connectors_api():
+    """List all available connectors with their installed/enabled state."""
+    from connectors import REGISTRY
+    config = load_config()
+    connectors_cfg = config.get("connectors", {})
+    result = []
+    for name, cls in REGISTRY.items():
+        cfg = connectors_cfg.get(name, {})
+        result.append({
+            "name": name,
+            "label": cls.label,
+            "description": cls.description,
+            "min_version": cls.min_version,
+            "modules": cls.MODULES,
+            "installed": bool(cfg.get("url")),
+            "enabled": bool(cfg.get("enabled")) and bool(cfg.get("url")),
+            "config": cfg,
+        })
+    return jsonify(result)
+
+
+@app.route('/api/connectors/allsky/status', methods=['GET'])
+@login_required
+def allsky_status_api():
+    """Return cached AllSky sensor data (allskydata.json)."""
+    config = load_config()
+    allsky_cfg = config.get("connectors", {}).get("allsky", {})
+    if not allsky_cfg.get("enabled") or not allsky_cfg.get("url"):
+        return jsonify({"error": "AllSky connector not configured"}), 404
+    if not allsky_cfg.get("modules", {}).get("sensor_data", {}).get("enabled"):
+        return jsonify({"error": "sensor_data module not enabled"}), 404
+
+    data = cache_store._allsky_sensor_cache.get("data")
+    if data is None:
+        from connectors.allsky_connector import AllSkyConnector
+        data = AllSkyConnector(allsky_cfg).fetch_sensor_data()
+        cache_store._allsky_sensor_cache["data"] = data
+        import time
+        cache_store._allsky_sensor_cache["timestamp"] = time.time()
+    return jsonify(data)
+
+
+@app.route('/api/connectors/allsky/health', methods=['GET'])
+@login_required
+def allsky_health_api():
+    """Run a per-module health check against the AllSky instance."""
+    config = load_config()
+    allsky_cfg = config.get("connectors", {}).get("allsky", {})
+    if not allsky_cfg.get("url"):
+        return jsonify({"reachable": False, "modules": {}, "error": "AllSky URL not configured"}), 200
+
+    import time
+    cached = cache_store._allsky_health_cache
+    if cached.get("data") and (time.time() - cached.get("timestamp", 0)) < 120:
+        return jsonify(cached["data"])
+
+    from connectors.allsky_connector import AllSkyConnector
+    result = AllSkyConnector(allsky_cfg).health_check()
+    cache_store._allsky_health_cache["data"] = result
+    cache_store._allsky_health_cache["timestamp"] = time.time()
+    return jsonify(result)
+
+
+@app.route('/api/connectors/allsky/urls', methods=['GET'])
+@login_required
+def allsky_urls_api():
+    """Return proxy URLs for all enabled AllSky modules.
+
+    Returns /api/connectors/allsky/proxy?module=<slug> paths so the browser
+    never contacts AllSky directly — works behind a reverse proxy / HTTPS.
+    """
+    config = load_config()
+    allsky_cfg = config.get("connectors", {}).get("allsky", {})
+    if not allsky_cfg.get("enabled") or not allsky_cfg.get("url"):
+        return jsonify({"error": "AllSky connector not configured"}), 404
+
+    date_str = request.args.get("date")
+    from connectors.allsky_connector import AllSkyConnector
+    direct_urls = AllSkyConnector(allsky_cfg).get_module_urls(date_str=date_str)
+
+    date_suffix = f"&date={date_str}" if date_str else ""
+    proxy_urls = {
+        module: f"/api/connectors/allsky/proxy?module={module}{date_suffix}"
+        for module in direct_urls
+    }
+    return jsonify(proxy_urls)
+
+
+@app.route('/api/connectors/allsky/proxy', methods=['GET'])
+@login_required
+def allsky_proxy_api():
+    """Proxy an AllSky resource through the backend.
+
+    The browser requests /api/connectors/allsky/proxy?module=<slug>[&date=YYYYMMDD].
+    The backend fetches the real AllSky URL and streams it back, so the browser
+    only ever talks to MyAstroBoard — no mixed-content or local-network issues.
+    Range requests (video seeking) are forwarded transparently.
+    """
+    module = request.args.get("module")
+    if not module:
+        return jsonify({"error": "module parameter required"}), 400
+
+    config = load_config()
+    allsky_cfg = config.get("connectors", {}).get("allsky", {})
+    if not allsky_cfg.get("enabled") or not allsky_cfg.get("url"):
+        return abort(503)
+
+    date_str = request.args.get("date")
+    from connectors.allsky_connector import AllSkyConnector
+    import requests as _req
+
+    direct_urls = AllSkyConnector(allsky_cfg).get_module_urls(date_str=date_str)
+    target_url = direct_urls.get(module)
+    if not target_url:
+        return abort(404)
+
+    upstream_headers = {}
+    range_header = request.headers.get("Range")
+    if range_header:
+        upstream_headers["Range"] = range_header
+
+    try:
+        r = _req.get(target_url, timeout=15, stream=True, headers=upstream_headers)
+    except _req.exceptions.Timeout:
+        logger.warning("AllSky proxy timeout for module %s", module)
+        return abort(504)
+    except _req.exceptions.RequestException as exc:
+        logger.warning("AllSky proxy error for module %s: %s", module, exc)
+        return abort(502)
+
+    proxy_headers = {"Content-Type": r.headers.get("Content-Type", "application/octet-stream")}
+    for hdr in ("Content-Length", "Content-Range", "Accept-Ranges"):
+        if hdr in r.headers:
+            proxy_headers[hdr] = r.headers[hdr]
+
+    return Response(
+        stream_with_context(r.iter_content(chunk_size=16384)),
+        status=r.status_code,
+        headers=proxy_headers,
     )
 
 

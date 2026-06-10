@@ -86,7 +86,7 @@ function applyUserStartupPreferences(force = false) {
     const hash = window.location.hash.replace(/^#/, '').toLowerCase();
     if (hash) {
         const firstSegment = hash.split('/')[0];
-        const navigableMains = ['forecast-astro', 'forecast-weather', 'skytonight', 'spaceflight', 'astrodex', 'about', 'equipment', 'my-settings', 'parameters', 'weather', 'planmynight', 'plan-my-night'];
+        const navigableMains = ['forecast-astro', 'forecast-weather', 'skytonight', 'spaceflight', 'astrodex', 'about', 'equipment', 'my-settings', 'parameters', 'weather', 'planmynight', 'plan-my-night', 'observatory'];
         if (navigableMains.includes(firstSegment) || navigableMains.some(m => hash.startsWith(m + '/'))) {
             window.__myastroboardStartupApplied = true;
             return;
@@ -169,6 +169,8 @@ function handleHashNavigation() {
     } else if (hash.startsWith('spaceflight/')) {
         mainTab = 'spaceflight';
         subTab = hash.split('/')[1];
+    } else if (hash === 'observatory') {
+        mainTab = 'observatory';
     } else if (hash.startsWith('skytonight/')) {
         mainTab = 'skytonight';
         subTab = hash.split('/')[1];
@@ -239,6 +241,9 @@ async function initializeApp() {
     // Show first-run location setup if location has never been configured
     if (typeof checkFirstRun === 'function') await checkFirstRun();
 
+    // Show Observatory nav tab only when at least one connector is installed and enabled
+    if (typeof updateObservatoryNavVisibility === 'function') updateObservatoryNavVisibility();
+
     // Load initial page from user preferences (or fallback defaults)
     applyUserStartupPreferences();
 
@@ -274,6 +279,9 @@ function switchMainTab(tabName, options = {}) {
     }
 
     cleanupTransientCharts();
+
+    // Stop AllSky polling when leaving Observatory tab
+    if (typeof stopAllSkyPolling === 'function') stopAllSkyPolling();
 
     // Forach .main-tab-dropdown remove "active" class
     document.querySelectorAll('.main-tab-dropdown').forEach(dropdown => {
@@ -326,6 +334,8 @@ function switchMainTab(tabName, options = {}) {
         loadAstrodex();
     } else if (tabName === 'spaceflight') {
         // nothing extra - subtab switch below handles initial load
+    } else if (tabName === 'observatory') {
+        loadAllSkyObservatory();
     } else if (tabName === 'forecast-weather') {
         loadWeather();
     }
@@ -393,6 +403,9 @@ function switchSubTab(parentTab, subtabName, options = {}) {
             break; // Parameters tab
         case 'log-export':
             loadLogLevel();
+            break; // Parameters tab
+        case 'connectors':
+            loadConnectorsStore();
             break; // Parameters tab
         case 'weather':
             loadWeather();
