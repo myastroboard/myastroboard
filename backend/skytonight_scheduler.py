@@ -296,7 +296,7 @@ class SkyTonightScheduler:
                     manual_trigger = True
                     logger.info('SkyTonight manual trigger detected')
                 except Exception as error:
-                    logger.error(f'Failed to remove SkyTonight trigger file: {error}')
+                    logger.error('Failed to remove SkyTonight trigger file: %s', error)
 
             schedule = resolve_schedule(config)
             self.current_mode = schedule.mode
@@ -304,9 +304,7 @@ class SkyTonightScheduler:
 
             should_run = manual_trigger or self.last_run is None
             if not should_run and not has_calculation_results():
-                logger.info(
-                    'SkyTonight calculation results are missing; ' 'triggering run regardless of last_run timestamp.'
-                )
+                logger.info('SkyTonight calculation results are missing; triggering run regardless of last_run timestamp.')
                 should_run = True
             # Use the committed next_run (set in a previous iteration when it
             # was still in the future) instead of the freshly-computed one so
@@ -418,7 +416,7 @@ class SkyTonightScheduler:
                 self.last_result = {}
                 failure_time = datetime.now().astimezone()
                 append_scheduler_log(f'[{failure_time.isoformat()}] SkyTonight run failed: {error}\n')
-                logger.error(f'SkyTonight execution cycle failed: {error}')
+                logger.error('SkyTonight execution cycle failed: %s', error)
             finally:
                 if self.execution_start_time:  # pragma: no branch
                     self.last_execution_duration_seconds = int(

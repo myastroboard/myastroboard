@@ -6,7 +6,7 @@ Provides consistent logging setup across all modules with configurable log level
 import logging
 import os
 import sys
-from datetime import datetime, timezone as _tz
+from datetime import datetime, timezone
 from logging.handlers import RotatingFileHandler
 from typing import Optional
 from constants import LOG_FILE, LOG_MAX_BYTES, LOG_BACKUP_COUNT
@@ -27,22 +27,22 @@ class _ConfiguredTzFormatter(logging.Formatter):
     unambiguous without cross-referencing the container configuration.
     """
 
-    _tz = None
+    _cached_tz = None
     _tz_resolved = False
 
     @classmethod
     def _get_tz(cls):
         if cls._tz_resolved:
-            return cls._tz
+            return cls._cached_tz
         cls._tz_resolved = True
         try:
             from zoneinfo import ZoneInfo
 
             tz_name = os.environ.get('TZ', 'UTC')
-            cls._tz = ZoneInfo(tz_name)
+            cls._cached_tz = ZoneInfo(tz_name)
         except Exception:
-            cls._tz = _tz.utc
-        return cls._tz
+            cls._cached_tz = timezone.utc
+        return cls._cached_tz
 
     def formatTime(self, record, datefmt=None):
         dt = datetime.fromtimestamp(record.created, tz=self._get_tz())
