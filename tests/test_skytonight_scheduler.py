@@ -1026,10 +1026,11 @@ class TestResolveSchedulePastCandidates:
     def test_all_candidates_in_past_uses_fallback(self):
         """92->97 and 101->87: all dawn/dusk candidates ≤ current_time → fallback."""
         config = _base_config()
-        # Use a relative far-future time so computed dawn/dusk candidates are in the past
-        YEARS_IN_FUTURE = 75
+        # Use a far-future offset so dawn/dusk candidates computed by resolve_schedule
+        # are reliably behind current_time; 75 years gives a large safety margin.
+        YEARS_TO_ENSURE_PAST_CANDIDATES = 75
         far_future = (
-            datetime.now(ZoneInfo('Europe/Paris')) + timedelta(days=365 * YEARS_IN_FUTURE)
+            datetime.now(ZoneInfo('Europe/Paris')) + timedelta(days=365 * YEARS_TO_ENSURE_PAST_CANDIDATES)
         ).replace(hour=20, minute=0, second=0, microsecond=0)
         schedule = resolve_schedule(config, now=far_future)
         assert schedule.mode == 'fallback-6h'
