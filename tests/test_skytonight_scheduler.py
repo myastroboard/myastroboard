@@ -279,7 +279,11 @@ class TestResolveScheduleEdgeCases:
 
     def test_fallback_when_config_is_not_dict(self):
         """Covers non-dict config path."""
-        schedule = resolve_schedule(None, now=datetime(2026, 4, 17, 12, 0, tzinfo=ZoneInfo('UTC')))  # type: ignore[arg-type]  # Intentionally pass invalid config to verify fallback behavior.
+        # Intentionally pass invalid config to verify fallback behavior.
+        schedule = resolve_schedule(
+            None,  # type: ignore[arg-type]
+            now=datetime(2026, 4, 17, 12, 0, tzinfo=ZoneInfo('UTC')),
+        )
         assert schedule.mode == 'fallback-6h'
 
     def test_now_is_none_uses_current_time(self):
