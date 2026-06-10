@@ -2,31 +2,6 @@
 // Weather
 // ======================
 
-function _createWeatherMetricCell(iconClass, colorClass, value, label) {
-    const cell = document.createElement('div');
-    cell.className = 'weather-metric-cell';
-
-    const icon = document.createElement('i');
-    icon.className = `bi ${iconClass}${colorClass ? ' ' + colorClass : ''}`;
-    icon.setAttribute('aria-hidden', 'true');
-
-    const info = document.createElement('div');
-    info.className = 'weather-metric-info';
-
-    const val = document.createElement('span');
-    val.className = 'weather-metric-val';
-    val.textContent = value;
-
-    const lbl = document.createElement('span');
-    lbl.className = 'weather-metric-lbl';
-    lbl.textContent = label;
-
-    info.appendChild(val);
-    info.appendChild(lbl);
-    cell.appendChild(icon);
-    cell.appendChild(info);
-    return cell;
-}
 
 function createChartShell(title, canvasId, legendItems = [], footerText = '') {
     const card = document.createElement('div');
@@ -224,12 +199,12 @@ async function loadWeather() {
             // 2-column metric grid
             const metricGrid = document.createElement('div');
             metricGrid.className = 'weather-metric-grid';
-            metricGrid.appendChild(_createWeatherMetricCell('bi-thermometer-half', 'text-danger', `${temp}${i18n.t('units.temperature_celsius')}`, i18n.t('weather.temperature')));
-            metricGrid.appendChild(_createWeatherMetricCell('bi-droplet', 'text-primary', `${humidity}${i18n.t('units.percent')}`, i18n.t('weather.humidity')));
-            metricGrid.appendChild(_createWeatherMetricCell('bi-droplet-half', 'text-primary', `${dewPoint}${i18n.t('units.temperature_celsius')}`, i18n.t('weather.dew_point')));
-            metricGrid.appendChild(_createWeatherMetricCell('bi-speedometer2', '', `${pressure} ${i18n.t('units.hpa')}`, i18n.t('weather.pressure')));
-            metricGrid.appendChild(_createWeatherMetricCell('bi-wind', '', `${windSpeed} ${i18n.t('units.wind_speed_kmh')}`, i18n.t('weather.wind')));
-            metricGrid.appendChild(_createWeatherMetricCell('bi-clouds', '', `${cloudCover}${i18n.t('units.percent')}`, i18n.t('weather.cloud_cover')));
+            metricGrid.appendChild(createForecastMetricCell('bi-thermometer-half', 'text-danger', `${temp}${i18n.t('units.temperature_celsius')}`, i18n.t('weather.temperature')));
+            metricGrid.appendChild(createForecastMetricCell('bi-droplet', 'text-primary', `${humidity}${i18n.t('units.percent')}`, i18n.t('weather.humidity')));
+            metricGrid.appendChild(createForecastMetricCell('bi-droplet-half', 'text-primary', `${dewPoint}${i18n.t('units.temperature_celsius')}`, i18n.t('weather.dew_point')));
+            metricGrid.appendChild(createForecastMetricCell('bi-speedometer2', '', `${pressure} ${i18n.t('units.hpa')}`, i18n.t('weather.pressure')));
+            metricGrid.appendChild(createForecastMetricCell('bi-wind', '', `${windSpeed} ${i18n.t('units.wind_speed_kmh')}`, i18n.t('weather.wind')));
+            metricGrid.appendChild(createForecastMetricCell('bi-clouds', '', `${cloudCover}${i18n.t('units.percent')}`, i18n.t('weather.cloud_cover')));
 
             // Cloud layer breakdown
             const cloudLayers = document.createElement('div');

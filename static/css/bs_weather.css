@@ -58,6 +58,10 @@
     min-width: 0;
 }
 
+.weather-metric-cell--full {
+    grid-column: 1 / -1;
+}
+
 .weather-metric-cell > i {
     flex-shrink: 0;
     font-size: 0.95rem;
@@ -97,6 +101,15 @@
 
 .weather-cloud-layer-item {
     white-space: nowrap;
+}
+
+/* Aurora Kp colored dot in forecast card body */
+.aurora-kp-dot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 0.4rem;
+    font-size: 1.5rem;
 }
 
 /* Quality Classes */

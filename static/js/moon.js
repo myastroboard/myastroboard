@@ -231,43 +231,34 @@ async function loadNextMoonPhases() {
                 item.className = 'col mb-3';
                 const card = document.createElement('div');
                 card.className = 'card h-100';
+
+                // Header: date (left) + quality label (right)
                 const cardHeader = document.createElement('div');
-                cardHeader.className = `card-header quality-box ${qualityClass}`;
-                const strong = document.createElement('strong');
-                strong.textContent = quality;
-                cardHeader.appendChild(strong);
+                cardHeader.className = `card-header d-flex justify-content-between align-items-center quality-box ${qualityClass}`;
+                const dateEl = document.createElement('span');
+                dateEl.className = 'fw-semibold';
+                dateEl.textContent = formatDateFull(date);
+                const qualityEl = document.createElement('span');
+                qualityEl.className = 'weather-quality-label';
+                qualityEl.textContent = quality;
+                cardHeader.appendChild(dateEl);
+                cardHeader.appendChild(qualityEl);
 
                 const cardBody = document.createElement('div');
-                cardBody.className = 'card-body';
-                const title = document.createElement('h5');
-                title.className = 'card-title card-title-weather mb-2';
-                title.textContent = formatDateFull(date);
-                const list = document.createElement('ul');
-                list.className = 'list-group list-group-flush';
+                cardBody.className = 'card-body p-2';
 
-                const addItem = (label, value = null) => {
-                    const li = document.createElement('li');
-                    li.className = 'list-group-item d-flex justify-content-between align-items-center';
-                    const labelSpan = document.createElement('span');
-                    labelSpan.innerHTML = label;
-                    li.appendChild(labelSpan);
-                    if (value !== null) {
-                        const span = document.createElement('span');
-                        span.textContent = value;
-                        li.appendChild(span);
-                    }
-                    list.appendChild(li);
-                };
+                // 2-column metric grid
+                const metricGrid = document.createElement('div');
+                metricGrid.className = 'weather-metric-grid';
+                metricGrid.appendChild(createForecastMetricCell('bi-moon', 'text-warning', `${illumination_percent}${i18n.t('units.percent')}`, i18n.t('moon.illumination')));
+                metricGrid.appendChild(createForecastMetricCell('bi-arrows-angle-expand', '', `${max_altitude}${i18n.t('units.degrees')}`, i18n.t('moon.max_altitude')));
+                metricGrid.appendChild(createForecastMetricCell('bi-stars', '', `${dark_hours_strict} ${i18n.t('units.hour')}`, i18n.t('best_window.strict')));
+                metricGrid.appendChild(createForecastMetricCell('bi-stars', '', `${dark_hours_practical} ${i18n.t('units.hour')}`, i18n.t('best_window.practical')));
+                const illuminCell = createForecastMetricCell('bi-stars', '', `${dark_hours_illumination} ${i18n.t('units.hour')}`, i18n.t('best_window.illumination'));
+                illuminCell.classList.add('weather-metric-cell--full');
+                metricGrid.appendChild(illuminCell);
 
-                addItem(`<i class="bi bi-moon text-warning icon-inline" aria-hidden="true"></i>${i18n.t('moon.illumination')}`, `${illumination_percent}${i18n.t('units.percent')}`);
-                addItem(`<i class="bi bi-arrows-angle-expand icon-inline" aria-hidden="true"></i>${i18n.t('moon.max_altitude')}`, `${max_altitude}${i18n.t('units.degrees')}`);
-                addItem(`<i class="bi bi-stars icon-inline" aria-hidden="true"></i>${i18n.t('moon.dark_time')}`);
-                addItem(` > ${i18n.t('best_window.strict')}`, `${dark_hours_strict} ${i18n.t('units.hour')}`);
-                addItem(` > ${i18n.t('best_window.practical')}`, `${dark_hours_practical} ${i18n.t('units.hour')}`);
-                addItem(` > ${i18n.t('best_window.illumination')}`, `${dark_hours_illumination} ${i18n.t('units.hour')}`);
-
-                cardBody.appendChild(title);
-                cardBody.appendChild(list);
+                cardBody.appendChild(metricGrid);
                 card.appendChild(cardHeader);
                 card.appendChild(cardBody);
                 item.appendChild(card);

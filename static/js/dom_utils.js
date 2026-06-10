@@ -189,4 +189,34 @@ function createSpinnerWrapper(message, spinnerClass = 'text-info') {
     return wrapper;
 }
 
+/**
+ * Shared metric cell used by weather, moon, and aurora forecast cards.
+ * Renders: [icon] [bold value / small label], both white-space: nowrap.
+ */
+function createForecastMetricCell(iconClass, colorClass, value, label) {
+    const cell = document.createElement('div');
+    cell.className = 'weather-metric-cell';
+
+    const icon = document.createElement('i');
+    icon.className = `bi ${iconClass}${colorClass ? ' ' + colorClass : ''}`;
+    icon.setAttribute('aria-hidden', 'true');
+
+    const info = document.createElement('div');
+    info.className = 'weather-metric-info';
+
+    const val = document.createElement('span');
+    val.className = 'weather-metric-val';
+    val.textContent = value;
+
+    const lbl = document.createElement('span');
+    lbl.className = 'weather-metric-lbl';
+    lbl.textContent = label;
+
+    info.appendChild(val);
+    info.appendChild(lbl);
+    cell.appendChild(icon);
+    cell.appendChild(info);
+    return cell;
+}
+
 window.DOMUtils = DOMUtils;

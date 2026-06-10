@@ -56,13 +56,12 @@ async function loadAurora() {
             "Severe Storm": i18n.t('aurora.description.severe_storm')
         };
 
+        const rawVisibilityLevel = current.visibility_level;
         const visibilityIconClass = visibilityIconMap[current.visibility_level] || 'bi bi-stars';
         current.visibility_description = visibilityDescriptionMap[current.visibility_level] || current.visibility_description || '';
-        current.probability_level = probabilityLevelMap[current.probability_level] || current.probability_level || '';  
+        current.probability_level = probabilityLevelMap[current.probability_level] || current.probability_level || '';
         current.visibility_level = visibilityTextMap[current.visibility_level] || current.visibility_level || '';
 
-        //console.log(current);
-        // Determine color for probability bar
         const probability = current.probability || 0;
         const probabilityLevel = current.probability_level || '';
         let probabilityColor = '#dc3545'; // red
@@ -133,7 +132,9 @@ async function loadAurora() {
         g2Label.innerHTML = `<i class="bi bi-bar-chart-line icon-inline" aria-hidden="true"></i>${i18n.t('aurora.aurora_probability')}`;
         const g2Value = document.createElement('span');
         g2Value.className = 'fw-bold';
-        g2Value.textContent = `${probability.toFixed(0)}%${probabilityLevel ? ` (${probabilityLevel})` : ''}`;
+        g2Value.textContent = rawVisibilityLevel === 'None'
+            ? current.visibility_level
+            : `${probability.toFixed(0)}%${probabilityLevel ? ` (${probabilityLevel})` : ''}`;
         geomag2.appendChild(g2Label);
         geomag2.appendChild(g2Value);
 
@@ -264,37 +265,57 @@ async function loadAurora() {
             forecastAlert.append(i18n.t('aurora.alert_2'));
             forecastBody.appendChild(forecastAlert);
 
-            const bubblesRow = document.createElement('div');
-            bubblesRow.className = 'row row-cols-2 row-cols-sm-3 row-cols-lg-4 text-center g-3';
+            const slotsRow = document.createElement('div');
+            slotsRow.className = 'row row-cols-2 row-cols-sm-3 row-cols-lg-4 row-cols-xl-5 g-2';
             data.forecast.slice(0, 8).forEach((f) => {
                 const kp = f.kp_index || 0;
-                let bubbleColor = 'danger';
-                if (kp >= 7) bubbleColor = 'success';
-                else if (kp >= 5) bubbleColor = 'warning';
-                const size = 24 + kp * 2;
+                const visKey = (f.visibility_level || 'none').toLowerCase().replace(/ /g, '_');
+                const visLabel = i18n.t(`aurora.visibility.${visKey}`);
+                const probability = f.probability != null ? Math.round(f.probability) : 0;
 
-                const bubbleCol = document.createElement('div');
-                bubbleCol.className = 'col d-flex flex-column align-items-center';
-                const ts = document.createElement('div');
-                ts.className = 'fw-bold small mb-1';
-                ts.textContent = formatTimeThenDate(new Date(f.timestamp));
-                const bubble = document.createElement('div');
-                bubble.className = `rounded-circle bg-${bubbleColor} shadow-sm mb-1`;
-                bubble.style.width = `${size}px`;
-                bubble.style.height = `${size}px`;
-                bubble.style.lineHeight = `${size}px`;
-                const kpLabel = document.createElement('div');
-                kpLabel.className = 'small';
-                kpLabel.append(`Kp ${kp.toFixed(1)}`);
-                kpLabel.appendChild(document.createElement('br'));
-                kpLabel.append(`${probability.toFixed(0)}%${probabilityLevel ? ` (${probabilityLevel})` : ''}`);
+                let kpQualityClass = 'quality-poor';
+                let kpDotColor = 'text-danger';
+                if (visKey === 'excellent' || visKey === 'severe_storm') { kpQualityClass = 'quality-excellent'; kpDotColor = 'text-success'; }
+                else if (visKey === 'good')                               { kpQualityClass = 'quality-good';      kpDotColor = 'text-warning'; }
+                else if (visKey === 'moderate')                           { kpQualityClass = 'quality-fair';                                   }
 
-                bubbleCol.appendChild(ts);
-                bubbleCol.appendChild(bubble);
-                bubbleCol.appendChild(kpLabel);
-                bubblesRow.appendChild(bubbleCol);
+                const slotCol = document.createElement('div');
+                slotCol.className = 'col';
+                const slotCard = document.createElement('div');
+                slotCard.className = 'card h-100';
+
+                const slotHeader = document.createElement('div');
+                slotHeader.className = `card-header d-flex justify-content-between align-items-center quality-box ${kpQualityClass}`;
+                const tsEl = document.createElement('span');
+                tsEl.className = 'fw-semibold';
+                tsEl.style.fontSize = '0.8rem';
+                tsEl.textContent = formatTimeThenDate(new Date(f.timestamp));
+                const levelEl = document.createElement('span');
+                levelEl.className = 'weather-quality-label';
+                levelEl.textContent = `${probability}% (${visLabel})`;
+                slotHeader.appendChild(tsEl);
+                slotHeader.appendChild(levelEl);
+
+                const slotBody = document.createElement('div');
+                slotBody.className = 'card-body p-2';
+                const kpGrid = document.createElement('div');
+                kpGrid.className = 'weather-metric-grid';
+                kpGrid.appendChild(createForecastMetricCell('bi-lightning-charge', 'text-warning', `Kp ${kp.toFixed(1)}`, i18n.t('aurora.kp_index')));
+                const kpDot = document.createElement('div');
+                kpDot.className = 'aurora-kp-dot';
+                const kpDotIcon = document.createElement('i');
+                kpDotIcon.className = `bi bi-circle-fill ${kpDotColor}`;
+                kpDotIcon.setAttribute('aria-hidden', 'true');
+                kpDot.appendChild(kpDotIcon);
+                kpGrid.appendChild(kpDot);
+
+                slotBody.appendChild(kpGrid);
+                slotCard.appendChild(slotHeader);
+                slotCard.appendChild(slotBody);
+                slotCol.appendChild(slotCard);
+                slotsRow.appendChild(slotCol);
             });
-            forecastBody.appendChild(bubblesRow);
+            forecastBody.appendChild(slotsRow);
             forecastCard.appendChild(forecastHeader);
             forecastCard.appendChild(forecastBody);
             forecastCol.appendChild(forecastCard);
