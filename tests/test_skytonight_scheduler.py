@@ -1,5 +1,6 @@
 """Tests for SkyTonight scheduler schedule resolution."""
 
+import os
 import threading
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
@@ -82,8 +83,15 @@ def test_disabled_scheduler_does_not_execute_runner(monkeypatch):
         stored_status.update(payload)
         return True
 
+    def _load_status(default=None):
+        if stored_status:
+            return dict(stored_status)
+        if default is not None:
+            return dict(default)
+        return {}
+
     monkeypatch.setattr('skytonight_scheduler.save_scheduler_status', _save_status)
-    monkeypatch.setattr('skytonight_scheduler.load_scheduler_status', lambda default=None: dict(stored_status or (default or {})))
+    monkeypatch.setattr('skytonight_scheduler.load_scheduler_status', _load_status)
 
     scheduler = SkyTonightScheduler(
         config_loader=lambda: {
@@ -124,10 +132,11 @@ def test_missed_run_recovery_on_startup(monkeypatch):
         (server_time >= committed) fires immediately.
     """
     # The missed slot is 30 seconds in the past so the recovery check fires.
-    past_slot = datetime.now(ZoneInfo('Europe/Paris')) - timedelta(seconds=30)
+    base_now = datetime.now(ZoneInfo('Europe/Paris'))
+    past_slot = base_now - timedelta(seconds=30)
     night_end = past_slot - timedelta(hours=1)  # night_end = missed_slot - 1h
     # next_run in the status is 4 hours in the future (well past the missed slot)
-    future_next_run = datetime.now(ZoneInfo('Europe/Paris')) + timedelta(hours=4)
+    future_next_run = base_now + timedelta(hours=4)
     last_run = past_slot - timedelta(hours=6)   # comfortably before the missed slot
 
     stored_status = {
@@ -268,7 +277,7 @@ class TestResolveScheduleEdgeCases:
 
     def test_fallback_when_config_is_not_dict(self):
         """Covers non-dict config path."""
-        schedule = resolve_schedule(None, now=datetime(2026, 4, 17, 12, 0, tzinfo=ZoneInfo('UTC')))  # type: ignore
+        schedule = resolve_schedule(None, now=datetime(2026, 4, 17, 12, 0, tzinfo=ZoneInfo('UTC')))  # type: ignore[arg-type]
         assert schedule.mode == 'fallback-6h'
 
     def test_now_is_none_uses_current_time(self):
@@ -687,8 +696,9 @@ class TestRunLoopBranches:
         self._setup_monkeypatches(monkeypatch)
         done_event = threading.Event()
         calls = []
+        now_utc = datetime.now(ZoneInfo('UTC'))
 
-        future_run = datetime.now(ZoneInfo('UTC')) + timedelta(hours=6)
+        future_run = now_utc + timedelta(hours=6)
 
         monkeypatch.setattr(
             'skytonight_scheduler.resolve_schedule',
@@ -697,7 +707,7 @@ class TestRunLoopBranches:
                 next_run=future_run,
                 server_time_valid=True,
                 reason='test',
-                server_time=datetime.now(ZoneInfo('UTC')),
+                server_time=now_utc,
                 timezone='UTC',
             ),
         )
@@ -1110,7 +1120,7 @@ class TestRunLoopTriggerFileException:
                 timezone='UTC',
             )
 
-        original_remove = __import__('os').remove
+        original_remove = os.remove
 
         def failing_remove(path):
             if str(path) == str(trigger_file):
