@@ -1,3 +1,4 @@
 - Notification for aurora with better localization and cooldown.
 - Improve hero cards for astro score
+- Improve cards weather/moon/aurora
 - Improve tests and code quality
