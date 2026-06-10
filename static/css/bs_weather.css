@@ -33,6 +33,72 @@
     color: var(--text-color);
 }
 
+/* Quality label in card header */
+.weather-quality-label {
+    font-size: 0.72rem;
+    font-weight: var(--font-semibold);
+    opacity: 0.85;
+    white-space: nowrap;
+}
+
+/* 2-column metric grid inside forecast cards */
+.weather-metric-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.3rem;
+}
+
+.weather-metric-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.4rem;
+    border-radius: var(--border-radius);
+    background: var(--bs-secondary-bg);
+    min-width: 0;
+}
+
+.weather-metric-cell > i {
+    flex-shrink: 0;
+    font-size: 0.95rem;
+    opacity: 0.85;
+}
+
+.weather-metric-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.25;
+}
+
+.weather-metric-val {
+    font-weight: 600;
+    white-space: nowrap;
+    font-size: 0.85rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.weather-metric-lbl {
+    font-size: 0.67rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Cloud layer breakdown row */
+.weather-cloud-layers {
+    display: flex;
+    justify-content: space-around;
+    padding: 0.35rem 0 0;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+.weather-cloud-layer-item {
+    white-space: nowrap;
+}
+
 /* Quality Classes */
 .quality-box {
     border-top-left-radius: var(--border-radius-card) !important;

@@ -53,7 +53,7 @@
     <link rel="stylesheet" href="/static/css/bs_timeline.css?v={{ version }}">
 </head>
 <body>
-    
+
     <div class="hero text-center mb-2 pb-1">
         <h1 class="display-4 fw-bold">
             <img src="/static/img/favicon-animated.svg" alt="MyAstroBoard Logo" width="40" height="40" style="height: 1em; width: auto; vertical-align: middle;"> MyAstroBoard
@@ -76,7 +76,7 @@
             </span>
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
-        
+
         <!-- Global cache Status Banner -->
         <div id="global-cache-banner" class="alert alert-info mb-3" role="alert" style="display: none;">
             <div class="spinner-border text-primary" role="status">
@@ -225,7 +225,7 @@
                         <i class="bi bi-thermometer-half icon-inline text-danger" aria-hidden="true"></i>
                         <span data-i18n="astro_weather.section_title">Current Conditions</span>
                     </h2>
-                    
+
                     <!-- Loading State -->
                     <div id="astro-weather-loading" class="row row-cols-1">
                         <div class="col">
@@ -240,10 +240,10 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- Error State -->
                     <div id="astro-weather-error" class="row row-cols-1 mb-2"></div>
-                    
+
                     <!-- Main Content -->
                     <div id="astro-weather-display" style="display: none;">
                         <!-- Current Conditions -->
@@ -268,7 +268,7 @@
                         <i class="bi bi-hourglass-split icon-inline" aria-hidden="true"></i>
                         <span data-i18n="astro_weather.best_periods_title">Best Observation Periods</span>
                     </h2>
-                    
+
                     <!-- Best Observation Periods -->
                     <!-- <div class="alert alert-info mb-2" role="alert" data-i18n="astro_weather.best_periods_description">Optimal periods for astrophotography in the next 24 hours</div>-->
                     <div id="astro-best-periods"></div>
@@ -279,7 +279,7 @@
                         <i class="bi bi-exclamation-triangle-fill icon-inline text-warning" aria-hidden="true"></i>
                         <span data-i18n="astro_weather.alerts_title">Weather Alerts</span>
                     </h2>
-                        
+
                     <!-- Weather Alerts -->
                     <div id="astro-weather-alerts"></div>
                 </div>
@@ -405,7 +405,7 @@
                     </div>
                 </div>
             </div>
-        
+
 
         </div>
 
@@ -437,7 +437,7 @@
                 <div class="shadow p-2 mb-3 rounded bg-sub-container">
                     <h2><i class="bi bi-cloud-sun icon-inline" aria-hidden="true"></i> <span data-i18n="weather.forecast">Weather Forecast</span></h2>
                     <div id="weather-location" class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 row-cols-xl-4"></div>
-                    <div id="weather-display" class="row row-cols-1 row-cols-sm-3 row-cols-lg-4 row-cols-xl-5 row-cols-xxl-6">
+                    <div id="weather-display" class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 row-cols-xl-4 row-cols-xxl-6">
                         <div class="col">
                             <div class="card h-100">
                                 <div class="card-body">
@@ -467,7 +467,7 @@
                         <div id="cloudConditionsChartContainer" class="col mb-3"></div>
                         <div id="seeingConditionsChartContainer" class="col mb-3"></div>
                     </div>
-                    
+
                     <div id="astro-charts-error" class="alert alert-danger" role="alert" style="display: none" data-i18n="weather.loading_astro_failed">
                         Failed to load astronomical data. Please check your internet connection.
                     </div>
@@ -594,14 +594,14 @@
                 <div class="shadow p-2 mb-3 rounded bg-sub-container">
                     <h2>
                         <i class="bi bi-stars text-warning icon-inline" aria-hidden="true"></i> <span data-i18n="astrodex.title">Astrodex - Gotta Catch 'Em All!</span>
-                    </h2>                
+                    </h2>
                     <p id="astrodex-collection-subtitle" data-i18n="astrodex.your_collection">Your personal collection of captured celestial objects</p>
-                    
+
                     <!-- Stats Cards -->
                     <div id="astrodex-stats" class="row row-cols-2 row-cols-md-5 g-4">
                         <!-- Stats will be rendered by JavaScript -->
                     </div>
-                
+
                 </div>
                 <div class="shadow p-2 mb-3 rounded bg-sub-container">
                     <h2 id="astrodex-collection-title">
@@ -656,7 +656,7 @@
                             </button>
                         </div>
                     </div>
-                    
+
                     <!-- Items Grid -->
                     <div id="astrodex-content">
                         <div id="astrodex-grid" class="row row-cols-1 row-cols-sm-3 row-cols-lg-4 row-cols-xl-5 row-cols-xxl-6">
@@ -777,7 +777,7 @@
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <p class="text-muted" data-i18n="equipment.telescopes_description">
                             Manage your telescope profiles with automatic calculation of focal ratios and effective focal lengths.
-                        </p>                    
+                        </p>
                         <button class="btn btn-success btn-new-telescope" data-i18n="equipment.new_telescope">New Telescope</button>
                     </div>
                     <div id="equipment-telescopes-display">
@@ -1298,17 +1298,17 @@
                     <h2>
                         <i class="bi bi-geo-alt text-danger icon-inline" aria-hidden="true"></i> <span data-i18n="settings.location">Location Settings</span>
                     </h2>
-                    
+
                     <div class="alert alert-info" role="alert" data-i18n="settings.location_info">
                         Location parameters are used for accurate weather, astronomical calculations, and SkyTonight scheduling.
                     </div>
-                    
+
                     <div class="row g-3">
                         <div class="col-12">
                             <label for="location-name" class="form-label" data-i18n="settings.location_name">Location Name:</label>
                             <input type="text" id="location-name" class="form-control" placeholder="My Observatory" data-i18n-placeholder="settings.location_name_placeholder">
                         </div>
-                                                
+
                         <div class="col-md-3">
                             <label for="latitude-input" class="form-label" data-i18n="settings.latitude">Latitude (DMS or Decimal):</label>
                             <div class="input-group">
@@ -1327,7 +1327,7 @@
                             <div id="longitude-converted" class="valid-feedback"></div>
                             <div id="longitude-error" class="invalid-feedback"></div>
                         </div>
-                    
+
                     </div>
                     <div class="row g-3 mt-1 mb-2">
 
@@ -1413,7 +1413,7 @@
                     <h2>
                         <i class="bi bi-save text-primary icon-inline" aria-hidden="true"></i> <span data-i18n="settings.save_actions">Save & Actions</span>
                     </h2>
-                    
+
                     <div class="alert alert-info" role="alert" data-i18n="settings.save_actions_info">
                         When new SkyTonight settings are saved, a manual run may be required to see changes on dashboard, or wait for the next scheduled run.
                     </div>
@@ -1431,7 +1431,7 @@
 
             <!-- Advanced Settings Sub-tab -->
             <div id="advanced-subtab" class="sub-tab-content">
-                
+
                 <div class="shadow p-2 mb-3 rounded bg-sub-container">
                     <h2>
                         <i class="bi bi-link text-secondary icon-inline" aria-hidden="true"></i> <span data-i18n="settings.constraints">Constraints</span>
@@ -1568,7 +1568,7 @@
                         <i class="bi bi-triangle text-secondary icon-inline" aria-hidden="true"></i>
                         <span data-i18n="settings.horizon_profile">Custom Horizon Profile</span>
                     </h2>
-                    
+
                     <div class="alert alert-info" role="alert">
                         <span data-i18n="settings.horizon_profile_info">Define the minimum observable altitude at each azimuth direction to exclude targets blocked by trees, hills, or buildings. Leave empty to use the flat altitude minimum.</span>
                     </div>
@@ -1680,7 +1680,7 @@
             </div>
 
             <!-- Logs Sub-tab -->
-            <div id="logs-subtab" class="sub-tab-content">                
+            <div id="logs-subtab" class="sub-tab-content">
                 <div class="shadow p-2 mb-3 rounded bg-sub-container">
                     <h2>
                         <i class="bi bi-journal-text text-info icon-inline" aria-hidden="true"></i> <span data-i18n="settings.system_logs">System Logs</span>
@@ -1703,13 +1703,13 @@
                                 <option value="5000" data-i18n="settings.log_limit_5000">Last 5000</option>
                                 <option value="0" data-i18n="settings.log_limit_all">All</option>
                             </select>
-                        </div>                        
+                        </div>
                         <div class="col-12">
                             <button id="refresh-logs" class="btn btn-secondary"><i class="bi bi-arrow-clockwise icon-inline" aria-hidden="true"></i> <span data-i18n="settings.refresh_logs">Refresh</span></button>
-                        </div> 
-                        <div class="col-12">         
+                        </div>
+                        <div class="col-12">
                             <button id="clear-logs-display" class="btn btn-secondary"><i class="bi bi-trash icon-inline" aria-hidden="true"></i> <span data-i18n="settings.clear_logs">Delete logs (empty log file)</span></button>
-                        </div>          
+                        </div>
                     </div>
                     <div class="mt-2 d-flex gap-2 align-items-center">
                         <input type="text" id="log-filter" class="form-control form-control-sm font-monospace"
@@ -1731,7 +1731,7 @@
                         <i class="bi bi-people text-success icon-inline" aria-hidden="true"></i> <span data-i18n="users.user_management">User Management</span>
                     </h2>
                     <div data-i18n="users.manage_users">Manage users and their access roles.</div>
-                    
+
                     <!-- Create User Form -->
                     <form id="create-user-form">
                         <div class="row row-cols-lg-auto g-3 align-items-center">
@@ -1757,11 +1757,11 @@
                             <div class="col-12">
                                 <button type="submit" class="btn btn-primary" data-i18n="users.create_user">Create User</button>
                             </div>
-                        </div>   
-                    </form>             
+                        </div>
+                    </form>
                 </div>
-                
-                <div class="shadow p-2 mb-3 rounded bg-sub-container">    
+
+                <div class="shadow p-2 mb-3 rounded bg-sub-container">
                     <!-- Users List -->
                     <h2>
                         <i class="bi bi-people-fill text-success icon-inline" aria-hidden="true"></i> <span data-i18n="users.existing_users">Existing Users</span>
@@ -1779,7 +1779,7 @@
                     <div class="alert alert-info" role="alert" data-i18n="metrics.info_title">
                         System performance and resource monitoring. Data refreshes automatically every 5 seconds.
                     </div>
-                    
+
                     <div class="row g-3">
                         <div class="col-6 col-lg-3">
                             <div class="card h-100">
@@ -2418,7 +2418,7 @@
                             </div>
                             <div class="card-body">
                                 <p class="mb-2">
-                                    <strong data-i18n="about.vitrine_note">Public showcase and presentation page</strong>                                
+                                    <strong data-i18n="about.vitrine_note">Public showcase and presentation page</strong>
                                 </p>
                                 <p class="mb-2">
                                     <a class="btn btn-outline-secondary btn-sm" href="https://myastroboard.org" target="_blank" rel="noopener noreferrer">
@@ -2482,7 +2482,7 @@
                                     </a>
                                 </div>
                                 <p class="mb-0 text-muted">
-                                    <span data-i18n="about.funding_label">Funding file</span>: 
+                                    <span data-i18n="about.funding_label">Funding file</span>:
                                     <a class="btn btn-outline-secondary btn-sm ms-1" href="https://github.com/myastroboard/myastroboard/blob/main/.github/FUNDING.yml" target="_blank" rel="noopener noreferrer">
                                         <i class="bi bi-file-earmark-text icon-inline" aria-hidden="true"></i>
                                         .github/FUNDING.yml
@@ -2618,7 +2618,7 @@
         </div>
 
 
-    <!-- End of mainContainer -->    
+    <!-- End of mainContainer -->
     </main>
 
 

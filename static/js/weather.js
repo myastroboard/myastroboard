@@ -2,19 +2,30 @@
 // Weather
 // ======================
 
-function createWeatherMetricItem(label, value) {
-    const li = document.createElement('li');
-    li.className = 'list-group-item d-flex justify-content-between align-items-center';
+function _createWeatherMetricCell(iconClass, colorClass, value, label) {
+    const cell = document.createElement('div');
+    cell.className = 'weather-metric-cell';
 
-    const labelSpan = document.createElement('span');
-    labelSpan.innerHTML = label;
-    const badge = document.createElement('span');
-    badge.className = 'badge text-bg-primary rounded-pill';
-    badge.textContent = value;
+    const icon = document.createElement('i');
+    icon.className = `bi ${iconClass}${colorClass ? ' ' + colorClass : ''}`;
+    icon.setAttribute('aria-hidden', 'true');
 
-    li.appendChild(labelSpan);
-    li.appendChild(badge);
-    return li;
+    const info = document.createElement('div');
+    info.className = 'weather-metric-info';
+
+    const val = document.createElement('span');
+    val.className = 'weather-metric-val';
+    val.textContent = value;
+
+    const lbl = document.createElement('span');
+    lbl.className = 'weather-metric-lbl';
+    lbl.textContent = label;
+
+    info.appendChild(val);
+    info.appendChild(lbl);
+    cell.appendChild(icon);
+    cell.appendChild(info);
+    return cell;
 }
 
 function createChartShell(title, canvasId, legendItems = [], footerText = '') {
@@ -195,32 +206,47 @@ async function loadWeather() {
             const card = document.createElement('div');
             card.className = 'card h-100';
 
+            // Header: time on the left, quality label on the right
             const cardHeader = document.createElement('div');
-            cardHeader.className = `card-header quality-box ${qualityClass}`;
-            const headerStrong = document.createElement('strong');
-            headerStrong.textContent = quality;
-            cardHeader.appendChild(headerStrong);
+            cardHeader.className = `card-header d-flex justify-content-between align-items-center quality-box ${qualityClass}`;
+            const timeEl = document.createElement('span');
+            timeEl.className = 'fw-semibold';
+            timeEl.textContent = formatTimeOnlyInTimezone(forecast.date, configuredTimezone);
+            const qualityEl = document.createElement('span');
+            qualityEl.className = 'weather-quality-label';
+            qualityEl.textContent = quality;
+            cardHeader.appendChild(timeEl);
+            cardHeader.appendChild(qualityEl);
 
             const cardBody = document.createElement('div');
-            cardBody.className = 'card-body';
-            const title = document.createElement('h5');
-            title.className = 'card-title card-title-weather';
-            title.textContent = formatTimeOnlyInTimezone(forecast.date, configuredTimezone);
+            cardBody.className = 'card-body p-2';
 
-            const list = document.createElement('ul');
-            list.className = 'list-group list-group-flush';
-            list.appendChild(createWeatherMetricItem(`<i class="bi bi-clouds icon-inline" aria-hidden="true"></i>${i18n.t('weather.cloud_cover')}`, `${cloudCover}${i18n.t('units.percent')}`));
-            list.appendChild(createWeatherMetricItem(` > ${i18n.t('weather.low')}`, `${cloudCoverL}${i18n.t('units.percent')}`));
-            list.appendChild(createWeatherMetricItem(` > ${i18n.t('weather.mid')}`, `${cloudCoverM}${i18n.t('units.percent')}`));
-            list.appendChild(createWeatherMetricItem(` > ${i18n.t('weather.high')}`, `${cloudCoverH}${i18n.t('units.percent')}`));
-            list.appendChild(createWeatherMetricItem(`<i class="bi bi-droplet text-primary icon-inline" aria-hidden="true"></i>${i18n.t('weather.humidity')}`, `${humidity}${i18n.t('units.percent')}`));
-            list.appendChild(createWeatherMetricItem(`<i class="bi bi-thermometer-half text-danger icon-inline" aria-hidden="true"></i>${i18n.t('weather.temperature')}`, `${temp}${i18n.t('units.temperature_celsius')}`));
-            list.appendChild(createWeatherMetricItem(`<i class="bi bi-droplet-half text-primary icon-inline" aria-hidden="true"></i>${i18n.t('weather.dew_point')}`, `${dewPoint}${i18n.t('units.temperature_celsius')}`));
-            list.appendChild(createWeatherMetricItem(`<i class="bi bi-speedometer2 icon-inline" aria-hidden="true"></i>${i18n.t('weather.pressure')}`, `${pressure} ${i18n.t('units.hpa')}`));
-            list.appendChild(createWeatherMetricItem(`<i class="bi bi-wind icon-inline" aria-hidden="true"></i>${i18n.t('weather.wind')}`, `${windSpeed} ${i18n.t('units.wind_speed_kmh')}`));
+            // 2-column metric grid
+            const metricGrid = document.createElement('div');
+            metricGrid.className = 'weather-metric-grid';
+            metricGrid.appendChild(_createWeatherMetricCell('bi-thermometer-half', 'text-danger', `${temp}${i18n.t('units.temperature_celsius')}`, i18n.t('weather.temperature')));
+            metricGrid.appendChild(_createWeatherMetricCell('bi-droplet', 'text-primary', `${humidity}${i18n.t('units.percent')}`, i18n.t('weather.humidity')));
+            metricGrid.appendChild(_createWeatherMetricCell('bi-droplet-half', 'text-primary', `${dewPoint}${i18n.t('units.temperature_celsius')}`, i18n.t('weather.dew_point')));
+            metricGrid.appendChild(_createWeatherMetricCell('bi-speedometer2', '', `${pressure} ${i18n.t('units.hpa')}`, i18n.t('weather.pressure')));
+            metricGrid.appendChild(_createWeatherMetricCell('bi-wind', '', `${windSpeed} ${i18n.t('units.wind_speed_kmh')}`, i18n.t('weather.wind')));
+            metricGrid.appendChild(_createWeatherMetricCell('bi-clouds', '', `${cloudCover}${i18n.t('units.percent')}`, i18n.t('weather.cloud_cover')));
 
-            cardBody.appendChild(title);
-            cardBody.appendChild(list);
+            // Cloud layer breakdown
+            const cloudLayers = document.createElement('div');
+            cloudLayers.className = 'weather-cloud-layers';
+            [
+                [i18n.t('weather.low'),  cloudCoverL],
+                [i18n.t('weather.mid'),  cloudCoverM],
+                [i18n.t('weather.high'), cloudCoverH],
+            ].forEach(([label, val]) => {
+                const s = document.createElement('span');
+                s.className = 'weather-cloud-layer-item';
+                s.textContent = `${label} ${val}${i18n.t('units.percent')}`;
+                cloudLayers.appendChild(s);
+            });
+
+            cardBody.appendChild(metricGrid);
+            cardBody.appendChild(cloudLayers);
             card.appendChild(cardHeader);
             card.appendChild(cardBody);
             item.appendChild(card);
