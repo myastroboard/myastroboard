@@ -350,8 +350,7 @@ class SkyTonightScheduler:
                     ready = self._cache_ready_event.wait(timeout=300)
                     if not ready:  # pragma: no cover  # race-condition path: event set between is_set() check and wait()
                         logger.warning('Cache ready timeout exceeded; proceeding with SkyTonight run anyway.')
-                elif not self._cache_ready_waited:
-                    self._cache_ready_waited = True
+                self._cache_ready_waited = True
                 # Set is_executing optimistically before the thread lands so the
                 # status file never shows is_executing=False during pending start.
                 self.is_executing = True

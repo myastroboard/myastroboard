@@ -852,8 +852,6 @@ def _compute_body_result(
         return None, None, None
 
     max_altitude = float(np.max(alt_deg))
-    if not is_moon and max_altitude < alt_min:  # pragma: no cover  # unreachable: frac > 0 implies max_alt >= alt_min
-        return None, None, None
 
     peak_idx = int(np.argmax(alt_deg))
     meridian_altitude = float(alt_deg[peak_idx])

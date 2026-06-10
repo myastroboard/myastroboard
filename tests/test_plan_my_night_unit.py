@@ -1462,7 +1462,6 @@ class TestEntryMatchesAlias:
 
     def test_is_target_in_current_plan_found(self, temp_plan_dir):
         user_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
-        from datetime import datetime, timezone, timedelta
         now = datetime.now(timezone.utc)
         payload = {
             'user_id': user_id,
@@ -1483,7 +1482,6 @@ class TestEntryMatchesAlias:
 
     def test_create_or_add_target_already_in_plan(self, temp_plan_dir):
         user_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
-        from datetime import datetime, timezone, timedelta
         now = datetime.now(timezone.utc)
         night_start = (now - timedelta(hours=1)).isoformat()
         night_end = (now + timedelta(hours=5)).isoformat()

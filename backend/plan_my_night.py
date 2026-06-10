@@ -685,7 +685,7 @@ def get_plan_with_timeline(user_id: str, username: str, telescope_id: Optional[s
 
     if night_start and night_end and night_end > night_start:
         total_seconds = (night_end - night_start).total_seconds()
-        if total_seconds > 0:  # pragma: no branch  # guaranteed by night_end > night_start
+        if total_seconds > 0:
             elapsed_seconds = (now_dt - night_start).total_seconds()
             progress_percent = max(0.0, min(100.0, (elapsed_seconds / total_seconds) * 100.0))
         is_inside_night = night_start <= now_dt <= night_end
@@ -1048,8 +1048,7 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
 
         def _lerp(p0, p1, x):
             span = (p1[0] - p0[0]).total_seconds()
-            if span == 0:  # pragma: no cover  # caller guards: prev[0] < start < p[0] → span > 0
-                return x, p0[1]
+            assert span > 0, 'Invariant violated: interpolation points must be strictly increasing in time'
             frac = (x - p0[0]).total_seconds() / span
             return x, p0[1] + frac * (p1[1] - p0[1])
 

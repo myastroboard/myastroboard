@@ -11,6 +11,7 @@ import time
 from unittest.mock import MagicMock, patch
 
 import pytest
+import spaceflight_tracker
 
 # ---------------------------------------------------------------------------
 # push_scheduler.py — lines 613-614
@@ -156,10 +157,13 @@ class TestGetOrCreateSchedulerLockCleanup:
 class TestWeatherAstroBranches:
     """Cover the two missed weather_astro branches."""
 
+    @classmethod
+    def setup_class(cls):
+        import weather_astro
+        cls.weather_astro = weather_astro
+
     def test_parse_extended_data_timezone_already_string(self):
         """Branch 213->217: Timezone() returns str, not bytes — no decode needed."""
-        import weather_astro
-
         analyzer = MagicMock()
         analyzer.location = {"name": "Paris", "latitude": 48.0, "longitude": 2.0}
 
@@ -180,7 +184,7 @@ class TestWeatherAstroBranches:
         mock_response.Longitude.return_value = 2.0
         mock_response.Elevation.return_value = 100.0
 
-        result = weather_astro.AstroWeatherAnalyzer._parse_extended_data(
+        result = self.weather_astro.AstroWeatherAnalyzer._parse_extended_data(
             analyzer, mock_response, ["temperature_2m"]
         )
         assert result is not None
@@ -188,21 +192,19 @@ class TestWeatherAstroBranches:
 
     def test_fresh_ts_but_no_cached_data_falls_through(self):
         """Branch 814->820: TTL not expired but cached data is None → fall through."""
-        import weather_astro
-
-        key = weather_astro._analysis_cache_key(24, "nocache_lang")
+        key = self.weather_astro._analysis_cache_key(24, "nocache_lang")
         # Fresh timestamp so TTL check passes
-        weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS_TS[key] = time.time()
+        self.weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS_TS[key] = time.time()
         # But no cached data for this key
-        weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS.pop(key, None)
+        self.weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS.pop(key, None)
 
         try:
             with patch("weather_astro.is_openmeteo_rate_limited", return_value=True):
-                result = weather_astro.get_astro_weather_analysis(24, "nocache_lang")
+                result = self.weather_astro.get_astro_weather_analysis(24, "nocache_lang")
             # rate limited + no cache → None
             assert result is None
         finally:
-            weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS_TS.pop(key, None)
+            self.weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS_TS.pop(key, None)
 
 
 # ---------------------------------------------------------------------------
@@ -234,7 +236,7 @@ class TestAuthDeleteUserMissingBranches:
     """Cover delete_user image-cleanup branches not yet hit."""
 
     @pytest.fixture
-    def _setup(self, tmp_path, monkeypatch):
+    def setup_auth_manager(self, tmp_path, monkeypatch):
         import auth
 
         isolated_users = tmp_path / "users.json"
@@ -253,9 +255,9 @@ class TestAuthDeleteUserMissingBranches:
 
         return manager, admin, alice, astrodex_dir, images_dir
 
-    def test_image_file_referenced_but_missing(self, tmp_path, monkeypatch, _setup):
+    def test_image_file_referenced_but_missing(self, tmp_path, monkeypatch, setup_auth_manager):
         """Branch 572->566: image listed in astrodex but doesn't exist on disk → skip."""
-        manager, admin, alice, astrodex_dir, images_dir = _setup
+        manager, admin, alice, astrodex_dir, images_dir = setup_auth_manager
         user_id = alice.user_id
 
         # Astrodex references an image that does NOT exist on disk
@@ -268,9 +270,9 @@ class TestAuthDeleteUserMissingBranches:
         manager.delete_user(user_id, current_user_id=admin.user_id)
         assert manager.get_user_by_id(user_id) is None
 
-    def test_listdir_filename_not_matching_user_prefix(self, tmp_path, monkeypatch, _setup):
+    def test_listdir_filename_not_matching_user_prefix(self, tmp_path, monkeypatch, setup_auth_manager):
         """Branch 581->580: filename in listdir doesn't start with user_id prefix → skip."""
-        manager, admin, alice, astrodex_dir, images_dir = _setup
+        manager, admin, alice, astrodex_dir, images_dir = setup_auth_manager
         user_id = alice.user_id
 
         # Create a file that belongs to a DIFFERENT user
@@ -282,11 +284,11 @@ class TestAuthDeleteUserMissingBranches:
         # Other user's file should remain
         assert other_user_file.exists()
 
-    def test_listdir_path_traversal_guard(self, tmp_path, monkeypatch, _setup):
+    def test_listdir_path_traversal_guard(self, tmp_path, monkeypatch, setup_auth_manager):
         """Branch 584->580: normpath resolves outside images_dir → skip."""
         import auth as auth_mod
 
-        manager, admin, alice, astrodex_dir, images_dir = _setup
+        manager, admin, alice, astrodex_dir, images_dir = setup_auth_manager
         user_id = alice.user_id
 
         # Create a file matching the prefix
@@ -560,8 +562,6 @@ class TestSpaceflightTrackerBackoffHelpers:
 
     def test_load_backoff_file_not_exists_returns_empty(self, tmp_path, monkeypatch):
         """Line 75: backoff file doesn't exist → return {}."""
-        import spaceflight_tracker
-
         nonexistent = str(tmp_path / "no_backoff.json")
         monkeypatch.setattr(spaceflight_tracker, "_SPACEFLIGHT_BACKOFF_FILE", nonexistent)
 
@@ -570,8 +570,6 @@ class TestSpaceflightTrackerBackoffHelpers:
 
     def test_load_backoff_invalid_float_entry_skipped(self, tmp_path, monkeypatch):
         """Lines 83-84: float(exp) raises TypeError/ValueError → continue."""
-        import spaceflight_tracker
-
         backoff_file = tmp_path / "backoff.json"
         future_ts = time.time() + 3600
         # One valid entry, one with non-numeric value
@@ -586,8 +584,6 @@ class TestSpaceflightTrackerBackoffHelpers:
 
     def test_load_backoff_json_parse_exception(self, tmp_path, monkeypatch):
         """Lines 88-90: outer exception (JSON parse error) → return {}."""
-        import spaceflight_tracker
-
         backoff_file = tmp_path / "bad_backoff.json"
         backoff_file.write_text("{not valid json", encoding="utf-8")
         monkeypatch.setattr(spaceflight_tracker, "_SPACEFLIGHT_BACKOFF_FILE", str(backoff_file))
@@ -597,8 +593,6 @@ class TestSpaceflightTrackerBackoffHelpers:
 
     def test_save_backoff_state_write_exception(self, tmp_path, monkeypatch):
         """Lines 101-102: exception in _save_backoff_state → logged, no raise."""
-        import spaceflight_tracker
-
         monkeypatch.setattr(spaceflight_tracker, "_SPACEFLIGHT_BACKOFF_FILE", str(tmp_path / "x.json"))
         monkeypatch.setattr(
             spaceflight_tracker,
@@ -611,8 +605,6 @@ class TestSpaceflightTrackerBackoffHelpers:
 
     def test_load_backoff_expired_entry_excluded(self, tmp_path, monkeypatch):
         """Branch 85->80: exp_val <= now_ts (expired entry) → if is False → loop continues."""
-        import spaceflight_tracker
-
         backoff_file = tmp_path / "backoff_expired.json"
         expired_ts = time.time() - 3600  # 1 hour in the past → expired
         backoff_file.write_text(
