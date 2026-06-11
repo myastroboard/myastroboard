@@ -335,7 +335,7 @@ function switchMainTab(tabName, options = {}) {
     } else if (tabName === 'spaceflight') {
         // nothing extra - subtab switch below handles initial load
     } else if (tabName === 'observatory') {
-        loadAllSkyObservatory();
+        loadObservatory();
     } else if (tabName === 'forecast-weather') {
         loadWeather();
     }

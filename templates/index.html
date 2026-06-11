@@ -49,6 +49,7 @@
     <link rel="stylesheet" href="/static/css/bs_events.css?v={{ version }}">
     <link rel="stylesheet" href="/static/css/bs_iss.css?v={{ version }}">
     <link rel="stylesheet" href="/static/css/bs_spaceflight.css?v={{ version }}">
+    <link rel="stylesheet" href="/static/css/bs_connectors.css?v={{ version }}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css" integrity="sha256-QZFpF9DkpabUBLoCc7fQJVCmtag/LaVAfAkUJSfuNyY=" crossorigin="anonymous">
     <link rel="stylesheet" href="/static/css/bs_timeline.css?v={{ version }}">
 </head>
@@ -579,12 +580,13 @@
 
         <!-- Observatory Section -->
         <div id="observatory-tab" class="main-tab-content">
-            <div class="shadow p-3 mb-3 rounded bg-sub-container">
-                <div id="allsky-observatory">
-                    <div class="text-muted text-center py-4">
-                        <div class="spinner-border spinner-border-sm me-2"></div>
-                        <span data-i18n="observatory.loading">Loading observatory data…</span>
-                    </div>
+            <div class="shadow p-2 mb-3 rounded bg-sub-container" id="observatory-subtabs-container" style="display:none;">
+                <ul class="nav nav-pills sub-tabs" id="observatory-subtabs"></ul>
+            </div>
+            <div id="observatory-content">
+                <div class="text-muted text-center py-4">
+                    <div class="spinner-border spinner-border-sm me-2"></div>
+                    <span data-i18n="observatory.loading">Loading observatory data…</span>
                 </div>
             </div>
         </div>
@@ -2910,7 +2912,6 @@
     <script src="/static/js/pwa.js?v={{ version }}"></script>
     <script src="/static/js/constraint_help.js?v={{ version }}"></script>
     <script src="/static/js/first_run.js?v={{ version }}"></script>
-    <script src="/static/js/connectors/allsky.js?v={{ version }}"></script>
     <script src="/static/js/connectors/connectors.js?v={{ version }}"></script>
     <script src="/static/js/app.js?v={{ version }}"></script>
 </body>

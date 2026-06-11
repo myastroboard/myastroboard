@@ -20,185 +20,294 @@ async function loadAllSkyObservatory() {
 
     const allskyCfg = (connectors || []).find(c => c.name === 'allsky');
     if (!allskyCfg || !allskyCfg.enabled) {
-        container.innerHTML = `
-            <div class="alert alert-secondary text-center mt-4">
-                <i class="bi bi-camera-video-off fs-2 d-block mb-2"></i>
-                <span>${i18n.t('observatory.not_configured')}</span>
-            </div>`;
+        DOMUtils.clear(container);
+        const alert = document.createElement('div');
+        alert.className = 'alert alert-secondary text-center mt-4';
+        alert.appendChild(DOMUtils.createIcon('bi bi-camera-video-off fs-2 d-block mb-2'));
+        const text = document.createElement('span');
+        text.textContent = i18n.t('observatory.not_configured');
+        alert.appendChild(text);
+        container.appendChild(alert);
         return;
     }
 
     const modules = allskyCfg.config.modules || {};
-    container.innerHTML = _buildAllSkyLayout(allskyCfg, modules, urls || {});
-
+    DOMUtils.clear(container);
+    container.appendChild(_buildAllSkyLayout(allskyCfg, modules, urls || {}));
     _startAllSkyPolling(modules, urls || {});
 }
 
 // ── HTML builder ─────────────────────────────────────────────────────────────
 
 function _buildAllSkyLayout(cfg, modules, urls) {
-    const label = cfg.config.label || 'AllSky';
-    let html = `<h5 class="mb-3"><i class="bi bi-camera-video me-2"></i>${label}</h5><div class="row g-3">`;
+    const row = document.createElement('div');
+    row.className = 'row g-3';
 
-    // Determine live image column width: full row if no sensor panel, 2/3 if sensor is next to it
     const hasSensor = modules.sensor_data?.enabled;
     const liveCol = hasSensor ? 'col-12 col-lg-8' : 'col-12';
 
     if (modules.live_image?.enabled && urls.live_image) {
-        html += `
-        <div class="${liveCol}">
-            <div class="card h-100">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <span>${i18n.t('observatory.live_image')}</span>
-                    <span id="allsky-day-night-badge" class="badge bg-secondary ms-2"></span>
-                </div>
-                <div class="card-body p-1 text-center" id="allsky-live-body">
-                    <img id="allsky-live-img" src="${urls.live_image}" alt="AllSky live"
-                         class="img-fluid rounded" style="max-height:480px;object-fit:contain;">
-                </div>
-            </div>
-        </div>`;
+        const col = document.createElement('div');
+        col.className = liveCol;
+
+        const card = document.createElement('div');
+        card.className = 'card h-100';
+
+        const header = document.createElement('div');
+        header.className = 'card-header d-flex justify-content-between align-items-center';
+        const headerText = document.createElement('span');
+        headerText.textContent = i18n.t('observatory.live_image');
+        const dayNightBadge = document.createElement('span');
+        dayNightBadge.id = 'allsky-day-night-badge';
+        dayNightBadge.className = 'badge bg-secondary ms-2';
+        header.appendChild(headerText);
+        header.appendChild(dayNightBadge);
+
+        const body = document.createElement('div');
+        body.className = 'card-body p-1 text-center';
+        body.id = 'allsky-live-body';
+        const img = document.createElement('img');
+        img.id = 'allsky-live-img';
+        img.src = urls.live_image;
+        img.alt = 'AllSky live';
+        img.className = 'img-fluid rounded allsky-media-fit';
+        body.appendChild(img);
+
+        card.appendChild(header);
+        card.appendChild(body);
+        col.appendChild(card);
+        row.appendChild(col);
     }
 
     if (hasSensor) {
-        html += `
-        <div class="col-12 col-lg-4">
-            <div class="card h-100">
-                <div class="card-header">${i18n.t('observatory.sensor_data')}</div>
-                <div class="card-body p-2" id="allsky-sensor-body">
-                    <div class="text-muted text-center py-3"><div class="spinner-border spinner-border-sm"></div></div>
-                </div>
-            </div>
-        </div>`;
+        const col = document.createElement('div');
+        col.className = 'col-12 col-lg-4';
+
+        const card = document.createElement('div');
+        card.className = 'card h-100';
+
+        const header = document.createElement('div');
+        header.className = 'card-header';
+        header.textContent = i18n.t('observatory.sensor_data');
+
+        const body = document.createElement('div');
+        body.className = 'card-body p-2';
+        body.id = 'allsky-sensor-body';
+        const sensorSpinner = document.createElement('div');
+        sensorSpinner.className = 'text-muted text-center py-3';
+        const sensorSpinnerIcon = document.createElement('div');
+        sensorSpinnerIcon.className = 'spinner-border spinner-border-sm';
+        sensorSpinner.appendChild(sensorSpinnerIcon);
+        body.appendChild(sensorSpinner);
+
+        card.appendChild(header);
+        card.appendChild(body);
+        col.appendChild(card);
+        row.appendChild(col);
     }
 
     if (modules.mini_timelapse?.enabled && urls.mini_timelapse_thumb) {
-        html += `
-        <div class="col-12 col-md-6 col-lg-3">
-            <div class="card h-100">
-                <div class="card-header">${i18n.t('observatory.mini_timelapse')}</div>
-                <div class="card-body p-1 text-center" id="allsky-mini-body">
-                    <a href="${urls.mini_timelapse_video || '#'}" target="_blank" rel="noopener">
-                        <img id="allsky-mini-img" src="${urls.mini_timelapse_thumb}" alt="mini-timelapse"
-                             class="img-fluid rounded" style="max-height:200px;object-fit:contain;">
-                        <div class="mt-1 small text-muted"><i class="bi bi-play-circle me-1"></i>${i18n.t('observatory.watch_video')}</div>
-                    </a>
-                </div>
-            </div>
-        </div>`;
+        const col = document.createElement('div');
+        col.className = 'col-12 col-md-6 col-lg-3';
+
+        const card = document.createElement('div');
+        card.className = 'card h-100';
+
+        const header = document.createElement('div');
+        header.className = 'card-header';
+        header.textContent = i18n.t('observatory.mini_timelapse');
+
+        const body = document.createElement('div');
+        body.className = 'card-body p-1 text-center';
+        body.id = 'allsky-mini-body';
+
+        const link = document.createElement('a');
+        link.href = urls.mini_timelapse_video || '#';
+        link.target = '_blank';
+        link.rel = 'noopener';
+
+        const img = document.createElement('img');
+        img.id = 'allsky-mini-img';
+        img.src = urls.mini_timelapse_thumb;
+        img.alt = 'mini-timelapse';
+        img.className = 'img-fluid rounded allsky-media-thumb';
+
+        const caption = document.createElement('div');
+        caption.className = 'mt-1 small text-muted';
+        caption.appendChild(DOMUtils.createIcon('bi bi-play-circle me-1'));
+        caption.appendChild(document.createTextNode(i18n.t('observatory.watch_video')));
+
+        link.appendChild(img);
+        link.appendChild(caption);
+        body.appendChild(link);
+        card.appendChild(header);
+        card.appendChild(body);
+        col.appendChild(card);
+        row.appendChild(col);
     }
 
     if (modules.keogram?.enabled && urls.keogram) {
-        // Keogram is a wide timeline strip — give it as much horizontal space as possible
         const hasNeighbour = modules.startrails?.enabled || modules.mini_timelapse?.enabled;
         const keogramCol = hasNeighbour ? 'col-12 col-lg-9' : 'col-12';
-        html += `
-        <div class="${keogramCol}">
-            <div class="card h-100">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <span>${i18n.t('observatory.keogram')}</span>
-                    <span id="allsky-keogram-date" class="badge bg-dark text-muted small"></span>
-                </div>
-                <div class="card-body p-1 text-center" id="allsky-keogram-body">
-                    <img id="allsky-keogram-img" src="${urls.keogram}" alt="keogram" class="img-fluid rounded">
-                </div>
-            </div>
-        </div>`;
+
+        const col = document.createElement('div');
+        col.className = keogramCol;
+
+        const card = document.createElement('div');
+        card.className = 'card h-100';
+
+        const header = document.createElement('div');
+        header.className = 'card-header d-flex justify-content-between align-items-center';
+        const headerText = document.createElement('span');
+        headerText.textContent = i18n.t('observatory.keogram');
+        const dateBadge = document.createElement('span');
+        dateBadge.id = 'allsky-keogram-date';
+        dateBadge.className = 'badge bg-dark text-muted small';
+        header.appendChild(headerText);
+        header.appendChild(dateBadge);
+
+        const body = document.createElement('div');
+        body.className = 'card-body p-1 text-center';
+        body.id = 'allsky-keogram-body';
+        const img = document.createElement('img');
+        img.id = 'allsky-keogram-img';
+        img.src = urls.keogram;
+        img.alt = 'keogram';
+        img.className = 'img-fluid rounded';
+        body.appendChild(img);
+
+        card.appendChild(header);
+        card.appendChild(body);
+        col.appendChild(card);
+        row.appendChild(col);
     }
 
     if (modules.startrails?.enabled && urls.startrails) {
-        html += `
-        <div class="col-12 col-md-6 col-lg-3">
-            <div class="card h-100">
-                <div class="card-header">${i18n.t('observatory.startrails')}</div>
-                <div class="card-body p-1 text-center" id="allsky-startrails-body">
-                    <img id="allsky-startrails-img" src="${urls.startrails}" alt="startrails" class="img-fluid rounded">
-                </div>
-            </div>
-        </div>`;
+        const col = document.createElement('div');
+        col.className = 'col-12 col-md-6 col-lg-3';
+
+        const card = document.createElement('div');
+        card.className = 'card h-100';
+
+        const header = document.createElement('div');
+        header.className = 'card-header';
+        header.textContent = i18n.t('observatory.startrails');
+
+        const body = document.createElement('div');
+        body.className = 'card-body p-1 text-center';
+        body.id = 'allsky-startrails-body';
+        const img = document.createElement('img');
+        img.id = 'allsky-startrails-img';
+        img.src = urls.startrails;
+        img.alt = 'startrails';
+        img.className = 'img-fluid rounded';
+        body.appendChild(img);
+
+        card.appendChild(header);
+        card.appendChild(body);
+        col.appendChild(card);
+        row.appendChild(col);
     }
 
     if (modules.daily_timelapse?.enabled && urls.daily_timelapse) {
-        html += `
-        <div class="col-12 col-md-6">
-            <div class="card h-100">
-                <div class="card-header">${i18n.t('observatory.daily_timelapse')}</div>
-                <div class="card-body p-1 text-center" id="allsky-timelapse-body">
-                    <video id="allsky-timelapse-video" controls class="img-fluid rounded" style="max-height:240px;">
-                        <source src="${urls.daily_timelapse}" type="video/mp4">
-                    </video>
-                </div>
-            </div>
-        </div>`;
+        const col = document.createElement('div');
+        col.className = 'col-12 col-md-6';
+
+        const card = document.createElement('div');
+        card.className = 'card h-100';
+
+        const header = document.createElement('div');
+        header.className = 'card-header';
+        header.textContent = i18n.t('observatory.daily_timelapse');
+
+        const body = document.createElement('div');
+        body.className = 'card-body p-1 text-center';
+        body.id = 'allsky-timelapse-body';
+
+        const video = document.createElement('video');
+        video.id = 'allsky-timelapse-video';
+        video.controls = true;
+        video.className = 'img-fluid rounded allsky-media-video';
+        const source = document.createElement('source');
+        source.src = urls.daily_timelapse;
+        source.type = 'video/mp4';
+        video.appendChild(source);
+        body.appendChild(video);
+
+        card.appendChild(header);
+        card.appendChild(body);
+        col.appendChild(card);
+        row.appendChild(col);
     }
 
-    html += '</div>';
-    return html;
+    return row;
 }
 
-// ── Error placeholder ─────────────────────────────────────────────────────────
+// ── Error placeholder nodes ────────────────────────────────────────────────────
 
-function _notYetGeneratedHTML() {
-    return `<p class="text-muted small p-2 mb-0"><i class="bi bi-hourglass-split me-1"></i>${i18n.t('observatory.not_yet_generated')}</p>`;
+function _notYetGeneratedNode() {
+    const p = document.createElement('p');
+    p.className = 'text-muted small p-2 mb-0';
+    p.appendChild(DOMUtils.createIcon('bi bi-hourglass-split me-1'));
+    p.appendChild(document.createTextNode(i18n.t('observatory.not_yet_generated')));
+    return p;
 }
 
-function _imageUnavailableHTML() {
-    return `<p class="text-muted small p-2 mb-0"><i class="bi bi-wifi-off me-1"></i>${i18n.t('observatory.image_unavailable')}</p>`;
+function _imageUnavailableNode() {
+    const p = document.createElement('p');
+    p.className = 'text-muted small p-2 mb-0';
+    p.appendChild(DOMUtils.createIcon('bi bi-wifi-off me-1'));
+    p.appendChild(document.createTextNode(i18n.t('observatory.image_unavailable')));
+    return p;
 }
 
 // ── Error handlers (set after DOM is ready, never inline) ─────────────────────
 
 function _attachImageErrorHandlers(modules, urls) {
-    // Live image — on error: show placeholder, stop interval, schedule retry
     const liveImg = document.getElementById('allsky-live-img');
     if (liveImg) {
         liveImg.onerror = () => {
-            liveImg.onerror = null; // prevent any further onerror firing
+            liveImg.onerror = null;
             const body = document.getElementById('allsky-live-body');
-            if (body) body.innerHTML = _imageUnavailableHTML();
+            if (body) { DOMUtils.clear(body); body.appendChild(_imageUnavailableNode()); }
             _stopLiveImageRefresh();
-            // Retry after 5 min — just reload the whole Observatory widget
             _allskyImageRetryTimeout = setTimeout(loadAllSkyObservatory, _ALLSKY_IMAGE_RETRY_MS);
         };
     }
 
-    // Mini-timelapse — static snapshot, no retry needed
     const miniImg = document.getElementById('allsky-mini-img');
     if (miniImg) {
         miniImg.onerror = () => {
             miniImg.onerror = null;
             const body = document.getElementById('allsky-mini-body');
-            if (body) body.innerHTML = _notYetGeneratedHTML();
+            if (body) { DOMUtils.clear(body); body.appendChild(_notYetGeneratedNode()); }
         };
     }
 
-    // Keogram — generated end-of-night, show "not yet" message
     const keogramImg = document.getElementById('allsky-keogram-img');
     if (keogramImg) {
         keogramImg.onerror = () => {
             keogramImg.onerror = null;
             const body = document.getElementById('allsky-keogram-body');
-            if (body) body.innerHTML = _notYetGeneratedHTML();
+            if (body) { DOMUtils.clear(body); body.appendChild(_notYetGeneratedNode()); }
         };
     }
 
-    // Startrails — same as keogram
     const startrailsImg = document.getElementById('allsky-startrails-img');
     if (startrailsImg) {
         startrailsImg.onerror = () => {
             startrailsImg.onerror = null;
             const body = document.getElementById('allsky-startrails-body');
-            if (body) body.innerHTML = _notYetGeneratedHTML();
+            if (body) { DOMUtils.clear(body); body.appendChild(_notYetGeneratedNode()); }
         };
     }
 
-    // Daily timelapse video — <video> error fires on the element itself
     const video = document.getElementById('allsky-timelapse-video');
     if (video) {
         video.onerror = () => {
             video.onerror = null;
             const body = document.getElementById('allsky-timelapse-body');
-            if (body) body.innerHTML = _notYetGeneratedHTML();
+            if (body) { DOMUtils.clear(body); body.appendChild(_notYetGeneratedNode()); }
         };
     }
 }
@@ -207,24 +316,16 @@ function _attachImageErrorHandlers(modules, urls) {
 
 function _startAllSkyPolling(modules, urls) {
     stopAllSkyPolling();
-
-    // Attach error handlers before starting the interval
     _attachImageErrorHandlers(modules, urls);
 
-    // Refresh live image every 30s only while the img element is present
     if (modules.live_image?.enabled && urls.live_image) {
         _allskyImageInterval = setInterval(() => {
             const img = document.getElementById('allsky-live-img');
-            if (!img) {
-                // Element was replaced by error handler — stop the interval
-                _stopLiveImageRefresh();
-                return;
-            }
+            if (!img) { _stopLiveImageRefresh(); return; }
             img.src = `${urls.live_image}&_ts=${Date.now()}`;
         }, _ALLSKY_IMAGE_REFRESH_MS);
     }
 
-    // Poll sensor data every 60s
     if (modules.sensor_data?.enabled) {
         _pollAllSkySensor();
         _allskySensorInterval = setInterval(_pollAllSkySensor, 60000);
@@ -237,8 +338,8 @@ function _stopLiveImageRefresh() {
 
 function stopAllSkyPolling() {
     _stopLiveImageRefresh();
-    if (_allskySensorInterval)    { clearInterval(_allskySensorInterval);      _allskySensorInterval = null; }
-    if (_allskyImageRetryTimeout) { clearTimeout(_allskyImageRetryTimeout);    _allskyImageRetryTimeout = null; }
+    if (_allskySensorInterval)    { clearInterval(_allskySensorInterval);   _allskySensorInterval = null; }
+    if (_allskyImageRetryTimeout) { clearTimeout(_allskyImageRetryTimeout); _allskyImageRetryTimeout = null; }
 }
 
 // ── Sensor data ───────────────────────────────────────────────────────────────
@@ -249,11 +350,14 @@ async function _pollAllSkySensor() {
 
     const data = await fetchJSONOnce('/api/connectors/allsky/status').catch(() => null);
     if (!data) {
-        body.innerHTML = `<p class="text-danger small p-2">${i18n.t('observatory.sensor_unavailable')}</p>`;
+        DOMUtils.clear(body);
+        const errMsg = document.createElement('p');
+        errMsg.className = 'text-danger small p-2';
+        errMsg.textContent = i18n.t('observatory.sensor_unavailable');
+        body.appendChild(errMsg);
         return;
     }
 
-    // Update day/night badge on live image card (only if present)
     const badge = document.getElementById('allsky-day-night-badge');
     if (badge) {
         const dn = (data.DAY_OR_NIGHT || '').toLowerCase();
@@ -261,36 +365,48 @@ async function _pollAllSkySensor() {
         badge.className = `badge ms-2 ${dn === 'night' ? 'bg-primary' : 'bg-warning text-dark'}`;
     }
 
-    // Humidity: prefer dew controller reading, fall back to direct sensor
-    const humidityKey = data['AS_DEWCONTROLHUMIDITY'] != null ? 'AS_DEWCONTROLHUMIDITY' : 'AS_HUMIDITY';
-    // Exposure: prefer human-readable string, fall back to raw µs
-    const exposureKey = data['AS_sEXPOSURE'] != null ? 'AS_sEXPOSURE' : 'AS_EXPOSURE_US';
+    const humidityKey  = data['AS_DEWCONTROLHUMIDITY'] != null ? 'AS_DEWCONTROLHUMIDITY' : 'AS_HUMIDITY';
+    const exposureKey  = data['AS_sEXPOSURE'] != null ? 'AS_sEXPOSURE' : 'AS_EXPOSURE_US';
     const exposureUnit = exposureKey === 'AS_EXPOSURE_US' ? 'µs' : '';
 
     const rows = [
-        { key: 'AS_TEMPERATURE_C',      label: i18n.t('observatory.temperature'),    unit: '°C', icon: 'bi-thermometer-half' },
-        { key: humidityKey,             label: i18n.t('observatory.humidity'),        unit: '%',  icon: 'bi-droplet-half' },
-        { key: 'AS_DEWCONTROLDEW',      label: i18n.t('observatory.dew_point'),       unit: '°C', icon: 'bi-water' },
-        { key: 'AS_DEWCONTROLHEATER',   label: i18n.t('observatory.dew_heater'),      unit: '',   icon: 'bi-lightning-charge' },
-        { key: 'AS_GAIN',               label: i18n.t('observatory.gain'),            unit: '',   icon: 'bi-sliders' },
-        { key: exposureKey,             label: i18n.t('observatory.exposure'),        unit: exposureUnit, icon: 'bi-clock' },
-        { key: 'AS_MEAN',               label: i18n.t('observatory.mean_brightness'), unit: '',   icon: 'bi-brightness-high' },
-        { key: 'ALLSKY_VERSION',        label: i18n.t('observatory.version'),         unit: '',   icon: 'bi-info-circle' },
+        { key: 'AS_TEMPERATURE_C',    label: i18n.t('observatory.temperature'),     unit: '°C', icon: 'bi-thermometer-half' },
+        { key: humidityKey,           label: i18n.t('observatory.humidity'),         unit: '%',  icon: 'bi-droplet-half' },
+        { key: 'AS_DEWCONTROLDEW',    label: i18n.t('observatory.dew_point'),        unit: '°C', icon: 'bi-water' },
+        { key: 'AS_DEWCONTROLHEATER', label: i18n.t('observatory.dew_heater'),       unit: '',   icon: 'bi-lightning-charge' },
+        { key: 'AS_GAIN',             label: i18n.t('observatory.gain'),             unit: '',   icon: 'bi-sliders' },
+        { key: exposureKey,           label: i18n.t('observatory.exposure'),         unit: exposureUnit, icon: 'bi-clock' },
+        { key: 'AS_MEAN',             label: i18n.t('observatory.mean_brightness'),  unit: '',   icon: 'bi-brightness-high' },
+        { key: 'ALLSKY_VERSION',      label: i18n.t('observatory.version'),          unit: '',   icon: 'bi-info-circle' },
     ];
 
-    let html = '<table class="table table-sm table-borderless mb-0 small">';
+    const table = document.createElement('table');
+    table.className = 'table table-sm table-borderless mb-0 small';
+    let hasRows = false;
+
     for (const { key, label, unit, icon } of rows) {
         if (data[key] == null) continue;
-        html += `<tr>
-            <td class="text-muted pe-2"><i class="${icon} me-1"></i>${label}</td>
-            <td class="fw-semibold">${data[key]}${unit ? ' ' + unit : ''}</td>
-        </tr>`;
+        hasRows = true;
+        const tr = document.createElement('tr');
+        const td1 = document.createElement('td');
+        td1.className = 'text-muted pe-2';
+        td1.appendChild(DOMUtils.createIcon(`${icon} me-1`));
+        td1.appendChild(document.createTextNode(label));
+        const td2 = document.createElement('td');
+        td2.className = 'fw-semibold';
+        td2.textContent = `${data[key]}${unit ? ' ' + unit : ''}`;
+        tr.appendChild(td1);
+        tr.appendChild(td2);
+        table.appendChild(tr);
     }
-    html += '</table>';
 
-    if (!html.includes('<tr>')) {
-        html = `<p class="text-muted small p-2">${i18n.t('observatory.sensor_no_data')}</p>`;
+    DOMUtils.clear(body);
+    if (!hasRows) {
+        const msg = document.createElement('p');
+        msg.className = 'text-muted small p-2';
+        msg.textContent = i18n.t('observatory.sensor_no_data');
+        body.appendChild(msg);
+    } else {
+        body.appendChild(table);
     }
-
-    body.innerHTML = html;
 }

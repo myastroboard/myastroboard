@@ -1,0 +1,25 @@
+/* ======================
+   Connectors & Observatory
+   ====================== */
+
+.connector-suggest-card {
+    border: 2px dashed var(--bs-border-color);
+}
+
+.connector-suggest-card .small {
+    font-size: 0.75rem;
+}
+
+.allsky-media-fit {
+    max-height: 480px;
+    object-fit: contain;
+}
+
+.allsky-media-thumb {
+    max-height: 200px;
+    object-fit: contain;
+}
+
+.allsky-media-video {
+    max-height: 240px;
+}
