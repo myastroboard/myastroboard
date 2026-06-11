@@ -15,7 +15,7 @@ async function loadConnectorsStore() {
     }
 
     container.innerHTML = connectors.map(c => _connectorCard(c)).join('') +
-        _placeholderCards();
+        _suggestCard();
 
     // Wire up events
     connectors.forEach(c => _bindConnectorEvents(c));
@@ -131,23 +131,23 @@ function _allskyAdvancedFields(cfg) {
            id="connector-allsky-export-json-path" value="${cfg.export_json_path || 'allskydata.json'}" placeholder="allskydata.json">`;
 }
 
-function _placeholderCards() {
-    const placeholders = [
-        { label: 'INDI Server',  icon: 'bi-cpu',         soon: true },
-        { label: 'PHD2',         icon: 'bi-crosshair',   soon: true },
-    ];
-    return placeholders.map(p => `
+function _suggestCard() {
+    const url = 'https://github.com/myastroboard/myastroboard/discussions/new?category=ideas&labels=enhancement,connector';
+
+    return `
     <div class="col-12 col-md-6 col-xl-4">
-        <div class="card h-100 opacity-50">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="${p.icon} me-2 text-secondary"></i>${p.label}</span>
-                <span class="badge bg-light text-dark border">${i18n.t('connectors.coming_soon')}</span>
-            </div>
-            <div class="card-body">
-                <p class="text-muted small">${i18n.t('connectors.coming_soon_desc')}</p>
+        <div class="card h-100 text-center py-4 px-3" style="border: 2px dashed var(--bs-border-color);">
+            <div class="card-body d-flex flex-column align-items-center justify-content-center">
+                <i class="bi bi-plug fs-2 text-primary mb-3 d-block"></i>
+                <h6 class="fw-semibold mb-2">${i18n.t('connectors.suggest_title')}</h6>
+                <p class="text-muted small mb-3">${i18n.t('connectors.suggest_desc')}</p>
+                <a href="${url}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-lightbulb me-1"></i>${i18n.t('connectors.suggest_btn')}
+                </a>
+                <p class="text-muted mt-3 mb-0" style="font-size:0.75rem;">${i18n.t('connectors.suggest_examples')}</p>
             </div>
         </div>
-    </div>`).join('');
+    </div>`;
 }
 
 function _bindConnectorEvents(c) {
