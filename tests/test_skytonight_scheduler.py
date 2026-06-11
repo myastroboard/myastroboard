@@ -42,8 +42,10 @@ def test_resolve_schedule_uses_fallback_for_invalid_time():
 
 def test_resolve_schedule_prefers_soonest_valid_candidate():
     config = _base_config()
-    # Use an April date where a proper nautical night exists in Paris
-    now = datetime(2026, 4, 1, 4, 0, tzinfo=ZoneInfo('Europe/Paris'))
+    # April 1 at 04:00 Paris time gives a proper nautical night; pick the next upcoming one
+    paris_now = datetime.now(ZoneInfo('Europe/Paris'))
+    target_year = paris_now.year if (paris_now.month, paris_now.day) <= (4, 1) else paris_now.year + 1
+    now = datetime(target_year, 4, 1, 4, 0, tzinfo=ZoneInfo('Europe/Paris'))
     schedule = resolve_schedule(config, now=now)
 
     assert schedule.server_time_valid is True
@@ -183,7 +185,7 @@ def test_missed_run_recovery_on_startup(monkeypatch):
             next_run=future_next_run,
             server_time_valid=True,
             reason='test-schedule',
-            server_time=datetime.now(ZoneInfo('Europe/Paris')),
+            server_time=base_now,
             timezone='Europe/Paris',
         ),
     )

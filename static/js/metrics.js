@@ -32,7 +32,7 @@ async function loadSystemMetrics() {
         document.getElementById('cpu-logical').textContent = data?.cpu?.count_logical ?? i18n.t('units.na');
         document.getElementById('cpu-physical').textContent = data?.cpu?.count_physical ?? i18n.t('units.na');
         
-        if (data.cpu.frequency && data.cpu.frequency.current) {
+        if (data?.cpu?.frequency?.current) {
             document.getElementById('cpu-frequency').textContent = 
                 `${(data.cpu.frequency.current / 1000).toFixed(2)} ${i18n.t('units.ghz')}`;
         } else {
@@ -164,7 +164,7 @@ async function updateSchedulerMetrics() {
 function formatTTL(seconds) {
     if (!seconds) return '-';
     const s = Number(seconds);
-    if (s >= 86400) return `${Math.round(s / 3600)}h`;
+    if (s >= 86400) return `${Math.round(s / 86400)}d`;
     if (s >= 3600)  return `${Math.round(s / 3600)}h`;
     if (s >= 60)    return `${Math.round(s / 60)}m`;
     return `${s}s`;
@@ -211,7 +211,7 @@ async function updateCacheJobsMetrics() {
     const formatSecs = (secs) => {
         if (secs == null || !Number.isFinite(Number(secs))) return '-';
         const s = Number(secs);
-        return s < 60 ? `${s.toFixed(2)}s` : `${Math.floor(s / 60)}m ${(s % 60).toFixed(0)}s`;
+        return s < 60 ? `${s.toFixed(1)}s` : `${Math.floor(s / 60)}m ${(s % 60).toFixed(0)}s`;
     };
 
     try {
@@ -325,16 +325,12 @@ function updateFolderMetrics(folders, rootTotalBytes = null) {
             const totalElement = document.getElementById(totalId);
             const percentElement = document.getElementById(percentId);
             
-            if (bar && sizeElement) {
+            if (bar && sizeElement && totalElement && percentElement) {
                 const percent = folderData.percent_of_root || 0;
                 updateCompactProgressBar(barId, percent);
                 sizeElement.textContent = formatBytes(folderData.bytes || 0);
-                if (percentElement) {
-                    percentElement.textContent = `${Math.round(percent)}${i18n.t('units.percent')}`;
-                }
-                if (totalElement) {
-                    totalElement.textContent = rootTotalBytes ? formatBytes(rootTotalBytes) : '-';
-                }
+                percentElement.textContent = `${Math.round(percent)}${i18n.t('units.percent')}`;
+                totalElement.textContent = rootTotalBytes ? formatBytes(rootTotalBytes) : '-';
             }
         }
     }
@@ -482,7 +478,8 @@ function escapeHtml(value) {
 function updateProgressBar(elementId, percent) {
     const bar = document.getElementById(elementId);
     if (!bar) return;
-    
+    if (!Number.isFinite(percent)) return;
+
     const roundedPercent = Math.round(percent * 10) / 10;
     bar.style.width = `${roundedPercent}${i18n.t('units.percent')}`;
     bar.setAttribute('aria-valuenow', roundedPercent);

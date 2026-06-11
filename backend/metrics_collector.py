@@ -100,9 +100,9 @@ def get_folder_disk_usage(folder_path):
                             elif entry.is_dir(follow_symlinks=False):
                                 stack.append(entry.path)
                         except (OSError, IOError):
-                            pass
+                            pass  # skip inaccessible files (permissions, broken symlinks)
             except (OSError, IOError):
-                pass
+                pass  # skip inaccessible directories (permissions, deleted mid-scan)
         return total_size
     except (OSError, IOError) as e:
         logger.warning(f"Error calculating disk usage for {folder_path}: {e}")
@@ -184,7 +184,7 @@ def get_environment_processes():
             cpu_times = info.get('cpu_times')
             cpu_total = 0.0
             if cpu_times:
-                cpu_total = float(getattr(cpu_times, 'user', 0.0) + getattr(cpu_times, 'system', 0.0))
+                cpu_total = float(getattr(cpu_times, 'user', 0.0)) + float(getattr(cpu_times, 'system', 0.0))
             cpu_percent = 0.0
             if uptime_seconds > 0:
                 cpu_percent = min(100.0, max(0.0, (cpu_total / uptime_seconds) * (100.0 / cpu_count)))
@@ -338,8 +338,8 @@ def collect_metrics():
             'platform': platform_info,
         }
         with _metrics_cache_lock:
-            _metrics_cache = result
-            _metrics_cache_ts = time.monotonic()
+            _metrics_cache = result  # lgtm[py/unused-global-variable]
+            _metrics_cache_ts = time.monotonic()  # lgtm[py/unused-global-variable]
         return result
     except Exception as e:
         logger.error(f"Error collecting metrics: {e}", exc_info=True)
