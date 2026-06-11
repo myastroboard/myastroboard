@@ -1015,6 +1015,7 @@ def list_connectors_api():
             "label": cls.label,
             "description": cls.description,
             "min_version": cls.min_version,
+            "homepage": cls.homepage,
             "modules": cls.MODULES,
             "installed": bool(cfg.get("url")),
             "enabled": bool(cfg.get("enabled")) and bool(cfg.get("url")),

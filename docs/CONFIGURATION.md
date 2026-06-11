@@ -10,6 +10,7 @@ MyAstroBoard stores its runtime configuration in `data/config.json`. All setting
 |---------|---------|
 | **Configuration** | Location, timezone, sky quality |
 | **Advanced** | SkyTonight constraints, horizon profile, scheduler, app settings |
+| **Connectors** | External tool connectors (AllSky, etc.) |
 | **Logs** | Live log viewer and export |
 | **Users** | User management (admin only) |
 | **Metrics** | Scheduler and cache performance dashboard |
@@ -119,6 +120,35 @@ Stored separately in `data/app_settings.json` (see [AUTHENTICATION.md](AUTHENTIC
 | `vapid_contact_email` | `""` | Contact email for Web Push VAPID tokens (required for iOS push) |
 | `trust_proxy_headers` | `false` | Enable `X-Forwarded-For` / `X-Forwarded-Proto` forwarding (reverse proxy deployments) |
 | `session_cookie_secure` | `false` | Require HTTPS for session cookie |
+
+---
+
+## Connectors
+
+**Sub-tab**: Parameters → Connectors
+
+Connector configuration is stored in `config.json → connectors.<name>`. See [CONNECTORS.md](CONNECTORS.md) for the full reference.
+
+```json
+"connectors": {
+  "allsky": {
+    "url": "http://allsky.local",
+    "label": "My AllSky",
+    "enabled": true,
+    "image_path": "current/tmp",
+    "image_filename": "image.jpg",
+    "export_json_path": "allskydata.json",
+    "modules": {
+      "live_image":      { "enabled": true },
+      "sensor_data":     { "enabled": false },
+      "keogram":         { "enabled": true },
+      "startrails":      { "enabled": false },
+      "daily_timelapse": { "enabled": false },
+      "mini_timelapse":  { "enabled": false }
+    }
+  }
+}
+```
 
 ---
 

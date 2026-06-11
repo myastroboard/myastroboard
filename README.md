@@ -22,6 +22,8 @@ If you want see more, maybe look at the [visual tour](docs/VISUAL_TOUR.md).
 - Astrodex: personal astrophotography catalog and image management
 - Plan My Night timeline builder with CSV/PDF export
 - Equipment profiles and field-of-view calculator
+- Observatory: live dashboard fed by external connectors
+- Connectors: AllSky all-sky camera integration (live image, keogram, startrails, timelapse, sensor data)
 - Multi-user auth system with admin/user roles
 - i18n support (English/French plus community translations)
 

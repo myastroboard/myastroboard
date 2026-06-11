@@ -29,7 +29,8 @@ class AllSkyConnector(BaseConnector):
     name = "allsky"
     label = "AllSky"
     description = "All-sky camera — live image, keogram, startrails, sensor data, timelapse"
-    min_version = "v2023.1"
+    min_version = "v2024.12"
+    homepage = "https://github.com/AllskyTeam/allsky"
 
     MODULES = [
         {"slug": "live_image",       "label": "Live image",        "description": "Auto-refreshing live sky image", "default_enabled": True},

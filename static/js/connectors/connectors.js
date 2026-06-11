@@ -34,7 +34,10 @@ function _connectorCard(c) {
     <div class="col-12 col-md-6 col-xl-4">
         <div class="card h-100" id="connector-card-${c.name}">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="bi bi-camera-video me-2 text-info"></i>${i18n.t(`connectors.${c.name}_label`)}</span>
+                <span>
+                    <i class="bi bi-camera-video me-2 text-info"></i>${i18n.t(`connectors.${c.name}_label`)}
+                    ${c.homepage ? `<a href="${c.homepage}" target="_blank" rel="noopener" class="ms-2 text-muted" title="${c.homepage}"><i class="bi bi-github"></i></a>` : ''}
+                </span>
                 ${statusBadge}
             </div>
             <div class="card-body">

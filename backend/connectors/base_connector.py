@@ -13,6 +13,7 @@ class BaseConnector(ABC):
     label: str = ""
     description: str = ""
     min_version: str = ""
+    homepage: str = ""
 
     # Ordered list of module definitions: {slug, label, description, default_enabled}
     MODULES: list[dict] = []

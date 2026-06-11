@@ -132,6 +132,14 @@ This page lists the HTTP routes currently declared in `backend/app.py` and `back
 - `GET /api/spaceflight/img/<filename>`
 - `GET /api/spaceflight/launch/<launch_id>/vidurls`
 
+## Connectors
+
+- `GET /api/connectors` — List all available connectors with installed/enabled state and module config
+- `GET /api/connectors/allsky/status` — Return cached AllSky sensor data (`allskydata.json`); requires `sensor_data` module enabled
+- `GET /api/connectors/allsky/health` — Run a per-module health check against the AllSky instance; accepts `?fresh=1` to bypass cache
+- `GET /api/connectors/allsky/urls` — Return proxy URLs for all enabled AllSky modules; accepts `?date=YYYYMMDD`
+- `GET /api/connectors/allsky/proxy` — Proxy an AllSky resource through the backend; params: `module=<slug>` and optional `date=YYYYMMDD`
+
 ## Object Lookup
 
 - `GET /api/object/<path:identifier>`

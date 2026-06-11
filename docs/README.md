@@ -36,6 +36,10 @@ Welcome to the comprehensive documentation for MyAstroBoard, the integrated astr
 #### Spaceflight
 - [Spaceflight Tracker](SPACEFLIGHT.md) - Rocket launches, astronauts, ISS pass prediction (SGP4 algorithm), space events
 
+#### Observatory & Connectors
+- [Observatory](OBSERVATORY.md) - Live dashboard fed by external connectors (AllSky panels, sensor data, keogram, timelapse)
+- [Connectors](CONNECTORS.md) - Connector architecture, AllSky setup, module reference, and how to add a new connector
+
 ### Administration
 - [Authentication & Users](AUTHENTICATION.md) - Roles, user management, preferences, session security
 - [Configuration](CONFIGURATION.md) - Location setup, SkyTonight constraints, horizon profile, backup/restore, logs, metrics
@@ -81,6 +85,8 @@ Welcome to the comprehensive documentation for MyAstroBoard, the integrated astr
 | Exposure calculation | Equipment → Exposure Calc | [EXPOSURE_CALC.md](EXPOSURE_CALC.md) |
 | Launches & astronauts | Spaceflight | [SPACEFLIGHT.md](SPACEFLIGHT.md) |
 | ISS passes | Spaceflight → ISS | [SPACEFLIGHT.md](SPACEFLIGHT.md) |
+| AllSky live image & data | Observatory | [OBSERVATORY.md](OBSERVATORY.md) |
+| External connectors setup | Parameters → Connectors | [CONNECTORS.md](CONNECTORS.md) |
 | Push notifications | My Settings → Notifications | [NOTIFICATIONS.md](NOTIFICATIONS.md) |
 | User roles | Parameters → Users | [AUTHENTICATION.md](AUTHENTICATION.md) |
 | Location & constraints | Parameters → Configuration | [CONFIGURATION.md](CONFIGURATION.md) |
