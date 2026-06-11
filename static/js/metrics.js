@@ -1,5 +1,7 @@
 // System Metrics Functions
 
+const METRICS_REFRESH_INTERVAL_MS = 5000;
+const METRICS_FETCH_TIMEOUT_MS = 10000;
 let metricsUpdateInterval = null;
 let metricsLoading = false;
 let processSortState = { key: 'cpu_percent', direction: 'desc' };
@@ -13,7 +15,7 @@ async function loadSystemMetrics() {
     if (metricsLoading) return;
     metricsLoading = true;
     try {
-        const data = await fetchJSONOnce('/api/metrics', { timeoutMs: 20000 });
+        const data = await fetchJSONOnce('/api/metrics', { timeoutMs: METRICS_FETCH_TIMEOUT_MS });
         
         if (!data) {
             console.warn('No metrics data received');
@@ -528,7 +530,7 @@ function startMetricsAutoRefresh() {
 
     async function runAndReschedule() {
         await loadSystemMetrics();
-        metricsUpdateInterval = setTimeout(runAndReschedule, 5000);
+        metricsUpdateInterval = setTimeout(runAndReschedule, METRICS_REFRESH_INTERVAL_MS);
     }
 
     runAndReschedule();

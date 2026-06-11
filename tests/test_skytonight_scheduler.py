@@ -42,10 +42,9 @@ def test_resolve_schedule_uses_fallback_for_invalid_time():
 
 def test_resolve_schedule_prefers_soonest_valid_candidate():
     config = _base_config()
-    # April 1 at 04:00 Paris time gives a proper nautical night; pick the next upcoming one
-    paris_now = datetime.now(ZoneInfo('Europe/Paris'))
-    target_year = paris_now.year if (paris_now.month, paris_now.day) <= (4, 1) else paris_now.year + 1
-    now = datetime(target_year, 4, 1, 4, 0, tzinfo=ZoneInfo('Europe/Paris'))
+    # Fixed date for deterministic behavior across runs/environments.
+    # April 1 at 04:00 Paris time gives a proper nautical night; pick the next upcoming one.
+    now = datetime(2026, 4, 1, 4, 0, tzinfo=ZoneInfo('Europe/Paris'))
     schedule = resolve_schedule(config, now=now)
 
     assert schedule.server_time_valid is True
@@ -1087,7 +1086,7 @@ class TestRunLoopMissedRunFalseBranch:
         monkeypatch.setattr('skytonight_scheduler.get_scheduler_trigger_file', lambda: '/tmp/nonexistent_st2')
         monkeypatch.setattr('skytonight_scheduler.append_scheduler_log', lambda msg: None)
         monkeypatch.setattr('skytonight_scheduler.resolve_schedule', mock_resolve)
-        monkeypatch.setattr('skytonight_scheduler.time', MagicMock(sleep=lambda _: None))
+        monkeypatch.setattr('skytonight_scheduler.time.sleep', lambda _: None)
 
         sched = SkyTonightScheduler(
             config_loader=lambda: {'location': {'timezone': 'Europe/Paris'}, 'skytonight': {'enabled': True}},
@@ -1143,7 +1142,7 @@ class TestRunLoopTriggerFileException:
         monkeypatch.setattr('skytonight_scheduler.append_scheduler_log', lambda msg: None)
         monkeypatch.setattr('skytonight_scheduler.resolve_schedule', mock_resolve)
         monkeypatch.setattr('skytonight_scheduler.os.remove', failing_remove)
-        monkeypatch.setattr('skytonight_scheduler.time', MagicMock(sleep=lambda _: None))
+        monkeypatch.setattr('skytonight_scheduler.time.sleep', lambda _: None)
 
         sched = SkyTonightScheduler(
             config_loader=lambda: {'location': {'timezone': 'UTC'}, 'skytonight': {'enabled': True}},
@@ -1201,7 +1200,7 @@ class TestRunLoopMissedRunRecoveryException:
         monkeypatch.setattr('skytonight_scheduler.get_scheduler_trigger_file', lambda: '/tmp/nonexistent_st3')
         monkeypatch.setattr('skytonight_scheduler.append_scheduler_log', lambda msg: None)
         monkeypatch.setattr('skytonight_scheduler.resolve_schedule', mock_resolve)
-        monkeypatch.setattr('skytonight_scheduler.time', MagicMock(sleep=lambda _: None))
+        monkeypatch.setattr('skytonight_scheduler.time.sleep', lambda _: None)
 
         sched = SkyTonightScheduler(
             config_loader=lambda: {'location': {'timezone': 'UTC'}, 'skytonight': {'enabled': True}},
@@ -1242,7 +1241,7 @@ class TestRunLoopScheduleNextRunNone:
         monkeypatch.setattr('skytonight_scheduler.get_scheduler_trigger_file', lambda: '/tmp/nonexistent_st4')
         monkeypatch.setattr('skytonight_scheduler.append_scheduler_log', lambda msg: None)
         monkeypatch.setattr('skytonight_scheduler.resolve_schedule', mock_resolve)
-        monkeypatch.setattr('skytonight_scheduler.time', MagicMock(sleep=lambda _: None))
+        monkeypatch.setattr('skytonight_scheduler.time.sleep', lambda _: None)
 
         sched = SkyTonightScheduler(
             config_loader=lambda: {'location': {'timezone': 'UTC'}, 'skytonight': {'enabled': True}},
@@ -1287,7 +1286,7 @@ class TestRunLoopCommittedNextRunUnchanged:
         monkeypatch.setattr('skytonight_scheduler.get_scheduler_trigger_file', lambda: '/tmp/nonexistent_st5')
         monkeypatch.setattr('skytonight_scheduler.append_scheduler_log', lambda msg: None)
         monkeypatch.setattr('skytonight_scheduler.resolve_schedule', mock_resolve)
-        monkeypatch.setattr('skytonight_scheduler.time', MagicMock(sleep=lambda _: None))
+        monkeypatch.setattr('skytonight_scheduler.time.sleep', lambda _: None)
 
         sched = SkyTonightScheduler(
             config_loader=lambda: {'location': {'timezone': 'UTC'}, 'skytonight': {'enabled': True}},
@@ -1345,7 +1344,7 @@ class TestRunLoopCacheReadyElseBranch:
         monkeypatch.setattr('skytonight_scheduler.get_scheduler_trigger_file', lambda: str(trigger_file))
         monkeypatch.setattr('skytonight_scheduler.append_scheduler_log', lambda msg: None)
         monkeypatch.setattr('skytonight_scheduler.resolve_schedule', mock_resolve)
-        monkeypatch.setattr('skytonight_scheduler.time', MagicMock(sleep=lambda _: None))
+        monkeypatch.setattr('skytonight_scheduler.time.sleep', lambda _: None)
 
         sched = SkyTonightScheduler(
             config_loader=lambda: {'location': {'timezone': 'UTC'}, 'skytonight': {'enabled': True}},
@@ -1405,7 +1404,7 @@ class TestRunLoopCacheReadyTimeoutAndAlreadyWaited:
             )
 
         monkeypatch.setattr('skytonight_scheduler.resolve_schedule', mock_resolve)
-        monkeypatch.setattr('skytonight_scheduler.time', MagicMock(sleep=lambda _: None))
+        monkeypatch.setattr('skytonight_scheduler.time.sleep', lambda _: None)
 
         sched = SkyTonightScheduler(
             config_loader=lambda: {'location': {'timezone': 'UTC'}, 'skytonight': {'enabled': True}},
@@ -1448,7 +1447,7 @@ class TestRunLoopCacheReadyTimeoutAndAlreadyWaited:
             )
 
         monkeypatch.setattr('skytonight_scheduler.resolve_schedule', mock_resolve)
-        monkeypatch.setattr('skytonight_scheduler.time', MagicMock(sleep=lambda _: None))
+        monkeypatch.setattr('skytonight_scheduler.time.sleep', lambda _: None)
 
         sched = SkyTonightScheduler(
             config_loader=lambda: {'location': {'timezone': 'UTC'}, 'skytonight': {'enabled': True}},

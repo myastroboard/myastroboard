@@ -23,9 +23,8 @@ from constants import (
 logger = get_logger(__name__)
 
 _metrics_cache_lock = threading.Lock()
-_metrics_cache: dict | None = None
-_metrics_cache_ts: float = 0.0
-_METRICS_CACHE_TTL = 30.0
+_metrics_cache: dict[str, object] = {'data': None, 'ts': 0.0}
+_METRICS_CACHE_TTL = 30.0  # 30s balances near-real-time metrics visibility with lower collection overhead.
 
 CONTAINER_PROCESS_HINTS = {
     'dockerd',
@@ -247,11 +246,10 @@ def collect_metrics():
     Returns comprehensive metrics dictionary. Result is cached for 30 seconds
     so rapid or concurrent calls (e.g. from the auto-refresh poll) are cheap.
     """
-    global _metrics_cache, _metrics_cache_ts
     now = time.monotonic()
     with _metrics_cache_lock:
-        if _metrics_cache is not None and now - _metrics_cache_ts < _METRICS_CACHE_TTL:
-            return _metrics_cache
+        if _metrics_cache['data'] is not None and now - _metrics_cache['ts'] < _METRICS_CACHE_TTL:
+            return _metrics_cache['data']
     try:
         # Detect environment
         is_container, container_type = is_running_in_container()
@@ -338,8 +336,8 @@ def collect_metrics():
             'platform': platform_info,
         }
         with _metrics_cache_lock:
-            _metrics_cache = result  # lgtm[py/unused-global-variable]
-            _metrics_cache_ts = time.monotonic()  # lgtm[py/unused-global-variable]
+            _metrics_cache['data'] = result
+            _metrics_cache['ts'] = time.monotonic()
         return result
     except Exception as e:
         logger.error(f"Error collecting metrics: {e}", exc_info=True)
