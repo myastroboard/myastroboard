@@ -111,11 +111,11 @@ class TestGetFolderDiskUsage:
         result = get_folder_disk_usage("/path/that/does/not/exist/12345")
         assert result is None
 
-    def test_returns_none_on_os_error(self, tmp_path):
-        """Should return None when os.walk raises an OSError."""
-        with patch("metrics_collector.os.walk", side_effect=OSError("permission denied")):
+    def test_returns_zero_on_scandir_os_error(self, tmp_path):
+        """OSError from os.scandir is caught internally; function returns 0 (not None)."""
+        with patch("metrics_collector.os.scandir", side_effect=OSError("permission denied")):
             result = get_folder_disk_usage(str(tmp_path))
-        assert result is None
+        assert result == 0
 
     def test_returns_zero_for_empty_directory(self, tmp_path):
         result = get_folder_disk_usage(str(tmp_path))
@@ -134,6 +134,64 @@ class TestGetFolderDiskUsage:
         (sub / "b.txt").write_bytes(b"B" * 200)
         result = get_folder_disk_usage(str(tmp_path))
         assert result == 300
+
+    def test_skips_entry_on_stat_os_error(self, tmp_path):
+        """OSError from entry.stat() is caught; file is skipped (branch 101-102)."""
+        f = tmp_path / "unreadable.txt"
+        f.write_bytes(b"data")
+
+        real_scandir = os.scandir
+
+        def _patched_scandir(path):
+            ctx = real_scandir(path)
+
+            class _WrappedCtx:
+                def __enter__(self_):
+                    self_._it = ctx.__enter__()
+                    return self_
+
+                def __exit__(self_, *args):
+                    return ctx.__exit__(*args)
+
+                def __iter__(self_):
+                    for entry in self_._it:
+                        entry_mock = MagicMock(wraps=entry)
+                        entry_mock.is_file.return_value = True
+                        entry_mock.stat.side_effect = OSError("permission denied")
+                        yield entry_mock
+
+            return _WrappedCtx()
+
+        with patch("metrics_collector.os.scandir", side_effect=_patched_scandir):
+            result = get_folder_disk_usage(str(tmp_path))
+        assert result == 0  # file skipped, no size added
+
+    def test_entry_neither_file_nor_dir_is_skipped(self, tmp_path):
+        """Entry that is neither file nor dir (e.g. socket/pipe) hits branch 99->95."""
+        real_scandir = os.scandir
+
+        def _patched_scandir(path):
+            ctx = real_scandir(path)
+
+            class _WrappedCtx:
+                def __enter__(self_):
+                    self_._it = ctx.__enter__()
+                    return self_
+
+                def __exit__(self_, *args):
+                    return ctx.__exit__(*args)
+
+                def __iter__(self_):
+                    mock_entry = MagicMock()
+                    mock_entry.is_file.return_value = False
+                    mock_entry.is_dir.return_value = False
+                    yield mock_entry
+
+            return _WrappedCtx()
+
+        with patch("metrics_collector.os.scandir", side_effect=_patched_scandir):
+            result = get_folder_disk_usage(str(tmp_path))
+        assert result == 0  # neither branch adds anything
 
 
 class TestDetectDockerInDocker:
@@ -403,6 +461,9 @@ class TestCollectMetricsMocked:
         """Cover the 'if cpu_freq else None' branch when cpu_freq is None."""
         self._mock_psutil(monkeypatch)
         monkeypatch.setattr(mc.psutil, "cpu_freq", lambda: None, raising=False)
+        # Reset the module-level cache so this test is not served a stale cached result
+        mc._metrics_cache['data'] = None
+        mc._metrics_cache['ts'] = 0.0
         result = mc.collect_metrics()
         if "cpu" in result:
             assert result["cpu"]["frequency"] is None

@@ -457,7 +457,16 @@ class TestCacheImage:
 class TestGet:
 
     def setup_method(self):
-        """Clear backoff dict before each test."""
+        """Clear backoff dict and isolate from disk state before each test."""
+        spaceflight_tracker._backoff_until.clear()
+        self._patcher_load = patch("spaceflight_tracker._load_backoff_state", return_value={})
+        self._patcher_save = patch("spaceflight_tracker._save_backoff_state")
+        self._patcher_load.start()
+        self._patcher_save.start()
+
+    def teardown_method(self):
+        self._patcher_load.stop()
+        self._patcher_save.stop()
         spaceflight_tracker._backoff_until.clear()
 
     def test_successful_get_returns_json(self):
@@ -841,6 +850,104 @@ class TestPruneImageCacheOsError:
 # ---------------------------------------------------------------------------
 # spaceflight_cache_images_intact - tuple branch
 # ---------------------------------------------------------------------------
+
+
+class TestSpaceflightCacheImagesIntactNonContainerObj:
+
+    def test_integer_value_returns_true(self):
+        """obj that is not str/dict/list/tuple hits the implicit-else branch → True."""
+        data = {"count": 42}
+        assert spaceflight_cache_images_intact(data) is True
+
+    def test_none_value_returns_true(self):
+        data = {"status": None}
+        assert spaceflight_cache_images_intact(data) is True
+
+    def test_float_value_returns_true(self):
+        data = {"probability": 0.95}
+        assert spaceflight_cache_images_intact(data) is True
+
+
+# ---------------------------------------------------------------------------
+# _load_backoff_state / _save_backoff_state
+# ---------------------------------------------------------------------------
+
+
+class TestLoadBackoffState:
+
+    def test_returns_empty_when_file_missing(self, tmp_path):
+        missing = str(tmp_path / "no_backoff.json")
+        with patch("spaceflight_tracker._SPACEFLIGHT_BACKOFF_FILE", missing):
+            result = spaceflight_tracker._load_backoff_state()
+        assert result == {}
+
+    def test_loads_valid_future_entries(self, tmp_path, monkeypatch):
+        import json, time as _time
+        future = _time.time() + 3600
+        f = tmp_path / "backoff.json"
+        f.write_text(json.dumps({"/launch/": future}))
+        monkeypatch.setattr(spaceflight_tracker, "_SPACEFLIGHT_BACKOFF_FILE", str(f))
+        result = spaceflight_tracker._load_backoff_state()
+        assert "/launch/" in result
+        assert result["/launch/"] == future
+
+    def test_skips_expired_entries(self, tmp_path, monkeypatch):
+        import json, time as _time
+        past = _time.time() - 100
+        f = tmp_path / "backoff.json"
+        f.write_text(json.dumps({"/old/": past}))
+        monkeypatch.setattr(spaceflight_tracker, "_SPACEFLIGHT_BACKOFF_FILE", str(f))
+        result = spaceflight_tracker._load_backoff_state()
+        assert "/old/" not in result
+
+    def test_skips_invalid_exp_value(self, tmp_path, monkeypatch):
+        import json
+        f = tmp_path / "backoff.json"
+        f.write_text(json.dumps({"/bad/": "not-a-number"}))
+        monkeypatch.setattr(spaceflight_tracker, "_SPACEFLIGHT_BACKOFF_FILE", str(f))
+        result = spaceflight_tracker._load_backoff_state()
+        assert "/bad/" not in result
+
+    def test_returns_empty_on_read_error(self, tmp_path, monkeypatch):
+        f = tmp_path / "backoff.json"
+        f.write_text("not valid json {{{{")
+        monkeypatch.setattr(spaceflight_tracker, "_SPACEFLIGHT_BACKOFF_FILE", str(f))
+        result = spaceflight_tracker._load_backoff_state()
+        assert result == {}
+
+
+class TestSaveBackoffState:
+
+    def test_writes_active_entries(self, tmp_path, monkeypatch):
+        import json, time as _time
+        f = tmp_path / "backoff.json"
+        monkeypatch.setattr(spaceflight_tracker, "_SPACEFLIGHT_BACKOFF_FILE", str(f))
+        monkeypatch.setattr(spaceflight_tracker, "DATA_DIR_CACHE", str(tmp_path))
+        future = _time.time() + 3600
+        spaceflight_tracker._backoff_until["/save-test/"] = future
+        try:
+            spaceflight_tracker._save_backoff_state()
+            data = json.loads(f.read_text())
+            assert "/save-test/" in data
+        finally:
+            spaceflight_tracker._backoff_until.pop("/save-test/", None)
+
+    def test_omits_expired_entries(self, tmp_path, monkeypatch):
+        import json, time as _time
+        f = tmp_path / "backoff.json"
+        monkeypatch.setattr(spaceflight_tracker, "_SPACEFLIGHT_BACKOFF_FILE", str(f))
+        monkeypatch.setattr(spaceflight_tracker, "DATA_DIR_CACHE", str(tmp_path))
+        spaceflight_tracker._backoff_until["/expired/"] = _time.time() - 1
+        try:
+            spaceflight_tracker._save_backoff_state()
+            data = json.loads(f.read_text())
+            assert "/expired/" not in data
+        finally:
+            spaceflight_tracker._backoff_until.pop("/expired/", None)
+
+    def test_handles_write_error_gracefully(self, monkeypatch):
+        with patch("spaceflight_tracker.os.makedirs", side_effect=OSError("disk full")):
+            spaceflight_tracker._save_backoff_state()  # must not raise
 
 
 class TestSpaceflightCacheImagesIntactTuple:

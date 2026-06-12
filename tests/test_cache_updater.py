@@ -1598,6 +1598,33 @@ class TestFullyInitializeCachesAdditional:
         # Timestamp should have been zeroed, forcing a refetch
         assert launches_cache["timestamp"] == 0
 
+    @patch("cache_updater.cache_store")
+    @patch("cache_updater.load_config")
+    @patch("cache_updater.check_and_handle_config_changes")
+    def test_spaceflight_image_integrity_intact_skips_reset(self, _check, mock_load_config, mock_cache_store):
+        """Branch 1286->1293: images are intact so timestamp is NOT reset."""
+        from cache_updater import fully_initialize_caches
+
+        mock_load_config.return_value = {"location": {"latitude": 48.85, "longitude": 2.35, "timezone": "Europe/Paris"}}
+        mock_cache_store.is_cache_valid.return_value = True
+        mock_cache_store.is_cache_valid_for_today.return_value = True
+        mock_cache_store.sync_cache_from_shared.return_value = None
+
+        original_ts = 999999
+        launches_cache = {"data": {"upcoming": {}}, "timestamp": original_ts}
+        mock_cache_store._spaceflight_launches_cache = launches_cache
+        mock_cache_store._spaceflight_astronauts_cache = {"data": None, "timestamp": 0}
+
+        fake_tracker = types.SimpleNamespace(
+            spaceflight_cache_images_intact=MagicMock(return_value=True)  # images are intact
+        )
+
+        with patch.dict(sys.modules, {"spaceflight_tracker": fake_tracker}):
+            fully_initialize_caches()
+
+        # Timestamp must NOT have been reset since images are intact
+        assert launches_cache["timestamp"] == original_ts
+
     @patch("astropy.utils.iers.IERS_Auto.iers_table", new=None)
     @patch("cache_updater.cache_store")
     @patch("cache_updater.load_config")
@@ -1640,5 +1667,146 @@ class TestFullyInitializeCachesAdditional:
         mock_cache_store._spaceflight_astronauts_cache = {"data": None, "timestamp": 0}
 
         fully_initialize_caches()  # Should not raise despite iers failure
+
+        mock_cache_store.set_cache_initialization_in_progress.assert_called_with(False)
+
+    @patch("cache_updater.cache_store")
+    @patch("cache_updater.load_config")
+    @patch("cache_updater.check_and_handle_config_changes")
+    def test_iers_table_loaded_and_fresh_skips_predownload(self, _check, mock_load_config, mock_cache_store):
+        """Branch 1357->1374: iers_table is loaded and not near expiry → pre-download skipped."""
+        from cache_updater import fully_initialize_caches
+        from unittest.mock import MagicMock
+
+        mock_load_config.return_value = {"location": {"latitude": 48.85, "longitude": 2.35, "timezone": "Europe/Paris"}}
+        mock_cache_store.is_cache_valid.return_value = True
+        mock_cache_store.is_cache_valid_for_today.return_value = True
+        mock_cache_store.sync_cache_from_shared.return_value = None
+        mock_cache_store._spaceflight_launches_cache = {"data": None, "timestamp": 0}
+        mock_cache_store._spaceflight_astronauts_cache = {"data": None, "timestamp": 0}
+
+        # Mock a loaded, fresh IERS table (far future MJD → not near expiry)
+        mock_table = MagicMock()
+        mock_table.__getitem__ = MagicMock(return_value=MagicMock(max=MagicMock(return_value=99999.0)))
+
+        with patch("astropy.utils.iers.IERS_Auto.iers_table", new=mock_table):
+            fully_initialize_caches()
+
+        mock_cache_store.set_cache_initialization_in_progress.assert_called_with(False)
+
+
+# ---------------------------------------------------------------------------
+# update_allsky_sensor_cache
+# ---------------------------------------------------------------------------
+
+
+class TestUpdateAllskySensorCache:
+    """Tests for update_allsky_sensor_cache (lines 1059-1076)."""
+
+    def test_returns_early_when_config_is_none_and_allsky_not_in_config(self):
+        """When load_config returns no allsky key, function returns without updating cache."""
+        import cache_store as cs
+        from cache_updater import update_allsky_sensor_cache
+
+        with patch("cache_updater.load_config", return_value={}):
+            before_ts = cs._allsky_sensor_cache["timestamp"]
+            update_allsky_sensor_cache()
+            assert cs._allsky_sensor_cache["timestamp"] == before_ts
+
+    def test_returns_early_when_allsky_disabled(self):
+        """enabled=False → return without touching cache."""
+        from cache_updater import update_allsky_sensor_cache
+        cfg = {"connectors": {"allsky": {"enabled": False, "url": "http://allsky.local", "modules": {}}}}
+        import cache_store as cs
+        before_ts = cs._allsky_sensor_cache["timestamp"]
+        update_allsky_sensor_cache(config=cfg)
+        assert cs._allsky_sensor_cache["timestamp"] == before_ts
+
+    def test_returns_early_when_no_url(self):
+        """enabled but no url → return without touching cache."""
+        from cache_updater import update_allsky_sensor_cache
+        cfg = {"connectors": {"allsky": {"enabled": True, "url": "", "modules": {}}}}
+        import cache_store as cs
+        before_ts = cs._allsky_sensor_cache["timestamp"]
+        update_allsky_sensor_cache(config=cfg)
+        assert cs._allsky_sensor_cache["timestamp"] == before_ts
+
+    def test_returns_early_when_sensor_module_disabled(self):
+        """sensor_data module disabled → return without touching cache."""
+        from cache_updater import update_allsky_sensor_cache
+        cfg = {"connectors": {"allsky": {
+            "enabled": True,
+            "url": "http://allsky.local",
+            "modules": {"sensor_data": {"enabled": False}},
+        }}}
+        import cache_store as cs
+        before_ts = cs._allsky_sensor_cache["timestamp"]
+        update_allsky_sensor_cache(config=cfg)
+        assert cs._allsky_sensor_cache["timestamp"] == before_ts
+
+    def test_updates_cache_when_connector_enabled(self):
+        """All conditions met → fetch sensor data and update cache."""
+        from cache_updater import update_allsky_sensor_cache
+        import cache_store as cs
+
+        cfg = {"connectors": {"allsky": {
+            "enabled": True,
+            "url": "http://allsky.local",
+            "modules": {"sensor_data": {"enabled": True}},
+        }}}
+        sensor_data = {"AS_TEMPERATURE_C": 15.2}
+        mock_connector = MagicMock()
+        mock_connector.fetch_sensor_data.return_value = sensor_data
+
+        with patch("connectors.allsky_connector.AllSkyConnector", return_value=mock_connector):
+            update_allsky_sensor_cache(config=cfg)
+
+        assert cs._allsky_sensor_cache["data"] == sensor_data
+        assert cs._allsky_sensor_cache["timestamp"] > 0
+
+    def test_uses_load_config_when_no_config_arg(self):
+        """config=None triggers load_config() call."""
+        from cache_updater import update_allsky_sensor_cache
+        cfg = {"connectors": {"allsky": {
+            "enabled": True,
+            "url": "http://allsky.local",
+            "modules": {"sensor_data": {"enabled": True}},
+        }}}
+        mock_connector = MagicMock()
+        mock_connector.fetch_sensor_data.return_value = {}
+
+        with patch("cache_updater.load_config", return_value=cfg):
+            with patch("connectors.allsky_connector.AllSkyConnector", return_value=mock_connector):
+                update_allsky_sensor_cache()  # no config arg
+
+        mock_connector.fetch_sensor_data.assert_called_once()
+
+
+class TestFullyInitializeCachesAllskyJob:
+    """Test that allsky job is added to cache_jobs when connector is properly configured."""
+
+    @patch("cache_updater.cache_store")
+    @patch("cache_updater.load_config")
+    @patch("cache_updater.check_and_handle_config_changes")
+    def test_allsky_job_added_when_enabled(self, _check, mock_load_config, mock_cache_store):
+        """Line 1260: allsky job appended when connector enabled with sensor_data module."""
+        from cache_updater import fully_initialize_caches
+
+        mock_load_config.return_value = {
+            "location": {"latitude": 48.85, "longitude": 2.35, "timezone": "Europe/Paris"},
+            "connectors": {"allsky": {
+                "enabled": True,
+                "url": "http://allsky.local",
+                "modules": {"sensor_data": {"enabled": True}},
+            }},
+        }
+        mock_cache_store.is_cache_valid.return_value = True
+        mock_cache_store.is_cache_valid_for_today.return_value = True
+        mock_cache_store.sync_cache_from_shared.return_value = None
+        mock_cache_store._spaceflight_launches_cache = {"data": None, "timestamp": 0}
+        mock_cache_store._spaceflight_astronauts_cache = {"data": None, "timestamp": 0}
+        mock_cache_store._allsky_sensor_cache = {"data": None, "timestamp": 0}
+
+        fully_initialize_caches()  # must run without error
 
         mock_cache_store.set_cache_initialization_in_progress.assert_called_with(False)

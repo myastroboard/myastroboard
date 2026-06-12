@@ -20,6 +20,13 @@ def pytest_sessionfinish(session, exitstatus):
     except (OSError, ValueError):
         pass  # signal registration unsupported in this environment (e.g. non-main thread)
 
+# Force matplotlib non-GUI backend before any test imports matplotlib or a module
+# that indirectly triggers it. Without this, the Tk backend can be loaded in the
+# main thread and then Tcl/Tk objects get destroyed in background threads (jplephem
+# ThreadPoolExecutor), causing fatal crashes on Windows.
+import matplotlib
+matplotlib.use('Agg')
+
 # Set up environment variables BEFORE any imports from backend
 # This prevents permission errors when modules try to create directories
 if 'DATA_DIR' not in os.environ:

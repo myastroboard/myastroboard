@@ -85,27 +85,23 @@ def get_folder_disk_usage(folder_path):
     if not os.path.exists(folder_path):
         return None
 
-    try:
-        total_size = 0
-        stack = [folder_path]
-        while stack:
-            current = stack.pop()
-            try:
-                with os.scandir(current) as it:
-                    for entry in it:
-                        try:
-                            if entry.is_file(follow_symlinks=False):
-                                total_size += entry.stat(follow_symlinks=False).st_size
-                            elif entry.is_dir(follow_symlinks=False):
-                                stack.append(entry.path)
-                        except (OSError, IOError):
-                            pass  # skip inaccessible files (permissions, broken symlinks)
-            except (OSError, IOError):
-                pass  # skip inaccessible directories (permissions, deleted mid-scan)
-        return total_size
-    except (OSError, IOError) as e:
-        logger.warning(f"Error calculating disk usage for {folder_path}: {e}")
-        return None
+    total_size = 0
+    stack = [folder_path]
+    while stack:
+        current = stack.pop()
+        try:
+            with os.scandir(current) as it:
+                for entry in it:
+                    try:
+                        if entry.is_file(follow_symlinks=False):
+                            total_size += entry.stat(follow_symlinks=False).st_size
+                        elif entry.is_dir(follow_symlinks=False):
+                            stack.append(entry.path)
+                    except (OSError, IOError):
+                        pass  # skip inaccessible files (permissions, broken symlinks)
+        except (OSError, IOError):
+            pass  # skip inaccessible directories (permissions, deleted mid-scan)
+    return total_size
 
 
 def get_disk_space_details():
