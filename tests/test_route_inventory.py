@@ -186,6 +186,13 @@ EXPECTED_ROUTES = {
     ('/api/equipment/telescopes/<telescope_id>', ('GET',)),
     ('/api/equipment/telescopes/<telescope_id>', ('PUT',)),
 
+    # --- connectors ---
+    ('/api/connectors', ('GET',)),
+    ('/api/connectors/allsky/health', ('GET',)),
+    ('/api/connectors/allsky/proxy', ('GET',)),
+    ('/api/connectors/allsky/status', ('GET',)),
+    ('/api/connectors/allsky/urls', ('GET',)),
+
     # --- skytonight (blueprint) ---
     ('/api/catalogues', ('GET',)),
     ('/api/scheduler/status', ('GET',)),
