@@ -153,11 +153,11 @@ class AllSkyConnector(BaseConnector):
             r.raise_for_status()
             return r.json()
         except requests.exceptions.HTTPError as e:
-            logger.warning("AllSky sensor data HTTP error: %s", e)
+            logger.debug("AllSky sensor data HTTP error: %s", e)
         except requests.exceptions.ConnectionError:
-            logger.warning("AllSky sensor data: connection refused at %s", url)
+            logger.debug("AllSky sensor data: connection refused at %s", url)
         except requests.exceptions.Timeout:
-            logger.warning("AllSky sensor data: timeout at %s", url)
+            logger.debug("AllSky sensor data: timeout at %s", url)
         except Exception as e:
             logger.error("AllSky sensor data unexpected error: %s", e)
         return {}
