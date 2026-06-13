@@ -5,6 +5,7 @@
 let _allskySensorInterval = null;
 let _allskyImageInterval  = null;
 let _allskyImageRetryTimeout = null;
+let _allskyModalRefreshInterval = null;
 
 const _ALLSKY_IMAGE_REFRESH_MS = 30000;  // 30s normal refresh
 const _ALLSKY_IMAGE_RETRY_MS   = 300000; // 5 min retry after failure
@@ -70,7 +71,8 @@ function _buildAllSkyLayout(cfg, modules, urls) {
         img.id = 'allsky-live-img';
         img.src = urls.live_image;
         img.alt = 'AllSky live';
-        img.className = 'img-fluid rounded allsky-media-fit';
+        img.className = 'img-fluid rounded allsky-media-fit allsky-zoomable';
+        img.addEventListener('click', () => _openAllSkyZoomModal(urls));
         body.appendChild(img);
 
         card.appendChild(header);
@@ -338,8 +340,50 @@ function _stopLiveImageRefresh() {
 
 function stopAllSkyPolling() {
     _stopLiveImageRefresh();
-    if (_allskySensorInterval)    { clearInterval(_allskySensorInterval);   _allskySensorInterval = null; }
-    if (_allskyImageRetryTimeout) { clearTimeout(_allskyImageRetryTimeout); _allskyImageRetryTimeout = null; }
+    if (_allskySensorInterval)       { clearInterval(_allskySensorInterval);       _allskySensorInterval = null; }
+    if (_allskyImageRetryTimeout)    { clearTimeout(_allskyImageRetryTimeout);     _allskyImageRetryTimeout = null; }
+    if (_allskyModalRefreshInterval) { clearInterval(_allskyModalRefreshInterval); _allskyModalRefreshInterval = null; }
+}
+
+// ── Zoom modal ────────────────────────────────────────────────────────────────
+
+function _openAllSkyZoomModal(urls) {
+    const titleEl = document.getElementById('modal_full_close_title');
+    const bodyEl  = document.getElementById('modal_full_close_body');
+    if (!titleEl || !bodyEl) return;
+
+    titleEl.textContent = i18n.t('observatory.live_image');
+    DOMUtils.clear(bodyEl);
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'd-flex align-items-center justify-content-center h-100';
+
+    const modalImg = document.createElement('img');
+    modalImg.id        = 'allsky-modal-img';
+    modalImg.src       = `${urls.live_image}&_ts=${Date.now()}`;
+    modalImg.alt       = 'AllSky live';
+    modalImg.className = 'img-fluid allsky-modal-img';
+
+    wrapper.appendChild(modalImg);
+    bodyEl.appendChild(wrapper);
+
+    const modalEl = document.getElementById('modal_full_close');
+    const bsModal = new bootstrap.Modal(modalEl, { backdrop: true, keyboard: true });
+
+    _allskyModalRefreshInterval = setInterval(() => {
+        const img = document.getElementById('allsky-modal-img');
+        if (img) img.src = `${urls.live_image}&_ts=${Date.now()}`;
+    }, _ALLSKY_IMAGE_REFRESH_MS);
+
+    modalEl.addEventListener('hidden.bs.modal', function cleanup() {
+        if (_allskyModalRefreshInterval) {
+            clearInterval(_allskyModalRefreshInterval);
+            _allskyModalRefreshInterval = null;
+        }
+        modalEl.removeEventListener('hidden.bs.modal', cleanup);
+    });
+
+    bsModal.show();
 }
 
 // ── Sensor data ───────────────────────────────────────────────────────────────

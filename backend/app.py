@@ -1045,10 +1045,30 @@ def allsky_status_api():
     return jsonify(data)
 
 
-@app.route('/api/connectors/allsky/health', methods=['GET'])
+@app.route('/api/connectors/allsky/health', methods=['GET', 'POST'])
 @login_required
 def allsky_health_api():
-    """Run a per-module health check against the AllSky instance."""
+    """Run a per-module health check against the AllSky instance.
+
+    POST {"url": "..."} — quick reachability probe against an arbitrary URL
+    (used by the test button before saving).
+    GET — full module health check using saved config, with 2-minute cache.
+    """
+    if request.method == 'POST':
+        data = request.get_json(silent=True) or {}
+        test_url = (data.get("url") or "").strip().rstrip("/")
+        if not test_url:
+            return jsonify({"reachable": False, "error": "url required"}), 400
+        import requests as _req
+        try:
+            r = _req.head(test_url, timeout=5, allow_redirects=True)
+            if r.status_code == 405:
+                r = _req.get(test_url, timeout=5, stream=True)
+            reachable = r.status_code < 500
+        except _req.exceptions.RequestException:
+            reachable = False
+        return jsonify({"reachable": reachable})
+
     config = load_config()
     allsky_cfg = config.get("connectors", {}).get("allsky", {})
     if not allsky_cfg.get("url"):

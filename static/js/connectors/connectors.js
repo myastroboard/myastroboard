@@ -151,7 +151,7 @@ function _connectorConfigForm(c) {
     urlInput.id = `connector-url-${c.name}`;
     urlInput.dataset.connector = c.name;
     urlInput.value = cfg.url || '';
-    urlInput.placeholder = 'http://allsky.local';
+    urlInput.placeholder = 'http://192.168.x.x';
     const testBtn = document.createElement('button');
     testBtn.className = 'btn btn-outline-secondary connector-test-btn';
     testBtn.dataset.connector = c.name;
@@ -159,6 +159,19 @@ function _connectorConfigForm(c) {
     inputGroup.appendChild(urlInput);
     inputGroup.appendChild(testBtn);
     urlDiv.appendChild(inputGroup);
+
+    const localWarn = document.createElement('div');
+    localWarn.className = 'form-text text-warning connector-local-warn d-none';
+    localWarn.appendChild(DOMUtils.createIcon('bi bi-exclamation-triangle me-1'));
+    localWarn.appendChild(document.createTextNode(i18n.t('connectors.local_hostname_warning')));
+    urlDiv.appendChild(localWarn);
+
+    const _updateLocalWarn = () => {
+        const v = urlInput.value.trim();
+        localWarn.classList.toggle('d-none', !/\.local(\/|$)/i.test(v));
+    };
+    urlInput.addEventListener('input', _updateLocalWarn);
+    _updateLocalWarn();
 
     const testResult = document.createElement('div');
     testResult.className = 'form-text connector-test-result';
@@ -379,7 +392,7 @@ async function _testConnector(name) {
     const resultDiv = document.getElementById(`test-result-${name}`);
     if (!urlInput || !resultDiv) return;
 
-    const url = urlInput.value.trim();
+    const url = urlInput.value.trim().replace(/\/+$/, '');
     if (!url) {
         _setResultMessage(resultDiv, i18n.t('connectors.url_required'), 'text-danger');
         return;
@@ -387,13 +400,19 @@ async function _testConnector(name) {
 
     _setResultSpinner(resultDiv, i18n.t('connectors.testing'));
 
-    await fetchJSONOnce(`/api/connectors/${name}/health`, {
+    const result = await fetchJSONOnce(`/api/connectors/${name}/health`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
     }).catch(() => null);
 
-    _setResultMessage(resultDiv, i18n.t('connectors.save_to_test'), 'text-info');
+    if (!result) {
+        _setResultMessage(resultDiv, i18n.t('connectors.health_error'), 'text-danger');
+    } else if (result.reachable) {
+        _setResultMessage(resultDiv, i18n.t('connectors.reachable'), 'text-success', 'bi bi-check-circle');
+    } else {
+        _setResultMessage(resultDiv, i18n.t('connectors.unreachable'), 'text-danger', 'bi bi-x-circle');
+    }
 }
 
 async function _runHealthCheck(name) {
@@ -442,7 +461,7 @@ async function _saveConnector(name) {
 
     const updated = {
         ...existing,
-        url:     urlInput.value.trim(),
+        url:     urlInput.value.trim().replace(/\/+$/, ''),
         label:   labelInput ? labelInput.value.trim() : existing.label,
         enabled: enabledChk ? enabledChk.checked : existing.enabled,
         modules: { ...(existing.modules || {}), ...modules },

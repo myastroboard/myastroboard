@@ -1958,6 +1958,7 @@
     "module_daily_timelapse_label": "Täglicher Zeitraffer",
     "module_daily_timelapse_desc": "Zeitraffer-Video der ganzen Nacht (am Ende der Nacht erstellt)",
     "module_mini_timelapse_label": "Mini-Zeitraffer",
-    "module_mini_timelapse_desc": "Häufiger Mini-Zeitraffer-Clip — Mini-Zeitraffer in AllSky muss aktiviert sein"
+    "module_mini_timelapse_desc": "Häufiger Mini-Zeitraffer-Clip — Mini-Zeitraffer in AllSky muss aktiviert sein",
+    "local_hostname_warning": ".local-Hostnamen verwenden mDNS, das in Docker nicht verfügbar ist. Verwende stattdessen die statische IP-Adresse (z.B. http://192.168.1.x/)."
   }
 }

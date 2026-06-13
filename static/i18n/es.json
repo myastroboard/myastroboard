@@ -1958,6 +1958,7 @@
     "module_daily_timelapse_label": "Timelapse diario",
     "module_daily_timelapse_desc": "Vídeo timelapse de la noche completa (generado al final de la noche)",
     "module_mini_timelapse_label": "Mini timelapse",
-    "module_mini_timelapse_desc": "Clip mini timelapse frecuente — requiere activar el mini timelapse en AllSky"
+    "module_mini_timelapse_desc": "Clip mini timelapse frecuente — requiere activar el mini timelapse en AllSky",
+    "local_hostname_warning": "Los nombres de host .local usan mDNS, no disponible en Docker. Use la IP estática del dispositivo (ej. http://192.168.1.x/)."
   }
 }

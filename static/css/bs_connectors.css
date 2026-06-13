@@ -15,6 +15,24 @@
     object-fit: contain;
 }
 
+.allsky-zoomable {
+    cursor: zoom-in;
+    transition: opacity 0.15s;
+}
+
+.allsky-zoomable:hover {
+    opacity: 0.9;
+}
+
+.allsky-modal-img {
+    max-height: 90vh;
+    object-fit: contain;
+}
+
+#allsky-sensor-body .table {
+    --bs-table-bg: transparent;
+}
+
 .allsky-media-thumb {
     max-height: 200px;
     object-fit: contain;
