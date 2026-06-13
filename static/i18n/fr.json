@@ -1917,7 +1917,8 @@
     "version": "Version AllSky",
     "sensor_unavailable": "Données capteur indisponibles",
     "sensor_no_data": "Aucune donnée capteur disponible",
-    "image_unavailable": "Image indisponible — AllSky est peut-être hors ligne"
+    "image_unavailable": "Image indisponible — AllSky est peut-être hors ligne",
+    "updated_at": "Mis à jour à"
   },
   "connectors": {
     "load_error": "Erreur de chargement des connecteurs",

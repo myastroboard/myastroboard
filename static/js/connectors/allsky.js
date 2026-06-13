@@ -73,7 +73,13 @@ function _buildAllSkyLayout(cfg, modules, urls) {
         img.alt = 'AllSky live';
         img.className = 'img-fluid rounded allsky-media-fit allsky-zoomable';
         img.addEventListener('click', () => _openAllSkyZoomModal(urls));
+        img.addEventListener('load', _updateLiveTimestamp, { once: true });
         body.appendChild(img);
+
+        const ts = document.createElement('p');
+        ts.id = 'allsky-live-ts';
+        ts.className = 'text-muted small mb-0 mt-1';
+        body.appendChild(ts);
 
         card.appendChild(header);
         card.appendChild(body);
@@ -175,7 +181,8 @@ function _buildAllSkyLayout(cfg, modules, urls) {
         img.id = 'allsky-keogram-img';
         img.src = urls.keogram;
         img.alt = 'keogram';
-        img.className = 'img-fluid rounded';
+        img.className = 'img-fluid rounded allsky-zoomable';
+        img.addEventListener('click', () => _openAllSkyStaticModal(i18n.t('observatory.keogram'), urls.keogram));
         body.appendChild(img);
 
         card.appendChild(header);
@@ -202,7 +209,8 @@ function _buildAllSkyLayout(cfg, modules, urls) {
         img.id = 'allsky-startrails-img';
         img.src = urls.startrails;
         img.alt = 'startrails';
-        img.className = 'img-fluid rounded';
+        img.className = 'img-fluid rounded allsky-zoomable';
+        img.addEventListener('click', () => _openAllSkyStaticModal(i18n.t('observatory.startrails'), urls.startrails));
         body.appendChild(img);
 
         card.appendChild(header);
@@ -325,6 +333,7 @@ function _startAllSkyPolling(modules, urls) {
             const img = document.getElementById('allsky-live-img');
             if (!img) { _stopLiveImageRefresh(); return; }
             img.src = `${urls.live_image}&_ts=${Date.now()}`;
+            _updateLiveTimestamp();
         }, _ALLSKY_IMAGE_REFRESH_MS);
     }
 
@@ -345,7 +354,40 @@ function stopAllSkyPolling() {
     if (_allskyModalRefreshInterval) { clearInterval(_allskyModalRefreshInterval); _allskyModalRefreshInterval = null; }
 }
 
-// ── Zoom modal ────────────────────────────────────────────────────────────────
+// ── Live image timestamp ──────────────────────────────────────────────────────
+
+function _updateLiveTimestamp() {
+    const ts = document.getElementById('allsky-live-ts');
+    if (!ts) return;
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    DOMUtils.clear(ts);
+    ts.appendChild(DOMUtils.createIcon('bi bi-arrow-clockwise me-1'));
+    ts.appendChild(document.createTextNode(`${i18n.t('observatory.updated_at')} ${time}`));
+}
+
+// ── Zoom modals ───────────────────────────────────────────────────────────────
+
+function _openAllSkyStaticModal(title, url) {
+    const titleEl = document.getElementById('modal_full_close_title');
+    const bodyEl  = document.getElementById('modal_full_close_body');
+    if (!titleEl || !bodyEl) return;
+
+    titleEl.textContent = title;
+    DOMUtils.clear(bodyEl);
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'd-flex align-items-center justify-content-center h-100';
+
+    const img = document.createElement('img');
+    img.src       = url;
+    img.alt       = title;
+    img.className = 'img-fluid allsky-modal-img';
+
+    wrapper.appendChild(img);
+    bodyEl.appendChild(wrapper);
+
+    new bootstrap.Modal(document.getElementById('modal_full_close'), { backdrop: true, keyboard: true }).show();
+}
 
 function _openAllSkyZoomModal(urls) {
     const titleEl = document.getElementById('modal_full_close_title');
