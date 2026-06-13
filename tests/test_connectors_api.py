@@ -225,6 +225,41 @@ class TestAllSkyHealth:
                 resp = client_user.get('/api/connectors/allsky/health')
         assert resp.get_json() == fresh_health
 
+    # POST — quick URL probe (test button, no save required)
+
+    def test_post_requires_login(self, client):
+        resp = client.post('/api/connectors/allsky/health',
+                           json={"url": "http://192.168.1.1"})
+        assert resp.status_code == 401
+
+    def test_post_400_when_no_url(self, client_user):
+        resp = client_user.post('/api/connectors/allsky/health', json={})
+        assert resp.status_code == 400
+
+    def test_post_reachable_true_on_200(self, client_user):
+        mock_resp = MagicMock(status_code=200)
+        with patch('requests.head', return_value=mock_resp):
+            resp = client_user.post('/api/connectors/allsky/health',
+                                    json={"url": "http://192.168.1.1"})
+        assert resp.status_code == 200
+        assert resp.get_json()["reachable"] is True
+
+    def test_post_reachable_false_on_connection_error(self, client_user):
+        with patch('requests.head', side_effect=_requests.exceptions.ConnectionError):
+            resp = client_user.post('/api/connectors/allsky/health',
+                                    json={"url": "http://192.168.1.1"})
+        assert resp.status_code == 200
+        assert resp.get_json()["reachable"] is False
+
+    def test_post_falls_back_to_get_on_405(self, client_user):
+        head_resp = MagicMock(status_code=405)
+        get_resp = MagicMock(status_code=200)
+        with patch('requests.head', return_value=head_resp):
+            with patch('requests.get', return_value=get_resp):
+                resp = client_user.post('/api/connectors/allsky/health',
+                                        json={"url": "http://192.168.1.1"})
+        assert resp.get_json()["reachable"] is True
+
 
 # ---------------------------------------------------------------------------
 # GET /api/connectors/allsky/urls
