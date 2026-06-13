@@ -114,40 +114,31 @@ function _buildAllSkyLayout(cfg, modules, urls) {
         row.appendChild(col);
     }
 
-    if (modules.mini_timelapse?.enabled && urls.mini_timelapse_thumb) {
+    // ── Row 2: Startrails + Keogram ──────────────────────────────────────────
+
+    if (modules.startrails?.enabled && urls.startrails) {
+        const hasKeogramNeighbour = modules.keogram?.enabled && urls.keogram;
         const col = document.createElement('div');
-        col.className = 'col-12 col-md-6 col-lg-3';
+        col.className = hasKeogramNeighbour ? 'col-12 col-lg-8' : 'col-12 col-md-6';
 
         const card = document.createElement('div');
         card.className = 'card h-100';
 
         const header = document.createElement('div');
         header.className = 'card-header';
-        header.textContent = i18n.t('observatory.mini_timelapse');
+        header.textContent = i18n.t('observatory.startrails');
 
         const body = document.createElement('div');
         body.className = 'card-body p-1 text-center';
-        body.id = 'allsky-mini-body';
-
-        const link = document.createElement('a');
-        link.href = urls.mini_timelapse_video || '#';
-        link.target = '_blank';
-        link.rel = 'noopener';
-
+        body.id = 'allsky-startrails-body';
         const img = document.createElement('img');
-        img.id = 'allsky-mini-img';
-        img.src = urls.mini_timelapse_thumb;
-        img.alt = 'mini-timelapse';
-        img.className = 'img-fluid rounded allsky-media-thumb';
+        img.id = 'allsky-startrails-img';
+        img.src = urls.startrails;
+        img.alt = 'startrails';
+        img.className = 'img-fluid rounded allsky-zoomable';
+        img.addEventListener('click', () => _openAllSkyStaticModal(i18n.t('observatory.startrails'), urls.startrails));
+        body.appendChild(img);
 
-        const caption = document.createElement('div');
-        caption.className = 'mt-1 small text-muted';
-        caption.appendChild(DOMUtils.createIcon('bi bi-play-circle me-1'));
-        caption.appendChild(document.createTextNode(i18n.t('observatory.watch_video')));
-
-        link.appendChild(img);
-        link.appendChild(caption);
-        body.appendChild(link);
         card.appendChild(header);
         card.appendChild(body);
         col.appendChild(card);
@@ -155,8 +146,8 @@ function _buildAllSkyLayout(cfg, modules, urls) {
     }
 
     if (modules.keogram?.enabled && urls.keogram) {
-        const hasNeighbour = modules.startrails?.enabled || modules.mini_timelapse?.enabled;
-        const keogramCol = hasNeighbour ? 'col-12 col-lg-9' : 'col-12';
+        const hasStartrailsNeighbour = modules.startrails?.enabled && urls.startrails;
+        const keogramCol = hasStartrailsNeighbour ? 'col-12 col-lg-4' : 'col-12';
 
         const col = document.createElement('div');
         col.className = keogramCol;
@@ -191,28 +182,42 @@ function _buildAllSkyLayout(cfg, modules, urls) {
         row.appendChild(col);
     }
 
-    if (modules.startrails?.enabled && urls.startrails) {
+    // ── Row 3: Mini timelapse + Daily timelapse ───────────────────────────────
+
+    if (modules.mini_timelapse?.enabled && urls.mini_timelapse_thumb) {
         const col = document.createElement('div');
-        col.className = 'col-12 col-md-6 col-lg-3';
+        col.className = 'col-12 col-md-6';
 
         const card = document.createElement('div');
         card.className = 'card h-100';
 
         const header = document.createElement('div');
         header.className = 'card-header';
-        header.textContent = i18n.t('observatory.startrails');
+        header.textContent = i18n.t('observatory.mini_timelapse');
 
         const body = document.createElement('div');
         body.className = 'card-body p-1 text-center';
-        body.id = 'allsky-startrails-body';
-        const img = document.createElement('img');
-        img.id = 'allsky-startrails-img';
-        img.src = urls.startrails;
-        img.alt = 'startrails';
-        img.className = 'img-fluid rounded allsky-zoomable';
-        img.addEventListener('click', () => _openAllSkyStaticModal(i18n.t('observatory.startrails'), urls.startrails));
-        body.appendChild(img);
+        body.id = 'allsky-mini-body';
 
+        const link = document.createElement('a');
+        link.href = urls.mini_timelapse_video || '#';
+        link.target = '_blank';
+        link.rel = 'noopener';
+
+        const img = document.createElement('img');
+        img.id = 'allsky-mini-img';
+        img.src = urls.mini_timelapse_thumb;
+        img.alt = 'mini-timelapse';
+        img.className = 'img-fluid rounded allsky-media-thumb';
+
+        const caption = document.createElement('div');
+        caption.className = 'mt-1 small text-muted';
+        caption.appendChild(DOMUtils.createIcon('bi bi-play-circle me-1'));
+        caption.appendChild(document.createTextNode(i18n.t('observatory.watch_video')));
+
+        link.appendChild(img);
+        link.appendChild(caption);
+        body.appendChild(link);
         card.appendChild(header);
         card.appendChild(body);
         col.appendChild(card);
