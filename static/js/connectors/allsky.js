@@ -60,7 +60,7 @@ function _buildAllSkyLayout(cfg, modules, urls) {
         headerText.textContent = i18n.t('observatory.live_image');
         const dayNightBadge = document.createElement('span');
         dayNightBadge.id = 'allsky-day-night-badge';
-        dayNightBadge.className = 'badge bg-secondary ms-2';
+        dayNightBadge.className = 'badge bg-secondary ms-2 d-none';
         header.appendChild(headerText);
         header.appendChild(dayNightBadge);
 
@@ -449,8 +449,12 @@ async function _pollAllSkySensor() {
     const badge = document.getElementById('allsky-day-night-badge');
     if (badge) {
         const dn = (data.DAY_OR_NIGHT || '').toLowerCase();
-        badge.textContent = dn === 'night' ? i18n.t('observatory.night') : i18n.t('observatory.day');
-        badge.className = `badge ms-2 ${dn === 'night' ? 'bg-primary' : 'bg-warning text-dark'}`;
+        if (dn === 'night' || dn === 'day') {
+            badge.textContent = dn === 'night' ? i18n.t('observatory.night') : i18n.t('observatory.day');
+            badge.className = `badge ms-2 ${dn === 'night' ? 'bg-primary' : 'bg-warning text-dark'}`;
+        } else {
+            badge.className = 'badge ms-2 d-none';
+        }
     }
 
     const humidityKey  = data['AS_DEWCONTROLHUMIDITY'] != null ? 'AS_DEWCONTROLHUMIDITY' : 'AS_HUMIDITY';
