@@ -238,10 +238,7 @@ function _buildAllSkyLayout(cfg, modules, urls) {
         video.id = 'allsky-timelapse-video';
         video.controls = true;
         video.className = 'img-fluid rounded allsky-media-video';
-        const source = document.createElement('source');
-        source.src = urls.daily_timelapse;
-        source.type = 'video/mp4';
-        video.appendChild(source);
+        video.src = urls.daily_timelapse;
         body.appendChild(video);
 
         card.appendChild(header);
