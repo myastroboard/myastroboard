@@ -1139,6 +1139,22 @@ def allsky_proxy_api():
     if not target_url:
         return abort(404)
 
+    # Force IPv4 to avoid ENETUNREACH when the host resolves to an IPv6
+    # link-local address (common with .local mDNS names inside Docker).
+    import socket
+    from urllib.parse import urlparse, urlunparse
+    try:
+        parsed = urlparse(target_url)
+        hostname = parsed.hostname
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        infos = socket.getaddrinfo(hostname, port, socket.AF_INET, socket.SOCK_STREAM)
+        if infos:
+            ipv4 = infos[0][4][0]
+            netloc = f"{ipv4}:{parsed.port}" if parsed.port else ipv4
+            target_url = urlunparse(parsed._replace(netloc=netloc))
+    except OSError:
+        pass  # already an IP or DNS unavailable — proceed with original URL
+
     upstream_headers = {}
     range_header = request.headers.get("Range")
     if range_header:
@@ -1150,7 +1166,7 @@ def allsky_proxy_api():
         logger.warning("AllSky proxy timeout for module %s", module)
         return abort(504)
     except _req.exceptions.RequestException as exc:
-        logger.warning("AllSky proxy error for module %s: %s", module, exc)
+        logger.debug("AllSky proxy error for module %s: %s", module, exc)
         return abort(502)
 
     proxy_headers = {"Content-Type": r.headers.get("Content-Type", "application/octet-stream")}

@@ -4,6 +4,9 @@ AllSky exposes data purely via file serving (no REST API).
 All image resources are returned as URLs for the browser to fetch directly.
 """
 
+import socket
+from urllib.parse import urlparse, urlunparse
+
 import requests
 from datetime import datetime, timezone
 from typing import Any
@@ -66,8 +69,24 @@ class AllSkyConnector(BaseConnector):
     def _mini_timelapse_video_url(self) -> str:
         return f"{self.base_url}/allsky-tmp/mini-timelapse.mp4"
 
+    @staticmethod
+    def _force_ipv4(url: str) -> str:
+        """Replace hostname with its IPv4 address to avoid IPv6 ENETUNREACH in Docker."""
+        try:
+            parsed = urlparse(url)
+            port = parsed.port or (443 if parsed.scheme == "https" else 80)
+            infos = socket.getaddrinfo(parsed.hostname, port, socket.AF_INET, socket.SOCK_STREAM)
+            if infos:
+                ipv4 = infos[0][4][0]
+                netloc = f"{ipv4}:{parsed.port}" if parsed.port else ipv4
+                return urlunparse(parsed._replace(netloc=netloc))
+        except OSError:
+            pass
+        return url
+
     def _head(self, url: str) -> tuple[bool, int]:
         """Returns (success, status_code). Falls back to GET if HEAD not allowed."""
+        url = self._force_ipv4(url)
         try:
             r = requests.head(url, timeout=REQUEST_TIMEOUT, allow_redirects=True)
             if r.status_code == 405:
@@ -147,7 +166,7 @@ class AllSkyConnector(BaseConnector):
     def fetch_sensor_data(self) -> dict[str, Any]:
         if not self.is_module_enabled("sensor_data"):
             return {}
-        url = self._sensor_data_url()
+        url = self._force_ipv4(self._sensor_data_url())
         try:
             r = requests.get(url, timeout=REQUEST_TIMEOUT)
             r.raise_for_status()
