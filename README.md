@@ -40,6 +40,7 @@ If you want see more, maybe look at the [visual tour](docs/VISUAL_TOUR.md).
 - Quick Start: [docs/2.QUICKSTART.md](docs/2.QUICKSTART.md)
 - Update Guide: [docs/3.UPDATE.md](docs/3.UPDATE.md)
 - Reverse Proxy: [docs/6.REVERSE_PROXY.md](docs/6.REVERSE_PROXY.md)
+- Connectors: [docs/CONNECTORS.md](docs/CONNECTORS.md)
 - API Endpoints: [docs/API_ENDPOINTS.md](docs/API_ENDPOINTS.md)
 - Visual Tour: [docs/VISUAL_TOUR.md](docs/VISUAL_TOUR.md)
 
