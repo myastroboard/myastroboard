@@ -264,6 +264,11 @@ class TestAllSkyHealth:
         assert resp.status_code == 400
         assert "http" in resp.get_json()["error"]
 
+    def test_post_400_when_no_hostname(self, client_user):
+        resp = client_user.post('/api/connectors/allsky/health', json={"url": "http://"})
+        assert resp.status_code == 400
+        assert "host" in resp.get_json()["error"]
+
     def test_post_400_when_loopback(self, client_user):
         resp = client_user.post('/api/connectors/allsky/health', json={"url": "http://127.0.0.1"})
         assert resp.status_code == 400
