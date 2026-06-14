@@ -191,6 +191,7 @@ async function loadAstroWeather() {
         
         // Render different sections
         renderCurrentAstroConditions(data.current_conditions);
+        renderNightTimeline(data.hourly_data, data.location?.timezone);
         renderBestObservationPeriods(data.best_observation_periods);
         renderAstroWeatherCharts(data.hourly_data, data.location?.timezone);
         renderWeatherAlerts(data.weather_alerts, data.location?.timezone);
@@ -303,6 +304,128 @@ function renderCurrentAstroConditions(conditions) {
         })
     ];
     cards.forEach(card => container.appendChild(card));
+}
+
+/**
+ * Render the hourly night score timeline (sunset → sunrise)
+ */
+function renderNightTimeline(hourlyData, timezone) {
+    const container = document.getElementById('night-timeline-display');
+    const mainEl = document.getElementById('night-timeline-main');
+    if (!container || !mainEl || !hourlyData || hourlyData.length === 0) return;
+
+    const nowMs = Date.now();
+
+    // Collect nighttime hours from now (or within 30 min ago), then keep only the
+    // first continuous block — avoids mixing tonight's tail with tomorrow's night.
+    const candidates = hourlyData
+        .filter(h => h.is_day === 0 && new Date(h.datetime).getTime() >= nowMs - 30 * 60 * 1000)
+        .sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
+
+    const nightHours = [];
+    for (let i = 0; i < candidates.length; i++) {
+        if (i === 0) {
+            nightHours.push(candidates[i]);
+        } else {
+            const gapMs = new Date(candidates[i].datetime) - new Date(candidates[i - 1].datetime);
+            if (gapMs <= 2 * 60 * 60 * 1000) {
+                nightHours.push(candidates[i]);
+            } else {
+                break;
+            }
+        }
+    }
+
+    mainEl.style.display = 'block';
+    DOMUtils.clear(container);
+
+    if (nightHours.length === 0) {
+        const msg = document.createElement('p');
+        msg.className = 'text-muted fst-italic mb-0';
+        msg.textContent = i18n.t('astro_weather.night_score_no_night');
+        container.appendChild(msg);
+        return;
+    }
+
+    const timeline = document.createElement('div');
+    timeline.className = 'night-score-timeline';
+
+    nightHours.forEach(h => {
+        const hMs = new Date(h.datetime).getTime();
+        const isNow = Math.abs(hMs - nowMs) < 60 * 60 * 1000;
+
+        // Composite score 0–10 (same formula as best_observation_periods backend)
+        const rawScore = (
+            (h.seeing_pickering || 0) * 10 +
+            (h.transparency_score || 0) +
+            (h.cloud_discrimination || 0) +
+            (h.tracking_stability_score || 0)
+        ) / 4;
+        const score = rawScore / 10;
+
+        const qualityClass = score >= 8 ? 'quality-excellent'
+            : score >= 6 ? 'quality-good'
+            : score >= 4 ? 'quality-fair'
+            : score >= 2 ? 'quality-poor'
+            : 'quality-bad';
+
+        const qualityLabel = score >= 8 ? i18n.t('common.quality_scale.excellent')
+            : score >= 6 ? i18n.t('common.quality_scale.good')
+            : score >= 4 ? i18n.t('common.quality_scale.fair')
+            : i18n.t('common.quality_scale.poor');
+
+        const scoreColorClass = score >= 6 ? 'text-success' : score >= 4 ? 'text-warning' : 'text-danger';
+
+        const card = document.createElement('div');
+        card.className = `card h-100 night-score-card${isNow ? ' night-score-card-now' : ''}`;
+
+        const header = document.createElement('div');
+        header.className = 'card-header night-score-card-header';
+
+        const hourEl = document.createElement('span');
+        hourEl.className = 'fw-semibold night-score-hour';
+        hourEl.textContent = formatTimeOnlyInTimezone(h.datetime, timezone || 'UTC');
+        header.appendChild(hourEl);
+
+        card.appendChild(header);
+
+        const body = document.createElement('div');
+        body.className = 'card-body p-1 text-center';
+
+        const scoreEl = document.createElement('div');
+        scoreEl.className = `night-score-value ${scoreColorClass}`;
+        scoreEl.textContent = score.toFixed(1);
+        body.appendChild(scoreEl);
+
+        const qualBadge = document.createElement('div');
+        qualBadge.className = `astro-quality-text quality-box ${qualityClass}`;
+        qualBadge.textContent = qualityLabel;
+        body.appendChild(qualBadge);
+
+        const metricColor = (val) => val >= 80 ? 'text-success' : val >= 60 ? 'text-warning' : 'text-danger';
+        const dewColor = (s) => s >= 70 ? 'text-success' : s >= 50 ? 'text-warning' : 'text-danger';
+
+        const iconRow = document.createElement('div');
+        iconRow.className = 'night-score-icons';
+        [
+            ['bi bi-eye', metricColor((h.seeing_pickering || 0) * 10), i18n.t('astro_weather.seeing')],
+            ['bi bi-stars', metricColor(h.transparency_score || 0), i18n.t('astro_weather.transparency')],
+            ['bi bi-clouds', metricColor(h.cloud_discrimination || 0), i18n.t('astro_weather.cloud_layers')],
+            ['bi bi-droplet', dewColor(h.dew_risk_score || 0), i18n.t('astro_weather.dew_risk')],
+            ['bi bi-crosshair2', metricColor(h.tracking_stability_score || 0), i18n.t('astro_weather.tracking')],
+        ].forEach(([cls, color, title]) => {
+            const ico = DOMUtils.createIcon(cls);
+            ico.className += ` ${color}`;
+            ico.title = title;
+            iconRow.appendChild(ico);
+        });
+
+        body.appendChild(iconRow);
+        card.appendChild(body);
+        timeline.appendChild(card);
+    });
+
+    container.appendChild(timeline);
 }
 
 /**

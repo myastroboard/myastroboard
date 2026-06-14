@@ -13,6 +13,7 @@ Connect external astronomy tools to MyAstroBoard and view their live data in the
 #### Various
 
 - Notification for aurora with better localization and cooldown.
+- Add forecast night with score for a quick information
 - Improve hero cards for astro score
 - Improve cards weather/moon/aurora
 - Improve tests and code quality

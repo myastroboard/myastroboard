@@ -164,6 +164,77 @@
     --quality-shadow-hover: var(--quality-bad-shadow-hover);
 }
 
+/* Night Score Timeline */
+.night-score-timeline-scroll {
+    overflow-x: auto;
+    overflow-y: visible;
+    scrollbar-width: thin;
+    padding: 0.5rem 0.1rem 0.6rem;
+}
+
+.night-score-timeline {
+    display: flex;
+    gap: 0.5rem;
+    width: max-content;
+}
+
+.night-score-card {
+    min-width: 74px;
+    max-width: 74px;
+}
+
+.night-score-card .card-header {
+    padding: 0.35rem 0.3rem;
+    text-align: center;
+}
+
+.night-score-hour {
+    font-size: 0.72rem;
+    display: block;
+}
+
+
+.night-score-card-now {
+    border: 2px solid var(--accent-glow-strong) !important;
+}
+
+.night-score-card .card-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.night-score-value {
+    font-size: 1.5rem;
+    font-weight: var(--font-bold);
+    line-height: 1;
+}
+
+.night-score-card .astro-quality-text {
+    margin-bottom: 0;
+}
+
+.night-score-icons {
+    display: flex;
+    justify-content: center;
+    gap: 0.2rem;
+    font-size: 0.65rem;
+}
+
+@media (max-width: 575.98px) {
+    .night-score-card {
+        min-width: 64px;
+        max-width: 64px;
+    }
+    .night-score-value {
+        font-size: 1.25rem;
+    }
+    .night-score-hour {
+        font-size: 0.63rem;
+    }
+}
+
 /* Astro weather */
 .astro-card-header {
     display: flex;
