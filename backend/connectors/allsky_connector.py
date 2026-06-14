@@ -73,8 +73,8 @@ class AllSkyConnector(BaseConnector):
                 ipv4 = infos[0][4][0]
                 netloc = f"{ipv4}:{parsed.port}" if parsed.port else ipv4
                 return urlunparse(parsed._replace(netloc=netloc))
-        except OSError:
-            pass
+        except OSError as exc:
+            logger.debug("IPv4 resolution failed for %s: %s", url, exc)
         return url
 
     def _head(self, url: str) -> tuple[bool, int]:

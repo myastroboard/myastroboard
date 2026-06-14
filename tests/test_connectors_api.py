@@ -23,7 +23,6 @@ if 'psutil' not in sys.modules:
     sys.modules['psutil'] = types.ModuleType('psutil')
 
 import cache_store
-from app import app
 
 
 # ---------------------------------------------------------------------------

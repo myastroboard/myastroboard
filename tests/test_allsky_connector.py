@@ -1,16 +1,14 @@
 """Unit tests for AllSkyConnector and BaseConnector."""
 import sys
 import os
-import types
 
-import pytest
 import requests as _requests
 from unittest.mock import MagicMock, patch
 
 backend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'backend')
 sys.path.insert(0, backend_path)
 
-from connectors.allsky_connector import AllSkyConnector, _MODULE_404_HINTS
+from connectors.allsky_connector import AllSkyConnector
 
 
 # ---------------------------------------------------------------------------

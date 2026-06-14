@@ -1059,6 +1059,9 @@ def allsky_health_api():
         test_url = (data.get("url") or "").strip().rstrip("/")
         if not test_url:
             return jsonify({"reachable": False, "error": "url required"}), 400
+        from urllib.parse import urlparse as _urlparse
+        if _urlparse(test_url).scheme not in ('http', 'https'):
+            return jsonify({"reachable": False, "error": "url must use http or https"}), 400
         import requests as _req
         try:
             r = _req.head(test_url, timeout=5, allow_redirects=True)

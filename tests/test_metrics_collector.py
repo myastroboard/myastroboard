@@ -146,15 +146,15 @@ class TestGetFolderDiskUsage:
             ctx = real_scandir(path)
 
             class _WrappedCtx:
-                def __enter__(self_):
-                    self_._it = ctx.__enter__()
-                    return self_
+                def __enter__(self):
+                    self._it = ctx.__enter__()
+                    return self
 
-                def __exit__(self_, *args):
+                def __exit__(self, *args):
                     return ctx.__exit__(*args)
 
-                def __iter__(self_):
-                    for entry in self_._it:
+                def __iter__(self):
+                    for entry in self._it:
                         entry_mock = MagicMock(wraps=entry)
                         entry_mock.is_file.return_value = True
                         entry_mock.stat.side_effect = OSError("permission denied")
@@ -174,14 +174,14 @@ class TestGetFolderDiskUsage:
             ctx = real_scandir(path)
 
             class _WrappedCtx:
-                def __enter__(self_):
-                    self_._it = ctx.__enter__()
-                    return self_
+                def __enter__(self):
+                    self._it = ctx.__enter__()
+                    return self
 
-                def __exit__(self_, *args):
+                def __exit__(self, *args):
                     return ctx.__exit__(*args)
 
-                def __iter__(self_):
+                def __iter__(self):
                     mock_entry = MagicMock()
                     mock_entry.is_file.return_value = False
                     mock_entry.is_dir.return_value = False
