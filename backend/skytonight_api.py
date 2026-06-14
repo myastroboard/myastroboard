@@ -730,11 +730,11 @@ def _build_dso_section_payload(catalogue: Optional[str], user_id: str, username:
             break
         catalogue_names = _target_catalogue_names(target)
         preferred_name = str(_target_attr(target, 'preferred_name', '') or '').strip()
+        source_catalogue = catalogue or ''
         if catalogue:
             display_name = str(catalogue_names.get(catalogue, '') or '').strip()
             if not display_name:
                 continue
-            source_catalogue = catalogue
         else:
             display_name = preferred_name
         const = str(_target_attr(target, 'constellation', '') or '')

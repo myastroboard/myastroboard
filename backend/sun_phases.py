@@ -104,7 +104,7 @@ class SunService:
         ]
         t_arr = AstroTime(utc_times)
         frame = AltAz(obstime=t_arr, location=self.location)
-        sun_alts = np.asarray(get_sun(t_arr).transform_to(frame).alt.deg)
+        sun_alts = np.asarray(get_sun(t_arr).transform_to(frame).alt.deg)  # type: ignore[union-attr]
 
         def find_crossing(target_alt, direction):
             if direction == "down":
@@ -146,7 +146,7 @@ class SunService:
         utc = dt_local.astimezone(datetime.timezone.utc)
         t = AstroTime(utc)
         frame = AltAz(obstime=t, location=self.location)
-        return float(get_sun(t).transform_to(frame).alt.deg)
+        return float(get_sun(t).transform_to(frame).alt.deg)  # type: ignore[union-attr, arg-type]
 
     # -----------------------------
     # Formatting

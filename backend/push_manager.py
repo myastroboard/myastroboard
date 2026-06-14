@@ -44,7 +44,7 @@ def _pem_to_raw_b64(pem_str: str) -> str:
     from cryptography.hazmat.primitives.serialization import load_pem_private_key  # type: ignore[import]
 
     key = load_pem_private_key(pem_str.encode('utf-8'), password=None)
-    raw_bytes = key.private_numbers().private_value.to_bytes(32, 'big')
+    raw_bytes = key.private_numbers().private_value.to_bytes(32, 'big')  # type: ignore[union-attr]
     return base64.urlsafe_b64encode(raw_bytes).rstrip(b'=').decode('utf-8')
 
 
