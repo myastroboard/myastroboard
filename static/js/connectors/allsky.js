@@ -114,12 +114,11 @@ function _buildAllSkyLayout(cfg, modules, urls) {
         row.appendChild(col);
     }
 
-    // ── Row 2: Startrails + Keogram ──────────────────────────────────────────
+    // ── Row 2: Startrails + Daily timelapse ──────────────────────────────────
 
     if (modules.startrails?.enabled && urls.startrails) {
-        const hasKeogramNeighbour = modules.keogram?.enabled && urls.keogram;
         const col = document.createElement('div');
-        col.className = hasKeogramNeighbour ? 'col-12 col-lg-8' : 'col-12 col-md-6';
+        col.className = 'col-12 col-md-6';
 
         const card = document.createElement('div');
         card.className = 'card h-100';
@@ -135,89 +134,10 @@ function _buildAllSkyLayout(cfg, modules, urls) {
         img.id = 'allsky-startrails-img';
         img.src = urls.startrails;
         img.alt = 'startrails';
-        img.className = 'img-fluid rounded allsky-zoomable';
+        img.className = 'img-fluid rounded allsky-media-fit allsky-zoomable';
         img.addEventListener('click', () => _openAllSkyStaticModal(i18n.t('observatory.startrails'), urls.startrails));
         body.appendChild(img);
 
-        card.appendChild(header);
-        card.appendChild(body);
-        col.appendChild(card);
-        row.appendChild(col);
-    }
-
-    if (modules.keogram?.enabled && urls.keogram) {
-        const hasStartrailsNeighbour = modules.startrails?.enabled && urls.startrails;
-        const keogramCol = hasStartrailsNeighbour ? 'col-12 col-lg-4' : 'col-12';
-
-        const col = document.createElement('div');
-        col.className = keogramCol;
-
-        const card = document.createElement('div');
-        card.className = 'card h-100';
-
-        const header = document.createElement('div');
-        header.className = 'card-header d-flex justify-content-between align-items-center';
-        const headerText = document.createElement('span');
-        headerText.textContent = i18n.t('observatory.keogram');
-        const dateBadge = document.createElement('span');
-        dateBadge.id = 'allsky-keogram-date';
-        dateBadge.className = 'badge bg-dark text-muted small';
-        header.appendChild(headerText);
-        header.appendChild(dateBadge);
-
-        const body = document.createElement('div');
-        body.className = 'card-body p-1 text-center';
-        body.id = 'allsky-keogram-body';
-        const img = document.createElement('img');
-        img.id = 'allsky-keogram-img';
-        img.src = urls.keogram;
-        img.alt = 'keogram';
-        img.className = 'img-fluid rounded allsky-zoomable';
-        img.addEventListener('click', () => _openAllSkyStaticModal(i18n.t('observatory.keogram'), urls.keogram));
-        body.appendChild(img);
-
-        card.appendChild(header);
-        card.appendChild(body);
-        col.appendChild(card);
-        row.appendChild(col);
-    }
-
-    // ── Row 3: Mini timelapse + Daily timelapse ───────────────────────────────
-
-    if (modules.mini_timelapse?.enabled && urls.mini_timelapse_thumb) {
-        const col = document.createElement('div');
-        col.className = 'col-12 col-md-6';
-
-        const card = document.createElement('div');
-        card.className = 'card h-100';
-
-        const header = document.createElement('div');
-        header.className = 'card-header';
-        header.textContent = i18n.t('observatory.mini_timelapse');
-
-        const body = document.createElement('div');
-        body.className = 'card-body p-1 text-center';
-        body.id = 'allsky-mini-body';
-
-        const link = document.createElement('a');
-        link.href = urls.mini_timelapse_video || '#';
-        link.target = '_blank';
-        link.rel = 'noopener';
-
-        const img = document.createElement('img');
-        img.id = 'allsky-mini-img';
-        img.src = urls.mini_timelapse_thumb;
-        img.alt = 'mini-timelapse';
-        img.className = 'img-fluid rounded allsky-media-thumb';
-
-        const caption = document.createElement('div');
-        caption.className = 'mt-1 small text-muted';
-        caption.appendChild(DOMUtils.createIcon('bi bi-play-circle me-1'));
-        caption.appendChild(document.createTextNode(i18n.t('observatory.watch_video')));
-
-        link.appendChild(img);
-        link.appendChild(caption);
-        body.appendChild(link);
         card.appendChild(header);
         card.appendChild(body);
         col.appendChild(card);
@@ -245,6 +165,42 @@ function _buildAllSkyLayout(cfg, modules, urls) {
         video.className = 'img-fluid rounded allsky-media-video';
         video.src = urls.daily_timelapse;
         body.appendChild(video);
+
+        card.appendChild(header);
+        card.appendChild(body);
+        col.appendChild(card);
+        row.appendChild(col);
+    }
+
+    // ── Row 3: Keogram ───────────────────────────────────────────────────────
+
+    if (modules.keogram?.enabled && urls.keogram) {
+        const col = document.createElement('div');
+        col.className = 'col-12';
+
+        const card = document.createElement('div');
+        card.className = 'card h-100';
+
+        const header = document.createElement('div');
+        header.className = 'card-header d-flex justify-content-between align-items-center';
+        const headerText = document.createElement('span');
+        headerText.textContent = i18n.t('observatory.keogram');
+        const dateBadge = document.createElement('span');
+        dateBadge.id = 'allsky-keogram-date';
+        dateBadge.className = 'badge bg-dark text-muted small';
+        header.appendChild(headerText);
+        header.appendChild(dateBadge);
+
+        const body = document.createElement('div');
+        body.className = 'card-body p-1 text-center';
+        body.id = 'allsky-keogram-body';
+        const img = document.createElement('img');
+        img.id = 'allsky-keogram-img';
+        img.src = urls.keogram;
+        img.alt = 'keogram';
+        img.className = 'img-fluid rounded allsky-keogram allsky-zoomable';
+        img.addEventListener('click', () => _openAllSkyStaticModal(i18n.t('observatory.keogram'), urls.keogram));
+        body.appendChild(img);
 
         card.appendChild(header);
         card.appendChild(body);
@@ -284,15 +240,6 @@ function _attachImageErrorHandlers(modules, urls) {
             if (body) { DOMUtils.clear(body); body.appendChild(_imageUnavailableNode()); }
             _stopLiveImageRefresh();
             _allskyImageRetryTimeout = setTimeout(loadAllSkyObservatory, _ALLSKY_IMAGE_RETRY_MS);
-        };
-    }
-
-    const miniImg = document.getElementById('allsky-mini-img');
-    if (miniImg) {
-        miniImg.onerror = () => {
-            miniImg.onerror = null;
-            const body = document.getElementById('allsky-mini-body');
-            if (body) { DOMUtils.clear(body); body.appendChild(_notYetGeneratedNode()); }
         };
     }
 

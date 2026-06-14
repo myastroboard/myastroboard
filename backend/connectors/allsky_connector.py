@@ -8,7 +8,7 @@ import socket
 from urllib.parse import urlparse, urlunparse
 
 import requests
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Any
 
 from connectors.base_connector import BaseConnector
@@ -21,10 +21,10 @@ REQUEST_TIMEOUT = 5
 # Human-readable hints for common 404 causes per module
 _MODULE_404_HINTS = {
     "sensor_data":     "Export module not added to AllSky pipeline",
-    "mini_timelapse":  "Mini-timelapse disabled in AllSky settings (Number Of Images = 0)",
+
     "daily_timelapse": "Daily timelapse not yet generated (runs at end of night)",
-    "keogram":         "Keogram not yet generated for today (runs at end of night)",
-    "startrails":      "Startrails not yet generated for today (runs at end of night)",
+    "keogram":         "Keogram not found for last night (generated end-of-night, named after session start date)",
+    "startrails":      "Startrails not found for last night (generated end-of-night, named after session start date)",
 }
 
 
@@ -41,7 +41,6 @@ class AllSkyConnector(BaseConnector):
         {"slug": "keogram",          "label": "Keogram",           "description": "Daily keogram timeline strip (generated end-of-night)", "default_enabled": True},
         {"slug": "startrails",       "label": "Startrails",        "description": "Stacked startrails image (generated end-of-night)", "default_enabled": False},
         {"slug": "daily_timelapse",  "label": "Daily timelapse",   "description": "Full-night timelapse video (generated end-of-night)", "default_enabled": False},
-        {"slug": "mini_timelapse",   "label": "Mini-timelapse",    "description": "Frequent mini-timelapse clip — requires AllSky mini-timelapse enabled", "default_enabled": False},
     ]
 
     def _image_url(self) -> str:
@@ -55,19 +54,13 @@ class AllSkyConnector(BaseConnector):
         return f"{self.base_url}/{image_path}/{json_file}"
 
     def _keogram_url(self, date_str: str) -> str:
-        return f"{self.base_url}/keograms/keogram-{date_str}.jpg"
+        return f"{self.base_url}/images/{date_str}/keogram/keogram-{date_str}.jpg"
 
     def _startrails_url(self, date_str: str) -> str:
-        return f"{self.base_url}/startrails/startrails-{date_str}.jpg"
+        return f"{self.base_url}/images/{date_str}/startrails/startrails-{date_str}.jpg"
 
     def _daily_timelapse_url(self, date_str: str) -> str:
-        return f"{self.base_url}/videos/allsky-{date_str}.mp4"
-
-    def _mini_timelapse_thumb_url(self) -> str:
-        return f"{self.base_url}/allsky-tmp/mini-timelapse.jpg"
-
-    def _mini_timelapse_video_url(self) -> str:
-        return f"{self.base_url}/allsky-tmp/mini-timelapse.mp4"
+        return f"{self.base_url}/images/{date_str}/allsky-{date_str}.mp4"
 
     @staticmethod
     def _force_ipv4(url: str) -> str:
@@ -106,16 +99,16 @@ class AllSkyConnector(BaseConnector):
         # Check base URL reachability first
         base_ok, base_code = self._head(self.base_url)
 
-        today = datetime.now(timezone.utc).strftime("%Y%m%d")
+        # End-of-night files are named after the date the night started (previous day).
+        last_night = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y%m%d")
         module_results = {}
 
         url_map = {
             "live_image":       self._image_url(),
             "sensor_data":      self._sensor_data_url(),
-            "keogram":          self._keogram_url(today),
-            "startrails":       self._startrails_url(today),
-            "daily_timelapse":  self._daily_timelapse_url(today),
-            "mini_timelapse":   self._mini_timelapse_thumb_url(),
+            "keogram":          self._keogram_url(last_night),
+            "startrails":       self._startrails_url(last_night),
+            "daily_timelapse":  self._daily_timelapse_url(last_night),
         }
 
         for slug, url in url_map.items():
@@ -131,7 +124,7 @@ class AllSkyConnector(BaseConnector):
                 detail = "Timeout"
             else:
                 detail = f"HTTP {code}"
-            module_results[slug] = {"ok": ok, "detail": detail}
+            module_results[slug] = {"ok": ok, "detail": detail, "url": url}
 
         return {
             "reachable": base_ok or any(v["ok"] for v in module_results.values()),
@@ -139,7 +132,9 @@ class AllSkyConnector(BaseConnector):
         }
 
     def get_module_urls(self, date_str: str | None = None) -> dict:
-        today = date_str or datetime.now(timezone.utc).strftime("%Y%m%d")
+        # End-of-night files are named after the date the night started (previous day).
+        last_night = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y%m%d")
+        today = date_str or last_night
         urls = {}
 
         if self.is_module_enabled("live_image"):
@@ -156,10 +151,6 @@ class AllSkyConnector(BaseConnector):
 
         if self.is_module_enabled("daily_timelapse"):
             urls["daily_timelapse"] = self._daily_timelapse_url(today)
-
-        if self.is_module_enabled("mini_timelapse"):
-            urls["mini_timelapse_thumb"] = self._mini_timelapse_thumb_url()
-            urls["mini_timelapse_video"] = self._mini_timelapse_video_url()
 
         return urls
 

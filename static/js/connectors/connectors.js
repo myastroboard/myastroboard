@@ -436,7 +436,9 @@ async function _runHealthCheck(name) {
         if (!badge) continue;
         badge.textContent = result.ok ? '✓' : '✗';
         badge.className = `connector-module-health badge small align-self-center ${result.ok ? 'bg-success' : 'bg-danger'}`;
-        badge.title = result.detail || '';
+        const titleParts = [result.detail || ''];
+        if (result.url) titleParts.push(result.url);
+        badge.title = titleParts.join('\n');
     }
 }
 

@@ -1169,6 +1169,9 @@ def allsky_proxy_api():
         logger.debug("AllSky proxy error for module %s: %s", module, exc)
         return abort(502)
 
+    if r.status_code != 200:
+        logger.debug("AllSky proxy: %s → HTTP %s for %s", module, r.status_code, target_url)
+
     proxy_headers = {"Content-Type": r.headers.get("Content-Type", "application/octet-stream")}
     for hdr in ("Content-Length", "Content-Range", "Accept-Ranges"):
         if hdr in r.headers:

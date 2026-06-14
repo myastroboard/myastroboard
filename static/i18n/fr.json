@@ -1902,7 +1902,6 @@
     "keogram": "Kéogramme",
     "startrails": "Traînée d'étoiles",
     "daily_timelapse": "Timelapse journalier",
-    "mini_timelapse": "Mini timelapse",
     "watch_video": "Voir la vidéo",
     "not_yet_generated": "Pas encore généré (en fin de nuit)",
     "night": "Nuit",
@@ -1958,8 +1957,7 @@
     "module_startrails_desc": "Image de traînées d'étoiles empilées (générée en fin de nuit)",
     "module_daily_timelapse_label": "Timelapse journalier",
     "module_daily_timelapse_desc": "Vidéo timelapse de la nuit complète (générée en fin de nuit)",
-    "module_mini_timelapse_label": "Mini-timelapse",
-    "module_mini_timelapse_desc": "Clip mini-timelapse fréquent — nécessite l'activation du mini-timelapse dans AllSky",
+
     "local_hostname_warning": "Les noms d'hôtes .local utilisent mDNS, indisponible dans Docker. Utilisez l'adresse IP statique de l'appareil (ex. http://192.168.1.x/)."
   }
 }

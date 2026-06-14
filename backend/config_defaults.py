@@ -78,7 +78,6 @@ DEFAULT_ALLSKY_CONNECTOR = {
         "keogram":         {"enabled": True},
         "startrails":      {"enabled": False},
         "daily_timelapse": {"enabled": False},
-        "mini_timelapse":  {"enabled": False},
     },
 }
 

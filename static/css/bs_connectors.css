@@ -39,5 +39,10 @@
 }
 
 .allsky-media-video {
-    max-height: 240px;
+    max-height: 480px;
+}
+
+.allsky-keogram {
+    max-height: 250px;
+    object-fit: contain;
 }

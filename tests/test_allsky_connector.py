@@ -31,7 +31,7 @@ def _make_all_modules(enabled=True):
         "enabled": True,
         "modules": {s: {"enabled": enabled} for s in [
             "live_image", "sensor_data", "keogram",
-            "startrails", "daily_timelapse", "mini_timelapse",
+            "startrails", "daily_timelapse",
         ]},
     })
 
@@ -106,23 +106,16 @@ class TestUrlBuilders:
 
     def test_keogram_url(self):
         c = _make()
-        assert c._keogram_url("20260101") == "http://allsky.local/keograms/keogram-20260101.jpg"
+        assert c._keogram_url("20260101") == "http://allsky.local/images/20260101/keogram/keogram-20260101.jpg"
 
     def test_startrails_url(self):
         c = _make()
-        assert c._startrails_url("20260101") == "http://allsky.local/startrails/startrails-20260101.jpg"
+        assert c._startrails_url("20260101") == "http://allsky.local/images/20260101/startrails/startrails-20260101.jpg"
 
     def test_daily_timelapse_url(self):
         c = _make()
-        assert c._daily_timelapse_url("20260101") == "http://allsky.local/videos/allsky-20260101.mp4"
+        assert c._daily_timelapse_url("20260101") == "http://allsky.local/images/20260101/allsky-20260101.mp4"
 
-    def test_mini_timelapse_thumb_url(self):
-        c = _make()
-        assert c._mini_timelapse_thumb_url() == "http://allsky.local/allsky-tmp/mini-timelapse.jpg"
-
-    def test_mini_timelapse_video_url(self):
-        c = _make()
-        assert c._mini_timelapse_video_url() == "http://allsky.local/allsky-tmp/mini-timelapse.mp4"
 
 
 # ---------------------------------------------------------------------------
@@ -192,7 +185,7 @@ class TestHealthCheck:
         with patch("requests.head", return_value=mock_resp):
             result = _make().health_check()
         assert result["reachable"] is True
-        for slug in ["live_image", "sensor_data", "keogram", "startrails", "daily_timelapse", "mini_timelapse"]:
+        for slug in ["live_image", "sensor_data", "keogram", "startrails", "daily_timelapse"]:
             assert result["modules"][slug]["ok"] is True
             assert result["modules"][slug]["detail"] == "200 OK"
 
@@ -274,7 +267,7 @@ class TestGetModuleUrls:
         c = _make({"url": "http://allsky.local", "enabled": True,
                    "modules": {"keogram": {"enabled": True}}})
         urls = c.get_module_urls(date_str="20260101")
-        assert urls["keogram"] == "http://allsky.local/keograms/keogram-20260101.jpg"
+        assert urls["keogram"] == "http://allsky.local/images/20260101/keogram/keogram-20260101.jpg"
 
     def test_startrails_included_when_enabled(self):
         c = _make({"url": "http://allsky.local", "enabled": True,
@@ -288,24 +281,17 @@ class TestGetModuleUrls:
         urls = c.get_module_urls(date_str="20260101")
         assert "daily_timelapse" in urls
 
-    def test_mini_timelapse_adds_two_urls(self):
-        c = _make({"url": "http://allsky.local", "enabled": True,
-                   "modules": {"mini_timelapse": {"enabled": True}}})
-        urls = c.get_module_urls()
-        assert "mini_timelapse_thumb" in urls
-        assert "mini_timelapse_video" in urls
-
     def test_all_modules_enabled(self):
         c = _make_all_modules(enabled=True)
         urls = c.get_module_urls(date_str="20260101")
-        assert len(urls) == 7  # live_image, sensor_data, keogram, startrails, daily_timelapse, thumb, video
+        assert len(urls) == 5  # live_image, sensor_data, keogram, startrails, daily_timelapse
 
-    def test_date_defaults_to_today_when_not_provided(self):
+    def test_date_defaults_to_last_night_when_not_provided(self):
         c = _make({"url": "http://allsky.local", "enabled": True,
                    "modules": {"keogram": {"enabled": True}}})
         urls = c.get_module_urls()
         assert "keogram" in urls
-        assert "/keograms/keogram-" in urls["keogram"]
+        assert "/images/" in urls["keogram"] and "/keogram/keogram-" in urls["keogram"]
 
 
 # ---------------------------------------------------------------------------
