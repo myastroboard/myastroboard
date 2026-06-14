@@ -621,35 +621,39 @@ function updateAstrodexFilter(filterName, value, isAllowedAstrodex) {
 
 async function addToAstrodex(itemData) {
     try {
-        const response = await fetchJSON('/api/astrodex/items', {
+        const resp = await fetch('/api/astrodex/items', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(itemData)
         });
-        
-        if (response.status === 'success') {
-            // No alert on success - just redirect to item
+        const data = await resp.json();
+
+        if (resp.status === 409 && data.error === 'duplicate' && data.existing_item) {
+            showMessage('warning', i18n.t('astrodex.item_already_exists'));
             await loadAstrodex();
-            
-            // Update catalogue badges if the function exists (from app.js)
+            closeModal();
+            showAstrodexItemDetail(data.existing_item.id);
+            return false;
+        }
+
+        if (!resp.ok) {
+            showMessage('error', data.error || i18n.t('astrodex.failed_to_add_item'));
+            return false;
+        }
+
+        if (data.status === 'success') {
+            await loadAstrodex();
             if (typeof updateCatalogueCapturedBadge === 'function') {
-                updateCatalogueCapturedBadge(response.item || itemData, true);
+                updateCatalogueCapturedBadge(data.item || itemData, true);
             }
-            
             return true;
         } else {
-            showMessage('error', response.error || i18n.t('astrodex.failed_to_add_item'));
+            showMessage('error', data.error || i18n.t('astrodex.failed_to_add_item'));
             return false;
         }
     } catch (error) {
         console.error('Error adding to astrodex:', error);
-        if (error.message && error.message.includes('already exists')) {
-            showMessage('warning', i18n.t('astrodex.item_already_exists'));
-        } else {
-            showMessage('error', i18n.t('astrodex.failed_to_add_astrodex_item'));
-        }
+        showMessage('error', i18n.t('astrodex.failed_to_add_astrodex_item'));
         return false;
     }
 }
