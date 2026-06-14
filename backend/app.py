@@ -1067,22 +1067,26 @@ def allsky_health_api():
             return jsonify({"reachable": False, "error": "url must use http or https"}), 400
         if not parsed.hostname:
             return jsonify({"reachable": False, "error": "url must include a valid host"}), 400
-        # Resolve hostname and block loopback / link-local (covers cloud metadata endpoints
-        # like 169.254.169.254) while allowing private LAN IPs that AllSky uses.
+        # Resolve hostname to IP, validate it is not a dangerous range (loopback, link-local
+        # which covers cloud metadata endpoints like 169.254.169.254, unspecified, multicast),
+        # then make the request to the resolved IP — not the original URL — to break the
+        # user-controlled data flow and prevent DNS rebinding.
         try:
             port = parsed.port or (443 if parsed.scheme == "https" else 80)
             addrinfo = _socket.getaddrinfo(parsed.hostname, port, type=_socket.SOCK_STREAM)
-            for info in addrinfo:
-                ip = _ipaddress.ip_address(info[4][0])
-                if ip.is_loopback or ip.is_link_local or ip.is_unspecified or ip.is_multicast:
-                    return jsonify({"reachable": False, "error": "url host is not allowed"}), 400
+            resolved_ip = addrinfo[0][4][0]
+            ip_obj = _ipaddress.ip_address(resolved_ip)
+            if ip_obj.is_loopback or ip_obj.is_link_local or ip_obj.is_unspecified or ip_obj.is_multicast:
+                return jsonify({"reachable": False, "error": "url host is not allowed"}), 400
         except (_socket.gaierror, ValueError):
             return jsonify({"reachable": False, "error": "unable to resolve host"}), 400
+        safe_scheme = 'https' if parsed.scheme == 'https' else 'http'
+        safe_url = f"{safe_scheme}://{resolved_ip}"
         import requests as _req
         try:
-            r = _req.head(test_url, timeout=5, allow_redirects=True)
+            r = _req.head(safe_url, timeout=5, allow_redirects=True)
             if r.status_code == 405:
-                r = _req.get(test_url, timeout=5, stream=True)
+                r = _req.get(safe_url, timeout=5, stream=True)
             reachable = r.status_code < 500
         except _req.exceptions.RequestException:
             reachable = False
