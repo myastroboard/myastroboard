@@ -1059,9 +1059,25 @@ def allsky_health_api():
         test_url = (data.get("url") or "").strip().rstrip("/")
         if not test_url:
             return jsonify({"reachable": False, "error": "url required"}), 400
+        import ipaddress as _ipaddress
+        import socket as _socket
         from urllib.parse import urlparse as _urlparse
-        if _urlparse(test_url).scheme not in ('http', 'https'):
+        parsed = _urlparse(test_url)
+        if parsed.scheme not in ('http', 'https'):
             return jsonify({"reachable": False, "error": "url must use http or https"}), 400
+        if not parsed.hostname:
+            return jsonify({"reachable": False, "error": "url must include a valid host"}), 400
+        # Resolve hostname and block loopback / link-local (covers cloud metadata endpoints
+        # like 169.254.169.254) while allowing private LAN IPs that AllSky uses.
+        try:
+            port = parsed.port or (443 if parsed.scheme == "https" else 80)
+            addrinfo = _socket.getaddrinfo(parsed.hostname, port, type=_socket.SOCK_STREAM)
+            for info in addrinfo:
+                ip = _ipaddress.ip_address(info[4][0])
+                if ip.is_loopback or ip.is_link_local or ip.is_unspecified or ip.is_multicast:
+                    return jsonify({"reachable": False, "error": "url host is not allowed"}), 400
+        except (_socket.gaierror, ValueError):
+            return jsonify({"reachable": False, "error": "unable to resolve host"}), 400
         import requests as _req
         try:
             r = _req.head(test_url, timeout=5, allow_redirects=True)

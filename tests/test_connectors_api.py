@@ -259,6 +259,29 @@ class TestAllSkyHealth:
                                         json={"url": "http://192.168.1.1"})
         assert resp.get_json()["reachable"] is True
 
+    def test_post_400_when_invalid_scheme(self, client_user):
+        resp = client_user.post('/api/connectors/allsky/health', json={"url": "ftp://192.168.1.1"})
+        assert resp.status_code == 400
+        assert "http" in resp.get_json()["error"]
+
+    def test_post_400_when_loopback(self, client_user):
+        resp = client_user.post('/api/connectors/allsky/health', json={"url": "http://127.0.0.1"})
+        assert resp.status_code == 400
+        assert "not allowed" in resp.get_json()["error"]
+
+    def test_post_400_when_link_local(self, client_user):
+        resp = client_user.post('/api/connectors/allsky/health', json={"url": "http://169.254.169.254"})
+        assert resp.status_code == 400
+        assert "not allowed" in resp.get_json()["error"]
+
+    def test_post_400_when_unresolvable_host(self, client_user):
+        import socket
+        with patch('socket.getaddrinfo', side_effect=socket.gaierror):
+            resp = client_user.post('/api/connectors/allsky/health',
+                                    json={"url": "http://nonexistent.invalid"})
+        assert resp.status_code == 400
+        assert "resolve" in resp.get_json()["error"]
+
 
 # ---------------------------------------------------------------------------
 # GET /api/connectors/allsky/urls
