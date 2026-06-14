@@ -309,6 +309,7 @@ def reset_all_caches():
     global _planetary_events_cache, _special_phenomena_cache, _solar_system_events_cache
     global _sidereal_time_cache, _seeing_forecast_cache
     global _spaceflight_launches_cache, _spaceflight_astronauts_cache, _spaceflight_events_cache
+    global _allsky_sensor_cache, _allsky_health_cache
 
     _moon_report_cache = {"timestamp": 0, "data": None}
     _sun_report_cache = {"timestamp": 0, "data": None}
@@ -332,6 +333,8 @@ def reset_all_caches():
     _spaceflight_launches_cache = {"timestamp": 0, "data": None}
     _spaceflight_astronauts_cache = {"timestamp": 0, "data": None}
     _spaceflight_events_cache = {"timestamp": 0, "data": None}
+    _allsky_sensor_cache = {"timestamp": 0, "data": None}
+    _allsky_health_cache = {"timestamp": 0, "data": None}
     _write_all_astronomical_caches_to_shared()
 
 
@@ -471,6 +474,8 @@ def get_cache_init_status():
         "spaceflight_events": is_cache_valid(_spaceflight_events_cache, CACHE_TTL_SPACEFLIGHT_EVENTS),
         "weather_forecast": is_cache_valid(_weather_cache, WEATHER_CACHE_TTL),
         "iers": is_cache_valid(_iers_cache, CACHE_TTL_IERS),
+        "allsky_sensor": is_cache_valid(_allsky_sensor_cache, CACHE_TTL_ALLSKY_SENSOR),
+        "allsky_health": is_cache_valid(_allsky_health_cache, CACHE_TTL_ALLSKY_HEALTH),
         "all_ready": (
             is_cache_valid(_moon_report_cache, CACHE_TTL_MOON_REPORT)
             and is_cache_valid(_sun_report_cache, CACHE_TTL_SUN_REPORT)
@@ -517,6 +522,8 @@ def get_cache_init_status():
             "spaceflight_events": CACHE_TTL_SPACEFLIGHT_EVENTS,
             "weather_forecast": WEATHER_CACHE_TTL,
             "iers": CACHE_TTL_IERS,
+            "allsky_sensor": CACHE_TTL_ALLSKY_SENSOR,
+            "allsky_health": CACHE_TTL_ALLSKY_HEALTH,
         },
         "execution_metrics": get_cache_metrics(),
     }

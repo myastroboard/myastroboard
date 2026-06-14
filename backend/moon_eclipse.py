@@ -143,6 +143,10 @@ class LunarEclipseService:
             partial_end_local = partial_end_utc.astimezone(self.timezone)
 
         # Total eclipse times (may be zero for partial/penumbral)
+        total_begin_local = None
+        total_end_local = None
+        total_begin_str = None
+        total_end_str = None
         if eclipse.sd_total > 0:
             delta_minutes = datetime.timedelta(minutes=eclipse.sd_total)
             total_begin_utc = peak_time_utc - delta_minutes
@@ -151,11 +155,6 @@ class LunarEclipseService:
             total_end_local = total_end_utc.astimezone(self.timezone)
             total_begin_str = self._fmt(total_begin_local)
             total_end_str = self._fmt(total_end_local)
-        else:
-            total_begin_str = None
-            total_end_str = None
-            total_begin_local = None
-            total_end_local = None
 
         # Calculate altitude/azimuth at peak
         peak_alt_deg, peak_az_deg = self._get_moon_altitude_azimuth(peak_utc)
