@@ -1076,7 +1076,8 @@ def allsky_health_api():
 
     import time
     cached = cache_store._allsky_health_cache
-    if cached.get("data") and (time.time() - cached.get("timestamp", 0)) < 120:
+    fresh = request.args.get("fresh") == "1"
+    if not fresh and cached.get("data") and (time.time() - cached.get("timestamp", 0)) < 120:
         return jsonify(cached["data"])
 
     from connectors.allsky_connector import AllSkyConnector
