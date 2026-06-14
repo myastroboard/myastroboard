@@ -3743,8 +3743,12 @@ def add_astrodex_item():
             return jsonify({'error': 'Item name is required'}), 400
 
         # Check if item already exists (exact name or catalogue aliases)
-        if astrodex.is_item_in_astrodex(user_id, item_data['name'], item_data.get('catalogue', '')):
-            return jsonify({'error': 'Item already exists in Astrodex'}), 400
+        existing = astrodex.find_item_in_astrodex(user_id, item_data['name'], item_data.get('catalogue', ''))
+        if existing:
+            return jsonify({
+                'error': 'duplicate',
+                'existing_item': {'id': existing['id'], 'name': existing.get('name', '')},
+            }), 409
 
         new_item = astrodex.create_astrodex_item(user_id, item_data, user.username)
 
