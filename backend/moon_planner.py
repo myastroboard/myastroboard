@@ -112,8 +112,8 @@ class MoonPlanner:
         # Single vectorized Astropy call per celestial body
         t_arr = Time(utc_times)
         frame = AltAz(obstime=t_arr, location=self.location)
-        sun_alts = np.asarray(get_sun(t_arr).transform_to(frame).alt.deg)
-        moon_alts = np.asarray(get_body("moon", t_arr).transform_to(frame).alt.deg)
+        sun_alts = np.asarray(get_sun(t_arr).transform_to(frame).alt.deg)  # type: ignore[union-attr]
+        moon_alts = np.asarray(get_body("moon", t_arr).transform_to(frame).alt.deg)  # type: ignore[union-attr]
 
         # Illumination is constant across the night (computed once)
         illum_percent = self._moon_illumination(start)

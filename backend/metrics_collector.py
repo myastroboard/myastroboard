@@ -6,6 +6,7 @@ Provides container/VM-aware metrics with detailed disk space tracking and proces
 import os
 import threading
 import time
+from typing import TypedDict
 import psutil
 import platform
 from datetime import datetime
@@ -22,8 +23,14 @@ from constants import (
 
 logger = get_logger(__name__)
 
+
+class _MetricsCache(TypedDict):
+    data: dict | None
+    ts: float
+
+
 _metrics_cache_lock = threading.Lock()
-_metrics_cache: dict[str, object] = {'data': None, 'ts': 0.0}
+_metrics_cache: _MetricsCache = {'data': None, 'ts': 0.0}
 _METRICS_CACHE_TTL = 30.0  # 30s balances near-real-time metrics visibility with lower collection overhead.
 
 CONTAINER_PROCESS_HINTS = {

@@ -155,6 +155,7 @@ class LunarEclipseService:
             total_begin_str = None
             total_end_str = None
             total_begin_local = None
+            total_end_local = None
 
         # Calculate altitude/azimuth at peak
         peak_alt_deg, peak_az_deg = self._get_moon_altitude_azimuth(peak_utc)

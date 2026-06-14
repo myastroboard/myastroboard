@@ -215,7 +215,7 @@ class SiderealTimeService:
 
             return {
                 'datetime_utc': utc_time_dt.isoformat() if isinstance(utc_time_dt, datetime) else str(utc_time_dt),
-                'julian_date': float(time_obj.jd) if hasattr(time_obj.jd, '__float__') else time_obj.jd,
+                'julian_date': float(time_obj.jd),  # type: ignore[arg-type]
                 'greenwich_sidereal_time_hours': round(float(gst_hours), 6),
                 'greenwich_sidereal_time_hms': gst_hms,
                 'local_sidereal_time_hours': round(float(lst_hours), 6),
