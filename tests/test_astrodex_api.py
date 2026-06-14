@@ -163,6 +163,32 @@ def test_get_astrodex_private_mode_hides_other_users_items(client, monkeypatch):
         assert items[0].get('is_owned_by_current_user') is True
 
 
+def test_add_astrodex_item_duplicate_returns_409_with_existing_item(client, monkeypatch):
+    """Adding a duplicate object returns 409 with the existing item's id and name."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        monkeypatch.setenv('DATA_DIR', tmpdir)
+        astrodex.ASTRODEX_DIR = os.path.join(tmpdir, 'astrodex')
+        astrodex.ASTRODEX_IMAGES_DIR = os.path.join(astrodex.ASTRODEX_DIR, 'images')
+
+        user = user_manager.get_user_by_username('admin')
+        existing = astrodex.create_astrodex_item(
+            user.user_id,
+            {'name': 'M42', 'type': 'Nebula', 'catalogue': ''},
+            username=user.username,
+        )
+        assert existing is not None
+
+        response = client.post(
+            '/api/astrodex/items',
+            json={'name': 'M42', 'type': 'Nebula', 'catalogue': ''},
+        )
+        assert response.status_code == 409
+        payload = response.get_json()
+        assert payload['error'] == 'duplicate'
+        assert payload['existing_item']['id'] == existing['id']
+        assert payload['existing_item']['name'] == 'M42'
+
+
 def test_get_astrodex_image_private_mode_blocks_other_user_images(client, monkeypatch):
     """In private mode, image endpoint must reject images not owned by current user."""
     with tempfile.TemporaryDirectory() as tmpdir:

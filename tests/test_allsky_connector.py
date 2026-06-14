@@ -117,6 +117,29 @@ class TestUrlBuilders:
         assert c._daily_timelapse_url("20260101") == "http://allsky.local/images/20260101/allsky-20260101.mp4"
 
 
+# ---------------------------------------------------------------------------
+# _force_ipv4()
+# ---------------------------------------------------------------------------
+
+class TestForceIpv4:
+
+    def test_replaces_hostname_with_ipv4(self):
+        with patch("socket.getaddrinfo", return_value=[
+            (None, None, None, None, ("1.2.3.4", 80))
+        ]):
+            result = AllSkyConnector._force_ipv4("http://allsky.local/image.jpg")
+        assert result == "http://1.2.3.4/image.jpg"
+
+    def test_returns_original_when_getaddrinfo_empty(self):
+        with patch("socket.getaddrinfo", return_value=[]):
+            result = AllSkyConnector._force_ipv4("http://allsky.local/image.jpg")
+        assert result == "http://allsky.local/image.jpg"
+
+    def test_returns_original_on_os_error(self):
+        with patch("socket.getaddrinfo", side_effect=OSError("no route")):
+            result = AllSkyConnector._force_ipv4("http://allsky.local/image.jpg")
+        assert result == "http://allsky.local/image.jpg"
+
 
 # ---------------------------------------------------------------------------
 # _head()

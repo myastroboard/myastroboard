@@ -1367,3 +1367,103 @@ class TestAstrodexyRemainingBranches:
         monkeypatch.setattr(astrodex, 'enrich_item_with_catalogue_aliases', lambda i: i.update({'catalogue_aliases': {'Messier': 'M31', 'NGC': 'NGC 224'}}) or i)
         result = astrodex.switch_item_catalogue_name('testuser', item2['id'], 'Messier')
         assert result is not None
+
+    # -----------------------------------------------------------------------
+    # find_item_in_astrodex
+    # -----------------------------------------------------------------------
+
+    def test_find_item_returns_item_by_exact_name(self, temp_data_dir):
+        item = astrodex.create_astrodex_item('testuser', {'name': 'M42', 'catalogue': ''})
+        result = astrodex.find_item_in_astrodex('testuser', 'M42')
+        assert result is not None
+        assert result['id'] == item['id']
+        assert result['name'] == 'M42'
+
+    def test_find_item_returns_none_when_not_found(self, temp_data_dir):
+        astrodex.create_astrodex_item('testuser', {'name': 'M42', 'catalogue': ''})
+        result = astrodex.find_item_in_astrodex('testuser', 'M31')
+        assert result is None
+
+    def test_find_item_returns_none_on_empty_astrodex(self, temp_data_dir):
+        result = astrodex.find_item_in_astrodex('testuser', 'M42')
+        assert result is None
+
+    def test_find_item_matches_via_catalogue_alias(self, temp_data_dir, monkeypatch):
+        def fake_lookup(catalogue, name):
+            if name in ('M31', 'NGC 224') or catalogue in ('Messier', 'OpenNGC'):
+                return {'group_id': 'GRP001', 'aliases': {'Messier': 'M31', 'OpenNGC': 'NGC 224'}}
+            return {}
+        monkeypatch.setattr(skytonight_targets, 'get_lookup_entry', fake_lookup)
+        item = astrodex.create_astrodex_item('testuser', {'name': 'M31', 'catalogue': 'Messier'})
+        result = astrodex.find_item_in_astrodex('testuser', 'NGC 224', 'OpenNGC')
+        assert result is not None
+        assert result['id'] == item['id']
+
+    def test_find_item_matches_via_alias_intersection(self, temp_data_dir, monkeypatch):
+        """Line 951-952: existing alias names intersect with requested alias names."""
+        def fake_lookup(catalogue, name):
+            if (catalogue == 'Messier' and name == 'M31') or (catalogue == 'PopName' and name == 'M31pop'):
+                return {'group_id': '', 'aliases': {'Messier': 'M31', 'PopName': 'M31pop'}}
+            return {}
+        monkeypatch.setattr(skytonight_targets, 'get_lookup_entry', fake_lookup)
+        item = astrodex.create_astrodex_item('testuser', {'name': 'M31', 'catalogue': 'Messier'})
+        # Searching 'M31pop'/'PopName' builds requested_alias_names={'m31','m31pop'};
+        # the stored item's aliases also contain those names → intersection fires line 952.
+        result = astrodex.find_item_in_astrodex('testuser', 'M31pop', 'PopName')
+        assert result is not None
+        assert result['id'] == item['id']
+
+    def test_find_item_matches_via_name_in_alias_names(self, temp_data_dir, monkeypatch):
+        """Line 953-954: existing item name is itself inside the requested alias set."""
+        def fake_lookup(catalogue, name):
+            if catalogue == 'Messier' and name == 'M31':
+                return {'group_id': '', 'aliases': {'Messier': 'M31', 'PopName': 'M31pop'}}
+            return {}
+        monkeypatch.setattr(skytonight_targets, 'get_lookup_entry', fake_lookup)
+        # Item stored with bare name 'M31pop' (no catalogue → no aliases of its own)
+        item = astrodex.create_astrodex_item('testuser', {'name': 'M31pop', 'catalogue': ''})
+        # Searching 'M31'/'Messier' builds requested_alias_names={'m31','m31pop'};
+        # the item name 'm31pop' is in that set → fires line 954.
+        result = astrodex.find_item_in_astrodex('testuser', 'M31', 'Messier')
+        assert result is not None
+        assert result['id'] == item['id']
+
+    def test_find_item_matches_via_catalogue_specific_alias(self, temp_data_dir, monkeypatch):
+        """Match via per-catalogue alias when the search term has no lookup aliases of its own."""
+        def fake_lookup(catalogue, name):
+            if catalogue == 'Messier' and name == 'M31':
+                return {'group_id': '', 'aliases': {'Messier': 'M31', 'OpenNGC': 'NGC 224'}}
+            return {}
+        monkeypatch.setattr(skytonight_targets, 'get_lookup_entry', fake_lookup)
+        item = astrodex.create_astrodex_item('testuser', {'name': 'M31', 'catalogue': 'Messier'})
+        result = astrodex.find_item_in_astrodex('testuser', 'NGC 224', 'OpenNGC')
+        assert result is not None
+        assert result['id'] == item['id']
+
+    def test_find_item_no_match_when_item_name_not_in_alias_set(self, temp_data_dir, monkeypatch):
+        """Item with no catalogue aliases whose name isn't in search aliases doesn't match early; loop continues to the next item."""
+        def fake_lookup(catalogue, name):
+            if catalogue == 'Messier' and name == 'M31':
+                return {'group_id': '', 'aliases': {'Messier': 'M31', 'PopName': 'Andromeda'}}
+            return {}
+        monkeypatch.setattr(skytonight_targets, 'get_lookup_entry', fake_lookup)
+        astrodex.create_astrodex_item('testuser', {'name': 'Unrelated', 'catalogue': ''})
+        item = astrodex.create_astrodex_item('testuser', {'name': 'M31', 'catalogue': 'Messier'})
+        result = astrodex.find_item_in_astrodex('testuser', 'M31', 'Messier')
+        assert result is not None
+        assert result['id'] == item['id']
+
+    def test_find_item_skips_item_whose_catalogue_alias_does_not_match(self, temp_data_dir, monkeypatch):
+        """Item whose per-catalogue alias doesn't match the search name is skipped; loop continues to the matching item."""
+        def fake_lookup(catalogue, name):
+            if catalogue == 'Messier' and name == 'M51':
+                return {'group_id': '', 'aliases': {'Messier': 'M51', 'OpenNGC': 'NGC 5194'}}
+            if catalogue == 'Messier' and name == 'M31':
+                return {'group_id': '', 'aliases': {'Messier': 'M31', 'OpenNGC': 'NGC 224'}}
+            return {}
+        monkeypatch.setattr(skytonight_targets, 'get_lookup_entry', fake_lookup)
+        astrodex.create_astrodex_item('testuser', {'name': 'M51', 'catalogue': 'Messier'})
+        item = astrodex.create_astrodex_item('testuser', {'name': 'M31', 'catalogue': 'Messier'})
+        result = astrodex.find_item_in_astrodex('testuser', 'NGC 224', 'OpenNGC')
+        assert result is not None
+        assert result['id'] == item['id']

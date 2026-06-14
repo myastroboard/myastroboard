@@ -6,7 +6,7 @@ Connect external astronomy tools to MyAstroBoard and view their live data in the
 - **AllSky connector**: integrates with an [AllSky](https://github.com/AllskyTeam/allsky) all-sky camera (v2024.12+)
   - Live image with 30 s auto-refresh
   - Sensor data (temperature, humidity, gain, exposure, brightness) via AllSky Export module
-  - Keogram, startrails, daily timelapse, and mini-timelapse
+  - Keogram, startrails and daily timelapse
   - All resources proxied through the backend — works behind HTTPS reverse proxies
 - **Connector framework**: extensible architecture (`BaseConnector`) for adding future integrations
 

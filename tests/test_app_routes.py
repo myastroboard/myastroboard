@@ -2896,12 +2896,12 @@ class TestAstrodexItemLifecycle:
         del_resp = client_admin.delete(f'/api/astrodex/items/{item_id}')
         assert del_resp.status_code in (200, 404)
 
-    def test_duplicate_item_returns_400(self, client_admin):
+    def test_duplicate_item_returns_409(self, client_admin):
         import uuid as _uuid
         name = f'DupObj_{_uuid.uuid4().hex[:6]}'
         client_admin.post('/api/astrodex/items', json={'name': name, 'type': 'Star', 'catalogue': 'HIP'})
         resp2 = client_admin.post('/api/astrodex/items', json={'name': name, 'type': 'Star', 'catalogue': 'HIP'})
-        assert resp2.status_code in (200, 201, 400, 500)
+        assert resp2.status_code in (200, 201, 400, 409, 500)
 
 
 # ---------------------------------------------------------------------------
@@ -4855,12 +4855,12 @@ class TestAstrodexCrudRoutes:
         resp = client_admin.post('/api/astrodex/items', json={'type': 'Galaxy'})
         assert resp.status_code == 400
 
-    def test_add_item_already_exists_returns_400(self, client_admin, monkeypatch):
+    def test_add_item_already_exists_returns_409(self, client_admin, monkeypatch):
         monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
-        monkeypatch.setattr(_app_mod.astrodex, 'is_item_in_astrodex', lambda *_a, **_k: True)
+        monkeypatch.setattr(_app_mod.astrodex, 'find_item_in_astrodex', lambda *_a, **_k: {'id': 'x1', 'name': 'M42'})
         resp = client_admin.post('/api/astrodex/items', json={'name': 'M42'})
-        assert resp.status_code == 400
-        assert 'already exists' in resp.get_json()['error']
+        assert resp.status_code == 409
+        assert resp.get_json()['error'] == 'duplicate'
 
     def test_add_item_create_fails_returns_500(self, client_admin, monkeypatch):
         monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
@@ -6170,3 +6170,327 @@ class TestCacheSchedulerStartTrue:
                 _app_mod.app.config['cache_scheduler'] = saved
             elif 'cache_scheduler' in _app_mod.app.config:
                 _app_mod.app.config.pop('cache_scheduler')
+
+
+# ---------------------------------------------------------------------------
+# Connector routes
+# ---------------------------------------------------------------------------
+
+_ALLSKY_CFG_FULL = {
+    "url": "http://allsky.local",
+    "enabled": True,
+    "modules": {
+        "live_image": {"enabled": True},
+        "keogram": {"enabled": True},
+        "sensor_data": {"enabled": True},
+    },
+}
+
+
+class TestListConnectorsApi:
+
+    def test_returns_list_with_allsky(self, client_admin, monkeypatch):
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
+        resp = client_admin.get('/api/connectors')
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert isinstance(data, list)
+        names = [d['name'] for d in data]
+        assert 'allsky' in names
+
+    def test_connector_fields_present(self, client_admin, monkeypatch):
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
+        resp = client_admin.get('/api/connectors')
+        item = next(d for d in resp.get_json() if d['name'] == 'allsky')
+        for field in ('label', 'description', 'min_version', 'homepage', 'modules', 'installed', 'enabled', 'config'):
+            assert field in item
+
+    def test_not_installed_when_no_url(self, client_admin, monkeypatch):
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {}})
+        resp = client_admin.get('/api/connectors')
+        item = next(d for d in resp.get_json() if d['name'] == 'allsky')
+        assert item['installed'] is False
+        assert item['enabled'] is False
+
+    def test_unauthenticated_returns_401(self, client):
+        resp = client.get('/api/connectors')
+        assert resp.status_code == 401
+
+
+class TestAllSkyStatusApi:
+
+    def test_returns_404_when_not_configured(self, client_admin, monkeypatch):
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {}})
+        resp = client_admin.get('/api/connectors/allsky/status')
+        assert resp.status_code == 404
+
+    def test_returns_404_when_sensor_data_not_enabled(self, client_admin, monkeypatch):
+        cfg = {"url": "http://allsky.local", "enabled": True, "modules": {}}
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
+        resp = client_admin.get('/api/connectors/allsky/status')
+        assert resp.status_code == 404
+
+    def test_returns_cached_data(self, client_admin, monkeypatch):
+        cfg = {
+            "url": "http://allsky.local", "enabled": True,
+            "modules": {"sensor_data": {"enabled": True}},
+        }
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
+        import cache_store as cs
+        original = dict(cs._allsky_sensor_cache)
+        cs._allsky_sensor_cache["data"] = {"AS_TEMPERATURE_C": 15.0}
+        try:
+            resp = client_admin.get('/api/connectors/allsky/status')
+            assert resp.status_code == 200
+            assert resp.get_json().get("AS_TEMPERATURE_C") == 15.0
+        finally:
+            cs._allsky_sensor_cache.update(original)
+            cs._allsky_sensor_cache["data"] = None
+
+    def test_fetches_live_when_cache_empty(self, client_admin, monkeypatch):
+        from unittest.mock import patch, MagicMock
+        cfg = {
+            "url": "http://allsky.local", "enabled": True,
+            "modules": {"sensor_data": {"enabled": True}},
+        }
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
+        import cache_store as cs
+        cs._allsky_sensor_cache["data"] = None
+        with patch('connectors.allsky_connector.AllSkyConnector.fetch_sensor_data', return_value={"AS_TEMPERATURE_C": 20.0}):
+            resp = client_admin.get('/api/connectors/allsky/status')
+        assert resp.status_code == 200
+        cs._allsky_sensor_cache["data"] = None
+
+
+class TestAllSkyHealthApi:
+
+    def test_get_no_url_returns_200_not_reachable(self, client_admin, monkeypatch):
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {}})
+        resp = client_admin.get('/api/connectors/allsky/health')
+        assert resp.status_code == 200
+        assert resp.get_json()['reachable'] is False
+
+    def test_get_returns_cached_health(self, client_admin, monkeypatch):
+        cfg = {"url": "http://allsky.local", "enabled": True, "modules": {}}
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
+        import cache_store as cs
+        import time
+        cs._allsky_health_cache["data"] = {"reachable": True, "modules": {}}
+        cs._allsky_health_cache["timestamp"] = time.time()
+        try:
+            resp = client_admin.get('/api/connectors/allsky/health')
+            assert resp.status_code == 200
+            assert resp.get_json()['reachable'] is True
+        finally:
+            cs._allsky_health_cache["data"] = None
+            cs._allsky_health_cache["timestamp"] = 0
+
+    def test_get_fresh_bypasses_cache(self, client_admin, monkeypatch):
+        from unittest.mock import patch
+        cfg = {"url": "http://allsky.local", "enabled": True, "modules": {}}
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
+        import cache_store as cs
+        import time
+        cs._allsky_health_cache["data"] = {"reachable": True, "modules": {}}
+        cs._allsky_health_cache["timestamp"] = time.time()
+        fresh_result = {"reachable": False, "modules": {}}
+        try:
+            with patch('connectors.allsky_connector.AllSkyConnector.health_check', return_value=fresh_result):
+                resp = client_admin.get('/api/connectors/allsky/health?fresh=1')
+            assert resp.status_code == 200
+            assert resp.get_json()['reachable'] is False
+        finally:
+            cs._allsky_health_cache["data"] = None
+            cs._allsky_health_cache["timestamp"] = 0
+
+    def test_get_live_health_check(self, client_admin, monkeypatch):
+        from unittest.mock import patch
+        cfg = {"url": "http://allsky.local", "enabled": True, "modules": {}}
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
+        import cache_store as cs
+        cs._allsky_health_cache["data"] = None
+        cs._allsky_health_cache["timestamp"] = 0
+        with patch('connectors.allsky_connector.AllSkyConnector.health_check',
+                   return_value={"reachable": True, "modules": {}}):
+            resp = client_admin.get('/api/connectors/allsky/health')
+        assert resp.status_code == 200
+        assert resp.get_json()['reachable'] is True
+        cs._allsky_health_cache["data"] = None
+        cs._allsky_health_cache["timestamp"] = 0
+
+    def test_post_missing_url_returns_400(self, client_admin, monkeypatch):
+        resp = client_admin.post('/api/connectors/allsky/health',
+                                 json={}, content_type='application/json')
+        assert resp.status_code == 400
+        assert resp.get_json()['reachable'] is False
+
+    def test_post_reachable_url(self, client_admin, monkeypatch):
+        from unittest.mock import patch, MagicMock
+        mock_resp = MagicMock(status_code=200)
+        with patch('requests.head', return_value=mock_resp):
+            resp = client_admin.post('/api/connectors/allsky/health',
+                                     json={"url": "http://allsky.local"},
+                                     content_type='application/json')
+        assert resp.status_code == 200
+        assert resp.get_json()['reachable'] is True
+
+    def test_post_405_falls_back_to_get(self, client_admin, monkeypatch):
+        from unittest.mock import patch, MagicMock
+        head_resp = MagicMock(status_code=405)
+        get_resp = MagicMock(status_code=200)
+        with patch('requests.head', return_value=head_resp):
+            with patch('requests.get', return_value=get_resp):
+                resp = client_admin.post('/api/connectors/allsky/health',
+                                         json={"url": "http://allsky.local"},
+                                         content_type='application/json')
+        assert resp.status_code == 200
+        assert resp.get_json()['reachable'] is True
+
+    def test_post_connection_error_returns_not_reachable(self, client_admin, monkeypatch):
+        import requests as _req
+        from unittest.mock import patch
+        with patch('requests.head', side_effect=_req.exceptions.ConnectionError):
+            resp = client_admin.post('/api/connectors/allsky/health',
+                                     json={"url": "http://allsky.local"},
+                                     content_type='application/json')
+        assert resp.status_code == 200
+        assert resp.get_json()['reachable'] is False
+
+    def test_post_500_not_reachable(self, client_admin, monkeypatch):
+        from unittest.mock import patch, MagicMock
+        mock_resp = MagicMock(status_code=500)
+        with patch('requests.head', return_value=mock_resp):
+            resp = client_admin.post('/api/connectors/allsky/health',
+                                     json={"url": "http://allsky.local"},
+                                     content_type='application/json')
+        assert resp.status_code == 200
+        assert resp.get_json()['reachable'] is False
+
+
+class TestAllSkyUrlsApi:
+
+    def test_returns_404_when_not_configured(self, client_admin, monkeypatch):
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {}})
+        resp = client_admin.get('/api/connectors/allsky/urls')
+        assert resp.status_code == 404
+
+    def test_returns_proxy_urls_for_enabled_modules(self, client_admin, monkeypatch):
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
+        resp = client_admin.get('/api/connectors/allsky/urls')
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert "live_image" in data
+        assert data["live_image"].startswith("/api/connectors/allsky/proxy?module=live_image")
+
+    def test_date_suffix_appended_when_provided(self, client_admin, monkeypatch):
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
+        resp = client_admin.get('/api/connectors/allsky/urls?date=20260101')
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert "keogram" in data
+        assert "&date=20260101" in data["keogram"]
+
+
+class TestAllSkyProxyApi:
+
+    def test_missing_module_param_returns_400(self, client_admin, monkeypatch):
+        resp = client_admin.get('/api/connectors/allsky/proxy')
+        assert resp.status_code == 400
+
+    def test_not_configured_returns_503(self, client_admin, monkeypatch):
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {}})
+        resp = client_admin.get('/api/connectors/allsky/proxy?module=live_image')
+        assert resp.status_code == 503
+
+    def test_unknown_module_returns_404(self, client_admin, monkeypatch):
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
+        resp = client_admin.get('/api/connectors/allsky/proxy?module=nonexistent')
+        assert resp.status_code == 404
+
+    def test_proxy_streams_content(self, client_admin, monkeypatch):
+        from unittest.mock import patch, MagicMock
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.headers = {"Content-Type": "image/jpeg", "Content-Length": "1234"}
+        mock_resp.iter_content.return_value = iter([b"fake-image-data"])
+        with patch('socket.getaddrinfo', return_value=[(None, None, None, None, ("1.2.3.4", 80))]):
+            with patch('requests.get', return_value=mock_resp):
+                resp = client_admin.get('/api/connectors/allsky/proxy?module=live_image')
+        assert resp.status_code == 200
+        assert resp.content_type == "image/jpeg"
+
+    def test_proxy_timeout_returns_504(self, client_admin, monkeypatch):
+        import requests as _req
+        from unittest.mock import patch
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
+        with patch('socket.getaddrinfo', return_value=[(None, None, None, None, ("1.2.3.4", 80))]):
+            with patch('requests.get', side_effect=_req.exceptions.Timeout):
+                resp = client_admin.get('/api/connectors/allsky/proxy?module=live_image')
+        assert resp.status_code == 504
+
+    def test_proxy_connection_error_returns_502(self, client_admin, monkeypatch):
+        import requests as _req
+        from unittest.mock import patch
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
+        with patch('socket.getaddrinfo', return_value=[(None, None, None, None, ("1.2.3.4", 80))]):
+            with patch('requests.get', side_effect=_req.exceptions.ConnectionError):
+                resp = client_admin.get('/api/connectors/allsky/proxy?module=live_image')
+        assert resp.status_code == 502
+
+    def test_proxy_range_header_forwarded(self, client_admin, monkeypatch):
+        from unittest.mock import patch, MagicMock
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
+        mock_resp = MagicMock()
+        mock_resp.status_code = 206
+        mock_resp.headers = {
+            "Content-Type": "video/mp4",
+            "Content-Range": "bytes 0-999/5000",
+            "Accept-Ranges": "bytes",
+        }
+        mock_resp.iter_content.return_value = iter([b"chunk"])
+        with patch('socket.getaddrinfo', return_value=[(None, None, None, None, ("1.2.3.4", 80))]):
+            with patch('requests.get', return_value=mock_resp) as mock_get:
+                resp = client_admin.get(
+                    '/api/connectors/allsky/proxy?module=live_image',
+                    headers={"Range": "bytes=0-999"},
+                )
+        assert resp.status_code == 206
+        call_kwargs = mock_get.call_args[1]
+        assert call_kwargs.get('headers', {}).get('Range') == 'bytes=0-999'
+
+    def test_proxy_dns_failure_uses_original_url(self, client_admin, monkeypatch):
+        from unittest.mock import patch, MagicMock
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.headers = {"Content-Type": "image/jpeg"}
+        mock_resp.iter_content.return_value = iter([b"data"])
+        with patch('socket.getaddrinfo', side_effect=OSError("no route")):
+            with patch('requests.get', return_value=mock_resp):
+                resp = client_admin.get('/api/connectors/allsky/proxy?module=live_image')
+        assert resp.status_code == 200
+
+    def test_proxy_empty_dns_result_uses_original_url(self, client_admin, monkeypatch):
+        from unittest.mock import patch, MagicMock
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.headers = {"Content-Type": "image/jpeg"}
+        mock_resp.iter_content.return_value = iter([b"data"])
+        with patch('socket.getaddrinfo', return_value=[]):
+            with patch('requests.get', return_value=mock_resp):
+                resp = client_admin.get('/api/connectors/allsky/proxy?module=live_image')
+        assert resp.status_code == 200
+
+    def test_proxy_non200_upstream_still_returned(self, client_admin, monkeypatch):
+        from unittest.mock import patch, MagicMock
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
+        mock_resp = MagicMock()
+        mock_resp.status_code = 404
+        mock_resp.headers = {"Content-Type": "text/html"}
+        mock_resp.iter_content.return_value = iter([b"not found"])
+        with patch('socket.getaddrinfo', return_value=[(None, None, None, None, ("1.2.3.4", 80))]):
+            with patch('requests.get', return_value=mock_resp):
+                resp = client_admin.get('/api/connectors/allsky/proxy?module=live_image')
+        assert resp.status_code == 404

@@ -188,7 +188,7 @@ EXPECTED_ROUTES = {
 
     # --- connectors ---
     ('/api/connectors', ('GET',)),
-    ('/api/connectors/allsky/health', ('GET',)),
+    ('/api/connectors/allsky/health', ('GET', 'POST')),
     ('/api/connectors/allsky/proxy', ('GET',)),
     ('/api/connectors/allsky/status', ('GET',)),
     ('/api/connectors/allsky/urls', ('GET',)),
