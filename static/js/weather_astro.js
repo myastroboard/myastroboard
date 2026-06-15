@@ -315,37 +315,46 @@ function renderNightTimeline(hourlyData, timezone) {
     if (!container || !mainEl || !hourlyData || hourlyData.length === 0) return;
 
     const nowMs = Date.now();
+    const cutoff = nowMs - 30 * 60 * 1000;
 
-    // Collect nighttime hours from now (or within 30 min ago), then keep only the
-    // first continuous block — avoids mixing tonight's tail with tomorrow's night.
-    const candidates = hourlyData
-        .filter(h => h.is_day === 0 && new Date(h.datetime).getTime() >= nowMs - 30 * 60 * 1000)
-        .sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
+    // Sort all hourly data chronologically
+    const allSorted = [...hourlyData].sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
 
-    const nightHours = [];
-    for (let i = 0; i < candidates.length; i++) {
-        if (i === 0) {
-            nightHours.push(candidates[i]);
-        } else {
-            const gapMs = new Date(candidates[i].datetime) - new Date(candidates[i - 1].datetime);
-            if (gapMs <= 2 * 60 * 60 * 1000) {
-                nightHours.push(candidates[i]);
-            } else {
-                break;
-            }
+    // Find the first continuous night block (is_day === 0) at or after cutoff,
+    // avoiding mixing tonight's tail with tomorrow's night.
+    let nightStartIdx = -1, nightEndIdx = -1;
+    for (let i = 0; i < allSorted.length; i++) {
+        const h = allSorted[i];
+        if (h.is_day !== 0 || new Date(h.datetime).getTime() < cutoff) continue;
+        nightStartIdx = i;
+        nightEndIdx = i;
+        for (let j = i + 1; j < allSorted.length; j++) {
+            if (allSorted[j].is_day !== 0) break;
+            const gapMs = new Date(allSorted[j].datetime) - new Date(allSorted[j - 1].datetime);
+            if (gapMs > 2 * 60 * 60 * 1000) break;
+            nightEndIdx = j;
         }
+        break;
     }
 
     mainEl.style.display = 'block';
     DOMUtils.clear(container);
 
-    if (nightHours.length === 0) {
+    if (nightStartIdx === -1) {
         const msg = document.createElement('p');
         msg.className = 'text-muted fst-italic mb-0';
         msg.textContent = i18n.t('astro_weather.night_score_no_night');
         container.appendChild(msg);
         return;
     }
+
+    // Extend 2 hours before and after the night block to show twilight context
+    const extStart = Math.max(0, nightStartIdx - 2);
+    const extEnd = Math.min(allSorted.length - 1, nightEndIdx + 2);
+    const nightHours = allSorted.slice(extStart, extEnd + 1);
+
+    const nightFirstMs = new Date(allSorted[nightStartIdx].datetime).getTime();
+    const nightLastMs  = new Date(allSorted[nightEndIdx].datetime).getTime();
 
     const timeline = document.createElement('div');
     timeline.className = 'night-score-timeline';
@@ -379,18 +388,22 @@ function renderNightTimeline(hourlyData, timezone) {
         const card = document.createElement('div');
         card.className = `card h-100 night-score-card${isNow ? ' night-score-card-now' : ''}`;
 
-        const header = document.createElement('div');
-        header.className = 'card-header night-score-card-header';
+        const body = document.createElement('div');
+        body.className = 'card-body p-1 text-center';
+
+        const hourRow = document.createElement('div');
+        hourRow.className = 'night-score-hour-row';
+
+        const phaseIco = DOMUtils.createIcon(h.is_day === 1 ? 'bi bi-sun-fill' : 'bi bi-moon-stars-fill');
+        phaseIco.className += h.is_day === 1 ? ' text-warning' : ' text-info';
+        hourRow.appendChild(phaseIco);
 
         const hourEl = document.createElement('span');
         hourEl.className = 'fw-semibold night-score-hour';
         hourEl.textContent = formatTimeOnlyInTimezone(h.datetime, timezone || 'UTC');
-        header.appendChild(hourEl);
+        hourRow.appendChild(hourEl);
 
-        card.appendChild(header);
-
-        const body = document.createElement('div');
-        body.className = 'card-body p-1 text-center';
+        body.appendChild(hourRow);
 
         const scoreEl = document.createElement('div');
         scoreEl.className = `night-score-value ${scoreColorClass}`;
