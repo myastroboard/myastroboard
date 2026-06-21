@@ -58,6 +58,22 @@ def test_create_telescope(temp_data_dir, test_user_id):
     assert 'created_at' in telescope
 
 
+def test_create_rasa_telescope(temp_data_dir, test_user_id):
+    """Test creating a RASA telescope profile."""
+    telescope_data = {
+        "name": "Test RASA",
+        "telescope_type": "Rowe Ackerman Schmidt Astrograph (RASA)",
+        "aperture_mm": 279,
+        "focal_length_mm": 620,
+        "reducer_barlow_factor": 1.0,
+    }
+
+    telescope = equipment_profiles.create_telescope(test_user_id, telescope_data)
+
+    assert telescope is not None
+    assert telescope["telescope_type"] == equipment_profiles.TelescopeType.RASA.value
+    assert telescope["native_focal_ratio"] == 2.22
+
 def test_get_telescope(temp_data_dir, test_user_id):
     """Test retrieving a telescope profile"""
     telescope_data = {

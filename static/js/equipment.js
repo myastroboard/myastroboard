@@ -908,6 +908,7 @@ async function showTelescopeModal(id = null) {
                     <option value="Refractor" ${telescope?.telescope_type === 'Refractor' ? 'selected' : ''}>${i18n.t('equipment.form_refractor')}</option>
                     <option value="Reflector" ${telescope?.telescope_type === 'Reflector' ? 'selected' : ''}>${i18n.t('equipment.form_reflector')}</option>
                     <option value="Schmidt-Cassegrain (SCT)" ${telescope?.telescope_type === 'Schmidt-Cassegrain (SCT)' ? 'selected' : ''}>${i18n.t('equipment.form_sct')}</option>
+                    <option value="Rowe Ackerman Schmidt Astrograph (RASA)" ${telescope?.telescope_type === 'Rowe Ackerman Schmidt Astrograph (RASA)' ? 'selected' : ''}>${i18n.t('equipment.form_rasa')}</option>
                     <option value="Ritchey-Chrétien (RC)" ${telescope?.telescope_type === 'Ritchey-Chrétien (RC)' ? 'selected' : ''}>${i18n.t('equipment.form_rc')}</option>
                     <option value="Newtonian" ${telescope?.telescope_type === 'Newtonian' ? 'selected' : ''}>${i18n.t('equipment.form_newtonian')}</option>
                     <option value="Maksutov-Cassegrain" ${telescope?.telescope_type === 'Maksutov-Cassegrain' ? 'selected' : ''}>${i18n.t('equipment.form_maksutov')}</option>

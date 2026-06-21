@@ -26,6 +26,7 @@ class TelescopeType(str, Enum):
     REFRACTOR = "Refractor"
     REFLECTOR = "Reflector"
     SCT = "Schmidt-Cassegrain (SCT)"
+    RASA = "Rowe Ackerman Schmidt Astrograph (RASA)"
     RC = "Ritchey-Chrétien (RC)"
     NEWTONIAN = "Newtonian"
     MAKSUTOV = "Maksutov-Cassegrain"
