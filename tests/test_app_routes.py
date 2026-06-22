@@ -1329,27 +1329,27 @@ class TestEquipmentNumericValidation:
     # --- Telescope: invalid values must be rejected ---
 
     def test_telescope_aperture_too_small_returns_400(self, client_admin):
-        data = {**self.VALID_TELESCOPE, 'aperture_mm': 5}
+        data = {**self.VALID_TELESCOPE, 'aperture_mm': 5}  # below min 10
         resp = client_admin.post('/api/equipment/telescopes', json=data)
         assert resp.status_code == 400
 
     def test_telescope_aperture_too_large_returns_400(self, client_admin):
-        data = {**self.VALID_TELESCOPE, 'aperture_mm': 9999}
+        data = {**self.VALID_TELESCOPE, 'aperture_mm': 9999}  # above max 5000
         resp = client_admin.post('/api/equipment/telescopes', json=data)
         assert resp.status_code == 400
 
     def test_telescope_focal_length_too_large_returns_400(self, client_admin):
-        data = {**self.VALID_TELESCOPE, 'focal_length_mm': 99999}
+        data = {**self.VALID_TELESCOPE, 'focal_length_mm': 99999}  # above max 50000
         resp = client_admin.post('/api/equipment/telescopes', json=data)
         assert resp.status_code == 400
 
     def test_telescope_reducer_too_small_returns_400(self, client_admin):
-        data = {**self.VALID_TELESCOPE, 'reducer_barlow_factor': 0.05}
+        data = {**self.VALID_TELESCOPE, 'reducer_barlow_factor': 0.05}  # below min 0.1
         resp = client_admin.post('/api/equipment/telescopes', json=data)
         assert resp.status_code == 400
 
     def test_telescope_reducer_too_large_returns_400(self, client_admin):
-        data = {**self.VALID_TELESCOPE, 'reducer_barlow_factor': 5.0}
+        data = {**self.VALID_TELESCOPE, 'reducer_barlow_factor': 5.0}  # above max 3.0
         resp = client_admin.post('/api/equipment/telescopes', json=data)
         assert resp.status_code == 400
 
@@ -1363,21 +1363,21 @@ class TestEquipmentNumericValidation:
     # --- Camera: invalid sensor dimensions must be rejected ---
 
     def test_camera_sensor_width_too_large_returns_400(self, client_admin):
-        data = {**self.VALID_CAMERA, 'sensor_width_mm': 200}
+        data = {**self.VALID_CAMERA, 'sensor_width_mm': 200}  # above max 100
         resp = client_admin.post('/api/equipment/cameras', json=data)
         assert resp.status_code == 400
 
     def test_camera_sensor_height_too_large_returns_400(self, client_admin):
-        data = {**self.VALID_CAMERA, 'sensor_height_mm': 200}
+        data = {**self.VALID_CAMERA, 'sensor_height_mm': 200}  # above max 100
         resp = client_admin.post('/api/equipment/cameras', json=data)
         assert resp.status_code == 400
 
     def test_camera_sensor_width_zero_returns_400(self, client_admin):
-        data = {**self.VALID_CAMERA, 'sensor_width_mm': 0}
+        data = {**self.VALID_CAMERA, 'sensor_width_mm': 0}  # below min 1
         resp = client_admin.post('/api/equipment/cameras', json=data)
         assert resp.status_code == 400
 
-    # --- Non-numeric strings trigger TypeError/ValueError path ---
+    # --- Non-numeric strings trigger the TypeError/ValueError branch in validators ---
 
     def test_telescope_aperture_non_numeric_returns_400(self, client_admin):
         data = {**self.VALID_TELESCOPE, 'aperture_mm': 'not-a-number'}
@@ -1409,14 +1409,14 @@ class TestEquipmentNumericValidation:
         r = client_admin.post('/api/equipment/telescopes', json=self.VALID_TELESCOPE)
         tid = r.get_json()['data']['id']
         resp = client_admin.put(f'/api/equipment/telescopes/{tid}',
-                                json={**self.VALID_TELESCOPE, 'aperture_mm': 9999})
+                                json={**self.VALID_TELESCOPE, 'aperture_mm': 9999})  # above max 5000
         assert resp.status_code == 400
 
     def test_update_camera_invalid_sensor_returns_400(self, client_admin):
         r = client_admin.post('/api/equipment/cameras', json=self.VALID_CAMERA)
         cid = r.get_json()['data']['id']
         resp = client_admin.put(f'/api/equipment/cameras/{cid}',
-                                json={**self.VALID_CAMERA, 'sensor_width_mm': 200})
+                                json={**self.VALID_CAMERA, 'sensor_width_mm': 200})  # above max 100
         assert resp.status_code == 400
 
 
