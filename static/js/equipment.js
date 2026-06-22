@@ -906,8 +906,10 @@ async function showTelescopeModal(id = null) {
                 <label for="telescope-type" class="form-label">${i18n.t('equipment.form_type')} *</label>
                 <select class="form-select" id="telescope-type" name="telescope_type" required>
                     <option value="Refractor" ${telescope?.telescope_type === 'Refractor' ? 'selected' : ''}>${i18n.t('equipment.form_refractor')}</option>
+                    <option value="Apochromatic Refractor (APO)" ${telescope?.telescope_type === 'Apochromatic Refractor (APO)' ? 'selected' : ''}>${i18n.t('equipment.form_apo')}</option>
                     <option value="Reflector" ${telescope?.telescope_type === 'Reflector' ? 'selected' : ''}>${i18n.t('equipment.form_reflector')}</option>
                     <option value="Schmidt-Cassegrain (SCT)" ${telescope?.telescope_type === 'Schmidt-Cassegrain (SCT)' ? 'selected' : ''}>${i18n.t('equipment.form_sct')}</option>
+                    <option value="EdgeHD" ${telescope?.telescope_type === 'EdgeHD' ? 'selected' : ''}>${i18n.t('equipment.form_edgehd')}</option>
                     <option value="Rowe Ackerman Schmidt Astrograph (RASA)" ${telescope?.telescope_type === 'Rowe Ackerman Schmidt Astrograph (RASA)' ? 'selected' : ''}>${i18n.t('equipment.form_rasa')}</option>
                     <option value="Ritchey-Chrétien (RC)" ${telescope?.telescope_type === 'Ritchey-Chrétien (RC)' ? 'selected' : ''}>${i18n.t('equipment.form_rc')}</option>
                     <option value="Newtonian" ${telescope?.telescope_type === 'Newtonian' ? 'selected' : ''}>${i18n.t('equipment.form_newtonian')}</option>

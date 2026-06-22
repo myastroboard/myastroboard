@@ -1,5 +1,6 @@
 - Increale aperture limite and allow 2 decimal on reducer - Thanks @cgobat
-- Add RASA (Rowe Ackerman Schmidt Astrograph) as a telescope type option - Thanks @cgobat
 - Server side input verification for equipment
+- Add RASA (Rowe Ackerman Schmidt Astrograph) - Thanks @cgobat
+- Add APO Refractor and EdgeHD as telescope type options
 - Fix log display on mobile view
 - Fix notification NaN when no astronomical night
