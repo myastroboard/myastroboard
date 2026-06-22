@@ -121,10 +121,11 @@ function _checkSunN6(data) {
     if (typeof notificationManager === 'undefined') return;
     if (!notificationManager.isTriggerEnabled('N6')) return;
 
-    const duskIso = data?.sun?.astronomical_dusk;
+    const duskIso = data?.next_astronomical_dusk_utc;
     if (!duskIso) return;
 
-    const dusk   = new Date(duskIso).getTime();
+    const dusk = new Date(duskIso).getTime();
+    if (isNaN(dusk)) return;
     const now    = Date.now();
     const msUntil = dusk - now;
     const leadMs  = notificationManager.getLeadMinutes('N6') * 60 * 1000;
