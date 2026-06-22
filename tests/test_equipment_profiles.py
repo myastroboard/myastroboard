@@ -72,7 +72,38 @@ def test_create_rasa_telescope(temp_data_dir, test_user_id):
 
     assert telescope is not None
     assert telescope["telescope_type"] == equipment_profiles.TelescopeType.RASA.value
-    assert telescope["native_focal_ratio"] == 2.22
+    assert telescope["native_focal_ratio"] == round(620 / 279, 2)  # 2.22
+
+
+def test_update_rasa_telescope(temp_data_dir, test_user_id):
+    """Test updating a RASA telescope profile."""
+    telescope_data = {
+        "name": "Test RASA",
+        "telescope_type": "Rowe Ackerman Schmidt Astrograph (RASA)",
+        "aperture_mm": 279,
+        "focal_length_mm": 620,
+        "reducer_barlow_factor": 1.0,
+    }
+
+    created = equipment_profiles.create_telescope(test_user_id, telescope_data)
+
+    update_data = {
+        "name": "Updated RASA",
+        "telescope_type": "Rowe Ackerman Schmidt Astrograph (RASA)",
+        "aperture_mm": 279,
+        "focal_length_mm": 620,
+        "reducer_barlow_factor": 1.0,
+        "notes": "Updated notes",
+    }
+
+    updated = equipment_profiles.update_telescope(test_user_id, created["id"], update_data)
+
+    assert updated is not None
+    assert updated["name"] == "Updated RASA"
+    assert updated["telescope_type"] == equipment_profiles.TelescopeType.RASA.value
+    assert updated["native_focal_ratio"] == round(620 / 279, 2)
+    assert updated["notes"] == "Updated notes"
+
 
 def test_get_telescope(temp_data_dir, test_user_id):
     """Test retrieving a telescope profile"""
