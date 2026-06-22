@@ -1030,11 +1030,11 @@ async function showCameraModal(id = null) {
             </div>
             <div class="col-md-6">
                 <label for="camera-sensor-width" class="form-label">${i18n.t('equipment.form_sensor_width')} *</label>
-                <input type="number" class="form-control" id="camera-sensor-width" name="sensor_width_mm" value="${camera?.sensor_width_mm || ''}" required min="1" max="100" step="0.1" inputmode="decimal">
+                <input type="number" class="form-control" id="camera-sensor-width" name="sensor_width_mm" value="${camera?.sensor_width_mm || ''}" required min="1" max="100" step="0.01" inputmode="decimal">
             </div>
             <div class="col-md-6">
                 <label for="camera-sensor-height" class="form-label">${i18n.t('equipment.form_sensor_height')} *</label>
-                <input type="number" class="form-control" id="camera-sensor-height" name="sensor_height_mm" value="${camera?.sensor_height_mm || ''}" required min="1" max="100" step="0.1" inputmode="decimal">
+                <input type="number" class="form-control" id="camera-sensor-height" name="sensor_height_mm" value="${camera?.sensor_height_mm || ''}" required min="1" max="100" step="0.01" inputmode="decimal">
             </div>
             <div class="col-md-6">
                 <label for="camera-resolution-width" class="form-label">${i18n.t('equipment.form_resolution_width')} *</label>
