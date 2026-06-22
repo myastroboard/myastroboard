@@ -917,7 +917,7 @@ async function showTelescopeModal(id = null) {
             </div>
             <div class="col-md-6">
                 <label for="telescope-aperture" class="form-label">${i18n.t('equipment.form_aperture')} *</label>
-                <input type="number" class="form-control" id="telescope-aperture" name="aperture_mm" value="${telescope?.aperture_mm || ''}" required min="10" max="2000" inputmode="numeric">
+                <input type="number" class="form-control" id="telescope-aperture" name="aperture_mm" value="${telescope?.aperture_mm || ''}" required min="10" inputmode="numeric">
             </div>
             <div class="col-md-6">
                 <label for="telescope-focal-length" class="form-label">${i18n.t('equipment.form_focal_length')} *</label>
