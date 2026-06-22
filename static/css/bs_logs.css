@@ -110,3 +110,30 @@
     text-align: center;
     padding: var(--space-5);
 }
+
+/* sm screens (576–767px): hide location column */
+@media (min-width: 576px) and (max-width: 767.98px) {
+    .log-entry {
+        grid-template-columns: 9ch 10ch 22ch 1fr;
+    }
+    .log-entry.log-continuation {
+        padding-left: calc(var(--space-3) + 9ch + 10ch + 22ch + 1.5rem);
+    }
+    .log-col-location {
+        display: none;
+    }
+}
+
+/* xs screens (<576px): show only time, level, message */
+@media (max-width: 575.98px) {
+    .log-entry {
+        grid-template-columns: 8ch 8ch 1fr;
+    }
+    .log-entry.log-continuation {
+        padding-left: calc(var(--space-3) + 8ch + 8ch + 1rem);
+    }
+    .log-col-module,
+    .log-col-location {
+        display: none;
+    }
+}
