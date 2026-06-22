@@ -925,7 +925,7 @@ async function showTelescopeModal(id = null) {
             </div>
             <div class="col-md-6">
                 <label for="telescope-reducer-barlow-factor" class="form-label">${i18n.t('equipment.form_reducer_barlow_factor')}</label>
-                <input type="number" class="form-control" id="telescope-reducer-barlow-factor" name="reducer_barlow_factor" value="${telescope?.reducer_barlow_factor || 1.0}" min="0.1" max="3" step="0.1" inputmode="decimal">
+                <input type="number" class="form-control" id="telescope-reducer-barlow-factor" name="reducer_barlow_factor" value="${telescope?.reducer_barlow_factor || 1.0}" min="0.1" max="3" step="0.01" inputmode="decimal">
                 <small class="form-text text-muted">${i18n.t('equipment.form_reducer_barlow_text')}</small>
             </div>
             <div class="col-md-6">
