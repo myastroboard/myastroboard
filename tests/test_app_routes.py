@@ -1377,6 +1377,48 @@ class TestEquipmentNumericValidation:
         resp = client_admin.post('/api/equipment/cameras', json=data)
         assert resp.status_code == 400
 
+    # --- Non-numeric strings trigger TypeError/ValueError path ---
+
+    def test_telescope_aperture_non_numeric_returns_400(self, client_admin):
+        data = {**self.VALID_TELESCOPE, 'aperture_mm': 'not-a-number'}
+        resp = client_admin.post('/api/equipment/telescopes', json=data)
+        assert resp.status_code == 400
+        assert 'must be a number' in resp.get_json()['error']
+
+    def test_telescope_focal_length_non_numeric_returns_400(self, client_admin):
+        data = {**self.VALID_TELESCOPE, 'focal_length_mm': 'not-a-number'}
+        resp = client_admin.post('/api/equipment/telescopes', json=data)
+        assert resp.status_code == 400
+        assert 'must be a number' in resp.get_json()['error']
+
+    def test_telescope_reducer_non_numeric_returns_400(self, client_admin):
+        data = {**self.VALID_TELESCOPE, 'reducer_barlow_factor': 'not-a-number'}
+        resp = client_admin.post('/api/equipment/telescopes', json=data)
+        assert resp.status_code == 400
+        assert 'must be a number' in resp.get_json()['error']
+
+    def test_camera_sensor_width_non_numeric_returns_400(self, client_admin):
+        data = {**self.VALID_CAMERA, 'sensor_width_mm': 'not-a-number'}
+        resp = client_admin.post('/api/equipment/cameras', json=data)
+        assert resp.status_code == 400
+        assert 'must be a number' in resp.get_json()['error']
+
+    # --- Validation errors on PUT (update) routes ---
+
+    def test_update_telescope_invalid_aperture_returns_400(self, client_admin):
+        r = client_admin.post('/api/equipment/telescopes', json=self.VALID_TELESCOPE)
+        tid = r.get_json()['data']['id']
+        resp = client_admin.put(f'/api/equipment/telescopes/{tid}',
+                                json={**self.VALID_TELESCOPE, 'aperture_mm': 9999})
+        assert resp.status_code == 400
+
+    def test_update_camera_invalid_sensor_returns_400(self, client_admin):
+        r = client_admin.post('/api/equipment/cameras', json=self.VALID_CAMERA)
+        cid = r.get_json()['data']['id']
+        resp = client_admin.put(f'/api/equipment/cameras/{cid}',
+                                json={**self.VALID_CAMERA, 'sensor_width_mm': 200})
+        assert resp.status_code == 400
+
 
 # ---------------------------------------------------------------------------
 # Equipment Profiles — Mounts CRUD
