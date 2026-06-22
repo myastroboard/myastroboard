@@ -27,7 +27,7 @@ Data is stored per-user in `data/equipments/<user_id>_<type>.json`.
 |-------|-------------|
 | `name` | Display name (e.g. "Celestron C8") |
 | `manufacturer` | Brand |
-| `telescope_type` | `Refractor`, `Reflector`, `Schmidt-Cassegrain (SCT)`, `Rowe Ackerman Schmidt Astrograph (RASA)`, `Ritchey-Chrétien (RC)`, `Newtonian`, `Maksutov-Cassegrain`, `Cassegrain`, `Dobsonian` |
+| `telescope_type` | `Refractor`, `Apochromatic Refractor (APO)`, `Reflector`, `Schmidt-Cassegrain (SCT)`, `EdgeHD`, `Rowe Ackerman Schmidt Astrograph (RASA)`, `Ritchey-Chrétien (RC)`, `Newtonian`, `Maksutov-Cassegrain`, `Cassegrain`, `Dobsonian` |
 | `aperture_mm` | Clear aperture in mm |
 | `focal_length_mm` | Native focal length in mm |
 | `reducer_barlow_factor` | Focal reducer (< 1) or Barlow (> 1) factor; default 1.0 |

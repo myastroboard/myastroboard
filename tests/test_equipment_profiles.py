@@ -58,6 +58,40 @@ def test_create_telescope(temp_data_dir, test_user_id):
     assert 'created_at' in telescope
 
 
+def test_create_apo_telescope(temp_data_dir, test_user_id):
+    """Test creating an APO refractor telescope profile."""
+    telescope_data = {
+        "name": "Test APO",
+        "telescope_type": "Apochromatic Refractor (APO)",
+        "aperture_mm": 102,
+        "focal_length_mm": 714,
+        "reducer_barlow_factor": 1.0,
+    }
+
+    telescope = equipment_profiles.create_telescope(test_user_id, telescope_data)
+
+    assert telescope is not None
+    assert telescope["telescope_type"] == equipment_profiles.TelescopeType.APO.value
+    assert telescope["native_focal_ratio"] == round(714 / 102, 2)
+
+
+def test_create_edgehd_telescope(temp_data_dir, test_user_id):
+    """Test creating an EdgeHD telescope profile."""
+    telescope_data = {
+        "name": "Test EdgeHD",
+        "telescope_type": "EdgeHD",
+        "aperture_mm": 279,
+        "focal_length_mm": 2800,
+        "reducer_barlow_factor": 1.0,
+    }
+
+    telescope = equipment_profiles.create_telescope(test_user_id, telescope_data)
+
+    assert telescope is not None
+    assert telescope["telescope_type"] == equipment_profiles.TelescopeType.EDGEHD.value
+    assert telescope["native_focal_ratio"] == round(2800 / 279, 2)
+
+
 def test_create_rasa_telescope(temp_data_dir, test_user_id):
     """Test creating a RASA telescope profile."""
     telescope_data = {
