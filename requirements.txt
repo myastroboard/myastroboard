@@ -15,7 +15,7 @@ sgp4==2.25
 PyOngc==1.2.2
 
 # Data processing
-numpy==2.4.6
+numpy==2.5.0
 matplotlib==3.11.0
 pandas==3.0.3
 
