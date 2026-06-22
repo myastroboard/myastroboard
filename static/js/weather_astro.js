@@ -353,9 +353,6 @@ function renderNightTimeline(hourlyData, timezone) {
     const extEnd = Math.min(allSorted.length - 1, nightEndIdx + 2);
     const nightHours = allSorted.slice(extStart, extEnd + 1);
 
-    const nightFirstMs = new Date(allSorted[nightStartIdx].datetime).getTime();
-    const nightLastMs  = new Date(allSorted[nightEndIdx].datetime).getTime();
-
     const timeline = document.createElement('div');
     timeline.className = 'night-score-timeline';
 

@@ -4734,6 +4734,24 @@ class TestTranslateSolarSystemEvents:
         except RuntimeError:
             pass  # test verifies the exception is raised or swallowed — either is acceptable
 
+    def test_unknown_event_type_passes_through(self):
+        """Lines 2632->2641: event_type not in known list → appended unchanged."""
+        data = {'events': [{'event_type': 'Unknown Galaxy Event', 'title': 'Original'}]}
+        result = self._fn(data, 'fr')
+        assert result['events'][0]['title'] == 'Original'
+
+    def test_i18n_exception_caught_by_inner_handler(self, monkeypatch):
+        """Lines 2638-2639: i18n.t raises inside try → except logged, event appended."""
+        class _BrokenI18n:
+            def t(self, *a, **kw):
+                raise RuntimeError('i18n broken')
+
+        monkeypatch.setattr(_app_mod, 'I18nManager', lambda lang: _BrokenI18n())
+        data = {'events': [{'event_type': 'Asteroid Occultation', 'title': 'Original'}]}
+        result = self._fn(data, 'fr')
+        # Event appended despite exception
+        assert len(result['events']) == 1
+
 
 class TestTranslateSpecialPhenomenaEvents:
     """Direct tests for app._translate_special_phenomena_events."""
@@ -5708,33 +5726,6 @@ class TestSpaceflightImageSidecar:
         monkeypatch.setattr(_reqs, 'get', lambda *a, **kw: mock_response)
         resp = client_admin.get(f'/api/spaceflight/img/{self.VALID_HEX}')
         assert resp.status_code in (200, 404)  # 200 if downloaded file is served
-
-
-# ---------------------------------------------------------------------------
-# Lines 2632->2641, 2638-2639: _translate_solar_system_events
-# ---------------------------------------------------------------------------
-
-
-class TestTranslateSolarSystemEvents:
-    """Cover unknown event_type (falls through all elif) and exception handler."""
-
-    def test_unknown_event_type_passes_through(self):
-        """Lines 2632->2641: event_type not in known list → appended unchanged."""
-        data = {'events': [{'event_type': 'Unknown Galaxy Event', 'title': 'Original'}]}
-        result = _app_mod._translate_solar_system_events(data, 'fr')
-        assert result['events'][0]['title'] == 'Original'
-
-    def test_i18n_exception_caught_by_inner_handler(self, monkeypatch):
-        """Lines 2638-2639: i18n.t raises inside try → except logged, event appended."""
-        class _BrokenI18n:
-            def t(self, *a, **kw):
-                raise RuntimeError('i18n broken')
-
-        monkeypatch.setattr(_app_mod, 'I18nManager', lambda lang: _BrokenI18n())
-        data = {'events': [{'event_type': 'Asteroid Occultation', 'title': 'Original'}]}
-        result = _app_mod._translate_solar_system_events(data, 'fr')
-        # Event appended despite exception
-        assert len(result['events']) == 1
 
 
 # ---------------------------------------------------------------------------
