@@ -4160,6 +4160,52 @@ def astrodex_catalogue_lookup():
 # ============================================================
 
 
+def _validate_telescope_data(data):
+    """Return an error message string if telescope numeric fields are out of range, else None."""
+    if 'aperture_mm' in data:
+        try:
+            aperture = float(data['aperture_mm'])
+            if not (10 <= aperture <= 5000):
+                return 'aperture_mm must be between 10 and 5000 mm'
+        except (TypeError, ValueError):
+            return 'aperture_mm must be a number'
+
+    if 'focal_length_mm' in data:
+        try:
+            focal = float(data['focal_length_mm'])
+            if not (100 <= focal <= 50000):
+                return 'focal_length_mm must be between 100 and 50000 mm'
+        except (TypeError, ValueError):
+            return 'focal_length_mm must be a number'
+
+    if 'reducer_barlow_factor' in data:
+        try:
+            factor = float(data['reducer_barlow_factor'])
+            if not (0.1 <= factor <= 3.0):
+                return 'reducer_barlow_factor must be between 0.1 and 3.0'
+        except (TypeError, ValueError):
+            return 'reducer_barlow_factor must be a number'
+
+    return None
+
+
+def _validate_camera_data(data):
+    """Return an error message string if camera numeric fields are out of range, else None."""
+    for field, label, lo, hi in [
+        ('sensor_width_mm', 'sensor_width_mm', 1, 100),
+        ('sensor_height_mm', 'sensor_height_mm', 1, 100),
+    ]:
+        if field in data:
+            try:
+                val = float(data[field])
+                if not (lo <= val <= hi):
+                    return f'{label} must be between {lo} and {hi} mm'
+            except (TypeError, ValueError):
+                return f'{label} must be a number'
+
+    return None
+
+
 # Telescopes
 @app.route('/api/equipment/telescopes', methods=['GET'])
 @user_required
@@ -4197,6 +4243,9 @@ def create_telescope():
             return jsonify({'error': 'User not authenticated'}), 401
 
         telescope_data = request.json
+        err = _validate_telescope_data(telescope_data)
+        if err:
+            return jsonify({'error': err}), 400
         new_telescope = equipment_profiles.create_telescope(user_id, telescope_data)
 
         if new_telescope:
@@ -4240,6 +4289,9 @@ def update_telescope(telescope_id):
             return jsonify({'error': 'User not authenticated'}), 401
 
         telescope_data = request.json
+        err = _validate_telescope_data(telescope_data)
+        if err:
+            return jsonify({'error': err}), 400
         shared = equipment_profiles.load_all_shared_equipment('telescopes', user_id)
         if any(t['id'] == telescope_id for t in shared):
             return jsonify({'error': 'Cannot modify shared equipment owned by another user'}), 403
@@ -4312,6 +4364,9 @@ def create_camera():
             return jsonify({'error': 'User not authenticated'}), 401
 
         camera_data = request.json
+        err = _validate_camera_data(camera_data)
+        if err:
+            return jsonify({'error': err}), 400
         new_camera = equipment_profiles.create_camera(user_id, camera_data)
 
         if new_camera:
@@ -4355,6 +4410,9 @@ def update_camera(camera_id):
             return jsonify({'error': 'User not authenticated'}), 401
 
         camera_data = request.json
+        err = _validate_camera_data(camera_data)
+        if err:
+            return jsonify({'error': err}), 400
         shared = equipment_profiles.load_all_shared_equipment('cameras', user_id)
         if any(c['id'] == camera_id for c in shared):
             return jsonify({'error': 'Cannot modify shared equipment owned by another user'}), 403

@@ -1284,6 +1284,101 @@ class TestEquipmentCameras:
 
 
 # ---------------------------------------------------------------------------
+# Equipment Profiles — Numeric Validation (PR #121)
+# ---------------------------------------------------------------------------
+
+
+class TestEquipmentNumericValidation:
+    """Server-side validation of relaxed numeric constraints from PR #121."""
+
+    VALID_TELESCOPE = {
+        'name': 'ValidScope',
+        'telescope_type': 'Refractor',
+        'focal_length_mm': 800,
+        'aperture_mm': 102,
+    }
+
+    VALID_CAMERA = {
+        'name': 'ValidCam',
+        'manufacturer': 'ZWO',
+        'sensor_type': 'CMOS Mono',
+        'sensor_width_mm': 23.4,
+        'sensor_height_mm': 15.6,
+        'pixel_size_um': 3.76,
+        'resolution_width_px': 6248,
+        'resolution_height_px': 4176,
+    }
+
+    # --- Telescope: valid edge cases that were previously blocked ---
+
+    def test_telescope_aperture_above_2000_is_accepted(self, client_admin):
+        data = {**self.VALID_TELESCOPE, 'aperture_mm': 2500}
+        resp = client_admin.post('/api/equipment/telescopes', json=data)
+        assert resp.status_code in (200, 201)
+
+    def test_telescope_reducer_063x_is_accepted(self, client_admin):
+        data = {**self.VALID_TELESCOPE, 'reducer_barlow_factor': 0.63}
+        resp = client_admin.post('/api/equipment/telescopes', json=data)
+        assert resp.status_code in (200, 201)
+
+    def test_telescope_reducer_two_decimals_accepted(self, client_admin):
+        data = {**self.VALID_TELESCOPE, 'reducer_barlow_factor': 2.75}
+        resp = client_admin.post('/api/equipment/telescopes', json=data)
+        assert resp.status_code in (200, 201)
+
+    # --- Telescope: invalid values must be rejected ---
+
+    def test_telescope_aperture_too_small_returns_400(self, client_admin):
+        data = {**self.VALID_TELESCOPE, 'aperture_mm': 5}
+        resp = client_admin.post('/api/equipment/telescopes', json=data)
+        assert resp.status_code == 400
+
+    def test_telescope_aperture_too_large_returns_400(self, client_admin):
+        data = {**self.VALID_TELESCOPE, 'aperture_mm': 9999}
+        resp = client_admin.post('/api/equipment/telescopes', json=data)
+        assert resp.status_code == 400
+
+    def test_telescope_focal_length_too_large_returns_400(self, client_admin):
+        data = {**self.VALID_TELESCOPE, 'focal_length_mm': 99999}
+        resp = client_admin.post('/api/equipment/telescopes', json=data)
+        assert resp.status_code == 400
+
+    def test_telescope_reducer_too_small_returns_400(self, client_admin):
+        data = {**self.VALID_TELESCOPE, 'reducer_barlow_factor': 0.05}
+        resp = client_admin.post('/api/equipment/telescopes', json=data)
+        assert resp.status_code == 400
+
+    def test_telescope_reducer_too_large_returns_400(self, client_admin):
+        data = {**self.VALID_TELESCOPE, 'reducer_barlow_factor': 5.0}
+        resp = client_admin.post('/api/equipment/telescopes', json=data)
+        assert resp.status_code == 400
+
+    # --- Camera: valid two-decimal sensor dimensions ---
+
+    def test_camera_sensor_two_decimal_dimensions_accepted(self, client_admin):
+        data = {**self.VALID_CAMERA, 'sensor_width_mm': 23.45, 'sensor_height_mm': 15.63}
+        resp = client_admin.post('/api/equipment/cameras', json=data)
+        assert resp.status_code in (200, 201)
+
+    # --- Camera: invalid sensor dimensions must be rejected ---
+
+    def test_camera_sensor_width_too_large_returns_400(self, client_admin):
+        data = {**self.VALID_CAMERA, 'sensor_width_mm': 200}
+        resp = client_admin.post('/api/equipment/cameras', json=data)
+        assert resp.status_code == 400
+
+    def test_camera_sensor_height_too_large_returns_400(self, client_admin):
+        data = {**self.VALID_CAMERA, 'sensor_height_mm': 200}
+        resp = client_admin.post('/api/equipment/cameras', json=data)
+        assert resp.status_code == 400
+
+    def test_camera_sensor_width_zero_returns_400(self, client_admin):
+        data = {**self.VALID_CAMERA, 'sensor_width_mm': 0}
+        resp = client_admin.post('/api/equipment/cameras', json=data)
+        assert resp.status_code == 400
+
+
+# ---------------------------------------------------------------------------
 # Equipment Profiles — Mounts CRUD
 # ---------------------------------------------------------------------------
 
