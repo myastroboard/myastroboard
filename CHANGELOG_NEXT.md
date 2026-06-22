@@ -1,0 +1,2 @@
+- Increale aperture limite and allow 2 decimal on reducer - Thanks @cgobat
+- Server side input verification for equipment

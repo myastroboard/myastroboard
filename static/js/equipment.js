@@ -917,11 +917,11 @@ async function showTelescopeModal(id = null) {
             </div>
             <div class="col-md-6">
                 <label for="telescope-aperture" class="form-label">${i18n.t('equipment.form_aperture')} *</label>
-                <input type="number" class="form-control" id="telescope-aperture" name="aperture_mm" value="${telescope?.aperture_mm || ''}" required min="10" inputmode="numeric">
+                <input type="number" class="form-control" id="telescope-aperture" name="aperture_mm" value="${telescope?.aperture_mm || ''}" required min="10" max="5000" inputmode="numeric">
             </div>
             <div class="col-md-6">
                 <label for="telescope-focal-length" class="form-label">${i18n.t('equipment.form_focal_length')} *</label>
-                <input type="number" class="form-control" id="telescope-focal-length" name="focal_length_mm" value="${telescope?.focal_length_mm || ''}" required min="100" max="20000" inputmode="numeric">
+                <input type="number" class="form-control" id="telescope-focal-length" name="focal_length_mm" value="${telescope?.focal_length_mm || ''}" required min="100" max="50000" inputmode="numeric">
             </div>
             <div class="col-md-6">
                 <label for="telescope-reducer-barlow-factor" class="form-label">${i18n.t('equipment.form_reducer_barlow_factor')}</label>
