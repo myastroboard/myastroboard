@@ -72,7 +72,8 @@ def test_create_apo_telescope(temp_data_dir, test_user_id):
 
     assert telescope is not None
     assert telescope["telescope_type"] == equipment_profiles.TelescopeType.APO.value
-    assert telescope["native_focal_ratio"] == round(714 / 102, 2)
+    expected_ratio = round(telescope_data["focal_length_mm"] / telescope_data["aperture_mm"], 2)
+    assert telescope["native_focal_ratio"] == expected_ratio
 
 
 def test_create_edgehd_telescope(temp_data_dir, test_user_id):
@@ -89,7 +90,8 @@ def test_create_edgehd_telescope(temp_data_dir, test_user_id):
 
     assert telescope is not None
     assert telescope["telescope_type"] == equipment_profiles.TelescopeType.EDGEHD.value
-    assert telescope["native_focal_ratio"] == round(2800 / 279, 2)
+    expected_ratio = round(telescope_data["focal_length_mm"] / telescope_data["aperture_mm"], 2)
+    assert telescope["native_focal_ratio"] == expected_ratio
 
 
 def test_create_rasa_telescope(temp_data_dir, test_user_id):
@@ -106,7 +108,8 @@ def test_create_rasa_telescope(temp_data_dir, test_user_id):
 
     assert telescope is not None
     assert telescope["telescope_type"] == equipment_profiles.TelescopeType.RASA.value
-    assert telescope["native_focal_ratio"] == round(620 / 279, 2)  # 2.22
+    expected_ratio = round(telescope_data["focal_length_mm"] / telescope_data["aperture_mm"], 2)
+    assert telescope["native_focal_ratio"] == expected_ratio
 
 
 def test_update_rasa_telescope(temp_data_dir, test_user_id):
@@ -133,9 +136,10 @@ def test_update_rasa_telescope(temp_data_dir, test_user_id):
     updated = equipment_profiles.update_telescope(test_user_id, created["id"], update_data)
 
     assert updated is not None
-    assert updated["name"] == "Updated RASA"
+    assert updated["name"] == update_data["name"]
     assert updated["telescope_type"] == equipment_profiles.TelescopeType.RASA.value
-    assert updated["native_focal_ratio"] == round(620 / 279, 2)
+    expected_ratio = round(update_data["focal_length_mm"] / update_data["aperture_mm"], 2)
+    assert updated["native_focal_ratio"] == expected_ratio
     assert updated["notes"] == "Updated notes"
 
 
