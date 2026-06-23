@@ -41,17 +41,19 @@ body:
       label: Feature Category
       description: What area of the application does this feature relate to?
       options:
+        - Astrophotography
         - Weather & Conditions
         - Astrodex
         - Plan my Night
         - Astronomy Calculations
-        - Target Management
-        - Catalogues
         - Events / Calendar
         - Aurora Borealis
+        - Spaceflight / Astronauts
         - ISS
         - Observatory
         - Connectors
+        - Target Management
+        - Catalogues
         - Configuration
         - User Interface
         - Mobile/Responsive

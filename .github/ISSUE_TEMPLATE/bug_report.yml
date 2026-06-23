@@ -54,20 +54,23 @@ body:
       label: Component
       description: Which component is affected?
       options:
+        - Astrophotography
+        - Sun & Moon Information
+        - Events / Calendar
         - Weather Forecast
+        - Seeing Forecast
         - Astrodex
         - Plan my Night
         - SkyTonight
-        - Astronomy Calculations
-        - Observation Conditions
-        - Sun & Moon Information
-        - Configuration Interface
-        - Catalogue Browser
-        - Events / Calendar
         - Aurora Borealis
         - ISS
+        - Spaceflight / Astronauts
         - Observatory
         - Connectors
+        - Astronomy Calculations
+        - Observation Conditions
+        - Configuration Interface
+        - Catalogue Browser
         - Docker/Installation
         - UI/UX
         - Other
