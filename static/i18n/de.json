@@ -155,6 +155,7 @@
     "no_horizon_data": "Keine Horizontdaten verfügbar",
     "error_loading_horizon_graph": "Das Horizontdiagramm konnte nicht geladen werden",
     "horizon_badge": "Horizont",
+    "twilight_badge": "Dämmerung",
     "now_badge": "Jetzt",
     "chart_horizon_axis": "Höhe (Grad)",
     "horizon_graph_details": "Höhe (-90° bis +90°) | Datum: {date}",

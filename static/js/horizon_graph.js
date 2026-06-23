@@ -189,6 +189,7 @@ function renderHorizonChart(horizonData) {
     footerRow.appendChild(createBadgeItem(`<i class="bi bi-sun icon-inline" aria-hidden="true"></i>${i18n.t('common.sun')}`, 'badge', '#FDB813'));
     footerRow.appendChild(createBadgeItem(`<i class="bi bi-moon-stars icon-inline" aria-hidden="true"></i>${i18n.t('common.moon')}`, 'badge', '#C0C0C0'));
     footerRow.appendChild(createBadgeItem(`━ ${i18n.t('astro_weather.horizon_badge')} (0°)`, 'badge bg-secondary'));
+    footerRow.appendChild(createBadgeItem(`╌ ${i18n.t('astro_weather.twilight_badge')} (-6° / -12° / -18°)`, 'badge bg-secondary'));
     footerRow.appendChild(createBadgeItem(`┃ ${i18n.t('astro_weather.now_badge')} ${currentTimeLabel || ''}`, 'badge', '#ef4444'));
 
     const detailsCol = document.createElement('div');
@@ -213,6 +214,19 @@ function renderHorizonChart(horizonData) {
     const ctx = canvasElement.getContext('2d');
     if (!ctx) return;
     
+    // Twilight reference lines as datasets (annotation plugin not available)
+    // Labels prefixed with '_' are filtered out of the Chart.js legend
+    const twilightLineConfig = {
+        parsing: false,
+        borderColor: 'rgba(150, 150, 150, 0.6)',
+        borderWidth: 1,
+        borderDash: [4, 4],
+        pointRadius: 0,
+        fill: false,
+        tension: 0,
+        yAxisID: 'y'
+    };
+
     horizonChartInstance = new Chart(ctx, {
         type: 'line',
         data: {
@@ -247,6 +261,12 @@ function renderHorizonChart(horizonData) {
                     pointHoverRadius: 5,
                     yAxisID: 'y'
                 },
+                // Civil twilight: sun at -6°
+                { ...twilightLineConfig, label: '_civil',      data: [{ x: 0, y: -6  }, { x: 24, y: -6  }] },
+                // Nautical twilight: sun at -12°
+                { ...twilightLineConfig, label: '_nautical',   data: [{ x: 0, y: -12 }, { x: 24, y: -12 }] },
+                // Astronomical twilight: sun at -18°
+                { ...twilightLineConfig, label: '_astronomical', data: [{ x: 0, y: -18 }, { x: 24, y: -18 }] },
                 ...(currentTimeLine.length
                     ? [{
                         label: i18n.t('astro_weather.now_badge'),
@@ -277,41 +297,23 @@ function renderHorizonChart(horizonData) {
                     labels: {
                         usePointStyle: true,
                         padding: 15,
-                        font: {
-                            size: 12
-                        }
+                        font: { size: 12 },
+                        // Exclude internal twilight reference datasets from the legend
+                        filter: (item) => !item.text.startsWith('_')
                     }
                 },
                 tooltip: {
-                    callback: {
+                    callbacks: {
                         label: function(context) {
+                            // Hide twilight reference lines from tooltip
+                            if (context.dataset.label.startsWith('_')) return null;
                             let label = context.dataset.label || '';
-                            if (label) {
-                                label += ': ';
-                            }
+                            if (label) label += ': ';
                             if (context.parsed.y !== null) {
                                 label += context.parsed.y.toFixed(1) + i18n.t('units.degrees');
                             }
                             return label;
                         }
-                    }
-                },
-                // Add horizon and current time markers
-                annotation: {
-                    annotations: {
-                        horizon: {
-                            type: 'line',
-                            yMin: 0,
-                            yMax: 0,
-                            borderColor: '#666666',
-                            borderWidth: 3,
-                            borderDash: [5, 5],
-                            label: {
-                                display: true,
-                                content: [i18n.t('astro_weather.horizon_badge')]
-                            }
-                        },
-                        currentTime: null
                     }
                 }
             },
