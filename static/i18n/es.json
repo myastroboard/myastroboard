@@ -155,6 +155,7 @@
     "no_horizon_data": "No hay datos de horizonte disponibles",
     "error_loading_horizon_graph": "No se pudo cargar el gráfico de horizonte",
     "horizon_badge": "Horizonte",
+    "twilight_badge": "Crepúsculo",
     "now_badge": "Ahora",
     "chart_horizon_axis": "Altitud (grados)",
     "horizon_graph_details": "Altitud (-90° a +90°) | Fecha: {date}",

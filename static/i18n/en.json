@@ -155,6 +155,7 @@
     "no_horizon_data": "No horizon data available",
     "error_loading_horizon_graph": "Failed to load horizon graph",
     "horizon_badge": "Horizon",
+    "twilight_badge": "Twilight",
     "now_badge": "Now",
     "chart_horizon_axis": "Altitude (degrees)",
     "horizon_graph_details": "Altitude (-90° to +90°) | Date: {date}",
