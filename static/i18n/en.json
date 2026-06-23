@@ -1688,6 +1688,8 @@
     "step_spaceflight_astronauts": "Astronauts in space",
     "step_spaceflight_events": "Space events",
     "step_iers": "IERS earth orientation data",
+    "step_allsky_sensor": "AllSky sensor data",
+    "step_allsky_health": "AllSky health check",
     "step_parallel_network": "Parallel network requests"
   },
   "scheduler": {

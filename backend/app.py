@@ -90,6 +90,7 @@ from constants import (
     CACHE_TTL_SPACEFLIGHT_ASTRONAUTS,
     CACHE_TTL_SPACEFLIGHT_EVENTS,
     CACHE_TTL_SIDEREAL_TIME,
+    CACHE_TTL_ALLSKY_HEALTH,
 )
 from logging_config import get_logger
 from version_checker import check_for_updates
@@ -1100,7 +1101,7 @@ def allsky_health_api():
     import time
     cached = cache_store._allsky_health_cache
     fresh = request.args.get("fresh") == "1"
-    if not fresh and cached.get("data") and (time.time() - cached.get("timestamp", 0)) < 120:
+    if not fresh and cached.get("data") and (time.time() - cached.get("timestamp", 0)) < CACHE_TTL_ALLSKY_HEALTH:
         return jsonify(cached["data"])
 
     from connectors.allsky_connector import AllSkyConnector

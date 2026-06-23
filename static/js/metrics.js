@@ -191,6 +191,8 @@ const CACHE_JOB_LABELS = {
     sidereal_time:        'Sidereal Time',
     seeing_forecast:      'Seeing Forecast',
     weather_forecast:     'Weather Forecast',
+    allsky_sensor:        'AllSky Sensor Data',
+    allsky_health:        'AllSky Health Check',
 };
 
 function getCacheJobLabel(jobKey) {

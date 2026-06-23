@@ -673,3 +673,39 @@ class TestRecordCacheExecution:
         metrics = cache_store.get_cache_metrics()
         assert metrics["sun_report"]["last_success"] is False
         assert metrics["sun_report"]["last_duration_s"] == 1.0
+
+
+class TestIsExecutionMetricsValid:
+    """Tests for _is_execution_metrics_valid — allsky validity uses shared execution metrics."""
+
+    def test_returns_false_when_no_metrics_for_job(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(cs, '_SHARED_CACHE_FILE', str(tmp_path / "ev1.json"))
+        monkeypatch.setattr(cs, '_SHARED_CACHE_LOCK', str(tmp_path / "ev1.lock"))
+        assert cache_store._is_execution_metrics_valid("allsky_sensor", 300) is False
+
+    def test_returns_false_when_last_success_is_false(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(cs, '_SHARED_CACHE_FILE', str(tmp_path / "ev2.json"))
+        monkeypatch.setattr(cs, '_SHARED_CACHE_LOCK', str(tmp_path / "ev2.lock"))
+        cache_store.record_cache_execution("allsky_sensor", 0.1, False)
+        assert cache_store._is_execution_metrics_valid("allsky_sensor", 300) is False
+
+    def test_returns_true_when_recent_success(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(cs, '_SHARED_CACHE_FILE', str(tmp_path / "ev3.json"))
+        monkeypatch.setattr(cs, '_SHARED_CACHE_LOCK', str(tmp_path / "ev3.lock"))
+        cache_store.record_cache_execution("allsky_sensor", 0.1, True)
+        assert cache_store._is_execution_metrics_valid("allsky_sensor", 300) is True
+
+    def test_returns_false_when_success_but_expired(self, tmp_path, monkeypatch):
+        from datetime import datetime, timezone, timedelta
+        monkeypatch.setattr(cs, '_SHARED_CACHE_FILE', str(tmp_path / "ev4.json"))
+        monkeypatch.setattr(cs, '_SHARED_CACHE_LOCK', str(tmp_path / "ev4.lock"))
+        cache_store.record_cache_execution("allsky_sensor", 0.1, True)
+        # Manually backdate the last_run_at to simulate expiry
+        import json
+        with open(str(tmp_path / "ev4.json")) as f:
+            data = json.load(f)
+        old_ts = (datetime.now(timezone.utc) - timedelta(seconds=400)).isoformat()
+        data["_cache_metrics"]["allsky_sensor"]["last_run_at"] = old_ts
+        with open(str(tmp_path / "ev4.json"), "w") as f:
+            json.dump(data, f)
+        assert cache_store._is_execution_metrics_valid("allsky_sensor", 300) is False

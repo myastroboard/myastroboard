@@ -431,6 +431,29 @@ def is_astronomical_cache_ready():
     return all_valid
 
 
+def _is_execution_metrics_valid(job_name, ttl):
+    """Check cache validity from persisted execution metrics.
+
+    Allsky caches are in-memory only (no shared-file sync), so in multi-worker
+    setups the web worker's in-memory timestamp stays at 0 even after the
+    scheduler runs.  The execution_metrics written by record_cache_execution()
+    are stored in the shared JSON file and are visible to all workers, making
+    this the correct source for cross-process validity checks.
+    """
+    entry = get_cache_metrics().get(job_name, {})
+    if not entry.get("last_success"):
+        return False
+    last_run_str = entry.get("last_run_at")
+    if not last_run_str:
+        return False
+    try:
+        dt = datetime.fromisoformat(last_run_str)
+        age = (datetime.now(timezone.utc) - dt).total_seconds()
+        return age < ttl
+    except Exception:
+        return False
+
+
 def get_cache_init_status():
     """Get detailed cache initialization status"""
     shared_cache = _sync_all_from_shared()
@@ -474,8 +497,8 @@ def get_cache_init_status():
         "spaceflight_events": is_cache_valid(_spaceflight_events_cache, CACHE_TTL_SPACEFLIGHT_EVENTS),
         "weather_forecast": is_cache_valid(_weather_cache, WEATHER_CACHE_TTL),
         "iers": is_cache_valid(_iers_cache, CACHE_TTL_IERS),
-        "allsky_sensor": is_cache_valid(_allsky_sensor_cache, CACHE_TTL_ALLSKY_SENSOR),
-        "allsky_health": is_cache_valid(_allsky_health_cache, CACHE_TTL_ALLSKY_HEALTH),
+        "allsky_sensor": _is_execution_metrics_valid("allsky_sensor", CACHE_TTL_ALLSKY_SENSOR),
+        "allsky_health": _is_execution_metrics_valid("allsky_health", CACHE_TTL_ALLSKY_HEALTH),
         "all_ready": (
             is_cache_valid(_moon_report_cache, CACHE_TTL_MOON_REPORT)
             and is_cache_valid(_sun_report_cache, CACHE_TTL_SUN_REPORT)

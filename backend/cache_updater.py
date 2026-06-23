@@ -42,6 +42,7 @@ from constants import (
     CACHE_TTL_SPACEFLIGHT_EVENTS,
     CACHE_TTL_IERS,
     CACHE_TTL_ALLSKY_SENSOR,
+    CACHE_TTL_ALLSKY_HEALTH,
 )
 
 # Initialize logger for this module
@@ -1076,6 +1077,22 @@ def update_allsky_sensor_cache(config=None):
     logger.debug("AllSky sensor cache updated")
 
 
+def update_allsky_health_cache(config=None):
+    """Runs per-module reachability checks against the AllSky instance and stores results in cache."""
+    if config is None:
+        config = load_config()
+
+    allsky_cfg = config.get("connectors", {}).get("allsky", {})
+    if not allsky_cfg.get("enabled") or not allsky_cfg.get("url"):
+        return
+
+    from connectors.allsky_connector import AllSkyConnector
+    result = AllSkyConnector(allsky_cfg).health_check()
+    cache_store._allsky_health_cache["data"] = result
+    cache_store._allsky_health_cache["timestamp"] = time.time()
+    logger.debug("AllSky health cache updated")
+
+
 def fully_initialize_caches():
     """
     Selectively refreshes cache entries whose individual TTL has expired.
@@ -1250,19 +1267,24 @@ def fully_initialize_caches():
             ("iers", "iers", update_iers_cache, CACHE_TTL_IERS, cache_store._iers_cache, False),
         ]
 
-        # Add AllSky sensor job only when the connector is enabled
+        # Add AllSky jobs only when the connector is enabled
         allsky_cfg = config.get("connectors", {}).get("allsky", {})
-        if (
-            allsky_cfg.get("enabled")
-            and allsky_cfg.get("url")
-            and allsky_cfg.get("modules", {}).get("sensor_data", {}).get("enabled")
-        ):
+        if allsky_cfg.get("enabled") and allsky_cfg.get("url"):
+            if allsky_cfg.get("modules", {}).get("sensor_data", {}).get("enabled"):
+                cache_jobs.append((
+                    "allsky_sensor",
+                    None,
+                    partial(update_allsky_sensor_cache, config=config),
+                    CACHE_TTL_ALLSKY_SENSOR,
+                    cache_store._allsky_sensor_cache,
+                    False,
+                ))
             cache_jobs.append((
-                "allsky_sensor",
+                "allsky_health",
                 None,
-                partial(update_allsky_sensor_cache, config=config),
-                CACHE_TTL_ALLSKY_SENSOR,
-                cache_store._allsky_sensor_cache,
+                partial(update_allsky_health_cache, config=config),
+                CACHE_TTL_ALLSKY_HEALTH,
+                cache_store._allsky_health_cache,
                 False,
             ))
 

@@ -210,14 +210,14 @@ class TestAllSkyHealth:
         assert resp.get_json() == fresh_health
         assert cache_store._allsky_health_cache["data"] == fresh_health
 
-    def test_fetches_when_cache_older_than_120s(self, client_user):
+    def test_fetches_when_cache_older_than_300s(self, client_user):
         stale_data = {"reachable": False, "modules": {}}
         fresh_health = {"reachable": True, "modules": {}}
         mock_connector = MagicMock()
         mock_connector.health_check.return_value = fresh_health
 
         cache_store._allsky_health_cache["data"] = stale_data
-        cache_store._allsky_health_cache["timestamp"] = time.time() - 200  # 200s old → stale
+        cache_store._allsky_health_cache["timestamp"] = time.time() - 400  # 400s old → stale
 
         with patch('app.load_config', return_value=_config(_CFG_ALLSKY_ENABLED)):
             with patch('connectors.allsky_connector.AllSkyConnector', return_value=mock_connector):
