@@ -109,6 +109,9 @@ EXPECTED_ROUTES = {
     ('/api/events/upcoming', ('GET',)),
 
     # --- ISS / spaceflight ---
+    ('/api/css/celestrak/restart', ('POST',)),
+    ('/api/css/location', ('GET',)),
+    ('/api/css/passes', ('GET',)),
     ('/api/iss/celestrak/restart', ('POST',)),
     ('/api/iss/location', ('GET',)),
     ('/api/iss/passes', ('GET',)),
