@@ -339,3 +339,113 @@ def test_vapid_contact_email_configured_skips_warning(tmp_path, monkeypatch):
 
     assert keys.get('private_key') == 'PRIV'
     assert not push_manager._VAPID_CONTACT_WARNING_EMITTED
+
+
+# ---------------------------------------------------------------------------
+# get_vapid_claims_email — branch where email already starts with mailto:/https://
+# ---------------------------------------------------------------------------
+
+def test_get_vapid_claims_email_already_has_mailto_prefix(monkeypatch):
+    """Email already prefixed with 'mailto:' is returned unchanged."""
+    import push_manager
+    import app_settings
+
+    monkeypatch.setattr(app_settings, 'get_app_settings', lambda: {'vapid_contact_email': 'mailto:admin@example.com'})
+    result = push_manager.get_vapid_claims_email()
+    assert result == 'mailto:admin@example.com'
+
+
+def test_get_vapid_claims_email_already_has_https_prefix(monkeypatch):
+    """Email starting with 'https://' is returned unchanged (URL contact form)."""
+    import push_manager
+    import app_settings
+
+    monkeypatch.setattr(app_settings, 'get_app_settings', lambda: {'vapid_contact_email': 'https://example.com/contact'})
+    result = push_manager.get_vapid_claims_email()
+    assert result == 'https://example.com/contact'
+
+
+def test_get_vapid_claims_email_plain_address_gets_mailto_prefix(monkeypatch):
+    """Plain email address is prefixed with 'mailto:'."""
+    import push_manager
+    import app_settings
+
+    monkeypatch.setattr(app_settings, 'get_app_settings', lambda: {'vapid_contact_email': 'user@example.com'})
+    result = push_manager.get_vapid_claims_email()
+    assert result == 'mailto:user@example.com'
+
+
+def test_get_vapid_claims_email_empty_returns_default(monkeypatch):
+    """Empty contact email falls back to the default mailto:admin@localhost."""
+    import push_manager
+    import app_settings
+
+    monkeypatch.setattr(app_settings, 'get_app_settings', lambda: {'vapid_contact_email': ''})
+    result = push_manager.get_vapid_claims_email()
+    assert result == 'mailto:admin@localhost'
+
+
+# ---------------------------------------------------------------------------
+# get_vapid_contact_status
+# ---------------------------------------------------------------------------
+
+def test_get_vapid_contact_status_not_set(monkeypatch):
+    """Empty contact email reports not_set."""
+    import push_manager
+    import app_settings
+
+    monkeypatch.setattr(app_settings, 'get_app_settings', lambda: {'vapid_contact_email': ''})
+    result = push_manager.get_vapid_contact_status()
+    assert result == {'ok': False, 'reason': 'not_set'}
+
+
+def test_get_vapid_contact_status_localhost_domain(monkeypatch):
+    """localhost domain is rejected as invalid."""
+    import push_manager
+    import app_settings
+
+    monkeypatch.setattr(app_settings, 'get_app_settings', lambda: {'vapid_contact_email': 'admin@localhost'})
+    result = push_manager.get_vapid_contact_status()
+    assert result['ok'] is False
+    assert result['reason'] == 'invalid_domain'
+
+
+def test_get_vapid_contact_status_example_domain(monkeypatch):
+    """example.com domain is rejected as invalid."""
+    import push_manager
+    import app_settings
+
+    monkeypatch.setattr(app_settings, 'get_app_settings', lambda: {'vapid_contact_email': 'admin@example.com'})
+    result = push_manager.get_vapid_contact_status()
+    assert result['ok'] is False
+    assert result['reason'] == 'invalid_domain'
+
+
+def test_get_vapid_contact_status_valid_email(monkeypatch):
+    """Valid production email domain returns ok=True."""
+    import push_manager
+    import app_settings
+
+    monkeypatch.setattr(app_settings, 'get_app_settings', lambda: {'vapid_contact_email': 'admin@mysite.com'})
+    result = push_manager.get_vapid_contact_status()
+    assert result == {'ok': True}
+
+
+def test_get_vapid_contact_status_mailto_prefixed_valid(monkeypatch):
+    """get_vapid_contact_status strips 'mailto:' prefix before checking domain."""
+    import push_manager
+    import app_settings
+
+    monkeypatch.setattr(app_settings, 'get_app_settings', lambda: {'vapid_contact_email': 'mailto:admin@mysite.com'})
+    result = push_manager.get_vapid_contact_status()
+    assert result == {'ok': True}
+
+
+def test_get_vapid_contact_status_subdomain_of_bad(monkeypatch):
+    """Domain ending with .local is treated as invalid."""
+    import push_manager
+    import app_settings
+
+    monkeypatch.setattr(app_settings, 'get_app_settings', lambda: {'vapid_contact_email': 'admin@server.local'})
+    result = push_manager.get_vapid_contact_status()
+    assert result['ok'] is False

@@ -1476,4 +1476,151 @@ def test_release_lock_logger_failure_swallowed(monkeypatch):
     import logging
     monkeypatch.setattr(push_scheduler.logger, 'error', lambda *a, **k: (_ for _ in ()).throw(ValueError('log closed')))
     push_scheduler._release_lock()  # Must not raise
+
+
+# ---------------------------------------------------------------------------
+# N8 - CSS transits
+# ---------------------------------------------------------------------------
+
+def test_n8_sends_for_upcoming_solar_transit(monkeypatch):
+    import push_scheduler
+    send_calls = []
+    monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
+
+    cache = {'solar_transits': [{'start_time': _now_iso(minutes=8)}], 'lunar_transits': []}
+    push_scheduler._check_n8_css(_make_user(), cache)
+
+    assert len(send_calls) == 1
+    assert send_calls[0][1] == 'N8'
+    assert 'solar' in send_calls[0][3].lower()
+
+
+def test_n8_sends_for_upcoming_lunar_transit(monkeypatch):
+    import push_scheduler
+    send_calls = []
+    monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
+
+    cache = {'solar_transits': [], 'lunar_transits': [{'start_time': _now_iso(minutes=5)}]}
+    push_scheduler._check_n8_css(_make_user(), cache)
+
+    assert len(send_calls) == 1
+    assert 'lunar' in send_calls[0][3].lower()
+
+
+def test_n8_no_cache_skips(monkeypatch):
+    import push_scheduler
+    send_calls = []
+    monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
+    push_scheduler._check_n8_css(_make_user(), None)
+    assert not send_calls
+
+
+def test_n8_disabled_skips(monkeypatch):
+    import push_scheduler
+    send_calls = []
+    monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
+    user = _make_user(triggers={'N8': {'enabled': False}})
+    push_scheduler._check_n8_css(user, {'solar_transits': [{'start_time': _now_iso(minutes=5)}],
+                                         'lunar_transits': []})
+    assert not send_calls
+
+
+def test_n8_transit_outside_lead_no_notification(monkeypatch):
+    import push_scheduler
+    send_calls = []
+    monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
+    cache = {'solar_transits': [{'start_time': _now_iso(minutes=30)}], 'lunar_transits': []}
+    push_scheduler._check_n8_css(_make_user(), cache)
+    assert not send_calls
+
+
+def test_n8_cooldown_active_skips(monkeypatch):
+    import push_scheduler
+    push_scheduler._mark_notified('u1', 'N8')
+    send_calls = []
+    monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
+    cache = {'solar_transits': [{'start_time': _now_iso(minutes=5)}], 'lunar_transits': []}
+    push_scheduler._check_n8_css(_make_user(), cache)
+    assert not send_calls
+
+
+def test_n8_no_start_str_in_transit_skipped(monkeypatch):
+    import push_scheduler
+    send_calls = []
+    monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
+    cache = {'solar_transits': [{}], 'lunar_transits': [{}]}
+    push_scheduler._check_n8_css(_make_user(), cache)
+    assert not send_calls
+
+
+def test_n8_bad_solar_timestamp_exception_swallowed(monkeypatch):
+    import push_scheduler
+    send_calls = []
+    monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
+    cache = {'solar_transits': [{'start_time': 'bad-date'}], 'lunar_transits': []}
+    push_scheduler._check_n8_css(_make_user(), cache)
+    assert not send_calls
+
+
+def test_n8_bad_lunar_timestamp_exception_swallowed(monkeypatch):
+    import push_scheduler
+    send_calls = []
+    monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
+    cache = {'solar_transits': [], 'lunar_transits': [{'start_time': 'not-a-date'}]}
+    push_scheduler._check_n8_css(_make_user(), cache)
+    assert not send_calls
+
+
+def test_n8_naive_solar_datetime_gets_utc(monkeypatch):
+    import push_scheduler
+    from datetime import datetime, timedelta
+    send_calls = []
+    monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
+    push_scheduler._last_sent.clear()
+    soon = (datetime.utcnow() + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S')  # naive
+    cache = {'solar_transits': [{'start_time': soon}], 'lunar_transits': []}
+    push_scheduler._check_n8_css(_make_user(), cache)
+    # Must not raise
+
+
+def test_n8_no_upcoming_transits_skips(monkeypatch):
+    import push_scheduler
+    send_calls = []
+    monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
+    cache = {'solar_transits': [], 'lunar_transits': []}
+    push_scheduler._check_n8_css(_make_user(), cache)
+    assert not send_calls
     assert push_scheduler._lock_file is None
+
+
+def test_n8_past_solar_transit_not_added_to_candidates(monkeypatch):
+    """Solar transit that already passed is not added to candidates."""
+    import push_scheduler
+    send_calls = []
+    monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
+    past = _now_iso(minutes=-30)
+    cache = {'solar_transits': [{'start_time': past}], 'lunar_transits': []}
+    push_scheduler._check_n8_css(_make_user(), cache)
+    assert not send_calls
+
+
+def test_n8_naive_lunar_datetime_gets_utc(monkeypatch):
+    """Naive lunar transit datetime is treated as UTC before comparison."""
+    import push_scheduler
+    push_scheduler._last_sent.clear()
+    send_calls = []
+    monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
+    soon_naive = (datetime.utcnow() + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S')
+    cache = {'solar_transits': [], 'lunar_transits': [{'start_time': soon_naive}]}
+    push_scheduler._check_n8_css(_make_user(), cache)
+
+
+def test_n8_past_lunar_transit_not_added_to_candidates(monkeypatch):
+    """Lunar transit that already passed is not added to candidates."""
+    import push_scheduler
+    send_calls = []
+    monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
+    past = _now_iso(minutes=-30)
+    cache = {'solar_transits': [], 'lunar_transits': [{'start_time': past}]}
+    push_scheduler._check_n8_css(_make_user(), cache)
+    assert not send_calls
