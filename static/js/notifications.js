@@ -12,6 +12,7 @@ const NOTIF_TRIGGERS = Object.freeze({
     N5: 'N5', // Solar eclipse maximum
     N6: 'N6', // Astronomical darkness begins
     N7: 'N7', // Aurora: Kp index ≥ threshold
+    N8: 'N8', // CSS solar or lunar transit
 });
 
 const NOTIF_ICON = '/static/ico/android/launchericon-192x192.png';
@@ -25,6 +26,7 @@ const _NOTIF_DEFAULTS = Object.freeze({
         N2: Object.freeze({ enabled: true, lead_minutes: 5  }),
         N3: Object.freeze({ enabled: true, lead_minutes: 10 }),
         N4: Object.freeze({ enabled: true, lead_minutes: 30 }),
+        N8: Object.freeze({ enabled: true, lead_minutes: 10 }),
         N5: Object.freeze({ enabled: true, lead_minutes: 30 }),
         N6: Object.freeze({ enabled: true, lead_minutes: 20 }),
         N7: Object.freeze({ enabled: true, kp_threshold: 6  }),
@@ -338,6 +340,15 @@ async function _runNotificationChecks() {
             const data = await fetch('/api/iss/passes?days=20', { credentials: 'same-origin' })
                 .then(r => r.ok ? r.json() : null);
             if (data && typeof _checkIssN3 === 'function') _checkIssN3(data);
+        } catch (_) {}
+    }
+
+    // N8 - CSS transit
+    if (enabled?.N8?.enabled !== false) {
+        try {
+            const data = await fetch('/api/css/passes?days=20', { credentials: 'same-origin' })
+                .then(r => r.ok ? r.json() : null);
+            if (data && typeof _checkCssN8 === 'function') _checkCssN8(data);
         } catch (_) {}
     }
 

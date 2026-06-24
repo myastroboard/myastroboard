@@ -306,7 +306,9 @@ class SkyTonightScheduler:
 
             should_run = manual_trigger or self.last_run is None
             if not should_run and not has_calculation_results():
-                logger.info('SkyTonight calculation results are missing; triggering run regardless of last_run timestamp.')
+                logger.info(
+                    'SkyTonight calculation results are missing; triggering run regardless of last_run timestamp.'
+                )
                 should_run = True
             # Use the committed next_run (set in a previous iteration when it
             # was still in the future) instead of the freshly-computed one so

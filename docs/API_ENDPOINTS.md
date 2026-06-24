@@ -110,9 +110,12 @@ This page lists the HTTP routes currently declared in `backend/app.py` and `back
 - `GET /api/moon/next-7-nights`
 - `GET /api/moon/month-calendar`
 - `GET /api/aurora/predictions`
-- `GET /api/iss/passes` - Returns passes, solar transits, and lunar transits; all times in configured local TZ. Response includes `passes`, `solar_transits`, `lunar_transits`, `next_visible_passage`, `next_solar_transit`, `next_lunar_transit`, `total_passes`, `total_solar_transits`, `total_lunar_transits`.
+- `GET /api/iss/passes` - Returns ISS passes, solar transits, and lunar transits; all times in configured local TZ. Response includes `passes`, `solar_transits`, `lunar_transits`, `next_visible_passage`, `next_solar_transit`, `next_lunar_transit`, `total_passes`, `total_solar_transits`, `total_lunar_transits`.
 - `GET /api/iss/location`
 - `POST /api/iss/celestrak/restart`
+- `GET /api/css/passes` - Returns CSS (China Space Station, NORAD 48274/Tiangong) passes, solar transits, and lunar transits. Same response structure as ISS; includes `station: "CSS"` field.
+- `GET /api/css/location`
+- `POST /api/css/celestrak/restart`
 - `GET /api/sun/today`
 - `GET /api/sun/next-eclipse`
 - `GET /api/moon/next-eclipse`

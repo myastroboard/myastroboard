@@ -691,7 +691,9 @@ class AstroWeatherAnalyzer:
         current_period_qualities: List[float] = []
 
         def _finalize_current_period() -> None:
-            if current_period_start is None or current_period_last_slot is None or len(current_period_qualities) == 0:  # pragma: no cover
+            if (
+                current_period_start is None or current_period_last_slot is None or len(current_period_qualities) == 0
+            ):  # pragma: no cover
                 return  # pragma: no cover
 
             period_end = current_period_last_slot + slot_delta

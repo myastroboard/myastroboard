@@ -47,7 +47,7 @@
     <link rel="stylesheet" href="/static/css/bs_equipment.css?v={{ version }}">
     <link rel="stylesheet" href="/static/css/bs_metrics.css?v={{ version }}">
     <link rel="stylesheet" href="/static/css/bs_events.css?v={{ version }}">
-    <link rel="stylesheet" href="/static/css/bs_iss.css?v={{ version }}">
+    <link rel="stylesheet" href="/static/css/bs_orbital_stations.css?v={{ version }}">
     <link rel="stylesheet" href="/static/css/bs_spaceflight.css?v={{ version }}">
     <link rel="stylesheet" href="/static/css/bs_connectors.css?v={{ version }}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css" integrity="sha256-QZFpF9DkpabUBLoCc7fQJVCmtag/LaVAfAkUJSfuNyY=" crossorigin="anonymous">
@@ -533,9 +533,9 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link sub-tab-btn" href="#" data-subtab="iss">
+                        <a class="nav-link sub-tab-btn" href="#" data-subtab="orbital-stations">
                             <i class="bi bi-iss icon-inline" aria-hidden="true"></i>
-                            <span data-i18n="navbar.iss">ISS</span>
+                            <span data-i18n="navbar.orbital_stations">Orbital Stations</span>
                         </a>
                     </li>
                 </ul>
@@ -574,13 +574,13 @@
                 </div>
             </div>
 
-            <!-- ISS Sub-tab (moved from forecast-astro) -->
-            <div id="iss-subtab" class="sub-tab-content">
+            <!-- Orbital Stations Sub-tab (ISS + CSS) -->
+            <div id="orbital-stations-subtab" class="sub-tab-content">
                 <div class="shadow p-2 mb-3 rounded bg-sub-container">
                     <h2>
-                        <i class="bi bi-iss icon-inline" aria-hidden="true"></i> <span data-i18n="iss.passes">ISS Passes</span>
+                        <i class="bi bi-iss icon-inline" aria-hidden="true"></i> <span data-i18n="orbital_stations.title">Orbital Stations</span>
                     </h2>
-                    <div id="iss-display" class="iss-info-card rounded"></div>
+                    <div id="orbital-stations-display" class="iss-info-card rounded"></div>
                 </div>
             </div>
         </div>
@@ -1087,6 +1087,29 @@
                                 <div class="d-flex align-items-center gap-2 ms-auto">
                                     <label class="form-label mb-0 text-muted small" data-i18n="settings.notifications_lead_label">Notify before</label>
                                     <select class="form-select form-select-sm notif-lead-select" id="notif-lead-N3" data-trigger="N3" style="width:auto;">
+                                        <option value="5">5 min</option>
+                                        <option value="10">10 min</option>
+                                        <option value="15">15 min</option>
+                                        <option value="20">20 min</option>
+                                        <option value="30">30 min</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- N8 - CSS transit -->
+                        <div class="col-12">
+                            <div class="bg-features rounded p-2 d-flex flex-wrap align-items-center gap-3">
+                                <div class="form-check form-switch mb-0 flex-shrink-0">
+                                    <input class="form-check-input notif-trigger-toggle" type="checkbox" id="notif-trigger-N8" data-trigger="N8" role="switch">
+                                    <label class="form-check-label" for="notif-trigger-N8">
+                                        <i class="bi bi-rocket text-danger icon-inline" aria-hidden="true"></i>
+                                        <span data-i18n="settings.notifications_n8">CSS transit (solar or lunar)</span>
+                                    </label>
+                                </div>
+                                <div class="d-flex align-items-center gap-2 ms-auto">
+                                    <label class="form-label mb-0 text-muted small" data-i18n="settings.notifications_lead_label">Notify before</label>
+                                    <select class="form-select form-select-sm notif-lead-select" id="notif-lead-N8" data-trigger="N8" style="width:auto;">
                                         <option value="5">5 min</option>
                                         <option value="10">10 min</option>
                                         <option value="15">15 min</option>
@@ -2897,7 +2920,7 @@
     <script src="/static/js/horizon_graph.js?v={{ version }}"></script>
     <script src="/static/js/aurora.js?v={{ version }}"></script>
     <script src="/static/js/seeing_forecast.js?v={{ version }}"></script>
-    <script src="/static/js/iss.js?v={{ version }}"></script>
+    <script src="/static/js/orbital_stations.js?v={{ version }}"></script>
     <script src="/static/js/spaceflight.js?v={{ version }}"></script>
     <script src="/static/js/weather.js?v={{ version }}"></script>
     <script src="/static/js/weather_astro.js?v={{ version }}"></script>

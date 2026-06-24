@@ -22,6 +22,7 @@ from constants import (
     CACHE_TTL_HORIZON_GRAPH,
     CACHE_TTL_AURORA,
     CACHE_TTL_ISS_PASSES,
+    CACHE_TTL_CSS_PASSES,
     CACHE_TTL_PLANETARY_EVENTS,
     CACHE_TTL_SPECIAL_PHENOMENA,
     CACHE_TTL_SOLAR_SYSTEM_EVENTS,
@@ -56,6 +57,7 @@ _lunar_eclipse_cache = {"timestamp": 0, "data": None}
 _horizon_graph_cache = {"timestamp": 0, "data": None}
 _aurora_cache = {"timestamp": 0, "data": None}
 _iss_passes_cache = {"timestamp": 0, "data": None}
+_css_passes_cache = {"timestamp": 0, "data": None}
 _planetary_events_cache = {"timestamp": 0, "data": None}
 _special_phenomena_cache = {"timestamp": 0, "data": None}
 _solar_system_events_cache = {"timestamp": 0, "data": None}
@@ -217,6 +219,7 @@ def _write_all_astronomical_caches_to_shared():
                 "horizon_graph": _horizon_graph_cache,
                 "aurora": _aurora_cache,
                 "iss_passes": _iss_passes_cache,
+                "css_passes": _css_passes_cache,
                 "planetary_events": _planetary_events_cache,
                 "special_phenomena": _special_phenomena_cache,
                 "solar_system_events": _solar_system_events_cache,
@@ -305,7 +308,8 @@ def reset_all_caches():
     """Reset all astronomical caches (called when location changes)"""
     global _moon_report_cache, _sun_report_cache, _best_window_cache
     global _moon_planner_report_cache, _dark_window_report_cache
-    global _solar_eclipse_cache, _lunar_eclipse_cache, _horizon_graph_cache, _aurora_cache, _iss_passes_cache
+    global _solar_eclipse_cache, _lunar_eclipse_cache, _horizon_graph_cache
+    global _aurora_cache, _iss_passes_cache, _css_passes_cache
     global _planetary_events_cache, _special_phenomena_cache, _solar_system_events_cache
     global _sidereal_time_cache, _seeing_forecast_cache
     global _spaceflight_launches_cache, _spaceflight_astronauts_cache, _spaceflight_events_cache
@@ -325,6 +329,7 @@ def reset_all_caches():
     _horizon_graph_cache = {"timestamp": 0, "data": None}
     _aurora_cache = {"timestamp": 0, "data": None}
     _iss_passes_cache = {"timestamp": 0, "data": None}
+    _css_passes_cache = {"timestamp": 0, "data": None}
     _planetary_events_cache = {"timestamp": 0, "data": None}
     _special_phenomena_cache = {"timestamp": 0, "data": None}
     _solar_system_events_cache = {"timestamp": 0, "data": None}
@@ -386,6 +391,7 @@ def _sync_all_from_shared():
         "horizon_graph": _horizon_graph_cache,
         "aurora": _aurora_cache,
         "iss_passes": _iss_passes_cache,
+        "css_passes": _css_passes_cache,
         "planetary_events": _planetary_events_cache,
         "special_phenomena": _special_phenomena_cache,
         "solar_system_events": _solar_system_events_cache,
@@ -419,6 +425,7 @@ def is_astronomical_cache_ready():
         and is_cache_valid(_horizon_graph_cache, CACHE_TTL_HORIZON_GRAPH)
         and is_cache_valid(_aurora_cache, CACHE_TTL_AURORA)
         and is_cache_valid(_iss_passes_cache, CACHE_TTL_ISS_PASSES)
+        and is_cache_valid(_css_passes_cache, CACHE_TTL_CSS_PASSES)
         and is_cache_valid(_planetary_events_cache, CACHE_TTL_PLANETARY_EVENTS)
         and is_cache_valid(_special_phenomena_cache, CACHE_TTL_SPECIAL_PHENOMENA)
         and is_cache_valid(_solar_system_events_cache, CACHE_TTL_SOLAR_SYSTEM_EVENTS)
@@ -487,6 +494,7 @@ def get_cache_init_status():
         "horizon_graph": is_cache_valid(_horizon_graph_cache, CACHE_TTL_HORIZON_GRAPH),
         "aurora": is_cache_valid(_aurora_cache, CACHE_TTL_AURORA),
         "iss_passes": is_cache_valid(_iss_passes_cache, CACHE_TTL_ISS_PASSES),
+        "css_passes": is_cache_valid(_css_passes_cache, CACHE_TTL_CSS_PASSES),
         "planetary_events": is_cache_valid(_planetary_events_cache, CACHE_TTL_PLANETARY_EVENTS),
         "special_phenomena": is_cache_valid(_special_phenomena_cache, CACHE_TTL_SPECIAL_PHENOMENA),
         "solar_system_events": is_cache_valid(_solar_system_events_cache, CACHE_TTL_SOLAR_SYSTEM_EVENTS),
@@ -510,6 +518,7 @@ def get_cache_init_status():
             and is_cache_valid(_horizon_graph_cache, CACHE_TTL_HORIZON_GRAPH)
             and is_cache_valid(_aurora_cache, CACHE_TTL_AURORA)
             and is_cache_valid(_iss_passes_cache, CACHE_TTL_ISS_PASSES)
+            and is_cache_valid(_css_passes_cache, CACHE_TTL_CSS_PASSES)
             and is_cache_valid(_planetary_events_cache, CACHE_TTL_PLANETARY_EVENTS)
             and is_cache_valid(_special_phenomena_cache, CACHE_TTL_SPECIAL_PHENOMENA)
             and is_cache_valid(_solar_system_events_cache, CACHE_TTL_SOLAR_SYSTEM_EVENTS)
@@ -535,6 +544,7 @@ def get_cache_init_status():
             "horizon_graph": CACHE_TTL_HORIZON_GRAPH,
             "aurora": CACHE_TTL_AURORA,
             "iss_passes": CACHE_TTL_ISS_PASSES,
+            "css_passes": CACHE_TTL_CSS_PASSES,
             "planetary_events": CACHE_TTL_PLANETARY_EVENTS,
             "special_phenomena": CACHE_TTL_SPECIAL_PHENOMENA,
             "solar_system_events": CACHE_TTL_SOLAR_SYSTEM_EVENTS,

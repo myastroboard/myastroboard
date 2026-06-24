@@ -53,6 +53,7 @@ CACHE_TTL_LUNAR_ECLIPSE = 86400  # 24 hours - next event is months away
 CACHE_TTL_HORIZON_GRAPH = 21600  # 6 hours - daily arc computed for the full day
 CACHE_TTL_AURORA = 3600  # 1 hour  - geomagnetic forecast updates hourly
 CACHE_TTL_ISS_PASSES = 21600  # 6 hours - 20-day window, stable predictions
+CACHE_TTL_CSS_PASSES = 21600  # 6 hours - 20-day window, stable predictions
 CACHE_TTL_PLANETARY_EVENTS = 86400  # 24 hours - 365-day planetary forecast
 CACHE_TTL_SPECIAL_PHENOMENA = 86400  # 24 hours - annual events (equinoxes, etc.)
 CACHE_TTL_SOLAR_SYSTEM_EVENTS = 86400  # 24 hours - annual events (meteor showers, etc.)
@@ -85,8 +86,8 @@ WIND_TRACKING_THRESHOLD = 15.0  # km/h - wind speed that affects mount tracking
 ASTRO_BEST_PERIOD_MIN_DURATION_HOURS = 2.0  # Hide short windows that are not practical for setup/imaging
 
 # Connector cache TTLs
-CACHE_TTL_ALLSKY_SENSOR = 300   # 5 min  - live sensor data (temp, gain, etc.)
-CACHE_TTL_ALLSKY_HEALTH = 300   # 5 min  - per-module reachability checks
+CACHE_TTL_ALLSKY_SENSOR = 300  # 5 min  - live sensor data (temp, gain, etc.)
+CACHE_TTL_ALLSKY_HEALTH = 300  # 5 min  - per-module reachability checks
 
 # Logging configuration
 LOG_MAX_BYTES = 10 * 1024 * 1024  # 10MB

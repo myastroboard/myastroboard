@@ -185,6 +185,7 @@ const CACHE_JOB_LABELS = {
     horizon_graph:        'Horizon Graph',
     aurora:               'Aurora',
     iss_passes:           'ISS Passes',
+    css_passes:           'CSS Passes',
     planetary_events:     'Planetary Events',
     special_phenomena:    'Special Phenomena',
     solar_system_events:  'Solar System Events',

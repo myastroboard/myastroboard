@@ -73,10 +73,10 @@ DEFAULT_ALLSKY_CONNECTOR = {
     "image_filename": "image.jpg",
     "export_json_path": "allskydata.json",
     "modules": {
-        "live_image":      {"enabled": True},
-        "sensor_data":     {"enabled": False},
-        "keogram":         {"enabled": True},
-        "startrails":      {"enabled": False},
+        "live_image": {"enabled": True},
+        "sensor_data": {"enabled": False},
+        "keogram": {"enabled": True},
+        "startrails": {"enabled": False},
         "daily_timelapse": {"enabled": False},
     },
 }

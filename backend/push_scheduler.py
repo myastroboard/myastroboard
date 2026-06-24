@@ -392,7 +392,70 @@ def _check_n3_iss(user: Any, cache_data: Optional[dict]) -> None:
         'N3',
         _t(user, 'push_n3_title'),
         _t(user, body_key, minutes=minutes),
-        '/#spaceflight/iss',
+        '/#spaceflight/orbital-stations',
+        ttl=int(ms_until),
+        urgency='high',
+    )  # short window (≤10 min): needs immediate delivery
+
+
+def _check_n8_css(user: Any, cache_data: Optional[dict]) -> None:
+    if not cache_data:
+        logger.debug(f"N8 skip {user.username}: no css_passes cache")
+        return
+    triggers = _get_notif_prefs(user)
+    t = triggers.get('N8', {})
+    if not t.get('enabled', True):
+        logger.debug(f"N8 skip {user.username}: trigger disabled")
+        return
+
+    lead_s = t.get('lead_minutes', 10) * 60
+    now = datetime.now(timezone.utc)
+
+    candidates = []
+    for transit in cache_data.get('solar_transits', []):
+        start_str = transit.get('start_time')
+        if start_str:
+            try:
+                dt = datetime.fromisoformat(start_str)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                if dt > now:
+                    candidates.append((dt, 'solar'))
+            except Exception as e:
+                logger.debug(f"N8 {user.username}: bad solar transit timestamp {start_str!r}: {e}")
+    for transit in cache_data.get('lunar_transits', []):
+        start_str = transit.get('start_time')
+        if start_str:
+            try:
+                dt = datetime.fromisoformat(start_str)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                if dt > now:
+                    candidates.append((dt, 'lunar'))
+            except Exception as e:
+                logger.debug(f"N8 {user.username}: bad lunar transit timestamp {start_str!r}: {e}")
+
+    if not candidates:
+        logger.debug(f"N8 skip {user.username}: no upcoming CSS transits")
+        return
+    candidates.sort(key=lambda x: x[0])
+    next_dt, transit_type = candidates[0]
+    ms_until = (next_dt - now).total_seconds()
+    logger.debug(f"N8 {user.username}: next {transit_type} transit in {ms_until:.0f}s, lead={lead_s}s")
+    if ms_until > lead_s:
+        return
+    if _was_recently_notified(user.user_id, 'N8', 60 * 60):
+        logger.debug(f"N8 skip {user.username}: cooldown active")
+        return
+
+    minutes = round(ms_until / 60)
+    body_key = 'push_n8_solar_body' if transit_type == 'solar' else 'push_n8_lunar_body'
+    _send(
+        user,
+        'N8',
+        _t(user, 'push_n8_title'),
+        _t(user, body_key, minutes=minutes),
+        '/#spaceflight/orbital-stations',
         ttl=int(ms_until),
         urgency='high',
     )  # short window (≤10 min): needs immediate delivery
@@ -519,6 +582,7 @@ def _poll() -> None:
         aurora_data = _load_cache('aurora')
         sun_data = _load_cache('sun_report')
         iss_data = _load_cache('iss_passes')
+        css_data = _load_cache('css_passes')
         solar_data = _load_cache('solar_eclipse')
         lunar_data = _load_cache('lunar_eclipse')
 
@@ -562,6 +626,7 @@ def _poll() -> None:
             _check_n2_next_target(user, plan_payload)
             _check_n6_darkness(user, sun_data)
             _check_n3_iss(user, iss_data)
+            _check_n8_css(user, css_data)
             _check_n4_n5_eclipse(user, solar_data, lunar_data)
 
     except Exception as e:

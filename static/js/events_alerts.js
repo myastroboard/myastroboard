@@ -362,19 +362,20 @@ function scrollToEventDetails(eventType, structureKey = null) {
             moon: 'moon',
             sun: 'sun',
             aurora: 'aurora',
-            iss: 'iss',
+            iss: 'orbital-stations',
+            css: 'orbital-stations',
             calendar: 'calendar'
         };
         subTabName = structureMap[normalizedStructureKey] || '';
     }
-    
+
     // Map event types to corresponding tabs
     if (!subTabName && normalizedEventType.includes('eclipse')) {
         subTabName = normalizedEventType.includes('solar') ? 'sun' : 'moon';
     } else if (!subTabName && normalizedEventType === 'aurora') {
         subTabName = 'aurora';
-    } else if (!subTabName && normalizedEventType.includes('iss')) {
-        subTabName = 'iss';
+    } else if (!subTabName && (normalizedEventType.includes('iss') || normalizedEventType.includes('css'))) {
+        subTabName = 'orbital-stations';
     } else if (!subTabName && normalizedEventType === 'moon phase') {
         subTabName = 'moon';
     } else if (!subTabName && (normalizedEventType.includes('planetary') || 
@@ -403,8 +404,8 @@ function scrollToEventDetails(eventType, structureKey = null) {
         subTabName = 'calendar';
     }
 
-    if (subTabName === 'iss') {
-        // ISS details live under Spaceflight tab, not Astrophotography.
+    if (subTabName === 'orbital-stations') {
+        // Orbital Stations details live under Spaceflight tab, not Astrophotography.
         mainTabName = 'spaceflight';
     }
 

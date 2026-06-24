@@ -20,11 +20,10 @@ REQUEST_TIMEOUT = 5
 
 # Human-readable hints for common 404 causes per module
 _MODULE_404_HINTS = {
-    "sensor_data":     "Export module not added to AllSky pipeline",
-
+    "sensor_data": "Export module not added to AllSky pipeline",
     "daily_timelapse": "Daily timelapse not yet generated (runs at end of night)",
-    "keogram":         "Keogram not found for last night (generated end-of-night, named after session start date)",
-    "startrails":      "Startrails not found for last night (generated end-of-night, named after session start date)",
+    "keogram": "Keogram not found for last night (generated end-of-night, named after session start date)",
+    "startrails": "Startrails not found for last night (generated end-of-night, named after session start date)",
 }
 
 
@@ -36,11 +35,36 @@ class AllSkyConnector(BaseConnector):
     homepage = "https://github.com/AllskyTeam/allsky"
 
     MODULES = [
-        {"slug": "live_image",       "label": "Live image",        "description": "Auto-refreshing live sky image", "default_enabled": True},
-        {"slug": "sensor_data",      "label": "Sensor data",       "description": "Temperature, humidity, gain, exposure, brightness — requires AllSky Export module", "default_enabled": False},
-        {"slug": "keogram",          "label": "Keogram",           "description": "Daily keogram timeline strip (generated end-of-night)", "default_enabled": True},
-        {"slug": "startrails",       "label": "Startrails",        "description": "Stacked startrails image (generated end-of-night)", "default_enabled": False},
-        {"slug": "daily_timelapse",  "label": "Daily timelapse",   "description": "Full-night timelapse video (generated end-of-night)", "default_enabled": False},
+        {
+            "slug": "live_image",
+            "label": "Live image",
+            "description": "Auto-refreshing live sky image",
+            "default_enabled": True,
+        },
+        {
+            "slug": "sensor_data",
+            "label": "Sensor data",
+            "description": "Temperature, humidity, gain, exposure, brightness — requires AllSky Export module",
+            "default_enabled": False,
+        },
+        {
+            "slug": "keogram",
+            "label": "Keogram",
+            "description": "Daily keogram timeline strip (generated end-of-night)",
+            "default_enabled": True,
+        },
+        {
+            "slug": "startrails",
+            "label": "Startrails",
+            "description": "Stacked startrails image (generated end-of-night)",
+            "default_enabled": False,
+        },
+        {
+            "slug": "daily_timelapse",
+            "label": "Daily timelapse",
+            "description": "Full-night timelapse video (generated end-of-night)",
+            "default_enabled": False,
+        },
     ]
 
     def _image_url(self) -> str:
@@ -50,7 +74,7 @@ class AllSkyConnector(BaseConnector):
 
     def _sensor_data_url(self) -> str:
         image_path = self.config.get("image_path", "current/tmp").strip("/")
-        json_file  = self.config.get("export_json_path", "allskydata.json").strip("/")
+        json_file = self.config.get("export_json_path", "allskydata.json").strip("/")
         return f"{self.base_url}/{image_path}/{json_file}"
 
     def _keogram_url(self, date_str: str) -> str:
@@ -104,11 +128,11 @@ class AllSkyConnector(BaseConnector):
         module_results = {}
 
         url_map = {
-            "live_image":       self._image_url(),
-            "sensor_data":      self._sensor_data_url(),
-            "keogram":          self._keogram_url(last_night),
-            "startrails":       self._startrails_url(last_night),
-            "daily_timelapse":  self._daily_timelapse_url(last_night),
+            "live_image": self._image_url(),
+            "sensor_data": self._sensor_data_url(),
+            "keogram": self._keogram_url(last_night),
+            "startrails": self._startrails_url(last_night),
+            "daily_timelapse": self._daily_timelapse_url(last_night),
         }
 
         for slug, url in url_map.items():
