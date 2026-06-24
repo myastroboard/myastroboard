@@ -444,6 +444,7 @@ class CSSPassService:
             if line1.startswith("1 ") and line2.startswith("2 "):
                 return line1, line2
         except (json.JSONDecodeError, AttributeError, TypeError):
+            # Response is not JSON — expected for plain-text TLE sources; fall through to line-based parsing
             pass
 
         lines = [line.strip() for line in response_text.splitlines() if line.strip()]
@@ -762,8 +763,8 @@ class CSSPassService:
             distance_km = float(sun_apparent.distance().km)
             if distance_km > SOLAR_RADIUS_KM:
                 return degrees(asin(SOLAR_RADIUS_KM / distance_km))
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Solar angular radius calculation failed, using fallback: %s", exc)
         return SOLAR_ANGULAR_RADIUS_FALLBACK_DEG
 
     def _find_lunar_transits(
@@ -956,8 +957,8 @@ class CSSPassService:
             distance_km = float(moon_apparent.distance().km)
             if distance_km > LUNAR_RADIUS_KM:
                 return degrees(asin(LUNAR_RADIUS_KM / distance_km))
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Lunar angular radius calculation failed, using fallback: %s", exc)
         return LUNAR_ANGULAR_RADIUS_FALLBACK_DEG
 
     def _angular_separation_deg(
@@ -1189,8 +1190,8 @@ def get_css_current_position(
         eph = None
         try:
             eph = SKYFIELD_LOADER('de421.bsp')
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Failed to load ephemeris de421.bsp, solar/lunar data unavailable: %s", exc)
 
         if eph is not None:
             earth = eph["earth"]

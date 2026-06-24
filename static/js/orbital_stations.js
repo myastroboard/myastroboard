@@ -572,7 +572,21 @@ async function loadOrbitalStations() {
         col.className = 'col';
         const footerEl = document.createElement('div');
         footerEl.className = 'text-muted small mt-1';
-        footerEl.textContent = `${station}: ${i18n.t('iss.footer_source', { source: name })}`;
+        const sentinel = '\x00SOURCE\x00';
+        const translated = `${station}: ${i18n.t('iss.footer_source', { source: sentinel })}`;
+        const parts = translated.split(sentinel);
+        footerEl.appendChild(document.createTextNode(parts[0]));
+        if (url) {
+            const link = document.createElement('a');
+            link.href = url;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            link.textContent = name;
+            footerEl.appendChild(link);
+        } else {
+            footerEl.appendChild(document.createTextNode(name));
+        }
+        if (parts[1]) footerEl.appendChild(document.createTextNode(parts[1]));
         col.appendChild(footerEl);
         tleRow.appendChild(col);
     }
