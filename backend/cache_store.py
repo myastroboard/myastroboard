@@ -229,6 +229,8 @@ def _write_all_astronomical_caches_to_shared():
                 "spaceflight_astronauts": _spaceflight_astronauts_cache,
                 "spaceflight_events": _spaceflight_events_cache,
                 "iers": _iers_cache,
+                "allsky_sensor": _allsky_sensor_cache,
+                "allsky_health": _allsky_health_cache,
             }
         )
         _write_shared_cache(shared_cache)

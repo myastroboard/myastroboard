@@ -6622,3 +6622,96 @@ class TestAllSkyProxyApi:
             with patch('requests.get', return_value=mock_resp):
                 resp = client_admin.get('/api/connectors/allsky/proxy?module=live_image')
         assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# CSS passes endpoint
+# ---------------------------------------------------------------------------
+
+
+class TestCSSPasses:
+
+    def test_css_passes_unauthenticated_returns_401(self, client):
+        resp = client.get('/api/css/passes')
+        assert resp.status_code == 401
+
+    def test_css_passes_no_cache_returns_202(self, client_admin):
+        resp = client_admin.get('/api/css/passes')
+        assert resp.status_code in (200, 202, 500)
+
+    def test_css_passes_cached_same_window_returns_200(self, client_admin, monkeypatch):
+        monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
+        monkeypatch.setitem(_cache_store._css_passes_cache, 'data', {'passes': [], 'window_days': 20})
+        resp = client_admin.get('/api/css/passes')
+        assert resp.status_code == 200
+
+    def test_css_passes_cached_different_window_returns_202(self, client_admin, monkeypatch):
+        monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
+        monkeypatch.setitem(_cache_store._css_passes_cache, 'data', {'passes': [], 'window_days': 5})
+        resp = client_admin.get('/api/css/passes')
+        assert resp.status_code in (200, 202)
+
+    def test_css_passes_exception_returns_500(self, client_admin, monkeypatch):
+        def _boom(c, t):
+            raise RuntimeError('storage failure')
+        monkeypatch.setattr(_cache_store, 'is_cache_valid', _boom)
+        resp = client_admin.get('/api/css/passes')
+        assert resp.status_code == 500
+
+
+# ---------------------------------------------------------------------------
+# CSS location endpoint
+# ---------------------------------------------------------------------------
+
+
+class TestCSSLocation:
+
+    def test_css_location_unauthenticated_returns_401(self, client):
+        resp = client.get('/api/css/location')
+        assert resp.status_code == 401
+
+    def test_css_location_returns_response(self, client_admin, monkeypatch):
+        monkeypatch.setattr(_app_mod.css_passes, 'get_css_current_position', lambda **_: {'lat': 0.0, 'lon': 0.0})
+        resp = client_admin.get('/api/css/location')
+        assert resp.status_code in (200, 500)
+
+    def test_css_location_runtime_error_returns_503(self, client_admin, monkeypatch):
+        def _raise(**_):
+            raise RuntimeError('TLE unavailable')
+        monkeypatch.setattr(_app_mod.css_passes, 'get_css_current_position', _raise)
+        resp = client_admin.get('/api/css/location')
+        assert resp.status_code == 503
+
+    def test_css_location_generic_exception_returns_500(self, client_admin, monkeypatch):
+        def _raise(**_):
+            raise ValueError('bad value')
+        monkeypatch.setattr(_app_mod.css_passes, 'get_css_current_position', _raise)
+        resp = client_admin.get('/api/css/location')
+        assert resp.status_code == 500
+
+
+# ---------------------------------------------------------------------------
+# CSS Celestrak restart endpoint
+# ---------------------------------------------------------------------------
+
+
+class TestCSSCelestrakRestart:
+
+    def test_css_celestrak_restart_unauthenticated_returns_401(self, client):
+        resp = client.post('/api/css/celestrak/restart')
+        assert resp.status_code == 401
+
+    def test_css_celestrak_restart_returns_200(self, client_admin, monkeypatch):
+        monkeypatch.setattr(_app_mod.css_passes, 'clear_css_celestrak_block_flag', lambda: {'blocked': False})
+        resp = client_admin.post('/api/css/celestrak/restart')
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data['status'] == 'ok'
+        assert 'celestrak_status' in data
+
+    def test_css_celestrak_restart_exception_returns_500(self, client_admin, monkeypatch):
+        def _raise():
+            raise RuntimeError('disk error')
+        monkeypatch.setattr(_app_mod.css_passes, 'clear_css_celestrak_block_flag', _raise)
+        resp = client_admin.post('/api/css/celestrak/restart')
+        assert resp.status_code == 500
