@@ -179,7 +179,7 @@ function _updateHorizonTableVisibility() {
 function loadHorizonProfileTable(profile) {
     const tbody = document.getElementById('horizon-profile-tbody');
     if (!tbody) return;
-    tbody.innerHTML = '';
+    DOMUtils.clear(tbody);
     _horizonExplicitlyCleared = false;
     (profile || []).forEach(pt => addHorizonRow(pt.az, pt.alt));
     _updateHorizonTableVisibility();
@@ -189,17 +189,49 @@ function addHorizonRow(az = '', alt = '') {
     const tbody = document.getElementById('horizon-profile-tbody');
     if (!tbody) return;
     const tr = document.createElement('tr');
-    tr.innerHTML = `
-        <td><input type="number" class="form-control form-control-sm horizon-az" value="${az}" min="0" max="360" step="1" inputmode="numeric" placeholder="0-360"></td>
-        <td><input type="number" class="form-control form-control-sm horizon-alt" value="${alt}" min="0" max="90" step="1" inputmode="numeric" placeholder="0-90"></td>
-        <td><button type="button" class="btn btn-sm btn-danger" data-action="delete-horizon-row"><i class="bi bi-trash icon-inline" aria-hidden="true"></i></button></td>`;
+
+    const tdAz = document.createElement('td');
+    const inputAz = document.createElement('input');
+    inputAz.type = 'number';
+    inputAz.className = 'form-control form-control-sm horizon-az';
+    inputAz.value = az;
+    inputAz.min = '0';
+    inputAz.max = '360';
+    inputAz.step = '1';
+    inputAz.setAttribute('inputmode', 'numeric');
+    inputAz.placeholder = '0-360';
+    tdAz.appendChild(inputAz);
+
+    const tdAlt = document.createElement('td');
+    const inputAlt = document.createElement('input');
+    inputAlt.type = 'number';
+    inputAlt.className = 'form-control form-control-sm horizon-alt';
+    inputAlt.value = alt;
+    inputAlt.min = '0';
+    inputAlt.max = '90';
+    inputAlt.step = '1';
+    inputAlt.setAttribute('inputmode', 'numeric');
+    inputAlt.placeholder = '0-90';
+    tdAlt.appendChild(inputAlt);
+
+    const tdDel = document.createElement('td');
+    const btnDel = document.createElement('button');
+    btnDel.type = 'button';
+    btnDel.className = 'btn btn-sm btn-danger';
+    btnDel.setAttribute('data-action', 'delete-horizon-row');
+    btnDel.appendChild(DOMUtils.createIcon('bi bi-trash icon-inline'));
+    tdDel.appendChild(btnDel);
+
+    tr.appendChild(tdAz);
+    tr.appendChild(tdAlt);
+    tr.appendChild(tdDel);
     tbody.appendChild(tr);
     _updateHorizonTableVisibility();
 }
 
 function clearHorizonProfile() {
     const tbody = document.getElementById('horizon-profile-tbody');
-    if (tbody) tbody.innerHTML = '';
+    if (tbody) DOMUtils.clear(tbody);
     _horizonExplicitlyCleared = true;
     _updateHorizonTableVisibility();
 }

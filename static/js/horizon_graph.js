@@ -157,7 +157,7 @@ function renderHorizonChart(horizonData) {
     cardHeader.className = 'card-header';
     const title = document.createElement('h5');
     title.className = 'mb-0';
-    title.innerHTML = `<i class="bi bi-sunrise icon-inline" aria-hidden="true"></i>${i18n.t('astro_weather.title_horizon_graph')}`;
+    DOMUtils.append(title, DOMUtils.createIcon('bi bi-sunrise icon-inline'), i18n.t('astro_weather.title_horizon_graph'));
     cardHeader.appendChild(title);
 
     const cardBody = document.createElement('div');
@@ -173,7 +173,7 @@ function renderHorizonChart(horizonData) {
     const footerRow = document.createElement('div');
     footerRow.className = 'row';
 
-    const createBadgeItem = (text, className, backgroundColor) => {
+    const createBadgeItem = (className, backgroundColor, ...content) => {
         const itemCol = document.createElement('div');
         itemCol.className = 'col-auto';
         const badge = document.createElement('span');
@@ -181,16 +181,16 @@ function renderHorizonChart(horizonData) {
         if (backgroundColor) {
             badge.style.backgroundColor = backgroundColor;
         }
-        badge.innerHTML = text;
+        DOMUtils.append(badge, ...content);
         itemCol.appendChild(badge);
         return itemCol;
     };
 
-    footerRow.appendChild(createBadgeItem(`<i class="bi bi-sun icon-inline" aria-hidden="true"></i>${i18n.t('common.sun')}`, 'badge', '#FDB813'));
-    footerRow.appendChild(createBadgeItem(`<i class="bi bi-moon-stars icon-inline" aria-hidden="true"></i>${i18n.t('common.moon')}`, 'badge', '#C0C0C0'));
-    footerRow.appendChild(createBadgeItem(`━ ${i18n.t('astro_weather.horizon_badge')} (0°)`, 'badge bg-secondary'));
-    footerRow.appendChild(createBadgeItem(`╌ ${i18n.t('astro_weather.twilight_badge')} (-6° / -12° / -18°)`, 'badge bg-secondary'));
-    footerRow.appendChild(createBadgeItem(`┃ ${i18n.t('astro_weather.now_badge')} ${currentTimeLabel || ''}`, 'badge', '#ef4444'));
+    footerRow.appendChild(createBadgeItem('badge', '#FDB813', DOMUtils.createIcon('bi bi-sun icon-inline'), i18n.t('common.sun')));
+    footerRow.appendChild(createBadgeItem('badge', '#C0C0C0', DOMUtils.createIcon('bi bi-moon-stars icon-inline'), i18n.t('common.moon')));
+    footerRow.appendChild(createBadgeItem('badge bg-secondary', null, `━ ${i18n.t('astro_weather.horizon_badge')} (0°)`));
+    footerRow.appendChild(createBadgeItem('badge bg-secondary', null, `╌ ${i18n.t('astro_weather.twilight_badge')} (-6° / -12° / -18°)`));
+    footerRow.appendChild(createBadgeItem('badge', '#ef4444', `┃ ${i18n.t('astro_weather.now_badge')} ${currentTimeLabel || ''}`));
 
     const detailsCol = document.createElement('div');
     detailsCol.className = 'col-auto';

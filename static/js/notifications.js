@@ -535,7 +535,7 @@ async function _loadSubscriptionList() {
         const data = await fetchJSON('/api/push/subscriptions');
         const subs = data.subscriptions || [];
 
-        list.innerHTML = '';
+        DOMUtils.clear(list);
         if (countEl) {
             countEl.textContent = subs.length;
             countEl.style.display = subs.length ? '' : 'none';

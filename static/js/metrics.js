@@ -399,48 +399,90 @@ function updateProcessesTable(processData) {
     const sorted = sortProcesses(processes, processSortState);
     const rows = sorted.slice(0, showLimit);
 
+    DOMUtils.clear(tableBody);
+
     if (!rows.length) {
-        tableBody.innerHTML = `<tr><td colspan="5" class="text-muted">${escapeHtml(i18n.t('metrics.no_process_data'))}</td></tr>`;
+        const emptyRow = document.createElement('tr');
+        const emptyCell = document.createElement('td');
+        emptyCell.setAttribute('colspan', '5');
+        emptyCell.className = 'text-muted';
+        emptyCell.textContent = i18n.t('metrics.no_process_data');
+        emptyRow.appendChild(emptyCell);
+        tableBody.appendChild(emptyRow);
         return;
     }
 
-    tableBody.innerHTML = rows.map((proc) => {
+    rows.forEach((proc) => {
         const cpuPercent = Number(proc.cpu_percent || 0);
         const cpuBar = Math.max(0, Math.min(100, cpuPercent));
         const statusClass = getStatusBadgeClass(proc.status || 'unknown');
         const isContainerProc = Boolean(proc.is_container_related);
-        const rowClass = isContainerProc ? 'process-row-container' : '';
-        const processName = escapeHtml(proc.name || 'unknown');
-        const status = escapeHtml(proc.status || 'unknown');
-        const pid = Number(proc.pid || 0);
-        const pidLabel = escapeHtml(i18n.t('metrics.pid'));
-        const containerLabel = escapeHtml(i18n.t('metrics.container'));
-        const memory = formatBytes(proc.memory_rss || 0);
-        const uptime = formatUptime(proc.uptime_seconds || 0);
 
-        return `
-            <tr class="${rowClass}">
-                <td>
-                    <div class="process-name-cell">
-                        <i class="bi ${isContainerProc ? 'bi-boxes text-info' : 'bi-terminal text-muted'}" aria-hidden="true"></i>
-                        <div>
-                            <div class="process-main-name">${processName}${isContainerProc ? ` <span class="process-container-chip">${containerLabel}</span>` : ''}</div>
-                            <div class="process-sub">${pidLabel}${pid}</div>
-                        </div>
-                    </div>
-                </td>
-                <td><span class="badge ${statusClass}">${status}</span></td>
-                <td>
-                    <div class="process-cpu-cell">
-                        <div class="process-cpu-bar-bg"><div class="process-cpu-bar" style="width:${cpuBar}%;"></div></div>
-                        <span>${cpuPercent.toFixed(1)}${i18n.t('units.percent')}</span>
-                    </div>
-                </td>
-                <td><span class="process-num">${memory}</span></td>
-                <td><span class="process-num">${uptime}</span></td>
-            </tr>
-        `;
-    }).join('');
+        const tr = document.createElement('tr');
+        if (isContainerProc) tr.className = 'process-row-container';
+
+        const tdName = document.createElement('td');
+        const nameCell = document.createElement('div');
+        nameCell.className = 'process-name-cell';
+        nameCell.appendChild(DOMUtils.createIcon(`bi ${isContainerProc ? 'bi-boxes text-info' : 'bi-terminal text-muted'}`));
+        const nameDiv = document.createElement('div');
+        const mainName = document.createElement('div');
+        mainName.className = 'process-main-name';
+        mainName.textContent = proc.name || 'unknown';
+        if (isContainerProc) {
+            const chip = document.createElement('span');
+            chip.className = 'process-container-chip';
+            chip.textContent = i18n.t('metrics.container');
+            mainName.append(' ', chip);
+        }
+        const subDiv = document.createElement('div');
+        subDiv.className = 'process-sub';
+        subDiv.textContent = `${i18n.t('metrics.pid')}${Number(proc.pid || 0)}`;
+        nameDiv.appendChild(mainName);
+        nameDiv.appendChild(subDiv);
+        nameCell.appendChild(nameDiv);
+        tdName.appendChild(nameCell);
+
+        const tdStatus = document.createElement('td');
+        const statusBadge = document.createElement('span');
+        statusBadge.className = `badge ${statusClass}`;
+        statusBadge.textContent = proc.status || 'unknown';
+        tdStatus.appendChild(statusBadge);
+
+        const tdCpu = document.createElement('td');
+        const cpuCell = document.createElement('div');
+        cpuCell.className = 'process-cpu-cell';
+        const cpuBarBg = document.createElement('div');
+        cpuBarBg.className = 'process-cpu-bar-bg';
+        const cpuBarEl = document.createElement('div');
+        cpuBarEl.className = 'process-cpu-bar';
+        cpuBarEl.style.width = `${cpuBar}%`;
+        cpuBarBg.appendChild(cpuBarEl);
+        const cpuText = document.createElement('span');
+        cpuText.textContent = `${cpuPercent.toFixed(1)}${i18n.t('units.percent')}`;
+        cpuCell.appendChild(cpuBarBg);
+        cpuCell.appendChild(cpuText);
+        tdCpu.appendChild(cpuCell);
+
+        const tdMem = document.createElement('td');
+        const memSpan = document.createElement('span');
+        memSpan.className = 'process-num';
+        memSpan.textContent = formatBytes(proc.memory_rss || 0);
+        tdMem.appendChild(memSpan);
+
+        const tdUptime = document.createElement('td');
+        const uptimeSpan = document.createElement('span');
+        uptimeSpan.className = 'process-num';
+        uptimeSpan.textContent = formatUptime(proc.uptime_seconds || 0);
+        tdUptime.appendChild(uptimeSpan);
+
+        tr.appendChild(tdName);
+        tr.appendChild(tdStatus);
+        tr.appendChild(tdCpu);
+        tr.appendChild(tdMem);
+        tr.appendChild(tdUptime);
+        tableBody.appendChild(tr);
+    });
 }
 
 function sortProcesses(processes, sortState) {

@@ -42,23 +42,27 @@ async function loadSun() {
         const cardsRow = document.createElement('div');
         cardsRow.className = 'row row-cols-1 row-cols-sm-2 row-cols-lg-2 row-cols-xl-4 p-2 mb-3';
 
-        const createTimeCard = (cardTitle, duskLabel, duskValue, dawnLabel, dawnValue) => {
+        const createTimeCard = (headerIconClass, headerLabelText, duskIconClass, duskLabelText, duskValue, dawnIconClass, dawnLabelText, dawnValue) => {
             const col = document.createElement('div');
             col.className = 'col mb-3';
             const card = document.createElement('div');
             card.className = 'card h-100';
             const cardHeader = document.createElement('div');
             cardHeader.className = 'card-header fw-bold';
-            cardHeader.innerHTML = cardTitle;
+            DOMUtils.append(cardHeader, DOMUtils.createIcon(headerIconClass), headerLabelText);
 
             const list = document.createElement('ul');
             list.className = 'list-group list-group-flush';
 
-            const createItem = (label, value) => {
+            const createItem = (iconClass, labelText, value) => {
                 const li = document.createElement('li');
                 li.className = 'list-group-item d-flex justify-content-between align-items-center';
                 const labelSpan = document.createElement('span');
-                labelSpan.innerHTML = label;
+                if (iconClass) {
+                    DOMUtils.append(labelSpan, DOMUtils.createIcon(iconClass), labelText);
+                } else {
+                    labelSpan.textContent = labelText;
+                }
                 const valueSpan = document.createElement('span');
                 valueSpan.className = 'fw-bold';
                 valueSpan.textContent = value;
@@ -67,8 +71,8 @@ async function loadSun() {
                 return li;
             };
 
-            list.appendChild(createItem(duskLabel, duskValue));
-            list.appendChild(createItem(dawnLabel, dawnValue));
+            list.appendChild(createItem(duskIconClass, duskLabelText, duskValue));
+            list.appendChild(createItem(dawnIconClass, dawnLabelText, dawnValue));
             card.appendChild(cardHeader);
             card.appendChild(list);
             col.appendChild(card);
@@ -76,32 +80,24 @@ async function loadSun() {
         };
 
         cardsRow.appendChild(createTimeCard(
-            `<i class="bi bi-sun icon-inline" aria-hidden="true"></i>${i18n.t('common.sun')}`,
-            `<i class="bi bi-sunset icon-inline" aria-hidden="true"></i>${i18n.t('sun.sunset')}`,
-            formatTimeThenDate(new Date(data.sun.sunset)),
-            `<i class="bi bi-sunrise icon-inline" aria-hidden="true"></i>${i18n.t('sun.sunrise')}`,
-            formatTimeThenDate(new Date(data.sun.sunrise))
+            'bi bi-sun icon-inline', i18n.t('common.sun'),
+            'bi bi-sunset icon-inline', i18n.t('sun.sunset'), formatTimeThenDate(new Date(data.sun.sunset)),
+            'bi bi-sunrise icon-inline', i18n.t('sun.sunrise'), formatTimeThenDate(new Date(data.sun.sunrise))
         ));
         cardsRow.appendChild(createTimeCard(
-            `<i class="bi bi-brightness-low icon-inline" aria-hidden="true"></i>${i18n.t('sun.civil_twilight')}`,
-            `${i18n.t('sun.dusk')}`,
-            formatTimeThenDate(new Date(data.sun.civil_dusk)),
-            `${i18n.t('sun.dawn')}`,
-            formatTimeThenDate(new Date(data.sun.civil_dawn))
+            'bi bi-brightness-low icon-inline', i18n.t('sun.civil_twilight'),
+            '', i18n.t('sun.dusk'), formatTimeThenDate(new Date(data.sun.civil_dusk)),
+            '', i18n.t('sun.dawn'), formatTimeThenDate(new Date(data.sun.civil_dawn))
         ));
         cardsRow.appendChild(createTimeCard(
-            `<i class="bi bi-compass icon-inline" aria-hidden="true"></i>${i18n.t('sun.nautical_twilight')}`,
-            `${i18n.t('sun.dusk')}`,
-            formatTimeThenDate(new Date(data.sun.nautical_dusk)),
-            `${i18n.t('sun.dawn')}`,
-            formatTimeThenDate(new Date(data.sun.nautical_dawn))
+            'bi bi-compass icon-inline', i18n.t('sun.nautical_twilight'),
+            '', i18n.t('sun.dusk'), formatTimeThenDate(new Date(data.sun.nautical_dusk)),
+            '', i18n.t('sun.dawn'), formatTimeThenDate(new Date(data.sun.nautical_dawn))
         ));
         cardsRow.appendChild(createTimeCard(
-            `<i class="bi bi-stars icon-inline" aria-hidden="true"></i>${i18n.t('sun.astronomical_twilight')}`,
-            `${i18n.t('sun.dusk')}`,
-            formatTimeThenDate(new Date(data.sun.astronomical_dusk)),
-            `${i18n.t('sun.dawn')}`,
-            formatTimeThenDate(new Date(data.sun.astronomical_dawn))
+            'bi bi-stars icon-inline', i18n.t('sun.astronomical_twilight'),
+            '', i18n.t('sun.dusk'), formatTimeThenDate(new Date(data.sun.astronomical_dusk)),
+            '', i18n.t('sun.dawn'), formatTimeThenDate(new Date(data.sun.astronomical_dawn))
         ));
 
         container.appendChild(header);

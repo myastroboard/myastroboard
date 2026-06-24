@@ -76,20 +76,44 @@ async function showPlanTelescopePickerModal(telescopeItems, row) {
             btn.type = 'button';
             btn.className = 'btn btn-telescope-pick w-100 mb-2 text-start d-flex align-items-center gap-2';
 
-            const stateBadge = t.state !== 'none'
-                ? `<span class="badge bg-${t.state === 'current' ? 'success' : 'warning'}">${i18n.t(`plan_my_night.plan_status_${t.state}`, {defaultValue: t.state})}</span>`
-                : `<span class="badge bg-secondary">${i18n.t('plan_my_night.plan_status_none', {defaultValue: 'no plan'})}</span>`;
+            const stateBadgeEl = document.createElement('span');
+            stateBadgeEl.className = t.state !== 'none'
+                ? `badge bg-${t.state === 'current' ? 'success' : 'warning'}`
+                : 'badge bg-secondary';
+            stateBadgeEl.textContent = t.state !== 'none'
+                ? i18n.t(`plan_my_night.plan_status_${t.state}`, {defaultValue: t.state})
+                : i18n.t('plan_my_night.plan_status_none', {defaultValue: 'no plan'});
 
-            const sharedBadge = t.owner_username
-                ? ` <span class="badge bg-info text-dark" style="font-size:0.75em">${escapeHtml(i18n.t('equipment.shared_fov_suffix', { username: t.owner_username }))}</span>`
-                : '';
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'flex-grow-1';
+            nameSpan.appendChild(document.createTextNode(t.telescope_name || t.telescope_id));
+            if (t.owner_username) {
+                const _sharedEl = document.createElement('span');
+                _sharedEl.className = 'badge bg-info text-dark';
+                _sharedEl.style.fontSize = '0.75em';
+                _sharedEl.textContent = i18n.t('equipment.shared_fov_suffix', { username: t.owner_username });
+                nameSpan.append(' ');
+                nameSpan.appendChild(_sharedEl);
+            }
+            nameSpan.append(' ');
+            nameSpan.appendChild(stateBadgeEl);
 
             const rating = ratingsById[t.telescope_id];
-            const ratingHtml = rating
-                ? `<span class="ms-auto text-warning text-nowrap" title="${escapeHtml(String(rating))}/5" aria-label="${escapeHtml(String(rating))} stars">${escapeHtml(_skytStarsFromRating(rating))}</span>`
-                : (hasRatings ? `<span class="ms-auto text-muted text-nowrap" aria-hidden="true">&#8212;</span>` : '');
-
-            btn.innerHTML = `<i class="bi bi-telescope icon-inline flex-shrink-0" aria-hidden="true"></i><span class="flex-grow-1">${escapeHtml(t.telescope_name || t.telescope_id)}${sharedBadge} ${stateBadge}</span>${ratingHtml}`;
+            DOMUtils.append(btn, DOMUtils.createIcon('bi bi-telescope icon-inline flex-shrink-0'), nameSpan);
+            if (rating) {
+                const ratingEl = document.createElement('span');
+                ratingEl.className = 'ms-auto text-warning text-nowrap';
+                ratingEl.title = `${String(rating)}/5`;
+                ratingEl.setAttribute('aria-label', `${String(rating)} stars`);
+                ratingEl.textContent = _skytStarsFromRating(rating);
+                btn.appendChild(ratingEl);
+            } else if (hasRatings) {
+                const ratingEl = document.createElement('span');
+                ratingEl.className = 'ms-auto text-muted text-nowrap';
+                ratingEl.setAttribute('aria-hidden', 'true');
+                ratingEl.textContent = '—';
+                btn.appendChild(ratingEl);
+            }
             btn.addEventListener('click', () => {
                 overlay.remove();
                 resolve({ telescope_id: t.telescope_id, telescope_name: t.telescope_name });
@@ -224,34 +248,53 @@ async function _skytFetchTelescopeRecommendations(row) {
 
 function _skytBuildTelescopeRecommendationsHtml(response, row) {
     if (!response || !response.has_telescopes) {
-        return '';
+        return null;
     }
 
     const targetTitle = response.target?.target_name || row['target name'] || row['id'] || '';
     const recommendations = Array.isArray(response.recommendations) ? response.recommendations : [];
 
-    let html = `<div class="mt-3 pt-3 border-top">`;
-    html += `<h6 class="mb-2">${escapeHtml(tSkyTonightCompat('telescope_reco_title'))}</h6>`;
-    html += `<div class="small text-muted mb-2">${escapeHtml(targetTitle)}</div>`;
+    const wrapper = document.createElement('div');
+    wrapper.className = 'mt-3 pt-3 border-top';
+
+    const h6 = document.createElement('h6');
+    h6.className = 'mb-2';
+    h6.textContent = tSkyTonightCompat('telescope_reco_title');
+    wrapper.appendChild(h6);
+
+    const titleDiv = document.createElement('div');
+    titleDiv.className = 'small text-muted mb-2';
+    titleDiv.textContent = targetTitle;
+    wrapper.appendChild(titleDiv);
 
     if (recommendations.length === 0) {
-        html += `<p class="text-muted mb-0">${escapeHtml(tSkyTonightCompat('telescope_reco_no_result'))}</p>`;
-        html += `</div>`;
-        return html;
+        const p = document.createElement('p');
+        p.className = 'text-muted mb-0';
+        p.textContent = tSkyTonightCompat('telescope_reco_no_result');
+        wrapper.appendChild(p);
+        return wrapper;
     }
 
-    html += `
-        <div class="table-responsive">
-            <table class="table table-striped table-sm align-middle mb-0">
-                <thead>
-                    <tr>
-                        <th>${escapeHtml(tSkyTonightCompat('telescope_reco_table_telescope'))}</th>
-                        <th class="text-center">${escapeHtml(tSkyTonightCompat('telescope_reco_table_rating'))}</th>
-                        <th>${escapeHtml(tSkyTonightCompat('telescope_reco_table_note'))}</th>
-                    </tr>
-                </thead>
-                <tbody>`;
+    const tableResponsive = document.createElement('div');
+    tableResponsive.className = 'table-responsive';
+    const table = document.createElement('table');
+    table.className = 'table table-striped table-sm align-middle mb-0';
+    const thead = document.createElement('thead');
+    const trh = document.createElement('tr');
+    [
+        { text: tSkyTonightCompat('telescope_reco_table_telescope'), cls: '' },
+        { text: tSkyTonightCompat('telescope_reco_table_rating'), cls: 'text-center' },
+        { text: tSkyTonightCompat('telescope_reco_table_note'), cls: '' }
+    ].forEach(({ text, cls }) => {
+        const th = document.createElement('th');
+        if (cls) th.className = cls;
+        th.textContent = text;
+        trh.appendChild(th);
+    });
+    thead.appendChild(trh);
+    table.appendChild(thead);
 
+    const tbody = document.createElement('tbody');
     const sorted = [...recommendations].sort((a, b) => {
         const aOwned = !a.owner_username ? 0 : 1;
         const bOwned = !b.owner_username ? 0 : 1;
@@ -263,19 +306,37 @@ function _skytBuildTelescopeRecommendationsHtml(response, row) {
         const scopeName = `${item.name || ''}${item.manufacturer ? ` (${item.manufacturer})` : ''}`.trim();
         const rating = parseInt(item.rating_1_to_5, 10) || 1;
         const noteText = _skytBuildTelescopeRecommendationNote(item);
-        const sharedBadge = item.owner_username
-            ? ` <span class="badge bg-info text-dark" style="font-size:0.7em">${escapeHtml(tSkyTonightCompat('telescope_reco_shared_by').replace('{username}', item.owner_username))}</span>`
-            : '';
-        html += `
-            <tr>
-                <td>${escapeHtml(scopeName)}${sharedBadge}</td>
-                <td class="text-center" title="${escapeHtml(String(rating))}/5">${escapeHtml(_skytStarsFromRating(rating))}</td>
-                <td>${escapeHtml(noteText)}</td>
-            </tr>`;
+        const tr = document.createElement('tr');
+
+        const tdName = document.createElement('td');
+        tdName.appendChild(document.createTextNode(scopeName));
+        if (item.owner_username) {
+            const _sb = document.createElement('span');
+            _sb.className = 'badge bg-info text-dark';
+            _sb.style.fontSize = '0.7em';
+            _sb.textContent = tSkyTonightCompat('telescope_reco_shared_by').replace('{username}', item.owner_username);
+            tdName.append(' ');
+            tdName.appendChild(_sb);
+        }
+
+        const tdRating = document.createElement('td');
+        tdRating.className = 'text-center';
+        tdRating.title = `${String(rating)}/5`;
+        tdRating.textContent = _skytStarsFromRating(rating);
+
+        const tdNote = document.createElement('td');
+        tdNote.textContent = noteText;
+
+        tr.appendChild(tdName);
+        tr.appendChild(tdRating);
+        tr.appendChild(tdNote);
+        tbody.appendChild(tr);
     });
 
-    html += `</tbody></table></div></div>`;
-    return html;
+    table.appendChild(tbody);
+    tableResponsive.appendChild(table);
+    wrapper.appendChild(tableResponsive);
+    return wrapper;
 }
 
 // ── AstroScore visual helpers ─────────────────────────────────────────────────
@@ -541,12 +602,12 @@ async function _renderSkyMap(reports, container) {
 
     const chartTitle = document.createElement('span');
     chartTitle.className = 'fw-semibold';
-    chartTitle.innerHTML = `<i class="bi bi-globe2 icon-inline" aria-hidden="true"></i>${tSkyTonightCompat('sky_map_title')}`;
+    DOMUtils.append(chartTitle, DOMUtils.createIcon('bi bi-globe2 icon-inline'), tSkyTonightCompat('sky_map_title'));
 
     const resetBtn = document.createElement('button');
     resetBtn.type = 'button';
     resetBtn.className = 'btn btn-sm btn-outline-secondary';
-    resetBtn.innerHTML = `<i class="bi bi-arrows-fullscreen icon-inline" aria-hidden="true"></i>${tSkyTonightCompat('sky_map_reset_view')}`;
+    DOMUtils.append(resetBtn, DOMUtils.createIcon('bi bi-arrows-fullscreen icon-inline'), tSkyTonightCompat('sky_map_reset_view'));
 
     chartHeader.appendChild(chartTitle);
     chartHeader.appendChild(resetBtn);
@@ -558,7 +619,7 @@ async function _renderSkyMap(reports, container) {
 
     const hint = document.createElement('div');
     hint.className = 'text-muted small mb-2';
-    hint.innerHTML = `<i class="bi bi-info-circle icon-inline" aria-hidden="true"></i>${tSkyTonightCompat('sky_map_hint')}`;
+    DOMUtils.append(hint, DOMUtils.createIcon('bi bi-info-circle icon-inline'), tSkyTonightCompat('sky_map_hint'));
     chartBody.appendChild(hint);
 
     const mapDiv = document.createElement('div');
@@ -670,7 +731,7 @@ async function _renderSkyMap(reports, container) {
 
     const legendHeader = document.createElement('div');
     legendHeader.className = 'card-header fw-semibold';
-    legendHeader.innerHTML = `<i class="bi bi-funnel icon-inline" aria-hidden="true"></i>${tSkyTonightCompat('sky_map_legend_title')}`;
+    DOMUtils.append(legendHeader, DOMUtils.createIcon('bi bi-funnel icon-inline'), tSkyTonightCompat('sky_map_legend_title'));
     legendCard.appendChild(legendHeader);
 
     const legendBody = document.createElement('div');
@@ -732,7 +793,7 @@ async function _renderSkyMap(reports, container) {
         const messierBtn = document.createElement('button');
         messierBtn.type = 'button';
         messierBtn.className = 'btn btn-sm btn-outline-secondary sky-map-filter-btn';
-        messierBtn.innerHTML = '<i class="bi bi-star icon-inline" aria-hidden="true"></i>Messier';
+        DOMUtils.append(messierBtn, DOMUtils.createIcon('bi bi-star icon-inline'), 'Messier');
         messierBtn.title = tSkyTonightCompat('sky_map_filter_dso') + ' - Messier only';
         messierBtn.addEventListener('click', () => {
             messierOnly = !messierOnly;
@@ -805,7 +866,7 @@ async function _renderSkyMap(reports, container) {
         resetConstBtn.type = 'button';
         resetConstBtn.className = 'btn btn-sm btn-link p-0 text-muted';
         resetConstBtn.title = 'Show all constellations';
-        resetConstBtn.innerHTML = '<i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>';
+        resetConstBtn.appendChild(DOMUtils.createIcon('bi bi-arrow-counterclockwise'));
         constLabelRow.appendChild(resetConstBtn);
 
         const constBtnWrap = document.createElement('div');
@@ -1034,7 +1095,9 @@ function _buildSkyTonightSectionButtons() {
         a.className = `nav-link sub-tab-btn${sec.key === _skytCurrentSection ? ' active' : ''}`;
         a.href = '#';
         a.setAttribute('data-subtab', subtabName);
-        a.innerHTML = `<i class="bi ${sec.icon} icon-inline" aria-hidden="true"></i> <span>${tSkyTonightCompat(sec.labelKey)}</span>`;
+        const _navSpan = document.createElement('span');
+        _navSpan.textContent = tSkyTonightCompat(sec.labelKey);
+        DOMUtils.append(a, DOMUtils.createIcon(`bi ${sec.icon} icon-inline`), ' ', _navSpan);
         li.appendChild(a);
         navContainer.appendChild(li);
 
@@ -1048,7 +1111,9 @@ function _buildSkyTonightSectionButtons() {
             wrapper.className = 'shadow p-2 mb-3 rounded bg-sub-container';
 
             const h2 = document.createElement('h2');
-            h2.innerHTML = `<i class="bi ${sec.icon} icon-inline" aria-hidden="true"></i> <span>${tSkyTonightCompat(sec.labelKey)}</span>`;
+            const _h2Span = document.createElement('span');
+            _h2Span.textContent = tSkyTonightCompat(sec.labelKey);
+            DOMUtils.append(h2, DOMUtils.createIcon(`bi ${sec.icon} icon-inline`), ' ', _h2Span);
             wrapper.appendChild(h2);
 
             const dataDiv = document.createElement('div');
@@ -1184,9 +1249,7 @@ async function _showSkyTonightLogSection(container) {
                 if (typeof value === 'object' && value !== null) {
                     valEl.textContent = JSON.stringify(value);
                 } else if (typeof value === 'boolean') {
-                    valEl.innerHTML = value
-                        ? '<i class="bi bi-check-circle-fill text-success" aria-hidden="true"></i>'
-                        : '<i class="bi bi-x-circle-fill text-danger" aria-hidden="true"></i>';
+                    valEl.appendChild(DOMUtils.createIcon(value ? 'bi bi-check-circle-fill text-success' : 'bi bi-x-circle-fill text-danger'));
                 } else {
                     valEl.textContent = String(value ?? '\u2014');
                 }
@@ -2100,17 +2163,28 @@ async function showMorePopupFromRowData(moreData) {
 
     const recoContainer = document.createElement('div');
     recoContainer.className = 'mt-3 pt-3 border-top';
-    recoContainer.innerHTML = `<div class="text-muted small">${escapeHtml(tSkyTonightCompat('loading_report_content'))}</div>`;
+    const _loadDiv = document.createElement('div');
+    _loadDiv.className = 'text-muted small';
+    _loadDiv.textContent = tSkyTonightCompat('loading_report_content');
+    recoContainer.appendChild(_loadDiv);
     contentEl.appendChild(recoContainer);
 
     const response = await _skytFetchTelescopeRecommendations(row);
     if (!response) {
-        recoContainer.innerHTML = `<div class="text-danger small">${escapeHtml(tSkyTonightCompat('telescope_reco_load_error'))}</div>`;
+        DOMUtils.clear(recoContainer);
+        const _errDiv = document.createElement('div');
+        _errDiv.className = 'text-danger small';
+        _errDiv.textContent = tSkyTonightCompat('telescope_reco_load_error');
+        recoContainer.appendChild(_errDiv);
         return;
     }
 
-    recoContainer.className = '';
-    recoContainer.innerHTML = _skytBuildTelescopeRecommendationsHtml(response, row);
+    const _recoEl = _skytBuildTelescopeRecommendationsHtml(response, row);
+    if (_recoEl) {
+        recoContainer.replaceWith(_recoEl);
+    } else {
+        recoContainer.remove();
+    }
 }
 
 /**
@@ -3257,7 +3331,7 @@ async function showAlttimePopup(title, targetId) {
     cardHeader.className = 'card-header';
     const cardTitle = document.createElement('h5');
     cardTitle.className = 'mb-0';
-    cardTitle.innerHTML = `<i class="bi bi-graph-up-arrow icon-inline text-primary" aria-hidden="true"></i>${escapeHtml(title)}`;
+    DOMUtils.append(cardTitle, DOMUtils.createIcon('bi bi-graph-up-arrow icon-inline text-primary'), title);
     cardHeader.appendChild(cardTitle);
 
     // Card body - canvas fills the full width, explicit height like weather charts
@@ -3687,7 +3761,7 @@ async function updateCatalogueCapturedBadge(itemDataOrName, isInAstrodex) {
                 badge.className = 'in-astrodex-badge astrodex-captured-btn';
                 badge.setAttribute('data-item', JSON.stringify(rowItemData));
                 badge.setAttribute('title', tSkyTonightCompat('captured'));
-                badge.innerHTML = `<i class="bi bi-check-circle-fill icon-inline" aria-hidden="true"></i>${tSkyTonightCompat('captured')}`;
+                DOMUtils.append(badge, DOMUtils.createIcon('bi bi-check-circle-fill icon-inline'), tSkyTonightCompat('captured'));
                 badge.addEventListener('click', async (event) => {
                     event.preventDefault();
                     await openCapturedAstrodexItem(rowItemData);
@@ -3699,7 +3773,7 @@ async function updateCatalogueCapturedBadge(itemDataOrName, isInAstrodex) {
                 const addButton = document.createElement('button');
                 addButton.className = 'btn btn-sm btn-outline-primary astrodex-add-btn';
                 addButton.setAttribute('data-item', itemDataJson);
-                addButton.innerHTML = `<i class="bi bi-plus-circle icon-inline" aria-hidden="true"></i>${tSkyTonightCompat('add')}`;
+                DOMUtils.append(addButton, DOMUtils.createIcon('bi bi-plus-circle icon-inline'), tSkyTonightCompat('add'));
                 astrodexCell.appendChild(addButton);
             }
         });
@@ -3766,7 +3840,7 @@ function updateCataloguePlanMyNightBadge(itemDataOrName, isPlanned) {
                 DOMUtils.clear(planCell);
                 const badge = document.createElement('span');
                 badge.className = 'in-astrodex-badge in-plan-my-night-badge';
-                badge.innerHTML = `<i class="bi bi-check-circle-fill icon-inline" aria-hidden="true"></i>${tSkyTonightCompat('planned')}`;
+                DOMUtils.append(badge, DOMUtils.createIcon('bi bi-check-circle-fill icon-inline'), tSkyTonightCompat('planned'));
                 planCell.appendChild(badge);
             } else {
                 const itemDataJson = JSON.stringify(rowItemData);
@@ -3775,7 +3849,7 @@ function updateCataloguePlanMyNightBadge(itemDataOrName, isPlanned) {
                 addButton.className = 'btn btn-sm btn-outline-info plan-my-night-add-btn';
                 addButton.setAttribute('data-item', itemDataJson);
                 addButton.setAttribute('data-catalogue', rowItemData.catalogue || currentCatalogueTab || '');
-                addButton.innerHTML = `<i class="bi bi-moon-stars-fill icon-inline" aria-hidden="true"></i>${tSkyTonightCompat('add')}`;
+                DOMUtils.append(addButton, DOMUtils.createIcon('bi bi-moon-stars-fill icon-inline'), tSkyTonightCompat('add'));
                 planCell.appendChild(addButton);
             }
         });

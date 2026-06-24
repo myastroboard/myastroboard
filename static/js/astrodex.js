@@ -227,12 +227,14 @@ function updateAstrodexCollectionTitle() {
     if (!title) return;
 
     if (astrodexData.privateMode) {
-        title.innerHTML = `<i class="bi bi-galaxy text-warning icon-inline" aria-hidden="true"></i>${i18n.t('astrodex.my_collection')}`;
+        DOMUtils.clear(title);
+        DOMUtils.append(title, DOMUtils.createIcon('bi bi-galaxy text-warning icon-inline'), i18n.t('astrodex.my_collection'));
         if (subtitle) {
             subtitle.textContent = i18n.t('astrodex.your_collection');
         }
     } else {
-        title.innerHTML = `<i class="bi bi-galaxy text-warning icon-inline" aria-hidden="true"></i>${i18n.t('astrodex.common_collection')}`;
+        DOMUtils.clear(title);
+        DOMUtils.append(title, DOMUtils.createIcon('bi bi-galaxy text-warning icon-inline'), i18n.t('astrodex.common_collection'));
         if (subtitle) {
             subtitle.textContent = i18n.t('astrodex.shared_collection');
         }
@@ -354,7 +356,7 @@ function renderAstrodexGrid(items, isAllowedAstrodex) {
             const body = document.createElement('div');
             body.className = 'card-body text-center';
             const title = document.createElement('b');
-            title.innerHTML = `<i class="bi bi-journal-bookmark icon-inline" aria-hidden="true"></i>${i18n.t('astrodex.astrodex_empty')}`;
+            DOMUtils.append(title, DOMUtils.createIcon('bi bi-journal-bookmark icon-inline'), i18n.t('astrodex.astrodex_empty'));
             body.appendChild(title);
             body.appendChild(document.createElement('br'));
             body.append(i18n.t('astrodex.start_adding'));
@@ -364,7 +366,7 @@ function renderAstrodexGrid(items, isAllowedAstrodex) {
             const button = document.createElement('button');
             button.className = 'btn btn-outline-primary';
             button.setAttribute('data-action', 'add-astrodex-item');
-            button.innerHTML = `<i class="bi bi-plus-circle icon-inline" aria-hidden="true"></i>${i18n.t('astrodex.add_object')}`;
+            DOMUtils.append(button, DOMUtils.createIcon('bi bi-plus-circle icon-inline'), i18n.t('astrodex.add_object'));
             footer.appendChild(button);
 
             card.appendChild(body);
@@ -379,7 +381,7 @@ function renderAstrodexGrid(items, isAllowedAstrodex) {
             const body = document.createElement('div');
             body.className = 'card-body text-center';
             const title = document.createElement('b');
-            title.innerHTML = '<i class="bi bi-journal-bookmark icon-inline" aria-hidden="true"></i>Astrodex is empty';
+            DOMUtils.append(title, DOMUtils.createIcon('bi bi-journal-bookmark icon-inline'), 'Astrodex is empty');
             body.appendChild(title);
             body.appendChild(document.createElement('br'));
             body.append(i18n.t('astrodex.read_only_user'));
@@ -425,7 +427,8 @@ function renderAstrodexGrid(items, isAllowedAstrodex) {
         if (photoCount > 0) {
             const badge = document.createElement('div');
             badge.className = 'photo-badge';
-            badge.innerHTML = `${photoCount} <i class="bi bi-camera" aria-hidden="true"></i>`;
+            badge.appendChild(document.createTextNode(`${photoCount} `));
+            badge.appendChild(DOMUtils.createIcon('bi bi-camera'));
             imageWrap.appendChild(badge);
         }
 
@@ -457,14 +460,14 @@ function renderAstrodexGrid(items, isAllowedAstrodex) {
 
             const constellation = document.createElement('div');
             constellation.className = 'astrodex-card-constellation';
-            constellation.innerHTML = `<i class="bi bi-geo-alt text-danger icon-inline" aria-hidden="true"></i>${constellationLabel}`;
+            DOMUtils.append(constellation, DOMUtils.createIcon('bi bi-geo-alt text-danger icon-inline'), constellationLabel);
             body.appendChild(constellation);
         }
 
         if (!isOwnedByCurrentUser) {
             const owner = document.createElement('div');
             owner.className = 'astrodex-card-constellation';
-            owner.innerHTML = `<i class="bi bi-person text-primary icon-inline" aria-hidden="true"></i>${item.owner_username || 'Shared'}`;
+            DOMUtils.append(owner, DOMUtils.createIcon('bi bi-person text-primary icon-inline'), item.owner_username || 'Shared');
             body.appendChild(owner);
         }
 
@@ -798,7 +801,12 @@ async function showAddAstrodexItemModal() {
 
         if (searchBtn) {
             searchBtn.disabled = true;
-            searchBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+            DOMUtils.clear(searchBtn);
+            const _spinner = document.createElement('span');
+            _spinner.className = 'spinner-border spinner-border-sm';
+            _spinner.setAttribute('role', 'status');
+            _spinner.setAttribute('aria-hidden', 'true');
+            searchBtn.appendChild(_spinner);
         }
         if (feedbackEl) feedbackEl.classList.add('d-none');
 
@@ -807,7 +815,11 @@ async function showAddAstrodexItemModal() {
 
             if (!res || !res.found) {
                 if (feedbackEl) {
-                    feedbackEl.innerHTML = `<span class="badge bg-warning text-dark"><i class="bi bi-exclamation-circle me-1"></i>${i18n.t('astrodex.catalogue_not_found')}</span>`;
+                    DOMUtils.clear(feedbackEl);
+                    const _badgeWarn = document.createElement('span');
+                    _badgeWarn.className = 'badge bg-warning text-dark';
+                    DOMUtils.append(_badgeWarn, DOMUtils.createIcon('bi bi-exclamation-circle me-1'), i18n.t('astrodex.catalogue_not_found'));
+                    feedbackEl.appendChild(_badgeWarn);
                     feedbackEl.classList.remove('d-none');
                 }
                 return;
@@ -843,14 +855,19 @@ async function showAddAstrodexItemModal() {
             }
 
             if (feedbackEl) {
-                feedbackEl.innerHTML = `<span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>${i18n.t('astrodex.catalogue_found')}</span>`;
+                DOMUtils.clear(feedbackEl);
+                const _badgeOk = document.createElement('span');
+                _badgeOk.className = 'badge bg-success';
+                DOMUtils.append(_badgeOk, DOMUtils.createIcon('bi bi-check-circle me-1'), i18n.t('astrodex.catalogue_found'));
+                feedbackEl.appendChild(_badgeOk);
                 feedbackEl.classList.remove('d-none');
             }
         } catch (_) { /* silent - lookup is best-effort */ }
         finally {
             if (searchBtn) {
                 searchBtn.disabled = false;
-                searchBtn.innerHTML = '<i class="bi bi-search"></i>';
+                DOMUtils.clear(searchBtn);
+                searchBtn.appendChild(DOMUtils.createIcon('bi bi-search'));
             }
         }
     }
@@ -1785,10 +1802,12 @@ async function toggleAstrodexSortOrder() {
     const button = document.getElementById('astrodex-sort-order');
     if (astrodexFilters.sortOrder === 'asc') {
         astrodexFilters.sortOrder = 'desc';
-        button.innerHTML = `<i class="bi bi-sort-down-alt icon-inline" aria-hidden="true"></i>${i18n.t('astrodex.sort_order_descending')}`;
+        DOMUtils.clear(button);
+        DOMUtils.append(button, DOMUtils.createIcon('bi bi-sort-down-alt icon-inline'), i18n.t('astrodex.sort_order_descending'));
     } else {
         astrodexFilters.sortOrder = 'asc';
-        button.innerHTML = `<i class="bi bi-sort-up-alt icon-inline" aria-hidden="true"></i>${i18n.t('astrodex.sort_order_ascending')}`;
+        DOMUtils.clear(button);
+        DOMUtils.append(button, DOMUtils.createIcon('bi bi-sort-up-alt icon-inline'), i18n.t('astrodex.sort_order_ascending'));
     }
     renderAstrodexView(isAllowedAstrodex);
 }
@@ -1865,9 +1884,9 @@ async function initializeAstrodexEventListeners() {
     //Init buttons - wait for translations to be loaded before setting labels
     await i18n.ready;
     const buttonSort = document.getElementById('astrodex-sort-order');
-    buttonSort.innerHTML = `<i class="bi bi-sort-up-alt icon-inline" aria-hidden="true"></i>${i18n.t('astrodex.sort_order_ascending')}`;
+    DOMUtils.append(buttonSort, DOMUtils.createIcon('bi bi-sort-up-alt icon-inline'), i18n.t('astrodex.sort_order_ascending'));
     const buttonAddItem = document.getElementById('add-astrodex-item');
-    buttonAddItem.innerHTML = `<i class="bi bi-plus-circle icon-inline" aria-hidden="true"></i>${i18n.t('astrodex.add_object')}`;
+    DOMUtils.append(buttonAddItem, DOMUtils.createIcon('bi bi-plus-circle icon-inline'), i18n.t('astrodex.add_object'));
     
     // ============================================
     // Event delegation on document.body for modals and dynamic content

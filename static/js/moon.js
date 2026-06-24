@@ -123,21 +123,21 @@ async function loadMoon() {
         const row = document.createElement('div');
         row.className = 'row row-cols-1 row-cols-sm-2 row-cols-lg-2 row-cols-xl-3 p-2 mb-3';
 
-        const createCard = (titleText, lines) => {
+        const createCard = (iconClass, headerText, lines) => {
             const col = document.createElement('div');
             col.className = 'col mb-3';
             const card = document.createElement('div');
             card.className = 'card h-100';
             const cardHeader = document.createElement('div');
             cardHeader.className = 'card-header fw-bold';
-            cardHeader.innerHTML = titleText;
+            DOMUtils.append(cardHeader, DOMUtils.createIcon(iconClass), headerText);
             const list = document.createElement('ul');
             list.className = 'list-group list-group-flush';
-            lines.forEach(({ label, value }) => {
+            lines.forEach(({ labelIcon, labelText, value }) => {
                 const li = document.createElement('li');
                 li.className = 'list-group-item d-flex justify-content-between align-items-center';
                 const left = document.createElement('span');
-                left.innerHTML = label;
+                DOMUtils.append(left, DOMUtils.createIcon(labelIcon), labelText);
                 const right = document.createElement('span');
                 right.className = 'fw-bold';
                 right.textContent = value;
@@ -151,24 +151,24 @@ async function loadMoon() {
             return col;
         };
 
-        row.appendChild(createCard(`<i class="bi bi-moon-stars icon-inline" aria-hidden="true"></i>${i18n.t('common.moon')}`, [
-            { label: `<i class="bi bi-sunrise icon-inline" aria-hidden="true"></i>${i18n.t('moon.rise')}`, value: formatTimeThenDate(moon.next_moonrise) },
-            { label: `<i class="bi bi-sunset icon-inline" aria-hidden="true"></i>${i18n.t('moon.set')}`, value: formatTimeThenDate(moon.next_moonset) }
+        row.appendChild(createCard('bi bi-moon-stars icon-inline', i18n.t('common.moon'), [
+            { labelIcon: 'bi bi-sunrise icon-inline', labelText: i18n.t('moon.rise'), value: formatTimeThenDate(moon.next_moonrise) },
+            { labelIcon: 'bi bi-sunset icon-inline', labelText: i18n.t('moon.set'), value: formatTimeThenDate(moon.next_moonset) }
         ]));
-        row.appendChild(createCard(`<i class="bi bi-compass icon-inline" aria-hidden="true"></i>${i18n.t('moon.position')}`, [
-            { label: `<i class="bi bi-rulers icon-inline" aria-hidden="true"></i>${i18n.t('moon.distance')}`, value: moon.distance_km ? `${Math.round(moon.distance_km).toLocaleString()} ${i18n.t('units.km')}` : i18n.t('units.na') },
-            { label: `<i class="bi bi-arrows-angle-expand icon-inline" aria-hidden="true"></i>${i18n.t('moon.altitude')}`, value: moon.altitude_deg ? `${moon.altitude_deg.toFixed(2)}${i18n.t('units.degrees')}` : i18n.t('units.na') },
-            { label: `<i class="bi bi-compass icon-inline" aria-hidden="true"></i>${i18n.t('moon.azimuth')}`, value: moon.azimuth_deg ? `${moon.azimuth_deg.toFixed(2)}${i18n.t('units.degrees')}` : i18n.t('units.na') }
+        row.appendChild(createCard('bi bi-compass icon-inline', i18n.t('moon.position'), [
+            { labelIcon: 'bi bi-rulers icon-inline', labelText: i18n.t('moon.distance'), value: moon.distance_km ? `${Math.round(moon.distance_km).toLocaleString()} ${i18n.t('units.km')}` : i18n.t('units.na') },
+            { labelIcon: 'bi bi-arrows-angle-expand icon-inline', labelText: i18n.t('moon.altitude'), value: moon.altitude_deg ? `${moon.altitude_deg.toFixed(2)}${i18n.t('units.degrees')}` : i18n.t('units.na') },
+            { labelIcon: 'bi bi-compass icon-inline', labelText: i18n.t('moon.azimuth'), value: moon.azimuth_deg ? `${moon.azimuth_deg.toFixed(2)}${i18n.t('units.degrees')}` : i18n.t('units.na') }
         ]));
 
         const next_full_moon_txt = moon.next_full_moon === 'Not found' ? i18n.t('best_window.not_found') : formatTimeThenDate(new Date(moon.next_full_moon));
         const next_new_moon_txt = moon.next_new_moon === 'Not found' ? i18n.t('best_window.not_found') : formatTimeThenDate(new Date(moon.next_new_moon));
         const next_dark_night_start_txt = moon.next_dark_night_start === 'Not found' ? i18n.t('best_window.not_found') : formatTimeThenDate(new Date(moon.next_dark_night_start));
 
-        row.appendChild(createCard(`<i class="bi bi-calendar-event text-danger icon-inline" aria-hidden="true"></i>${i18n.t('moon.next_events')}`, [
-            { label: `<i class="bi bi-moon-stars-fill icon-inline" aria-hidden="true"></i>${i18n.t('moon.next_full_moon')}`, value: next_full_moon_txt },
-            { label: `<i class="bi bi-moon-fill icon-inline" aria-hidden="true"></i>${i18n.t('moon.next_new_moon')}`, value: next_new_moon_txt },
-            { label: `<i class="bi bi-stars icon-inline" aria-hidden="true"></i>${i18n.t('moon.next_dark_night')}`, value: next_dark_night_start_txt }
+        row.appendChild(createCard('bi bi-calendar-event text-danger icon-inline', i18n.t('moon.next_events'), [
+            { labelIcon: 'bi bi-moon-stars-fill icon-inline', labelText: i18n.t('moon.next_full_moon'), value: next_full_moon_txt },
+            { labelIcon: 'bi bi-moon-fill icon-inline', labelText: i18n.t('moon.next_new_moon'), value: next_new_moon_txt },
+            { labelIcon: 'bi bi-stars icon-inline', labelText: i18n.t('moon.next_dark_night'), value: next_dark_night_start_txt }
         ]));
 
         container.appendChild(header);
@@ -363,22 +363,22 @@ async function loadBestDarkWindow() {
         card.className = 'card h-100';
         const header = document.createElement('div');
         header.className = 'card-header';
-        header.innerHTML = `<i class="bi bi-stars icon-inline" aria-hidden="true"></i>${i18n.t('best_window.next_window')}`;
+        DOMUtils.append(header, DOMUtils.createIcon('bi bi-stars icon-inline'), i18n.t('best_window.next_window'));
         const list = document.createElement('ul');
         list.className = 'list-group list-group-flush';
-        const addTiming = (labelText, valueText) => {
+        const addTiming = (iconClass, labelText, valueText) => {
             const li = document.createElement('li');
             li.className = 'list-group-item d-flex justify-content-between align-items-center';
             const label = document.createElement('span');
-            label.innerHTML = labelText;
+            DOMUtils.append(label, DOMUtils.createIcon(iconClass), labelText);
             const value = document.createElement('span');
             value.textContent = valueText;
             li.appendChild(label);
             li.appendChild(value);
             list.appendChild(li);
         };
-        addTiming(`<i class="bi bi-sunset icon-inline" aria-hidden="true"></i>${i18n.t('best_window.start')}`, start_txt);
-        addTiming(`<i class="bi bi-sunrise icon-inline" aria-hidden="true"></i>${i18n.t('best_window.end')}`, end_txt);
+        addTiming('bi bi-sunset icon-inline', i18n.t('best_window.start'), start_txt);
+        addTiming('bi bi-sunrise icon-inline', i18n.t('best_window.end'), end_txt);
         card.appendChild(header);
         card.appendChild(list);
         item.appendChild(card);
@@ -472,11 +472,11 @@ async function loadBestDarkWindow() {
             modeHeader.textContent = modeTranslated.toUpperCase();
             const modeList = document.createElement('ul');
             modeList.className = 'list-group list-group-flush';
-            const addModeItem = (labelText, valueText) => {
+            const addModeItem = (iconClass, labelText, valueText) => {
                 const li = document.createElement('li');
                 li.className = 'list-group-item d-flex justify-content-between align-items-center';
                 const label = document.createElement('span');
-                label.innerHTML = labelText;
+                DOMUtils.append(label, DOMUtils.createIcon(iconClass), labelText);
                 li.appendChild(label);
                 const span = document.createElement('span');
                 span.textContent = valueText;
@@ -501,10 +501,10 @@ async function loadBestDarkWindow() {
                     moonConditionText = modeData.best_window.moon_condition;
                     break;
             }
-            addModeItem(`<i class="bi bi-activity icon-inline" aria-hidden="true"></i>${i18n.t('best_window.score')}`, String(modeData.best_window.score));
-            addModeItem(`<i class="bi bi-moon-stars icon-inline" aria-hidden="true"></i>${i18n.t('best_window.moon_condition')}`, moonConditionText);
-            addModeItem(`<i class="bi bi-sunset icon-inline" aria-hidden="true"></i>${i18n.t('best_window.start')}`, start_txt);
-            addModeItem(`<i class="bi bi-sunrise icon-inline" aria-hidden="true"></i>${i18n.t('best_window.end')}`, end_txt);
+            addModeItem('bi bi-activity icon-inline', i18n.t('best_window.score'), String(modeData.best_window.score));
+            addModeItem('bi bi-moon-stars icon-inline', i18n.t('best_window.moon_condition'), moonConditionText);
+            addModeItem('bi bi-sunset icon-inline', i18n.t('best_window.start'), start_txt);
+            addModeItem('bi bi-sunrise icon-inline', i18n.t('best_window.end'), end_txt);
             modeCard.appendChild(modeHeader);
             modeCard.appendChild(modeList);
             item.appendChild(modeCard);

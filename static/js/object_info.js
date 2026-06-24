@@ -34,13 +34,12 @@ async function fetchObjectInfo(identifier) {
 }
 
 /**
- * Build and return the HTML for an object-info section.
- * Uses the same card pattern as the slideshow picture-info tiles
- * (d-flex align-items-center p-2 rounded shadow-sm bg-light).
+ * Build and return a DOM element for an object-info section.
+ * Uses the same card pattern as the slideshow picture-info tiles.
  *
  * @param {object} data  - Response from /api/object/<id>
- * @param {object} opts  - { compact: bool }  compact = fewer aliases / shorter description
- * @returns {string} HTML string
+ * @param {object} opts  - { compact: bool, vertical: bool, noImage: bool, noError: bool }
+ * @returns {HTMLElement|null} DOM element, or null when suppressed by noError
  */
 function buildObjectInfoCardHtml(data, opts = {}) {
     const t = (key, fb) => (typeof i18n !== 'undefined' && i18n.has(key)) ? i18n.t(key) : fb;
@@ -49,98 +48,133 @@ function buildObjectInfoCardHtml(data, opts = {}) {
     const noError = !!opts.noError;
     const colClass = opts.vertical ? 'col-12' : 'col-md-6 col-lg-4';
 
+    const mkTile = (iconClass, labelText, ...valueNodes) => {
+        const col = document.createElement('div');
+        col.className = colClass;
+        const tile = document.createElement('div');
+        tile.className = 'd-flex align-items-center p-2 rounded shadow-sm object-info-tile h-100';
+        const iconWrap = document.createElement('div');
+        iconWrap.className = 'me-3 fs-4';
+        iconWrap.appendChild(DOMUtils.createIcon(iconClass));
+        const textWrap = document.createElement('div');
+        const label = document.createElement('small');
+        label.className = 'text-muted d-block';
+        label.textContent = labelText;
+        textWrap.appendChild(label);
+        valueNodes.forEach(n => textWrap.appendChild(n));
+        tile.appendChild(iconWrap);
+        tile.appendChild(textWrap);
+        col.appendChild(tile);
+        return col;
+    };
+
     if (!data || data.error === 'not_found') {
-        if (noError) return '';
-        return `<div class="slideshow-info mt-4">
-            <p class="text-muted small">
-                <i class="bi bi-question-circle icon-inline" aria-hidden="true"></i>
-                ${escapeHtml(t('object_info.not_found', 'Object not found in SIMBAD'))}
-            </p>
-        </div>`;
+        if (noError) return null;
+        const wrap = document.createElement('div');
+        wrap.className = 'slideshow-info mt-4';
+        const p = document.createElement('p');
+        p.className = 'text-muted small';
+        DOMUtils.append(p, DOMUtils.createIcon('bi bi-question-circle icon-inline'), t('object_info.not_found', 'Object not found in SIMBAD'));
+        wrap.appendChild(p);
+        return wrap;
     }
     if (data.error === 'invalid_identifier') {
-        if (noError) return '';
-        return `<div class="slideshow-info mt-4">
-            <p class="text-muted small">
-                <i class="bi bi-exclamation-circle icon-inline" aria-hidden="true"></i>
-                ${escapeHtml(t('object_info.invalid_identifier', 'Invalid identifier'))}
-            </p>
-        </div>`;
+        if (noError) return null;
+        const wrap = document.createElement('div');
+        wrap.className = 'slideshow-info mt-4';
+        const p = document.createElement('p');
+        p.className = 'text-muted small';
+        DOMUtils.append(p, DOMUtils.createIcon('bi bi-exclamation-circle icon-inline'), t('object_info.invalid_identifier', 'Invalid identifier'));
+        wrap.appendChild(p);
+        return wrap;
     }
 
-    let html = `<div class="slideshow-info mt-4">`;
+    const container = document.createElement('div');
+    container.className = 'slideshow-info mt-4';
 
     // ── Section heading ───────────────────────────────────
-    html += `<div class="row mb-3">
-        <div class="col">
-            <h5 class="mb-0">
-                <i class="bi bi-telescope icon-inline" aria-hidden="true"></i>
-                ${escapeHtml(t('object_info.title', 'Object Information'))}
-            </h5>
-        </div>
-    </div>`;
+    const headRow = document.createElement('div');
+    headRow.className = 'row mb-3';
+    const headCol = document.createElement('div');
+    headCol.className = 'col';
+    const h5 = document.createElement('h5');
+    h5.className = 'mb-0';
+    DOMUtils.append(h5, DOMUtils.createIcon('bi bi-telescope icon-inline'), t('object_info.title', 'Object Information'));
+    headCol.appendChild(h5);
+    headRow.appendChild(headCol);
+    container.appendChild(headRow);
 
     // ── Image ────────────────────────────────────────────
     if (!noImage && data.image && data.image.url) {
-        html += `<div class="row mb-3">
-            <div class="col text-center">
-                <img src="${escapeHtml(data.image.url)}"
-                     alt="${escapeHtml(data.name)}"
-                     class="img-fluid rounded shadow-sm"
-                     loading="lazy"
-                     style="max-height:${compact ? '160px' : '300px'}; object-fit:cover;"
-                     onerror="this.closest('.row').style.display='none'">
-                <small class="text-muted d-block mt-1">
-                    <i class="bi bi-camera icon-inline" aria-hidden="true"></i>
-                    ${escapeHtml(data.image.credit)}
-                </small>
-            </div>
-        </div>`;
+        const imgRow = document.createElement('div');
+        imgRow.className = 'row mb-3';
+        const imgCol = document.createElement('div');
+        imgCol.className = 'col text-center';
+        const img = document.createElement('img');
+        img.src = data.image.url;
+        img.alt = data.name || '';
+        img.className = 'img-fluid rounded shadow-sm';
+        img.loading = 'lazy';
+        img.style.maxHeight = compact ? '160px' : '300px';
+        img.style.objectFit = 'cover';
+        img.addEventListener('error', () => { imgRow.style.display = 'none'; });
+        const credit = document.createElement('small');
+        credit.className = 'text-muted d-block mt-1';
+        DOMUtils.append(credit, DOMUtils.createIcon('bi bi-camera icon-inline'), data.image.credit || '');
+        imgCol.appendChild(img);
+        imgCol.appendChild(credit);
+        imgRow.appendChild(imgCol);
+        container.appendChild(imgRow);
     }
 
     // ── Data tiles ───────────────────────────────────────
-    html += `<div class="row g-3">`;
+    const tilesRow = document.createElement('div');
+    tilesRow.className = 'row g-3';
 
     if (data.type) {
-        html += `<div class="${colClass}">
-            <div class="d-flex align-items-center p-2 rounded shadow-sm object-info-tile h-100">
-                <div class="me-3 fs-4"><i class="bi bi-tag text-primary" aria-hidden="true"></i></div>
-                <div>
-                    <small class="text-muted d-block">${escapeHtml(t('object_info.type_label', 'Type'))}</small>
-                    <strong>${escapeHtml(data.type)}</strong>
-                </div>
-            </div>
-        </div>`;
+        const strong = document.createElement('strong');
+        strong.textContent = data.type;
+        tilesRow.appendChild(mkTile('bi bi-tag text-primary', t('object_info.type_label', 'Type'), strong));
     }
 
     if (data.coordinates) {
         const ra  = data.coordinates.ra  != null ? Number(data.coordinates.ra).toFixed(4)  : '-';
         const dec = data.coordinates.dec != null ? Number(data.coordinates.dec).toFixed(4) : '-';
-        html += `<div class="${colClass}">
-            <div class="d-flex align-items-center p-2 rounded shadow-sm object-info-tile h-100">
-                <div class="me-3 fs-4"><i class="bi bi-geo-alt text-success" aria-hidden="true"></i></div>
-                <div>
-                    <small class="text-muted d-block">${escapeHtml(t('object_info.coordinates_label', 'Coordinates'))}</small>
-                    <strong>RA ${escapeHtml(ra)}° &nbsp; Dec ${escapeHtml(dec)}°</strong>
-                </div>
-            </div>
-        </div>`;
+        const strong = document.createElement('strong');
+        strong.textContent = `RA ${ra}°  Dec ${dec}°`;
+        tilesRow.appendChild(mkTile('bi bi-geo-alt text-success', t('object_info.coordinates_label', 'Coordinates'), strong));
     }
 
     if (data.aliases && data.aliases.length > 0) {
         const shown = compact ? data.aliases.slice(0, 4) : data.aliases;
-        html += `<div class="${colClass}">
-            <div class="d-flex align-items-start p-2 rounded shadow-sm object-info-tile h-100">
-                <div class="me-3 fs-4"><i class="bi bi-bookmarks text-warning" aria-hidden="true"></i></div>
-                <div>
-                    <small class="text-muted d-block">${escapeHtml(t('object_info.aliases_label', 'Also known as'))}</small>
-                    <div class="mt-1">${shown.map(a => `<span class="badge bg-secondary me-1 mb-1">${escapeHtml(a)}</span>`).join('')}</div>
-                </div>
-            </div>
-        </div>`;
+        const aliasesDiv = document.createElement('div');
+        aliasesDiv.className = 'mt-1';
+        shown.forEach(a => {
+            const badge = document.createElement('span');
+            badge.className = 'badge bg-secondary me-1 mb-1';
+            badge.textContent = a;
+            aliasesDiv.appendChild(badge);
+        });
+        const aliasTile = document.createElement('div');
+        aliasTile.className = colClass;
+        const tileInner = document.createElement('div');
+        tileInner.className = 'd-flex align-items-start p-2 rounded shadow-sm object-info-tile h-100';
+        const iconWrap = document.createElement('div');
+        iconWrap.className = 'me-3 fs-4';
+        iconWrap.appendChild(DOMUtils.createIcon('bi bi-bookmarks text-warning'));
+        const textWrap = document.createElement('div');
+        const lbl = document.createElement('small');
+        lbl.className = 'text-muted d-block';
+        lbl.textContent = t('object_info.aliases_label', 'Also known as');
+        textWrap.appendChild(lbl);
+        textWrap.appendChild(aliasesDiv);
+        tileInner.appendChild(iconWrap);
+        tileInner.appendChild(textWrap);
+        aliasTile.appendChild(tileInner);
+        tilesRow.appendChild(aliasTile);
     }
 
-    html += `</div>`; // row g-3
+    container.appendChild(tilesRow);
 
     // ── Description ──────────────────────────────────────
     if (data.description) {
@@ -148,34 +182,52 @@ function buildObjectInfoCardHtml(data, opts = {}) {
         const text = data.description.length > maxLen
             ? data.description.slice(0, maxLen) + '…'
             : data.description;
-        html += `<div class="row mt-3">
-            <div class="col">
-                <div class="d-flex align-items-start p-2 rounded shadow-sm object-info-tile">
-                    <div class="me-3 fs-4"><i class="bi bi-journal-text" aria-hidden="true"></i></div>
-                    <div>
-                        <small class="text-muted d-block">${escapeHtml(t('object_info.description_label', 'Description'))}</small>
-                        <p class="mb-0 small mt-1" style="white-space:pre-wrap;">${escapeHtml(text)}</p>
-                    </div>
-                </div>
-            </div>
-        </div>`;
+        const descRow = document.createElement('div');
+        descRow.className = 'row mt-3';
+        const descCol = document.createElement('div');
+        descCol.className = 'col';
+        const descTile = document.createElement('div');
+        descTile.className = 'd-flex align-items-start p-2 rounded shadow-sm object-info-tile';
+        const iconWrap = document.createElement('div');
+        iconWrap.className = 'me-3 fs-4';
+        iconWrap.appendChild(DOMUtils.createIcon('bi bi-journal-text'));
+        const textWrap = document.createElement('div');
+        const lbl = document.createElement('small');
+        lbl.className = 'text-muted d-block';
+        lbl.textContent = t('object_info.description_label', 'Description');
+        const p = document.createElement('p');
+        p.className = 'mb-0 small mt-1';
+        p.style.whiteSpace = 'pre-wrap';
+        p.textContent = text;
+        textWrap.appendChild(lbl);
+        textWrap.appendChild(p);
+        descTile.appendChild(iconWrap);
+        descTile.appendChild(textWrap);
+        descCol.appendChild(descTile);
+        descRow.appendChild(descCol);
+        container.appendChild(descRow);
     }
 
     // ── Sources ──────────────────────────────────────────
-    let sources = [t('object_info.source_simbad', 'Source: SIMBAD (CDS, Strasbourg)')];
-    if (!noImage && data.image) sources.push(t('object_info.source_skyview',   'Image: DSS2 / SkyView (NASA GSFC)'));
-    if (data.description)       sources.push(t('object_info.source_wikipedia', 'Description: Wikipedia'));
-    html += `<div class="row mt-3">
-        <div class="col">
-            <small class="text-muted">
-                <i class="bi bi-c-circle icon-inline" aria-hidden="true"></i>
-                ${sources.map(s => escapeHtml(s)).join(' &nbsp;·&nbsp; ')}
-            </small>
-        </div>
-    </div>`;
+    const srcList = [t('object_info.source_simbad', 'Source: SIMBAD (CDS, Strasbourg)')];
+    if (!noImage && data.image) srcList.push(t('object_info.source_skyview',   'Image: DSS2 / SkyView (NASA GSFC)'));
+    if (data.description)       srcList.push(t('object_info.source_wikipedia', 'Description: Wikipedia'));
+    const srcRow = document.createElement('div');
+    srcRow.className = 'row mt-3';
+    const srcCol = document.createElement('div');
+    srcCol.className = 'col';
+    const srcSmall = document.createElement('small');
+    srcSmall.className = 'text-muted';
+    srcSmall.appendChild(DOMUtils.createIcon('bi bi-c-circle icon-inline'));
+    srcList.forEach((s, i) => {
+        if (i > 0) srcSmall.appendChild(document.createTextNode('  ·  '));
+        srcSmall.appendChild(document.createTextNode(s));
+    });
+    srcCol.appendChild(srcSmall);
+    srcRow.appendChild(srcCol);
+    container.appendChild(srcRow);
 
-    html += `</div>`; // .slideshow-info
-    return html;
+    return container;
 }
 
 /**
@@ -195,10 +247,15 @@ async function showObjectInfoModal(identifier) {
 
     // Loading state
     DOMUtils.clear(bodyEl);
-    bodyEl.innerHTML = `<div class="text-center py-4">
-        <div class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></div>
-        ${escapeHtml(t('object_info.loading', 'Loading object data…'))}
-    </div>`;
+    const _loadDiv = document.createElement('div');
+    _loadDiv.className = 'text-center py-4';
+    const _loadSpinner = document.createElement('div');
+    _loadSpinner.className = 'spinner-border spinner-border-sm me-2';
+    _loadSpinner.setAttribute('role', 'status');
+    _loadSpinner.setAttribute('aria-hidden', 'true');
+    _loadDiv.appendChild(_loadSpinner);
+    _loadDiv.appendChild(document.createTextNode(t('object_info.loading', 'Loading object data…')));
+    bodyEl.appendChild(_loadDiv);
 
     const _modalEl = document.getElementById('modal_lg_close');
     let bs_modal = bootstrap.Modal.getInstance(_modalEl);
@@ -210,7 +267,8 @@ async function showObjectInfoModal(identifier) {
     const data = await fetchObjectInfo(identifier);
 
     DOMUtils.clear(bodyEl);
-    bodyEl.innerHTML = buildObjectInfoCardHtml(data, { compact: false, vertical: true });
+    const _cardEl = buildObjectInfoCardHtml(data, { compact: false, vertical: true });
+    if (_cardEl) bodyEl.appendChild(_cardEl);
 }
 
 /**
@@ -227,15 +285,23 @@ async function injectObjectInfoIntoContainer(identifier, container) {
     // Placeholder while loading
     const placeholder = document.createElement('div');
     placeholder.className = 'slideshow-info mt-4';
-    placeholder.innerHTML = `<div class="text-muted small py-2"><div class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></div>${escapeHtml(t('object_info.loading', 'Loading…'))}</div>`;
+    const _phInner = document.createElement('div');
+    _phInner.className = 'text-muted small py-2';
+    const _phSpinner = document.createElement('div');
+    _phSpinner.className = 'spinner-border spinner-border-sm me-2';
+    _phSpinner.setAttribute('role', 'status');
+    _phSpinner.setAttribute('aria-hidden', 'true');
+    _phInner.appendChild(_phSpinner);
+    _phInner.appendChild(document.createTextNode(t('object_info.loading', 'Loading…')));
+    placeholder.appendChild(_phInner);
     container.appendChild(placeholder);
 
     const data = await fetchObjectInfo(identifier);
 
-    const html = buildObjectInfoCardHtml(data, { compact: true, noImage: true, noError: true });
-    if (!html) {
+    const _infoEl = buildObjectInfoCardHtml(data, { compact: true, noImage: true, noError: true });
+    if (!_infoEl) {
         placeholder.remove();
         return;
     }
-    placeholder.outerHTML = html;
+    placeholder.replaceWith(_infoEl);
 }

@@ -3,7 +3,7 @@
 // ======================
 
 
-function createChartShell(title, canvasId, legendItems = [], footerText = '') {
+function createChartShell(iconClass, labelText, canvasId, legendItems = [], footerText = '') {
     const card = document.createElement('div');
     card.className = 'card h-100';
 
@@ -11,7 +11,7 @@ function createChartShell(title, canvasId, legendItems = [], footerText = '') {
     header.className = 'card-header';
     const h5 = document.createElement('h5');
     h5.className = 'mb-0';
-    h5.innerHTML = title;
+    DOMUtils.append(h5, DOMUtils.createIcon(iconClass), labelText);
     header.appendChild(h5);
 
     const body = document.createElement('div');
@@ -347,7 +347,7 @@ async function loadAstronomicalCharts() {
         const container1 = document.getElementById('cloudConditionsChartContainer');
         if (container1) {
             DOMUtils.clear(container1);
-            container1.appendChild(createChartShell(`<i class="bi bi-clouds icon-inline" aria-hidden="true"></i>${i18n.t('weather.chart_cloud_title')}`, 'cloudConditionsChart', [
+            container1.appendChild(createChartShell('bi bi-clouds icon-inline', i18n.t('weather.chart_cloud_title'), 'cloudConditionsChart', [
                 { label: i18n.t('weather.chart_cloudless'), color: '#22c55e' },
                 { label: i18n.t('weather.chart_condition'), color: '#ef4444' },
                 { label: i18n.t('weather.chart_fog'), color: '#808080' }
@@ -508,7 +508,7 @@ async function loadAstronomicalCharts() {
         const container2 = document.getElementById('seeingConditionsChartContainer');
         if (container2) {
             DOMUtils.clear(container2);
-            container2.appendChild(createChartShell(`<i class="bi bi-eye icon-inline" aria-hidden="true"></i>${i18n.t('weather.chart_seeing_title')}`, 'seeingConditionsChart', [
+            container2.appendChild(createChartShell('bi bi-eye icon-inline', i18n.t('weather.chart_seeing_title'), 'seeingConditionsChart', [
                 { label: i18n.t('weather.chart_fog'), color: '#808080' },
                 { label: i18n.t('weather.chart_condition'), color: '#ef4444' },
                 { label: i18n.t('weather.chart_seeing'), color: '#f97316' },
