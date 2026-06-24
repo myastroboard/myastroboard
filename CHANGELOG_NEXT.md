@@ -1,9 +1,0 @@
-- Add CSS orbital station on parallel of ISS
-- Add civil (-6°), nautical (-12°) and astronomical (-18°) twilight lines on horizon graph
-- Increale aperture limite and allow 2 decimal on reducer - Thanks @cgobat
-- Server side input verification for equipment
-- Add RASA (Rowe Ackerman Schmidt Astrograph) - Thanks @cgobat
-- Add APO Refractor and EdgeHD as telescope type options
-- Add Twilight (-6° / -12° / -18°) on horizon graph
-- Fix log display on mobile view
-- Fix notification NaN when no astronomical night
