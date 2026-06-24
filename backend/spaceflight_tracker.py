@@ -136,7 +136,9 @@ def _get(path: str, params: Optional[Dict[str, Any]] = None) -> Optional[Dict[st
         response = exc.response
         sc = response.status_code if response is not None else 0
         if sc == 429:
-            retry_after_header = response.headers.get("Retry-After", _BACKOFF_TTL) if response is not None else _BACKOFF_TTL
+            retry_after_header = (
+                response.headers.get("Retry-After", _BACKOFF_TTL) if response is not None else _BACKOFF_TTL
+            )
             retry_after = int(retry_after_header)
             backoff = min(max(retry_after, 60), _BACKOFF_TTL)
             _backoff_until[path] = time.time() + backoff

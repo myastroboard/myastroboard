@@ -45,6 +45,7 @@ myastroboard/
 │   ├── horizon_graph.py             # Horizon graph generation
 │   ├── i18n_utils.py                # Translation backend helpers
 │   ├── iss_passes.py                # ISS passes, solar transit, and lunar transit integration
+│   ├── css_passes.py                # CSS (China Space Station, NORAD 48274) passes – full parallel mirror of iss_passes.py
 │   ├── logging_config.py            # Centralized logger setup
 │   ├── metrics_collector.py         # Metrics collection service
 │   ├── moon_astrotonight.py         # Best astrophotography window calculations
@@ -153,6 +154,7 @@ myastroboard/
 │   ├── test_horizon_graph.py        # Horizon graph tests
 │   ├── test_i18n_utils.py           # i18n utility tests
 │   ├── test_iss_passes.py           # ISS passes tests
+│   ├── test_css_passes.py           # CSS passes tests
 │   ├── test_logging_config.py       # Logging configuration tests
 │   ├── test_moon_eclipse.py         # Moon eclipse tests
 │   ├── test_new_event_services.py   # New event services tests
@@ -410,6 +412,7 @@ except Exception as e:
     - Admin operations (`@admin_required`): `GET/POST /api/admin/app-settings`, `POST /api/admin/restart`
     - Seeing forecast: `GET /api/seeing-forecast`
     - ISS tracking: `GET /api/iss/passes` (returns passes, solar transits **and lunar transits**, all times in configured local TZ), `GET /api/iss/location`, `POST /api/iss/celestrak/restart` (`@admin_required`)
+    - CSS tracking: `GET /api/css/passes` (same structure as ISS, includes `station: "CSS"`), `GET /api/css/location`, `POST /api/css/celestrak/restart` (`@admin_required`)
     - Moon details: `GET /api/moon/month-calendar`
     - On-demand translation: `POST /api/translate/on-demand`
     - Spaceflight: `GET /api/spaceflight/launches`, `GET /api/spaceflight/astronauts`, `GET /api/spaceflight/events`, `GET /api/spaceflight/img/<filename>`, `GET /api/spaceflight/launch/<launch_id>/vidurls`
@@ -1171,6 +1174,7 @@ The background cache is **selective-refresh**: the scheduler polls every 25 min 
 | `horizon_graph` | `CACHE_TTL_HORIZON_GRAPH` | 1 hour |
 | `aurora` | `CACHE_TTL_AURORA` | 1 hour |
 | `iss_passes` | `CACHE_TTL_ISS_PASSES` | 6 hours |
+| `css_passes` | `CACHE_TTL_CSS_PASSES` | 6 hours |
 | `planetary_events` | `CACHE_TTL_PLANETARY_EVENTS` | 24 hours |
 | `special_phenomena` | `CACHE_TTL_SPECIAL_PHENOMENA` | 24 hours |
 | `solar_system_events` | `CACHE_TTL_SOLAR_SYSTEM_EVENTS` | 24 hours |
@@ -1185,6 +1189,7 @@ The background cache is **selective-refresh**: the scheduler polls every 25 min 
 - Execution metrics for `moon_report` **and** `dark_window` are both recorded (same timing) because they are computed together - the `moon_report` job entry records both after success or failure.
 - **ISS pass event extraction early exit**: `events_aggregator._extract_iss_pass_events()` breaks out of the passes loop as soon as `days_until > 7` since passes are generated in chronological order by Skyfield's `find_events`.
 - **ISS lunar transit**: `iss_passes.ISSPassService` detects ISS transits across the **lunar** disk in addition to the solar disk. Detection requires the `de421.bsp` ephemeris (gracefully skipped if absent). The report includes `lunar_transits` (list), `next_lunar_transit`, and `total_lunar_transits`. Each entry carries `start_time`/`peak_time`/`end_time` in the configured local timezone, `minimum_separation_arcmin`, `lunar_radius_arcmin`, `moon_altitude_deg`, `moon_azimuth_deg`, `moon_illumination_pct`, `iss_altitude_deg`, `iss_azimuth_deg`. The `events_aggregator` converts these to `EventType.ISS_LUNAR_TRANSIT` events (importance: CRITICAL, score 9.0, icon `bi bi-moon-stars`, `structure_key="iss"`). All i18n keys (`events_api.iss_lunar_transit_title`, `events_api.iss_lunar_transit_description`) are provided for all 6 supported languages.
+- **CSS parallel system**: `css_passes.CSSPassService` is a complete, independent mirror of `ISSPassService` for NORAD 48274 (Tiangong/CSS). All state is separate (`css_tle_cache.json`, `_css_*` functions). Both run as parallel jobs in `PARALLELIZABLE_JOBS` via `ThreadPoolExecutor`. The CSS cache key is `css_passes`; sample keys in observations use `css_altitude_deg`/`css_azimuth_deg`. The `events_aggregator` converts CSS events to `EventType.CSS_PASS`, `CSS_SOLAR_TRANSIT`, `CSS_LUNAR_TRANSIT` with `structure_key="css"`. Frontend at `#spaceflight/orbital-stations` shows both ISS and CSS side-by-side. N8 notification trigger handles CSS solar/lunar transits.
 
 ### Version Comparison
 - `version_checker.is_newer_version()` uses `packaging.version.parse()` (from the `packaging` library, declared in `requirements.txt`) for correct PEP 440 semantic version comparison. Do not revert to manual string parsing.

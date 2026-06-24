@@ -62,6 +62,7 @@
     "aurora": "Aurora boreal",
     "seeing": "Pronóstico de seeing",
     "iss": "ISS",
+    "orbital_stations": "Estaciones orbitales",
     "calendar": "Calendario de eventos",
     "plan_my_night": "Planifica mi noche",
     "spaceflight": "Vuelos espaciales",
@@ -408,7 +409,7 @@
     "passes": "ISS Pases",
     "loading_passes": "Cargando predicciones de pases ISS...",
     "info_tab": "ISS pasajes visibles para los próximos {days} días (iluminado por el sol ISS y cielo bastante oscuro), calculados para su ubicación y zona horaria configuradas.",
-    "next_visible_passage": "Siguiente pasaje visible",
+    "next_visible_passage": "Siguiente pasaje ISS visible",
     "start": "Comenzar:",
     "culmination": "Culminación:",
     "end": "Fin:",
@@ -443,6 +444,21 @@
     "celestrak_restart_confirm": "Confirmar reinicio: use esto solo después de que Celestrak quite el bloqueo para la IP de este host. ¿Continuar?",
     "footer_unknown_source": "Fuente desconocida",
     "footer_source": "Fuente de datos: el proveedor TLE activo es {source}. La geometría de los pasos orbitales se calcula localmente a partir de este TLE."
+  },
+  "orbital_stations": {
+    "title": "Estaciones orbitales",
+    "iss_label": "ISS",
+    "css_label": "CSS",
+    "map_title": "Posición en tiempo real de las estaciones orbitales",
+    "map_live": "Seguimiento en tiempo real de la ISS y la CSS",
+    "info_tab": "Pasos visibles para los próximos {days} días (estación iluminada, cielo suficientemente oscuro), calculados para su ubicación y zona horaria."
+  },
+  "css": {
+    "passes": "Pasos CSS",
+    "next_visible_passage": "Próximo paso CSS visible",
+    "no_passes": "No se encontró ningún paso CSS visible en la ventana de pronóstico seleccionada.",
+    "upcoming_passages": "Próximos pasos CSS",
+    "not_found": "No se encontraron pasos CSS visibles."
   },
   "spaceflight": {
     "subtab_launches": "Lanzamientos",
@@ -738,6 +754,7 @@
     "notifications_n1": "Inicio de sesión Plan My Night",
     "notifications_n2": "Próximo objetivo de observación",
     "notifications_n3": "Tránsito ISS (solar o lunar)",
+    "notifications_n8": "Tránsito CSS (solar o lunar)",
     "notifications_n4": "Eclipse lunar",
     "notifications_n5": "Eclipse solar",
     "notifications_n6": "Inicio de la oscuridad astronómica",
@@ -757,6 +774,9 @@
     "push_n6_body": "La noche comienza a las {time} (en {minutes} min) - prepárate",
     "push_n7_title": "Alerta aurora",
     "push_n7_body": "Kp {kp} detectado - {visibility}",
+    "push_n8_title": "Tránsito CSS",
+    "push_n8_solar_body": "Tránsito solar CSS en {minutes} min",
+    "push_n8_lunar_body": "Tránsito lunar CSS en {minutes} min",
     "push_kp_visibility_none": "Ninguna",
     "push_kp_visibility_very_low": "Muy baja",
     "push_kp_visibility_low": "Baja",
@@ -1570,6 +1590,11 @@
     "iss_solar_transit_description": "La ISS cruza el disco solar desde tu ubicación. Separación mínima {minimum_separation_arcmin}′, ventana estimada de tránsito de {duration_seconds}s con el Sol a {sun_altitude_deg}°. Requiere filtro solar certificado.",
     "iss_lunar_transit_title": "Tránsito lunar de la ISS",
     "iss_lunar_transit_description": "La ISS cruza el disco lunar desde tu ubicación. Separación mínima {minimum_separation_arcmin}′, ventana estimada de tránsito de {duration_seconds}s con la Luna a {moon_altitude_deg}°. Iluminación lunar {moon_illumination_pct}%.",
+    "css_description": "Puntuación del paso CSS {score}/100 ({visibility_day_night}). Altitud máxima {peak_altitude_deg}°.",
+    "css_solar_transit_title": "Tránsito solar CSS",
+    "css_solar_transit_description": "La estación espacial china cruza el disco solar desde tu ubicación. Separación mínima {minimum_separation_arcmin}′, ventana estimada de tránsito de {duration_seconds}s con el Sol a {sun_altitude_deg}°. Filtro solar certificado requerido.",
+    "css_lunar_transit_title": "Tránsito lunar CSS",
+    "css_lunar_transit_description": "La estación espacial china cruza el disco lunar desde tu ubicación. Separación mínima {minimum_separation_arcmin}′, ventana estimada de tránsito de {duration_seconds}s con la Luna a {moon_altitude_deg}°. Iluminación lunar {moon_illumination_pct}%.",
     "activities": {
       "deep_sky_observations": "observaciones de cielo profundo",
       "lunar_observations": "observaciones lunares",
@@ -1677,6 +1702,7 @@
     "step_horizon_graph": "Gráfico de horizonte",
     "step_aurora": "Aurora",
     "step_iss_passes": "Pasos de la ISS",
+    "step_css_passes": "Pasos CSS",
     "step_planetary_events": "Eventos planetarios",
     "step_special_phenomena": "Fenómenos especiales",
     "step_solar_system_events": "Eventos del sistema solar",
@@ -1902,7 +1928,10 @@
     "n6_body": "La noche comienza en {minutes} min - preparate",
     "n6_title": "Oscuridad astronomica",
     "n7_body": "Kp {kp} detectado - {visibility}",
-    "n7_title": "Alerta aurora"
+    "n7_title": "Alerta aurora",
+    "n8_body_lunar": "Tránsito lunar CSS en {minutes} min",
+    "n8_body_solar": "Tránsito solar CSS en {minutes} min",
+    "n8_title": "Tránsito CSS"
   },
   "observatory": {
     "loading": "Cargando datos del observatorio…",

@@ -438,8 +438,8 @@ function switchSubTab(parentTab, subtabName, options = {}) {
             clearEventsCache();
             loadAndDisplayEvents();
             break; // Astro Forecast tab
-        case 'iss':
-            loadIss();
+        case 'orbital-stations':
+            loadOrbitalStations();
             break; // Spaceflight tab
         case 'launches':
             loadSpaceflightLaunches();

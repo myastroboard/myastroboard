@@ -922,9 +922,7 @@ def find_item_in_astrodex(user_id: str, item_name: str, catalogue: str = '') -> 
     astrodex = load_user_astrodex(user_id)
 
     requested_candidates = _extract_name_candidates(item_name)
-    requested_normalized_names = {
-        _normalize_name(c) for c in requested_candidates if _normalize_name(c)
-    }
+    requested_normalized_names = {_normalize_name(c) for c in requested_candidates if _normalize_name(c)}
 
     requested_group_ids: set = set()
     requested_alias_names: set = set()

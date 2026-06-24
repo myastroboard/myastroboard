@@ -83,6 +83,7 @@ from constants import (
     CACHE_TTL_LUNAR_ECLIPSE,
     CACHE_TTL_AURORA,
     CACHE_TTL_ISS_PASSES,
+    CACHE_TTL_CSS_PASSES,
     CACHE_TTL_PLANETARY_EVENTS,
     CACHE_TTL_SPECIAL_PHENOMENA,
     CACHE_TTL_SOLAR_SYSTEM_EVENTS,
@@ -118,6 +119,7 @@ from auth import (
 # Astrodex
 import astrodex
 import iss_passes
+import css_passes
 import plan_my_night
 import skytonight_targets
 
@@ -1006,22 +1008,25 @@ def update_config_api():
 def list_connectors_api():
     """List all available connectors with their installed/enabled state."""
     from connectors import REGISTRY
+
     config = load_config()
     connectors_cfg = config.get("connectors", {})
     result = []
     for name, cls in REGISTRY.items():
         cfg = connectors_cfg.get(name, {})
-        result.append({
-            "name": name,
-            "label": cls.label,
-            "description": cls.description,
-            "min_version": cls.min_version,
-            "homepage": cls.homepage,
-            "modules": cls.MODULES,
-            "installed": bool(cfg.get("url")),
-            "enabled": bool(cfg.get("enabled")) and bool(cfg.get("url")),
-            "config": cfg,
-        })
+        result.append(
+            {
+                "name": name,
+                "label": cls.label,
+                "description": cls.description,
+                "min_version": cls.min_version,
+                "homepage": cls.homepage,
+                "modules": cls.MODULES,
+                "installed": bool(cfg.get("url")),
+                "enabled": bool(cfg.get("enabled")) and bool(cfg.get("url")),
+                "config": cfg,
+            }
+        )
     return jsonify(result)
 
 
@@ -1039,9 +1044,11 @@ def allsky_status_api():
     data = cache_store._allsky_sensor_cache.get("data")
     if data is None:
         from connectors.allsky_connector import AllSkyConnector
+
         data = AllSkyConnector(allsky_cfg).fetch_sensor_data()
         cache_store._allsky_sensor_cache["data"] = data
         import time
+
         cache_store._allsky_sensor_cache["timestamp"] = time.time()
     return jsonify(data)
 
@@ -1063,6 +1070,7 @@ def allsky_health_api():
         import ipaddress as _ipaddress
         import socket as _socket
         from urllib.parse import urlparse as _urlparse
+
         parsed = _urlparse(test_url)
         if parsed.scheme not in ('http', 'https'):
             return jsonify({"reachable": False, "error": "url must use http or https"}), 400
@@ -1084,6 +1092,7 @@ def allsky_health_api():
         safe_scheme = 'https' if parsed.scheme == 'https' else 'http'
         safe_url = f"{safe_scheme}://{resolved_ip}"
         import requests as _req
+
         try:
             r = _req.head(safe_url, timeout=5, allow_redirects=True)
             if r.status_code == 405:
@@ -1099,12 +1108,14 @@ def allsky_health_api():
         return jsonify({"reachable": False, "modules": {}, "error": "AllSky URL not configured"}), 200
 
     import time
+
     cached = cache_store._allsky_health_cache
     fresh = request.args.get("fresh") == "1"
     if not fresh and cached.get("data") and (time.time() - cached.get("timestamp", 0)) < CACHE_TTL_ALLSKY_HEALTH:
         return jsonify(cached["data"])
 
     from connectors.allsky_connector import AllSkyConnector
+
     result = AllSkyConnector(allsky_cfg).health_check()
     cache_store._allsky_health_cache["data"] = result
     cache_store._allsky_health_cache["timestamp"] = time.time()
@@ -1126,13 +1137,11 @@ def allsky_urls_api():
 
     date_str = request.args.get("date")
     from connectors.allsky_connector import AllSkyConnector
+
     direct_urls = AllSkyConnector(allsky_cfg).get_module_urls(date_str=date_str)
 
     date_suffix = f"&date={date_str}" if date_str else ""
-    proxy_urls = {
-        module: f"/api/connectors/allsky/proxy?module={module}{date_suffix}"
-        for module in direct_urls
-    }
+    proxy_urls = {module: f"/api/connectors/allsky/proxy?module={module}{date_suffix}" for module in direct_urls}
     return jsonify(proxy_urls)
 
 
@@ -1168,6 +1177,7 @@ def allsky_proxy_api():
     # link-local address (common with .local mDNS names inside Docker).
     import socket
     from urllib.parse import urlparse, urlunparse
+
     try:
         parsed = urlparse(target_url)
         hostname = parsed.hostname
@@ -2323,6 +2333,84 @@ def restart_iss_celestrak_crawl_api():
         return jsonify({'error': 'Internal server error'}), 500
 
 
+@app.route("/api/css/passes", methods=["GET"])
+@login_required
+def get_css_passes_api():
+    """Return CSS (Tiangong) passes report, from cache only."""
+    try:
+
+        def _with_celestrak_status(payload: Dict[str, Any]) -> Dict[str, Any]:
+            merged = dict(payload)
+            merged["celestrak_status"] = css_passes.get_css_celestrak_status()
+            merged["tle_source"] = css_passes.get_css_tle_source_info()
+            return merged
+
+        days = request.args.get("days", default=20, type=int)
+        days = max(1, min(days, 30))
+
+        if cache_store.is_cache_valid(cache_store._css_passes_cache, CACHE_TTL_CSS_PASSES):
+            cached_data = cache_store._css_passes_cache["data"]
+            if isinstance(cached_data, dict) and cached_data.get("window_days") == days:
+                return jsonify(_with_celestrak_status(cached_data))
+
+        if cache_store.sync_cache_from_shared("css_passes", cache_store._css_passes_cache):
+            if cache_store.is_cache_valid(cache_store._css_passes_cache, CACHE_TTL_CSS_PASSES):
+                cached_data = cache_store._css_passes_cache["data"]
+                if isinstance(cached_data, dict) and cached_data.get("window_days") == days:
+                    return jsonify(_with_celestrak_status(cached_data))
+
+        return (
+            jsonify({"status": "pending", "message": "CSS passes cache is not ready yet. Please try again shortly."}),
+            202,
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting CSS passes cache: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@app.route("/api/css/location", methods=["GET"])
+@login_required
+def get_css_location_api():
+    """Return current CSS ground position and ±50-minute orbit track, computed from cached TLE."""
+    try:
+        config = load_config()
+        location = config.get("location", {})
+        lat = location.get("latitude")
+        lon = location.get("longitude")
+        elev = float(location.get("elevation", 0) or 0)
+        position = css_passes.get_css_current_position(
+            latitude=float(lat) if lat is not None else None,
+            longitude=float(lon) if lon is not None else None,
+            elevation_m=elev,
+        )
+        return jsonify(position)
+    except RuntimeError:
+        logger.exception("Runtime error computing CSS location")
+        return jsonify({'error': 'Service temporarily unavailable'}), 503
+    except Exception as exc:
+        logger.error(f"Error computing CSS location: {exc}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@app.route("/api/css/celestrak/restart", methods=["POST"])
+@login_required
+def restart_css_celestrak_crawl_api():
+    """Clear CSS Celestrak block flag after explicit operator confirmation in UI."""
+    try:
+        status = css_passes.clear_css_celestrak_block_flag()
+        return jsonify(
+            {
+                "status": "ok",
+                "message": "CSS Celestrak block flag cleared. Next crawl may query Celestrak again.",
+                "celestrak_status": status,
+            }
+        )
+    except Exception as exc:
+        logger.error(f"Error resetting CSS Celestrak block flag: {exc}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
 @app.route("/api/spaceflight/launches", methods=["GET"])
 @login_required
 def get_spaceflight_launches_api():
@@ -2581,6 +2669,7 @@ def get_upcoming_events_api():
         lunar_eclipse_data = None
         aurora_data = None
         iss_passes_data = None
+        css_passes_data = None
         moon_phases_data = None
         planetary_events_data = None
         special_phenomena_data = None
@@ -2613,6 +2702,13 @@ def get_upcoming_events_api():
         elif cache_store.sync_cache_from_shared("iss_passes", cache_store._iss_passes_cache):
             if cache_store.is_cache_valid(cache_store._iss_passes_cache, CACHE_TTL_ISS_PASSES):
                 iss_passes_data = cache_store._iss_passes_cache.get("data")
+
+        # Try to get CSS passes data
+        if cache_store.is_cache_valid(cache_store._css_passes_cache, CACHE_TTL_CSS_PASSES):
+            css_passes_data = cache_store._css_passes_cache.get("data")
+        elif cache_store.sync_cache_from_shared("css_passes", cache_store._css_passes_cache):
+            if cache_store.is_cache_valid(cache_store._css_passes_cache, CACHE_TTL_CSS_PASSES):
+                css_passes_data = cache_store._css_passes_cache.get("data")
 
         # Try to get moon phases data
         if cache_store.is_cache_valid(cache_store._moon_planner_report_cache, CACHE_TTL_MOON_PLANNER):
@@ -2656,6 +2752,7 @@ def get_upcoming_events_api():
             lunar_eclipse_data=lunar_eclipse_data,
             aurora_data=aurora_data,
             iss_passes_data=iss_passes_data,
+            css_passes_data=css_passes_data,
             moon_phases_data=moon_phases_data,
             planetary_events_data=planetary_events_data,
             special_phenomena_data=special_phenomena_data,
@@ -3769,10 +3866,15 @@ def add_astrodex_item():
         # Check if item already exists (exact name or catalogue aliases)
         existing = astrodex.find_item_in_astrodex(user_id, item_data['name'], item_data.get('catalogue', ''))
         if existing:
-            return jsonify({
-                'error': 'duplicate',
-                'existing_item': {'id': existing['id'], 'name': existing.get('name', '')},
-            }), 409
+            return (
+                jsonify(
+                    {
+                        'error': 'duplicate',
+                        'existing_item': {'id': existing['id'], 'name': existing.get('name', '')},
+                    }
+                ),
+                409,
+            )
 
         new_item = astrodex.create_astrodex_item(user_id, item_data, user.username)
 

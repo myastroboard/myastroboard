@@ -28,6 +28,7 @@ Each cache job has an individual TTL defined in `backend/constants.py`:
 | `horizon_graph` | 6 hours | Daily arc of sun/moon |
 | `aurora` | 1 hour | Geomagnetic forecast updates hourly |
 | `iss_passes` | 6 hours | 20-day prediction window, stable |
+| `css_passes` | 6 hours | 20-day prediction window, stable (CSS NORAD 48274) |
 | `planetary_events` | 24 hours | 365-day planetary forecast |
 | `special_phenomena` | 24 hours | Annual events (equinoxes, solstices…) |
 | `solar_system_events` | 24 hours | Annual events (meteor showers, comets…) |
@@ -166,6 +167,7 @@ When location is updated via `/api/config` POST endpoint:
     "horizon_graph": true,
     "aurora": true,
     "iss_passes": true,
+    "css_passes": true,
     "planetary_events": true,
     "special_phenomena": true,
     "solar_system_events": true,
@@ -184,6 +186,7 @@ When location is updated via `/api/config` POST endpoint:
       "horizon_graph": 21600,
       "aurora": 3600,
       "iss_passes": 21600,
+      "css_passes": 21600,
       "planetary_events": 86400,
       "special_phenomena": 86400,
       "solar_system_events": 86400,

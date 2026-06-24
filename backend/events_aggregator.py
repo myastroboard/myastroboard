@@ -55,6 +55,9 @@ class EventType(Enum):
     ISS_PASS = "ISS Pass"
     ISS_SOLAR_TRANSIT = "ISS Solar Transit"
     ISS_LUNAR_TRANSIT = "ISS Lunar Transit"
+    CSS_PASS = "CSS Pass"
+    CSS_SOLAR_TRANSIT = "CSS Solar Transit"
+    CSS_LUNAR_TRANSIT = "CSS Lunar Transit"
     MOON_PHASE = "Moon Phase"
     PLANETARY_CONJUNCTION = "Planetary Conjunction"
     PLANETARY_OPPOSITION = "Planetary Opposition"
@@ -210,6 +213,9 @@ class EventsAggregator:
             EventType.ISS_PASS.value: "bi bi-iss",
             EventType.ISS_SOLAR_TRANSIT.value: "bi bi-sun",
             EventType.ISS_LUNAR_TRANSIT.value: "bi bi-moon-stars",
+            EventType.CSS_PASS.value: "bi bi-iss",
+            EventType.CSS_SOLAR_TRANSIT.value: "bi bi-sun",
+            EventType.CSS_LUNAR_TRANSIT.value: "bi bi-moon-stars",
             EventType.MOON_PHASE.value: "bi bi-moon-stars",
             EventType.PLANETARY_CONJUNCTION.value: "bi bi-conjonction",
             EventType.PLANETARY_OPPOSITION.value: "bi bi-bullseye",
@@ -340,6 +346,7 @@ class EventsAggregator:
         lunar_eclipse_data: Optional[Dict[str, Any]] = None,
         aurora_data: Optional[Dict[str, Any]] = None,
         iss_passes_data: Optional[Dict[str, Any]] = None,
+        css_passes_data: Optional[Dict[str, Any]] = None,
         moon_phases_data: Optional[Dict[str, Any]] = None,
         planetary_events_data: Optional[Dict[str, Any]] = None,
         special_phenomena_data: Optional[Dict[str, Any]] = None,
@@ -404,6 +411,14 @@ class EventsAggregator:
                 events.extend(iss_events)
             except Exception as e:
                 logger.warning(f"Error extracting ISS pass events: {e}")
+
+        # Add CSS pass if available
+        if css_passes_data:
+            try:
+                css_events = self._extract_css_pass_events(css_passes_data)
+                events.extend(css_events)
+            except Exception as e:
+                logger.warning(f"Error extracting CSS pass events: {e}")
 
         # Add planetary events if available
         if planetary_events_data:
@@ -901,6 +916,189 @@ class EventsAggregator:
                 score=score,
                 raw_data=lunar_transit,
                 structure_key="iss",
+            )
+            events.append(event)
+
+        events.sort(key=lambda event: self._parse_iso_time(event.peak_time) if event.peak_time else self.local_now)
+        return events
+
+    def _extract_css_pass_events(self, css_data: Dict[str, Any]) -> List[AstronomicalEvent]:
+        """Extract CSS visible pass, solar transit, and lunar transit events occurring in the next 7 days."""
+        raw_passes = css_data.get("passes")
+        if not isinstance(raw_passes, list):
+            next_pass = css_data.get("next_visible_passage")
+            raw_passes = [next_pass] if next_pass else []
+
+        raw_transits = css_data.get("solar_transits")
+        if not isinstance(raw_transits, list):
+            next_transit = css_data.get("next_solar_transit")
+            raw_transits = [next_transit] if next_transit else []
+
+        raw_lunar_transits = css_data.get("lunar_transits")
+        if not isinstance(raw_lunar_transits, list):
+            next_lunar_transit = css_data.get("next_lunar_transit")
+            raw_lunar_transits = [next_lunar_transit] if next_lunar_transit else []
+
+        events: List[AstronomicalEvent] = []
+
+        for css_pass in raw_passes:
+            if not isinstance(css_pass, dict):
+                continue
+
+            peak_time_str = css_pass.get("peak_time")
+            if not peak_time_str:
+                continue
+
+            peak_time = self._parse_iso_time(peak_time_str)
+            days_until = (peak_time.date() - self.local_now.date()).days
+
+            if days_until > 7:
+                break
+            if days_until < 0:
+                continue
+
+            score = float(css_pass.get("visibility_score", 0) or 0)
+            visibility_day_night = css_pass.get("visibility_day_night", "Unknown")
+            visibility_period_localized = self._translate_visibility_period(str(visibility_day_night))
+
+            if score >= 75:
+                importance = EventImportance.HIGH.value
+            elif score >= 55:
+                importance = EventImportance.MEDIUM.value
+            else:
+                importance = EventImportance.LOW.value
+
+            event = AstronomicalEvent(
+                id=f"css_pass_{peak_time_str.replace(':', '').replace('-', '')}",
+                event_type=EventType.CSS_PASS.value,
+                icon_class="bi bi-iss",
+                icon_color_class=self._importance_icon_color_class(importance),
+                title=(
+                    "CSS Visible Passage"
+                    if self.i18n.get_language() == "en"
+                    else self._t("css.next_visible_passage", "CSS Visible Passage")
+                ),
+                description=(
+                    self._t(
+                        "events_api.css_description",
+                        f"CSS pass score {score:.0f}/100 ({visibility_day_night})."
+                        f" Peak altitude {float(css_pass.get('peak_altitude_deg', 0)):.1f}°.",
+                        score=f"{score:.0f}",
+                        visibility_day_night=visibility_period_localized,
+                        peak_altitude_deg=f"{float(css_pass.get('peak_altitude_deg', 0)):.1f}",
+                    )
+                ),
+                start_time=css_pass.get("start_time"),
+                peak_time=peak_time_str,
+                end_time=css_pass.get("end_time"),
+                days_until_event=days_until,
+                visibility=bool(css_pass.get("is_visible", False)),
+                importance=importance,
+                score=score,
+                raw_data=css_pass,
+                structure_key="css",
+            )
+            events.append(event)
+
+        for transit in raw_transits:
+            if not isinstance(transit, dict):
+                continue
+
+            peak_time_str = transit.get("peak_time")
+            if not peak_time_str:
+                continue
+
+            peak_time = self._parse_iso_time(peak_time_str)
+            days_until = (peak_time.date() - self.local_now.date()).days
+
+            if days_until < 0 or days_until > 7:
+                continue
+
+            min_sep_arcmin = float(transit.get("minimum_separation_arcmin", 0) or 0)
+            duration_seconds = float(transit.get("duration_seconds", 0) or 0)
+            sun_altitude_deg = float(transit.get("sun_altitude_deg", 0) or 0)
+            solar_radius_arcmin = float(transit.get("solar_radius_arcmin", 0) or 0)
+
+            score = 10.0
+            importance = EventImportance.CRITICAL.value
+
+            event = AstronomicalEvent(
+                id=f"css_solar_transit_{peak_time_str.replace(':', '').replace('-', '')}",
+                event_type=EventType.CSS_SOLAR_TRANSIT.value,
+                icon_class="bi bi-sun",
+                icon_color_class=self._importance_icon_color_class(importance),
+                title=self._t("events_api.css_solar_transit_title", "CSS Solar Transit"),
+                description=self._t(
+                    "events_api.css_solar_transit_description",
+                    "CSS crosses the solar disk from your location."
+                    " Minimum separation {minimum_separation_arcmin}′, estimated transit window {duration_seconds}s"
+                    " near {sun_altitude_deg}° solar altitude. Certified solar filter required.",
+                    minimum_separation_arcmin=f"{min_sep_arcmin:.2f}",
+                    duration_seconds=f"{duration_seconds:.1f}",
+                    sun_altitude_deg=f"{sun_altitude_deg:.1f}",
+                    solar_radius_arcmin=f"{solar_radius_arcmin:.2f}",
+                ),
+                start_time=transit.get("start_time"),
+                peak_time=peak_time_str,
+                end_time=transit.get("end_time"),
+                days_until_event=days_until,
+                visibility=bool(transit.get("is_visible", True)),
+                importance=importance,
+                score=score,
+                raw_data=transit,
+                structure_key="css",
+            )
+            events.append(event)
+
+        for lunar_transit in raw_lunar_transits:
+            if not isinstance(lunar_transit, dict):
+                continue
+
+            peak_time_str = lunar_transit.get("peak_time")
+            if not peak_time_str:
+                continue
+
+            peak_time = self._parse_iso_time(peak_time_str)
+            days_until = (peak_time.date() - self.local_now.date()).days
+
+            if days_until < 0 or days_until > 7:
+                continue
+
+            min_sep_arcmin = float(lunar_transit.get("minimum_separation_arcmin", 0) or 0)
+            duration_seconds = float(lunar_transit.get("duration_seconds", 0) or 0)
+            moon_altitude_deg = float(lunar_transit.get("moon_altitude_deg", 0) or 0)
+            lunar_radius_arcmin = float(lunar_transit.get("lunar_radius_arcmin", 0) or 0)
+            moon_illumination_pct = float(lunar_transit.get("moon_illumination_pct", 0) or 0)
+
+            score = 9.0
+            importance = EventImportance.CRITICAL.value
+
+            event = AstronomicalEvent(
+                id=f"css_lunar_transit_{peak_time_str.replace(':', '').replace('-', '')}",
+                event_type=EventType.CSS_LUNAR_TRANSIT.value,
+                icon_class="bi bi-moon-stars",
+                icon_color_class=self._importance_icon_color_class(importance),
+                title=self._t("events_api.css_lunar_transit_title", "CSS Lunar Transit"),
+                description=self._t(
+                    "events_api.css_lunar_transit_description",
+                    "CSS crosses the lunar disk from your location."
+                    " Minimum separation {minimum_separation_arcmin}′, estimated transit window {duration_seconds}s"
+                    " near {moon_altitude_deg}° lunar altitude. Moon illumination {moon_illumination_pct}%.",
+                    minimum_separation_arcmin=f"{min_sep_arcmin:.2f}",
+                    duration_seconds=f"{duration_seconds:.1f}",
+                    moon_altitude_deg=f"{moon_altitude_deg:.1f}",
+                    lunar_radius_arcmin=f"{lunar_radius_arcmin:.2f}",
+                    moon_illumination_pct=f"{moon_illumination_pct:.0f}",
+                ),
+                start_time=lunar_transit.get("start_time"),
+                peak_time=peak_time_str,
+                end_time=lunar_transit.get("end_time"),
+                days_until_event=days_until,
+                visibility=bool(lunar_transit.get("is_visible", True)),
+                importance=importance,
+                score=score,
+                raw_data=lunar_transit,
+                structure_key="css",
             )
             events.append(event)
 

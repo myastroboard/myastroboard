@@ -62,6 +62,7 @@
     "aurora": "Nordlicht",
     "seeing": "Seeing-Vorhersage",
     "iss": "ISS",
+    "orbital_stations": "Raumstationen",
     "calendar": "Veranstaltungskalender",
     "plan_my_night": "Plane meine Nacht",
     "spaceflight": "Raumfahrt",
@@ -408,7 +409,7 @@
     "passes": "ISS Bestanden",
     "loading_passes": "ISS Pass-Vorhersagen werden geladen...",
     "info_tab": "ISS sichtbare Passagen für die nächsten {days} Tage (sonnenbeschienene ISS und ausreichend dunkler Himmel), berechnet für Ihren konfigurierten Standort und Ihre Zeitzone.",
-    "next_visible_passage": "Nächste sichtbare Passage",
+    "next_visible_passage": "Nächste sichtbare ISS-Passage",
     "start": "Start:",
     "culmination": "Höhepunkt:",
     "end": "Ende:",
@@ -443,6 +444,21 @@
     "celestrak_restart_confirm": "Neustart bestätigen: Nur verwenden, wenn Celestrak die Sperre für diese Host-IP entfernt hat. Fortfahren?",
     "footer_unknown_source": "Unbekannte Quelle",
     "footer_source": "Datenquelle: Aktiver TLE-Anbieter ist {source}. Die Geometrie der Überflüge wird lokal aus diesem TLE berechnet."
+  },
+  "orbital_stations": {
+    "title": "Raumstationen",
+    "iss_label": "ISS",
+    "css_label": "CSS",
+    "map_title": "Echtzeit-Position der Raumstationen",
+    "map_live": "ISS und CSS werden in Echtzeit verfolgt",
+    "info_tab": "Sichtbare Überflüge für die nächsten {days} Tage (beleuchtete Station, ausreichend dunkler Himmel), berechnet für Ihren Standort und Ihre Zeitzone."
+  },
+  "css": {
+    "passes": "CSS-Überflüge",
+    "next_visible_passage": "Nächster sichtbarer CSS-Überflug",
+    "no_passes": "Kein sichtbarer CSS-Überflug im ausgewählten Prognosefenster gefunden.",
+    "upcoming_passages": "Bevorstehende CSS-Überflüge",
+    "not_found": "Keine sichtbaren CSS-Überflüge gefunden."
   },
   "spaceflight": {
     "subtab_launches": "Starts",
@@ -738,6 +754,7 @@
     "notifications_n1": "Plan My Night Sitzung beginnt",
     "notifications_n2": "Nächstes Beobachtungsziel",
     "notifications_n3": "ISS-Transit (solar oder lunar)",
+    "notifications_n8": "CSS-Transit (solar oder lunar)",
     "notifications_n4": "Mondfinsternis",
     "notifications_n5": "Sonnenfinsternis",
     "notifications_n6": "Astronomische Dunkelheit beginnt",
@@ -757,6 +774,9 @@
     "push_n6_body": "Nacht beginnt um {time} (in {minutes} Min.) - Vorbereitung!",
     "push_n7_title": "Aurora-Alarm",
     "push_n7_body": "Kp {kp} erkannt - {visibility}",
+    "push_n8_title": "CSS-Transit",
+    "push_n8_solar_body": "CSS-Sonnentransit in {minutes} Min",
+    "push_n8_lunar_body": "CSS-Mondtransit in {minutes} Min",
     "push_kp_visibility_none": "Keine",
     "push_kp_visibility_very_low": "Sehr niedrig",
     "push_kp_visibility_low": "Niedrig",
@@ -1570,6 +1590,11 @@
     "iss_solar_transit_description": "Die ISS durchquert von Ihrem Standort aus die Sonnenscheibe. Minimale Trennung {minimum_separation_arcmin}′, geschätztes Transitfenster {duration_seconds}s bei {sun_altitude_deg}° Sonnenhöhe. Zertifizierter Sonnenfilter erforderlich.",
     "iss_lunar_transit_title": "ISS-Mondtransit",
     "iss_lunar_transit_description": "Die ISS durchquert von Ihrem Standort aus die Mondscheibe. Minimale Trennung {minimum_separation_arcmin}′, geschätztes Transitfenster {duration_seconds}s bei {moon_altitude_deg}° Mondhöhe. Mondbeleuchtung {moon_illumination_pct}%.",
+    "css_description": "CSS Überflugpunktzahl {score}/100 ({visibility_day_night}). Gipfelhöhe {peak_altitude_deg}°.",
+    "css_solar_transit_title": "CSS-Sonnentransit",
+    "css_solar_transit_description": "Die Raumstation China durchquert von Ihrem Standort aus die Sonnenscheibe. Minimale Trennung {minimum_separation_arcmin}′, geschätztes Transitfenster {duration_seconds}s bei {sun_altitude_deg}° Sonnenhöhe. Zertifizierter Sonnenfilter erforderlich.",
+    "css_lunar_transit_title": "CSS-Mondtransit",
+    "css_lunar_transit_description": "Die Raumstation China durchquert von Ihrem Standort aus die Mondscheibe. Minimale Trennung {minimum_separation_arcmin}′, geschätztes Transitfenster {duration_seconds}s bei {moon_altitude_deg}° Mondhöhe. Mondbeleuchtung {moon_illumination_pct}%.",
     "activities": {
       "deep_sky_observations": "Deep-Sky-Beobachtungen",
       "lunar_observations": "Mondbeobachtungen",
@@ -1677,6 +1702,7 @@
     "step_horizon_graph": "Horizontgraph",
     "step_aurora": "Aurora",
     "step_iss_passes": "ISS-Überflüge",
+    "step_css_passes": "CSS-Überflüge",
     "step_planetary_events": "Planetarische Ereignisse",
     "step_special_phenomena": "Besondere Phänomene",
     "step_solar_system_events": "Sonnensystemereignisse",
@@ -1902,7 +1928,10 @@
     "n6_body": "Nacht beginnt in {minutes} Min - machen Sie sich bereit",
     "n6_title": "Astronomische Nacht",
     "n7_body": "Kp {kp} erkannt - {visibility}",
-    "n7_title": "Aurora-Alarm"
+    "n7_title": "Aurora-Alarm",
+    "n8_body_lunar": "CSS-Mondtransit in {minutes} Min",
+    "n8_body_solar": "CSS-Sonnentransit in {minutes} Min",
+    "n8_title": "CSS-Transit"
   },
   "observatory": {
     "loading": "Observatorium-Daten werden geladen…",

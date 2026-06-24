@@ -62,6 +62,7 @@
     "aurora": "Aurora Borealis",
     "seeing": "Seeing Forecast",
     "iss": "ISS",
+    "orbital_stations": "Orbital Stations",
     "calendar": "Events Calendar",
     "plan_my_night": "Plan my night",
     "spaceflight": "Spaceflight",
@@ -408,7 +409,7 @@
     "passes": "ISS Passes",
     "loading_passes": "Loading ISS pass predictions...",
     "info_tab": "ISS visible passages for the next {days} days (sunlit ISS and dark-enough sky), computed for your configured location and timezone.",
-    "next_visible_passage": "Next visible passage",
+    "next_visible_passage": "Next visible ISS passage",
     "start": "Start: ",
     "culmination": "Culmination: ",
     "end": "End: ",
@@ -443,6 +444,21 @@
     "celestrak_restart_confirm": "Confirm restart: use this only after Celestrak has removed the block for this host IP. Continue?",
     "footer_unknown_source": "Unknown source",
     "footer_source": "Data source: Active TLE provider is {source}. Orbital pass geometry is calculated locally from this TLE."
+  },
+  "orbital_stations": {
+    "title": "Orbital Stations",
+    "iss_label": "ISS",
+    "css_label": "CSS",
+    "map_title": "Real-time Orbital Station Positions",
+    "map_live": "Tracking ISS and CSS in real time",
+    "info_tab": "Visible passages for the next {days} days (sunlit station, dark-enough sky), computed for your configured location and timezone."
+  },
+  "css": {
+    "passes": "CSS Passes",
+    "next_visible_passage": "Next visible CSS passage",
+    "no_passes": "No visible CSS passage found in the selected forecast window.",
+    "upcoming_passages": "Upcoming CSS passages",
+    "not_found": "No visible CSS passages found."
   },
   "spaceflight": {
     "subtab_launches": "Launches",
@@ -738,6 +754,7 @@
     "notifications_n1": "Plan My Night session starts",
     "notifications_n2": "Next observation target",
     "notifications_n3": "ISS transit (solar or lunar)",
+    "notifications_n8": "CSS transit (solar or lunar)",
     "notifications_n4": "Lunar eclipse",
     "notifications_n5": "Solar eclipse",
     "notifications_n6": "Astronomical darkness begins",
@@ -757,6 +774,9 @@
     "push_n6_body": "Night begins at {time} (in {minutes} min) - time to get ready",
     "push_n7_title": "Aurora Alert",
     "push_n7_body": "Kp {kp} detected - {visibility}",
+    "push_n8_title": "CSS Transit",
+    "push_n8_solar_body": "CSS solar transit in {minutes} min",
+    "push_n8_lunar_body": "CSS lunar transit in {minutes} min",
     "push_kp_visibility_none": "None",
     "push_kp_visibility_very_low": "Very Low",
     "push_kp_visibility_low": "Low",
@@ -1570,6 +1590,11 @@
     "iss_solar_transit_description": "ISS crosses the solar disk from your location. Minimum separation {minimum_separation_arcmin}′, estimated transit window {duration_seconds}s near {sun_altitude_deg}° solar altitude. Certified solar filter required.",
     "iss_lunar_transit_title": "ISS Lunar Transit",
     "iss_lunar_transit_description": "ISS crosses the lunar disk from your location. Minimum separation {minimum_separation_arcmin}′, estimated transit window {duration_seconds}s near {moon_altitude_deg}° lunar altitude. Moon illumination {moon_illumination_pct}%.",
+    "css_description": "CSS pass score {score}/100 ({visibility_day_night}). Peak altitude {peak_altitude_deg}°.",
+    "css_solar_transit_title": "CSS Solar Transit",
+    "css_solar_transit_description": "China Space Station crosses the solar disk from your location. Minimum separation {minimum_separation_arcmin}′, estimated transit window {duration_seconds}s near {sun_altitude_deg}° solar altitude. Certified solar filter required.",
+    "css_lunar_transit_title": "CSS Lunar Transit",
+    "css_lunar_transit_description": "China Space Station crosses the lunar disk from your location. Minimum separation {minimum_separation_arcmin}′, estimated transit window {duration_seconds}s near {moon_altitude_deg}° lunar altitude. Moon illumination {moon_illumination_pct}%.",
     "activities": {
       "deep_sky_observations": "deep-sky observations",
       "lunar_observations": "lunar observations",
@@ -1677,6 +1702,7 @@
     "step_horizon_graph": "Horizon graph",
     "step_aurora": "Aurora",
     "step_iss_passes": "ISS passes",
+    "step_css_passes": "CSS passes",
     "step_planetary_events": "Planetary events",
     "step_special_phenomena": "Special phenomena",
     "step_solar_system_events": "Solar system events",
@@ -1902,7 +1928,10 @@
     "n6_body": "Night begins in {minutes} min - time to get ready",
     "n6_title": "Astronomical darkness",
     "n7_body": "Kp {kp} detected - {visibility}",
-    "n7_title": "Aurora Alert"
+    "n7_title": "Aurora Alert",
+    "n8_body_lunar": "CSS lunar transit in {minutes} min",
+    "n8_body_solar": "CSS solar transit in {minutes} min",
+    "n8_title": "CSS Transit"
   },
   "observatory": {
     "loading": "Loading observatory data…",

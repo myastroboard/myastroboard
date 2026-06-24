@@ -19,6 +19,7 @@ from moon_eclipse import LunarEclipseService
 from horizon_graph import HorizonGraphService
 from aurora_predictions import get_aurora_report
 from iss_passes import get_iss_passes_report
+from css_passes import get_css_passes_report
 from weather_openmeteo import get_hourly_forecast
 import cache_store
 from constants import (
@@ -32,6 +33,7 @@ from constants import (
     CACHE_TTL_HORIZON_GRAPH,
     CACHE_TTL_AURORA,
     CACHE_TTL_ISS_PASSES,
+    CACHE_TTL_CSS_PASSES,
     CACHE_TTL_PLANETARY_EVENTS,
     CACHE_TTL_SPECIAL_PHENOMENA,
     CACHE_TTL_SOLAR_SYSTEM_EVENTS,
@@ -610,6 +612,47 @@ def update_iss_passes_cache(days: int = 20, config=None):
         logger.warning(f"Failed to update ISS passes cache: {e}")
 
 
+def update_css_passes_cache(days: int = 20, config=None):
+    """Updates the CSS (Tiangong) passes cache."""
+    try:
+        logger.info("Updating CSS passes cache...")
+        if config is None:
+            config = load_config()
+
+        if not config.get("location"):
+            raise ValueError("Location configuration is missing")
+
+        location = config["location"]
+        logger.debug(
+            f"Using location: lat={int(location.get('latitude'))}, lon={int(location.get('longitude'))}, tz=***"
+        )
+
+        report = get_css_passes_report(
+            latitude=location["latitude"],
+            longitude=location["longitude"],
+            elevation_m=location.get("elevation", 0),
+            timezone_str=location["timezone"],
+            days=days,
+        )
+
+        if report is None:
+            logger.warning("CSS passes report unavailable (provider/network/cache miss); keeping previous cache state")
+            return
+
+        cache_store._css_passes_cache["data"] = report
+        cache_store._css_passes_cache["timestamp"] = time.time()
+        cache_store.update_shared_cache_entry(
+            "css_passes",
+            cache_store._css_passes_cache["data"],
+            cache_store._css_passes_cache["timestamp"],
+        )
+
+        logger.info(f"CSS passes cache updated at {datetime.now().isoformat()}")
+
+    except Exception as e:
+        logger.warning(f"Failed to update CSS passes cache: {e}")
+
+
 def update_planetary_events_cache(config=None):
     """
     Updates the Planetary Events cache
@@ -1069,6 +1112,7 @@ def update_allsky_sensor_cache(config=None):
         return
 
     from connectors.allsky_connector import AllSkyConnector
+
     connector = AllSkyConnector(allsky_cfg)
     data = connector.fetch_sensor_data()
     now_ts = time.time()
@@ -1087,6 +1131,7 @@ def update_allsky_health_cache(config=None):
         return
 
     from connectors.allsky_connector import AllSkyConnector
+
     result = AllSkyConnector(allsky_cfg).health_check()
     cache_store._allsky_health_cache["data"] = result
     cache_store._allsky_health_cache["timestamp"] = time.time()
@@ -1192,6 +1237,14 @@ def fully_initialize_caches():
                 False,
             ),
             (
+                "css_passes",
+                "css_passes",
+                partial(update_css_passes_cache, config=config),
+                CACHE_TTL_CSS_PASSES,
+                cache_store._css_passes_cache,
+                False,
+            ),
+            (
                 "planetary_events",
                 "planetary_events",
                 partial(update_planetary_events_cache, config=config),
@@ -1271,22 +1324,26 @@ def fully_initialize_caches():
         allsky_cfg = config.get("connectors", {}).get("allsky", {})
         if allsky_cfg.get("enabled") and allsky_cfg.get("url"):
             if allsky_cfg.get("modules", {}).get("sensor_data", {}).get("enabled"):
-                cache_jobs.append((
-                    "allsky_sensor",
+                cache_jobs.append(
+                    (
+                        "allsky_sensor",
+                        None,
+                        partial(update_allsky_sensor_cache, config=config),
+                        CACHE_TTL_ALLSKY_SENSOR,
+                        cache_store._allsky_sensor_cache,
+                        False,
+                    )
+                )
+            cache_jobs.append(
+                (
+                    "allsky_health",
                     None,
-                    partial(update_allsky_sensor_cache, config=config),
-                    CACHE_TTL_ALLSKY_SENSOR,
-                    cache_store._allsky_sensor_cache,
+                    partial(update_allsky_health_cache, config=config),
+                    CACHE_TTL_ALLSKY_HEALTH,
+                    cache_store._allsky_health_cache,
                     False,
-                ))
-            cache_jobs.append((
-                "allsky_health",
-                None,
-                partial(update_allsky_health_cache, config=config),
-                CACHE_TTL_ALLSKY_HEALTH,
-                cache_store._allsky_health_cache,
-                False,
-            ))
+                )
+            )
 
         # Spaceflight image-integrity check jobs (cache_entry key -> name for logging)
         _SPACEFLIGHT_IMAGE_JOBS = {
@@ -1357,6 +1414,7 @@ def fully_initialize_caches():
         PARALLELIZABLE_JOBS = {
             "aurora",
             "iss_passes",
+            "css_passes",
             "seeing_forecast",
             "spaceflight_launches",
             "spaceflight_astronauts",
@@ -1368,7 +1426,7 @@ def fully_initialize_caches():
         parallel = [(n, fn, ttl) for n, fn, ttl in jobs_to_run if n in PARALLELIZABLE_JOBS]
 
         total_steps = len(jobs_to_run)
-        n_parallel = len(parallel)   # saved before any pre-phase removal
+        n_parallel = len(parallel)  # saved before any pre-phase removal
         success_count = 0
 
         # If the IERS table is not yet loaded in this process, run the IERS download
@@ -1376,11 +1434,13 @@ def fully_initialize_caches():
         # use astropy AltAz; without a current IERS table they would trigger the
         # "polar motions after IERS data is valid" warning on every first-boot cycle.
         from astropy.utils.iers import IERS_Auto as _iers_auto_check
+
         if _iers_auto_check.iers_table is None or iers_stale_or_near_expiry:
             iers_parallel = next(((n, fn, ttl) for n, fn, ttl in parallel if n == 'iers'), None)
             if iers_parallel is not None:
                 logger.info(
-                    "IERS table absent/stale; downloading synchronously before parallel phase to avoid stale-data warnings"
+                    "IERS table absent/stale; downloading synchronously before parallel phase"
+                    " to avoid stale-data warnings"
                 )
                 _iers_start = time.time()
                 try:
