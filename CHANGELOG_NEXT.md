@@ -1,3 +1,4 @@
+- Add CSS orbital station on parallel of ISS
 - Add civil (-6°), nautical (-12°) and astronomical (-18°) twilight lines on horizon graph
 - Increale aperture limite and allow 2 decimal on reducer - Thanks @cgobat
 - Server side input verification for equipment
