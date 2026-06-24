@@ -134,7 +134,9 @@ const SkyTonightScheduler = (() => {
     function finish() {
         stopPolling();
 
-        els.progress().innerHTML = `<i class="bi bi-check-circle-fill text-success icon-inline" aria-hidden="true"></i>${i18n.t('scheduler.complete')}`;
+        const _prog = els.progress();
+        DOMUtils.clear(_prog);
+        DOMUtils.append(_prog, DOMUtils.createIcon('bi bi-check-circle-fill text-success icon-inline'), i18n.t('scheduler.complete'));
         els.detail().textContent =
             i18n.t('scheduler.success');
 
@@ -188,14 +190,16 @@ const SkyTonightScheduler = (() => {
         const btn = els.button();
         if (!btn) return;
         btn.disabled = true;
-        btn.innerHTML = `<i class="bi bi-hourglass-split icon-inline" aria-hidden="true"></i>${i18n.t('scheduler.status_running')}`;
+        DOMUtils.clear(btn);
+        DOMUtils.append(btn, DOMUtils.createIcon('bi bi-hourglass-split icon-inline'), i18n.t('scheduler.status_running'));
     }
 
     function resetButton() {
         const btn = els.button();
         if (!btn) return;
         btn.disabled = false;
-        btn.innerHTML = `<i class="bi bi-play-fill icon-inline" aria-hidden="true"></i>${i18n.t('scheduler.run_now')}`;
+        DOMUtils.clear(btn);
+        DOMUtils.append(btn, DOMUtils.createIcon('bi bi-play-fill icon-inline'), i18n.t('scheduler.run_now'));
     }
 
     function resetUI() {

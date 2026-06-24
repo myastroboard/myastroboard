@@ -128,14 +128,24 @@ async function _createOrbitalMapCard(container) {
 
     const cardHeader = document.createElement('div');
     cardHeader.className = 'card-header fw-bold d-flex align-items-center gap-2 flex-wrap';
-    cardHeader.innerHTML =
-        `<i class="bi bi-globe-americas icon-inline" aria-hidden="true"></i>${i18n.t('orbital_stations.map_title')}` +
-        `<span class="ms-auto iss-map-legend d-flex gap-3 flex-wrap">` +
-        `<span><span class="iss-legend-dot" style="background:${ISS_PAST_COLOR};opacity:0.6;"></span>ISS ${i18n.t('iss.map_past_track')}</span>` +
-        `<span><span class="iss-legend-dot" style="background:${ISS_FUTURE_COLOR};"></span>ISS ${i18n.t('iss.map_future_track')}</span>` +
-        `<span><span class="iss-legend-dot" style="background:${CSS_PAST_COLOR};opacity:0.6;"></span>CSS ${i18n.t('iss.map_past_track')}</span>` +
-        `<span><span class="iss-legend-dot" style="background:${CSS_FUTURE_COLOR};"></span>CSS ${i18n.t('iss.map_future_track')}</span>` +
-        `</span>`;
+    DOMUtils.append(cardHeader, DOMUtils.createIcon('bi bi-globe-americas icon-inline'), i18n.t('orbital_stations.map_title'));
+    const _legend = document.createElement('span');
+    _legend.className = 'ms-auto iss-map-legend d-flex gap-3 flex-wrap';
+    const _mkLegendItem = (color, opacity, label) => {
+        const s = document.createElement('span');
+        const dot = document.createElement('span');
+        dot.className = 'iss-legend-dot';
+        dot.style.background = color;
+        if (opacity) dot.style.opacity = String(opacity);
+        s.appendChild(dot);
+        s.appendChild(document.createTextNode(label));
+        return s;
+    };
+    _legend.appendChild(_mkLegendItem(ISS_PAST_COLOR, 0.6, `ISS ${i18n.t('iss.map_past_track')}`));
+    _legend.appendChild(_mkLegendItem(ISS_FUTURE_COLOR, null, `ISS ${i18n.t('iss.map_future_track')}`));
+    _legend.appendChild(_mkLegendItem(CSS_PAST_COLOR, 0.6, `CSS ${i18n.t('iss.map_past_track')}`));
+    _legend.appendChild(_mkLegendItem(CSS_FUTURE_COLOR, null, `CSS ${i18n.t('iss.map_future_track')}`));
+    cardHeader.appendChild(_legend);
 
     const metaBar = document.createElement('div');
     metaBar.id = 'orb-map-meta';
@@ -340,7 +350,7 @@ function _createNextPassCard(passData, stationKey, borderClass) {
     cardHeader.className = 'card-header fw-bold';
     const stationLabel = i18n.t(`orbital_stations.${stationKey}_label`);
     if (passData) {
-        cardHeader.innerHTML = `<i class="bi bi-check-circle-fill text-success icon-inline" aria-hidden="true"></i>${i18n.t(`${stationKey}.next_visible_passage`)}`;
+        DOMUtils.append(cardHeader, DOMUtils.createIcon('bi bi-check-circle-fill text-success icon-inline'), i18n.t(`${stationKey}.next_visible_passage`));
         const cardBody = document.createElement('div');
         cardBody.className = 'card-body';
         const bodyRow = document.createElement('div');
@@ -348,10 +358,10 @@ function _createNextPassCard(passData, stationKey, borderClass) {
         const createInfoCol = (items) => {
             const c = document.createElement('div');
             c.className = 'col mb-2';
-            items.forEach(({ label, value }) => {
+            items.forEach(({ iconClass, labelText, value }) => {
                 const line = document.createElement('div');
                 const strong = document.createElement('strong');
-                strong.innerHTML = label;
+                DOMUtils.append(strong, DOMUtils.createIcon(iconClass), labelText);
                 line.appendChild(strong);
                 line.append(' ');
                 line.append(value);
@@ -360,20 +370,20 @@ function _createNextPassCard(passData, stationKey, borderClass) {
             return c;
         };
         bodyRow.appendChild(createInfoCol([
-            { label: `<i class="bi bi-clock icon-inline" aria-hidden="true"></i>${i18n.t('iss.start')}`, value: formatTimeThenDateWithSeconds(passData.start_time) },
-            { label: `<i class="bi bi-stopwatch icon-inline" aria-hidden="true"></i>${i18n.t('iss.culmination')}`, value: formatTimeThenDateWithSeconds(passData.peak_time) },
-            { label: `<i class="bi bi-clock-history icon-inline" aria-hidden="true"></i>${i18n.t('iss.end')}`, value: formatTimeThenDateWithSeconds(passData.end_time) },
+            { iconClass: 'bi bi-clock icon-inline', labelText: i18n.t('iss.start'), value: formatTimeThenDateWithSeconds(passData.start_time) },
+            { iconClass: 'bi bi-stopwatch icon-inline', labelText: i18n.t('iss.culmination'), value: formatTimeThenDateWithSeconds(passData.peak_time) },
+            { iconClass: 'bi bi-clock-history icon-inline', labelText: i18n.t('iss.end'), value: formatTimeThenDateWithSeconds(passData.end_time) },
         ]));
         bodyRow.appendChild(createInfoCol([
-            { label: `<i class="bi bi-compass icon-inline" aria-hidden="true"></i>${i18n.t('iss.start_alt_az')}`, value: formatAltAz(passData.start_altitude_deg, passData.start_azimuth_cardinal, passData.start_azimuth_deg) },
-            { label: `<i class="bi bi-compass icon-inline" aria-hidden="true"></i>${i18n.t('iss.peak_alt_az')}`,  value: formatAltAz(passData.peak_altitude_deg,  passData.peak_azimuth_cardinal,  passData.peak_azimuth_deg)  },
-            { label: `<i class="bi bi-compass icon-inline" aria-hidden="true"></i>${i18n.t('iss.end_alt_az')}`,  value: formatAltAz(passData.end_altitude_deg,  passData.end_azimuth_cardinal,  passData.end_azimuth_deg)  },
+            { iconClass: 'bi bi-compass icon-inline', labelText: i18n.t('iss.start_alt_az'), value: formatAltAz(passData.start_altitude_deg, passData.start_azimuth_cardinal, passData.start_azimuth_deg) },
+            { iconClass: 'bi bi-compass icon-inline', labelText: i18n.t('iss.peak_alt_az'),  value: formatAltAz(passData.peak_altitude_deg,  passData.peak_azimuth_cardinal,  passData.peak_azimuth_deg)  },
+            { iconClass: 'bi bi-compass icon-inline', labelText: i18n.t('iss.end_alt_az'),  value: formatAltAz(passData.end_altitude_deg,  passData.end_azimuth_cardinal,  passData.end_azimuth_deg)  },
         ]));
         cardBody.appendChild(bodyRow);
         card.appendChild(cardHeader);
         card.appendChild(cardBody);
     } else {
-        cardHeader.innerHTML = `<i class="bi bi-question-circle icon-inline" aria-hidden="true"></i>${stationLabel}`;
+        DOMUtils.append(cardHeader, DOMUtils.createIcon('bi bi-question-circle icon-inline'), stationLabel);
         card.appendChild(cardHeader);
         const cardBody = document.createElement('div');
         cardBody.className = 'card-body text-muted';
@@ -390,7 +400,7 @@ function _createPassesTableCard(passes, stationLabel, stationKey) {
     card.className = 'card h-100';
     const tableHeader = document.createElement('div');
     tableHeader.className = 'card-header fw-bold';
-    tableHeader.innerHTML = `<i class="bi bi-calendar-event text-danger icon-inline" aria-hidden="true"></i>${stationLabel} – ${i18n.t(`${stationKey}.upcoming_passages`)}`;
+    DOMUtils.append(tableHeader, DOMUtils.createIcon('bi bi-calendar-event text-danger icon-inline'), `${stationLabel} – ${i18n.t(`${stationKey}.upcoming_passages`)}`);
     const tableResponsive = document.createElement('div');
     tableResponsive.className = 'table-responsive';
     const table = document.createElement('table');
@@ -480,7 +490,7 @@ async function loadOrbitalStations() {
 
     const loadingEl = document.createElement('div');
     loadingEl.className = 'text-center text-muted py-3';
-    loadingEl.innerHTML = `<div class="spinner-border spinner-border-sm me-2"></div>${i18n.t('iss.loading_passes')}`;
+    loadingEl.appendChild(DOMUtils.createSpinnerWrapper(i18n.t('iss.loading_passes')));
     container.appendChild(loadingEl);
 
     const [issResp, cssResp] = await Promise.all([
@@ -531,7 +541,7 @@ async function loadOrbitalStations() {
         const a = document.createElement('a');
         a.className = 'nav-link' + (_activePassesStation === station ? ' active' : '');
         a.href = '#';
-        a.innerHTML = `<i class="bi ${iconClass} ${colorClass} icon-inline" aria-hidden="true"></i> ${label}`;
+        DOMUtils.append(a, DOMUtils.createIcon(`bi ${iconClass} ${colorClass} icon-inline`), ` ${label}`);
         a.addEventListener('click', (e) => { e.preventDefault(); renderTable(station); });
         li.appendChild(a);
         return { li, a };

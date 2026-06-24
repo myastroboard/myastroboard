@@ -22,7 +22,10 @@ function _syncFirstRunTimezones() {
     const source = document.getElementById('timezone');
     const target = document.getElementById('setup-timezone');
     if (!source || !target) return;
-    target.innerHTML = source.innerHTML;
+    DOMUtils.clear(target);
+    for (const opt of Array.from(source.options)) {
+        target.appendChild(opt.cloneNode(true));
+    }
     target.value = currentConfig?.location?.timezone || 'UTC';
 }
 

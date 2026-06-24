@@ -162,12 +162,12 @@ async function loadMoonCalendar() {
     header.className = 'plan-moon-calendar-header';
     const title = document.createElement('span');
     title.className = 'fw-semibold small';
-    title.innerHTML = `<i class="bi bi-moon-stars-fill text-info icon-inline" aria-hidden="true"></i> ${i18n.t('plan_my_night.moon_calendar_title')}`;
+    DOMUtils.append(title, DOMUtils.createIcon('bi bi-moon-stars-fill text-info icon-inline'), ` ${i18n.t('plan_my_night.moon_calendar_title')}`);
     const toggle = document.createElement('button');
     toggle.type = 'button';
     toggle.className = 'btn btn-link btn-sm p-0 ms-2 text-muted plan-moon-calendar-toggle';
     toggle.setAttribute('aria-expanded', 'true');
-    toggle.innerHTML = '<i class="bi bi-chevron-up" aria-hidden="true"></i>';
+    toggle.appendChild(DOMUtils.createIcon('bi bi-chevron-up'));
     header.appendChild(title);
     header.appendChild(toggle);
     section.appendChild(header);
@@ -271,9 +271,8 @@ async function loadMoonCalendar() {
     toggle.addEventListener('click', () => {
         const expanded = toggle.getAttribute('aria-expanded') === 'true';
         toggle.setAttribute('aria-expanded', String(!expanded));
-        toggle.innerHTML = expanded
-            ? '<i class="bi bi-chevron-down" aria-hidden="true"></i>'
-            : '<i class="bi bi-chevron-up" aria-hidden="true"></i>';
+        DOMUtils.clear(toggle);
+        toggle.appendChild(DOMUtils.createIcon(expanded ? 'bi bi-chevron-down' : 'bi bi-chevron-up'));
         calBody.style.display = expanded ? 'none' : '';
     });
 }
@@ -341,12 +340,12 @@ async function loadSeeingWeek() {
     header.className = 'plan-moon-calendar-header';
     const title = document.createElement('span');
     title.className = 'fw-semibold small';
-    title.innerHTML = `<i class="bi bi-eye text-info icon-inline" aria-hidden="true"></i> ${i18n.t('plan_my_night.seeing_week_title')}`;
+    DOMUtils.append(title, DOMUtils.createIcon('bi bi-eye text-info icon-inline'), ` ${i18n.t('plan_my_night.seeing_week_title')}`);
     const toggle = document.createElement('button');
     toggle.type = 'button';
     toggle.className = 'btn btn-link btn-sm p-0 ms-2 text-muted plan-moon-calendar-toggle';
     toggle.setAttribute('aria-expanded', 'true');
-    toggle.innerHTML = '<i class="bi bi-chevron-up" aria-hidden="true"></i>';
+    toggle.appendChild(DOMUtils.createIcon('bi bi-chevron-up'));
     header.appendChild(title);
     header.appendChild(toggle);
     section.appendChild(header);
@@ -412,9 +411,8 @@ async function loadSeeingWeek() {
     toggle.addEventListener('click', () => {
         const expanded = toggle.getAttribute('aria-expanded') === 'true';
         toggle.setAttribute('aria-expanded', String(!expanded));
-        toggle.innerHTML = expanded
-            ? '<i class="bi bi-chevron-down" aria-hidden="true"></i>'
-            : '<i class="bi bi-chevron-up" aria-hidden="true"></i>';
+        DOMUtils.clear(toggle);
+        toggle.appendChild(DOMUtils.createIcon(expanded ? 'bi bi-chevron-down' : 'bi bi-chevron-up'));
         calBody.style.display = expanded ? 'none' : '';
     });
 }
@@ -639,20 +637,23 @@ function movePlanTargetItemInDom(entryId, direction) {
 }
 
 function makePlanActionButton(labelKey, className, onClick) {
-    // Icon if pdf or csv to add with text
-    let ico = '';
+    let iconClass = null;
     if (labelKey === 'plan_my_night.export_pdf') {
-        ico = '<i class="bi bi-filetype-pdf"></i> ';
+        iconClass = 'bi bi-filetype-pdf';
     } else if (labelKey === 'plan_my_night.export_csv') {
-        ico = '<i class="bi bi-filetype-csv"></i> ';
+        iconClass = 'bi bi-filetype-csv';
     } else if (labelKey === 'plan_my_night.clear_this_plan' || labelKey === 'plan_my_night.clear_plan' || labelKey === 'plan_my_night.clear_all_plans') {
-        ico = '<i class="bi bi-trash"></i> ';
+        iconClass = 'bi bi-trash';
     }
 
     const button = document.createElement('button');
     button.type = 'button';
     button.className = className;
-    button.innerHTML = ico + i18n.t(labelKey);
+    if (iconClass) {
+        DOMUtils.append(button, DOMUtils.createIcon(iconClass), ` ${i18n.t(labelKey)}`);
+    } else {
+        button.textContent = i18n.t(labelKey);
+    }
     button.addEventListener('click', onClick);
     return button;
 }
@@ -1301,16 +1302,21 @@ function renderPlanMyNight(payload) {
         } else {
             el.className = `badge bg-${color}${color === 'warning' ? ' text-dark' : ''} plan-telescope-badge`;
         }
-        let html = `<i class="bi bi-telescope icon-inline" aria-hidden="true"></i> ${t.telescope_name || t.telescope_id}`;
+        DOMUtils.append(el, DOMUtils.createIcon('bi bi-telescope icon-inline'), ` ${t.telescope_name || t.telescope_id}`);
         if (t.is_own === false) {
             const ownerLabel = t.owner_username
                 ? i18n.t('equipment.shared_fov_suffix', { username: t.owner_username })
                 : '';
             el.title = ownerLabel;
-            html += ` <i class="bi bi-share-fill plan-telescope-shared-icon" aria-label="${ownerLabel}"></i>`;
+            const shareIcon = DOMUtils.createIcon('bi bi-share-fill plan-telescope-shared-icon');
+            shareIcon.setAttribute('aria-label', ownerLabel);
+            el.append(' ', shareIcon);
         }
-        if (t.is_orphaned) html += ` <i class="bi bi-exclamation-triangle-fill plan-telescope-orphan-icon" aria-label="${i18n.t('plan_my_night.orphaned_telescope')}"></i>`;
-        el.innerHTML = html;
+        if (t.is_orphaned) {
+            const orphanIcon = DOMUtils.createIcon('bi bi-exclamation-triangle-fill plan-telescope-orphan-icon');
+            orphanIcon.setAttribute('aria-label', i18n.t('plan_my_night.orphaned_telescope'));
+            el.append(' ', orphanIcon);
+        }
         return el;
     };
 
@@ -1459,11 +1465,10 @@ function renderPlanMyNight(payload) {
         const color = _stateColor(selectedTelescope.state);
         const telescopeBadge = document.createElement('span');
         telescopeBadge.className = `badge bg-${color}${color === 'warning' ? ' text-dark' : ''} ms-2 small`;
-        let badgeHtml = `<i class="bi bi-telescope icon-inline" aria-hidden="true"></i> ${selectedTelescope.telescope_name}`;
+        DOMUtils.append(telescopeBadge, DOMUtils.createIcon('bi bi-telescope icon-inline'), ` ${selectedTelescope.telescope_name}`);
         if (selectedTelescope.is_own === false && selectedTelescope.owner_username) {
-            badgeHtml += ` · ${selectedTelescope.owner_username}`;
+            telescopeBadge.appendChild(document.createTextNode(` · ${selectedTelescope.owner_username}`));
         }
-        telescopeBadge.innerHTML = badgeHtml;
         title.appendChild(telescopeBadge);
     }
 
@@ -1663,7 +1668,7 @@ function renderPlanMyNight(payload) {
         if (entry.in_astrodex) {
             const capturedBadge = document.createElement('span');
             capturedBadge.className = 'in-astrodex-badge';
-            capturedBadge.innerHTML = `<i class="bi bi-check-circle-fill icon-inline" aria-hidden="true"></i>${tSkyTonightCompat('captured')}`;
+            DOMUtils.append(capturedBadge, DOMUtils.createIcon('bi bi-check-circle-fill icon-inline'), tSkyTonightCompat('captured'));
             controls.appendChild(capturedBadge);
         } else {
             const addToAstrodexBtn = makePlanActionButton('plan_my_night.add_to_astrodex', 'btn btn-primary btn-sm', async () => {
@@ -1828,7 +1833,7 @@ function renderPlanMyNight(payload) {
             const alttimeButton = document.createElement('button');
             alttimeButton.type = 'button';
             alttimeButton.className = 'btn btn-info btn-sm mt-1';
-            alttimeButton.innerHTML = `<i class="bi bi-graph-up-arrow icon-inline" aria-hidden="true"></i>${i18n.t('settings.feature_alttime')}`;
+            DOMUtils.append(alttimeButton, DOMUtils.createIcon('bi bi-graph-up-arrow icon-inline'), i18n.t('settings.feature_alttime'));
             alttimeButton.addEventListener('click', () => {
                 const targetTitle = `${entry.name || entry.target_name || 'Target'} - ${i18n.t('skytonight.altitude_time_title') || 'Altitude vs Time'}`;
                 showAlttimePopup(targetTitle, entry.alttime_file);

@@ -317,7 +317,7 @@ function updateElementText(element, key, params = {}) {
  */
 function updateElementHTML(element, key, params = {}) {
     if (element) {
-        element.innerHTML = i18n.t(key, params);
+        element.textContent = i18n.t(key, params);
     }
 }
 

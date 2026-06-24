@@ -155,7 +155,7 @@ function renderSeeingForecastRows(forecast, timezone) {
         period.className = `seeing-daynight-indicator ${night ? 'is-night' : 'is-day'}`;
         period.setAttribute('title', periodLabel);
         period.setAttribute('aria-label', periodLabel);
-        period.innerHTML = `<i class="bi ${night ? 'bi-moon-stars-fill' : 'bi-sun-fill'}" aria-hidden="true"></i>`;
+        period.appendChild(DOMUtils.createIcon(`bi ${night ? 'bi-moon-stars-fill' : 'bi-sun-fill'}`));
         timeCellWrap.appendChild(period);
 
         const tlabel = document.createElement('span');
@@ -166,7 +166,10 @@ function renderSeeingForecastRows(forecast, timezone) {
 
         const tdSeeing = document.createElement('td');
         const badgeClass = getSeeingBadgeClass(point.seeing);
-        tdSeeing.innerHTML = `<span class="seeing-score-pill fw-bold ${badgeClass}">${point.seeing}</span>`;
+        const _pill = document.createElement('span');
+        _pill.className = `seeing-score-pill fw-bold ${badgeClass}`;
+        _pill.textContent = point.seeing;
+        tdSeeing.appendChild(_pill);
 
         const tdDesc = document.createElement('td');
         const qualityText = document.createElement('div');
@@ -221,7 +224,7 @@ async function loadSeeingForecast() {
     const infoAlert = document.createElement('div');
     infoAlert.className = 'alert alert-info';
     infoAlert.setAttribute('role', 'alert');
-    infoAlert.innerHTML = `<i class="bi bi-bullseye icon-inline" aria-hidden="true"></i>${i18n.t('seeing_forecast.planetary_imaging')}`;
+    DOMUtils.append(infoAlert, DOMUtils.createIcon('bi bi-bullseye icon-inline'), i18n.t('seeing_forecast.planetary_imaging'));
     container.appendChild(infoAlert);
 
     const topRow = document.createElement('div');
@@ -231,17 +234,29 @@ async function loadSeeingForecast() {
     currentCol.className = 'col';
     const currentCard = document.createElement('div');
     currentCard.className = 'card h-100';
-    currentCard.innerHTML = `
-        <div class="card-header fw-bold">
-            <i class="bi bi-eye icon-inline" aria-hidden="true"></i>${i18n.t('seeing_forecast.current_seeing')}
-        </div>
-        <div class="card-body">
-            <div class="fs-3 fw-bold ${getSeeingBadgeClass(seeingData.now)}">${seeingData.now ?? '-'}</div>
-            <div class="text-muted">${getLocalizedSeeingQuality(seeingData.now, seeingData.now_description)}</div>
-            <small class="text-muted d-block mt-1">${getLocalizedSeeingDetails(seeingData.now, '')}</small>
-            <small class="text-muted">${i18n.t('seeing_forecast.data_source')}</small>
-        </div>
-    `;
+    const _curHeader = document.createElement('div');
+    _curHeader.className = 'card-header fw-bold';
+    DOMUtils.append(_curHeader, DOMUtils.createIcon('bi bi-eye icon-inline'), i18n.t('seeing_forecast.current_seeing'));
+    const _curBody = document.createElement('div');
+    _curBody.className = 'card-body';
+    const _scoreDiv = document.createElement('div');
+    _scoreDiv.className = `fs-3 fw-bold ${getSeeingBadgeClass(seeingData.now)}`;
+    _scoreDiv.textContent = seeingData.now ?? '-';
+    const _qualDiv = document.createElement('div');
+    _qualDiv.className = 'text-muted';
+    _qualDiv.textContent = getLocalizedSeeingQuality(seeingData.now, seeingData.now_description);
+    const _detailSmall = document.createElement('small');
+    _detailSmall.className = 'text-muted d-block mt-1';
+    _detailSmall.textContent = getLocalizedSeeingDetails(seeingData.now, '');
+    const _srcSmall = document.createElement('small');
+    _srcSmall.className = 'text-muted';
+    _srcSmall.textContent = i18n.t('seeing_forecast.data_source');
+    _curBody.appendChild(_scoreDiv);
+    _curBody.appendChild(_qualDiv);
+    _curBody.appendChild(_detailSmall);
+    _curBody.appendChild(_srcSmall);
+    currentCard.appendChild(_curHeader);
+    currentCard.appendChild(_curBody);
     currentCol.appendChild(currentCard);
 
     const bestCol = document.createElement('div');
@@ -249,25 +264,45 @@ async function loadSeeingForecast() {
     const bestCard = document.createElement('div');
     bestCard.className = 'card h-100';
     const bw = seeingData.best_window;
+    const _bwHeader = document.createElement('div');
+    _bwHeader.className = 'card-header fw-bold';
+    DOMUtils.append(_bwHeader, DOMUtils.createIcon('bi bi-clock-history icon-inline'), i18n.t('seeing_forecast.best_window'));
+    bestCard.appendChild(_bwHeader);
     if (bw) {
-        bestCard.innerHTML = `
-            <div class="card-header fw-bold">
-                <i class="bi bi-clock-history icon-inline" aria-hidden="true"></i>${i18n.t('seeing_forecast.best_window')}
-            </div>
-            <div class="card-body">
-                <div><strong>${i18n.t('common.time_label')}:</strong> ${formatTimeThenDateInTimezone(bw.start, configuredTimezone)}</div>
-                <div><strong>${i18n.t('common.duration')}</strong> ${bw.duration_hours}h</div>
-                <div><strong>${i18n.t('common.quality')}</strong> <span class="${getSeeingBadgeClass(bw.seeing)}">${getLocalizedSeeingQuality(bw.seeing, bw.description)}</span></div>
-                <div class="small text-muted mt-1">${getLocalizedSeeingDetails(bw.seeing, bw.conditions || '')}</div>
-            </div>
-        `;
+        const _bwBody = document.createElement('div');
+        _bwBody.className = 'card-body';
+        const _timeDiv = document.createElement('div');
+        const _tStrong = document.createElement('strong');
+        _tStrong.textContent = `${i18n.t('common.time_label')}:`;
+        _timeDiv.appendChild(_tStrong);
+        _timeDiv.append(` ${formatTimeThenDateInTimezone(bw.start, configuredTimezone)}`);
+        const _durDiv = document.createElement('div');
+        const _dStrong = document.createElement('strong');
+        _dStrong.textContent = i18n.t('common.duration');
+        _durDiv.appendChild(_dStrong);
+        _durDiv.append(` ${bw.duration_hours}h`);
+        const _qualDiv = document.createElement('div');
+        const _qStrong = document.createElement('strong');
+        _qStrong.textContent = i18n.t('common.quality');
+        _qualDiv.appendChild(_qStrong);
+        _qualDiv.append(' ');
+        const _qualSpan = document.createElement('span');
+        _qualSpan.className = getSeeingBadgeClass(bw.seeing);
+        _qualSpan.textContent = getLocalizedSeeingQuality(bw.seeing, bw.description);
+        _qualDiv.appendChild(_qualSpan);
+        const _detDiv = document.createElement('div');
+        _detDiv.className = 'small text-muted mt-1';
+        _detDiv.textContent = getLocalizedSeeingDetails(bw.seeing, bw.conditions || '');
+        _bwBody.appendChild(_timeDiv);
+        _bwBody.appendChild(_durDiv);
+        _bwBody.appendChild(_qualDiv);
+        _bwBody.appendChild(_detDiv);
+        bestCard.appendChild(_bwBody);
     } else {
-        bestCard.innerHTML = `
-            <div class="card-header fw-bold">
-                <i class="bi bi-clock-history icon-inline" aria-hidden="true"></i>${i18n.t('seeing_forecast.best_window')}
-            </div>
-            <div class="card-body text-muted">${i18n.t('seeing_forecast.no_data')}</div>
-        `;
+        const _bwBody = document.createElement('div');
+        _bwBody.className = 'card-body text-muted';
+        _bwBody.textContent = i18n.t('seeing_forecast.no_data');
+        bestCard.appendChild(_bwBody);
     }
     bestCol.appendChild(bestCard);
 
@@ -279,7 +314,7 @@ async function loadSeeingForecast() {
     forecastCard.className = 'card h-100';
     const header = document.createElement('div');
     header.className = 'card-header fw-bold';
-    header.innerHTML = `<i class="bi bi-calendar-event text-danger icon-inline" aria-hidden="true"></i>${i18n.t('seeing_forecast.forecast')}`;
+    DOMUtils.append(header, DOMUtils.createIcon('bi bi-calendar-event text-danger icon-inline'), i18n.t('seeing_forecast.forecast'));
     const body = document.createElement('div');
     body.className = 'table-responsive';
     body.appendChild(renderSeeingForecastRows(seeingData.forecast, configuredTimezone));
@@ -291,11 +326,15 @@ async function loadSeeingForecast() {
     const normalizationInfo = document.createElement('div');
     normalizationInfo.className = 'alert alert-secondary mt-3 mb-0';
     normalizationInfo.setAttribute('role', 'note');
-    normalizationInfo.innerHTML = `
-        <i class="bi bi-info-circle icon-inline" aria-hidden="true"></i>
-        <strong>${i18n.t('seeing_forecast.scale_mapping_title')}</strong>
-        <div class="small mt-1">${i18n.t('seeing_forecast.scale_mapping_info')}</div>
-    `;
+    normalizationInfo.appendChild(DOMUtils.createIcon('bi bi-info-circle icon-inline'));
+    normalizationInfo.append(' ');
+    const _normStrong = document.createElement('strong');
+    _normStrong.textContent = i18n.t('seeing_forecast.scale_mapping_title');
+    normalizationInfo.appendChild(_normStrong);
+    const _normInfo = document.createElement('div');
+    _normInfo.className = 'small mt-1';
+    _normInfo.textContent = i18n.t('seeing_forecast.scale_mapping_info');
+    normalizationInfo.appendChild(_normInfo);
     container.appendChild(normalizationInfo);
 
     const tips = [];
@@ -312,7 +351,7 @@ async function loadSeeingForecast() {
 
         const tipsHeader = document.createElement('div');
         tipsHeader.className = 'card-header fw-bold';
-        tipsHeader.innerHTML = `<i class="bi bi-lightbulb icon-inline" aria-hidden="true"></i>${i18n.t('common.info')}`;
+        DOMUtils.append(tipsHeader, DOMUtils.createIcon('bi bi-lightbulb icon-inline'), i18n.t('common.info'));
 
         const tipsBody = document.createElement('div');
         tipsBody.className = 'card-body py-2';

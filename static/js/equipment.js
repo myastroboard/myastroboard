@@ -381,7 +381,7 @@ function renderFOVCalculatorTab() {
     body.className = 'card-body';
     const title = document.createElement('h5');
     title.className = 'card-title';
-    title.innerHTML = `<i class="bi bi-binoculars icon-inline" aria-hidden="true"></i>${i18n.t('equipment.fov_calculator')}`;
+    DOMUtils.append(title, DOMUtils.createIcon('bi bi-binoculars icon-inline'), i18n.t('equipment.fov_calculator'));
     body.appendChild(title);
 
     const row1 = document.createElement('div');
@@ -1842,7 +1842,7 @@ function renderExposureCalcTab() {
     btnCol.className = 'col-md-6 d-flex align-items-end';
     const calcBtn = document.createElement('button');
     calcBtn.className = 'btn btn-success w-100';
-    calcBtn.innerHTML = `<i class="bi bi-calculator icon-inline" aria-hidden="true"></i>${i18n.t('equipment.exposure_calc_calculate')}`;
+    DOMUtils.append(calcBtn, DOMUtils.createIcon('bi bi-calculator icon-inline'), i18n.t('equipment.exposure_calc_calculate'));
     btnCol.appendChild(calcBtn);
 
     row3.appendChild(borCol);

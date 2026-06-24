@@ -36,7 +36,7 @@ function destroyAstroWeatherCharts() {
     }
 }
 
-function createAstroChartShell(title, canvasId, legendItems = [], footerText = '') {
+function createAstroChartShell(iconClass, labelText, canvasId, legendItems = [], footerText = '') {
     const col = document.createElement('div');
     col.className = 'col mb-3';
 
@@ -47,7 +47,7 @@ function createAstroChartShell(title, canvasId, legendItems = [], footerText = '
     header.className = 'card-header';
     const h5 = document.createElement('h5');
     h5.className = 'mb-0';
-    h5.innerHTML = title;
+    DOMUtils.append(h5, DOMUtils.createIcon(iconClass), labelText);
     header.appendChild(h5);
 
     const body = document.createElement('div');
@@ -102,18 +102,13 @@ function createAstroConditionCard({ title, value, valueClass = '', badgeClass, b
     // Build stacked header: icon above, label below
     const cardTitle = document.createElement('div');
     cardTitle.className = 'card-body astro-card-header';
-    const titleTemp = document.createElement('div');
-    titleTemp.innerHTML = title;
-    const iconEl = titleTemp.querySelector('i');
-    const labelText = titleTemp.textContent.trim();
-    if (iconEl) {
-        iconEl.classList.remove('icon-inline');
-        iconEl.classList.add('astro-card-icon');
-        cardTitle.appendChild(iconEl);
-    }
+    const iconEl = DOMUtils.createIcon(title.iconClass);
+    iconEl.classList.remove('icon-inline');
+    iconEl.classList.add('astro-card-icon');
+    cardTitle.appendChild(iconEl);
     const labelEl = document.createElement('div');
     labelEl.className = 'astro-card-label';
-    labelEl.textContent = labelText;
+    labelEl.textContent = title.labelText;
     cardTitle.appendChild(labelEl);
 
     const body = document.createElement('div');
@@ -263,7 +258,7 @@ function renderCurrentAstroConditions(conditions) {
     DOMUtils.clear(container);
     const cards = [
         createAstroConditionCard({
-            title: `<i class="bi bi-eye icon-inline" aria-hidden="true"></i>${i18n.t('astro_weather.seeing')}`,
+            title: { iconClass: 'bi bi-eye icon-inline', labelText: i18n.t('astro_weather.seeing') },
             value: `${conditions.seeing_pickering}/10`,
             badgeClass: `astro-quality-text quality-box ${seeingQuality.class}`,
             badgeText: seeingQuality.text,
@@ -271,7 +266,7 @@ function renderCurrentAstroConditions(conditions) {
             qualityClass: seeingQuality.class
         }),
         createAstroConditionCard({
-            title: `<i class="bi bi-stars text-warning icon-inline" aria-hidden="true"></i>${i18n.t('astro_weather.transparency')}`,
+            title: { iconClass: 'bi bi-stars text-warning icon-inline', labelText: i18n.t('astro_weather.transparency') },
             value: `${conditions.limiting_magnitude}m`,
             badgeClass: `astro-quality-text quality-box ${transparencyQuality.class}`,
             badgeText: transparencyQuality.text,
@@ -279,7 +274,7 @@ function renderCurrentAstroConditions(conditions) {
             qualityClass: transparencyQuality.class
         }),
         createAstroConditionCard({
-            title: `<i class="bi bi-clouds icon-inline" aria-hidden="true"></i>${i18n.t('astro_weather.cloud_layers')}`,
+            title: { iconClass: 'bi bi-clouds icon-inline', labelText: i18n.t('astro_weather.cloud_layers') },
             value: `${Math.round(conditions.cloud_discrimination)}%`,
             badgeClass: `astro-quality-text quality-box ${cloudQuality.class}`,
             badgeText: cloudQuality.text,
@@ -287,7 +282,7 @@ function renderCurrentAstroConditions(conditions) {
             qualityClass: cloudQuality.class
         }),
         createAstroConditionCard({
-            title: `<i class="bi bi-droplet text-primary icon-inline" aria-hidden="true"></i>${i18n.t('astro_weather.dew_risk')}`,
+            title: { iconClass: 'bi bi-droplet text-primary icon-inline', labelText: i18n.t('astro_weather.dew_risk') },
             value: `${Math.round(conditions.dew_point_spread * 10) / 10}${i18n.t('units.temperature_celsius')}`,
             badgeClass: `astro-quality-text dew-box ${dewRiskColor.class}`,
             badgeText: `${dewRiskColor.text}`,
@@ -295,7 +290,7 @@ function renderCurrentAstroConditions(conditions) {
             qualityClass: dewRiskColor.class
         }),
         createAstroConditionCard({
-            title: `<i class="bi bi-crosshair2 icon-inline" aria-hidden="true"></i>${i18n.t('astro_weather.tracking')}`,
+            title: { iconClass: 'bi bi-crosshair2 icon-inline', labelText: i18n.t('astro_weather.tracking') },
             value: `${conditions.tracking_stability_score}%`,
             badgeClass: `astro-quality-text quality-box ${trackingQuality.class}`,
             badgeText: trackingQuality.text,
@@ -531,7 +526,7 @@ function renderBestObservationPeriods(periods, timezone) {
         const durationItem = document.createElement('li');
         durationItem.className = 'list-group-item d-flex justify-content-between align-items-center';
         const durationLabel = document.createElement('span');
-        durationLabel.innerHTML = `<i class="bi bi-clock-history icon-inline" aria-hidden="true"></i>${i18n.t('common.duration')}`;
+        DOMUtils.append(durationLabel, DOMUtils.createIcon('bi bi-clock-history icon-inline'), i18n.t('common.duration'));
         durationItem.appendChild(durationLabel);
         const durationBadge = document.createElement('span');
         durationBadge.className = 'fw-bold';
@@ -541,7 +536,7 @@ function renderBestObservationPeriods(periods, timezone) {
         const qualityItem = document.createElement('li');
         qualityItem.className = 'list-group-item d-flex justify-content-between align-items-center';
         const qualityLabel = document.createElement('span');
-        qualityLabel.innerHTML = `<i class="bi bi-stars icon-inline" aria-hidden="true"></i>${i18n.t('common.quality')}`;
+        DOMUtils.append(qualityLabel, DOMUtils.createIcon('bi bi-stars icon-inline'), i18n.t('common.quality'));
         qualityItem.appendChild(qualityLabel);
         const qualityBadge = document.createElement('span');
         qualityBadge.className = 'fw-bold';
@@ -591,7 +586,7 @@ function renderSeeingTransparencyChart(labels, data) {
     const transparencyData = data.map(item => item.transparency_score);
     
     DOMUtils.clear(container);
-    container.appendChild(createAstroChartShell(`<i class="bi bi-eye icon-inline" aria-hidden="true"></i>${i18n.t('astro_weather.chart_seeing_title')}` , 'astro-seeing-chart', [
+    container.appendChild(createAstroChartShell('bi bi-eye icon-inline', i18n.t('astro_weather.chart_seeing_title'), 'astro-seeing-chart', [
         { label: i18n.t('astro_weather.seeing_label'), color: '#3b82f6' },
         { label: i18n.t('astro_weather.transparency_label'), color: '#a855f7' }
     ], i18n.t('astro_weather.quality_score_label')));
@@ -693,7 +688,7 @@ function renderCloudLayersChart(labels, data) {
     const lowCloudImpact = data.map(item => item.low_cloud_impact);
     
     DOMUtils.clear(container);
-    container.appendChild(createAstroChartShell(`<i class="bi bi-clouds icon-inline" aria-hidden="true"></i>${i18n.t('astro_weather.chart_cloud_title')}`, 'astro-clouds-chart', [
+    container.appendChild(createAstroChartShell('bi bi-clouds icon-inline', i18n.t('astro_weather.chart_cloud_title'), 'astro-clouds-chart', [
         { label: i18n.t('astro_weather.high_cloud_impact'), color: '#22c55e' },
         { label: i18n.t('astro_weather.mid_cloud_impact'), color: '#fbbf24' },
         { label: i18n.t('astro_weather.low_cloud_impact'), color: '#ef4444' }
@@ -802,7 +797,7 @@ function renderDewTrackingChart(labels, data) {
     const trackingScore = data.map(item => item.tracking_stability_score);
     
     DOMUtils.clear(container);
-    container.appendChild(createAstroChartShell(`<i class="bi bi-droplet icon-inline" aria-hidden="true"></i>${i18n.t('astro_weather.chart_dew_tracking_title')}`, 'astro-conditions-chart', [
+    container.appendChild(createAstroChartShell('bi bi-droplet icon-inline', i18n.t('astro_weather.chart_dew_tracking_title'), 'astro-conditions-chart', [
         { label: i18n.t('astro_weather.dew_label'), color: '#06b6d4' },
         { label: i18n.t('astro_weather.tracking_stability_label'), color: '#f56565' }
     ], i18n.t('astro_weather.score_100_label')));

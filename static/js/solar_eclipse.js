@@ -48,14 +48,14 @@ async function loadSolarEclipse() {
         const row = document.createElement('div');
         row.className = 'row row-cols-1 row-cols-sm-2 row-cols-lg-2 row-cols-xl-4 mb-3';
 
-        const createCardCol = (titleText) => {
+        const createCardCol = (iconClass, labelText) => {
             const col = document.createElement('div');
             col.className = 'col mb-3';
             const card = document.createElement('div');
             card.className = 'card h-100';
             const header = document.createElement('div');
             header.className = 'card-header fw-bold';
-            header.innerHTML = titleText;
+            DOMUtils.append(header, DOMUtils.createIcon(iconClass), labelText);
             card.appendChild(header);
             col.appendChild(card);
             return { col, card };
@@ -91,7 +91,7 @@ async function loadSolarEclipse() {
             'annular': i18n.t('sun.eclipse_type.annular')
         };
 
-        const overview = createCardCol(`<i class="bi bi-bar-chart-line icon-inline" aria-hidden="true"></i>${i18n.t('sun.overview')}`);
+        const overview = createCardCol('bi bi-bar-chart-line icon-inline', i18n.t('sun.overview'));
         const overviewList = createList();
         overviewList.appendChild(createListItem(`${i18n.t('sun.type')}`, typeEclipseType[eclipse.type.toLowerCase()] || eclipse.type));
         const visibilityItem = document.createElement('li');
@@ -111,7 +111,7 @@ async function loadSolarEclipse() {
         overview.card.appendChild(overviewList);
         row.appendChild(overview.col);
 
-        const timing = createCardCol(`<i class="bi bi-stopwatch icon-inline" aria-hidden="true"></i>${i18n.t('sun.timing')}`);
+        const timing = createCardCol('bi bi-stopwatch icon-inline', i18n.t('sun.timing'));
         const timingList = createList();
         timingList.appendChild(createListItem(`${i18n.t('sun.start')}`, formatTimeThenDate(eclipse.start_time)));
         timingList.appendChild(createListItem(`${i18n.t('sun.peak')}`, formatTimeThenDate(eclipse.peak_time)));
@@ -120,7 +120,7 @@ async function loadSolarEclipse() {
         timing.card.appendChild(timingList);
         row.appendChild(timing.col);
 
-        const position = createCardCol(`<i class="bi bi-geo-alt text-danger icon-inline" aria-hidden="true"></i>${i18n.t('sun.position_at_peak')}`);
+        const position = createCardCol('bi bi-geo-alt text-danger icon-inline', i18n.t('sun.position_at_peak'));
         const positionList = createList();
         positionList.appendChild(createListItem(`${i18n.t('sun.altitude')}`, `${eclipse.peak_altitude_deg.toFixed(2)}${i18n.t('units.degrees')}`));
         positionList.appendChild(createListItem(`${i18n.t('sun.azimuth')}`, `${eclipse.peak_azimuth_deg.toFixed(2)}${i18n.t('units.degrees')}`));
@@ -133,7 +133,7 @@ async function loadSolarEclipse() {
             ? i18n.t(classificationKey)
             : i18n.t('sun.not_visible');
         
-        const score = createCardCol(`<i class="bi bi-star-fill text-warning icon-inline" aria-hidden="true"></i>${i18n.t('sun.astrophoto_score')}`);
+        const score = createCardCol('bi bi-star-fill text-warning icon-inline', i18n.t('sun.astrophoto_score'));
         const scoreBody = document.createElement('div');
         scoreBody.className = 'p-3';
         scoreBody.style.textAlign = 'center';
@@ -196,7 +196,7 @@ function renderSolarEclipseAltitudeChart(altitudeData) {
     cardHeader.className = 'card-header';
     const title = document.createElement('h5');
     title.className = 'mb-0';
-    title.innerHTML = `<i class="bi bi-graph-up icon-inline" aria-hidden="true"></i>${i18n.t('sun.eclipse_chart_title')}`;
+    DOMUtils.append(title, DOMUtils.createIcon('bi bi-graph-up icon-inline'), i18n.t('sun.eclipse_chart_title'));
     cardHeader.appendChild(title);
 
     const cardBody = document.createElement('div');

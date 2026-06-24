@@ -700,7 +700,7 @@ function displayUsers(users) {
         const actionsCell = document.createElement('td');
         actionsCell.className = 'text-center';
 
-        const createActionButton = ({ className, userId, username, role, text }) => {
+        const createActionButton = ({ className, userId, username, role, iconClass, label }) => {
             const button = document.createElement('button');
             button.className = className;
             button.setAttribute('data-user-id', userId);
@@ -708,7 +708,7 @@ function displayUsers(users) {
             if (role) {
                 button.setAttribute('data-role', role);
             }
-            button.innerHTML = text;
+            DOMUtils.append(button, DOMUtils.createIcon(iconClass), label);
             return button;
         };
 
@@ -716,7 +716,8 @@ function displayUsers(users) {
             className: 'btn btn-primary btn-small user-edit-username mb-2 me-2',
             userId: user.user_id,
             username: user.username,
-            text: `<i class="bi bi-pencil-square icon-inline" aria-hidden="true"></i>${i18n.t('users.username')}`
+            iconClass: 'bi bi-pencil-square icon-inline',
+            label: i18n.t('users.username')
         }));
 
         if (!isCurrentUser) {
@@ -725,7 +726,8 @@ function displayUsers(users) {
                 userId: user.user_id,
                 username: user.username,
                 role: user.role,
-                text: `<i class="bi bi-key icon-inline" aria-hidden="true"></i>${i18n.t('users.role')}`
+                iconClass: 'bi bi-key icon-inline',
+                label: i18n.t('users.role')
             }));
         }
 
@@ -733,7 +735,8 @@ function displayUsers(users) {
             className: 'btn btn-secondary btn-small user-change-password mb-2 me-2',
             userId: user.user_id,
             username: user.username,
-            text: `<i class="bi bi-lock icon-inline" aria-hidden="true"></i>${i18n.t('users.password')}`
+            iconClass: 'bi bi-lock icon-inline',
+            label: i18n.t('users.password')
         }));
 
         if (!isCurrentUser) {
@@ -741,7 +744,8 @@ function displayUsers(users) {
                 className: 'btn btn-danger btn-small user-delete mb-2 me-2',
                 userId: user.user_id,
                 username: user.username,
-                text: `<i class="bi bi-trash icon-inline" aria-hidden="true"></i>${i18n.t('users.delete')}`
+                iconClass: 'bi bi-trash icon-inline',
+                label: i18n.t('users.delete')
             }));
         }
 
@@ -836,7 +840,8 @@ function setupCreateUserForm() {
 // Edit username using modal dialog
 function editUsername(userId, currentUsername) {
     const titleElement = document.getElementById('modal_lg_close_title');
-    titleElement.innerHTML = `<i class="bi bi-pencil-square icon-inline" aria-hidden="true"></i>${i18n.t('users.edit_username')}`;
+    DOMUtils.clear(titleElement);
+    DOMUtils.append(titleElement, DOMUtils.createIcon('bi bi-pencil-square icon-inline'), i18n.t('users.edit_username'));
     
     const contentElement = document.getElementById('modal_lg_close_body');
     DOMUtils.clear(contentElement);
@@ -959,7 +964,8 @@ function editUsername(userId, currentUsername) {
 // Edit user role using modal dialog
 function editRole(userId, username, currentRole) {
     const titleElement = document.getElementById('modal_lg_close_title');
-    titleElement.innerHTML = `<i class="bi bi-key icon-inline" aria-hidden="true"></i>${i18n.t('users.edit_role')}`;
+    DOMUtils.clear(titleElement);
+    DOMUtils.append(titleElement, DOMUtils.createIcon('bi bi-key icon-inline'), i18n.t('users.edit_role'));
     
     const contentElement = document.getElementById('modal_lg_close_body');
     DOMUtils.clear(contentElement);
@@ -1085,7 +1091,8 @@ function editRole(userId, username, currentRole) {
 function changePassword(userId, username) {
     //Prepare modal title
     const titleElement = document.getElementById('modal_lg_close_title');
-    titleElement.innerHTML = `<i class="bi bi-lock icon-inline" aria-hidden="true"></i>${i18n.t('users.change_password')}`;
+    DOMUtils.clear(titleElement);
+    DOMUtils.append(titleElement, DOMUtils.createIcon('bi bi-lock icon-inline'), i18n.t('users.change_password'));
     
     //Prepare modal content
     const contentElement = document.getElementById('modal_lg_close_body');
