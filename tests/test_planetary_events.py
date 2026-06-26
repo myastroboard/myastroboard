@@ -4,7 +4,7 @@ Covers pure-logic rating, constants, and vectorized find_runs helper.
 """
 
 import numpy as np
-from planetary_events import PlanetaryEventsService, PLANETS, PLANET_SYMBOLS
+from planetary_events import PlanetaryEventsService, PLANETS
 
 
 class TestPlanetaryEventsConstants:
@@ -12,10 +12,6 @@ class TestPlanetaryEventsConstants:
 
     def test_planets_dict_contains_seven_planets(self):
         assert len(PLANETS) == 7
-
-    def test_planet_symbols_has_all_planets(self):
-        for planet in PLANETS:
-            assert planet in PLANET_SYMBOLS
 
     def test_outer_planets_have_opposition(self):
         outer = ["Mars", "Jupiter", "Saturn", "Uranus", "Neptune"]

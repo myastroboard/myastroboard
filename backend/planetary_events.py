@@ -38,15 +38,6 @@ PLANETS = {
     'Neptune': {'min_elong': 0, 'has_opposition': True},
 }
 
-PLANET_SYMBOLS = {
-    'Mercury': '☿️',
-    'Venus': '♀',
-    'Mars': '♂',
-    'Jupiter': '♃️',
-    'Saturn': '♄️',
-    'Uranus': '♅️',
-    'Neptune': '♆️',
-}
 
 
 class PlanetaryEventsService:
@@ -92,6 +83,7 @@ class PlanetaryEventsService:
 
         try:
             events.extend(self._find_conjunctions(start_date, end_date))
+            events.extend(self._find_moon_conjunctions(start_date, days_ahead))
             events.extend(self._find_oppositions(start_date, end_date))
             events.extend(self._find_elongations(start_date, end_date))
             events.extend(self._find_retrograde_periods(start_date, end_date))
@@ -146,8 +138,6 @@ class PlanetaryEventsService:
                                 'event_type': 'Planetary Conjunction',
                                 'title': f'{planet1} - {planet2} Conjunction',
                                 'description': f'{planet1} and {planet2} appear very close in the sky',
-                                'star_emoji': PLANET_SYMBOLS.get(planet1, '○'),
-                                'secondary_emoji': PLANET_SYMBOLS.get(planet2, '○'),
                                 'peak_time': self._to_local_iso(peak_time),
                                 'start_time': self._to_local_iso(t_arr[s]),
                                 'end_time': self._to_local_iso(t_arr[min(e, n - 1)]),
@@ -163,6 +153,54 @@ class PlanetaryEventsService:
                         )
                 except Exception as ex:
                     logger.debug(f"Error finding conjunction {planet1}-{planet2}: {ex}")
+
+        return events
+
+    def _find_moon_conjunctions(self, start_date: Time, days_ahead: int) -> List[Dict[str, Any]]:
+        """Find Moon-planet conjunctions using 6-hour sampling (Moon moves ~13°/day)."""
+        step_days = 0.25  # 6-hour steps — coarser steps miss the minimum at ~3° threshold
+        n = int(days_ahead / step_days) + 1
+        t_arr = start_date + np.arange(n) * step_days * u.day
+
+        try:
+            moon_coords = get_body('moon', t_arr, self.location)
+        except Exception as e:
+            logger.warning(f"Failed to fetch moon positions: {e}")
+            return []
+
+        events = []
+        threshold_deg = 3.0
+
+        for planet in PLANETS.keys():
+            try:
+                planet_coords = get_body(planet, t_arr, self.location)
+                seps = np.asarray(moon_coords.separation(planet_coords).degree)
+                for s, e in self._find_runs(seps < threshold_deg):
+                    min_idx = s + int(np.argmin(seps[s:e]))
+                    min_sep = float(seps[min_idx])
+                    peak_time = t_arr[min_idx]
+                    events.append(
+                        {
+                            'event_type': 'Moon Conjunction',
+                            'title': f'Moon - {planet} Conjunction',
+                            'description': (
+                                f'The Moon passes within {min_sep:.1f}° of {planet}'
+                            ),
+                            'peak_time': self._to_local_iso(peak_time),  # type: ignore[arg-type]
+                            'start_time': self._to_local_iso(t_arr[s]),  # type: ignore[arg-type]
+                            'end_time': self._to_local_iso(t_arr[min(e, n - 1)]),  # type: ignore[arg-type]
+                            'min_separation_degrees': min_sep,
+                            'visibility': self._is_event_visible('moon', planet, peak_time),  # type: ignore[arg-type]
+                            'importance': 'high',
+                            'raw_data': {
+                                'planet1': 'Moon',
+                                'planet2': planet,
+                                'separation_degrees': min_sep,
+                            },
+                        }
+                    )
+            except Exception as ex:
+                logger.debug(f"Error finding Moon-{planet} conjunction: {ex}")
 
         return events
 
@@ -190,7 +228,6 @@ class PlanetaryEventsService:
                             'event_type': 'Planetary Opposition',
                             'title': f'{planet} at Opposition',
                             'description': f'{planet} is at opposition (best visibility). Optimal for observation.',
-                            'emoji': PLANET_SYMBOLS.get(planet, '○'),
                             'peak_time': self._to_local_iso(peak_time),
                             'start_time': self._to_local_iso(t_arr[s]),
                             'end_time': self._to_local_iso(t_arr[min(e, n - 1)]),
@@ -236,7 +273,6 @@ class PlanetaryEventsService:
                             'description': (
                                 f'{planet} reaches maximum elongation ({max_elong_val:.1f}°). Best viewing time.'
                             ),
-                            'emoji': PLANET_SYMBOLS.get(planet, '○'),
                             'peak_time': self._to_local_iso(peak_time),
                             'elongation_degrees': max_elong_val,
                             'visibility': True,
@@ -279,7 +315,6 @@ class PlanetaryEventsService:
                             'event_type': 'Planetary Retrograde',
                             'title': f'{planet} Retrograde Motion',
                             'description': f'{planet} appears to move backward for ~{duration_days:.0f} days.',
-                            'emoji': PLANET_SYMBOLS.get(planet, '○'),
                             'start_time': self._to_local_iso(start_time),
                             'end_time': self._to_local_iso(end_time),
                             'duration_days': duration_days,
