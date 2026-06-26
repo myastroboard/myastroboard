@@ -1617,7 +1617,9 @@
       "elongation_title": "{planet} bei maximaler Dehnung",
       "elongation_description": "{planet} erreicht die maximale Dehnung ({elongation_degrees}°). Beste Sehzeit.",
       "retrograde_title": "{planet} Rückläufige Bewegung",
-      "retrograde_description": "{planet} scheint sich für ~{duration_days} Tage rückwärts zu bewegen."
+      "retrograde_description": "{planet} scheint sich für ~{duration_days} Tage rückwärts zu bewegen.",
+      "moon_conjunction_title": "Mond - {planet} Konjunktion",
+      "moon_conjunction_description": "Der Mond passiert {planet} in {separation_degrees}° Abstand"
     },
     "solar_system": {
       "meteor_shower_title": "{shower_name} Peak",

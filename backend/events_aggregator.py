@@ -241,6 +241,20 @@ class EventsAggregator:
         fallback_title = event_data.get("title", "Planetary Event")
         fallback_description = event_data.get("description", "")
 
+        if event_type == EventType.MOON_CONJUNCTION.value:
+            planet = self._translate_planet_name(str(raw.get("planet2", "")))
+            sep = raw.get("separation_degrees")
+            sep_value = f"{float(sep):.1f}" if sep is not None else ""
+            return (
+                self._t("events_api.planetary.moon_conjunction_title", fallback_title, planet=planet),
+                self._t(
+                    "events_api.planetary.moon_conjunction_description",
+                    fallback_description,
+                    planet=planet,
+                    separation_degrees=sep_value,
+                ),
+            )
+
         if event_type == EventType.PLANETARY_CONJUNCTION.value:
             planet1 = self._translate_planet_name(str(raw.get("planet1", "")))
             planet2 = self._translate_planet_name(str(raw.get("planet2", "")))

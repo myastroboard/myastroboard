@@ -1617,7 +1617,9 @@
       "elongation_title": "{planet} at Maximum Elongation",
       "elongation_description": "{planet} reaches maximum elongation ({elongation_degrees}°). Best viewing time.",
       "retrograde_title": "{planet} Retrograde Motion",
-      "retrograde_description": "{planet} appears to move backward for ~{duration_days} days."
+      "retrograde_description": "{planet} appears to move backward for ~{duration_days} days.",
+      "moon_conjunction_title": "Moon - {planet} Conjunction",
+      "moon_conjunction_description": "The Moon passes within {separation_degrees}° of {planet}"
     },
     "solar_system": {
       "meteor_shower_title": "{shower_name} Peak",
