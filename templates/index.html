@@ -80,12 +80,15 @@
 
         <!-- Global cache Status Banner -->
         <div id="global-cache-banner" class="alert alert-info mb-3" role="alert" style="display: none;">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden" data-i18n="common.loading">Loading...</span>
+            <div class="d-flex align-items-start">
+                <div class="spinner-border spinner-border-sm text-primary flex-shrink-0 mt-1" role="status">
+                    <span class="visually-hidden" data-i18n="common.loading">Loading...</span>
+                </div>
+                <div class="ps-3">
+                    <div id="cache-banner-text" data-i18n="cache.updating_data">Updating astronomical data, please wait...</div>
+                    <small id="cache-banner-detail" class="text-muted" style="display: none;"></small>
+                </div>
             </div>
-            <span id="cache-banner-text" class="ps-4" data-i18n="cache.updating_data">
-                Updating astronomical data, please wait...
-            </span>
         </div>
 
         <!-- Global SkyTonight Scheduler Status Banner -->

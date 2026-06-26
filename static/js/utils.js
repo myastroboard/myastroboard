@@ -49,6 +49,7 @@ function formatDuration(seconds) {
 async function checkCacheStatus() {
     const banner = document.getElementById('global-cache-banner');
     const bannerText = document.getElementById('cache-banner-text');
+    const bannerDetail = document.getElementById('cache-banner-detail');
     if (!banner) return;
     
     try {
@@ -64,40 +65,31 @@ async function checkCacheStatus() {
             banner.style.display = 'none';
             setTimeout(checkCacheStatus, 30000);
         } else if (data.in_progress === true) {
-            // Cache is actively being initialized/refreshed
-            banner.style.display = 'block';
-            if (bannerText) {
-                // Display progress information if available
-                const progress = data.progress_percent || 0;
-                const currentStep = data.current_step || 0;
-                const totalSteps = data.total_steps || 0;
-                const stepName = data.step_name || '';
-                
-                if (totalSteps > 0) {
-                    const translatedStep = i18n.t(`cache.step_${stepName}`, {}, stepName);
-                    if (stepName === 'parallel_network') {
-                        const remainingTasks = Math.max(0, totalSteps - currentStep);
-                        bannerText.textContent = i18n.t('cache.updating_data_parallel_details', {
-                            completedTasks: currentStep,
-                            totalTasks: totalSteps,
-                            remainingTasks,
-                            progress,
-                            stepName: translatedStep
-                        });
-                    } else {
-                        bannerText.textContent = i18n.t('cache.updating_data_details', {
-                            currentStep,
-                            totalSteps,
-                            progress,
-                            stepName: translatedStep
-                        });
-                    }
-                } else {
-                    bannerText.textContent = i18n.t('cache.updating_data');
+            const progress = data.progress_percent || 0;
+            const currentStep = data.current_step || 0;
+            const totalSteps = data.total_steps || 0;
+            const stepName = data.step_name || '';
+            const hasInfo = progress > 0 || !!stepName;
+
+            if (hasInfo) {
+                banner.style.display = 'block';
+                if (bannerText) {
+                    bannerText.textContent = i18n.t('cache.updating_data_progress', { progress });
+                }
+                if (bannerDetail && stepName) {
+                    const translatedStep = i18n.t(`cache.step_${stepName}`);
+                    const label = translatedStep !== `cache.step_${stepName}` ? translatedStep : stepName;
+                    bannerDetail.textContent = (stepName === 'parallel_network' && totalSteps > 0)
+                        ? `${label} (${currentStep}/${totalSteps})`
+                        : label;
+                    bannerDetail.style.display = '';
+                } else if (bannerDetail) {
+                    bannerDetail.style.display = 'none';
                 }
             }
-            // Check more frequently during initialization (every 10 seconds)
-            setTimeout(checkCacheStatus, 10000);
+            // No real info yet: stay hidden and poll fast to catch completion quickly
+            const pollInterval = hasInfo ? 10000 : 2000;
+            setTimeout(checkCacheStatus, pollInterval);
         } else {
             // Cache expired but not yet refreshing - will refresh soon
             // Hide banner to avoid confusion, data will still work with stale cache

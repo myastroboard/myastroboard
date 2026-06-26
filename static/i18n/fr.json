@@ -1686,8 +1686,7 @@
   },
   "cache": {
     "updating_data": "Mise à jour des données astronomiques, veuillez patienter...",
-    "updating_data_details": "Mise à jour des données astronomiques ({currentStep}/{totalSteps}) {progress}% - {stepName}",
-    "updating_data_parallel_details": "Mise à jour des données astronomiques ({remainingTasks} tâches restantes, {completedTasks}/{totalTasks} terminées) {progress}% - {stepName}",
+    "updating_data_progress": "Mise à jour des données astronomiques... {progress}%",
     "cache_valid": "Le cache est à jour",
     "cache_updating": "Mise à jour du cache...",
     "cache_error": "Échec de la mise à jour du cache",

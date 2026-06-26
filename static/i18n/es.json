@@ -1686,8 +1686,7 @@
   },
   "cache": {
     "updating_data": "Actualizando datos astronómicos, por favor espere...",
-    "updating_data_details": "Actualización de datos astronómicos ({currentStep}/{totalSteps}) {progress}% - {stepName}",
-    "updating_data_parallel_details": "Actualizando datos astronómicos ({remainingTasks} tareas restantes, {completedTasks}/{totalTasks} completadas) {progress}% - {stepName}",
+    "updating_data_progress": "Actualizando datos astronómicos... {progress}%",
     "cache_valid": "La caché está actualizada.",
     "cache_updating": "Actualizando caché...",
     "cache_error": "Error al actualizar la caché",
