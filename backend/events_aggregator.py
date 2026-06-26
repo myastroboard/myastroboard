@@ -59,6 +59,7 @@ class EventType(Enum):
     CSS_SOLAR_TRANSIT = "CSS Solar Transit"
     CSS_LUNAR_TRANSIT = "CSS Lunar Transit"
     MOON_PHASE = "Moon Phase"
+    MOON_CONJUNCTION = "Moon Conjunction"
     PLANETARY_CONJUNCTION = "Planetary Conjunction"
     PLANETARY_OPPOSITION = "Planetary Opposition"
     PLANETARY_ELONGATION = "Planetary Elongation"
@@ -217,6 +218,7 @@ class EventsAggregator:
             EventType.CSS_SOLAR_TRANSIT.value: "bi bi-sun",
             EventType.CSS_LUNAR_TRANSIT.value: "bi bi-moon-stars",
             EventType.MOON_PHASE.value: "bi bi-moon-stars",
+            EventType.MOON_CONJUNCTION.value: "bi bi-moon-stars",
             EventType.PLANETARY_CONJUNCTION.value: "bi bi-conjonction",
             EventType.PLANETARY_OPPOSITION.value: "bi bi-bullseye",
             EventType.PLANETARY_ELONGATION.value: "bi bi-arrows-angle-expand",
