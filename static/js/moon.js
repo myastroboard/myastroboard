@@ -314,13 +314,12 @@ async function loadBestDarkWindow() {
             maxDelayMs: 12000,
             timeoutMs: 15000,
             shouldRetryData: (payload) => payload && payload.status === 'pending',
-            onRetry: ({ reason, attempt, maxAttempts, waitMs, data }) => {
+            onRetry: ({ reason, attempt, maxAttempts, waitMs }) => {
                 const seconds = Math.max(1, Math.round(waitMs / 1000));
-                if (reason === 'data' && data && data.message) {
-                    containerLoader.textContent = `${data.message} ${i18n.t('common.retrying_in', { seconds, attempt, maxAttempts })}`;
-                    return;
-                }
-                containerLoader.textContent = i18n.t('common.retrying_in', { seconds, attempt, maxAttempts });
+                const base = reason === 'data'
+                    ? i18n.t('cache.cache_not_ready')
+                    : i18n.t('cache.cache_error');
+                containerLoader.textContent = `${base} ${i18n.t('common.retrying_in', { seconds, attempt, maxAttempts })}`;
             }
         };
 
@@ -334,11 +333,8 @@ async function loadBestDarkWindow() {
         // Cache pending (retries exhausted)
         if (data.status && data.status === 'pending') {
             DOMUtils.clear(container);
-            const infoNotice = document.createElement('div');
-            infoNotice.className = 'info-notice';
-            infoNotice.textContent = data.message || '';
-            container.appendChild(infoNotice);
-            containerLoader.style.display = 'none';
+            containerLoader.textContent = i18n.t('cache.cache_not_ready');
+            containerLoader.style.display = 'block';
             return;
         }
 
