@@ -1686,8 +1686,7 @@
   },
   "cache": {
     "updating_data": "Astronomische Daten werden aktualisiert, bitte warten...",
-    "updating_data_details": "Astronomische Daten aktualisieren ({currentStep}/{totalSteps}) {progress}% - {stepName}",
-    "updating_data_parallel_details": "Astronomische Daten werden aktualisiert ({remainingTasks} Aufgaben verbleiben, {completedTasks}/{totalTasks} abgeschlossen) {progress}% - {stepName}",
+    "updating_data_progress": "Astronomische Daten werden aktualisiert... {progress}%",
     "cache_valid": "Cache ist auf dem neuesten Stand",
     "cache_updating": "Cache wird aktualisiert...",
     "cache_error": "Cache-Aktualisierung fehlgeschlagen",
