@@ -133,6 +133,7 @@ class PlanetaryEventsService:
                         min_idx = s + int(np.argmin(seps[s:e]))
                         min_sep = float(seps[min_idx])
                         peak_time = t_arr[min_idx]
+                        visible = self._is_event_visible(planet1, planet2, peak_time)
                         events.append(
                             {
                                 'event_type': 'Planetary Conjunction',
@@ -142,8 +143,8 @@ class PlanetaryEventsService:
                                 'start_time': self._to_local_iso(t_arr[s]),
                                 'end_time': self._to_local_iso(t_arr[min(e, n - 1)]),
                                 'min_separation_degrees': min_sep,
-                                'visibility': self._is_event_visible(planet1, planet2, peak_time),
-                                'importance': self._rate_importance(planet1, planet2, min_sep),
+                                'visibility': visible,
+                                'importance': self._rate_importance(planet1, planet2, min_sep) if visible else 'low',
                                 'raw_data': {
                                     'planet1': planet1,
                                     'planet2': planet2,
@@ -179,6 +180,7 @@ class PlanetaryEventsService:
                     min_idx = s + int(np.argmin(seps[s:e]))
                     min_sep = float(seps[min_idx])
                     peak_time = t_arr[min_idx]
+                    visible = self._is_event_visible('moon', planet, peak_time)  # type: ignore[arg-type]
                     events.append(
                         {
                             'event_type': 'Moon Conjunction',
@@ -190,8 +192,8 @@ class PlanetaryEventsService:
                             'start_time': self._to_local_iso(t_arr[s]),  # type: ignore[arg-type]
                             'end_time': self._to_local_iso(t_arr[min(e, n - 1)]),  # type: ignore[arg-type]
                             'min_separation_degrees': min_sep,
-                            'visibility': self._is_event_visible('moon', planet, peak_time),  # type: ignore[arg-type]
-                            'importance': 'high',
+                            'visibility': visible,
+                            'importance': 'high' if visible else 'low',
                             'raw_data': {
                                 'planet1': 'Moon',
                                 'planet2': planet,
