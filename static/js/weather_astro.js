@@ -3,6 +3,7 @@
 // ======================
 
 // Global variables for astro weather
+const ASTRO_ANALYSIS_HOURS = 24;
 let astroWeatherData = null;
 let astroWeatherUpdateInterval = null;
 let astroWeatherRequestInFlight = null;
@@ -145,97 +146,97 @@ async function loadAstroWeather() {
     }
 
     astroWeatherRequestInFlight = (async () => {
-    const container = document.getElementById('astro-weather-display');
-    const loadingDiv = document.getElementById('astro-weather-loading');
-    const errorDiv = document.getElementById('astro-weather-error');
-    
-    if (loadingDiv) loadingDiv.style.display = 'block';
-    if (errorDiv) errorDiv.style.display = 'none';
-    if (container) container.style.display = 'none';
-    
-    try {
-        const currentLang = (typeof i18n !== 'undefined' && typeof i18n.getCurrentLanguage === 'function')
-            ? i18n.getCurrentLanguage()
-            : 'en';
-        const data = await fetchJSONWithRetry(`/api/weather/astro-analysis?hours=24&lang=${encodeURIComponent(currentLang)}`, {}, {
-            maxAttempts: 8,
-            baseDelayMs: 1000,
-            maxDelayMs: 15000,
-            timeoutMs: 20000,
-            shouldRetryData: (payload) => payload && payload.status === 'pending',
-            onRetry: ({ reason, attempt, maxAttempts, waitMs }) => {
-                if (!loadingDiv) return;
-                const seconds = Math.max(1, Math.round(waitMs / 1000));
-                const message = i18n.t('astro_weather.loading_details');
-                updateAstroWeatherLoadingMessage(`${message} ${i18n.t('common.retrying_in', { seconds, attempt, maxAttempts })}`);
+        const container = document.getElementById('astro-weather-display');
+        const loadingDiv = document.getElementById('astro-weather-loading');
+        const errorDiv = document.getElementById('astro-weather-error');
+
+        if (loadingDiv) loadingDiv.style.display = 'block';
+        if (errorDiv) errorDiv.style.display = 'none';
+        if (container) container.style.display = 'none';
+
+        try {
+            const currentLang = (typeof i18n !== 'undefined' && typeof i18n.getCurrentLanguage === 'function')
+                ? i18n.getCurrentLanguage()
+                : 'en';
+            const data = await fetchJSONWithRetry(`/api/weather/astro-analysis?hours=${ASTRO_ANALYSIS_HOURS}&lang=${encodeURIComponent(currentLang)}`, {}, {
+                maxAttempts: 8,
+                baseDelayMs: 1000,
+                maxDelayMs: 15000,
+                timeoutMs: 20000,
+                shouldRetryData: (payload) => payload && payload.status === 'pending',
+                onRetry: ({ reason, attempt, maxAttempts, waitMs }) => {
+                    if (!loadingDiv) return;
+                    const seconds = Math.max(1, Math.round(waitMs / 1000));
+                    const message = i18n.t('astro_weather.loading_details');
+                    updateAstroWeatherLoadingMessage(`${message} ${i18n.t('common.retrying_in', { seconds, attempt, maxAttempts })}`);
+                }
+            });
+
+            if (data.status === 'pending') {
+                throw new Error(i18n.t('weather.loading_astro_failed'));
             }
-        });
 
-        if (data.status === 'pending') {
-            throw new Error(i18n.t('weather.loading_astro_failed'));
-        }
-        
-        if (data.error) {
-            throw new Error(data.error);
-        }
-        
-        astroWeatherData = data;
-        
-        if (loadingDiv) loadingDiv.style.display = 'none';
-        if (container) container.style.display = 'block';
-        
-        // Render different sections
-        renderCurrentAstroConditions(data.current_conditions);
-        renderNightTimeline(data.hourly_data, data.location?.timezone);
-        renderBestObservationPeriods(data.best_observation_periods);
-        renderAstroWeatherCharts(data.hourly_data, data.location?.timezone);
-        renderWeatherAlerts(data.weather_alerts, data.location?.timezone);
-        
-        // Load horizon graph separately (has its own API call)
-        loadHorizonGraph();        
+            if (data.error) {
+                throw new Error(data.error);
+            }
 
-        const footerContainer = document.getElementById('astro-advanced-weather-main');
-        const existingFooter = footerContainer ? footerContainer.querySelector('.sf-data-source') : null;
-        if (existingFooter && existingFooter.parentNode) {
-            existingFooter.parentNode.removeChild(existingFooter);
+            astroWeatherData = data;
+
+            if (loadingDiv) loadingDiv.style.display = 'none';
+            if (container) container.style.display = 'block';
+
+            // Render different sections
+            renderCurrentAstroConditions(data.current_conditions);
+            renderNightTimeline(data.hourly_data, data.location?.timezone);
+            renderBestObservationPeriods(data.best_observation_periods);
+            renderAstroWeatherCharts(data.hourly_data, data.location?.timezone);
+            renderWeatherAlerts(data.weather_alerts, data.location?.timezone);
+
+            // Load horizon graph separately (has its own API call)
+            loadHorizonGraph();
+
+            const footerContainer = document.getElementById('astro-advanced-weather-main');
+            const existingFooter = footerContainer ? footerContainer.querySelector('.sf-data-source') : null;
+            if (existingFooter && existingFooter.parentNode) {
+                existingFooter.parentNode.removeChild(existingFooter);
+            }
+            appendDataSourceFooter(footerContainer, {
+                text: i18n.t('astro_weather.footer_source'),
+                links: [
+                    { href: 'https://open-meteo.com/', label: 'Open-Meteo' }
+                ]
+            });
+
+            //console.log('Astro weather data loaded:', data);
+
+        } catch (error) {
+            console.error('Error loading astro weather:', error);
+
+            if (loadingDiv) loadingDiv.style.display = 'none';
+            if (errorDiv) {
+                errorDiv.style.display = 'block';
+                DOMUtils.clear(errorDiv);
+                const col = document.createElement('div');
+                col.className = 'col';
+                const card = document.createElement('div');
+                card.className = 'card h-100 bg-danger-subtle';
+                const body = document.createElement('div');
+                body.className = 'card-body';
+                const title = document.createElement('h5');
+                title.className = 'card-title';
+                title.replaceChildren(DOMUtils.createIcon('bi bi-clouds', 'icon-inline'), document.createTextNode(` ${i18n.t('common.error')}`));
+                const text = document.createElement('p');
+                text.className = 'card-text';
+                text.textContent = `${i18n.t('common.failed_to_load_element')}${error.message}`;
+                body.appendChild(title);
+                body.appendChild(text);
+                card.appendChild(body);
+                col.appendChild(card);
+                errorDiv.appendChild(col);
+            }
+        } finally {
+            astroWeatherRequestInFlight = null;
         }
-        appendDataSourceFooter(footerContainer, {
-            text: i18n.t('astro_weather.footer_source'),
-            links: [
-                { href: 'https://open-meteo.com/', label: 'Open-Meteo' }
-            ]
-        });
-        
-        //console.log('Astro weather data loaded:', data);
-        
-    } catch (error) {
-        console.error('Error loading astro weather:', error);
-        
-        if (loadingDiv) loadingDiv.style.display = 'none';
-        if (errorDiv) {
-            errorDiv.style.display = 'block';
-            DOMUtils.clear(errorDiv);
-            const col = document.createElement('div');
-            col.className = 'col';
-            const card = document.createElement('div');
-            card.className = 'card h-100 bg-danger-subtle';
-            const body = document.createElement('div');
-            body.className = 'card-body';
-            const title = document.createElement('h5');
-            title.className = 'card-title';
-            title.replaceChildren(DOMUtils.createIcon('bi bi-clouds', 'icon-inline'), document.createTextNode(` ${i18n.t('common.error')}`));
-            const text = document.createElement('p');
-            text.className = 'card-text';
-            text.textContent = `${i18n.t('common.failed_to_load_element')}${error.message}`;
-            body.appendChild(title);
-            body.appendChild(text);
-            card.appendChild(body);
-            col.appendChild(card);
-            errorDiv.appendChild(col);
-        }
-    } finally {
-        astroWeatherRequestInFlight = null;
-    }
     })();
 
     return astroWeatherRequestInFlight;
@@ -247,7 +248,7 @@ async function loadAstroWeather() {
 function renderCurrentAstroConditions(conditions) {
     const container = document.getElementById('astro-current-conditions');
     if (!container || !conditions) return;
-    
+
     // Quality indicators
     const seeingQuality = getSeeingQualityText(conditions.seeing_pickering);
     const transparencyQuality = getTransparencyQualityText(conditions.transparency_score);
@@ -355,25 +356,18 @@ function renderNightTimeline(hourlyData, timezone) {
         const hMs = new Date(h.datetime).getTime();
         const isNow = Math.abs(hMs - nowMs) < 60 * 60 * 1000;
 
-        // Composite score 0–10 (same formula as best_observation_periods backend)
-        const rawScore = (
-            (h.seeing_pickering || 0) * 10 +
-            (h.transparency_score || 0) +
-            (h.cloud_discrimination || 0) +
-            (h.tracking_stability_score || 0)
-        ) / 4;
-        const score = rawScore / 10;
+        const score = h.observation_score ?? 0;
 
         const qualityClass = score >= 8 ? 'quality-excellent'
             : score >= 6 ? 'quality-good'
-            : score >= 4 ? 'quality-fair'
-            : score >= 2 ? 'quality-poor'
-            : 'quality-bad';
+                : score >= 4 ? 'quality-fair'
+                    : score >= 2 ? 'quality-poor'
+                        : 'quality-bad';
 
         const qualityLabel = score >= 8 ? i18n.t('common.quality_scale.excellent')
             : score >= 6 ? i18n.t('common.quality_scale.good')
-            : score >= 4 ? i18n.t('common.quality_scale.fair')
-            : i18n.t('common.quality_scale.poor');
+                : score >= 4 ? i18n.t('common.quality_scale.fair')
+                    : i18n.t('common.quality_scale.poor');
 
         const scoreColorClass = score >= 6 ? 'text-success' : score >= 4 ? 'text-warning' : 'text-danger';
 
@@ -443,24 +437,6 @@ function renderBestObservationPeriods(periods, timezone) {
     const mainContainer = document.getElementById('best-observation-periods-main');
     if (mainContainer) mainContainer.style.display = 'block';
 
-    // Fake periods for testing
-    /*
-    periods = [
-        {
-            start: new Date(Date.now() + 1 * 60 * 60 * 1000).toISOString(),
-            end: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(),
-            duration_hours: 2,
-            average_quality: 85.5
-        },
-        {
-            start: new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString(),
-            end: new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString(),
-            duration_hours: 2,
-            average_quality: 78.2
-        }
-    ];
-    //*/
-    
     if (!periods || periods.length === 0) {
         DOMUtils.clear(container);
         const row = document.createElement('div');
@@ -512,10 +488,10 @@ function renderBestObservationPeriods(periods, timezone) {
         h5.textContent = `${formatTimeOnlyInTimezone(period.start, timezone || 'UTC')} - ${formatTimeOnlyInTimezone(period.end, timezone || 'UTC')}`;
         const h6 = document.createElement('h6');
         h6.className = 'card-subtitle mt-1 mb-0 text-muted';
-        const startDate = startTime.toLocaleDateString(navigator.language, {month: 'short', day: 'numeric', timeZone: timezone || 'UTC'});
-        const endDate = endTime.toLocaleDateString(navigator.language, {month: 'short', day: 'numeric', timeZone: timezone || 'UTC'});
-        const startDateKey = startTime.toLocaleDateString('en-CA', {timeZone: timezone || 'UTC'});
-        const endDateKey = endTime.toLocaleDateString('en-CA', {timeZone: timezone || 'UTC'});
+        const startDate = startTime.toLocaleDateString(navigator.language, { month: 'short', day: 'numeric', timeZone: timezone || 'UTC' });
+        const endDate = endTime.toLocaleDateString(navigator.language, { month: 'short', day: 'numeric', timeZone: timezone || 'UTC' });
+        const startDateKey = startTime.toLocaleDateString('en-CA', { timeZone: timezone || 'UTC' });
+        const endDateKey = endTime.toLocaleDateString('en-CA', { timeZone: timezone || 'UTC' });
         h6.textContent = startDateKey !== endDateKey ? `${startDate} - ${endDate}` : startDate;
         header.appendChild(h5);
         header.appendChild(h6);
@@ -559,15 +535,18 @@ function renderBestObservationPeriods(periods, timezone) {
  */
 function renderAstroWeatherCharts(hourlyData, timezone) {
     if (!hourlyData || hourlyData.length === 0) return;
-    
+
+    // Destroy existing chart
+    destroyAstroWeatherCharts();
+
     const labels = hourlyData.map(item => formatTimeOnlyInTimezone(item.datetime, timezone || 'UTC'));
-    
+
     // Seeing and Transparency Chart
     renderSeeingTransparencyChart(labels, hourlyData);
-    
-    // Cloud Layers Chart  
+
+    // Cloud Layers Chart
     renderCloudLayersChart(labels, hourlyData);
-    
+
     // Dew Point and Tracking Chart
     renderDewTrackingChart(labels, hourlyData);
 }
@@ -578,19 +557,16 @@ function renderAstroWeatherCharts(hourlyData, timezone) {
 function renderSeeingTransparencyChart(labels, data) {
     const container = document.getElementById('astro-seeing-chart-container');
     if (!container) return;
-    
-    // Destroy existing chart
-    destroyAstroWeatherCharts();
-    
+
     const seeingData = data.map(item => item.seeing_pickering * 10); // Convert to percentage scale
     const transparencyData = data.map(item => item.transparency_score);
-    
+
     DOMUtils.clear(container);
     container.appendChild(createAstroChartShell('bi bi-eye icon-inline', i18n.t('astro_weather.chart_seeing_title'), 'astro-seeing-chart', [
         { label: i18n.t('astro_weather.seeing_label'), color: '#3b82f6' },
         { label: i18n.t('astro_weather.transparency_label'), color: '#a855f7' }
     ], i18n.t('astro_weather.quality_score_label')));
-    
+
     // Render chart
     const ctx = document.getElementById('astro-seeing-chart');
     if (!ctx || typeof ctx.getContext !== 'function') return;
@@ -654,14 +630,14 @@ function renderSeeingTransparencyChart(labels, data) {
                     max: 105,
                     ticks: {
                         stepSize: 20,
-                        callback: function(value) {
+                        callback: function (value) {
                             if (value === 105) {
                                 return '';
                             }
                             return value + '%';
                         }
                     },
-                    afterBuildTicks: function(axis) {
+                    afterBuildTicks: function (axis) {
                         axis.ticks = [0, 20, 40, 60, 80, 100, 105].map(value => ({ value }));
                     }
                 }
@@ -676,24 +652,24 @@ function renderSeeingTransparencyChart(labels, data) {
 function renderCloudLayersChart(labels, data) {
     const container = document.getElementById('astro-clouds-chart-container');
     if (!container) return;
-    
+
     // Destroy existing chart
     if (window.astroCloudsChart) {
         window.astroCloudsChart.destroy();
         window.astroCloudsChart = null;
     }
-    
+
     const highCloudImpact = data.map(item => item.high_cloud_impact);
     const midCloudImpact = data.map(item => item.mid_cloud_impact);
     const lowCloudImpact = data.map(item => item.low_cloud_impact);
-    
+
     DOMUtils.clear(container);
     container.appendChild(createAstroChartShell('bi bi-clouds icon-inline', i18n.t('astro_weather.chart_cloud_title'), 'astro-clouds-chart', [
         { label: i18n.t('astro_weather.high_cloud_impact'), color: '#22c55e' },
         { label: i18n.t('astro_weather.mid_cloud_impact'), color: '#fbbf24' },
         { label: i18n.t('astro_weather.low_cloud_impact'), color: '#ef4444' }
     ]));
-    
+
     // Render chart
     const ctx = document.getElementById('astro-clouds-chart');
     if (!ctx || typeof ctx.getContext !== 'function') return;
@@ -761,14 +737,14 @@ function renderCloudLayersChart(labels, data) {
                     max: 105,
                     ticks: {
                         stepSize: 20,
-                        callback: function(value) {
+                        callback: function (value) {
                             if (value === 105) {
                                 return '';
                             }
                             return value + '%';
                         }
                     },
-                    afterBuildTicks: function(axis) {
+                    afterBuildTicks: function (axis) {
                         axis.ticks = [0, 20, 40, 60, 80, 100, 105].map(value => ({ value }));
                     }
                 }
@@ -786,22 +762,22 @@ function renderDewTrackingChart(labels, data) {
 
     const mainContainer = document.getElementById('astro-advanced-weather-main');
     if (mainContainer) mainContainer.style.display = 'block';
-    
+
     // Destroy existing chart
     if (window.astroConditionsChart) {
         window.astroConditionsChart.destroy();
         window.astroConditionsChart = null;
     }
-    
+
     const dewRiskScore = data.map(item => item.dew_risk_score);
     const trackingScore = data.map(item => item.tracking_stability_score);
-    
+
     DOMUtils.clear(container);
     container.appendChild(createAstroChartShell('bi bi-droplet icon-inline', i18n.t('astro_weather.chart_dew_tracking_title'), 'astro-conditions-chart', [
         { label: i18n.t('astro_weather.dew_label'), color: '#06b6d4' },
         { label: i18n.t('astro_weather.tracking_stability_label'), color: '#f56565' }
     ], i18n.t('astro_weather.score_100_label')));
-    
+
     // Render chart
     const ctx = document.getElementById('astro-conditions-chart');
     if (!ctx || typeof ctx.getContext !== 'function') return;
@@ -861,14 +837,14 @@ function renderDewTrackingChart(labels, data) {
                     max: 105,
                     ticks: {
                         stepSize: 20,
-                        callback: function(value) {
+                        callback: function (value) {
                             if (value === 105) {
                                 return '';
                             }
                             return value + '%';
                         }
                     },
-                    afterBuildTicks: function(axis) {
+                    afterBuildTicks: function (axis) {
                         axis.ticks = [0, 20, 40, 60, 80, 100, 105].map(value => ({ value }));
                     }
                 }
@@ -886,7 +862,7 @@ function renderWeatherAlerts(alerts, timezone) {
 
     const mainContainer = document.getElementById('astro-weather-alerts-main');
     if (mainContainer) mainContainer.style.display = 'block';
-    
+
     if (!alerts || alerts.length === 0) {
         DOMUtils.clear(container);
         const alert = document.createElement('div');
@@ -1009,10 +985,10 @@ function startAstroWeatherAutoRefresh() {
 function initAstroWeather() {
     // Load initial data
     loadAstroWeather();
-    
+
     // Start auto-refresh
     startAstroWeatherAutoRefresh();
-    
+
     //console.log('Astrophotography weather module initialized');
 }
 

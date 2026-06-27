@@ -271,6 +271,7 @@ class TestSkyWidgetApi:
         "transparency_score": 80.0,
         "cloud_discrimination": 70.0,
         "tracking_stability_score": 90.0,
+        "observation_score": 8.2,  # (70+80+70+90)/4/10
     }
 
     def _setup_sun_cache(self, monkeypatch, sun_data):
@@ -297,19 +298,19 @@ class TestSkyWidgetApi:
         assert data["observation_score"] is not None
 
     def test_score_formula_matches_night_timeline(self, client_admin, monkeypatch):
-        """Score == round(avg(seeing*10, transp, cloud, tracking) / 10, 1)."""
+        """observation_score is read directly from current_conditions (computed by backend)."""
         conditions = {
             "seeing_pickering": 6.0,
             "transparency_score": 60.0,
             "cloud_discrimination": 60.0,
             "tracking_stability_score": 60.0,
+            "observation_score": 6.0,
         }
         self._setup_sun_cache(monkeypatch, _make_sun_data())
         with patch("app.load_config", return_value=self._FAKE_CONFIG), \
              patch(self._PATCH_TARGET, return_value=conditions):
             resp = client_admin.get("/api/sky-widget")
         data = resp.get_json()
-        # raw = (60+60+60+60)/4 = 60, score = round(60/10, 1) = 6.0
         assert data["observation_score"] == 6.0
 
     def test_sun_cache_invalid_triggers_sync(self, client_admin, monkeypatch):
@@ -342,7 +343,7 @@ class TestSkyWidgetApi:
         assert resp.get_json()["observation_score"] is None
 
     def test_score_is_none_when_conditions_missing_seeing(self, client_admin, monkeypatch):
-        """Conditions without 'seeing_pickering' → score stays None."""
+        """Conditions without 'observation_score' → score stays None."""
         self._setup_sun_cache(monkeypatch, _make_sun_data())
         with patch("app.load_config", return_value=self._FAKE_CONFIG), \
              patch(self._PATCH_TARGET, return_value={"other": 1}):

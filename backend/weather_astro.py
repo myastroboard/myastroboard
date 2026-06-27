@@ -565,6 +565,13 @@ class AstroWeatherAnalyzer:
             df_json = df.copy()
             dt_series = cast(pd.Series, pd.to_datetime(df_json["datetime"], errors="coerce"))
             df_json["datetime"] = dt_series.map(lambda x: x.strftime("%Y-%m-%dT%H:%M:%S%z") if pd.notna(x) else None)
+            df_json["observation_score"] = (
+                (df_json["seeing_pickering"].fillna(0) * 10
+                 + df_json["transparency_score"].fillna(0)
+                 + df_json["cloud_discrimination"].fillna(0)
+                 + df_json["tracking_stability_score"].fillna(0))
+                / 4 / 10
+            ).round(1)
 
             # Create summary statistics
             current_conditions = self._generate_current_summary(df.iloc[0] if len(df) > 0 else None)
@@ -585,20 +592,31 @@ class AstroWeatherAnalyzer:
             logger.exception("Failed to generate comprehensive analysis")
             return None
 
+    @staticmethod
+    def _observation_score(seeing: float, transparency: float, cloud: float, tracking: float) -> float:
+        """0–10 composite observation quality score (canonical definition of the formula)."""
+        return ((seeing * 10 + transparency + cloud + tracking) / 4) / 10
+
     def _generate_current_summary(self, current_row: Optional[pd.Series]) -> Dict:
         """Generate summary of current conditions"""
         if current_row is None:
             return {"status": "No current data available"}
 
+        seeing = float(current_row.get("seeing_pickering", 0))
+        transparency = float(current_row.get("transparency_score", 0))
+        cloud = float(current_row.get("cloud_discrimination", 0))
+        tracking = float(current_row.get("tracking_stability_score", 0))
+
         return {
-            "seeing_pickering": float(current_row.get("seeing_pickering", 0)),
-            "transparency_score": float(current_row.get("transparency_score", 0)),
+            "seeing_pickering": seeing,
+            "transparency_score": transparency,
             "limiting_magnitude": float(current_row.get("limiting_magnitude", 0)),
-            "cloud_discrimination": float(current_row.get("cloud_discrimination", 0)),
+            "cloud_discrimination": cloud,
             "dew_risk_level": current_row.get("dew_risk_level", "UNKNOWN"),
             "dew_point_spread": float(current_row.get("dew_point_spread", 0)),
             "wind_tracking_impact": current_row.get("wind_tracking_impact", "UNKNOWN"),
-            "tracking_stability_score": float(current_row.get("tracking_stability_score", 0)),
+            "tracking_stability_score": tracking,
+            "observation_score": round(self._observation_score(seeing, transparency, cloud, tracking), 1),
         }
 
     def _resolve_astronomical_night_window(self) -> Optional[Tuple[pd.Timestamp, pd.Timestamp]]:
