@@ -740,19 +740,22 @@ function _renderAstronauts(container, data) {
         container.appendChild(notice);
     }
 
-    // ISS Crew expedition block
-    const expedition = data.iss_crew && data.iss_crew.current_expedition;
-    if (expedition && expedition.crew && expedition.crew.length > 0) {
+    // Active station expedition blocks (ISS, CSS, etc.)
+    const expeditions = (data.iss_crew && data.iss_crew.expeditions) || [];
+    const hasExpeditionCrew = expeditions.some(e => e.crew && e.crew.length > 0);
+    expeditions.forEach(expedition => {
+        if (!expedition.crew || expedition.crew.length === 0) return;
         const section = document.createElement('div');
         section.className = 'mb-4';
 
         const header = document.createElement('h5');
         header.className = 'mb-3';
         const icon = document.createElement('i');
-        icon.className = 'bi bi-iss me-2';
+        icon.className = (expedition.station_abbrev === 'ISS' ? 'bi bi-iss' : 'bi bi-stars') + ' me-2';
         header.appendChild(icon);
-        const expName = expedition.name || i18n.t('spaceflight.iss_crew_title', 'Current ISS Crew');
-        header.appendChild(document.createTextNode(expName));
+        header.appendChild(document.createTextNode(
+            expedition.name || expedition.station_name || i18n.t('spaceflight.station_crew_title', 'Current Station Crew')
+        ));
         section.appendChild(header);
 
         const grid = document.createElement('div');
@@ -763,11 +766,10 @@ function _renderAstronauts(container, data) {
 
         const hr = document.createElement('hr');
         container.appendChild(hr);
-    }
+    });
 
     // All astronauts in space
     const astronauts = (data.astronauts_in_space && data.astronauts_in_space.results) || [];
-    const hasExpeditionCrew = expedition && expedition.crew && expedition.crew.length > 0;
 
     if (astronauts.length === 0 && !hasExpeditionCrew) {
         const noData = document.createElement('div');
@@ -885,11 +887,25 @@ function _makeAstronautCard(ast) {
         body.appendChild(nat);
     }
 
-    if (ast.agency_abbrev) {
-        const agency = document.createElement('span');
-        agency.className = 'badge bg-secondary';
-        agency.textContent = ast.agency_abbrev;
-        body.appendChild(agency);
+    if (ast.agency_abbrev || ast.station_abbrev) {
+        const badges = document.createElement('div');
+        badges.className = 'mb-1';
+        if (ast.agency_abbrev) {
+            const agency = document.createElement('span');
+            agency.className = 'badge bg-secondary me-1';
+            agency.textContent = ast.agency_abbrev;
+            badges.appendChild(agency);
+        }
+        if (ast.station_abbrev) {
+            const station = document.createElement('span');
+            const stationClass = ast.station_abbrev === 'ISS' ? 'bg-info text-dark'
+                               : ast.station_abbrev === 'CSS' ? 'bg-warning text-dark'
+                               : 'bg-secondary';
+            station.className = `badge ${stationClass}`;
+            station.textContent = ast.station_abbrev;
+            badges.appendChild(station);
+        }
+        body.appendChild(badges);
     }
 
     if (ast.bio) {

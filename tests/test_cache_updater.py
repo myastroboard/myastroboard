@@ -1283,7 +1283,7 @@ class TestUpdateSpaceflightAstronautsCache:
         mock_cache_store._spaceflight_astronauts_cache = {"data": None, "timestamp": 0}
 
         fake_module = types.SimpleNamespace(
-            get_iss_crew=MagicMock(return_value={"count": 7, "results": []}),
+            get_iss_crew=MagicMock(return_value={"expeditions": [], "fetched_at": "2026-01-01T00:00:00Z"}),
             get_astronauts_in_space=MagicMock(return_value={"count": 7, "results": []}),
         )
 
