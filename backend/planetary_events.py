@@ -39,7 +39,6 @@ PLANETS = {
 }
 
 
-
 class PlanetaryEventsService:
     """
     Calculates planetary events for a given location.
@@ -185,9 +184,7 @@ class PlanetaryEventsService:
                         {
                             'event_type': 'Moon Conjunction',
                             'title': f'Moon - {planet} Conjunction',
-                            'description': (
-                                f'The Moon passes within {min_sep:.1f}° of {planet}'
-                            ),
+                            'description': (f'The Moon passes within {min_sep:.1f}° of {planet}'),
                             'peak_time': self._to_local_iso(peak_time),  # type: ignore[arg-type]
                             'start_time': self._to_local_iso(t_arr[s]),  # type: ignore[arg-type]
                             'end_time': self._to_local_iso(t_arr[min(e, n - 1)]),  # type: ignore[arg-type]
