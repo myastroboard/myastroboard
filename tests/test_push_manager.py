@@ -1,12 +1,13 @@
 """Tests for push_manager.py: VAPID key management and Web Push delivery."""
 
 import json
+import os
 import sys
 import types
 
 import pytest
 
-backend_path = __import__('os').path.join(__import__('os').path.dirname(__import__('os').path.dirname(__file__)), 'backend')
+backend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'backend')
 if backend_path not in sys.path:
     sys.path.insert(0, backend_path)
 
@@ -20,6 +21,15 @@ def reset_vapid_cache():
     push_manager._vapid_keys = {}
     yield
     push_manager._vapid_keys = {}
+
+
+def test_push_manager_handles_missing_psutil(monkeypatch):
+    monkeypatch.delitem(sys.modules, 'psutil', raising=False)
+    import importlib
+    import push_manager
+    importlib.reload(push_manager)
+    push_manager._vapid_keys = {'private_key': 'PRIV', 'public_key': 'PUB'}
+    assert push_manager.get_vapid_public_key() == 'PUB'
 
 
 # ---------------------------------------------------------------------------
@@ -88,16 +98,17 @@ def test_regenerates_when_file_missing_required_keys(tmp_path, monkeypatch):
 
 def test_returns_cached_keys_without_regenerating(monkeypatch):
     import push_manager
+    from unittest.mock import MagicMock
 
     push_manager._vapid_keys = {'private_key': 'CACHED', 'public_key': 'CACHED_PUB'}
 
-    generate_called = []
-    monkeypatch.setattr(push_manager, '_generate_keys', lambda: generate_called.append(1) or {})
+    mock_generate = MagicMock(return_value={})
+    monkeypatch.setattr(push_manager, '_generate_keys', mock_generate)
 
     keys = push_manager.load_or_generate_vapid_keys()
 
     assert keys['private_key'] == 'CACHED'
-    assert not generate_called
+    mock_generate.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -157,8 +168,11 @@ def test_send_push_returns_false_on_delivery_error(monkeypatch):
 
     push_manager._vapid_keys = {'private_key': 'PRIV', 'public_key': 'PUB'}
 
+    def _raise_subscription_expired(**kw):
+        raise RuntimeError('Subscription expired')
+
     fake_pywebpush = types.ModuleType('pywebpush')
-    fake_pywebpush.webpush = lambda **kw: (_ for _ in ()).throw(RuntimeError('Subscription expired'))
+    fake_pywebpush.webpush = _raise_subscription_expired
     monkeypatch.setitem(sys.modules, 'pywebpush', fake_pywebpush)
 
     sub = {'endpoint': 'https://push.example.com/v1/dead', 'keys': {}}
@@ -259,7 +273,11 @@ def test_load_warns_when_vapid_contact_email_empty(tmp_path, monkeypatch):
     push_manager._VAPID_CONTACT_WARNING_EMITTED = False
     vapid_file = tmp_path / 'vapid.json'
     monkeypatch.setattr(push_manager, '_VAPID_FILE', str(vapid_file))
-    app_settings._cache = {'vapid_contact_email': '', 'trust_proxy_headers': False, 'session_cookie_secure': False}
+    monkeypatch.setattr(
+        app_settings,
+        'get_app_settings',
+        lambda: {'vapid_contact_email': '', 'trust_proxy_headers': False, 'session_cookie_secure': False},
+    )
 
     fake_keys = {'private_key': 'P', 'public_key': 'K'}
     monkeypatch.setattr(push_manager, '_generate_keys', lambda: fake_keys)
