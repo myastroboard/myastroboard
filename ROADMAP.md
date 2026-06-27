@@ -295,20 +295,11 @@ Export Plan My Night or SkyTonight results as:
 |---------|-------|----------|--------|
 | v0.9 | Web Push E2E validation | All | Low |
 | v1.0 | First stable release | All | Low |
-| v1.1 | Multi-location profiles | All | Medium |
-| v1.2 | First Light - beginner onboarding | Beginners | Medium |
+| v1.1 | First Light - beginner onboarding | Beginners | Medium |
+| v1.2 | Multi-location profiles | All | Medium |
 | v1.3 | Observation Log | Intermediate+ | High |
 | v1.4 | Planning Intelligence | Advanced | High |
 | v1.5 | Session Analytics | All | Medium |
 | v2.0 | Interactive Sky Chart | All | High |
 | v2.1 | Community & Sharing | All | Medium |
 | v2.2 | Integrations (plate solve, PHD2, NINA) | Advanced | High |
-
-### Ordering rationale
-
-- **v1.1 before v1.2** - Multi-location is foundational; the Observation Log (v1.3) uses location presets.
-- **v1.2 before v1.3** - Beginners need onboarding before they have sessions worth logging. First Light is also Medium effort vs. the High effort of the Observation Log - better ROI first.
-- **v1.5 after v1.3** - Session Analytics are meaningless without Observation Log data.
-- **v2.0 after v1.4** - The Sky Chart's value multiplies when planning tools, FOV data, and Astrodex are all mature.
-- **v2.1 after v1.2 + v1.5** - Community sharing needs both a user base (built by First Light) and content to share (stats from Analytics, captures from Astrodex).
-- **v2.2 last** - Narrowest audience; most complex; no dependency on it from other features.
