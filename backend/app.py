@@ -2589,8 +2589,6 @@ def _determine_sky_period(sun_data: "dict | None", timezone_str: str) -> tuple:
             return None
 
     def secs(dt_end):
-        if dt_end is None:
-            return None
         return max(0, int((dt_end - now).total_seconds()))
 
     sunset = parse_dt(sun.get("sunset"))
