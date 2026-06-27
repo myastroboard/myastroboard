@@ -1999,5 +1999,17 @@
     "module_daily_timelapse_desc": "Zeitraffer-Video der ganzen Nacht (am Ende der Nacht erstellt)",
 
     "local_hostname_warning": ".local-Hostnamen verwenden mDNS, das in Docker nicht verfügbar ist. Verwende stattdessen die statische IP-Adresse (z.B. http://192.168.1.x/)."
+  },
+  "sky_widget": {
+    "loading": "Laden...",
+    "period_day": "Tag",
+    "period_civil_twilight": "Bürgerliche Dämmerung",
+    "period_nautical_twilight": "Nautische Dämmerung",
+    "period_astronomical_twilight": "Astronomische Dämmerung",
+    "period_astronomical_night": "Astronomische Nacht",
+    "period_astronomical_dawn": "Astronomische Morgendämmerung",
+    "period_unknown": "Unbekannt",
+    "next_in": "{period} in {time}",
+    "score_title": "Aktueller Himmelsqualitätswert (0–10): Seeing, Transparenz, Wolkenbedeckung, Nachführungsstabilität"
   }
 }

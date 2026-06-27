@@ -236,6 +236,9 @@ async function initializeApp() {
     // Init SkyTonight scheduler
     SkyTonightScheduler.init();
 
+    // Init persistent sky status widget
+    if (typeof SkyWidget !== 'undefined') SkyWidget.init();
+
     checkCacheStatus();
 
     // Show first-run location setup if location has never been configured
