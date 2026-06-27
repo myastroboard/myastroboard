@@ -262,6 +262,8 @@ class TestErrorHandling:
         assert result["seeing_pickering"] == 7.5
         assert result["dew_risk_level"] == "LOW"
         assert result["wind_tracking_impact"] == "GOOD"
+        # (7.5*10 + 80 + 82 + 75) / 4 / 10 = 312/40 = 7.8
+        assert result["observation_score"] == 7.8
 
     def test_infer_forecast_slot_hours_with_regular_intervals(self):
         analyzer = _build_analyzer()

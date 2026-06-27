@@ -2641,19 +2641,12 @@ def get_sky_widget_api():
             cache_store.sync_cache_from_shared("sun_report", cache_store._sun_report_cache)
             sun_data = cache_store._sun_report_cache.get("data")
 
-        # Get current-hour astro score (same formula as night timeline)
         observation_score = None
         try:
             from weather_astro import get_current_astro_conditions
             conditions = get_current_astro_conditions()
-            if conditions and "seeing_pickering" in conditions:
-                raw = (
-                    (conditions.get("seeing_pickering") or 0) * 10
-                    + (conditions.get("transparency_score") or 0)
-                    + (conditions.get("cloud_discrimination") or 0)
-                    + (conditions.get("tracking_stability_score") or 0)
-                ) / 4
-                observation_score = round(raw / 10, 1)
+            if conditions:
+                observation_score = conditions.get("observation_score")
         except Exception:
             pass  # score stays None if weather data unavailable
 
