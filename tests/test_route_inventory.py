@@ -243,8 +243,8 @@ def test_no_breaking_route_changes():
 
     messages = []
     if added:
-        messages.append("Routes added (not in EXPECTED_ROUTES):\n" + "\n".join(f"  {m} {p}" for p, m in sorted(added)))
+        messages.append("Routes added (not in EXPECTED_ROUTES):\n" + "\n".join(f"  {p} {m}" for p, m in sorted(added)))
     if removed:
-        messages.append("Routes removed (missing from app):\n" + "\n".join(f"  {m} {p}" for p, m in sorted(removed)))
+        messages.append("Routes removed (missing from app):\n" + "\n".join(f"  {p} {m}" for p, m in sorted(removed)))
 
     assert not added and not removed, "\n\n" + "\n\n".join(messages)
