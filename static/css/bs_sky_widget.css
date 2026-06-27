@@ -1,0 +1,206 @@
+/* ============================================================
+   Sky Status Widget
+   Centered inline pill below the hero slogan.
+   Compact view always visible; panel expands on hover / touch.
+   ============================================================ */
+
+/* ── Per-theme period tokens ───────────────────────────────── */
+
+:root {
+    --sky-day-bg:           #fffde7;
+    --sky-day-border:       #f9a825;
+    --sky-day-color:        #5d4037;
+    --sky-day-icon:         #f9a825;
+
+    --sky-civil-bg:         #fff3e0;
+    --sky-civil-border:     #ef6c00;
+    --sky-civil-color:      #4e342e;
+    --sky-civil-icon:       #ef6c00;
+
+    --sky-nautical-bg:      #ede7f6;
+    --sky-nautical-border:  #7e57c2;
+    --sky-nautical-color:   #311b92;
+    --sky-nautical-icon:    #7e57c2;
+
+    --sky-astro-tw-bg:      #e8eaf6;
+    --sky-astro-tw-border:  #3f51b5;
+    --sky-astro-tw-color:   #1a237e;
+    --sky-astro-tw-icon:    #3f51b5;
+
+    --sky-night-bg:         #0d1b2a;
+    --sky-night-border:     #1e3a5f;
+    --sky-night-color:      #cdd9e5;
+    --sky-night-icon:       #7986cb;
+}
+
+[data-bs-theme="dark"],
+[data-bs-theme="red"] {
+    --sky-day-bg:           #2c2300;
+    --sky-day-border:       #f9a825;
+    --sky-day-color:        #ffe082;
+    --sky-day-icon:         #f9a825;
+
+    --sky-civil-bg:         #2a1500;
+    --sky-civil-border:     #ef6c00;
+    --sky-civil-color:      #ffcc80;
+    --sky-civil-icon:       #ef6c00;
+
+    --sky-nautical-bg:      #1a1440;
+    --sky-nautical-border:  #9575cd;
+    --sky-nautical-color:   #d1c4e9;
+    --sky-nautical-icon:    #9575cd;
+
+    --sky-astro-tw-bg:      #0d1240;
+    --sky-astro-tw-border:  #5c6bc0;
+    --sky-astro-tw-color:   #c5cae9;
+    --sky-astro-tw-icon:    #5c6bc0;
+
+    --sky-night-bg:         #030510;
+    --sky-night-border:     #3f51b5;
+    --sky-night-color:      #c5cae9;
+    --sky-night-icon:       #7986cb;
+}
+
+/* ── Widget wrapper ────────────────────────────────────────── */
+
+.sky-widget {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    cursor: default;
+    /* hero uses text-center so this inline element is automatically centered */
+}
+
+/* ── Compact pill (always visible) ────────────────────────── */
+
+.sky-widget-compact {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--bs-border-color);
+    background-color: var(--bs-secondary-bg);
+    color: var(--bs-body-color);
+    font-size: 0.8125rem;
+    transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+    user-select: none;
+    white-space: nowrap;
+}
+
+/* Period backgrounds on compact pill */
+.sky-widget.period-day                  .sky-widget-compact {
+    background-color: var(--sky-day-bg);
+    border-color:     var(--sky-day-border);
+    color:            var(--sky-day-color);
+}
+.sky-widget.period-civil_twilight       .sky-widget-compact {
+    background-color: var(--sky-civil-bg);
+    border-color:     var(--sky-civil-border);
+    color:            var(--sky-civil-color);
+}
+.sky-widget.period-nautical_twilight    .sky-widget-compact {
+    background-color: var(--sky-nautical-bg);
+    border-color:     var(--sky-nautical-border);
+    color:            var(--sky-nautical-color);
+}
+.sky-widget.period-astronomical_twilight .sky-widget-compact {
+    background-color: var(--sky-astro-tw-bg);
+    border-color:     var(--sky-astro-tw-border);
+    color:            var(--sky-astro-tw-color);
+}
+.sky-widget.period-astronomical_night   .sky-widget-compact {
+    background-color: var(--sky-night-bg);
+    border-color:     var(--sky-night-border);
+    color:            var(--sky-night-color);
+}
+
+/* Period icon color */
+.sky-widget-period-icon { font-size: 1rem; flex-shrink: 0; }
+
+.sky-widget.period-day                  .sky-widget-period-icon { color: var(--sky-day-icon); }
+.sky-widget.period-civil_twilight       .sky-widget-period-icon { color: var(--sky-civil-icon); }
+.sky-widget.period-nautical_twilight    .sky-widget-period-icon { color: var(--sky-nautical-icon); }
+.sky-widget.period-astronomical_twilight .sky-widget-period-icon { color: var(--sky-astro-tw-icon); }
+.sky-widget.period-astronomical_night   .sky-widget-period-icon { color: var(--sky-night-icon); }
+
+/* Location text */
+.sky-widget-location {
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Score badge ───────────────────────────────────────────── */
+
+.sky-widget-score {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 26px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.sky-widget-score.score-good { background: #28a745; color: #fff; }
+.sky-widget-score.score-fair { background: #ffc107; color: #000; }
+.sky-widget-score.score-poor { background: #fd7e14; color: #fff; }
+.sky-widget-score.score-bad  { background: #dc3545; color: #fff; }
+
+/* ── Expanded panel ────────────────────────────────────────── */
+
+.sky-widget-panel {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: 180px;
+    padding: 9px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--bs-border-color);
+    background-color: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+    z-index: 200;
+    font-size: 0.8125rem;
+    text-align: left;
+    white-space: nowrap;
+}
+
+/* Show on hover (desktop), focus, or JS-toggled touch state */
+.sky-widget:hover       .sky-widget-panel,
+.sky-widget:focus       .sky-widget-panel,
+.sky-widget.sky-widget--open .sky-widget-panel {
+    display: block;
+}
+
+.sky-widget-panel-period,
+.sky-widget-panel-next {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.sky-widget-panel-next {
+    margin-top: 4px;
+    opacity: 0.75;
+    font-size: 0.775rem;
+}
+
+.sky-widget-panel-period-icon {
+    font-size: 0.9rem;
+    flex-shrink: 0;
+}
+
+.sky-widget.period-day                  .sky-widget-panel-period-icon { color: var(--sky-day-icon); }
+.sky-widget.period-civil_twilight       .sky-widget-panel-period-icon { color: var(--sky-civil-icon); }
+.sky-widget.period-nautical_twilight    .sky-widget-panel-period-icon { color: var(--sky-nautical-icon); }
+.sky-widget.period-astronomical_twilight .sky-widget-panel-period-icon { color: var(--sky-astro-tw-icon); }
+.sky-widget.period-astronomical_night   .sky-widget-panel-period-icon { color: var(--sky-night-icon); }

@@ -1999,5 +1999,17 @@
     "module_daily_timelapse_desc": "Video timelapse dell'intera notte (generato a fine notte)",
 
     "local_hostname_warning": "I nomi host .local usano mDNS, non disponibile in Docker. Usa l'indirizzo IP statico del dispositivo (es. http://192.168.1.x/)."
+  },
+  "sky_widget": {
+    "loading": "Caricamento...",
+    "period_day": "Giorno",
+    "period_civil_twilight": "Crepuscolo civile",
+    "period_nautical_twilight": "Crepuscolo nautico",
+    "period_astronomical_twilight": "Crepuscolo astronomico",
+    "period_astronomical_night": "Notte astronomica",
+    "period_astronomical_dawn": "Alba astronomica",
+    "period_unknown": "Sconosciuto",
+    "next_in": "{period} tra {time}",
+    "score_title": "Punteggio qualità cielo attuale (0–10): seeing, trasparenza, copertura nuvolosa, stabilità di inseguimento"
   }
 }
