@@ -295,13 +295,11 @@ class TestGetPlanetaryEventsExceptionPath:
         now = Time(datetime(2026, 1, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
         end = Time(datetime(2026, 12, 31, 0, 0, tzinfo=ZoneInfo("UTC")))
         svc._prefetch_coords(now, 365)
-        # Patch separation to raise for all calls
+        # Replace all coords with mocks that raise on separation
         for body in svc._coords:
-            obj = svc._coords[body]
-            if hasattr(obj, 'separation'):
-                mock = MagicMock()
-                mock.separation.side_effect = Exception("sep fail")
-                svc._coords[body] = mock
+            mock = MagicMock()
+            mock.separation.side_effect = Exception("sep fail")
+            svc._coords[body] = mock
         events = svc._find_conjunctions(now, end)
         assert isinstance(events, list)
 
