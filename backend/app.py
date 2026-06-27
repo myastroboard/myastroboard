@@ -2644,6 +2644,7 @@ def get_sky_widget_api():
         observation_score = None
         try:
             from weather_astro import get_current_astro_conditions
+
             conditions = get_current_astro_conditions()
             if conditions:
                 observation_score = conditions.get("observation_score")
@@ -2652,13 +2653,15 @@ def get_sky_widget_api():
 
         period, next_period, seconds_until_next = _determine_sky_period(sun_data, timezone_str)
 
-        return jsonify({
-            "location": location_name,
-            "period": period,
-            "next_period": next_period,
-            "time_until_next_seconds": seconds_until_next,
-            "observation_score": observation_score,
-        })
+        return jsonify(
+            {
+                "location": location_name,
+                "period": period,
+                "next_period": next_period,
+                "time_until_next_seconds": seconds_until_next,
+                "observation_score": observation_score,
+            }
+        )
 
     except Exception as e:
         logger.error(f"Error getting sky widget data: {e}")

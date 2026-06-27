@@ -566,11 +566,14 @@ class AstroWeatherAnalyzer:
             dt_series = cast(pd.Series, pd.to_datetime(df_json["datetime"], errors="coerce"))
             df_json["datetime"] = dt_series.map(lambda x: x.strftime("%Y-%m-%dT%H:%M:%S%z") if pd.notna(x) else None)
             df_json["observation_score"] = (
-                (df_json["seeing_pickering"].fillna(0) * 10
-                 + df_json["transparency_score"].fillna(0)
-                 + df_json["cloud_discrimination"].fillna(0)
-                 + df_json["tracking_stability_score"].fillna(0))
-                / 4 / 10
+                (
+                    df_json["seeing_pickering"].fillna(0) * 10
+                    + df_json["transparency_score"].fillna(0)
+                    + df_json["cloud_discrimination"].fillna(0)
+                    + df_json["tracking_stability_score"].fillna(0)
+                )
+                / 4
+                / 10
             ).round(1)
 
             # Create summary statistics
