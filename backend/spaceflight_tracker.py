@@ -26,6 +26,12 @@ _REQUEST_TIMEOUT = 15
 _SPACEFLIGHT_IMAGES_DIR = os.path.join(DATA_DIR_CACHE, 'spaceflight_images')
 _SPACEFLIGHT_BACKOFF_FILE = os.path.join(DATA_DIR_CACHE, 'spaceflight_backoff.json')
 
+_STATION_ABBREV_MAP: Dict[str, str] = {
+    "international space station": "ISS",
+    "tiangong space station": "CSS",
+    "tiangong": "CSS",
+}
+
 
 def _cache_image(url: Optional[str]) -> Optional[str]:
     """
@@ -222,7 +228,9 @@ def _normalise_astronaut(raw: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _normalise_expedition(raw: Dict[str, Any]) -> Dict[str, Any]:
-    """Slim representation of an ISS expedition."""
+    """Slim representation of a space station expedition."""
+    station = raw.get("spacestation") or {}
+    station_name = station.get("name")
     crew = []
     for cr in raw.get("crew", []):
         ast = cr.get("astronaut") or {}
@@ -242,6 +250,8 @@ def _normalise_expedition(raw: Dict[str, Any]) -> Dict[str, Any]:
         "name": raw.get("name"),
         "start": raw.get("start"),
         "end": raw.get("end"),
+        "station_name": station_name,
+        "station_abbrev": _STATION_ABBREV_MAP.get(station_name.casefold()) if station_name else None,
         "crew_count": len(crew),
         "crew": crew,
         "mission_patch": raw.get("mission_patch"),
@@ -305,17 +315,23 @@ def get_past_launches(limit: int = 10) -> Optional[Dict[str, Any]]:
 
 
 def get_iss_crew() -> Optional[Dict[str, Any]]:
-    """Fetch current ISS expedition crew via the expeditions endpoint."""
-    raw = _get("/expedition/", params={"format": "json", "limit": 1, "ordering": "-start"})
+    """Fetch all currently active space station expeditions (ISS, CSS, etc.)."""
+    raw = _get("/expedition/", params={"format": "json", "limit": 5, "ordering": "-start"})
     if raw is None:
         return None
     expeditions = raw.get("results") or []
-    if not expeditions:
-        return {"expeditions": [], "fetched_at": datetime.now(timezone.utc).isoformat()}
-    # The first result is the current expedition (API returns most recent first)
-    current = _normalise_expedition(expeditions[0])
+    active = []
+    for exp in expeditions:
+        if exp.get("end"):
+            continue
+        # The list endpoint omits crew — fetch the detail endpoint to get it
+        if not exp.get("crew") and exp.get("id"):
+            detail = _get(f"/expedition/{exp['id']}/", params={"format": "json"})
+            if detail:
+                exp = detail
+        active.append(_normalise_expedition(exp))
     return {
-        "current_expedition": current,
+        "expeditions": active,
         "fetched_at": datetime.now(timezone.utc).isoformat(),
     }
 

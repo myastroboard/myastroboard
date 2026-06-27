@@ -966,6 +966,21 @@ def update_spaceflight_astronauts_cache():
             logger.warning("Spaceflight astronauts fetch returned no data (kept existing cache)")
             return
 
+        # Build name → station map from active expeditions and annotate each astronaut
+        station_by_name = {}
+        for exp in (iss_crew or {}).get("expeditions", []):
+            for member in exp.get("crew", []):
+                if member.get("name"):
+                    station_by_name[member["name"]] = {
+                        "station_name": exp.get("station_name"),
+                        "station_abbrev": exp.get("station_abbrev"),
+                    }
+        if astronauts:
+            for ast in astronauts.get("results", []):
+                station = station_by_name.get(ast.get("name") or "")
+                ast["station_name"] = station["station_name"] if station else None
+                ast["station_abbrev"] = station["station_abbrev"] if station else None
+
         response = {
             "iss_crew": iss_crew or {},
             "astronauts_in_space": astronauts or {"count": 0, "results": []},

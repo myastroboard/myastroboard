@@ -181,6 +181,7 @@ class TestNormaliseExpedition:
             "name": "Expedition 71",
             "start": "2024-03-04T00:00:00Z",
             "end": None,
+            "spacestation": {"name": "International Space Station"},
             "crew": [
                 {
                     "astronaut": {
@@ -204,6 +205,8 @@ class TestNormaliseExpedition:
         assert result["id"] == 71
         assert result["name"] == "Expedition 71"
         assert result["start"] == "2024-03-04T00:00:00Z"
+        assert result["station_name"] == "International Space Station"
+        assert result["station_abbrev"] == "ISS"
         assert result["crew_count"] == 1
         assert result["crew"][0]["name"] == "Oleg Kononenko"
         assert result["crew"][0]["role"] == "Commander"
@@ -636,24 +639,73 @@ class TestGetIssCrew:
         assert result["expeditions"] == []
         assert "fetched_at" in result
 
-    def test_returns_current_expedition(self):
-        raw = {
+    def test_returns_active_expeditions(self):
+        list_response = {
             "results": [
                 {
                     "id": 71,
                     "name": "Expedition 71",
                     "start": "2024-03-04T00:00:00Z",
                     "end": None,
+                    "spacestation": {"name": "International Space Station"},
+                    "crew": [],   # list endpoint omits crew
+                    "mission_patch": None,
+                    "wiki": None,
+                },
+                {
+                    "id": 12,
+                    "name": "Shenzhou 19",
+                    "start": "2024-10-30T00:00:00Z",
+                    "end": None,
+                    "spacestation": {"name": "Tiangong space station"},
                     "crew": [],
                     "mission_patch": None,
                     "wiki": None,
-                }
+                },
+                {
+                    "id": 70,
+                    "name": "Expedition 70",
+                    "start": "2023-09-27T00:00:00Z",
+                    "end": "2024-03-04T00:00:00Z",  # ended — should be excluded
+                    "spacestation": {"name": "International Space Station"},
+                    "crew": [],
+                    "mission_patch": None,
+                    "wiki": None,
+                },
             ]
         }
+        detail_71 = {
+            "id": 71, "name": "Expedition 71", "start": "2024-03-04T00:00:00Z",
+            "end": None, "spacestation": {"name": "International Space Station"},
+            "crew": [{"astronaut": {"name": "Test Astronaut", "nationality": "American",
+                                    "agency": {"name": "NASA", "abbrev": "NASA"},
+                                    "profile_image": None},
+                      "role": {"role": "Commander"}}],
+            "mission_patch": None, "wiki": None,
+        }
+        detail_12 = {
+            "id": 12, "name": "Shenzhou 19", "start": "2024-10-30T00:00:00Z",
+            "end": None, "spacestation": {"name": "Tiangong space station"},
+            "crew": [], "mission_patch": None, "wiki": None,
+        }
+
+        def _mock_get(path, params=None):
+            if path == "/expedition/":
+                return list_response
+            if path == "/expedition/71/":
+                return detail_71
+            if path == "/expedition/12/":
+                return detail_12
+            return None
+
         with _no_cache():
-            with patch("spaceflight_tracker._get", return_value=raw):
+            with patch("spaceflight_tracker._get", side_effect=_mock_get):
                 result = get_iss_crew()
-        assert result["current_expedition"]["name"] == "Expedition 71"
+        assert len(result["expeditions"]) == 2
+        assert result["expeditions"][0]["name"] == "Expedition 71"
+        assert result["expeditions"][0]["station_abbrev"] == "ISS"
+        assert result["expeditions"][0]["crew_count"] == 1
+        assert result["expeditions"][1]["station_abbrev"] == "CSS"
         assert "fetched_at" in result
 
 
