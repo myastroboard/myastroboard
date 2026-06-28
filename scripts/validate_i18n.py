@@ -9,6 +9,10 @@ Checks (all are hard failures):
   3. Every language has an <option value="<lang>"> entry in the language selector
      in templates/index.html.
   4. No translation key present in en.json is missing from another language file.
+  5. No JSON file contains duplicate object keys.
+  6. No JSON file contains inline object values (object opened and closed on one line).
+  7. No translated file contains keys not present in en.json (orphan/extra keys).
+  8. No translated leaf value has a different type than the corresponding en.json value.
 
 Usage:
     python scripts/validate_i18n.py
@@ -29,6 +33,8 @@ INDEX_HTML = ROOT / "templates" / "index.html"
 STATIC_DIR = ROOT / "static"
 REFERENCE_LANG = "en"
 
+_INLINE_OBJECT_RE = re.compile(r'"[^"]+"\s*:\s*\{[^}]+\}')
+
 
 def flatten_keys(data: Any, parent: str = "") -> Set[str]:
     """Return flattened dot-notation keys from a nested JSON structure."""
@@ -48,6 +54,54 @@ def flatten_keys(data: Any, parent: str = "") -> Set[str]:
             else:
                 keys.add(path)
     return keys
+
+
+def get_leaf_types(data: Any, parent: str = "") -> dict[str, str]:
+    """Return {dot-notation-path: type_name} for every leaf node."""
+    result: dict[str, str] = {}
+    if isinstance(data, dict):
+        for key, value in data.items():
+            path = f"{parent}.{key}" if parent else str(key)
+            if isinstance(value, (dict, list)):
+                result.update(get_leaf_types(value, path))
+            else:
+                result[path] = type(value).__name__
+    elif isinstance(data, list):
+        for index, value in enumerate(data):
+            path = f"{parent}[{index}]" if parent else f"[{index}]"
+            if isinstance(value, (dict, list)):
+                result.update(get_leaf_types(value, path))
+            else:
+                result[path] = type(value).__name__
+    return result
+
+
+def find_duplicate_keys(text: str) -> list[str]:
+    """Return keys that appear more than once in any JSON object within the text."""
+    duplicates: list[str] = []
+
+    def object_pairs_hook(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        seen: dict[str, Any] = {}
+        for key, value in pairs:
+            if key in seen:
+                duplicates.append(key)
+            seen[key] = value
+        return seen
+
+    try:
+        json.loads(text, object_pairs_hook=object_pairs_hook)
+    except json.JSONDecodeError:
+        pass  # parse errors are reported separately
+    return duplicates
+
+
+def find_inline_objects(text: str) -> list[tuple[int, str]]:
+    """Return (line_number, stripped_line) for lines that contain inline object values."""
+    hits = []
+    for lineno, line in enumerate(text.splitlines(), 1):
+        if _INLINE_OBJECT_RE.search(line):
+            hits.append((lineno, line.strip()))
+    return hits
 
 
 def parse_backend_languages(source: str) -> Set[str]:
@@ -107,13 +161,21 @@ def main() -> int:
                 "Could not find 'var supported = [...]' for webmanifests in index.html"
             )
 
-    # --- Load reference translation keys ---
+    # --- Load reference translation keys and types ---
     ref_path = I18N_DIR / f"{REFERENCE_LANG}.json"
     if not ref_path.exists():
         errors.append(f"Reference translation file not found: {ref_path}")
         ref_keys: Set[str] = set()
+        ref_types: dict[str, str] = {}
     else:
-        ref_keys = flatten_keys(json.loads(ref_path.read_text(encoding="utf-8")))
+        try:
+            ref_data = json.loads(ref_path.read_text(encoding="utf-8"))
+            ref_keys = flatten_keys(ref_data)
+            ref_types = get_leaf_types(ref_data)
+        except (OSError, json.JSONDecodeError) as exc:
+            errors.append(f"[{REFERENCE_LANG}] Could not load reference file: {exc}")
+            ref_keys = set()
+            ref_types = {}
 
     # --- Per-language checks ---
     for lang in sorted(json_languages):
@@ -142,24 +204,55 @@ def main() -> int:
                     f"[{lang}] Not listed in 'var supported = [...]' for webmanifests in index.html"
                 )
 
-        # Check 4: translation key completeness (skip reference language)
+        # Load raw text once for checks 4, 5, 6
+        lang_path = I18N_DIR / f"{lang}.json"
+        try:
+            raw = lang_path.read_text(encoding="utf-8")
+        except OSError as exc:
+            errors.append(f"[{lang}] Could not read file: {exc}")
+            continue
+
+        # Check 5: duplicate object keys
+        for dup in find_duplicate_keys(raw):
+            errors.append(f"[{lang}] Duplicate key: '{dup}'")
+
+        # Check 6: inline object values
+        for lineno, snippet in find_inline_objects(raw):
+            display = snippet if len(snippet) <= 100 else snippet[:97] + "..."
+            errors.append(f"[{lang}] Inline object on line {lineno}: {display}")
+
+        # Checks 4, 7, 8: key completeness, extra keys, type mismatches (skip reference)
         if lang != REFERENCE_LANG and ref_keys:
-            lang_path = I18N_DIR / f"{lang}.json"
             try:
-                lang_json = json.loads(lang_path.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError) as exc:
-                errors.append(f"[{lang}] Could not load translation file: {exc}")
+                lang_json = json.loads(raw)
+            except json.JSONDecodeError as exc:
+                errors.append(f"[{lang}] Could not parse translation file: {exc}")
                 continue
             lang_keys = flatten_keys(lang_json)
-            missing = sorted(ref_keys - lang_keys)
-            for key in missing:
+
+            # Check 4: missing keys
+            for key in sorted(ref_keys - lang_keys):
                 errors.append(f"[{lang}] Missing translation key: '{key}'")
+
+            # Check 7: extra/orphan keys
+            for key in sorted(lang_keys - ref_keys):
+                errors.append(f"[{lang}] Extra key not in reference: '{key}'")
+
+            # Check 8: leaf value type mismatches
+            if ref_types:
+                lang_types = get_leaf_types(lang_json)
+                for key in sorted(set(ref_types) & set(lang_types)):
+                    if ref_types[key] != lang_types[key]:
+                        errors.append(
+                            f"[{lang}] Type mismatch at '{key}':"
+                            f" expected {ref_types[key]}, got {lang_types[key]}"
+                        )
 
     # --- Report ---
     if errors:
         print(f"i18n validation FAILED - {len(errors)} error(s) found:\n")
         for err in errors:
-            print(f"  ✗ {err}")
+            print(f" X {err}")
         print()
         return 1
 
