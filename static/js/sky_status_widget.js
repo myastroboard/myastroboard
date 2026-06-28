@@ -88,14 +88,17 @@ const SkyWidget = (() => {
 
         // Next period
         const nextLabelEl = document.getElementById('sky-widget-next-label');
+        const nextDivEl = document.getElementById('sky-widget-panel-next');
         if (nextLabelEl) {
             if (data.next_period && data.time_until_next_seconds !== null) {
                 nextLabelEl.textContent = i18n.t('sky_widget.next_in', {
                     period: _periodLabel(data.next_period),
                     time: _formatSeconds(data.time_until_next_seconds),
                 });
+                if (nextDivEl) nextDivEl.style.display = '';
             } else {
                 nextLabelEl.textContent = '';
+                if (nextDivEl) nextDivEl.style.display = 'none';
             }
         }
     }
