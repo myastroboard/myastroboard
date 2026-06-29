@@ -61,16 +61,16 @@ Lightweight tooltip layer shown on first visit to each major feature. Dismissibl
 What needs to be built:
 
 - **Location presets** - app list of saved locations (name, lat/lon, elevation, timezone, horizon profile, bortle, sqm). Creation only by admin. There is always a default location, if no location attributed to users.
-- **Attribution of locations** - each locations (one or more) can be attributed to an user
-- **Per-user settings** - user can select a default location, and sort locations if he have more that 2
+- **Attribution of locations** - each location (one or more) can be attributed to a user
+- **Per-user settings** - user can select a default location, and sort locations if they have more than 2
 - **Location switcher** - quick selector in the navbar; drives all active calculations
 - **Backend extension** - extend existing location config in `auth.py` / `config_defaults.py`; no new storage module needed
 - **Horizon profile per location** - associate a custom horizon with each preset
 - **i18n** in 6 languages
-- **Pre-requis** - must absolutely check for each external API the limit rate to define a limit of authorized location max.
+- **Prerequisites** - must absolutely check for each external API the limit rate to define a limit of authorized location max.
 - **Concerned modules** - these modules are specifically based on location: #forecast-astro (all subs), #forecast-weather (all subs), /#skytonight, #spaceflight/iss
 - **Astrodex & Plan my night** - use of this location
-- **Advanced call API** - in case of multiple location there is a high risk that same API will be called multiple time quickly. Must be check if some API allow multiple requests in same call, or make an orchestration of calls following the previous did.
+- **Advanced call API** - in case of multiple locations there is a high risk that the same API will be called multiple times quickly. Must check whether some APIs allow multiple requests in the same call, or orchestrate calls following the same pattern as previous ones.
 - **Notifications** - notifications must take care of location in message. Maybe user should have possibility to disable notification for specific location, in user params.
 
 ---
@@ -86,7 +86,7 @@ Users can record what they actually captured after a session, not just what they
 
 What needs to be built from scratch:
 
-- **Session concept** - date, observing site (linked to multi-location preset from v1.1), equipment combo, start/end time, sky conditions (SQM, seeing, transparency)
+- **Session concept** - date, observing site (linked to multi-location preset from v1.2), equipment combo, start/end time, sky conditions (SQM, seeing, transparency)
 - **Per-target entries** - actual frame count, integration time, notes, rating (1–5), link to Astrodex
 - **New backend module** (`observation_sessions.py`) with per-user JSON storage, same pattern as `astrodex.py`
 - **Import from plan** - one-click to seed a session from tonight's Plan My Night targets
