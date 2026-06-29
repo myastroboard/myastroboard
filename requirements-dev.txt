@@ -8,4 +8,4 @@ pytest-cov==7.1.0
 # Development tools (optional)
 black==26.5.1
 flake8==7.3.0
-djlint==1.39.2
+djlint==1.39.5
