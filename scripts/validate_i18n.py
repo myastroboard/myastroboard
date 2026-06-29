@@ -37,7 +37,8 @@ MAX_SNIPPET_LENGTH = 100
 _ELLIPSIS = "..."
 _TRUNCATED_SNIPPET_LENGTH = MAX_SNIPPET_LENGTH - len(_ELLIPSIS)
 
-_HTML_ENTITY_RE = re.compile(r"&(?:[a-zA-Z]{2,10}|#\d{1,6}|#x[0-9a-fA-F]{1,5});")
+_HTML_ENTITY_RE = re.compile(r"&(?:[a-zA-Z]{2,10}|#\d{1,7}|#x[0-9a-fA-F]{1,6});")
+_LANGUAGE_CODE_PATTERN = r"[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*"
 
 
 def flatten_keys(data: Any, parent: str = "") -> set[str]:
@@ -178,7 +179,7 @@ def parse_backend_languages(source: str) -> set[str]:
     if not match:
         return set()
     return set(
-        re.findall(r"['\"]([A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*)['\"]\s*:", match.group(1))
+        re.findall(rf"['\"]({_LANGUAGE_CODE_PATTERN})['\"]\s*:", match.group(1))
     )
 
 
@@ -187,12 +188,12 @@ def parse_html_supported_langs(html: str) -> set[str]:
     match = re.search(r"var\s+supported\s*=\s*\[([^\]]+)\]", html)
     if not match:
         return set()
-    return set(re.findall(r"['\"]([a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*)['\"]", match.group(1)))
+    return set(re.findall(rf"['\"]({_LANGUAGE_CODE_PATTERN})['\"]", match.group(1)))
 
 
 def parse_html_selector_langs(html: str) -> set[str]:
     """Extract language <option> values from the language selector in index.html."""
-    return set(re.findall(r"<option[^>]*value=['\"]([a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*)['\"]", html))
+    return set(re.findall(rf"<option[^>]*value=['\"]({_LANGUAGE_CODE_PATTERN})['\"]", html))
 
 
 def main() -> int:
