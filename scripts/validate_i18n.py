@@ -25,7 +25,7 @@ import json
 import re
 import sys
 from pathlib import Path
-from typing import Any, Set
+from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 I18N_DIR = ROOT / "static" / "i18n"
@@ -40,9 +40,9 @@ _TRUNCATED_SNIPPET_LENGTH = MAX_SNIPPET_LENGTH - len(_ELLIPSIS)
 _HTML_ENTITY_RE = re.compile(r"&(?:[a-zA-Z]{2,10}|#\d{1,6}|#x[0-9a-fA-F]{1,5});")
 
 
-def flatten_keys(data: Any, parent: str = "") -> Set[str]:
+def flatten_keys(data: Any, parent: str = "") -> set[str]:
     """Return flattened dot-notation keys from a nested JSON structure."""
-    keys: Set[str] = set()
+    keys: set[str] = set()
     if isinstance(data, dict):
         for key, value in data.items():
             path = f"{parent}.{key}" if parent else str(key)
@@ -170,7 +170,7 @@ def find_inline_objects(text: str) -> list[tuple[int, str]]:
     return hits
 
 
-def parse_backend_languages(source: str) -> Set[str]:
+def parse_backend_languages(source: str) -> set[str]:
     """Extract declared language codes from _TRANSLATION_FILENAMES dict."""
     match = re.search(
         r"_TRANSLATION_FILENAMES\s*=\s*\{([^}]+)\}", source, re.DOTALL
@@ -182,7 +182,7 @@ def parse_backend_languages(source: str) -> Set[str]:
     )
 
 
-def parse_html_supported_langs(html: str) -> Set[str]:
+def parse_html_supported_langs(html: str) -> set[str]:
     """Extract language codes from the 'var supported = [...]' array in index.html."""
     match = re.search(r"var\s+supported\s*=\s*\[([^\]]+)\]", html)
     if not match:
@@ -190,7 +190,7 @@ def parse_html_supported_langs(html: str) -> Set[str]:
     return set(re.findall(r"['\"]([a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*)['\"]", match.group(1)))
 
 
-def parse_html_selector_langs(html: str) -> Set[str]:
+def parse_html_selector_langs(html: str) -> set[str]:
     """Extract language <option> values from the language selector in index.html."""
     return set(re.findall(r"<option[^>]*value=['\"]([a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*)['\"]", html))
 
@@ -207,7 +207,7 @@ def main() -> int:
     # --- Parse backend/i18n_utils.py ---
     if not BACKEND_FILE.exists():
         errors.append(f"Backend file not found: {BACKEND_FILE}")
-        backend_langs: Set[str] = set()
+        backend_langs: set[str] = set()
     else:
         backend_langs = parse_backend_languages(BACKEND_FILE.read_text(encoding="utf-8"))
         if not backend_langs:
@@ -218,8 +218,8 @@ def main() -> int:
     # --- Parse templates/index.html ---
     if not INDEX_HTML.exists():
         errors.append(f"Template not found: {INDEX_HTML}")
-        html_supported_langs: Set[str] = set()
-        html_selector_langs: Set[str] = set()
+        html_supported_langs: set[str] = set()
+        html_selector_langs: set[str] = set()
     else:
         html_content = INDEX_HTML.read_text(encoding="utf-8")
         html_supported_langs = parse_html_supported_langs(html_content)
@@ -233,7 +233,7 @@ def main() -> int:
     ref_path = I18N_DIR / f"{REFERENCE_LANG}.json"
     if not ref_path.exists():
         errors.append(f"Reference translation file not found: {ref_path}")
-        ref_keys: Set[str] = set()
+        ref_keys: set[str] = set()
         ref_types: dict[str, str] = {}
     else:
         try:
