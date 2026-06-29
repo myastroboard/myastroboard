@@ -17,7 +17,7 @@ PyOngc==1.2.2
 # Data processing
 numpy==2.5.0
 matplotlib==3.11.0
-pandas==3.0.3
+pandas==3.0.4
 
 # HTTP and API
 requests==2.34.2
