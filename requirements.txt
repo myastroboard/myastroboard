@@ -11,7 +11,7 @@ astroplan==0.10.1
 astronomy-engine==2.1.19
 constellation-enum==0.1.0
 skyfield==1.54
-sgp4==2.25
+sgp4==2.26
 PyOngc==1.2.2
 
 # Data processing
