@@ -37,7 +37,6 @@ MAX_SNIPPET_LENGTH = 100
 _ELLIPSIS = "..."
 _TRUNCATED_SNIPPET_LENGTH = MAX_SNIPPET_LENGTH - len(_ELLIPSIS)
 
-_INLINE_OBJECT_RE = re.compile(r'"[^"]+"\s*:\s*\{[^}]+\}')
 _HTML_ENTITY_RE = re.compile(r"&(?:[a-zA-Z]{2,10}|#\d{1,6}|#x[0-9a-fA-F]{1,5});")
 
 
@@ -120,8 +119,54 @@ def find_inline_objects(text: str) -> list[tuple[int, str]]:
     """Return (line_number, stripped_line) for lines that contain inline object values."""
     hits = []
     for lineno, line in enumerate(text.splitlines(), 1):
-        if _INLINE_OBJECT_RE.search(line):
-            hits.append((lineno, line.strip()))
+        in_string = False
+        escape = False
+        i = 0
+        while i < len(line):
+            ch = line[i]
+            if in_string:
+                if escape:
+                    escape = False
+                elif ch == "\\":
+                    escape = True
+                elif ch == '"':
+                    in_string = False
+                i += 1
+                continue
+            if ch == '"':
+                in_string = True
+                i += 1
+                continue
+            if ch == ":":
+                j = i + 1
+                while j < len(line) and line[j].isspace():
+                    j += 1
+                if j < len(line) and line[j] == "{":
+                    # Verify the object is also closed on the same line
+                    depth = 1
+                    k = j + 1
+                    in_str = False
+                    esc = False
+                    while k < len(line) and depth > 0:
+                        c = line[k]
+                        if in_str:
+                            if esc:
+                                esc = False
+                            elif c == "\\":
+                                esc = True
+                            elif c == '"':
+                                in_str = False
+                        elif c == '"':
+                            in_str = True
+                        elif c == "{":
+                            depth += 1
+                        elif c == "}":
+                            depth -= 1
+                        k += 1
+                    if depth == 0:
+                        hits.append((lineno, line.strip()))
+                    break
+            i += 1
     return hits
 
 
@@ -133,7 +178,7 @@ def parse_backend_languages(source: str) -> Set[str]:
     if not match:
         return set()
     return set(
-        re.findall(r"['\"]([A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})*)['\"]\s*:", match.group(1))
+        re.findall(r"['\"]([A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*)['\"]\s*:", match.group(1))
     )
 
 
@@ -227,7 +272,7 @@ def main() -> int:
                     f"[{lang}] Not listed in 'var supported = [...]' for webmanifests in index.html"
                 )
 
-        # Load raw text once for checks 4, 5, 6
+        # Load raw text once for checks 5, 6, 9 (and 4/7/8 for non-reference)
         lang_path = I18N_DIR / f"{lang}.json"
         try:
             raw = lang_path.read_text(encoding="utf-8")
