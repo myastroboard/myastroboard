@@ -33,6 +33,9 @@ BACKEND_FILE = ROOT / "backend" / "i18n_utils.py"
 INDEX_HTML = ROOT / "templates" / "index.html"
 STATIC_DIR = ROOT / "static"
 REFERENCE_LANG = "en"
+MAX_SNIPPET_LENGTH = 100
+_ELLIPSIS = "..."
+_TRUNCATED_SNIPPET_LENGTH = MAX_SNIPPET_LENGTH - len(_ELLIPSIS)
 
 _INLINE_OBJECT_RE = re.compile(r'"[^"]+"\s*:\s*\{[^}]+\}')
 _HTML_ENTITY_RE = re.compile(r"&(?:[a-zA-Z]{2,10}|#\d{1,6}|#x[0-9a-fA-F]{1,5});")
@@ -129,7 +132,9 @@ def parse_backend_languages(source: str) -> Set[str]:
     )
     if not match:
         return set()
-    return set(re.findall(r"['\"]([a-z]{2,3})['\"]\s*:", match.group(1)))
+    return set(
+        re.findall(r"['\"]([A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})*)['\"]\s*:", match.group(1))
+    )
 
 
 def parse_html_supported_langs(html: str) -> Set[str]:
@@ -137,12 +142,12 @@ def parse_html_supported_langs(html: str) -> Set[str]:
     match = re.search(r"var\s+supported\s*=\s*\[([^\]]+)\]", html)
     if not match:
         return set()
-    return set(re.findall(r"['\"]([a-z]{2,3})['\"]", match.group(1)))
+    return set(re.findall(r"['\"]([a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*)['\"]", match.group(1)))
 
 
 def parse_html_selector_langs(html: str) -> Set[str]:
     """Extract language <option> values from the language selector in index.html."""
-    return set(re.findall(r"<option[^>]*value=['\"]([a-z]{2,3})['\"]", html))
+    return set(re.findall(r"<option[^>]*value=['\"]([a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*)['\"]", html))
 
 
 def main() -> int:
@@ -236,7 +241,7 @@ def main() -> int:
 
         # Check 6: inline object values
         for lineno, snippet in find_inline_objects(raw):
-            display = snippet if len(snippet) <= 100 else snippet[:97] + "..."
+            display = snippet if len(snippet) <= MAX_SNIPPET_LENGTH else snippet[:_TRUNCATED_SNIPPET_LENGTH] + _ELLIPSIS
             errors.append(f"[{lang}] Inline object on line {lineno}: {display}")
 
         # Check 9: HTML entities in string values (applies to all languages)
