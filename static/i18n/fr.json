@@ -1990,7 +1990,7 @@
     "module_live_image_label": "Image en direct",
     "module_live_image_desc": "Image du ciel en direct, actualisée automatiquement",
     "module_sensor_data_label": "Données capteur",
-    "module_sensor_data_desc": "Température, humidité, gain, exposition, luminosité — nécessite le module Export AllSky ajouté aux pipelines Jour &amp; Nuit",
+    "module_sensor_data_desc": "Température, humidité, gain, exposition, luminosité — nécessite le module Export AllSky ajouté aux pipelines Jour & Nuit",
     "module_keogram_label": "Kéogramme",
     "module_keogram_desc": "Kéogramme journalier (généré en fin de nuit)",
     "module_startrails_label": "Traînées d'étoiles",

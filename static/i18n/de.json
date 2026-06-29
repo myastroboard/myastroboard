@@ -1990,7 +1990,7 @@
     "module_live_image_label": "Live-Bild",
     "module_live_image_desc": "Automatisch aktualisiertes Live-Himmelsbild",
     "module_sensor_data_label": "Sensordaten",
-    "module_sensor_data_desc": "Temperatur, Luftfeuchtigkeit, Verstärkung, Belichtung, Helligkeit — benötigt AllSky Export-Modul in Tag- &amp; Nacht-Pipeline",
+    "module_sensor_data_desc": "Temperatur, Luftfeuchtigkeit, Verstärkung, Belichtung, Helligkeit — benötigt AllSky Export-Modul in Tag- & Nacht-Pipeline",
     "module_keogram_label": "Keogramm",
     "module_keogram_desc": "Täglicher Keogramm-Zeitstreifen (am Ende der Nacht erstellt)",
     "module_startrails_label": "Sternspuren",

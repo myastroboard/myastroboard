@@ -1990,7 +1990,7 @@
     "module_live_image_label": "Imagen en vivo",
     "module_live_image_desc": "Imagen del cielo en vivo con actualización automática",
     "module_sensor_data_label": "Datos del sensor",
-    "module_sensor_data_desc": "Temperatura, humedad, ganancia, exposición, brillo — requiere el módulo Export de AllSky añadido a los pipelines Día &amp; Noche",
+    "module_sensor_data_desc": "Temperatura, humedad, ganancia, exposición, brillo — requiere el módulo Export de AllSky añadido a los pipelines Día & Noche",
     "module_keogram_label": "Keograma",
     "module_keogram_desc": "Franja temporal del keograma diario (generada al final de la noche)",
     "module_startrails_label": "Trazas de estrellas",

@@ -1990,7 +1990,7 @@
     "module_live_image_label": "Live image",
     "module_live_image_desc": "Auto-refreshing live sky image",
     "module_sensor_data_label": "Sensor data",
-    "module_sensor_data_desc": "Temperature, humidity, gain, exposure, brightness — requires AllSky Export module added to Day &amp; Night pipelines",
+    "module_sensor_data_desc": "Temperature, humidity, gain, exposure, brightness — requires AllSky Export module added to Day & Night pipelines",
     "module_keogram_label": "Keogram",
     "module_keogram_desc": "Daily keogram timeline strip (generated end-of-night)",
     "module_startrails_label": "Startrails",

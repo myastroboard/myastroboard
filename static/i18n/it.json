@@ -1990,7 +1990,7 @@
     "module_live_image_label": "Immagine live",
     "module_live_image_desc": "Immagine del cielo in diretta con aggiornamento automatico",
     "module_sensor_data_label": "Dati sensore",
-    "module_sensor_data_desc": "Temperatura, umidità, guadagno, esposizione, luminosità — richiede il modulo Export di AllSky aggiunto alle pipeline Giorno &amp; Notte",
+    "module_sensor_data_desc": "Temperatura, umidità, guadagno, esposizione, luminosità — richiede il modulo Export di AllSky aggiunto alle pipeline Giorno & Notte",
     "module_keogram_label": "Keogramma",
     "module_keogram_desc": "Striscia temporale del keogramma giornaliero (generata a fine notte)",
     "module_startrails_label": "Scie stellari",

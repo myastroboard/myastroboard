@@ -13,6 +13,7 @@ Checks (all are hard failures):
   6. No JSON file contains inline object values (object opened and closed on one line).
   7. No translated file contains keys not present in en.json (orphan/extra keys).
   8. No translated leaf value has a different type than the corresponding en.json value.
+  9. No translation value contains HTML entities (e.g. &amp; &lt; &gt; &quot; &#…;).
 
 Usage:
     python scripts/validate_i18n.py
@@ -34,6 +35,7 @@ STATIC_DIR = ROOT / "static"
 REFERENCE_LANG = "en"
 
 _INLINE_OBJECT_RE = re.compile(r'"[^"]+"\s*:\s*\{[^}]+\}')
+_HTML_ENTITY_RE = re.compile(r"&(?:[a-zA-Z]{2,10}|#\d{1,6}|#x[0-9a-fA-F]{1,5});")
 
 
 def flatten_keys(data: Any, parent: str = "") -> Set[str]:
@@ -93,6 +95,22 @@ def find_duplicate_keys(text: str) -> list[str]:
     except json.JSONDecodeError:
         pass  # parse errors are reported separately
     return duplicates
+
+
+def find_html_entities(data: Any, parent: str = "") -> list[str]:
+    """Return dot-notation paths of leaf strings that contain HTML entities."""
+    hits: list[str] = []
+    if isinstance(data, dict):
+        for key, value in data.items():
+            path = f"{parent}.{key}" if parent else str(key)
+            hits.extend(find_html_entities(value, path))
+    elif isinstance(data, list):
+        for index, value in enumerate(data):
+            path = f"{parent}[{index}]" if parent else f"[{index}]"
+            hits.extend(find_html_entities(value, path))
+    elif isinstance(data, str) and _HTML_ENTITY_RE.search(data):
+        hits.append(parent)
+    return hits
 
 
 def find_inline_objects(text: str) -> list[tuple[int, str]]:
@@ -220,6 +238,14 @@ def main() -> int:
         for lineno, snippet in find_inline_objects(raw):
             display = snippet if len(snippet) <= 100 else snippet[:97] + "..."
             errors.append(f"[{lang}] Inline object on line {lineno}: {display}")
+
+        # Check 9: HTML entities in string values (applies to all languages)
+        try:
+            lang_json_for_entities = json.loads(raw)
+            for key in find_html_entities(lang_json_for_entities):
+                errors.append(f"[{lang}] HTML entity in value at '{key}' (use plain Unicode characters instead)")
+        except json.JSONDecodeError:
+            pass  # parse errors are reported in checks 4/7/8
 
         # Checks 4, 7, 8: key completeness, extra keys, type mismatches (skip reference)
         if lang != REFERENCE_LANG and ref_keys:
