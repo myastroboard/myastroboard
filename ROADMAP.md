@@ -166,7 +166,7 @@ New section (or tab within an existing one):
 
 - Mark any SkyTonight or catalog object as "on my wishlist"
 - Progress view: X of Y wishlist objects captured, sorted by next visibility window
-- Feeds directly into the Beginner Catalog (v1.2) - beginner objects can be pre-added to the wishlist on first setup
+- Feeds directly into the Beginner Catalog (v1.1) - beginner objects can be pre-added to the wishlist on first setup
 
 #### Sky coverage map
 
@@ -227,7 +227,7 @@ Scope: a planning-grade sky chart integrated with existing data - not a full Ste
 
 | | |
 |---|---|
-| **Why** | Single-user self-hosted installs benefit from sharing; club and family installs benefit even more. Built last in the 2.x cycle because it needs a stable feature set and a user base large enough to make sharing meaningful. v1.2 (beginner onboarding) is the prerequisite for that user base. |
+| **Why** | Single-user self-hosted installs benefit from sharing; club and family installs benefit even more. Built last in the 2.x cycle because it needs a stable feature set and a user base large enough to make sharing meaningful. v1.1 (beginner onboarding) is the prerequisite for that user base. |
 | **Effort** | Medium |
 
 #### Public Astrodex profiles (opt-in)
