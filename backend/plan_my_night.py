@@ -459,6 +459,7 @@ def _build_target_payload(item_data: Dict, catalogue: str) -> Dict:
         'mag': item_data.get('mag') or item_data.get('visual magnitude'),
         'size': item_data.get('size'),
         'foto': item_data.get('foto') or item_data.get('fraction of time observable'),
+        'difficulty': str(item_data.get('difficulty') or '').strip() or None,
         'alttime_file': str(item_data.get('alttime_file') or '').strip(),
         'catalogue_group_id': group_id,
         'catalogue_aliases': aliases,

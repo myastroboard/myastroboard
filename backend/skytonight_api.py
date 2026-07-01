@@ -11,10 +11,11 @@ from typing import Any, Dict, Optional
 from flask import Blueprint, jsonify, request
 
 import astrodex
+import beginner_catalog
 import equipment_profiles
 import plan_my_night
 import skytonight_targets
-from auth import admin_required, get_current_user, login_required
+from auth import admin_required, get_current_user, login_required, user_manager
 from constants import (
     OUTPUT_DIR,
     SKYTONIGHT_BODIES_RESULTS_FILE,
@@ -260,6 +261,8 @@ def _build_skytonight_reports_payload(catalogue: Optional[str], user_id: str, us
                 'mag': calc_item.get('magnitude'),
                 'size': calc_item.get('size_arcmin'),
                 'foto': calc_item.get('astro_score'),
+                'difficulty': calc_item.get('difficulty'),
+                'difficulty_score': calc_item.get('difficulty_score'),
                 'fraction of time observable': observation.get('observable_fraction'),
                 'altitude': observation.get('max_altitude'),
                 'azimuth': observation.get('azimuth'),
@@ -680,6 +683,8 @@ def _build_dso_section_payload(catalogue: Optional[str], user_id: str, username:
                 'mag': calc_item.get('magnitude'),
                 'size': calc_item.get('size_arcmin'),
                 'foto': calc_item.get('astro_score'),
+                'difficulty': calc_item.get('difficulty'),
+                'difficulty_score': calc_item.get('difficulty_score'),
                 'fraction of time observable': observation.get('observable_fraction'),
                 'altitude': observation.get('max_altitude'),
                 'azimuth': observation.get('azimuth'),
@@ -1282,6 +1287,149 @@ def get_skytonight_data_dso_api():
         return jsonify(_build_dso_section_payload(catalogue, user.user_id, user.username))
     except Exception:
         logger.exception('Error building DSO section payload')
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+# Difficulty tiers a given experience_level preference is allowed to see.
+_EXPERIENCE_LEVEL_ALLOWED_DIFFICULTIES: Dict[str, set] = {
+    'beginner': {'beginner'},
+    'intermediate': {'beginner', 'intermediate'},
+    'advanced': {'beginner', 'intermediate', 'advanced'},
+}
+
+# Fallback estimated integration time (hours) by difficulty tier, used when a
+# recommended target has no matching entry in the curated beginner catalog.
+_DIFFICULTY_ESTIMATED_HOURS: Dict[str, float] = {
+    'beginner': 2.0,
+    'intermediate': 4.0,
+    'advanced': 8.0,
+}
+
+_RECOMMENDATIONS_DEFAULT_LIMIT = 5
+_RECOMMENDATIONS_MAX_LIMIT = 10
+
+
+def _normalize_catalogue_key(value: Optional[str]) -> str:
+    """Normalize a catalogue/target name for loose matching (uppercase, no separators)."""
+    return re.sub(r'[^A-Za-z0-9]', '', str(value or '')).upper()
+
+
+def _build_beginner_catalog_hours_lookup() -> Dict[str, float]:
+    """Return a normalized-catalogue-id -> typical_integration_hours lookup from the beginner catalog."""
+    lookup: Dict[str, float] = {}
+    for entry in beginner_catalog.load_beginner_catalog():
+        key = _normalize_catalogue_key(entry.get('catalogue_id'))
+        if key:
+            lookup[key] = entry.get('typical_integration_hours')
+    return lookup
+
+
+@skytonight_bp.route('/api/skytonight/recommendations', methods=['GET'])
+@login_required
+def get_skytonight_recommendations_api():
+    """Return a small, difficulty-filtered set of "what to shoot tonight" target recommendations.
+
+    Filters ``dso_results.json`` by the user's ``experience_level`` preference, sorts the
+    remaining targets by AstroScore descending, and returns the top N (default 5, max 10).
+    """
+    try:
+        user = get_current_user()
+        if not user:  # pragma: no cover
+            return jsonify({'error': 'User not authenticated'}), 401
+
+        try:
+            limit = int(request.args.get('limit', _RECOMMENDATIONS_DEFAULT_LIMIT))
+        except (TypeError, ValueError):
+            limit = _RECOMMENDATIONS_DEFAULT_LIMIT
+        limit = max(1, min(limit, _RECOMMENDATIONS_MAX_LIMIT))
+
+        preferences = user_manager.get_user_preferences(user.user_id)
+        experience_level = preferences.get('experience_level', 'advanced')
+        allowed_difficulties = _EXPERIENCE_LEVEL_ALLOWED_DIFFICULTIES.get(
+            experience_level, _EXPERIENCE_LEVEL_ALLOWED_DIFFICULTIES['advanced']
+        )
+
+        dso_data = load_json_file(SKYTONIGHT_DSO_RESULTS_FILE, default={})
+        deep_sky = dso_data.get('deep_sky', []) if isinstance(dso_data, dict) else []
+
+        candidates = [
+            item for item in deep_sky if item.get('difficulty', 'intermediate') in allowed_difficulties
+        ]
+        candidates.sort(key=lambda item: item.get('astro_score') or 0.0, reverse=True)
+        candidates = candidates[:limit]
+
+        hours_lookup = _build_beginner_catalog_hours_lookup()
+        preloaded_plan_entries = _preload_all_current_plan_entries(user.user_id, user.username)
+
+        targets = []
+        for item in candidates:
+            catalogue_names: Dict[str, str] = item.get('catalogue_names', {}) or {}
+            preferred_name = str(item.get('preferred_name', '') or '').strip()
+            difficulty = item.get('difficulty', 'intermediate')
+            source_catalogue = _resolve_source_catalogue(catalogue_names, preferred_name)
+            canonical_id = (
+                str(catalogue_names.get('OpenNGC') or catalogue_names.get('OpenIC') or '').strip()
+                or preferred_name
+            )
+            messier = str(catalogue_names.get('Messier') or '').strip() or None
+
+            matched_hours = None
+            for name in catalogue_names.values():
+                matched_hours = hours_lookup.get(_normalize_catalogue_key(name))
+                if matched_hours is not None:
+                    break
+            if matched_hours is not None:
+                estimated_hours = matched_hours
+                is_estimate = False
+            else:
+                estimated_hours = _DIFFICULTY_ESTIMATED_HOURS.get(difficulty, 4.0)
+                is_estimate = True
+
+            in_astrodex = (
+                astrodex.is_item_in_astrodex(user.user_id, preferred_name, source_catalogue)
+                if preferred_name
+                else False
+            )
+            in_plan = (
+                plan_my_night.is_target_in_entries(
+                    preloaded_plan_entries, source_catalogue, preferred_name
+                )
+                if preferred_name
+                else False
+            )
+
+            targets.append(
+                {
+                    'target_id': item.get('target_id', ''),
+                    'id': canonical_id,
+                    'messier': messier,
+                    'preferred_name': preferred_name,
+                    'catalogue': source_catalogue,
+                    'object_type': item.get('object_type', ''),
+                    'constellation': item.get('constellation', ''),
+                    'coordinates': item.get('coordinates'),
+                    'difficulty': difficulty,
+                    'difficulty_score': item.get('difficulty_score', 0),
+                    'astro_score': item.get('astro_score'),
+                    'magnitude': item.get('magnitude'),
+                    'size_arcmin': item.get('size_arcmin'),
+                    'estimated_integration_hours': estimated_hours,
+                    'estimated_integration_hours_is_estimate': is_estimate,
+                    'thumbnail_url': None,
+                    'in_astrodex': in_astrodex,
+                    'in_plan': in_plan,
+                }
+            )
+
+        return jsonify(
+            {
+                'targets': targets,
+                'experience_level': experience_level,
+                'count': len(targets),
+            }
+        )
+    except Exception:
+        logger.exception('Error building SkyTonight recommendations payload')
         return jsonify({'error': 'Internal server error'}), 500
 
 

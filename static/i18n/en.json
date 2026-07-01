@@ -516,7 +516,6 @@
     }
   },
   "first_run": {
-    "title": "Welcome to MyAstroBoard",
     "intro": "Before we start, tell us where you observe from. All calculations depend on your location.",
     "latitude": "Latitude (decimal):",
     "latitude_placeholder": "e.g. 48.8667",
@@ -524,8 +523,6 @@
     "longitude_placeholder": "e.g. 2.3333",
     "elevation_optional": "Elevation (meters, optional):",
     "hint": "You can refine all these settings later in Parameters → Configuration.",
-    "save": "Save and continue",
-    "skip": "Skip for now",
     "lat_invalid": "Latitude must be a number between -90 and 90.",
     "lon_invalid": "Longitude must be a number between -180 and 180.",
     "default_location_name": "My Location"
@@ -807,7 +804,18 @@
     "pref_first_dow_sunday": "Sunday",
     "connectors": "Connectors",
     "connectors_title": "External Connectors",
-    "connectors_info": "Connect external tools to display their data in the Observatory tab. Each connector has individual modules that can be enabled or disabled."
+    "connectors_info": "Connect external tools to display their data in the Observatory tab. Each connector has individual modules that can be enabled or disabled.",
+    "experience_level": "Experience level",
+    "experience_level_beginner": "Beginner",
+    "experience_level_intermediate": "Intermediate",
+    "experience_level_advanced": "Advanced",
+    "experience_level_info": "Controls which SkyTonight targets are highlighted as recommended for you. Beginner shows only easy targets; Advanced shows everything.",
+    "pref_invalid_experience_level": "Invalid experience level",
+    "pref_invalid_wizard": "Invalid wizard state",
+    "pref_beginner_catalog_enabled": "Show Beginner Catalog tab",
+    "pref_beginner_catalog_enabled_info": "Adds a \"Beginner\" tab to SkyTonight with a curated list of easy targets.",
+    "pref_recommendations_enabled": "Show \"Tonight for you\" panel",
+    "pref_recommendations_enabled_info": "Shows a \"Tonight for you\" panel of recommended targets at the top of the SkyTonight Deep Sky Objects tab."
   },
   "astrodex": {
     "title": "Astrodex - Gotta Catch 'Em All!",
@@ -1100,7 +1108,10 @@
     "target_debug_moon_phase": "Moon illumination",
     "target_debug_night_hours": "Night duration",
     "target_debug_observable_hours": "Observable hours",
-    "target_debug_adjust_hint": "Adjust:"
+    "target_debug_adjust_hint": "Adjust:",
+    "table_difficulty": "Difficulty",
+    "search_difficulty": "All difficulties",
+    "beginner_catalog_tab_label": "Beginner"
   },
   "plan_my_night": {
     "section_intro": "Build a private timeline for tonight directly from SkyTonight targets.",
@@ -1997,7 +2008,6 @@
     "module_startrails_desc": "Stacked startrails image (generated end-of-night)",
     "module_daily_timelapse_label": "Daily timelapse",
     "module_daily_timelapse_desc": "Full-night timelapse video (generated end-of-night)",
-
     "local_hostname_warning": ".local hostnames rely on mDNS which is not available inside Docker. Use the device's static IP address instead (e.g. http://192.168.1.x/)."
   },
   "sky_widget": {
@@ -2011,5 +2021,216 @@
     "period_unknown": "Unknown",
     "next_in": "{period} in {time}",
     "score_title": "Current sky quality score (0–10): seeing, transparency, cloud cover, tracking stability"
+  },
+  "wizard": {
+    "title": "Getting Started",
+    "step_location": "Set your location",
+    "step_sky_quality": "Sky quality",
+    "step_welcome_location": "Your observatory",
+    "step_equipment": "Your equipment",
+    "step_notifications": "Notifications",
+    "step_tonight": "Tonight's sky",
+    "step_progress": "Step {current} of {total}",
+    "skip": "Skip",
+    "skip_all": "Skip all",
+    "confirm_skip_all": "Skip the whole setup wizard? You can configure everything manually later, or restart it anytime from My settings → Customize.",
+    "skip_alert": "No problem — you can configure everything manually later in Parameters and My Settings.",
+    "next": "Next",
+    "back": "Back",
+    "finish": "Finish",
+    "go_to_skytonight": "Go to SkyTonight",
+    "equipment_preset_label": "Choose a preset",
+    "equipment_preset_placeholder": "Select a telescope or camera...",
+    "equipment_manual": "Enter manually",
+    "equipment_existing_title": "Your equipment",
+    "equipment_existing_empty": "You don't have any equipment set up yet.",
+    "equipment_telescope_label": "Telescope",
+    "equipment_camera_label": "Camera",
+    "experience_level_label": "Your experience level",
+    "bortle_intro": "The Bortle scale rates your sky's darkness from 1 (excellent) to 9 (inner city).",
+    "bortle_link_label": "Find my Bortle class at lightpollutionmap.info",
+    "welcome_location_intro": "Your location is already configured. Here's what the app knows about your site.",
+    "notifications_intro": "Get notified tonight when your imaging window opens? You can change this anytime in My Settings.",
+    "notifications_vapid_label": "Contact email for push notifications",
+    "notifications_vapid_placeholder": "admin@your-domain.com",
+    "notifications_enable_btn": "Enable notifications",
+    "tonight_intro": "Here's what you can image tonight",
+    "redo_wizard": "Redo Setup Wizard",
+    "redo_wizard_info": "Run the guided setup wizard again from the beginning."
+  },
+  "difficulty": {
+    "beginner": "Beginner",
+    "intermediate": "Intermediate",
+    "advanced": "Advanced",
+    "label": "Difficulty",
+    "explanation": "Beginner targets are bright, large and forgiving. Intermediate targets need more experience with framing and exposure. Advanced targets are faint, small, or require precise tracking and processing."
+  },
+  "recommender": {
+    "title": "Tonight for you",
+    "subtitle": "Targets matched to your experience level and tonight's sky",
+    "empty": "No recommendations available yet — check back once SkyTonight has calculated tonight's results.",
+    "estimated_integration": "Est. integration",
+    "add_to_plan": "Add to Plan",
+    "add_to_plan_done": "Added",
+    "show_more": "Show more",
+    "skill_mismatch": "This target may be more challenging than your current experience level.",
+    "integration_estimated_tooltip": "Estimated from the difficulty level - no measured integration time available for this target.",
+    "integration_catalog_tooltip": "Typical integration time from the curated Beginner Catalog."
+  },
+  "beginner_catalog": {
+    "tab_label": "Beginner",
+    "title": "Beginner Catalog",
+    "subtitle": "A curated list of astrophotography targets that are great for getting started. The maximum difficulty shown is based on your profile. This beginner catalog can be disabled in your profile.",
+    "why_beginner_label": "Why it's good for beginners",
+    "suggested_framing_label": "Suggested framing",
+    "integration_time": "Typical integration time",
+    "visible_tonight": "Visible tonight",
+    "not_visible": "Not visible tonight",
+    "captured": "Captured",
+    "plan_it": "Plan it tonight",
+    "empty_tonight": "No beginner-friendly targets are visible tonight. Try disabling the \"visible tonight only\" filter.",
+    "filter_visible": "Show visible tonight only",
+    "filter_difficulty": "Difficulty",
+    "filter_type": "Type",
+    "mark_captured": "Captured it",
+    "in_plan": "In your plan",
+    "objects": {
+      "m42": {
+        "why": "One of the brightest nebulae in the sky and visible even in short exposures, making it a forgiving and rewarding first target.",
+        "framing": "Use a wide field of view to capture the full nebula complex, including the surrounding Running Man Nebula."
+      },
+      "m45": {
+        "why": "A bright open star cluster wrapped in faint blue reflection nebulosity, easy to find and pleasing even with short exposures.",
+        "framing": "A wide field captures the whole cluster along with its surrounding nebulosity."
+      },
+      "m31": {
+        "why": "The brightest galaxy visible from northern latitudes, with a bright core that shows up quickly even under light pollution.",
+        "framing": "A wide field is needed to fit the full galaxy along with its companion galaxies M32 and M110."
+      },
+      "m33": {
+        "why": "A large, face-on spiral galaxy, but its low surface brightness makes it a step up from brighter beginner galaxies.",
+        "framing": "Frame the whole galaxy disk with a moderate wide field of view."
+      },
+      "m44": {
+        "why": "A large, bright open cluster that requires no special processing to look good, even in a single exposure.",
+        "framing": "A wide field of view fits the whole cluster comfortably."
+      },
+      "m13": {
+        "why": "One of the brightest globular clusters in the northern sky, resolving into individual stars even with modest equipment.",
+        "framing": "A moderate field of view centered on the cluster core works well."
+      },
+      "m57": {
+        "why": "A compact but bright planetary nebula that shows its distinctive ring shape in relatively short exposures.",
+        "framing": "Use a longer focal length to fill the frame, since the nebula is small."
+      },
+      "m27": {
+        "why": "One of the brightest planetary nebulae in the sky, with a clear dumbbell shape that appears quickly in short exposures.",
+        "framing": "A moderate focal length nicely frames the nebula and its surrounding faint outer halo."
+      },
+      "m51": {
+        "why": "A classic face-on spiral galaxy with a smaller companion galaxy, popular but needing longer integration to reveal spiral detail.",
+        "framing": "A moderate field of view captures both the main galaxy and its companion, NGC 5195."
+      },
+      "m81": {
+        "why": "A bright spiral galaxy that shows a well-defined core quickly, though spiral arm detail needs longer exposures.",
+        "framing": "Frame it together with its neighbor M82 using a wide field of view."
+      },
+      "m82": {
+        "why": "An edge-on starburst galaxy with a bright, distinctive shape that stands out even in shorter exposures.",
+        "framing": "Frame it together with its neighbor M81 using a wide field of view."
+      },
+      "m101": {
+        "why": "A large face-on spiral galaxy, but its light is spread over a wide area, so it needs longer integration than brighter beginner targets.",
+        "framing": "A wide field of view is needed to capture the full extent of its spiral arms."
+      },
+      "m104": {
+        "why": "A bright galaxy with a striking edge-on dust lane that is visible even in moderate exposures.",
+        "framing": "A moderate focal length frames the galaxy with some surrounding space."
+      },
+      "m64": {
+        "why": "A bright galaxy with a distinctive dark dust band near its core, visible with moderate integration time.",
+        "framing": "A moderate focal length nicely fills the frame with the galaxy."
+      },
+      "ngc869": {
+        "why": "Part of a bright pair of open clusters that are easy to find and rewarding even with short exposures.",
+        "framing": "Use a wide field of view to capture both h and chi Persei together."
+      },
+      "ngc884": {
+        "why": "Part of a bright pair of open clusters that are easy to find and rewarding even with short exposures.",
+        "framing": "Use a wide field of view to capture both chi and h Persei together."
+      },
+      "ic1805": {
+        "why": "A large, bright emission nebula with a recognizable heart shape, well suited to narrowband imaging for beginners.",
+        "framing": "A wide field of view is needed to capture the full extent of the nebula."
+      },
+      "ic1848": {
+        "why": "A large emission nebula neighboring the Heart Nebula, bright enough for beginners exploring narrowband imaging.",
+        "framing": "A wide field of view captures the full nebula, often together with the Heart Nebula."
+      },
+      "ngc7000": {
+        "why": "One of the largest and brightest emission nebulae in the sky, with a recognizable continent-like shape.",
+        "framing": "A wide field of view is needed to capture its full extent, often together with the Pelican Nebula."
+      },
+      "ic5070": {
+        "why": "A bright emission nebula next to the North America Nebula, rewarding for beginners trying narrowband imaging.",
+        "framing": "A wide field of view captures the nebula, often together with the North America Nebula."
+      },
+      "m8": {
+        "why": "A large, bright emission nebula visible even in short exposures, with an embedded star cluster.",
+        "framing": "A wide field of view captures the full nebula and its surrounding star field."
+      },
+      "m20": {
+        "why": "A colorful combination of emission and reflection nebulosity with a distinctive three-lobed dark lane pattern.",
+        "framing": "A moderate field of view nicely frames the nebula, often together with the nearby Lagoon Nebula."
+      },
+      "m16": {
+        "why": "Famous for the Pillars of Creation, but its fainter dust structures need longer integration than brighter beginner nebulae.",
+        "framing": "A moderate field of view frames the surrounding emission nebula and embedded star cluster."
+      },
+      "m17": {
+        "why": "A bright emission nebula with a distinctive swan or checkmark shape, visible in relatively short exposures.",
+        "framing": "A moderate field of view nicely frames the bright central structure."
+      },
+      "ngc6992": {
+        "why": "A bright section of a supernova remnant with delicate, wispy filament structures well suited to narrowband imaging.",
+        "framing": "A moderate to wide field of view captures the sweeping filament structure."
+      },
+      "ngc6888": {
+        "why": "A distinctive bubble-shaped nebula formed by a Wolf-Rayet star, rewarding for narrowband imaging with moderate integration.",
+        "framing": "A moderate field of view frames the crescent shape with some surrounding space."
+      },
+      "m1": {
+        "why": "A famous supernova remnant with intricate filament detail that rewards longer integration time to bring out.",
+        "framing": "Use a longer focal length to fill the frame, since the nebula is relatively small."
+      },
+      "m35": {
+        "why": "A large, bright open cluster that looks good with minimal processing, ideal for a first star cluster target.",
+        "framing": "A wide field of view fits the whole cluster comfortably."
+      },
+      "m36": {
+        "why": "A compact, bright open cluster that is quick and easy to capture with short exposures.",
+        "framing": "A moderate field of view frames the cluster well, often together with M37 and M38."
+      },
+      "m37": {
+        "why": "The richest of the three Auriga clusters, with many stars visible even in short exposures.",
+        "framing": "A moderate field of view frames the cluster well, often together with M36 and M38."
+      },
+      "m38": {
+        "why": "A bright open cluster that is easy to capture and pairs nicely with its neighbors M36 and M37.",
+        "framing": "A moderate field of view frames the cluster well, often together with M36 and M37."
+      },
+      "ngc2244": {
+        "why": "A large emission nebula surrounding a bright star cluster, rewarding for narrowband imaging with moderate integration.",
+        "framing": "A wide field of view is needed to capture the full flower-like shape of the nebula."
+      },
+      "m46": {
+        "why": "A rich open cluster with a bonus: a small planetary nebula appears to overlap it, adding visual interest for little extra effort.",
+        "framing": "A moderate field of view frames the cluster and the embedded planetary nebula together."
+      },
+      "ngc5128": {
+        "why": "A bright galaxy with a striking dark dust lane, easy to capture from southern latitudes with moderate integration.",
+        "framing": "A moderate focal length frames the galaxy with some surrounding space."
+      }
+    }
   }
 }

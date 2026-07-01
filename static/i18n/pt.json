@@ -516,7 +516,6 @@
     }
   },
   "first_run": {
-    "title": "Bem-vindo ao MyAstroBoard",
     "intro": "Antes de começar, diga-nos de onde você observa. Todos os cálculos dependem da sua localização.",
     "latitude": "Latitude (decimal):",
     "latitude_placeholder": "ex. 48.8667",
@@ -524,8 +523,6 @@
     "longitude_placeholder": "ex. 2.3333",
     "elevation_optional": "Elevação (metros, opcional):",
     "hint": "Você pode ajustar todas essas configurações depois em Parâmetros → Configuração.",
-    "save": "Salvar e continuar",
-    "skip": "Pular por enquanto",
     "lat_invalid": "A latitude deve ser um número entre -90 e 90.",
     "lon_invalid": "A longitude deve ser um número entre -180 e 180.",
     "default_location_name": "Minha localização"
@@ -807,7 +804,18 @@
     "pref_first_dow_sunday": "Domingo",
     "connectors": "Conectores",
     "connectors_title": "Conectores externos",
-    "connectors_info": "Conecte ferramentas externas para exibir seus dados na aba Observatório. Cada conector possui módulos ativáveis individualmente."
+    "connectors_info": "Conecte ferramentas externas para exibir seus dados na aba Observatório. Cada conector possui módulos ativáveis individualmente.",
+    "experience_level": "Nível de experiência",
+    "experience_level_beginner": "Novato",
+    "experience_level_intermediate": "Intermediário",
+    "experience_level_advanced": "Avançado",
+    "experience_level_info": "Controla quais alvos SkyTonight são destacados conforme recomendado para você. Iniciante mostra apenas alvos fáceis; Avançado mostra tudo.",
+    "pref_invalid_experience_level": "Nível de experiência inválido",
+    "pref_invalid_wizard": "Estado inválido do assistente",
+    "pref_beginner_catalog_enabled": "Mostrar a aba Catálogo para iniciantes",
+    "pref_beginner_catalog_enabled_info": "Adiciona uma aba \"Iniciante\" ao SkyTonight com uma lista selecionada de alvos fáceis.",
+    "pref_recommendations_enabled": "Mostrar o painel \"Esta noite para você\"",
+    "pref_recommendations_enabled_info": "Mostra um painel \"Esta noite para você\" com alvos recomendados no topo da aba Objetos de céu profundo do SkyTonight."
   },
   "astrodex": {
     "title": "Astrodex - Tenho que pegar todos!",
@@ -1100,7 +1108,10 @@
     "target_debug_moon_phase": "Iluminação lunar",
     "target_debug_night_hours": "Duração da noite",
     "target_debug_observable_hours": "Horas observáveis",
-    "target_debug_adjust_hint": "Ajustar:"
+    "target_debug_adjust_hint": "Ajustar:",
+    "table_difficulty": "Dificuldade",
+    "search_difficulty": "Todas as dificuldades",
+    "beginner_catalog_tab_label": "Iniciante"
   },
   "plan_my_night": {
     "section_intro": "Crie um cronograma privado para esta noite diretamente dos alvos SkyTonight.",
@@ -1997,7 +2008,6 @@
     "module_startrails_desc": "Imagem empilhada de trilhas de estrelas (gerada ao final da noite)",
     "module_daily_timelapse_label": "Timelapse diário",
     "module_daily_timelapse_desc": "Vídeo timelapse da noite completa (gerado ao final da noite)",
-
     "local_hostname_warning": "Nomes de host .local usam mDNS, indisponível no Docker. Use o endereço IP estático do dispositivo (ex. http://192.168.1.x/)."
   },
   "sky_widget": {
@@ -2011,5 +2021,216 @@
     "period_unknown": "Desconhecido",
     "next_in": "{period} em {time}",
     "score_title": "Pontuação atual de qualidade do céu (0–10): seeing, transparência, cobertura de nuvens, estabilidade de rastreamento"
+  },
+  "wizard": {
+    "title": "Começando",
+    "step_location": "Defina sua localização",
+    "step_sky_quality": "Qualidade do céu",
+    "step_welcome_location": "Seu observatório",
+    "step_equipment": "Seu equipamento",
+    "step_notifications": "Notificações",
+    "step_tonight": "O céu desta noite",
+    "step_progress": "Etapa {current} de {total}",
+    "skip": "Pular",
+    "skip_all": "Pular tudo",
+    "confirm_skip_all": "Ignorar todo o assistente de configuração? Pode configurar tudo manualmente mais tarde, ou reiniciá-lo a qualquer momento em Minhas configurações → Personalizar.",
+    "skip_alert": "Não tem problema – você pode configurar tudo manualmente mais tarde em Parâmetros e Minhas configurações.",
+    "next": "Próximo",
+    "back": "Voltar",
+    "finish": "Terminar",
+    "go_to_skytonight": "Vá para SkyTonight",
+    "equipment_preset_label": "Escolha uma predefinição",
+    "equipment_preset_placeholder": "Selecione um telescópio ou câmera...",
+    "equipment_manual": "Insira manualmente",
+    "equipment_existing_title": "Seu equipamento",
+    "equipment_existing_empty": "Você ainda não tem nenhum equipamento configurado.",
+    "equipment_telescope_label": "Telescópio",
+    "equipment_camera_label": "Câmera",
+    "experience_level_label": "Seu nível de experiência",
+    "bortle_intro": "A escala Bortle avalia a escuridão do céu de 1 (excelente) a 9 (centro da cidade).",
+    "bortle_link_label": "Encontre minha aula Bortle em lightpollutionmap.info",
+    "welcome_location_intro": "Sua localização já está configurada. Aqui está o que o aplicativo sabe sobre o seu site.",
+    "notifications_intro": "Ser notificado hoje à noite quando sua janela de imagem abrir? Você pode alterar isso a qualquer momento em Minhas configurações.",
+    "notifications_vapid_label": "E-mail de contato para notificações push",
+    "notifications_vapid_placeholder": "admin@seu-domínio.com",
+    "notifications_enable_btn": "Habilitar notificações",
+    "tonight_intro": "Aqui está o que você pode imaginar esta noite",
+    "redo_wizard": "Assistente de refazer configuração",
+    "redo_wizard_info": "Execute o assistente de configuração guiada novamente desde o início."
+  },
+  "difficulty": {
+    "beginner": "Novato",
+    "intermediate": "Intermediário",
+    "advanced": "Avançado",
+    "label": "Dificuldade",
+    "explanation": "Os alvos iniciantes são brilhantes, grandes e indulgentes. Alvos intermediários precisam de mais experiência com enquadramento e exposição. Os alvos avançados são fracos, pequenos ou requerem rastreamento e processamento precisos."
+  },
+  "recommender": {
+    "title": "Esta noite para você",
+    "subtitle": "Metas correspondentes ao seu nível de experiência e ao céu desta noite",
+    "empty": "Nenhuma recomendação disponível ainda. Verifique novamente assim que SkyTonight calcular os resultados desta noite.",
+    "estimated_integration": "Husa. integração",
+    "add_to_plan": "Adicionar ao plano",
+    "add_to_plan_done": "Adicionado",
+    "show_more": "Mostrar mais",
+    "skill_mismatch": "Esta meta pode ser mais desafiadora do que o seu nível de experiência atual.",
+    "integration_estimated_tooltip": "Estimativa baseada no nível de dificuldade - não há tempo de integração medido disponível para este alvo.",
+    "integration_catalog_tooltip": "Tempo de integração típico do Catálogo para iniciantes selecionado."
+  },
+  "beginner_catalog": {
+    "tab_label": "Novato",
+    "title": "Catálogo Iniciante",
+    "subtitle": "Uma lista selecionada de alvos astrofotográficos que são ótimos para começar. A dificuldade máxima exibida depende do seu perfil. Este catálogo para iniciantes pode ser desativado no seu perfil.",
+    "why_beginner_label": "Por que é bom para iniciantes",
+    "suggested_framing_label": "Enquadramento sugerido",
+    "integration_time": "Tempo de integração típico",
+    "visible_tonight": "Visível esta noite",
+    "not_visible": "Não visível esta noite",
+    "captured": "Capturado",
+    "plan_it": "Planeje esta noite",
+    "empty_tonight": "Nenhum alvo amigável para iniciantes está visível esta noite. Tente desativar o filtro \"visível somente esta noite\".",
+    "filter_visible": "Mostrar visível apenas esta noite",
+    "filter_difficulty": "Dificuldade",
+    "filter_type": "Tipo",
+    "mark_captured": "Capturou",
+    "in_plan": "No seu plano",
+    "objects": {
+      "m42": {
+        "why": "Uma das nebulosas mais brilhantes do céu e visível mesmo em exposições curtas, o que a torna um primeiro alvo indulgente e recompensador.",
+        "framing": "Use um amplo campo de visão para capturar todo o complexo da nebulosa, incluindo a nebulosa Running Man circundante."
+      },
+      "m45": {
+        "why": "Um enxame estelar aberto e brilhante envolto numa nebulosidade de reflexo azul fraco, fácil de encontrar e agradável mesmo com exposições curtas.",
+        "framing": "Um amplo campo captura todo o aglomerado junto com a nebulosidade circundante."
+      },
+      "m31": {
+        "why": "A galáxia mais brilhante visível nas latitudes norte, com um núcleo brilhante que aparece rapidamente mesmo sob poluição luminosa.",
+        "framing": "Um amplo campo é necessário para acomodar toda a galáxia junto com suas galáxias companheiras M32 e M110."
+      },
+      "m33": {
+        "why": "Uma grande galáxia espiral frontal, mas seu baixo brilho superficial a torna um avanço em relação às galáxias iniciantes mais brilhantes.",
+        "framing": "Enquadre todo o disco galáctico com um amplo campo de visão moderado."
+      },
+      "m44": {
+        "why": "Um aglomerado aberto grande e brilhante que não requer nenhum processamento especial para ter uma boa aparência, mesmo em uma única exposição.",
+        "framing": "Um amplo campo de visão ajusta-se confortavelmente a todo o cluster."
+      },
+      "m13": {
+        "why": "Um dos aglomerados globulares mais brilhantes do céu setentrional, transformando-se em estrelas individuais mesmo com equipamento modesto.",
+        "framing": "Um campo de visão moderado centrado no núcleo do cluster funciona bem."
+      },
+      "m57": {
+        "why": "Uma nebulosa planetária compacta mas brilhante que mostra a sua forma de anel distinta em exposições relativamente curtas.",
+        "framing": "Use uma distância focal maior para preencher o quadro, já que a nebulosa é pequena."
+      },
+      "m27": {
+        "why": "Uma das nebulosas planetárias mais brilhantes do céu, com um formato claro de haltere que aparece rapidamente em exposições curtas.",
+        "framing": "Uma distância focal moderada enquadra bem a nebulosa e seu fraco halo externo circundante."
+      },
+      "m51": {
+        "why": "Uma clássica galáxia espiral frontal com uma galáxia companheira menor, popular, mas que precisa de uma integração mais longa para revelar detalhes espirais.",
+        "framing": "Um campo de visão moderado captura tanto a galáxia principal como a sua companheira, NGC 5195."
+      },
+      "m81": {
+        "why": "Uma galáxia espiral brilhante que mostra rapidamente um núcleo bem definido, embora os detalhes do braço espiral precisem de exposições mais longas.",
+        "framing": "Enquadre-o junto com seu vizinho M82 usando um amplo campo de visão."
+      },
+      "m82": {
+        "why": "Uma galáxia starburst de perfil com uma forma brilhante e distinta que se destaca mesmo em exposições mais curtas.",
+        "framing": "Enquadre-o junto com seu vizinho M81 usando um amplo campo de visão."
+      },
+      "m101": {
+        "why": "Uma grande galáxia espiral frontal, mas a sua luz está espalhada por uma vasta área, por isso necessita de uma integração mais longa do que alvos iniciantes mais brilhantes.",
+        "framing": "É necessário um amplo campo de visão para capturar toda a extensão dos seus braços espirais."
+      },
+      "m104": {
+        "why": "Uma galáxia brilhante com uma impressionante faixa de poeira que é visível mesmo em exposições moderadas.",
+        "framing": "Uma distância focal moderada enquadra a galáxia com algum espaço circundante."
+      },
+      "m64": {
+        "why": "Uma galáxia brilhante com uma faixa de poeira escura distinta perto do seu núcleo, visível com tempo de integração moderado.",
+        "framing": "Uma distância focal moderada preenche perfeitamente o quadro com a galáxia."
+      },
+      "ngc869": {
+        "why": "Parte de um par brilhante de clusters abertos que são fáceis de encontrar e recompensadores mesmo com exposições curtas.",
+        "framing": "Use um amplo campo de visão para capturar h e chi Persei juntos."
+      },
+      "ngc884": {
+        "why": "Parte de um par brilhante de clusters abertos que são fáceis de encontrar e recompensadores mesmo com exposições curtas.",
+        "framing": "Use um amplo campo de visão para capturar chi e h Persei juntos."
+      },
+      "ic1805": {
+        "why": "Uma nebulosa de emissão grande e brilhante com formato de coração reconhecível, adequada para imagens de banda estreita para iniciantes.",
+        "framing": "É necessário um amplo campo de visão para capturar toda a extensão da nebulosa."
+      },
+      "ic1848": {
+        "why": "Uma grande nebulosa de emissão vizinha à Nebulosa do Coração, brilhante o suficiente para iniciantes explorarem imagens de banda estreita.",
+        "framing": "Um amplo campo de visão captura toda a nebulosa, muitas vezes junto com a Nebulosa do Coração."
+      },
+      "ngc7000": {
+        "why": "Uma das maiores e mais brilhantes nebulosas de emissão no céu, com uma forma reconhecível de continente.",
+        "framing": "É necessário um amplo campo de visão para capturar toda a sua extensão, muitas vezes juntamente com a Nebulosa do Pelicano."
+      },
+      "ic5070": {
+        "why": "Uma nebulosa de emissão brilhante próxima à Nebulosa da América do Norte, gratificante para iniciantes que tentam imagens de banda estreita.",
+        "framing": "Um amplo campo de visão captura a nebulosa, muitas vezes junto com a Nebulosa da América do Norte."
+      },
+      "m8": {
+        "why": "Uma nebulosa de emissão grande e brilhante, visível mesmo em exposições curtas, com um aglomerado de estrelas incorporado.",
+        "framing": "Um amplo campo de visão captura toda a nebulosa e o campo estelar circundante."
+      },
+      "m20": {
+        "why": "Uma combinação colorida de nebulosidade de emissão e reflexão com um padrão distinto de faixa escura trilobada.",
+        "framing": "Um campo de visão moderado enquadra bem a nebulosa, muitas vezes juntamente com a vizinha Nebulosa da Lagoa."
+      },
+      "m16": {
+        "why": "Famosa pelos Pilares da Criação, mas as suas estruturas de poeira mais fracas necessitam de uma integração mais longa do que as nebulosas iniciantes mais brilhantes.",
+        "framing": "Um campo de visão moderado enquadra a nebulosa de emissão circundante e o aglomerado de estrelas incorporado."
+      },
+      "m17": {
+        "why": "Uma nebulosa de emissão brilhante com um formato distinto de cisne ou marca de verificação, visível em exposições relativamente curtas.",
+        "framing": "Um campo de visão moderado enquadra bem a estrutura central brilhante."
+      },
+      "ngc6992": {
+        "why": "Uma seção brilhante de um remanescente de supernova com estruturas de filamentos delicados e finos, adequadas para imagens de banda estreita.",
+        "framing": "Um campo de visão moderado a amplo captura a ampla estrutura do filamento."
+      },
+      "ngc6888": {
+        "why": "Uma distinta nebulosa em forma de bolha formada por uma estrela Wolf-Rayet, recompensadora por imagens de banda estreita com integração moderada.",
+        "framing": "Um campo de visão moderado enquadra a forma crescente com algum espaço circundante."
+      },
+      "m1": {
+        "why": "Um famoso remanescente de supernova com detalhes intrincados de filamento que recompensa um tempo de integração mais longo para ser revelado.",
+        "framing": "Use uma distância focal maior para preencher o quadro, já que a nebulosa é relativamente pequena."
+      },
+      "m35": {
+        "why": "Um aglomerado aberto grande e brilhante que parece bom com processamento mínimo, ideal para um primeiro alvo de aglomerado estelar.",
+        "framing": "Um amplo campo de visão ajusta-se confortavelmente a todo o cluster."
+      },
+      "m36": {
+        "why": "Um cluster aberto compacto e brilhante que é rápido e fácil de capturar com exposições curtas.",
+        "framing": "Um campo de visão moderado enquadra bem o aglomerado, muitas vezes junto com M37 e M38."
+      },
+      "m37": {
+        "why": "O mais rico dos três aglomerados de Auriga, com muitas estrelas visíveis mesmo em exposições curtas.",
+        "framing": "Um campo de visão moderado enquadra bem o aglomerado, muitas vezes junto com M36 e M38."
+      },
+      "m38": {
+        "why": "Um cluster aberto e brilhante que é fácil de capturar e combina perfeitamente com seus vizinhos M36 e M37.",
+        "framing": "Um campo de visão moderado enquadra bem o aglomerado, muitas vezes junto com M36 e M37."
+      },
+      "ngc2244": {
+        "why": "Uma grande nebulosa de emissão em torno de um aglomerado de estrelas brilhantes, recompensadora por imagens de banda estreita com integração moderada.",
+        "framing": "É necessário um amplo campo de visão para capturar toda a forma de flor da nebulosa."
+      },
+      "m46": {
+        "why": "Um rico enxame aberto com um bónus: uma pequena nebulosa planetária parece sobrepor-se a ele, acrescentando interesse visual com pouco esforço extra.",
+        "framing": "Um campo de visão moderado enquadra o aglomerado e a nebulosa planetária incorporada."
+      },
+      "ngc5128": {
+        "why": "Uma galáxia brilhante com uma impressionante faixa de poeira escura, fácil de capturar nas latitudes meridionais com integração moderada.",
+        "framing": "Uma distância focal moderada enquadra a galáxia com algum espaço circundante."
+      }
+    }
   }
 }

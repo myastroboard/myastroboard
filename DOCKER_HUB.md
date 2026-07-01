@@ -11,6 +11,7 @@ MyAstroBoard combines weather analysis, automated sky calculations, and planning
 ## ✨ Features
 
 - **SkyTonight** - Automated deep-sky object calculations based on your location and constraints, running twice daily (after astronomical dusk and before astronomical dawn)
+- **Beginner-friendly** - Guided setup wizard, skill-aware "Tonight for you" recommendations, difficulty ratings, and a curated Beginner Catalog
 - **Weather & Conditions** - Observing condition analysis powered by Open-Meteo
 - **Astronomy Events** - Moon, sun, eclipses, aurora forecasts, ISS passes
 - **Astrodex** - Personal astrophotography catalog with image management
@@ -79,6 +80,7 @@ For complete installation instructions, see the [Installation Guide](https://git
 - [Reverse Proxy Setup](https://github.com/myastroboard/myastroboard/blob/main/docs/6.REVERSE_PROXY.md)
 - [API Endpoints](https://github.com/myastroboard/myastroboard/blob/main/docs/API_ENDPOINTS.md)
 - [Visual Tour](https://github.com/myastroboard/myastroboard/blob/main/docs/VISUAL_TOUR.md)
+- [Beginner Experience](https://github.com/myastroboard/myastroboard/blob/main/docs/BEGINNER_EXPERIENCE.md)
 
 ---
 

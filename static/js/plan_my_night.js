@@ -1659,6 +1659,12 @@ function renderPlanMyNight(payload) {
         timeRange.textContent = `${startTimeText} -> ${entry.timeline_end ? formatTimeOnly(entry.timeline_end) : '--:--'}`;
 
         head.appendChild(name);
+        if (entry.difficulty && typeof createDifficultyBadgeNode === 'function') {
+            const difficultyWrap = document.createElement('div');
+            difficultyWrap.className = 'mb-1';
+            difficultyWrap.appendChild(createDifficultyBadgeNode(entry.difficulty));
+            head.appendChild(difficultyWrap);
+        }
         head.appendChild(meta);
         head.appendChild(timeRange);
 

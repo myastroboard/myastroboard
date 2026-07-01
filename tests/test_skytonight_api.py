@@ -1961,3 +1961,100 @@ class TestRemainingRouteGaps:
         assert len(targets) == 2
         # 'messier' was already set on second target → stays True
         assert targets[1]['messier'] is True
+
+
+class TestSkytonightRecommendationsEndpoint:
+    """Tests for GET /api/skytonight/recommendations."""
+
+    @staticmethod
+    def _dso_results():
+        return {
+            'deep_sky': [
+                {
+                    'target_id': 't-beginner', 'preferred_name': 'Beginner Target',
+                    'catalogue_names': {'Messier': 'M 42'}, 'object_type': 'Nebula',
+                    'magnitude': 4.0, 'size_arcmin': 90.0,
+                    'astro_score': 0.5, 'difficulty': 'beginner', 'difficulty_score': 18,
+                },
+                {
+                    'target_id': 't-intermediate', 'preferred_name': 'Intermediate Target',
+                    'catalogue_names': {'OpenNGC': 'NGC 1'}, 'object_type': 'Galaxy',
+                    'magnitude': 9.0, 'size_arcmin': 10.0,
+                    'astro_score': 0.9, 'difficulty': 'intermediate', 'difficulty_score': 50,
+                },
+                {
+                    'target_id': 't-advanced', 'preferred_name': 'Advanced Target',
+                    'catalogue_names': {'OpenNGC': 'NGC 2'}, 'object_type': 'Galaxy',
+                    'magnitude': 16.0, 'size_arcmin': 0.5,
+                    'astro_score': 0.7, 'difficulty': 'advanced', 'difficulty_score': 80,
+                },
+            ]
+        }
+
+    def _mock_common(self, monkeypatch, experience_level='advanced'):
+        monkeypatch.setattr(skytonight_api_module, 'load_json_file', lambda *a, **k: self._dso_results())
+        monkeypatch.setattr(skytonight_api_module.beginner_catalog, 'load_beginner_catalog', lambda: [])
+        monkeypatch.setattr(skytonight_api_module.astrodex, 'is_item_in_astrodex', lambda *a, **k: False)
+        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'is_target_in_current_plan', lambda *a, **k: False)
+        monkeypatch.setattr(
+            skytonight_api_module.user_manager, 'get_user_preferences',
+            lambda user_id: {'experience_level': experience_level},
+        )
+
+    def test_requires_authentication(self):
+        app.config['TESTING'] = True
+        with app.test_client() as anon_client:
+            response = anon_client.get('/api/skytonight/recommendations')
+        assert response.status_code == 401
+
+    def test_beginner_level_returns_only_beginner_targets(self, client_admin, monkeypatch):
+        self._mock_common(monkeypatch, experience_level='beginner')
+        response = client_admin.get('/api/skytonight/recommendations?lang=en')
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert payload['experience_level'] == 'beginner'
+        assert all(t['difficulty'] == 'beginner' for t in payload['targets'])
+        assert len(payload['targets']) == 1
+
+    def test_advanced_level_returns_all_difficulties(self, client_admin, monkeypatch):
+        self._mock_common(monkeypatch, experience_level='advanced')
+        response = client_admin.get('/api/skytonight/recommendations?lang=en')
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert payload['count'] == 3
+
+    def test_results_sorted_by_astro_score_descending(self, client_admin, monkeypatch):
+        self._mock_common(monkeypatch, experience_level='advanced')
+        response = client_admin.get('/api/skytonight/recommendations?lang=en')
+        scores = [t['astro_score'] for t in response.get_json()['targets']]
+        assert scores == sorted(scores, reverse=True)
+
+    def test_limit_clamped_to_maximum_of_ten(self, client_admin, monkeypatch):
+        self._mock_common(monkeypatch, experience_level='advanced')
+        response = client_admin.get('/api/skytonight/recommendations?lang=en&limit=50')
+        assert response.status_code == 200
+        assert len(response.get_json()['targets']) <= 10
+
+    def test_estimated_hours_is_estimate_when_no_beginner_catalog_match(self, client_admin, monkeypatch):
+        self._mock_common(monkeypatch, experience_level='beginner')
+        response = client_admin.get('/api/skytonight/recommendations?lang=en')
+        targets = response.get_json()['targets']
+        assert targets[0]['estimated_integration_hours_is_estimate'] is True
+        assert targets[0]['estimated_integration_hours'] == 2.0
+
+    def test_estimated_hours_uses_beginner_catalog_match_when_available(self, client_admin, monkeypatch):
+        monkeypatch.setattr(skytonight_api_module, 'load_json_file', lambda *a, **k: self._dso_results())
+        monkeypatch.setattr(
+            skytonight_api_module.beginner_catalog, 'load_beginner_catalog',
+            lambda: [{'catalogue_id': 'M42', 'typical_integration_hours': 3}],
+        )
+        monkeypatch.setattr(skytonight_api_module.astrodex, 'is_item_in_astrodex', lambda *a, **k: False)
+        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'is_target_in_current_plan', lambda *a, **k: False)
+        monkeypatch.setattr(
+            skytonight_api_module.user_manager, 'get_user_preferences',
+            lambda user_id: {'experience_level': 'beginner'},
+        )
+        response = client_admin.get('/api/skytonight/recommendations?lang=en')
+        targets = response.get_json()['targets']
+        assert targets[0]['estimated_integration_hours'] == 3
+        assert targets[0]['estimated_integration_hours_is_estimate'] is False

@@ -1,0 +1,512 @@
+[
+  {
+    "id": "M42",
+    "preferred_name": "Orion Nebula",
+    "catalogue_id": "M42",
+    "ra_hours": 5.5879,
+    "dec_degrees": -5.39,
+    "i18n_key": "m42",
+    "typical_integration_hours": 2,
+    "object_type": "Star cluster + Nebula",
+    "constellation": "Ori",
+    "difficulty": "beginner",
+    "season": [
+      "winter"
+    ]
+  },
+  {
+    "id": "M45",
+    "preferred_name": "Pleiades",
+    "catalogue_id": "M45",
+    "ra_hours": 3.7913,
+    "dec_degrees": 24.11,
+    "i18n_key": "m45",
+    "typical_integration_hours": 2,
+    "object_type": "Open Cluster",
+    "constellation": "Tau",
+    "difficulty": "beginner",
+    "season": [
+      "winter"
+    ]
+  },
+  {
+    "id": "M31",
+    "preferred_name": "Andromeda Galaxy",
+    "catalogue_id": "M31",
+    "ra_hours": 0.7123,
+    "dec_degrees": 41.27,
+    "i18n_key": "m31",
+    "typical_integration_hours": 2,
+    "object_type": "Galaxy",
+    "constellation": "And",
+    "difficulty": "beginner",
+    "season": [
+      "autumn"
+    ]
+  },
+  {
+    "id": "M33",
+    "preferred_name": "Triangulum Galaxy",
+    "catalogue_id": "M33",
+    "ra_hours": 1.5641,
+    "dec_degrees": 30.66,
+    "i18n_key": "m33",
+    "typical_integration_hours": 4,
+    "object_type": "Galaxy",
+    "constellation": "Tri",
+    "difficulty": "intermediate",
+    "season": [
+      "autumn"
+    ]
+  },
+  {
+    "id": "M44",
+    "preferred_name": "Beehive Cluster",
+    "catalogue_id": "M44",
+    "ra_hours": 8.6728,
+    "dec_degrees": 19.67,
+    "i18n_key": "m44",
+    "typical_integration_hours": 2,
+    "object_type": "Open Cluster",
+    "constellation": "Cnc",
+    "difficulty": "beginner",
+    "season": [
+      "spring"
+    ]
+  },
+  {
+    "id": "M13",
+    "preferred_name": "Hercules Cluster",
+    "catalogue_id": "M13",
+    "ra_hours": 16.6949,
+    "dec_degrees": 36.46,
+    "i18n_key": "m13",
+    "typical_integration_hours": 2,
+    "object_type": "Globular Cluster",
+    "constellation": "Her",
+    "difficulty": "beginner",
+    "season": [
+      "summer"
+    ]
+  },
+  {
+    "id": "M57",
+    "preferred_name": "Ring Nebula",
+    "catalogue_id": "M57",
+    "ra_hours": 18.8931,
+    "dec_degrees": 33.03,
+    "i18n_key": "m57",
+    "typical_integration_hours": 4,
+    "object_type": "Planetary Nebula",
+    "constellation": "Lyr",
+    "difficulty": "intermediate",
+    "season": [
+      "summer"
+    ]
+  },
+  {
+    "id": "M27",
+    "preferred_name": "Dumbbell Nebula",
+    "catalogue_id": "M27",
+    "ra_hours": 19.9934,
+    "dec_degrees": 22.72,
+    "i18n_key": "m27",
+    "typical_integration_hours": 2,
+    "object_type": "Planetary Nebula",
+    "constellation": "Vul",
+    "difficulty": "beginner",
+    "season": [
+      "summer"
+    ]
+  },
+  {
+    "id": "M51",
+    "preferred_name": "Whirlpool Galaxy",
+    "catalogue_id": "M51",
+    "ra_hours": 13.498,
+    "dec_degrees": 47.2,
+    "i18n_key": "m51",
+    "typical_integration_hours": 4,
+    "object_type": "Galaxy",
+    "constellation": "CVn",
+    "difficulty": "intermediate",
+    "season": [
+      "spring"
+    ]
+  },
+  {
+    "id": "M81",
+    "preferred_name": "Bode's Galaxy",
+    "catalogue_id": "M81",
+    "ra_hours": 9.9259,
+    "dec_degrees": 69.07,
+    "i18n_key": "m81",
+    "typical_integration_hours": 4,
+    "object_type": "Galaxy",
+    "constellation": "UMa",
+    "difficulty": "intermediate",
+    "season": [
+      "spring"
+    ]
+  },
+  {
+    "id": "M82",
+    "preferred_name": "Cigar Galaxy",
+    "catalogue_id": "M82",
+    "ra_hours": 9.9313,
+    "dec_degrees": 69.68,
+    "i18n_key": "m82",
+    "typical_integration_hours": 4,
+    "object_type": "Galaxy",
+    "constellation": "UMa",
+    "difficulty": "intermediate",
+    "season": [
+      "spring"
+    ]
+  },
+  {
+    "id": "M101",
+    "preferred_name": "Pinwheel Galaxy",
+    "catalogue_id": "M101",
+    "ra_hours": 14.0535,
+    "dec_degrees": 54.35,
+    "i18n_key": "m101",
+    "typical_integration_hours": 4,
+    "object_type": "Galaxy",
+    "constellation": "UMa",
+    "difficulty": "intermediate",
+    "season": [
+      "spring"
+    ]
+  },
+  {
+    "id": "M104",
+    "preferred_name": "Sombrero Galaxy",
+    "catalogue_id": "M104",
+    "ra_hours": 12.6665,
+    "dec_degrees": -11.62,
+    "i18n_key": "m104",
+    "typical_integration_hours": 4,
+    "object_type": "Galaxy",
+    "constellation": "Vir",
+    "difficulty": "intermediate",
+    "season": [
+      "spring"
+    ]
+  },
+  {
+    "id": "M64",
+    "preferred_name": "Black Eye Galaxy",
+    "catalogue_id": "M64",
+    "ra_hours": 12.9455,
+    "dec_degrees": 21.68,
+    "i18n_key": "m64",
+    "typical_integration_hours": 4,
+    "object_type": "Galaxy",
+    "constellation": "Com",
+    "difficulty": "intermediate",
+    "season": [
+      "spring"
+    ]
+  },
+  {
+    "id": "NGC869",
+    "preferred_name": "Double Cluster (h Persei)",
+    "catalogue_id": "NGC869",
+    "ra_hours": 2.3163,
+    "dec_degrees": 57.12,
+    "i18n_key": "ngc869",
+    "typical_integration_hours": 2,
+    "object_type": "Open Cluster",
+    "constellation": "Per",
+    "difficulty": "beginner",
+    "season": [
+      "autumn"
+    ]
+  },
+  {
+    "id": "NGC884",
+    "preferred_name": "Double Cluster (chi Persei)",
+    "catalogue_id": "NGC884",
+    "ra_hours": 2.3756,
+    "dec_degrees": 57.14,
+    "i18n_key": "ngc884",
+    "typical_integration_hours": 2,
+    "object_type": "Open Cluster",
+    "constellation": "Per",
+    "difficulty": "beginner",
+    "season": [
+      "autumn"
+    ]
+  },
+  {
+    "id": "IC1805",
+    "preferred_name": "Heart Nebula",
+    "catalogue_id": "IC1805",
+    "ra_hours": 2.5449,
+    "dec_degrees": 61.46,
+    "i18n_key": "ic1805",
+    "typical_integration_hours": 2,
+    "object_type": "Star cluster + Nebula",
+    "constellation": "Cas",
+    "difficulty": "beginner",
+    "season": [
+      "autumn"
+    ]
+  },
+  {
+    "id": "IC1848",
+    "preferred_name": "Soul Nebula",
+    "catalogue_id": "IC1848",
+    "ra_hours": 2.8529,
+    "dec_degrees": 60.4,
+    "i18n_key": "ic1848",
+    "typical_integration_hours": 2,
+    "object_type": "Star cluster + Nebula",
+    "constellation": "Cas",
+    "difficulty": "beginner",
+    "season": [
+      "autumn"
+    ]
+  },
+  {
+    "id": "NGC7000",
+    "preferred_name": "North America Nebula",
+    "catalogue_id": "NGC7000",
+    "ra_hours": 20.9881,
+    "dec_degrees": 44.53,
+    "i18n_key": "ngc7000",
+    "typical_integration_hours": 2,
+    "object_type": "HII Ionized region",
+    "constellation": "Cyg",
+    "difficulty": "beginner",
+    "season": [
+      "summer"
+    ]
+  },
+  {
+    "id": "IC5070",
+    "preferred_name": "Pelican Nebula",
+    "catalogue_id": "IC5070",
+    "ra_hours": 20.8502,
+    "dec_degrees": 44.4,
+    "i18n_key": "ic5070",
+    "typical_integration_hours": 2,
+    "object_type": "HII Ionized region",
+    "constellation": "Cyg",
+    "difficulty": "beginner",
+    "season": [
+      "summer"
+    ]
+  },
+  {
+    "id": "M8",
+    "preferred_name": "Lagoon Nebula",
+    "catalogue_id": "M8",
+    "ra_hours": 18.0615,
+    "dec_degrees": -24.38,
+    "i18n_key": "m8",
+    "typical_integration_hours": 2,
+    "object_type": "Nebula",
+    "constellation": "Sgr",
+    "difficulty": "beginner",
+    "season": [
+      "summer"
+    ]
+  },
+  {
+    "id": "M20",
+    "preferred_name": "Trifid Nebula",
+    "catalogue_id": "M20",
+    "ra_hours": 18.045,
+    "dec_degrees": -22.97,
+    "i18n_key": "m20",
+    "typical_integration_hours": 2,
+    "object_type": "Nebula",
+    "constellation": "Sgr",
+    "difficulty": "beginner",
+    "season": [
+      "summer"
+    ]
+  },
+  {
+    "id": "M16",
+    "preferred_name": "Eagle Nebula",
+    "catalogue_id": "M16",
+    "ra_hours": 18.3134,
+    "dec_degrees": -13.81,
+    "i18n_key": "m16",
+    "typical_integration_hours": 4,
+    "object_type": "Nebula",
+    "constellation": "Se2",
+    "difficulty": "intermediate",
+    "season": [
+      "summer"
+    ]
+  },
+  {
+    "id": "M17",
+    "preferred_name": "Omega Nebula",
+    "catalogue_id": "M17",
+    "ra_hours": 18.3464,
+    "dec_degrees": -16.17,
+    "i18n_key": "m17",
+    "typical_integration_hours": 2,
+    "object_type": "Nebula",
+    "constellation": "Sgr",
+    "difficulty": "beginner",
+    "season": [
+      "summer"
+    ]
+  },
+  {
+    "id": "NGC6992",
+    "preferred_name": "Eastern Veil Nebula",
+    "catalogue_id": "NGC6992",
+    "ra_hours": 20.9386,
+    "dec_degrees": 31.74,
+    "i18n_key": "ngc6992",
+    "typical_integration_hours": 4,
+    "object_type": "Supernova remnant",
+    "constellation": "Cyg",
+    "difficulty": "intermediate",
+    "season": [
+      "summer"
+    ]
+  },
+  {
+    "id": "NGC6888",
+    "preferred_name": "Crescent Nebula",
+    "catalogue_id": "NGC6888",
+    "ra_hours": 20.2018,
+    "dec_degrees": 38.35,
+    "i18n_key": "ngc6888",
+    "typical_integration_hours": 4,
+    "object_type": "HII Ionized region",
+    "constellation": "Cyg",
+    "difficulty": "intermediate",
+    "season": [
+      "summer"
+    ]
+  },
+  {
+    "id": "M1",
+    "preferred_name": "Crab Nebula",
+    "catalogue_id": "M1",
+    "ra_hours": 5.5755,
+    "dec_degrees": 22.01,
+    "i18n_key": "m1",
+    "typical_integration_hours": 4,
+    "object_type": "Supernova remnant",
+    "constellation": "Tau",
+    "difficulty": "intermediate",
+    "season": [
+      "winter"
+    ]
+  },
+  {
+    "id": "M35",
+    "preferred_name": "M35",
+    "catalogue_id": "M35",
+    "ra_hours": 6.1514,
+    "dec_degrees": 24.34,
+    "i18n_key": "m35",
+    "typical_integration_hours": 2,
+    "object_type": "Open Cluster",
+    "constellation": "Gem",
+    "difficulty": "beginner",
+    "season": [
+      "winter"
+    ]
+  },
+  {
+    "id": "M36",
+    "preferred_name": "M36",
+    "catalogue_id": "M36",
+    "ra_hours": 5.6049,
+    "dec_degrees": 34.14,
+    "i18n_key": "m36",
+    "typical_integration_hours": 2,
+    "object_type": "Open Cluster",
+    "constellation": "Aur",
+    "difficulty": "beginner",
+    "season": [
+      "winter"
+    ]
+  },
+  {
+    "id": "M37",
+    "preferred_name": "M37",
+    "catalogue_id": "M37",
+    "ra_hours": 5.8718,
+    "dec_degrees": 32.55,
+    "i18n_key": "m37",
+    "typical_integration_hours": 2,
+    "object_type": "Open Cluster",
+    "constellation": "Aur",
+    "difficulty": "beginner",
+    "season": [
+      "winter"
+    ]
+  },
+  {
+    "id": "M38",
+    "preferred_name": "M38",
+    "catalogue_id": "M38",
+    "ra_hours": 5.4785,
+    "dec_degrees": 35.85,
+    "i18n_key": "m38",
+    "typical_integration_hours": 2,
+    "object_type": "Open Cluster",
+    "constellation": "Aur",
+    "difficulty": "beginner",
+    "season": [
+      "winter"
+    ]
+  },
+  {
+    "id": "NGC2244",
+    "preferred_name": "Rosette Nebula",
+    "catalogue_id": "NGC2244",
+    "ra_hours": 6.5321,
+    "dec_degrees": 4.94,
+    "i18n_key": "ngc2244",
+    "typical_integration_hours": 2,
+    "object_type": "Star cluster + Nebula",
+    "constellation": "Mon",
+    "difficulty": "beginner",
+    "season": [
+      "winter"
+    ]
+  },
+  {
+    "id": "M46",
+    "preferred_name": "M46",
+    "catalogue_id": "M46",
+    "ra_hours": 7.6963,
+    "dec_degrees": -14.81,
+    "i18n_key": "m46",
+    "typical_integration_hours": 2,
+    "object_type": "Open Cluster",
+    "constellation": "Pup",
+    "difficulty": "beginner",
+    "season": [
+      "winter"
+    ]
+  },
+  {
+    "id": "NGC5128",
+    "preferred_name": "Centaurus A",
+    "catalogue_id": "NGC5128",
+    "ra_hours": 13.4243,
+    "dec_degrees": -43.02,
+    "i18n_key": "ngc5128",
+    "typical_integration_hours": 4,
+    "object_type": "Galaxy",
+    "constellation": "Cen",
+    "difficulty": "intermediate",
+    "season": [
+      "spring"
+    ]
+  }
+]

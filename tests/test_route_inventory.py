@@ -139,6 +139,9 @@ EXPECTED_ROUTES = {
     ('/api/plan-my-night/targets/<entry_id>/add-to-astrodex', ('POST',)),
     ('/api/plan-my-night/targets/<entry_id>/reorder', ('POST',)),
 
+    # --- beginner catalog ---
+    ('/api/beginner-catalog', ('GET',)),
+
     # --- astrodex ---
     ('/api/astrodex', ('GET',)),
     ('/api/astrodex/catalogue-lookup', ('GET',)),
@@ -210,6 +213,7 @@ EXPECTED_ROUTES = {
     ('/api/skytonight/log', ('GET',)),
     ('/api/skytonight/logs/<catalogue>', ('GET',)),
     ('/api/skytonight/logs/<catalogue>/exists', ('GET',)),
+    ('/api/skytonight/recommendations', ('GET',)),
     ('/api/skytonight/reports', ('GET',)),
     ('/api/skytonight/reports/<catalogue>', ('GET',)),
     ('/api/skytonight/scheduler/status', ('GET',)),

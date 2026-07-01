@@ -68,8 +68,8 @@ async function showPlanTelescopePickerModal(telescopeItems, row) {
         const hasRatings = Object.keys(ratingsById).length > 0;
 
         // Exclude orphaned plans from the picker (telescope no longer accessible)
-        const ownItems    = telescopeItems.filter(t => t.is_own !== false && !t.is_orphaned);
-        const sharedItems = telescopeItems.filter(t => t.is_own === false  && !t.is_orphaned);
+        const ownItems = telescopeItems.filter(t => t.is_own !== false && !t.is_orphaned);
+        const sharedItems = telescopeItems.filter(t => t.is_own === false && !t.is_orphaned);
 
         const appendTelescopeBtn = (t) => {
             const btn = document.createElement('button');
@@ -81,8 +81,8 @@ async function showPlanTelescopePickerModal(telescopeItems, row) {
                 ? `badge bg-${t.state === 'current' ? 'success' : 'warning'}`
                 : 'badge bg-secondary';
             stateBadgeEl.textContent = t.state !== 'none'
-                ? i18n.t(`plan_my_night.plan_status_${t.state}`, {defaultValue: t.state})
-                : i18n.t('plan_my_night.plan_status_none', {defaultValue: 'no plan'});
+                ? i18n.t(`plan_my_night.plan_status_${t.state}`, { defaultValue: t.state })
+                : i18n.t('plan_my_night.plan_status_none', { defaultValue: 'no plan' });
 
             const nameSpan = document.createElement('span');
             nameSpan.className = 'flex-grow-1';
@@ -155,6 +155,33 @@ async function showPlanTelescopePickerModal(telescopeItems, row) {
             if (ev.target === overlay) { overlay.remove(); resolve(null); }
         });
     });
+}
+
+/**
+ * Resolve which telescope's plan an "Add to Plan My Night" action should target:
+ * shows a picker when the user owns/shares multiple telescopes, auto-picks the
+ * only one when there's exactly one, or leaves it unset (default/no-telescope
+ * plan) when there are none. Returns null if the user cancelled the picker.
+ */
+async function _resolvePlanTelescopeSelection(itemForRatings) {
+    let telescopeId = null;
+    let telescopeName = null;
+    try {
+        const listPayload = await fetchJSON('/api/plan-my-night/list');
+        const telescopeItems = (listPayload?.plans || []).filter(p => p.telescope_id !== null);
+        if (telescopeItems.length >= 2) {
+            const picked = await showPlanTelescopePickerModal(telescopeItems, itemForRatings);
+            if (!picked) return null; // user cancelled
+            telescopeId = picked.telescope_id;
+            telescopeName = picked.telescope_name;
+        } else if (telescopeItems.length === 1) {
+            telescopeId = telescopeItems[0].telescope_id;
+            telescopeName = telescopeItems[0].telescope_name;
+        }
+    } catch (_) {
+        // If list fetch fails, proceed without telescope
+    }
+    return { telescope_id: telescopeId, telescope_name: telescopeName };
 }
 
 function _translatedConstellation(value) {
@@ -360,11 +387,45 @@ function _astroScoreBadgeHtml(score) {
     if (score === null || score === undefined || score === '') return '-';
     const num = parseFloat(score);
     if (isNaN(num)) return escapeHtml(String(score));
-    const pct  = Math.round(num * 100);
-    const cls  = _astroScoreBadgeClass(num);
+    const pct = Math.round(num * 100);
+    const cls = _astroScoreBadgeClass(num);
     const tier = tSkyTonightCompat(_astroScoreTierKey(num));
     return `<span class="badge ${cls}" title="${escapeHtml(tier)}">${pct}%</span>`;
 }
+
+// ── Difficulty visual helpers (Feature 2) ──────────────────────────────────
+
+function _difficultyBadgeClass(difficulty) {
+    if (difficulty === 'beginner') return 'bg-success';
+    if (difficulty === 'advanced') return 'bg-danger';
+    return 'bg-warning text-dark';
+}
+
+/** Returns an HTML string badge, for use in the legacy template-string DSO table renderer. */
+function _difficultyBadgeHtml(difficulty) {
+    if (!difficulty) return '-';
+    const cls = _difficultyBadgeClass(difficulty);
+    const label = escapeHtml(i18n.t(`difficulty.${difficulty}`));
+    return `<span class="badge ${cls}">${label}</span>`;
+}
+
+/**
+ * Returns a DOM node badge, for use in DOMUtils/createElement-based contexts
+ * (recommendations panel, astrodex.js, plan_my_night.js). Exposed on window
+ * so those other modules can call it without a module import system.
+ */
+function createDifficultyBadgeNode(difficulty) {
+    const badge = document.createElement('span');
+    if (!difficulty) {
+        badge.className = 'badge bg-secondary';
+        badge.textContent = '-';
+        return badge;
+    }
+    badge.className = `badge ${_difficultyBadgeClass(difficulty)}`;
+    badge.textContent = i18n.t(`difficulty.${difficulty}`);
+    return badge;
+}
+window.createDifficultyBadgeNode = createDifficultyBadgeNode;
 
 /**
  * Returns a colour-coded badge for solar elongation (angular distance from the Sun).
@@ -390,9 +451,9 @@ function _elongationBadgeHtml(deg) {
 function _astroScoreLegendHtml() {
     const tiers = [
         { key: 'astroscore_exceptional', cls: 'astroscore-badge astroscore-badge-exceptional', range: '≥ 85%' },
-        { key: 'astroscore_good',        cls: 'astroscore-badge astroscore-badge-good',        range: '65-84%' },
-        { key: 'astroscore_average',     cls: 'astroscore-badge astroscore-badge-average',     range: '45-64%' },
-        { key: 'astroscore_poor',        cls: 'astroscore-badge astroscore-badge-poor',        range: '< 45%' },
+        { key: 'astroscore_good', cls: 'astroscore-badge astroscore-badge-good', range: '65-84%' },
+        { key: 'astroscore_average', cls: 'astroscore-badge astroscore-badge-average', range: '45-64%' },
+        { key: 'astroscore_poor', cls: 'astroscore-badge astroscore-badge-poor', range: '< 45%' },
     ];
     let html = `<div class="d-flex flex-wrap gap-2 mb-2 align-items-center small mt-3">`;
     html += `<span class="text-muted fw-semibold">${escapeHtml(tSkyTonightCompat('astroscore_legend_title'))}:</span>`;
@@ -478,10 +539,10 @@ async function _renderSkyMap(reports, container) {
 
     // ── colour palette (cycling) ────────────────────────────────────────────
     const PALETTE = [
-        '#4dabf7','#ffd43b','#51cf66','#ff8c00','#f783ac',
-        '#a9e34b','#74c0fc','#ff6b6b','#cc5de8','#20c997',
-        '#fd7e14','#748ffc','#e599f7','#94d82d','#63e6be',
-        '#ff922b','#339af0','#f06595','#a9e34b','#845ef7',
+        '#4dabf7', '#ffd43b', '#51cf66', '#ff8c00', '#f783ac',
+        '#a9e34b', '#74c0fc', '#ff6b6b', '#cc5de8', '#20c997',
+        '#fd7e14', '#748ffc', '#e599f7', '#94d82d', '#63e6be',
+        '#ff922b', '#339af0', '#f06595', '#a9e34b', '#845ef7',
     ];
 
     // ── category → marker symbol for the numbered start dot ─────────────────
@@ -495,8 +556,8 @@ async function _renderSkyMap(reports, container) {
     };
 
     // ── theme ────────────────────────────────────────────────────────────────
-    const isDark  = document.documentElement.getAttribute('data-bs-theme') !== 'light';
-    const skyBg   = isDark ? '#07101f' : '#d9eaf7';
+    const isDark = document.documentElement.getAttribute('data-bs-theme') !== 'light';
+    const skyBg = isDark ? '#07101f' : '#d9eaf7';
     const gridClr = isDark ? 'rgba(180,210,255,0.12)' : 'rgba(40,60,120,0.15)';
     const tickClr = isDark ? '#9ab0cc' : '#334466';
 
@@ -505,18 +566,18 @@ async function _renderSkyMap(reports, container) {
     const traceMap = []; // [{arcIdx, dotIdx, target}] in same order as targets[]
 
     targets.forEach((tgt, i) => {
-        const color    = PALETTE[i % PALETTE.length];
-        const alt      = tgt.alt;
-        const az       = tgt.az;
-        const label    = String(tgt.n);
+        const color = PALETTE[i % PALETTE.length];
+        const alt = tgt.alt;
+        const az = tgt.az;
+        const label = String(tgt.n);
         const scoreStr = tgt.score != null ? (tgt.score * 100).toFixed(0) + '%' : '-';
         const constLabel = tgt.constellation ? _translatedConstellation(tgt.constellation) : '';
-        const tooltip  = `<b>${label}: ${escapeHtml(tgt.name)}</b><br>` +
-                         `${escapeHtml(tSkyTonightType(tgt.type || tgt.category))}<br>` +
-                         `AstroScore: ${scoreStr}<br>` +
-                         (constLabel ? `${escapeHtml(constLabel)}<br>` : '');
+        const tooltip = `<b>${label}: ${escapeHtml(tgt.name)}</b><br>` +
+            `${escapeHtml(tSkyTonightType(tgt.type || tgt.category))}<br>` +
+            `AstroScore: ${scoreStr}<br>` +
+            (constLabel ? `${escapeHtml(constLabel)}<br>` : '');
 
-        const r     = alt.map(a => Math.max(0, 90 - a));
+        const r = alt.map(a => Math.max(0, 90 - a));
         const theta = az;
 
         const arcIdx = traces.length;
@@ -553,33 +614,33 @@ async function _renderSkyMap(reports, container) {
     // ── Plotly layout ─────────────────────────────────────────────────────────
     const plotLayout = {
         paper_bgcolor: 'rgba(0,0,0,0)',
-        plot_bgcolor:  'rgba(0,0,0,0)',
+        plot_bgcolor: 'rgba(0,0,0,0)',
         autosize: true,
         polar: {
             bgcolor: skyBg,
             radialaxis: {
                 range: [0, 90],
-                tickvals:  [0, 30, 60, 90],
-                ticktext:  ['90°', '60°', '30°', '0°'],
-                tickfont:  { size: 9, color: tickClr },
+                tickvals: [0, 30, 60, 90],
+                ticktext: ['90°', '60°', '30°', '0°'],
+                tickfont: { size: 9, color: tickClr },
                 gridcolor: gridClr, linecolor: gridClr, showline: true,
             },
             angularaxis: {
                 direction: 'clockwise', rotation: 90,
-                tickvals:  [0, 45, 90, 135, 180, 225, 270, 315],
-                ticktext:  ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'],
-                tickfont:  { size: 11, color: tickClr },
+                tickvals: [0, 45, 90, 135, 180, 225, 270, 315],
+                ticktext: ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'],
+                tickfont: { size: 11, color: tickClr },
                 gridcolor: gridClr,
             },
         },
         showlegend: false,
         margin: { t: 10, r: 10, b: 10, l: 10 },
-        font:   { color: tickClr },
+        font: { color: tickClr },
     };
 
     const plotConfig = {
-        responsive:             true,
-        displaylogo:            false,
+        responsive: true,
+        displaylogo: false,
         modeBarButtonsToRemove: ['toImage'],
     };
 
@@ -633,7 +694,7 @@ async function _renderSkyMap(reports, container) {
 
     // Flat alt_min circle: r = 90 - alt_min at every azimuth
     const circleTheta = Array.from({ length: 361 }, (_, i) => i);
-    const circleR     = circleTheta.map(() => 90 - altMin);
+    const circleR = circleTheta.map(() => 90 - altMin);
     traces.push({
         type: 'scatterpolar', mode: 'lines',
         name: `${altMin}° min`,
@@ -750,8 +811,8 @@ async function _renderSkyMap(reports, container) {
     // ── Group toggle buttons ──────────────────────────────────────────────────
     const groupDefs = [
         { cat: 'deep_sky', key: 'sky_map_filter_dso' },
-        { cat: 'bodies',   key: 'sky_map_filter_bodies' },
-        { cat: 'comets',   key: 'sky_map_filter_comets' },
+        { cat: 'bodies', key: 'sky_map_filter_bodies' },
+        { cat: 'comets', key: 'sky_map_filter_comets' },
     ];
 
     // Only show group buttons for categories that actually have targets
@@ -935,14 +996,14 @@ async function _renderSkyMap(reports, container) {
     const legendRows = [];
 
     targets.forEach((tgt, i) => {
-        const color    = PALETTE[i % PALETTE.length];
+        const color = PALETTE[i % PALETTE.length];
         const tableRow = tbody.insertRow();
-        tableRow.dataset.cat   = tgt.category;
+        tableRow.dataset.cat = tgt.category;
         tableRow.dataset.score = tgt.score != null ? tgt.score : '0';
 
         [
-            { text: tgt.n,                    colored: true },
-            { text: tgt.name,                 colored: false },
+            { text: tgt.n, colored: true },
+            { text: tgt.name, colored: false },
             { text: tSkyTonightType(tgt.type || tgt.category), colored: false },
             { score: tgt.score },
             { text: tgt.constellation ? _translatedConstellation(tgt.constellation) : '-', colored: false },
@@ -975,9 +1036,9 @@ async function _renderSkyMap(reports, container) {
         const visArr = new Array(traces.length).fill(true);
         traceMap.forEach(({ arcIdx, dotIdx, target }) => {
             const show = activeCategories.has(target.category) &&
-                         (target.score == null || target.score >= minScore) &&
-                         (!messierOnly || (target.category === 'deep_sky' && target.messier)) &&
-                         (allConstellations.length === 0 || !target.constellation || activeConstellations.has(target.constellation));
+                (target.score == null || target.score >= minScore) &&
+                (!messierOnly || (target.category === 'deep_sky' && target.messier)) &&
+                (allConstellations.length === 0 || !target.constellation || activeConstellations.has(target.constellation));
             visArr[arcIdx] = show;
             visArr[dotIdx] = show;
         });
@@ -985,11 +1046,11 @@ async function _renderSkyMap(reports, container) {
 
         let visible = 0;
         legendRows.forEach((tableRow, i) => {
-            const tgt  = targets[i];
+            const tgt = targets[i];
             const show = activeCategories.has(tgt.category) &&
-                         (tgt.score == null || tgt.score >= minScore) &&
-                         (!messierOnly || (tgt.category === 'deep_sky' && tgt.messier)) &&
-                         (allConstellations.length === 0 || !tgt.constellation || activeConstellations.has(tgt.constellation));
+                (tgt.score == null || tgt.score >= minScore) &&
+                (!messierOnly || (tgt.category === 'deep_sky' && tgt.messier)) &&
+                (allConstellations.length === 0 || !tgt.constellation || activeConstellations.has(tgt.constellation));
             tableRow.style.display = show ? '' : 'none';
             if (show) visible++;
         });
@@ -1008,15 +1069,15 @@ async function _renderSkyMap(reports, container) {
 async function loadCatalogues() {
     try {
         const catalogues = await fetchJSON('/api/catalogues');
-        
+
         const container = document.getElementById('catalogues-list');
         if (!container) return; // Element doesn't exist on this page view
 
         DOMUtils.clear(container);
-        
+
         // Ensure Messier is checked by default if no catalogues selected
         const selectedCatalogues = currentConfig.selected_catalogues || ['Messier'];
-        
+
         catalogues.forEach(catalogue => {
             const checkboxElt = document.createElement('div');
             checkboxElt.className = 'form-check form-switch bg-checkbox';
@@ -1038,7 +1099,7 @@ async function loadCatalogues() {
             checkboxElt.appendChild(label);
             container.appendChild(checkboxElt);
         });
-        
+
     } catch (error) {
         console.error('Error loading catalogues:', error);
     }
@@ -1077,13 +1138,19 @@ function _buildSkyTonightSectionButtons() {
     const skytonightTab = document.getElementById('skytonight-tab');
 
     const sections = [
-        { key: 'plot',   icon: 'bi-bar-chart-line text-success', labelKey: 'plot' },
-        { key: 'report', icon: 'bi-galaxy',                      labelKey: 'deep_sky_objects' },
-        { key: 'bodies', icon: 'bi-globe2 text-warning',         labelKey: 'bodies' },
-        { key: 'comets', icon: 'bi-comet text-warning',          labelKey: 'comets' },
-        { key: 'log',    icon: 'bi-journal-text text-danger',    labelKey: 'logs' },
-        { key: 'debug',  icon: 'bi-question-circle text-info',   labelKey: 'target_debug' },
-    ];
+        { key: 'plot', icon: 'bi-bar-chart-line text-success', labelKey: 'plot' },
+        { key: 'report', icon: 'bi-galaxy', labelKey: 'deep_sky_objects' },
+        { key: 'beginner', icon: 'bi-book text-primary', labelKey: 'beginner_catalog_tab_label' },
+        { key: 'bodies', icon: 'bi-globe2 text-warning', labelKey: 'bodies' },
+        { key: 'comets', icon: 'bi-comet text-warning', labelKey: 'comets' },
+        { key: 'log', icon: 'bi-journal-text text-danger', labelKey: 'logs' },
+        { key: 'debug', icon: 'bi-question-circle text-info', labelKey: 'target_debug' },
+    ].filter(sec => sec.key !== 'beginner' || currentUserPreferences?.beginner_catalog_enabled !== false);
+
+    // If the currently-active section was just hidden (preference toggled off), fall back to 'report'.
+    if (_skytCurrentSection === 'beginner' && !sections.some(sec => sec.key === 'beginner')) {
+        _skytCurrentSection = 'report';
+    }
 
     sections.forEach(sec => {
         const subtabName = `skytonight-${sec.key}`;
@@ -1162,6 +1229,11 @@ async function _showSkyTonightSectionData(sectionKey) {
 
     if (sectionKey === 'debug') {
         _renderSkytDebugSection(dataDiv);
+        return;
+    }
+
+    if (sectionKey === 'beginner') {
+        await _showBeginnerCatalogSection(dataDiv);
         return;
     }
 
@@ -1600,19 +1672,19 @@ function _renderDebugChecksCard(container, checks, constraints) {
     const tbody = document.createElement('tbody');
 
     const checkLabelKeys = {
-        'size_min':             'target_debug_check_size_min',
-        'size_max':             'target_debug_check_size_max',
-        'moon_separation':      'target_debug_check_moon_separation',
-        'max_altitude':         'target_debug_check_max_altitude',
-        'observable_fraction':  'target_debug_check_observable_fraction',
+        'size_min': 'target_debug_check_size_min',
+        'size_max': 'target_debug_check_size_max',
+        'moon_separation': 'target_debug_check_moon_separation',
+        'max_altitude': 'target_debug_check_max_altitude',
+        'observable_fraction': 'target_debug_check_observable_fraction',
     };
 
     const horizonActive = constraints && constraints.horizon_active;
     const checkSettingKeys = {
-        'size_min':            ['settings.size_min'],
-        'size_max':            ['settings.size_max'],
-        'moon_separation':     ['settings.moon_sep'],
-        'max_altitude':        ['settings.altitude_min'],
+        'size_min': ['settings.size_min'],
+        'size_max': ['settings.size_max'],
+        'moon_separation': ['settings.moon_sep'],
+        'max_altitude': ['settings.altitude_min'],
         'observable_fraction': horizonActive
             ? ['settings.time_threshold', 'settings.horizon_profile']
             : ['settings.time_threshold'],
@@ -1743,8 +1815,8 @@ function _renderDebugAltimeChart(container, alttimeData, target) {
     const altColor = `rgba(${primaryRgb}, 0.92)`;
     const zoneColor = 'rgba(20, 110, 40, 0.8)';
 
-    [{color: altColor, label: tSkyTonightCompat('altitude_time_altitude_label') || 'Altitude (°)'},
-     {color: zoneColor, label: tSkyTonightCompat('altitude_time_observable_zone')}].forEach(item => {
+    [{ color: altColor, label: tSkyTonightCompat('altitude_time_altitude_label') || 'Altitude (°)' },
+    { color: zoneColor, label: tSkyTonightCompat('altitude_time_observable_zone') }].forEach(item => {
         const col = document.createElement('div');
         col.className = 'col-auto';
         const badge = document.createElement('span');
@@ -1876,6 +1948,580 @@ function _renderDebugAltimeChart(container, alttimeData, target) {
     });
 }
 
+// ======================
+// "Tonight for you" recommendations panel (Feature 2)
+// ======================
+
+/**
+ * Render the difficulty-aware "Tonight for you" recommendations panel into
+ * `container`. Used both at the top of the SkyTonight DSO sub-tab and inline
+ * in the Guided Setup Wizard's "Tonight" step.
+ */
+async function renderSkyTonightRecommendationsPanel(container, options = {}) {
+    const { limit = 10 } = options;
+    if (!container) return;
+    DOMUtils.clear(container);
+
+    if (currentUserPreferences?.recommendations_enabled === false) return;
+
+    const card = document.createElement('div');
+    card.className = 'card mb-3';
+
+    const header = document.createElement('div');
+    header.className = 'card-header';
+    const title = document.createElement('h5');
+    title.className = 'mb-0';
+    DOMUtils.append(title, DOMUtils.createIcon('bi bi-stars text-warning icon-inline'), ' ', i18n.t('recommender.title'));
+    header.appendChild(title);
+    card.appendChild(header);
+
+    const body = document.createElement('div');
+    body.className = 'card-body';
+    body.appendChild(DOMUtils.createSpinnerWrapper(i18n.t('common.loading')));
+    card.appendChild(body);
+    container.appendChild(card);
+
+    try {
+        const lang = i18n.getCurrentLanguage();
+        const data = await fetchJSON(`/api/skytonight/recommendations?limit=${limit}&lang=${encodeURIComponent(lang)}`);
+        DOMUtils.clear(body);
+
+        const subtitle = document.createElement('p');
+        subtitle.className = 'text-muted small mb-3';
+        subtitle.textContent = i18n.t('recommender.subtitle');
+        body.appendChild(subtitle);
+
+        const targets = data.targets || [];
+        if (targets.length === 0) {
+            // Nothing to recommend yet (e.g. SkyTonight hasn't calculated tonight's results) -
+            // hide the whole panel rather than showing an empty-state card.
+            DOMUtils.clear(container);
+            return;
+        }
+
+        const strip = document.createElement('div');
+        strip.className = 'd-flex flex-nowrap gap-2 pb-2';
+        strip.style.overflowX = 'auto';
+        targets.forEach((target) => strip.appendChild(_buildRecommendationCard(target)));
+        body.appendChild(strip);
+    } catch (err) {
+        console.error('Error loading SkyTonight recommendations:', err);
+        DOMUtils.clear(body);
+        const errAlert = document.createElement('div');
+        errAlert.className = 'alert alert-danger mb-0';
+        errAlert.textContent = i18n.t('recommender.empty');
+        body.appendChild(errAlert);
+    }
+}
+window.renderSkyTonightRecommendationsPanel = renderSkyTonightRecommendationsPanel;
+
+function _buildRecommendationCard(target) {
+    const identifier = target.id || target.messier || target.preferred_name;
+
+    const card = document.createElement('div');
+    card.className = 'card flex-shrink-0';
+    card.style.width = '160px';
+
+    // ── Thumbnail (clickable -> Object Information modal) ──────────────────
+    const thumbBtn = document.createElement('button');
+    thumbBtn.type = 'button';
+    thumbBtn.className = 'btn p-0 border-0 bg-transparent w-100';
+    thumbBtn.disabled = !identifier;
+    const img = document.createElement('img');
+    img.className = 'card-img-top';
+    img.style.height = '90px';
+    img.style.objectFit = 'cover';
+    img.loading = 'lazy';
+    img.alt = target.preferred_name || '';
+    img.style.display = 'none';
+    thumbBtn.appendChild(img);
+    if (target.thumbnail_url) {
+        img.src = target.thumbnail_url;
+        img.style.display = '';
+    } else if (identifier && typeof fetchObjectInfo === 'function') {
+        fetchObjectInfo(identifier).then((data) => {
+            if (data?.image?.url) {
+                img.src = data.image.url;
+                img.style.display = '';
+            }
+        });
+    }
+    if (identifier) {
+        thumbBtn.addEventListener('click', () => {
+            if (typeof showObjectInfoModal === 'function') showObjectInfoModal(identifier);
+        });
+    }
+    card.appendChild(thumbBtn);
+
+    const body = document.createElement('div');
+    body.className = 'card-body p-2 d-flex flex-column';
+
+    // ── Name + Messier label ────────────────────────────────────────────────
+    const nameRow = document.createElement('div');
+    nameRow.className = 'd-flex align-items-center flex-wrap gap-1 mb-1';
+    const nameLink = document.createElement('a');
+    nameLink.href = '#';
+    nameLink.className = 'fw-semibold small link-underline link-underline-opacity-0 text-truncate';
+    nameLink.style.maxWidth = '100%';
+    nameLink.title = target.preferred_name || '';
+    nameLink.textContent = target.preferred_name || '';
+    if (identifier) {
+        nameLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (typeof showObjectInfoModal === 'function') showObjectInfoModal(identifier);
+        });
+    }
+    nameRow.appendChild(nameLink);
+    if (target.messier) {
+        const messierBadge = document.createElement('span');
+        messierBadge.className = 'messier-badge';
+        messierBadge.title = target.messier;
+        messierBadge.textContent = target.messier;
+        nameRow.appendChild(messierBadge);
+    }
+    body.appendChild(nameRow);
+
+    // ── Badges ───────────────────────────────────────────────────────────────
+    const badgeRow = document.createElement('div');
+    badgeRow.className = 'd-flex flex-wrap gap-1 mb-1';
+    badgeRow.style.minWidth = '0';
+    const typeBadge = document.createElement('span');
+    typeBadge.className = 'badge bg-secondary text-truncate d-inline-block';
+    typeBadge.style.maxWidth = '100%';
+    typeBadge.style.minWidth = '0';
+    typeBadge.style.verticalAlign = 'bottom';
+    const typeTranslationKey = `skytonight.type_${strToTranslateKey(target.object_type || '')}`;
+    const typeLabel = i18n.has(typeTranslationKey) ? i18n.t(typeTranslationKey) : (target.object_type || '-');
+    typeBadge.title = typeLabel;
+    typeBadge.textContent = typeLabel;
+    badgeRow.appendChild(typeBadge);
+    badgeRow.appendChild(createDifficultyBadgeNode(target.difficulty));
+    if (target.in_astrodex) {
+        const capturedBadge = document.createElement('span');
+        capturedBadge.className = 'badge bg-success';
+        DOMUtils.append(capturedBadge, DOMUtils.createIcon('bi bi-check-circle-fill'), ` ${i18n.t('beginner_catalog.captured')}`);
+        badgeRow.appendChild(capturedBadge);
+    }
+    body.appendChild(badgeRow);
+
+    // ── Integration estimate ────────────────────────────────────────────────
+    const integration = document.createElement('div');
+    integration.className = 'text-muted small mb-2';
+    integration.style.cursor = 'help';
+    const hoursLabel = target.estimated_integration_hours_is_estimate
+        ? `~${target.estimated_integration_hours}h`
+        : `${target.estimated_integration_hours}h`;
+    integration.title = target.estimated_integration_hours_is_estimate
+        ? i18n.t('recommender.integration_estimated_tooltip')
+        : i18n.t('recommender.integration_catalog_tooltip');
+    DOMUtils.append(integration, DOMUtils.createIcon('bi bi-clock-history icon-inline'), ` ${hoursLabel}`);
+    body.appendChild(integration);
+
+    // ── Add to Plan ──────────────────────────────────────────────────────────
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'btn btn-sm btn-outline-primary w-100 mt-auto';
+    if (target.in_plan) {
+        addBtn.textContent = i18n.t('recommender.add_to_plan_done');
+        addBtn.disabled = true;
+    } else {
+        addBtn.textContent = i18n.t('recommender.add_to_plan');
+        addBtn.addEventListener('click', async () => {
+            addBtn.disabled = true;
+            try {
+                const telescopeSelection = await _resolvePlanTelescopeSelection(target);
+                if (!telescopeSelection) { addBtn.disabled = false; return; } // user cancelled the telescope picker
+                await fetchJSON('/api/plan-my-night/targets', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        item: {
+                            name: target.preferred_name,
+                            catalogue: target.catalogue,
+                            type: target.object_type,
+                            constellation: target.constellation,
+                            ra: target.coordinates?.ra_hours,
+                            dec: target.coordinates?.dec_degrees,
+                            mag: target.magnitude,
+                            size: target.size_arcmin,
+                            difficulty: target.difficulty,
+                        },
+                        catalogue: target.catalogue,
+                        telescope_id: telescopeSelection.telescope_id,
+                        telescope_name: telescopeSelection.telescope_name,
+                    }),
+                });
+                addBtn.textContent = i18n.t('recommender.add_to_plan_done');
+                showMessage('success', i18n.t('plan_my_night.target_added'));
+                updateCataloguePlanMyNightBadge(target.preferred_name, true);
+                updateCataloguePlanMyNightData(target.preferred_name, true);
+            } catch (err) {
+                console.error('Error adding recommendation to plan:', err);
+                addBtn.disabled = false;
+                showMessage('error', i18n.t('plan_my_night.failed_to_add_target'));
+            }
+        });
+    }
+    body.appendChild(addBtn);
+
+    card.appendChild(body);
+    return card;
+}
+
+// ======================
+// Beginner Catalog sub-tab (Feature 3)
+// ======================
+
+const _beginnerCatalogState = {
+    objects: [],
+    visibleOnly: true,
+    difficultyFilter: '',
+    typeFilter: '',
+};
+
+async function _showBeginnerCatalogSection(container) {
+    DOMUtils.clear(container);
+    container.appendChild(DOMUtils.createSpinnerWrapper(i18n.t('common.loading')));
+
+    try {
+        const lang = i18n.getCurrentLanguage();
+        const visibleOnlyParam = _beginnerCatalogState.visibleOnly ? 'true' : 'false';
+        const data = await fetchJSON(`/api/beginner-catalog?lang=${encodeURIComponent(lang)}&visible_only=${visibleOnlyParam}`);
+        _beginnerCatalogState.objects = data.objects || [];
+        _renderBeginnerCatalogUI(container);
+    } catch (err) {
+        console.error('Error loading beginner catalog:', err);
+        DOMUtils.clear(container);
+        const errAlert = document.createElement('div');
+        errAlert.className = 'alert alert-danger';
+        errAlert.textContent = i18n.t('common.error');
+        container.appendChild(errAlert);
+    }
+}
+
+function _renderBeginnerCatalogUI(container) {
+    DOMUtils.clear(container);
+
+    const header = document.createElement('div');
+    header.className = 'mb-3';
+    const title = document.createElement('h5');
+    title.textContent = i18n.t('beginner_catalog.title');
+    const subtitle = document.createElement('p');
+    subtitle.className = 'text-muted small mb-0';
+    subtitle.textContent = i18n.t('beginner_catalog.subtitle');
+    header.appendChild(title);
+    header.appendChild(subtitle);
+    container.appendChild(header);
+
+    const filterRow = document.createElement('div');
+    filterRow.className = 'row g-2 align-items-center mb-3';
+
+    const visibleCol = document.createElement('div');
+    visibleCol.className = 'col-auto';
+    const visibleCheckWrap = document.createElement('div');
+    visibleCheckWrap.className = 'form-check form-switch';
+    const visibleCheck = document.createElement('input');
+    visibleCheck.className = 'form-check-input';
+    visibleCheck.type = 'checkbox';
+    visibleCheck.id = 'beginner-catalog-visible-toggle';
+    visibleCheck.checked = _beginnerCatalogState.visibleOnly;
+    const visibleLabel = document.createElement('label');
+    visibleLabel.className = 'form-check-label';
+    visibleLabel.htmlFor = 'beginner-catalog-visible-toggle';
+    visibleLabel.textContent = i18n.t('beginner_catalog.filter_visible');
+    visibleCheckWrap.appendChild(visibleCheck);
+    visibleCheckWrap.appendChild(visibleLabel);
+    visibleCol.appendChild(visibleCheckWrap);
+    filterRow.appendChild(visibleCol);
+
+    const difficultyCol = document.createElement('div');
+    difficultyCol.className = 'col-auto';
+    const difficultySelect = document.createElement('select');
+    difficultySelect.className = 'form-select form-select-sm';
+    difficultySelect.id = 'beginner-catalog-difficulty-filter';
+    const diffNoneOpt = document.createElement('option');
+    diffNoneOpt.value = '';
+    diffNoneOpt.textContent = i18n.t('beginner_catalog.filter_difficulty');
+    difficultySelect.appendChild(diffNoneOpt);
+    // Only offer difficulties up to the user's own experience level (a beginner-level user has no
+    // reason to filter a beginner catalog down to "advanced"), and only ones actually present in
+    // the fetched objects - otherwise a level-appropriate option could still yield an empty grid.
+    const _DIFFICULTY_ORDER = ['beginner', 'intermediate', 'advanced'];
+    const userLevel = currentUserPreferences?.experience_level;
+    const maxLevelIndex = _DIFFICULTY_ORDER.includes(userLevel) ? _DIFFICULTY_ORDER.indexOf(userLevel) : _DIFFICULTY_ORDER.length - 1;
+    const presentDifficulties = new Set(_beginnerCatalogState.objects.map((o) => o.difficulty).filter(Boolean));
+    const allowedDifficulties = _DIFFICULTY_ORDER.slice(0, maxLevelIndex + 1).filter((d) => presentDifficulties.has(d));
+    allowedDifficulties.forEach((d) => {
+        const opt = document.createElement('option');
+        opt.value = d;
+        opt.textContent = i18n.t(`difficulty.${d}`);
+        difficultySelect.appendChild(opt);
+    });
+    if (!allowedDifficulties.includes(_beginnerCatalogState.difficultyFilter)) {
+        _beginnerCatalogState.difficultyFilter = '';
+    }
+    difficultySelect.value = _beginnerCatalogState.difficultyFilter;
+    difficultyCol.appendChild(difficultySelect);
+    filterRow.appendChild(difficultyCol);
+
+    const typeCol = document.createElement('div');
+    typeCol.className = 'col-auto';
+    const typeSelect = document.createElement('select');
+    typeSelect.className = 'form-select form-select-sm';
+    typeSelect.id = 'beginner-catalog-type-filter';
+    const typeNoneOpt = document.createElement('option');
+    typeNoneOpt.value = '';
+    typeNoneOpt.textContent = i18n.t('beginner_catalog.filter_type');
+    typeSelect.appendChild(typeNoneOpt);
+    const distinctTypes = [...new Set(_beginnerCatalogState.objects.map((o) => o.object_type).filter(Boolean))].sort();
+    distinctTypes.forEach((t) => {
+        const opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = t;
+        typeSelect.appendChild(opt);
+    });
+    typeSelect.value = _beginnerCatalogState.typeFilter;
+    typeCol.appendChild(typeSelect);
+    filterRow.appendChild(typeCol);
+
+    container.appendChild(filterRow);
+
+    const gridContainer = document.createElement('div');
+    gridContainer.id = 'beginner-catalog-grid';
+    gridContainer.className = 'row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-3';
+    container.appendChild(gridContainer);
+
+    _renderBeginnerCatalogGrid(gridContainer);
+
+    visibleCheck.addEventListener('change', () => {
+        _beginnerCatalogState.visibleOnly = visibleCheck.checked;
+        _showBeginnerCatalogSection(container);
+    });
+    difficultySelect.addEventListener('change', () => {
+        _beginnerCatalogState.difficultyFilter = difficultySelect.value;
+        _renderBeginnerCatalogGrid(gridContainer);
+    });
+    typeSelect.addEventListener('change', () => {
+        _beginnerCatalogState.typeFilter = typeSelect.value;
+        _renderBeginnerCatalogGrid(gridContainer);
+    });
+}
+
+function _renderBeginnerCatalogGrid(gridContainer) {
+    DOMUtils.clear(gridContainer);
+    let objects = _beginnerCatalogState.objects;
+    if (_beginnerCatalogState.difficultyFilter) {
+        objects = objects.filter((o) => o.difficulty === _beginnerCatalogState.difficultyFilter);
+    }
+    if (_beginnerCatalogState.typeFilter) {
+        objects = objects.filter((o) => o.object_type === _beginnerCatalogState.typeFilter);
+    }
+
+    if (objects.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'col-12';
+        const alert = document.createElement('div');
+        alert.className = 'alert alert-info';
+        alert.textContent = i18n.t('beginner_catalog.empty_tonight');
+        empty.appendChild(alert);
+        gridContainer.appendChild(empty);
+        return;
+    }
+
+    objects.forEach((obj) => gridContainer.appendChild(_buildBeginnerCatalogCard(obj)));
+}
+
+function _buildBeginnerCatalogCard(obj) {
+    const col = document.createElement('div');
+    col.className = 'col';
+
+    const card = document.createElement('div');
+    card.className = 'card h-100';
+    if (obj.in_astrodex) card.classList.add('border-success');
+
+    if (typeof fetchObjectInfo === 'function') {
+        const img = document.createElement('img');
+        img.className = 'card-img-top';
+        img.style.maxHeight = '140px';
+        img.style.objectFit = 'cover';
+        img.loading = 'lazy';
+        img.style.display = 'none';
+        card.appendChild(img);
+        fetchObjectInfo(obj.catalogue_id || obj.preferred_name).then((data) => {
+            if (data?.image?.url) {
+                img.src = data.image.url;
+                img.alt = obj.preferred_name || '';
+                img.style.display = '';
+            }
+        });
+    }
+
+    const body = document.createElement('div');
+    body.className = 'card-body';
+
+    const name = document.createElement('h6');
+    name.className = 'card-title mb-1';
+    name.textContent = obj.preferred_name || '';
+    body.appendChild(name);
+
+    const badgeRow = document.createElement('div');
+    badgeRow.className = 'd-flex flex-wrap gap-1 mb-2';
+    const typeBadge = document.createElement('span');
+    typeBadge.className = 'badge bg-secondary';
+    const typeTranslationKey = `skytonight.type_${strToTranslateKey(obj.object_type || '')}`;
+    typeBadge.textContent = i18n.has(typeTranslationKey) ? i18n.t(typeTranslationKey) : (obj.object_type || '-');
+    badgeRow.appendChild(typeBadge);
+    badgeRow.appendChild(createDifficultyBadgeNode(obj.difficulty));
+    if (obj.constellation) {
+        const constBadge = document.createElement('span');
+        constBadge.className = 'badge bg-light text-dark border';
+        constBadge.textContent = typeof getConstellationDisplayName === 'function'
+            ? getConstellationDisplayName(obj.constellation)
+            : obj.constellation;
+        badgeRow.appendChild(constBadge);
+    }
+    if (obj.in_astrodex) {
+        const capturedBadge = document.createElement('span');
+        capturedBadge.className = 'badge bg-success';
+        DOMUtils.append(capturedBadge, DOMUtils.createIcon('bi bi-check-circle-fill'), ` ${i18n.t('beginner_catalog.captured')}`);
+        badgeRow.appendChild(capturedBadge);
+    }
+    if (obj.in_astrodex) {
+        const capturedBadge = document.createElement('span');
+        capturedBadge.className = 'badge bg-success';
+        DOMUtils.append(capturedBadge, DOMUtils.createIcon('bi bi-check-circle-fill'), ` ${i18n.t('beginner_catalog.captured')}`);
+        badgeRow.appendChild(capturedBadge);
+    }
+    body.appendChild(badgeRow);
+
+    const visibility = document.createElement('div');
+    visibility.className = `small mb-2 ${obj.visible_tonight ? 'text-success' : 'text-muted'}`;
+    visibility.textContent = obj.visible_tonight
+        ? i18n.t('beginner_catalog.visible_tonight')
+        : i18n.t('beginner_catalog.not_visible');
+    body.appendChild(visibility);
+
+    if (obj.why_beginner) {
+        const whyLabel = document.createElement('div');
+        whyLabel.className = 'fw-semibold small mt-2';
+        whyLabel.textContent = i18n.t('beginner_catalog.why_beginner_label');
+        const why = document.createElement('p');
+        why.className = 'small mb-2';
+        why.textContent = obj.why_beginner;
+        body.appendChild(whyLabel);
+        body.appendChild(why);
+    }
+
+    if (obj.suggested_framing) {
+        const framingLabel = document.createElement('div');
+        framingLabel.className = 'fw-semibold small';
+        framingLabel.textContent = i18n.t('beginner_catalog.suggested_framing_label');
+        const framing = document.createElement('p');
+        framing.className = 'small mb-2';
+        framing.textContent = obj.suggested_framing;
+        body.appendChild(framingLabel);
+        body.appendChild(framing);
+    }
+
+    const integration = document.createElement('div');
+    integration.className = 'text-muted small mb-3';
+    integration.textContent = `${i18n.t('beginner_catalog.integration_time')}: ${obj.typical_integration_hours}h`;
+    body.appendChild(integration);
+
+    const ctaRow = document.createElement('div');
+    ctaRow.className = 'd-flex gap-2';
+
+    const captureBtn = document.createElement('button');
+    captureBtn.type = 'button';
+    captureBtn.className = 'btn btn-sm btn-outline-success flex-fill';
+    if (obj.in_astrodex) {
+        captureBtn.textContent = i18n.t('beginner_catalog.captured');
+        captureBtn.disabled = true;
+    } else {
+        captureBtn.textContent = i18n.t('beginner_catalog.mark_captured');
+        captureBtn.addEventListener('click', () => _beginnerCatalogAddToAstrodex(obj, captureBtn));
+    }
+    ctaRow.appendChild(captureBtn);
+
+    const planBtn = document.createElement('button');
+    planBtn.type = 'button';
+    planBtn.className = 'btn btn-sm btn-outline-primary flex-fill';
+    if (obj.in_plan) {
+        planBtn.textContent = i18n.t('beginner_catalog.in_plan');
+        planBtn.disabled = true;
+    } else {
+        planBtn.textContent = i18n.t('beginner_catalog.plan_it');
+        planBtn.addEventListener('click', () => _beginnerCatalogAddToPlan(obj, planBtn));
+    }
+    ctaRow.appendChild(planBtn);
+
+    body.appendChild(ctaRow);
+    card.appendChild(body);
+    col.appendChild(card);
+    return col;
+}
+
+async function _beginnerCatalogAddToAstrodex(obj, buttonEl) {
+    buttonEl.disabled = true;
+    try {
+        const response = await fetchJSON('/api/astrodex/items', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: obj.preferred_name,
+                catalogue: obj.catalogue_id,
+                type: obj.object_type,
+                constellation: (obj.constellation || '').toLowerCase(),
+            }),
+        });
+        if (response && response.status === 'success') {
+            obj.in_astrodex = true;
+            buttonEl.textContent = i18n.t('beginner_catalog.captured');
+        }
+    } catch (err) {
+        console.error('Error adding beginner catalog item to Astrodex:', err);
+        buttonEl.disabled = false;
+        showMessage('error', tSkyTonightCompat('failed_to_add_astrodex'));
+    }
+}
+
+async function _beginnerCatalogAddToPlan(obj, buttonEl) {
+    buttonEl.disabled = true;
+    try {
+        const telescopeSelection = await _resolvePlanTelescopeSelection(obj);
+        if (!telescopeSelection) { buttonEl.disabled = false; return; } // user cancelled the telescope picker
+        const response = await fetchJSON('/api/plan-my-night/targets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                item: {
+                    name: obj.preferred_name,
+                    catalogue: obj.catalogue_id,
+                    type: obj.object_type,
+                    constellation: (obj.constellation || '').toLowerCase(),
+                    ra: obj.ra_hours,
+                    dec: obj.dec_degrees,
+                    difficulty: obj.difficulty,
+                },
+                catalogue: obj.catalogue_id,
+                telescope_id: telescopeSelection.telescope_id,
+                telescope_name: telescopeSelection.telescope_name,
+            }),
+        });
+        if (response && response.status === 'success') {
+            obj.in_plan = true;
+            buttonEl.textContent = i18n.t('beginner_catalog.in_plan');
+            showMessage('success', i18n.t('plan_my_night.target_added'));
+            updateCataloguePlanMyNightBadge(obj.preferred_name, true);
+            updateCataloguePlanMyNightData(obj.preferred_name, true);
+        }
+    } catch (err) {
+        console.error('Error adding beginner catalog item to Plan My Night:', err);
+        buttonEl.disabled = false;
+        showMessage('error', i18n.t('plan_my_night.failed_to_add_target'));
+    }
+}
+
 async function _showSkyTonightDataSection(sectionKey, container) {
     const displayAstrodex = await getSkyTonightDisplayAstrodex();
 
@@ -1916,6 +2562,14 @@ async function _showSkyTonightDataSection(sectionKey, container) {
         }
 
         DOMUtils.clear(container);
+
+        // "Tonight for you" recommendations panel, injected above the filters/table on the DSO tab only.
+        if (sectionKey === 'report') {
+            const recoContainer = document.createElement('div');
+            recoContainer.id = 'skytonight-recommendations-panel';
+            container.appendChild(recoContainer);
+            renderSkyTonightRecommendationsPanel(recoContainer);
+        }
 
         // Banner when a calculation is still running
         if (data.in_progress) {
@@ -1965,9 +2619,9 @@ async function _showSkyTonightDataSection(sectionKey, container) {
             scaleRow.className = 'd-flex flex-wrap gap-2';
             const scale = [
                 { cls: 'astroscore-badge astroscore-badge-exceptional', key: 'bodies_elongation_scale_excellent' },
-                { cls: 'astroscore-badge astroscore-badge-good',        key: 'bodies_elongation_scale_good' },
-                { cls: 'astroscore-badge astroscore-badge-average',     key: 'bodies_elongation_scale_average' },
-                { cls: 'astroscore-badge astroscore-badge-poor',        key: 'bodies_elongation_scale_poor' },
+                { cls: 'astroscore-badge astroscore-badge-good', key: 'bodies_elongation_scale_good' },
+                { cls: 'astroscore-badge astroscore-badge-average', key: 'bodies_elongation_scale_average' },
+                { cls: 'astroscore-badge astroscore-badge-poor', key: 'bodies_elongation_scale_poor' },
             ];
             scale.forEach(({ cls, key }) => {
                 const badge = document.createElement('span');
@@ -2010,10 +2664,10 @@ async function _showSkyTonightDataSection(sectionKey, container) {
  */
 function _buildPaginationHtml(catalogue, type, page, totalPages, totalItems) {
     const startItem = page * SKYT_PAGE_SIZE + 1;
-    const endItem   = Math.min((page + 1) * SKYT_PAGE_SIZE, totalItems);
-    const atFirst   = page === 0;
-    const atLast    = page >= totalPages - 1;
-    const esc       = escapeHtml;
+    const endItem = Math.min((page + 1) * SKYT_PAGE_SIZE, totalItems);
+    const atFirst = page === 0;
+    const atLast = page >= totalPages - 1;
+    const esc = escapeHtml;
 
     const btn = (iconClass, targetPage, disabled, ariaLabel) =>
         `<li class="page-item${disabled ? ' disabled' : ''}">` +
@@ -2025,8 +2679,8 @@ function _buildPaginationHtml(catalogue, type, page, totalPages, totalItems) {
     // Numbered page buttons: show up to 5 pages centred around the current page
     const WIN = 2;
     const rangeStart = Math.max(0, Math.min(page - WIN, totalPages - 2 * WIN - 1));
-    const rangeEnd   = Math.min(totalPages - 1, rangeStart + 2 * WIN);
-    let pageButtons  = '';
+    const rangeEnd = Math.min(totalPages - 1, rangeStart + 2 * WIN);
+    let pageButtons = '';
     for (let p = rangeStart; p <= rangeEnd; p++) {
         pageButtons +=
             `<li class="page-item${p === page ? ' active' : ''}">` +
@@ -2043,11 +2697,11 @@ function _buildPaginationHtml(catalogue, type, page, totalPages, totalItems) {
         countLabel +
         `<nav aria-label="${esc(tSkyTonightCompat('table_pagination') || 'Pagination')}">` +
         `<ul class="pagination pagination-sm mb-0 gap-1">` +
-        btn('bi-chevron-double-left',  0,              atFirst, 'First') +
-        btn('bi-chevron-left',         page - 1,       atFirst, 'Previous') +
+        btn('bi-chevron-double-left', 0, atFirst, 'First') +
+        btn('bi-chevron-left', page - 1, atFirst, 'Previous') +
         pageButtons +
-        btn('bi-chevron-right',        page + 1,       atLast,  'Next') +
-        btn('bi-chevron-double-right', totalPages - 1, atLast,  'Last') +
+        btn('bi-chevron-right', page + 1, atLast, 'Next') +
+        btn('bi-chevron-double-right', totalPages - 1, atLast, 'Last') +
         `</ul></nav>` +
         `</div>`
     );
@@ -2197,28 +2851,30 @@ function _skytApplyFilter(catalogue, type) {
         return;
     }
 
-    const filterInput        = document.getElementById(`filter-${catalogue}-${type}`);
-    const fotoCheckbox       = document.getElementById(`foto-filter-${catalogue}-${type}`);
-    const fotoValueInput     = document.getElementById(`foto-value-${catalogue}-${type}`);
+    const filterInput = document.getElementById(`filter-${catalogue}-${type}`);
+    const fotoCheckbox = document.getElementById(`foto-filter-${catalogue}-${type}`);
+    const fotoValueInput = document.getElementById(`foto-value-${catalogue}-${type}`);
     const constellationSelect = document.getElementById(`constellation-filter-${catalogue}-${type}`);
-    const typeSelect         = document.getElementById(`type-filter-${catalogue}-${type}`);
-    const catalogueSelect    = document.getElementById(`catalogue-filter-${catalogue}-${type}`);
+    const typeSelect = document.getElementById(`type-filter-${catalogue}-${type}`);
+    const catalogueSelect = document.getElementById(`catalogue-filter-${catalogue}-${type}`);
+    const difficultySelect = document.getElementById(`difficulty-filter-${catalogue}-${type}`);
 
-    const filterRaw    = filterInput        ? filterInput.value        : '';
-    const filterText   = filterRaw.trim().toLowerCase();
-    const fotoEnabled  =  fotoCheckbox       ? fotoCheckbox.checked     : false;
-    const fotoThreshold = fotoValueInput     ? parseFloat(sanitizeFotoFilterValue(fotoValueInput.value)) / 100 : 0.8;
+    const filterRaw = filterInput ? filterInput.value : '';
+    const filterText = filterRaw.trim().toLowerCase();
+    const fotoEnabled = fotoCheckbox ? fotoCheckbox.checked : false;
+    const fotoThreshold = fotoValueInput ? parseFloat(sanitizeFotoFilterValue(fotoValueInput.value)) / 100 : 0.8;
     const constellation = constellationSelect ? constellationSelect.value : '';
-    const typeVal       = typeSelect          ? typeSelect.value          : '';
-    const catalogueVal  = catalogueSelect     ? catalogueSelect.value    : '';
+    const typeVal = typeSelect ? typeSelect.value : '';
+    const catalogueVal = catalogueSelect ? catalogueSelect.value : '';
+    const difficultyVal = difficultySelect ? difficultySelect.value : '';
 
     // Persist state so it survives pagination re-renders.
     // filterRaw preserves the original un-trimmed value so it can be restored
     // exactly as typed if the user revisits the section.
-    _skytFilterState[type] = { filterText, filterRaw, fotoEnabled, fotoThreshold, constellation, typeVal, catalogueVal };
+    _skytFilterState[type] = { filterText, filterRaw, fotoEnabled, fotoThreshold, constellation, typeVal, catalogueVal, difficultyVal };
 
-    const hasFilter = filterText || fotoEnabled || constellation || typeVal || catalogueVal;
-    const fullData  = _skytSectionCache[type][type];
+    const hasFilter = filterText || fotoEnabled || constellation || typeVal || catalogueVal || difficultyVal;
+    const fullData = _skytSectionCache[type][type];
     if (!Array.isArray(fullData)) return;
 
     if (!hasFilter) {
@@ -2246,8 +2902,9 @@ function _skytApplyFilter(catalogue, type) {
             if (isNaN(fotoVal) || fotoVal < fotoThreshold) return false;
         }
         if (constellation && (row.constellation || '') !== constellation) return false;
-        if (typeVal       && (row.type          || '') !== typeVal)        return false;
-        if (catalogueVal  && !(row.catalogue_names && row.catalogue_names[catalogueVal])) return false;
+        if (typeVal && (row.type || '') !== typeVal) return false;
+        if (catalogueVal && !(row.catalogue_names && row.catalogue_names[catalogueVal])) return false;
+        if (difficultyVal && (row.difficulty || '') !== difficultyVal) return false;
         return true;
     });
 
@@ -2311,7 +2968,7 @@ async function _reRenderTablePage(sectionKey, page) {
 
 function generateReportTable(report, catalogue, type, displayAstrodex = true, page = 0, isRerender = false) {
     if (!report || report.length === 0) return `<p>${tSkyTonightCompat('no_target_in_report')}</p>`;
-    
+
     // Define column order and configuration for Report type
     const reportColumns = [
         { key: 'id', label: tSkyTonightCompat('table_id'), align: 'left' },
@@ -2321,13 +2978,14 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
         { key: 'mag', label: tSkyTonightCompat('table_mag'), align: 'center' },
         { key: 'constellation', label: tSkyTonightCompat('table_constellation'), align: 'center' },
         { key: 'type', label: tSkyTonightCompat('table_type'), align: 'center' },
+        { key: 'difficulty', label: tSkyTonightCompat('table_difficulty'), align: 'center' },
         { key: 'altitude', label: tSkyTonightCompat('table_altitude'), align: 'center', unit: '°', decimals: 2 },
         { key: 'azimuth', label: tSkyTonightCompat('table_azimuth'), align: 'center', unit: '°', decimals: 2 },
         ...(displayAstrodex ? [{ key: 'astrodex', label: tSkyTonightCompat('table_astrodex'), align: 'center' }] : []),
         ...(displayAstrodex ? [{ key: 'plan_my_night', label: tSkyTonightCompat('table_plan_my_night'), align: 'center' }] : []),
         { key: 'more', label: tSkyTonightCompat('table_more'), align: 'center' }
     ];
-    
+
     // Define column order and configuration for Bodies type
     const bodiesColumns = [
         { key: 'target name', label: tSkyTonightCompat('table_name'), align: 'left' },
@@ -2342,7 +3000,7 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
         ...(displayAstrodex ? [{ key: 'plan_my_night', label: tSkyTonightCompat('table_plan_my_night'), align: 'center' }] : []),
         { key: 'more', label: tSkyTonightCompat('table_more'), align: 'center' }
     ];
-    
+
     // Define column order and configuration for Comets type
     const cometsColumns = [
         { key: 'target name', label: tSkyTonightCompat('table_name'), align: 'left' },
@@ -2355,10 +3013,10 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
         ...(displayAstrodex ? [{ key: 'plan_my_night', label: tSkyTonightCompat('table_plan_my_night'), align: 'center' }] : []),
         { key: 'more', label: tSkyTonightCompat('table_more'), align: 'center' }
     ];
-    
+
     // Fields to show in "More" popup
     let moreFields = ['catalogue_names', 'meridian transit', 'antimeridian transit', 'right ascension', 'declination', 'hmsdms'];
-    
+
     // Select columns based on type
     let columns;
     if (type === 'report') {
@@ -2377,12 +3035,12 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
             align: 'left'
         }));
     }
-    
+
     // Pagination: compute the row slice for the current page
     const _totalItems = report.length;
     const _totalPages = Math.ceil(_totalItems / SKYT_PAGE_SIZE);
-    const _startIdx   = page * SKYT_PAGE_SIZE;
-    const _pageRows   = report.slice(_startIdx, Math.min(_startIdx + SKYT_PAGE_SIZE, _totalItems));
+    const _startIdx = page * SKYT_PAGE_SIZE;
+    const _pageRows = report.slice(_startIdx, Math.min(_startIdx + SKYT_PAGE_SIZE, _totalItems));
 
     // Extract unique values for constellation and type filters (from the FULL dataset for complete filter lists).
     // Sort by translated label so the dropdown order is alphabetical in the active locale.
@@ -2414,7 +3072,7 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
                 <div class="form-check">
                     <input class="form-check-input" type="checkbox" id="foto-filter-${eCat}-${eType}">
                     <label class="form-check-label" for="inlineFormCheck"> ${tSkyTonightCompat('search_foto')} </label>
-                </div>               
+                </div>
             </div>`;
 
             html += `
@@ -2464,19 +3122,19 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
         // Add catalogue filter for curated sub-lists present in this report
         const _catFilterOptions = [
             { key: 'AbellClusters', label: 'Abell Clusters' },
-            { key: 'AbellPNe',      label: 'Abell PNe' },
-            { key: 'Arp',           label: 'Arp' },
-            { key: 'Barnard',       label: 'Barnard' },
-            { key: 'Caldwell',      label: 'Caldwell' },
-            { key: 'GaryImm',       label: 'GaryImm' },
-            { key: 'Herschel400',   label: 'Herschel 400' },
-            { key: 'OpenIC',        label: 'IC' },
-            { key: 'LBN',           label: 'LBN' },
-            { key: 'Messier',       label: 'Messier' },
-            { key: 'OpenNGC',       label: 'NGC' },
-            { key: 'Pensack500',    label: 'Pensack 500' },
-            { key: 'Sharpless',     label: 'Sharpless' },
-            { key: 'vdB',           label: 'vdB' },
+            { key: 'AbellPNe', label: 'Abell PNe' },
+            { key: 'Arp', label: 'Arp' },
+            { key: 'Barnard', label: 'Barnard' },
+            { key: 'Caldwell', label: 'Caldwell' },
+            { key: 'GaryImm', label: 'GaryImm' },
+            { key: 'Herschel400', label: 'Herschel 400' },
+            { key: 'OpenIC', label: 'IC' },
+            { key: 'LBN', label: 'LBN' },
+            { key: 'Messier', label: 'Messier' },
+            { key: 'OpenNGC', label: 'NGC' },
+            { key: 'Pensack500', label: 'Pensack 500' },
+            { key: 'Sharpless', label: 'Sharpless' },
+            { key: 'vdB', label: 'vdB' },
         ];
         const _availableCatFilters = _catFilterOptions.filter(opt =>
             report.some(r => r.catalogue_names && r.catalogue_names[opt.key])
@@ -2491,6 +3149,20 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
                 html += `<option value="${escapeHtml(opt.key)}">${escapeHtml(opt.label)}</option>`;
             });
             html += `</select>
+            </div>`;
+        }
+
+        // Difficulty filter - DSO report table only (difficulty is not computed for bodies/comets).
+        if (type === 'report') {
+            html += `
+            <div class="col-12">
+                <label class="visually-hidden" for="difficulty-filter-${eCat}-${eType}">${tSkyTonightCompat('search_difficulty')}</label>
+                <select id="difficulty-filter-${eCat}-${eType}" class="form-select filter-select">
+                    <option value="">${tSkyTonightCompat('search_difficulty')}</option>
+                    <option value="beginner">${i18n.t('difficulty.beginner')}</option>
+                    <option value="intermediate">${i18n.t('difficulty.intermediate')}</option>
+                    <option value="advanced">${i18n.t('difficulty.advanced')}</option>
+                </select>
             </div>`;
         }
 
@@ -2509,7 +3181,7 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
                 <thead>
                     <tr>
     `;
-    
+
     // Generate table headers
     columns.forEach(col => {
         if (col.key === 'more' || col.key === 'astrodex') {
@@ -2518,16 +3190,16 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
             html += `<th class="sortable" data-column="${escapeHtml(col.key)}" onclick="sortTable('${escapeHtml(catalogue)}', '${escapeHtml(col.key)}', '${escapeHtml(type)}')" style="text-align: ${col.align}">${escapeHtml(col.label)} <span class="sort-indicator"></span></th>`;
         }
     });
-    
+
     html += `</tr></thead><tbody class="table-group-divider">`;
-    
+
     // Generate table rows (current page slice only)
     _pageRows.forEach((row, _pageIdx) => {
         const idx = _startIdx + _pageIdx; // absolute row index across all pages
         const fotoValue = row['foto'] || row['fraction of time observable'] || 0;
         const _catKeys = row.catalogue_names ? Object.keys(row.catalogue_names).join(',') : '';
         html += `<tr data-foto="${escapeHtml(String(fotoValue))}" data-constellation="${escapeHtml(row.constellation || '')}" data-type="${escapeHtml(row.type || '')}" data-catalogues="${escapeHtml(_catKeys)}">`;
-        
+
         columns.forEach(col => {
             if (col.key === 'more') {
                 // Lazy more popup: store row data by key, referenced via data attribute
@@ -2552,8 +3224,8 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
                     size: row['size']
                 };
                 const itemDataJson = escapeHtml(JSON.stringify(itemData));
-                
-                if(displayAstrodex) {
+
+                if (displayAstrodex) {
                     if (isInAstrodex) {
                         html += `<td style="text-align: ${col.align}" data-item="${itemDataJson}"><button type="button" class="in-astrodex-badge astrodex-captured-btn" data-item="${itemDataJson}" title="${tSkyTonightCompat('captured')}"><i class="bi bi-check-circle-fill icon-inline" aria-hidden="true"></i>${tSkyTonightCompat('captured')}</button></td>`;
                     } else if (itemName) {
@@ -2579,6 +3251,7 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
                     mag: row['mag'] || row['visual magnitude'],
                     size: row['size'],
                     foto: row['foto'] || row['fraction of time observable'],
+                    difficulty: row['difficulty'] || '',
                     alttime_file: row['alttime_file'] || '',
                     catalogue_group_id: row['catalogue_group_id'] || '',
                     catalogue_aliases: row['catalogue_aliases'] || {}
@@ -2601,6 +3274,9 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
                     ? parseFloat(row[col.key]) : NaN;
                 const sortVal = isNaN(fotoNum) ? -1 : Math.round(fotoNum * 100);
                 html += `<td style="text-align: ${col.align}" data-sort-value="${sortVal}">${isNaN(fotoNum) ? '\u2014' : _astroScoreBadgeHtml(fotoNum)}</td>`;
+            } else if (col.key === 'difficulty') {
+                const difficultyVal = row[col.key] || '';
+                html += `<td style="text-align: ${col.align}" data-sort-value="${escapeHtml(difficultyVal)}">${_difficultyBadgeHtml(difficultyVal)}</td>`;
             } else if (col.key === 'solar elongation') {
                 const elongVal = (row[col.key] !== null && row[col.key] !== undefined)
                     ? parseFloat(row[col.key]) : NaN;
@@ -2608,7 +3284,7 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
                 html += `<td style="text-align: ${col.align}" data-sort-value="${elongSort}">${isNaN(elongVal) ? '\u2014' : _elongationBadgeHtml(elongVal)}</td>`;
             } else {
                 let value = row[col.key];
-                
+
                 // Format values
                 if (col.key === 'target name' && value) {
                     value = String(value).replace(/\s*\([^)]*\)/g, '');
@@ -2627,13 +3303,13 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
                         value = i18n.t(translationKey);
                     }
                 }
-                
+
                 // Add unit if specified
                 let displayValue = value !== null && value !== undefined && value !== '' ? escapeHtml(String(value)) : '';
                 if (col.unit && displayValue) {
                     displayValue += col.unit;
                 }
-                
+
                 // Make ID or Target name clickable
                 if ((col.key === 'id' || col.key === 'target name')) {
                     // Messier badge: shown in the target name cell when the object is in the Messier catalogue
@@ -2665,10 +3341,10 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
                 }
             }
         });
-        
+
         html += `</tr>`;
     });
-    
+
     html += `</tbody></table>`;
 
     // Pagination bar (only when the dataset spans more than one page)
@@ -2708,13 +3384,15 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
             // Restore any persisted filter state (from a previous section visit)
             const _savedFilter = _skytFilterState[type];
             if (_savedFilter && catalogue === 'SkyTonight') {
-                if (filterInput)         filterInput.value          = (_savedFilter.filterRaw !== undefined) ? _savedFilter.filterRaw : _savedFilter.filterText;
-                if (fotoCheckbox)        fotoCheckbox.checked       = _savedFilter.fotoEnabled;
-                if (fotoValueInput)      fotoValueInput.value       = String(Math.round(_savedFilter.fotoThreshold * 100));
-                if (constellationSelect) constellationSelect.value  = _savedFilter.constellation;
-                if (typeSelect)          typeSelect.value           = _savedFilter.typeVal;
+                if (filterInput) filterInput.value = (_savedFilter.filterRaw !== undefined) ? _savedFilter.filterRaw : _savedFilter.filterText;
+                if (fotoCheckbox) fotoCheckbox.checked = _savedFilter.fotoEnabled;
+                if (fotoValueInput) fotoValueInput.value = String(Math.round(_savedFilter.fotoThreshold * 100));
+                if (constellationSelect) constellationSelect.value = _savedFilter.constellation;
+                if (typeSelect) typeSelect.value = _savedFilter.typeVal;
                 const _catSel = document.getElementById(`catalogue-filter-${catalogue}-${type}`);
                 if (_catSel && _savedFilter.catalogueVal) _catSel.value = _savedFilter.catalogueVal;
+                const _diffSel = document.getElementById(`difficulty-filter-${catalogue}-${type}`);
+                if (_diffSel && _savedFilter.difficultyVal) _diffSel.value = _savedFilter.difficultyVal;
             }
         }
 
@@ -2758,26 +3436,31 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
             _catSelEl._skytListened = true;
             _catSelEl.addEventListener('change', () => _skytApplyFilter(catalogue, type));
         }
+        const _diffSelEl = document.getElementById(`difficulty-filter-${catalogue}-${type}`);
+        if (_diffSelEl && !_diffSelEl._skytListened) {
+            _diffSelEl._skytListened = true;
+            _diffSelEl.addEventListener('change', () => _skytApplyFilter(catalogue, type));
+        }
 
         // Add event listeners for Astrodex "Add" buttons
         const addButtons = document.querySelectorAll('.astrodex-add-btn');
         addButtons.forEach(button => {
-            button.addEventListener('click', function(e) {
+            button.addEventListener('click', function (e) {
                 e.preventDefault();
                 try {
                     const itemDataJson = this.getAttribute('data-item');
                     const itemData = JSON.parse(itemDataJson);
-                    
+
                     // Validate the parsed object structure
                     if (!itemData || typeof itemData !== 'object') {
                         throw new Error('Invalid item data');
                     }
-                    
+
                     // Ensure required fields exist
                     if (!itemData.name) {
                         throw new Error('Item name is required');
                     }
-                    
+
                     addFromCatalogue(itemData);
                 } catch (error) {
                     console.error('Error adding to astrodex:', error);
@@ -2789,7 +3472,7 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
         // Add event listeners for captured Astrodex buttons (open pictures popup)
         const capturedButtons = document.querySelectorAll('.astrodex-captured-btn');
         capturedButtons.forEach(button => {
-            button.addEventListener('click', async function(e) {
+            button.addEventListener('click', async function (e) {
                 e.preventDefault();
                 try {
                     const itemDataJson = this.getAttribute('data-item');
@@ -2804,7 +3487,7 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
         // Add event listeners for Plan My Night "Add" buttons
         const addPlanButtons = document.querySelectorAll('.plan-my-night-add-btn');
         addPlanButtons.forEach(button => {
-            button.addEventListener('click', async function(e) {
+            button.addEventListener('click', async function (e) {
                 e.preventDefault();
                 try {
                     const itemDataJson = this.getAttribute('data-item');
@@ -2815,25 +3498,8 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
                         throw new Error('Invalid item data');
                     }
 
-                    // Check telescope count to decide whether to show picker
-                    let telescopeId = null;
-                    let telescopeName = null;
-                    try {
-                        const listPayload = await fetchJSON('/api/plan-my-night/list');
-                        const telescopeItems = (listPayload?.plans || []).filter(p => p.telescope_id !== null);
-                        if (telescopeItems.length >= 2) {
-                            // Show telescope picker modal
-                            const picked = await showPlanTelescopePickerModal(telescopeItems, itemData);
-                            if (!picked) return; // user cancelled
-                            telescopeId = picked.telescope_id;
-                            telescopeName = picked.telescope_name;
-                        } else if (telescopeItems.length === 1) {
-                            telescopeId = telescopeItems[0].telescope_id;
-                            telescopeName = telescopeItems[0].telescope_name;
-                        }
-                    } catch (_) {
-                        // If list fetch fails, proceed without telescope
-                    }
+                    const telescopeSelection = await _resolvePlanTelescopeSelection(itemData);
+                    if (!telescopeSelection) return; // user cancelled the telescope picker
 
                     const response = await fetchJSON('/api/plan-my-night/targets', {
                         method: 'POST',
@@ -2841,8 +3507,8 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
                         body: JSON.stringify({
                             item: itemData,
                             catalogue: catalogueName || itemData.catalogue || currentCatalogueTab,
-                            telescope_id: telescopeId,
-                            telescope_name: telescopeName,
+                            telescope_id: telescopeSelection.telescope_id,
+                            telescope_name: telescopeSelection.telescope_name,
                         })
                     });
 
@@ -2871,7 +3537,7 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
         // Add event listeners for Alttime popup links (avoid inline onclick quoting issues)
         const alttimeLinks = document.querySelectorAll('.alttime-popup-link');
         alttimeLinks.forEach(link => {
-            link.addEventListener('click', function(e) {
+            link.addEventListener('click', function (e) {
                 e.preventDefault();
                 const parentCell = this.closest('.alttime-check');
                 if (!parentCell) {
@@ -2885,10 +3551,10 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
                 showAlttimePopup(title, targetId);
             });
         });
-        
+
         // Apply default sorting based on table type
         applyDefaultSort(catalogue, type);
-        
+
         // Apply filter on initial render only (not on pagination/filter re-renders to avoid loops).
         // Re-renders already display the correct filtered slice; just restore the input values above.
         if (!isRerender && ((fotoCheckbox && fotoCheckbox.checked) || _skytFilterState[type])) {
@@ -2928,7 +3594,7 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
             });
         });
     }, 100);
-    
+
     return html;
 }
 
@@ -2971,7 +3637,7 @@ function syncFotoCheckboxes(checked) {
 function applyDefaultSort(catalogue, type) {
     let defaultColumn = '';
     let defaultDirection = 'desc';
-    
+
     if (type === 'report') {
         defaultColumn = 'foto';
         defaultDirection = 'desc';
@@ -2982,20 +3648,20 @@ function applyDefaultSort(catalogue, type) {
         defaultColumn = 'foto';
         defaultDirection = 'desc';
     }
-    
+
     if (defaultColumn) {
         // Trigger the sort
         const table = document.getElementById(`table-${catalogue}-${type}`);
         if (!table) return;
-        
+
         const thead = table.querySelector('thead');
         const th = thead.querySelector(`th[data-column="${defaultColumn}"]`);
-        
+
         if (th) {
             // Set the sort state to opposite of desired, since sortTable will toggle
             const oppositeDirection = defaultDirection === 'asc' ? 'desc' : 'asc';
             th.setAttribute('data-sort', oppositeDirection);
-            
+
             // Call sortTable which will toggle to the desired direction
             sortTable(catalogue, defaultColumn, type);
         }
@@ -3042,15 +3708,15 @@ function sortTable(catalogue, column, type) {
     // Simple client-side sorting implementation with type parameter
     const table = document.getElementById(`table-${catalogue}-${type}`);
     if (!table) return;
-    
+
     const tbody = table.querySelector('tbody');
     const thead = table.querySelector('thead');
     const rows = Array.from(tbody.querySelectorAll('tr'));
-    
+
     // Get current sort state for this column
     const th = thead.querySelector(`th[data-column="${column}"]`);
     const currentSort = th.getAttribute('data-sort') || 'none';
-    
+
     // Clear other columns' sort indicators (but preserve current column state for toggle logic)
     thead.querySelectorAll('th').forEach(header => {
         if (header !== th) {
@@ -3059,7 +3725,7 @@ function sortTable(catalogue, column, type) {
             if (indicator) indicator.classList.remove('bi-caret-up-fill', 'bi-caret-down-fill');
         }
     });
-    
+
     // Toggle sort direction
     let sortDirection = 'asc';
     if (currentSort === 'asc') {
@@ -3067,7 +3733,7 @@ function sortTable(catalogue, column, type) {
     } else if (currentSort === 'desc') {
         sortDirection = 'asc';
     }
-    
+
     th.setAttribute('data-sort', sortDirection);
     const indicator = th.querySelector('.sort-indicator');
     if (indicator) {
@@ -3078,24 +3744,24 @@ function sortTable(catalogue, column, type) {
             'bi'
         );
     }
-    
+
     // Sort rows
     rows.sort((a, b) => {
         const aCell = a.querySelector(`td:nth-child(${getColumnIndex(table, column)})`);
         const bCell = b.querySelector(`td:nth-child(${getColumnIndex(table, column)})`);
         const aVal = 'sortValue' in aCell.dataset ? aCell.dataset.sortValue : aCell.textContent;
         const bVal = 'sortValue' in bCell.dataset ? bCell.dataset.sortValue : bCell.textContent;
-        
+
         let comparison = 0;
         if (!isNaN(aVal) && !isNaN(bVal)) {
             comparison = parseFloat(aVal) - parseFloat(bVal);
         } else {
             comparison = aVal.localeCompare(bVal);
         }
-        
+
         return sortDirection === 'asc' ? comparison : -comparison;
     });
-    
+
     DOMUtils.clear(tbody);
     rows.forEach(row => tbody.appendChild(row));
 }
@@ -3291,12 +3957,12 @@ async function showAlttimePopup(title, targetId) {
     const hasCustomHorizon = horizonProfile.length > 0 && azimuths.length === altitudes.length;
 
     const nightStart = data.night_start ? tzFmt.format(new Date(data.night_start)) : '';
-    const nightEnd   = data.night_end   ? tzFmt.format(new Date(data.night_end))   : '';
+    const nightEnd = data.night_end ? tzFmt.format(new Date(data.night_end)) : '';
 
     const nightAstroStart = data.night_astro_start ? new Date(data.night_astro_start) : null;
-    const nightAstroEnd   = data.night_astro_end   ? new Date(data.night_astro_end)   : null;
+    const nightAstroEnd = data.night_astro_end ? new Date(data.night_astro_end) : null;
     const nightAstroStartFmt = nightAstroStart ? tzFmt.format(nightAstroStart) : '';
-    const nightAstroEndFmt   = nightAstroEnd   ? tzFmt.format(nightAstroEnd)   : '';
+    const nightAstroEndFmt = nightAstroEnd ? tzFmt.format(nightAstroEnd) : '';
     // UTC millisecond timestamps for each sample - used by the astro-night plugin
     // to find the chart x-index matching the astronomical twilight boundaries.
     const timesUtcMs = (data.times_utc || []).map(t => new Date(t + 'Z').getTime());
@@ -3350,8 +4016,8 @@ async function showAlttimePopup(title, targetId) {
     footerRow.className = 'row align-items-center';
 
     const legendDefs = [
-        { color: altitudeLineColor,      label: tSkyTonightCompat('altitude_time_altitude_label') || 'Altitude (°)' },
-        { color: constraintLineColor,    label: tSkyTonightCompat('altitude_time_observable_zone') },
+        { color: altitudeLineColor, label: tSkyTonightCompat('altitude_time_altitude_label') || 'Altitude (°)' },
+        { color: constraintLineColor, label: tSkyTonightCompat('altitude_time_observable_zone') },
     ];
     if (hasCustomHorizon) {
         legendDefs.push({ color: customHorizonLineColor, label: tSkyTonightCompat('horizon_custom_line') || 'Custom Horizon' });
@@ -3411,7 +4077,7 @@ async function showAlttimePopup(title, targetId) {
     // -----------------------------------------------------------------------
     _destroyAlttimeChart();
 
-    const constraintBand  = altitudes.map(() => altMax);
+    const constraintBand = altitudes.map(() => altMax);
     const constraintFloor = altitudes.map(() => altMin);
 
     // Build custom horizon curve: per-step altitude derived from azimuth + profile
@@ -3454,7 +4120,7 @@ async function showAlttimePopup(title, targetId) {
             if (!chartArea) return;
             const { left, right, top, bottom } = chartArea;
             const astroStartMs = nightAstroStart.getTime();
-            const astroEndMs   = nightAstroEnd.getTime();
+            const astroEndMs = nightAstroEnd.getTime();
 
             // Find the chart x-index closest to astro dusk and astro dawn.
             let xAstroStart = left;
@@ -3470,8 +4136,8 @@ async function showAlttimePopup(title, targetId) {
             const twilightColor = isDarkLikeTheme ? 'rgba(255, 160, 40, 0.12)' : 'rgba(200, 110, 0, 0.10)';
             ctx.save();
             ctx.fillStyle = twilightColor;
-            if (xAstroStart > left) ctx.fillRect(left,       top, xAstroStart - left,  bottom - top);
-            if (xAstroEnd  < right) ctx.fillRect(xAstroEnd,  top, right - xAstroEnd,   bottom - top);
+            if (xAstroStart > left) ctx.fillRect(left, top, xAstroStart - left, bottom - top);
+            if (xAstroEnd < right) ctx.fillRect(xAstroEnd, top, right - xAstroEnd, bottom - top);
             ctx.restore();
         },
     };
@@ -3577,13 +4243,13 @@ async function showAlttimePopup(title, targetId) {
 
 function showMorePopup(popupId) {
     const popup = document.getElementById(popupId);
-    
+
     if (popup) {
         // Use BS modal
         //Prepare modal title
         const titleElement = document.getElementById('modal_lg_close_title');
         titleElement.textContent = tSkyTonightCompat('more_info');
-        
+
         //Prepare modal content
         const contentElement = document.getElementById('modal_lg_close_body');
         DOMUtils.clear(contentElement);
@@ -3602,7 +4268,7 @@ function showMorePopup(popupId) {
 }
 
 // Close popup when clicking outside
-window.addEventListener('click', function(event) {
+window.addEventListener('click', function (event) {
     if (event.target.classList.contains('more-popup')) {
         event.target.style.display = 'none';
     }
@@ -3724,10 +4390,10 @@ async function updateCatalogueCapturedBadge(itemDataOrName, isInAstrodex) {
     }
     targetNames.delete('');
     if (targetNames.size === 0) return;
-    
+
     // Find all table rows with matching item name
     const tables = document.querySelectorAll('table[id^="table-"]');
-    
+
     tables.forEach(table => {
         const rows = table.querySelectorAll('tbody tr');
         rows.forEach(row => {
@@ -3737,7 +4403,7 @@ async function updateCatalogueCapturedBadge(itemDataOrName, isInAstrodex) {
                 const button = cell.querySelector('.astrodex-add-btn');
                 return badge || button;
             });
-            
+
             if (!astrodexCell) return;
 
             const rawItem = astrodexCell.getAttribute('data-item');
@@ -3753,7 +4419,7 @@ async function updateCatalogueCapturedBadge(itemDataOrName, isInAstrodex) {
             const rowItemName = rowItemData.name || rowItemData['target name'] || rowItemData.id;
             const rowNormalizedName = normalize(rowItemName);
             if (!targetNames.has(rowNormalizedName)) return;
-            
+
             if (isInAstrodex) {
                 DOMUtils.clear(astrodexCell);
                 const badge = document.createElement('button');

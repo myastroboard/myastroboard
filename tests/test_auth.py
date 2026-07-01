@@ -700,6 +700,37 @@ class TestValidateUserPreferences:
         assert not is_valid
         assert 'notifications' in msg
 
+    def test_invalid_experience_level_fails(self):
+        is_valid, msg = auth.UserManager.validate_user_preferences({'experience_level': 'expert'})
+        assert not is_valid
+        assert 'experience_level' in msg
+
+    def test_valid_experience_level_passes(self):
+        for level in ('beginner', 'intermediate', 'advanced'):
+            is_valid, msg = auth.UserManager.validate_user_preferences({'experience_level': level})
+            assert is_valid
+
+    def test_wizard_not_dict_fails(self):
+        is_valid, msg = auth.UserManager.validate_user_preferences({'wizard': 'yes'})
+        assert not is_valid
+        assert 'wizard' in msg
+
+    def test_wizard_completed_not_bool_fails(self):
+        is_valid, msg = auth.UserManager.validate_user_preferences({'wizard': {'completed': 'yes'}})
+        assert not is_valid
+        assert 'wizard' in msg
+
+    def test_wizard_skipped_not_bool_fails(self):
+        is_valid, msg = auth.UserManager.validate_user_preferences({'wizard': {'skipped': 'yes'}})
+        assert not is_valid
+        assert 'wizard' in msg
+
+    def test_wizard_valid_passes(self):
+        is_valid, msg = auth.UserManager.validate_user_preferences(
+            {'wizard': {'completed': True, 'skipped': False}}
+        )
+        assert is_valid
+
     def test_valid_minimal_preferences(self):
         is_valid, msg = auth.UserManager.validate_user_preferences({'time_format': '24h'})
         assert is_valid
@@ -721,6 +752,16 @@ class TestValidateUserPreferences:
     def test_unknown_keys_silently_ignored(self):
         is_valid, msg = auth.UserManager.validate_user_preferences({'unknown_future_key': 'value'})
         assert is_valid
+
+    def test_default_experience_level_is_advanced(self):
+        """Locks in the resolved feature.md discrepancy: 'advanced', not 'beginner'."""
+        assert auth.DEFAULT_USER_PREFERENCES['experience_level'] == 'advanced'
+
+    def test_default_wizard_state_is_not_completed_or_skipped(self):
+        assert auth.DEFAULT_USER_PREFERENCES['wizard'] == {'completed': False, 'skipped': False}
+
+    def test_default_notifications_includes_n8_trigger(self):
+        assert 'N8' in auth.DEFAULT_USER_PREFERENCES['notifications']['triggers']
 
 
 class TestSanitizeUserPreferences:

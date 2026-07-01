@@ -170,6 +170,15 @@ The final value is clamped to **[0.0, 1.0]** and rounded to 4 decimal places.
 | 0.45 - 0.64 | Average - worth imaging if nothing better |
 | < 0.45 | Poor - significant limitation (moon, low altitude, faint object) |
 
+### Difficulty rating
+
+Alongside AstroScore, every target also gets a static `difficulty_score` (0-100) and `difficulty`
+label (`beginner` / `intermediate` / `advanced`), computed once per calculation run from
+magnitude, angular size, and surface brightness. Unlike AstroScore, difficulty does not depend on
+location, date, or Bortle class - the same object is always the same difficulty everywhere. It
+powers the SkyTonight difficulty filter/badges, the "Tonight for you" recommendations panel, and
+the Beginner Catalog. Full model and thresholds: [BEGINNER_EXPERIENCE.md](BEGINNER_EXPERIENCE.md).
+
 ---
 
 ## Output files

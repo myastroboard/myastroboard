@@ -1,2 +1,3 @@
 - Add moon conjunction information to astronomical events
 - Add widget with current situation in selected location, should be bases for multiple-location selector
+- Add beginner-friendly experience: guided setup wizard, difficulty ratings, "Tonight for you" recommendations, and a curated Beginner Catalog (see docs/BEGINNER_EXPERIENCE.md)

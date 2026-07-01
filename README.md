@@ -18,6 +18,7 @@ If you want see more, maybe look at the [visual tour](docs/VISUAL_TOUR.md).
 ## Features
 
 - SkyTonight integration with automated runs and report/log browsing
+- Beginner-friendly: guided setup wizard, skill-aware "Tonight for you" recommendations, difficulty ratings, and a curated Beginner Catalog ([details](docs/BEGINNER_EXPERIENCE.md))
 - Weather and observing-condition analysis (Open-Meteo)
 - Moon, sun, eclipses, aurora, ISS passes, and astronomy event endpoints
 - Astrodex: personal astrophotography catalog and image management

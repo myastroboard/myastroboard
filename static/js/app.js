@@ -225,9 +225,16 @@ async function initializeApp() {
     await loadTimezones();
     await loadConfiguration();  // Wait for config to load before loading catalogues
     if (typeof loadAppSettings === 'function' && currentUser?.role === 'admin') loadAppSettings();
+    if (typeof initFirstRun === 'function') initFirstRun();
+
+    // Show the Guided Setup Wizard as soon as its own dependencies (config,
+    // user preferences) are ready, rather than after the full catalogue load -
+    // that chain can take several seconds (or fail outright), which previously
+    // delayed or silently skipped the wizard on a user's very first session.
+    if (typeof checkFirstRun === 'function') await checkFirstRun();
+
     await loadCatalogues();  // Also await catalogues to ensure proper sequencing
     setupEventListeners();
-    if (typeof initFirstRun === 'function') initFirstRun();
     loadVersion();
 
     // Init constraint visual guides
@@ -240,9 +247,6 @@ async function initializeApp() {
     if (typeof SkyWidget !== 'undefined') SkyWidget.init();
 
     checkCacheStatus();
-
-    // Show first-run location setup if location has never been configured
-    if (typeof checkFirstRun === 'function') await checkFirstRun();
 
     // Show Observatory nav tab only when at least one connector is installed and enabled
     if (typeof updateObservatoryNavVisibility === 'function') updateObservatoryNavVisibility();

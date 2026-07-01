@@ -557,6 +557,98 @@ def compute_astro_score(
     return round(min(1.0, max(0.0, score)), 4)
 
 
+# Fixed literal ranges for difficulty normalisation - intentionally not tied to
+# user-configurable observability constraints, since difficulty must be static
+# and location/Bortle-independent (Bortle affects AstroScore, not difficulty).
+_DIFFICULTY_SB_RANGE = (12.0, 22.0)
+_DIFFICULTY_SIZE_ARCMIN_RANGE = (1.0, 120.0)
+_DIFFICULTY_MAGNITUDE_RANGE = (0.0, 16.0)
+
+_DIFFICULTY_WEIGHT_SURFACE_BRIGHTNESS = 0.40
+_DIFFICULTY_WEIGHT_SIZE = 0.30
+_DIFFICULTY_WEIGHT_MAGNITUDE = 0.20
+# Minimum-integration-hours weight (0.10) is not applied - see docstring below.
+
+
+def compute_difficulty_score(target: SkyTonightTarget) -> Tuple[int, str]:
+    """
+    Compute a static astrophotography difficulty score and label for a target.
+
+    Score components (of the theoretical 100-point weighted total)
+    ----------------
+    surface_brightness (weight 0.40):
+        Derived from magnitude + angular size via ``_surface_brightness()``.
+        A higher (dimmer) surface brightness value increases difficulty.
+
+    angular_size (weight 0.30):
+        A larger apparent size is easier to frame and reduces difficulty.
+
+    visual_magnitude (weight 0.20):
+        A brighter (lower) magnitude is easier and reduces difficulty.
+
+    minimum_integration (weight 0.10):
+        No per-target minimum-integration-time data exists in the general
+        catalogue (only the curated 30-object beginner catalog has it). This
+        factor is a documented simplification: it always contributes 0,
+        capping the maximum achievable raw score at ~90 instead of 100. This
+        does not materially affect the beginner/intermediate/advanced
+        thresholds, which sit well below that ceiling.
+
+    Fallback behaviour
+    ------------------
+    When magnitude or size_arcmin is missing, surface brightness cannot be
+    computed; the surface_brightness and angular_size contributions are both
+    zeroed (not proportionally rescaled) and only the visual_magnitude factor
+    is used, i.e. "magnitude-only" scoring. If magnitude is also unavailable,
+    the function returns a neutral default of (50, 'intermediate').
+
+    Difficulty is static (computed once from magnitude/size only) and does
+    not depend on Bortle or sky quality - those affect AstroScore, not this
+    label.
+
+    Returns
+    -------
+    Tuple[int, str]
+        ``(difficulty_score, difficulty)`` where ``difficulty_score`` is in
+        [0, 100] (lower = easier) and ``difficulty`` is one of
+        ``'beginner'`` (score <= 35), ``'intermediate'`` (35 < score <= 65),
+        or ``'advanced'`` (score > 65).
+    """
+    magnitude = target.magnitude
+    size_arcmin = target.size_arcmin
+
+    if magnitude is None and size_arcmin is None:
+        return 50, 'intermediate'
+
+    sb = _surface_brightness(magnitude, size_arcmin)
+
+    magnitude_component = _normalise(magnitude, *_DIFFICULTY_MAGNITUDE_RANGE) if magnitude is not None else 0.5
+
+    if sb is not None:
+        sb_component = _normalise(sb, *_DIFFICULTY_SB_RANGE)
+        size_norm = _normalise(size_arcmin, *_DIFFICULTY_SIZE_ARCMIN_RANGE)
+        size_component = 1.0 - size_norm
+        raw_score = (
+            _DIFFICULTY_WEIGHT_SURFACE_BRIGHTNESS * sb_component
+            + _DIFFICULTY_WEIGHT_SIZE * size_component
+            + _DIFFICULTY_WEIGHT_MAGNITUDE * magnitude_component
+        )
+    else:
+        # Magnitude-only fallback: surface_brightness and angular_size are zeroed.
+        raw_score = _DIFFICULTY_WEIGHT_MAGNITUDE * magnitude_component
+
+    difficulty_score = int(round(min(100.0, max(0.0, raw_score * 100.0))))
+
+    if difficulty_score <= 35:
+        difficulty = 'beginner'
+    elif difficulty_score <= 65:
+        difficulty = 'intermediate'
+    else:
+        difficulty = 'advanced'
+
+    return difficulty_score, difficulty
+
+
 # ---------------------------------------------------------------------------
 # Per-target result builder
 # ---------------------------------------------------------------------------
@@ -737,6 +829,8 @@ def _compute_target_result(
         object_type=target.object_type,
     )
 
+    difficulty_score, difficulty = compute_difficulty_score(target)
+
     return {
         'target_id': target.target_id,
         'preferred_name': (
@@ -770,6 +864,8 @@ def _compute_target_result(
             'dec_dms': dec_dms,
         },
         'astro_score': astro_score,
+        'difficulty_score': difficulty_score,
+        'difficulty': difficulty,
         'moon_angular_distance': round(angular_distance_moon, 1) if angular_distance_moon is not None else None,
         'source_catalogues': target.source_catalogues,
         'metadata': target.metadata,
