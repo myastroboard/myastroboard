@@ -90,6 +90,9 @@ Each user has a `preferences` object stored inside `users.json`. These are saved
 | `theme_mode` | `auto`, `light`, `dark`, `red` | `auto` | Colour theme (`auto` follows OS preference) |
 | `first_day_of_week` | `monday`, `sunday` | `monday` | Calendar and date picker start day |
 | `language` | `en`, `fr`, plus community translations | `en` | Interface language |
+| `experience_level` | `beginner`, `intermediate`, `advanced` | `advanced` | Filters SkyTonight recommendations and the Beginner Catalog by difficulty (see [BEGINNER_EXPERIENCE.md](BEGINNER_EXPERIENCE.md)) |
+| `beginner_catalog_enabled` | boolean | `true` | Shows/hides the "Beginner" SkyTonight sub-tab |
+| `wizard` | Object (`completed`, `skipped` booleans) | both `false` | Guided setup wizard completion state (see [BEGINNER_EXPERIENCE.md](BEGINNER_EXPERIENCE.md)) |
 | `notifications` | Object (see [NOTIFICATIONS.md](NOTIFICATIONS.md)) | enabled, defaults per trigger | Push and in-browser notification settings |
 
 ---

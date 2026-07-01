@@ -16,6 +16,10 @@ const DEFAULT_USER_PREFERENCES = {
     density: 'comfortable',
     theme_mode: 'auto',
     first_day_of_week: 'monday',
+    experience_level: 'advanced',
+    beginner_catalog_enabled: true,
+    recommendations_enabled: true,
+    wizard: { completed: false, skipped: false },
     notifications: null,
 };
 
@@ -370,6 +374,16 @@ function populateCustomizeFormFromPreferences() {
     if (theme) theme.value = prefs.theme_mode;
     const firstDow = document.getElementById('pref-first-day-of-week');
     if (firstDow) firstDow.value = prefs.first_day_of_week || DEFAULT_USER_PREFERENCES.first_day_of_week;
+    const experienceLevel = document.getElementById('pref-experience-level');
+    if (experienceLevel) experienceLevel.value = prefs.experience_level || DEFAULT_USER_PREFERENCES.experience_level;
+    const beginnerCatalogEnabled = document.getElementById('pref-beginner-catalog-enabled');
+    if (beginnerCatalogEnabled) {
+        beginnerCatalogEnabled.checked = prefs.beginner_catalog_enabled !== false;
+    }
+    const recommendationsEnabled = document.getElementById('pref-recommendations-enabled');
+    if (recommendationsEnabled) {
+        recommendationsEnabled.checked = prefs.recommendations_enabled !== false;
+    }
 }
 
 async function saveUserPreferences(preferences) {
@@ -417,7 +431,10 @@ function setupCustomizeForm() {
             time_format: document.getElementById('pref-time-format')?.value || DEFAULT_USER_PREFERENCES.time_format,
             density: document.getElementById('pref-density')?.value || DEFAULT_USER_PREFERENCES.density,
             theme_mode: document.getElementById('pref-theme-mode')?.value || DEFAULT_USER_PREFERENCES.theme_mode,
-            first_day_of_week: document.getElementById('pref-first-day-of-week')?.value || DEFAULT_USER_PREFERENCES.first_day_of_week
+            first_day_of_week: document.getElementById('pref-first-day-of-week')?.value || DEFAULT_USER_PREFERENCES.first_day_of_week,
+            experience_level: document.getElementById('pref-experience-level')?.value || DEFAULT_USER_PREFERENCES.experience_level,
+            beginner_catalog_enabled: document.getElementById('pref-beginner-catalog-enabled')?.checked ?? DEFAULT_USER_PREFERENCES.beginner_catalog_enabled,
+            recommendations_enabled: document.getElementById('pref-recommendations-enabled')?.checked ?? DEFAULT_USER_PREFERENCES.recommendations_enabled
         };
 
         try {
@@ -451,6 +468,13 @@ function setupCustomizeForm() {
     window.addEventListener('i18nLanguageChanged', () => {
         updateCustomizeSubtabOptions();
         populateCustomizeFormFromPreferences();
+    });
+
+    const redoWizardBtn = document.getElementById('customize-redo-wizard-btn');
+    redoWizardBtn?.addEventListener('click', async () => {
+        if (typeof window.restartWizard === 'function') {
+            await window.restartWizard();
+        }
     });
 }
 

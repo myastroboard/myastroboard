@@ -14,6 +14,7 @@ Welcome to the comprehensive documentation for MyAstroBoard, the integrated astr
 - [Quick Start](2.QUICKSTART.md) - Get up and running in 5 minutes
 - [Updating](3.UPDATE.md) - How to update to new versions
 - [Visual Tour](VISUAL_TOUR.md) - Screenshots and feature walkthrough
+- [Beginner Experience](BEGINNER_EXPERIENCE.md) - Guided setup wizard, difficulty ratings, "Tonight for you" recommendations, and the Beginner Catalog
 
 ### Deployment & Security
 - [Reverse Proxy & HTTPS Setup](6.REVERSE_PROXY.md) - Deploy behind NGINX Proxy Manager, Traefik, or other reverse proxies with HTTPS
@@ -79,6 +80,9 @@ Welcome to the comprehensive documentation for MyAstroBoard, the integrated astr
 | Weather forecast | Weather → Weather | [WEATHER.md](WEATHER.md) |
 | Seeing forecast | Weather → Seeing | [WEATHER.md](WEATHER.md) |
 | Target catalogue & AstroScore | SkyTonight | [SKYTONIGHT.md](SKYTONIGHT.md) |
+| Guided setup wizard (first run) | Startup modal | [BEGINNER_EXPERIENCE.md](BEGINNER_EXPERIENCE.md) |
+| Difficulty ratings & "Tonight for you" | SkyTonight → DSO | [BEGINNER_EXPERIENCE.md](BEGINNER_EXPERIENCE.md) |
+| Beginner Catalog | SkyTonight → Beginner | [BEGINNER_EXPERIENCE.md](BEGINNER_EXPERIENCE.md) |
 | Night planning | Astrodex → Plan My Night | [PLAN_MY_NIGHT.md](PLAN_MY_NIGHT.md) |
 | Astrophotography log | Astrodex | [ASTRODEX.md](ASTRODEX.md) |
 | Equipment & FOV | Equipment | [EQUIPMENT.md](EQUIPMENT.md) |

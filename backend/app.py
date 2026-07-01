@@ -92,13 +92,16 @@ from constants import (
     CACHE_TTL_SPACEFLIGHT_EVENTS,
     CACHE_TTL_SIDEREAL_TIME,
     CACHE_TTL_ALLSKY_HEALTH,
+    SKYTONIGHT_DSO_RESULTS_FILE,
 )
 from logging_config import get_logger
 from version_checker import check_for_updates
 from metrics_collector import collect_metrics
 from skytonight_storage import (
     get_scheduler_lock_file as get_skytonight_scheduler_lock_file,
+    has_dso_results,
 )
+from utils import load_json_file
 from on_demand_translate import translate_text_on_demand
 from skytonight_calculator import load_calculation_results
 from sun_phases import SunService
@@ -122,6 +125,7 @@ import iss_passes
 import css_passes
 import plan_my_night
 import skytonight_targets
+import beginner_catalog
 
 # Equipment Profiles
 import equipment_profiles
@@ -478,6 +482,10 @@ def update_own_preferences():
             error_key = 'settings.pref_invalid_density'
         elif error_text.startswith('Invalid theme_mode'):
             error_key = 'settings.pref_invalid_theme'
+        elif error_text.startswith('Invalid experience_level'):
+            error_key = 'settings.pref_invalid_experience_level'
+        elif error_text.startswith('Invalid wizard'):
+            error_key = 'settings.pref_invalid_wizard'
 
         logger.warning(f"Preference update rejected for user {session.get('username')}: {e}")
         return jsonify({'error': 'Invalid request', 'error_key': error_key}), 400
@@ -3915,6 +3923,38 @@ def export_plan_my_night_pdf():
         return jsonify({'error': 'Internal server error'}), 500
 
 
+def _normalize_catalogue_key_for_difficulty(value):
+    """Normalize a catalogue/target name for loose difficulty cross-referencing (uppercase, no separators)."""
+    return re.sub(r'[^A-Za-z0-9]', '', str(value or '')).upper()
+
+
+def _enrich_astrodex_items_with_difficulty(items):
+    """Attach a `difficulty` field to each Astrodex item by cross-referencing SkyTonight's dso_results.json.
+
+    Items with no catalogue/name match (e.g. manual entries not present in SkyTonight's
+    catalogue) get `difficulty: None` rather than a guessed value.
+    """
+    dso_data = load_json_file(SKYTONIGHT_DSO_RESULTS_FILE, default={})
+    lookup = {}
+    for entry in dso_data.get('deep_sky', []) if isinstance(dso_data, dict) else []:
+        difficulty = entry.get('difficulty')
+        catalogue_names = entry.get('catalogue_names', {})
+        if not difficulty or not isinstance(catalogue_names, dict):
+            continue
+        for name in catalogue_names.values():
+            key = _normalize_catalogue_key_for_difficulty(name)
+            if key:
+                lookup[key] = difficulty
+
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        catalogue_key = _normalize_catalogue_key_for_difficulty(item.get('catalogue'))
+        name_key = _normalize_catalogue_key_for_difficulty(item.get('name'))
+        item['difficulty'] = lookup.get(catalogue_key) or lookup.get(name_key)
+    return items
+
+
 @app.route('/api/astrodex', methods=['GET'])
 @login_required
 def get_astrodex():
@@ -3940,6 +3980,7 @@ def get_astrodex():
             private_mode=private_mode,
             usernames_by_id=usernames_by_id,
         )
+        _enrich_astrodex_items_with_difficulty(astrodex_data.get('items', []))
 
         return jsonify(
             {
@@ -3953,6 +3994,54 @@ def get_astrodex():
         )
     except Exception as e:
         logger.error(f"Error getting astrodex: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@app.route('/api/beginner-catalog', methods=['GET'])
+@login_required
+def get_beginner_catalog():
+    """Return the curated beginner-friendly DSO catalog, enriched with the user's SkyTonight/Astrodex/Plan state."""
+    try:
+        user = get_current_user()
+        if not user:  # pragma: no cover
+            return jsonify({'error': 'User not authenticated'}), 401
+
+        lang = _resolve_requested_language()
+        visible_only_param = request.args.get('visible_only', 'true')
+        visible_only = str(visible_only_param).strip().lower() != 'false'
+
+        catalog = beginner_catalog.load_beginner_catalog()
+        catalog = beginner_catalog.translate_catalog_entries(catalog, lang)
+
+        dso_results = load_json_file(SKYTONIGHT_DSO_RESULTS_FILE, default={})
+        astrodex_payload = astrodex.load_user_astrodex(user.user_id, user.username)
+        user_astrodex_items = astrodex_payload.get('items', []) if isinstance(astrodex_payload, dict) else []
+        plan_payload = plan_my_night.load_user_plan(user.user_id, user.username)
+        plan = plan_payload.get('plan') if isinstance(plan_payload, dict) else None
+        user_plan_entries = plan.get('entries', []) if isinstance(plan, dict) else []
+
+        catalog = beginner_catalog.enrich_with_skytonight(
+            catalog, dso_results, user_astrodex_items, user_plan_entries
+        )
+
+        # Only apply the visible_only filter when results actually exist - per spec, an
+        # empty/missing dso_results.json (no calculation run yet) returns everything.
+        if visible_only and has_dso_results():
+            objects = [entry for entry in catalog if entry.get('visible_tonight')]
+        else:
+            objects = catalog
+
+        visible_tonight_count = sum(1 for entry in catalog if entry.get('visible_tonight'))
+
+        return jsonify(
+            {
+                'objects': objects,
+                'total': len(catalog),
+                'visible_tonight': visible_tonight_count,
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error getting beginner catalog: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
 

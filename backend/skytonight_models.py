@@ -34,6 +34,8 @@ class SkyTonightTarget:
     source_catalogues: List[str] = field(default_factory=list)
     translation_key: str = ''
     metadata: Dict[str, Any] = field(default_factory=dict)
+    difficulty_score: int = 0
+    difficulty: str = 'intermediate'
 
     def to_dict(self) -> Dict[str, Any]:
         payload = asdict(self)
@@ -78,4 +80,6 @@ class SkyTonightTarget:
             ),
             translation_key=str(data.get('translation_key', '') or '').strip(),
             metadata=metadata if isinstance(metadata, dict) else {},
+            difficulty_score=int(data['difficulty_score']) if data.get('difficulty_score') is not None else 0,
+            difficulty=str(data.get('difficulty', 'intermediate') or 'intermediate').strip(),
         )

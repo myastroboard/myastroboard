@@ -455,6 +455,10 @@ function renderAstrodexGrid(items, isAllowedAstrodex) {
         body.appendChild(title);
         body.appendChild(type);
 
+        if (item.difficulty && typeof createDifficultyBadgeNode === 'function') {
+            body.appendChild(createDifficultyBadgeNode(item.difficulty));
+        }
+
         if (item.constellation) {
             const constellationLabel = getConstellationDisplayName(item.constellation);
 

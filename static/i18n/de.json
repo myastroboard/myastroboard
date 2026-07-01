@@ -516,7 +516,6 @@
     }
   },
   "first_run": {
-    "title": "Willkommen bei MyAstroBoard",
     "intro": "Bevor wir beginnen, sagen Sie uns, wo Sie beobachten. Alle Berechnungen hängen von Ihrem Standort ab.",
     "latitude": "Breitengrad (Dezimal):",
     "latitude_placeholder": "z.B. 48.8667",
@@ -524,8 +523,6 @@
     "longitude_placeholder": "z.B. 2.3333",
     "elevation_optional": "Höhe (Meter, optional):",
     "hint": "Sie können alle Einstellungen später unter Parameter → Konfiguration anpassen.",
-    "save": "Speichern und fortfahren",
-    "skip": "Vorerst überspringen",
     "lat_invalid": "Breitengrad muss eine Zahl zwischen -90 und 90 sein.",
     "lon_invalid": "Längengrad muss eine Zahl zwischen -180 und 180 sein.",
     "default_location_name": "Mein Standort"
@@ -807,7 +804,18 @@
     "pref_first_dow_sunday": "Sonntag",
     "connectors": "Verbindungen",
     "connectors_title": "Externe Verbindungen",
-    "connectors_info": "Verbinde externe Tools, um deren Daten im Observatory-Tab anzuzeigen."
+    "connectors_info": "Verbinde externe Tools, um deren Daten im Observatory-Tab anzuzeigen.",
+    "experience_level": "Erfahrungsniveau",
+    "experience_level_beginner": "Anfänger",
+    "experience_level_intermediate": "Mittelstufe",
+    "experience_level_advanced": "Fortgeschritten",
+    "experience_level_info": "Steuert, welche SkyTonight-Ziele als für Sie empfohlen hervorgehoben werden. Anfänger zeigt nur einfache Ziele; Fortgeschritten zeigt alles.",
+    "pref_invalid_experience_level": "Ungültige Erfahrungsstufe",
+    "pref_invalid_wizard": "Ungültiger Assistentenstatus",
+    "pref_beginner_catalog_enabled": "Registerkarte „Einsteiger-Katalog“ anzeigen",
+    "pref_beginner_catalog_enabled_info": "Fügt SkyTonight eine Registerkarte \"Einsteiger\" mit einer kuratierten Liste einfacher Ziele hinzu.",
+    "pref_recommendations_enabled": "Bereich „Heute Nacht für Sie\" anzeigen",
+    "pref_recommendations_enabled_info": "Zeigt oben auf der Registerkarte „Deep-Sky-Objekte\" von SkyTonight einen Bereich „Heute Nacht für Sie\" mit empfohlenen Zielen an."
   },
   "astrodex": {
     "title": "Astrodex - Ich muss sie alle fangen!",
@@ -1100,7 +1108,10 @@
     "target_debug_moon_phase": "Mondbeleuchtung",
     "target_debug_night_hours": "Nachtdauer",
     "target_debug_observable_hours": "Beobachtbare Stunden",
-    "target_debug_adjust_hint": "Anpassen:"
+    "target_debug_adjust_hint": "Anpassen:",
+    "table_difficulty": "Schwierigkeit",
+    "search_difficulty": "Alle Schwierigkeiten",
+    "beginner_catalog_tab_label": "Anfänger"
   },
   "plan_my_night": {
     "section_intro": "Erstellen Sie direkt aus SkyTonight-Zielen eine private Zeitplanung für die heutige Nacht.",
@@ -1997,7 +2008,6 @@
     "module_startrails_desc": "Gestapeltes Sternspur-Bild (am Ende der Nacht erstellt)",
     "module_daily_timelapse_label": "Täglicher Zeitraffer",
     "module_daily_timelapse_desc": "Zeitraffer-Video der ganzen Nacht (am Ende der Nacht erstellt)",
-
     "local_hostname_warning": ".local-Hostnamen verwenden mDNS, das in Docker nicht verfügbar ist. Verwende stattdessen die statische IP-Adresse (z.B. http://192.168.1.x/)."
   },
   "sky_widget": {
@@ -2011,5 +2021,216 @@
     "period_unknown": "Unbekannt",
     "next_in": "{period} in {time}",
     "score_title": "Aktueller Himmelsqualitätswert (0–10): Seeing, Transparenz, Wolkenbedeckung, Nachführungsstabilität"
+  },
+  "wizard": {
+    "title": "Erste Schritte",
+    "step_location": "Legen Sie Ihren Standort fest",
+    "step_sky_quality": "Sky-Qualität",
+    "step_welcome_location": "Ihr Observatorium",
+    "step_equipment": "Ihre Ausrüstung",
+    "step_notifications": "Benachrichtigungen",
+    "step_tonight": "Der heutige Nachthimmel",
+    "step_progress": "Schritt {current} von {total}",
+    "skip": "Überspringen",
+    "skip_all": "Alles überspringen",
+    "confirm_skip_all": "Den gesamten Einrichtungsassistenten überspringen? Sie können später alles manuell konfigurieren oder ihn jederzeit über Meine Einstellungen → Anpassen neu starten.",
+    "skip_alert": "Kein Problem – Sie können alles später manuell in „Parameter“ und „Meine Einstellungen“ konfigurieren.",
+    "next": "Nächste",
+    "back": "Zurück",
+    "finish": "Beenden",
+    "go_to_skytonight": "Gehe zu SkyTonight",
+    "equipment_preset_label": "Wählen Sie eine Voreinstellung",
+    "equipment_preset_placeholder": "Wählen Sie ein Teleskop oder eine Kamera...",
+    "equipment_manual": "Geben Sie manuell ein",
+    "equipment_existing_title": "Ihre Ausrüstung",
+    "equipment_existing_empty": "Sie haben noch keine Ausrüstung eingerichtet.",
+    "equipment_telescope_label": "Teleskop",
+    "equipment_camera_label": "Kamera",
+    "experience_level_label": "Ihr Erfahrungsniveau",
+    "bortle_intro": "Die Bortle-Skala bewertet die Dunkelheit Ihres Himmels mit einer Note von 1 (ausgezeichnet) bis 9 (Innenstadt).",
+    "bortle_link_label": "Meine Bortle-Klasse finden Sie unter lightpollutionmap.info",
+    "welcome_location_intro": "Ihr Standort ist bereits konfiguriert. Hier erfahren Sie, was die App über Ihre Website weiß.",
+    "notifications_intro": "Erhalten Sie heute Abend eine Benachrichtigung, wenn Ihr Imaging-Fenster geöffnet wird? Sie können dies jederzeit in „Meine Einstellungen“ ändern.",
+    "notifications_vapid_label": "Kontakt-E-Mail für Push-Benachrichtigungen",
+    "notifications_vapid_placeholder": "admin@your-domain.com",
+    "notifications_enable_btn": "Benachrichtigungen aktivieren",
+    "tonight_intro": "Hier ist, was Sie sich heute Abend vorstellen können",
+    "redo_wizard": "Wiederholen Sie den Setup-Assistenten",
+    "redo_wizard_info": "Führen Sie den geführten Einrichtungsassistenten erneut von Anfang an aus."
+  },
+  "difficulty": {
+    "beginner": "Anfänger",
+    "intermediate": "Mittelstufe",
+    "advanced": "Fortgeschritten",
+    "label": "Schwierigkeit",
+    "explanation": "Anfängerziele sind hell, groß und fehlerverzeihend. Ziele der Mittelstufe erfordern mehr Erfahrung mit Bildausschnitt und Belichtung. Fortgeschrittene Ziele sind schwach, klein oder erfordern eine präzise Nachführung und Verarbeitung."
+  },
+  "recommender": {
+    "title": "Heute Abend für dich",
+    "subtitle": "Ziele, die auf Ihr Erfahrungsniveau und den heutigen Nachthimmel abgestimmt sind",
+    "empty": "Noch keine Empfehlungen verfügbar – schauen Sie noch einmal vorbei, sobald SkyTonight die heutigen Ergebnisse berechnet hat.",
+    "estimated_integration": "Schätzung: Integration",
+    "add_to_plan": "Zum Plan hinzufügen",
+    "add_to_plan_done": "Hinzugefügt",
+    "show_more": "Mehr anzeigen",
+    "skill_mismatch": "Dieses Ziel ist möglicherweise anspruchsvoller als Ihr aktuelles Erfahrungsniveau.",
+    "integration_estimated_tooltip": "Schätzung basierend auf dem Schwierigkeitsgrad - für dieses Ziel liegt keine gemessene Belichtungszeit vor.",
+    "integration_catalog_tooltip": "Typische Belichtungszeit aus dem kuratierten Einsteiger-Katalog."
+  },
+  "beginner_catalog": {
+    "tab_label": "Anfänger",
+    "title": "Einsteigerkatalog",
+    "subtitle": "Eine kuratierte Liste von Astrofotografiezielen, die sich hervorragend für den Einstieg eignen. Der angezeigte maximale Schwierigkeitsgrad richtet sich nach Ihrem Profil. Dieser Einsteiger-Katalog kann in Ihrem Profil deaktiviert werden.",
+    "why_beginner_label": "Warum es gut für Anfänger ist",
+    "suggested_framing_label": "Empfohlener Rahmen",
+    "integration_time": "Typische Integrationszeit",
+    "visible_tonight": "Heute Abend sichtbar",
+    "not_visible": "Heute Abend nicht sichtbar",
+    "captured": "Gefangen",
+    "plan_it": "Planen Sie es heute Abend",
+    "empty_tonight": "Heute Nacht sind keine anfängerfreundlichen Ziele sichtbar. Versuchen Sie, den Filter „Nur heute Abend sichtbar“ zu deaktivieren.",
+    "filter_visible": "Nur heute Abend sichtbar",
+    "filter_difficulty": "Schwierigkeit",
+    "filter_type": "Typ",
+    "mark_captured": "Habe es eingefangen",
+    "in_plan": "In deinem Plan",
+    "objects": {
+      "m42": {
+        "why": "Einer der hellsten Nebel am Himmel und auch bei kurzen Belichtungszeiten sichtbar, was ihn zu einem verzeihenden und lohnenden ersten Ziel macht.",
+        "framing": "Nutzen Sie ein weites Sichtfeld, um den gesamten Nebelkomplex einschließlich des ihn umgebenden Running Man-Nebels einzufangen."
+      },
+      "m45": {
+        "why": "Ein heller, offener Sternhaufen, umhüllt von einem schwachen blauen Reflexionsnebel, leicht zu finden und selbst bei kurzen Belichtungszeiten ansprechend.",
+        "framing": "Ein weites Feld erfasst den gesamten Sternhaufen und den ihn umgebenden Nebel."
+      },
+      "m31": {
+        "why": "Die hellste aus nördlichen Breiten sichtbare Galaxie mit einem hellen Kern, der selbst bei Lichtverschmutzung schnell sichtbar ist.",
+        "framing": "Um die gesamte Galaxie zusammen mit ihren Begleitgalaxien M32 und M110 aufzunehmen, ist ein weites Feld erforderlich."
+      },
+      "m33": {
+        "why": "Eine große, frontale Spiralgalaxie, aber ihre geringe Oberflächenhelligkeit macht sie zu einem Fortschritt gegenüber helleren Anfängergalaxien.",
+        "framing": "Erfassen Sie die gesamte Galaxienscheibe mit einem mäßig weiten Sichtfeld."
+      },
+      "m44": {
+        "why": "Ein großer, heller offener Sternhaufen, der keiner besonderen Bearbeitung bedarf, um selbst in einer einzigen Aufnahme gut auszusehen.",
+        "framing": "Ein weites Sichtfeld passt bequem auf das gesamte Cluster."
+      },
+      "m13": {
+        "why": "Einer der hellsten Kugelsternhaufen am Nordhimmel, der sich selbst mit bescheidener Ausrüstung in einzelne Sterne auflöst.",
+        "framing": "Ein moderates Sichtfeld, das auf den Clusterkern zentriert ist, funktioniert gut."
+      },
+      "m57": {
+        "why": "Ein kompakter, aber heller planetarischer Nebel, der seine charakteristische Ringform in relativ kurzen Belichtungszeiten zeigt.",
+        "framing": "Verwenden Sie eine längere Brennweite, um den Rahmen auszufüllen, da der Nebel klein ist."
+      },
+      "m27": {
+        "why": "Einer der hellsten planetarischen Nebel am Himmel mit einer klaren Hantelform, die bei kurzen Belichtungszeiten schnell erscheint.",
+        "framing": "Eine mäßige Brennweite rahmt den Nebel und seinen umgebenden schwachen äußeren Halo gut ein."
+      },
+      "m51": {
+        "why": "Eine klassische Face-on-Spiralgalaxie mit einer kleineren Begleitgalaxie, die beliebt ist, aber eine längere Integration erfordert, um Spiraldetails sichtbar zu machen.",
+        "framing": "Ein moderates Sichtfeld erfasst sowohl die Hauptgalaxie als auch ihren Begleiter NGC 5195."
+      },
+      "m81": {
+        "why": "Eine helle Spiralgalaxie, die schnell einen gut definierten Kern zeigt, obwohl die Details des Spiralarms längere Belichtungszeiten erfordern.",
+        "framing": "Bilden Sie es mithilfe eines weiten Sichtfelds zusammen mit dem benachbarten M82."
+      },
+      "m82": {
+        "why": "Eine Starburst-Galaxie im Randbereich mit einer hellen, markanten Form, die auch bei kürzeren Belichtungszeiten hervorsticht.",
+        "framing": "Bilden Sie es mithilfe eines weiten Sichtfelds zusammen mit dem benachbarten M81."
+      },
+      "m101": {
+        "why": "Eine große frontale Spiralgalaxie, deren Licht jedoch über ein weites Gebiet verteilt ist und daher eine längere Integration benötigt als hellere Anfängerziele.",
+        "framing": "Um das volle Ausmaß seiner Spiralarme zu erfassen, ist ein weites Sichtfeld erforderlich."
+      },
+      "m104": {
+        "why": "Eine helle Galaxie mit einer markanten Staubspur am Rand, die selbst bei mäßiger Belichtung sichtbar ist.",
+        "framing": "Eine moderate Brennweite umrahmt die Galaxie mit etwas umgebendem Raum."
+      },
+      "m64": {
+        "why": "Eine helle Galaxie mit einem markanten dunklen Staubband in der Nähe ihres Kerns, sichtbar mit mäßiger Integrationszeit.",
+        "framing": "Eine moderate Brennweite füllt den Rahmen mit der Galaxie gut aus."
+      },
+      "ngc869": {
+        "why": "Teil eines hellen Paares offener Sternhaufen, die leicht zu finden und selbst bei kurzen Belichtungszeiten lohnend sind.",
+        "framing": "Verwenden Sie ein weites Sichtfeld, um sowohl h als auch chi Persei zusammen einzufangen."
+      },
+      "ngc884": {
+        "why": "Teil eines hellen Paares offener Sternhaufen, die leicht zu finden und selbst bei kurzen Belichtungszeiten lohnend sind.",
+        "framing": "Verwenden Sie ein weites Sichtfeld, um sowohl Chi als auch H Persei zusammen einzufangen."
+      },
+      "ic1805": {
+        "why": "Ein großer, heller Emissionsnebel mit einer erkennbaren Herzform, der sich gut für die Schmalbandbildgebung für Anfänger eignet.",
+        "framing": "Um die gesamte Ausdehnung des Nebels einzufangen, ist ein weites Sichtfeld erforderlich."
+      },
+      "ic1848": {
+        "why": "Ein großer Emissionsnebel neben dem Herznebel, hell genug für Anfänger, die sich mit der Schmalbandbildgebung beschäftigen.",
+        "framing": "Ein weites Sichtfeld erfasst den gesamten Nebel, oft zusammen mit dem Herznebel."
+      },
+      "ngc7000": {
+        "why": "Einer der größten und hellsten Emissionsnebel am Himmel mit einer erkennbaren kontinentalähnlichen Form.",
+        "framing": "Um seine volle Ausdehnung einzufangen, ist ein weites Sichtfeld erforderlich, oft zusammen mit dem Pelikannebel."
+      },
+      "ic5070": {
+        "why": "Ein heller Emissionsnebel neben dem Nordamerikanebel, der sich für Anfänger lohnt, die sich an der Schmalbandbildgebung versuchen.",
+        "framing": "Ein weites Sichtfeld erfasst den Nebel, oft zusammen mit dem Nordamerikanebel."
+      },
+      "m8": {
+        "why": "Ein großer, heller Emissionsnebel, der auch bei kurzen Belichtungszeiten sichtbar ist und einen eingebetteten Sternhaufen enthält.",
+        "framing": "Ein weites Sichtfeld erfasst den gesamten Nebel und das ihn umgebende Sternenfeld."
+      },
+      "m20": {
+        "why": "Eine farbenfrohe Kombination aus Emissions- und Reflexionsnebel mit einem charakteristischen dreilappigen dunklen Streifenmuster.",
+        "framing": "Ein mäßiges Sichtfeld umrahmt den Nebel gut, oft zusammen mit dem nahegelegenen Lagunennebel."
+      },
+      "m16": {
+        "why": "Berühmt für die Säulen der Schöpfung, aber seine schwächeren Staubstrukturen erfordern eine längere Integration als hellere Anfängernebel.",
+        "framing": "Ein moderates Sichtfeld umrahmt den umgebenden Emissionsnebel und den darin eingebetteten Sternhaufen."
+      },
+      "m17": {
+        "why": "Ein heller Emissionsnebel mit der charakteristischen Schwanen- oder Häkchenform, der in relativ kurzen Belichtungszeiten sichtbar ist.",
+        "framing": "Ein moderates Sichtfeld umrahmt die helle zentrale Struktur schön."
+      },
+      "ngc6992": {
+        "why": "Ein heller Abschnitt eines Supernova-Überrests mit zarten, feinen Filamentstrukturen, die sich gut für Schmalbandaufnahmen eignen.",
+        "framing": "Ein mittleres bis weites Sichtfeld erfasst die geschwungene Filamentstruktur."
+      },
+      "ngc6888": {
+        "why": "Ein charakteristischer blasenförmiger Nebel, der von einem Wolf-Rayet-Stern gebildet wird und sich für Schmalbandaufnahmen mit mäßiger Integration lohnt.",
+        "framing": "Ein moderates Sichtfeld umrahmt die Halbmondform mit etwas umgebendem Raum."
+      },
+      "m1": {
+        "why": "Ein berühmter Supernova-Überrest mit komplizierten Filamentdetails, der eine längere Integrationszeit zum Herausbringen belohnt.",
+        "framing": "Verwenden Sie eine längere Brennweite, um den Rahmen auszufüllen, da der Nebel relativ klein ist."
+      },
+      "m35": {
+        "why": "Ein großer, heller offener Sternhaufen, der mit minimaler Bearbeitung gut aussieht, ideal für ein erstes Sternhaufenziel.",
+        "framing": "Ein weites Sichtfeld passt bequem auf das gesamte Cluster."
+      },
+      "m36": {
+        "why": "Ein kompakter, heller offener Sternhaufen, der mit kurzen Belichtungszeiten schnell und einfach einzufangen ist.",
+        "framing": "Ein mäßiges Sichtfeld umrahmt das Cluster gut, oft zusammen mit M37 und M38."
+      },
+      "m37": {
+        "why": "Der reichste der drei Auriga-Haufen, mit vielen Sternen, die selbst bei kurzen Belichtungszeiten sichtbar sind.",
+        "framing": "Ein mäßiges Sichtfeld umrahmt das Cluster gut, oft zusammen mit M36 und M38."
+      },
+      "m38": {
+        "why": "Ein heller offener Sternhaufen, der leicht einzufangen ist und sich gut mit seinen Nachbarn M36 und M37 paart.",
+        "framing": "Ein mäßiges Sichtfeld umrahmt das Cluster gut, oft zusammen mit M36 und M37."
+      },
+      "ngc2244": {
+        "why": "Ein großer Emissionsnebel, der einen hellen Sternhaufen umgibt und sich für Schmalbandaufnahmen mit mäßiger Integration lohnt.",
+        "framing": "Um die volle blütenartige Form des Nebels einzufangen, ist ein weites Sichtfeld erforderlich."
+      },
+      "m46": {
+        "why": "Ein reichhaltiger offener Sternhaufen mit einem Bonus: Ein kleiner planetarischer Nebel scheint ihn zu überlappen, was ohne großen Aufwand für visuelles Interesse sorgt.",
+        "framing": "Ein moderates Sichtfeld rahmt den Sternhaufen und den darin eingebetteten planetarischen Nebel ein."
+      },
+      "ngc5128": {
+        "why": "Eine helle Galaxie mit einer auffälligen dunklen Staubspur, die aus südlichen Breitengraden mit mäßiger Integration leicht einzufangen ist.",
+        "framing": "Eine moderate Brennweite umrahmt die Galaxie mit etwas umgebendem Raum."
+      }
+    }
   }
 }

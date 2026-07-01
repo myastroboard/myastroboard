@@ -516,7 +516,6 @@
     }
   },
   "first_run": {
-    "title": "Bienvenue sur MyAstroBoard",
     "intro": "Avant de commencer, indiquez-nous votre lieu d'observation. Tous les calculs dépendent de votre localisation.",
     "latitude": "Latitude (décimal) :",
     "latitude_placeholder": "ex. 48.8667",
@@ -524,8 +523,6 @@
     "longitude_placeholder": "ex. 2.3333",
     "elevation_optional": "Altitude (mètres, optionnel) :",
     "hint": "Vous pourrez affiner ces paramètres plus tard dans Paramètres → Configuration.",
-    "save": "Enregistrer et continuer",
-    "skip": "Ignorer pour l'instant",
     "lat_invalid": "La latitude doit être un nombre entre -90 et 90.",
     "lon_invalid": "La longitude doit être un nombre entre -180 et 180.",
     "default_location_name": "Mon lieu d'observation"
@@ -807,7 +804,18 @@
     "pref_first_dow_sunday": "Dimanche",
     "connectors": "Connecteurs",
     "connectors_title": "Connecteurs externes",
-    "connectors_info": "Connectez des outils externes pour afficher leurs données dans l'onglet Observatoire. Chaque connecteur possède des modules activables individuellement."
+    "connectors_info": "Connectez des outils externes pour afficher leurs données dans l'onglet Observatoire. Chaque connecteur possède des modules activables individuellement.",
+    "experience_level": "Niveau d'expérience",
+    "experience_level_beginner": "Débutant",
+    "experience_level_intermediate": "Intermédiaire",
+    "experience_level_advanced": "Avancé",
+    "experience_level_info": "Contrôle les cibles SkyTonight mises en avant comme recommandées pour vous. Débutant n'affiche que les cibles faciles ; Avancé affiche tout.",
+    "pref_invalid_experience_level": "Niveau d'expérience invalide",
+    "pref_invalid_wizard": "État de l'assistant invalide",
+    "pref_beginner_catalog_enabled": "Afficher l'onglet Catalogue débutant",
+    "pref_beginner_catalog_enabled_info": "Ajoute un onglet « Débutant » à SkyTonight avec une liste sélectionnée de cibles faciles.",
+    "pref_recommendations_enabled": "Afficher le panneau « Ce soir pour vous »",
+    "pref_recommendations_enabled_info": "Affiche un panneau « Ce soir pour vous » de cibles recommandées en haut de l'onglet Objets du ciel profond de SkyTonight."
   },
   "astrodex": {
     "title": "Astrodex - Attrapez-les tous !",
@@ -1100,7 +1108,10 @@
     "target_debug_moon_phase": "Illumination lunaire",
     "target_debug_night_hours": "Durée de la nuit",
     "target_debug_observable_hours": "Heures observables",
-    "target_debug_adjust_hint": "Ajuster :"
+    "target_debug_adjust_hint": "Ajuster :",
+    "table_difficulty": "Difficulté",
+    "search_difficulty": "Toutes les difficultés",
+    "beginner_catalog_tab_label": "Débutant"
   },
   "plan_my_night": {
     "section_intro": "Construisez une chronologie privée pour cette nuit directement depuis les cibles SkyTonight.",
@@ -1997,7 +2008,6 @@
     "module_startrails_desc": "Image de traînées d'étoiles empilées (générée en fin de nuit)",
     "module_daily_timelapse_label": "Timelapse journalier",
     "module_daily_timelapse_desc": "Vidéo timelapse de la nuit complète (générée en fin de nuit)",
-
     "local_hostname_warning": "Les noms d'hôtes .local utilisent mDNS, indisponible dans Docker. Utilisez l'adresse IP statique de l'appareil (ex. http://192.168.1.x/)."
   },
   "sky_widget": {
@@ -2011,5 +2021,216 @@
     "period_unknown": "Inconnu",
     "next_in": "{period} dans {time}",
     "score_title": "Score qualité du ciel actuel (0–10) : seeing, transparence, couverture nuageuse, stabilité de suivi"
+  },
+  "wizard": {
+    "title": "Premiers pas",
+    "step_location": "Définir votre emplacement",
+    "step_sky_quality": "Qualité du ciel",
+    "step_welcome_location": "Votre observatoire",
+    "step_equipment": "Votre équipement",
+    "step_notifications": "Notifications",
+    "step_tonight": "Le ciel ce soir",
+    "step_progress": "Étape {current} sur {total}",
+    "skip": "Ignorer",
+    "skip_all": "Tout ignorer",
+    "confirm_skip_all": "Ignorer tout l'assistant de configuration ? Vous pourrez tout configurer manuellement plus tard, ou le relancer à tout moment depuis Mes paramètres → Personnaliser.",
+    "skip_alert": "Pas de problème — vous pourrez tout configurer manuellement plus tard dans Paramètres et Mes Paramètres.",
+    "next": "Suivant",
+    "back": "Retour",
+    "finish": "Terminer",
+    "go_to_skytonight": "Aller à SkyTonight",
+    "equipment_preset_label": "Choisir un modèle prédéfini",
+    "equipment_preset_placeholder": "Sélectionner un télescope ou un appareil photo...",
+    "equipment_manual": "Saisie manuelle",
+    "equipment_existing_title": "Votre équipement",
+    "equipment_existing_empty": "Vous n'avez pas encore d'équipement configuré.",
+    "equipment_telescope_label": "Télescope",
+    "equipment_camera_label": "Appareil photo",
+    "experience_level_label": "Votre niveau d'expérience",
+    "bortle_intro": "L'échelle de Bortle évalue l'obscurité de votre ciel de 1 (excellent) à 9 (centre-ville).",
+    "bortle_link_label": "Trouver ma classe de Bortle sur lightpollutionmap.info",
+    "welcome_location_intro": "Votre emplacement est déjà configuré. Voici ce que l'application sait sur votre site.",
+    "notifications_intro": "Être notifié ce soir quand votre fenêtre d'imagerie s'ouvre ? Vous pourrez changer cela à tout moment dans Mes Paramètres.",
+    "notifications_vapid_label": "E-mail de contact pour les notifications push",
+    "notifications_vapid_placeholder": "admin@votre-domaine.com",
+    "notifications_enable_btn": "Activer les notifications",
+    "tonight_intro": "Voici ce que vous pouvez photographier ce soir",
+    "redo_wizard": "Relancer l'assistant de configuration",
+    "redo_wizard_info": "Relancer l'assistant de configuration guidée depuis le début."
+  },
+  "difficulty": {
+    "beginner": "Débutant",
+    "intermediate": "Intermédiaire",
+    "advanced": "Avancé",
+    "label": "Difficulté",
+    "explanation": "Les cibles débutant sont lumineuses, grandes et indulgentes. Les cibles intermédiaires demandent plus d'expérience en cadrage et en exposition. Les cibles avancées sont faibles, petites, ou exigent un suivi et un traitement précis."
+  },
+  "recommender": {
+    "title": "Ce soir pour vous",
+    "subtitle": "Cibles adaptées à votre niveau d'expérience et au ciel de ce soir",
+    "empty": "Aucune recommandation disponible pour le moment — revenez une fois que SkyTonight aura calculé les résultats de ce soir.",
+    "estimated_integration": "Intégration estimée",
+    "add_to_plan": "Ajouter au plan",
+    "add_to_plan_done": "Ajouté",
+    "show_more": "Voir plus",
+    "skill_mismatch": "Cette cible peut être plus difficile que votre niveau d'expérience actuel.",
+    "integration_estimated_tooltip": "Estimation basée sur le niveau de difficulté - aucun temps d'intégration mesuré n'est disponible pour cette cible.",
+    "integration_catalog_tooltip": "Temps d'intégration typique issu du Catalogue débutant."
+  },
+  "beginner_catalog": {
+    "tab_label": "Débutant",
+    "title": "Catalogue Débutant",
+    "subtitle": "Une liste organisée de cibles d'astrophotographie parfaites pour commencer. La difficulté maximum est affichée selon votre profil. Ce catalogue pour débutants peut être désactivé dans votre profil.",
+    "why_beginner_label": "Pourquoi c'est adapté aux débutants",
+    "suggested_framing_label": "Cadrage suggéré",
+    "integration_time": "Temps d'intégration typique",
+    "visible_tonight": "Visible ce soir",
+    "not_visible": "Non visible ce soir",
+    "captured": "Capturé",
+    "plan_it": "Planifier ce soir",
+    "empty_tonight": "Aucune cible adaptée aux débutants n'est visible ce soir. Essayez de désactiver le filtre « visible ce soir uniquement ».",
+    "filter_visible": "Afficher uniquement ce qui est visible ce soir",
+    "filter_difficulty": "Difficulté",
+    "filter_type": "Type",
+    "mark_captured": "Capturé",
+    "in_plan": "Dans votre plan",
+    "objects": {
+      "m42": {
+        "why": "L'une des nébuleuses les plus brillantes du ciel, visible même avec des poses courtes, ce qui en fait une première cible indulgente et gratifiante.",
+        "framing": "Utilisez un grand champ pour capturer l'ensemble du complexe nébulaire, y compris la nébuleuse de l'Homme courant qui l'entoure."
+      },
+      "m45": {
+        "why": "Un amas ouvert brillant enveloppé d'une faible nébulosité par réflexion bleue, facile à trouver et agréable même avec des poses courtes.",
+        "framing": "Un grand champ capture l'ensemble de l'amas ainsi que la nébulosité qui l'entoure."
+      },
+      "m31": {
+        "why": "La galaxie la plus brillante visible depuis les latitudes nord, avec un noyau lumineux qui apparaît rapidement même sous pollution lumineuse.",
+        "framing": "Un grand champ est nécessaire pour cadrer toute la galaxie ainsi que ses galaxies compagnes M32 et M110."
+      },
+      "m33": {
+        "why": "Une grande galaxie spirale vue de face, mais sa faible luminosité de surface en fait une étape au-dessus des galaxies plus brillantes pour débutants.",
+        "framing": "Cadrez tout le disque de la galaxie avec un champ modéré à large."
+      },
+      "m44": {
+        "why": "Un grand amas ouvert brillant qui n'a besoin d'aucun traitement spécial pour être beau, même sur une seule pose.",
+        "framing": "Un grand champ suffit pour cadrer confortablement tout l'amas."
+      },
+      "m13": {
+        "why": "L'un des amas globulaires les plus brillants du ciel nordique, se résolvant en étoiles individuelles même avec un équipement modeste.",
+        "framing": "Un champ modéré centré sur le cœur de l'amas convient bien."
+      },
+      "m57": {
+        "why": "Une nébuleuse planétaire compacte mais brillante qui révèle sa forme d'anneau caractéristique en des poses relativement courtes.",
+        "framing": "Utilisez une focale plus longue pour remplir le cadre, car la nébuleuse est petite."
+      },
+      "m27": {
+        "why": "L'une des nébuleuses planétaires les plus brillantes du ciel, avec une forme d'haltère nette qui apparaît rapidement sur des poses courtes.",
+        "framing": "Une focale modérée cadre bien la nébuleuse et son faible halo externe."
+      },
+      "m51": {
+        "why": "Une galaxie spirale classique vue de face avec une galaxie compagne plus petite, populaire mais nécessitant une intégration plus longue pour révéler le détail des bras spiraux.",
+        "framing": "Un champ modéré capture à la fois la galaxie principale et sa compagne, NGC 5195."
+      },
+      "m81": {
+        "why": "Une galaxie spirale brillante qui montre rapidement un noyau bien défini, bien que le détail des bras spiraux nécessite des poses plus longues.",
+        "framing": "Cadrez-la avec sa voisine M82 en utilisant un grand champ."
+      },
+      "m82": {
+        "why": "Une galaxie à sursaut de formation d'étoiles vue par la tranche, avec une forme brillante et distinctive qui ressort même sur des poses plus courtes.",
+        "framing": "Cadrez-la avec sa voisine M81 en utilisant un grand champ."
+      },
+      "m101": {
+        "why": "Une grande galaxie spirale vue de face, mais sa lumière est étalée sur une large zone, ce qui nécessite une intégration plus longue que les cibles débutant plus brillantes.",
+        "framing": "Un grand champ est nécessaire pour capturer toute l'étendue de ses bras spiraux."
+      },
+      "m104": {
+        "why": "Une galaxie brillante avec une bande de poussière vue par la tranche saisissante, visible même avec des poses modérées.",
+        "framing": "Une focale modérée cadre la galaxie avec un peu d'espace environnant."
+      },
+      "m64": {
+        "why": "Une galaxie brillante avec une bande de poussière sombre distinctive près de son noyau, visible avec un temps d'intégration modéré.",
+        "framing": "Une focale modérée remplit bien le cadre avec la galaxie."
+      },
+      "ngc869": {
+        "why": "Fait partie d'une paire brillante d'amas ouverts, faciles à trouver et gratifiants même avec des poses courtes.",
+        "framing": "Utilisez un grand champ pour capturer h et chi Persei ensemble."
+      },
+      "ngc884": {
+        "why": "Fait partie d'une paire brillante d'amas ouverts, faciles à trouver et gratifiants même avec des poses courtes.",
+        "framing": "Utilisez un grand champ pour capturer chi et h Persei ensemble."
+      },
+      "ic1805": {
+        "why": "Une grande et brillante nébuleuse en émission avec une forme de cœur reconnaissable, bien adaptée à l'imagerie à bande étroite pour les débutants.",
+        "framing": "Un grand champ est nécessaire pour capturer toute l'étendue de la nébuleuse."
+      },
+      "ic1848": {
+        "why": "Une grande nébuleuse en émission voisine de la nébuleuse du Cœur, assez brillante pour les débutants explorant l'imagerie à bande étroite.",
+        "framing": "Un grand champ capture toute la nébuleuse, souvent avec la nébuleuse du Cœur."
+      },
+      "ngc7000": {
+        "why": "L'une des plus grandes et des plus brillantes nébuleuses en émission du ciel, avec une forme reconnaissable de continent.",
+        "framing": "Un grand champ est nécessaire pour capturer toute son étendue, souvent avec la nébuleuse du Pélican."
+      },
+      "ic5070": {
+        "why": "Une nébuleuse en émission brillante voisine de la nébuleuse d'Amérique du Nord, gratifiante pour les débutants tentant l'imagerie à bande étroite.",
+        "framing": "Un grand champ capture la nébuleuse, souvent avec la nébuleuse d'Amérique du Nord."
+      },
+      "m8": {
+        "why": "Une grande et brillante nébuleuse en émission visible même sur des poses courtes, avec un amas d'étoiles intégré.",
+        "framing": "Un grand champ capture toute la nébuleuse et son champ d'étoiles environnant."
+      },
+      "m20": {
+        "why": "Une combinaison colorée de nébulosité en émission et par réflexion avec un motif caractéristique de bandes sombres en trois lobes.",
+        "framing": "Un champ modéré cadre bien la nébuleuse, souvent avec la proche nébuleuse du Lagon."
+      },
+      "m16": {
+        "why": "Célèbre pour les Piliers de la Création, mais ses structures de poussière plus faibles nécessitent une intégration plus longue que les nébuleuses débutant plus brillantes.",
+        "framing": "Un champ modéré cadre la nébuleuse en émission environnante et l'amas d'étoiles intégré."
+      },
+      "m17": {
+        "why": "Une nébuleuse en émission brillante avec une forme distinctive de cygne ou de coche, visible avec des poses relativement courtes.",
+        "framing": "Un champ modéré cadre bien la structure centrale brillante."
+      },
+      "ngc6992": {
+        "why": "Une section brillante d'un rémanent de supernova avec des structures filamenteuses délicates, bien adaptées à l'imagerie à bande étroite.",
+        "framing": "Un champ modéré à large capture la structure filamenteuse étendue."
+      },
+      "ngc6888": {
+        "why": "Une nébuleuse en forme de bulle distinctive formée par une étoile Wolf-Rayet, gratifiante pour l'imagerie à bande étroite avec une intégration modérée.",
+        "framing": "Un champ modéré cadre la forme de croissant avec un peu d'espace environnant."
+      },
+      "m1": {
+        "why": "Un célèbre rémanent de supernova avec un détail filamenteux complexe qui récompense un temps d'intégration plus long.",
+        "framing": "Utilisez une focale plus longue pour remplir le cadre, car la nébuleuse est relativement petite."
+      },
+      "m35": {
+        "why": "Un grand amas ouvert brillant qui est beau avec un minimum de traitement, idéal pour une première cible d'amas d'étoiles.",
+        "framing": "Un grand champ suffit pour cadrer confortablement tout l'amas."
+      },
+      "m36": {
+        "why": "Un amas ouvert compact et brillant, rapide et facile à capturer avec des poses courtes.",
+        "framing": "Un champ modéré cadre bien l'amas, souvent avec M37 et M38."
+      },
+      "m37": {
+        "why": "Le plus riche des trois amas d'Auriga, avec de nombreuses étoiles visibles même sur des poses courtes.",
+        "framing": "Un champ modéré cadre bien l'amas, souvent avec M36 et M38."
+      },
+      "m38": {
+        "why": "Un amas ouvert brillant, facile à capturer et qui se marie bien avec ses voisins M36 et M37.",
+        "framing": "Un champ modéré cadre bien l'amas, souvent avec M36 et M37."
+      },
+      "ngc2244": {
+        "why": "Une grande nébuleuse en émission entourant un amas d'étoiles brillant, gratifiante pour l'imagerie à bande étroite avec une intégration modérée.",
+        "framing": "Un grand champ est nécessaire pour capturer toute la forme de fleur de la nébuleuse."
+      },
+      "m46": {
+        "why": "Un riche amas ouvert avec un bonus : une petite nébuleuse planétaire semble le chevaucher, ajoutant un intérêt visuel pour peu d'effort supplémentaire.",
+        "framing": "Un champ modéré cadre l'amas et la nébuleuse planétaire intégrée ensemble."
+      },
+      "ngc5128": {
+        "why": "Une galaxie brillante avec une bande de poussière sombre saisissante, facile à capturer depuis les latitudes sud avec une intégration modérée.",
+        "framing": "Une focale modérée cadre la galaxie avec un peu d'espace environnant."
+      }
+    }
   }
 }

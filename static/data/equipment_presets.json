@@ -1,0 +1,158 @@
+{
+  "telescopes": [
+    {
+      "id": "seestar_s50",
+      "label": "Seestar S50",
+      "manufacturer": "ZWO",
+      "aperture_mm": 50,
+      "focal_length_mm": 250,
+      "focal_ratio": 5.0,
+      "type": "refractor",
+      "suggests_experience": "beginner"
+    },
+    {
+      "id": "seestar_s30",
+      "label": "Seestar S30",
+      "manufacturer": "ZWO",
+      "aperture_mm": 30,
+      "focal_length_mm": 150,
+      "focal_ratio": 5.0,
+      "type": "refractor",
+      "suggests_experience": "beginner"
+    },
+    {
+      "id": "skywatcher_130pds",
+      "label": "Sky-Watcher 130PDS",
+      "manufacturer": "Sky-Watcher",
+      "aperture_mm": 130,
+      "focal_length_mm": 650,
+      "focal_ratio": 5.0,
+      "type": "newtonian",
+      "suggests_experience": "beginner"
+    },
+    {
+      "id": "william_optics_z61",
+      "label": "William Optics Z61",
+      "manufacturer": "William Optics",
+      "aperture_mm": 61,
+      "focal_length_mm": 360,
+      "focal_ratio": 5.9,
+      "type": "refractor",
+      "suggests_experience": "intermediate"
+    },
+    {
+      "id": "celestron_c8",
+      "label": "Celestron C8",
+      "manufacturer": "Celestron",
+      "aperture_mm": 203,
+      "focal_length_mm": 2032,
+      "focal_ratio": 10.0,
+      "type": "sct",
+      "suggests_experience": "intermediate"
+    },
+    {
+      "id": "skywatcher_ed80",
+      "label": "Sky-Watcher ED80",
+      "manufacturer": "Sky-Watcher",
+      "aperture_mm": 80,
+      "focal_length_mm": 600,
+      "focal_ratio": 7.5,
+      "type": "refractor",
+      "suggests_experience": "beginner"
+    },
+    {
+      "id": "skywatcher_200p",
+      "label": "Sky-Watcher 200P",
+      "manufacturer": "Sky-Watcher",
+      "aperture_mm": 200,
+      "focal_length_mm": 1000,
+      "focal_ratio": 5.0,
+      "type": "newtonian",
+      "suggests_experience": "intermediate"
+    },
+    {
+      "id": "takahashi_fs60",
+      "label": "Takahashi FS-60",
+      "manufacturer": "Takahashi",
+      "aperture_mm": 60,
+      "focal_length_mm": 355,
+      "focal_ratio": 5.9,
+      "type": "refractor",
+      "suggests_experience": "advanced"
+    }
+  ],
+  "cameras": [
+    {
+      "id": "zwo_asi294mc_pro",
+      "label": "ZWO ASI294MC Pro",
+      "manufacturer": "ZWO",
+      "sensor_width_mm": 19.1,
+      "sensor_height_mm": 13.0,
+      "pixel_size_um": 4.63,
+      "resolution_w": 4144,
+      "resolution_h": 2822,
+      "type": "cmos_color",
+      "suggests_experience": "beginner"
+    },
+    {
+      "id": "zwo_asi533mc_pro",
+      "label": "ZWO ASI533MC Pro",
+      "manufacturer": "ZWO",
+      "sensor_width_mm": 11.3,
+      "sensor_height_mm": 11.3,
+      "pixel_size_um": 3.76,
+      "resolution_w": 3008,
+      "resolution_h": 3008,
+      "type": "cmos_color",
+      "suggests_experience": "beginner"
+    },
+    {
+      "id": "zwo_asi2600mc_pro",
+      "label": "ZWO ASI2600MC Pro",
+      "manufacturer": "ZWO",
+      "sensor_width_mm": 28.3,
+      "sensor_height_mm": 19.0,
+      "pixel_size_um": 3.76,
+      "resolution_w": 6248,
+      "resolution_h": 4176,
+      "type": "cmos_color",
+      "suggests_experience": "intermediate"
+    },
+    {
+      "id": "canon_600d",
+      "label": "Canon 600D (DSLR)",
+      "manufacturer": "Canon",
+      "sensor_width_mm": 22.3,
+      "sensor_height_mm": 14.9,
+      "pixel_size_um": 4.30,
+      "resolution_w": 5184,
+      "resolution_h": 3456,
+      "type": "dslr_color",
+      "suggests_experience": "beginner"
+    },
+    {
+      "id": "sony_a7s",
+      "label": "Sony A7S (Mirrorless)",
+      "manufacturer": "Sony",
+      "sensor_width_mm": 35.6,
+      "sensor_height_mm": 23.8,
+      "pixel_size_um": 8.40,
+      "resolution_w": 4240,
+      "resolution_h": 2832,
+      "type": "mirrorless_color",
+      "suggests_experience": "intermediate"
+    },
+    {
+      "id": "nikon_d5300",
+      "label": "Nikon D5300 (DSLR)",
+      "manufacturer": "Nikon",
+      "sensor_width_mm": 23.5,
+      "sensor_height_mm": 15.6,
+      "pixel_size_um": 3.92,
+      "resolution_w": 6000,
+      "resolution_h": 4000,
+      "type": "dslr_color",
+      "suggests_experience": "beginner"
+    }
+  ]
+}

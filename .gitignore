@@ -20,8 +20,8 @@ htmlcov/
 .cache/
 .tox/
 
-# Data files
-data/
+# Data files (runtime data directory only - do not shadow static/data/)
+/data/
 *.db
 *.sqlite
 

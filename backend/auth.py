@@ -73,6 +73,7 @@ ALLOWED_DENSITY_MODES = {'comfortable', 'compact'}
 ALLOWED_THEME_MODES = {'auto', 'light', 'dark', 'red'}
 ALLOWED_FIRST_DAY_OF_WEEK = {'monday', 'sunday'}
 ALLOWED_LANGUAGES = set(SUPPORTED_LANGUAGES)
+ALLOWED_EXPERIENCE_LEVELS = {'beginner', 'intermediate', 'advanced'}
 
 DEFAULT_USER_PREFERENCES = {
     'startup_main_tab': 'forecast-astro',
@@ -82,6 +83,13 @@ DEFAULT_USER_PREFERENCES = {
     'theme_mode': 'auto',
     'first_day_of_week': 'monday',
     'language': 'en',
+    'experience_level': 'advanced',
+    'beginner_catalog_enabled': True,
+    'recommendations_enabled': True,
+    'wizard': {
+        'completed': False,
+        'skipped': False,
+    },
     'notifications': {
         'enabled': True,
         'permission_asked': False,
@@ -93,6 +101,7 @@ DEFAULT_USER_PREFERENCES = {
             'N5': {'enabled': True, 'lead_minutes': 30},
             'N6': {'enabled': True, 'lead_minutes': 20},
             'N7': {'enabled': True, 'kp_threshold': 6},
+            'N8': {'enabled': True, 'lead_minutes': 10},
         },
     },
 }
@@ -365,6 +374,29 @@ class UserManager:
         language = preferences.get('language')
         if language is not None and language not in ALLOWED_LANGUAGES:
             return False, f"Invalid language: {language}"
+
+        experience_level = preferences.get('experience_level')
+        if experience_level is not None and experience_level not in ALLOWED_EXPERIENCE_LEVELS:
+            return False, f"Invalid experience_level: {experience_level}"
+
+        beginner_catalog_enabled = preferences.get('beginner_catalog_enabled')
+        if beginner_catalog_enabled is not None and not isinstance(beginner_catalog_enabled, bool):
+            return False, "Invalid beginner_catalog_enabled: must be a boolean"
+
+        recommendations_enabled = preferences.get('recommendations_enabled')
+        if recommendations_enabled is not None and not isinstance(recommendations_enabled, bool):
+            return False, "Invalid recommendations_enabled: must be a boolean"
+
+        wizard = preferences.get('wizard')
+        if wizard is not None:
+            if not isinstance(wizard, dict):
+                return False, "Invalid wizard: must be a dictionary"
+            completed = wizard.get('completed')
+            if completed is not None and not isinstance(completed, bool):
+                return False, "Invalid wizard: completed must be a boolean"
+            skipped = wizard.get('skipped')
+            if skipped is not None and not isinstance(skipped, bool):
+                return False, "Invalid wizard: skipped must be a boolean"
 
         return True, ""
 

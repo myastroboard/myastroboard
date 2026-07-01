@@ -97,6 +97,7 @@ This page lists the HTTP routes currently declared in `backend/app.py` and `back
 - `GET /api/skytonight/logs/<catalogue>`
 - `GET /api/skytonight/logs/<catalogue>/exists`
 - `GET /api/skytonight/target-debug`
+- `GET /api/skytonight/recommendations` - Difficulty-aware "what to shoot tonight" recommendations, filtered by the user's `experience_level` preference. Params: `limit` (default 5, max 10), `lang` (mandatory for translated content).
 
 ## Weather, Moon, Sun, and Astronomy
 
@@ -146,6 +147,10 @@ This page lists the HTTP routes currently declared in `backend/app.py` and `back
 ## Object Lookup
 
 - `GET /api/object/<path:identifier>`
+
+## Beginner Catalog
+
+- `GET /api/beginner-catalog` - Curated beginner-friendly DSO catalog, enriched with `visible_tonight`/`astro_score`/`in_astrodex`/`in_plan`. Params: `lang` (mandatory), `visible_only` (default true; ignored if no SkyTonight results are cached yet).
 
 ## Astrodex
 
