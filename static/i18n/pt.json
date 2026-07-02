@@ -815,7 +815,8 @@
     "pref_beginner_catalog_enabled": "Mostrar a aba Catálogo para iniciantes",
     "pref_beginner_catalog_enabled_info": "Adiciona uma aba \"Iniciante\" ao SkyTonight com uma lista selecionada de alvos fáceis.",
     "pref_recommendations_enabled": "Mostrar o painel \"Esta noite para você\"",
-    "pref_recommendations_enabled_info": "Mostra um painel \"Esta noite para você\" com alvos recomendados no topo da aba Objetos de céu profundo do SkyTonight."
+    "pref_recommendations_enabled_info": "Mostra um painel \"Esta noite para você\" com alvos recomendados no topo da aba Objetos de céu profundo do SkyTonight.",
+    "notifications_insecure_context": "As notificações exigem uma conexão segura (HTTPS). Não podem ser ativadas usando HTTP simples."
   },
   "astrodex": {
     "title": "Astrodex - Tenho que pegar todos!",

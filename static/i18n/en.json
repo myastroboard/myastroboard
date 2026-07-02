@@ -815,7 +815,8 @@
     "pref_beginner_catalog_enabled": "Show Beginner Catalog tab",
     "pref_beginner_catalog_enabled_info": "Adds a \"Beginner\" tab to SkyTonight with a curated list of easy targets.",
     "pref_recommendations_enabled": "Show \"Tonight for you\" panel",
-    "pref_recommendations_enabled_info": "Shows a \"Tonight for you\" panel of recommended targets at the top of the SkyTonight Deep Sky Objects tab."
+    "pref_recommendations_enabled_info": "Shows a \"Tonight for you\" panel of recommended targets at the top of the SkyTonight Deep Sky Objects tab.",
+    "notifications_insecure_context": "Notifications require a secure connection (HTTPS). They cannot be enabled while using plain HTTP."
   },
   "astrodex": {
     "title": "Astrodex - Gotta Catch 'Em All!",

@@ -815,7 +815,8 @@
     "pref_beginner_catalog_enabled": "Afficher l'onglet Catalogue débutant",
     "pref_beginner_catalog_enabled_info": "Ajoute un onglet « Débutant » à SkyTonight avec une liste sélectionnée de cibles faciles.",
     "pref_recommendations_enabled": "Afficher le panneau « Ce soir pour vous »",
-    "pref_recommendations_enabled_info": "Affiche un panneau « Ce soir pour vous » de cibles recommandées en haut de l'onglet Objets du ciel profond de SkyTonight."
+    "pref_recommendations_enabled_info": "Affiche un panneau « Ce soir pour vous » de cibles recommandées en haut de l'onglet Objets du ciel profond de SkyTonight.",
+    "notifications_insecure_context": "Les notifications nécessitent une connexion sécurisée (HTTPS). Elles ne peuvent pas être activées en HTTP simple."
   },
   "astrodex": {
     "title": "Astrodex - Attrapez-les tous !",

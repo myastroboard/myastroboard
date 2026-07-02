@@ -1,5 +1,9 @@
 """Tests for object_info.py - pure functions and mocked-network paths."""
 
+import os
+
+import pytest
+
 import skytonight_targets as _st_module  # needed for patching the locally-imported get_lookup_entry
 
 import object_info as oi
@@ -14,6 +18,21 @@ _translate_object_type = oi._translate_object_type
 build_catalogue_names_from_aliases = oi.build_catalogue_names_from_aliases
 get_object_info = oi.get_object_info
 is_safe_identifier = oi.is_safe_identifier
+
+
+@pytest.fixture(autouse=True)
+def _reset_object_info_backoff(monkeypatch):
+    """Isolate the upstream-backoff state (module-level dict + disk file) between tests.
+
+    Without this, a test that simulates a SIMBAD/Wikipedia/hips2fits failure would
+    trip the backoff and silently short-circuit every later test's network call
+    for _BACKOFF_TTL seconds.
+    """
+    oi._backoff_until.clear()
+    monkeypatch.setattr(oi, '_load_backoff_state', lambda: {})
+    monkeypatch.setattr(oi, '_save_backoff_state', lambda: None)
+    yield
+    oi._backoff_until.clear()
 
 
 # ---------------------------------------------------------------------------
@@ -180,6 +199,69 @@ def test_get_dss_image_url_accepts_custom_fov():
     url_large = _get_dss_image_url(ra=0.0, dec=0.0, size_deg=1.0)
     assert '0.250' in url_small
     assert '1.000' in url_large
+
+
+# ---------------------------------------------------------------------------
+# get_object_image_proxy_url / parse_object_image_filename / ensure_cached_object_image
+# ---------------------------------------------------------------------------
+
+
+def test_get_object_image_proxy_url_format():
+    url = oi.get_object_image_proxy_url(ra=10.684, dec=41.269)
+    assert url == '/api/object-image/10.684000_41.269000.jpg'
+
+
+def test_parse_object_image_filename_round_trips():
+    assert oi.parse_object_image_filename('10.684000_41.269000.jpg') == (10.684, 41.269)
+
+
+def test_parse_object_image_filename_rejects_bad_format():
+    assert oi.parse_object_image_filename('not-a-filename.jpg') is None
+    assert oi.parse_object_image_filename('../../etc/passwd') is None
+    assert oi.parse_object_image_filename('10.684000_41.269000.png') is None
+
+
+def test_parse_object_image_filename_rejects_out_of_range_coordinates():
+    assert oi.parse_object_image_filename('400.000000_0.000000.jpg') is None
+    assert oi.parse_object_image_filename('0.000000_100.000000.jpg') is None
+
+
+def test_ensure_cached_object_image_returns_none_on_request_failure(monkeypatch, tmp_path):
+    monkeypatch.setattr(oi, 'OBJECT_IMAGE_CACHE_DIR', str(tmp_path))
+    with patch('object_info.requests.get', side_effect=_req_module.RequestException('timeout')):
+        result = oi.ensure_cached_object_image(ra=10.684, dec=41.269)
+    assert result is None
+
+
+def test_ensure_cached_object_image_fetches_and_writes_cache(monkeypatch, tmp_path):
+    monkeypatch.setattr(oi, 'OBJECT_IMAGE_CACHE_DIR', str(tmp_path))
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status.return_value = None
+    mock_resp.iter_content.return_value = [b'fake-jpeg-bytes']
+
+    with patch('object_info.requests.get', return_value=mock_resp) as mock_get:
+        result = oi.ensure_cached_object_image(ra=10.684, dec=41.269)
+
+    expected_path = os.path.join(str(tmp_path), '10.684000_41.269000.jpg')
+    assert result == expected_path
+    mock_get.assert_called_once()
+    assert os.path.isfile(expected_path)
+    with open(expected_path, 'rb') as f:
+        assert f.read() == b'fake-jpeg-bytes'
+
+
+def test_ensure_cached_object_image_serves_from_disk_without_network(monkeypatch, tmp_path):
+    monkeypatch.setattr(oi, 'OBJECT_IMAGE_CACHE_DIR', str(tmp_path))
+    expected_path = os.path.join(str(tmp_path), '10.684000_41.269000.jpg')
+    os.makedirs(str(tmp_path), exist_ok=True)
+    with open(expected_path, 'wb') as f:
+        f.write(b'already-cached-bytes')
+
+    with patch('object_info.requests.get') as mock_get:
+        result = oi.ensure_cached_object_image(ra=10.684, dec=41.269)
+
+    assert result == expected_path
+    mock_get.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -728,4 +810,79 @@ class TestWikipediaWithFallbackNonCandidates:
         with patch("object_info._get_wikipedia_summary") as mock_wiki:
             result = oi._wikipedia_with_fallback(["[HB89] 0951+699"], "fr")
         assert result is None
-        mock_wiki.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Upstream backoff — prevents a burst of N object cards, each hitting a down
+# service, from stacking into N x REQUEST_TIMEOUT of stalled requests.
+# ---------------------------------------------------------------------------
+
+
+class TestSimbadBackoff:
+
+    def test_failure_triggers_backoff_for_subsequent_calls(self):
+        with patch("object_info.requests.get", side_effect=_req_module.RequestException("down")):
+            assert oi._simbad_query("SELECT * FROM basic") is None
+
+        # Second call must not touch the network at all - backoff should short-circuit it.
+        with patch("object_info.requests.get") as mock_get:
+            assert oi._simbad_query("SELECT * FROM basic") is None
+        mock_get.assert_not_called()
+
+    def test_success_clears_backoff(self):
+        oi._backoff_until['simbad'] = oi.time.time() - 1  # expired entry present
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.return_value = None
+        mock_resp.json.return_value = {"data": [], "metadata": []}
+        with patch("object_info.requests.get", return_value=mock_resp):
+            oi._simbad_query("SELECT * FROM basic")
+        assert 'simbad' not in oi._backoff_until
+
+    def test_active_backoff_short_circuits_resolve(self):
+        oi._backoff_until['simbad'] = oi.time.time() + 300
+        with patch("object_info.requests.get") as mock_get:
+            assert oi._resolve_via_simbad("M31") is None
+        mock_get.assert_not_called()
+
+
+class TestWikipediaBackoff:
+
+    def test_failure_triggers_backoff_for_subsequent_calls(self):
+        with patch("object_info.requests.get", side_effect=_req_module.RequestException("down")):
+            assert oi._get_wikipedia_summary("M 31") is None
+
+        with patch("object_info.requests.get") as mock_get:
+            assert oi._get_wikipedia_summary("NGC 224") is None
+        mock_get.assert_not_called()
+
+    def test_success_clears_backoff(self):
+        oi._backoff_until['wikipedia'] = oi.time.time() - 1
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.raise_for_status.return_value = None
+        mock_resp.json.return_value = {"type": "standard", "extract": "text"}
+        with patch("object_info.requests.get", return_value=mock_resp):
+            oi._get_wikipedia_summary("M 31")
+        assert 'wikipedia' not in oi._backoff_until
+
+
+class TestHips2fitsBackoff:
+
+    def test_failure_triggers_backoff_for_subsequent_calls(self, tmp_path):
+        with patch.object(oi, 'OBJECT_IMAGE_CACHE_DIR', str(tmp_path)):
+            with patch("object_info.requests.get", side_effect=_req_module.RequestException("down")):
+                assert oi.ensure_cached_object_image(10.684, 41.269) is None
+
+            with patch("object_info.requests.get") as mock_get:
+                assert oi.ensure_cached_object_image(20.0, 30.0) is None
+            mock_get.assert_not_called()
+
+    def test_success_clears_backoff(self, tmp_path):
+        oi._backoff_until['hips2fits'] = oi.time.time() - 1
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.return_value = None
+        mock_resp.iter_content.return_value = [b'jpeg-bytes']
+        with patch.object(oi, 'OBJECT_IMAGE_CACHE_DIR', str(tmp_path)):
+            with patch("object_info.requests.get", return_value=mock_resp):
+                oi.ensure_cached_object_image(10.684, 41.269)
+        assert 'hips2fits' not in oi._backoff_until

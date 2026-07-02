@@ -67,7 +67,7 @@ What needs to be built:
 - **Backend extension** - extend existing location config in `auth.py` / `config_defaults.py`; no new storage module needed
 - **Horizon profile per location** - associate a custom horizon with each preset
 - **i18n** in 6 languages
-- **Prerequisites** - must absolutely check for each external API the limit rate to define a limit of authorized location max.
+- **Prerequisites** - must absolutely check for each external API the limit rate to define a limit of authorized location max. Detail of this calculation must be documented to easily recalculate it when API change their quota. Finally, if the result is 5 or more, we should limit to 5 locations.
 - **Concerned modules** - these modules are specifically based on location: #forecast-astro (all subs), #forecast-weather (all subs), /#skytonight, #spaceflight/iss
 - **Astrodex & Plan my night** - use of this location
 - **Advanced call API** - in case of multiple locations there is a high risk that the same API will be called multiple times quickly. Must check whether some APIs allow multiple requests in the same call, or orchestrate calls following the same pattern as previous ones.
