@@ -31,28 +31,46 @@
       })();
     </script>
     <link rel="apple-touch-icon" sizes="180x180" href="/static/ico/ios/180.png?v={{ version }}">
-    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+    <link href="/static/vendor/bootstrap/css/bootstrap.min.css?v={{ version }}" rel="stylesheet">
     <!-- Bootstrap Icons loaded asynchronously - icons use font-display:swap so no FOUT on layout -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css" rel="stylesheet" media="print" onload="this.media='all'" crossorigin="anonymous">
-    <noscript><link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css" rel="stylesheet" crossorigin="anonymous"></noscript>
+    <link href="/static/vendor/bootstrap-icons/font/bootstrap-icons.min.css?v={{ version }}" rel="stylesheet" media="print" onload="this.media='all'">
+    <noscript><link href="/static/vendor/bootstrap-icons/font/bootstrap-icons.min.css?v={{ version }}" rel="stylesheet"></noscript>
     <link rel="stylesheet" href="/static/css/bs_icons_custom.css?v={{ version }}">
     <link rel="stylesheet" href="/static/css/bs_variables.css?v={{ version }}">
     <link rel="stylesheet" href="/static/css/bs_main.css?v={{ version }}">
     <link rel="stylesheet" href="/static/css/bs_weather.css?v={{ version }}">
-    <link rel="stylesheet" href="/static/css/bs_logs.css?v={{ version }}">
-    <link rel="stylesheet" href="/static/css/bs_skytonight.css?v={{ version }}">
-    <link rel="stylesheet" href="/static/css/bs_astrodex.css?v={{ version }}">
-    <link rel="stylesheet" href="/static/css/bs_plan_my_night.css?v={{ version }}">
-    <link rel="stylesheet" href="/static/css/bs_equipment.css?v={{ version }}">
-    <link rel="stylesheet" href="/static/css/bs_metrics.css?v={{ version }}">
-    <link rel="stylesheet" href="/static/css/bs_events.css?v={{ version }}">
-    <link rel="stylesheet" href="/static/css/bs_orbital_stations.css?v={{ version }}">
-    <link rel="stylesheet" href="/static/css/bs_spaceflight.css?v={{ version }}">
-    <link rel="stylesheet" href="/static/css/bs_connectors.css?v={{ version }}">
     <link rel="stylesheet" href="/static/css/bs_sky_widget.css?v={{ version }}">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css" integrity="sha256-QZFpF9DkpabUBLoCc7fQJVCmtag/LaVAfAkUJSfuNyY=" crossorigin="anonymous">
-    <link rel="stylesheet" href="/static/css/bs_timeline.css?v={{ version }}">
+    <!--
+        The stylesheets below only apply to secondary tabs that are hidden on initial load
+        (SkyTonight, Astrodex, Plan My Night, Equipment, Metrics, Events, Spaceflight, Connectors,
+        Leaflet map, Timeline, Logs). Loading them with media="print" keeps them non-render-blocking;
+        the onload swap activates them once fetched, well before a user can switch tabs.
+    -->
+    <link rel="stylesheet" href="/static/css/bs_logs.css?v={{ version }}" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="/static/css/bs_skytonight.css?v={{ version }}" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="/static/css/bs_astrodex.css?v={{ version }}" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="/static/css/bs_plan_my_night.css?v={{ version }}" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="/static/css/bs_equipment.css?v={{ version }}" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="/static/css/bs_metrics.css?v={{ version }}" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="/static/css/bs_events.css?v={{ version }}" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="/static/css/bs_orbital_stations.css?v={{ version }}" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="/static/css/bs_spaceflight.css?v={{ version }}" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="/static/css/bs_connectors.css?v={{ version }}" media="print" onload="this.media='all'">
+    <!-- Leaflet CSS/JS are lazy-loaded on demand by orbital_stations.js only when the orbital map is rendered -->
+    <link rel="stylesheet" href="/static/css/bs_timeline.css?v={{ version }}" media="print" onload="this.media='all'">
+    <noscript>
+        <link rel="stylesheet" href="/static/css/bs_logs.css?v={{ version }}">
+        <link rel="stylesheet" href="/static/css/bs_skytonight.css?v={{ version }}">
+        <link rel="stylesheet" href="/static/css/bs_astrodex.css?v={{ version }}">
+        <link rel="stylesheet" href="/static/css/bs_plan_my_night.css?v={{ version }}">
+        <link rel="stylesheet" href="/static/css/bs_equipment.css?v={{ version }}">
+        <link rel="stylesheet" href="/static/css/bs_metrics.css?v={{ version }}">
+        <link rel="stylesheet" href="/static/css/bs_events.css?v={{ version }}">
+        <link rel="stylesheet" href="/static/css/bs_orbital_stations.css?v={{ version }}">
+        <link rel="stylesheet" href="/static/css/bs_spaceflight.css?v={{ version }}">
+        <link rel="stylesheet" href="/static/css/bs_connectors.css?v={{ version }}">
+        <link rel="stylesheet" href="/static/css/bs_timeline.css?v={{ version }}">
+    </noscript>
 </head>
 <body>
 
@@ -2933,10 +2951,9 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js" defer></script>
-    <script src="https://cdn.plot.ly/plotly-3.5.1.min.js" defer></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js" integrity="sha256-MgH13bFTTNqsnuEoqNPBLDaqxjGH+lCpqrukmXc8Ppg=" crossorigin="anonymous"></script>
+    <script src="/static/vendor/chartjs/chart.umd.min.js?v={{ version }}" defer></script>
+    <!-- Plotly (~4.8MB) is lazy-loaded on demand by skytonight.js only when the sky map is rendered -->
+    <script src="/static/vendor/bootstrap/js/bootstrap.bundle.min.js?v={{ version }}"></script>
     <script src="/static/js/dom_utils.js?v={{ version }}"></script>
     <script src="/static/js/i18n.js?v={{ version }}"></script>
     <script src="/static/js/language_selector.js?v={{ version }}"></script>
