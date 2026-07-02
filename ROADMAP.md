@@ -6,51 +6,6 @@ This document describes features that could potentially be integrated into MyAst
 
 ## Release Plan
 
-### v1.1 - First Light (Beginner Experience)
-
-| | |
-|---|---|
-| **Why** | Astrophotography has a steep learning curve; today MAB assumes prior knowledge. Lowering the floor grows the user base and makes every later feature more valuable. Placed before the Observation Log because beginners need onboarding before they have anything to log. |
-| **Effort** | Medium |
-
-#### Guided setup wizard (first-run, skippable)
-
-Step-by-step flow triggered on first login:
-
-1. Set your location on the interactive map
-2. Add your first telescope + camera (with presets for popular gear: SW 130PDS, Seestar S50, ZWO ASI294, etc.)
-3. Pick your Bortle class from a light pollution map preview
-4. Subscribe to push notifications for tonight
-5. Land on "Here's what you can image tonight"
-
-#### "What to shoot tonight?" recommender
-
-One-click answer driven by: current conditions, moon phase, equipment FOV, and user skill level (beginner / intermediate / advanced - set in user profile).
-
-Returns 3–5 ranked targets with:
-- A sample reference image
-- Difficulty tag (`beginner` / `intermediate` / `advanced`)
-- Estimated integration time
-- One-click "Add to Plan My Night"
-
-Difficulty logic: auto-calculated from magnitude, angular size (larger = easier), surface brightness, and typical integration time required. Surfaced as a badge throughout the UI - SkyTonight cards, Astrodex items, Plan My Night entries.
-
-#### Beginner catalog
-
-Curated seasonal list of 30–50 starter objects:
-- Canonical reference image, why it is good for beginners, suggested framing, typical integration time
-- Cross-linked to Astrodex ("have you captured this yet?") and Plan My Night
-- Seasonally rotated based on current visibility at user location
-
-#### Contextual tips system
-
-Lightweight tooltip layer shown on first visit to each major feature. Dismissible; re-openable from a help icon. One to three sentences max: what this is, why it matters for astrophotography. Not a tutorial wizard - passive and non-intrusive.
-
-**i18n in 6 languages.**
-
-
----
-
 ### v1.2 - Multi-location Profiles
 
 | | |
@@ -291,15 +246,15 @@ Export Plan My Night or SkyTonight results as:
 
 ## Summary
 
-| Version | Theme | Audience | Effort |
-|---------|-------|----------|--------|
-| v0.9 | Web Push E2E validation | All | Low |
-| v1.0 | First stable release | All | Low |
-| v1.1 | First Light - beginner onboarding | Beginners | Medium |
-| v1.2 | Multi-location profiles | All | Medium |
-| v1.3 | Observation Log | Intermediate+ | High |
-| v1.4 | Planning Intelligence | Advanced | High |
-| v1.5 | Session Analytics | All | Medium |
-| v2.0 | Interactive Sky Chart | All | High |
-| v2.1 | Community & Sharing | All | Medium |
-| v2.2 | Integrations (plate solve, PHD2, NINA) | Advanced | High |
+| Version | Theme | Audience | Effort | Implemented |
+|---------|-------|----------|--------|--------|
+| v0.9 | Web Push E2E validation | All | Low | X |
+| v1.0 | First stable release | All | Low | X |
+| v1.1 | First Light - beginner onboarding | Beginners | Medium | X |
+| v1.2 | Multi-location profiles | All | Medium | |
+| v1.3 | Observation Log | Intermediate+ | High | |
+| v1.4 | Planning Intelligence | Advanced | High | |
+| v1.5 | Session Analytics | All | Medium | |
+| v2.0 | Interactive Sky Chart | All | High | |
+| v2.1 | Community & Sharing | All | Medium | |
+| v2.2 | Integrations (plate solve, PHD2, NINA) | Advanced | High | |
