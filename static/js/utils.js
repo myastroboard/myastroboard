@@ -389,3 +389,43 @@ function tSkyTonightType(value) {
     const skytonightKey = `skytonight.type_${suffix}`;
     return i18n.has(skytonightKey) ? i18n.t(skytonightKey) : normalizedValue;
 }
+
+// ---------------------------------------------------------------------------
+// Lazy vendor-script loader
+// Single canonical definition - loaded before orbital_stations.js and
+// skytonight.js so both can use it to lazy-load Leaflet/Plotly on demand
+// instead of duplicating the same "load once, memoize the promise" logic.
+// ---------------------------------------------------------------------------
+
+/**
+ * Lazily load a vendor <script> (and optional <link rel="stylesheet">), only once,
+ * memoizing the in-flight/completed load as a Promise so concurrent callers share it.
+ *
+ * @param {() => boolean} isLoaded - Returns true if the library global is already present.
+ * @param {string} scriptUrl - URL of the vendor script to inject.
+ * @param {string} [cssUrl] - Optional URL of a stylesheet to inject alongside it.
+ * @param {{promise: Promise|null}} state - Caller-owned box holding the memoized promise
+ *   (a plain object so each caller keeps its own independent cache slot).
+ * @param {string} libraryName - Used only in the rejection error message.
+ */
+function ensureVendorScriptLoaded(isLoaded, scriptUrl, cssUrl, state, libraryName) {
+    if (isLoaded()) return Promise.resolve();
+    if (state.promise) return state.promise;
+    state.promise = new Promise((resolve, reject) => {
+        if (cssUrl) {
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = cssUrl;
+            document.head.appendChild(link);
+        }
+        const script = document.createElement('script');
+        script.src = scriptUrl;
+        script.onload = resolve;
+        script.onerror = () => {
+            state.promise = null;
+            reject(new Error(`Failed to load ${libraryName}`));
+        };
+        document.head.appendChild(script);
+    });
+    return state.promise;
+}

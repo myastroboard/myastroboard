@@ -6,7 +6,7 @@ All /api/skytonight/* and /api/catalogues routes, plus the payload-builder helpe
 import json
 import os
 import re
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from flask import Blueprint, jsonify, request
 
@@ -1298,6 +1298,21 @@ _EXPERIENCE_LEVEL_ALLOWED_DIFFICULTIES: Dict[str, set] = {
     'advanced': {'beginner', 'intermediate', 'advanced'},
 }
 
+
+def _experience_level_allowed_difficulties(experience_level: str) -> set:
+    """Return the difficulty tiers a given experience_level preference is allowed to see."""
+    return _EXPERIENCE_LEVEL_ALLOWED_DIFFICULTIES.get(
+        experience_level, _EXPERIENCE_LEVEL_ALLOWED_DIFFICULTIES['advanced']
+    )
+
+
+def _filter_targets_by_experience_level(
+    targets: List[Dict[str, Any]], experience_level: str
+) -> List[Dict[str, Any]]:
+    """Return only the targets whose `difficulty` tier is allowed for experience_level."""
+    allowed = _experience_level_allowed_difficulties(experience_level)
+    return [item for item in targets if item.get('difficulty', 'intermediate') in allowed]
+
 # Fallback estimated integration time (hours) by difficulty tier, used when a
 # recommended target has no matching entry in the curated beginner catalog.
 _DIFFICULTY_ESTIMATED_HOURS: Dict[str, float] = {
@@ -1341,16 +1356,11 @@ def get_skytonight_recommendations_api():
 
         preferences = user_manager.get_user_preferences(user.user_id)
         experience_level = preferences.get('experience_level', 'advanced')
-        allowed_difficulties = _EXPERIENCE_LEVEL_ALLOWED_DIFFICULTIES.get(
-            experience_level, _EXPERIENCE_LEVEL_ALLOWED_DIFFICULTIES['advanced']
-        )
 
         dso_data = load_json_file(SKYTONIGHT_DSO_RESULTS_FILE, default={})
         deep_sky = dso_data.get('deep_sky', []) if isinstance(dso_data, dict) else []
 
-        candidates = [
-            item for item in deep_sky if item.get('difficulty', 'intermediate') in allowed_difficulties
-        ]
+        candidates = _filter_targets_by_experience_level(deep_sky, experience_level)
         candidates.sort(key=lambda item: item.get('astro_score') or 0.0, reverse=True)
         candidates = candidates[:limit]
 

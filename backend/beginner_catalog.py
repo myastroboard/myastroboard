@@ -10,6 +10,7 @@ import os
 import re
 from typing import Any, Dict, List, Optional
 
+import object_info
 from constellation import Constellation as _Constellation
 from i18n_utils import I18nManager
 from logging_config import get_logger
@@ -149,6 +150,17 @@ def enrich_with_skytonight(
         dso_match = dso_lookup.get(catalogue_key)
         new_entry['visible_tonight'] = dso_match is not None
         new_entry['astro_score'] = dso_match.get('astro_score') if dso_match else None
+
+        # Every catalog entry has its own fixed coordinates, so the thumbnail can be
+        # resolved directly rather than making the client re-resolve the object via a
+        # full SIMBAD/Wikipedia lookup just to recover an image URL.
+        ra_hours = entry.get('ra_hours')
+        dec_degrees = entry.get('dec_degrees')
+        new_entry['thumbnail_url'] = (
+            object_info.get_object_image_proxy_url(ra_hours * 15.0, dec_degrees)
+            if ra_hours is not None and dec_degrees is not None
+            else None
+        )
 
         # Match against every known alias for this object (not just its own
         # catalogue_id/preferred_name), so an astrodex/plan entry saved under a
