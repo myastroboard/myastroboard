@@ -815,7 +815,8 @@
     "pref_beginner_catalog_enabled": "Mostra la scheda Catalogo per principianti",
     "pref_beginner_catalog_enabled_info": "Aggiunge a SkyTonight una scheda \"Principianti\" con un elenco selezionato di obiettivi facili.",
     "pref_recommendations_enabled": "Mostra il pannello \"Stasera per te\"",
-    "pref_recommendations_enabled_info": "Mostra un pannello \"Stasera per te\" con obiettivi consigliati in cima alla scheda Oggetti del cielo profondo di SkyTonight."
+    "pref_recommendations_enabled_info": "Mostra un pannello \"Stasera per te\" con obiettivi consigliati in cima alla scheda Oggetti del cielo profondo di SkyTonight.",
+    "notifications_insecure_context": "Le notifiche richiedono una connessione sicura (HTTPS). Non possono essere attivate utilizzando HTTP semplice."
   },
   "astrodex": {
     "title": "Astrodex - Dobbiamo prenderli tutti!",

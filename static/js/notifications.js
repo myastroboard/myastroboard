@@ -388,6 +388,12 @@ function stopNotificationPoller() {
 // ======================
 
 function _notifPermissionBannerState() {
+    // The Notification API silently denies permission requests on insecure origins (plain
+    // HTTP, not localhost) - flag this distinctly so it doesn't look like a generic "not
+    // enabled yet" state that a click on Enable would fix.
+    if (typeof window !== 'undefined' && window.isSecureContext === false) {
+        return { cls: 'alert-warning', i18n: 'settings.notifications_insecure_context', fallback: 'Notifications require a secure connection (HTTPS). They cannot be enabled while using plain HTTP.' };
+    }
     if (!notificationManager.isSupported) {
         return { cls: 'alert-warning', i18n: 'settings.notifications_unsupported', fallback: 'Your browser does not support notifications.' };
     }

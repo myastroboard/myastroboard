@@ -815,7 +815,8 @@
     "pref_beginner_catalog_enabled": "Registerkarte „Einsteiger-Katalog“ anzeigen",
     "pref_beginner_catalog_enabled_info": "Fügt SkyTonight eine Registerkarte \"Einsteiger\" mit einer kuratierten Liste einfacher Ziele hinzu.",
     "pref_recommendations_enabled": "Bereich „Heute Nacht für Sie\" anzeigen",
-    "pref_recommendations_enabled_info": "Zeigt oben auf der Registerkarte „Deep-Sky-Objekte\" von SkyTonight einen Bereich „Heute Nacht für Sie\" mit empfohlenen Zielen an."
+    "pref_recommendations_enabled_info": "Zeigt oben auf der Registerkarte „Deep-Sky-Objekte\" von SkyTonight einen Bereich „Heute Nacht für Sie\" mit empfohlenen Zielen an.",
+    "notifications_insecure_context": "Benachrichtigungen erfordern eine sichere Verbindung (HTTPS). Sie können bei einfachem HTTP nicht aktiviert werden."
   },
   "astrodex": {
     "title": "Astrodex - Ich muss sie alle fangen!",

@@ -897,10 +897,24 @@ function _buildNotificationsStep(container) {
     intro.textContent = i18n.t('wizard.notifications_intro');
     container.appendChild(intro);
 
+    // Notifications silently fail to enable on an insecure origin (plain HTTP) or an
+    // unsupported browser - warn explicitly rather than letting the Enable button appear
+    // to do nothing.
+    const notifBlocked = (typeof window !== 'undefined' && window.isSecureContext === false)
+        || (typeof notificationManager !== 'undefined' && !notificationManager.isSupported);
+    if (notifBlocked && typeof _notifPermissionBannerState === 'function') {
+        const state = _notifPermissionBannerState();
+        const warning = document.createElement('div');
+        warning.className = `alert ${state.cls} mb-3`;
+        warning.textContent = i18n.has(state.i18n) ? i18n.t(state.i18n) : state.fallback;
+        container.appendChild(warning);
+    }
+
     const enableBtn = document.createElement('button');
     enableBtn.type = 'button';
     enableBtn.className = 'btn btn-outline-primary btn-sm mb-3';
     enableBtn.textContent = i18n.t('wizard.notifications_enable_btn');
+    enableBtn.disabled = notifBlocked;
     enableBtn.addEventListener('click', async () => {
         enableBtn.disabled = true;
         await notificationManager.requestPermission();

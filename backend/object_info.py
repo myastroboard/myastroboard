@@ -7,12 +7,17 @@ Provides:
   Phase 3 - Localized description via Wikipedia REST API with language fallback chain
 """
 
+import hashlib
+import json
+import os
 import re
+import time
 import urllib.parse
 from typing import Any, Dict, List, Optional
 
 import requests
 
+from constants import DATA_DIR_CACHE
 from logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -83,6 +88,79 @@ _WIKIPEDIA_BASES: Dict[str, str] = {
 SIMBAD_TAP_URL = 'https://simbad.cds.unistra.fr/simbad/sim-tap/sync'
 HIPS2FITS_URL = 'https://alasky.cds.unistra.fr/hips-image-services/hips2fits'
 
+# Local on-disk cache for hips2fits imagery, keyed by (ra, dec) — DSS2 survey
+# tiles never change, so once fetched an image is cached indefinitely.
+OBJECT_IMAGE_CACHE_DIR = os.path.join(DATA_DIR_CACHE, 'object_images')
+
+
+# ──────────────────────────────────────────────
+# Upstream backoff
+# ──────────────────────────────────────────────
+#
+# A single object-info request can call SIMBAD (2x on fallback), Wikipedia
+# and hips2fits. Pages like the beginner-catalogue grid render many objects
+# at once, each firing its own request - so when an upstream is unreachable,
+# every card independently eats a full REQUEST_TIMEOUT (or two, for SIMBAD's
+# identifier-variant retry) instead of failing fast. Once one call to a given
+# service fails, back off from that service for a while so the rest of the
+# burst (and any page reloads within the window) return immediately instead
+# of stacking up multi-second timeouts.
+
+_BACKOFF_FILE = os.path.join(DATA_DIR_CACHE, 'object_info_backoff.json')
+_BACKOFF_TTL = 300  # seconds
+_backoff_until: Dict[str, float] = {}
+
+
+def _load_backoff_state() -> Dict[str, float]:
+    """Load persisted per-service backoff expirations from disk."""
+    try:
+        if not os.path.exists(_BACKOFF_FILE):
+            return {}
+        with open(_BACKOFF_FILE, 'r', encoding='utf-8') as fh:
+            raw = json.load(fh)
+        now_ts = time.time()
+        return {str(k): float(v) for k, v in (raw or {}).items() if float(v) > now_ts}
+    except Exception as exc:
+        logger.debug(f'Failed to read object_info backoff state: {exc}')
+        return {}
+
+
+def _save_backoff_state() -> None:
+    """Persist active backoff expirations to disk so all workers see them."""
+    try:
+        os.makedirs(DATA_DIR_CACHE, exist_ok=True)
+        now_ts = time.time()
+        active = {k: v for k, v in _backoff_until.items() if v > now_ts}
+        with open(_BACKOFF_FILE, 'w', encoding='utf-8') as fh:
+            json.dump(active, fh)
+    except Exception as exc:
+        logger.debug(f'Failed to persist object_info backoff state: {exc}')
+
+
+_backoff_until.update(_load_backoff_state())
+
+
+def _is_backed_off(service: str) -> bool:
+    """True if *service* recently failed and should be skipped without a network call."""
+    _backoff_until.update(_load_backoff_state())
+    exp = _backoff_until.get(service)
+    if exp and exp > time.time():
+        return True
+    if exp:
+        _backoff_until.pop(service, None)
+        _save_backoff_state()
+    return False
+
+
+def _trigger_backoff(service: str) -> None:
+    _backoff_until[service] = time.time() + _BACKOFF_TTL
+    _save_backoff_state()
+
+
+def _clear_backoff(service: str) -> None:
+    if _backoff_until.pop(service, None) is not None:
+        _save_backoff_state()
+
 
 # ──────────────────────────────────────────────
 # Input validation
@@ -106,6 +184,8 @@ def _sanitize_lang(lang: str) -> str:
 
 def _simbad_query(adql: str) -> Optional[Dict]:
     """Execute an ADQL query against the SIMBAD TAP endpoint and return the JSON payload."""
+    if _is_backed_off('simbad'):
+        return None
     try:
         resp = requests.get(
             SIMBAD_TAP_URL,
@@ -119,9 +199,11 @@ def _simbad_query(adql: str) -> Optional[Dict]:
             headers={'Accept': 'application/json'},
         )
         resp.raise_for_status()
+        _clear_backoff('simbad')
         return resp.json()
     except requests.RequestException as exc:
         logger.warning(f'SIMBAD TAP request failed: {exc}')
+        _trigger_backoff('simbad')
         return None
 
 
@@ -364,6 +446,71 @@ def _get_dss_image_url(ra: float, dec: float, size_deg: float = 0.5) -> str:
     return f"{HIPS2FITS_URL}?{urllib.parse.urlencode(params)}"
 
 
+# Matches filenames produced by _object_image_filename(), e.g. "10.684000_41.269000.jpg".
+# Used to both validate the /api/object-image/<filename> route (path traversal safety)
+# and to recover (ra, dec) so a missing/evicted file can be re-fetched on demand.
+_OBJECT_IMAGE_FILENAME_RE = re.compile(r'^(-?\d{1,3}\.\d{6})_(-?\d{1,2}\.\d{6})\.jpg$')
+
+
+def _object_image_filename(ra: float, dec: float) -> str:
+    return f'{ra:.6f}_{dec:.6f}.jpg'
+
+
+def get_object_image_proxy_url(ra: float, dec: float) -> str:
+    """Return the local URL that serves a (server-cached) hips2fits image for (ra, dec).
+
+    Used in API responses instead of the raw CDS URL so the browser fetches the
+    image from our own server, which fetches it from CDS once and caches it on
+    disk afterwards - hips2fits requests are otherwise slow (multi-second).
+    """
+    return f'/api/object-image/{_object_image_filename(ra, dec)}'
+
+
+def parse_object_image_filename(filename: str) -> Optional[tuple]:
+    """Validate an /api/object-image/<filename> path segment and recover (ra, dec).
+
+    Returns None if the filename doesn't match the expected pattern or the
+    coordinates it encodes are out of range.
+    """
+    m = _OBJECT_IMAGE_FILENAME_RE.match(filename)
+    if not m:
+        return None
+    ra, dec = float(m.group(1)), float(m.group(2))
+    if not (0.0 <= ra < 360.0) or not (-90.0 <= dec <= 90.0):
+        return None
+    return ra, dec
+
+
+def ensure_cached_object_image(ra: float, dec: float) -> Optional[str]:
+    """Make sure the DSS2 image for (ra, dec) exists in the on-disk cache.
+
+    Returns the absolute local file path (downloading from hips2fits first if
+    not already cached), or None if the upstream fetch failed.
+    """
+    local_path = os.path.join(OBJECT_IMAGE_CACHE_DIR, _object_image_filename(ra, dec))
+    if os.path.isfile(local_path):
+        return local_path
+
+    if _is_backed_off('hips2fits'):
+        return None
+
+    try:
+        os.makedirs(OBJECT_IMAGE_CACHE_DIR, exist_ok=True)
+        resp = requests.get(_get_dss_image_url(ra, dec), timeout=REQUEST_TIMEOUT, stream=True)
+        resp.raise_for_status()
+        tmp_path = f'{local_path}.tmp-{os.getpid()}'
+        with open(tmp_path, 'wb') as f:
+            for chunk in resp.iter_content(chunk_size=8192):
+                f.write(chunk)
+        os.replace(tmp_path, local_path)
+        _clear_backoff('hips2fits')
+        return local_path
+    except (requests.RequestException, OSError) as exc:
+        logger.warning(f'Failed to cache hips2fits image for ra={ra}, dec={dec}: {exc}')
+        _trigger_backoff('hips2fits')
+        return None
+
+
 # ──────────────────────────────────────────────
 # Phase 3 - Localized description (Wikipedia)
 # ──────────────────────────────────────────────
@@ -398,6 +545,8 @@ def _get_wikipedia_summary(search_term: str, lang: str = 'en') -> Optional[Dict[
     or None if not found.
     """
     lang = _sanitize_lang(lang)
+    if _is_backed_off('wikipedia'):
+        return None
     safe_term = urllib.parse.quote(_normalize_wikipedia_term(search_term), safe='')
     # Use the pre-built base URL so the hostname is never derived from user input.
     base = _WIKIPEDIA_BASES[lang]  # lang is guaranteed in _ALLOWED_LANGS after _sanitize_lang
@@ -412,8 +561,10 @@ def _get_wikipedia_summary(search_term: str, lang: str = 'en') -> Optional[Dict[
             },
         )
         if resp.status_code in (404, 403):
+            _clear_backoff('wikipedia')
             return None
         resp.raise_for_status()
+        _clear_backoff('wikipedia')
         data = resp.json()
         # Skip disambiguation pages - they list unrelated topics sharing the same label
         if data.get('type') == 'disambiguation':
@@ -428,6 +579,7 @@ def _get_wikipedia_summary(search_term: str, lang: str = 'en') -> Optional[Dict[
         }
     except requests.RequestException as exc:
         logger.warning(f'Wikipedia request failed ({lang}/{search_term}): {exc}')
+        _trigger_backoff('wikipedia')
         return None
 
 
@@ -578,7 +730,7 @@ def get_object_info(identifier: str, lang: str = 'en') -> Dict[str, Any]:
             _dec = float(_local_entry['dec_deg'])
             _local_type = str(_local_entry.get('object_type') or '').strip()
             _preferred = str(_local_entry.get('preferred_name') or identifier).strip()
-            _image = {'url': _get_dss_image_url(_ra, _dec), 'credit': 'DSS2 Red / CDS HiPS'}
+            _image = {'url': get_object_image_proxy_url(_ra, _dec), 'credit': 'DSS2 Red / CDS HiPS'}
             _seen: set = set()
             _search_terms: List[str] = []
             for _t in [identifier, _preferred]:
@@ -628,7 +780,7 @@ def get_object_info(identifier: str, lang: str = 'en') -> Dict[str, Any]:
     image = None
     if ra is not None and dec is not None:
         image = {
-            'url': _get_dss_image_url(ra, dec),
+            'url': get_object_image_proxy_url(ra, dec),
             'credit': 'DSS2 Red / CDS HiPS',
         }
 

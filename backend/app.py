@@ -2263,6 +2263,28 @@ def get_object_info_api(identifier):
     return jsonify(data)
 
 
+@app.route('/api/object-image/<filename>', methods=['GET'])
+@login_required
+def get_object_image_api(filename):
+    """Serve a locally cached DSS2 (hips2fits) image, e.g. "10.684000_41.269000.jpg".
+
+    Downloads from CDS hips2fits on first request and caches the JPEG to disk
+    (data/cache/object_images/) so subsequent requests - from any user - are
+    served locally instead of round-tripping to CDS, which is slow.
+    """
+    from object_info import OBJECT_IMAGE_CACHE_DIR, parse_object_image_filename, ensure_cached_object_image
+
+    coords = parse_object_image_filename(filename)
+    if coords is None:
+        return jsonify({'error': 'invalid_filename'}), 400
+    ra, dec = coords
+
+    if ensure_cached_object_image(ra, dec) is None:
+        return jsonify({'error': 'image_unavailable'}), 502
+
+    return send_from_directory(OBJECT_IMAGE_CACHE_DIR, filename, max_age=2592000)
+
+
 @app.route("/api/iss/passes", methods=["GET"])
 @login_required
 def get_iss_passes_api():

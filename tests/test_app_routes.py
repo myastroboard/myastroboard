@@ -4495,6 +4495,49 @@ class TestObjectInfoEdgeCases:
 
 
 # ---------------------------------------------------------------------------
+# Object image proxy/cache — /api/object-image
+# ---------------------------------------------------------------------------
+
+
+class TestObjectImageApi:
+
+    def test_unauthenticated_returns_401(self, client):
+        resp = client.get('/api/object-image/10.684000_41.269000.jpg')
+        assert resp.status_code == 401
+
+    def test_invalid_filename_returns_400(self, client_admin):
+        resp = client_admin.get('/api/object-image/not-a-valid-filename.jpg')
+        assert resp.status_code == 400
+
+    def test_path_traversal_filename_returns_400(self, client_admin):
+        resp = client_admin.get('/api/object-image/..%2f..%2fetc%2fpasswd.jpg')
+        assert resp.status_code in (400, 404)
+
+    def test_out_of_range_coordinates_returns_400(self, client_admin):
+        resp = client_admin.get('/api/object-image/400.000000_41.269000.jpg')
+        assert resp.status_code == 400
+
+    def test_valid_filename_returns_image(self, client_admin, monkeypatch, tmp_path):
+        import object_info as _oi
+        monkeypatch.setattr(_oi, 'OBJECT_IMAGE_CACHE_DIR', str(tmp_path))
+        cached_file = tmp_path / '10.684000_41.269000.jpg'
+        cached_file.write_bytes(b'\xff\xd8\xff\xe0fakejpeg')
+        monkeypatch.setattr(_oi, 'ensure_cached_object_image', lambda ra, dec: str(cached_file))
+
+        resp = client_admin.get('/api/object-image/10.684000_41.269000.jpg')
+        assert resp.status_code == 200
+        assert resp.mimetype == 'image/jpeg'
+        assert resp.data == b'\xff\xd8\xff\xe0fakejpeg'
+        assert 'max-age' in resp.headers.get('Cache-Control', '')
+
+    def test_upstream_failure_returns_502(self, client_admin, monkeypatch):
+        import object_info as _oi
+        monkeypatch.setattr(_oi, 'ensure_cached_object_image', lambda ra, dec: None)
+        resp = client_admin.get('/api/object-image/10.684000_41.269000.jpg')
+        assert resp.status_code == 502
+
+
+# ---------------------------------------------------------------------------
 # Logs API edge cases
 # ---------------------------------------------------------------------------
 
