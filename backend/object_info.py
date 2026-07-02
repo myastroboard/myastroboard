@@ -428,12 +428,12 @@ def resolve_identifier_for_catalogue_lookup(identifier: str) -> Optional[Dict[st
 
 def _get_dss_image_url(ra: float, dec: float, size_deg: float = 0.5) -> str:
     """
-    Construct a CDS hips2fits URL for a DSS2 Red image at the given coordinates.
+    Construct a CDS hips2fits URL for a DSS2 color-composite image at the given coordinates.
 
     The URL returns a JPEG image directly (no HTML wrapper).
     """
     params = {
-        'hips': 'CDS/P/DSS2/red',
+        'hips': 'CDS/P/DSS2/color',
         'width': '400',
         'height': '400',
         'fov': f'{size_deg:.3f}',
@@ -730,7 +730,7 @@ def get_object_info(identifier: str, lang: str = 'en') -> Dict[str, Any]:
             _dec = float(_local_entry['dec_deg'])
             _local_type = str(_local_entry.get('object_type') or '').strip()
             _preferred = str(_local_entry.get('preferred_name') or identifier).strip()
-            _image = {'url': get_object_image_proxy_url(_ra, _dec), 'credit': 'DSS2 Red / CDS HiPS'}
+            _image = {'url': get_object_image_proxy_url(_ra, _dec), 'credit': 'DSS2 Color / CDS HiPS'}
             _seen: set = set()
             _search_terms: List[str] = []
             for _t in [identifier, _preferred]:
@@ -781,7 +781,7 @@ def get_object_info(identifier: str, lang: str = 'en') -> Dict[str, Any]:
     if ra is not None and dec is not None:
         image = {
             'url': get_object_image_proxy_url(ra, dec),
-            'credit': 'DSS2 Red / CDS HiPS',
+            'credit': 'DSS2 Color / CDS HiPS',
         }
 
     # ── Phase 3: Wikipedia description ─────────────
