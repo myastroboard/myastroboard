@@ -20,10 +20,9 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/static/ico/ios/16.png?v={{ version }}">
     <link rel="manifest" href="/manifest.webmanifest?v={{ version }}">
     <link rel="apple-touch-icon" sizes="180x180" href="/static/ico/ios/180.png?v={{ version }}">
-    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css" rel="stylesheet" media="print" onload="this.media='all'" crossorigin="anonymous">
-    <noscript><link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css" rel="stylesheet" crossorigin="anonymous"></noscript>
+    <link href="/static/vendor/bootstrap/css/bootstrap.min.css?v={{ version }}" rel="stylesheet">
+    <link href="/static/vendor/bootstrap-icons/font/bootstrap-icons.min.css?v={{ version }}" rel="stylesheet" media="print" onload="this.media='all'">
+    <noscript><link href="/static/vendor/bootstrap-icons/font/bootstrap-icons.min.css?v={{ version }}" rel="stylesheet"></noscript>
     <link rel="stylesheet" href="/static/css/bs_icons_custom.css?v={{ version }}">
     <link rel="stylesheet" href="/static/css/bs_variables.css?v={{ version }}">
     <link rel="stylesheet" href="/static/css/bs_main.css?v={{ version }}">
@@ -68,7 +67,7 @@
     </div>
 
     <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
+    <script src="/static/vendor/bootstrap/js/bootstrap.bundle.min.js?v={{ version }}"></script>
     <script src="/static/js/i18n.js?v={{ version }}"></script>
     <script src="/static/js/pwa.js?v={{ version }}"></script>
     <script src="/static/js/login.js?v={{ version }}"></script>

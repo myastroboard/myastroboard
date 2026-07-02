@@ -2,8 +2,8 @@
 @font-face {
     font-family: "bootstrap-icons";
     font-display: swap;
-    src: url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/fonts/bootstrap-icons.woff2") format("woff2"),
-         url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/fonts/bootstrap-icons.woff") format("woff");
+    src: url("/static/vendor/bootstrap-icons/font/fonts/bootstrap-icons.woff2") format("woff2"),
+         url("/static/vendor/bootstrap-icons/font/fonts/bootstrap-icons.woff") format("woff");
 }
 
 /* Custom icons that behave like Bootstrap Icons (bi bi-*) */

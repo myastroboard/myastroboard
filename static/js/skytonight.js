@@ -15,6 +15,25 @@ let _skytHasTelescopesCache = null;
 let _skytHasTelescopesPromise = null;
 const _skytListenerTimers = {};  // catalogue+type -> pending setTimeout id (cancelled on re-render)
 
+let _plotlyLoadPromise = null;
+
+/** Lazily load the Plotly library (only needed for the SkyTonight sky map) so it isn't fetched on every page load. */
+function _ensurePlotlyLoaded() {
+    if (typeof Plotly !== 'undefined') return Promise.resolve();
+    if (_plotlyLoadPromise) return _plotlyLoadPromise;
+    _plotlyLoadPromise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = '/static/vendor/plotly/plotly-3.5.1.min.js?v=3.5.1';
+        script.onload = resolve;
+        script.onerror = () => {
+            _plotlyLoadPromise = null;
+            reject(new Error('Failed to load Plotly'));
+        };
+        document.head.appendChild(script);
+    });
+    return _plotlyLoadPromise;
+}
+
 /**
  * Show a modal to pick a telescope for "Add to Plan My Night".
  * Returns a Promise that resolves with {telescope_id, telescope_name} or null if cancelled.
@@ -503,7 +522,9 @@ async function _renderSkyMap(reports, container) {
     // NOTE: do NOT clear 'container' here - the caller already inserted a loading indicator.
     // We clear it only once we have data (or an error) to show.
 
-    if (typeof Plotly === 'undefined') {
+    try {
+        await _ensurePlotlyLoaded();
+    } catch (_) {
         DOMUtils.clear(container);
         const w = document.createElement('div');
         w.className = 'alert alert-warning mt-3';
