@@ -13,6 +13,7 @@ from flask import Blueprint, jsonify, request
 import astrodex
 import beginner_catalog
 import equipment_profiles
+import object_info
 import plan_my_night
 import skytonight_targets
 from auth import admin_required, get_current_user, login_required, user_manager
@@ -41,7 +42,7 @@ from skytonight_storage import (
     has_dso_results,
 )
 from skytonight_calculator import compute_target_debug, load_calculation_results
-from utils import load_json_file
+from utils import load_json_file, normalize_catalogue_key as _normalize_catalogue_key
 
 logger = get_logger(__name__)
 
@@ -1309,11 +1310,6 @@ _RECOMMENDATIONS_DEFAULT_LIMIT = 5
 _RECOMMENDATIONS_MAX_LIMIT = 10
 
 
-def _normalize_catalogue_key(value: Optional[str]) -> str:
-    """Normalize a catalogue/target name for loose matching (uppercase, no separators)."""
-    return re.sub(r'[^A-Za-z0-9]', '', str(value or '')).upper()
-
-
 def _build_beginner_catalog_hours_lookup() -> Dict[str, float]:
     """Return a normalized-catalogue-id -> typical_integration_hours lookup from the beginner catalog."""
     lookup: Dict[str, float] = {}
@@ -1360,6 +1356,7 @@ def get_skytonight_recommendations_api():
 
         hours_lookup = _build_beginner_catalog_hours_lookup()
         preloaded_plan_entries = _preload_all_current_plan_entries(user.user_id, user.username)
+        preloaded_astrodex = astrodex.load_user_astrodex(user.user_id, user.username)
 
         targets = []
         for item in candidates:
@@ -1386,7 +1383,7 @@ def get_skytonight_recommendations_api():
                 is_estimate = True
 
             in_astrodex = (
-                astrodex.is_item_in_astrodex(user.user_id, preferred_name, source_catalogue)
+                astrodex.is_item_in_preloaded_astrodex(preloaded_astrodex, preferred_name, source_catalogue)
                 if preferred_name
                 else False
             )
@@ -1397,6 +1394,13 @@ def get_skytonight_recommendations_api():
                 if preferred_name
                 else False
             )
+
+            coordinates = item.get('coordinates') or {}
+            thumbnail_url = None
+            ra_hours = coordinates.get('ra_hours')
+            dec_degrees = coordinates.get('dec_degrees')
+            if ra_hours is not None and dec_degrees is not None:
+                thumbnail_url = object_info.get_object_image_proxy_url(ra_hours * 15.0, dec_degrees)
 
             targets.append(
                 {
@@ -1415,7 +1419,7 @@ def get_skytonight_recommendations_api():
                     'size_arcmin': item.get('size_arcmin'),
                     'estimated_integration_hours': estimated_hours,
                     'estimated_integration_hours_is_estimate': is_estimate,
-                    'thumbnail_url': None,
+                    'thumbnail_url': thumbnail_url,
                     'in_astrodex': in_astrodex,
                     'in_plan': in_plan,
                 }

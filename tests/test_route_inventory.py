@@ -141,6 +141,7 @@ EXPECTED_ROUTES = {
 
     # --- beginner catalog ---
     ('/api/beginner-catalog', ('GET',)),
+    ('/api/object-image/<filename>', ('GET',)),
 
     # --- astrodex ---
     ('/api/astrodex', ('GET',)),

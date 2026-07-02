@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional
 from constellation import Constellation as _Constellation
 from i18n_utils import I18nManager
 from logging_config import get_logger
+from utils import normalize_catalogue_key as _normalize_key
 
 logger = get_logger(__name__)
 
@@ -34,9 +35,8 @@ _CONSTELLATION_ABBR_MAP['Se1'] = 'Serpens Caput'
 _CONSTELLATION_ABBR_MAP['Se2'] = 'Serpens Cauda'
 
 
-def _normalize_key(value: Optional[str]) -> str:
-    """Normalize a catalogue/target name for loose cross-referencing (lowercase, no separators)."""
-    return re.sub(r'[^a-z0-9]', '', str(value or '').lower())
+_catalog_cache: Optional[List[Dict[str, Any]]] = None
+_catalog_cache_key: Optional[tuple] = None
 
 
 def load_beginner_catalog() -> List[Dict[str, Any]]:
@@ -44,10 +44,21 @@ def load_beginner_catalog() -> List[Dict[str, Any]]:
 
     Returns an empty list (and logs a warning) if the bundled file is missing
     or malformed, rather than raising - this dataset is not user-critical.
+
+    The parsed result is cached in memory keyed by (path, mtime) - this file is
+    bundled/static in production, so this avoids re-reading and re-parsing it
+    on every request while still picking up an on-disk change (or a test
+    monkeypatching the file path) automatically.
     """
+    global _catalog_cache, _catalog_cache_key
+
     if not os.path.exists(_BEGINNER_CATALOG_FILE):
         logger.warning(f'Beginner catalog file not found: {_BEGINNER_CATALOG_FILE}')
         return []
+
+    cache_key = (_BEGINNER_CATALOG_FILE, os.path.getmtime(_BEGINNER_CATALOG_FILE))
+    if _catalog_cache is not None and _catalog_cache_key == cache_key:
+        return _catalog_cache
 
     try:
         with open(_BEGINNER_CATALOG_FILE, encoding='utf-8') as f:
@@ -60,6 +71,7 @@ def load_beginner_catalog() -> List[Dict[str, Any]]:
         logger.error('Beginner catalog file does not contain a JSON list')
         return []
 
+    _catalog_cache, _catalog_cache_key = data, cache_key
     return data
 
 
@@ -138,8 +150,17 @@ def enrich_with_skytonight(
         new_entry['visible_tonight'] = dso_match is not None
         new_entry['astro_score'] = dso_match.get('astro_score') if dso_match else None
 
-        new_entry['in_astrodex'] = catalogue_key in astrodex_keys or name_key in astrodex_keys
-        new_entry['in_plan'] = catalogue_key in plan_keys or name_key in plan_keys
+        # Match against every known alias for this object (not just its own
+        # catalogue_id/preferred_name), so an astrodex/plan entry saved under a
+        # different alias of the same object (e.g. "NGC1976" for "M42") is still
+        # recognized as captured/planned.
+        match_keys = {catalogue_key, name_key}
+        if dso_match:
+            match_keys.update(_normalize_key(alias) for alias in dso_match.get('catalogue_names', {}).values())
+        match_keys.discard('')
+
+        new_entry['in_astrodex'] = bool(match_keys & astrodex_keys)
+        new_entry['in_plan'] = bool(match_keys & plan_keys)
 
         enriched.append(new_entry)
 

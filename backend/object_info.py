@@ -7,18 +7,25 @@ Provides:
   Phase 3 - Localized description via Wikipedia REST API with language fallback chain
 """
 
-import hashlib
 import json
 import os
 import re
+import sys
 import time
 import urllib.parse
+from contextlib import contextmanager
 from typing import Any, Dict, List, Optional
 
 import requests
 
 from constants import DATA_DIR_CACHE
 from logging_config import get_logger
+
+# Windows-compatible file locking (mirrors cache_store.py's cross-platform pattern).
+if sys.platform == 'win32':
+    import msvcrt
+else:  # pragma: no cover
+    import fcntl
 
 logger = get_logger(__name__)
 
@@ -107,8 +114,31 @@ OBJECT_IMAGE_CACHE_DIR = os.path.join(DATA_DIR_CACHE, 'object_images')
 # of stacking up multi-second timeouts.
 
 _BACKOFF_FILE = os.path.join(DATA_DIR_CACHE, 'object_info_backoff.json')
+_BACKOFF_LOCK_FILE = os.path.join(DATA_DIR_CACHE, 'object_info_backoff.lock')
 _BACKOFF_TTL = 300  # seconds
 _backoff_until: Dict[str, float] = {}
+_backoff_mtime_seen: Optional[float] = None
+
+
+@contextmanager
+def _backoff_file_lock():
+    """Cross-platform exclusive lock guarding writes to _BACKOFF_FILE across workers."""
+    os.makedirs(DATA_DIR_CACHE, exist_ok=True)
+    lock_file = open(_BACKOFF_LOCK_FILE, 'a+')
+    try:
+        if sys.platform == 'win32':
+            msvcrt.locking(lock_file.fileno(), msvcrt.LK_LOCK, 1)
+        else:  # pragma: no cover
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        yield
+    finally:
+        try:
+            if sys.platform == 'win32':
+                msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
+            else:  # pragma: no cover
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+        finally:
+            lock_file.close()
 
 
 def _load_backoff_state() -> Dict[str, float]:
@@ -126,23 +156,47 @@ def _load_backoff_state() -> Dict[str, float]:
 
 
 def _save_backoff_state() -> None:
-    """Persist active backoff expirations to disk so all workers see them."""
+    """Persist active backoff expirations to disk so all workers see them.
+
+    Writes under an exclusive cross-worker lock to a temp file followed by an
+    atomic rename, so a concurrent writer can never leave readers looking at a
+    torn/corrupted JSON file.
+    """
     try:
         os.makedirs(DATA_DIR_CACHE, exist_ok=True)
         now_ts = time.time()
         active = {k: v for k, v in _backoff_until.items() if v > now_ts}
-        with open(_BACKOFF_FILE, 'w', encoding='utf-8') as fh:
-            json.dump(active, fh)
+        tmp_path = f'{_BACKOFF_FILE}.tmp-{os.getpid()}'
+        with _backoff_file_lock():
+            with open(tmp_path, 'w', encoding='utf-8') as fh:
+                json.dump(active, fh)
+            os.replace(tmp_path, _BACKOFF_FILE)
     except Exception as exc:
         logger.debug(f'Failed to persist object_info backoff state: {exc}')
 
 
+def _refresh_backoff_state_if_changed() -> None:
+    """Re-read the shared backoff file only when another worker has actually changed it."""
+    global _backoff_mtime_seen
+    try:
+        mtime = os.path.getmtime(_BACKOFF_FILE)
+    except OSError:
+        mtime = None
+    if mtime != _backoff_mtime_seen:
+        _backoff_mtime_seen = mtime
+        _backoff_until.update(_load_backoff_state())
+
+
 _backoff_until.update(_load_backoff_state())
+try:
+    _backoff_mtime_seen = os.path.getmtime(_BACKOFF_FILE)
+except OSError:
+    _backoff_mtime_seen = None
 
 
 def _is_backed_off(service: str) -> bool:
     """True if *service* recently failed and should be skipped without a network call."""
-    _backoff_until.update(_load_backoff_state())
+    _refresh_backoff_state_if_changed()
     exp = _backoff_until.get(service)
     if exp and exp > time.time():
         return True
@@ -476,6 +530,11 @@ def parse_object_image_filename(filename: str) -> Optional[tuple]:
     if not m:
         return None
     ra, dec = float(m.group(1)), float(m.group(2))
+    # `f'{ra:.6f}'` can round a value just under 360 up to the literal "360.000000"
+    # (e.g. 359.9999997) - normalize only that exact boundary artifact back to 0.0
+    # rather than rejecting a valid RA. Anything else out of range is still rejected.
+    if ra == 360.0:
+        ra = 0.0
     if not (0.0 <= ra < 360.0) or not (-90.0 <= dec <= 90.0):
         return None
     return ra, dec
