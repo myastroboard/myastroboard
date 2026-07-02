@@ -15,23 +15,17 @@ let _skytHasTelescopesCache = null;
 let _skytHasTelescopesPromise = null;
 const _skytListenerTimers = {};  // catalogue+type -> pending setTimeout id (cancelled on re-render)
 
-let _plotlyLoadPromise = null;
+const _plotlyLoadState = { promise: null };
 
 /** Lazily load the Plotly library (only needed for the SkyTonight sky map) so it isn't fetched on every page load. */
 function _ensurePlotlyLoaded() {
-    if (typeof Plotly !== 'undefined') return Promise.resolve();
-    if (_plotlyLoadPromise) return _plotlyLoadPromise;
-    _plotlyLoadPromise = new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = '/static/vendor/plotly/plotly-3.5.1.min.js?v=3.5.1';
-        script.onload = resolve;
-        script.onerror = () => {
-            _plotlyLoadPromise = null;
-            reject(new Error('Failed to load Plotly'));
-        };
-        document.head.appendChild(script);
-    });
-    return _plotlyLoadPromise;
+    return ensureVendorScriptLoaded(
+        () => typeof Plotly !== 'undefined',
+        '/static/vendor/plotly/plotly-3.5.1.min.js?v=3.5.1',
+        null,
+        _plotlyLoadState,
+        'Plotly'
+    );
 }
 
 /**
@@ -445,6 +439,38 @@ function createDifficultyBadgeNode(difficulty) {
     return badge;
 }
 window.createDifficultyBadgeNode = createDifficultyBadgeNode;
+
+/**
+ * Returns the "Captured" (in Astrodex) badge node shared by the beginner-catalog
+ * and recommendation cards.
+ */
+function _buildCapturedBadge() {
+    const capturedBadge = document.createElement('span');
+    capturedBadge.className = 'badge bg-success';
+    DOMUtils.append(capturedBadge, DOMUtils.createIcon('bi bi-check-circle-fill'), ` ${i18n.t('beginner_catalog.captured')}`);
+    return capturedBadge;
+}
+
+/**
+ * Populate a card thumbnail <img>: use a server-provided thumbnail_url directly
+ * if present, otherwise fall back to resolving it client-side via fetchObjectInfo
+ * (used when the caller has no known coordinates to build a thumbnail URL from).
+ */
+function _loadCardThumbnail(imgEl, thumbnailUrl, identifier) {
+    if (thumbnailUrl) {
+        imgEl.src = thumbnailUrl;
+        imgEl.style.display = '';
+        return;
+    }
+    if (identifier && typeof fetchObjectInfo === 'function') {
+        fetchObjectInfo(identifier).then((data) => {
+            if (data?.image?.url) {
+                imgEl.src = data.image.url;
+                imgEl.style.display = '';
+            }
+        });
+    }
+}
 
 /**
  * Returns a colour-coded badge for solar elongation (angular distance from the Sun).
@@ -2059,17 +2085,7 @@ function _buildRecommendationCard(target) {
     img.alt = target.preferred_name || '';
     img.style.display = 'none';
     thumbBtn.appendChild(img);
-    if (target.thumbnail_url) {
-        img.src = target.thumbnail_url;
-        img.style.display = '';
-    } else if (identifier && typeof fetchObjectInfo === 'function') {
-        fetchObjectInfo(identifier).then((data) => {
-            if (data?.image?.url) {
-                img.src = data.image.url;
-                img.style.display = '';
-            }
-        });
-    }
+    _loadCardThumbnail(img, target.thumbnail_url, identifier);
     if (identifier) {
         thumbBtn.addEventListener('click', () => {
             if (typeof showObjectInfoModal === 'function') showObjectInfoModal(identifier);
@@ -2120,12 +2136,7 @@ function _buildRecommendationCard(target) {
     typeBadge.textContent = typeLabel;
     badgeRow.appendChild(typeBadge);
     badgeRow.appendChild(createDifficultyBadgeNode(target.difficulty));
-    if (target.in_astrodex) {
-        const capturedBadge = document.createElement('span');
-        capturedBadge.className = 'badge bg-success';
-        DOMUtils.append(capturedBadge, DOMUtils.createIcon('bi bi-check-circle-fill'), ` ${i18n.t('beginner_catalog.captured')}`);
-        badgeRow.appendChild(capturedBadge);
-    }
+    if (target.in_astrodex) badgeRow.appendChild(_buildCapturedBadge());
     body.appendChild(badgeRow);
 
     // ── Integration estimate ────────────────────────────────────────────────
@@ -2363,22 +2374,15 @@ function _buildBeginnerCatalogCard(obj) {
     card.className = 'card h-100';
     if (obj.in_astrodex) card.classList.add('border-success');
 
-    if (typeof fetchObjectInfo === 'function') {
-        const img = document.createElement('img');
-        img.className = 'card-img-top';
-        img.style.maxHeight = '140px';
-        img.style.objectFit = 'cover';
-        img.loading = 'lazy';
-        img.style.display = 'none';
-        card.appendChild(img);
-        fetchObjectInfo(obj.catalogue_id || obj.preferred_name).then((data) => {
-            if (data?.image?.url) {
-                img.src = data.image.url;
-                img.alt = obj.preferred_name || '';
-                img.style.display = '';
-            }
-        });
-    }
+    const img = document.createElement('img');
+    img.className = 'card-img-top';
+    img.style.maxHeight = '140px';
+    img.style.objectFit = 'cover';
+    img.loading = 'lazy';
+    img.alt = obj.preferred_name || '';
+    img.style.display = 'none';
+    card.appendChild(img);
+    _loadCardThumbnail(img, obj.thumbnail_url, obj.catalogue_id || obj.preferred_name);
 
     const body = document.createElement('div');
     body.className = 'card-body';
@@ -2404,12 +2408,7 @@ function _buildBeginnerCatalogCard(obj) {
             : obj.constellation;
         badgeRow.appendChild(constBadge);
     }
-    if (obj.in_astrodex) {
-        const capturedBadge = document.createElement('span');
-        capturedBadge.className = 'badge bg-success';
-        DOMUtils.append(capturedBadge, DOMUtils.createIcon('bi bi-check-circle-fill'), ` ${i18n.t('beginner_catalog.captured')}`);
-        badgeRow.appendChild(capturedBadge);
-    }
+    if (obj.in_astrodex) badgeRow.appendChild(_buildCapturedBadge());
     body.appendChild(badgeRow);
 
     const visibility = document.createElement('div');

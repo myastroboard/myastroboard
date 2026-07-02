@@ -8,7 +8,8 @@
       "focal_length_mm": 250,
       "focal_ratio": 5.0,
       "type": "refractor",
-      "suggests_experience": "beginner"
+      "suggests_experience": "beginner",
+      "source_url": "https://us.zwoastro.com/products/seestar-s50"
     },
     {
       "id": "seestar_s30",
@@ -18,73 +19,168 @@
       "focal_length_mm": 150,
       "focal_ratio": 5.0,
       "type": "refractor",
-      "suggests_experience": "beginner"
+      "suggests_experience": "beginner",
+      "source_url": "https://www.seestar.com/blogs/faq/s30"
+    },
+    {
+      "id": "vaonis_vespera2",
+      "label": "Vespera II",
+      "manufacturer": "Vaonis",
+      "aperture_mm": 50,
+      "focal_length_mm": 250,
+      "focal_ratio": 5.0,
+      "type": "refractor",
+      "suggests_experience": "beginner",
+      "source_url": "https://vaonis.com/products/vespera-2"
+    },
+    {
+      "id": "skywatcher_evostar72ed",
+      "label": "Evostar 72ED",
+      "manufacturer": "Sky-Watcher",
+      "aperture_mm": 72,
+      "focal_length_mm": 420,
+      "focal_ratio": 5.8,
+      "type": "apo",
+      "suggests_experience": "beginner",
+      "source_url": "http://skywatcher.com/product/evostar-72ed/"
+    },
+    {
+      "id": "skywatcher_ed80",
+      "label": "Evostar 80ED",
+      "manufacturer": "Sky-Watcher",
+      "aperture_mm": 80,
+      "focal_length_mm": 600,
+      "focal_ratio": 7.5,
+      "type": "apo",
+      "suggests_experience": "beginner",
+      "source_url": "https://www.skywatcherusa.com/products/evostar-80ed"
     },
     {
       "id": "skywatcher_130pds",
-      "label": "Sky-Watcher 130PDS",
+      "label": "Explorer 130PDS",
       "manufacturer": "Sky-Watcher",
       "aperture_mm": 130,
       "focal_length_mm": 650,
       "focal_ratio": 5.0,
       "type": "newtonian",
-      "suggests_experience": "beginner"
+      "suggests_experience": "beginner",
+      "source_url": "https://www.firstlightoptics.com/telescopes-in-stock/skywatcher-explorer-130p-ds-ota.html"
     },
     {
       "id": "william_optics_z61",
-      "label": "William Optics Z61",
+      "label": "Zenithstar 61 II",
       "manufacturer": "William Optics",
       "aperture_mm": 61,
       "focal_length_mm": 360,
       "focal_ratio": 5.9,
-      "type": "refractor",
-      "suggests_experience": "intermediate"
+      "type": "apo",
+      "suggests_experience": "intermediate",
+      "source_url": "https://williamoptics.com/products/zenithstar-61ii"
+    },
+    {
+      "id": "williamoptics_redcat51",
+      "label": "RedCat 51 III",
+      "manufacturer": "William Optics",
+      "aperture_mm": 51,
+      "focal_length_mm": 250,
+      "focal_ratio": 4.9,
+      "type": "apo",
+      "suggests_experience": "intermediate",
+      "source_url": "https://williamoptics.com/products/cat-51"
+    },
+    {
+      "id": "williamoptics_gt71",
+      "label": "GT71 (Gran Turismo 71)",
+      "manufacturer": "William Optics",
+      "aperture_mm": 71,
+      "focal_length_mm": 419,
+      "focal_ratio": 5.9,
+      "type": "apo",
+      "suggests_experience": "intermediate",
+      "source_url": "https://williamoptics.com/products/gran-turismo-71-apo"
     },
     {
       "id": "celestron_c8",
-      "label": "Celestron C8",
+      "label": "C8 (8\" SCT)",
       "manufacturer": "Celestron",
       "aperture_mm": 203,
       "focal_length_mm": 2032,
       "focal_ratio": 10.0,
       "type": "sct",
-      "suggests_experience": "intermediate"
-    },
-    {
-      "id": "skywatcher_ed80",
-      "label": "Sky-Watcher ED80",
-      "manufacturer": "Sky-Watcher",
-      "aperture_mm": 80,
-      "focal_length_mm": 600,
-      "focal_ratio": 7.5,
-      "type": "refractor",
-      "suggests_experience": "beginner"
+      "suggests_experience": "intermediate",
+      "source_url": "https://www.celestron.com/products/c8-optical-tube-assembly-cge-dovetail"
     },
     {
       "id": "skywatcher_200p",
-      "label": "Sky-Watcher 200P",
+      "label": "Explorer 200P",
       "manufacturer": "Sky-Watcher",
       "aperture_mm": 200,
       "focal_length_mm": 1000,
       "focal_ratio": 5.0,
       "type": "newtonian",
-      "suggests_experience": "intermediate"
+      "suggests_experience": "intermediate",
+      "source_url": "https://altairastro.com/sky-watcher-explorer-200p-ota-511-p.asp"
     },
     {
-      "id": "takahashi_fs60",
-      "label": "Takahashi FS-60",
+      "id": "takahashi_fs60cb",
+      "label": "FS-60CB",
       "manufacturer": "Takahashi",
       "aperture_mm": 60,
       "focal_length_mm": 355,
       "focal_ratio": 5.9,
-      "type": "refractor",
-      "suggests_experience": "advanced"
+      "type": "apo",
+      "suggests_experience": "advanced",
+      "source_url": "https://takahashiamerica.com/products/takahashi-fs-60cb-refractor-telescope"
+    },
+    {
+      "id": "skywatcher_esprit100ed",
+      "label": "Esprit 100ED",
+      "manufacturer": "Sky-Watcher",
+      "aperture_mm": 100,
+      "focal_length_mm": 550,
+      "focal_ratio": 5.5,
+      "type": "apo",
+      "suggests_experience": "advanced",
+      "source_url": "https://skywatcher.com/product/esprit-100-ed-apo-triplet/"
+    },
+    {
+      "id": "celestron_rasa8",
+      "label": "RASA 8",
+      "manufacturer": "Celestron",
+      "aperture_mm": 203,
+      "focal_length_mm": 400,
+      "focal_ratio": 2.0,
+      "type": "rasa",
+      "suggests_experience": "advanced",
+      "source_url": "https://www.celestron.com/products/8-rowe-ackermann-schmidt-astrograph-rasa-8-optical-tube-assembly-cge-dovetail"
+    },
+    {
+      "id": "celestron_edgehd8",
+      "label": "EdgeHD 8",
+      "manufacturer": "Celestron",
+      "aperture_mm": 203,
+      "focal_length_mm": 2032,
+      "focal_ratio": 10.0,
+      "type": "edgehd",
+      "suggests_experience": "advanced",
+      "source_url": "https://www.celestron.com/products/edgehd-8-optical-tube-assembly-cge-dovetail"
+    },
+    {
+      "id": "skywatcher_quattro8",
+      "label": "Quattro 200P",
+      "manufacturer": "Sky-Watcher",
+      "aperture_mm": 203,
+      "focal_length_mm": 800,
+      "focal_ratio": 4.0,
+      "type": "newtonian",
+      "suggests_experience": "advanced",
+      "source_url": "https://www.skywatcherusa.com/products/sky-watcher-quattro-200p-imaging-newtonian-8-205-mm"
     }
   ],
   "cameras": [
     {
       "id": "zwo_asi294mc_pro",
-      "label": "ZWO ASI294MC Pro",
+      "label": "ASI294MC Pro",
       "manufacturer": "ZWO",
       "sensor_width_mm": 19.1,
       "sensor_height_mm": 13.0,
@@ -92,11 +188,12 @@
       "resolution_w": 4144,
       "resolution_h": 2822,
       "type": "cmos_color",
-      "suggests_experience": "beginner"
+      "suggests_experience": "beginner",
+      "source_url": "https://www.zwoastro.com/product/asi294/"
     },
     {
       "id": "zwo_asi533mc_pro",
-      "label": "ZWO ASI533MC Pro",
+      "label": "ASI533MC Pro",
       "manufacturer": "ZWO",
       "sensor_width_mm": 11.3,
       "sensor_height_mm": 11.3,
@@ -104,31 +201,73 @@
       "resolution_w": 3008,
       "resolution_h": 3008,
       "type": "cmos_color",
-      "suggests_experience": "beginner"
+      "suggests_experience": "beginner",
+      "source_url": "https://www.zwoastro.com/product/asi533-pro-series/"
+    },
+    {
+      "id": "zwo_asi183mc_pro",
+      "label": "ASI183MC Pro",
+      "manufacturer": "ZWO",
+      "sensor_width_mm": 13.2,
+      "sensor_height_mm": 8.8,
+      "pixel_size_um": 2.4,
+      "resolution_w": 5496,
+      "resolution_h": 3672,
+      "type": "cmos_color",
+      "suggests_experience": "beginner",
+      "source_url": "https://www.zwoastro.com/product/asi183/"
+    },
+    {
+      "id": "canon_600d",
+      "label": "Canon EOS 600D (DSLR)",
+      "manufacturer": "Canon",
+      "sensor_width_mm": 22.3,
+      "sensor_height_mm": 14.9,
+      "pixel_size_um": 4.31,
+      "resolution_w": 5184,
+      "resolution_h": 3456,
+      "type": "dslr_color",
+      "suggests_experience": "beginner",
+      "source_url": "https://www.canon-europe.com/for_home/product_finder/cameras/digital_slr/eos_600d/specifications/"
+    },
+    {
+      "id": "nikon_d5300",
+      "label": "Nikon D5300 (DSLR)",
+      "manufacturer": "Nikon",
+      "sensor_width_mm": 23.5,
+      "sensor_height_mm": 15.6,
+      "pixel_size_um": 3.91,
+      "resolution_w": 6000,
+      "resolution_h": 4000,
+      "type": "dslr_color",
+      "suggests_experience": "beginner",
+      "source_url": "https://www.nikonusa.com/p/d5300/1519/overview"
     },
     {
       "id": "zwo_asi2600mc_pro",
-      "label": "ZWO ASI2600MC Pro",
+      "label": "ASI2600MC Pro",
       "manufacturer": "ZWO",
-      "sensor_width_mm": 28.3,
-      "sensor_height_mm": 19.0,
+      "sensor_width_mm": 23.5,
+      "sensor_height_mm": 15.7,
       "pixel_size_um": 3.76,
       "resolution_w": 6248,
       "resolution_h": 4176,
       "type": "cmos_color",
-      "suggests_experience": "intermediate"
+      "suggests_experience": "intermediate",
+      "source_url": "https://www.zwoastro.com/product/new-asi2600mm-mc-pro/"
     },
     {
-      "id": "canon_600d",
-      "label": "Canon 600D (DSLR)",
-      "manufacturer": "Canon",
-      "sensor_width_mm": 22.3,
-      "sensor_height_mm": 14.9,
-      "pixel_size_um": 4.30,
-      "resolution_w": 5184,
-      "resolution_h": 3456,
-      "type": "dslr_color",
-      "suggests_experience": "beginner"
+      "id": "zwo_asi1600mm_pro",
+      "label": "ASI1600MM Pro",
+      "manufacturer": "ZWO",
+      "sensor_width_mm": 17.7,
+      "sensor_height_mm": 13.4,
+      "pixel_size_um": 3.8,
+      "resolution_w": 4656,
+      "resolution_h": 3520,
+      "type": "cmos_mono",
+      "suggests_experience": "intermediate",
+      "source_url": "https://astronomy-imaging-camera.com/product/asi1600mm/"
     },
     {
       "id": "sony_a7s",
@@ -140,19 +279,259 @@
       "resolution_w": 4240,
       "resolution_h": 2832,
       "type": "mirrorless_color",
-      "suggests_experience": "intermediate"
+      "suggests_experience": "intermediate",
+      "source_url": "https://www.bhphotovideo.com/c/product/1044728-REG/sony_ilce7s_b_alpha_a7s_mirrorless_digital.html"
     },
     {
-      "id": "nikon_d5300",
-      "label": "Nikon D5300 (DSLR)",
-      "manufacturer": "Nikon",
+      "id": "zwo_asi2600mm_pro",
+      "label": "ASI2600MM Pro (Mono)",
+      "manufacturer": "ZWO",
       "sensor_width_mm": 23.5,
-      "sensor_height_mm": 15.6,
-      "pixel_size_um": 3.92,
-      "resolution_w": 6000,
-      "resolution_h": 4000,
-      "type": "dslr_color",
-      "suggests_experience": "beginner"
+      "sensor_height_mm": 15.7,
+      "pixel_size_um": 3.76,
+      "resolution_w": 6248,
+      "resolution_h": 4176,
+      "type": "cmos_mono",
+      "suggests_experience": "advanced",
+      "source_url": "https://www.zwoastro.com/product/new-asi2600mm-mc-pro/"
+    },
+    {
+      "id": "qhy268c",
+      "label": "QHY268C",
+      "manufacturer": "QHYCCD",
+      "sensor_width_mm": 23.5,
+      "sensor_height_mm": 15.7,
+      "pixel_size_um": 3.76,
+      "resolution_w": 6280,
+      "resolution_h": 4210,
+      "type": "cmos_color",
+      "suggests_experience": "advanced",
+      "source_url": "https://www.qhyccd.com/astronomical-camera-qhy268/"
+    },
+    {
+      "id": "canon_eos_ra",
+      "label": "Canon EOS Ra (Mirrorless)",
+      "manufacturer": "Canon",
+      "sensor_width_mm": 36.0,
+      "sensor_height_mm": 24.0,
+      "pixel_size_um": 5.36,
+      "resolution_w": 6720,
+      "resolution_h": 4480,
+      "type": "mirrorless_color",
+      "suggests_experience": "advanced",
+      "source_url": "https://www.usa.canon.com/internet/portal/us/home/products/details/cameras/eos-dslr-and-mirrorless-cameras/mirrorless/eos-ra"
+    }
+  ],
+  "mounts": [
+    {
+      "id": "skywatcher_star_adventurer_gti",
+      "label": "Star Adventurer GTi",
+      "manufacturer": "Sky-Watcher",
+      "mount_type": "Equatorial",
+      "payload_capacity_kg": 5.0,
+      "tracking_accuracy_arcsec": null,
+      "guiding_supported": true,
+      "suggests_experience": "beginner",
+      "source_url": "https://www.skywatcher.com/product/star-adventurer-gti/"
+    },
+    {
+      "id": "celestron_avx",
+      "label": "Advanced VX (AVX)",
+      "manufacturer": "Celestron",
+      "mount_type": "Equatorial",
+      "payload_capacity_kg": 13.6,
+      "tracking_accuracy_arcsec": null,
+      "guiding_supported": true,
+      "suggests_experience": "beginner",
+      "source_url": "https://www.celestron.com/products/advanced-vx-mount-and-tripod"
+    },
+    {
+      "id": "skywatcher_heq5_pro",
+      "label": "HEQ5 Pro",
+      "manufacturer": "Sky-Watcher",
+      "mount_type": "Equatorial",
+      "payload_capacity_kg": 15.0,
+      "tracking_accuracy_arcsec": 10,
+      "guiding_supported": true,
+      "suggests_experience": "intermediate",
+      "source_url": "http://skywatcher.com/product/heq5-synscan/"
+    },
+    {
+      "id": "ioptron_gem45",
+      "label": "GEM45",
+      "manufacturer": "iOptron",
+      "mount_type": "Equatorial",
+      "payload_capacity_kg": 20.4,
+      "tracking_accuracy_arcsec": 7,
+      "guiding_supported": true,
+      "suggests_experience": "intermediate",
+      "source_url": "https://www.ioptron.com/product-p/7603a.htm"
+    },
+    {
+      "id": "skywatcher_eq6r_pro",
+      "label": "EQ6-R Pro",
+      "manufacturer": "Sky-Watcher",
+      "mount_type": "Equatorial",
+      "payload_capacity_kg": 20.0,
+      "tracking_accuracy_arcsec": 7,
+      "guiding_supported": true,
+      "suggests_experience": "advanced",
+      "source_url": "https://skywatcher.com/product/eq6r-pro/"
+    },
+    {
+      "id": "ioptron_cem70",
+      "label": "CEM70",
+      "manufacturer": "iOptron",
+      "mount_type": "Equatorial",
+      "payload_capacity_kg": 31.8,
+      "tracking_accuracy_arcsec": 3.5,
+      "guiding_supported": true,
+      "suggests_experience": "advanced",
+      "source_url": "https://www.ioptron.com/product-p/c70aw.htm"
+    }
+  ],
+  "filters": [
+    {
+      "id": "optolong_lpro",
+      "label": "L-Pro",
+      "manufacturer": "Optolong",
+      "filter_type": "Light Pollution Reduction",
+      "central_wavelength_nm": null,
+      "bandwidth_nm": null,
+      "intended_use": "Broadband light-pollution suppression (380-750nm) for natural star colors with OSC/DSLR cameras; galaxies, reflection nebulae, star clusters",
+      "suggests_experience": "beginner",
+      "source_url": "https://www.optolong.com/cms/document/detail/id/13.html"
+    },
+    {
+      "id": "optolong_lenhance",
+      "label": "L-eNhance",
+      "manufacturer": "Optolong",
+      "filter_type": "Narrowband",
+      "central_wavelength_nm": null,
+      "bandwidth_nm": null,
+      "intended_use": "Dual-band H-alpha 656nm (12nm) + OIII/H-beta 496-501nm (24nm) for emission nebulae with OSC cameras under moderate light pollution",
+      "suggests_experience": "beginner",
+      "source_url": "https://www.optolong.com/cms/document/detail/id/16.html"
+    },
+    {
+      "id": "optolong_lextreme",
+      "label": "L-eXtreme",
+      "manufacturer": "Optolong",
+      "filter_type": "Narrowband",
+      "central_wavelength_nm": null,
+      "bandwidth_nm": 7,
+      "intended_use": "Dual-band H-alpha 656nm + OIII 501nm (7nm each) for emission nebulae with OSC cameras under heavy light pollution",
+      "suggests_experience": "intermediate",
+      "source_url": "https://optolong.com/cms/document/detail/id/276.html"
+    },
+    {
+      "id": "zwo_duoband",
+      "label": "Duo-Band Filter",
+      "manufacturer": "ZWO",
+      "filter_type": "Narrowband",
+      "central_wavelength_nm": null,
+      "bandwidth_nm": null,
+      "intended_use": "Dual-band H-alpha 656nm (15nm) + OIII 501nm (35nm) nebula imaging with OSC/mono cameras",
+      "suggests_experience": "intermediate",
+      "source_url": "https://www.zwoastro.com/product/duo-band-filters/"
+    },
+    {
+      "id": "astronomik_ha6",
+      "label": "H-alpha 6nm CCD",
+      "manufacturer": "Astronomik",
+      "filter_type": "H-Alpha",
+      "central_wavelength_nm": 656,
+      "bandwidth_nm": 6,
+      "intended_use": "Narrowband emission-nebula imaging with mono cameras",
+      "suggests_experience": "advanced",
+      "source_url": "https://www.astronomik.com/en/photographic-filters/h-alpha-6nm-ccd-filter.html"
+    },
+    {
+      "id": "astronomik_oiii6",
+      "label": "OIII 6nm CCD",
+      "manufacturer": "Astronomik",
+      "filter_type": "OIII",
+      "central_wavelength_nm": 501,
+      "bandwidth_nm": 6,
+      "intended_use": "Narrowband emission-nebula imaging with mono cameras",
+      "suggests_experience": "advanced",
+      "source_url": "https://www.astronomik.com/en/fotografische-emissionslinienfilter/schmalbandfilter-oiii-ccd-6nm.html"
+    },
+    {
+      "id": "astronomik_sii6",
+      "label": "SII 6nm CCD",
+      "manufacturer": "Astronomik",
+      "filter_type": "SII",
+      "central_wavelength_nm": 672,
+      "bandwidth_nm": 6,
+      "intended_use": "Narrowband emission-nebula imaging with mono cameras (SHO palette)",
+      "suggests_experience": "advanced",
+      "source_url": "https://www.astronomik.com/en/Narrowband-Filters/SII/"
+    }
+  ],
+  "accessories": [
+    {
+      "id": "zwo_mini_guide_scope",
+      "label": "30mm Mini Guide Scope",
+      "manufacturer": "ZWO",
+      "accessory_type": "Guide Scope",
+      "weight_kg": 0.25,
+      "suggests_experience": "beginner",
+      "source_url": "https://www.zwoastro.com/product/zwo-30f4-mini-guide-scope/"
+    },
+    {
+      "id": "skywatcher_evoguide50ed",
+      "label": "Evoguide 50ED",
+      "manufacturer": "Sky-Watcher",
+      "accessory_type": "Guide Scope",
+      "weight_kg": 0.865,
+      "suggests_experience": "intermediate",
+      "source_url": "https://www.skywatcherusa.com/products/evoguide-50-apo-refractor"
+    },
+    {
+      "id": "zwo_eaf",
+      "label": "EAF (Electronic Auto Focuser)",
+      "manufacturer": "ZWO",
+      "accessory_type": "Electronic Focuser",
+      "weight_kg": 0.277,
+      "suggests_experience": "intermediate",
+      "source_url": "https://www.zwoastro.com/product/eaf/"
+    },
+    {
+      "id": "pegasus_focuscube3",
+      "label": "FocusCube 3",
+      "manufacturer": "Pegasus Astro",
+      "accessory_type": "Electronic Focuser",
+      "weight_kg": 0.26,
+      "suggests_experience": "intermediate",
+      "source_url": "https://pegasusastro.com/products/focuscube-3-universal/"
+    },
+    {
+      "id": "zwo_efw_7x36",
+      "label": "EFW 7x36mm Filter Wheel",
+      "manufacturer": "ZWO",
+      "accessory_type": "Filter Wheel",
+      "weight_kg": 0.4,
+      "suggests_experience": "intermediate",
+      "source_url": "https://www.zwoastro.com/product/efw-filter-wheels/"
+    },
+    {
+      "id": "zwo_oag_l",
+      "label": "OAG-L Off-Axis Guider",
+      "manufacturer": "ZWO",
+      "accessory_type": "Off-Axis Guider",
+      "weight_kg": 0.7,
+      "suggests_experience": "advanced",
+      "source_url": "https://us.zwoastro.com/products/zwo-off-axis-guider"
+    },
+    {
+      "id": "baader_mpcc3",
+      "label": "MPCC Mark III Coma Corrector",
+      "manufacturer": "Baader Planetarium",
+      "accessory_type": "Coma Corrector",
+      "weight_kg": 0.08,
+      "suggests_experience": "intermediate",
+      "source_url": "https://www.baader-planetarium.com/en/2%22-mpcc-mark-iii-(multi-purpose-coma-corrector-for-newtons).html"
     }
   ]
 }

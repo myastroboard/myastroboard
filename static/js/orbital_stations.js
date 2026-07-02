@@ -18,28 +18,17 @@ const ISS_FUTURE_COLOR  = '#6366f1'; // indigo
 const CSS_PAST_COLOR    = '#ef4444'; // red
 const CSS_FUTURE_COLOR  = '#8b5cf6'; // violet
 
-let _leafletLoadPromise = null;
+const _leafletLoadState = { promise: null };
 
 /** Lazily load the Leaflet library (only needed for the orbital stations map) so it isn't fetched on every page load. */
 function _ensureLeafletLoaded() {
-    if (typeof L !== 'undefined') return Promise.resolve();
-    if (_leafletLoadPromise) return _leafletLoadPromise;
-    _leafletLoadPromise = new Promise((resolve, reject) => {
-        const link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = '/static/vendor/leaflet/dist/leaflet.min.css?v=1.9.4';
-        document.head.appendChild(link);
-
-        const script = document.createElement('script');
-        script.src = '/static/vendor/leaflet/dist/leaflet.min.js?v=1.9.4';
-        script.onload = resolve;
-        script.onerror = () => {
-            _leafletLoadPromise = null;
-            reject(new Error('Failed to load Leaflet'));
-        };
-        document.head.appendChild(script);
-    });
-    return _leafletLoadPromise;
+    return ensureVendorScriptLoaded(
+        () => typeof L !== 'undefined',
+        '/static/vendor/leaflet/dist/leaflet.min.js?v=1.9.4',
+        '/static/vendor/leaflet/dist/leaflet.min.css?v=1.9.4',
+        _leafletLoadState,
+        'Leaflet'
+    );
 }
 
 // ---- Active passes tab ('iss' | 'css') ----

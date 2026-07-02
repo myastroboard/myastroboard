@@ -582,13 +582,24 @@ function _buildWelcomeStep(container) {
 
 const _WIZARD_TELESCOPE_TYPE_MAP = {
     refractor: 'Refractor',
-    newtonian: 'Newtonian',
+    apo: 'Apochromatic Refractor (APO)',
+    reflector: 'Reflector',
     sct: 'Schmidt-Cassegrain (SCT)',
+    edgehd: 'EdgeHD',
+    rasa: 'Rowe Ackerman Schmidt Astrograph (RASA)',
+    rc: 'Ritchey-Chrétien (RC)',
+    newtonian: 'Newtonian',
+    maksutov: 'Maksutov-Cassegrain',
+    cassegrain: 'Cassegrain',
+    dobsonian: 'Dobsonian',
 };
 const _WIZARD_CAMERA_SENSOR_TYPE_MAP = {
     cmos_color: 'CMOS Color',
     dslr_color: 'CMOS Color',
     mirrorless_color: 'CMOS Color',
+    cmos_mono: 'CMOS Mono',
+    ccd_color: 'CCD Color',
+    ccd_mono: 'CCD Mono',
 };
 
 async function _wizardLoadEquipmentData() {
@@ -704,14 +715,28 @@ function _buildEquipmentPickerBlock(kind, labelText, presets) {
     noneOpt.value = '';
     noneOpt.textContent = i18n.t('wizard.equipment_preset_placeholder');
     select.appendChild(noneOpt);
-    presets.forEach((preset) => {
+
+    // Presets tagged for the user's current experience level are surfaced first and
+    // labelled, so e.g. a beginner sees beginner-friendly gear at the top of the list.
+    const currentLevel = currentUserPreferences?.experience_level || 'advanced';
+    const orderedPresets = [...presets].sort((a, b) => {
+        const aMatch = a.suggests_experience === currentLevel ? 0 : 1;
+        const bMatch = b.suggests_experience === currentLevel ? 0 : 1;
+        return aMatch - bMatch;
+    });
+    orderedPresets.forEach((preset) => {
         const opt = document.createElement('option');
         opt.value = preset.id;
         const alreadyPrefixed = preset.manufacturer
             && preset.label.toLowerCase().startsWith(preset.manufacturer.toLowerCase());
-        opt.textContent = preset.manufacturer && !alreadyPrefixed
+        let text = preset.manufacturer && !alreadyPrefixed
             ? `${preset.manufacturer} ${preset.label}`
             : preset.label;
+        if (preset.suggests_experience === currentLevel) {
+            const levelLabel = i18n.t(`settings.experience_level_${preset.suggests_experience}`);
+            text += ` (${levelLabel})`;
+        }
+        opt.textContent = text;
         select.appendChild(opt);
     });
     const manualOpt = document.createElement('option');
@@ -825,65 +850,70 @@ function _mapCameraPresetToPayload(preset) {
     };
 }
 
+// Per-kind config driving _saveEquipmentOfKind() - keeps the telescope/camera save
+// flow as a single code path instead of two near-identical copies.
+const _WIZARD_EQUIPMENT_KIND_CONFIG = {
+    telescope: {
+        endpoint: '/api/equipment/telescopes',
+        selectId: 'wizard-telescope-preset',
+        presetsKey: 'telescopes',
+        mapPreset: _mapTelescopePresetToPayload,
+        buildManualPayload: (name) => ({
+            name,
+            telescope_type: document.getElementById('wizard-telescope-manual-type')?.value || 'Refractor',
+            aperture_mm: parseFloat(document.getElementById('wizard-telescope-manual-aperture')?.value) || 0,
+            focal_length_mm: parseFloat(document.getElementById('wizard-telescope-manual-focal')?.value) || 0,
+        }),
+    },
+    camera: {
+        endpoint: '/api/equipment/cameras',
+        selectId: 'wizard-camera-preset',
+        presetsKey: 'cameras',
+        mapPreset: _mapCameraPresetToPayload,
+        buildManualPayload: (name) => ({
+            name,
+            manufacturer: '',
+            sensor_type: document.getElementById('wizard-camera-manual-sensor-type')?.value || 'CMOS Color',
+            sensor_width_mm: parseFloat(document.getElementById('wizard-camera-manual-width')?.value) || 0,
+            sensor_height_mm: parseFloat(document.getElementById('wizard-camera-manual-height')?.value) || 0,
+            resolution_width_px: parseInt(document.getElementById('wizard-camera-manual-res-w')?.value, 10) || 0,
+            resolution_height_px: parseInt(document.getElementById('wizard-camera-manual-res-h')?.value, 10) || 0,
+            pixel_size_um: parseFloat(document.getElementById('wizard-camera-manual-pixel')?.value) || 0,
+        }),
+    },
+};
+
+async function _saveEquipmentOfKind(kind) {
+    const config = _WIZARD_EQUIPMENT_KIND_CONFIG[kind];
+    const select = document.getElementById(config.selectId);
+
+    if (select?.value === '__manual__') {
+        const name = document.getElementById(`wizard-${kind}-manual-name`)?.value.trim();
+        if (name) {
+            await fetchJSON(config.endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(config.buildManualPayload(name)),
+            });
+        }
+    } else if (select?.value) {
+        const preset = (_wizard.presets?.[config.presetsKey] || []).find((p) => p.id === select.value);
+        if (preset) {
+            await fetchJSON(config.endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(config.mapPreset(preset)),
+            });
+        }
+    }
+}
+
 async function _saveEquipmentStep() {
-    const telescopeSelect = document.getElementById('wizard-telescope-preset');
-    const cameraSelect = document.getElementById('wizard-camera-preset');
     const expSelect = document.getElementById('wizard-experience-level');
 
     try {
-        if (telescopeSelect?.value === '__manual__') {
-            const name = document.getElementById('wizard-telescope-manual-name')?.value.trim();
-            if (name) {
-                await fetchJSON('/api/equipment/telescopes', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        name,
-                        telescope_type: document.getElementById('wizard-telescope-manual-type')?.value || 'Refractor',
-                        aperture_mm: parseFloat(document.getElementById('wizard-telescope-manual-aperture')?.value) || 0,
-                        focal_length_mm: parseFloat(document.getElementById('wizard-telescope-manual-focal')?.value) || 0,
-                    }),
-                });
-            }
-        } else if (telescopeSelect?.value) {
-            const preset = (_wizard.presets?.telescopes || []).find((p) => p.id === telescopeSelect.value);
-            if (preset) {
-                await fetchJSON('/api/equipment/telescopes', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(_mapTelescopePresetToPayload(preset)),
-                });
-            }
-        }
-
-        if (cameraSelect?.value === '__manual__') {
-            const name = document.getElementById('wizard-camera-manual-name')?.value.trim();
-            if (name) {
-                await fetchJSON('/api/equipment/cameras', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        name,
-                        manufacturer: '',
-                        sensor_type: document.getElementById('wizard-camera-manual-sensor-type')?.value || 'CMOS Color',
-                        sensor_width_mm: parseFloat(document.getElementById('wizard-camera-manual-width')?.value) || 0,
-                        sensor_height_mm: parseFloat(document.getElementById('wizard-camera-manual-height')?.value) || 0,
-                        resolution_width_px: parseInt(document.getElementById('wizard-camera-manual-res-w')?.value, 10) || 0,
-                        resolution_height_px: parseInt(document.getElementById('wizard-camera-manual-res-h')?.value, 10) || 0,
-                        pixel_size_um: parseFloat(document.getElementById('wizard-camera-manual-pixel')?.value) || 0,
-                    }),
-                });
-            }
-        } else if (cameraSelect?.value) {
-            const preset = (_wizard.presets?.cameras || []).find((p) => p.id === cameraSelect.value);
-            if (preset) {
-                await fetchJSON('/api/equipment/cameras', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(_mapCameraPresetToPayload(preset)),
-                });
-            }
-        }
+        await _saveEquipmentOfKind('telescope');
+        await _saveEquipmentOfKind('camera');
 
         if (expSelect?.value) {
             currentUserPreferences = await saveUserPreferences({ experience_level: expSelect.value });
