@@ -1181,7 +1181,7 @@ function _buildSkyTonightSectionButtons() {
         li.className = 'nav-item';
         const a = document.createElement('a');
         a.className = `nav-link sub-tab-btn${sec.key === _skytCurrentSection ? ' active' : ''}`;
-        a.href = '#';
+        a.href = `#skytonight/${subtabName}`;
         a.setAttribute('data-subtab', subtabName);
         const _navSpan = document.createElement('span');
         _navSpan.textContent = tSkyTonightCompat(sec.labelKey);
