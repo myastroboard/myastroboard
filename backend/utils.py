@@ -259,3 +259,8 @@ def get_environment_info() -> Dict[str, str]:
         'working_directory': os.getcwd(),
         'docker_env': str(os.path.exists('/.dockerenv')),
     }
+
+
+def normalize_catalogue_key(value: Optional[str]) -> str:
+    """Normalize a catalogue/target name for loose cross-referencing (uppercase, no separators)."""
+    return re.sub(r'[^A-Za-z0-9]', '', str(value or '')).upper()

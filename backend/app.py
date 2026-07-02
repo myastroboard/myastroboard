@@ -101,7 +101,7 @@ from skytonight_storage import (
     get_scheduler_lock_file as get_skytonight_scheduler_lock_file,
     has_dso_results,
 )
-from utils import load_json_file
+from utils import load_json_file, normalize_catalogue_key as _normalize_catalogue_key_for_difficulty
 from on_demand_translate import translate_text_on_demand
 from skytonight_calculator import load_calculation_results
 from sun_phases import SunService
@@ -169,7 +169,7 @@ CORS(app, supports_credentials=True)
 Compress(app)
 
 # SkyTonight Blueprint (routes + scheduler management)
-from skytonight_api import skytonight_bp
+from skytonight_api import skytonight_bp, _preload_all_current_plan_entries
 from skytonight_scheduler_manager import get_or_create_skytonight_scheduler
 
 app.register_blueprint(skytonight_bp)
@@ -3945,19 +3945,29 @@ def export_plan_my_night_pdf():
         return jsonify({'error': 'Internal server error'}), 500
 
 
-def _normalize_catalogue_key_for_difficulty(value):
-    """Normalize a catalogue/target name for loose difficulty cross-referencing (uppercase, no separators)."""
-    return re.sub(r'[^A-Za-z0-9]', '', str(value or '')).upper()
+_difficulty_lookup_cache: Optional[Dict[str, str]] = None
+_difficulty_lookup_cache_key = None
 
 
-def _enrich_astrodex_items_with_difficulty(items):
-    """Attach a `difficulty` field to each Astrodex item by cross-referencing SkyTonight's dso_results.json.
+def _build_difficulty_lookup() -> Dict[str, str]:
+    """Build a normalized-catalogue-name -> difficulty lookup from SkyTonight's dso_results.json.
 
-    Items with no catalogue/name match (e.g. manual entries not present in SkyTonight's
-    catalogue) get `difficulty: None` rather than a guessed value.
+    Cached in memory keyed by the file's mtime - dso_results.json is only rewritten by the
+    twice-daily SkyTonight calculation job, so rebuilding this on every /api/astrodex request
+    is wasted work.
     """
+    global _difficulty_lookup_cache, _difficulty_lookup_cache_key
+
+    try:
+        cache_key = os.path.getmtime(SKYTONIGHT_DSO_RESULTS_FILE)
+    except OSError:
+        cache_key = None
+
+    if _difficulty_lookup_cache is not None and _difficulty_lookup_cache_key == cache_key:
+        return _difficulty_lookup_cache
+
     dso_data = load_json_file(SKYTONIGHT_DSO_RESULTS_FILE, default={})
-    lookup = {}
+    lookup: Dict[str, str] = {}
     for entry in dso_data.get('deep_sky', []) if isinstance(dso_data, dict) else []:
         difficulty = entry.get('difficulty')
         catalogue_names = entry.get('catalogue_names', {})
@@ -3968,6 +3978,17 @@ def _enrich_astrodex_items_with_difficulty(items):
             if key:
                 lookup[key] = difficulty
 
+    _difficulty_lookup_cache, _difficulty_lookup_cache_key = lookup, cache_key
+    return lookup
+
+
+def _enrich_astrodex_items_with_difficulty(items):
+    """Attach a `difficulty` field to each Astrodex item by cross-referencing SkyTonight's dso_results.json.
+
+    Items with no catalogue/name match (e.g. manual entries not present in SkyTonight's
+    catalogue) get `difficulty: None` rather than a guessed value.
+    """
+    lookup = _build_difficulty_lookup()
     for item in items:
         if not isinstance(item, dict):
             continue
@@ -4038,9 +4059,10 @@ def get_beginner_catalog():
         dso_results = load_json_file(SKYTONIGHT_DSO_RESULTS_FILE, default={})
         astrodex_payload = astrodex.load_user_astrodex(user.user_id, user.username)
         user_astrodex_items = astrodex_payload.get('items', []) if isinstance(astrodex_payload, dict) else []
-        plan_payload = plan_my_night.load_user_plan(user.user_id, user.username)
-        plan = plan_payload.get('plan') if isinstance(plan_payload, dict) else None
-        user_plan_entries = plan.get('entries', []) if isinstance(plan, dict) else []
+        # Aggregate across all telescope-scoped plans and only count "current" (non-archived)
+        # ones, matching /api/skytonight/recommendations so "already planned" status agrees
+        # between the two panels instead of only reflecting the default no-telescope plan.
+        user_plan_entries = _preload_all_current_plan_entries(user.user_id, user.username)
 
         catalog = beginner_catalog.enrich_with_skytonight(
             catalog, dso_results, user_astrodex_items, user_plan_entries

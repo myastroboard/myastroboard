@@ -2410,12 +2410,6 @@ function _buildBeginnerCatalogCard(obj) {
         DOMUtils.append(capturedBadge, DOMUtils.createIcon('bi bi-check-circle-fill'), ` ${i18n.t('beginner_catalog.captured')}`);
         badgeRow.appendChild(capturedBadge);
     }
-    if (obj.in_astrodex) {
-        const capturedBadge = document.createElement('span');
-        capturedBadge.className = 'badge bg-success';
-        DOMUtils.append(capturedBadge, DOMUtils.createIcon('bi bi-check-circle-fill'), ` ${i18n.t('beginner_catalog.captured')}`);
-        badgeRow.appendChild(capturedBadge);
-    }
     body.appendChild(badgeRow);
 
     const visibility = document.createElement('div');

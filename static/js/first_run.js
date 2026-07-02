@@ -141,18 +141,27 @@ function _wizardUpdateFooterButtons() {
 }
 
 async function _wizardNext() {
-    const stepKey = _wizard.steps[_wizard.stepIndex];
-    const saveFn = _WIZARD_STEP_SAVE[stepKey];
-    if (saveFn) {
-        const ok = await saveFn();
-        if (!ok) return; // validation failed - stay on this step
+    if (_wizard.saving) return; // guard against double-clicks re-submitting the current step
+    _wizard.saving = true;
+    const nextBtn = document.getElementById('wizard-next-btn');
+    if (nextBtn) nextBtn.disabled = true;
+    try {
+        const stepKey = _wizard.steps[_wizard.stepIndex];
+        const saveFn = _WIZARD_STEP_SAVE[stepKey];
+        if (saveFn) {
+            const ok = await saveFn();
+            if (!ok) return; // validation failed - stay on this step
+        }
+        if (_wizard.stepIndex >= _wizard.steps.length - 1) {
+            await _wizardFinish();
+            return;
+        }
+        _wizard.stepIndex += 1;
+        _renderWizardStep();
+    } finally {
+        _wizard.saving = false;
+        if (nextBtn) nextBtn.disabled = false;
     }
-    if (_wizard.stepIndex >= _wizard.steps.length - 1) {
-        await _wizardFinish();
-        return;
-    }
-    _wizard.stepIndex += 1;
-    _renderWizardStep();
 }
 
 function _wizardBack() {

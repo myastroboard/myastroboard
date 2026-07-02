@@ -597,10 +597,11 @@ def compute_difficulty_score(target: SkyTonightTarget) -> Tuple[int, str]:
     Fallback behaviour
     ------------------
     When magnitude or size_arcmin is missing, surface brightness cannot be
-    computed; the surface_brightness and angular_size contributions are both
-    zeroed (not proportionally rescaled) and only the visual_magnitude factor
-    is used, i.e. "magnitude-only" scoring. If magnitude is also unavailable,
-    the function returns a neutral default of (50, 'intermediate').
+    computed, so the surface_brightness contribution is zeroed (not
+    proportionally rescaled) and scoring falls back to whichever single factor
+    is actually available: "magnitude-only" scoring if magnitude is present,
+    or "size-only" scoring if only size_arcmin is present. If both are
+    unavailable, the function returns a neutral default of (50, 'intermediate').
 
     Difficulty is static (computed once from magnitude/size only) and does
     not depend on Bortle or sky quality - those affect AstroScore, not this
@@ -622,9 +623,8 @@ def compute_difficulty_score(target: SkyTonightTarget) -> Tuple[int, str]:
 
     sb = _surface_brightness(magnitude, size_arcmin)
 
-    magnitude_component = _normalise(magnitude, *_DIFFICULTY_MAGNITUDE_RANGE) if magnitude is not None else 0.5
-
     if sb is not None:
+        magnitude_component = _normalise(magnitude, *_DIFFICULTY_MAGNITUDE_RANGE)
         sb_component = _normalise(sb, *_DIFFICULTY_SB_RANGE)
         size_norm = _normalise(size_arcmin, *_DIFFICULTY_SIZE_ARCMIN_RANGE)
         size_component = 1.0 - size_norm
@@ -633,9 +633,16 @@ def compute_difficulty_score(target: SkyTonightTarget) -> Tuple[int, str]:
             + _DIFFICULTY_WEIGHT_SIZE * size_component
             + _DIFFICULTY_WEIGHT_MAGNITUDE * magnitude_component
         )
-    else:
-        # Magnitude-only fallback: surface_brightness and angular_size are zeroed.
+    elif magnitude is not None:
+        # Size missing: magnitude-only fallback (surface_brightness/size zeroed).
+        magnitude_component = _normalise(magnitude, *_DIFFICULTY_MAGNITUDE_RANGE)
         raw_score = _DIFFICULTY_WEIGHT_MAGNITUDE * magnitude_component
+    else:
+        # Magnitude missing, size available: size-only fallback (mirrors the
+        # magnitude-only branch above) instead of discarding the known size_arcmin.
+        size_norm = _normalise(size_arcmin, *_DIFFICULTY_SIZE_ARCMIN_RANGE)
+        size_component = 1.0 - size_norm
+        raw_score = _DIFFICULTY_WEIGHT_SIZE * size_component
 
     difficulty_score = int(round(min(100.0, max(0.0, raw_score * 100.0))))
 
