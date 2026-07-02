@@ -220,7 +220,8 @@ function handleHashNavigation() {
 async function initializeApp() {
     // Ensure translations are fully loaded before any component calls i18n.t()
     await i18n.ready;
-    setupMainTabs(); 
+    setupNavLinkHrefs();
+    setupMainTabs();
     setupSubTabs();
     await loadTimezones();
     await loadConfiguration();  // Wait for config to load before loading catalogues
@@ -266,10 +267,33 @@ async function initializeApp() {
     }
 }
 
+// Give every tab/sub-tab link a real "#..." href matching its data-tab/data-subtab
+// so that middle-click / Ctrl+click / "open in new tab" works, instead of the
+// placeholder href="#" they carry in the markup.
+function setupNavLinkHrefs() {
+    document.querySelectorAll('.main-tab-btn[data-tab]').forEach(btn => {
+        btn.setAttribute('href', `#${btn.getAttribute('data-tab')}`);
+    });
+    document.querySelectorAll('.sub-tab-btn[data-subtab]').forEach(btn => {
+        const parentTab = btn.closest('.main-tab-content');
+        if (!parentTab) return;
+        const mainTab = parentTab.id.replace('-tab', '');
+        btn.setAttribute('href', `#${mainTab}/${btn.getAttribute('data-subtab')}`);
+    });
+}
+
+// A modified click (Ctrl/Cmd/Shift) or non-primary button is the user's way of
+// asking the browser to open the link in a new tab/window - let that happen
+// instead of hijacking it for in-page SPA navigation.
+function isPlainLeftClick(e) {
+    return e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey;
+}
+
 function setupMainTabs() {
     const mainTabBtns = document.querySelectorAll('.main-tab-btn');
     mainTabBtns.forEach(btn => {
         btn.addEventListener('click', (e) => {
+            if (!isPlainLeftClick(e)) return;
             e.preventDefault();
             const tabName = btn.getAttribute('data-tab');
             switchMainTab(tabName);
@@ -357,6 +381,8 @@ function setupSubTabs() {
 
         const subtabName = btn.getAttribute('data-subtab');
         if (!subtabName) return;
+
+        if (!isPlainLeftClick(e)) return;
 
         // prevent default link behavior
         e.preventDefault();
