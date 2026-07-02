@@ -2019,8 +2019,11 @@ function _buildRecommendationCard(target) {
     const identifier = target.id || target.messier || target.preferred_name;
 
     const card = document.createElement('div');
-    card.className = 'card flex-shrink-0';
-    card.style.width = '160px';
+    card.className = 'card';
+    // Grow to fill the strip on wide screens (no leftover blank space); never
+    // shrink below 160px so small/mobile screens keep the horizontal scroll.
+    card.style.flex = '1 0 160px';
+    card.style.maxWidth = '220px';
 
     // ── Thumbnail (clickable -> Object Information modal) ──────────────────
     const thumbBtn = document.createElement('button');
