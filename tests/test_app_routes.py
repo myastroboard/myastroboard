@@ -1612,8 +1612,7 @@ class TestDifficultyLookupCache:
     """Tests for _build_difficulty_lookup / _enrich_astrodex_items_with_difficulty."""
 
     def setup_method(self):
-        _app_mod._difficulty_lookup_cache = None
-        _app_mod._difficulty_lookup_cache_key = None
+        _app_mod._difficulty_lookup_cache = {'data': None, 'key': None}
 
     def test_missing_dso_results_file_returns_empty_lookup(self, monkeypatch):
         monkeypatch.setattr(_app_mod, 'SKYTONIGHT_DSO_RESULTS_FILE', '/nonexistent/dso_results.json')
