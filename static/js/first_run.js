@@ -834,6 +834,7 @@ function _mapTelescopePresetToPayload(preset) {
         telescope_type: _WIZARD_TELESCOPE_TYPE_MAP[preset.type] || 'Refractor',
         aperture_mm: preset.aperture_mm,
         focal_length_mm: preset.focal_length_mm,
+        weight_kg: preset.weight_kg || 0,
     };
 }
 
@@ -847,6 +848,9 @@ function _mapCameraPresetToPayload(preset) {
         resolution_height_px: preset.resolution_h,
         pixel_size_um: preset.pixel_size_um,
         sensor_type: _WIZARD_CAMERA_SENSOR_TYPE_MAP[preset.type] || 'CMOS Color',
+        weight_kg: preset.weight_kg || 0,
+        cooling_supported: preset.cooling_supported || false,
+        min_temperature_c: preset.min_temperature_c ?? null,
     };
 }
 

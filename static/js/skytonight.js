@@ -78,6 +78,11 @@ async function showPlanTelescopePickerModal(telescopeItems, row) {
         const body = document.createElement('div');
         body.className = 'modal-body';
 
+        // Solid background wrapper (fixes gradient-on-text readability), same treatment as the setup wizard
+        const bodyContent = document.createElement('div');
+        bodyContent.className = 'bg-sub-container rounded p-3';
+        body.appendChild(bodyContent);
+
         const hasRatings = Object.keys(ratingsById).length > 0;
 
         // Exclude orphaned plans from the picker (telescope no longer accessible)
@@ -131,7 +136,7 @@ async function showPlanTelescopePickerModal(telescopeItems, row) {
                 overlay.remove();
                 resolve({ telescope_id: t.telescope_id, telescope_name: t.telescope_name });
             });
-            body.appendChild(btn);
+            bodyContent.appendChild(btn);
         };
 
         ownItems.forEach(appendTelescopeBtn);
@@ -139,11 +144,11 @@ async function showPlanTelescopePickerModal(telescopeItems, row) {
         if (sharedItems.length > 0) {
             const sep = document.createElement('hr');
             sep.className = 'my-2';
-            body.appendChild(sep);
+            bodyContent.appendChild(sep);
             const sepLabel = document.createElement('div');
             sepLabel.className = 'text-muted small px-1 mb-1';
             sepLabel.textContent = i18n.t('equipment.shared_by_others_section');
-            body.appendChild(sepLabel);
+            bodyContent.appendChild(sepLabel);
             sharedItems.forEach(appendTelescopeBtn);
         }
 
