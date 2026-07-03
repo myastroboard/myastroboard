@@ -407,6 +407,16 @@ async function saveUserPreferences(preferences) {
     return normalizePreferences(data.preferences || preferences);
 }
 
+// Other scripts (e.g. first_run.js) that update the shared preferences state after
+// calling saveUserPreferences() must go through this setter rather than assigning
+// the bare `currentUserPreferences` identifier - from their file alone that looks
+// like a missing declaration, when it's actually this `let` above being shared
+// across script tags.
+function setCurrentUserPreferences(preferences) {
+    currentUserPreferences = preferences;
+    return currentUserPreferences;
+}
+
 function setupCustomizeForm() {
     const form = document.getElementById('customize-preferences-form');
     if (!form) return;

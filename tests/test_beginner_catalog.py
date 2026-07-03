@@ -76,8 +76,7 @@ class TestLoadBeginnerCatalog:
         bad_file = tmp_path / 'malformed.json'
         bad_file.write_text('{not valid json', encoding='utf-8')
         monkeypatch.setattr(beginner_catalog, '_BEGINNER_CATALOG_FILE', str(bad_file))
-        monkeypatch.setattr(beginner_catalog, '_catalog_cache', None)
-        monkeypatch.setattr(beginner_catalog, '_catalog_cache_key', None)
+        monkeypatch.setattr(beginner_catalog, '_catalog_cache', {'data': None, 'key': None})
         assert beginner_catalog.load_beginner_catalog() == []
 
     def test_non_list_json_returns_empty_list(self, monkeypatch, tmp_path):
@@ -85,8 +84,7 @@ class TestLoadBeginnerCatalog:
         not_a_list_file = tmp_path / 'not_a_list.json'
         not_a_list_file.write_text(json.dumps({'not': 'a list'}), encoding='utf-8')
         monkeypatch.setattr(beginner_catalog, '_BEGINNER_CATALOG_FILE', str(not_a_list_file))
-        monkeypatch.setattr(beginner_catalog, '_catalog_cache', None)
-        monkeypatch.setattr(beginner_catalog, '_catalog_cache_key', None)
+        monkeypatch.setattr(beginner_catalog, '_catalog_cache', {'data': None, 'key': None})
         assert beginner_catalog.load_beginner_catalog() == []
 
     def test_caches_result_between_calls(self, monkeypatch, tmp_path):
@@ -94,8 +92,7 @@ class TestLoadBeginnerCatalog:
         catalog_file = tmp_path / 'cacheable.json'
         catalog_file.write_text(json.dumps([{'id': 'X1'}]), encoding='utf-8')
         monkeypatch.setattr(beginner_catalog, '_BEGINNER_CATALOG_FILE', str(catalog_file))
-        monkeypatch.setattr(beginner_catalog, '_catalog_cache', None)
-        monkeypatch.setattr(beginner_catalog, '_catalog_cache_key', None)
+        monkeypatch.setattr(beginner_catalog, '_catalog_cache', {'data': None, 'key': None})
         first = beginner_catalog.load_beginner_catalog()
         second = beginner_catalog.load_beginner_catalog()
         assert first == [{'id': 'X1'}]

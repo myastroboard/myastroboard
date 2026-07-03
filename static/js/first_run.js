@@ -207,7 +207,7 @@ async function _wizardSkip(all) {
  * backend does a shallow merge, so a partial object would drop the other key. */
 async function _wizardPersist(wizardState) {
     try {
-        currentUserPreferences = await saveUserPreferences({ wizard: wizardState });
+        setCurrentUserPreferences(await saveUserPreferences({ wizard: wizardState }));
         window.myastroboardUserPreferences = { ...currentUserPreferences };
     } catch (err) {
         console.error('Error saving wizard state:', err);
@@ -921,7 +921,7 @@ async function _saveEquipmentStep() {
         await _saveEquipmentOfKind('camera');
 
         if (expSelect?.value) {
-            currentUserPreferences = await saveUserPreferences({ experience_level: expSelect.value });
+            setCurrentUserPreferences(await saveUserPreferences({ experience_level: expSelect.value }));
             window.myastroboardUserPreferences = { ...currentUserPreferences };
         }
 

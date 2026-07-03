@@ -8,7 +8,7 @@ with the current user's SkyTonight/Astrodex/Plan My Night state.
 import json
 import os
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import object_info
 from constellation import Constellation as _Constellation
@@ -36,8 +36,7 @@ _CONSTELLATION_ABBR_MAP['Se1'] = 'Serpens Caput'
 _CONSTELLATION_ABBR_MAP['Se2'] = 'Serpens Cauda'
 
 
-_catalog_cache: Optional[List[Dict[str, Any]]] = None
-_catalog_cache_key: Optional[tuple] = None
+_catalog_cache: Dict[str, Any] = {'data': None, 'key': None}
 
 
 def load_beginner_catalog() -> List[Dict[str, Any]]:
@@ -51,15 +50,13 @@ def load_beginner_catalog() -> List[Dict[str, Any]]:
     on every request while still picking up an on-disk change (or a test
     monkeypatching the file path) automatically.
     """
-    global _catalog_cache, _catalog_cache_key
-
     if not os.path.exists(_BEGINNER_CATALOG_FILE):
         logger.warning(f'Beginner catalog file not found: {_BEGINNER_CATALOG_FILE}')
         return []
 
     cache_key = (_BEGINNER_CATALOG_FILE, os.path.getmtime(_BEGINNER_CATALOG_FILE))
-    if _catalog_cache is not None and _catalog_cache_key == cache_key:
-        return _catalog_cache
+    if _catalog_cache['data'] is not None and _catalog_cache['key'] == cache_key:
+        return _catalog_cache['data']
 
     try:
         with open(_BEGINNER_CATALOG_FILE, encoding='utf-8') as f:
@@ -72,7 +69,7 @@ def load_beginner_catalog() -> List[Dict[str, Any]]:
         logger.error('Beginner catalog file does not contain a JSON list')
         return []
 
-    _catalog_cache, _catalog_cache_key = data, cache_key
+    _catalog_cache['data'], _catalog_cache['key'] = data, cache_key
     return data
 
 

@@ -975,7 +975,7 @@ class TestBackoffStateRealPersistence:
         monkeypatch.setattr(oi, '_save_backoff_state', _REAL_SAVE_BACKOFF_STATE)
         monkeypatch.setattr(oi, '_BACKOFF_FILE', str(tmp_path / 'object_info_backoff.json'))
         monkeypatch.setattr(oi, '_BACKOFF_LOCK_FILE', str(tmp_path / 'object_info_backoff.lock'))
-        monkeypatch.setattr(oi, '_backoff_mtime_seen', None)
+        monkeypatch.setattr(oi, '_backoff_state', {'mtime_seen': None})
 
     def test_load_missing_file_returns_empty_dict(self, monkeypatch, tmp_path):
         self._use_real_persistence(monkeypatch, tmp_path)

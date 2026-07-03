@@ -3945,8 +3945,7 @@ def export_plan_my_night_pdf():
         return jsonify({'error': 'Internal server error'}), 500
 
 
-_difficulty_lookup_cache: Optional[Dict[str, str]] = None
-_difficulty_lookup_cache_key = None
+_difficulty_lookup_cache: Dict[str, Any] = {'data': None, 'key': None}
 
 
 def _build_difficulty_lookup() -> Dict[str, str]:
@@ -3956,15 +3955,13 @@ def _build_difficulty_lookup() -> Dict[str, str]:
     twice-daily SkyTonight calculation job, so rebuilding this on every /api/astrodex request
     is wasted work.
     """
-    global _difficulty_lookup_cache, _difficulty_lookup_cache_key
-
     try:
         cache_key = os.path.getmtime(SKYTONIGHT_DSO_RESULTS_FILE)
     except OSError:
         cache_key = None
 
-    if _difficulty_lookup_cache is not None and _difficulty_lookup_cache_key == cache_key:
-        return _difficulty_lookup_cache
+    if _difficulty_lookup_cache['data'] is not None and _difficulty_lookup_cache['key'] == cache_key:
+        return _difficulty_lookup_cache['data']
 
     dso_data = load_json_file(SKYTONIGHT_DSO_RESULTS_FILE, default={})
     lookup: Dict[str, str] = {}
@@ -3978,7 +3975,7 @@ def _build_difficulty_lookup() -> Dict[str, str]:
             if key:
                 lookup[key] = difficulty
 
-    _difficulty_lookup_cache, _difficulty_lookup_cache_key = lookup, cache_key
+    _difficulty_lookup_cache['data'], _difficulty_lookup_cache['key'] = lookup, cache_key
     return lookup
 
 

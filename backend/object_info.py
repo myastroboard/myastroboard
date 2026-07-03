@@ -117,7 +117,7 @@ _BACKOFF_FILE = os.path.join(DATA_DIR_CACHE, 'object_info_backoff.json')
 _BACKOFF_LOCK_FILE = os.path.join(DATA_DIR_CACHE, 'object_info_backoff.lock')
 _BACKOFF_TTL = 300  # seconds
 _backoff_until: Dict[str, float] = {}
-_backoff_mtime_seen: Optional[float] = None
+_backoff_state: Dict[str, Optional[float]] = {'mtime_seen': None}
 
 
 @contextmanager
@@ -177,21 +177,20 @@ def _save_backoff_state() -> None:
 
 def _refresh_backoff_state_if_changed() -> None:
     """Re-read the shared backoff file only when another worker has actually changed it."""
-    global _backoff_mtime_seen
     try:
         mtime = os.path.getmtime(_BACKOFF_FILE)
     except OSError:
         mtime = None
-    if mtime != _backoff_mtime_seen:
-        _backoff_mtime_seen = mtime
+    if mtime != _backoff_state['mtime_seen']:
+        _backoff_state['mtime_seen'] = mtime
         _backoff_until.update(_load_backoff_state())
 
 
 _backoff_until.update(_load_backoff_state())
 try:
-    _backoff_mtime_seen = os.path.getmtime(_BACKOFF_FILE)
+    _backoff_state['mtime_seen'] = os.path.getmtime(_BACKOFF_FILE)
 except OSError:  # pragma: no cover - module-import-time bootstrap; exercised per-call by
-    _backoff_mtime_seen = None  # the identical try/except in _refresh_backoff_state_if_changed()
+    _backoff_state['mtime_seen'] = None  # the identical try/except in _refresh_backoff_state_if_changed()
 
 
 def _is_backed_off(service: str) -> bool:
