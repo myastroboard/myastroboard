@@ -710,6 +710,24 @@ class TestValidateUserPreferences:
             is_valid, msg = auth.UserManager.validate_user_preferences({'experience_level': level})
             assert is_valid
 
+    def test_beginner_catalog_enabled_not_bool_fails(self):
+        is_valid, msg = auth.UserManager.validate_user_preferences({'beginner_catalog_enabled': 'yes'})
+        assert not is_valid
+        assert 'beginner_catalog_enabled' in msg
+
+    def test_beginner_catalog_enabled_bool_passes(self):
+        is_valid, msg = auth.UserManager.validate_user_preferences({'beginner_catalog_enabled': False})
+        assert is_valid
+
+    def test_recommendations_enabled_not_bool_fails(self):
+        is_valid, msg = auth.UserManager.validate_user_preferences({'recommendations_enabled': 'yes'})
+        assert not is_valid
+        assert 'recommendations_enabled' in msg
+
+    def test_recommendations_enabled_bool_passes(self):
+        is_valid, msg = auth.UserManager.validate_user_preferences({'recommendations_enabled': True})
+        assert is_valid
+
     def test_wizard_not_dict_fails(self):
         is_valid, msg = auth.UserManager.validate_user_preferences({'wizard': 'yes'})
         assert not is_valid

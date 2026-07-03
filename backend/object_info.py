@@ -190,8 +190,8 @@ def _refresh_backoff_state_if_changed() -> None:
 _backoff_until.update(_load_backoff_state())
 try:
     _backoff_mtime_seen = os.path.getmtime(_BACKOFF_FILE)
-except OSError:
-    _backoff_mtime_seen = None
+except OSError:  # pragma: no cover - module-import-time bootstrap; exercised per-call by
+    _backoff_mtime_seen = None  # the identical try/except in _refresh_backoff_state_if_changed()
 
 
 def _is_backed_off(service: str) -> bool:

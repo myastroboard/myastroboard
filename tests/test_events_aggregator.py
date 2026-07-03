@@ -355,6 +355,41 @@ class TestPlanetaryEventLocalization:
         assert title is not None
         assert desc is not None
 
+    def test_localize_moon_conjunction(self, aggregator):
+        """Test localizing Moon-planet conjunction event."""
+        event_data = {
+            "event_type": "Moon Conjunction",
+            "title": "Moon - Jupiter Conjunction",
+            "description": "The Moon passes within 2.5° of Jupiter",
+            "raw_data": {
+                "planet1": "Moon",
+                "planet2": "Jupiter",
+                "separation_degrees": 2.5,
+            },
+        }
+
+        title, desc = aggregator._localize_planetary_text(event_data)
+
+        assert title is not None
+        assert desc is not None
+
+    def test_localize_moon_conjunction_missing_separation(self, aggregator):
+        """Test localizing Moon conjunction when separation_degrees is absent."""
+        event_data = {
+            "event_type": "Moon Conjunction",
+            "title": "Moon - Saturn Conjunction",
+            "description": "The Moon passes near Saturn",
+            "raw_data": {
+                "planet1": "Moon",
+                "planet2": "Saturn",
+            },
+        }
+
+        title, desc = aggregator._localize_planetary_text(event_data)
+
+        assert title is not None
+        assert desc is not None
+
     def test_localize_unknown_planetary_event(self, aggregator):
         """Test localizing unknown planetary event type."""
         event_data = {
@@ -1401,6 +1436,12 @@ class TestAggregateAllEventsExceptionPaths:
         """Exception in ISS extraction is caught."""
         with patch.object(aggregator, "_extract_iss_pass_events", side_effect=RuntimeError("fail")):
             result = aggregator.aggregate_all_events(iss_passes_data={"passes": []})
+        assert "upcoming_events" in result
+
+    def test_css_extractor_exception_caught(self, aggregator):
+        """Exception in CSS extraction is caught."""
+        with patch.object(aggregator, "_extract_css_pass_events", side_effect=RuntimeError("fail")):
+            result = aggregator.aggregate_all_events(css_passes_data={"passes": []})
         assert "upcoming_events" in result
 
     def test_planetary_extractor_exception_caught(self, aggregator):

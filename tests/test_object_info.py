@@ -8,6 +8,11 @@ import skytonight_targets as _st_module  # needed for patching the locally-impor
 
 import object_info as oi
 
+# Captured at import time, before the autouse fixture below mocks these out, so tests
+# that need the *real* disk-persistence behaviour can restore them explicitly.
+_REAL_LOAD_BACKOFF_STATE = oi._load_backoff_state
+_REAL_SAVE_BACKOFF_STATE = oi._save_backoff_state
+
 _get_dss_image_url = oi._get_dss_image_url
 _is_wikipedia_candidate = oi._is_wikipedia_candidate
 _normalize_wikipedia_term = oi._normalize_wikipedia_term
@@ -224,6 +229,12 @@ def test_parse_object_image_filename_rejects_bad_format():
 def test_parse_object_image_filename_rejects_out_of_range_coordinates():
     assert oi.parse_object_image_filename('400.000000_0.000000.jpg') is None
     assert oi.parse_object_image_filename('0.000000_100.000000.jpg') is None
+
+
+def test_parse_object_image_filename_wraps_exact_360_boundary():
+    """f'{ra:.6f}' can round a value just under 360 up to the literal '360.000000' -
+    that exact boundary artifact should wrap to 0.0 rather than being rejected."""
+    assert oi.parse_object_image_filename('360.000000_5.000000.jpg') == (0.0, 5.0)
 
 
 def test_ensure_cached_object_image_returns_none_on_request_failure(monkeypatch, tmp_path):
@@ -508,6 +519,32 @@ class TestResolveViaSimbad:
         assert result["type"] == "Galaxy"
         assert "NGC 224" in result["aliases"] or "M 31" in result["aliases"]
 
+    def test_alias_matching_identifier_is_excluded(self):
+        """The alias identical to the user's search identifier is skipped (it's already
+        the modal title) - other aliases, including ones equal to main_id, are kept."""
+        main_result = {
+            "data": [["NGC 224", "Galaxy", 10.684, 41.269]],
+            "metadata": [
+                {"name": "main_id"}, {"name": "otype_txt"}, {"name": "ra"}, {"name": "dec"}
+            ],
+        }
+        alias_result = {
+            "data": [["M 100"], [""], ["NGC 224"], ["Andromeda Galaxy"]],
+            "metadata": [{"name": "id"}],
+        }
+        call_count = [0]
+
+        def mock_query(q):
+            call_count[0] += 1
+            return main_result if call_count[0] == 1 else alias_result
+
+        with patch("object_info._simbad_query", side_effect=mock_query):
+            result = oi._resolve_via_simbad("M 100")
+
+        assert "M 100" not in result["aliases"]
+        assert "" not in result["aliases"]
+        assert "Andromeda Galaxy" in result["aliases"]
+
     def test_handles_none_alias_result(self):
         main_result = {
             "data": [["Some Star", "Star", None, None]],
@@ -570,6 +607,28 @@ class TestResolveIdentifierForCatalogueLookup:
         assert "constellation" in result
         assert "aliases" in result
         assert result["object_type"] == "Galaxy"
+
+    def test_blank_alias_rows_are_excluded(self):
+        main_result = {
+            "data": [["M 31", "Galaxy", 10.684, 41.269]],
+            "metadata": [
+                {"name": "main_id"}, {"name": "otype_txt"}, {"name": "ra"}, {"name": "dec"}
+            ],
+        }
+        alias_result = {
+            "data": [[""], ["   "], ["NGC 224"]],
+            "metadata": [{"name": "id"}],
+        }
+        call_count = [0]
+
+        def mock_query(q):
+            call_count[0] += 1
+            return main_result if call_count[0] == 1 else alias_result
+
+        with patch("object_info._simbad_query", side_effect=mock_query):
+            result = oi.resolve_identifier_for_catalogue_lookup("M31")
+
+        assert result["aliases"] == ["NGC 224"]
 
     def test_handles_none_coordinates(self):
         main_result = {
@@ -719,6 +778,24 @@ class TestWikipediaWithFallback:
             result = oi._wikipedia_with_fallback(["UnknownObj1", "UnknownObj2"], "en")
 
         assert result is None
+
+    def test_english_fallback_tries_next_term_after_a_miss(self):
+        """When the first alias has no English article, the fallback loop moves on to
+        the next alias instead of giving up after the first miss."""
+        en_result = {"title": "NGC 224", "description": "Galaxy", "extract": "A galaxy."}
+
+        def mock_summary(term, lang='en'):
+            if lang == 'fr':
+                return None
+            if term == "Andromeda I":
+                return None  # first English attempt misses
+            return en_result  # second English attempt hits
+
+        with patch("object_info._get_wikipedia_summary", side_effect=mock_summary):
+            result = oi._wikipedia_with_fallback(["Andromeda I", "NGC 224"], "fr")
+
+        assert result is not None
+        assert result["title"] == "NGC 224"
 
 
 # ---------------------------------------------------------------------------
@@ -886,3 +963,94 @@ class TestHips2fitsBackoff:
             with patch("object_info.requests.get", return_value=mock_resp):
                 oi.ensure_cached_object_image(10.684, 41.269)
         assert 'hips2fits' not in oi._backoff_until
+
+
+class TestBackoffStateRealPersistence:
+    """Exercises the *real* (unmocked) disk-persistence implementation of the backoff
+    state: the cross-worker file lock, the atomic temp-file write, and the mtime-gated
+    re-read - all bypassed by the module's autouse mock in every other test here."""
+
+    def _use_real_persistence(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(oi, '_load_backoff_state', _REAL_LOAD_BACKOFF_STATE)
+        monkeypatch.setattr(oi, '_save_backoff_state', _REAL_SAVE_BACKOFF_STATE)
+        monkeypatch.setattr(oi, '_BACKOFF_FILE', str(tmp_path / 'object_info_backoff.json'))
+        monkeypatch.setattr(oi, '_BACKOFF_LOCK_FILE', str(tmp_path / 'object_info_backoff.lock'))
+        monkeypatch.setattr(oi, '_backoff_mtime_seen', None)
+
+    def test_load_missing_file_returns_empty_dict(self, monkeypatch, tmp_path):
+        self._use_real_persistence(monkeypatch, tmp_path)
+        assert oi._load_backoff_state() == {}
+
+    def test_load_corrupted_file_returns_empty_dict(self, monkeypatch, tmp_path):
+        self._use_real_persistence(monkeypatch, tmp_path)
+        with open(oi._BACKOFF_FILE, 'w', encoding='utf-8') as fh:
+            fh.write('{not valid json')
+        assert oi._load_backoff_state() == {}
+
+    def test_load_filters_out_expired_entries(self, monkeypatch, tmp_path):
+        self._use_real_persistence(monkeypatch, tmp_path)
+        import json
+        os.makedirs(tmp_path, exist_ok=True)
+        with open(oi._BACKOFF_FILE, 'w', encoding='utf-8') as fh:
+            json.dump({'simbad': oi.time.time() - 10, 'wikipedia': oi.time.time() + 300}, fh)
+        state = oi._load_backoff_state()
+        assert 'simbad' not in state
+        assert 'wikipedia' in state
+
+    def test_save_then_load_round_trips_through_real_lock_and_atomic_write(self, monkeypatch, tmp_path):
+        self._use_real_persistence(monkeypatch, tmp_path)
+        oi._backoff_until['hips2fits'] = oi.time.time() + 300
+        oi._save_backoff_state()
+        assert os.path.exists(oi._BACKOFF_FILE)
+        reloaded = oi._load_backoff_state()
+        assert 'hips2fits' in reloaded
+
+    def test_save_prunes_expired_entries_from_disk(self, monkeypatch, tmp_path):
+        self._use_real_persistence(monkeypatch, tmp_path)
+        oi._backoff_until['simbad'] = oi.time.time() - 10  # already expired
+        oi._save_backoff_state()
+        import json
+        with open(oi._BACKOFF_FILE, encoding='utf-8') as fh:
+            on_disk = json.load(fh)
+        assert on_disk == {}
+
+    def test_refresh_rereads_only_when_mtime_changes(self, monkeypatch, tmp_path):
+        self._use_real_persistence(monkeypatch, tmp_path)
+        oi._backoff_until['simbad'] = oi.time.time() + 300
+        oi._save_backoff_state()
+
+        # First refresh picks up the on-disk state written by another "worker".
+        oi._backoff_until.clear()
+        oi._refresh_backoff_state_if_changed()
+        assert 'simbad' in oi._backoff_until
+
+        # File untouched since -> a second refresh must not wipe in-memory state
+        # (it would, if it always re-read rather than checking mtime first).
+        oi._backoff_until['local_only'] = oi.time.time() + 300
+        oi._refresh_backoff_state_if_changed()
+        assert 'local_only' in oi._backoff_until
+
+    def test_is_backed_off_and_trigger_and_clear_round_trip_via_disk(self, monkeypatch, tmp_path):
+        self._use_real_persistence(monkeypatch, tmp_path)
+        assert oi._is_backed_off('simbad') is False
+
+        oi._trigger_backoff('simbad')
+        assert oi._is_backed_off('simbad') is True
+
+        oi._clear_backoff('simbad')
+        assert oi._is_backed_off('simbad') is False
+
+    def test_is_backed_off_clears_expired_entry_and_persists(self, monkeypatch, tmp_path):
+        self._use_real_persistence(monkeypatch, tmp_path)
+        oi._backoff_until['simbad'] = oi.time.time() - 1  # already expired, still in memory
+        assert oi._is_backed_off('simbad') is False
+        assert 'simbad' not in oi._backoff_until
+
+    def test_save_failure_is_caught_and_logged(self, monkeypatch, tmp_path):
+        self._use_real_persistence(monkeypatch, tmp_path)
+        # Lock file's parent directory doesn't exist -> opening it raises, exercising the
+        # outer try/except that keeps a persistence failure from ever propagating.
+        monkeypatch.setattr(oi, '_BACKOFF_LOCK_FILE', str(tmp_path / 'missing_dir' / 'backoff.lock'))
+        oi._backoff_until['simbad'] = oi.time.time() + 300
+        oi._save_backoff_state()  # should not raise
+        assert not os.path.exists(oi._BACKOFF_FILE)

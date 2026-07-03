@@ -2058,3 +2058,53 @@ class TestSkytonightRecommendationsEndpoint:
         targets = response.get_json()['targets']
         assert targets[0]['estimated_integration_hours'] == 3
         assert targets[0]['estimated_integration_hours_is_estimate'] is False
+
+    def test_non_numeric_limit_falls_back_to_default(self, client_admin, monkeypatch):
+        self._mock_common(monkeypatch, experience_level='advanced')
+        response = client_admin.get('/api/skytonight/recommendations?lang=en&limit=not-a-number')
+        assert response.status_code == 200
+        assert len(response.get_json()['targets']) <= 5  # default limit
+
+    def test_thumbnail_url_populated_when_coordinates_present(self, client_admin, monkeypatch):
+        dso_results = {
+            'deep_sky': [
+                {
+                    'target_id': 't-coords', 'preferred_name': 'Coord Target',
+                    'catalogue_names': {'Messier': 'M 42'}, 'object_type': 'Nebula',
+                    'magnitude': 4.0, 'size_arcmin': 90.0, 'astro_score': 0.5,
+                    'difficulty': 'beginner', 'difficulty_score': 18,
+                    'coordinates': {'ra_hours': 5.5, 'dec_degrees': -5.4},
+                },
+            ]
+        }
+        monkeypatch.setattr(skytonight_api_module, 'load_json_file', lambda *a, **k: dso_results)
+        monkeypatch.setattr(skytonight_api_module.beginner_catalog, 'load_beginner_catalog', lambda: [])
+        monkeypatch.setattr(skytonight_api_module.astrodex, 'is_item_in_astrodex', lambda *a, **k: False)
+        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'is_target_in_current_plan', lambda *a, **k: False)
+        monkeypatch.setattr(
+            skytonight_api_module.user_manager, 'get_user_preferences',
+            lambda user_id: {'experience_level': 'beginner'},
+        )
+        response = client_admin.get('/api/skytonight/recommendations?lang=en')
+        targets = response.get_json()['targets']
+        assert targets[0]['thumbnail_url'] is not None
+        assert targets[0]['thumbnail_url'].startswith('/api/object-image/')
+
+    def test_beginner_catalog_entry_with_blank_catalogue_id_skipped_in_hours_lookup(
+        self, client_admin, monkeypatch
+    ):
+        self._mock_common(monkeypatch, experience_level='advanced')
+        monkeypatch.setattr(
+            skytonight_api_module.beginner_catalog, 'load_beginner_catalog',
+            lambda: [{'catalogue_id': '', 'typical_integration_hours': 9}],
+        )
+        response = client_admin.get('/api/skytonight/recommendations?lang=en')
+        assert response.status_code == 200
+
+    def test_unexpected_exception_returns_500(self, client_admin, monkeypatch):
+        monkeypatch.setattr(
+            skytonight_api_module.user_manager, 'get_user_preferences',
+            lambda *a, **k: (_ for _ in ()).throw(RuntimeError('boom')),
+        )
+        response = client_admin.get('/api/skytonight/recommendations?lang=en')
+        assert response.status_code == 500
