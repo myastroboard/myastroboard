@@ -270,15 +270,24 @@ async function initializeApp() {
 // Give every tab/sub-tab link a real "#..." href matching its data-tab/data-subtab
 // so that middle-click / Ctrl+click / "open in new tab" works, instead of the
 // placeholder href="#" they carry in the markup.
+// Tab identifiers are always simple slugs (letters/digits/hyphens) defined in our own
+// markup - this allowlist check keeps that assumption enforced rather than assumed,
+// so nothing but a "#slug" fragment can ever reach the href attribute.
+const _TAB_SLUG_RE = /^[a-z0-9-]+$/i;
+
 function setupNavLinkHrefs() {
     document.querySelectorAll('.main-tab-btn[data-tab]').forEach(btn => {
-        btn.setAttribute('href', `#${btn.getAttribute('data-tab')}`);
+        const tab = btn.getAttribute('data-tab');
+        if (_TAB_SLUG_RE.test(tab)) btn.setAttribute('href', `#${tab}`);
     });
     document.querySelectorAll('.sub-tab-btn[data-subtab]').forEach(btn => {
         const parentTab = btn.closest('.main-tab-content');
         if (!parentTab) return;
         const mainTab = parentTab.id.replace('-tab', '');
-        btn.setAttribute('href', `#${mainTab}/${btn.getAttribute('data-subtab')}`);
+        const subtab = btn.getAttribute('data-subtab');
+        if (_TAB_SLUG_RE.test(mainTab) && _TAB_SLUG_RE.test(subtab)) {
+            btn.setAttribute('href', `#${mainTab}/${subtab}`);
+        }
     });
 }
 

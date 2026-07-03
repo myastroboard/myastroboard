@@ -722,7 +722,8 @@ function _buildEquipmentPickerBlock(kind, labelText, presets) {
     const orderedPresets = [...presets].sort((a, b) => {
         const aMatch = a.suggests_experience === currentLevel ? 0 : 1;
         const bMatch = b.suggests_experience === currentLevel ? 0 : 1;
-        return aMatch - bMatch;
+        if (aMatch !== bMatch) return aMatch - bMatch;
+        return (a.manufacturer || '').localeCompare(b.manufacturer || '') || a.label.localeCompare(b.label);
     });
     orderedPresets.forEach((preset) => {
         const opt = document.createElement('option');
