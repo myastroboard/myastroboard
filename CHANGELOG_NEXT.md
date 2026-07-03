@@ -9,3 +9,4 @@ This release rolls out the red carpet for newcomers: a guided setup wizard gets 
 - Add moon conjunction information to astronomical events
 - Add widget with current situation in selected location, should be bases for multiple-location selector
 - Add beginner-friendly experience: guided setup wizard, difficulty ratings, "Tonight for you" recommendations, and a curated Beginner Catalog (see docs/BEGINNER_EXPERIENCE.md)
+- Add a "Start from a preset" picker to the Equipment tab's New Telescope/Camera/Mount/Filter/Accessory forms, reusing the same preset catalog as the guided setup wizard (see docs/EQUIPMENT.md#presets)

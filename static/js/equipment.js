@@ -22,6 +22,137 @@ let equipmentFilters = {
 };
 
 // ============================================
+// Equipment Presets (static/data/equipment_presets.json)
+// ============================================
+
+let _equipmentPresetsCache = null;
+
+async function _loadEquipmentPresets() {
+    if (_equipmentPresetsCache) return _equipmentPresetsCache;
+    try {
+        const resp = await fetch('/static/data/equipment_presets.json', { credentials: 'same-origin' });
+        _equipmentPresetsCache = resp.ok ? await resp.json() : {};
+    } catch (_) {
+        _equipmentPresetsCache = {};
+    }
+    return _equipmentPresetsCache;
+}
+
+const _TELESCOPE_PRESET_TYPE_MAP = {
+    refractor: 'Refractor',
+    apo: 'Apochromatic Refractor (APO)',
+    reflector: 'Reflector',
+    sct: 'Schmidt-Cassegrain (SCT)',
+    edgehd: 'EdgeHD',
+    rasa: 'Rowe Ackerman Schmidt Astrograph (RASA)',
+    rc: 'Ritchey-Chrétien (RC)',
+    newtonian: 'Newtonian',
+    maksutov: 'Maksutov-Cassegrain',
+    cassegrain: 'Cassegrain',
+    dobsonian: 'Dobsonian',
+};
+
+const _CAMERA_PRESET_SENSOR_TYPE_MAP = {
+    cmos_color: 'CMOS Color',
+    dslr_color: 'CMOS Color',
+    mirrorless_color: 'CMOS Color',
+    cmos_mono: 'CMOS Mono',
+    ccd_color: 'CCD Color',
+    ccd_mono: 'CCD Mono',
+};
+
+/** Build <option> markup for a preset list, surfacing presets matching the user's
+ * current experience level first (mirrors the guided setup wizard's ordering). */
+function _buildPresetOptionsHtml(presets) {
+    const currentLevel = currentUserPreferences?.experience_level || 'advanced';
+    const ordered = [...presets].sort((a, b) => {
+        const aMatch = a.suggests_experience === currentLevel ? 0 : 1;
+        const bMatch = b.suggests_experience === currentLevel ? 0 : 1;
+        if (aMatch !== bMatch) return aMatch - bMatch;
+        return (a.manufacturer || '').localeCompare(b.manufacturer || '') || a.label.localeCompare(b.label);
+    });
+    return ordered.map((preset) => {
+        const alreadyPrefixed = preset.manufacturer
+            && preset.label.toLowerCase().startsWith(preset.manufacturer.toLowerCase());
+        const text = preset.manufacturer && !alreadyPrefixed
+            ? `${preset.manufacturer} ${preset.label}`
+            : preset.label;
+        return `<option value="${escapeHtml(preset.id)}">${escapeHtml(text)}</option>`;
+    }).join('');
+}
+
+/** Build the "Start from a preset" picker block shown at the top of an "add new" form.
+ * Pass wrapInRow for forms that aren't themselves a `.row` (e.g. the accessory form,
+ * which nests `.row` blocks internally instead of being one). */
+function _buildPresetPickerHtml(kind, presets, { wrapInRow = false } = {}) {
+    if (!presets || presets.length === 0) return '';
+    const field = `
+        <div class="col-md-12">
+            <label for="${kind}-preset-select" class="form-label">${i18n.t('equipment.preset_label')}</label>
+            <select class="form-select" id="${kind}-preset-select">
+                <option value="">${i18n.t('equipment.preset_placeholder')}</option>
+                ${_buildPresetOptionsHtml(presets)}
+            </select>
+        </div>
+    `;
+    return wrapInRow ? `<div class="row mb-3">${field}</div>` : field;
+}
+
+function _applyTelescopePreset(preset) {
+    document.getElementById('telescope-name').value = preset.label || '';
+    document.getElementById('telescope-manufacturer').value = preset.manufacturer || '';
+    document.getElementById('telescope-type').value = _TELESCOPE_PRESET_TYPE_MAP[preset.type] || 'Refractor';
+    document.getElementById('telescope-aperture').value = preset.aperture_mm ?? '';
+    document.getElementById('telescope-focal-length').value = preset.focal_length_mm ?? '';
+}
+
+function _applyCameraPreset(preset) {
+    document.getElementById('camera-name').value = preset.label || '';
+    document.getElementById('camera-manufacturer').value = preset.manufacturer || '';
+    document.getElementById('camera-sensor-type').value = _CAMERA_PRESET_SENSOR_TYPE_MAP[preset.type] || 'CMOS Color';
+    document.getElementById('camera-pixel-size').value = preset.pixel_size_um ?? '';
+    document.getElementById('camera-sensor-width').value = preset.sensor_width_mm ?? '';
+    document.getElementById('camera-sensor-height').value = preset.sensor_height_mm ?? '';
+    document.getElementById('camera-resolution-width').value = preset.resolution_w ?? '';
+    document.getElementById('camera-resolution-height').value = preset.resolution_h ?? '';
+}
+
+function _applyMountPreset(preset) {
+    document.getElementById('mount-name').value = preset.label || '';
+    document.getElementById('mount-manufacturer').value = preset.manufacturer || '';
+    document.getElementById('mount-type').value = preset.mount_type || 'Equatorial';
+    document.getElementById('mount-payload-capacity').value = preset.payload_capacity_kg ?? '';
+    document.getElementById('mount-tracking-accuracy').value = preset.tracking_accuracy_arcsec ?? '';
+    document.getElementById('mount-guiding-supported').value = preset.guiding_supported ? 'true' : 'false';
+}
+
+function _applyFilterPreset(preset) {
+    document.getElementById('filter-name').value = preset.label || '';
+    document.getElementById('filter-manufacturer').value = preset.manufacturer || '';
+    document.getElementById('filter-type').value = preset.filter_type || 'Other';
+    document.getElementById('filter-wavelength').value = preset.central_wavelength_nm ?? '';
+    document.getElementById('filter-bandwidth').value = preset.bandwidth_nm ?? '';
+    document.getElementById('filter-intended-use').value = preset.intended_use || '';
+}
+
+function _applyAccessoryPreset(preset) {
+    document.getElementById('accessory-name').value = preset.label || '';
+    document.getElementById('accessory-manufacturer').value = preset.manufacturer || '';
+    document.getElementById('accessory-type').value = preset.accessory_type || '';
+    document.getElementById('accessory-weight').value = preset.weight_kg ?? '';
+}
+
+/** Wire the preset <select> in an "add new" form to prefill fields via applyFn on change. */
+function _wirePresetSelect(kind, presets, applyFn) {
+    const select = document.getElementById(`${kind}-preset-select`);
+    if (!select) return;
+    select.addEventListener('change', () => {
+        const preset = (presets || []).find(p => p.id === select.value);
+        if (preset) applyFn(preset);
+    });
+}
+
+// ============================================
 // Initialize Equipment Module
 // ============================================
 
@@ -891,9 +1022,11 @@ function renderAccessoriesTab() {
 async function showTelescopeModal(id = null) {
     const telescope = id ? equipmentData.telescopes.find(t => t.id === id) : null;
     const title = telescope ? i18n.t('equipment.edit_telescope') : i18n.t('equipment.new_telescope');
-    
+    const presets = telescope ? [] : (await _loadEquipmentPresets())?.telescopes || [];
+
     const modalContent = `
         <form id="telescopeForm" class="form row g-3">
+            ${_buildPresetPickerHtml('telescope', presets)}
             <div class="col-md-6">
                 <label for="telescope-name" class="form-label">${i18n.t('equipment.form_name')} *</label>
                 <input type="text" class="form-control" id="telescope-name" name="name" value="${escapeHtml(telescope?.name || '')}" required>
@@ -963,6 +1096,8 @@ async function showTelescopeModal(id = null) {
     });
     bs_modal.show();
 
+    _wirePresetSelect('telescope', presets, _applyTelescopePreset);
+
     document.getElementById('telescopeForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         await saveTelescope(telescope?.id || '');
@@ -1007,9 +1142,11 @@ async function saveTelescope(id) {
 async function showCameraModal(id = null) {
     const camera = id ? equipmentData.cameras.find(c => c.id === id) : null;
     const title = camera ? i18n.t('equipment.edit_camera') : i18n.t('equipment.new_camera');
-    
+    const presets = camera ? [] : (await _loadEquipmentPresets())?.cameras || [];
+
     const modalContent = `
         <form id="cameraForm" class="form row g-3">
+            ${_buildPresetPickerHtml('camera', presets)}
             <div class="col-md-6">
                 <label for="camera-name" class="form-label">${i18n.t('equipment.form_name')} *</label>
                 <input type="text" class="form-control" id="camera-name" name="name" value="${escapeHtml(camera?.name || '')}" required>
@@ -1090,6 +1227,8 @@ async function showCameraModal(id = null) {
     });
     bs_modal.show();
 
+    _wirePresetSelect('camera', presets, _applyCameraPreset);
+
     document.getElementById('cameraForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         await saveCamera(camera?.id || '');
@@ -1135,9 +1274,11 @@ async function saveCamera(id) {
 async function showMountModal(id = null) {
     const mount = id ? equipmentData.mounts.find(m => m.id === id) : null;
     const title = mount ? i18n.t('equipment.edit_mount') : i18n.t('equipment.new_mount');
-    
+    const presets = mount ? [] : (await _loadEquipmentPresets())?.mounts || [];
+
     const modalContent = `
         <form id="mountForm" class="form row g-3">
+            ${_buildPresetPickerHtml('mount', presets)}
             <div class="col-md-6">
                 <label for="mount-name" class="form-label">${i18n.t('equipment.form_name')} *</label>
                 <input type="text" class="form-control" id="mount-name" name="name" value="${escapeHtml(mount?.name || '')}" required>
@@ -1198,6 +1339,8 @@ async function showMountModal(id = null) {
     });
     bs_modal.show();
 
+    _wirePresetSelect('mount', presets, _applyMountPreset);
+
     document.getElementById('mountForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         await saveMount(mount?.id || '');
@@ -1242,9 +1385,11 @@ async function saveMount(id) {
 async function showFilterModal(id = null) {
     const filter = id ? equipmentData.filters.find(f => f.id === id) : null;
     const title = filter ? i18n.t('equipment.edit_filter') : i18n.t('equipment.new_filter');
-    
+    const presets = filter ? [] : (await _loadEquipmentPresets())?.filters || [];
+
     const modalContent = `
         <form id="filterForm" class="form row g-3">
+            ${_buildPresetPickerHtml('filter', presets)}
             <div class="col-md-6">
                 <label for="filter-name" class="form-label">${i18n.t('equipment.form_name')} *</label>
                 <input type="text" class="form-control" id="filter-name" name="name" value="${escapeHtml(filter?.name || '')}" required>
@@ -1310,6 +1455,8 @@ async function showFilterModal(id = null) {
     });
     bs_modal.show();
 
+    _wirePresetSelect('filter', presets, _applyFilterPreset);
+
     document.getElementById('filterForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         await saveFilter(filter?.id || '');
@@ -1351,9 +1498,11 @@ async function saveFilter(id) {
 async function showAccessoryModal(id = null) {
     const accessory = id ? equipmentData.accessories.find(a => a.id === id) : null;
     const title = accessory ? i18n.t('equipment.edit_accessory') : i18n.t('equipment.new_accessory');
-    
+    const presets = accessory ? [] : (await _loadEquipmentPresets())?.accessories || [];
+
     const modalContent = `
         <form id="accessoryForm" class="form">
+            ${_buildPresetPickerHtml('accessory', presets, { wrapInRow: true })}
             <div class="row">
                 <div class="col-md-6 mb-3">
                     <label for="accessory-name" class="form-label">${i18n.t('equipment.form_name')} *</label>
@@ -1401,6 +1550,8 @@ async function showAccessoryModal(id = null) {
         keyboard: true
     });
     bs_modal.show();
+
+    _wirePresetSelect('accessory', presets, _applyAccessoryPreset);
 
     document.getElementById('accessoryForm').addEventListener('submit', async (e) => {
         e.preventDefault();
