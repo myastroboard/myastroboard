@@ -709,3 +709,27 @@ class TestIsExecutionMetricsValid:
         with open(str(tmp_path / "ev4.json"), "w") as f:
             json.dump(data, f)
         assert cache_store._is_execution_metrics_valid("allsky_sensor", 300) is False
+
+    def test_returns_false_when_last_run_at_missing(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(cs, '_SHARED_CACHE_FILE', str(tmp_path / "ev5.json"))
+        monkeypatch.setattr(cs, '_SHARED_CACHE_LOCK', str(tmp_path / "ev5.lock"))
+        cache_store.record_cache_execution("allsky_sensor", 0.1, True)
+        import json
+        with open(str(tmp_path / "ev5.json")) as f:
+            data = json.load(f)
+        del data["_cache_metrics"]["allsky_sensor"]["last_run_at"]
+        with open(str(tmp_path / "ev5.json"), "w") as f:
+            json.dump(data, f)
+        assert cache_store._is_execution_metrics_valid("allsky_sensor", 300) is False
+
+    def test_returns_false_when_last_run_at_unparseable(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(cs, '_SHARED_CACHE_FILE', str(tmp_path / "ev6.json"))
+        monkeypatch.setattr(cs, '_SHARED_CACHE_LOCK', str(tmp_path / "ev6.lock"))
+        cache_store.record_cache_execution("allsky_sensor", 0.1, True)
+        import json
+        with open(str(tmp_path / "ev6.json")) as f:
+            data = json.load(f)
+        data["_cache_metrics"]["allsky_sensor"]["last_run_at"] = "not-a-valid-timestamp"
+        with open(str(tmp_path / "ev6.json"), "w") as f:
+            json.dump(data, f)
+        assert cache_store._is_execution_metrics_valid("allsky_sensor", 300) is False

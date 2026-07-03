@@ -1608,6 +1608,41 @@ class TestEquipmentFovAndSummary:
         assert resp.status_code == 401
 
 
+class TestDifficultyLookupCache:
+    """Tests for _build_difficulty_lookup / _enrich_astrodex_items_with_difficulty."""
+
+    def setup_method(self):
+        _app_mod._difficulty_lookup_cache = None
+        _app_mod._difficulty_lookup_cache_key = None
+
+    def test_missing_dso_results_file_returns_empty_lookup(self, monkeypatch):
+        monkeypatch.setattr(_app_mod, 'SKYTONIGHT_DSO_RESULTS_FILE', '/nonexistent/dso_results.json')
+        lookup = _app_mod._build_difficulty_lookup()
+        assert lookup == {}
+
+    def test_skips_entries_missing_difficulty_or_bad_catalogue_names(self, monkeypatch):
+        monkeypatch.setattr(
+            _app_mod, 'load_json_file',
+            lambda *a, **k: {
+                'deep_sky': [
+                    {'catalogue_names': {'Messier': 'M 42'}},  # no difficulty -> skipped
+                    {'difficulty': 'beginner', 'catalogue_names': 'not-a-dict'},  # bad shape -> skipped
+                    {'difficulty': 'beginner', 'catalogue_names': {'Blank': '---'}},  # blank key -> skipped
+                    {'difficulty': 'advanced', 'catalogue_names': {'Messier': 'M 99'}},
+                ]
+            },
+        )
+        lookup = _app_mod._build_difficulty_lookup()
+        assert lookup.get('M99') == 'advanced'
+        assert 'M42' not in lookup
+
+    def test_enrich_skips_non_dict_items(self, monkeypatch):
+        monkeypatch.setattr(_app_mod, '_build_difficulty_lookup', lambda: {'M42': 'beginner'})
+        items = [None, 'not-a-dict', {'name': 'Orion Nebula', 'catalogue': 'M42'}]
+        result = _app_mod._enrich_astrodex_items_with_difficulty(items)
+        assert result[2]['difficulty'] == 'beginner'
+
+
 # ---------------------------------------------------------------------------
 # Astrodex — full CRUD + pictures + image upload
 # ---------------------------------------------------------------------------
@@ -3708,6 +3743,22 @@ class TestAuthErrorHandlers:
         resp = client_admin.put('/api/auth/preferences', json={'preferences': {}})
         assert resp.status_code == 400
         assert resp.get_json().get('error_key') == 'settings.pref_invalid_density'
+
+    def test_preferences_put_invalid_experience_level_returns_400(self, client_admin, monkeypatch):
+        """Line 486: Invalid experience_level → 400 with specific error_key."""
+        monkeypatch.setattr(user_manager, 'update_user_preferences',
+                            lambda *_a, **_k: (_ for _ in ()).throw(ValueError("Invalid experience_level: x")))
+        resp = client_admin.put('/api/auth/preferences', json={'preferences': {}})
+        assert resp.status_code == 400
+        assert resp.get_json().get('error_key') == 'settings.pref_invalid_experience_level'
+
+    def test_preferences_put_invalid_wizard_returns_400(self, client_admin, monkeypatch):
+        """Line 488: Invalid wizard → 400 with specific error_key."""
+        monkeypatch.setattr(user_manager, 'update_user_preferences',
+                            lambda *_a, **_k: (_ for _ in ()).throw(ValueError("Invalid wizard: must be a dictionary")))
+        resp = client_admin.put('/api/auth/preferences', json={'preferences': {}})
+        assert resp.status_code == 400
+        assert resp.get_json().get('error_key') == 'settings.pref_invalid_wizard'
 
     def test_preferences_put_generic_value_error_returns_400(self, client_admin, monkeypatch):
         """Lines 468->471: ValueError with unrecognised text → default error_key."""
@@ -6700,6 +6751,46 @@ class TestCSSPasses:
         monkeypatch.setattr(_cache_store, 'is_cache_valid', _boom)
         resp = client_admin.get('/api/css/passes')
         assert resp.status_code == 500
+
+    def test_css_passes_sync_succeeds_but_still_invalid_returns_202(self, client_admin, monkeypatch):
+        """Line 2387->2392: sync_cache_from_shared succeeds, but the post-sync cache is
+        still not valid (e.g. TTL check fails) -> falls through to the 202 response."""
+        monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: False)
+        monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda *a, **k: True)
+        resp = client_admin.get('/api/css/passes')
+        assert resp.status_code == 202
+
+    def test_css_passes_sync_succeeds_valid_but_window_mismatch_returns_202(self, client_admin, monkeypatch):
+        """Line 2389->2392: sync_cache_from_shared succeeds and the cache is valid, but the
+        synced data's window_days doesn't match the request -> falls through to 202."""
+        monkeypatch.setitem(_cache_store._css_passes_cache, 'data', {'passes': [], 'window_days': 5})
+        monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
+        monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda *a, **k: True)
+        resp = client_admin.get('/api/css/passes?days=20')
+        assert resp.status_code == 202
+
+    def test_css_passes_sync_from_shared_fails_returns_202(self, client_admin, monkeypatch):
+        """Line 2392: cache invalid and sync_cache_from_shared can't produce a fresh one
+        either -> falls through to the 'not ready yet' 202 response."""
+        monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: False)
+        monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda *a, **k: False)
+        resp = client_admin.get('/api/css/passes')
+        assert resp.status_code == 202
+
+    def test_css_passes_sync_from_shared_then_valid_returns_200(self, client_admin, monkeypatch):
+        """Lines 2386-2390: cache invalid initially, but sync_cache_from_shared succeeds and
+        the cache becomes valid with a matching window -> served from the synced cache."""
+        monkeypatch.setitem(_cache_store._css_passes_cache, 'data', {'passes': [], 'window_days': 20})
+        calls = {'n': 0}
+
+        def _is_valid(c, t):
+            calls['n'] += 1
+            return calls['n'] > 1  # invalid on the first check, valid on the post-sync re-check
+
+        monkeypatch.setattr(_cache_store, 'is_cache_valid', _is_valid)
+        monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda *a, **k: True)
+        resp = client_admin.get('/api/css/passes')
+        assert resp.status_code == 200
 
 
 # ---------------------------------------------------------------------------

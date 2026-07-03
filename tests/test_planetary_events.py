@@ -210,6 +210,41 @@ class TestFindConjunctionsAndOppositions:
         assert isinstance(events, list)
 
 
+class TestFindMoonConjunctionsExceptionHandlers:
+    """Cover the two exception-handling branches in _find_moon_conjunctions:
+    a failed Moon position fetch (returns [] immediately), and a failed
+    per-planet position fetch (swallowed, skips that planet only)."""
+
+    def test_returns_empty_on_moon_fetch_failure(self):
+        from astropy.time import Time
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        from unittest.mock import patch
+        svc = PlanetaryEventsService(45.0, -73.5)
+        now = Time(datetime(2026, 1, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
+        with patch("planetary_events.get_body", side_effect=Exception("moon fetch fail")):
+            events = svc._find_moon_conjunctions(now, 10)
+        assert events == []
+
+    def test_swallows_per_planet_fetch_failure(self):
+        from astropy.time import Time
+        from astropy.coordinates import get_body as real_get_body
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        from unittest.mock import patch
+        svc = PlanetaryEventsService(45.0, -73.5)
+        now = Time(datetime(2026, 1, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
+
+        def get_body_side(name, *args, **kwargs):
+            if name == 'moon':
+                return real_get_body(name, *args, **kwargs)
+            raise Exception("planet fetch fail")
+
+        with patch("planetary_events.get_body", side_effect=get_body_side):
+            events = svc._find_moon_conjunctions(now, 10)
+        assert events == []
+
+
 class TestPlanetaryHelperMethods:
     """Tests for _angular_separation, _get_elongation, _is_event_visible, _is_planet_visible."""
 

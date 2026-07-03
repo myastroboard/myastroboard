@@ -1019,6 +1019,57 @@ class TestUpdateIssPassesCache:
         update_iss_passes_cache()
 
 
+class TestUpdateCssPassesCache:
+    """Tests for update_css_passes_cache."""
+
+    @patch("cache_updater.cache_store")
+    @patch("cache_updater.get_css_passes_report")
+    @patch("cache_updater.load_config")
+    def test_css_passes_loads_config_when_not_provided(
+        self, mock_load_config, mock_get_css, mock_cache_store, mock_config
+    ):
+        """config=None (the default) falls back to load_config()."""
+        from cache_updater import update_css_passes_cache
+
+        mock_load_config.return_value = mock_config
+        mock_cache_store._css_passes_cache = {"data": None, "timestamp": 0}
+        mock_get_css.return_value = {"passes": [{"peak_time": "2026-04-17T21:00:00"}]}
+
+        update_css_passes_cache()
+
+        mock_load_config.assert_called_once()
+        mock_cache_store.update_shared_cache_entry.assert_called()
+
+    @patch("cache_updater.load_config")
+    def test_css_passes_missing_location(self, mock_load_config):
+        """Missing location config is handled gracefully."""
+        from cache_updater import update_css_passes_cache
+
+        mock_load_config.return_value = {}
+        update_css_passes_cache()  # Should not raise
+
+    @patch("cache_updater.cache_store")
+    @patch("cache_updater.get_css_passes_report")
+    def test_css_passes_none_report_keeps_previous_cache(self, mock_get_css, mock_cache_store, mock_config):
+        """A None report (provider/network/cache miss) leaves the cache untouched."""
+        from cache_updater import update_css_passes_cache
+
+        mock_get_css.return_value = None
+
+        update_css_passes_cache(config=mock_config)
+
+        mock_cache_store.update_shared_cache_entry.assert_not_called()
+
+    @patch("cache_updater.get_css_passes_report")
+    def test_css_passes_service_exception(self, mock_get_css, mock_config):
+        """Service exception is caught and logged."""
+        from cache_updater import update_css_passes_cache
+
+        mock_get_css.side_effect = RuntimeError("network error")
+
+        update_css_passes_cache(config=mock_config)  # Should not raise
+
+
 class TestUpdatePlanetaryEventsCache:
     """Tests for update_planetary_events_cache."""
 
@@ -1328,6 +1379,72 @@ class TestUpdateSpaceflightAstronautsCache:
 
         stored = mock_cache_store._spaceflight_astronauts_cache["data"]
         assert stored["iss_crew"] == {}
+
+    @patch("cache_updater.cache_store")
+    def test_astronauts_falsy_skips_annotation_loop(self, mock_cache_store):
+        """astronauts=None (falsy) with a real iss_crew present -> annotation loop is
+        skipped entirely, falling straight through to building the response."""
+        from cache_updater import update_spaceflight_astronauts_cache
+        import sys
+        import types
+
+        mock_cache_store._spaceflight_astronauts_cache = {"data": None, "timestamp": 0}
+
+        fake_module = types.SimpleNamespace(
+            get_iss_crew=MagicMock(return_value={
+                "expeditions": [
+                    {"station_name": "ISS", "station_abbrev": "ISS", "crew": [{"name": "Test Astronaut"}]}
+                ],
+            }),
+            get_astronauts_in_space=MagicMock(return_value=None),
+        )
+
+        with patch.dict(sys.modules, {"spaceflight_tracker": fake_module}):
+            update_spaceflight_astronauts_cache()
+
+        stored = mock_cache_store._spaceflight_astronauts_cache["data"]
+        assert stored["astronauts_in_space"] == {"count": 0, "results": []}
+
+    @patch("cache_updater.cache_store")
+    def test_astronauts_annotated_with_station_from_crew(self, mock_cache_store):
+        """Astronauts matching a crew member by name are annotated with their station;
+        a crew member with no name is skipped when building the name->station map."""
+        from cache_updater import update_spaceflight_astronauts_cache
+        import sys
+        import types
+
+        mock_cache_store._spaceflight_astronauts_cache = {"data": None, "timestamp": 0}
+
+        fake_module = types.SimpleNamespace(
+            get_iss_crew=MagicMock(return_value={
+                "expeditions": [
+                    {
+                        "station_name": "International Space Station",
+                        "station_abbrev": "ISS",
+                        "crew": [
+                            {},  # no "name" key -> skipped
+                            {"name": "Test Astronaut"},
+                        ],
+                    }
+                ],
+            }),
+            get_astronauts_in_space=MagicMock(return_value={
+                "count": 2,
+                "results": [
+                    {"name": "Test Astronaut"},
+                    {"name": "Unmatched Astronaut"},
+                ],
+            }),
+        )
+
+        with patch.dict(sys.modules, {"spaceflight_tracker": fake_module}):
+            update_spaceflight_astronauts_cache()
+
+        stored = mock_cache_store._spaceflight_astronauts_cache["data"]
+        matched = next(a for a in stored["astronauts_in_space"]["results"] if a["name"] == "Test Astronaut")
+        unmatched = next(a for a in stored["astronauts_in_space"]["results"] if a["name"] == "Unmatched Astronaut")
+        assert matched["station_abbrev"] == "ISS"
+        assert unmatched["station_abbrev"] is None
 
 
 class TestUpdateSpaceflightEventsCache:

@@ -615,6 +615,95 @@ class TestCSSCalendarAggregation:
         result = aggregator.aggregate_all_events(css_passes_data=css_payload)
         assert result["events_count"] == 0
 
+    def test_aggregate_all_events_css_pass_skips_invalid_or_past_or_low_score(self):
+        """Non-dict entries, entries missing peak_time, and past-dated passes are skipped;
+        a pass scoring below 55 gets LOW importance (all edge branches in the passes loop)."""
+        aggregator = EventsAggregator(45.5, -73.5, "America/Montreal")
+        base_day = aggregator.local_now.replace(hour=20, minute=0, second=0, microsecond=0)
+        past_peak = base_day - timedelta(days=1)
+        valid_peak = base_day + timedelta(days=1, minutes=4)
+
+        css_payload = {
+            "passes": [
+                "not-a-dict",
+                {"peak_altitude_deg": 10.0},  # missing peak_time
+                {
+                    "start_time": past_peak.isoformat(),
+                    "peak_time": past_peak.isoformat(),
+                    "end_time": past_peak.isoformat(),
+                    "peak_altitude_deg": 20.0,
+                    "visibility_score": 30.0,
+                    "visibility_day_night": "Daylight",
+                    "is_visible": False,
+                },  # in the past -> skipped
+                {
+                    "start_time": valid_peak.isoformat(),
+                    "peak_time": valid_peak.isoformat(),
+                    "end_time": valid_peak.isoformat(),
+                    "peak_altitude_deg": 25.0,
+                    "visibility_score": 40.0,  # below 55 -> LOW importance
+                    "visibility_day_night": "Astronomical Night",
+                    "is_visible": True,
+                },
+            ]
+        }
+
+        result = aggregator.aggregate_all_events(css_passes_data=css_payload)
+
+        assert result["events_count"] == 1
+        assert result["upcoming_events"][0]["importance"] == "low"
+
+    def test_aggregate_all_events_css_solar_transit_skips_invalid_or_out_of_window(self):
+        aggregator = EventsAggregator(45.5, -73.5, "America/Montreal")
+        base_day = aggregator.local_now.replace(hour=11, minute=0, second=0, microsecond=0)
+        out_of_window_peak = base_day + timedelta(days=10)
+
+        css_payload = {
+            "solar_transits": [
+                "not-a-dict",
+                {"duration_seconds": 1.0},  # missing peak_time
+                {
+                    "start_time": out_of_window_peak.isoformat(),
+                    "peak_time": out_of_window_peak.isoformat(),
+                    "end_time": out_of_window_peak.isoformat(),
+                    "duration_seconds": 0.5,
+                    "minimum_separation_arcmin": 0.1,
+                    "solar_radius_arcmin": 15.9,
+                    "sun_altitude_deg": 30.0,
+                    "is_visible": True,
+                },  # outside the 7-day window -> skipped
+            ]
+        }
+
+        result = aggregator.aggregate_all_events(css_passes_data=css_payload)
+        assert result["events_count"] == 0
+
+    def test_aggregate_all_events_css_lunar_transit_skips_invalid_or_out_of_window(self):
+        aggregator = EventsAggregator(45.5, -73.5, "America/Montreal")
+        base_day = aggregator.local_now.replace(hour=22, minute=0, second=0, microsecond=0)
+        out_of_window_peak = base_day + timedelta(days=10)
+
+        css_payload = {
+            "lunar_transits": [
+                "not-a-dict",
+                {"duration_seconds": 1.0},  # missing peak_time
+                {
+                    "start_time": out_of_window_peak.isoformat(),
+                    "peak_time": out_of_window_peak.isoformat(),
+                    "end_time": out_of_window_peak.isoformat(),
+                    "duration_seconds": 0.5,
+                    "minimum_separation_arcmin": 0.2,
+                    "lunar_radius_arcmin": 14.7,
+                    "moon_altitude_deg": 40.0,
+                    "moon_illumination_pct": 60.0,
+                    "is_visible": True,
+                },  # outside the 7-day window -> skipped
+            ]
+        }
+
+        result = aggregator.aggregate_all_events(css_passes_data=css_payload)
+        assert result["events_count"] == 0
+
     def test_aggregate_all_events_css_and_iss_independent(self):
         """CSS and ISS events are aggregated independently in the same call."""
         aggregator = EventsAggregator(45.5, -73.5, "America/Montreal")

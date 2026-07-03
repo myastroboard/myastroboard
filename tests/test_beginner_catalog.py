@@ -72,6 +72,35 @@ class TestLoadBeginnerCatalog:
         monkeypatch.setattr(beginner_catalog, '_BEGINNER_CATALOG_FILE', '/nonexistent/path.json')
         assert beginner_catalog.load_beginner_catalog() == []
 
+    def test_malformed_json_returns_empty_list(self, monkeypatch, tmp_path):
+        bad_file = tmp_path / 'malformed.json'
+        bad_file.write_text('{not valid json', encoding='utf-8')
+        monkeypatch.setattr(beginner_catalog, '_BEGINNER_CATALOG_FILE', str(bad_file))
+        monkeypatch.setattr(beginner_catalog, '_catalog_cache', None)
+        monkeypatch.setattr(beginner_catalog, '_catalog_cache_key', None)
+        assert beginner_catalog.load_beginner_catalog() == []
+
+    def test_non_list_json_returns_empty_list(self, monkeypatch, tmp_path):
+        import json
+        not_a_list_file = tmp_path / 'not_a_list.json'
+        not_a_list_file.write_text(json.dumps({'not': 'a list'}), encoding='utf-8')
+        monkeypatch.setattr(beginner_catalog, '_BEGINNER_CATALOG_FILE', str(not_a_list_file))
+        monkeypatch.setattr(beginner_catalog, '_catalog_cache', None)
+        monkeypatch.setattr(beginner_catalog, '_catalog_cache_key', None)
+        assert beginner_catalog.load_beginner_catalog() == []
+
+    def test_caches_result_between_calls(self, monkeypatch, tmp_path):
+        import json
+        catalog_file = tmp_path / 'cacheable.json'
+        catalog_file.write_text(json.dumps([{'id': 'X1'}]), encoding='utf-8')
+        monkeypatch.setattr(beginner_catalog, '_BEGINNER_CATALOG_FILE', str(catalog_file))
+        monkeypatch.setattr(beginner_catalog, '_catalog_cache', None)
+        monkeypatch.setattr(beginner_catalog, '_catalog_cache_key', None)
+        first = beginner_catalog.load_beginner_catalog()
+        second = beginner_catalog.load_beginner_catalog()
+        assert first == [{'id': 'X1'}]
+        assert second == [{'id': 'X1'}]
+
 
 class TestTranslateCatalogEntries:
     def test_resolves_known_key(self):
@@ -124,6 +153,36 @@ class TestEnrichWithSkytonight:
         assert m99['in_plan'] is True
         assert m99['in_astrodex'] is False
 
+    def test_dso_lookup_skips_non_dict_catalogue_names(self):
+        catalog = _fake_catalog()
+        dso_results = {
+            'deep_sky': [
+                {'catalogue_names': 'not-a-dict', 'astro_score': 0.1},
+                {'catalogue_names': {'Messier': 'M 42'}, 'astro_score': 0.82},
+            ]
+        }
+        enriched = beginner_catalog.enrich_with_skytonight(catalog, dso_results, [], [])
+        m42 = next(e for e in enriched if e['id'] == 'M42')
+        assert m42['visible_tonight'] is True
+
+    def test_dso_lookup_skips_blank_normalized_alias(self):
+        catalog = _fake_catalog()
+        dso_results = {
+            'deep_sky': [
+                {'catalogue_names': {'Blank': '---', 'Messier': 'M 42'}, 'astro_score': 0.82},
+            ]
+        }
+        enriched = beginner_catalog.enrich_with_skytonight(catalog, dso_results, [], [])
+        m42 = next(e for e in enriched if e['id'] == 'M42')
+        assert m42['visible_tonight'] is True
+
+    def test_name_key_set_skips_non_dict_items(self):
+        catalog = _fake_catalog()
+        astrodex_items = [None, 'not-a-dict', {'name': 'Orion Nebula', 'catalogue': 'M42'}]
+        enriched = beginner_catalog.enrich_with_skytonight(catalog, {}, astrodex_items, [])
+        m42 = next(e for e in enriched if e['id'] == 'M42')
+        assert m42['in_astrodex'] is True
+
 
 class TestBeginnerCatalogEndpoint:
     def test_requires_authentication(self):
@@ -131,6 +190,14 @@ class TestBeginnerCatalogEndpoint:
         with app.test_client() as anon_client:
             response = anon_client.get('/api/beginner-catalog')
         assert response.status_code == 401
+
+    def test_unexpected_exception_returns_500(self, client_admin, monkeypatch):
+        monkeypatch.setattr(
+            beginner_catalog, 'load_beginner_catalog',
+            lambda: (_ for _ in ()).throw(RuntimeError('boom')),
+        )
+        response = client_admin.get('/api/beginner-catalog?lang=en')
+        assert response.status_code == 500
 
     def test_returns_all_entries_with_visible_only_false(self, client_admin, monkeypatch):
         monkeypatch.setattr(beginner_catalog, 'load_beginner_catalog', lambda: _fake_catalog())

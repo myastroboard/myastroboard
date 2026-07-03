@@ -708,6 +708,68 @@ class TestGetIssCrew:
         assert result["expeditions"][1]["station_abbrev"] == "CSS"
         assert "fetched_at" in result
 
+    def test_skips_detail_fetch_when_crew_already_present(self):
+        """When the list endpoint already includes crew, no detail request is made."""
+        list_response = {
+            "results": [
+                {
+                    "id": 71,
+                    "name": "Expedition 71",
+                    "start": "2024-03-04T00:00:00Z",
+                    "end": None,
+                    "spacestation": {"name": "International Space Station"},
+                    "crew": [{"astronaut": {"name": "Test Astronaut", "nationality": "American",
+                                            "agency": {"name": "NASA", "abbrev": "NASA"},
+                                            "profile_image": None},
+                              "role": {"role": "Commander"}}],
+                    "mission_patch": None,
+                    "wiki": None,
+                },
+            ]
+        }
+
+        def _mock_get(path, params=None):
+            if path == "/expedition/":
+                return list_response
+            raise AssertionError(f"detail endpoint should not be called: {path}")
+
+        with _no_cache():
+            with patch("spaceflight_tracker._get", side_effect=_mock_get):
+                result = get_iss_crew()
+        assert len(result["expeditions"]) == 1
+        assert result["expeditions"][0]["crew_count"] == 1
+
+    def test_falls_back_to_list_entry_when_detail_fetch_fails(self):
+        """When the detail endpoint returns nothing, the original list entry is used as-is."""
+        list_response = {
+            "results": [
+                {
+                    "id": 71,
+                    "name": "Expedition 71",
+                    "start": "2024-03-04T00:00:00Z",
+                    "end": None,
+                    "spacestation": {"name": "International Space Station"},
+                    "crew": [],
+                    "mission_patch": None,
+                    "wiki": None,
+                },
+            ]
+        }
+
+        def _mock_get(path, params=None):
+            if path == "/expedition/":
+                return list_response
+            if path == "/expedition/71/":
+                return None
+            return None
+
+        with _no_cache():
+            with patch("spaceflight_tracker._get", side_effect=_mock_get):
+                result = get_iss_crew()
+        assert len(result["expeditions"]) == 1
+        assert result["expeditions"][0]["name"] == "Expedition 71"
+        assert result["expeditions"][0]["crew_count"] == 0
+
 
 class TestGetAstronautsInSpace:
 
