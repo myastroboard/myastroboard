@@ -1412,7 +1412,7 @@ def fully_initialize_caches():
 
                 # Keep a small forward cushion so startup does not run right at the
                 # edge of table validity and emit warnings under normal workload.
-                iers_stale_or_near_expiry = mjd_max <= (_Time.now().mjd + 2.0)
+                iers_stale_or_near_expiry = mjd_max <= (float(_Time.now().mjd) + 2.0)  # type: ignore[arg-type]
         except Exception as _iers_state_err:
             logger.warning("Unable to evaluate loaded IERS table validity: %s", _iers_state_err)
 

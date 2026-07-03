@@ -1329,8 +1329,9 @@ def _build_beginner_catalog_hours_lookup() -> Dict[str, float]:
     lookup: Dict[str, float] = {}
     for entry in beginner_catalog.load_beginner_catalog():
         key = _normalize_catalogue_key(entry.get('catalogue_id'))
-        if key:
-            lookup[key] = entry.get('typical_integration_hours')
+        hours = entry.get('typical_integration_hours')
+        if key and hours is not None:
+            lookup[key] = hours
     return lookup
 
 

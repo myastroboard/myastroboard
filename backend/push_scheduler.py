@@ -2,7 +2,7 @@
 Server-side push notification scheduler.
 
 Runs every POLL_INTERVAL_SECONDS in a background thread.
-Evaluates N1-N7 trigger conditions using cached data, then sends Web Push
+Evaluates N1-N8 trigger conditions using cached data, then sends Web Push
 to subscribed users whose notifications are enabled and cooldown has elapsed.
 
 Cooldown is tracked in-memory (resets on server restart, acceptable for a
