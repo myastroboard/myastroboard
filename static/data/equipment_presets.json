@@ -23,6 +23,28 @@
       "source_url": "https://www.seestar.com/blogs/faq/s30"
     },
     {
+      "id": "seestar_s30_pro",
+      "label": "Seestar S30 Pro",
+      "manufacturer": "ZWO",
+      "aperture_mm": 30,
+      "focal_length_mm": 160,
+      "focal_ratio": 5.3,
+      "type": "refractor",
+      "suggests_experience": "beginner",
+      "source_url": "https://www.seestar.com/products/seestar-s30-pro"
+    },
+    {
+      "id": "dwarflab_dwarf3",
+      "label": "Dwarf 3",
+      "manufacturer": "DWARFLAB",
+      "aperture_mm": 35,
+      "focal_length_mm": 150,
+      "focal_ratio": 4.3,
+      "type": "refractor",
+      "suggests_experience": "beginner",
+      "source_url": "https://www.dwarflab.com/us/products/dwarf-3-smart-telescope"
+    },
+    {
       "id": "vaonis_vespera2",
       "label": "Vespera II",
       "manufacturer": "Vaonis",

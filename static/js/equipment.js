@@ -61,21 +61,16 @@ const _CAMERA_PRESET_SENSOR_TYPE_MAP = {
     ccd_mono: 'CCD Mono',
 };
 
-/** Build <option> markup for a preset list, surfacing presets matching the user's
- * current experience level first (mirrors the guided setup wizard's ordering). */
+/** Build <option> markup for a preset list, sorted alphabetically by manufacturer then label. */
 function _buildPresetOptionsHtml(presets) {
-    const currentLevel = currentUserPreferences?.experience_level || 'advanced';
     const ordered = [...presets].sort((a, b) => {
-        const aMatch = a.suggests_experience === currentLevel ? 0 : 1;
-        const bMatch = b.suggests_experience === currentLevel ? 0 : 1;
-        if (aMatch !== bMatch) return aMatch - bMatch;
         return (a.manufacturer || '').localeCompare(b.manufacturer || '') || a.label.localeCompare(b.label);
     });
     return ordered.map((preset) => {
         const alreadyPrefixed = preset.manufacturer
             && preset.label.toLowerCase().startsWith(preset.manufacturer.toLowerCase());
         const text = preset.manufacturer && !alreadyPrefixed
-            ? `${preset.manufacturer} ${preset.label}`
+            ? `${preset.manufacturer} - ${preset.label}`
             : preset.label;
         return `<option value="${escapeHtml(preset.id)}">${escapeHtml(text)}</option>`;
     }).join('');
