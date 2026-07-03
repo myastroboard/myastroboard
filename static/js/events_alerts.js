@@ -213,7 +213,7 @@ function createEventAlertCard(event) {
     // Left icon circle
     const iconWrap = document.createElement('div');
     iconWrap.className = 'event-banner__icon';
-    iconWrap.appendChild(DOMUtils.createIcon(resolveEventIconClass(event), 'icon-inline'));
+    iconWrap.appendChild(DOMUtils.createIcon(resolveEventIconClass(event)));
     banner.appendChild(iconWrap);
 
     // Content area
