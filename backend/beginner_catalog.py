@@ -91,7 +91,9 @@ def translate_catalog_entries(catalog: List[Dict[str, Any]], lang: str) -> List[
         new_entry['why_beginner'] = manager.t(f'beginner_catalog.objects.{i18n_key}.why')
         new_entry['suggested_framing'] = manager.t(f'beginner_catalog.objects.{i18n_key}.framing')
         const_abbr = entry.get('constellation')
-        new_entry['constellation'] = _CONSTELLATION_ABBR_MAP.get(const_abbr, const_abbr)
+        new_entry['constellation'] = (
+            _CONSTELLATION_ABBR_MAP.get(const_abbr, const_abbr) if isinstance(const_abbr, str) else const_abbr
+        )
         translated.append(new_entry)
     return translated
 
