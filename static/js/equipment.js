@@ -99,6 +99,7 @@ function _applyTelescopePreset(preset) {
     document.getElementById('telescope-type').value = _TELESCOPE_PRESET_TYPE_MAP[preset.type] || 'Refractor';
     document.getElementById('telescope-aperture').value = preset.aperture_mm ?? '';
     document.getElementById('telescope-focal-length').value = preset.focal_length_mm ?? '';
+    document.getElementById('telescope-weight').value = preset.weight_kg ?? '';
 }
 
 function _applyCameraPreset(preset) {
@@ -110,6 +111,9 @@ function _applyCameraPreset(preset) {
     document.getElementById('camera-sensor-height').value = preset.sensor_height_mm ?? '';
     document.getElementById('camera-resolution-width').value = preset.resolution_w ?? '';
     document.getElementById('camera-resolution-height').value = preset.resolution_h ?? '';
+    document.getElementById('camera-cooling-supported').value = preset.cooling_supported ? 'true' : 'false';
+    document.getElementById('camera-min-temperature').value = preset.min_temperature_c ?? '';
+    document.getElementById('camera-weight').value = preset.weight_kg ?? '';
 }
 
 function _applyMountPreset(preset) {

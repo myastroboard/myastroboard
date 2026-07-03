@@ -1888,8 +1888,10 @@ async function initializeAstrodexEventListeners() {
     //Init buttons - wait for translations to be loaded before setting labels
     await i18n.ready;
     const buttonSort = document.getElementById('astrodex-sort-order');
+    DOMUtils.clear(buttonSort);
     DOMUtils.append(buttonSort, DOMUtils.createIcon('bi bi-sort-up-alt icon-inline'), i18n.t('astrodex.sort_order_ascending'));
     const buttonAddItem = document.getElementById('add-astrodex-item');
+    DOMUtils.clear(buttonAddItem);
     DOMUtils.append(buttonAddItem, DOMUtils.createIcon('bi bi-plus-circle icon-inline'), i18n.t('astrodex.add_object'));
     
     // ============================================
