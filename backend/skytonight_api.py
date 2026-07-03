@@ -1306,12 +1306,11 @@ def _experience_level_allowed_difficulties(experience_level: str) -> set:
     )
 
 
-def _filter_targets_by_experience_level(
-    targets: List[Dict[str, Any]], experience_level: str
-) -> List[Dict[str, Any]]:
+def _filter_targets_by_experience_level(targets: List[Dict[str, Any]], experience_level: str) -> List[Dict[str, Any]]:
     """Return only the targets whose `difficulty` tier is allowed for experience_level."""
     allowed = _experience_level_allowed_difficulties(experience_level)
     return [item for item in targets if item.get('difficulty', 'intermediate') in allowed]
+
 
 # Fallback estimated integration time (hours) by difficulty tier, used when a
 # recommended target has no matching entry in the curated beginner catalog.
@@ -1375,8 +1374,7 @@ def get_skytonight_recommendations_api():
             difficulty = item.get('difficulty', 'intermediate')
             source_catalogue = _resolve_source_catalogue(catalogue_names, preferred_name)
             canonical_id = (
-                str(catalogue_names.get('OpenNGC') or catalogue_names.get('OpenIC') or '').strip()
-                or preferred_name
+                str(catalogue_names.get('OpenNGC') or catalogue_names.get('OpenIC') or '').strip() or preferred_name
             )
             messier = str(catalogue_names.get('Messier') or '').strip() or None
 
@@ -1398,9 +1396,7 @@ def get_skytonight_recommendations_api():
                 else False
             )
             in_plan = (
-                plan_my_night.is_target_in_entries(
-                    preloaded_plan_entries, source_catalogue, preferred_name
-                )
+                plan_my_night.is_target_in_entries(preloaded_plan_entries, source_catalogue, preferred_name)
                 if preferred_name
                 else False
             )

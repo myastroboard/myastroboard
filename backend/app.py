@@ -4064,9 +4064,7 @@ def get_beginner_catalog():
         # between the two panels instead of only reflecting the default no-telescope plan.
         user_plan_entries = _preload_all_current_plan_entries(user.user_id, user.username)
 
-        catalog = beginner_catalog.enrich_with_skytonight(
-            catalog, dso_results, user_astrodex_items, user_plan_entries
-        )
+        catalog = beginner_catalog.enrich_with_skytonight(catalog, dso_results, user_astrodex_items, user_plan_entries)
 
         # Only apply the visible_only filter when results actually exist - per spec, an
         # empty/missing dso_results.json (no calculation run yet) returns everything.
