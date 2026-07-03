@@ -9,8 +9,8 @@ venv/
 .venv/
 ENV/
 *.egg-info/
-dist/
-build/
+/dist/
+/build/
 .env
 
 # Testing
