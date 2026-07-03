@@ -1672,6 +1672,8 @@
     "alert_severity_medium": "Medio",
     "alert_severity_low": "Basso",
     "starting_at": "A partire da",
+    "starts_in": "Tra {time}",
+    "started_ago": "{time} fa",
     "critical_dew_risk": "Rischio critico di rugiada a partire da {time}",
     "critical_wind_conditions": "Condizioni di vento critiche per il monitoraggio a partire dalle {time}",
     "poor_seeing_conditions": "Condizioni di visibilità scarsa (≤3) a partire da {time}",

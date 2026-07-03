@@ -1672,6 +1672,8 @@
     "alert_severity_medium": "Médio",
     "alert_severity_low": "Baixo",
     "starting_at": "Começando em",
+    "starts_in": "Em {time}",
+    "started_ago": "Há {time}",
     "critical_dew_risk": "Risco crítico de orvalho começando em {time}",
     "critical_wind_conditions": "Condições críticas de vento para rastreamento a partir de {time}",
     "poor_seeing_conditions": "Condições de visão ruins (≤3) começando em {time}",

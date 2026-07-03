@@ -1672,6 +1672,8 @@
     "alert_severity_medium": "Medium",
     "alert_severity_low": "Low",
     "starting_at": "Starting at",
+    "starts_in": "In {time}",
+    "started_ago": "{time} ago",
     "critical_dew_risk": "Critical dew risk starting at {time}",
     "critical_wind_conditions": "Critical wind conditions for tracking starting at {time}",
     "poor_seeing_conditions": "Poor seeing conditions (≤3) starting at {time}",

@@ -1672,6 +1672,8 @@
     "alert_severity_medium": "Moyenne",
     "alert_severity_low": "Basse",
     "starting_at": "À partir de",
+    "starts_in": "Dans {time}",
+    "started_ago": "Il y a {time}",
     "critical_dew_risk": "Risque critique de rosée à partir de {time}",
     "critical_wind_conditions": "Conditions de vent critique pour le suivi à partir de {time}",
     "poor_seeing_conditions": "Conditions de seeing médiocres (≤3) à partir de {time}",

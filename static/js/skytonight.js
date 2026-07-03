@@ -2185,6 +2185,8 @@ function _buildRecommendationCard(target) {
                             mag: target.magnitude,
                             size: target.size_arcmin,
                             difficulty: target.difficulty,
+                            alttime_file: target.target_id,
+                            source_type: 'recommendation',
                         },
                         catalogue: target.catalogue,
                         telescope_id: telescopeSelection.telescope_id,
