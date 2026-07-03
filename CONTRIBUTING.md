@@ -491,6 +491,8 @@ Contributors will be acknowledged in:
 - Follow existing CSS structure (separate files per feature)
 - Ensure mobile responsiveness
 - Test in multiple browsers
+- Equipment presets (`static/data/equipment_presets.json`) are a static asset consumed directly by the
+  browser — see [docs/EQUIPMENT.md#presets](docs/EQUIPMENT.md#presets) before adding or editing entries
 
 ### Documentation (`docs/`)
 - Use clear, concise language

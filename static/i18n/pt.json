@@ -1423,6 +1423,8 @@
     "use": "Usar",
     "general": "Em geral",
     "no_accessories_created_yet": "Nenhum acessório criado ainda.",
+    "preset_label": "Começar a partir de uma predefinição",
+    "preset_placeholder": "Selecione uma predefinição (opcional)...",
     "edit_telescope": "Editar telescópio",
     "form_name": "Nome",
     "form_manufacturer": "Fabricante",

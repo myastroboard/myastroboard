@@ -1423,6 +1423,8 @@
     "use": "Utilisation",
     "general": "Général",
     "no_accessories_created_yet": "Aucun accessoire créé pour le moment.",
+    "preset_label": "Partir d'un préréglage",
+    "preset_placeholder": "Sélectionnez un préréglage (optionnel)...",
     "edit_telescope": "Modifier le télescope",
     "form_name": "Nom",
     "form_manufacturer": "Fabricant",

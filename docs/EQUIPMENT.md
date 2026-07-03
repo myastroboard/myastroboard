@@ -90,6 +90,31 @@ Generic category for any optical or mechanical accessory not covered above: fiel
 
 ---
 
+## Presets
+
+**File**: `static/data/equipment_presets.json` (static asset, no backend involvement — fetched directly by the frontend)
+
+A curated list of real-world gear (telescopes, cameras, mounts, filters, accessories) that lets users
+skip manual data entry for common models. Each entry has an `id`, a `label`, a `manufacturer`, a
+`source_url` for provenance, a `suggests_experience` (`beginner` / `intermediate` / `advanced`) used to
+sort the closest match to the user's own experience level to the top, and type-specific spec fields
+matching the corresponding [gear type](#gear-types) table above one-to-one (e.g. a telescope preset's
+`type` maps to `telescope_type`, a filter preset's `filter_type` must be one of the enum values listed
+under [Filters](#filters), etc.).
+
+Consumed in two places:
+
+- The **guided setup wizard**'s equipment step (`static/js/first_run.js`) — offered alongside a manual-entry option.
+- The **Equipment tab**'s "New Telescope / Camera / Mount / Filter / Accessory" modals (`static/js/equipment.js`) —
+  a "Start from a preset" dropdown prefills the form, which remains fully editable afterward. Only shown when
+  adding a new item, not when editing an existing one.
+
+To add a preset, append an entry to the relevant array in the JSON file — no code change or restart needed
+(it's fetched fresh by the browser). Keep enum-like fields (`type`, `sensor_type`, `mount_type`, `filter_type`)
+consistent with the values each form's `<select>` accepts, or the preset will silently fail to prefill that field.
+
+---
+
 ## Equipment combinations
 
 A **combination** is a named configuration that groups a telescope, camera, mount, filters, and accessories. It is the unit used by:

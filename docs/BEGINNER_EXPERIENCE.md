@@ -178,7 +178,7 @@ New keys added to `preferences` (see [AUTHENTICATION.md](AUTHENTICATION.md#user-
 | File | Role |
 |---|---|
 | `static/js/first_run.js` | Wizard flow selection, step rendering, skip/completion persistence |
-| `static/data/equipment_presets.json` | Telescope/camera presets offered in the wizard's equipment step |
+| `static/data/equipment_presets.json` | Gear presets offered in the wizard's equipment step and in the Equipment tab's "New ..." modals — see [EQUIPMENT.md#presets](EQUIPMENT.md#presets) |
 | `backend/skytonight_calculator.py` | `compute_difficulty_score()` |
 | `backend/skytonight_api.py` | `GET /api/skytonight/recommendations` |
 | `backend/beginner_catalog.py` | Catalogue loading, i18n resolution, SkyTonight/Astrodex/Plan enrichment |

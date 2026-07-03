@@ -1423,6 +1423,8 @@
     "use": "Use",
     "general": "General",
     "no_accessories_created_yet": "No accessories created yet.",
+    "preset_label": "Start from a preset",
+    "preset_placeholder": "Select a preset (optional)...",
     "edit_telescope": "Edit Telescope",
     "form_name": "Name",
     "form_manufacturer": "Manufacturer",
