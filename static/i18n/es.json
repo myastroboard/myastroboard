@@ -1672,6 +1672,8 @@
     "alert_severity_medium": "Medio",
     "alert_severity_low": "Bajo",
     "starting_at": "A partir de",
+    "starts_in": "En {time}",
+    "started_ago": "Hace {time}",
     "critical_dew_risk": "Riesgo crítico de rocío a partir del {time}",
     "critical_wind_conditions": "Condiciones de viento críticas para el seguimiento a partir del {time}",
     "poor_seeing_conditions": "Malas condiciones de visión (≤3) a partir del {time}",

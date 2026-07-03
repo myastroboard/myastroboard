@@ -151,62 +151,95 @@ class WeatherAlertsSystem {
     
     showAlertsModal() {
 
-        const activeAlerts = this.alerts.filter(alert => this.isAlertActive(alert));
+        // Most severe first, then soonest first within the same severity
+        const severityRank = { HIGH: 0, MEDIUM: 1, LOW: 2 };
+        const activeAlerts = this.alerts
+            .filter(alert => this.isAlertActive(alert))
+            .slice()
+            .sort((a, b) => {
+                const rankDiff = (severityRank[a.severity] ?? 3) - (severityRank[b.severity] ?? 3);
+                return rankDiff !== 0 ? rankDiff : new Date(a.time) - new Date(b.time);
+            });
 
-        // Set modal content
-        document.getElementById('modal_lg_close_title').textContent = i18n.t('weather_alerts.section_title');
-        const modalBody = document.getElementById('modal_lg_close_body');
+        // Set modal content (dedicated lightweight modal - title is static in the template)
+        const modalBody = document.getElementById('weather-alerts-modal-body');
         DOMUtils.clear(modalBody);
-
-        const wrapper = document.createElement('div');
-        wrapper.className = 'weather-alerts-modal-body';
 
         if (activeAlerts.length === 0) {
             const empty = document.createElement('div');
-            empty.className = 'modal-no-alerts';
-            empty.textContent = i18n.t('weather_alerts.no_alerts');
-            wrapper.appendChild(empty);
+            empty.className = 'weather-alerts-empty';
+            empty.appendChild(DOMUtils.createIcon('bi bi-check-circle-fill'));
+            const emptyText = document.createElement('div');
+            emptyText.textContent = i18n.t('weather_alerts.no_alerts');
+            empty.appendChild(emptyText);
+            modalBody.appendChild(empty);
         } else {
             activeAlerts.forEach((alert) => {
-                const alertTime = new Date(alert.time);
-                const iconClass = this.getAlertTypeIcon(alert.type);
-
-                const card = document.createElement('div');
-                card.className = `alert alert-${alert.severity === 'HIGH' ? 'danger' : 'warning'}`;
-                card.setAttribute('role', 'alert');
-
-                const title = document.createElement('div');
-                title.className = 'fw-bold';
-
-                const iconSpan = document.createElement('span');
-                iconSpan.appendChild(DOMUtils.createIcon(iconClass, 'icon-inline'));
-                const typeSpan = document.createElement('span');
-                typeSpan.textContent = ` ${this.getAlertTypeLabel(alert.type)}`;
-                const timeSpan = document.createElement('span');
-                timeSpan.textContent = ` ${alertTime.toLocaleString()}`;
-
-                title.appendChild(iconSpan);
-                title.appendChild(typeSpan);
-                title.appendChild(timeSpan);
-
-                const message = document.createElement('div');
-                message.textContent = alert.message || '';
-
-                card.appendChild(title);
-                card.appendChild(message);
-                wrapper.appendChild(card);
+                modalBody.appendChild(this.buildAlertItem(alert));
             });
         }
 
-        modalBody.appendChild(wrapper);
-
-        const bs_modal = new bootstrap.Modal('#modal_lg_close', {
-            backdrop: 'static',
+        const bs_modal = new bootstrap.Modal('#weather-alerts-modal', {
             focus: true,
             keyboard: true
         });
 
         bs_modal.show();
+    }
+
+    /** Build a single alert card for the modal (icon + severity badge + relative time + message). */
+    buildAlertItem(alert) {
+        const severityModifier = alert.severity === 'HIGH' ? 'high' : (alert.severity === 'LOW' ? 'low' : 'medium');
+
+        const item = document.createElement('div');
+        item.className = `weather-alert-item weather-alert-item--${severityModifier}`;
+        item.setAttribute('role', 'alert');
+
+        const iconWrap = document.createElement('div');
+        iconWrap.className = 'weather-alert-item__icon';
+        iconWrap.appendChild(DOMUtils.createIcon(this.getAlertTypeIcon(alert.type)));
+        item.appendChild(iconWrap);
+
+        const content = document.createElement('div');
+        content.className = 'weather-alert-item__content';
+
+        const header = document.createElement('div');
+        header.className = 'weather-alert-item__header';
+
+        const badge = document.createElement('span');
+        badge.className = 'weather-alert-item__badge';
+        badge.textContent = i18n.t(`weather_alerts.alert_severity_${severityModifier}`);
+        header.appendChild(badge);
+
+        const time = document.createElement('span');
+        time.className = 'weather-alert-item__time';
+        time.textContent = this.formatRelativeAlertTime(new Date(alert.time));
+        header.appendChild(time);
+
+        content.appendChild(header);
+
+        const message = document.createElement('div');
+        message.className = 'weather-alert-item__message';
+        message.textContent = alert.message || '';
+        content.appendChild(message);
+
+        item.appendChild(content);
+        return item;
+    }
+
+    /** e.g. "In 45 min" / "In 1h 30min" / "12 min ago" */
+    formatRelativeAlertTime(alertTime) {
+        const diffMs = alertTime.getTime() - Date.now();
+        const isPast = diffMs < 0;
+        const absMinutes = Math.round(Math.abs(diffMs) / 60000);
+        const hours = Math.floor(absMinutes / 60);
+        const minutes = absMinutes % 60;
+
+        const parts = [];
+        if (hours > 0) parts.push(`${hours}${i18n.t('units.hour')}`);
+        if (minutes > 0 || parts.length === 0) parts.push(`${minutes}${i18n.t('units.minute')}`);
+
+        return i18n.t(isPast ? 'weather_alerts.started_ago' : 'weather_alerts.starts_in', { time: parts.join(' ') });
     }
     
     startPeriodicCheck() {
@@ -237,20 +270,6 @@ class WeatherAlertsSystem {
         return icons[type] || 'bi bi-exclamation-triangle-fill';
     }
 
-    getAlertTypeLabel(type) {
-        const keyMap = {
-            DEW_WARNING: 'weather_alerts.alert_dew_warning',
-            WIND_WARNING: 'weather_alerts.alert_wind_warning',
-            SEEING_WARNING: 'weather_alerts.alert_seeing_warning',
-            TRANSPARENCY_WARNING: 'weather_alerts.alert_transparency_warning',
-        };
-        const key = keyMap[type];
-        if (key) {
-            return i18n.t(key);
-        }
-        return String(type || '').replaceAll('_', ' ');
-    }
-    
     destroy() {
         this.stopPeriodicCheck();
         if (this.notificationContainer) {

@@ -1672,6 +1672,8 @@
     "alert_severity_medium": "Medium",
     "alert_severity_low": "Niedrig",
     "starting_at": "Beginnend bei",
+    "starts_in": "In {time}",
+    "started_ago": "Vor {time}",
     "critical_dew_risk": "Kritisches Taurisiko ab {time}",
     "critical_wind_conditions": "Kritische Windbedingungen für die Verfolgung ab {time}",
     "poor_seeing_conditions": "Schlechte Sichtbedingungen (≤3) ab {time}",

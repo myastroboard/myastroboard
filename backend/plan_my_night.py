@@ -460,7 +460,7 @@ def _build_target_payload(item_data: Dict, catalogue: str) -> Dict:
         'size': item_data.get('size'),
         'foto': item_data.get('foto') or item_data.get('fraction of time observable'),
         'difficulty': str(item_data.get('difficulty') or '').strip() or None,
-        'alttime_file': str(item_data.get('alttime_file') or '').strip(),
+        'alttime_file': str(item_data.get('alttime_file') or '').strip() or group_id,
         'catalogue_group_id': group_id,
         'catalogue_aliases': aliases,
         'planned_minutes': max(0, min(planned_minutes, 24 * 60)),

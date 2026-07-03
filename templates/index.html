@@ -2890,6 +2890,25 @@
         </div>
     </div>
 
+    <!-- Weather Alerts modal (dedicated, lightweight - content built dynamically by weather_alerts.js).
+         Deliberately NOT the shared modal_lg_close shell: an alert list doesn't need a full form-sized
+         modal, a nested background card, or a footer Close button - the header X and backdrop/Escape
+         are enough to dismiss it. -->
+    <div class="modal fade" id="weather-alerts-modal" tabindex="-1" aria-labelledby="weather-alerts-modal-title" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered weather-alerts-modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="weather-alerts-modal-title">
+                        <i class="bi bi-exclamation-triangle-fill icon-inline" aria-hidden="true"></i>
+                        <span data-i18n="weather_alerts.section_title">Weather Alerts</span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body weather-alerts-modal-body" id="weather-alerts-modal-body"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- Generic Modal Close Small -->
     <div class="modal fade" id="modal_sm_close" tabindex="-1" role="dialog" aria-labelledby="modalSmall">
         <div class="modal-dialog modal-dialog-scrollable modal-sm modal-dialog-centered" role="document">
