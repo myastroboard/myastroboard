@@ -808,7 +808,7 @@ class EventsAggregator:
                 description=(
                     self._t(
                         "events_api.iss_description",
-                        f"ISS pass score {score:.0f}/100 ({visibility_day_night})."
+                        f"ISS pass score {score:.0f}% ({visibility_day_night})."
                         f" Peak altitude {float(iss_pass.get('peak_altitude_deg', 0)):.1f}°.",
                         score=f"{score:.0f}",
                         visibility_day_night=visibility_period_localized,
@@ -997,7 +997,7 @@ class EventsAggregator:
                 description=(
                     self._t(
                         "events_api.css_description",
-                        f"CSS pass score {score:.0f}/100 ({visibility_day_night})."
+                        f"CSS pass score {score:.0f}% ({visibility_day_night})."
                         f" Peak altitude {float(css_pass.get('peak_altitude_deg', 0)):.1f}°.",
                         score=f"{score:.0f}",
                         visibility_day_night=visibility_period_localized,
