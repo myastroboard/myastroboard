@@ -248,8 +248,12 @@ function createEventAlertCard(event) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'btn btn-sm event-banner__btn';
+    btn.setAttribute('aria-label', i18n.t('calendar.details'));
     btn.appendChild(DOMUtils.createIcon('bi bi-journal-text', 'icon-inline'));
-    btn.appendChild(document.createTextNode(' ' + i18n.t('calendar.details')));
+    const btnLabel = document.createElement('span');
+    btnLabel.className = 'event-banner__btn-label';
+    btnLabel.textContent = ' ' + i18n.t('calendar.details');
+    btn.appendChild(btnLabel);
     btn.addEventListener('click', (e) => {
         e.preventDefault();
         scrollToEventDetails(event.event_type, event.structure_key);
