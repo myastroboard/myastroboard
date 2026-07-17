@@ -893,6 +893,38 @@ function _planBandColors(status) {
     return                           { border: '#6c757d', bg: 'rgba(108,117,125,0.09)' };
 }
 
+/**
+ * Build the "not observable in this window" title text for a visibility warning,
+ * shared by the timeline badge and the graph band tooltip label.
+ */
+function _planVisibilityWarningText(visibility) {
+    if (!visibility || visibility.status === 'ok') return '';
+    let text = i18n.t(
+        visibility.status === 'none'
+            ? 'plan_my_night.visibility_warning_none'
+            : 'plan_my_night.visibility_warning_partial'
+    );
+    if (visibility.visible_from) {
+        text += ' ' + i18n.t('plan_my_night.visibility_visible_from', { time: formatTimeOnly(visibility.visible_from) });
+    }
+    return text;
+}
+
+function _planVisibilityBadge(entry) {
+    const visibility = entry.visibility;
+    if (!visibility || visibility.status === 'ok') return null;
+
+    const badge = document.createElement('span');
+    badge.className = `badge ms-2 align-middle ${visibility.status === 'none' ? 'bg-danger' : 'bg-warning text-dark'}`;
+    badge.title = _planVisibilityWarningText(visibility);
+    DOMUtils.append(
+        badge,
+        DOMUtils.createIcon('bi bi-exclamation-triangle-fill icon-inline'),
+        ` ${i18n.t('plan_my_night.visibility_badge_label')}`
+    );
+    return badge;
+}
+
 async function buildPlanSummaryGraph(container, entries, plan, timeline) {
     destroyPlanSummaryChart();
     const myGen = planSummaryGraphGen;
@@ -979,12 +1011,13 @@ async function buildPlanSummaryGraph(container, entries, plan, timeline) {
         bands.push({
             startMs,
             endMs,
-            num:         index + 1,
-            name:        entryName,
-            entryId:     entry.id,
+            num:            index + 1,
+            name:           entryName,
+            entryId:        entry.id,
             status,
-            borderColor: colors.border,
-            bgColor:     colors.bg,
+            borderColor:    colors.border,
+            bgColor:        colors.bg,
+            warningStatus:  entry.visibility?.status ?? 'ok',
         });
 
         const atd = alttimeMap[entry.id];
@@ -1107,14 +1140,18 @@ async function buildPlanSummaryGraph(container, entries, plan, timeline) {
                 const x1 = Math.max(chartArea.left,  xScale.getPixelForValue(band.startMs));
                 const x2 = Math.min(chartArea.right, xScale.getPixelForValue(band.endMs));
                 if (x2 <= x1) continue;
+                const warned      = band.warningStatus && band.warningStatus !== 'ok';
+                // Purple (not red) so this never reads as the "now" line's red dashed marker.
+                const warningColor = band.warningStatus === 'none' ? '#6f42c1' : '#ffc107';
                 // Border - rounded rect, no horizontal inset so adjacent bands share the edge pixel
-                ctx.strokeStyle = band.borderColor;
-                ctx.lineWidth   = 1.5;
-                ctx.setLineDash([]);
+                ctx.strokeStyle = warned ? warningColor : band.borderColor;
+                ctx.lineWidth   = warned ? 2 : 1.5;
+                ctx.setLineDash(warned ? [4, 3] : []);
                 ctx.beginPath();
                 ctx.roundRect(x1, top + 1, x2 - x1, bottom - top - 2, bandRadius);
                 ctx.stroke();
-                // Label: "N. Name" with pill background, truncated to fit band width
+                ctx.setLineDash([]);
+                // Label: "N. Name" with pill background (pill color itself signals the warning)
                 const full       = `${band.num}. ${band.name}`;
                 const bandW      = x2 - x1;
                 const maxTextW   = bandW - labelPadX * 2 - 8;
@@ -1129,11 +1166,11 @@ async function buildPlanSummaryGraph(container, entries, plan, timeline) {
                     const pillH  = 12 + labelPadY * 2;
                     const pillX  = x1 + 6;
                     const pillY  = top + 7;
-                    ctx.fillStyle = band.borderColor;
+                    ctx.fillStyle = warned ? warningColor : band.borderColor;
                     ctx.beginPath();
                     ctx.roundRect(pillX, pillY, pillW, pillH, labelRadius);
                     ctx.fill();
-                    ctx.fillStyle = '#ffffff';
+                    ctx.fillStyle = warned ? '#212529' : '#ffffff';
                     ctx.fillText(label, pillX + labelPadX, pillY + pillH / 2);
                 }
             }
@@ -1156,14 +1193,18 @@ async function buildPlanSummaryGraph(container, entries, plan, timeline) {
     const footerRow = document.createElement('div');
     footerRow.className = 'row align-items-center mt-2';
 
-    const mkBadge = (color, text, dashed) => {
+    const mkBadge = (color, text, dashed, icon) => {
         const col   = document.createElement('div');
         col.className = 'col-auto';
         const badge = document.createElement('span');
         badge.className = 'badge';
         badge.style.backgroundColor = color;
         if (dashed) badge.style.outline = `2px dashed ${color}`;
-        badge.textContent = text;
+        if (icon) {
+            DOMUtils.append(badge, DOMUtils.createIcon(`bi ${icon} icon-inline`), ` ${text}`);
+        } else {
+            badge.textContent = text;
+        }
         col.appendChild(badge);
         return col;
     };
@@ -1177,6 +1218,9 @@ async function buildPlanSummaryGraph(container, entries, plan, timeline) {
     footerRow.appendChild(mkBadge('#fd7e14', i18n.t('plan_my_night.plan_status_previous') || 'Expired'));
     footerRow.appendChild(mkBadge('#6c757d', i18n.t('skytonight.planned') || 'Planned'));
     footerRow.appendChild(mkBadge('#ef4444', i18n.t('astro_weather.now_badge') || 'Now', true));
+    if (bands.some(b => b.warningStatus && b.warningStatus !== 'ok')) {
+        footerRow.appendChild(mkBadge('#6f42c1', i18n.t('plan_my_night.visibility_badge_label'), true, 'bi-exclamation-triangle-fill'));
+    }
 
     container.appendChild(footerRow);
 
@@ -1266,6 +1310,152 @@ function updatePlanSummaryChart(timeline) {
     planSummaryChartInstance.update('none');
 }
 
+/**
+ * Build one preview-table row for the optimizer modal: target name, proposed
+ * time range, and a status badge. Priority (most to least severe): never
+ * observable tonight, pushed past night end (no room left at all), truncated
+ * (shortened to fit before night end), insufficient visibility window, plain
+ * visibility warning (ok / partial / none), else fully observable.
+ */
+function _planOptimizeRow(previewEntry) {
+    const tr = document.createElement('tr');
+
+    const nameTd = document.createElement('td');
+    nameTd.textContent = previewEntry.name || '-';
+
+    const timeTd = document.createElement('td');
+    timeTd.textContent = `${formatTimeOnly(previewEntry.start)} -> ${formatTimeOnly(previewEntry.end)}`;
+
+    const statusTd = document.createElement('td');
+    const badge = document.createElement('span');
+    const warnings = previewEntry.warnings || [];
+    const vis = previewEntry.visibility;
+    if (warnings.includes('never_observable')) {
+        badge.className = 'badge bg-danger';
+        badge.textContent = i18n.t('plan_my_night.optimize_never_observable');
+    } else if (warnings.includes('pushed_past_night_end')) {
+        badge.className = 'badge bg-danger';
+        badge.textContent = i18n.t('plan_my_night.optimize_pushed_past_night_end');
+    } else if (warnings.includes('truncated')) {
+        badge.className = 'badge bg-warning text-dark';
+        badge.textContent = i18n.t('plan_my_night.optimize_truncated');
+    } else if (warnings.includes('insufficient_window')) {
+        badge.className = 'badge bg-warning text-dark';
+        badge.textContent = i18n.t('plan_my_night.optimize_insufficient_window');
+    } else if (vis && vis.status !== 'ok') {
+        badge.className = `badge ${vis.status === 'none' ? 'bg-danger' : 'bg-warning text-dark'}`;
+        badge.textContent = _planVisibilityWarningText(vis);
+    } else {
+        badge.className = 'badge bg-success';
+        badge.textContent = i18n.t('plan_my_night.optimize_ok');
+    }
+    statusTd.appendChild(badge);
+
+    tr.appendChild(nameTd);
+    tr.appendChild(timeTd);
+    tr.appendChild(statusTd);
+    return tr;
+}
+
+/**
+ * Fetch a proposed order/timing from the schedule optimizer and show it in the
+ * shared "modal_lg_close" shell for the user to confirm before it's applied.
+ */
+async function openPlanOptimizeModal() {
+    const tidParam = currentPlanTelescopeId ? `?telescope_id=${encodeURIComponent(currentPlanTelescopeId)}` : '';
+    let result;
+    try {
+        result = await fetchJSON(`/api/plan-my-night/optimize${tidParam}`);
+    } catch (err) {
+        showMessage('error', i18n.t('plan_my_night.optimize_error'));
+        return;
+    }
+
+    const modalEl = document.getElementById('modal_lg_close');
+    const titleEl = document.getElementById('modal_lg_close_title');
+    const bodyEl = document.getElementById('modal_lg_close_body');
+    titleEl.textContent = i18n.t('plan_my_night.optimize_modal_title');
+    DOMUtils.clear(bodyEl);
+
+    if ((result.plan_warnings || []).includes('total_duration_exceeds_night')) {
+        const warn = document.createElement('div');
+        warn.className = 'alert alert-warning py-2';
+        warn.textContent = i18n.t('plan_my_night.optimize_total_exceeds_night');
+        bodyEl.appendChild(warn);
+    }
+
+    const table = document.createElement('table');
+    table.className = 'table table-sm align-middle mb-2';
+    const thead = document.createElement('thead');
+    const headRow = document.createElement('tr');
+    [
+        i18n.t('plan_my_night.export_pdf_col_target'),
+        i18n.t('plan_my_night.optimize_col_time'),
+        i18n.t('plan_my_night.optimize_col_status'),
+    ].forEach(text => {
+        const th = document.createElement('th');
+        th.textContent = text;
+        headRow.appendChild(th);
+    });
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    (result.preview || []).forEach(p => tbody.appendChild(_planOptimizeRow(p)));
+    table.appendChild(tbody);
+    bodyEl.appendChild(table);
+
+    const delayInfo = document.createElement('div');
+    delayInfo.className = 'small text-muted';
+    delayInfo.textContent = i18n.t('plan_my_night.optimize_delay_info', {
+        delay: formatMinutesAsHourMinute(result.start_delay_minutes || 0),
+    });
+    bodyEl.appendChild(delayInfo);
+
+    // Inject an Apply button into the shared modal's footer - removed on hide so
+    // it doesn't leak into the other features that reuse this same modal shell.
+    const footer = modalEl.querySelector('.modal-footer');
+    footer.querySelector('#plan-optimize-apply-btn')?.remove();
+
+    const applyBtn = document.createElement('button');
+    applyBtn.type = 'button';
+    applyBtn.id = 'plan-optimize-apply-btn';
+    applyBtn.className = 'btn btn-primary';
+    applyBtn.textContent = i18n.t('plan_my_night.optimize_apply_button');
+    applyBtn.addEventListener('click', async () => {
+        applyBtn.disabled = true;
+        try {
+            await fetchJSON('/api/plan-my-night/optimize/apply', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    telescope_id: currentPlanTelescopeId,
+                    order: result.order,
+                    start_delay_minutes: result.start_delay_minutes,
+                }),
+            });
+            bootstrap.Modal.getInstance(modalEl)?.hide();
+            showMessage('success', i18n.t('plan_my_night.optimize_applied'));
+            await loadPlanMyNight();
+        } catch (err) {
+            showMessage('error', i18n.t('plan_my_night.optimize_apply_error'));
+        } finally {
+            applyBtn.disabled = false;
+        }
+    });
+    footer.insertBefore(applyBtn, footer.firstChild);
+
+    const cleanupOnHide = () => {
+        applyBtn.remove();
+        modalEl.removeEventListener('hidden.bs.modal', cleanupOnHide);
+    };
+    modalEl.addEventListener('hidden.bs.modal', cleanupOnHide);
+
+    let bsModal = bootstrap.Modal.getInstance(modalEl);
+    if (!bsModal) bsModal = new bootstrap.Modal(modalEl, { backdrop: true, focus: true, keyboard: true });
+    bsModal.show();
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 
 function renderPlanMyNight(payload) {
@@ -1286,6 +1476,12 @@ function renderPlanMyNight(payload) {
     const state = payload.state || 'none';
     const plan = payload.plan;
     const timeline = payload.timeline || {};
+
+    // Set once the async active-location check below resolves; hides the
+    // Optimize button (assigned further down) if the plan isn't for the
+    // viewer's current location, since the proposed schedule would be based
+    // on altitudes for a place they're not actually observing from.
+    let optimizeBtnEl = null;
 
     // Pinned-location banner (v1.2): the plan is computed for the location it
     // was created with; warn (non-blocking) when the viewer's active location
@@ -1315,6 +1511,9 @@ function renderPlanMyNight(payload) {
                             active: active?.name || '?',
                         })
                     );
+                    // The optimizer schedules against this plan's pinned-location
+                    // altitudes - don't offer it while viewing from elsewhere.
+                    optimizeBtnEl?.remove();
                 }
             }).catch(() => { /* banner stays informational */ });
         }
@@ -1537,8 +1736,23 @@ function renderPlanMyNight(payload) {
     coverageBadge.className = `badge ${coverageStatus.className}`;
     coverageBadge.textContent = i18n.t(`plan_my_night.coverage_status_${coverageStatus.key}`);
 
+    const coverageRightGroup = document.createElement('div');
+    coverageRightGroup.className = 'd-flex align-items-center gap-2';
+    coverageRightGroup.appendChild(coverageBadge);
+    if (state !== 'previous' && entries.length) {
+        const optimizeBtn = document.createElement('button');
+        optimizeBtn.type = 'button';
+        optimizeBtn.className = 'btn btn-outline-primary btn-sm';
+        DOMUtils.append(optimizeBtn, DOMUtils.createIcon('bi bi-magic icon-inline'), ` ${i18n.t('plan_my_night.optimize_button')}`);
+        optimizeBtn.addEventListener('click', () => {
+            openPlanOptimizeModal().catch(err => console.error('Plan optimize error:', err));
+        });
+        coverageRightGroup.appendChild(optimizeBtn);
+        optimizeBtnEl = optimizeBtn;
+    }
+
     coverageHeader.appendChild(coverageLabel);
-    coverageHeader.appendChild(coverageBadge);
+    coverageHeader.appendChild(coverageRightGroup);
 
     // Graph container - replaces both the stacked coverage bar and the timeline progress bar
     const graphContainer = document.createElement('div');
@@ -1703,6 +1917,8 @@ function renderPlanMyNight(payload) {
         }
         head.appendChild(meta);
         head.appendChild(timeRange);
+        const visibilityBadge = _planVisibilityBadge(entry);
+        if (visibilityBadge) head.appendChild(visibilityBadge);
 
         const controls = document.createElement('div');
         controls.className = 'd-flex gap-1 flex-wrap';

@@ -40,6 +40,11 @@ _csv_normalize_ra = plan_my_night._csv_normalize_ra
 _csv_normalize_dec = plan_my_night._csv_normalize_dec
 _csv_fmt_local_hm = plan_my_night._csv_fmt_local_hm
 _csv_fmt_observable_pct = plan_my_night._csv_fmt_observable_pct
+_observable_runs = plan_my_night._observable_runs
+_coverage_for_window = plan_my_night._coverage_for_window
+_visibility_summary = plan_my_night._visibility_summary
+compute_optimized_schedule = plan_my_night.compute_optimized_schedule
+apply_optimized_schedule = plan_my_night.apply_optimized_schedule
 
 
 @pytest.fixture
@@ -2152,3 +2157,274 @@ class TestGeneratePlanPdfAdditionalBranches:
         metrics = {"fill_percent": 10.0, "planned_minutes": 30, "night_minutes": 60, "overflow_minutes": 0}
         result = generate_plan_pdf(payload, metrics, _DummyI18n())
         assert result.getvalue().startswith(b"%PDF")
+
+
+def _write_alttime(dir_path, filename, times, altitudes, alt_min=25.0, alt_max=90.0, azimuths=None):
+    """Write a minimal *_alttime.json fixture into dir_path (str or Path)."""
+    data = {
+        "timezone": "UTC",
+        "times_utc": times,
+        "altitudes": altitudes,
+        "altitude_constraint_min": alt_min,
+        "altitude_constraint_max": alt_max,
+    }
+    if azimuths is not None:
+        data["azimuths"] = azimuths
+    path = os.path.join(str(dir_path), f"{filename}_alttime.json")
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(data, fh)
+
+
+class TestVisibilityWarnings:
+    """Regression coverage for the reported bug: Plan My Night scheduled targets
+    (Triangulum Galaxy, Neptune) entirely outside the hours they're actually
+    observable, with no warning. _observable_runs / _visibility_summary compute
+    the real altitude-based visibility window so it can be surfaced and used by
+    the optimizer below."""
+
+    def test_observable_runs_interpolates_crossing_and_clips_to_night(self):
+        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
+        night_end = datetime(2026, 7, 18, 8, 0, tzinfo=timezone.utc)
+        times = [(night_start + timedelta(minutes=30 * i)).strftime("%Y-%m-%dT%H:%M:%S") for i in range(5)]
+        # Crosses the 25 deg floor between the 07:00 (20 deg) and 07:30 (30 deg) samples.
+        altitudes = [-10.0, 0.0, 20.0, 30.0, 40.0]
+
+        runs = _observable_runs(times, altitudes, None, 25.0, 90.0, None, night_start, night_end)
+
+        assert len(runs) == 1
+        run_start, run_end = runs[0]
+        expected_crossing = night_start + timedelta(minutes=75)  # 07:15
+        assert abs((run_start - expected_crossing).total_seconds()) < 1
+        assert run_end == night_end  # altitude keeps rising through the end of the night
+
+    def test_observable_runs_empty_when_never_in_range(self):
+        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
+        night_end = datetime(2026, 7, 18, 8, 0, tzinfo=timezone.utc)
+        times = [(night_start + timedelta(minutes=30 * i)).strftime("%Y-%m-%dT%H:%M:%S") for i in range(5)]
+        altitudes = [-10.0, -5.0, -2.0, -1.0, -0.5]  # never reaches the 25 deg floor
+
+        runs = _observable_runs(times, altitudes, None, 25.0, 90.0, None, night_start, night_end)
+        assert runs == []
+
+    def test_visibility_summary_none_when_window_entirely_before_run(self):
+        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
+        run_start = night_start + timedelta(minutes=75)
+        run_end = night_start + timedelta(hours=2)
+        runs = [(run_start, run_end)]
+
+        summary = _visibility_summary(runs, night_start, night_start + timedelta(hours=1))
+
+        assert summary["status"] == "none"
+        assert summary["coverage_percent"] == 0.0
+        assert summary["visible_from"] is not None  # tells the user when it *does* become visible
+
+    def test_visibility_summary_partial_when_window_overlaps_run(self):
+        run_start = datetime(2026, 7, 18, 7, 15, tzinfo=timezone.utc)
+        run_end = datetime(2026, 7, 18, 9, 0, tzinfo=timezone.utc)
+        runs = [(run_start, run_end)]
+        window_start = datetime(2026, 7, 18, 6, 30, tzinfo=timezone.utc)
+        window_end = datetime(2026, 7, 18, 7, 30, tzinfo=timezone.utc)  # only the last 15 min overlap
+
+        summary = _coverage_for_window(runs, window_start, window_end)
+        assert 0.0 < summary < 1.0
+        assert _visibility_summary(runs, window_start, window_end)["status"] == "partial"
+
+    def test_visibility_summary_ok_when_window_inside_run(self):
+        run_start = datetime(2026, 7, 18, 7, 15, tzinfo=timezone.utc)
+        run_end = datetime(2026, 7, 18, 8, 0, tzinfo=timezone.utc)
+        runs = [(run_start, run_end)]
+
+        summary = _visibility_summary(runs, run_start, run_end)
+        assert summary["status"] == "ok"
+        assert summary["coverage_percent"] == 100.0
+
+    def test_get_plan_with_timeline_flags_triangulum_style_gap(self, temp_plan_dir, monkeypatch):
+        """The exact reported shape: a target planned for the first hour of the
+        night while its altitude only crosses the observable floor at the 75-minute
+        mark - get_plan_with_timeline must flag it as 'none', not silently plan it."""
+        monkeypatch.setattr("skytonight_storage.get_alttime_dir", lambda *_a, **_k: temp_plan_dir, raising=True)
+        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
+        night_end = datetime(2026, 7, 18, 8, 0, tzinfo=timezone.utc)
+        times = [(night_start + timedelta(minutes=30 * i)).strftime("%Y-%m-%dT%H:%M:%S") for i in range(5)]
+        altitudes = [-10.0, 0.0, 20.0, 30.0, 40.0]
+        _write_alttime(temp_plan_dir, "tri", times, altitudes)
+
+        uid = "eeee3001-0000-4000-8000-000000000000"
+        payload = {
+            "user_id": uid, "username": "user",
+            "plan": {
+                "night_start": night_start.isoformat(),
+                "night_end": night_end.isoformat(),
+                "start_delay_minutes": 0,
+                "entries": [
+                    {"id": "e1", "name": "Triangulum", "planned_minutes": 60, "alttime_file": "tri", "done": False},
+                ],
+            },
+        }
+        save_user_plan(uid, payload, username="user")
+
+        result = get_plan_with_timeline(uid, "user")
+        entry = result["plan"]["entries"][0]
+        assert entry["visibility"]["status"] == "none"
+        assert entry["visibility"]["visible_from"] is not None
+
+
+class TestScheduleOptimizer:
+    """compute_optimized_schedule / apply_optimized_schedule: reorders targets and
+    picks a single initial delay so each lines up with its real visibility window,
+    without introducing mid-plan idle gaps."""
+
+    def test_reorders_by_visibility_and_computes_initial_delay(self, temp_plan_dir, monkeypatch):
+        monkeypatch.setattr("skytonight_storage.get_alttime_dir", lambda *_a, **_k: temp_plan_dir, raising=True)
+        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
+        night_end = datetime(2026, 7, 18, 10, 0, tzinfo=timezone.utc)
+        times = [(night_start + timedelta(minutes=30 * i)).strftime("%Y-%m-%dT%H:%M:%S") for i in range(9)]
+
+        # "Triangulum": not observable until ~08:20, stays visible through the end of the night.
+        triangulum_alts = [-10.0, -2.5, 5.0, 12.5, 20.0, 27.5, 35.0, 42.5, 50.0]
+        _write_alttime(temp_plan_dir, "tri", times, triangulum_alts)
+
+        # "Neptune": already observable at night_start, drops out of range around 07:36.
+        neptune_alts = [30.0, 28.0, 26.0, 24.0, 22.0, 20.0, 18.0, 16.0, 14.0]
+        _write_alttime(temp_plan_dir, "nep", times, neptune_alts)
+
+        uid = "eeee3002-0000-4000-8000-000000000000"
+        payload = {
+            "user_id": uid, "username": "user",
+            "plan": {
+                "night_start": night_start.isoformat(),
+                "night_end": night_end.isoformat(),
+                "start_delay_minutes": 0,
+                "location_id": None,
+                # Planned in the *wrong* order: Triangulum (not visible yet) before Neptune.
+                "entries": [
+                    {"id": "triangulum", "name": "Triangulum", "planned_minutes": 60, "alttime_file": "tri", "done": False},
+                    {"id": "neptune", "name": "Neptune", "planned_minutes": 60, "alttime_file": "nep", "done": False},
+                ],
+            },
+        }
+        save_user_plan(uid, payload, username="user")
+
+        result = compute_optimized_schedule(uid, "user")
+
+        assert result is not None
+        assert result["order"] == ["neptune", "triangulum"]
+        assert result["start_delay_minutes"] == 0  # Neptune is already visible at night_start
+
+        preview_by_id = {p["id"]: p for p in result["preview"]}
+        assert preview_by_id["neptune"]["visibility"]["status"] == "ok"
+        assert preview_by_id["triangulum"]["visibility"]["status"] == "ok"
+
+    def test_never_observable_target_is_flagged(self, temp_plan_dir, monkeypatch):
+        monkeypatch.setattr("skytonight_storage.get_alttime_dir", lambda *_a, **_k: temp_plan_dir, raising=True)
+        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
+        night_end = datetime(2026, 7, 18, 8, 0, tzinfo=timezone.utc)
+        times = [(night_start + timedelta(minutes=30 * i)).strftime("%Y-%m-%dT%H:%M:%S") for i in range(5)]
+        always_low_alts = [-10.0, -8.0, -6.0, -4.0, -2.0]  # never reaches the 25 deg floor
+        _write_alttime(temp_plan_dir, "low", times, always_low_alts)
+
+        uid = "eeee3003-0000-4000-8000-000000000000"
+        payload = {
+            "user_id": uid, "username": "user",
+            "plan": {
+                "night_start": night_start.isoformat(),
+                "night_end": night_end.isoformat(),
+                "start_delay_minutes": 0,
+                "entries": [
+                    {"id": "e1", "name": "Never Up", "planned_minutes": 60, "alttime_file": "low", "done": False},
+                ],
+            },
+        }
+        save_user_plan(uid, payload, username="user")
+
+        result = compute_optimized_schedule(uid, "user")
+        assert result["preview"][0]["warnings"] == ["never_observable"]
+
+    def test_flags_overload_caused_by_mandatory_delay(self, temp_plan_dir, monkeypatch):
+        """Regression test: a target that only becomes visible late in the night
+        forces a large start_delay_minutes, which can shrink the *usable* window
+        below the total requested duration even though that duration is well
+        under the raw night length. plan_warnings must catch this - comparing
+        total planned minutes against the full night length (ignoring the
+        mandatory delay) would miss it entirely, matching the real-world bug
+        where the Plan My Night 'Overloaded' badge appeared only after applying,
+        with no warning in the optimizer preview beforehand."""
+        monkeypatch.setattr("skytonight_storage.get_alttime_dir", lambda *_a, **_k: temp_plan_dir, raising=True)
+        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
+        night_end = datetime(2026, 7, 18, 8, 0, tzinfo=timezone.utc)  # 120-minute night
+        times = [(night_start + timedelta(minutes=30 * i)).strftime("%Y-%m-%dT%H:%M:%S") for i in range(5)]
+        # Not observable until the very last sample (07:30) - forces a long mandatory delay.
+        late_alts = [-10.0, -5.0, -2.0, 0.0, 30.0]
+        _write_alttime(temp_plan_dir, "late", times, late_alts)
+
+        uid = "eeee3007-0000-4000-8000-000000000000"
+        payload = {
+            "user_id": uid, "username": "user",
+            "plan": {
+                "night_start": night_start.isoformat(),
+                "night_end": night_end.isoformat(),
+                "start_delay_minutes": 0,
+                "entries": [
+                    # 90 minutes requested, comfortably under the 120-minute night...
+                    {"id": "e1", "name": "Late Riser", "planned_minutes": 90, "alttime_file": "late", "done": False},
+                ],
+            },
+        }
+        save_user_plan(uid, payload, username="user")
+
+        result = compute_optimized_schedule(uid, "user")
+
+        # ...but it isn't visible until ~90 minutes in, leaving only ~5 usable minutes.
+        assert result["start_delay_minutes"] >= 60
+        assert plan_my_night._parse_utc(result["preview"][0]["end"]) == night_end
+        assert result["plan_warnings"] == ["total_duration_exceeds_night"]
+
+    def test_compute_returns_none_without_plan(self, temp_plan_dir):
+        assert compute_optimized_schedule("eeee3004-0000-4000-8000-000000000000", "user") is None
+
+    def test_apply_reorders_entries_and_sets_delay(self, temp_plan_dir):
+        uid = "eeee3005-0000-4000-8000-000000000000"
+        payload = {
+            "user_id": uid, "username": "user",
+            "plan": {
+                "night_start": "2026-07-18T06:00:00+00:00",
+                "night_end": "2026-07-18T10:00:00+00:00",
+                "start_delay_minutes": 0,
+                "entries": [
+                    {"id": "a", "name": "A", "planned_minutes": 60, "done": False},
+                    {"id": "b", "name": "B", "planned_minutes": 60, "done": False},
+                ],
+            },
+        }
+        save_user_plan(uid, payload, username="user")
+
+        ok = apply_optimized_schedule(uid, "user", None, ["b", "a"], 45)
+        assert ok is True
+
+        updated = load_user_plan(uid, "user")
+        entries = updated["plan"]["entries"]
+        assert [e["id"] for e in entries] == ["b", "a"]
+        assert updated["plan"]["start_delay_minutes"] == 45
+
+    def test_apply_rejects_stale_order(self, temp_plan_dir):
+        uid = "eeee3006-0000-4000-8000-000000000000"
+        payload = {
+            "user_id": uid, "username": "user",
+            "plan": {
+                "night_start": "2026-07-18T06:00:00+00:00",
+                "night_end": "2026-07-18T10:00:00+00:00",
+                "start_delay_minutes": 0,
+                "entries": [
+                    {"id": "a", "name": "A", "planned_minutes": 60, "done": False},
+                    {"id": "b", "name": "B", "planned_minutes": 60, "done": False},
+                ],
+            },
+        }
+        save_user_plan(uid, payload, username="user")
+
+        # Order references an id ("c") that no longer exists in the plan.
+        ok = apply_optimized_schedule(uid, "user", None, ["b", "c"], 0)
+        assert ok is False
+
+        unchanged = load_user_plan(uid, "user")
+        assert [e["id"] for e in unchanged["plan"]["entries"]] == ["a", "b"]
