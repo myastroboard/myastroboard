@@ -4,7 +4,9 @@ Covers pure-logic functions and mocked file/system calls.
 """
 
 import os
+import time
 from unittest.mock import patch, MagicMock
+import pytest
 import metrics_collector as mc
 
 is_running_in_container = mc.is_running_in_container
@@ -14,6 +16,18 @@ get_environment_processes = mc.get_environment_processes
 detect_docker_in_docker = mc.detect_docker_in_docker
 collect_metrics = mc.collect_metrics
 CONTAINER_PROCESS_HINTS = mc.CONTAINER_PROCESS_HINTS
+
+
+@pytest.fixture(autouse=True)
+def _reset_disk_details_cache():
+    """get_disk_space_details() now serves from a background-refreshed cache
+    (see metrics_collector.py) - reset it so every test still gets a fresh,
+    synchronous computation that reflects that test's own mocks, matching
+    the pre-cache behavior these tests were written against."""
+    mc._disk_details_cache['data'] = None
+    mc._disk_details_cache['ts'] = 0.0
+    mc._disk_details_refreshing = False
+    yield
 
 
 class TestIsRunningInContainer:
@@ -515,6 +529,57 @@ class TestGetDiskSpaceDetailsFolderNone:
         for folder_info in result["folders"].values():
             assert folder_info["bytes"] == 0
             assert folder_info["percent_of_root"] == 0
+
+
+class TestGetDiskSpaceDetailsCache:
+    """get_disk_space_details() serves from a background-refreshed cache
+    (see metrics_collector.py) so a slow recursive scan - observed to take
+    10+ seconds on a Docker-Desktop-on-Windows bind mount - never blocks the
+    /api/metrics request."""
+
+    def test_serves_cached_value_when_fresh_without_recomputing(self):
+        mc._disk_details_cache['data'] = {'root': {}, 'folders': {'sentinel': True}, 'total_tracked': 0}
+        mc._disk_details_cache['ts'] = time.monotonic()
+
+        with patch('metrics_collector._compute_disk_space_details') as mock_compute:
+            result = mc.get_disk_space_details()
+
+        mock_compute.assert_not_called()
+        assert result['folders'] == {'sentinel': True}
+
+    def test_stale_cache_returns_immediately_and_refreshes_in_background(self):
+        stale_value = {'root': {}, 'folders': {'stale': True}, 'total_tracked': 0}
+        fresh_value = {'root': {}, 'folders': {'fresh': True}, 'total_tracked': 1}
+        mc._disk_details_cache['data'] = stale_value
+        mc._disk_details_cache['ts'] = time.monotonic() - mc._DISK_DETAILS_CACHE_TTL - 1
+
+        class _ImmediateThread:
+            """Runs the target synchronously in place of a real background thread."""
+            def __init__(self, target, daemon=None):
+                self._target = target
+
+            def start(self):
+                self._target()
+
+        with patch('metrics_collector._compute_disk_space_details', return_value=fresh_value), \
+             patch('metrics_collector.threading.Thread', _ImmediateThread):
+            result = mc.get_disk_space_details()
+
+        # The caller gets the stale value immediately, never blocking on the scan...
+        assert result == stale_value
+        # ...and the cache is updated in the background for the next call.
+        assert mc._disk_details_cache['data'] == fresh_value
+        assert mc._disk_details_refreshing is False
+
+    def test_does_not_start_a_second_refresh_while_one_is_in_flight(self):
+        mc._disk_details_cache['data'] = {'root': {}, 'folders': {}, 'total_tracked': 0}
+        mc._disk_details_cache['ts'] = time.monotonic() - mc._DISK_DETAILS_CACHE_TTL - 1
+        mc._disk_details_refreshing = True
+
+        with patch('metrics_collector.threading.Thread') as mock_thread:
+            mc.get_disk_space_details()
+
+        mock_thread.assert_not_called()
 
 
 class TestGetEnvironmentProcessesBranchCoverage:

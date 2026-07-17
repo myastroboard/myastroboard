@@ -24,14 +24,14 @@ class TestTrimCalculationLog:
         result = log_file.read_text(encoding="utf-8").splitlines()
         assert len(result) == 6
 
-    def test_trims_to_max_runs_times_2(self, tmp_path):
+    def test_trims_to_per_run_budget(self, tmp_path):
         log_file = tmp_path / "big_calc.log"
-        # 30 lines = 15 runs × 2 lines each
-        lines = [json.dumps({"run": i}) + "\n" for i in range(30)]
+        # Budget: max_runs * (1 dataset line + MAX_LOCATIONS calc lines) = 5 * 6 = 30
+        lines = [json.dumps({"run": i}) + "\n" for i in range(50)]
         log_file.write_text("".join(lines), encoding="utf-8")
         _trim_calculation_log(str(log_file), max_runs=5)
         result = log_file.read_text(encoding="utf-8").splitlines()
-        assert len(result) == 10  # 5 * 2
+        assert len(result) == 30  # 5 * (1 + MAX_LOCATIONS)
 
     def test_preserves_last_entries(self, tmp_path):
         log_file = tmp_path / "order.log"
@@ -54,14 +54,14 @@ class TestTrimCalculationLog:
         ]
         assert len(result_lines) == 9
 
-    def test_max_runs_one_keeps_two_lines(self, tmp_path):
-        """max_runs=1 means keep at most 1*2=2 lines."""
+    def test_max_runs_one_keeps_one_run_budget(self, tmp_path):
+        """max_runs=1 keeps at most 1 * (1 + MAX_LOCATIONS) = 6 lines."""
         log_file = tmp_path / "one.log"
         lines = [f"entry_{i}\n" for i in range(10)]
         log_file.write_text("".join(lines), encoding="utf-8")
         _trim_calculation_log(str(log_file), max_runs=1)
         result = log_file.read_text(encoding="utf-8").splitlines()
-        assert len(result) == 2
+        assert len(result) == 6
 
 
 class TestAppendSkytonigtCalculationLog:
@@ -344,6 +344,37 @@ class TestRunSkytonigtRefresh:
                                 # but the try/except means failure is safe anyway
                                 result = _run_skytonight_refresh()
         assert "dataset_generated" in result
+
+    def test_refresh_multi_location_keeps_install_default_as_primary(self):
+        """Lines 130-151: with 2+ scheduler locations, every location's result is
+        collected in 'calculations', but 'calculation' (the legacy single-summary
+        key) stays pinned to the install default's result even when a later,
+        non-default location is processed afterwards (line 150's False arc)."""
+        from skytonight_scheduler_manager import _run_skytonight_refresh
+
+        mock_dataset_result = {"metadata": {"generated_at": None, "sources": [], "counts": {}}}
+        default_loc = {"id": "loc-default", "name": "Default"}
+        other_loc = {"id": "loc-other", "name": "Other"}
+
+        calc_results = {
+            "loc-default": {"counts": {"deep_sky": 5}},
+            "loc-other": {"counts": {"deep_sky": 9}},
+        }
+
+        with patch("skytonight_scheduler_manager.ensure_skytonight_directories"):
+            with patch("skytonight_scheduler_manager.load_config", return_value={}):
+                with patch("repo_config.get_scheduler_locations", return_value=[default_loc, other_loc]):
+                    with patch("repo_config.get_install_default_location", return_value=default_loc):
+                        with patch("skytonight_scheduler_manager.build_and_save_default_dataset",
+                                   return_value=mock_dataset_result):
+                            with patch("skytonight_scheduler_manager.invalidate_targets_dataset_cache"):
+                                with patch("skytonight_scheduler_manager.run_calculations",
+                                           side_effect=lambda config, location: calc_results[location["id"]]):
+                                    with patch("skytonight_scheduler_manager._append_skytonight_calculation_log"):
+                                        result = _run_skytonight_refresh()
+
+        assert result["calculation"] == calc_results["loc-default"]
+        assert result["calculations"] == calc_results
 
     def test_refresh_with_default_comet_source(self):
         """Covers config path where comets source is missing (defaults to mpc+jpl)."""

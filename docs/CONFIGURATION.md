@@ -8,8 +8,9 @@ MyAstroBoard stores its runtime configuration in `data/config.json`. All setting
 
 | Sub-tab | Content |
 |---------|---------|
-| **Configuration** | Location, timezone, sky quality |
-| **Advanced** | SkyTonight constraints, horizon profile, scheduler, app settings |
+| **Locations** | Location presets: coordinates, timezone, sky quality, horizon profile, user attribution (v1.2 — see [LOCATIONS.md](LOCATIONS.md)) |
+| **Configuration** | Global app settings (Astrodex privacy) |
+| **Advanced** | SkyTonight constraints, scheduler, app settings |
 | **Connectors** | External tool connectors (AllSky, etc.) |
 | **Logs** | Live log viewer and export |
 | **Users** | User management (admin only) |
@@ -18,23 +19,35 @@ MyAstroBoard stores its runtime configuration in `data/config.json`. All setting
 
 ---
 
-## Location
+## Locations (v1.2 — multi-location profiles)
 
-Location is **required** before most calculations can run. Setting it triggers an immediate cache reset and a full recalculation cycle.
+Since v1.2, `config.json` holds an admin-managed `locations` list (up to `MAX_LOCATIONS = 5` presets) instead of a single `location` object. At least one preset is **required** before most calculations can run; editing a preset's coordinates resets only that preset's caches.
+
+Full reference — data model, attribution, per-user default/active location, rate-limit analysis behind the cap: **[LOCATIONS.md](LOCATIONS.md)**.
+
+Each preset carries:
 
 | Field | Description | Default |
 |-------|-------------|---------|
+| `id` | Server-generated uuid4, immutable | — |
 | `name` | Human-readable site name | `"Paris"` |
 | `latitude` | Decimal degrees, −90 to +90 | `48.866669` |
 | `longitude` | Decimal degrees, −180 to +180 | `2.33333` |
 | `elevation` | Altitude above sea level in metres | `35` |
 | `timezone` | IANA timezone string (e.g. `Europe/Paris`) | `"Europe/Paris"` |
+| `bortle` / `sqm` | Sky quality (see below) | `null` |
+| `horizon_profile` | Per-preset horizon mask (see below) | `[]` |
+| `is_install_default` | Exactly one preset carries `true` | first preset |
 
-The timezone field determines how all local times (moonrise, sunset, event times…) are displayed throughout the app. `GET /api/timezones` returns all valid IANA timezone strings for the dropdown.
+The timezone field determines how all local times (moonrise, sunset, event times…) are displayed throughout the app for users observing from that preset. `GET /api/timezones` returns all valid IANA timezone strings for the dropdown.
 
 A coordinate converter is available at `POST /api/convert-coordinates` to translate between decimal degrees and DMS (degrees/minutes/seconds).
 
+Legacy single-location configs are migrated automatically on first load after upgrade (the old `location` key and the old global horizon profile move onto the first preset — zero manual action required).
+
 ### Sky quality (light pollution)
+
+Set per location preset:
 
 | Field | Description |
 |-------|-------------|
@@ -65,7 +78,7 @@ These values live under `config.json → skytonight.constraints`. They define wh
 
 ## Custom horizon profile
 
-`config.json → skytonight.constraints.horizon_profile` stores an array of `[azimuth, altitude]` pairs that describe your local horizon mask — mountains, buildings, or trees that block your view at specific azimuths.
+Since v1.2 the horizon profile is a **per-location preset field** (`locations[].horizon_profile`, edited in the location's edit modal) instead of the former global `skytonight.constraints.horizon_profile`. It stores an array of `[azimuth, altitude]` pairs that describe the site's local horizon mask — mountains, buildings, or trees that block the view at specific azimuths.
 
 ```json
 "horizon_profile": [
@@ -80,7 +93,7 @@ These values live under `config.json → skytonight.constraints`. They define wh
 
 SkyTonight evaluates each target against the horizon profile: if the object's altitude at a given azimuth is below the profile altitude for that direction, it counts as blocked. Targets are scored only during the fraction of time they clear both the global `altitude_constraint_min` and the horizon profile.
 
-The profile is set in **Parameters → Advanced → Horizon Profile**. Import as JSON or enter points manually.
+The profile is set in **Parameters → Locations → (edit a preset) → Custom Horizon Profile**. Enter points manually per location.
 
 ---
 
@@ -227,8 +240,9 @@ The metrics tab is the first place to check if a cache job is repeatedly failing
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| `GET` | `/api/config` | login | Read full config (sanitised — no internal fields) |
-| `POST` | `/api/config` | admin | Save config; triggers cache reset if location changed |
+| `GET` | `/api/config` | login | Read full config; also exposes the caller's *active* location under `location` (compat shim) |
+| `POST` | `/api/config` | admin | Save global config; a legacy `location` payload updates the install default preset (its caches only are reset) |
+| — | `/api/locations*` | admin/login | Location preset CRUD, attribution, switcher — see [LOCATIONS.md](LOCATIONS.md) and [API_ENDPOINTS.md](API_ENDPOINTS.md) |
 | `GET` | `/api/config/export` | admin | Download `config.json` directly |
 | `GET` | `/api/skyquality` | login | Current sky quality parameters and computed LP factor |
 | `GET` | `/api/admin/app-settings` | admin | Read `app_settings.json` |

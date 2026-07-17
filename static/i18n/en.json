@@ -599,9 +599,9 @@
     "sky_quality_sqm_placeholder": "e.g. 20.8",
     "sky_quality_sqm_info": "Enter if you have a real SQM meter reading. Overrides the Bortle midpoint estimate.",
     "sky_quality_disabled_info": "Leaving both empty disables light pollution integration.",
-    "save_actions": "Save & Actions",
+    "save_actions": "Actions",
     "save_actions_info": "When new SkyTonight settings are saved, a manual run may be required to see changes on dashboard, or wait for the next scheduled run.",
-    "save_configuration": "Save Configuration",
+    "save_configuration": "Save Astrodex Settings",
     "view_skytonight_configs": "View Generated SkyTonight Configs",
     "export_general_config": "Export General Config",
     "features": "Features",
@@ -816,7 +816,44 @@
     "pref_beginner_catalog_enabled_info": "Adds a \"Beginner\" tab to SkyTonight with a curated list of easy targets.",
     "pref_recommendations_enabled": "Show \"Tonight for you\" panel",
     "pref_recommendations_enabled_info": "Shows a \"Tonight for you\" panel of recommended targets at the top of the SkyTonight Deep Sky Objects tab.",
-    "notifications_insecure_context": "Notifications require a secure connection (HTTPS). They cannot be enabled while using plain HTTP."
+    "notifications_insecure_context": "Notifications require a secure connection (HTTPS). They cannot be enabled while using plain HTTP.",
+    "locations": "Locations",
+    "locations_info": "Create observing location presets and attribute them to users. Each location drives all calculations (weather, astro forecasts, SkyTonight, ISS/CSS) for the users observing from it.",
+    "location_new": "New location",
+    "location_max_reached": "Maximum number of locations reached ({max}). This cap protects the shared free weather APIs used by all MyAstroBoard installs.",
+    "locations_load_failed": "Failed to load locations",
+    "location_edit_title": "Location",
+    "location_edit_title_named": "Edit {name}",
+    "location_edit_btn": "Edit",
+    "location_default_badge": "Default",
+    "location_horizon_points": "Custom horizon: {count} point(s)",
+    "location_attributed_badge": "{count} attributed",
+    "location_excluded_badge": "{count} excluded",
+    "location_set_default": "Set as default",
+    "location_default_changed": "Install default location updated",
+    "location_cannot_delete_default": "The install default location cannot be deleted. Promote another location first.",
+    "location_delete_confirm": "Delete location \"{name}\"?",
+    "location_delete_refs": "Referenced by: {users} user(s), {astrodex} Astrodex item(s), {plans} Plan My Night plan(s).",
+    "location_delete_plans_note": "Plans pinned to this location will be deleted. Astrodex items are kept (they keep the location name as text).",
+    "location_deleted": "Location deleted",
+    "location_delete_failed": "Failed to delete location",
+    "location_save": "Save location",
+    "location_saved": "Location saved",
+    "location_save_failed": "Failed to save location",
+    "location_attribute_title": "Attributed users",
+    "location_attribute_info": "Users this location is available to. A user with no attributed location falls back to the install default.",
+    "my_location": "Location",
+    "my_location_title": "My Locations",
+    "my_location_info": "These are the observing locations attributed to you. Pick which one is shown by default when you connect, and reorder them for the quick switcher. Location presets themselves are managed by an administrator.",
+    "my_location_default": "Default location (shown when you connect)",
+    "my_location_order": "Location order",
+    "my_location_order_info": "Order used in the quick switcher of the sky widget.",
+    "my_location_save": "Save location preferences",
+    "my_location_saved": "Location preferences saved",
+    "my_location_save_failed": "Failed to save location preferences",
+    "notifications_locations_title": "Locations",
+    "notifications_locations_info": "Disable notifications for specific observing locations. Muted locations no longer trigger location-based alerts (darkness, ISS/CSS, aurora, eclipses).",
+    "push_location_suffix": "{body} • {location_name}"
   },
   "astrodex": {
     "title": "Astrodex - Gotta Catch 'Em All!",
@@ -1202,7 +1239,9 @@
     "moon_calendar_legend_good": "≥4h dark",
     "moon_calendar_legend_ok": "2-4h dark",
     "moon_calendar_legend_bright": "Bright moon",
-    "seeing_week_title": "Seeing Forecast"
+    "seeing_week_title": "Seeing Forecast",
+    "pinned_location": "Plan computed for {name}",
+    "location_mismatch": "This plan was created for {pinned}; your active location is now {active} - altitudes shown may not match what you'll actually see."
   },
   "users": {
     "user_management": "User Management",
@@ -1350,6 +1389,7 @@
     "cache_job_status": "Status",
     "cache_job_last_run": "Last run",
     "cache_job_duration": "Duration",
+    "cache_job_toggle_locations": "Toggle per-location detail",
     "cache_jobs_loading": "Loading cache metrics…",
     "cache_status_valid": "Valid",
     "cache_status_stale": "Stale",
@@ -1724,7 +1764,9 @@
     "step_special_phenomena": "Special phenomena",
     "step_solar_system_events": "Solar system events",
     "step_sidereal_time": "Sidereal time",
-    "step_best_window": "Best window",
+    "step_best_window_strict": "Best window (strict)",
+    "step_best_window_practical": "Best window (practical)",
+    "step_best_window_illumination": "Best window (illumination)",
     "step_seeing_forecast": "Seeing forecast",
     "step_weather_forecast": "Weather forecast",
     "step_spaceflight_launches": "Spaceflight launches",
@@ -2025,7 +2067,10 @@
     "period_astronomical_dawn": "Astronomical Dawn",
     "period_unknown": "Unknown",
     "next_in": "{period} in {time}",
-    "score_title": "Current sky quality score (0–10): seeing, transparency, cloud cover, tracking stability"
+    "score_title": "Current sky quality score (0–10): seeing, transparency, cloud cover, tracking stability",
+    "other_locations": "Locations",
+    "tz_badge_title": "This location's time zone is {offset} - different from yours",
+    "tz_notice": "Times shown for this location are in {tz} ({offset}). Your time zone is {your_tz} ({your_offset})."
   },
   "wizard": {
     "title": "Getting Started",
@@ -2237,5 +2282,11 @@
         "framing": "A moderate focal length frames the galaxy with some surrounding space."
       }
     }
+  },
+  "locations": {
+    "max_reached": "Maximum number of locations reached",
+    "not_found": "Location not found",
+    "cannot_delete_default": "Cannot delete the install default location - promote another preset first",
+    "not_accessible": "This location is not attributed to you"
   }
 }

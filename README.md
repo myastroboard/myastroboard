@@ -27,6 +27,7 @@ If you want see more, maybe look at the [visual tour](docs/VISUAL_TOUR.md).
 - Observatory: live dashboard fed by external connectors
 - Connectors: AllSky all-sky camera integration (live image, keogram, startrails, timelapse, sensor data)
 - Multi-user auth system with admin/user roles
+- Multi-location profiles: up to 5 admin-managed observing sites with per-user attribution, one-tap switching, and per-location caches ([details](docs/LOCATIONS.md))
 - i18n support (English/French plus community translations)
 
 ### Also for space enthusiasts

@@ -31,7 +31,7 @@ const startupSubtabsByMain = {
     'astrodex': ['astrodex', 'plan-my-night'],
     'equipment': ['combinations', 'fov', 'telescopes', 'cameras', 'mounts', 'filters', 'accessories'],
     'my-settings': ['customize', 'notifications', 'security'],
-    'parameters': ['configuration', 'advanced', 'logs', 'users', 'metrics']
+    'parameters': ['configuration', 'logs', 'users', 'metrics']
 };
 
 function getAuthStatusRetryOptions() {
@@ -290,7 +290,6 @@ function getSubtabLabelKey(subtabName) {
         'customize': 'settings.customize',
         'security': 'settings.security',
         'configuration': 'settings.configuration',
-        'advanced': 'settings.advanced',
         'logs': 'settings.logs',
         'users': 'settings.users',
         'metrics': 'settings.metrics'

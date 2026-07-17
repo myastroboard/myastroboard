@@ -820,10 +820,27 @@ class TestAstroWeatherAnalyzerInit:
     """Lines 76-78: AstroWeatherAnalyzer.__init__ runs normally."""
 
     def test_init_loads_config_and_sets_attributes(self):
-        with patch("weather_astro.load_config", return_value={"location": {"latitude": 48.0}}):
-            analyzer = AstroWeatherAnalyzer(language="fr")
-        assert analyzer.location == {"latitude": 48.0}
+        # v1.2: an explicit location wins; otherwise the install default preset
+        # from config["locations"] is resolved.
+        explicit = {"id": "wa-loc", "latitude": 48.0}
+        with patch("weather_astro.load_config", return_value={"locations": []}):
+            analyzer = AstroWeatherAnalyzer(language="fr", location=explicit)
+        assert analyzer.location == explicit
         assert analyzer.language == "fr"
+
+    def test_init_resolves_install_default_when_no_location(self):
+        preset = {
+            "id": "wa-default",
+            "name": "Cfg Site",
+            "latitude": 12.0,
+            "longitude": 34.0,
+            "timezone": "UTC",
+            "is_install_default": True,
+        }
+        with patch("weather_astro.load_config", return_value={"locations": [preset]}):
+            analyzer = AstroWeatherAnalyzer(language="en")
+        assert analyzer.location["id"] == "wa-default"
+        assert analyzer.location["latitude"] == 12.0
 
 
 class TestGenerateComprehensiveAnalysisSuccess:

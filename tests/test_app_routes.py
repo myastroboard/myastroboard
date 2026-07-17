@@ -19,6 +19,101 @@ if 'psutil' not in sys.modules:
 
 import app as _app_mod
 import cache_store as _cache_store
+import time as _time
+
+
+def _install_default_location_id():
+    """The admin client's active location = the install default preset (v1.2)."""
+    from repo_config import load_config, get_install_default_location
+
+    return get_install_default_location(load_config()).get('id')
+
+
+class _LegacySlotProxy:
+    """Adapter shim: legacy single-slot cache dict -> v1.2 per-location slot.
+
+    Pre-v1.2 these tests poked module-level dicts like
+    ``_cache_store._sun_report_cache['data']``. The v1.2 cache keeps one slot
+    per location preset; this proxy forwards the same dict operations to the
+    install default preset's slot so the route-level test intent is unchanged.
+    Setting non-None data stamps a far-future timestamp so the shared cache
+    file (possibly refreshed by the background scheduler thread mid-test) can
+    never override the planted payload.
+    """
+
+    def __init__(self, name):
+        self._name = name
+
+    def _entry(self):
+        return _cache_store.get_location_cache_entry(self._name, _install_default_location_id())
+
+    def __getitem__(self, key):
+        return self._entry()[key]
+
+    def __setitem__(self, key, value):
+        entry = self._entry()
+        entry[key] = value
+        if key == 'data':
+            entry['timestamp'] = (_time.time() + 3600) if value is not None else 0
+
+    def __delitem__(self, key):
+        entry = self._entry()
+        if key == 'data':
+            entry['data'] = None
+            entry['timestamp'] = 0
+        else:
+            entry.pop(key, None)
+
+    def __contains__(self, key):
+        return key in self._entry()
+
+    def get(self, key, default=None):
+        return self._entry().get(key, default)
+
+    def pop(self, key, default=None):
+        entry = self._entry()
+        if key == 'data':
+            value = entry.get('data')
+            entry['data'] = None
+            entry['timestamp'] = 0
+            return value if value is not None else default
+        return entry.pop(key, default)
+
+
+_LEGACY = {name: _LegacySlotProxy(name) for name in _cache_store.LOCATION_SCOPED_CACHE_TTLS}
+
+
+def _v12_config(location=None, **top_level):
+    """Build a v1.2-shaped config: one install-default preset + top-level extras.
+
+    `location` overrides preset fields (pass latitude/longitude None to model
+    the "no usable location" arcs - v1.2 always has a preset, but it may lack
+    coordinates).
+    """
+    preset = {
+        'id': 'route-test-loc',
+        'name': 'Route Test Site',
+        'latitude': 48.0,
+        'longitude': 2.0,
+        'elevation': 0,
+        'timezone': 'UTC',
+        'bortle': None,
+        'sqm': None,
+        'horizon_profile': [],
+        'is_install_default': True,
+    }
+    preset.update(location or {})
+    config = {'locations': [preset]}
+    config.update(top_level)
+    return config
+
+
+@pytest.fixture(autouse=True)
+def _isolate_location_cache_hydration(monkeypatch):
+    """Keep load_location_cache from hydrating slots off the on-disk shared
+    file: in-route reads must only see what each test plants via _LEGACY."""
+    monkeypatch.setattr(_cache_store, 'load_shared_cache_entry', lambda *_a, **_k: None)
+    yield
 from app import app
 from auth import user_manager
 
@@ -213,19 +308,34 @@ class TestConfigEndpoints:
         assert len(data) > 0
 
     def test_post_config_preserves_old_horizon_profile_without_clear_flag(self, client_admin, monkeypatch):
+        # v1.2: horizon_profile lives on the install-default location preset.
+        # An empty incoming horizon list WITHOUT the explicit clear flag must
+        # not wipe the preset's stored profile, and skytonight.constraints
+        # must never carry horizon_profile again.
         old_cfg = {
-            'location': {'latitude': 1, 'longitude': 2, 'timezone': 'UTC'},
+            'locations': [
+                {
+                    'id': 'preset-1',
+                    'name': 'Test Site',
+                    'latitude': 1,
+                    'longitude': 2,
+                    'elevation': 0,
+                    'timezone': 'UTC',
+                    'is_install_default': True,
+                    'horizon_profile': [{'az': 10, 'alt': 20}],
+                }
+            ],
             'location_configured': True,
             'skytonight': {
                 'enabled': True,
-                'constraints': {'horizon_profile': [{'az': 10, 'alt': 20}], 'altitude_constraint_min': 25},
+                'constraints': {'altitude_constraint_min': 25},
                 'scheduler': {'enabled': True},
             },
         }
         captured = {}
         monkeypatch.setattr(_app_mod, 'load_config', lambda: old_cfg)
         monkeypatch.setattr(_app_mod, 'save_config', lambda cfg: captured.setdefault('cfg', cfg))
-        monkeypatch.setattr(_app_mod.cache_store, 'reset_all_caches', lambda: None)
+        monkeypatch.setattr(_app_mod.cache_store, 'reset_caches_for_location', lambda *_a, **_k: None)
         monkeypatch.setattr(_app_mod.cache_store, 'update_location_config', lambda *_a, **_k: None)
 
         incoming = {
@@ -236,16 +346,72 @@ class TestConfigEndpoints:
 
         assert resp.status_code == 200
         saved = captured['cfg']
-        assert saved['skytonight']['constraints']['horizon_profile'] == [{'az': 10, 'alt': 20}]
+        preset = saved['locations'][0]
+        assert preset['horizon_profile'] == [{'az': 10, 'alt': 20}]
+        assert 'horizon_profile' not in saved['skytonight']['constraints']
         assert saved['location_configured'] is True
 
+    def test_post_config_horizon_clear_flag_wipes_preset_profile(self, client_admin, monkeypatch):
+        # v1.2: the explicit _horizon_cleared flag empties the install-default
+        # preset's horizon profile (and is itself never persisted).
+        old_cfg = {
+            'locations': [
+                {
+                    'id': 'preset-1',
+                    'name': 'Test Site',
+                    'latitude': 1,
+                    'longitude': 2,
+                    'elevation': 0,
+                    'timezone': 'UTC',
+                    'is_install_default': True,
+                    'horizon_profile': [{'az': 10, 'alt': 20}],
+                }
+            ],
+            'location_configured': True,
+            'skytonight': {'enabled': True, 'constraints': {}, 'scheduler': {'enabled': True}},
+        }
+        captured = {}
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: old_cfg)
+        monkeypatch.setattr(_app_mod, 'save_config', lambda cfg: captured.setdefault('cfg', cfg))
+        monkeypatch.setattr(_app_mod.cache_store, 'reset_caches_for_location', lambda *_a, **_k: None)
+        monkeypatch.setattr(_app_mod.cache_store, 'update_location_config', lambda *_a, **_k: None)
+
+        incoming = {
+            'location': {'latitude': 1, 'longitude': 2, 'timezone': 'UTC'},
+            'skytonight': {'constraints': {'horizon_profile': [], '_horizon_cleared': True}},
+        }
+        resp = client_admin.post('/api/config', json=incoming)
+
+        assert resp.status_code == 200
+        saved = captured['cfg']
+        assert saved['locations'][0]['horizon_profile'] == []
+        assert '_horizon_cleared' not in saved['skytonight']['constraints']
+
     def test_post_config_location_change_resets_cache(self, client_admin, monkeypatch):
-        old_cfg = {'location': {'latitude': 1, 'longitude': 2, 'timezone': 'UTC'}, 'skytonight': {'constraints': {}}}
+        # v1.2: a legacy location payload updates the install-default preset
+        # and resets only that preset's caches (not the whole install).
+        old_cfg = {
+            'locations': [
+                {
+                    'id': 'preset-1',
+                    'name': 'Test Site',
+                    'latitude': 1,
+                    'longitude': 2,
+                    'elevation': 0,
+                    'timezone': 'UTC',
+                    'is_install_default': True,
+                    'horizon_profile': [],
+                }
+            ],
+            'skytonight': {'constraints': {}},
+        }
         reset_calls = []
         update_calls = []
         monkeypatch.setattr(_app_mod, 'load_config', lambda: old_cfg)
         monkeypatch.setattr(_app_mod, 'save_config', lambda *_a, **_k: None)
-        monkeypatch.setattr(_app_mod.cache_store, 'reset_all_caches', lambda: reset_calls.append(1))
+        monkeypatch.setattr(
+            _app_mod.cache_store, 'reset_caches_for_location', lambda loc_id: reset_calls.append(loc_id)
+        )
         monkeypatch.setattr(_app_mod.cache_store, 'update_location_config', lambda loc: update_calls.append(loc))
 
         incoming = {'location': {'latitude': 3, 'longitude': 2, 'timezone': 'UTC'}}
@@ -254,16 +420,71 @@ class TestConfigEndpoints:
 
         assert resp.status_code == 200
         assert data['cache_reset'] is True
-        assert reset_calls == [1]
+        assert reset_calls == ['preset-1']
         assert len(update_calls) == 1
 
+    def test_post_config_without_legacy_location_key_skips_compat_path(self, client_admin, monkeypatch):
+        """A v1.2-native payload (no top-level 'location' key) must skip the
+        legacy compat block entirely - no cache reset, presets pass through
+        unchanged from old_config."""
+        old_cfg = {
+            'locations': [
+                {
+                    'id': 'preset-1', 'name': 'Test Site', 'latitude': 1, 'longitude': 2,
+                    'elevation': 0, 'timezone': 'UTC', 'is_install_default': True, 'horizon_profile': [],
+                }
+            ],
+            'skytonight': {'constraints': {}},
+        }
+        reset_calls = []
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: old_cfg)
+        monkeypatch.setattr(_app_mod, 'save_config', lambda *_a, **_k: None)
+        monkeypatch.setattr(
+            _app_mod.cache_store, 'reset_caches_for_location', lambda loc_id: reset_calls.append(loc_id)
+        )
+
+        resp = client_admin.post('/api/config', json={'skytonight': {'enabled': True}})
+
+        assert resp.status_code == 200
+        assert resp.get_json()['cache_reset'] is False
+        assert reset_calls == []
+
+    def test_post_config_legacy_location_with_no_matching_preset_id(self, client_admin, monkeypatch):
+        """Defensive arc: if the install default's id (from get_install_default_location)
+        somehow isn't present in old_config['locations'], the compat loop runs to
+        completion without ever matching - no preset is touched, no cache reset."""
+        old_cfg = {
+            'locations': [
+                {
+                    'id': 'preset-1', 'name': 'Test Site', 'latitude': 1, 'longitude': 2,
+                    'elevation': 0, 'timezone': 'UTC', 'is_install_default': True, 'horizon_profile': [],
+                }
+            ],
+            'skytonight': {'constraints': {}},
+        }
+        reset_calls = []
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: old_cfg)
+        monkeypatch.setattr(_app_mod, 'save_config', lambda *_a, **_k: None)
+        monkeypatch.setattr(
+            _app_mod.cache_store, 'reset_caches_for_location', lambda loc_id: reset_calls.append(loc_id)
+        )
+        # Simulate the defensive edge case: install default id not in old_config['locations']
+        monkeypatch.setattr(_app_mod, 'get_install_default_location', lambda config: {'id': 'ghost-id'})
+
+        incoming = {'location': {'latitude': 3, 'longitude': 2, 'timezone': 'UTC'}}
+        resp = client_admin.post('/api/config', json=incoming)
+
+        assert resp.status_code == 200
+        assert resp.get_json()['cache_reset'] is False
+        assert reset_calls == []
+
     def test_post_config_invalid_bortle_returns_400(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {'location': {}, 'skytonight': {'constraints': {}}})
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: _v12_config({}, skytonight={'constraints': {}}))
         resp = client_admin.post('/api/config', json={'location': {'bortle': 11}})
         assert resp.status_code == 400
 
     def test_post_config_invalid_sqm_returns_400(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {'location': {}, 'skytonight': {'constraints': {}}})
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: _v12_config({}, skytonight={'constraints': {}}))
         resp = client_admin.post('/api/config', json={'location': {'sqm': -1}})
         assert resp.status_code == 400
 
@@ -377,7 +598,7 @@ class TestCachedReportEndpoints:
 
     def test_moon_report_returns_200_with_cached_data(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda cache, ttl: True)
-        monkeypatch.setitem(_cache_store._moon_report_cache, 'data', {'moon': 'data'})
+        monkeypatch.setitem(_LEGACY['moon_report'], 'data', {'moon': 'data'})
         resp = client_admin.get('/api/moon/report')
         assert resp.status_code == 200
 
@@ -803,39 +1024,39 @@ class TestRoutesWithPopulatedCache:
 
     def test_moon_report_from_cache(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
-        monkeypatch.setitem(_cache_store._moon_report_cache, 'data', {'moon': 'data'})
-        monkeypatch.setitem(_cache_store._dark_window_report_cache, 'data', {'window': 'data'})
-        monkeypatch.setitem(_cache_store._aurora_cache, 'data', {'aurora': 'data'})
+        monkeypatch.setitem(_LEGACY['moon_report'], 'data', {'moon': 'data'})
+        monkeypatch.setitem(_LEGACY['dark_window'], 'data', {'window': 'data'})
+        monkeypatch.setitem(_LEGACY['aurora'], 'data', {'aurora': 'data'})
         # ISS passes checks window_days equality — include it in the data
-        monkeypatch.setitem(_cache_store._iss_passes_cache, 'data', {'passes': [], 'window_days': 20})
+        monkeypatch.setitem(_LEGACY['iss_passes'], 'data', {'passes': [], 'window_days': 20})
         for route in ['/api/moon/report', '/api/moon/dark-window', '/api/aurora/predictions', '/api/iss/passes']:
             resp = client_admin.get(route)
             assert resp.status_code == 200, f"{route} returned {resp.status_code}"
 
     def test_sun_report_from_cache(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
-        monkeypatch.setitem(_cache_store._sun_report_cache, 'data', {'sun': 'data'})
+        monkeypatch.setitem(_LEGACY['sun_report'], 'data', {'sun': 'data'})
         resp = client_admin.get('/api/sun/today')
         assert resp.status_code in (200, 400)
 
     def test_eclipses_from_cache(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
-        monkeypatch.setitem(_cache_store._solar_eclipse_cache, 'data', {'eclipse': 'data'})
-        monkeypatch.setitem(_cache_store._lunar_eclipse_cache, 'data', {'eclipse': 'data'})
+        monkeypatch.setitem(_LEGACY['solar_eclipse'], 'data', {'eclipse': 'data'})
+        monkeypatch.setitem(_LEGACY['lunar_eclipse'], 'data', {'eclipse': 'data'})
         for route in ['/api/sun/next-eclipse', '/api/moon/next-eclipse']:
             resp = client_admin.get(route)
             assert resp.status_code == 200
 
     def test_planetary_events_from_cache(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
-        monkeypatch.setitem(_cache_store._planetary_events_cache, 'data', {'events': []})
-        monkeypatch.setitem(_cache_store._special_phenomena_cache, 'data', {'events': [], 'equinoxes_solstices': [], 'zodiacal_light': [], 'milky_way': []})
+        monkeypatch.setitem(_LEGACY['planetary_events'], 'data', {'events': []})
+        monkeypatch.setitem(_LEGACY['special_phenomena'], 'data', {'events': [], 'equinoxes_solstices': [], 'zodiacal_light': [], 'milky_way': []})
         resp = client_admin.get('/api/events/planetary')
         assert resp.status_code == 200
 
     def test_horizon_graph_from_cache(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
-        monkeypatch.setitem(_cache_store._horizon_graph_cache, 'data', {'graph': 'data'})
+        monkeypatch.setitem(_LEGACY['horizon_graph'], 'data', {'graph': 'data'})
         resp = client_admin.get('/api/astro/horizon-graph')
         assert resp.status_code == 200
 
@@ -850,13 +1071,13 @@ class TestRoutesWithPopulatedCache:
 
     def test_seeing_from_cache(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
-        monkeypatch.setitem(_cache_store._seeing_forecast_cache, 'data', {'forecast': []})
+        monkeypatch.setitem(_LEGACY['seeing_forecast'], 'data', {'forecast': []})
         resp = client_admin.get('/api/seeing-forecast')
         assert resp.status_code == 200
 
     def test_weather_forecast_from_cache(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
-        monkeypatch.setitem(_cache_store._weather_cache, 'data', {'forecast': []})
+        monkeypatch.setitem(_LEGACY['weather_forecast'], 'data', {'forecast': []})
         resp = client_admin.get('/api/weather/forecast')
         assert resp.status_code == 200
 
@@ -1004,16 +1225,16 @@ class TestEventsEndpoints:
     def test_events_upcoming_with_cache_returns_200(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
         monkeypatch.setitem(
-            _cache_store._solar_eclipse_cache, 'data', {'eclipse': None, 'status': 'none'}
+            _LEGACY['solar_eclipse'], 'data', {'eclipse': None, 'status': 'none'}
         )
         monkeypatch.setitem(
-            _cache_store._lunar_eclipse_cache, 'data', {'eclipse': None, 'status': 'none'}
+            _LEGACY['lunar_eclipse'], 'data', {'eclipse': None, 'status': 'none'}
         )
-        monkeypatch.setitem(_cache_store._aurora_cache, 'data', {'kp_index': 0, 'probability': 0})
-        monkeypatch.setitem(_cache_store._iss_passes_cache, 'data', {'passes': [], 'window_days': 20})
-        monkeypatch.setitem(_cache_store._moon_planner_report_cache, 'data', {'nights': []})
-        monkeypatch.setitem(_cache_store._planetary_events_cache, 'data', {'events': []})
-        monkeypatch.setitem(_cache_store._special_phenomena_cache, 'data', {'events': [], 'equinoxes_solstices': [], 'zodiacal_light': [], 'milky_way': []})
+        monkeypatch.setitem(_LEGACY['aurora'], 'data', {'kp_index': 0, 'probability': 0})
+        monkeypatch.setitem(_LEGACY['iss_passes'], 'data', {'passes': [], 'window_days': 20})
+        monkeypatch.setitem(_LEGACY['moon_planner'], 'data', {'nights': []})
+        monkeypatch.setitem(_LEGACY['planetary_events'], 'data', {'events': []})
+        monkeypatch.setitem(_LEGACY['special_phenomena'], 'data', {'events': [], 'equinoxes_solstices': [], 'zodiacal_light': [], 'milky_way': []})
         resp = client_admin.get('/api/events/upcoming')
         assert resp.status_code in (200, 202, 400)
 
@@ -1024,7 +1245,7 @@ class TestEventsEndpoints:
     def test_events_solarsystem_with_cache_returns_200(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
         monkeypatch.setitem(
-            _cache_store._solar_system_events_cache,
+            _LEGACY['solar_system_events'],
             'data',
             {'meteor_showers': [], 'comets': [], 'asteroid_occultations': []},
         )
@@ -1116,14 +1337,14 @@ class TestStaleDataBranch:
 
         monkeypatch.setattr(_cache_store, 'is_cache_valid', is_valid_first_false)
         monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda name, cache: False)
-        monkeypatch.setitem(_cache_store._moon_report_cache, 'data', {'stale': True})
+        monkeypatch.setitem(_LEGACY['moon_report'], 'data', {'stale': True})
         resp = client_admin.get('/api/moon/report')
         assert resp.status_code == 200
 
     def test_dark_window_stale_data_returns_200(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: False)
         monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda name, cache: False)
-        monkeypatch.setitem(_cache_store._dark_window_report_cache, 'data', {'stale': True})
+        monkeypatch.setitem(_LEGACY['dark_window'], 'data', {'stale': True})
         resp = client_admin.get('/api/moon/dark-window')
         assert resp.status_code == 200
 
@@ -1138,13 +1359,13 @@ class TestEventsUpcomingFullCache:
     def _patch_all_caches(self, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
         monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda name, cache: True)
-        monkeypatch.setitem(_cache_store._solar_eclipse_cache, 'data', {'eclipse': None, 'status': 'none', 'events': []})
-        monkeypatch.setitem(_cache_store._lunar_eclipse_cache, 'data', {'eclipse': None, 'status': 'none', 'events': []})
-        monkeypatch.setitem(_cache_store._aurora_cache, 'data', {'kp_index': 1.0, 'probability': 5.0, 'visibility_level': 'None', 'reports': []})
-        monkeypatch.setitem(_cache_store._iss_passes_cache, 'data', {'passes': [], 'window_days': 20, 'status': 'ok'})
-        monkeypatch.setitem(_cache_store._moon_planner_report_cache, 'data', {'nights': [], 'dark_window': None})
-        monkeypatch.setitem(_cache_store._planetary_events_cache, 'data', {'events': []})
-        monkeypatch.setitem(_cache_store._special_phenomena_cache, 'data', {'events': [], 'equinoxes_solstices': [], 'zodiacal_light': [], 'milky_way': []})
+        monkeypatch.setitem(_LEGACY['solar_eclipse'], 'data', {'eclipse': None, 'status': 'none', 'events': []})
+        monkeypatch.setitem(_LEGACY['lunar_eclipse'], 'data', {'eclipse': None, 'status': 'none', 'events': []})
+        monkeypatch.setitem(_LEGACY['aurora'], 'data', {'kp_index': 1.0, 'probability': 5.0, 'visibility_level': 'None', 'reports': []})
+        monkeypatch.setitem(_LEGACY['iss_passes'], 'data', {'passes': [], 'window_days': 20, 'status': 'ok'})
+        monkeypatch.setitem(_LEGACY['moon_planner'], 'data', {'nights': [], 'dark_window': None})
+        monkeypatch.setitem(_LEGACY['planetary_events'], 'data', {'events': []})
+        monkeypatch.setitem(_LEGACY['special_phenomena'], 'data', {'events': [], 'equinoxes_solstices': [], 'zodiacal_light': [], 'milky_way': []})
 
     def test_events_upcoming_full_returns_200(self, client_admin, monkeypatch):
         self._patch_all_caches(monkeypatch)
@@ -1154,7 +1375,7 @@ class TestEventsUpcomingFullCache:
     def test_events_phenomena_full_returns_200(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
         monkeypatch.setitem(
-            _cache_store._special_phenomena_cache,
+            _LEGACY['special_phenomena'],
             'data',
             {'events': [], 'equinoxes_solstices': [], 'zodiacal_light': [], 'milky_way': []},
         )
@@ -1164,14 +1385,14 @@ class TestEventsUpcomingFullCache:
     def test_best_window_from_cache(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
         monkeypatch.setitem(
-            _cache_store._best_window_cache['strict'], 'data', {'window': 'data', 'mode': 'strict'}
+            _LEGACY['best_window_strict'], 'data', {'window': 'data', 'mode': 'strict'}
         )
         resp = client_admin.get('/api/tonight/best-window')
         assert resp.status_code == 200
 
     def test_sidereal_time_full_returns_response(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
-        monkeypatch.setitem(_cache_store._sidereal_time_cache, 'data', {'sidereal_time': 12.0})
+        monkeypatch.setitem(_LEGACY['sidereal_time'], 'data', {'sidereal_time': 12.0})
         resp = client_admin.get('/api/astro/sidereal-time')
         assert resp.status_code in (200, 202, 400, 500)
 
@@ -1615,7 +1836,7 @@ class TestDifficultyLookupCache:
         _app_mod._difficulty_lookup_cache = {'data': None, 'key': None}
 
     def test_missing_dso_results_file_returns_empty_lookup(self, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'SKYTONIGHT_DSO_RESULTS_FILE', '/nonexistent/dso_results.json')
+        monkeypatch.setattr(_app_mod, 'get_dso_results_file', lambda *_a, **_k: '/nonexistent/dso_results.json')
         lookup = _app_mod._build_difficulty_lookup()
         assert lookup == {}
 
@@ -1636,7 +1857,7 @@ class TestDifficultyLookupCache:
         assert 'M42' not in lookup
 
     def test_enrich_skips_non_dict_items(self, monkeypatch):
-        monkeypatch.setattr(_app_mod, '_build_difficulty_lookup', lambda: {'M42': 'beginner'})
+        monkeypatch.setattr(_app_mod, '_build_difficulty_lookup', lambda *_a, **_k: {'M42': 'beginner'})
         items = [None, 'not-a-dict', {'name': 'Orion Nebula', 'catalogue': 'M42'}]
         result = _app_mod._enrich_astrodex_items_with_difficulty(items)
         assert result[2]['difficulty'] == 'beginner'
@@ -1881,7 +2102,7 @@ class TestBestWindowAllMode:
     def test_best_window_all_mode_with_cache(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
         for mode in ['strict', 'practical', 'illumination']:
-            monkeypatch.setitem(_cache_store._best_window_cache[mode], 'data', {'mode': mode})
+            monkeypatch.setitem(_LEGACY['best_window_' + mode], 'data', {'mode': mode})
         resp = client_admin.get('/api/tonight/best-window?mode=all')
         assert resp.status_code == 200
         data = resp.get_json()
@@ -1889,13 +2110,13 @@ class TestBestWindowAllMode:
 
     def test_best_window_practical_mode(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
-        monkeypatch.setitem(_cache_store._best_window_cache['practical'], 'data', {'mode': 'practical'})
+        monkeypatch.setitem(_LEGACY['best_window_practical'], 'data', {'mode': 'practical'})
         resp = client_admin.get('/api/tonight/best-window?mode=practical')
         assert resp.status_code == 200
 
     def test_best_window_illumination_mode(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
-        monkeypatch.setitem(_cache_store._best_window_cache['illumination'], 'data', {'mode': 'illumination'})
+        monkeypatch.setitem(_LEGACY['best_window_illumination'], 'data', {'mode': 'illumination'})
         resp = client_admin.get('/api/tonight/best-window?mode=illumination')
         assert resp.status_code == 200
 
@@ -2142,7 +2363,7 @@ class TestSkyQualityVariants:
         monkeypatch.setattr(
             _app_mod,
             'load_config',
-            lambda: {'location': {'bortle': 4, 'sqm': 21.5}},
+            lambda: _v12_config({'bortle': 4, 'sqm': 21.5}),
         )
         resp = client_admin.get('/api/skyquality')
         assert resp.status_code == 200
@@ -2154,7 +2375,7 @@ class TestSkyQualityVariants:
         monkeypatch.setattr(
             _app_mod,
             'load_config',
-            lambda: {'location': {'sqm': 21.0}},
+            lambda: _v12_config({'sqm': 21.0}),
         )
         resp = client_admin.get('/api/skyquality')
         assert resp.status_code == 200
@@ -2165,7 +2386,7 @@ class TestSkyQualityVariants:
         monkeypatch.setattr(
             _app_mod,
             'load_config',
-            lambda: {'location': {'bortle': 6}},
+            lambda: _v12_config({'bortle': 6}),
         )
         resp = client_admin.get('/api/skyquality')
         assert resp.status_code == 200
@@ -2176,7 +2397,7 @@ class TestSkyQualityVariants:
         monkeypatch.setattr(
             _app_mod,
             'load_config',
-            lambda: {'location': {}},
+            lambda: _v12_config({'latitude': None, 'longitude': None}),
         )
         resp = client_admin.get('/api/skyquality')
         assert resp.status_code == 200
@@ -2246,16 +2467,14 @@ class TestLogsDeepCoverage:
 class TestConfigPostHorizonProfile:
 
     def test_post_config_with_clear_horizon_flag(self, client_admin, monkeypatch):
-        old_cfg = {
-            'location': {'latitude': 48.0, 'longitude': 2.0, 'timezone': 'UTC'},
-            'skytonight': {
-                'constraints': {'horizon_profile': [{'az': 10, 'alt': 20}]},
-            },
-        }
+        # v1.2: the clear flag empties the install-default PRESET's profile;
+        # skytonight.constraints never carries horizon_profile again.
+        old_cfg = _v12_config({'horizon_profile': [{'az': 10, 'alt': 20}]},
+                              skytonight={'constraints': {}})
         captured = {}
         monkeypatch.setattr(_app_mod, 'load_config', lambda: old_cfg)
         monkeypatch.setattr(_app_mod, 'save_config', lambda cfg: captured.setdefault('cfg', cfg))
-        monkeypatch.setattr(_app_mod.cache_store, 'reset_all_caches', lambda: None)
+        monkeypatch.setattr(_app_mod.cache_store, 'reset_caches_for_location', lambda *a, **k: None)
         monkeypatch.setattr(_app_mod.cache_store, 'update_location_config', lambda *a, **k: None)
 
         # _horizon_cleared=True tells the backend to allow clearing the profile
@@ -2265,11 +2484,11 @@ class TestConfigPostHorizonProfile:
         }
         resp = client_admin.post('/api/config', json=incoming)
         assert resp.status_code == 200
-        if 'cfg' in captured:
-            saved = captured['cfg']
-            # _horizon_cleared flag should be stripped; horizon_profile should be empty
-            assert saved['skytonight']['constraints']['horizon_profile'] == []
-            assert '_horizon_cleared' not in saved['skytonight']['constraints']
+        saved = captured['cfg']
+        # _horizon_cleared flag stripped; the preset's horizon_profile emptied
+        assert saved['locations'][0]['horizon_profile'] == []
+        assert 'horizon_profile' not in saved['skytonight']['constraints']
+        assert '_horizon_cleared' not in saved['skytonight']['constraints']
 
 
 # ---------------------------------------------------------------------------
@@ -2282,14 +2501,14 @@ class TestCacheStaleDataBranches:
     def test_aurora_stale_data_returns_200(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: False)
         monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda name, cache: False)
-        monkeypatch.setitem(_cache_store._aurora_cache, 'data', {'kp_index': 2.0})
+        monkeypatch.setitem(_LEGACY['aurora'], 'data', {'kp_index': 2.0})
         resp = client_admin.get('/api/aurora/predictions')
         assert resp.status_code == 200
 
     def test_seeing_stale_data_returns_200(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: False)
         monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda name, cache: False)
-        monkeypatch.setitem(_cache_store._seeing_forecast_cache, 'data', {'forecast': []})
+        monkeypatch.setitem(_LEGACY['seeing_forecast'], 'data', {'forecast': []})
         resp = client_admin.get('/api/seeing-forecast')
         assert resp.status_code == 200
 
@@ -2310,35 +2529,35 @@ class TestCacheStaleDataBranches:
     def test_planetary_events_stale_data_returns_200(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: False)
         monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda name, cache: False)
-        monkeypatch.setitem(_cache_store._planetary_events_cache, 'data', {'events': []})
+        monkeypatch.setitem(_LEGACY['planetary_events'], 'data', {'events': []})
         resp = client_admin.get('/api/events/planetary')
         assert resp.status_code == 200
 
     def test_horizon_graph_stale_data_returns_200(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: False)
         monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda name, cache: False)
-        monkeypatch.setitem(_cache_store._horizon_graph_cache, 'data', {'graph': 'data'})
+        monkeypatch.setitem(_LEGACY['horizon_graph'], 'data', {'graph': 'data'})
         resp = client_admin.get('/api/astro/horizon-graph')
         assert resp.status_code == 200
 
     def test_best_window_stale_data_returns_200(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: False)
         monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda name, cache: False)
-        monkeypatch.setitem(_cache_store._best_window_cache['strict'], 'data', {'mode': 'strict'})
+        monkeypatch.setitem(_LEGACY['best_window_strict'], 'data', {'mode': 'strict'})
         resp = client_admin.get('/api/tonight/best-window')
         assert resp.status_code == 200
 
     def test_solar_eclipse_stale_data_returns_200(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: False)
         monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda name, cache: False)
-        monkeypatch.setitem(_cache_store._solar_eclipse_cache, 'data', {'eclipse': None})
+        monkeypatch.setitem(_LEGACY['solar_eclipse'], 'data', {'eclipse': None})
         resp = client_admin.get('/api/sun/next-eclipse')
         assert resp.status_code == 200
 
     def test_lunar_eclipse_stale_data_returns_200(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: False)
         monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda name, cache: False)
-        monkeypatch.setitem(_cache_store._lunar_eclipse_cache, 'data', {'eclipse': None})
+        monkeypatch.setitem(_LEGACY['lunar_eclipse'], 'data', {'eclipse': None})
         resp = client_admin.get('/api/moon/next-eclipse')
         assert resp.status_code == 200
 
@@ -2346,7 +2565,7 @@ class TestCacheStaleDataBranches:
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: False)
         monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda name, cache: False)
         monkeypatch.setitem(
-            _cache_store._special_phenomena_cache,
+            _LEGACY['special_phenomena'],
             'data',
             {'events': [], 'equinoxes_solstices': [], 'zodiacal_light': [], 'milky_way': []},
         )
@@ -2364,17 +2583,17 @@ class TestWeatherStaleData:
     def test_weather_forecast_stale_data_returns_200(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: False)
         monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda name, cache: False)
-        monkeypatch.setitem(_cache_store._weather_cache, 'data', {'forecast': []})
+        monkeypatch.setitem(_LEGACY['weather_forecast'], 'data', {'forecast': []})
         # Mock get_hourly_forecast to return None so stale path is triggered
-        monkeypatch.setattr(_app_mod, 'get_hourly_forecast', lambda: None)
+        monkeypatch.setattr(_app_mod, 'get_hourly_forecast', lambda **_kw: None)
         resp = client_admin.get('/api/weather/forecast')
         assert resp.status_code in (200, 202)
 
     def test_weather_forecast_no_cache_no_data_returns_202(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: False)
         monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda name, cache: False)
-        _cache_store._weather_cache.pop('data', None)
-        monkeypatch.setattr(_app_mod, 'get_hourly_forecast', lambda: None)
+        _LEGACY['weather_forecast'].pop('data', None)
+        monkeypatch.setattr(_app_mod, 'get_hourly_forecast', lambda **_kw: None)
         resp = client_admin.get('/api/weather/forecast')
         assert resp.status_code in (200, 202)
 
@@ -2390,7 +2609,7 @@ class TestSolarSystemEventsCache:
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: False)
         monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda name, cache: False)
         monkeypatch.setitem(
-            _cache_store._solar_system_events_cache,
+            _LEGACY['solar_system_events'],
             'data',
             {'meteor_showers': [], 'comets': [], 'asteroid_occultations': []},
         )
@@ -2430,14 +2649,14 @@ class TestISSPassesWindowDays:
 
     def test_iss_passes_cached_different_window_returns_202(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
-        monkeypatch.setitem(_cache_store._iss_passes_cache, 'data', {'passes': [], 'window_days': 5})
+        monkeypatch.setitem(_LEGACY['iss_passes'], 'data', {'passes': [], 'window_days': 5})
         # With window_days=20 (default) vs cached 5 — should trigger refresh
         resp = client_admin.get('/api/iss/passes')
         assert resp.status_code in (200, 202)
 
     def test_iss_passes_cached_same_window_returns_200(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
-        monkeypatch.setitem(_cache_store._iss_passes_cache, 'data', {'passes': [], 'window_days': 20})
+        monkeypatch.setitem(_LEGACY['iss_passes'], 'data', {'passes': [], 'window_days': 20})
         resp = client_admin.get('/api/iss/passes')
         assert resp.status_code == 200
 
@@ -2474,7 +2693,7 @@ class TestMoonPlannerEndpoints:
 
     def test_moon_next_7_nights_with_cache(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
-        monkeypatch.setitem(_cache_store._moon_planner_report_cache, 'data', {'nights': []})
+        monkeypatch.setitem(_LEGACY['moon_planner'], 'data', {'nights': []})
         resp = client_admin.get('/api/moon/next-7-nights')
         assert resp.status_code in (200, 202)
 
@@ -2508,7 +2727,7 @@ class TestTonightPlanCache:
 
     def test_tonight_plan_with_moon_planner_cache(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
-        monkeypatch.setitem(_cache_store._moon_planner_report_cache, 'data', {'nights': []})
+        monkeypatch.setitem(_LEGACY['moon_planner'], 'data', {'nights': []})
         resp = client_admin.get('/api/plan-my-night/tonight-plan')
         assert resp.status_code in (200, 202, 400, 404)
 
@@ -2564,7 +2783,7 @@ class TestSpecialPhenomenaTranslation:
     def test_phenomena_with_fr_lang_header(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
         monkeypatch.setitem(
-            _cache_store._special_phenomena_cache,
+            _LEGACY['special_phenomena'],
             'data',
             {
                 'events': [
@@ -2586,7 +2805,7 @@ class TestSpecialPhenomenaTranslation:
     def test_solar_system_events_with_fr_lang(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
         monkeypatch.setitem(
-            _cache_store._solar_system_events_cache,
+            _LEGACY['solar_system_events'],
             'data',
             {
                 'events': [
@@ -2848,7 +3067,7 @@ class TestSpecialPhenomenaTranslationBranches:
     def test_phenomena_summer_solstice_fr(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
         monkeypatch.setitem(
-            _cache_store._special_phenomena_cache,
+            _LEGACY['special_phenomena'],
             'data',
             self._make_cache_with_events([
                 {
@@ -2865,7 +3084,7 @@ class TestSpecialPhenomenaTranslationBranches:
     def test_phenomena_autumn_equinox_fr(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
         monkeypatch.setitem(
-            _cache_store._special_phenomena_cache,
+            _LEGACY['special_phenomena'],
             'data',
             self._make_cache_with_events([
                 {
@@ -2882,7 +3101,7 @@ class TestSpecialPhenomenaTranslationBranches:
     def test_phenomena_winter_solstice_fr(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
         monkeypatch.setitem(
-            _cache_store._special_phenomena_cache,
+            _LEGACY['special_phenomena'],
             'data',
             self._make_cache_with_events([
                 {
@@ -2899,7 +3118,7 @@ class TestSpecialPhenomenaTranslationBranches:
     def test_phenomena_zodiacal_light_morning_fr(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
         monkeypatch.setitem(
-            _cache_store._special_phenomena_cache,
+            _LEGACY['special_phenomena'],
             'data',
             self._make_cache_with_events([
                 {
@@ -2917,7 +3136,7 @@ class TestSpecialPhenomenaTranslationBranches:
     def test_phenomena_zodiacal_light_evening_fr(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
         monkeypatch.setitem(
-            _cache_store._special_phenomena_cache,
+            _LEGACY['special_phenomena'],
             'data',
             self._make_cache_with_events([
                 {
@@ -2935,7 +3154,7 @@ class TestSpecialPhenomenaTranslationBranches:
     def test_phenomena_milky_way_fr(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
         monkeypatch.setitem(
-            _cache_store._special_phenomena_cache,
+            _LEGACY['special_phenomena'],
             'data',
             self._make_cache_with_events([
                 {
@@ -2961,7 +3180,7 @@ class TestSolarSystemEventTranslationBranches:
     def test_comet_event_fr(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
         monkeypatch.setitem(
-            _cache_store._solar_system_events_cache,
+            _LEGACY['solar_system_events'],
             'data',
             {
                 'events': [
@@ -2984,7 +3203,7 @@ class TestSolarSystemEventTranslationBranches:
     def test_asteroid_occultation_event_fr(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
         monkeypatch.setitem(
-            _cache_store._solar_system_events_cache,
+            _LEGACY['solar_system_events'],
             'data',
             {
                 'events': [
@@ -3005,7 +3224,7 @@ class TestSolarSystemEventTranslationBranches:
     def test_solar_system_en_lang_returns_data_unchanged(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
         monkeypatch.setitem(
-            _cache_store._solar_system_events_cache,
+            _LEGACY['solar_system_events'],
             'data',
             {'events': [], 'meteor_showers': [], 'comets': [], 'asteroid_occultations': []},
         )
@@ -3278,7 +3497,7 @@ class TestMoonPlannerStaleData:
     def test_moon_planner_stale_returns_200(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: False)
         monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda name, cache: False)
-        monkeypatch.setitem(_cache_store._moon_planner_report_cache, 'data', {'nights': [], 'stale': True})
+        monkeypatch.setitem(_LEGACY['moon_planner'], 'data', {'nights': [], 'stale': True})
         resp = client_admin.get('/api/moon/next-7-nights')
         assert resp.status_code == 200
 
@@ -3291,7 +3510,7 @@ class TestMoonPlannerStaleData:
 class TestSiderealTimeWithLocation:
 
     def test_sidereal_time_with_no_location_returns_400(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {})
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: _v12_config({'latitude': None, 'longitude': None}))
         resp = client_admin.get('/api/astro/sidereal-time')
         assert resp.status_code == 400
 
@@ -3306,19 +3525,19 @@ class TestUpcomingEventsFullAggregation:
     def test_upcoming_events_with_fr_lang(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
         monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda name, cache: True)
-        monkeypatch.setitem(_cache_store._solar_eclipse_cache, 'data', {'eclipse': None, 'status': 'none'})
-        monkeypatch.setitem(_cache_store._lunar_eclipse_cache, 'data', {'eclipse': None, 'status': 'none'})
-        monkeypatch.setitem(_cache_store._aurora_cache, 'data', {'kp_index': 1.0, 'probability': 5.0})
-        monkeypatch.setitem(_cache_store._iss_passes_cache, 'data', {'passes': [], 'window_days': 20})
-        monkeypatch.setitem(_cache_store._moon_planner_report_cache, 'data', {'nights': []})
-        monkeypatch.setitem(_cache_store._planetary_events_cache, 'data', {'events': []})
+        monkeypatch.setitem(_LEGACY['solar_eclipse'], 'data', {'eclipse': None, 'status': 'none'})
+        monkeypatch.setitem(_LEGACY['lunar_eclipse'], 'data', {'eclipse': None, 'status': 'none'})
+        monkeypatch.setitem(_LEGACY['aurora'], 'data', {'kp_index': 1.0, 'probability': 5.0})
+        monkeypatch.setitem(_LEGACY['iss_passes'], 'data', {'passes': [], 'window_days': 20})
+        monkeypatch.setitem(_LEGACY['moon_planner'], 'data', {'nights': []})
+        monkeypatch.setitem(_LEGACY['planetary_events'], 'data', {'events': []})
         monkeypatch.setitem(
-            _cache_store._special_phenomena_cache,
+            _LEGACY['special_phenomena'],
             'data',
             {'events': [], 'equinoxes_solstices': [], 'zodiacal_light': [], 'milky_way': []},
         )
         monkeypatch.setitem(
-            _cache_store._solar_system_events_cache,
+            _LEGACY['solar_system_events'],
             'data',
             {'events': [], 'meteor_showers': [], 'comets': [], 'asteroid_occultations': []},
         )
@@ -3406,7 +3625,7 @@ class TestCacheSyncPath:
 
         monkeypatch.setattr(_cache_store, 'is_cache_valid', valid_after_sync)
         monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda name, cache: True)
-        monkeypatch.setitem(_cache_store._moon_report_cache, 'data', {'moon': 'data'})
+        monkeypatch.setitem(_LEGACY['moon_report'], 'data', {'moon': 'data'})
         resp = client_admin.get('/api/moon/report')
         assert resp.status_code == 200
 
@@ -3419,7 +3638,7 @@ class TestCacheSyncPath:
 
         monkeypatch.setattr(_cache_store, 'is_cache_valid', valid_after_sync)
         monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda name, cache: True)
-        monkeypatch.setitem(_cache_store._aurora_cache, 'data', {'kp': 1})
+        monkeypatch.setitem(_LEGACY['aurora'], 'data', {'kp': 1})
         resp = client_admin.get('/api/aurora/predictions')
         assert resp.status_code == 200
 
@@ -3433,14 +3652,14 @@ class TestSunReportEndpoint:
 
     def test_sun_report_with_cache_returns_200(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
-        monkeypatch.setitem(_cache_store._sun_report_cache, 'data', {'sun': 'data'})
+        monkeypatch.setitem(_LEGACY['sun_report'], 'data', {'sun': 'data'})
         resp = client_admin.get('/api/sun/today')
         assert resp.status_code == 200
 
     def test_sun_report_stale_returns_200(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: False)
         monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda n, c: False)
-        monkeypatch.setitem(_cache_store._sun_report_cache, 'data', {'sun': 'stale'})
+        monkeypatch.setitem(_LEGACY['sun_report'], 'data', {'sun': 'stale'})
         resp = client_admin.get('/api/sun/today')
         assert resp.status_code == 200
 
@@ -3453,15 +3672,9 @@ class TestSunReportEndpoint:
 class TestIssPassesSyncPath:
 
     def test_iss_after_sync_returns_200(self, client_admin, monkeypatch):
-        call_count = [0]
-
-        def valid_after_sync(cache, ttl):
-            call_count[0] += 1
-            return call_count[0] >= 2
-
-        monkeypatch.setattr(_cache_store, 'is_cache_valid', valid_after_sync)
-        monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda name, cache: True)
-        monkeypatch.setitem(_cache_store._iss_passes_cache, 'data', {'passes': [], 'window_days': 20})
+        # v1.2: a fresh per-location slot (as if just hydrated from the shared
+        # file) with the matching window serves directly.
+        monkeypatch.setitem(_LEGACY['iss_passes'], 'data', {'passes': [], 'window_days': 20})
         resp = client_admin.get('/api/iss/passes')
         assert resp.status_code == 200
 
@@ -4274,21 +4487,21 @@ class TestSkyQualityInvalidValues:
 
     def test_both_sqm_and_bortle_invalid_returns_not_configured(self, client_admin, monkeypatch):
         monkeypatch.setattr(_app_mod, 'load_config',
-                            lambda: {'location': {'sqm': 'bad', 'bortle': 'worse'}})
+                            lambda: _v12_config({'sqm': 'bad', 'bortle': 'worse'}))
         resp = client_admin.get('/api/skyquality')
         assert resp.status_code == 200
         assert resp.get_json()['sqm_source'] == 'not_configured'
 
     def test_sqm_only_invalid_returns_null_sqm(self, client_admin, monkeypatch):
         monkeypatch.setattr(_app_mod, 'load_config',
-                            lambda: {'location': {'sqm': 'invalid'}})
+                            lambda: _v12_config({'sqm': 'invalid'}))
         resp = client_admin.get('/api/skyquality')
         assert resp.status_code == 200
         assert resp.get_json()['sqm'] is None
 
     def test_bortle_only_invalid_returns_null_bortle(self, client_admin, monkeypatch):
         monkeypatch.setattr(_app_mod, 'load_config',
-                            lambda: {'location': {'bortle': 'invalid'}})
+                            lambda: _v12_config({'bortle': 'invalid'}))
         resp = client_admin.get('/api/skyquality')
         assert resp.status_code == 200
         assert resp.get_json()['bortle'] is None
@@ -4462,7 +4675,8 @@ class TestCacheRouteExceptionHandlers:
         assert resp.status_code == 500
 
     def test_moon_calendar_exception_returns_500(self, client_admin, monkeypatch):
-        _app_mod._moon_calendar_cache['data'] = None
+        # v1.2: _moon_calendar_cache is keyed by location id - clear it whole
+        monkeypatch.setattr(_app_mod, '_moon_calendar_cache', {})
         monkeypatch.setattr(_app_mod, 'load_config',
                             lambda: (_ for _ in ()).throw(RuntimeError("cfg fail")))
         resp = client_admin.get('/api/moon/month-calendar')
@@ -4513,13 +4727,13 @@ class TestCacheRouteExceptionHandlers:
 class TestMoonCalendarNoLocation:
 
     def test_no_location_returns_400(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {'location': {}})
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: _v12_config({'latitude': None, 'longitude': None}))
         resp = client_admin.get('/api/moon/month-calendar')
         assert resp.status_code == 400
 
     def test_no_longitude_returns_400(self, client_admin, monkeypatch):
         monkeypatch.setattr(_app_mod, 'load_config',
-                            lambda: {'location': {'latitude': 48.5}})
+                            lambda: _v12_config({'latitude': 48.5, 'longitude': None}))
         resp = client_admin.get('/api/moon/month-calendar')
         assert resp.status_code == 400
 
@@ -5326,7 +5540,7 @@ class TestUserManagementMoreBranches:
         assert resp.get_json()['error_key'] == 'users.invalid_role'
 
     def test_config_update_bortle_invalid_returns_400(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {'location': {}, 'skytonight': {}})
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: _v12_config({}, skytonight={}))
         resp = client_admin.post('/api/config', json={
             'location': {'bortle': 99},
             'skytonight': {}
@@ -5335,7 +5549,7 @@ class TestUserManagementMoreBranches:
         assert 'bortle' in resp.get_json()['error']
 
     def test_config_update_sqm_invalid_returns_400(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {'location': {}, 'skytonight': {}})
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: _v12_config({}, skytonight={}))
         resp = client_admin.post('/api/config', json={
             'location': {'sqm': -5.0},
             'skytonight': {}
@@ -5415,63 +5629,63 @@ class TestStaleCachePathRoutes:
         return f
 
     def test_sun_report_sync_cache_returns_data(self, client_admin, monkeypatch):
-        _app_mod.cache_store._sun_report_cache['data'] = {'phase': 'test'}
+        _LEGACY['sun_report']['data'] = {'phase': 'test'}
         monkeypatch.setattr(_app_mod.cache_store, 'is_cache_valid', self._make_is_valid_counter())
         monkeypatch.setattr(_app_mod.cache_store, 'sync_cache_from_shared', lambda *_: True)
         resp = client_admin.get('/api/sun/today')
         assert resp.status_code == 200
 
     def test_sun_stale_data_returned(self, client_admin, monkeypatch):
-        _app_mod.cache_store._sun_report_cache['data'] = {'phase': 'stale'}
+        _LEGACY['sun_report']['data'] = {'phase': 'stale'}
         monkeypatch.setattr(_app_mod.cache_store, 'is_cache_valid', lambda *_: False)
         monkeypatch.setattr(_app_mod.cache_store, 'sync_cache_from_shared', lambda *_: False)
         resp = client_admin.get('/api/sun/today')
         assert resp.status_code == 200
 
     def test_moon_report_stale_data_returned(self, client_admin, monkeypatch):
-        _app_mod.cache_store._moon_report_cache['data'] = {'phase': 'stale'}
+        _LEGACY['moon_report']['data'] = {'phase': 'stale'}
         monkeypatch.setattr(_app_mod.cache_store, 'is_cache_valid', lambda *_: False)
         monkeypatch.setattr(_app_mod.cache_store, 'sync_cache_from_shared', lambda *_: False)
         resp = client_admin.get('/api/moon/report')
         assert resp.status_code == 200
 
     def test_dark_window_stale_data_returned(self, client_admin, monkeypatch):
-        _app_mod.cache_store._dark_window_report_cache['data'] = {'next': 'stale'}
+        _LEGACY['dark_window']['data'] = {'next': 'stale'}
         monkeypatch.setattr(_app_mod.cache_store, 'is_cache_valid', lambda *_: False)
         monkeypatch.setattr(_app_mod.cache_store, 'sync_cache_from_shared', lambda *_: False)
         resp = client_admin.get('/api/moon/dark-window')
         assert resp.status_code == 200
 
     def test_next_7_nights_stale_data_returned(self, client_admin, monkeypatch):
-        _app_mod.cache_store._moon_planner_report_cache['data'] = {'nights': []}
+        _LEGACY['moon_planner']['data'] = {'nights': []}
         monkeypatch.setattr(_app_mod.cache_store, 'is_cache_valid', lambda *_: False)
         monkeypatch.setattr(_app_mod.cache_store, 'sync_cache_from_shared', lambda *_: False)
         resp = client_admin.get('/api/moon/next-7-nights')
         assert resp.status_code == 200
 
     def test_solar_eclipse_sync_cache_returns_data(self, client_admin, monkeypatch):
-        _app_mod.cache_store._solar_eclipse_cache['data'] = {'eclipse': 'test'}
+        _LEGACY['solar_eclipse']['data'] = {'eclipse': 'test'}
         monkeypatch.setattr(_app_mod.cache_store, 'is_cache_valid', self._make_is_valid_counter())
         monkeypatch.setattr(_app_mod.cache_store, 'sync_cache_from_shared', lambda *_: True)
         resp = client_admin.get('/api/sun/next-eclipse')
         assert resp.status_code == 200
 
     def test_solar_eclipse_stale_data_returned(self, client_admin, monkeypatch):
-        _app_mod.cache_store._solar_eclipse_cache['data'] = {'eclipse': 'stale'}
+        _LEGACY['solar_eclipse']['data'] = {'eclipse': 'stale'}
         monkeypatch.setattr(_app_mod.cache_store, 'is_cache_valid', lambda *_: False)
         monkeypatch.setattr(_app_mod.cache_store, 'sync_cache_from_shared', lambda *_: False)
         resp = client_admin.get('/api/sun/next-eclipse')
         assert resp.status_code == 200
 
     def test_lunar_eclipse_sync_cache_returns_data(self, client_admin, monkeypatch):
-        _app_mod.cache_store._lunar_eclipse_cache['data'] = {'eclipse': 'test'}
+        _LEGACY['lunar_eclipse']['data'] = {'eclipse': 'test'}
         monkeypatch.setattr(_app_mod.cache_store, 'is_cache_valid', self._make_is_valid_counter())
         monkeypatch.setattr(_app_mod.cache_store, 'sync_cache_from_shared', lambda *_: True)
         resp = client_admin.get('/api/moon/next-eclipse')
         assert resp.status_code == 200
 
     def test_lunar_eclipse_stale_data_returned(self, client_admin, monkeypatch):
-        _app_mod.cache_store._lunar_eclipse_cache['data'] = {'eclipse': 'stale'}
+        _LEGACY['lunar_eclipse']['data'] = {'eclipse': 'stale'}
         monkeypatch.setattr(_app_mod.cache_store, 'is_cache_valid', lambda *_: False)
         monkeypatch.setattr(_app_mod.cache_store, 'sync_cache_from_shared', lambda *_: False)
         resp = client_admin.get('/api/moon/next-eclipse')
@@ -5482,7 +5696,7 @@ class TestAstroAndBestWindowRoutes:
     """Tests for sidereal time, horizon graph, and best-window routes."""
 
     def test_sidereal_time_no_location_returns_400(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {})
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: _v12_config({'latitude': None, 'longitude': None}))
         resp = client_admin.get('/api/astro/sidereal-time')
         assert resp.status_code == 400
 
@@ -5493,7 +5707,7 @@ class TestAstroAndBestWindowRoutes:
         assert resp.status_code == 500
 
     def test_horizon_graph_stale_data_returned(self, client_admin, monkeypatch):
-        _app_mod.cache_store._horizon_graph_cache['data'] = {'graph': 'stale'}
+        _LEGACY['horizon_graph']['data'] = {'graph': 'stale'}
         monkeypatch.setattr(_app_mod.cache_store, 'is_cache_valid', lambda *_: False)
         monkeypatch.setattr(_app_mod.cache_store, 'sync_cache_from_shared', lambda *_: False)
         resp = client_admin.get('/api/astro/horizon-graph')
@@ -5510,7 +5724,7 @@ class TestAstroAndBestWindowRoutes:
         assert resp.status_code == 400
 
     def test_best_window_stale_data_returned(self, client_admin, monkeypatch):
-        _app_mod.cache_store._best_window_cache['strict']['data'] = {'window': 'stale'}
+        _LEGACY['best_window_strict']['data'] = {'window': 'stale'}
         monkeypatch.setattr(_app_mod.cache_store, 'is_cache_valid', lambda *_: False)
         monkeypatch.setattr(_app_mod.cache_store, 'sync_cache_from_shared', lambda *_: False)
         resp = client_admin.get('/api/tonight/best-window?mode=strict')
@@ -5524,7 +5738,7 @@ class TestAstroAndBestWindowRoutes:
 
     def test_best_window_all_mode_stale_data(self, client_admin, monkeypatch):
         for mode in ('strict', 'practical', 'illumination'):
-            _app_mod.cache_store._best_window_cache[mode]['data'] = {'stale': True}
+            _LEGACY['best_window_' + mode]['data'] = {'stale': True}
         monkeypatch.setattr(_app_mod.cache_store, 'is_cache_valid', lambda *_: False)
         monkeypatch.setattr(_app_mod.cache_store, 'sync_cache_from_shared', lambda *_: False)
         resp = client_admin.get('/api/tonight/best-window?mode=all')
@@ -5539,8 +5753,8 @@ class TestWeatherRoutes:
     def test_hourly_forecast_none_returns_202(self, client_admin, monkeypatch):
         monkeypatch.setattr(_app_mod.cache_store, 'is_cache_valid', lambda *_: False)
         monkeypatch.setattr(_app_mod.cache_store, 'sync_cache_from_shared', lambda *_: False)
-        monkeypatch.setattr(_app_mod, 'get_hourly_forecast', lambda: None)
-        _app_mod.cache_store._weather_cache['data'] = None
+        monkeypatch.setattr(_app_mod, 'get_hourly_forecast', lambda **_kw: None)
+        _LEGACY['weather_forecast']['data'] = None
         resp = client_admin.get('/api/weather/forecast')
         assert resp.status_code == 202
 
@@ -5548,7 +5762,7 @@ class TestWeatherRoutes:
         monkeypatch.setattr(_app_mod.cache_store, 'is_cache_valid', lambda *_: False)
         monkeypatch.setattr(_app_mod.cache_store, 'sync_cache_from_shared', lambda *_: False)
         monkeypatch.setattr(_app_mod, 'get_hourly_forecast',
-                            lambda: (_ for _ in ()).throw(RuntimeError('fail')))
+                            lambda **_kw: (_ for _ in ()).throw(RuntimeError('fail')))
         resp = client_admin.get('/api/weather/forecast')
         assert resp.status_code == 500
 
@@ -5892,7 +6106,7 @@ class TestSiderealTimeCacheSkipSync:
         })
         # Make is_cache_valid_for_today return True → False branch of `if not ...` → skip line 2818
         monkeypatch.setattr(_app_mod.cache_store, 'is_cache_valid_for_today', lambda *_: True)
-        _app_mod.cache_store._sidereal_time_cache['data'] = {'hourly_forecast': []}
+        _LEGACY['sidereal_time']['data'] = {'hourly_forecast': []}
         resp = client_admin.get('/api/astro/sidereal-time')
         assert resp.status_code == 200
 
@@ -5940,8 +6154,8 @@ class TestResolveObservingNightBranches:
 
     def test_no_location_falls_to_skytonight_fallback(self, monkeypatch):
         """Lines 2968->3001: lat/lon/tz absent → skip sun service, fall to SkyTonight."""
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {'location': {}})
-        monkeypatch.setattr(_app_mod, 'load_calculation_results', lambda: {
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: _v12_config({'latitude': None, 'longitude': None}))
+        monkeypatch.setattr(_app_mod, 'load_calculation_results', lambda *_a, **_k: {
             'metadata': {'night_start': '2026-06-09T21:00:00+02:00', 'night_end': '2026-06-10T04:00:00+02:00'}
         })
         result = _app_mod._resolve_observing_night_for_plan()
@@ -5955,11 +6169,9 @@ class TestResolveObservingNightBranches:
         mock_svc.get_today_report.return_value = self._make_report('', 'Not found')
         # Tomorrow also returns empty → no valid window
         mock_svc.get_tomorrow_report.return_value = self._make_report('', '')
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {
-            'location': {'latitude': 48.0, 'longitude': 2.0, 'timezone': 'UTC'}
-        })
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: _v12_config())
         monkeypatch.setattr(_app_mod, 'SunService', lambda **kw: mock_svc)
-        monkeypatch.setattr(_app_mod, 'load_calculation_results', lambda: {'metadata': {}})
+        monkeypatch.setattr(_app_mod, 'load_calculation_results', lambda *_a, **_k: {'metadata': {}})
         result = _app_mod._resolve_observing_night_for_plan()
         assert result is None
 
@@ -5969,11 +6181,9 @@ class TestResolveObservingNightBranches:
         mock_svc = MagicMock()
         mock_svc.get_today_report.return_value = self._make_report('NOT-A-DATE', 'ALSO-BAD')
         mock_svc.get_tomorrow_report.return_value = self._make_report('NOT-A-DATE', 'ALSO-BAD')
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {
-            'location': {'latitude': 48.0, 'longitude': 2.0, 'timezone': 'UTC'}
-        })
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: _v12_config())
         monkeypatch.setattr(_app_mod, 'SunService', lambda **kw: mock_svc)
-        monkeypatch.setattr(_app_mod, 'load_calculation_results', lambda: {'metadata': {}})
+        monkeypatch.setattr(_app_mod, 'load_calculation_results', lambda *_a, **_k: {'metadata': {}})
         result = _app_mod._resolve_observing_night_for_plan()
         assert result is None
 
@@ -5987,9 +6197,7 @@ class TestResolveObservingNightBranches:
         mock_svc.get_tomorrow_report.return_value = self._make_report(
             '2026-06-10 21:30', '2026-06-11 04:00'
         )
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {
-            'location': {'latitude': 48.0, 'longitude': 2.0, 'timezone': 'UTC'}
-        })
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: _v12_config())
         monkeypatch.setattr(_app_mod, 'SunService', lambda **kw: mock_svc)
         result = _app_mod._resolve_observing_night_for_plan()
         assert result is not None
@@ -6001,11 +6209,9 @@ class TestResolveObservingNightBranches:
         mock_svc = MagicMock()
         mock_svc.get_today_report.return_value = self._make_report('', '')
         mock_svc.get_tomorrow_report.return_value = self._make_report('', '')
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {
-            'location': {'latitude': 48.0, 'longitude': 2.0, 'timezone': 'UTC'}
-        })
+        monkeypatch.setattr(_app_mod, 'load_config', lambda: _v12_config())
         monkeypatch.setattr(_app_mod, 'SunService', lambda **kw: mock_svc)
-        monkeypatch.setattr(_app_mod, 'load_calculation_results', lambda: {
+        monkeypatch.setattr(_app_mod, 'load_calculation_results', lambda *_a, **_k: {
             'metadata': {'night_start': '2026-06-09T21:00:00+00:00', 'night_end': '2026-06-10T04:00:00+00:00'}
         })
         result = _app_mod._resolve_observing_night_for_plan()
@@ -6734,13 +6940,13 @@ class TestCSSPasses:
 
     def test_css_passes_cached_same_window_returns_200(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
-        monkeypatch.setitem(_cache_store._css_passes_cache, 'data', {'passes': [], 'window_days': 20})
+        monkeypatch.setitem(_LEGACY['css_passes'], 'data', {'passes': [], 'window_days': 20})
         resp = client_admin.get('/api/css/passes')
         assert resp.status_code == 200
 
     def test_css_passes_cached_different_window_returns_202(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
-        monkeypatch.setitem(_cache_store._css_passes_cache, 'data', {'passes': [], 'window_days': 5})
+        monkeypatch.setitem(_LEGACY['css_passes'], 'data', {'passes': [], 'window_days': 5})
         resp = client_admin.get('/api/css/passes')
         assert resp.status_code in (200, 202)
 
@@ -6762,7 +6968,7 @@ class TestCSSPasses:
     def test_css_passes_sync_succeeds_valid_but_window_mismatch_returns_202(self, client_admin, monkeypatch):
         """Line 2389->2392: sync_cache_from_shared succeeds and the cache is valid, but the
         synced data's window_days doesn't match the request -> falls through to 202."""
-        monkeypatch.setitem(_cache_store._css_passes_cache, 'data', {'passes': [], 'window_days': 5})
+        monkeypatch.setitem(_LEGACY['css_passes'], 'data', {'passes': [], 'window_days': 5})
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
         monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda *a, **k: True)
         resp = client_admin.get('/api/css/passes?days=20')
@@ -6777,17 +6983,9 @@ class TestCSSPasses:
         assert resp.status_code == 202
 
     def test_css_passes_sync_from_shared_then_valid_returns_200(self, client_admin, monkeypatch):
-        """Lines 2386-2390: cache invalid initially, but sync_cache_from_shared succeeds and
-        the cache becomes valid with a matching window -> served from the synced cache."""
-        monkeypatch.setitem(_cache_store._css_passes_cache, 'data', {'passes': [], 'window_days': 20})
-        calls = {'n': 0}
-
-        def _is_valid(c, t):
-            calls['n'] += 1
-            return calls['n'] > 1  # invalid on the first check, valid on the post-sync re-check
-
-        monkeypatch.setattr(_cache_store, 'is_cache_valid', _is_valid)
-        monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda *a, **k: True)
+        """v1.2: a fresh per-location slot (as if just hydrated from the shared
+        file) with the matching window is served from cache."""
+        monkeypatch.setitem(_LEGACY['css_passes'], 'data', {'passes': [], 'window_days': 20})
         resp = client_admin.get('/api/css/passes')
         assert resp.status_code == 200
 

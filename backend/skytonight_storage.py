@@ -1,8 +1,15 @@
-"""Shared filesystem helpers for SkyTonight runtime state."""
+"""Shared filesystem helpers for SkyTonight runtime state.
+
+Since v1.2 the calculation results are stored **per location preset**:
+``SKYTONIGHT_CALCULATIONS_DIR/<location_id>/<file>.json``. The legacy flat
+files (pre-multi-location) are migrated once into the install default
+preset's directory so existing installs keep their results after upgrade.
+"""
 
 from __future__ import annotations
 
 import os
+import shutil
 from typing import Any, Dict, Optional
 
 from constants import (
@@ -20,6 +27,7 @@ from constants import (
     SKYTONIGHT_SCHEDULER_LOCK_FILE,
     SKYTONIGHT_SCHEDULER_STATUS_FILE,
     SKYTONIGHT_SCHEDULER_TRIGGER_FILE,
+    SKYTONIGHT_SKYMAP_FILE,
 )
 from utils import ensure_directory_exists, load_json_file, save_json_file, slugify_location_name
 
@@ -106,30 +114,182 @@ def _trim_log_file(log_path: str, max_lines: int) -> None:
         pass  # log rotation is best-effort; failure must not abort the caller
 
 
-def get_results_file() -> str:
-    """Return the path to the SkyTonight calculation results cache file."""
-    ensure_skytonight_directories()
-    return SKYTONIGHT_RESULTS_FILE
+# ---------------------------------------------------------------------------
+# Per-location calculation results (v1.2)
+# ---------------------------------------------------------------------------
+
+# Basenames of the per-location result files inside <calculations>/<location_id>/.
+_RESULTS_BASENAME = 'calculation_results.json'
+_DSO_BASENAME = 'dso_results.json'
+_BODIES_BASENAME = 'bodies_results.json'
+_COMETS_BASENAME = 'comets_results.json'
+_SKYMAP_BASENAME = 'skymap_data.json'
+
+# Legacy flat files (single-location era) mapped to their per-location basename.
+_LEGACY_RESULT_FILES = {
+    SKYTONIGHT_RESULTS_FILE: _RESULTS_BASENAME,
+    SKYTONIGHT_DSO_RESULTS_FILE: _DSO_BASENAME,
+    SKYTONIGHT_BODIES_RESULTS_FILE: _BODIES_BASENAME,
+    SKYTONIGHT_COMETS_RESULTS_FILE: _COMETS_BASENAME,
+    SKYTONIGHT_SKYMAP_FILE: _SKYMAP_BASENAME,
+}
 
 
-def has_calculation_results() -> bool:
-    """Return True if all calculations are complete (metadata summary file exists and not in-progress)."""
-    if not (os.path.isfile(SKYTONIGHT_RESULTS_FILE) and os.path.getsize(SKYTONIGHT_RESULTS_FILE) > 0):
+def _default_location_id() -> Optional[str]:
+    """Resolve the install default preset id (lazy import - avoids a cycle)."""
+    try:
+        from repo_config import load_config, get_install_default_location
+
+        return get_install_default_location(load_config()).get('id')
+    except Exception:
+        return None
+
+
+def _resolve_location_id(location_id: Optional[str]) -> Optional[str]:
+    return location_id or _default_location_id()
+
+
+def _legacy_alttime_files() -> list:
+    """Flat *_alttime.json files left in the outputs root by pre-v1.2 runs."""
+    try:
+        return [
+            os.path.join(SKYTONIGHT_OUTPUT_DIR, name)
+            for name in os.listdir(SKYTONIGHT_OUTPUT_DIR)
+            if name.endswith('_alttime.json')
+        ]
+    except OSError:
+        return []
+
+
+def migrate_legacy_results(location_id: Optional[str] = None) -> bool:
+    """Move the pre-v1.2 flat result/alttime files into the install default's directories.
+
+    Idempotent and cheap when there is nothing to migrate. Returns True when at
+    least one file was moved.
+    """
+    legacy_alttimes = _legacy_alttime_files()
+    if not any(os.path.isfile(path) for path in _LEGACY_RESULT_FILES) and not legacy_alttimes:
         return False
-    data = load_json_file(SKYTONIGHT_RESULTS_FILE, default={})
+    target_id = _resolve_location_id(location_id)
+    if not target_id:
+        return False
+
+    target_dir = os.path.join(SKYTONIGHT_CALCULATIONS_DIR, target_id)
+    ensure_directory_exists(target_dir)
+    moved = False
+    for legacy_path, basename in _LEGACY_RESULT_FILES.items():
+        if not os.path.isfile(legacy_path):
+            continue
+        destination = os.path.join(target_dir, basename)
+        try:
+            if not os.path.isfile(destination):
+                shutil.move(legacy_path, destination)
+            else:
+                os.remove(legacy_path)
+            moved = True
+        except OSError:
+            continue  # best-effort: a locked file just stays behind
+
+    if legacy_alttimes:
+        alttime_dir = os.path.join(SKYTONIGHT_OUTPUT_DIR, target_id)
+        ensure_directory_exists(alttime_dir)
+        for legacy_path in legacy_alttimes:
+            destination = os.path.join(alttime_dir, os.path.basename(legacy_path))
+            try:
+                if not os.path.isfile(destination):
+                    shutil.move(legacy_path, destination)
+                else:
+                    os.remove(legacy_path)
+                moved = True
+            except OSError:
+                continue  # best-effort: a locked file just stays behind
+    return moved
+
+
+def get_location_results_dir(location_id: Optional[str] = None) -> str:
+    """Return (and create) the calculations directory for a location preset."""
+    resolved = _resolve_location_id(location_id)
+    migrate_legacy_results(resolved)
+    path = os.path.join(SKYTONIGHT_CALCULATIONS_DIR, resolved) if resolved else SKYTONIGHT_CALCULATIONS_DIR
+    ensure_directory_exists(path)
+    return path
+
+
+def get_results_file(location_id: Optional[str] = None) -> str:
+    """Return the path to the SkyTonight calculation results summary for a location."""
+    return os.path.join(get_location_results_dir(location_id), _RESULTS_BASENAME)
+
+
+def get_dso_results_file(location_id: Optional[str] = None) -> str:
+    return os.path.join(get_location_results_dir(location_id), _DSO_BASENAME)
+
+
+def get_bodies_results_file(location_id: Optional[str] = None) -> str:
+    return os.path.join(get_location_results_dir(location_id), _BODIES_BASENAME)
+
+
+def get_comets_results_file(location_id: Optional[str] = None) -> str:
+    return os.path.join(get_location_results_dir(location_id), _COMETS_BASENAME)
+
+
+def get_skymap_file(location_id: Optional[str] = None) -> str:
+    return os.path.join(get_location_results_dir(location_id), _SKYMAP_BASENAME)
+
+
+def get_alttime_dir(location_id: Optional[str] = None) -> str:
+    """Return (and create) the per-location directory for *_alttime.json files."""
+    resolved = _resolve_location_id(location_id)
+    migrate_legacy_results(resolved)
+    path = os.path.join(SKYTONIGHT_OUTPUT_DIR, resolved) if resolved else SKYTONIGHT_OUTPUT_DIR
+    ensure_directory_exists(path)
+    return path
+
+
+def drop_location_results(location_id: str) -> bool:
+    """Delete a preset's calculation results and alttime outputs.
+
+    Called when a preset is removed or its coordinates change; the scheduler
+    notices the missing results on its next poll and recomputes.
+    """
+    if not location_id:
+        return False
+    dropped = False
+    for path in (
+        os.path.join(SKYTONIGHT_CALCULATIONS_DIR, location_id),
+        os.path.join(SKYTONIGHT_OUTPUT_DIR, location_id),
+    ):
+        if not os.path.isdir(path):
+            continue
+        try:
+            shutil.rmtree(path)
+            dropped = True
+        except OSError:
+            continue
+    return dropped
+
+
+def has_calculation_results(location_id: Optional[str] = None) -> bool:
+    """Return True if all calculations are complete (summary exists and not in-progress)."""
+    results_file = get_results_file(location_id)
+    if not (os.path.isfile(results_file) and os.path.getsize(results_file) > 0):
+        return False
+    data = load_json_file(results_file, default={})
     return not bool(data.get('metadata', {}).get('in_progress', False))
 
 
-def has_bodies_results() -> bool:
+def has_bodies_results(location_id: Optional[str] = None) -> bool:
     """Return True if solar body calculation results are available."""
-    return os.path.isfile(SKYTONIGHT_BODIES_RESULTS_FILE) and os.path.getsize(SKYTONIGHT_BODIES_RESULTS_FILE) > 0
+    path = get_bodies_results_file(location_id)
+    return os.path.isfile(path) and os.path.getsize(path) > 0
 
 
-def has_comets_results() -> bool:
+def has_comets_results(location_id: Optional[str] = None) -> bool:
     """Return True if comet calculation results are available."""
-    return os.path.isfile(SKYTONIGHT_COMETS_RESULTS_FILE) and os.path.getsize(SKYTONIGHT_COMETS_RESULTS_FILE) > 0
+    path = get_comets_results_file(location_id)
+    return os.path.isfile(path) and os.path.getsize(path) > 0
 
 
-def has_dso_results() -> bool:
+def has_dso_results(location_id: Optional[str] = None) -> bool:
     """Return True if deep-sky object calculation results are available."""
-    return os.path.isfile(SKYTONIGHT_DSO_RESULTS_FILE) and os.path.getsize(SKYTONIGHT_DSO_RESULTS_FILE) > 0
+    path = get_dso_results_file(location_id)
+    return os.path.isfile(path) and os.path.getsize(path) > 0

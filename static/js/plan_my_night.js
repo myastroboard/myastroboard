@@ -1284,6 +1284,39 @@ function renderPlanMyNight(payload) {
     const plan = payload.plan;
     const timeline = payload.timeline || {};
 
+    // Pinned-location banner (v1.2): the plan is computed for the location it
+    // was created with; warn (non-blocking) when the viewer's active location
+    // differs - altitudes shown may not match what they'll actually see.
+    if (plan && plan.location_id) {
+        const locationBanner = document.createElement('div');
+        locationBanner.id = 'plan-location-banner';
+        locationBanner.className = 'alert alert-light border d-flex align-items-center gap-2 py-2 mb-2';
+        DOMUtils.append(
+            locationBanner,
+            DOMUtils.createIcon('bi bi-geo-alt icon-inline'),
+            i18n.t('plan_my_night.pinned_location', { name: plan.location_name || '?' })
+        );
+        container.appendChild(locationBanner);
+
+        if (typeof fetchMyLocations === 'function') {
+            fetchMyLocations().then(data => {
+                if (data?.active_location_id && data.active_location_id !== plan.location_id) {
+                    const active = (data.locations || []).find(l => l.id === data.active_location_id);
+                    locationBanner.className = 'alert alert-warning d-flex align-items-center gap-2 py-2 mb-2';
+                    DOMUtils.clear(locationBanner);
+                    DOMUtils.append(
+                        locationBanner,
+                        DOMUtils.createIcon('bi bi-exclamation-triangle icon-inline'),
+                        i18n.t('plan_my_night.location_mismatch', {
+                            pinned: plan.location_name || '?',
+                            active: active?.name || '?',
+                        })
+                    );
+                }
+            }).catch(() => { /* banner stays informational */ });
+        }
+    }
+
     const toolbar = document.createElement('div');
     toolbar.className = 'd-flex gap-2 mb-3 flex-wrap align-items-center';
 

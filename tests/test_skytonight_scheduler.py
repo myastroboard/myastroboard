@@ -160,7 +160,7 @@ def test_missed_run_recovery_on_startup(monkeypatch):
     def _load_status(default=None):
         return dict(stored_status) if stored_status else (default or {})
 
-    def _has_results():
+    def _has_results(*_a, **_k):
         return True  # pretend previous results exist (no forced re-run)
 
     def _ensure_dirs():
@@ -271,9 +271,16 @@ class TestResolveScheduleEdgeCases:
     """Cover additional resolve_schedule branches."""
 
     def test_fallback_when_no_location(self):
-        """Covers the fallback path when no scheduling candidates are available."""
+        """Covers the fallback path when no scheduling candidates are available.
+
+        v1.2: there is always an install-default preset, so the no-candidates
+        path is reached via a preset without usable coordinates (lat/lon None).
+        """
         config = {
-            'location': {},  # No lat/lon → no SunService call → no candidates
+            'locations': [
+                {'id': 'sched-loc', 'name': 'Broken', 'latitude': None, 'longitude': None,
+                 'timezone': 'UTC', 'is_install_default': True}
+            ],
             'skytonight': {'enabled': True},
         }
         now = datetime(2026, 4, 17, 12, 0, tzinfo=ZoneInfo('UTC'))
@@ -342,7 +349,7 @@ class TestSchedulerHelperMethods:
         monkeypatch.setattr('skytonight_scheduler.save_scheduler_status', _save)
         monkeypatch.setattr('skytonight_scheduler.load_scheduler_status', _load)
         monkeypatch.setattr('skytonight_scheduler.ensure_skytonight_directories', lambda: None)
-        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda: {})
+        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda *_a, **_k: {})
 
         if runner is None:
             runner = lambda: {'result': 'ok'}
@@ -415,7 +422,7 @@ class TestSchedulerHelperMethods:
         """Covers the _scheduler_started guard ensuring start() is idempotent."""
         monkeypatch.setattr('skytonight_scheduler.append_scheduler_log', lambda msg: None)
         monkeypatch.setattr('skytonight_scheduler.get_scheduler_trigger_file', lambda: '/tmp/no_trigger')
-        monkeypatch.setattr('skytonight_scheduler.has_calculation_results', lambda: True)
+        monkeypatch.setattr('skytonight_scheduler.has_calculation_results', lambda *_a, **_k: True)
         monkeypatch.setattr(
             'skytonight_scheduler.resolve_schedule',
             lambda _cfg: SkyTonightSchedule(
@@ -439,7 +446,7 @@ class TestSchedulerHelperMethods:
         """Covers stop() joining the thread and setting running to False."""
         monkeypatch.setattr('skytonight_scheduler.append_scheduler_log', lambda msg: None)
         monkeypatch.setattr('skytonight_scheduler.get_scheduler_trigger_file', lambda: '/tmp/no_trigger')
-        monkeypatch.setattr('skytonight_scheduler.has_calculation_results', lambda: True)
+        monkeypatch.setattr('skytonight_scheduler.has_calculation_results', lambda *_a, **_k: True)
         monkeypatch.setattr(
             'skytonight_scheduler.resolve_schedule',
             lambda _cfg: SkyTonightSchedule(
@@ -475,7 +482,7 @@ class TestSchedulerExecuteCycle:
         monkeypatch.setattr('skytonight_scheduler.save_scheduler_status', _save)
         monkeypatch.setattr('skytonight_scheduler.load_scheduler_status', _load)
         monkeypatch.setattr('skytonight_scheduler.ensure_skytonight_directories', lambda: None)
-        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda: {})
+        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda *_a, **_k: {})
         monkeypatch.setattr('skytonight_scheduler.append_scheduler_log', lambda msg: None)
 
         if runner is None:
@@ -577,7 +584,7 @@ class TestSchedulerInitFromPersistedStatus:
         """Covers restoring last_run from a valid ISO string in persisted status."""
         last_run_dt = datetime(2026, 4, 17, 3, 0, tzinfo=ZoneInfo('UTC'))
         self._monkeypatch_storage(monkeypatch, {'last_run': last_run_dt.isoformat()})
-        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda: {})
+        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda *_a, **_k: {})
 
         sched = SkyTonightScheduler(
             config_loader=lambda: {'location': {'timezone': 'UTC'}, 'skytonight': {}},
@@ -589,7 +596,7 @@ class TestSchedulerInitFromPersistedStatus:
     def test_invalid_last_run_iso_gives_none(self, monkeypatch):
         """Covers last_run left as None when the stored ISO string is invalid."""
         self._monkeypatch_storage(monkeypatch, {'last_run': 'not-a-datetime'})
-        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda: {})
+        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda *_a, **_k: {})
 
         sched = SkyTonightScheduler(
             config_loader=lambda: {'location': {'timezone': 'UTC'}, 'skytonight': {}},
@@ -600,7 +607,7 @@ class TestSchedulerInitFromPersistedStatus:
     def test_last_error_non_string_coerced(self, monkeypatch):
         """Covers non-string last_error coerced to str on restore."""
         self._monkeypatch_storage(monkeypatch, {'last_error': 42})
-        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda: {})
+        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda *_a, **_k: {})
 
         sched = SkyTonightScheduler(
             config_loader=lambda: {'location': {'timezone': 'UTC'}, 'skytonight': {}},
@@ -611,7 +618,7 @@ class TestSchedulerInitFromPersistedStatus:
     def test_last_result_non_dict_wrapped(self, monkeypatch):
         """Covers non-dict last_result wrapped in a dict on restore."""
         self._monkeypatch_storage(monkeypatch, {'last_result': 'some-string'})
-        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda: {})
+        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda *_a, **_k: {})
 
         sched = SkyTonightScheduler(
             config_loader=lambda: {'location': {'timezone': 'UTC'}, 'skytonight': {}},
@@ -630,7 +637,7 @@ class TestSchedulerInitFromPersistedStatus:
                 'counts': {'deep_sky': 10, 'bodies': 3, 'comets': 0},
             }
         }
-        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda: calc_cache)
+        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda *_a, **_k: calc_cache)
 
         sched = SkyTonightScheduler(
             config_loader=lambda: {'location': {'timezone': 'UTC'}, 'skytonight': {}},
@@ -643,7 +650,7 @@ class TestSchedulerInitFromPersistedStatus:
         """Covers restoring _committed_next_run from a valid ISO string in persisted status."""
         future = datetime(2026, 4, 18, 22, 0, tzinfo=ZoneInfo('UTC'))
         self._monkeypatch_storage(monkeypatch, {'next_run': future.isoformat()})
-        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda: {})
+        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda *_a, **_k: {})
 
         sched = SkyTonightScheduler(
             config_loader=lambda: {'location': {'timezone': 'UTC'}, 'skytonight': {}},
@@ -655,7 +662,7 @@ class TestSchedulerInitFromPersistedStatus:
     def test_invalid_next_run_iso_leaves_none(self, monkeypatch):
         """Covers _committed_next_run left as None when the stored ISO string is invalid."""
         self._monkeypatch_storage(monkeypatch, {'next_run': 'bad-iso'})
-        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda: {})
+        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda *_a, **_k: {})
 
         sched = SkyTonightScheduler(
             config_loader=lambda: {'location': {'timezone': 'UTC'}, 'skytonight': {}},
@@ -666,7 +673,7 @@ class TestSchedulerInitFromPersistedStatus:
     def test_duration_stored_in_status(self, monkeypatch):
         """Covers restoring last_execution_duration_seconds from persisted status."""
         self._monkeypatch_storage(monkeypatch, {'progress': {'last_execution_duration_seconds': 42}})
-        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda: {})
+        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda *_a, **_k: {})
 
         sched = SkyTonightScheduler(
             config_loader=lambda: {'location': {'timezone': 'UTC'}, 'skytonight': {}},
@@ -691,9 +698,9 @@ class TestRunLoopBranches:
         monkeypatch.setattr('skytonight_scheduler.save_scheduler_status', _save)
         monkeypatch.setattr('skytonight_scheduler.load_scheduler_status', _load)
         monkeypatch.setattr('skytonight_scheduler.ensure_skytonight_directories', lambda: None)
-        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda: {})
+        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda *_a, **_k: {})
         monkeypatch.setattr('skytonight_scheduler.append_scheduler_log', lambda msg: None)
-        monkeypatch.setattr('skytonight_scheduler.has_calculation_results', lambda: True)
+        monkeypatch.setattr('skytonight_scheduler.has_calculation_results', lambda *_a, **_k: True)
         monkeypatch.setattr('skytonight_scheduler.get_scheduler_trigger_file', lambda: trigger_path)
         return stored
 
@@ -736,7 +743,7 @@ class TestRunLoopBranches:
     def test_loop_fires_when_missing_calculation_results(self, monkeypatch):
         """Covers should_run=True when calculation results are absent despite a recent last_run."""
         self._setup_monkeypatches(monkeypatch)
-        monkeypatch.setattr('skytonight_scheduler.has_calculation_results', lambda: False)
+        monkeypatch.setattr('skytonight_scheduler.has_calculation_results', lambda *_a, **_k: False)
         done_event = threading.Event()
         calls = []
 
@@ -907,7 +914,7 @@ class TestRunLoopBranches:
             monkeypatch.setattr('skytonight_scheduler.save_scheduler_status', _save)
 
             monkeypatch.setattr('skytonight_scheduler.load_scheduler_status', lambda default=None: {})
-            monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda: {})
+            monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda *_a, **_k: {})
 
             sched = SkyTonightScheduler(
                 config_loader=lambda: {'location': {'timezone': 'UTC'}, 'skytonight': {'enabled': False}},
@@ -969,7 +976,7 @@ class TestSchedulerInitFromStoredStatus:
         stored = {'last_error': 'something went wrong'}
         monkeypatch.setattr('skytonight_scheduler.load_scheduler_status', lambda default=None: stored)
         monkeypatch.setattr('skytonight_scheduler.ensure_skytonight_directories', lambda: None)
-        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda: {})
+        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda *_a, **_k: {})
         sched = SkyTonightScheduler(config_loader=lambda: {}, runner=lambda: {})
         assert sched.last_error == 'something went wrong'
 
@@ -978,7 +985,7 @@ class TestSchedulerInitFromStoredStatus:
         stored = {'last_error': 42}
         monkeypatch.setattr('skytonight_scheduler.load_scheduler_status', lambda default=None: stored)
         monkeypatch.setattr('skytonight_scheduler.ensure_skytonight_directories', lambda: None)
-        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda: {})
+        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda *_a, **_k: {})
         sched = SkyTonightScheduler(config_loader=lambda: {}, runner=lambda: {})
         assert sched.last_error == '42'
 
@@ -987,7 +994,7 @@ class TestSchedulerInitFromStoredStatus:
         stored = {'progress': {'last_execution_duration_seconds': 'not_a_number'}}
         monkeypatch.setattr('skytonight_scheduler.load_scheduler_status', lambda default=None: stored)
         monkeypatch.setattr('skytonight_scheduler.ensure_skytonight_directories', lambda: None)
-        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda: {})
+        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda *_a, **_k: {})
         sched = SkyTonightScheduler(config_loader=lambda: {}, runner=lambda: {})
         assert sched.last_execution_duration_seconds is None
 
@@ -995,7 +1002,7 @@ class TestSchedulerInitFromStoredStatus:
         """Lines 212-213: exception in backfill → pass (no crash)."""
         stored = {}  # empty → enters backfill try block
 
-        def _raise_disk_error():
+        def _raise_disk_error(*_a, **_k):
             raise RuntimeError("disk error")
 
         monkeypatch.setattr('skytonight_scheduler.load_scheduler_status', lambda default=None: stored)
@@ -1013,7 +1020,7 @@ class TestSchedulerStopWithNoThread:
         """Covers stop() not crashing when the thread was never created."""
         monkeypatch.setattr('skytonight_scheduler.load_scheduler_status', lambda default=None: {})
         monkeypatch.setattr('skytonight_scheduler.ensure_skytonight_directories', lambda: None)
-        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda: {})
+        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda *_a, **_k: {})
         monkeypatch.setattr('skytonight_scheduler.save_scheduler_status', lambda _: None)
         monkeypatch.setattr('skytonight_scheduler.resolve_schedule', lambda _: SkyTonightSchedule(
             mode='disabled', next_run=None, server_time_valid=False,
@@ -1081,7 +1088,7 @@ class TestRunLoopMissedRunFalseBranch:
 
         monkeypatch.setattr('skytonight_scheduler.save_scheduler_status', _save_status)
         monkeypatch.setattr('skytonight_scheduler.load_scheduler_status', _load_status)
-        monkeypatch.setattr('skytonight_scheduler.has_calculation_results', lambda: True)
+        monkeypatch.setattr('skytonight_scheduler.has_calculation_results', lambda *_a, **_k: True)
         monkeypatch.setattr('skytonight_scheduler.ensure_skytonight_directories', lambda: None)
         monkeypatch.setattr('skytonight_scheduler.get_scheduler_trigger_file', lambda: '/tmp/nonexistent_st2')
         monkeypatch.setattr('skytonight_scheduler.append_scheduler_log', lambda msg: None)
@@ -1136,7 +1143,7 @@ class TestRunLoopTriggerFileException:
 
         monkeypatch.setattr('skytonight_scheduler.save_scheduler_status', _save_status)
         monkeypatch.setattr('skytonight_scheduler.load_scheduler_status', lambda default=None: {})
-        monkeypatch.setattr('skytonight_scheduler.has_calculation_results', lambda: True)
+        monkeypatch.setattr('skytonight_scheduler.has_calculation_results', lambda *_a, **_k: True)
         monkeypatch.setattr('skytonight_scheduler.ensure_skytonight_directories', lambda: None)
         monkeypatch.setattr('skytonight_scheduler.get_scheduler_trigger_file', lambda: str(trigger_file))
         monkeypatch.setattr('skytonight_scheduler.append_scheduler_log', lambda msg: None)
@@ -1195,7 +1202,7 @@ class TestRunLoopMissedRunRecoveryException:
 
         monkeypatch.setattr('skytonight_scheduler.save_scheduler_status', lambda _: None)
         monkeypatch.setattr('skytonight_scheduler.load_scheduler_status', _load_status)
-        monkeypatch.setattr('skytonight_scheduler.has_calculation_results', lambda: True)
+        monkeypatch.setattr('skytonight_scheduler.has_calculation_results', lambda *_a, **_k: True)
         monkeypatch.setattr('skytonight_scheduler.ensure_skytonight_directories', lambda: None)
         monkeypatch.setattr('skytonight_scheduler.get_scheduler_trigger_file', lambda: '/tmp/nonexistent_st3')
         monkeypatch.setattr('skytonight_scheduler.append_scheduler_log', lambda msg: None)
@@ -1236,7 +1243,7 @@ class TestRunLoopScheduleNextRunNone:
 
         monkeypatch.setattr('skytonight_scheduler.save_scheduler_status', lambda _: None)
         monkeypatch.setattr('skytonight_scheduler.load_scheduler_status', lambda default=None: {})
-        monkeypatch.setattr('skytonight_scheduler.has_calculation_results', lambda: True)
+        monkeypatch.setattr('skytonight_scheduler.has_calculation_results', lambda *_a, **_k: True)
         monkeypatch.setattr('skytonight_scheduler.ensure_skytonight_directories', lambda: None)
         monkeypatch.setattr('skytonight_scheduler.get_scheduler_trigger_file', lambda: '/tmp/nonexistent_st4')
         monkeypatch.setattr('skytonight_scheduler.append_scheduler_log', lambda msg: None)
@@ -1281,7 +1288,7 @@ class TestRunLoopCommittedNextRunUnchanged:
 
         monkeypatch.setattr('skytonight_scheduler.save_scheduler_status', lambda _: None)
         monkeypatch.setattr('skytonight_scheduler.load_scheduler_status', lambda default=None: {})
-        monkeypatch.setattr('skytonight_scheduler.has_calculation_results', lambda: True)
+        monkeypatch.setattr('skytonight_scheduler.has_calculation_results', lambda *_a, **_k: True)
         monkeypatch.setattr('skytonight_scheduler.ensure_skytonight_directories', lambda: None)
         monkeypatch.setattr('skytonight_scheduler.get_scheduler_trigger_file', lambda: '/tmp/nonexistent_st5')
         monkeypatch.setattr('skytonight_scheduler.append_scheduler_log', lambda msg: None)
@@ -1339,7 +1346,7 @@ class TestRunLoopCacheReadyElseBranch:
 
         monkeypatch.setattr('skytonight_scheduler.save_scheduler_status', lambda _: None)
         monkeypatch.setattr('skytonight_scheduler.load_scheduler_status', lambda default=None: {})
-        monkeypatch.setattr('skytonight_scheduler.has_calculation_results', lambda: True)
+        monkeypatch.setattr('skytonight_scheduler.has_calculation_results', lambda *_a, **_k: True)
         monkeypatch.setattr('skytonight_scheduler.ensure_skytonight_directories', lambda: None)
         monkeypatch.setattr('skytonight_scheduler.get_scheduler_trigger_file', lambda: str(trigger_file))
         monkeypatch.setattr('skytonight_scheduler.append_scheduler_log', lambda msg: None)
@@ -1363,7 +1370,7 @@ class TestRunLoopCacheReadyTimeoutAndAlreadyWaited:
     def _common_patches(self, monkeypatch):
         monkeypatch.setattr('skytonight_scheduler.save_scheduler_status', lambda _: None)
         monkeypatch.setattr('skytonight_scheduler.load_scheduler_status', lambda default=None: {})
-        monkeypatch.setattr('skytonight_scheduler.has_calculation_results', lambda: True)
+        monkeypatch.setattr('skytonight_scheduler.has_calculation_results', lambda *_a, **_k: True)
         monkeypatch.setattr('skytonight_scheduler.ensure_skytonight_directories', lambda: None)
         monkeypatch.setattr('skytonight_scheduler.append_scheduler_log', lambda msg: None)
         monkeypatch.setattr('skytonight_scheduler.get_scheduler_trigger_file',
@@ -1467,7 +1474,7 @@ class TestWaitForInitialCacheReady:
     def _make_scheduler(self, monkeypatch, cache_ready_event=None):
         monkeypatch.setattr('skytonight_scheduler.load_scheduler_status', lambda default=None: {})
         monkeypatch.setattr('skytonight_scheduler.ensure_skytonight_directories', lambda: None)
-        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda: {})
+        monkeypatch.setattr('skytonight_scheduler.load_calculation_results', lambda *_a, **_k: {})
         return SkyTonightScheduler(
             config_loader=lambda: {},
             runner=lambda: {},

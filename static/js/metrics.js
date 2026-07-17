@@ -1,7 +1,12 @@
 // System Metrics Functions
 
 const METRICS_REFRESH_INTERVAL_MS = 5000;
-const METRICS_FETCH_TIMEOUT_MS = 10000;
+// Generous margin for the one-time cold-start cost: disk usage is served from
+// a background-refreshed cache (see metrics_collector.py) so steady-state
+// calls are fast, but the very first call after a restart has no cached
+// value yet and must scan synchronously once - slow on some Docker/Windows
+// bind-mount setups.
+const METRICS_FETCH_TIMEOUT_MS = 20000;
 let metricsUpdateInterval = null;
 let metricsLoading = false;
 let processSortState = { key: 'cpu_percent', direction: 'desc' };
@@ -179,7 +184,9 @@ const CACHE_JOB_LABELS = {
     dark_window:          'Dark Window',
     moon_planner:         'Moon Planner',
     sun_report:           'Sun Report',
-    best_window:          'Best Window',
+    best_window_strict:       'Best Window (strict)',
+    best_window_practical:    'Best Window (practical)',
+    best_window_illumination: 'Best Window (illumination)',
     solar_eclipse:        'Solar Eclipse',
     lunar_eclipse:        'Lunar Eclipse',
     horizon_graph:        'Horizon Graph',
@@ -205,27 +212,93 @@ function getCacheJobLabel(jobKey) {
         : (CACHE_JOB_LABELS[jobKey] ?? jobKey);
 }
 
+// Job rows the admin has expanded to see the per-location breakdown - kept
+// across the 5s auto-refresh so re-rendering doesn't collapse them.
+const _expandedCacheJobRows = new Set();
+
+function _formatCacheDt(iso) {
+    if (!iso) return '-';
+    try { return new Date(iso).toLocaleString(); } catch (_) { return iso; }
+}
+
+function _formatCacheSecs(secs) {
+    if (secs == null || !Number.isFinite(Number(secs))) return '-';
+    const s = Number(secs);
+    return s < 60 ? `${s.toFixed(1)}s` : `${Math.floor(s / 60)}m ${(s % 60).toFixed(0)}s`;
+}
+
+function _cacheStatusBadge(isValid) {
+    const b = document.createElement('span');
+    if (isValid === null || isValid === undefined) {
+        b.className = 'badge bg-secondary';
+        b.textContent = i18n.t('metrics.cache_status_unknown') || '-';
+    } else if (isValid) {
+        b.className = 'badge bg-success';
+        b.textContent = i18n.t('metrics.cache_status_valid') || 'Valid';
+    } else {
+        b.className = 'badge bg-warning text-dark';
+        b.textContent = i18n.t('metrics.cache_status_stale') || 'Stale';
+    }
+    return b;
+}
+
+function _cacheDurationCell(exec) {
+    const td = document.createElement('td');
+    td.className = 'font-monospace small';
+    if (exec.last_success === false) {
+        const errBadge = document.createElement('span');
+        errBadge.className = 'badge bg-danger me-1';
+        errBadge.textContent = i18n.t('metrics.cache_status_failed') || 'Failed';
+        td.appendChild(errBadge);
+    }
+    td.appendChild(document.createTextNode(_formatCacheSecs(exec.last_duration_s)));
+    return td;
+}
+
+// A job is "location-scoped" when at least one scheduler location reports a
+// validity flag for it in details.locations (global jobs like spaceflight/IERS/
+// AllSky never appear there and keep the old single-row rendering).
+function _cacheJobLocationIds(jobKey, locationsBlock) {
+    return Object.keys(locationsBlock).filter((locId) => (
+        Object.prototype.hasOwnProperty.call(locationsBlock[locId] || {}, jobKey)
+    ));
+}
+
+// best_window_strict/practical/illumination are 3 separate cache slots (each
+// with its own staleness) but share ONE execution: a single Astropy night-scan
+// computes all 3 modes together, recorded under the unified 'best_window' job
+// name. Execution lookups for any of the 3 modes must use that shared name.
+function _cacheExecFamilyKey(jobKey) {
+    return jobKey.startsWith('best_window_') ? 'best_window' : jobKey;
+}
+
+// Match execution_metrics entries to this job, across every location label
+// variant ("<job>" for the install default, "<job>@<slug>" for the rest).
+function _cacheJobExecEntries(jobKey, execMeta, installDefaultId) {
+    const execKey = _cacheExecFamilyKey(jobKey);
+    const entries = [];
+    for (const [key, exec] of Object.entries(execMeta)) {
+        if (key !== execKey && !key.startsWith(`${execKey}@`)) continue;
+        const locationId = exec.location_id ?? (key === execKey ? installDefaultId : null);
+        entries.push({ locationId, exec });
+    }
+    return entries;
+}
+
 async function updateCacheJobsMetrics() {
     const tbody = document.getElementById('cache-jobs-table-body');
     if (!tbody) return;
-
-    const formatDt = (iso) => {
-        if (!iso) return '-';
-        try { return new Date(iso).toLocaleString(); } catch (_) { return iso; }
-    };
-    const formatSecs = (secs) => {
-        if (secs == null || !Number.isFinite(Number(secs))) return '-';
-        const s = Number(secs);
-        return s < 60 ? `${s.toFixed(1)}s` : `${Math.floor(s / 60)}m ${(s % 60).toFixed(0)}s`;
-    };
 
     try {
         const data = await fetchJSON('/api/cache');
         if (!data) return;
 
-        const details   = data.details ?? {};
-        const ttls      = details.ttls ?? {};
-        const execMeta  = details.execution_metrics ?? {};
+        const details          = data.details ?? {};
+        const ttls             = details.ttls ?? {};
+        const execMeta          = details.execution_metrics ?? {};
+        const locationsBlock    = details.locations ?? {};
+        const locationNames     = data.location_names ?? {};
+        const installDefaultId  = data.install_default_location_id ?? null;
 
         // Build job order: keys from ttls (canonical list), fallback to execMeta keys
         const jobKeys = Object.keys(ttls).length
@@ -235,18 +308,40 @@ async function updateCacheJobsMetrics() {
         DOMUtils.clear(tbody);
 
         for (const jobKey of jobKeys) {
-            const ttl       = ttls[jobKey];
-            const exec      = execMeta[jobKey] ?? {};
-            // best_window validity uses best_window_strict in details
-            const validKey  = jobKey === 'best_window' ? 'best_window_strict' : jobKey;
-            const isValid   = details[validKey] ?? null;
-            const label     = getCacheJobLabel(jobKey);
+            const ttl   = ttls[jobKey];
+            const label = getCacheJobLabel(jobKey);
+            const locationIds = _cacheJobLocationIds(jobKey, locationsBlock);
+            const execEntries = _cacheJobExecEntries(jobKey, execMeta, installDefaultId);
 
             const tr = document.createElement('tr');
 
-            // Job name
+            // Job name (+ expand toggle for multi-location jobs)
             const tdName = document.createElement('td');
-            tdName.textContent = label;
+            if (locationIds.length > 1) {
+                const isExpanded = _expandedCacheJobRows.has(jobKey);
+                const toggle = document.createElement('button');
+                toggle.type = 'button';
+                toggle.className = 'btn btn-sm btn-link p-0 me-1 text-decoration-none';
+                toggle.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+                toggle.setAttribute('aria-label', i18n.t('metrics.cache_job_toggle_locations') || 'Toggle per-location detail');
+                toggle.innerHTML = `<i class="bi ${isExpanded ? 'bi-chevron-down' : 'bi-chevron-right'}" aria-hidden="true"></i>`;
+                toggle.addEventListener('click', () => {
+                    if (_expandedCacheJobRows.has(jobKey)) {
+                        _expandedCacheJobRows.delete(jobKey);
+                    } else {
+                        _expandedCacheJobRows.add(jobKey);
+                    }
+                    updateCacheJobsMetrics();
+                });
+                tdName.appendChild(toggle);
+            }
+            tdName.appendChild(document.createTextNode(label));
+            if (locationIds.length > 1) {
+                const countBadge = document.createElement('span');
+                countBadge.className = 'badge bg-secondary-subtle text-secondary-emphasis ms-2';
+                countBadge.textContent = `×${locationIds.length}`;
+                tdName.appendChild(countBadge);
+            }
             tr.appendChild(tdName);
 
             // TTL
@@ -257,45 +352,76 @@ async function updateCacheJobsMetrics() {
             tdTTL.appendChild(ttlBadge);
             tr.appendChild(tdTTL);
 
-            // Valid / stale badge
+            // Valid / stale badge - aggregated across every scheduler location
             const tdStatus = document.createElement('td');
-            if (isValid === null) {
-                const b = document.createElement('span');
-                b.className = 'badge bg-secondary';
-                b.textContent = i18n.t('metrics.cache_status_unknown') || '-';
-                tdStatus.appendChild(b);
-            } else if (isValid) {
-                const b = document.createElement('span');
-                b.className = 'badge bg-success';
-                b.textContent = i18n.t('metrics.cache_status_valid') || 'Valid';
-                tdStatus.appendChild(b);
+            if (locationIds.length > 1) {
+                const validCount = locationIds.filter((id) => locationsBlock[id]?.[jobKey]).length;
+                // Any location stale (even just one of many) means the row needs
+                // attention - "Stale", not an ambiguous "-" unknown badge. The
+                // (n/total) text below still shows how many locations are affected.
+                tdStatus.appendChild(_cacheStatusBadge(validCount === locationIds.length));
+                if (validCount !== locationIds.length) {
+                    const countText = document.createElement('span');
+                    countText.className = 'text-muted small ms-1';
+                    countText.textContent = `(${validCount}/${locationIds.length})`;
+                    tdStatus.appendChild(countText);
+                }
             } else {
-                const b = document.createElement('span');
-                b.className = 'badge bg-warning text-dark';
-                b.textContent = i18n.t('metrics.cache_status_stale') || 'Stale';
-                tdStatus.appendChild(b);
+                tdStatus.appendChild(_cacheStatusBadge(details[jobKey] ?? null));
             }
             tr.appendChild(tdStatus);
 
-            // Last run
+            // Last run / duration - most recent execution across all locations
+            const latestExec = execEntries
+                .map((e) => e.exec)
+                .sort((a, b) => new Date(b.last_run_at || 0) - new Date(a.last_run_at || 0))[0] ?? {};
+
             const tdLastRun = document.createElement('td');
             tdLastRun.className = 'font-monospace small';
-            tdLastRun.textContent = formatDt(exec.last_run_at);
+            tdLastRun.textContent = _formatCacheDt(latestExec.last_run_at);
             tr.appendChild(tdLastRun);
 
-            // Duration
-            const tdDur = document.createElement('td');
-            tdDur.className = 'font-monospace small';
-            if (exec.last_success === false) {
-                const errBadge = document.createElement('span');
-                errBadge.className = 'badge bg-danger me-1';
-                errBadge.textContent = i18n.t('metrics.cache_status_failed') || 'Failed';
-                tdDur.appendChild(errBadge);
-            }
-            tdDur.appendChild(document.createTextNode(formatSecs(exec.last_duration_s)));
-            tr.appendChild(tdDur);
+            tr.appendChild(_cacheDurationCell(latestExec));
 
             tbody.appendChild(tr);
+
+            // Per-location sub-rows (only when expanded)
+            if (locationIds.length > 1 && _expandedCacheJobRows.has(jobKey)) {
+                for (const locId of locationIds) {
+                    const locExec = execEntries.find((e) => e.locationId === locId)?.exec ?? {};
+                    const locName = locationNames[locId] || locId;
+
+                    const subTr = document.createElement('tr');
+                    subTr.className = 'table-secondary bg-opacity-10';
+
+                    const tdLocName = document.createElement('td');
+                    tdLocName.className = 'ps-4 small';
+                    tdLocName.innerHTML = '<i class="bi bi-geo-alt icon-inline" aria-hidden="true"></i> ';
+                    tdLocName.appendChild(document.createTextNode(locName));
+                    if (locId === installDefaultId) {
+                        const defBadge = document.createElement('span');
+                        defBadge.className = 'badge bg-info-subtle text-info-emphasis ms-2';
+                        defBadge.textContent = i18n.t('settings.location_default_badge') || 'Default';
+                        tdLocName.appendChild(defBadge);
+                    }
+                    subTr.appendChild(tdLocName);
+
+                    subTr.appendChild(document.createElement('td')); // TTL - same as parent, left blank
+
+                    const tdLocStatus = document.createElement('td');
+                    tdLocStatus.appendChild(_cacheStatusBadge(locationsBlock[locId]?.[jobKey] ?? null));
+                    subTr.appendChild(tdLocStatus);
+
+                    const tdLocLastRun = document.createElement('td');
+                    tdLocLastRun.className = 'font-monospace small';
+                    tdLocLastRun.textContent = _formatCacheDt(locExec.last_run_at);
+                    subTr.appendChild(tdLocLastRun);
+
+                    subTr.appendChild(_cacheDurationCell(locExec));
+
+                    tbody.appendChild(subTr);
+                }
+            }
         }
     } catch (error) {
         console.warn('Error loading cache jobs metrics:', error);

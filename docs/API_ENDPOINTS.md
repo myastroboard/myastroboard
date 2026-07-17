@@ -52,6 +52,17 @@ This page lists the HTTP routes currently declared in `backend/app.py` and `back
 - `GET /api/config/export`
 - `GET /api/skyquality`
 
+## Locations (multi-location profiles, v1.2 - see docs/LOCATIONS.md)
+
+- `GET /api/locations` (admin)
+- `POST /api/locations` (admin, capped at MAX_LOCATIONS)
+- `PUT /api/locations/<location_id>` (admin)
+- `DELETE /api/locations/<location_id>?plans=cascade|orphan` (admin)
+- `GET /api/locations/<location_id>/references` (admin)
+- `POST /api/locations/<location_id>/attribute` (admin)
+- `GET /api/locations/mine`
+- `POST /api/locations/active`
+
 ## Backup & Restore
 
 - `GET /api/backup/download` - Download a ZIP archive (config.json, users.json, astrodex/, equipments/)

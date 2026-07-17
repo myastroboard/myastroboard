@@ -36,66 +36,43 @@ async function loadConfiguration() {
     try {
         const config = await fetchJSON('/api/config');
         currentConfig = config;
-        
-        // Populate basic fields - check if elements exist before setting values
-        const locationName = document.getElementById('location-name');
-        if (locationName) locationName.value = config.location?.name || '';
-        
-        const latInput = document.getElementById('latitude-input');
-        if (latInput) latInput.value = config.location?.latitude || '';
-        
-        const lonInput = document.getElementById('longitude-input');
-        if (lonInput) lonInput.value = config.location?.longitude || '';
-        
-        const elevation = document.getElementById('elevation');
-        if (elevation) elevation.value = config.location?.elevation || 0;
-        
-        const timezone = document.getElementById('timezone');
-        if (timezone) timezone.value = config.location?.timezone || 'UTC';
 
-        // Sky quality (light pollution)
-        const bortleSelect = document.getElementById('bortle-class');
-        if (bortleSelect) bortleSelect.value = config.location?.bortle != null ? String(config.location.bortle) : '';
-
-        const sqmInput = document.getElementById('sqm-value');
-        if (sqmInput) sqmInput.value = config.location?.sqm != null ? config.location.sqm : '';
+        // v1.2: location fields moved to the per-preset editor (Parameters ->
+        // Locations, see locations.js) - /api/config only drives global settings.
 
         // Astrodex options
         const astrodexPrivate = document.getElementById('astrodex-private');
         if (astrodexPrivate) astrodexPrivate.checked = config.astrodex?.private !== false;
-        
+
         const constraints = config.skytonight?.constraints || {};
-        
+
         const altMin = document.getElementById('altitude-min');
         if (altMin) altMin.value = constraints.altitude_constraint_min || 30;
-        
+
         const altMax = document.getElementById('altitude-max');
         if (altMax) altMax.value = constraints.altitude_constraint_max || 80;
-        
+
         const airmass = document.getElementById('airmass');
         if (airmass) airmass.value = constraints.airmass_constraint || 2;
-        
+
         const sizeMin = document.getElementById('size-min');
         if (sizeMin) sizeMin.value = constraints.size_constraint_min || 10;
-        
+
         const sizeMax = document.getElementById('size-max');
         if (sizeMax) sizeMax.value = constraints.size_constraint_max || 300;
-        
+
         const moonSep = document.getElementById('moon-sep');
         if (moonSep) moonSep.value = constraints.moon_separation_min || 45;
-        
+
         const timeThreshold = document.getElementById('time-threshold');
         if (timeThreshold) timeThreshold.value = constraints.fraction_of_time_observable_threshold || 0.5;
-        
+
         const moonIllumination = document.getElementById('moon-illumination');
         if (moonIllumination) moonIllumination.checked = constraints.moon_separation_use_illumination !== false;
-        
+
         const northCCW = document.getElementById('north-ccw');
         if (northCCW) northCCW.checked = constraints.north_to_east_ccw === true;
 
-        // Horizon profile
-        loadHorizonProfileTable(constraints.horizon_profile || []);
-                
     } catch (error) {
         console.error('Error loading configuration:', error);
         showMessage('error', i18n.t('settings.failed_to_load_config'));
@@ -103,17 +80,9 @@ async function loadConfiguration() {
 }
 
 async function saveConfiguration() {
-    
+    // v1.2: locations are saved through /api/locations (locations.js); this
+    // payload only carries global app settings + SkyTonight constraints.
     const config = {
-        location: {
-            name: document.getElementById('location-name').value,
-            latitude: parseFloat(document.getElementById('latitude-input').value),
-            longitude: parseFloat(document.getElementById('longitude-input').value),
-            elevation: parseFloat(document.getElementById('elevation').value || 0),
-            timezone: document.getElementById('timezone').value,
-            bortle: (() => { const v = document.getElementById('bortle-class')?.value; return v ? parseInt(v, 10) : null; })(),
-            sqm: (() => { const v = document.getElementById('sqm-value')?.value; return v !== '' && v != null ? parseFloat(v) : null; })(),
-        },
         astrodex: {
             private: document.getElementById('astrodex-private').checked
         },
@@ -128,21 +97,9 @@ async function saveConfiguration() {
                 moon_separation_use_illumination: document.getElementById('moon-illumination').checked,
                 fraction_of_time_observable_threshold: parseFloat(document.getElementById('time-threshold').value),
                 north_to_east_ccw: document.getElementById('north-ccw').checked,
-                horizon_profile: readHorizonProfile(),
-                _horizon_cleared: _horizonExplicitlyCleared,
             }
         }
     };
-
-    // Coherence check: validate horizon profile before saving
-    const horizonCheck = validateHorizonProfile();
-    if (!horizonCheck.valid) {
-        showMessage('error', horizonCheck.errors.join(' '));
-        return;
-    }
-    if (horizonCheck.warnings.length > 0) {
-        showMessage('warning', horizonCheck.warnings.join(' '));
-    }
 
     try {
         const result = await fetchJSON('/api/config', {
@@ -150,7 +107,7 @@ async function saveConfiguration() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(config)
         });
-        
+
         if (result.status === 'success') {
             showMessage('success', i18n.t('settings.config_saved'));
             currentConfig = config;

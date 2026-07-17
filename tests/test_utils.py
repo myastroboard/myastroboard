@@ -72,8 +72,8 @@ class TestJsonFileOperations:
         """Test loading a valid JSON file"""
         data = load_json_file(sample_json_file)
         assert isinstance(data, dict)
-        assert "location" in data
-        assert data["location"]["name"] == "Test Location"
+        assert "locations" in data
+        assert data["locations"][0]["name"] == "Test Location"
     
     def test_load_json_file_nonexistent(self):
         """Test loading non-existent file returns default"""

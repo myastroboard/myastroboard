@@ -141,6 +141,12 @@ def _get_notif_prefs(user: Any) -> dict:
     return user.preferences.get('notifications', {}).get('triggers', {})
 
 
+def _get_muted_location_ids(user: Any) -> set:
+    """Per-location mute list (v1.2): locations the user opted out of notifications for."""
+    raw = user.preferences.get('notifications', {}).get('disabled_location_ids', [])
+    return {lid for lid in raw if isinstance(lid, str)} if isinstance(raw, list) else set()
+
+
 def _t(user: Any, key: str, **params) -> str:
     """Translate a push notification string using the user's preferred language."""
     from i18n_utils import get_translated_message
@@ -149,7 +155,23 @@ def _t(user: Any, key: str, **params) -> str:
     return get_translated_message(f'settings.{key}', language=lang, **params)
 
 
-def _check_n7_aurora(user: Any, cache_data: Optional[dict]) -> None:
+def _with_location(user: Any, body: str, location_name: Optional[str], multi_location: Optional[bool]) -> str:
+    """Append the location name to a push body - only for multi-location users.
+
+    Single-location installs (the vast majority) keep messages exactly as they
+    read pre-v1.2: no location noise.
+    """
+    if not multi_location or not location_name:
+        return body
+    return _t(user, 'push_location_suffix', body=body, location_name=location_name)
+
+
+def _loc_trigger_key(trigger_id: str, location_id: Optional[str]) -> str:
+    """Cooldown key per (trigger, location) so two watched locations don't suppress each other."""
+    return f'{trigger_id}@{location_id}' if location_id else trigger_id
+
+
+def _check_n7_aurora(user: Any, cache_data: Optional[dict], loc: Optional[dict] = None) -> None:
     if not cache_data:
         logger.debug(f"N7 skip {user.username}: no aurora cache")
         return
@@ -159,6 +181,9 @@ def _check_n7_aurora(user: Any, cache_data: Optional[dict]) -> None:
         logger.debug(f"N7 skip {user.username}: trigger disabled")
         return
 
+    loc = loc or {}
+    trigger_key = _loc_trigger_key('N7', loc.get('id'))
+
     kp = cache_data.get('current', {}).get('kp_index')
     if not isinstance(kp, (int, float)):
         logger.debug(f"N7 skip {user.username}: kp_index missing or non-numeric ({kp!r})")
@@ -167,7 +192,7 @@ def _check_n7_aurora(user: Any, cache_data: Optional[dict]) -> None:
     if kp < threshold:
         logger.debug(f"N7 skip {user.username}: kp={kp:.1f} below threshold={threshold}")
         return
-    if _was_recently_notified(user.user_id, 'N7', 4 * 60 * 60):
+    if _was_recently_notified(user.user_id, trigger_key, 4 * 60 * 60):
         logger.debug(f"N7 skip {user.username}: cooldown active")
         return
 
@@ -177,16 +202,18 @@ def _check_n7_aurora(user: Any, cache_data: Optional[dict]) -> None:
     visibility = visibility_raw if translated_vis.startswith('settings.') else translated_vis
     _send(
         user,
-        'N7',
+        trigger_key,
         _t(user, 'push_n7_title'),
-        _t(user, 'push_n7_body', kp=f'{kp:.1f}', visibility=visibility),
+        _with_location(
+            user, _t(user, 'push_n7_body', kp=f'{kp:.1f}', visibility=visibility), loc.get('name'), loc.get('multi')
+        ),
         '/#forecast-astro/aurora',
         ttl=3600,
         urgency='high',
     )  # aurora: immediate delivery, can last ~1 h
 
 
-def _check_n1_plan_start(user: Any, plan_payload: Optional[dict]) -> None:
+def _check_n1_plan_start(user: Any, plan_payload: Optional[dict], multi_location: bool = False) -> None:
     if not plan_payload or plan_payload.get('state') == 'none':
         logger.debug(f"N1 skip {user.username}: no active plan")
         return
@@ -219,7 +246,12 @@ def _check_n1_plan_start(user: Any, plan_payload: Optional[dict]) -> None:
                 user,
                 'N1',
                 _t(user, 'push_n1_title'),
-                _t(user, 'push_n1_body', minutes=minutes),
+                _with_location(
+                    user,
+                    _t(user, 'push_n1_body', minutes=minutes),
+                    plan.get('location_name'),
+                    bool(multi_location),
+                ),
                 '/#astrodex/plan-my-night',
                 ttl=int(ms_until),
             )
@@ -227,7 +259,7 @@ def _check_n1_plan_start(user: Any, plan_payload: Optional[dict]) -> None:
         logger.debug(f"N1 check error for {user.username}: {e}")
 
 
-def _check_n2_next_target(user: Any, plan_payload: Optional[dict]) -> None:
+def _check_n2_next_target(user: Any, plan_payload: Optional[dict], multi_location: bool = False) -> None:
     if not plan_payload or plan_payload.get('state') == 'none':
         logger.debug(f"N2 skip {user.username}: no active plan")
         return
@@ -277,7 +309,12 @@ def _check_n2_next_target(user: Any, plan_payload: Optional[dict]) -> None:
                 user,
                 'N2',
                 _t(user, 'push_n2_title'),
-                _t(user, 'push_n2_body', name=name, minutes=minutes),
+                _with_location(
+                    user,
+                    _t(user, 'push_n2_body', name=name, minutes=minutes),
+                    (plan_payload.get('plan') or {}).get('location_name'),
+                    bool(multi_location),
+                ),
                 '/#astrodex/plan-my-night',
                 ttl=int(ms_until),
             )
@@ -289,7 +326,7 @@ def _check_n2_next_target(user: Any, plan_payload: Optional[dict]) -> None:
         logger.debug(f"N2 skip {user.username}: no undone targets with a future start time")
 
 
-def _check_n6_darkness(user: Any, cache_data: Optional[dict]) -> None:
+def _check_n6_darkness(user: Any, cache_data: Optional[dict], loc: Optional[dict] = None) -> None:
     if not cache_data:
         logger.debug(f"N6 skip {user.username}: no sun_report cache")
         return
@@ -298,6 +335,9 @@ def _check_n6_darkness(user: Any, cache_data: Optional[dict]) -> None:
     if not t.get('enabled', True):
         logger.debug(f"N6 skip {user.username}: trigger disabled")
         return
+
+    loc = loc or {}
+    trigger_key = _loc_trigger_key('N6', loc.get('id'))
 
     # Use the pre-computed UTC field to avoid timezone and cache-reset bugs.
     # (astronomical_dusk in sun.* is naive local time and the cache can refresh
@@ -314,7 +354,7 @@ def _check_n6_darkness(user: Any, cache_data: Optional[dict]) -> None:
         ms_until = (dusk - now).total_seconds()
         lead_s = t.get('lead_minutes', 20) * 60
         logger.debug(f"N6 {user.username}: dusk in {ms_until:.0f}s, lead={lead_s}s")
-        if 0 < ms_until <= lead_s and not _was_recently_notified(user.user_id, 'N6', 8 * 60 * 60):
+        if 0 < ms_until <= lead_s and not _was_recently_notified(user.user_id, trigger_key, 8 * 60 * 60):
             minutes = round(ms_until / 60)
             try:
                 from zoneinfo import ZoneInfo
@@ -325,9 +365,14 @@ def _check_n6_darkness(user: Any, cache_data: Optional[dict]) -> None:
                 dusk_local_time = ''
             _send(
                 user,
-                'N6',
+                trigger_key,
                 _t(user, 'push_n6_title'),
-                _t(user, 'push_n6_body', minutes=minutes, time=dusk_local_time),
+                _with_location(
+                    user,
+                    _t(user, 'push_n6_body', minutes=minutes, time=dusk_local_time),
+                    loc.get('name'),
+                    loc.get('multi'),
+                ),
                 '/#forecast-astro/astro-weather',
                 ttl=int(ms_until),
             )
@@ -335,7 +380,7 @@ def _check_n6_darkness(user: Any, cache_data: Optional[dict]) -> None:
         logger.debug(f"N6 check error for {user.username}: {e}")
 
 
-def _check_n3_iss(user: Any, cache_data: Optional[dict]) -> None:
+def _check_n3_iss(user: Any, cache_data: Optional[dict], loc: Optional[dict] = None) -> None:
     if not cache_data:
         logger.debug(f"N3 skip {user.username}: no iss_passes cache")
         return
@@ -345,6 +390,7 @@ def _check_n3_iss(user: Any, cache_data: Optional[dict]) -> None:
         logger.debug(f"N3 skip {user.username}: trigger disabled")
         return
 
+    loc = loc or {}
     lead_s = t.get('lead_minutes', 10) * 60
     now = datetime.now(timezone.utc)
 
@@ -381,7 +427,8 @@ def _check_n3_iss(user: Any, cache_data: Optional[dict]) -> None:
     logger.debug(f"N3 {user.username}: next {transit_type} transit in {ms_until:.0f}s, lead={lead_s}s")
     if ms_until > lead_s:
         return
-    if _was_recently_notified(user.user_id, 'N3', 60 * 60):
+    trigger_key = _loc_trigger_key('N3', loc.get('id'))
+    if _was_recently_notified(user.user_id, trigger_key, 60 * 60):
         logger.debug(f"N3 skip {user.username}: cooldown active")
         return
 
@@ -389,16 +436,16 @@ def _check_n3_iss(user: Any, cache_data: Optional[dict]) -> None:
     body_key = 'push_n3_solar_body' if transit_type == 'solar' else 'push_n3_lunar_body'
     _send(
         user,
-        'N3',
+        trigger_key,
         _t(user, 'push_n3_title'),
-        _t(user, body_key, minutes=minutes),
+        _with_location(user, _t(user, body_key, minutes=minutes), loc.get('name'), loc.get('multi')),
         '/#spaceflight/orbital-stations',
         ttl=int(ms_until),
         urgency='high',
     )  # short window (≤10 min): needs immediate delivery
 
 
-def _check_n8_css(user: Any, cache_data: Optional[dict]) -> None:
+def _check_n8_css(user: Any, cache_data: Optional[dict], loc: Optional[dict] = None) -> None:
     if not cache_data:
         logger.debug(f"N8 skip {user.username}: no css_passes cache")
         return
@@ -408,6 +455,7 @@ def _check_n8_css(user: Any, cache_data: Optional[dict]) -> None:
         logger.debug(f"N8 skip {user.username}: trigger disabled")
         return
 
+    loc = loc or {}
     lead_s = t.get('lead_minutes', 10) * 60
     now = datetime.now(timezone.utc)
 
@@ -444,7 +492,8 @@ def _check_n8_css(user: Any, cache_data: Optional[dict]) -> None:
     logger.debug(f"N8 {user.username}: next {transit_type} transit in {ms_until:.0f}s, lead={lead_s}s")
     if ms_until > lead_s:
         return
-    if _was_recently_notified(user.user_id, 'N8', 60 * 60):
+    trigger_key = _loc_trigger_key('N8', loc.get('id'))
+    if _was_recently_notified(user.user_id, trigger_key, 60 * 60):
         logger.debug(f"N8 skip {user.username}: cooldown active")
         return
 
@@ -452,18 +501,21 @@ def _check_n8_css(user: Any, cache_data: Optional[dict]) -> None:
     body_key = 'push_n8_solar_body' if transit_type == 'solar' else 'push_n8_lunar_body'
     _send(
         user,
-        'N8',
+        trigger_key,
         _t(user, 'push_n8_title'),
-        _t(user, body_key, minutes=minutes),
+        _with_location(user, _t(user, body_key, minutes=minutes), loc.get('name'), loc.get('multi')),
         '/#spaceflight/orbital-stations',
         ttl=int(ms_until),
         urgency='high',
     )  # short window (≤10 min): needs immediate delivery
 
 
-def _check_n4_n5_eclipse(user: Any, solar_data: Optional[dict], lunar_data: Optional[dict]) -> None:
+def _check_n4_n5_eclipse(
+    user: Any, solar_data: Optional[dict], lunar_data: Optional[dict], loc: Optional[dict] = None
+) -> None:
     triggers = _get_notif_prefs(user)
     now = datetime.now(timezone.utc)
+    loc = loc or {}
 
     for trigger_id, cache_data, title_key, body_key, url in (
         ('N4', lunar_data, 'push_n4_title', 'push_n4_body', '/#forecast-astro/moon'),
@@ -488,10 +540,16 @@ def _check_n4_n5_eclipse(user: Any, solar_data: Optional[dict], lunar_data: Opti
             ms_until = (peak - now).total_seconds()
             lead_s = t.get('lead_minutes', 30) * 60
             logger.debug(f"{trigger_id} {user.username}: peak in {ms_until:.0f}s, lead={lead_s}s")
-            if 0 < ms_until <= lead_s and not _was_recently_notified(user.user_id, trigger_id, 4 * 60 * 60):
+            trigger_key = _loc_trigger_key(trigger_id, loc.get('id'))
+            if 0 < ms_until <= lead_s and not _was_recently_notified(user.user_id, trigger_key, 4 * 60 * 60):
                 minutes = round(ms_until / 60)
                 _send(
-                    user, trigger_id, _t(user, title_key), _t(user, body_key, minutes=minutes), url, ttl=int(ms_until)
+                    user,
+                    trigger_key,
+                    _t(user, title_key),
+                    _with_location(user, _t(user, body_key, minutes=minutes), loc.get('name'), loc.get('multi')),
+                    url,
+                    ttl=int(ms_until),
                 )
         except Exception as e:
             logger.debug(f"{trigger_id} check error for {user.username}: {e}")
@@ -571,20 +629,33 @@ def _pick_active_plan(user_id: str, username: str) -> Optional[dict]:
 
 
 def _poll() -> None:
-    """Single poll cycle: evaluate all triggers for all users."""
+    """Single poll cycle: evaluate all triggers for all users.
+
+    Multi-location (v1.2): location-scoped triggers (N3-N8) run once per
+    (user, attributed location) pair - minus locations the user muted via
+    preferences.notifications.disabled_location_ids. Per-location caches are
+    preloaded once per cycle. Plan triggers (N1/N2) stay per-plan (the plan is
+    pinned to its own location).
+    """
     global _any_active_night
     any_active = False
 
     try:
         from auth import user_manager
+        from repo_config import load_config, get_locations_for_user
 
-        # Load shared caches once per cycle
-        aurora_data = _load_cache('aurora')
-        sun_data = _load_cache('sun_report')
-        iss_data = _load_cache('iss_passes')
-        css_data = _load_cache('css_passes')
-        solar_data = _load_cache('solar_eclipse')
-        lunar_data = _load_cache('lunar_eclipse')
+        config = load_config()
+
+        # Preload per-location caches once per cycle: {location_id: {name: data}}
+        _LOCATION_CACHE_NAMES = ('aurora', 'sun_report', 'iss_passes', 'css_passes', 'solar_eclipse', 'lunar_eclipse')
+        location_caches: Dict[str, Dict[str, Optional[dict]]] = {}
+
+        def _caches_for(location_id: str) -> Dict[str, Optional[dict]]:
+            if location_id not in location_caches:
+                location_caches[location_id] = {
+                    name: _load_cache(f'{name}:{location_id}') for name in _LOCATION_CACHE_NAMES
+                }
+            return location_caches[location_id]
 
         user_manager._reload_users_if_changed()
         logger.debug(f"Poll cycle: {len(user_manager.users)} user(s) loaded")
@@ -597,6 +668,11 @@ def _poll() -> None:
                 logger.debug(f"Skipping {user.username}: no push subscriptions")
                 continue
             logger.debug(f"Evaluating {user.username}: {len(user.push_subscriptions)} subscription(s)")
+
+            # Locations this user watches: attributed set minus per-location mutes
+            muted = _get_muted_location_ids(user)
+            watched = [loc for loc in get_locations_for_user(config, user) if loc.get('id') and loc['id'] not in muted]
+            multi_location = len(watched) > 1
 
             # Plan data is per-user - pick the most active plan across all
             # telescope-specific plan files (not just the default one).
@@ -621,13 +697,17 @@ def _poll() -> None:
                         except Exception:
                             pass  # malformed night_start timestamp — skip this entry
 
-            _check_n7_aurora(user, aurora_data)
-            _check_n1_plan_start(user, plan_payload)
-            _check_n2_next_target(user, plan_payload)
-            _check_n6_darkness(user, sun_data)
-            _check_n3_iss(user, iss_data)
-            _check_n8_css(user, css_data)
-            _check_n4_n5_eclipse(user, solar_data, lunar_data)
+            _check_n1_plan_start(user, plan_payload, multi_location)
+            _check_n2_next_target(user, plan_payload, multi_location)
+
+            for location in watched:
+                caches = _caches_for(location['id'])
+                loc_ctx = {'id': location['id'], 'name': location.get('name'), 'multi': multi_location}
+                _check_n7_aurora(user, caches['aurora'], loc_ctx)
+                _check_n6_darkness(user, caches['sun_report'], loc_ctx)
+                _check_n3_iss(user, caches['iss_passes'], loc_ctx)
+                _check_n8_css(user, caches['css_passes'], loc_ctx)
+                _check_n4_n5_eclipse(user, caches['solar_eclipse'], caches['lunar_eclipse'], loc_ctx)
 
     except Exception as e:
         logger.error(f"Push scheduler poll error: {e}")

@@ -629,6 +629,10 @@ def create_astrodex_item(user_id: str, item_data: Dict, username: Optional[str] 
         return None
 
     # Create new item
+    # location_id is best-effort (resolves live details while the preset still
+    # exists); location_name is a frozen plain-text snapshot taken at creation -
+    # it is the only field the UI trusts for display once the preset is renamed
+    # or deleted. Astrodex items are NEVER cascade-deleted with a preset (v1.2).
     new_item = {
         'id': str(uuid.uuid4()),
         'name': item_name,
@@ -636,6 +640,8 @@ def create_astrodex_item(user_id: str, item_data: Dict, username: Optional[str] 
         'catalogue': item_data.get('catalogue', ''),
         'constellation': item_data.get('constellation', ''),
         'notes': item_data.get('notes', ''),
+        'location_id': item_data.get('location_id') or None,
+        'location_name': item_data.get('location_name') or None,
         'pictures': [],
         'created_at': datetime.now(timezone.utc).isoformat(),
         'updated_at': datetime.now(timezone.utc).isoformat(),
@@ -657,6 +663,29 @@ def get_astrodex_item(user_id: str, item_id: str) -> Optional[Dict]:
             return item
 
     return None
+
+
+def count_items_for_location(location_id: str) -> int:
+    """Count Astrodex items (all users) referencing a location preset.
+
+    Read-only pre-delete check: deleting a preset never cascades to Astrodex -
+    items keep their frozen location_name snapshot (v1.2 deletion workflow).
+    """
+    if not location_id or not os.path.isdir(ASTRODEX_DIR):
+        return 0
+    count = 0
+    for fname in os.listdir(ASTRODEX_DIR):
+        if not fname.endswith('_astrodex.json'):
+            continue
+        try:
+            with open(os.path.join(ASTRODEX_DIR, fname), 'r', encoding='utf-8') as file_obj:
+                data = json.load(file_obj)
+            for item in data.get('items', []):
+                if isinstance(item, dict) and item.get('location_id') == location_id:
+                    count += 1
+        except Exception:
+            continue  # unreadable file — skip, this is a best-effort count
+    return count
 
 
 def update_astrodex_item(user_id: str, item_id: str, updates: Dict) -> Optional[Dict]:

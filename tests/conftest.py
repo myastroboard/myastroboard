@@ -41,6 +41,35 @@ if 'CONSOLE_LOG_LEVEL' not in os.environ:
     os.environ['CONSOLE_LOG_LEVEL'] = 'ERROR'
 # SECRET_KEY is no longer an env var — it's auto-generated in DATA_DIR/secret_key.txt
 
+
+def _clean_stale_test_state():
+    """Delete app-generated state files left in the temp root by previous runs.
+
+    Backend modules are imported at pytest collection time (before any fixture
+    can re-point DATA_DIR), so CONFIG_FILE & co. bind to the directory set
+    above - and their files persist across runs. Since v1.2, load_config()
+    persists the location migration (sticky preset ids), which turns leftover
+    state into cross-run test pollution. This runs at conftest import time,
+    BEFORE backend modules load that state into memory. Cheap-to-regenerate
+    files only; expensive downloads (skyfield/IERS ephemeris, object images)
+    are kept so runs stay fast.
+    """
+    data_root = os.environ['DATA_DIR']
+    for name in ('config.json', 'users.json', 'secret_key.txt'):
+        try:
+            os.remove(os.path.join(data_root, name))
+        except OSError:
+            pass
+    cache_dir = os.path.join(data_root, 'cache')
+    for name in ('astro_cache.json', 'astro_cache.lock', 'location_cache.json'):
+        try:
+            os.remove(os.path.join(cache_dir, name))
+        except OSError:
+            pass
+
+
+_clean_stale_test_state()
+
 import pytest
 import sys
 import shutil
@@ -117,17 +146,25 @@ def temp_file():
 
 @pytest.fixture
 def sample_config():
-    """Return a sample configuration dictionary matching the current DEFAULT_CONFIG structure."""
+    """Return a sample configuration dictionary matching the current DEFAULT_CONFIG structure (v1.2)."""
     return {
-        "location": {
-            "name": "Test Location",
-            "latitude": 45.5,
-            "longitude": -73.5,
-            "elevation": 50,
-            "timezone": "America/Montreal",
-            "bortle": None,
-            "sqm": None,
-        },
+        "locations": [
+            {
+                "id": "sample-loc-1",
+                "name": "Test Location",
+                "latitude": 45.5,
+                "longitude": -73.5,
+                "elevation": 50,
+                "timezone": "America/Montreal",
+                "bortle": None,
+                "sqm": None,
+                "horizon_profile": [],
+                "is_install_default": True,
+                "created_at": "2026-01-01T00:00:00+00:00",
+                "updated_at": "2026-01-01T00:00:00+00:00",
+            }
+        ],
+        "location_configured": True,
         "min_altitude": 25,
         "astrodex": {"private": False},
         "skytonight": {

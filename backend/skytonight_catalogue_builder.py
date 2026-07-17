@@ -19,6 +19,7 @@ from skytonight_targets import (
     save_targets_dataset,
     choose_preferred_catalogue_name,
 )
+from utils import fix_astropy_constellation_name
 
 logger = get_logger(__name__)
 
@@ -904,7 +905,7 @@ def _build_standalone_targets_from_json(filename: str, catalogue_key: str) -> Li
             coords = SkyCoord(ra=ras, dec=decs, unit='deg')
             names = get_constellation(coords)
             for i, con in zip(missing_idx, names):
-                parsed[i]['constellation'] = str(con)
+                parsed[i]['constellation'] = fix_astropy_constellation_name(str(con))
             logger.info(f'{filename}: resolved constellations for {len(missing_idx)} entries via astropy')
         except Exception as exc:
             logger.warning(f'{filename}: constellation batch lookup failed - {exc}')

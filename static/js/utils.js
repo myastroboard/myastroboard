@@ -28,7 +28,7 @@ function showMessage(type, message) {
     `;
     messageDiv.textContent = message;
     document.body.appendChild(messageDiv);
-    
+
     setTimeout(() => {
         messageDiv.style.animation = 'slideOut 0.3s ease-in';
         setTimeout(() => messageDiv.remove(), 300);
@@ -51,7 +51,7 @@ async function checkCacheStatus() {
     const bannerText = document.getElementById('cache-banner-text');
     const bannerDetail = document.getElementById('cache-banner-detail');
     if (!banner) return;
-    
+
     try {
         const data = await fetchJSONWithRetry('/api/cache', {}, {
             maxAttempts: 2,
@@ -77,9 +77,18 @@ async function checkCacheStatus() {
                     bannerText.textContent = i18n.t('cache.updating_data_progress', { progress });
                 }
                 if (bannerDetail && stepName) {
-                    const translatedStep = i18n.t(`cache.step_${stepName}`);
-                    const label = translatedStep !== `cache.step_${stepName}` ? translatedStep : stepName;
-                    bannerDetail.textContent = (stepName === 'parallel_network' && totalSteps > 0)
+                    const [rawStepKey, rawStepLocation = ''] = String(stepName).split('@', 2);
+                    const stepKey = (rawStepKey || '').trim();
+                    const stepLocation = (rawStepLocation || '').trim();
+                    const translatedStep = stepKey ? i18n.t(`cache.step_${stepKey}`) : '';
+                    const baseLabel = (stepKey && translatedStep !== `cache.step_${stepKey}`)
+                        ? translatedStep
+                        : (stepKey || stepName);
+                    const locationLabel = stepLocation
+                        ? ` (${capitalizeWords(stepLocation.replace(/[-_]+/g, ' '))})`
+                        : '';
+                    const label = `${baseLabel}${locationLabel}`;
+                    bannerDetail.textContent = (stepKey === 'parallel_network' && totalSteps > 0)
                         ? `${label} (${currentStep}/${totalSteps})`
                         : label;
                     bannerDetail.style.display = '';
@@ -110,12 +119,12 @@ async function checkCacheStatus() {
 
 // Helper function to capitalize each word in a string, including accented characters
 function capitalizeWords(str) {
-  return str.replace(/\b[a-zA-ZÀ-ÿ](?:(?:'[a-zA-ZÀ-ÿ])|(?:-[a-zA-ZÀ-ÿ]))*/g, word => {
-    return word
-      .split(/([-'])/) // kept separator - and '
-      .map(part => part.match(/[-']/) ? part : part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-      .join('');
-  });
+    return str.replace(/\b[a-zA-ZÀ-ÿ](?:(?:'[a-zA-ZÀ-ÿ])|(?:-[a-zA-ZÀ-ÿ]))*/g, word => {
+        return word
+            .split(/([-'])/) // kept separator - and '
+            .map(part => part.match(/[-']/) ? part : part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+            .join('');
+    });
 }
 
 // Helper function to escape HTML
@@ -131,10 +140,10 @@ function escapeHtml(str) {
 // Helper function to escape text for JavaScript string context
 function escapeForJs(text) {
     return text.replace(/\\/g, '\\\\')
-               .replace(/'/g, "\\'")
-               .replace(/"/g, '\\"')
-               .replace(/\n/g, '\\n')
-               .replace(/\r/g, '\\r');
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '\\"')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r');
 }
 
 /**
@@ -329,6 +338,21 @@ function formatTimeOnlyInTimezone(isoString, timezone, locale = navigator.langua
     }
 }
 
+// Appends the current UTC offset to an IANA timezone name, e.g. "Pacific/Honolulu (UTC-10)"
+function formatTimezoneWithOffset(timezone) {
+    const tz = timezone || 'UTC';
+    try {
+        const parts = new Intl.DateTimeFormat('en-US', {
+            timeZone: tz,
+            timeZoneName: 'shortOffset'
+        }).formatToParts(new Date());
+        const offset = parts.find(p => p.type === 'timeZoneName')?.value.replace('GMT', 'UTC');
+        return offset && offset !== 'UTC' ? `${tz} (${offset})` : tz;
+    } catch (_) {
+        return tz;
+    }
+}
+
 
 // Helper function to format date from YYYY-MM-DD to DD/MM/YYYY
 function formatStringToDate(dateInput, locale = navigator.language) {
@@ -355,8 +379,8 @@ function formatStringToDate(dateInput, locale = navigator.language) {
 
 // Helper function to get cardinal direction from azimuth
 function getCardinalDirection(azimuth) {
-    const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 
-                       'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+    const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+        'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
     const index = Math.round((azimuth % 360) / 22.5);
     const direction = directions[index % 16];
     return i18n.t(`cardinal_directions.${direction}`);

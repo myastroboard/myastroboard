@@ -757,7 +757,7 @@ class TestGeneratePlanPdf:
 
         matplotlib.use("Agg", force=True)
 
-        monkeypatch.setattr("constants.SKYTONIGHT_OUTPUT_DIR", str(tmp_path), raising=True)
+        monkeypatch.setattr("skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True)
 
         alttime_payload = {
             "timezone": "UTC",
@@ -1751,7 +1751,7 @@ class TestGeneratePlanPdfBranchCoverage:
         """Line 999: _load_alttime returns None when file doesn't exist on disk."""
         import matplotlib
         matplotlib.use("Agg", force=True)
-        monkeypatch.setattr("constants.SKYTONIGHT_OUTPUT_DIR", str(tmp_path), raising=True)
+        monkeypatch.setattr("skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True)
         now = datetime(2026, 8, 12, 21, 0, tzinfo=timezone.utc)
         payload = {
             "plan": {
@@ -1773,7 +1773,7 @@ class TestGeneratePlanPdfBranchCoverage:
         """Lines 1087-1089: alttime with bad timezone name → falls back to UTC."""
         import matplotlib
         matplotlib.use("Agg", force=True)
-        monkeypatch.setattr("constants.SKYTONIGHT_OUTPUT_DIR", str(tmp_path), raising=True)
+        monkeypatch.setattr("skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True)
         now = datetime(2026, 8, 12, 21, 0, tzinfo=timezone.utc)
         # Write an alttime file with a bad timezone
         alttime_data = {
@@ -1804,7 +1804,7 @@ class TestGeneratePlanPdfBranchCoverage:
         """Lines 1015-1016 and 1017-1018: naive and offset timezone datetime strings."""
         import matplotlib
         matplotlib.use("Agg", force=True)
-        monkeypatch.setattr("constants.SKYTONIGHT_OUTPUT_DIR", str(tmp_path), raising=True)
+        monkeypatch.setattr("skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True)
         now = datetime(2026, 8, 12, 21, 0, tzinfo=timezone.utc)
         alttime_data = {
             "timezone": "UTC",
@@ -1951,7 +1951,7 @@ class TestGeneratePlanPdfAdditionalBranches:
         """Lines 1003-1004: invalid JSON in alttime file → exception caught, return None."""
         import matplotlib
         matplotlib.use("Agg", force=True)
-        monkeypatch.setattr("constants.SKYTONIGHT_OUTPUT_DIR", str(tmp_path), raising=True)
+        monkeypatch.setattr("skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True)
         # Write invalid JSON
         (tmp_path / "m31_alttime.json").write_text("{invalid json", encoding="utf-8")
         now = datetime.now(timezone.utc).replace(microsecond=0)
@@ -1975,7 +1975,7 @@ class TestGeneratePlanPdfAdditionalBranches:
         """Line 1271 (telescope name), 1308->1312 (fill_w<=0.01), 1318 (overflow>0)."""
         import matplotlib
         matplotlib.use("Agg", force=True)
-        monkeypatch.setattr("constants.SKYTONIGHT_OUTPUT_DIR", str(tmp_path), raising=True)
+        monkeypatch.setattr("skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True)
         now = datetime.now(timezone.utc).replace(microsecond=0)
         payload = {
             "plan": {
@@ -1996,7 +1996,7 @@ class TestGeneratePlanPdfAdditionalBranches:
            Also covers line 1008 via _fmt_hm/_fmt_date called with None."""
         import matplotlib
         matplotlib.use("Agg", force=True)
-        monkeypatch.setattr("constants.SKYTONIGHT_OUTPUT_DIR", str(tmp_path), raising=True)
+        monkeypatch.setattr("skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True)
         now = datetime.now(timezone.utc).replace(microsecond=0)
         alttime_data = {
             "timezone": "UTC",
@@ -2026,7 +2026,7 @@ class TestGeneratePlanPdfAdditionalBranches:
         """Lines 1362, 1365, 1374: entries without start/end, reversed range, empty clip result."""
         import matplotlib
         matplotlib.use("Agg", force=True)
-        monkeypatch.setattr("constants.SKYTONIGHT_OUTPUT_DIR", str(tmp_path), raising=True)
+        monkeypatch.setattr("skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True)
         now = datetime.now(timezone.utc).replace(microsecond=0)
         alttime_data = {
             "timezone": "UTC",
@@ -2074,7 +2074,7 @@ class TestGeneratePlanPdfAdditionalBranches:
            Also covers 1044->1042 (None dt) and 1047 (no valid pts)."""
         import matplotlib
         matplotlib.use("Agg", force=True)
-        monkeypatch.setattr("constants.SKYTONIGHT_OUTPUT_DIR", str(tmp_path), raising=True)
+        monkeypatch.setattr("skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True)
         now = datetime.now(timezone.utc).replace(microsecond=0)
         # Empty times_utc → _clip_alttime([], altitudes, ...) → line 1040 → return [], []
         alttime_empty = {
@@ -2123,7 +2123,7 @@ class TestGeneratePlanPdfAdditionalBranches:
         """Line 1067: _clip_alttime with points all before the window → out=[] → return [], []."""
         import matplotlib
         matplotlib.use("Agg", force=True)
-        monkeypatch.setattr("constants.SKYTONIGHT_OUTPUT_DIR", str(tmp_path), raising=True)
+        monkeypatch.setattr("skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True)
         early = datetime(2026, 1, 1, 20, 0, 0, tzinfo=timezone.utc)
         late = datetime(2026, 1, 1, 23, 0, 0, tzinfo=timezone.utc)
         # alttime data: two points at early hours (20:00 and 20:30)

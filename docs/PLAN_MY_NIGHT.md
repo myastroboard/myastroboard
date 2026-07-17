@@ -23,6 +23,14 @@ From SkyTonight report tables (deep sky, bodies, comets), a dedicated **Plan My 
 - `current`: plan can be edited.
 - `previous`: plan is locked for edits; targets can still be added to Astrodex; plan can be cleared.
 
+## Pinned Location (v1.2)
+
+A plan is **pinned to the user's active location at creation time** (`location_id` + a frozen `location_name` snapshot in the plan payload). Its altitude/timeline math is never silently recomputed against different coordinates:
+
+- The plan view shows which location the plan was computed for.
+- If the viewer's *current* active location differs from the plan's pinned location, a non-blocking warning banner appears (altitudes shown may not match what you'll actually see).
+- When an admin deletes a location preset, plans pinned to it are cascade-deleted by default (`DELETE /api/locations/<id>?plans=cascade`), or kept orphaned with the stale-location banner (`?plans=orphan`). See [LOCATIONS.md](LOCATIONS.md).
+
 ## Editing Features
 
 - Per-target planned duration (`HH:MM`).

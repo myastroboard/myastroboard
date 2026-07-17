@@ -88,8 +88,10 @@ class TestDefaultConfig:
         assert DEFAULT_SKYTONIGHT["constraints"] is not DEFAULT_CONSTRAINTS
 
     def test_default_config_top_level_keys(self):
-        for key in ("location", "min_altitude", "astrodex", "skytonight"):
+        # v1.2: the singular "location" key was replaced by the "locations" list
+        for key in ("locations", "min_altitude", "astrodex", "skytonight"):
             assert key in DEFAULT_CONFIG, f"Missing key: {key}"
+        assert "location" not in DEFAULT_CONFIG
 
     def test_default_config_no_legacy_keys(self):
         """Keys removed in the config refactor must not appear in DEFAULT_CONFIG."""
@@ -102,7 +104,9 @@ class TestDefaultConfig:
             assert key not in DEFAULT_CONFIG, f"Legacy key still present: {key}"
 
     def test_default_config_references_other_defaults(self):
-        assert DEFAULT_CONFIG["location"] == DEFAULT_LOCATION
+        # v1.2: locations starts empty; the first preset is seeded from
+        # DEFAULT_LOCATION by repo_config._ensure_locations() on first load.
+        assert DEFAULT_CONFIG["locations"] == []
         assert DEFAULT_CONFIG["astrodex"] == DEFAULT_ASTRODEX
         assert DEFAULT_CONFIG["skytonight"] == DEFAULT_SKYTONIGHT
 
@@ -162,13 +166,18 @@ class TestConfigLoading:
         _set_config_file(monkeypatch, os.path.join(temp_dir, "nonexistent.json"))
         config = load_config()
         assert isinstance(config, dict)
-        assert "location" in config
         assert "skytonight" in config
+        # v1.2: a brand-new install gets one preset seeded from DEFAULT_LOCATION
+        assert len(config["locations"]) == 1
+        preset = config["locations"][0]
+        assert preset["name"] == DEFAULT_LOCATION["name"]
+        assert preset["is_install_default"] is True
+        assert preset["id"]
 
     def test_load_config_has_required_fields(self, temp_dir, monkeypatch):
         _set_config_file(monkeypatch, os.path.join(temp_dir, "required.json"))
         config = load_config()
-        for field in ("location", "min_altitude", "astrodex", "skytonight"):
+        for field in ("locations", "min_altitude", "astrodex", "skytonight"):
             assert field in config
 
     def test_load_config_strips_legacy_top_level_constraints(self, temp_dir, monkeypatch):
@@ -194,7 +203,8 @@ class TestConfigLoading:
         _set_config_file(monkeypatch, path)
 
         config = load_config()
-        assert config["location"]["name"] == "Legacy"
+        # v1.2: the legacy singular location is migrated into locations[0]
+        assert config["locations"][0]["name"] == "Legacy"
         assert config["skytonight"]["constraints"]["altitude_constraint_min"] == 35
         assert config["skytonight"]["constraints"]["airmass_constraint"] == DEFAULT_CONSTRAINTS["airmass_constraint"]
         assert config["skytonight"]["scheduler"]["mode"] == "fallback-6h"
@@ -206,8 +216,12 @@ class TestConfigLoading:
             json.dump({"location": {"name": "Tokyo", "latitude": 35.6, "longitude": 139.7, "elevation": 40, "timezone": "Asia/Tokyo"}}, fp)
         _set_config_file(monkeypatch, path)
         config = load_config()
-        assert config["location"]["name"] == "Tokyo"
-        assert config["location"]["latitude"] == 35.6
+        # v1.2: migrated to a preset, keeping the custom values
+        preset = config["locations"][0]
+        assert "location" not in config
+        assert preset["name"] == "Tokyo"
+        assert preset["latitude"] == 35.6
+        assert preset["is_install_default"] is True
 
 
 class TestConfigSaving:
@@ -232,7 +246,7 @@ class TestConfigSaving:
         _set_config_file(monkeypatch, path)
         assert save_config(sample_config) is True
         loaded = load_config()
-        assert loaded["location"] == sample_config["location"]
+        assert loaded["locations"] == sample_config["locations"]
         assert loaded["min_altitude"] == sample_config["min_altitude"]
         assert loaded["skytonight"]["constraints"]["altitude_constraint_min"] == (
             sample_config["skytonight"]["constraints"]["altitude_constraint_min"]
@@ -242,9 +256,10 @@ class TestConfigSaving:
     def test_save_config_with_unicode(self, temp_dir, monkeypatch):
         path = os.path.join(temp_dir, "unicode.json")
         _set_config_file(monkeypatch, path)
+        # Legacy singular shape on disk: migrated to a preset on load, values kept
         cfg = {"location": {"name": "Montréal", "latitude": 45.5, "longitude": -73.5, "elevation": 0, "timezone": "America/Montreal"}}
         assert save_config(cfg) is True
-        assert load_config()["location"]["name"] == "Montréal"
+        assert load_config()["locations"][0]["name"] == "Montréal"
 
 
 class TestConfigIntegration:
@@ -253,11 +268,11 @@ class TestConfigIntegration:
     def test_modify_and_save_config(self, temp_dir, monkeypatch):
         _set_config_file(monkeypatch, os.path.join(temp_dir, "integration.json"))
         config = load_config()
-        config["location"]["name"] = "Modified Location"
+        config["locations"][0]["name"] = "Modified Location"
         config["min_altitude"] = 25
         save_config(config)
         reloaded = load_config()
-        assert reloaded["location"]["name"] == "Modified Location"
+        assert reloaded["locations"][0]["name"] == "Modified Location"
         assert reloaded["min_altitude"] == 25
 
     def test_skytonight_constraints_survive_roundtrip(self, temp_dir, monkeypatch):

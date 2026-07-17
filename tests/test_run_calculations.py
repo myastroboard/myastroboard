@@ -132,7 +132,7 @@ def test_run_calculations_empty_dataset_returns_night_found_true(monkeypatch):
     monkeypatch.setattr(calc, 'load_targets_dataset', lambda: {'targets': []})
     monkeypatch.setattr(calc, '_sample_times', lambda *a: _FakeTimes())
     monkeypatch.setattr(calc, '_MoonInfo', lambda times, location: _FakeMoon())
-    monkeypatch.setattr(calc, '_clear_alttime_files', lambda: None)
+    monkeypatch.setattr(calc, '_clear_alttime_files', lambda *_a, **_k: None)
     monkeypatch.setattr(calc, 'save_json_file', lambda *a, **kw: None)
 
     result = run_calculations(_MINIMAL_CONFIG)
@@ -148,7 +148,7 @@ def test_run_calculations_empty_dataset_writes_final_files(monkeypatch):
     monkeypatch.setattr(calc, 'load_targets_dataset', lambda: {'targets': []})
     monkeypatch.setattr(calc, '_sample_times', lambda *a: _FakeTimes())
     monkeypatch.setattr(calc, '_MoonInfo', lambda times, location: _FakeMoon())
-    monkeypatch.setattr(calc, '_clear_alttime_files', lambda: None)
+    monkeypatch.setattr(calc, '_clear_alttime_files', lambda *_a, **_k: None)
 
     saved = {}
 
@@ -187,7 +187,7 @@ def test_run_calculations_comet_without_coordinates_is_skipped(monkeypatch):
     monkeypatch.setattr(calc, 'load_targets_dataset', lambda: {'targets': [comet_no_coords]})
     monkeypatch.setattr(calc, '_sample_times', lambda *a: _FakeTimes())
     monkeypatch.setattr(calc, '_MoonInfo', lambda times, location: _FakeMoon())
-    monkeypatch.setattr(calc, '_clear_alttime_files', lambda: None)
+    monkeypatch.setattr(calc, '_clear_alttime_files', lambda *_a, **_k: None)
     monkeypatch.setattr(calc, 'save_json_file', lambda *a, **kw: None)
 
     result = run_calculations(_MINIMAL_CONFIG)

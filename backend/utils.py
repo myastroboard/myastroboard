@@ -12,6 +12,9 @@ import unicodedata
 import yaml
 from typing import Dict, Tuple, Optional
 from constants import CONFIG_FILE, DATA_DIR
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 # Optional numpy dependency - imported once at module level
 try:
@@ -153,9 +156,7 @@ def save_json_file(file_path: str, data: dict) -> bool:
         os.replace(tmp_path, file_path)
         return True
     except Exception as exc:
-        import logging
-
-        logging.getLogger(__name__).error(f'save_json_file failed for {file_path}: {type(exc).__name__}: {exc}')
+        logger.error(f'save_json_file failed for {file_path}: {type(exc).__name__}: {exc}')
         return False
 
 
@@ -264,3 +265,19 @@ def get_environment_info() -> Dict[str, str]:
 def normalize_catalogue_key(value: Optional[str]) -> str:
     """Normalize a catalogue/target name for loose cross-referencing (uppercase, no separators)."""
     return re.sub(r'[^A-Za-z0-9]', '', str(value or '')).upper()
+
+
+# astropy's bundled constellation_names.dat (Roman 1987) carries a few historical
+# misspellings that don't match the modern IAU-sanctioned names used by our i18n
+# files. Correct astropy.coordinates.get_constellation()'s output before it's used
+# as a display name or translation key.
+_ASTROPY_CONSTELLATION_FIXES: Dict[str, str] = {
+    'Ophiucus': 'Ophiuchus',
+    'Chamaleon': 'Chamaeleon',
+    'Pisces Austrinus': 'Piscis Austrinus',
+}
+
+
+def fix_astropy_constellation_name(name: str) -> str:
+    """Correct known misspellings in astropy's get_constellation() output."""
+    return _ASTROPY_CONSTELLATION_FIXES.get(name, name)
