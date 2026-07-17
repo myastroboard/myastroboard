@@ -710,6 +710,54 @@ class TestAstrodexVisibilityModes:
 
         assert astrodex.can_user_view_image('user1', 'bob_img.jpg', private_mode=False) is True
 
+    def test_public_mode_strips_coordinates_from_other_users_pictures(self, temp_data_dir):
+        """Coordinates are private to a picture's owner (v1.2) - the merged/
+        shared view must keep location_name visible but never leak another
+        user's exact capture coordinates (which, for a 'home' preset, is
+        effectively their address)."""
+        user1_item = astrodex.create_astrodex_item('user1', {'name': 'M51', 'type': 'Galaxy'}, username='alice')
+        user2_item = astrodex.create_astrodex_item('user2', {'name': 'M51', 'type': 'Galaxy'}, username='bob')
+        assert user1_item is not None
+        assert user2_item is not None
+
+        astrodex.add_picture_to_item('user1', user1_item['id'], {
+            'filename': 'alice_pic.jpg',
+            'location_id': 'loc-alice-home',
+            'location_name': 'Alice Backyard',
+            'latitude': 45.1, 'longitude': 5.2, 'elevation': 300,
+        })
+        astrodex.add_picture_to_item('user2', user2_item['id'], {
+            'filename': 'bob_pic.jpg',
+            'location_id': 'loc-bob-home',
+            'location_name': 'Bob Backyard',
+            'latitude': 48.8, 'longitude': 2.3, 'elevation': 35,
+        })
+
+        payload = astrodex.get_visible_astrodex(
+            current_user_id='user1',
+            current_username='alice',
+            private_mode=False,
+            usernames_by_id={'user1': 'alice', 'user2': 'bob'}
+        )
+
+        assert len(payload['items']) == 1
+        merged = payload['items'][0]
+        by_owner = {p['owner_username']: p for p in merged['pictures']}
+        assert set(by_owner) == {'alice', 'bob'}
+
+        # Alice viewing her own picture: full coordinates present.
+        assert by_owner['alice']['latitude'] == 45.1
+        assert by_owner['alice']['location_name'] == 'Alice Backyard'
+
+        # Alice viewing Bob's picture: name stays, coordinates are gone.
+        assert by_owner['bob']['location_name'] == 'Bob Backyard'
+        assert 'latitude' not in by_owner['bob']
+        assert 'longitude' not in by_owner['bob']
+        assert 'elevation' not in by_owner['bob']
+
+        # own_pictures (Alice's own list) is never stripped either way.
+        assert merged['own_pictures'][0]['latitude'] == 45.1
+
 
 class TestAstrodexMissingBranches:
     """Tests targeting uncovered branches in astrodex.py helper functions."""
@@ -762,6 +810,35 @@ class TestAstrodexMissingBranches:
         assert updated is not None
         assert updated['notes'] == 'Test notes'
         assert updated['iso'] == 800
+
+    def test_update_picture_location_is_editable(self, temp_data_dir):
+        """Unlike Astrodex items (location frozen at creation), a picture's
+        location can be corrected/backfilled after the fact - it's often
+        uploaded well after the session, or predates this field entirely."""
+        item = astrodex.create_astrodex_item('user1', {'name': 'M42'}, username='alice')
+        pic = astrodex.add_picture_to_item('user1', item['id'], {'filename': 'old.jpg'})
+        assert pic['location_id'] is None  # old/untagged picture starts with no location
+
+        updated = astrodex.update_picture('user1', item['id'], pic['id'], {
+            'location_id': 'loc-1',
+            'location_name': 'Backyard',
+            'latitude': 45.1,
+            'longitude': 5.2,
+            'elevation': 300,
+        })
+        assert updated['location_id'] == 'loc-1'
+        assert updated['location_name'] == 'Backyard'
+        assert updated['latitude'] == 45.1
+        assert updated['longitude'] == 5.2
+        assert updated['elevation'] == 300
+
+        # Clearing it back out (e.g. via the UI's "no location" option).
+        cleared = astrodex.update_picture('user1', item['id'], pic['id'], {
+            'location_id': None, 'location_name': None,
+            'latitude': None, 'longitude': None, 'elevation': None,
+        })
+        assert cleared['location_id'] is None
+        assert cleared['latitude'] is None
 
     def test_update_picture_item_not_found(self, temp_data_dir):
         result = astrodex.update_picture('user1', 'nonexistent-item', 'pic1', {'notes': 'x'})

@@ -298,30 +298,61 @@ async function promoteInstallDefault(locationId) {
 async function deleteLocationWithConfirm(loc) {
     try {
         const refs = await fetchJSON(`/api/locations/${encodeURIComponent(loc.id)}/references`);
-        const lines = [
-            i18n.t('settings.location_delete_confirm', { name: loc.name }),
-            i18n.t('settings.location_delete_refs', {
-                users: (refs.attributed_users || []).length,
-                astrodex: refs.astrodex_items || 0,
-                plans: refs.plan_my_night_plans || 0,
-            }),
-        ];
-        if ((refs.plan_my_night_plans || 0) > 0) {
-            lines.push(i18n.t('settings.location_delete_plans_note'));
-        }
-        if (!window.confirm(lines.join('\n'))) return;
+        const plansCount = refs.plan_my_night_plans || 0;
 
-        const result = await fetchJSON(`/api/locations/${encodeURIComponent(loc.id)}?plans=cascade`, {
-            method: 'DELETE'
+        const confirmText = document.getElementById('location-delete-confirm-text');
+        const refsText = document.getElementById('location-delete-refs-text');
+        const plansChoice = document.getElementById('location-delete-plans-choice');
+        const orphanBtn = document.getElementById('location-delete-orphan-btn');
+        const cascadeBtn = document.getElementById('location-delete-cascade-btn');
+        const plainBtn = document.getElementById('location-delete-plain-btn');
+        const modalEl = document.getElementById('location-delete-modal');
+        if (!confirmText || !refsText || !modalEl) return;
+
+        confirmText.textContent = i18n.t('settings.location_delete_confirm', { name: loc.name });
+        refsText.textContent = i18n.t('settings.location_delete_refs', {
+            users: (refs.attributed_users || []).length,
+            astrodex: refs.astrodex_items || 0,
+            plans: plansCount,
         });
-        if (result.status === 'success') {
-            showMessage('success', i18n.t('settings.location_deleted'));
-            invalidateMyLocationsCache();
-            await loadLocationsAdmin();
-            if (typeof SkyWidget !== 'undefined') SkyWidget.refresh();
-        }
+
+        // Cascade-vs-orphan is only a real choice when plans actually reference
+        // this location; with zero, either delete mode behaves identically.
+        const hasPlans = plansCount > 0;
+        if (plansChoice) plansChoice.style.display = hasPlans ? '' : 'none';
+        if (orphanBtn) orphanBtn.style.display = hasPlans ? '' : 'none';
+        if (cascadeBtn) cascadeBtn.style.display = hasPlans ? '' : 'none';
+        if (plainBtn) plainBtn.style.display = hasPlans ? 'none' : '';
+
+        const runDelete = async (plansMode) => {
+            try {
+                const result = await fetchJSON(
+                    `/api/locations/${encodeURIComponent(loc.id)}?plans=${plansMode}`,
+                    { method: 'DELETE' }
+                );
+                if (result.status === 'success') {
+                    showMessage('success', i18n.t('settings.location_deleted'));
+                    invalidateMyLocationsCache();
+                    await loadLocationsAdmin();
+                    if (typeof SkyWidget !== 'undefined') SkyWidget.refresh();
+                }
+            } catch (error) {
+                console.error('Error deleting location:', error);
+                showMessage('error', i18n.t('settings.location_delete_failed'));
+            } finally {
+                bootstrap.Modal.getInstance(modalEl)?.hide();
+            }
+        };
+
+        // Plain property assignment (not addEventListener) so re-opening this
+        // modal for a different location rebinds instead of stacking handlers.
+        if (orphanBtn) orphanBtn.onclick = () => runDelete('orphan');
+        if (cascadeBtn) cascadeBtn.onclick = () => runDelete('cascade');
+        if (plainBtn) plainBtn.onclick = () => runDelete('cascade'); // no plans referenced - mode is moot
+
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
     } catch (error) {
-        console.error('Error deleting location:', error);
+        console.error('Error loading location references:', error);
         showMessage('error', i18n.t('settings.location_delete_failed'));
     }
 }

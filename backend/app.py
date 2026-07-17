@@ -1366,6 +1366,7 @@ def my_locations_api():
                         'name': loc.get('name'),
                         'bortle': loc.get('bortle'),
                         'sqm': loc.get('sqm'),
+                        'timezone': loc.get('timezone'),
                         'is_install_default': bool(loc.get('is_install_default')),
                         'score': _cached_location_score(loc['id']),
                     }
@@ -2303,6 +2304,43 @@ def _resolve_active_location():
     except RuntimeError:
         user = None
     return get_active_location(config, user)
+
+
+_EMPTY_PICTURE_LOCATION = {
+    'location_id': None,
+    'location_name': None,
+    'latitude': None,
+    'longitude': None,
+    'elevation': None,
+}
+
+
+def _resolve_picture_location_snapshot(location_id, user):
+    """Resolve a user-supplied location_id into a frozen Astrodex picture
+    snapshot (name + coordinates, v1.2).
+
+    Coordinates are looked up server-side - never trusted from the client -
+    and restricted to locations the user can actually access, so a picture
+    can't be tagged with coordinates the uploader has no attribution to. An
+    empty/unknown/inaccessible id resolves to "no location" rather than an
+    error, since clearing a picture's location is a valid choice.
+    """
+    if not location_id:
+        return dict(_EMPTY_PICTURE_LOCATION)
+    config = load_config()
+    accessible_ids = {loc['id'] for loc in get_locations_for_user(config, user)}
+    if location_id not in accessible_ids:
+        return dict(_EMPTY_PICTURE_LOCATION)
+    location = get_location_by_id(config, location_id)
+    if not location:
+        return dict(_EMPTY_PICTURE_LOCATION)
+    return {
+        'location_id': location['id'],
+        'location_name': location.get('name'),
+        'latitude': location.get('latitude'),
+        'longitude': location.get('longitude'),
+        'elevation': location.get('elevation'),
+    }
 
 
 def _active_location_cache(name):
@@ -4535,6 +4573,16 @@ def add_picture_to_astrodex_item(item_id):
 
         picture_data = request.json
 
+        # Location is resolved server-side (v1.2) - never trust client-supplied
+        # coordinates. Uses the uploader's explicit choice if they picked one,
+        # else falls back to their current active location. Independent of the
+        # item's own location, since a single item can be re-imaged from
+        # different sites across multiple sessions.
+        requested_location_id = picture_data.get('location_id')
+        if not requested_location_id:
+            requested_location_id = _resolve_active_location().get('id')
+        picture_data.update(_resolve_picture_location_snapshot(requested_location_id, user))
+
         new_picture = astrodex.add_picture_to_item(user_id, item_id, picture_data)
 
         if new_picture:
@@ -4557,6 +4605,14 @@ def update_picture_api(item_id, picture_id):
             return jsonify({'error': 'User not authenticated'}), 401
 
         updates = request.json
+
+        # Location is resolved server-side (v1.2) and only touched if this
+        # edit explicitly included location_id - editing unrelated fields
+        # (notes, filters, ...) must never disturb an existing location. An
+        # empty/null location_id here means "clear the location", which
+        # _resolve_picture_location_snapshot turns into the all-None snapshot.
+        if 'location_id' in updates:
+            updates.update(_resolve_picture_location_snapshot(updates.get('location_id'), user))
 
         updated_picture = astrodex.update_picture(user_id, item_id, picture_id, updates)
 

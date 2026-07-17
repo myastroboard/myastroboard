@@ -834,7 +834,11 @@
     "location_cannot_delete_default": "La località predefinita dell'installazione non può essere eliminata. Promuovi prima un'altra località.",
     "location_delete_confirm": "Eliminare la località \"{name}\"?",
     "location_delete_refs": "Riferimenti: {users} utente/i, {astrodex} elemento/i Astrodex, {plans} piano/i Plan My Night.",
-    "location_delete_plans_note": "I piani ancorati a questa località verranno eliminati. Gli elementi Astrodex vengono conservati (mantengono il nome della località come testo).",
+    "location_delete_modal_title": "Elimina località",
+    "location_delete_plans_hint": "Scegli cosa fare dei piani Plan My Night ancorati a questa località:",
+    "location_delete_orphan_btn": "Elimina località, mantieni i piani",
+    "location_delete_cascade_btn": "Elimina località e piani",
+    "location_delete_plain_btn": "Elimina",
     "location_deleted": "Località eliminata",
     "location_delete_failed": "Impossibile eliminare la località",
     "location_save": "Salva località",
@@ -950,7 +954,10 @@
     "device_telescope": "Dispositivi/telescopi",
     "photos": "Foto",
     "astrodex_empty": "Il tuo Astrodex è vuoto",
-    "notes": "Note"
+    "notes": "Note",
+    "location": "Località",
+    "observed_location": "Osservato a {name}",
+    "no_location": "-- Nessuna località --"
   },
   "skytonight": {
     "info_1": "SkyTonight calcola i migliori obiettivi di osservazione per la notte in base alla tua posizione, alle previsioni del tempo e ai set di dati interni.",

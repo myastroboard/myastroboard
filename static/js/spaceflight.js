@@ -37,17 +37,43 @@ function _sfCacheNotReady(container) {
     _sfError(container, 'common.cache_not_ready', 'Data is being fetched. Please try again shortly.');
 }
 
+// Launch/event times are the same real-world instant for every location, but
+// displaying them in the browser's own timezone made all 3 locations show
+// identical hours - not helpful when planning around a launch from a specific
+// site. Resolved once per page load and reused by every date formatted below.
+let _sfTimezone = null;
+let _sfTimezonePromise = null;
+
+function _sfEnsureTimezone() {
+    if (_sfTimezonePromise) return _sfTimezonePromise;
+    _sfTimezonePromise = fetchJSON('/api/locations/mine')
+        .then(data => {
+            const locations = (data && data.locations) || [];
+            const active = locations.find(loc => loc.id === data.active_location_id);
+            _sfTimezone = active?.timezone || null;
+        })
+        .catch(() => { _sfTimezone = null; });
+    return _sfTimezonePromise;
+}
+
 /**
- * Format an ISO-8601 date string for display using the user locale.
+ * Format an ISO-8601 date string for display using the user locale, in the
+ * caller's active observing location's timezone (with a "(UTC+x)" suffix)
+ * when known, falling back to the browser's local timezone otherwise.
  * Returns the original string if parsing fails.
  */
 function _sfFormatDate(isoStr) {
     if (!isoStr) return '-';
     try {
-        return new Date(isoStr).toLocaleString(undefined, {
+        const date = new Date(isoStr);
+        const opts = {
             year: 'numeric', month: 'short', day: 'numeric',
             hour: '2-digit', minute: '2-digit',
-        });
+        };
+        if (_sfTimezone) opts.timeZone = _sfTimezone;
+        const formatted = date.toLocaleString(undefined, opts);
+        const offset = _sfTimezone ? getUtcOffsetLabel(_sfTimezone, date) : null;
+        return offset ? `${formatted} (${offset})` : formatted;
     } catch (_) {
         return isoStr;
     }
@@ -453,13 +479,15 @@ function loadSpaceflightLaunches() {
     if (!container) return;
     _sfLoading(container);
 
-    fetch('/api/spaceflight/launches')
-        .then(r => {
+    Promise.all([
+        fetch('/api/spaceflight/launches').then(r => {
             if (r.status === 503) return Promise.reject('cache_not_ready');
             if (!r.ok) return Promise.reject('http_error');
             return r.json();
-        })
-        .then(data => _renderLaunches(container, data))
+        }),
+        _sfEnsureTimezone()
+    ])
+        .then(([data]) => _renderLaunches(container, data))
         .catch(err => {
             if (err === 'cache_not_ready') _sfCacheNotReady(container);
             else _sfError(container, 'spaceflight.launches_error', 'Failed to load launch data.');
@@ -930,13 +958,15 @@ function loadSpaceflightEvents() {
     if (!container) return;
     _sfLoading(container);
 
-    fetch('/api/spaceflight/events')
-        .then(r => {
+    Promise.all([
+        fetch('/api/spaceflight/events').then(r => {
             if (r.status === 503) return Promise.reject('cache_not_ready');
             if (!r.ok) return Promise.reject('http_error');
             return r.json();
-        })
-        .then(data => _renderSpaceEvents(container, data))
+        }),
+        _sfEnsureTimezone()
+    ])
+        .then(([data]) => _renderSpaceEvents(container, data))
         .catch(err => {
             if (err === 'cache_not_ready') _sfCacheNotReady(container);
             else _sfError(container, 'spaceflight.events_error', 'Failed to load space events.');

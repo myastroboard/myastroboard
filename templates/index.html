@@ -75,12 +75,12 @@
 <body>
 
     <div class="hero text-center mb-2 pb-1">
-        <h1 class="display-4 fw-bold">
-            <img src="/static/img/favicon-animated.svg" alt="MyAstroBoard Logo" width="40" height="40" style="height: 1em; width: auto; vertical-align: middle;"> MyAstroBoard
+        <h1 class="display-5 fw-bold">
+            <img src="/static/img/favicon-animated.svg" alt="MyAstroBoard Logo" width="40" height="40"> MyAstroBoard
         </h1>
-        <p class="lead mb-2" data-i18n="common.slogan">
+        <!--<p class="lead mb-2" data-i18n="common.slogan">
             Astronomy Observation Planning Dashboard
-        </p>
+        </p>-->
         <div id="sky-status-widget"
              class="sky-widget period-unknown"
              tabindex="0"
@@ -2906,6 +2906,33 @@
                         <i class="bi bi-save icon-inline" aria-hidden="true"></i>
                         <span data-i18n="settings.location_save">Save location</span>
                     </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Location delete confirmation modal (v1.2): offers a cascade-vs-orphan
+         choice for Plan My Night plans pinned to the location being deleted;
+         Astrodex items are never part of this choice (never cascaded, by design). -->
+    <div class="modal fade" id="location-delete-modal" tabindex="-1" aria-labelledby="location-delete-modal-title" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="location-delete-modal-title" data-i18n="settings.location_delete_modal_title">Delete Location</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="location-delete-confirm-text" class="mb-2"></p>
+                    <p id="location-delete-refs-text" class="text-muted small mb-3"></p>
+                    <div id="location-delete-plans-choice" style="display:none;">
+                        <div class="form-text mb-2" data-i18n="settings.location_delete_plans_hint">Choose what happens to Plan My Night plans pinned to this location:</div>
+                    </div>
+                </div>
+                <div class="modal-footer flex-wrap">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="common.cancel">Cancel</button>
+                    <button type="button" class="btn btn-outline-danger" id="location-delete-orphan-btn" style="display:none;" data-i18n="settings.location_delete_orphan_btn">Delete location, keep plans</button>
+                    <button type="button" class="btn btn-danger" id="location-delete-cascade-btn" style="display:none;" data-i18n="settings.location_delete_cascade_btn">Delete location and plans</button>
+                    <button type="button" class="btn btn-danger" id="location-delete-plain-btn" style="display:none;" data-i18n="settings.location_delete_plain_btn">Delete</button>
                 </div>
             </div>
         </div>

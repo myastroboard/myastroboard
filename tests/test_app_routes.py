@@ -3294,6 +3294,118 @@ class TestAstrodexItemLifecycle:
         assert resp2.status_code in (200, 201, 400, 409, 500)
 
 
+class TestAstrodexPictureLocation:
+    """v1.2: pictures resolve their location server-side (never trusting
+    client-supplied coordinates), independently of the item's own location
+    and editable after the fact - see _resolve_picture_location_snapshot."""
+
+    def _create_item(self, client_admin):
+        import uuid as _uuid
+        resp = client_admin.post(
+            '/api/astrodex/items',
+            json={'name': f'PicLocObj_{_uuid.uuid4().hex[:6]}', 'type': 'Galaxy', 'catalogue': 'NGC'},
+        )
+        assert resp.status_code in (200, 201), resp.get_json()
+        return resp.get_json()['item']['id']
+
+    def _create_location(self, client_admin, name):
+        resp = client_admin.post(
+            '/api/locations',
+            json={'name': name, 'latitude': 43.6, 'longitude': 1.44, 'elevation': 150, 'timezone': 'Europe/Paris'},
+        )
+        assert resp.status_code == 201, resp.get_json()
+        return resp.get_json()['location']
+
+    def _add_picture(self, client_admin, item_id, **extra):
+        import uuid as _uuid
+        payload = {'filename': f'{_uuid.uuid4().hex}.jpg'}
+        payload.update(extra)
+        resp = client_admin.post(f'/api/astrodex/items/{item_id}/pictures', json=payload)
+        assert resp.status_code == 200, resp.get_json()
+        return resp.get_json()['picture']
+
+    def test_add_picture_with_explicit_location_stamps_coordinates(self, client_admin):
+        item_id = self._create_item(client_admin)
+        location = self._create_location(client_admin, 'Explicit Stamp Site')
+        try:
+            picture = self._add_picture(client_admin, item_id, location_id=location['id'])
+            assert picture['location_id'] == location['id']
+            assert picture['location_name'] == location['name']
+            assert picture['latitude'] == location['latitude']
+            assert picture['longitude'] == location['longitude']
+            assert picture['elevation'] == location['elevation']
+        finally:
+            client_admin.delete(f"/api/locations/{location['id']}")
+
+    def test_add_picture_without_location_id_falls_back_to_active(self, client_admin):
+        item_id = self._create_item(client_admin)
+        active_id = client_admin.get('/api/locations/mine').get_json()['active_location_id']
+        picture = self._add_picture(client_admin, item_id)
+        assert picture['location_id'] == active_id
+
+    def test_add_picture_with_unknown_location_id_resolves_to_none(self, client_admin):
+        """A location_id that doesn't resolve to any accessible preset (typo,
+        stale id, someone else's unattributed location) is silently treated
+        as 'no location' rather than trusting client-supplied coordinates."""
+        item_id = self._create_item(client_admin)
+        picture = self._add_picture(client_admin, item_id, location_id='not-a-real-location-id')
+        assert picture['location_id'] is None
+        assert picture['location_name'] is None
+        assert picture['latitude'] is None
+
+    def test_update_picture_can_change_location(self, client_admin):
+        item_id = self._create_item(client_admin)
+        loc_a = self._create_location(client_admin, 'Change From Site')
+        loc_b = self._create_location(client_admin, 'Change To Site')
+        try:
+            picture = self._add_picture(client_admin, item_id, location_id=loc_a['id'])
+            upd = client_admin.put(
+                f"/api/astrodex/items/{item_id}/pictures/{picture['id']}",
+                json={'location_id': loc_b['id']},
+            )
+            assert upd.status_code == 200
+            updated = upd.get_json()['picture']
+            assert updated['location_id'] == loc_b['id']
+            assert updated['location_name'] == loc_b['name']
+            assert updated['latitude'] == loc_b['latitude']
+        finally:
+            client_admin.delete(f"/api/locations/{loc_a['id']}")
+            client_admin.delete(f"/api/locations/{loc_b['id']}")
+
+    def test_update_picture_can_clear_location(self, client_admin):
+        item_id = self._create_item(client_admin)
+        location = self._create_location(client_admin, 'Clear Site')
+        try:
+            picture = self._add_picture(client_admin, item_id, location_id=location['id'])
+            upd = client_admin.put(
+                f"/api/astrodex/items/{item_id}/pictures/{picture['id']}",
+                json={'location_id': None},
+            )
+            assert upd.status_code == 200
+            updated = upd.get_json()['picture']
+            assert updated['location_id'] is None
+            assert updated['latitude'] is None
+        finally:
+            client_admin.delete(f"/api/locations/{location['id']}")
+
+    def test_update_picture_without_location_key_leaves_location_untouched(self, client_admin):
+        item_id = self._create_item(client_admin)
+        location = self._create_location(client_admin, 'Untouched Site')
+        try:
+            picture = self._add_picture(client_admin, item_id, location_id=location['id'])
+            upd = client_admin.put(
+                f"/api/astrodex/items/{item_id}/pictures/{picture['id']}",
+                json={'notes': 'unrelated edit'},
+            )
+            assert upd.status_code == 200
+            updated = upd.get_json()['picture']
+            assert updated['location_id'] == location['id']
+            assert updated['latitude'] == location['latitude']
+            assert updated['notes'] == 'unrelated edit'
+        finally:
+            client_admin.delete(f"/api/locations/{location['id']}")
+
+
 # ---------------------------------------------------------------------------
 # Push test with actual subscriptions (via monkeypatching)
 # ---------------------------------------------------------------------------

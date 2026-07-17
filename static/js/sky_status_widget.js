@@ -180,10 +180,11 @@ const SkyWidget = (() => {
 
         let data;
         try {
-            // Force a fresh fetch each poll: the payload now carries a per-location
-            // observation score, which the widget's cheap file-read endpoint keeps
-            // current - the client-side cache is only meant to dedupe rapid calls,
-            // not to survive across a 5-minute refresh cycle.
+            // Force a fresh fetch: the payload carries a per-location observation
+            // score, and callers of this function (see refresh()/_setupInteraction()
+            // below) already only invoke it on first paint or while the panel is
+            // actually open - never on a closed-panel poll tick - so there's no
+            // redundant-fetch cost left to dedupe against here.
             data = await fetchMyLocations(true);
         } catch (_) {
             return; // list is optional - widget stays fully functional without it
@@ -264,6 +265,8 @@ const SkyWidget = (() => {
         if (scoreEl) scoreEl.style.display = 'none';
     }
 
+    let _locationListLoadedOnce = false;
+
     async function refresh() {
         try {
             const data = await fetchJSON('/api/sky-widget');
@@ -273,7 +276,18 @@ const SkyWidget = (() => {
         } catch (_) {
             // Widget is non-critical; fail silently
         }
-        _renderLocationList();
+        // The other-locations panel needs at least one fetch on first paint (to
+        // learn whether >1 location exists at all and whether to show the
+        // chevron). After that, only refetch on this 5-minute tick if the panel
+        // is actually open right now - a closed panel has no reason to keep N
+        // per-location scores current, and re-opening it (see _setupInteraction
+        // below) always forces a fresh fetch anyway.
+        const widget = document.getElementById('sky-status-widget');
+        const isOpen = widget?.classList.contains('sky-widget--open');
+        if (!_locationListLoadedOnce || isOpen) {
+            _locationListLoadedOnce = true;
+            _renderLocationList();
+        }
     }
 
     function _setupInteraction() {
@@ -287,7 +301,8 @@ const SkyWidget = (() => {
         // double-toggle that a 'touchstart' + implicit click would cause).
         compact.addEventListener('click', (e) => {
             e.stopPropagation();
-            widget.classList.toggle('sky-widget--open');
+            const nowOpen = widget.classList.toggle('sky-widget--open');
+            if (nowOpen) _renderLocationList(); // always show current scores on open
         });
 
         // Collapse when clicking/tapping outside
@@ -301,7 +316,8 @@ const SkyWidget = (() => {
         widget.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                widget.classList.toggle('sky-widget--open');
+                const nowOpen = widget.classList.toggle('sky-widget--open');
+                if (nowOpen) _renderLocationList();
             } else if (e.key === 'Escape') {
                 widget.classList.remove('sky-widget--open');
             }
