@@ -918,7 +918,10 @@ def serialize_plan_csv(plan_payload: Dict, labels: Optional[Dict[str, str]] = No
 def get_all_plan_states(user_id: str, username: str, telescopes: list) -> list:
     """Return a list of plan summaries for each telescope plus the default (no-telescope) plan.
 
-    Each element: {telescope_id, telescope_name, state, entries_count, night_start, night_end}
+    Each element: {telescope_id, telescope_name, state, entries_count, night_start, night_end,
+    location_id, location_name}. ``location_id``/``location_name`` are the plan's pinned location
+    (None when the plan has no entries yet / doesn't exist) - used by the "Add to Plan" telescope
+    picker to warn against mixing locations on the same telescope's plan.
     """
     result = []
     # Include the default plan (no telescope) only if it exists on disk
@@ -935,6 +938,8 @@ def get_all_plan_states(user_id: str, username: str, telescopes: list) -> list:
                 'entries_count': len(plan.get('entries', [])) if plan else 0,
                 'night_start': plan.get('night_start') if plan else None,
                 'night_end': plan.get('night_end') if plan else None,
+                'location_id': plan.get('location_id') if plan else None,
+                'location_name': plan.get('location_name') if plan else None,
             }
         )
 
@@ -956,6 +961,8 @@ def get_all_plan_states(user_id: str, username: str, telescopes: list) -> list:
                 'entries_count': len(plan.get('entries', [])) if plan else 0,
                 'night_start': plan.get('night_start') if plan else None,
                 'night_end': plan.get('night_end') if plan else None,
+                'location_id': plan.get('location_id') if plan else None,
+                'location_name': plan.get('location_name') if plan else None,
                 'is_own': is_own,
                 'owner_username': owner_username,
                 'is_orphaned': False,

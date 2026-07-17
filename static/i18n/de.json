@@ -1253,7 +1253,8 @@
     "moon_calendar_legend_bright": "Heller Mond",
     "seeing_week_title": "Seeing-Vorhersage",
     "pinned_location": "Plan berechnet für {name}",
-    "location_mismatch": "Dieser Plan wurde für {pinned} erstellt; Ihr aktiver Standort ist jetzt {active} - die angezeigten Höhen stimmen möglicherweise nicht mit dem überein, was Sie tatsächlich sehen."
+    "location_mismatch": "Dieser Plan wurde für {pinned} erstellt; Ihr aktiver Standort ist jetzt {active}.",
+    "telescope_location_in_use": "Plan ist an {location} gebunden - wechseln Sie zu diesem Standort, um hier hinzuzufügen"
   },
   "users": {
     "user_management": "Benutzerverwaltung",

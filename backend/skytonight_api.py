@@ -23,7 +23,7 @@ from constants import (
 )
 from constellation import Constellation as _Constellation
 from logging_config import get_logger
-from repo_config import load_config, get_active_location
+from repo_config import load_config, get_active_location, get_locations_for_user
 from skytonight_scheduler_manager import (
     get_remote_skytonight_scheduler_status,
     get_skytonight_scheduler_for_api,
@@ -84,6 +84,30 @@ def _skytonight_request_location() -> Dict[str, Any]:
         user = get_current_user()
     except RuntimeError:
         user = None  # outside a request context (direct calls in tests/tools)
+    return get_active_location(config, user)
+
+
+def _skytonight_request_location_override(location_id: Optional[str]) -> Dict[str, Any]:
+    """Resolve the location preset for this request, optionally pinned to *location_id*.
+
+    Used by endpoints that need to read a specific location's result files regardless
+    of the viewer's currently active preset (e.g. Plan My Night reading altitude-time
+    data for the location a plan was pinned to at creation - see plan_my_night.py's
+    'Pinned at creation' comment). Falls back to the requester's active preset when
+    *location_id* is empty or the user has no access to it, so a stale/foreign id
+    can't be used to probe another location's data.
+    """
+    config = load_config()
+    try:
+        user = get_current_user()
+    except RuntimeError:
+        user = None  # outside a request context (direct calls in tests/tools)
+
+    if location_id:
+        accessible = {loc['id']: loc for loc in get_locations_for_user(config, user)}
+        if location_id in accessible:
+            return accessible[location_id]
+
     return get_active_location(config, user)
 
 
@@ -1131,11 +1155,16 @@ def get_skytonight_catalogue_reports_api(catalogue):
 @skytonight_bp.route('/api/skytonight/alttime/<target_id>', methods=['GET'])
 @login_required
 def get_skytonight_alttime_api(target_id):
-    """Return altitude-time JSON data for a single target's graph popup."""
+    """Return altitude-time JSON data for a single target's graph popup.
+
+    Accepts an optional ``?location_id=`` query param so a caller can pin the lookup
+    to a specific accessible location (e.g. Plan My Night reading a plan's pinned
+    location) instead of the viewer's currently active one.
+    """
     if not re.match(r'^[a-zA-Z0-9_-]+$', target_id):
         return jsonify({'error': 'Invalid target identifier'}), 400
 
-    request_location = _skytonight_request_location()
+    request_location = _skytonight_request_location_override(request.args.get('location_id'))
     file_path = os.path.realpath(_alttime_json_path(target_id, request_location.get('id')))
     output_dir_abs = os.path.abspath(OUTPUT_DIR)
     # Path traversal guard

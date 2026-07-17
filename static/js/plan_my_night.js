@@ -908,11 +908,14 @@ async function buildPlanSummaryGraph(container, entries, plan, timeline) {
     loadingEl.textContent = i18n.t('common.loading');
     container.appendChild(loadingEl);
 
-    // Fetch alttime for all entries concurrently
+    // Fetch alttime for all entries concurrently, pinned to the plan's own location (v1.2:
+    // altitude data is stored per location, and a plan's altitudes must stay reproducible
+    // regardless of the viewer's currently active location - see plan.location_id).
     const entriesWithAlt = entries.filter(e => e.alttime_file);
+    const planLocationQuery = plan.location_id ? `?location_id=${encodeURIComponent(plan.location_id)}` : '';
     const settled = await Promise.allSettled(
         entriesWithAlt.map(e =>
-            fetchJSON(`/api/skytonight/alttime/${encodeURIComponent(e.alttime_file)}`)
+            fetchJSON(`/api/skytonight/alttime/${encodeURIComponent(e.alttime_file)}${planLocationQuery}`)
         )
     );
 
@@ -1875,7 +1878,7 @@ function renderPlanMyNight(payload) {
             DOMUtils.append(alttimeButton, DOMUtils.createIcon('bi bi-graph-up-arrow icon-inline'), i18n.t('settings.feature_alttime'));
             alttimeButton.addEventListener('click', () => {
                 const targetTitle = `${entry.name || entry.target_name || 'Target'} - ${i18n.t('skytonight.altitude_time_title') || 'Altitude vs Time'}`;
-                showAlttimePopup(targetTitle, entry.alttime_file);
+                showAlttimePopup(targetTitle, entry.alttime_file, plan.location_id);
             });
             item.appendChild(alttimeButton);
         }

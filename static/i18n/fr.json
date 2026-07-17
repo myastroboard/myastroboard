@@ -1253,7 +1253,8 @@
     "moon_calendar_legend_bright": "Lune lumineuse",
     "seeing_week_title": "Prévision du seeing",
     "pinned_location": "Plan calculé pour {name}",
-    "location_mismatch": "Ce plan a été créé pour {pinned} ; votre lieu actif est maintenant {active} - les altitudes affichées peuvent ne pas correspondre à ce que vous verrez réellement."
+    "location_mismatch": "Ce plan a été créé pour {pinned} ; votre lieu actif est maintenant {active}.",
+    "telescope_location_in_use": "Plan lié à {location} - changez de lieu actif pour y ajouter des cibles"
   },
   "users": {
     "user_management": "Gestion des utilisateurs",
