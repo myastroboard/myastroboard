@@ -834,7 +834,11 @@
     "location_cannot_delete_default": "Der Installationsstandard-Standort kann nicht gelöscht werden. Befördern Sie zuerst einen anderen Standort.",
     "location_delete_confirm": "Standort „{name}“ löschen?",
     "location_delete_refs": "Referenziert von: {users} Benutzer(n), {astrodex} Astrodex-Eintrag/-Einträgen, {plans} Plan-My-Night-Plan/-Plänen.",
-    "location_delete_plans_note": "An diesen Standort angeheftete Pläne werden gelöscht. Astrodex-Einträge bleiben erhalten (der Standortname bleibt als Text).",
+    "location_delete_modal_title": "Standort löschen",
+    "location_delete_plans_hint": "Wählen Sie, was mit an diesen Standort angehefteten Plan-My-Night-Plänen geschehen soll:",
+    "location_delete_orphan_btn": "Standort löschen, Pläne behalten",
+    "location_delete_cascade_btn": "Standort und Pläne löschen",
+    "location_delete_plain_btn": "Löschen",
     "location_deleted": "Standort gelöscht",
     "location_delete_failed": "Standort konnte nicht gelöscht werden",
     "location_save": "Standort speichern",
@@ -950,7 +954,10 @@
     "device_telescope": "Geräte/Teleskope",
     "photos": "Fotos",
     "astrodex_empty": "Ihr Astrodex ist leer",
-    "notes": "Notizen"
+    "notes": "Notizen",
+    "location": "Standort",
+    "observed_location": "Beobachtet bei {name}",
+    "no_location": "-- Kein Standort --"
   },
   "skytonight": {
     "info_1": "SkyTonight berechnet die besten Beobachtungsziele der Nacht basierend auf Standort, Wetter und internen Datensatzen.",

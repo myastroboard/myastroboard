@@ -834,7 +834,11 @@
     "location_cannot_delete_default": "The install default location cannot be deleted. Promote another location first.",
     "location_delete_confirm": "Delete location \"{name}\"?",
     "location_delete_refs": "Referenced by: {users} user(s), {astrodex} Astrodex item(s), {plans} Plan My Night plan(s).",
-    "location_delete_plans_note": "Plans pinned to this location will be deleted. Astrodex items are kept (they keep the location name as text).",
+    "location_delete_modal_title": "Delete Location",
+    "location_delete_plans_hint": "Choose what happens to Plan My Night plans pinned to this location:",
+    "location_delete_orphan_btn": "Delete location, keep plans",
+    "location_delete_cascade_btn": "Delete location and plans",
+    "location_delete_plain_btn": "Delete",
     "location_deleted": "Location deleted",
     "location_delete_failed": "Failed to delete location",
     "location_save": "Save location",
@@ -950,7 +954,10 @@
     "device_telescope": "Devices/Telescopes",
     "photos": "Photos",
     "astrodex_empty": "Your Astrodex is empty",
-    "notes": "Notes"
+    "notes": "Notes",
+    "location": "Location",
+    "observed_location": "Observed at {name}",
+    "no_location": "-- No location --"
   },
   "skytonight": {
     "info_1": "SkyTonight calculates the best observation targets for the night based on your location, weather forecast, and internal datasets.",

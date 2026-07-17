@@ -202,6 +202,23 @@ def _attach_picture_owner_metadata(item: Dict, owner_user_id: str, owner_usernam
         picture['is_owned_by_current_user'] = owner_user_id == current_user_id
 
 
+_PRIVATE_PICTURE_FIELDS = ('latitude', 'longitude', 'elevation')
+
+
+def _strip_private_picture_fields(picture: Dict) -> Dict:
+    """Remove a picture's precise coordinates in place, keeping location_name.
+
+    Coordinates are private to the picture's owner (v1.2) - the shared/merged
+    astrodex view must never expose another user's exact capture location
+    (which, for a "home" preset, is effectively their address). The location
+    *name* stays visible either way; that's the whole point of the frozen
+    name snapshot on Astrodex items/pictures.
+    """
+    for field in _PRIVATE_PICTURE_FIELDS:
+        picture.pop(field, None)
+    return picture
+
+
 def _build_stats_from_items(items: List[Dict]) -> Dict:
     """Build astrodex stats from an arbitrary visible items list."""
     total_items = len(items)
@@ -326,7 +343,10 @@ def get_visible_astrodex(
                 if picture_key in seen_picture_keys:
                     continue  # pragma: no cover
                 seen_picture_keys.add(picture_key)
-                merged_pictures.append(copy.deepcopy(picture))
+                picture_copy = copy.deepcopy(picture)
+                if not picture_copy.get('is_owned_by_current_user'):
+                    _strip_private_picture_fields(picture_copy)
+                merged_pictures.append(picture_copy)
 
         own_pictures = copy.deepcopy(own_item.get('pictures', [])) if own_item else []
 
@@ -758,6 +778,12 @@ def add_picture_to_item(user_id: str, item_id: str, picture_data: Dict) -> Optio
             - device: Device/telescope used
             - filters: Filters used
             - notes: Picture notes
+            - location_id / location_name / latitude / longitude / elevation:
+              where this picture was taken (v1.2, resolved server-side from
+              the uploader's chosen location - see new_item's location fields
+              for the same best-effort-id/frozen-name split). Coordinates are
+              private to the picture's owner - get_visible_astrodex() strips
+              them from every picture it shows to a different user.
 
     Returns:
         Created picture with ID, or None on error
@@ -767,6 +793,9 @@ def add_picture_to_item(user_id: str, item_id: str, picture_data: Dict) -> Optio
     for item in astrodex['items']:
         if item['id'] == item_id:
             # Create new picture entry
+            # A single item can be re-imaged across multiple sessions/sites over
+            # its lifetime, so each picture gets its own location snapshot rather
+            # than inheriting the item's (first-logged) location.
             new_picture = {
                 'id': str(uuid.uuid4()),
                 'filename': picture_data.get('filename', ''),
@@ -777,6 +806,11 @@ def add_picture_to_item(user_id: str, item_id: str, picture_data: Dict) -> Optio
                 'iso': picture_data.get('iso', ''),
                 'frames': picture_data.get('frames', ''),
                 'notes': picture_data.get('notes', ''),
+                'location_id': picture_data.get('location_id') or None,
+                'location_name': picture_data.get('location_name') or None,
+                'latitude': picture_data.get('latitude'),
+                'longitude': picture_data.get('longitude'),
+                'elevation': picture_data.get('elevation'),
                 'is_main': False,  # New pictures are not main by default
                 'created_at': datetime.now(timezone.utc).isoformat(),
             }
@@ -803,8 +837,16 @@ def update_picture(user_id: str, item_id: str, picture_id: str, updates: Dict) -
         if item['id'] == item_id:
             for picture in item['pictures']:
                 if picture['id'] == picture_id:
-                    # Update allowed fields
-                    allowed_fields = ['date', 'exposition_time', 'device', 'filters', 'iso', 'frames', 'notes']
+                    # Update allowed fields. Unlike Astrodex items (location
+                    # frozen at creation), a picture's location is correctable
+                    # after the fact - pictures are often uploaded well after
+                    # the session (stacking/processing takes time), so the
+                    # auto-captured active-location-at-upload-time can be wrong,
+                    # and old pictures predating this field have none at all.
+                    allowed_fields = [
+                        'date', 'exposition_time', 'device', 'filters', 'iso', 'frames', 'notes',
+                        'location_id', 'location_name', 'latitude', 'longitude', 'elevation',
+                    ]
                     for field in allowed_fields:
                         if field in updates:
                             picture[field] = updates[field]

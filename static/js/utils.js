@@ -338,19 +338,27 @@ function formatTimeOnlyInTimezone(isoString, timezone, locale = navigator.langua
     }
 }
 
+// Returns the UTC offset for a timezone at a given instant, e.g. "UTC-10" -
+// or null when the timezone is unavailable/invalid or the offset is 0.
+function getUtcOffsetLabel(timezone, date = new Date()) {
+    if (!timezone) return null;
+    try {
+        const parts = new Intl.DateTimeFormat('en-US', {
+            timeZone: timezone,
+            timeZoneName: 'shortOffset'
+        }).formatToParts(date);
+        const offset = parts.find(p => p.type === 'timeZoneName')?.value.replace('GMT', 'UTC');
+        return offset && offset !== 'UTC' ? offset : null;
+    } catch (_) {
+        return null;
+    }
+}
+
 // Appends the current UTC offset to an IANA timezone name, e.g. "Pacific/Honolulu (UTC-10)"
 function formatTimezoneWithOffset(timezone) {
     const tz = timezone || 'UTC';
-    try {
-        const parts = new Intl.DateTimeFormat('en-US', {
-            timeZone: tz,
-            timeZoneName: 'shortOffset'
-        }).formatToParts(new Date());
-        const offset = parts.find(p => p.type === 'timeZoneName')?.value.replace('GMT', 'UTC');
-        return offset && offset !== 'UTC' ? `${tz} (${offset})` : tz;
-    } catch (_) {
-        return tz;
-    }
+    const offset = getUtcOffsetLabel(tz);
+    return offset ? `${tz} (${offset})` : tz;
 }
 
 

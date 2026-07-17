@@ -5,7 +5,21 @@ Covers AuroraService pure-logic methods and mocked HTTP calls.
 
 import pytest
 from unittest.mock import patch, MagicMock
+import aurora_predictions
 from aurora_predictions import AuroraService
+
+
+@pytest.fixture(autouse=True)
+def _reset_kp_cache():
+    """fetch_current_kp_index()/fetch_kp_forecast() now share a module-level
+    cache across locations (see aurora_predictions.py) - reset it before every
+    test so each test's own requests.get mock is actually exercised instead of
+    a previous test's cached value being returned."""
+    aurora_predictions._kp_index_cache['value'] = None
+    aurora_predictions._kp_index_cache['timestamp'] = 0.0
+    aurora_predictions._kp_forecast_cache['value'] = None
+    aurora_predictions._kp_forecast_cache['timestamp'] = 0.0
+    yield
 
 
 class TestCalculateAuroraProbability:
@@ -226,6 +240,55 @@ class TestFetchKpForecast:
         result = self.svc.fetch_kp_forecast()
         assert isinstance(result, list)
         assert result[0]["kp"] == pytest.approx(2.67)
+
+
+class TestKpDataSharedAcrossLocations:
+    """Kp index/forecast have no location dimension - a second AuroraService
+    instance (a different observer location) must reuse the first instance's
+    fetch instead of hitting NOAA again, within the cache TTL."""
+
+    @patch("aurora_predictions.requests.get")
+    def test_current_kp_fetched_once_for_two_locations(self, mock_get):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = [{"Kp": "4.0"}]
+        mock_resp.raise_for_status.return_value = None
+        mock_get.return_value = mock_resp
+
+        paris = AuroraService(48.85, 2.35, "Europe/Paris")
+        tokyo = AuroraService(35.68, 139.69, "Asia/Tokyo")
+
+        assert paris.fetch_current_kp_index() == pytest.approx(4.0)
+        assert tokyo.fetch_current_kp_index() == pytest.approx(4.0)
+        assert mock_get.call_count == 1
+
+    @patch("aurora_predictions.requests.get")
+    def test_kp_forecast_fetched_once_for_two_locations(self, mock_get):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = [{"time_tag": "2026-01-01T00:00:00", "kp": "3.0"}]
+        mock_resp.raise_for_status.return_value = None
+        mock_get.return_value = mock_resp
+
+        paris = AuroraService(48.85, 2.35, "Europe/Paris")
+        tokyo = AuroraService(35.68, 139.69, "Asia/Tokyo")
+
+        assert paris.fetch_kp_forecast() is not None
+        assert tokyo.fetch_kp_forecast() is not None
+        assert mock_get.call_count == 1
+
+    @patch("aurora_predictions.requests.get")
+    def test_current_kp_refetched_after_ttl_expires(self, mock_get):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = [{"Kp": "4.0"}]
+        mock_resp.raise_for_status.return_value = None
+        mock_get.return_value = mock_resp
+
+        svc = AuroraService(48.85, 2.35, "Europe/Paris")
+        assert svc.fetch_current_kp_index() == pytest.approx(4.0)
+        assert mock_get.call_count == 1
+
+        aurora_predictions._kp_index_cache['timestamp'] -= aurora_predictions.CACHE_TTL_AURORA + 1
+        assert svc.fetch_current_kp_index() == pytest.approx(4.0)
+        assert mock_get.call_count == 2
 
 
 class TestFetchCurrentKpIndexEdgeCases:

@@ -4,10 +4,11 @@ Predicts aurora visibility based on geomagnetic activity (Kp index) and observer
 Uses NOAA Space Weather Prediction Center data.
 """
 
+import time
 import requests
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List
-from constants import CACHE_TTL
+from constants import CACHE_TTL, CACHE_TTL_AURORA
 from logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -18,6 +19,15 @@ NOAA_3DAY_FORECAST = "https://services.swpc.noaa.gov/products/noaa-planetary-k-i
 
 # Timeout for API requests
 REQUEST_TIMEOUT = 10
+
+# Kp index / forecast are global geomagnetic values with no location
+# dimension, but the scheduler calls this module once per configured
+# location. Cache the raw NOAA responses at module level (shared across every
+# AuroraService instance) so N locations share one NOAA fetch per TTL window
+# instead of each making their own live call - mirrors the shared-TLE /
+# per-location-math split already used for ISS/CSS passes.
+_kp_index_cache: Dict[str, Any] = {'value': None, 'timestamp': 0.0}
+_kp_forecast_cache: Dict[str, Any] = {'value': None, 'timestamp': 0.0}
 
 # Aurora best window hours (local time)
 AURORA_BEST_WINDOW_START = 22
@@ -42,11 +52,15 @@ class AuroraService:
 
     def fetch_current_kp_index(self) -> Optional[float]:
         """
-        Fetch current Kp index from NOAA API
+        Fetch current Kp index from NOAA API (shared across locations - see
+        _kp_index_cache above)
 
         Returns:
             Latest Kp index value or None if fetch fails
         """
+        now = time.monotonic()
+        if _kp_index_cache['value'] is not None and (now - _kp_index_cache['timestamp']) < CACHE_TTL_AURORA:
+            return _kp_index_cache['value']
         try:
             response = requests.get(NOAA_KP_API, timeout=REQUEST_TIMEOUT)
             response.raise_for_status()
@@ -67,6 +81,8 @@ class AuroraService:
                     try:
                         kp_value = float(raw)
                         logger.debug(f"Fetched current Kp index: {kp_value}")
+                        _kp_index_cache['value'] = kp_value
+                        _kp_index_cache['timestamp'] = now
                         return kp_value
                     except (ValueError, TypeError):
                         logger.warning(f"Could not parse Kp value from {latest}")
@@ -85,6 +101,9 @@ class AuroraService:
         Returns:
             List of forecast entries with timestamp and Kp value or None if fetch fails
         """
+        now = time.monotonic()
+        if _kp_forecast_cache['value'] is not None and (now - _kp_forecast_cache['timestamp']) < CACHE_TTL_AURORA:
+            return _kp_forecast_cache['value']
         try:
             response = requests.get(NOAA_3DAY_FORECAST, timeout=REQUEST_TIMEOUT)
             response.raise_for_status()
@@ -122,7 +141,11 @@ class AuroraService:
                         forecast_data.append({'timestamp': timestamp, 'kp': kp_value})
 
             logger.debug(f"Fetched Kp forecast: {len(forecast_data)} entries")
-            return forecast_data if forecast_data else None
+            if forecast_data:
+                _kp_forecast_cache['value'] = forecast_data
+                _kp_forecast_cache['timestamp'] = now
+                return forecast_data
+            return None
         except requests.RequestException as e:
             logger.debug(f"Failed to fetch Kp forecast from NOAA: {e}")
             return None

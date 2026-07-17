@@ -948,8 +948,15 @@ async function showAstrodexItemDetail(itemId) {
         ? i18n.t('astrodex.my_photos', { ownPicturesCount, totalPicturesCount })
         : i18n.t('astrodex.all_photos', { ownPicturesCount });
     
+    const locationBadge = item.location_name ? `
+        <div class="alert alert-light border d-flex align-items-center gap-2 py-2 mb-3">
+            <i class="bi bi-pin-map icon-inline" aria-hidden="true"></i>${i18n.t('astrodex.observed_location', { name: escapeHtml(item.location_name) })}
+        </div>
+    ` : '';
+
     createModal(item.name, `
         <h3>${i18n.t('astrodex.object_info')}</h3>
+        ${locationBadge}
         <form id="edit-item-form-${escapeHtml(item.id)}" class="form row g-3">
             <div class="col-md-6">
                 <label for="edit-type-${escapeHtml(item.id)}" class="col form-label">${i18n.t('astrodex.form_object_type')}</label>
@@ -1075,6 +1082,7 @@ function renderPicturesGrid(item) {
                             ${picture.date ? `<div><i class="bi bi-calendar-event text-danger icon-inline" aria-hidden="true"></i>${escapeHtml(formatStringToDate(picture.date))}</div>` : ''}
                             ${picture.exposition_time ? `<div><i class="bi bi-stopwatch icon-inline" aria-hidden="true"></i>${escapeHtml(picture.exposition_time)}</div>` : ''}
                             ${picture.device ? `<div><i class="bi bi-binoculars icon-inline" aria-hidden="true"></i>${escapeHtml(picture.device)}</div>` : ''}
+                            ${picture.location_name ? `<div><i class="bi bi-pin-map icon-inline" aria-hidden="true"></i>${escapeHtml(picture.location_name)}</div>` : ''}
                         </p>
                     </div>
                     <div class="card-footer text-center">
@@ -1092,12 +1100,38 @@ function renderPicturesGrid(item) {
 // Picture Management
 // ============================================
 
-function showAddPictureModal(itemId) {
+// Shared <option> list for the picture location picker (add + edit forms).
+// selectedId omitted -> pre-select the current active location (add-picture
+// default). selectedId passed explicitly (including '' or null) -> pre-select
+// exactly that, e.g. the picture's own stored location_id when editing.
+async function _buildPictureLocationOptions(selectedId) {
+    let locations = [];
+    let activeId = null;
+    if (typeof fetchMyLocations === 'function') {
+        try {
+            const data = await fetchMyLocations();
+            locations = (data && data.locations) || [];
+            activeId = data?.active_location_id ?? null;
+        } catch (_) {
+            locations = []; // picker degrades to "no location" only - not fatal
+        }
+    }
+    const effectiveSelected = (selectedId === undefined ? activeId : selectedId) || '';
+    const noneSelected = !effectiveSelected ? ' selected' : '';
+    const options = [`<option value=""${noneSelected}>${i18n.t('astrodex.no_location')}</option>`];
+    locations.forEach(loc => {
+        const isSelected = loc.id === effectiveSelected ? ' selected' : '';
+        options.push(`<option value="${escapeHtml(loc.id)}"${isSelected}>${escapeHtml(loc.name || '?')}</option>`);
+    });
+    return options.join('');
+}
+
+async function showAddPictureModal(itemId) {
     closeModal(); // Close current modal to avoid stacking
 
     // Get current date in YYYY-MM-DD format
     const today = new Date().toISOString().split('T')[0];
-    
+
     // Get autocomplete suggestions from user's previous photos
     const allPictures = [];
     astrodexData.items.forEach(item => {
@@ -1105,21 +1139,27 @@ function showAddPictureModal(itemId) {
             allPictures.push(...item.pictures);
         }
     });
-    
+
     // Extract unique values for autocomplete
     const devices = [...new Set(allPictures.map(p => p.device).filter(d => d))];
     const filters = [...new Set(allPictures.map(p => p.filters).filter(f => f))];
     const isos = [...new Set(allPictures.map(p => p.iso).filter(i => i))];
-    
+
     // Create datalist options
     const deviceOptions = devices.map(d => `<option value="${escapeHtml(d)}">`).join('');
     const filterOptions = filters.map(f => `<option value="${escapeHtml(f)}">`).join('');
     const isoOptions = isos.map(i => `<option value="${escapeHtml(i)}">`).join('');
-    
+
     // Equipment combination and filter options
     const equipmentComboOptions = buildEquipmentCombinationOptions();
     const equipmentFilterOptions = buildEquipmentFilterOptions();
-    
+
+    // Location picker (v1.2) - defaults to the active location but the
+    // uploader can change/clear it, since a photo is often uploaded well
+    // after the session (stacking/processing takes time) and may not have
+    // been taken wherever the browser's active location currently is.
+    const locationOptions = await _buildPictureLocationOptions();
+
     createModal(`${i18n.t('astrodex.add_picture')}`, `
         <form id="add-picture-form" class="form row g-3">
             <div class="col-md-12">
@@ -1135,12 +1175,18 @@ function showAddPictureModal(itemId) {
                 <input type="text" class="form-control" id="picture-exposition" placeholder="${i18n.t('astrodex.exposition_time_placeholder')}">
             </div>
             <div class="col-md-6">
+                <label for="picture-location" class="form-label">${i18n.t('astrodex.location')}</label>
+                <select class="form-select" id="picture-location">
+                    ${locationOptions}
+                </select>
+            </div>
+            <div class="col-md-6">
                 <label for="picture-device" class="form-label">${i18n.t('astrodex.equipment_combinations')}</label>
                 <select class="form-select" id="picture-device-select" onchange="updateDeviceField()">
                     <option value="">${i18n.t('astrodex.free_text')}</option>
                     ${equipmentComboOptions}
                 </select>
-            </div>            
+            </div>
             <div class="col-md-6">
                 <label for="picture-device" class="form-label">${i18n.t('astrodex.custom_equipment')}</label>
                 <input type="text" class="form-control" id="picture-device" list="device-list" autocomplete="off">
@@ -1257,7 +1303,8 @@ async function uploadPicture(itemId) {
             filters: document.getElementById('picture-filters').value,
             iso: document.getElementById('picture-iso').value,
             frames: document.getElementById('picture-frames').value,
-            notes: document.getElementById('picture-notes').value
+            notes: document.getElementById('picture-notes').value,
+            location_id: document.getElementById('picture-location')?.value || null
         };
         
         const response = await fetchJSON(`/api/astrodex/items/${itemId}/pictures`, {
@@ -1397,17 +1444,22 @@ async function updateItemField(itemId, field, value) {
     }
 }
 
-function showEditPictureModal(itemId, pictureId) {
+async function showEditPictureModal(itemId, pictureId) {
     closeModal(); // Close current modal to avoid stacking
 
     const item = astrodexData.items.find(i => i.id === itemId);
     if (!item) return;
-    
+
     const picture = item.pictures.find(p => p.id === pictureId);
     if (!picture) return;
-    
+
+    // Pre-select whatever location this picture already has (or "no location"
+    // for old pictures that predate this field / were never tagged) - never
+    // silently overridden by the current active location.
+    const locationOptions = await _buildPictureLocationOptions(picture.location_id || '');
+
     createModal(i18n.t('astrodex.edit_photo'), `
-        <form id="edit-picture-form" class="form row g-3">            
+        <form id="edit-picture-form" class="form row g-3">
             <div class="col-md-6">
                 <label for="edit-picture-date" class="form-label">${i18n.t('astrodex.observation_date')}</label>
                 <input type="date" class="form-control" id="edit-picture-date" value="${escapeHtml(picture.date || '')}">
@@ -1417,7 +1469,13 @@ function showEditPictureModal(itemId, pictureId) {
                 <input type="text" class="form-control" id="edit-picture-exposition" placeholder="e.g., 120x30s" value="${escapeHtml(picture.exposition_time || '')}">
             </div>
             <div class="col-md-6">
-                <label for="edit-picture-device" class="form-label">${i18n.t('astrodex.equipment_combinations')}</label>                
+                <label for="edit-picture-location" class="form-label">${i18n.t('astrodex.location')}</label>
+                <select class="form-select" id="edit-picture-location">
+                    ${locationOptions}
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label for="edit-picture-device" class="form-label">${i18n.t('astrodex.equipment_combinations')}</label>
                 <select class="form-select" id="edit-picture-device-select" onchange="updateEditDeviceField()">
                     <option value="">${i18n.t('astrodex.free_text')}</option>
                     ${buildEquipmentCombinationOptions()}
@@ -1494,7 +1552,8 @@ async function updatePicture(itemId, pictureId) {
             filters: document.getElementById('edit-picture-filters').value,
             iso: document.getElementById('edit-picture-iso').value,
             frames: document.getElementById('edit-picture-frames').value,
-            notes: document.getElementById('edit-picture-notes').value
+            notes: document.getElementById('edit-picture-notes').value,
+            location_id: document.getElementById('edit-picture-location')?.value || null
         };
         
         await fetchJSON(`/api/astrodex/items/${itemId}/pictures/${pictureId}`, {
@@ -1610,6 +1669,17 @@ function showPictureSlideshow(itemId) {
                             <div>
                                 <small class="text-muted d-block">${i18n.t('astrodex.number_of_frames')}</small>
                                 <strong>${escapeHtml(picture.frames)}</strong>
+                            </div>
+                        </div>
+                    </div>
+                ` : ''}
+                ${picture.location_name ? `
+                    <div class="col-md-6 col-lg-4">
+                        <div class="d-flex align-items-center p-2 rounded shadow-sm astrodex-slideshow-tile">
+                            <div class="me-3 fs-4"><i class="bi bi-pin-map" aria-hidden="true"></i></div>
+                            <div>
+                                <small class="text-muted d-block">${i18n.t('astrodex.location')}</small>
+                                <strong>${escapeHtml(picture.location_name)}</strong>
                             </div>
                         </div>
                     </div>
