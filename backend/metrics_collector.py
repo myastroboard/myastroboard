@@ -111,7 +111,7 @@ def get_folder_disk_usage(folder_path):
     return total_size
 
 
-def get_disk_space_details():
+def _compute_disk_space_details():
     """
     Get detailed disk space information for important folders.
     Returns dict with folder paths, sizes, and percentages of root filesystem.
@@ -161,6 +161,59 @@ def get_disk_space_details():
     except Exception as e:
         logger.error(f"Error getting disk space details: {e}")
         return {'root': {'total': 0, 'used': 0, 'free': 0, 'percent': 0}, 'folders': {}, 'total_tracked': 0}
+
+
+_disk_details_cache_lock = threading.Lock()
+_disk_details_cache: _MetricsCache = {'data': None, 'ts': 0.0}
+_disk_details_refreshing = False
+# Recursively sizing every tracked folder is the slow part of /api/metrics -
+# on a Docker-Desktop-on-Windows bind mount, walking many-small-file
+# directories (skyfield ephemeris, cached images) can take several seconds
+# to tens of seconds, far more than CPU/memory collection. Disk usage also
+# doesn't need per-30s freshness, so it gets its own longer-lived cache.
+_DISK_DETAILS_CACHE_TTL = 300.0
+
+
+def get_disk_space_details():
+    """
+    Disk space details, served from a background-refreshed cache so a slow
+    recursive scan never blocks the /api/metrics request. Returns the last
+    computed value immediately and kicks off a background refresh once it
+    goes stale - except on the very first call, which has no cached value to
+    fall back on and must compute synchronously once.
+    """
+    global _disk_details_refreshing
+
+    with _disk_details_cache_lock:
+        cached = _disk_details_cache['data']
+        is_stale = (time.monotonic() - _disk_details_cache['ts']) >= _DISK_DETAILS_CACHE_TTL
+        start_refresh = cached is not None and is_stale and not _disk_details_refreshing
+        if start_refresh:
+            _disk_details_refreshing = True
+
+    if cached is None:
+        result = _compute_disk_space_details()
+        with _disk_details_cache_lock:
+            _disk_details_cache['data'] = result
+            _disk_details_cache['ts'] = time.monotonic()
+        return result
+
+    if start_refresh:
+        threading.Thread(target=_refresh_disk_details_cache, daemon=True).start()
+
+    return cached
+
+
+def _refresh_disk_details_cache():
+    global _disk_details_refreshing
+    try:
+        result = _compute_disk_space_details()
+        with _disk_details_cache_lock:
+            _disk_details_cache['data'] = result
+            _disk_details_cache['ts'] = time.monotonic()
+    finally:
+        with _disk_details_cache_lock:
+            _disk_details_refreshing = False
 
 
 def get_environment_processes():

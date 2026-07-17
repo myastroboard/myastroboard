@@ -39,6 +39,8 @@ Each item stored in `data/astrodex/<user_id>.json` has the following fields:
 | `constellation` | string | Constellation abbreviation (e.g. `And`, `Ori`) |
 | `notes` | string | Free-text notes, processing ideas, next steps |
 | `pictures` | array | List of picture objects (see below) |
+| `location_id` | UUID string or `null` | v1.2: the location preset active when the item was created — best-effort link, only trusted while the preset still exists |
+| `location_name` | string or `null` | v1.2: frozen plain-text snapshot of the location name at creation. The UI always trusts this field for display; it survives preset renames and deletions (Astrodex items are **never** deleted with a location — see [LOCATIONS.md](LOCATIONS.md)) |
 | `created_at` | ISO 8601 | When the item was added to the collection |
 | `updated_at` | ISO 8601 | Last modification time |
 

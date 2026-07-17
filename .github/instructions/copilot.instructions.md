@@ -313,13 +313,14 @@ except Exception as e:
 - **Pattern**: JSON file-based configuration with environment variable overrides
 - **Location**: `data/config.json`
 - **Structure**: Hierarchical with sections:
-  - `location`: Name, latitude, longitude, elevation, timezone
-  - `constraints`: Altitude (min/max), airmass, size (min/max), moon separation, observability threshold, azimuth convention
+  - `locations`: List of admin-managed location presets (v1.2 multi-location profiles) - each with uuid4 `id`, name, latitude, longitude, elevation, timezone, bortle, sqm, per-preset `horizon_profile`, `is_install_default` flag. The legacy singular `location` key is auto-migrated on first load (see `docs/LOCATIONS.md`).
+  - `constraints`: Altitude (min/max), airmass, size (min/max), moon separation, observability threshold, azimuth convention (under `skytonight.constraints`; `horizon_profile` moved to location presets in v1.2)
   - `skytonight`: Enabled flag, constraints_always_enabled, preferred_name_order, scheduler state, dataset sources
   - `astrodex`: Private flag
 - **Default values**: Managed by `backend/config_defaults.py` (`DEFAULT_CONFIG`, `DEFAULT_CONSTRAINTS`, `DEFAULT_SKYTONIGHT`)
 - **Persistence**: Stored in Docker volume, survives container rebuilds
 - **Why**: Simple, human-readable, easy to backup/restore, flexible
+- **CRITICAL RULE (v1.2)**: Backend code MUST NEVER read `config["location"]` directly. Resolve the request's location with `repo_config.get_active_location(config, get_current_user())` (per-user active location), or `repo_config.get_install_default_location(config)` for install-wide jobs (SkyTonight calculation, scheduler anchors). The cache scheduler iterates `repo_config.get_scheduler_locations(config)`. Cap: `constants.MAX_LOCATIONS = 5` (hard-coded, never admin-configurable - rationale in `docs/LOCATIONS.md`).
 
 ### 1.1. User Management
 - **Pattern**: JSON file-based user storage with hashed passwords
@@ -1160,6 +1161,13 @@ Every step below is mandatory - missing any one of them causes a partial or brok
 ## Cache System Rules
 
 The background cache is **selective-refresh**: the scheduler polls every 25 min but only runs jobs whose individual TTL has elapsed. Full documentation: [docs/CACHE_SYSTEM.md](../../docs/CACHE_SYSTEM.md).
+
+### Multi-location caches (v1.2)
+- Location-dependent caches (moon/sun/eclipses/horizon/sidereal/aurora/ISS/CSS/planetary/phenomena/solar-system/seeing/weather/best-window) keep **one slot per location preset id**; on-disk keys in `astro_cache.json` are `"<name>:<location_id>"`. Access via `cache_store.get_location_cache_entry(name, location_id)` / `load_location_cache(...)` / `update_location_cache(...)` - the old module-level singletons (`_sun_report_cache`, …) no longer exist for these. The full name list is `cache_store.LOCATION_SCOPED_CACHE_TTLS`.
+- Global caches (spaceflight, IERS, AllSky, version) keep the single-slot module-level shape and plain keys. The ISS/CSS TLE fetch stays global; only pass geometry is per-location.
+- `check_and_handle_config_changes()` detects changes **per preset** and calls `reset_caches_for_location(id)` - never wipe all caches for a single preset edit. Deleting a preset calls `drop_location_caches(id)`.
+- The scheduler expands each location-scoped job over `get_scheduler_locations(config)`; job × location units share the same ≤6-worker pool. The Open-Meteo single-flight lock/cooldown gate stays GLOBAL (one shared budget for all locations).
+- API routes serve the requester's location via the `_active_location_cache(name)` helper in `app.py`.
 
 ### Per-Job TTLs (defined in `backend/constants.py`)
 | Job | Constant | TTL |

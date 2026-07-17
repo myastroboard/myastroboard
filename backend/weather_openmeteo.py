@@ -7,10 +7,12 @@ import json
 import os
 import threading
 import time
-from typing import Optional
+from typing import cast, Optional
+import requests
+import numpy as np
 import pandas as pd
-from repo_config import load_config
-from constants import URL_OPENMETEO, CONDITIONS_FILE
+from repo_config import load_config, get_install_default_location
+from constants import URL_OPENMETEO, CONDITIONS_FILE, SKYTONIGHT_LIVE_CONDITIONS_DEBOUNCE_SECONDS
 from logging_config import get_logger
 from weather_utils import create_weather_client, create_fresh_weather_client
 
@@ -112,19 +114,74 @@ def parse_hourly(response, hourly_vars, timezone_str: Optional[str] = "UTC"):
     hourly = response.Hourly()
 
     # Dates in UTC
+    expected_len = None
+    for i, name in enumerate(hourly_vars):
+        try:
+            first_values = np.asarray(hourly.Variables(i).ValuesAsNumpy()).reshape(-1)
+            expected_len = len(first_values)
+            break
+        except Exception as e:
+            logger.warning(f"Hourly field '{name}' failed to decode, will use defaults - {str(e)[:120]}")
+
+    if expected_len is None:
+        raise ValueError("Unable to decode any hourly weather variable from Open-Meteo response")
+
     dates = pd.date_range(
         start=pd.to_datetime(hourly.Time(), unit="s", utc=True),
-        periods=len(hourly.Variables(0).ValuesAsNumpy()),
+        periods=expected_len,
         freq=pd.Timedelta(seconds=hourly.Interval()),
     )
 
-    data = {"date": dates}
+    data: dict[str, object] = {"date": dates}
 
     for i, name in enumerate(hourly_vars):
-        data[name] = hourly.Variables(i).ValuesAsNumpy()
+        try:
+            values = np.asarray(hourly.Variables(i).ValuesAsNumpy()).reshape(-1)
+        except Exception as e:
+            logger.warning(f"Hourly field '{name}' decode failed, substituting defaults - {str(e)[:120]}")
+            values = np.full(expected_len, np.nan)
+        if len(values) != expected_len:
+            logger.warning(
+                f"Hourly field '{name}' length mismatch (got {len(values)}, expected {expected_len}); coercing to aligned series"
+            )
+            if len(values) < expected_len:
+                values = np.pad(values, (0, expected_len - len(values)), mode="constant", constant_values=np.nan)
+            else:
+                values = values[:expected_len]
+
+        # Coerce to numeric to avoid array/object payloads causing downstream math errors.
+        data[name] = pd.to_numeric(values, errors="coerce")
 
     df = pd.DataFrame(data)
 
+    df = pd.DataFrame(data)
+    df = _normalize_hourly_dataframe(df)
+
+    return _enrich_hourly_dataframe(df, timezone_str=timezone_str)
+
+
+def _normalize_hourly_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    """Ensure required weather columns exist with safe defaults."""
+    defaults = {
+        "cloud_cover": 100.0,
+        "cloud_cover_low": 100.0,
+        "cloud_cover_mid": 100.0,
+        "cloud_cover_high": 100.0,
+        "wind_speed_10m": 0.0,
+        "lifted_index": 0.0,
+        "relative_humidity_2m": 70.0,
+        "visibility": 20000.0,
+    }
+    for col, default in defaults.items():
+        if col not in df.columns:
+            df[col] = default
+        else:
+            df[col] = cast(pd.Series, pd.to_numeric(df[col], errors="coerce")).fillna(default)
+    return df
+
+
+def _enrich_hourly_dataframe(df: pd.DataFrame, timezone_str: Optional[str] = "UTC") -> pd.DataFrame:
+    """Apply timezone conversion and derive astronomy-focused weather metrics."""
     # Convert to requested timezone
     try:
         # Ensure the timezone string is valid and convert
@@ -154,7 +211,7 @@ def parse_hourly(response, hourly_vars, timezone_str: Optional[str] = "UTC"):
     # -----------------------------
     # Seeing proxy (%)
     # -----------------------------
-    wind_factor = (100 - df["wind_speed_10m"] * 3).clip(0, 100)
+    wind_factor = cast(pd.Series, 100 - df["wind_speed_10m"] * 3).clip(0, 100)
 
     stability_factor = (df["lifted_index"] * 5 + 50).clip(0, 100)
 
@@ -173,7 +230,7 @@ def parse_hourly(response, hourly_vars, timezone_str: Optional[str] = "UTC"):
     # -----------------------------
     # Calm (%)
     # -----------------------------
-    calm_percent = (100 - df["wind_speed_10m"] * 5).clip(0, 100)
+    calm_percent = cast(pd.Series, 100 - df["wind_speed_10m"] * 5).clip(0, 100)
 
     # -----------------------------
     # Fog probability (%)
@@ -203,8 +260,77 @@ def parse_hourly(response, hourly_vars, timezone_str: Optional[str] = "UTC"):
     return df
 
 
-def get_hourly_forecast():
-    """Return location info + DataFrame of the next 12 hours of weather data"""
+def fetch_weather_json(latitude, longitude, timezone, hourly_vars, forecast_hours=12):
+    """Fetch Open-Meteo forecast via plain JSON HTTP as a fallback to SDK decoding."""
+    params = {
+        "latitude": latitude,
+        "longitude": longitude,
+        "timezone": timezone,
+        "hourly": ",".join(hourly_vars),
+        "forecast_hours": forecast_hours,
+    }
+    response = requests.get(URL_OPENMETEO, params=params, timeout=15)
+    response.raise_for_status()
+    payload = response.json()
+    if not isinstance(payload, dict) or not isinstance(payload.get("hourly"), dict):
+        raise ValueError("Open-Meteo JSON fallback: missing hourly payload")
+    return payload
+
+
+def parse_hourly_json(payload, hourly_vars, timezone_str: Optional[str] = "UTC"):
+    """Transform raw JSON fallback response into pandas DataFrame and derived metrics."""
+    hourly = payload.get("hourly") or {}
+    time_values = hourly.get("time")
+    if not isinstance(time_values, list) or not time_values:
+        raise ValueError("Open-Meteo JSON fallback: hourly time series is missing")
+
+    dates = pd.to_datetime(time_values, errors="coerce")
+    if cast(np.ndarray, dates.isna()).all():
+        raise ValueError("Open-Meteo JSON fallback: unable to parse hourly timestamps")
+
+    # Unlike the flatbuffer SDK path (hourly.Time() is always true UTC epoch
+    # seconds), Open-Meteo's plain JSON API returns naive LOCAL wall-clock
+    # strings whenever a timezone is requested. Localize before treating as
+    # UTC, or every non-UTC location gets its forecast window shifted by its
+    # own UTC offset - invisible for small offsets, but for e.g. Hawaii
+    # (UTC-10) it pushes the whole 12h window into the past, so the frontend's
+    # "future only" filter drops every entry and nothing renders.
+    tz = timezone_str or "UTC"
+    try:
+        dates = dates.tz_localize(tz)
+    except Exception:
+        logger.warning(f"Unknown timezone '{tz}' in JSON fallback, treating hourly times as UTC")
+        dates = dates.tz_localize("UTC")
+
+    expected_len = len(dates)
+    data: dict[str, object] = {"date": dates}
+
+    for name in hourly_vars:
+        raw_values = hourly.get(name, [])
+        values = np.asarray(raw_values).reshape(-1)
+        if len(values) != expected_len:
+            logger.warning(
+                f"Hourly JSON field '{name}' length mismatch (got {len(values)}, expected {expected_len}); coercing to aligned series"
+            )
+            if len(values) < expected_len:
+                values = np.pad(values, (0, expected_len - len(values)), mode="constant", constant_values=np.nan)
+            else:
+                values = values[:expected_len]
+        data[name] = pd.to_numeric(values, errors="coerce")
+
+    df = pd.DataFrame(data)
+    df = _normalize_hourly_dataframe(df)
+    return _enrich_hourly_dataframe(df, timezone_str=timezone_str)
+
+
+def get_hourly_forecast(location=None):
+    """Return location info + DataFrame of the next 12 hours of weather data.
+
+    ``location`` is a v1.2 location preset dict; falls back to the install
+    default preset when omitted. The single-flight lock and failure cooldown
+    stay GLOBAL (not per-location) so multi-location installs still respect
+    Open-Meteo's concurrency limit as one shared budget.
+    """
     global _FORECAST_LAST_FAILURE_TS
 
     # Failure cooldown: don't retry if we just failed
@@ -218,8 +344,9 @@ def get_hourly_forecast():
         return None
 
     try:
-        config = load_config()
-        hourly_vars = [
+        if not isinstance(location, dict) or location.get("latitude") is None:
+            location = get_install_default_location(load_config())
+        hourly_vars_full = [
             "temperature_2m",
             "relative_humidity_2m",
             "dew_point_2m",
@@ -241,34 +368,124 @@ def get_hourly_forecast():
             "surface_pressure",
         ]
 
-        response = fetch_weather(
-            latitude=config["location"]["latitude"],
-            longitude=config["location"]["longitude"],
-            timezone=config["location"]["timezone"],
-            hourly_vars=hourly_vars,
+        hourly_vars_core = [
+            "temperature_2m",
+            "relative_humidity_2m",
+            "precipitation_probability",
+            "precipitation",
+            "rain",
+            "weather_code",
+            "visibility",
+            "wind_speed_10m",
+            "wind_direction_10m",
+            "cloud_cover",
+            "cloud_cover_low",
+            "cloud_cover_mid",
+            "cloud_cover_high",
+            "is_day",
+        ]
+
+        def _build_forecast_from_sdk_response(response, used_hourly_vars):
+            # Some transient SDK decode issues affect scalar accessors even when hourly
+            # data is still readable. Fall back to configured location metadata.
+            try:
+                latitude = response.Latitude()
+            except Exception as e:
+                logger.warning(f"Weather forecast: latitude decode failed, using configured location - {str(e)[:120]}")
+                latitude = location.get("latitude")
+
+            try:
+                longitude = response.Longitude()
+            except Exception as e:
+                logger.warning(f"Weather forecast: longitude decode failed, using configured location - {str(e)[:120]}")
+                longitude = location.get("longitude")
+
+            try:
+                elevation = response.Elevation()
+            except Exception:
+                elevation = None
+
+            try:
+                timezone_str = response.Timezone()
+            except Exception as e:
+                logger.warning(f"Weather forecast: timezone decode failed, using configured timezone - {str(e)[:120]}")
+                timezone_str = location.get("timezone")
+
+            if isinstance(timezone_str, bytes):
+                timezone_str = timezone_str.decode("utf-8")
+            if timezone_str is None:
+                timezone_str = location.get("timezone") or "UTC"
+
+            location_info = {
+                "name": location["name"],
+                "id": location.get("id"),
+                "latitude": latitude,
+                "longitude": longitude,
+                "elevation": elevation,
+                "timezone": timezone_str,
+            }
+
+            hourly_df = parse_hourly(response, used_hourly_vars, timezone_str=timezone_str)
+            return {"location": location_info, "hourly": hourly_df}
+
+        try:
+            response = fetch_weather(
+                latitude=location["latitude"],
+                longitude=location["longitude"],
+                timezone=location["timezone"],
+                hourly_vars=hourly_vars_full,
+            )
+            result = _build_forecast_from_sdk_response(response, hourly_vars_full)
+            _FORECAST_LAST_FAILURE_TS = 0.0
+            clear_openmeteo_rate_limit()
+            logger.debug(f"Weather forecast failure timestamp reset to {_FORECAST_LAST_FAILURE_TS}")
+            return result
+        except Exception as full_error:
+            if _is_openmeteo_concurrency_error(full_error):
+                raise
+            logger.debug(
+                f"Weather forecast: full request failed, retrying with core variables - {str(full_error)[:120]}"
+            )
+
+        try:
+            response = fetch_weather(
+                latitude=location["latitude"],
+                longitude=location["longitude"],
+                timezone=location["timezone"],
+                hourly_vars=hourly_vars_core,
+                use_cache=False,
+            )
+            result = _build_forecast_from_sdk_response(response, hourly_vars_core)
+            _FORECAST_LAST_FAILURE_TS = 0.0
+            clear_openmeteo_rate_limit()
+            logger.debug("Weather forecast recovered via core-variable SDK fallback")
+            return result
+        except Exception as core_error:
+            if _is_openmeteo_concurrency_error(core_error):
+                raise
+            logger.debug(
+                f"Weather forecast: core request failed, retrying with JSON fallback - {str(core_error)[:120]}"
+            )
+
+        payload = fetch_weather_json(
+            latitude=location["latitude"],
+            longitude=location["longitude"],
+            timezone=location["timezone"],
+            hourly_vars=hourly_vars_core,
         )
-
+        timezone_str = payload.get("timezone") or location.get("timezone") or "UTC"
+        hourly_df = parse_hourly_json(payload, hourly_vars_core, timezone_str=timezone_str)
         location_info = {
-            "name": config["location"]["name"],
-            "latitude": response.Latitude(),
-            "longitude": response.Longitude(),
-            "elevation": response.Elevation(),
-            "timezone": response.Timezone(),
+            "name": location["name"],
+            "id": location.get("id"),
+            "latitude": payload.get("latitude", location.get("latitude")),
+            "longitude": payload.get("longitude", location.get("longitude")),
+            "elevation": payload.get("elevation"),
+            "timezone": timezone_str,
         }
-
-        # Because the timezone is returned as bytes
-        timezone_str = response.Timezone()
-        if isinstance(timezone_str, bytes):
-            timezone_str = timezone_str.decode("utf-8")
-        if timezone_str is None:
-            timezone_str = "UTC"
-
-        hourly_df = parse_hourly(response, hourly_vars, timezone_str=timezone_str)
-        # Clear failure timestamps on success
         _FORECAST_LAST_FAILURE_TS = 0.0
-        last_failure_ts = _FORECAST_LAST_FAILURE_TS
         clear_openmeteo_rate_limit()
-        logger.debug(f"Weather forecast failure timestamp reset to {last_failure_ts}")
+        logger.debug("Weather forecast recovered via JSON fallback")
         return {"location": location_info, "hourly": hourly_df}
 
     except Exception as e:
@@ -288,21 +505,36 @@ def get_hourly_forecast():
         _FORECAST_LOCK.release()
 
 
-def get_skytonight_conditions():
+# Server-side debounce for the live-conditions fetch: per-location result kept
+# for SKYTONIGHT_LIVE_CONDITIONS_DEBOUNCE_SECONDS so a hammered tab cannot
+# multiply uncached Open-Meteo calls (see docs/LOCATIONS.md rate-limit analysis).
+_SKYTONIGHT_CONDITIONS_DEBOUNCE: dict = {}
+_SKYTONIGHT_CONDITIONS_DEBOUNCE_LOCK = threading.Lock()
+
+
+def get_skytonight_conditions(location=None):
     """
     Return current SkyTonight conditions summary (1h forecast).
-    ALWAYS fetches fresh data (no caching) for accurate real-time conditions.
+    Fetches fresh data (no client cache), debounced server-side per location.
     """
     try:
-        config = load_config()
+        if not isinstance(location, dict) or location.get("latitude") is None:
+            location = get_install_default_location(load_config())
+        debounce_key = location.get("id") or f"{location.get('latitude')}:{location.get('longitude')}"
+
+        with _SKYTONIGHT_CONDITIONS_DEBOUNCE_LOCK:
+            cached = _SKYTONIGHT_CONDITIONS_DEBOUNCE.get(debounce_key)
+            if cached and (time.time() - cached["ts"]) < SKYTONIGHT_LIVE_CONDITIONS_DEBOUNCE_SECONDS:
+                logger.debug("SkyTonight conditions served from per-location debounce window")
+                return cached["data"]
 
         hourly_vars = ["temperature_2m", "relative_humidity_2m", "surface_pressure"]
 
         # Bypass cache for fresh SkyTonight conditions
         response = fetch_weather(
-            latitude=config["location"]["latitude"],
-            longitude=config["location"]["longitude"],
-            timezone=config["location"]["timezone"],
+            latitude=location["latitude"],
+            longitude=location["longitude"],
+            timezone=location["timezone"],
             hourly_vars=hourly_vars,
             forecast_hours=1,
             use_cache=False,  # Always fetch fresh data for SkyTonight
@@ -334,6 +566,9 @@ def get_skytonight_conditions():
         os.makedirs(os.path.dirname(CONDITIONS_FILE), exist_ok=True)
         with open(CONDITIONS_FILE, "w") as f:
             json.dump(conditions, f, indent=2)
+
+        with _SKYTONIGHT_CONDITIONS_DEBOUNCE_LOCK:
+            _SKYTONIGHT_CONDITIONS_DEBOUNCE[debounce_key] = {"ts": time.time(), "data": conditions}
 
         return conditions
 

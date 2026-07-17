@@ -15,7 +15,7 @@ import os
 import re
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, cast
 from zoneinfo import ZoneInfo
 
 import numpy as np
@@ -25,21 +25,21 @@ from astropy.time import Time
 
 from astroplan.moon import moon_illumination
 
-from constants import (
-    SKYTONIGHT_BODIES_RESULTS_FILE,
-    SKYTONIGHT_COMETS_RESULTS_FILE,
-    SKYTONIGHT_DSO_RESULTS_FILE,
-    SKYTONIGHT_OUTPUT_DIR,
-    SKYTONIGHT_RESULTS_FILE,
-    SKYTONIGHT_SKYMAP_FILE,
-)
 from logging_config import get_logger
 from repo_config import load_config
 from skytonight_models import SkyTonightTarget
-from skytonight_storage import ensure_skytonight_directories
+from skytonight_storage import (
+    ensure_skytonight_directories,
+    get_alttime_dir,
+    get_bodies_results_file,
+    get_comets_results_file,
+    get_dso_results_file,
+    get_results_file,
+    get_skymap_file,
+)
 from skytonight_targets import choose_preferred_catalogue_name, load_targets_dataset, normalize_object_name
 from sun_phases import SunService
-from utils import ensure_directory_exists, load_json_file, save_json_file
+from utils import load_json_file, save_json_file
 
 logger = get_logger(__name__)
 
@@ -61,10 +61,10 @@ _MIN_OBSERVABLE_HOURS_DSO = 1.0
 _ALTTIME_ID_SAFE = re.compile(r'[^a-z0-9_-]')
 
 
-def _alttime_json_path(target_id: str) -> str:
-    """Return the full path for a target's altitude-time JSON file."""
+def _alttime_json_path(target_id: str, location_id: Optional[str] = None) -> str:
+    """Return the full path for a target's altitude-time JSON file (per location)."""
     safe_id = _ALTTIME_ID_SAFE.sub('_', target_id.lower())
-    return os.path.join(SKYTONIGHT_OUTPUT_DIR, f'{safe_id}_alttime.json')
+    return os.path.join(get_alttime_dir(location_id), f'{safe_id}_alttime.json')
 
 
 def _save_alttime_json(
@@ -80,8 +80,9 @@ def _save_alttime_json(
     az_degrees: Optional[np.ndarray] = None,
     astro_night_start: Optional[datetime] = None,
     astro_night_end: Optional[datetime] = None,
+    location_id: Optional[str] = None,
 ) -> bool:
-    """Persist altitude-time series for one target to the outputs directory.
+    """Persist altitude-time series for one target to the location's outputs directory.
 
     The JSON is consumed by the frontend Chart.js graph rendered on demand
     when the user opens the altitude-vs-time popup for a specific target.
@@ -89,7 +90,6 @@ def _save_alttime_json(
     the file is used by the API to indicate that a graph is available.
     """
     try:
-        ensure_directory_exists(SKYTONIGHT_OUTPUT_DIR)
         if precomputed_times_iso is not None:
             times_iso = precomputed_times_iso
         else:
@@ -117,21 +117,21 @@ def _save_alttime_json(
         horizon_profile_save = constraints.get('horizon_profile', [])
         if horizon_profile_save:
             payload['horizon_profile'] = horizon_profile_save
-        path = _alttime_json_path(target_id)
+        path = _alttime_json_path(target_id, location_id)
         return save_json_file(path, payload)
     except Exception as exc:
         logger.debug(f'Failed to save alttime JSON for {target_id}: {exc}')
         return False
 
 
-def _clear_alttime_files() -> None:
-    """Remove all altitude-time JSON files produced by the previous calculation run."""
+def _clear_alttime_files(location_id: Optional[str] = None) -> None:
+    """Remove one location's altitude-time JSON files from the previous run."""
     try:
-        ensure_directory_exists(SKYTONIGHT_OUTPUT_DIR)
-        for filename in os.listdir(SKYTONIGHT_OUTPUT_DIR):
+        alttime_dir = get_alttime_dir(location_id)
+        for filename in os.listdir(alttime_dir):
             if filename.endswith('_alttime.json'):
                 try:
-                    os.remove(os.path.join(SKYTONIGHT_OUTPUT_DIR, filename))
+                    os.remove(os.path.join(alttime_dir, filename))
                 except Exception:
                     pass  # best-effort stale file cleanup; non-fatal
     except Exception as exc:
@@ -624,9 +624,10 @@ def compute_difficulty_score(target: SkyTonightTarget) -> Tuple[int, str]:
     sb = _surface_brightness(magnitude, size_arcmin)
 
     if sb is not None:
-        magnitude_component = _normalise(magnitude, *_DIFFICULTY_MAGNITUDE_RANGE)
+        # _surface_brightness only returns non-None when both inputs are non-None.
+        magnitude_component = _normalise(cast(float, magnitude), *_DIFFICULTY_MAGNITUDE_RANGE)
         sb_component = _normalise(sb, *_DIFFICULTY_SB_RANGE)
-        size_norm = _normalise(size_arcmin, *_DIFFICULTY_SIZE_ARCMIN_RANGE)
+        size_norm = _normalise(cast(float, size_arcmin), *_DIFFICULTY_SIZE_ARCMIN_RANGE)
         size_component = 1.0 - size_norm
         raw_score = (
             _DIFFICULTY_WEIGHT_SURFACE_BRIGHTNESS * sb_component
@@ -640,7 +641,9 @@ def compute_difficulty_score(target: SkyTonightTarget) -> Tuple[int, str]:
     else:
         # Magnitude missing, size available: size-only fallback (mirrors the
         # magnitude-only branch above) instead of discarding the known size_arcmin.
-        size_norm = _normalise(size_arcmin, *_DIFFICULTY_SIZE_ARCMIN_RANGE)
+        # Guaranteed non-None here: line 621 ruled out both being None, and this
+        # branch is only reached when magnitude is None.
+        size_norm = _normalise(cast(float, size_arcmin), *_DIFFICULTY_SIZE_ARCMIN_RANGE)
         size_component = 1.0 - size_norm
         raw_score = _DIFFICULTY_WEIGHT_SIZE * size_component
 
@@ -1116,16 +1119,20 @@ def _cleanup_calculation_memory(
 
 def run_calculations(
     config: Optional[Dict[str, Any]] = None,
+    location: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Compute observability and AstroScore for all visible targets.
 
-    Writes results to :data:`~constants.SKYTONIGHT_RESULTS_FILE`.
+    Writes the per-location result files (see skytonight_storage helpers).
 
     Parameters
     ----------
     config:
         Merged application config dict.  If *None*, it is loaded internally.
+    location:
+        Location preset dict to compute for.  If *None*, the install default
+        preset is used (the scheduler calls this once per scheduler location).
 
     Returns
     -------
@@ -1137,7 +1144,19 @@ def run_calculations(
     if config is None:
         config = load_config()
 
-    location = config.get('location', {}) if isinstance(config, dict) else {}
+    if not isinstance(location, dict) or not location:
+        from repo_config import get_install_default_location
+
+        location = get_install_default_location(config) if isinstance(config, dict) else {}
+    location_id = location.get('id')
+
+    # Per-location result files (v1.2): each preset keeps its own night table.
+    results_file = get_results_file(location_id)
+    dso_results_file = get_dso_results_file(location_id)
+    bodies_results_file = get_bodies_results_file(location_id)
+    comets_results_file = get_comets_results_file(location_id)
+    skymap_file = get_skymap_file(location_id)
+
     lat = float(location.get('latitude') or 0.0)
     lon = float(location.get('longitude') or 0.0)
     elevation = float(location.get('elevation') or 0.0)
@@ -1164,7 +1183,10 @@ def run_calculations(
             pass  # malformed config value — _sqm_for_run stays None
 
     skytonight_cfg = config.get('skytonight', {}) if isinstance(config, dict) else {}
-    constraints: Dict[str, Any] = skytonight_cfg.get('constraints', {})
+    constraints: Dict[str, Any] = dict(skytonight_cfg.get('constraints', {}))
+    # horizon_profile lives on the location preset since v1.2 - inject it into
+    # the constraints dict so the internal observability helpers stay unchanged.
+    constraints['horizon_profile'] = location.get('horizon_profile') or []
 
     # User-configured catalogue name order: applied at result time to override the
     # dataset's build-time preferred_name so the display matches user preference.
@@ -1183,10 +1205,11 @@ def run_calculations(
     # - if this run crashes before the final write, the flag stays True and
     #   the next startup correctly triggers a fresh calculation.
     save_json_file(
-        SKYTONIGHT_RESULTS_FILE,
+        results_file,
         {
             'metadata': {
                 'calculated_at': datetime.now(timezone.utc).isoformat(),
+                'location_id': location_id,
                 'location_name': location_name,
                 'in_progress': True,
             }
@@ -1199,6 +1222,7 @@ def run_calculations(
         logger.warning('No nautical night found for tonight; SkyTonight calculations skipped.')
         _empty_meta = {
             'calculated_at': datetime.now(timezone.utc).isoformat(),
+            'location_id': location_id,
             'location_name': location_name,
             'latitude': lat,
             'longitude': lon,
@@ -1211,10 +1235,10 @@ def run_calculations(
             'moon_phase': 0.0,
             'counts': {'deep_sky': 0, 'bodies': 0, 'comets': 0},
         }
-        save_json_file(SKYTONIGHT_BODIES_RESULTS_FILE, {'metadata': _empty_meta, 'bodies': []})
-        save_json_file(SKYTONIGHT_COMETS_RESULTS_FILE, {'metadata': _empty_meta, 'comets': []})
-        save_json_file(SKYTONIGHT_DSO_RESULTS_FILE, {'metadata': _empty_meta, 'deep_sky': []})
-        save_json_file(SKYTONIGHT_RESULTS_FILE, {'metadata': _empty_meta})
+        save_json_file(bodies_results_file, {'metadata': _empty_meta, 'bodies': []})
+        save_json_file(comets_results_file, {'metadata': _empty_meta, 'comets': []})
+        save_json_file(dso_results_file, {'metadata': _empty_meta, 'deep_sky': []})
+        save_json_file(results_file, {'metadata': _empty_meta})
         return {'counts': {'deep_sky': 0, 'bodies': 0, 'comets': 0}, 'night_found': False}
 
     night_start, night_end = night_window
@@ -1275,7 +1299,7 @@ def run_calculations(
     skymap_entries: List[Dict[str, Any]] = []  # accumulates trajectory data for sky map
     # Clear altitude-time JSON files from the previous calculation run so stale
     # files are never served after a recalculation for a different night.
-    _clear_alttime_files()
+    _clear_alttime_files(location_id)
 
     # -----------------------------------------------------------------------
     # Phase 1: Bodies (planets, Moon) - live ephemeris, fast, save immediately
@@ -1323,6 +1347,7 @@ def run_calculations(
                     az_degrees=body_az_deg,
                     astro_night_start=astro_night_start,
                     astro_night_end=astro_night_end,
+                    location_id=location_id,
                 )
         processed_bodies += 1
         _set_progress('bodies', processed_bodies, n_bodies)
@@ -1330,10 +1355,11 @@ def run_calculations(
     # Immediate partial save: bodies are available in the frontend while comets/DSOs compute
     logger.debug(f'Bodies done: {len(bodies_results)} visible. Writing bodies results...')
     save_json_file(
-        SKYTONIGHT_BODIES_RESULTS_FILE,
+        bodies_results_file,
         {
             'metadata': {
                 'calculated_at': datetime.now(timezone.utc).isoformat(),
+                'location_id': location_id,
                 'location_name': location_name,
                 'latitude': lat,
                 'longitude': lon,
@@ -1409,6 +1435,7 @@ def run_calculations(
                 az_degrees=az_values_comet,
                 astro_night_start=astro_night_start,
                 astro_night_end=astro_night_end,
+                location_id=location_id,
             )
         processed_comets += 1
         _set_progress('comets', processed_comets, n_comets)
@@ -1416,10 +1443,11 @@ def run_calculations(
     # Partial save: comets are now available while DSOs compute
     logger.debug(f'Comets done: {len(comets_results)} visible. Writing comets results...')
     save_json_file(
-        SKYTONIGHT_COMETS_RESULTS_FILE,
+        comets_results_file,
         {
             'metadata': {
                 'calculated_at': datetime.now(timezone.utc).isoformat(),
+                'location_id': location_id,
                 'location_name': location_name,
                 'latitude': lat,
                 'longitude': lon,
@@ -1534,6 +1562,7 @@ def run_calculations(
                         az_matrix[idx],
                         astro_night_start,
                         astro_night_end,
+                        location_id=location_id,
                     )
                 processed_deep_sky += 1
                 if processed_deep_sky % _DSO_LOG_INTERVAL == 0:
@@ -1554,6 +1583,7 @@ def run_calculations(
 
     _final_meta = {
         'calculated_at': datetime.now(timezone.utc).isoformat(),
+        'location_id': location_id,
         'location_name': location_name,
         'latitude': lat,
         'longitude': lon,
@@ -1570,22 +1600,22 @@ def run_calculations(
     }
 
     # Write each category to its own file (final, sorted, in_progress=False)
-    save_json_file(SKYTONIGHT_BODIES_RESULTS_FILE, {'metadata': _final_meta, 'bodies': bodies_results})
-    save_json_file(SKYTONIGHT_COMETS_RESULTS_FILE, {'metadata': _final_meta, 'comets': comets_results})
-    save_json_file(SKYTONIGHT_DSO_RESULTS_FILE, {'metadata': _final_meta, 'deep_sky': deep_sky_results})
+    save_json_file(bodies_results_file, {'metadata': _final_meta, 'bodies': bodies_results})
+    save_json_file(comets_results_file, {'metadata': _final_meta, 'comets': comets_results})
+    save_json_file(dso_results_file, {'metadata': _final_meta, 'deep_sky': deep_sky_results})
     # Metadata-only summary - signals that all calculations are complete
-    save_json_file(SKYTONIGHT_RESULTS_FILE, {'metadata': _final_meta})
+    save_json_file(results_file, {'metadata': _final_meta})
 
     # Write skymap trajectory data sorted by AstroScore descending, numbered 1..N
     skymap_entries.sort(key=lambda e: e['score'], reverse=True)
     for rank, entry in enumerate(skymap_entries, start=1):
         entry['n'] = rank
-    save_json_file(SKYTONIGHT_SKYMAP_FILE, {'targets': skymap_entries})
+    save_json_file(skymap_file, {'targets': skymap_entries})
 
     _calculation_progress.clear()
 
     logger.info(
-        f'SkyTonight calculations done: '
+        f'SkyTonight calculations done for {location_name}: '
         f'{counts["deep_sky"]} DSOs, {counts["bodies"]} bodies, {counts["comets"]} comets.'
     )
 
@@ -1608,12 +1638,15 @@ def run_calculations(
     }
 
 
-def load_calculation_results() -> Dict[str, Any]:
-    """Load and combine the latest SkyTonight calculation results from the split files."""
-    meta_file = load_json_file(SKYTONIGHT_RESULTS_FILE, default={})
-    dso_file = load_json_file(SKYTONIGHT_DSO_RESULTS_FILE, default={})
-    bodies_file = load_json_file(SKYTONIGHT_BODIES_RESULTS_FILE, default={})
-    comets_file = load_json_file(SKYTONIGHT_COMETS_RESULTS_FILE, default={})
+def load_calculation_results(location_id: Optional[str] = None) -> Dict[str, Any]:
+    """Load and combine a location's latest SkyTonight calculation results.
+
+    *location_id* of None resolves to the install default preset.
+    """
+    meta_file = load_json_file(get_results_file(location_id), default={})
+    dso_file = load_json_file(get_dso_results_file(location_id), default={})
+    bodies_file = load_json_file(get_bodies_results_file(location_id), default={})
+    comets_file = load_json_file(get_comets_results_file(location_id), default={})
 
     # Prefer metadata from the summary file; fall back to whichever data file has it
     metadata = (
@@ -1679,24 +1712,37 @@ def _find_body_entry_by_localized_name(
     return lookup.get(f'alias::{english_norm}') or lookup.get(f'preferred::{english_norm}')
 
 
-def compute_target_debug(name: str, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def compute_target_debug(
+    name: str,
+    config: Optional[Dict[str, Any]] = None,
+    location: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """Compute detailed constraint diagnostics for a single target by name.
 
     Returns a structured dict describing which SkyTonight constraints the target
     passes or fails tonight, plus altitude-time data for the frontend chart.
     This powers the 'DSO not found?' debug tab.
+
+    *location* is the preset to diagnose against (the API passes the requesting
+    user's active location so diagnostics match the results they are viewing);
+    None falls back to the install default preset.
     """
     if config is None:
         config = load_config()
 
-    location_cfg = config.get('location', {}) if isinstance(config, dict) else {}
+    location_cfg = location
+    if not isinstance(location_cfg, dict) or not location_cfg:
+        from repo_config import get_install_default_location
+
+        location_cfg = get_install_default_location(config) if isinstance(config, dict) else {}
     lat = float(location_cfg.get('latitude') or 0.0)
     lon = float(location_cfg.get('longitude') or 0.0)
     elevation = float(location_cfg.get('elevation') or 0.0)
     timezone_name = str(location_cfg.get('timezone') or 'UTC')
 
     skytonight_cfg = config.get('skytonight', {}) if isinstance(config, dict) else {}
-    constraints: Dict[str, Any] = skytonight_cfg.get('constraints', {})
+    constraints: Dict[str, Any] = dict(skytonight_cfg.get('constraints', {}))
+    constraints['horizon_profile'] = location_cfg.get('horizon_profile') or []
     _raw_name_order = skytonight_cfg.get('preferred_name_order')
     preferred_name_order: Optional[List[str]] = (
         [str(x) for x in _raw_name_order if x] if isinstance(_raw_name_order, list) and _raw_name_order else None

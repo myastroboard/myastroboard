@@ -37,6 +37,18 @@ SKYTONIGHT_SCHEDULER_LOCK_FILE = os.path.join(SKYTONIGHT_RUNTIME_DIR, 'scheduler
 # API/Service URLs
 URL_OPENMETEO = "https://api.open-meteo.com/v1/forecast"
 
+# Multi-location profiles (v1.2)
+# Hard cap on admin-created location presets. NOT admin-configurable: every
+# self-hosted install shares the same free, keyless Open-Meteo/7Timer capacity
+# pool, so this is a collective-good constraint (avoid provider-side blacklisting),
+# not a per-install tuning knob. Full rate-limit derivation: docs/LOCATIONS.md.
+MAX_LOCATIONS = 5
+
+# Server-side debounce for the SkyTonight live-conditions fetch (use_cache=False
+# Open-Meteo call). Bounds the worst-case per-location call rate — see
+# docs/LOCATIONS.md "Rate-limit analysis".
+SKYTONIGHT_LIVE_CONDITIONS_DEBOUNCE_SECONDS = 300
+
 # Cache configuration
 CACHE_TTL = 1800  # seconds (legacy default, prefer per-job TTLs below)
 CACHE_SCHEDULER_INTERVAL_SECONDS = 300  # 5 minutes

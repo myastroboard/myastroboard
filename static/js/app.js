@@ -434,6 +434,12 @@ function switchSubTab(parentTab, subtabName, options = {}) {
 
     // Load subtab-specific content
     switch (subtabName) {
+        case 'locations':
+            if (typeof loadLocationsAdmin === 'function') loadLocationsAdmin();
+            break; // Parameters tab (admin, v1.2)
+        case 'location':
+            if (typeof loadMyLocationSettings === 'function') loadMyLocationSettings();
+            break; // My Settings tab (v1.2)
         case 'logs':
             loadLogs();
             break; // Parameters tab
@@ -577,7 +583,7 @@ function setupEventListeners() {
     setupModalAccessibility();
 
     // Configuration save
-    document.getElementById('save-config')?.addEventListener('click', saveConfiguration);
+    document.getElementById('save-astrodex')?.addEventListener('click', saveConfiguration);
     document.getElementById('save-advanced')?.addEventListener('click', saveConfiguration);
     document.getElementById('export-config-main')?.addEventListener('click', exportConfiguration);
 
@@ -642,6 +648,9 @@ function setupEventListeners() {
         const btn = e.target.closest('button[data-action="delete-horizon-row"]');
         if (btn) { btn.closest('tr').remove(); _updateHorizonTableVisibility(); }
     });
+
+    // Multi-location profiles UI (admin grid + modal + my-settings, v1.2)
+    if (typeof initLocationsUI === 'function') initLocationsUI();
     
     // Logs
     document.getElementById('refresh-logs')?.addEventListener('click', loadLogs);

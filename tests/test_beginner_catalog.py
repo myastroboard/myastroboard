@@ -199,7 +199,7 @@ class TestBeginnerCatalogEndpoint:
     def test_returns_all_entries_with_visible_only_false(self, client_admin, monkeypatch):
         monkeypatch.setattr(beginner_catalog, 'load_beginner_catalog', _fake_catalog)
         monkeypatch.setattr(app_module, 'load_json_file', lambda *a, **k: {})
-        monkeypatch.setattr(app_module, 'has_dso_results', lambda: False)
+        monkeypatch.setattr(app_module, 'has_dso_results', lambda *_a, **_k: False)
 
         response = client_admin.get('/api/beginner-catalog?lang=en&visible_only=false')
         assert response.status_code == 200
@@ -213,7 +213,7 @@ class TestBeginnerCatalogEndpoint:
             app_module, 'load_json_file',
             lambda *a, **k: {'deep_sky': [{'catalogue_names': {'Messier': 'M 42'}, 'astro_score': 0.5}]},
         )
-        monkeypatch.setattr(app_module, 'has_dso_results', lambda: True)
+        monkeypatch.setattr(app_module, 'has_dso_results', lambda *_a, **_k: True)
 
         response = client_admin.get('/api/beginner-catalog?lang=en&visible_only=true')
         assert response.status_code == 200
@@ -225,7 +225,7 @@ class TestBeginnerCatalogEndpoint:
     def test_missing_lang_param_does_not_error(self, client_admin, monkeypatch):
         monkeypatch.setattr(beginner_catalog, 'load_beginner_catalog', _fake_catalog)
         monkeypatch.setattr(app_module, 'load_json_file', lambda *a, **k: {})
-        monkeypatch.setattr(app_module, 'has_dso_results', lambda: False)
+        monkeypatch.setattr(app_module, 'has_dso_results', lambda *_a, **_k: False)
 
         response = client_admin.get('/api/beginner-catalog')
         assert response.status_code == 200

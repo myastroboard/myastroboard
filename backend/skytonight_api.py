@@ -19,15 +19,11 @@ import skytonight_targets
 from auth import admin_required, get_current_user, login_required, user_manager
 from constants import (
     OUTPUT_DIR,
-    SKYTONIGHT_BODIES_RESULTS_FILE,
     SKYTONIGHT_CALCULATION_LOG_FILE,
-    SKYTONIGHT_COMETS_RESULTS_FILE,
-    SKYTONIGHT_DSO_RESULTS_FILE,
-    SKYTONIGHT_SKYMAP_FILE,
 )
 from constellation import Constellation as _Constellation
 from logging_config import get_logger
-from repo_config import load_config
+from repo_config import load_config, get_active_location
 from skytonight_scheduler_manager import (
     get_remote_skytonight_scheduler_status,
     get_skytonight_scheduler_for_api,
@@ -35,7 +31,12 @@ from skytonight_scheduler_manager import (
 )
 from skytonight_storage import (
     ensure_skytonight_directories,
+    get_alttime_dir,
+    get_bodies_results_file,
+    get_comets_results_file,
+    get_dso_results_file,
     get_scheduler_trigger_file as get_skytonight_scheduler_trigger_file,
+    get_skymap_file,
     has_bodies_results,
     has_calculation_results,
     has_comets_results,
@@ -68,6 +69,22 @@ _CONSTELLATION_ABBR_MAP['Se2'] = 'Serpens Cauda'
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
+
+
+def _skytonight_request_location() -> Dict[str, Any]:
+    """The location preset SkyTonight endpoints serve for this request.
+
+    v1.2: the nightly calculation runs once per scheduler location, so every
+    endpoint resolves the requesting user's *active* preset and reads that
+    location's result files. Overlays (horizon lines, timezone) come from the
+    same preset, keeping them consistent with the served data.
+    """
+    config = load_config()
+    try:
+        user = get_current_user()
+    except RuntimeError:
+        user = None  # outside a request context (direct calls in tests/tools)
+    return get_active_location(config, user)
 
 
 def _target_attr(target: object, key: str, default=None):
@@ -186,10 +203,10 @@ def _annotate_skytonight_item(
 _ALTTIME_ID_SAFE = re.compile(r'[^a-z0-9_-]')
 
 
-def _alttime_json_path(target_id: str) -> str:
-    """Return absolute path for a target's altitude-time JSON file."""
+def _alttime_json_path(target_id: str, location_id: Optional[str] = None) -> str:
+    """Return absolute path for a target's altitude-time JSON file (per location)."""
     safe_id = _ALTTIME_ID_SAFE.sub('_', target_id.lower())
-    return os.path.normpath(os.path.join(OUTPUT_DIR, f'{safe_id}_alttime.json'))
+    return os.path.normpath(os.path.join(get_alttime_dir(location_id), f'{safe_id}_alttime.json'))
 
 
 # ---------------------------------------------------------------------------
@@ -211,6 +228,7 @@ def _build_skytonight_reports_payload(catalogue: Optional[str], user_id: str, us
     """
     plan_payload = plan_my_night.get_plan_with_timeline(user_id, username)
     plan_state = plan_payload.get('state', 'none')
+    location_id = _skytonight_request_location().get('id')
 
     base_result: Dict[str, Any] = {
         'report': [],
@@ -219,8 +237,8 @@ def _build_skytonight_reports_payload(catalogue: Optional[str], user_id: str, us
     }
 
     # --- Prefer calculation results cache (scheduler-computed) ---
-    if has_calculation_results():
-        calc = load_calculation_results()
+    if has_calculation_results(location_id):
+        calc = load_calculation_results(location_id)
         night_meta = calc.get('metadata', {})
 
         base_result['night_metadata'] = night_meta
@@ -276,7 +294,7 @@ def _build_skytonight_reports_payload(catalogue: Optional[str], user_id: str, us
                 'catalogue_names': calc_catalogue_names,
                 'alttime_file': (
                     calc_item.get('target_id', '')
-                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', '')))
+                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', ''), location_id))
                     else ''
                 ),
                 'source_type': 'calculated',
@@ -308,7 +326,7 @@ def _build_skytonight_reports_payload(catalogue: Optional[str], user_id: str, us
                 'solar elongation': calc_item.get('solar_elongation_deg'),
                 'alttime_file': (
                     calc_item.get('target_id', '')
-                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', '')))
+                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', ''), location_id))
                     else ''
                 ),
                 'source_type': 'calculated',
@@ -345,7 +363,7 @@ def _build_skytonight_reports_payload(catalogue: Optional[str], user_id: str, us
                 'observable_hours': observation.get('observable_hours'),
                 'alttime_file': (
                     calc_item.get('target_id', '')
-                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', '')))
+                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', ''), location_id))
                     else ''
                 ),
                 'source_type': 'calculated',
@@ -450,13 +468,14 @@ def _build_bodies_section_payload(user_id: str, username: str) -> Dict[str, Any]
     """Build the Solar system bodies payload for the reactive UI section."""
     plan_payload = plan_my_night.get_plan_with_timeline(user_id, username)
     plan_state = plan_payload.get('state', 'none')
+    location_id = _skytonight_request_location().get('id')
 
     # Pre-load user data once to avoid N×file-reads inside the per-item annotation loop.
     _preloaded_astrodex = astrodex.load_user_astrodex(user_id)
     _preloaded_plan_entries: list = _preload_all_current_plan_entries(user_id, username)
 
-    if has_bodies_results():
-        data = load_json_file(SKYTONIGHT_BODIES_RESULTS_FILE, default={})
+    if has_bodies_results(location_id):
+        data = load_json_file(get_bodies_results_file(location_id), default={})
         rows = []
         for calc_item in data.get('bodies', []):
             observation = calc_item.get('observation', {})
@@ -479,7 +498,7 @@ def _build_bodies_section_payload(user_id: str, username: str) -> Dict[str, Any]
                 'observable_hours': observation.get('observable_hours'),
                 'alttime_file': (
                     calc_item.get('target_id', '')
-                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', '')))
+                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', ''), location_id))
                     else ''
                 ),
                 'source_type': 'calculated',
@@ -541,13 +560,14 @@ def _build_comets_section_payload(user_id: str, username: str) -> Dict[str, Any]
     """Build the comets payload for the reactive UI section."""
     plan_payload = plan_my_night.get_plan_with_timeline(user_id, username)
     plan_state = plan_payload.get('state', 'none')
+    location_id = _skytonight_request_location().get('id')
 
     # Pre-load user data once to avoid N×file-reads inside the per-item annotation loop.
     _preloaded_astrodex = astrodex.load_user_astrodex(user_id)
     _preloaded_plan_entries: list = _preload_all_current_plan_entries(user_id, username)
 
-    if has_comets_results():
-        data = load_json_file(SKYTONIGHT_COMETS_RESULTS_FILE, default={})
+    if has_comets_results(location_id):
+        data = load_json_file(get_comets_results_file(location_id), default={})
         rows = []
         for calc_item in data.get('comets', []):
             observation = calc_item.get('observation', {})
@@ -577,7 +597,7 @@ def _build_comets_section_payload(user_id: str, username: str) -> Dict[str, Any]
                 'observable_hours': observation.get('observable_hours'),
                 'alttime_file': (
                     calc_item.get('target_id', '')
-                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', '')))
+                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', ''), location_id))
                     else ''
                 ),
                 'source_type': 'calculated',
@@ -644,13 +664,14 @@ def _build_dso_section_payload(catalogue: Optional[str], user_id: str, username:
     plan_payload = plan_my_night.get_plan_with_timeline(user_id, username)
     plan_state = plan_payload.get('state', 'none')
     max_rows = 1000 if not catalogue else 4000
+    location_id = _skytonight_request_location().get('id')
 
     # Pre-load user data once to avoid N×file-reads inside the per-item annotation loop.
     _preloaded_astrodex = astrodex.load_user_astrodex(user_id)
     _preloaded_plan_entries: list = _preload_all_current_plan_entries(user_id, username)
 
-    if has_dso_results():
-        data = load_json_file(SKYTONIGHT_DSO_RESULTS_FILE, default={})
+    if has_dso_results(location_id):
+        data = load_json_file(get_dso_results_file(location_id), default={})
         rows = []
         rows_added = 0
         for calc_item in data.get('deep_sky', []):
@@ -698,7 +719,7 @@ def _build_dso_section_payload(catalogue: Optional[str], user_id: str, username:
                 'catalogue_names': calc_catalogue_names,
                 'alttime_file': (
                     calc_item.get('target_id', '')
-                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', '')))
+                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', ''), location_id))
                     else ''
                 ),
                 'source_type': 'calculated',
@@ -969,7 +990,7 @@ def skytonight_scheduler_status_api():
             'reason': 'SkyTonight scheduler not running',
             'server_time_valid': False,
             'server_time': None,
-            'timezone': str(load_config().get('location', {}).get('timezone') or 'UTC'),
+            'timezone': str(_skytonight_request_location().get('timezone') or 'UTC'),
             'last_error': None,
             'last_result': {},
             'progress': {
@@ -1031,7 +1052,7 @@ def skytonight_dataset_status_api():
                 'targets_total': len(targets),
                 'deep_sky': deep_sky_count,
             },
-            'calculations_cached': has_calculation_results(),
+            'calculations_cached': has_calculation_results(_skytonight_request_location().get('id')),
             'scheduler': {
                 'running': scheduler_status.get('running', False),
                 'is_executing': scheduler_status.get('is_executing', False),
@@ -1114,10 +1135,14 @@ def get_skytonight_alttime_api(target_id):
     if not re.match(r'^[a-zA-Z0-9_-]+$', target_id):
         return jsonify({'error': 'Invalid target identifier'}), 400
 
-    file_path = _alttime_json_path(target_id)
+    request_location = _skytonight_request_location()
+    file_path = os.path.realpath(_alttime_json_path(target_id, request_location.get('id')))
     output_dir_abs = os.path.abspath(OUTPUT_DIR)
     # Path traversal guard
-    if not file_path.startswith(output_dir_abs):
+    try:
+        if os.path.commonpath([output_dir_abs, file_path]) != output_dir_abs:
+            return jsonify({'error': 'Invalid target identifier'}), 400
+    except ValueError:
         return jsonify({'error': 'Invalid target identifier'}), 400
 
     if not os.path.isfile(file_path):
@@ -1126,10 +1151,11 @@ def get_skytonight_alttime_api(target_id):
     try:
         with open(file_path, 'r', encoding='utf-8') as fobj:
             data = json.load(fobj)
-        # Always inject the current horizon profile from config so the chart
-        # reflects the live profile even for alttime files pre-dating the profile.
-        cfg = load_config()
-        current_horizon = cfg.get('skytonight', {}).get('constraints', {}).get('horizon_profile', [])
+        # Always inject the current horizon profile so the chart reflects the
+        # live profile even for alttime files pre-dating it. Since v1.2 the
+        # horizon lives on the location preset the calculation ran for (the
+        # requester's active preset) - keeps the overlay consistent with the data.
+        current_horizon = request_location.get('horizon_profile') or []
         if current_horizon:
             data['horizon_profile'] = current_horizon
         elif 'horizon_profile' not in data:
@@ -1200,10 +1226,12 @@ def get_skytonight_telescope_recommendations_api():
 @login_required
 def get_skytonight_skymap_api():
     """Return sky map trajectory data (az/alt arrays per visible target)."""
-    if not os.path.isfile(SKYTONIGHT_SKYMAP_FILE):
+    request_location = _skytonight_request_location()
+    skymap_file = get_skymap_file(request_location.get('id'))
+    if not os.path.isfile(skymap_file):
         return jsonify({'targets': []}), 200
     try:
-        with open(SKYTONIGHT_SKYMAP_FILE, 'r', encoding='utf-8') as fobj:
+        with open(skymap_file, 'r', encoding='utf-8') as fobj:
             data = json.load(fobj)
         targets = data.get('targets', [])
 
@@ -1216,8 +1244,9 @@ def get_skytonight_skymap_api():
         # Backfill the messier flag for skymap files written before this field was added.
         # Cross-reference against dso_results.json (already loaded; O(n) pass).
         needs_enrichment = any(tgt.get('category') == 'deep_sky' and 'messier' not in tgt for tgt in targets)
-        if needs_enrichment and os.path.isfile(SKYTONIGHT_DSO_RESULTS_FILE):
-            dso_data = load_json_file(SKYTONIGHT_DSO_RESULTS_FILE, default={})
+        dso_results_file = get_dso_results_file(request_location.get('id'))
+        if needs_enrichment and os.path.isfile(dso_results_file):
+            dso_data = load_json_file(dso_results_file, default={})
             messier_ids = {
                 item.get('target_id', ''): bool('Messier' in (item.get('catalogue_names') or {}))
                 for item in dso_data.get('deep_sky', [])
@@ -1226,7 +1255,8 @@ def get_skytonight_skymap_api():
                 if tgt.get('category') == 'deep_sky' and 'messier' not in tgt:
                     tgt['messier'] = messier_ids.get(tgt.get('id', ''), False)
 
-        # Include constraints so the frontend can draw horizon lines on the map
+        # Include constraints so the frontend can draw horizon lines on the map.
+        # horizon_profile comes from the active location's preset (v1.2).
         cfg = load_config()
         constraints = cfg.get('skytonight', {}).get('constraints', {})
         return jsonify(
@@ -1234,7 +1264,7 @@ def get_skytonight_skymap_api():
                 'targets': targets,
                 'constraints': {
                     'altitude_constraint_min': float(constraints.get('altitude_constraint_min', 30)),
-                    'horizon_profile': constraints.get('horizon_profile', []),
+                    'horizon_profile': request_location.get('horizon_profile') or [],
                 },
             }
         )
@@ -1357,7 +1387,7 @@ def get_skytonight_recommendations_api():
         preferences = user_manager.get_user_preferences(user.user_id)
         experience_level = preferences.get('experience_level', 'advanced')
 
-        dso_data = load_json_file(SKYTONIGHT_DSO_RESULTS_FILE, default={})
+        dso_data = load_json_file(get_dso_results_file(_skytonight_request_location().get('id')), default={})
         deep_sky = dso_data.get('deep_sky', []) if isinstance(dso_data, dict) else []
 
         candidates = _filter_targets_by_experience_level(deep_sky, experience_level)
@@ -1521,7 +1551,7 @@ def skytonight_target_debug():
 
     try:
         config = load_config()
-        result = compute_target_debug(name, config=config)
+        result = compute_target_debug(name, config=config, location=_skytonight_request_location())
         return jsonify(result)
     except Exception as e:
         logger.error(f'Error in skytonight_target_debug for name={name!r}: {e}')

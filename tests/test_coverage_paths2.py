@@ -1,74 +1,88 @@
 
 # ---------------------------------------------------------------------------
-# Coverage boost — second batch: sync-False arcs, config, backup, etc.
+# Coverage boost — second batch: cache fallback arcs, config, backup, etc.
 # ---------------------------------------------------------------------------
+import time as _time
+
 import app as _app_mod
 import cache_store as _cache_store
 
 
-def _make_always_false_then_sync_true(monkeypatch, stale_data=None):
-    """is_cache_valid always False; sync returns True; stale_data set if provided."""
+def _install_default_location_id():
+    """The admin client's active location = the install default preset."""
+    from repo_config import load_config, get_install_default_location
+
+    return get_install_default_location(load_config()).get('id')
+
+
+def _force_invalid_isolated(monkeypatch):
+    """v1.2 arc setup: the TTL check always fails and shared-file lookups are
+    isolated, so each route deterministically exercises its stale/pending
+    fallback for the caller's per-location cache slot."""
     monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda *_: False)
-    monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda *_: True)
+    monkeypatch.setattr(_cache_store, 'load_shared_cache_entry', lambda *_: None)
+
+
+def _set_location_slot(name, data):
+    """Plant `data` in the active location's in-memory slot for cache `name`."""
+    entry = _cache_store.get_location_cache_entry(name, _install_default_location_id())
+    entry['data'] = data
+    entry['timestamp'] = 1.0 if data is not None else 0
+    return entry
 
 
 class TestSyncTruePostSyncFalseBranches:
-    """Covers the False arc of the post-sync is_cache_valid check in every cached endpoint.
+    """Covers the stale/pending fallback arc of every per-location cached endpoint.
 
-    Pattern: sync_cache_from_shared() returns True, but is_cache_valid() still
-    returns False → the data-return line is NOT taken; we fall through to stale/pending.
+    v1.2 pattern: the in-memory slot is expired (is_cache_valid False) and the
+    shared file has nothing fresher → the data-return line is NOT taken; the
+    route falls through to serving stale data or a 202 pending payload.
     """
 
     def _setup(self, monkeypatch):
-        _make_always_false_then_sync_true(monkeypatch)
+        _force_invalid_isolated(monkeypatch)
 
     def test_moon_report_sync_true_post_invalid(self, client_admin, monkeypatch):
-        """Covers 1801->1806 – post-sync is_cache_valid False."""
+        """moon_report slot empty → pending fallback."""
         self._setup(monkeypatch)
-        _cache_store._moon_report_cache['data'] = None
+        _set_location_slot('moon_report', None)
         resp = client_admin.get('/api/moon/report')
         assert resp.status_code in (200, 202)
 
     def test_dark_window_sync_true_post_invalid(self, client_admin, monkeypatch):
-        """Covers 1831->1836 – post-sync is_cache_valid False."""
+        """dark_window slot empty → pending fallback."""
         self._setup(monkeypatch)
-        _cache_store._dark_window_report_cache['data'] = None
+        _set_location_slot('dark_window', None)
         resp = client_admin.get('/api/moon/dark-window')
         assert resp.status_code in (200, 202)
 
     def test_next_7_nights_sync_then_valid(self, client_admin, monkeypatch):
-        """Covers 1861-1862 – sync path for /api/moon/next-7-nights."""
-        call_counts = {}
-
-        def is_valid_fake(c, ttl):
-            key = id(c)
-            call_counts[key] = call_counts.get(key, 0) + 1
-            return call_counts[key] >= 2
-
-        _cache_store._moon_planner_report_cache['data'] = {'next_7_nights': []}
-        monkeypatch.setattr(_cache_store, 'is_cache_valid', is_valid_fake)
-        monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda *_: True)
+        """moon_planner slot hydrated from the shared file → 200 with data."""
+        shared_payload = {'timestamp': _time.time() + 60, 'data': {'next_7_nights': []}}
+        entry = _set_location_slot('moon_planner', None)
+        assert entry['data'] is None
+        monkeypatch.setattr(_cache_store, 'load_shared_cache_entry', lambda *_: shared_payload)
         resp = client_admin.get('/api/moon/next-7-nights')
         assert resp.status_code == 200
 
     def test_aurora_sync_true_post_invalid(self, client_admin, monkeypatch):
-        """Covers 1934->1937 and 1942 – post-sync False then 202 pending."""
+        """aurora slot empty → pending fallback."""
         self._setup(monkeypatch)
-        _cache_store._aurora_cache['data'] = None
+        _set_location_slot('aurora', None)
         resp = client_admin.get('/api/aurora/predictions')
         assert resp.status_code in (200, 202)
 
     def test_seeing_forecast_sync_true_post_invalid(self, client_admin, monkeypatch):
-        """Covers 1964->1967 – post-sync is_cache_valid False."""
+        """seeing_forecast slot empty → pending fallback."""
         self._setup(monkeypatch)
-        _cache_store._seeing_forecast_cache['data'] = None
+        _set_location_slot('seeing_forecast', None)
         resp = client_admin.get('/api/seeing-forecast')
         assert resp.status_code in (200, 202)
 
     def test_iss_passes_sync_true_post_invalid(self, client_admin, monkeypatch):
-        """Covers 2052->2057 – post-sync False, iss_passes 202 pending."""
+        """iss_passes slot empty → 202 pending."""
         self._setup(monkeypatch)
-        _cache_store._iss_passes_cache['data'] = None
+        _set_location_slot('iss_passes', None)
         import iss_passes as _iss
         monkeypatch.setattr(_iss, 'get_celestrak_status', lambda: 'ok')
         monkeypatch.setattr(_iss, 'get_iss_tle_source_info', lambda: {})
@@ -76,66 +90,63 @@ class TestSyncTruePostSyncFalseBranches:
         assert resp.status_code in (200, 202)
 
     def test_sun_report_sync_true_post_invalid(self, client_admin, monkeypatch):
-        """Covers 2272->2275 – post-sync is_cache_valid False for sun_report."""
+        """sun_report slot empty → pending fallback."""
         self._setup(monkeypatch)
-        _cache_store._sun_report_cache['data'] = None
+        _set_location_slot('sun_report', None)
         resp = client_admin.get('/api/sun/today')
         assert resp.status_code in (200, 202)
 
     def test_solar_eclipse_sync_true_post_invalid(self, client_admin, monkeypatch):
-        """Covers 2300->2303 – post-sync is_cache_valid False for solar_eclipse."""
+        """solar_eclipse slot empty → pending fallback."""
         self._setup(monkeypatch)
-        _cache_store._solar_eclipse_cache['data'] = None
+        _set_location_slot('solar_eclipse', None)
         resp = client_admin.get('/api/sun/next-eclipse')
         assert resp.status_code in (200, 202)
 
     def test_lunar_eclipse_sync_true_post_invalid(self, client_admin, monkeypatch):
-        """Covers 2330->2333 – post-sync is_cache_valid False for lunar_eclipse."""
+        """lunar_eclipse slot empty → pending fallback."""
         self._setup(monkeypatch)
-        _cache_store._lunar_eclipse_cache['data'] = None
+        _set_location_slot('lunar_eclipse', None)
         resp = client_admin.get('/api/moon/next-eclipse')
         assert resp.status_code in (200, 202)
 
     def test_all_events_sync_post_invalid(self, client_admin, monkeypatch):
-        """Covers 2380->2384, 2387->2391, 2394->2398, 2401->2405, 2408->2412,
-           2415->2419, 2422->2426, 2429->2432 – all sync-True post-invalid arcs
-           in get_upcoming_events_api."""
+        """All aggregated per-location slots empty in get_upcoming_events_api."""
         self._setup(monkeypatch)
-        for attr in (
-            '_solar_eclipse_cache', '_lunar_eclipse_cache', '_aurora_cache',
-            '_iss_passes_cache', '_moon_planner_report_cache',
-            '_planetary_events_cache', '_special_phenomena_cache',
-            '_solar_system_events_cache',
+        for name in (
+            'solar_eclipse', 'lunar_eclipse', 'aurora', 'iss_passes',
+            'moon_planner', 'planetary_events', 'special_phenomena',
+            'solar_system_events',
         ):
-            getattr(_cache_store, attr)['data'] = None
+            _set_location_slot(name, None)
         resp = client_admin.get('/api/events/upcoming')
         assert resp.status_code in (200, 400, 500)
 
     def test_planetary_events_sync_true_post_invalid(self, client_admin, monkeypatch):
-        """Covers 2469->2472 – post-sync False for planetary_events."""
+        """planetary_events slot empty → pending fallback."""
         self._setup(monkeypatch)
-        _cache_store._planetary_events_cache['data'] = None
+        _set_location_slot('planetary_events', None)
         resp = client_admin.get('/api/events/planetary')
         assert resp.status_code in (200, 202)
 
     def test_special_phenomena_sync_true_post_invalid(self, client_admin, monkeypatch):
-        """Covers 2507->2511 – post-sync False for special_phenomena."""
+        """special_phenomena slot empty → pending fallback."""
         self._setup(monkeypatch)
-        _cache_store._special_phenomena_cache['data'] = None
+        _set_location_slot('special_phenomena', None)
         resp = client_admin.get('/api/events/phenomena')
         assert resp.status_code in (200, 202)
 
     def test_solar_system_sync_true_post_invalid(self, client_admin, monkeypatch):
-        """Covers 2547->2551 – post-sync False for solar_system_events."""
+        """solar_system_events slot empty → pending fallback."""
         self._setup(monkeypatch)
-        _cache_store._solar_system_events_cache['data'] = None
+        _set_location_slot('solar_system_events', None)
         resp = client_admin.get('/api/events/solarsystem')
         assert resp.status_code in (200, 202)
 
     def test_sidereal_time_sync_true_post_invalid(self, client_admin, monkeypatch):
-        """Covers 2821->2823 – post-sync False for sidereal_time."""
+        """sidereal_time slot empty → live computation fallback."""
         self._setup(monkeypatch)
-        _cache_store._sidereal_time_cache['data'] = None
+        _set_location_slot('sidereal_time', None)
         import sidereal_time as _st
         monkeypatch.setattr(
             _st.SiderealTimeService,
@@ -146,29 +157,23 @@ class TestSyncTruePostSyncFalseBranches:
         assert resp.status_code in (200, 400)
 
     def test_horizon_graph_sync_true_post_invalid(self, client_admin, monkeypatch):
-        """Covers 2854->2857 – post-sync False for horizon_graph."""
+        """horizon_graph slot empty → pending fallback."""
         self._setup(monkeypatch)
-        _cache_store._horizon_graph_cache['data'] = None
+        _set_location_slot('horizon_graph', None)
         resp = client_admin.get('/api/astro/horizon-graph')
         assert resp.status_code in (200, 202)
 
     def test_best_window_sync_true_post_invalid(self, client_admin, monkeypatch):
-        """Covers 2897-2899, 2928-2929 – post-sync False for best_window."""
+        """best_window slots expired → stale/pending fallback."""
         self._setup(monkeypatch)
         resp = client_admin.get('/api/tonight/best-window')
         assert resp.status_code in (200, 400, 202)
 
     def test_best_window_single_mode_sync(self, client_admin, monkeypatch):
-        """Covers single-mode best_window sync path (2928-2929)."""
-        call_counts = {}
-
-        def is_valid_fake(c, ttl):
-            key = id(c)
-            call_counts[key] = call_counts.get(key, 0) + 1
-            return call_counts[key] >= 2
-
-        monkeypatch.setattr(_cache_store, 'is_cache_valid', is_valid_fake)
-        monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda *_: True)
+        """Single-mode best_window served from a hydrated shared-file entry."""
+        shared_payload = {'timestamp': _time.time() + 60, 'data': {'window': {'start': None}}}
+        _set_location_slot('best_window_practical', None)
+        monkeypatch.setattr(_cache_store, 'load_shared_cache_entry', lambda *_: shared_payload)
         resp = client_admin.get('/api/tonight/best-window?mode=standard')
         assert resp.status_code in (200, 400, 202)
 
@@ -352,7 +357,7 @@ class TestPlanResolveNightFallback:
 
         monkeypatch.setattr(_SS, 'get_today_report', sun_raise)
         monkeypatch.setattr(_app_mod, 'load_calculation_results',
-                            lambda: (_ for _ in ()).throw(RuntimeError('calc fail')))
+                            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('calc fail')))
 
         import plan_my_night as _pmn
 
@@ -377,7 +382,7 @@ class TestPlanResolveNightFallback:
 
         monkeypatch.setattr(_SS, 'get_today_report', sun_raise)
         monkeypatch.setattr(_app_mod, 'load_calculation_results',
-                            lambda: {'metadata': {'night_start': None, 'night_end': None}})
+                            lambda *_a, **_k: {'metadata': {'night_start': None, 'night_end': None}})
 
         import plan_my_night as _pmn
 
@@ -619,25 +624,17 @@ class TestMiscRemainingPaths:
         assert resp.status_code == 200
 
     def test_next_7_nights_sync_false_post_invalid(self, client_admin, monkeypatch):
-        """Covers 1861->1864 – sync True but post-sync is_cache_valid False for next-7-nights."""
-        monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda *_: False)
-        monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda *_: True)
-        _cache_store._moon_planner_report_cache['data'] = None
+        """moon_planner slot empty and TTL invalid → pending fallback."""
+        _force_invalid_isolated(monkeypatch)
+        _set_location_slot('moon_planner', None)
         resp = client_admin.get('/api/moon/next-7-nights')
         assert resp.status_code in (200, 202)
 
     def test_iss_passes_sync_data_different_window(self, client_admin, monkeypatch):
-        """Covers 2054->2057 – sync True but cached window_days doesn't match request."""
-        call_counts = {}
-
-        def is_valid_per(c, ttl):
-            key = id(c)
-            call_counts[key] = call_counts.get(key, 0) + 1
-            return call_counts[key] >= 2
-
-        _cache_store._iss_passes_cache['data'] = {'window_days': 99, 'passes': []}
-        monkeypatch.setattr(_cache_store, 'is_cache_valid', is_valid_per)
-        monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda *_: True)
+        """Cached window_days doesn't match the requested window → recompute/pending arc."""
+        entry = _set_location_slot('iss_passes', {'window_days': 99, 'passes': []})
+        entry['timestamp'] = _time.time() + 60  # valid TTL, wrong window
+        monkeypatch.setattr(_cache_store, 'load_shared_cache_entry', lambda *_: None)
         import iss_passes as _iss
         monkeypatch.setattr(_iss, 'get_celestrak_status', lambda: 'ok')
         monkeypatch.setattr(_iss, 'get_iss_tle_source_info', lambda: {})
@@ -659,10 +656,9 @@ class TestMiscRemainingPaths:
                 user.push_subscriptions = original
 
     def test_translation_asteroid_occultation_missing_body(self, client_admin, monkeypatch):
-        """Covers 2636->2645, 2642-2643 – asteroid occultation with empty body/star."""
-        monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda *_: False)
-        monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda *_: False)
-        _cache_store._solar_system_events_cache['data'] = {
+        """Asteroid occultation with empty body/star translated from stale slot data."""
+        _force_invalid_isolated(monkeypatch)
+        _set_location_slot('solar_system_events', {
             'events': [{
                 'event_type': 'Asteroid Occultation',
                 'title': 'Test',
@@ -670,22 +666,21 @@ class TestMiscRemainingPaths:
                 'raw_data': {'asteroid_name': 'Test', 'star_magnitude': 8.5},
             }],
             'language': 'en',
-        }
+        })
         resp = client_admin.get('/api/events/solarsystem?lang=fr')
         assert resp.status_code == 200
 
     def test_special_phenomena_translation_with_format_key(self, client_admin, monkeypatch):
-        """Covers 2666-2671 – phenomena translation fallback.format(**kwargs)."""
-        monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda *_: False)
-        monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda *_: False)
-        _cache_store._special_phenomena_cache['data'] = {
+        """Phenomena translation fallback.format(**kwargs) from stale slot data."""
+        _force_invalid_isolated(monkeypatch)
+        _set_location_slot('special_phenomena', {
             'events': [{
                 'event_type': 'Astronomical Event',
                 'title': 'Spring Equinox',
                 'raw_data': {'event': 'spring_equinox', 'hemisphere': 'northern'},
             }],
             'language': 'en',
-        }
+        })
         resp = client_admin.get('/api/events/phenomena?lang=de')
         assert resp.status_code == 200
 
@@ -697,7 +692,7 @@ class TestMiscRemainingPaths:
             raise RuntimeError('sun fail')
 
         monkeypatch.setattr(_SS, 'get_today_report', sun_raise)
-        monkeypatch.setattr(_app_mod, 'load_calculation_results', lambda: {})
+        monkeypatch.setattr(_app_mod, 'load_calculation_results', lambda *_a, **_k: {})
 
         import plan_my_night as _pmn
 
@@ -738,10 +733,10 @@ class TestMiscRemainingPaths:
         assert resp.status_code in (200, 400, 403, 404, 500)
 
     def test_sidereal_time_sync_post_invalid_location(self, client_admin, monkeypatch):
-        """Covers 2821->2823 – sidereal sync True post False."""
+        """Sidereal slot invalid-for-today → live computation arc."""
         monkeypatch.setattr(_cache_store, 'is_cache_valid_for_today', lambda *_: False)
-        monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda *_: True)
-        _cache_store._sidereal_time_cache['data'] = None
+        monkeypatch.setattr(_cache_store, 'load_shared_cache_entry', lambda *_: None)
+        _set_location_slot('sidereal_time', None)
         import sidereal_time as _st
         monkeypatch.setattr(
             _st.SiderealTimeService,
@@ -752,20 +747,10 @@ class TestMiscRemainingPaths:
         assert resp.status_code in (200, 400)
 
     def test_best_window_all_modes_sync_post_valid(self, client_admin, monkeypatch):
-        """Covers 2897-2898 True branch – best_window data found after sync."""
-        call_counts = {}
-
-        def is_valid_per(c, ttl):
-            key = id(c)
-            call_counts[key] = call_counts.get(key, 0) + 1
-            return call_counts[key] >= 2
-
-        for attr in ('_best_window_cache_standard', '_best_window_cache_weighted',
-                     '_best_window_cache_moon_safe'):
-            if hasattr(_cache_store, attr):
-                getattr(_cache_store, attr)['data'] = {'status': 'ready'}
-
-        monkeypatch.setattr(_cache_store, 'is_cache_valid', is_valid_per)
-        monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda *_: True)
+        """best_window slots pre-filled and valid → data-found arc."""
+        for name in ('best_window_strict', 'best_window_practical', 'best_window_illumination'):
+            entry = _set_location_slot(name, {'status': 'ready'})
+            entry['timestamp'] = _time.time() + 60
+        monkeypatch.setattr(_cache_store, 'load_shared_cache_entry', lambda *_: None)
         resp = client_admin.get('/api/tonight/best-window')
         assert resp.status_code in (200, 400, 202)

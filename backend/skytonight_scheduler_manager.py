@@ -9,7 +9,7 @@ import sys
 from datetime import datetime, timezone
 from typing import Any, Dict
 
-from constants import SKYTONIGHT_CALCULATION_LOG_FILE
+from constants import MAX_LOCATIONS, SKYTONIGHT_CALCULATION_LOG_FILE
 from logging_config import get_logger
 from repo_config import load_config
 from skytonight_catalogue_builder import build_and_save_default_dataset
@@ -52,11 +52,15 @@ def _append_skytonight_calculation_log(status: str, payload: Dict[str, Any]) -> 
 
 
 def _trim_calculation_log(log_path: str, max_runs: int = 5) -> None:
-    """Keep only the last *max_runs* runs (2 lines each) in the calculation log."""
+    """Keep only the last *max_runs* runs in the calculation log.
+
+    A run writes one dataset line plus one calculation line per scheduler
+    location, so budget 1 + MAX_LOCATIONS lines per run.
+    """
     try:
         with open(log_path, 'r', encoding='utf-8') as f:
             lines = [line for line in f.readlines() if line.strip()]
-        max_lines = max_runs * 2
+        max_lines = max_runs * (1 + MAX_LOCATIONS)
         if len(lines) > max_lines:
             with open(log_path, 'w', encoding='utf-8') as f:
                 f.writelines(lines[-max_lines:])
@@ -73,8 +77,11 @@ def _run_skytonight_refresh() -> Dict[str, Any]:
     """Run the current SkyTonight refresh pipeline.
 
     Two phases:
-    1. Rebuild the targets dataset (catalogue ingestion from PyOngc, MPC…).
-    2. Run observability calculations for tonight and write the results cache.
+    1. Rebuild the targets dataset (catalogue ingestion from PyOngc, MPC…) -
+       shared by every location, built once.
+    2. Run observability calculations for tonight once per scheduler location
+       (install default + attributed/active presets), each writing its own
+       per-location results cache.
     """
     ensure_skytonight_directories()
     config = load_config()
@@ -110,17 +117,42 @@ def _run_skytonight_refresh() -> Dict[str, Any]:
     # also releases the old ~13 000-target list from RAM.
     invalidate_targets_dataset_cache()
 
-    # --- Phase 2: observability calculations ---
-    try:
-        calc_result = run_calculations(config=config)
-        _append_skytonight_calculation_log('calculation_success', calc_result)
-    except Exception as exc:
-        _append_skytonight_calculation_log('calculation_error', {'error': str(exc)})
-        # Calculations failing is not fatal - the dataset is still usable.
-        logger.error(f'SkyTonight observability calculations failed: {exc}')
-        calc_result = {}
+    # --- Phase 2: observability calculations, once per scheduler location ---
+    from repo_config import get_install_default_location, get_scheduler_locations
 
-    return {**dataset_payload, 'calculation': calc_result}
+    locations = get_scheduler_locations(config)
+    if not locations:
+        locations = [get_install_default_location(config)]
+    install_default_id = get_install_default_location(config).get('id')
+
+    primary_result: Dict[str, Any] = {}
+    per_location_results: Dict[str, Any] = {}
+    for preset in locations:
+        loc_id = preset.get('id')
+        loc_name = preset.get('name') or loc_id
+        try:
+            calc_result = run_calculations(config=config, location=preset)
+            _append_skytonight_calculation_log(
+                'calculation_success',
+                {**calc_result, 'location_id': loc_id, 'location_name': loc_name},
+            )
+        except Exception as exc:
+            _append_skytonight_calculation_log(
+                'calculation_error',
+                {'error': str(exc), 'location_id': loc_id, 'location_name': loc_name},
+            )
+            # One location failing is not fatal - the dataset and the other
+            # locations' results are still usable.
+            logger.error(f'SkyTonight observability calculations failed for {loc_name}: {exc}')
+            calc_result = {}
+        if loc_id:
+            per_location_results[loc_id] = calc_result
+        if loc_id == install_default_id or not primary_result:
+            primary_result = calc_result
+
+    # 'calculation' keeps the install default's summary (existing UI contract);
+    # 'calculations' details every location computed this run.
+    return {**dataset_payload, 'calculation': primary_result, 'calculations': per_location_results}
 
 
 # ============================================================
@@ -275,6 +307,8 @@ def get_remote_skytonight_scheduler_status() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f'Failed to read remote SkyTonight scheduler status: {e}')
 
+    from repo_config import get_install_default_location
+
     config = load_config()
     return {
         'running': True,
@@ -286,7 +320,7 @@ def get_remote_skytonight_scheduler_status() -> Dict[str, Any]:
         'reason': 'SkyTonight scheduler status unavailable from remote worker',
         'server_time_valid': False,
         'server_time': None,
-        'timezone': str(config.get('location', {}).get('timezone') or 'UTC'),
+        'timezone': str(get_install_default_location(config).get('timezone') or 'UTC'),
         'worker': 'remote',
         'last_error': None,
         'last_result': {},

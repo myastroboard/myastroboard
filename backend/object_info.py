@@ -20,6 +20,7 @@ import requests
 
 from constants import DATA_DIR_CACHE
 from logging_config import get_logger
+from utils import fix_astropy_constellation_name
 
 # Windows-compatible file locking (mirrors cache_store.py's cross-platform pattern).
 if sys.platform == 'win32':
@@ -451,7 +452,7 @@ def resolve_identifier_for_catalogue_lookup(identifier: str) -> Optional[Dict[st
             from astropy.coordinates import SkyCoord, get_constellation
 
             coord = SkyCoord(ra=float(ra_raw), dec=float(dec_raw), unit='deg')
-            constellation = str(get_constellation(coord)).lower()
+            constellation = fix_astropy_constellation_name(str(get_constellation(coord))).lower()
         except Exception:
             pass  # astropy unavailable or coordinates out of range — constellation stays None
 

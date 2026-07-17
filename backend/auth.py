@@ -61,9 +61,10 @@ ALLOWED_STARTUP_SUBTABS = {
     'filters',
     'accessories',
     'customize',
+    'location',
     'security',
+    'locations',
     'configuration',
-    'advanced',
     'logs',
     'users',
     'metrics',
@@ -93,6 +94,7 @@ DEFAULT_USER_PREFERENCES = {
     'notifications': {
         'enabled': True,
         'permission_asked': False,
+        'disabled_location_ids': [],
         'triggers': {
             'N1': {'enabled': True, 'lead_minutes': 15},
             'N2': {'enabled': True, 'lead_minutes': 5},
@@ -103,6 +105,17 @@ DEFAULT_USER_PREFERENCES = {
             'N7': {'enabled': True, 'kp_threshold': 6},
             'N8': {'enabled': True, 'lead_minutes': 10},
         },
+    },
+    # Multi-location profiles (v1.2):
+    # - attributed_location_ids: admin-assigned; empty = install default only
+    # - default_location_id: durable "what I see when I connect" preference
+    # - active_location_id: what drives calculations right now, this session
+    # - order: user-chosen display order in the switcher
+    'location': {
+        'attributed_location_ids': [],
+        'default_location_id': None,
+        'active_location_id': None,
+        'order': [],
     },
 }
 
@@ -398,12 +411,34 @@ class UserManager:
             if skipped is not None and not isinstance(skipped, bool):
                 return False, "Invalid wizard: skipped must be a boolean"
 
+        location = preferences.get('location')
+        if location is not None:
+            if not isinstance(location, dict):
+                return False, "Invalid location: must be a dictionary"
+            for list_key in ('attributed_location_ids', 'order'):
+                value = location.get(list_key)
+                if value is not None:
+                    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+                        return False, f"Invalid location.{list_key}: must be a list of strings"
+            for id_key in ('default_location_id', 'active_location_id'):
+                value = location.get(id_key)
+                if value is not None and not isinstance(value, str):
+                    return False, f"Invalid location.{id_key}: must be a string or null"
+
         return True, ""
 
     @staticmethod
     def sanitize_user_preferences(preferences):
-        """Merge a partial preferences payload into defaults."""
-        merged = DEFAULT_USER_PREFERENCES.copy()
+        """Merge a partial preferences payload into defaults.
+
+        Deep-copies the defaults so nested blocks (notifications, wizard,
+        location) are never shared by reference across users - a user missing
+        a nested block must not receive a mutable alias of the module-level
+        default dict.
+        """
+        import copy as _copy
+
+        merged = _copy.deepcopy(DEFAULT_USER_PREFERENCES)
         if isinstance(preferences, dict):
             for key, value in preferences.items():
                 if key in merged:
@@ -417,6 +452,18 @@ class UserManager:
             logger.info("Creating default admin user")
             self.create_user(DEFAULT_ADMIN_USERNAME, DEFAULT_ADMIN_PASSWORD, ROLE_ADMIN)
 
+    @staticmethod
+    def _all_location_ids():
+        """Every currently configured location id (lazy import: avoids a
+        module-load-time cycle with repo_config.py, which itself lazily
+        imports auth.user_manager in get_scheduler_locations et al)."""
+        try:
+            from repo_config import load_config, get_all_locations
+
+            return [loc["id"] for loc in get_all_locations(load_config()) if loc.get("id")]
+        except Exception:
+            return []
+
     def create_user(self, username, password, role):
         """Create a new user"""
         self._reload_users_if_changed()
@@ -428,6 +475,17 @@ class UserManager:
             raise ValueError(f"Invalid role: {role}")
 
         user = User(username=username, password_hash=generate_password_hash(password), role=role)
+
+        # New users are attributed to every existing location by default - an
+        # admin can manually exclude specific ones afterward. Saves having to
+        # re-attribute each location by hand on larger installs.
+        location_ids = self._all_location_ids()
+        if location_ids:
+            block = self._get_location_prefs_block(user)
+            block['attributed_location_ids'] = location_ids
+            user.preferences = self.sanitize_user_preferences(user.preferences)
+            user.preferences['location'] = block
+
         self.users[user.user_id] = user
         self.save_users()
         logger.info(f"Created user {username} (ID: {user.user_id}) with role {role}")
@@ -541,6 +599,126 @@ class UserManager:
         logger.info(f"Updated preferences for user {user.username} (ID: {user_id})")
         return user.preferences.copy()
 
+    # ------------------------------------------------------------------
+    # Multi-location profiles (v1.2) - per-user location preference helpers
+    # ------------------------------------------------------------------
+
+    def _get_location_prefs_block(self, user):
+        """Return a normalized, mutable copy of a user's location prefs block."""
+        import copy as _copy
+
+        block = user.preferences.get('location')
+        if not isinstance(block, dict):
+            block = {}
+        normalized = _copy.deepcopy(DEFAULT_USER_PREFERENCES['location'])
+        for key in normalized:
+            if key in block:
+                normalized[key] = _copy.deepcopy(block[key])
+        return normalized
+
+    def set_user_location_prefs(self, user_id, **updates):
+        """Partially update a user's preferences.location block (validated keys only)."""
+        self._reload_users_if_changed()
+        user = self.get_user_by_id(user_id)
+        if not user:
+            raise ValueError("User not found")
+
+        block = self._get_location_prefs_block(user)
+        for key, value in updates.items():
+            if key not in block:
+                raise ValueError(f"Unknown location preference: {key}")
+            block[key] = value
+
+        is_valid, error_msg = self.validate_user_preferences({'location': block})
+        if not is_valid:
+            raise ValueError(error_msg)
+
+        user.preferences = self.sanitize_user_preferences(user.preferences)
+        user.preferences['location'] = block
+        self.save_users()
+        logger.info(f"Updated location preferences for user {user.username} (ID: {user_id})")
+        return block
+
+    def set_location_attribution(self, location_id, user_ids):
+        """Attach *location_id* to exactly the users in *user_ids* (detach from others).
+
+        Admin-controlled many-to-many: a location can be attributed to several
+        users and a user can hold several locations.
+        """
+        self._reload_users_if_changed()
+        target_ids = {str(uid) for uid in user_ids}
+        changed = False
+        for uid, user in self.users.items():
+            block = self._get_location_prefs_block(user)
+            attributed = list(block['attributed_location_ids'])
+            has_it = location_id in attributed
+            if uid in target_ids and not has_it:
+                attributed.append(location_id)
+            elif uid not in target_ids and has_it:
+                attributed.remove(location_id)
+            else:
+                continue
+            block['attributed_location_ids'] = attributed
+            # Keep order list consistent with attribution
+            block['order'] = [lid for lid in block['order'] if lid in attributed]
+            user.preferences = self.sanitize_user_preferences(user.preferences)
+            user.preferences['location'] = block
+            changed = True
+        if changed:
+            self.save_users()
+            logger.info(f"Attribution updated for location {location_id}: {len(target_ids)} user(s)")
+        return changed
+
+    def cleanup_location_references(self, location_id, fallback_location_id):
+        """Eagerly remove a deleted preset from every user's location prefs.
+
+        default/active pointers that referenced the deleted preset are reset to
+        the install default (*fallback_location_id*) so users don't silently
+        lose a preference without a consistent replacement.
+        """
+        self._reload_users_if_changed()
+        changed = False
+        for user in self.users.values():
+            block = self._get_location_prefs_block(user)
+            touched = False
+            if location_id in block['attributed_location_ids']:
+                block['attributed_location_ids'] = [
+                    lid for lid in block['attributed_location_ids'] if lid != location_id
+                ]
+                touched = True
+            if location_id in block['order']:
+                block['order'] = [lid for lid in block['order'] if lid != location_id]
+                touched = True
+            for pointer in ('default_location_id', 'active_location_id'):
+                if block[pointer] == location_id:
+                    block[pointer] = fallback_location_id
+                    touched = True
+            if touched:
+                user.preferences = self.sanitize_user_preferences(user.preferences)
+                user.preferences['location'] = block
+                changed = True
+        if changed:
+            self.save_users()
+            logger.info(f"Cleaned location {location_id} references from user preferences")
+        return changed
+
+    def reset_active_location_on_login(self, user_id):
+        """On fresh login, reset active_location_id to default_location_id.
+
+        This is the mechanism behind "the default location is what's shown when
+        the user connects": a mid-session switch never outlives the session.
+        """
+        user = self.get_user_by_id(user_id)
+        if not user:
+            return
+        block = self._get_location_prefs_block(user)
+        if block['default_location_id'] and block['active_location_id'] != block['default_location_id']:
+            block['active_location_id'] = block['default_location_id']
+            user.preferences = self.sanitize_user_preferences(user.preferences)
+            user.preferences['location'] = block
+            self.save_users()
+            logger.debug(f"Reset active location to default for user {user.username}")
+
     def delete_user(self, user_id, current_user_id=None):
         """Delete a user and safely clean related astrodex data"""
 
@@ -568,14 +746,17 @@ class UserManager:
         try:
             from astrodex import ASTRODEX_DIR, ASTRODEX_IMAGES_DIR
 
-            base_astrodex_dir = os.path.abspath(ASTRODEX_DIR)
-            base_images_dir = os.path.abspath(ASTRODEX_IMAGES_DIR)
+            base_astrodex_dir = os.path.realpath(ASTRODEX_DIR)
+            base_images_dir = os.path.realpath(ASTRODEX_IMAGES_DIR)
 
-            astrodex_file = os.path.normpath(os.path.join(base_astrodex_dir, f"{user_id}_astrodex.json"))
+            astrodex_file = os.path.realpath(os.path.join(base_astrodex_dir, f"{user_id}_astrodex.json"))
 
             # Ensure confinement
-            if not astrodex_file.startswith(base_astrodex_dir):
-                raise ValueError("Invalid astrodex file path")
+            try:
+                if os.path.commonpath([base_astrodex_dir, astrodex_file]) != base_astrodex_dir:
+                    raise ValueError("Invalid astrodex file path")
+            except ValueError as path_error:
+                raise ValueError("Invalid astrodex file path") from path_error
 
             image_filenames = set()
 
@@ -596,9 +777,12 @@ class UserManager:
 
             # Delete referenced images safely
             for filename in image_filenames:
-                file_path = os.path.normpath(os.path.join(base_images_dir, filename))
+                file_path = os.path.realpath(os.path.join(base_images_dir, filename))
 
-                if not file_path.startswith(base_images_dir):
+                try:
+                    if os.path.commonpath([base_images_dir, file_path]) != base_images_dir:
+                        continue
+                except ValueError:
                     continue
 
                 if os.path.exists(file_path):
@@ -611,13 +795,18 @@ class UserManager:
             if os.path.exists(base_images_dir):
                 for filename in os.listdir(base_images_dir):
                     if filename.startswith(f"{user_id}_") and re.match(r"^[a-zA-Z0-9_.-]+$", filename):
-                        file_path = os.path.normpath(os.path.join(base_images_dir, filename))
+                        file_path = os.path.realpath(os.path.join(base_images_dir, filename))
 
-                        if file_path.startswith(base_images_dir):
-                            try:
-                                os.remove(file_path)
-                            except Exception as remove_error:
-                                logger.warning(f"Failed to delete astrodex image {filename}: {remove_error}")
+                        try:
+                            if os.path.commonpath([base_images_dir, file_path]) != base_images_dir:
+                                continue
+                        except ValueError:
+                            continue
+
+                        try:
+                            os.remove(file_path)
+                        except Exception as remove_error:
+                            logger.warning(f"Failed to delete astrodex image {filename}: {remove_error}")
 
             # Delete astrodex file itself
             if os.path.exists(astrodex_file):

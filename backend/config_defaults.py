@@ -16,11 +16,26 @@ DEFAULT_LOCATION = {
     "sqm": None,  # float mag/arcsec², user-measured; takes priority over bortle
 }
 
+# Location preset fields added by the multi-location model (v1.2) on top of
+# the base DEFAULT_LOCATION shape. Every preset in config["locations"] carries
+# these; "id" is a server-generated uuid4 string, immutable for the preset's life.
+LOCATION_PRESET_EXTRA_FIELDS = {
+    "id": None,
+    "horizon_profile": [],  # per-preset custom horizon (moved from skytonight.constraints)
+    "is_install_default": False,  # exactly one preset carries True at all times
+    "created_at": None,
+    "updated_at": None,
+}
+
 # Default feature flags
 DEFAULT_ASTRODEX = {"private": False}
 
 
 # Default constraint values
+# NOTE (v1.2): horizon_profile is deliberately NOT part of the default
+# constraints anymore - it lives on each location preset
+# (LOCATION_PRESET_EXTRA_FIELDS). Keeping it here would re-inject the legacy
+# key on every load_config() merge and force a config re-save each load.
 DEFAULT_CONSTRAINTS = {
     "altitude_constraint_min": 30,
     "altitude_constraint_max": 80,
@@ -31,7 +46,6 @@ DEFAULT_CONSTRAINTS = {
     "moon_separation_use_illumination": True,
     "fraction_of_time_observable_threshold": 0.5,
     "north_to_east_ccw": False,
-    "horizon_profile": [],
 }
 
 
@@ -86,8 +100,14 @@ DEFAULT_CONNECTORS = {
 }
 
 # Default complete configuration
+# NOTE (v1.2): the legacy singular "location" key is no longer part of the
+# default shape - location presets live in the "locations" list. A pre-v1.2
+# config that still contains "location" is migrated (and the key dropped) by
+# repo_config._ensure_locations() on first load after upgrade. Brand-new
+# installs get their first preset seeded from DEFAULT_LOCATION by the same
+# function.
 DEFAULT_CONFIG = {
-    "location": DEFAULT_LOCATION,
+    "locations": [],
     "location_configured": False,
     "min_altitude": 30,
     "astrodex": DEFAULT_ASTRODEX,

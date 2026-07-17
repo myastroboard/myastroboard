@@ -93,7 +93,8 @@ Each user has a `preferences` object stored inside `users.json`. These are saved
 | `experience_level` | `beginner`, `intermediate`, `advanced` | `advanced` | Filters SkyTonight recommendations and the Beginner Catalog by difficulty (see [BEGINNER_EXPERIENCE.md](BEGINNER_EXPERIENCE.md)) |
 | `beginner_catalog_enabled` | boolean | `true` | Shows/hides the "Beginner" SkyTonight sub-tab |
 | `wizard` | Object (`completed`, `skipped` booleans) | both `false` | Guided setup wizard completion state (see [BEGINNER_EXPERIENCE.md](BEGINNER_EXPERIENCE.md)) |
-| `notifications` | Object (see [NOTIFICATIONS.md](NOTIFICATIONS.md)) | enabled, defaults per trigger | Push and in-browser notification settings |
+| `notifications` | Object (see [NOTIFICATIONS.md](NOTIFICATIONS.md)) | enabled, defaults per trigger | Push and in-browser notification settings; includes `disabled_location_ids` per-location mutes (v1.2) |
+| `location` | Object (see [LOCATIONS.md](LOCATIONS.md)) | empty attribution, install default | v1.2 multi-location block: `attributed_location_ids` (admin-set), `default_location_id` (user's "what I see when I connect"), `active_location_id` (session-scoped, reset to default at login), `order` |
 
 ---
 

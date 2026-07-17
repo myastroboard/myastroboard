@@ -150,7 +150,13 @@ class TestSpecialPhenomenaService:
         assert translated_event["viewing_type"] == "soir"
 
     def test_special_phenomena_api_translates_cached_event_payload(self, authenticated_client, monkeypatch):
-        cache_store._special_phenomena_cache["data"] = {
+        # v1.2: the route reads the per-location slot of the caller's active
+        # location - plant the payload in the install default preset's slot.
+        from repo_config import load_config, get_install_default_location
+
+        loc_id = get_install_default_location(load_config()).get("id")
+        entry = cache_store.get_location_cache_entry("special_phenomena", loc_id)
+        entry["data"] = {
             "events": [
                 {
                     "event_type": "Solstice",
@@ -167,12 +173,12 @@ class TestSpecialPhenomenaService:
                 },
             ]
         }
-        cache_store._special_phenomena_cache["timestamp"] = time.time()
+        entry["timestamp"] = time.time() + 60  # fresh: shared-file sync must not override
 
         monkeypatch.setattr(
             cache_store,
             "is_cache_valid",
-            lambda cache_obj, ttl: cache_obj is cache_store._special_phenomena_cache,
+            lambda cache_obj, ttl: cache_obj is entry,
         )
 
         response = authenticated_client.get("/api/events/phenomena?lang=fr")

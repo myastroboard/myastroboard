@@ -1,20 +1,16 @@
 """
 Unit tests for cache store (cache_store.py)
 Tests the server-side cache management system with TTL-based expiration
+and the per-location cache slots introduced by v1.2 multi-location profiles.
 """
 import pytest
 import time
 import os
+import uuid
 import cache_store
 import cache_store as cs
 from constants import CACHE_TTL, DATA_DIR_CACHE
 
-_moon_report_cache = cache_store._moon_report_cache
-_sun_report_cache = cache_store._sun_report_cache
-_best_window_cache = cache_store._best_window_cache
-_moon_planner_report_cache = cache_store._moon_planner_report_cache
-_dark_window_report_cache = cache_store._dark_window_report_cache
-_last_known_location_config = cache_store._last_known_location_config
 is_cache_valid = cache_store.is_cache_valid
 is_astronomical_cache_ready = cache_store.is_astronomical_cache_ready
 has_location_changed = cache_store.has_location_changed
@@ -23,21 +19,13 @@ update_location_config = cache_store.update_location_config
 get_current_location_signature = cache_store.get_current_location_signature
 get_cache_init_status = cache_store.get_cache_init_status
 set_cache_initialization_in_progress = cache_store.set_cache_initialization_in_progress
-reset_weather_cache = cache_store.reset_weather_cache
 is_cache_valid_for_today = cache_store.is_cache_valid_for_today
 
 
 @pytest.fixture(autouse=True)
 def reset_location_tracking_state():
-    """Reset location tracking state to avoid cross-test contamination."""
-    _last_known_location_config.clear()
-    _last_known_location_config.update({
-        "latitude": None,
-        "longitude": None,
-        "elevation": None,
-        "timezone": None
-    })
-    cache_store._last_known_location_config = _last_known_location_config
+    """Reset location signature tracking to avoid cross-test contamination."""
+    cache_store._last_known_location_signatures.clear()
 
     location_cache_file = os.path.join(DATA_DIR_CACHE, 'location_cache.json')
     if os.path.exists(location_cache_file):
@@ -46,156 +34,72 @@ def reset_location_tracking_state():
     yield
 
 
-class TestCacheStructures:
-    """Test cache data structures"""
-    
-    def test_moon_report_cache_structure(self):
-        """Test _moon_report_cache has correct structure"""
-        assert isinstance(_moon_report_cache, dict)
-        assert 'timestamp' in _moon_report_cache
-        assert 'data' in _moon_report_cache
-        assert isinstance(_moon_report_cache['timestamp'], (int, float))
-    
-    def test_sun_report_cache_structure(self):
-        """Test _sun_report_cache has correct structure"""
-        assert isinstance(_sun_report_cache, dict)
-        assert 'timestamp' in _sun_report_cache
-        assert 'data' in _sun_report_cache
-        assert isinstance(_sun_report_cache['timestamp'], (int, float))
-    
-    def test_best_window_cache_structure(self):
-        """Test _best_window_cache has correct structure"""
-        assert isinstance(_best_window_cache, dict)
-        
-        # Should have three sub-caches
-        assert 'strict' in _best_window_cache
-        assert 'practical' in _best_window_cache
-        assert 'illumination' in _best_window_cache
-        
-        # Each sub-cache should have timestamp and data
-        for key in ['strict', 'practical', 'illumination']:
-            assert 'timestamp' in _best_window_cache[key]
-            assert 'data' in _best_window_cache[key]
-            assert isinstance(_best_window_cache[key]['timestamp'], (int, float))
-    
-    def test_moon_planner_report_cache_structure(self):
-        """Test _moon_planner_report_cache has correct structure"""
-        assert isinstance(_moon_planner_report_cache, dict)
-        assert 'timestamp' in _moon_planner_report_cache
-        assert 'data' in _moon_planner_report_cache
-        assert isinstance(_moon_planner_report_cache['timestamp'], (int, float))
-    
-    def test_dark_window_report_cache_structure(self):
-        """Test _dark_window_report_cache has correct structure"""
-        assert isinstance(_dark_window_report_cache, dict)
-        assert 'timestamp' in _dark_window_report_cache
-        assert 'data' in _dark_window_report_cache
-        assert isinstance(_dark_window_report_cache['timestamp'], (int, float))
-    
-    def test_cache_location_tracking_structure(self):
-        """Test _last_known_location_config has correct structure"""
-        assert isinstance(_last_known_location_config, dict)
-        assert 'latitude' in _last_known_location_config
-        assert 'longitude' in _last_known_location_config
-        assert 'elevation' in _last_known_location_config
-        assert 'timezone' in _last_known_location_config
+class TestLocationScopedRegistry:
+    """Structure of the per-location cache registry (v1.2)."""
 
+    def test_registry_covers_every_scoped_name(self):
+        assert set(cache_store._location_caches.keys()) == set(cache_store.LOCATION_SCOPED_CACHE_TTLS.keys())
 
+    def test_expected_names_are_scoped(self):
+        for name in (
+            'moon_report',
+            'dark_window',
+            'moon_planner',
+            'sun_report',
+            'best_window_strict',
+            'best_window_practical',
+            'best_window_illumination',
+            'solar_eclipse',
+            'lunar_eclipse',
+            'horizon_graph',
+            'aurora',
+            'iss_passes',
+            'css_passes',
+            'planetary_events',
+            'special_phenomena',
+            'solar_system_events',
+            'sidereal_time',
+            'seeing_forecast',
+            'weather_forecast',
+        ):
+            assert name in cache_store.LOCATION_SCOPED_CACHE_TTLS
 
-class TestCacheInitialValues:
-    """Test initial cache values"""
+    def test_entry_created_on_demand_with_zero_state(self):
+        loc_id = str(uuid.uuid4())
+        entry = cache_store.get_location_cache_entry('sun_report', loc_id)
+        assert entry == {'timestamp': 0, 'data': None}
+        # Same object returned on second access (mutable slot)
+        assert cache_store.get_location_cache_entry('sun_report', loc_id) is entry
 
-    @pytest.fixture(autouse=True)
-    def _reset_caches_before_test(self):
-        """Ensure assertions run against a clean cache state."""
-        reset_all_caches()
-    
-    def test_moon_report_cache_initial_values(self):
-        """Test _moon_report_cache initial values"""
-        # Initial timestamp should be 0
-        assert cache_store._moon_report_cache['timestamp'] == 0
-        # Initial data should be None
-        assert cache_store._moon_report_cache['data'] is None
-    
-    def test_sun_report_cache_initial_values(self):
-        """Test _sun_report_cache initial values"""
-        assert cache_store._sun_report_cache['timestamp'] == 0
-        assert cache_store._sun_report_cache['data'] is None
-    
-    def test_best_window_cache_initial_values(self):
-        """Test _best_window_cache initial values"""
-        for key in ['strict', 'practical', 'illumination']:
-            assert cache_store._best_window_cache[key]['timestamp'] == 0
-            assert cache_store._best_window_cache[key]['data'] is None
-    
-    def test_moon_planner_report_cache_initial_values(self):
-        """Test _moon_planner_report_cache initial values"""
-        assert cache_store._moon_planner_report_cache['timestamp'] == 0
-        assert cache_store._moon_planner_report_cache['data'] is None
-    
-    def test_dark_window_report_cache_initial_values(self):
-        """Test _dark_window_report_cache initial values"""
-        assert cache_store._dark_window_report_cache['timestamp'] == 0
-        assert cache_store._dark_window_report_cache['data'] is None
-    
-    def test_location_config_initial_values(self):
-        """Test _last_known_location_config initial values (None)"""
-        # Initial location config should have None values (not yet tracked)
-        assert _last_known_location_config['latitude'] is None
-        assert _last_known_location_config['longitude'] is None
-        assert _last_known_location_config['elevation'] is None
-        assert _last_known_location_config['timezone'] is None
+    def test_location_cache_key_format(self):
+        assert cache_store.location_cache_key('sun_report', 'abc') == 'sun_report:abc'
 
-
-
-class TestCacheConsistency:
-    """Test cache structure consistency"""
-    
-    def test_all_simple_caches_have_same_structure(self):
-        """Test that all simple caches have the same structure"""
-        simple_caches = [
-            _moon_report_cache,
-            _sun_report_cache,
-            _moon_planner_report_cache,
-            _dark_window_report_cache
-        ]
-        
-        for cache in simple_caches:
-            assert set(cache.keys()) == {'timestamp', 'data'}
-            assert isinstance(cache['timestamp'], (int, float))
-    
-    def test_best_window_cache_subcaches_consistency(self):
-        """Test that all best_window sub-caches have the same structure"""
-        for key in ['strict', 'practical', 'illumination']:
-            subcache = _best_window_cache[key]
-            assert set(subcache.keys()) == {'timestamp', 'data'}
-            assert isinstance(subcache['timestamp'], (int, float))
 
 class TestCacheValidation:
     """Test TTL-based cache validation"""
-    
+
     def test_is_cache_valid_with_fresh_cache(self):
         """Test is_cache_valid returns True for fresh cache"""
         cache_entry = {"timestamp": time.time(), "data": {"test": "data"}}
         assert is_cache_valid(cache_entry, CACHE_TTL) is True
-    
+
     def test_is_cache_valid_with_expired_cache(self):
         """Test is_cache_valid returns False for expired cache"""
         # Set timestamp to past (expired)
         past_time = time.time() - (CACHE_TTL + 10)
         cache_entry = {"timestamp": past_time, "data": {"test": "data"}}
         assert is_cache_valid(cache_entry, CACHE_TTL) is False
-    
+
     def test_is_cache_valid_with_no_data(self):
         """Test is_cache_valid returns False when data is None"""
         cache_entry = {"timestamp": time.time(), "data": None}
         assert is_cache_valid(cache_entry, CACHE_TTL) is False
-    
+
     def test_is_cache_valid_with_empty_cache(self):
         """Test is_cache_valid returns False for empty cache"""
         cache_entry = {"timestamp": 0, "data": None}
         assert is_cache_valid(cache_entry, CACHE_TTL) is False
-    
+
     def test_is_cache_valid_with_different_ttl(self):
         """Test is_cache_valid respects different TTL values"""
         cache_entry = {"timestamp": time.time() - 30, "data": {"test": "data"}}
@@ -206,8 +110,8 @@ class TestCacheValidation:
 
 
 class TestLocationChangeDetection:
-    """Test location configuration change detection"""
-    
+    """Test per-preset location configuration change detection"""
+
     def test_get_current_location_signature(self):
         """Test location signature creation"""
         location = {
@@ -221,27 +125,33 @@ class TestLocationChangeDetection:
         assert signature["longitude"] == -73.5
         assert signature["elevation"] == 100
         assert signature["timezone"] == "America/Montreal"
-    
+
     def test_get_current_location_signature_with_none(self):
         """Test location signature with None input"""
         signature = get_current_location_signature(None)
         assert signature is None
-    
+
     def test_has_location_changed_first_time(self):
         """Test has_location_changed returns True on first tracking"""
-        # Reset to initial state
         location = {
             "latitude": 45.5,
             "longitude": -73.5,
             "elevation": 100,
             "timezone": "America/Montreal"
         }
-        # First time should return True (change detected)
-        result = has_location_changed(location)
-        assert result is True or result is False  # Depends on test order
-    
-    def test_has_location_changed_latitude(self):
-        """Test location change detection for latitude"""
+        assert has_location_changed(location) is True
+
+    @pytest.mark.parametrize(
+        "field,new_value",
+        [
+            ("latitude", 46.5),
+            ("longitude", -74.5),
+            ("elevation", 200),
+            ("timezone", "America/New_York"),
+        ],
+    )
+    def test_has_location_changed_per_field(self, field, new_value):
+        """Each tracked field triggers change detection independently"""
         location1 = {
             "latitude": 45.5,
             "longitude": -73.5,
@@ -249,69 +159,11 @@ class TestLocationChangeDetection:
             "timezone": "America/Montreal"
         }
         update_location_config(location1)
-        
-        location2 = {
-            "latitude": 46.5,  # Changed
-            "longitude": -73.5,
-            "elevation": 100,
-            "timezone": "America/Montreal"
-        }
+
+        location2 = dict(location1)
+        location2[field] = new_value
         assert has_location_changed(location2) is True
-    
-    def test_has_location_changed_longitude(self):
-        """Test location change detection for longitude"""
-        location1 = {
-            "latitude": 45.5,
-            "longitude": -73.5,
-            "elevation": 100,
-            "timezone": "America/Montreal"
-        }
-        update_location_config(location1)
-        
-        location2 = {
-            "latitude": 45.5,
-            "longitude": -74.5,  # Changed
-            "elevation": 100,
-            "timezone": "America/Montreal"
-        }
-        assert has_location_changed(location2) is True
-    
-    def test_has_location_changed_elevation(self):
-        """Test location change detection for elevation"""
-        location1 = {
-            "latitude": 45.5,
-            "longitude": -73.5,
-            "elevation": 100,
-            "timezone": "America/Montreal"
-        }
-        update_location_config(location1)
-        
-        location2 = {
-            "latitude": 45.5,
-            "longitude": -73.5,
-            "elevation": 200,  # Changed
-            "timezone": "America/Montreal"
-        }
-        assert has_location_changed(location2) is True
-    
-    def test_has_location_changed_timezone(self):
-        """Test location change detection for timezone"""
-        location1 = {
-            "latitude": 45.5,
-            "longitude": -73.5,
-            "elevation": 100,
-            "timezone": "America/Montreal"
-        }
-        update_location_config(location1)
-        
-        location2 = {
-            "latitude": 45.5,
-            "longitude": -73.5,
-            "elevation": 100,
-            "timezone": "America/New_York"  # Changed
-        }
-        assert has_location_changed(location2) is True
-    
+
     def test_has_location_changed_no_change(self):
         """Test location change detection when nothing changed"""
         location = {
@@ -321,12 +173,12 @@ class TestLocationChangeDetection:
             "timezone": "America/Montreal"
         }
         update_location_config(location)
-        
+
         # Same location
         assert has_location_changed(location) is False
-    
+
     def test_update_location_config(self):
-        """Test updating tracked location config"""
+        """Test updating tracked location config (legacy flat slot)"""
         location = {
             "latitude": 40.7,
             "longitude": -74.0,
@@ -334,42 +186,64 @@ class TestLocationChangeDetection:
             "timezone": "America/New_York"
         }
         update_location_config(location)
-        
-        # Verify it was updated (access via module, not local import)
-        assert cache_store._last_known_location_config["latitude"] == 40.7
-        assert cache_store._last_known_location_config["longitude"] == -74.0
+
+        stored = cache_store._last_known_location_signatures[cache_store._LEGACY_SIGNATURE_KEY]
+        assert stored["latitude"] == 40.7
+        assert stored["longitude"] == -74.0
+
+    def test_signatures_are_independent_per_preset_id(self):
+        """v1.2: each preset id tracks its own signature"""
+        preset_a = {"id": "loc-a", "latitude": 1.0, "longitude": 2.0, "elevation": 3, "timezone": "UTC"}
+        preset_b = {"id": "loc-b", "latitude": 9.0, "longitude": 8.0, "elevation": 7, "timezone": "UTC"}
+        update_location_config(preset_a)
+        assert has_location_changed(preset_a) is False
+        assert has_location_changed(preset_b) is True  # never tracked
+
+        update_location_config(preset_b)
+        moved_a = dict(preset_a, latitude=1.5)
+        assert has_location_changed(moved_a) is True
+        assert has_location_changed(preset_b) is False  # untouched by A's change
+
+    def test_remove_location_signature(self):
+        preset = {"id": "loc-gone", "latitude": 1.0, "longitude": 2.0, "elevation": 3, "timezone": "UTC"}
+        update_location_config(preset)
+        assert cache_store.is_location_tracked(preset) is True
+        cache_store.remove_location_signature("loc-gone")
+        assert cache_store.is_location_tracked(preset) is False
 
 
 class TestCacheReset:
-    """Test cache reset functionality"""
-    
-    def test_reset_all_caches(self):
-        """Test resetting all astronomical caches"""
-        # Set some data
-        cache_store._moon_report_cache["data"] = {"test": "data"}
-        cache_store._moon_report_cache["timestamp"] = time.time()
-        cache_store._sun_report_cache["data"] = {"test": "data"}
-        
-        # Reset
+    """Test cache reset functionality (per-location slots, v1.2)"""
+
+    def test_reset_all_caches_clears_every_location_slot(self):
+        loc_a, loc_b = str(uuid.uuid4()), str(uuid.uuid4())
+        cache_store.update_location_cache("moon_report", loc_a, {"test": "a"})
+        cache_store.update_location_cache("sun_report", loc_b, {"test": "b"})
+
         reset_all_caches()
-        
-        # Verify all are cleared (access via module, not local import)
-        assert cache_store._moon_report_cache["data"] is None
-        assert cache_store._moon_report_cache["timestamp"] == 0
-        assert cache_store._sun_report_cache["data"] is None
-        assert cache_store._sun_report_cache["timestamp"] == 0
-        assert cache_store._best_window_cache["strict"]["data"] is None
-        assert cache_store._moon_planner_report_cache["data"] is None
-        assert cache_store._dark_window_report_cache["data"] is None
+
+        assert cache_store.get_location_cache_entry("moon_report", loc_a)["data"] is None
+        assert cache_store.get_location_cache_entry("moon_report", loc_a)["timestamp"] == 0
+        assert cache_store.get_location_cache_entry("sun_report", loc_b)["data"] is None
+
+    def test_reset_caches_for_location_only_touches_that_preset(self):
+        loc_a, loc_b = str(uuid.uuid4()), str(uuid.uuid4())
+        cache_store.update_location_cache("horizon_graph", loc_a, {"v": 1})
+        cache_store.update_location_cache("horizon_graph", loc_b, {"v": 2})
+
+        cache_store.reset_caches_for_location(loc_a)
+
+        assert cache_store.load_location_cache("horizon_graph", loc_a)["data"] is None
+        assert cache_store.load_location_cache("horizon_graph", loc_b)["data"] == {"v": 2}
 
 
 class TestCacheInitStatus:
     """Test cache initialization status reporting"""
-    
+
     def test_get_cache_init_status(self):
         """Test getting detailed cache status"""
         status = get_cache_init_status()
-        
+
         # Check structure
         assert "moon_report" in status
         assert "sun_report" in status
@@ -384,30 +258,66 @@ class TestCacheInitStatus:
         assert "solar_system_events" in status
         assert "sidereal_time" in status
         assert "in_progress" in status
-        
+        assert "locations" in status  # v1.2 per-location detail block
+        assert "ttls" in status
+
         # Should be booleans
         assert isinstance(status["all_ready"], bool)
         assert isinstance(status["in_progress"], bool)
-    
+
+        # AllSky connector is not configured in the test environment - its
+        # jobs must not appear as permanently "stale" for no reason.
+        assert "allsky_sensor" not in status
+        assert "allsky_health" not in status
+        assert "allsky_sensor" not in status["ttls"]
+        assert "allsky_health" not in status["ttls"]
+
+    def test_get_cache_init_status_allsky_configured(self, monkeypatch):
+        """AllSky connector fully enabled (incl. the sensor_data module toggle)
+        -> both jobs appear in status and ttls."""
+        monkeypatch.setattr(
+            "repo_config.load_config",
+            lambda: {
+                "connectors": {
+                    "allsky": {
+                        "enabled": True,
+                        "url": "http://allsky.local",
+                        "modules": {"sensor_data": {"enabled": True}},
+                    }
+                }
+            },
+        )
+        status = get_cache_init_status()
+        assert "allsky_sensor" in status
+        assert "allsky_health" in status
+        assert "allsky_sensor" in status["ttls"]
+        assert "allsky_health" in status["ttls"]
+
     def test_set_cache_initialization_in_progress(self):
         """Test setting cache initialization progress flag"""
         set_cache_initialization_in_progress(True)
         status = get_cache_init_status()
         assert status["in_progress"] is True
-        
+
         set_cache_initialization_in_progress(False)
         status = get_cache_init_status()
         assert status["in_progress"] is False
-    
+
     def test_is_astronomical_cache_ready_when_empty(self):
         """Test cache ready status when caches are empty"""
-        # With no data, caches should not be ready
         reset_all_caches()
         assert is_astronomical_cache_ready() is False
 
+    def test_is_astronomical_cache_ready_explicit_ids(self):
+        """Explicit location_ids: all-empty slots are not ready"""
+        assert is_astronomical_cache_ready([str(uuid.uuid4())]) is False
+
+    def test_is_astronomical_cache_ready_no_ids(self):
+        assert is_astronomical_cache_ready([]) is False
+
 
 class TestReadSharedCacheMissingFile:
-    """Line 145: _read_shared_cache returns {} when shared cache file doesn't exist."""
+    """_read_shared_cache returns {} when shared cache file doesn't exist."""
 
     def test_returns_empty_dict_when_file_absent(self, monkeypatch):
         monkeypatch.setattr(cache_store, '_SHARED_CACHE_FILE', '/nonexistent/path/astro_cache.json')
@@ -416,7 +326,7 @@ class TestReadSharedCacheMissingFile:
 
 
 class TestLoadSharedCacheEntryMissingKeys:
-    """Line 177: load_shared_cache_entry returns None when entry is a dict missing timestamp/data."""
+    """load_shared_cache_entry returns None when entry is a dict missing timestamp/data."""
 
     def test_entry_missing_timestamp(self, monkeypatch):
         monkeypatch.setattr(cache_store, '_read_shared_cache', lambda: {"mykey": {"data": "foo"}})
@@ -429,29 +339,50 @@ class TestLoadSharedCacheEntryMissingKeys:
         assert result is None
 
 
-class TestLoadLocationCacheReadsFile:
-    """Lines 229-233: _load_location_cache reads file contents or swallows exceptions."""
+class TestLoadLocationSignaturesFile:
+    """_load_location_signatures reads file contents or swallows exceptions."""
 
-    def test_load_location_cache_from_existing_file(self, tmp_path, monkeypatch):
+    def test_legacy_flat_file_maps_to_legacy_slot(self, tmp_path, monkeypatch):
         import json
         location_data = {"latitude": 51.5, "longitude": -0.12, "elevation": 10, "timezone": "Europe/London"}
         loc_file = tmp_path / 'location_cache.json'
         loc_file.write_text(json.dumps(location_data))
         monkeypatch.setattr(cache_store, '_LOCATION_CACHE_FILE', str(loc_file))
-        cache_store._load_location_cache()
-        assert cache_store._last_known_location_config["latitude"] == 51.5
-        assert cache_store._last_known_location_config["timezone"] == "Europe/London"
+        cache_store._load_location_signatures()
+        legacy = cache_store._last_known_location_signatures[cache_store._LEGACY_SIGNATURE_KEY]
+        assert legacy["latitude"] == 51.5
+        assert legacy["timezone"] == "Europe/London"
 
-    def test_load_location_cache_corrupted_file_swallows_exception(self, tmp_path, monkeypatch):
-        """Lines 231-233: json.JSONDecodeError → except block executed, no exception raised."""
+    def test_per_id_file_shape_loads_directly(self, tmp_path, monkeypatch):
+        import json
+        data = {"loc-1": {"latitude": 1.0, "longitude": 2.0, "elevation": 3, "timezone": "UTC"}}
+        loc_file = tmp_path / 'location_cache.json'
+        loc_file.write_text(json.dumps(data))
+        monkeypatch.setattr(cache_store, '_LOCATION_CACHE_FILE', str(loc_file))
+        cache_store._load_location_signatures()
+        assert cache_store._last_known_location_signatures["loc-1"]["latitude"] == 1.0
+
+    def test_corrupted_file_swallows_exception(self, tmp_path, monkeypatch):
         loc_file = tmp_path / 'location_cache.json'
         loc_file.write_text("NOT VALID JSON {{{{")
         monkeypatch.setattr(cache_store, '_LOCATION_CACHE_FILE', str(loc_file))
-        cache_store._load_location_cache()  # must not raise
+        cache_store._load_location_signatures()  # must not raise
+
+    def test_non_dict_json_is_ignored(self, tmp_path, monkeypatch):
+        """A valid JSON array (neither the legacy nor per-id dict shape) matches
+        neither branch - the loader must leave the in-memory state untouched
+        rather than raising or storing a non-dict value."""
+        import json
+        loc_file = tmp_path / 'location_cache.json'
+        loc_file.write_text(json.dumps(["not", "a", "dict"]))
+        monkeypatch.setattr(cache_store, '_LOCATION_CACHE_FILE', str(loc_file))
+        monkeypatch.setattr(cache_store, '_last_known_location_signatures', {'sentinel': True})
+        cache_store._load_location_signatures()
+        assert cache_store._last_known_location_signatures == {'sentinel': True}
 
 
-class TestSaveLocationCacheException:
-    """Lines 242-244: _save_location_cache swallows write exceptions silently."""
+class TestSaveLocationSignaturesException:
+    """_save_location_signatures swallows write exceptions silently."""
 
     def test_save_exception_is_silently_ignored(self, monkeypatch):
         import builtins
@@ -463,11 +394,11 @@ class TestSaveLocationCacheException:
             return original_open(path, mode, **kwargs)
 
         monkeypatch.setattr(builtins, 'open', raising_open)
-        cache_store._save_location_cache()  # must not propagate the exception
+        cache_store._save_location_signatures()  # must not propagate the exception
 
 
 class TestHasLocationChangedNoneConfig:
-    """Line 269: has_location_changed returns True when new config is None."""
+    """has_location_changed returns True when new config is None."""
 
     def test_none_config_treated_as_changed(self):
         result = has_location_changed(None)
@@ -475,25 +406,16 @@ class TestHasLocationChangedNoneConfig:
 
 
 class TestUpdateLocationConfigNone:
-    """Line 288->exit: update_location_config is a no-op when signature is None."""
+    """update_location_config is a no-op when signature is None."""
 
     def test_none_config_leaves_state_unchanged(self):
-        before = cache_store._last_known_location_config.copy()
+        before = dict(cache_store._last_known_location_signatures)
         update_location_config(None)
-        assert cache_store._last_known_location_config == before
-
-
-class TestResetWeatherCache:
-    """Line 330: reset_weather_cache resets _weather_cache to its zero state."""
-
-    def test_reset_weather_cache_clears_data(self):
-        cache_store._weather_cache = {"timestamp": 99999, "data": {"temperature": 20}}
-        reset_weather_cache()
-        assert cache_store._weather_cache == {"timestamp": 0, "data": None}
+        assert cache_store._last_known_location_signatures == before
 
 
 class TestIsCacheValidForToday:
-    """Lines 351-354: is_cache_valid_for_today checks both TTL and calendar date."""
+    """is_cache_valid_for_today checks both TTL and calendar date."""
 
     def test_fresh_cache_from_today_is_valid(self):
 
@@ -507,7 +429,6 @@ class TestIsCacheValidForToday:
 
     def test_stale_day_cache_is_invalid(self, monkeypatch):
 
-        from datetime import datetime, date
         yesterday_ts = time.time() - 86400
         cache_entry = {"timestamp": yesterday_ts, "data": {"some": "data"}}
         # Use a large TTL so it would pass TTL check but fail date check
@@ -515,7 +436,7 @@ class TestIsCacheValidForToday:
 
 
 class TestReadSharedCacheCorrupt:
-    """Cover lines 149-151: corrupted shared cache file returns empty dict."""
+    """Corrupted shared cache file returns empty dict."""
 
     def test_corrupt_json_returns_empty(self, tmp_path, monkeypatch):
 
@@ -528,7 +449,7 @@ class TestReadSharedCacheCorrupt:
 
 
 class TestUpdateAndLoadSharedCacheEntry:
-    """Cover lines 163-166 (update_shared_cache_entry) and 175,178 (load_shared_cache_entry)."""
+    """update_shared_cache_entry / load_shared_cache_entry roundtrips."""
 
     def test_update_then_load_roundtrip(self, tmp_path, monkeypatch):
 
@@ -549,7 +470,6 @@ class TestUpdateAndLoadSharedCacheEntry:
         assert result is None
 
     def test_load_entry_not_dict_returns_none(self, tmp_path, monkeypatch):
-        """Line 175: if entry is not a dict → return None."""
         import json
 
         cache_file = tmp_path / "cache3.json"
@@ -560,7 +480,6 @@ class TestUpdateAndLoadSharedCacheEntry:
         assert result is None
 
     def test_load_entry_missing_timestamp_returns_none(self, tmp_path, monkeypatch):
-        """Line 178: entry dict but missing 'timestamp' → return None."""
         import json
 
         cache_file = tmp_path / "cache4.json"
@@ -572,23 +491,21 @@ class TestUpdateAndLoadSharedCacheEntry:
 
 
 class TestSyncCacheFromShared:
-    """Cover lines 183-188: sync_cache_from_shared."""
+    """sync_cache_from_shared (still used by global caches)."""
 
     def test_sync_updates_in_memory_entry(self, tmp_path, monkeypatch):
-        """Lines 186-188: sync returns True and updates cache_entry."""
 
         monkeypatch.setattr(cs, '_SHARED_CACHE_FILE', str(tmp_path / "sync.json"))
         monkeypatch.setattr(cs, '_SHARED_CACHE_LOCK', str(tmp_path / "sync.lock"))
         ts = time.time()
-        cache_store.update_shared_cache_entry("moon_report", {"phase": "full"}, ts)
+        cache_store.update_shared_cache_entry("spaceflight_launches", {"count": 3}, ts)
         local_entry = {"timestamp": 0, "data": None}
-        result = cache_store.sync_cache_from_shared("moon_report", local_entry)
+        result = cache_store.sync_cache_from_shared("spaceflight_launches", local_entry)
         assert result is True
-        assert local_entry["data"] == {"phase": "full"}
+        assert local_entry["data"] == {"count": 3}
         assert local_entry["timestamp"] == ts
 
     def test_sync_returns_false_when_no_data(self, tmp_path, monkeypatch):
-        """Lines 184-185: entry missing or data is None → return False."""
 
         monkeypatch.setattr(cs, '_SHARED_CACHE_FILE', str(tmp_path / "sync2.json"))
         monkeypatch.setattr(cs, '_SHARED_CACHE_LOCK', str(tmp_path / "sync2.lock"))
@@ -597,11 +514,32 @@ class TestSyncCacheFromShared:
         assert result is False
 
 
+class TestSyncAllFromShared:
+    """_sync_all_from_shared hydrates location slots from keyed entries."""
+
+    def test_keyed_entries_hydrate_registry(self, tmp_path, monkeypatch):
+        import json
+
+        loc_id = str(uuid.uuid4())
+        shared = {
+            f"sun_report:{loc_id}": {"timestamp": time.time(), "data": {"sun": True}},
+            "spaceflight_launches": {"timestamp": time.time(), "data": {"launches": []}},
+        }
+        cache_file = tmp_path / "syncall.json"
+        cache_file.write_text(json.dumps(shared), encoding="utf-8")
+        monkeypatch.setattr(cs, '_SHARED_CACHE_FILE', str(cache_file))
+        monkeypatch.setattr(cs, '_SHARED_CACHE_LOCK', str(tmp_path / "syncall.lock"))
+
+        cache_store._sync_all_from_shared()
+
+        assert cache_store.get_location_cache_entry("sun_report", loc_id)["data"] == {"sun": True}
+        assert cache_store._spaceflight_launches_cache["data"] == {"launches": []}
+
+
 class TestGetCacheStatusProgressPercent:
-    """Cover line 438: progress_percent calculation when total_steps > 0."""
+    """progress_percent calculation when total_steps > 0."""
 
     def test_progress_percent_computed_from_shared_cache(self, tmp_path, monkeypatch):
-        """Line 438: progress_percent = int((current_step / total_steps) * 100)."""
         import json
 
         shared = {
@@ -621,20 +559,20 @@ class TestGetCacheStatusProgressPercent:
         assert result.get("progress_percent") == 30
 
 
-class TestLoadLocationCacheFileAbsent:
-    """Line 228->exit: _load_location_cache is a no-op when file doesn't exist."""
+class TestLoadLocationSignaturesFileAbsent:
+    """_load_location_signatures is a no-op when file doesn't exist."""
 
     def test_missing_file_leaves_state_unchanged(self, tmp_path, monkeypatch):
 
         absent_path = str(tmp_path / "nonexistent_location.json")
         monkeypatch.setattr(cs, '_LOCATION_CACHE_FILE', absent_path)
-        before = dict(cache_store._last_known_location_config)
-        cache_store._load_location_cache()
-        assert cache_store._last_known_location_config == before
+        before = dict(cache_store._last_known_location_signatures)
+        cache_store._load_location_signatures()
+        assert cache_store._last_known_location_signatures == before
 
 
 class TestCacheInitStatusNoCacheInProgress:
-    """Line 431->440: get_cache_init_status with no _cache_in_progress in shared cache."""
+    """get_cache_init_status with no _cache_in_progress in shared cache."""
 
     def test_no_cache_in_progress_key(self, tmp_path, monkeypatch):
         import json
@@ -650,10 +588,9 @@ class TestCacheInitStatusNoCacheInProgress:
 
 
 class TestRecordCacheExecution:
-    """Cover lines 530-539: record_cache_execution."""
+    """record_cache_execution + get_cache_metrics."""
 
     def test_record_then_get_metrics(self, tmp_path, monkeypatch):
-        """Lines 530-539: writes per-job metrics and get_cache_metrics reads them back."""
 
         monkeypatch.setattr(cs, '_SHARED_CACHE_FILE', str(tmp_path / "metricache_store.json"))
         monkeypatch.setattr(cs, '_SHARED_CACHE_LOCK', str(tmp_path / "metricache_store.lock"))
@@ -664,7 +601,6 @@ class TestRecordCacheExecution:
         assert metrics["moon_report"]["last_duration_s"] == 1.234
 
     def test_second_record_updates_existing_metrics(self, tmp_path, monkeypatch):
-        """Line 532->534: second record_cache_execution call hits the False branch."""
 
         monkeypatch.setattr(cs, '_SHARED_CACHE_FILE', str(tmp_path / "metrics2.json"))
         monkeypatch.setattr(cs, '_SHARED_CACHE_LOCK', str(tmp_path / "metrics2.lock"))

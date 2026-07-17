@@ -130,36 +130,249 @@ class TestAppendSchedulerLog:
         assert len(result) == 3
 
 
+def _isolated_layout(tmp_path):
+    """Patch the storage module onto a temp per-location layout (no legacy migration)."""
+    return (
+        patch.object(skytonight_storage, "SKYTONIGHT_CALCULATIONS_DIR", str(tmp_path / "calc")),
+        patch.object(skytonight_storage, "SKYTONIGHT_OUTPUT_DIR", str(tmp_path / "outputs")),
+        patch.object(skytonight_storage, "migrate_legacy_results", lambda *a, **k: False),
+    )
+
+
 class TestHasResultsHelpers:
-    """Tests for has_*_results helpers."""
+    """Tests for has_*_results helpers (per-location layout, v1.2)."""
 
-    def test_has_calculation_results_false_when_file_missing(self):
-        with patch("skytonight_storage.SKYTONIGHT_RESULTS_FILE", "/nonexistent/path/results.json"):
-            assert has_calculation_results() is False
+    def test_has_calculation_results_false_when_file_missing(self, tmp_path):
+        p1, p2, p3 = _isolated_layout(tmp_path)
+        with p1, p2, p3:
+            assert has_calculation_results("loc-missing") is False
 
-    def test_has_bodies_results_false_when_file_missing(self):
-        with patch("skytonight_storage.SKYTONIGHT_BODIES_RESULTS_FILE", "/nonexistent/path/bodies.json"):
-            assert has_bodies_results() is False
+    def test_has_bodies_results_false_when_file_missing(self, tmp_path):
+        p1, p2, p3 = _isolated_layout(tmp_path)
+        with p1, p2, p3:
+            assert has_bodies_results("loc-missing") is False
 
-    def test_has_comets_results_false_when_file_missing(self):
-        with patch("skytonight_storage.SKYTONIGHT_COMETS_RESULTS_FILE", "/nonexistent/path/comets.json"):
-            assert has_comets_results() is False
+    def test_has_comets_results_false_when_file_missing(self, tmp_path):
+        p1, p2, p3 = _isolated_layout(tmp_path)
+        with p1, p2, p3:
+            assert has_comets_results("loc-missing") is False
 
-    def test_has_dso_results_false_when_file_missing(self):
-        with patch("skytonight_storage.SKYTONIGHT_DSO_RESULTS_FILE", "/nonexistent/path/dso.json"):
-            assert has_dso_results() is False
+    def test_has_dso_results_false_when_file_missing(self, tmp_path):
+        p1, p2, p3 = _isolated_layout(tmp_path)
+        with p1, p2, p3:
+            assert has_dso_results("loc-missing") is False
 
     def test_has_calculation_results_true_when_valid_file(self, tmp_path):
-        results_file = tmp_path / "results.json"
-        results_file.write_text(json.dumps({"metadata": {"in_progress": False}}), encoding="utf-8")
-        with patch("skytonight_storage.SKYTONIGHT_RESULTS_FILE", str(results_file)):
-            assert has_calculation_results() is True
+        p1, p2, p3 = _isolated_layout(tmp_path)
+        with p1, p2, p3:
+            results_file = skytonight_storage.get_results_file("loc-1")
+            with open(results_file, "w", encoding="utf-8") as f:
+                json.dump({"metadata": {"in_progress": False}}, f)
+            assert has_calculation_results("loc-1") is True
 
     def test_has_calculation_results_false_when_in_progress(self, tmp_path):
-        results_file = tmp_path / "results_ip.json"
-        results_file.write_text(json.dumps({"metadata": {"in_progress": True}}), encoding="utf-8")
-        with patch("skytonight_storage.SKYTONIGHT_RESULTS_FILE", str(results_file)):
-            assert has_calculation_results() is False
+        p1, p2, p3 = _isolated_layout(tmp_path)
+        with p1, p2, p3:
+            results_file = skytonight_storage.get_results_file("loc-2")
+            with open(results_file, "w", encoding="utf-8") as f:
+                json.dump({"metadata": {"in_progress": True}}, f)
+            assert has_calculation_results("loc-2") is False
+
+    def test_results_are_isolated_between_locations(self, tmp_path):
+        p1, p2, p3 = _isolated_layout(tmp_path)
+        with p1, p2, p3:
+            results_file = skytonight_storage.get_results_file("loc-a")
+            with open(results_file, "w", encoding="utf-8") as f:
+                json.dump({"metadata": {"in_progress": False}}, f)
+            assert has_calculation_results("loc-a") is True
+            assert has_calculation_results("loc-b") is False
+
+
+class TestPerLocationResultsLayout:
+    """v1.2 per-location result directories: paths, migration, cleanup."""
+
+    def test_result_file_paths_are_scoped_by_location_id(self, tmp_path):
+        p1, p2, p3 = _isolated_layout(tmp_path)
+        with p1, p2, p3:
+            assert os.path.join("calc", "loc-a") in skytonight_storage.get_results_file("loc-a")
+            assert skytonight_storage.get_dso_results_file("loc-a").endswith("dso_results.json")
+            assert skytonight_storage.get_bodies_results_file("loc-a").endswith("bodies_results.json")
+            assert skytonight_storage.get_comets_results_file("loc-a").endswith("comets_results.json")
+            assert skytonight_storage.get_skymap_file("loc-a").endswith("skymap_data.json")
+
+    def test_get_alttime_dir_scoped_and_created(self, tmp_path):
+        p1, p2, p3 = _isolated_layout(tmp_path)
+        with p1, p2, p3:
+            path = skytonight_storage.get_alttime_dir("loc-x")
+            assert os.path.isdir(path)
+            assert os.path.basename(path) == "loc-x"
+
+    def test_drop_location_results_removes_both_dirs(self, tmp_path):
+        p1, p2, p3 = _isolated_layout(tmp_path)
+        with p1, p2, p3:
+            results_file = skytonight_storage.get_results_file("loc-drop")
+            with open(results_file, "w", encoding="utf-8") as f:
+                json.dump({}, f)
+            alttime_dir = skytonight_storage.get_alttime_dir("loc-drop")
+            assert skytonight_storage.drop_location_results("loc-drop") is True
+            assert not os.path.isdir(os.path.dirname(results_file))
+            assert not os.path.isdir(alttime_dir)
+
+    def test_drop_location_results_false_for_missing_or_empty_id(self, tmp_path):
+        p1, p2, p3 = _isolated_layout(tmp_path)
+        with p1, p2, p3:
+            assert skytonight_storage.drop_location_results("never-existed") is False
+            assert skytonight_storage.drop_location_results("") is False
+
+    def test_migrate_legacy_results_moves_flat_files(self, tmp_path):
+        calc_dir = tmp_path / "calc"
+        out_dir = tmp_path / "outputs"
+        calc_dir.mkdir()
+        out_dir.mkdir()
+        legacy_results = calc_dir / "calculation_results.json"
+        legacy_results.write_text(json.dumps({"metadata": {}}), encoding="utf-8")
+        legacy_alttime = out_dir / "dso-m31_alttime.json"
+        legacy_alttime.write_text("{}", encoding="utf-8")
+
+        with patch.object(skytonight_storage, "SKYTONIGHT_CALCULATIONS_DIR", str(calc_dir)), patch.object(
+            skytonight_storage, "SKYTONIGHT_OUTPUT_DIR", str(out_dir)
+        ), patch.object(
+            skytonight_storage, "_LEGACY_RESULT_FILES", {str(legacy_results): "calculation_results.json"}
+        ):
+            assert skytonight_storage.migrate_legacy_results("loc-mig") is True
+            assert not legacy_results.exists()
+            assert not legacy_alttime.exists()
+            assert (calc_dir / "loc-mig" / "calculation_results.json").is_file()
+            assert (out_dir / "loc-mig" / "dso-m31_alttime.json").is_file()
+
+    def test_migrate_legacy_results_removes_leftover_when_destination_exists(self, tmp_path):
+        calc_dir = tmp_path / "calc"
+        out_dir = tmp_path / "outputs"
+        (calc_dir / "loc-mig").mkdir(parents=True)
+        out_dir.mkdir()
+        legacy_results = calc_dir / "calculation_results.json"
+        legacy_results.write_text(json.dumps({"metadata": {"old": True}}), encoding="utf-8")
+        destination = calc_dir / "loc-mig" / "calculation_results.json"
+        destination.write_text(json.dumps({"metadata": {"new": True}}), encoding="utf-8")
+
+        with patch.object(skytonight_storage, "SKYTONIGHT_CALCULATIONS_DIR", str(calc_dir)), patch.object(
+            skytonight_storage, "SKYTONIGHT_OUTPUT_DIR", str(out_dir)
+        ), patch.object(
+            skytonight_storage, "_LEGACY_RESULT_FILES", {str(legacy_results): "calculation_results.json"}
+        ):
+            assert skytonight_storage.migrate_legacy_results("loc-mig") is True
+            assert not legacy_results.exists()
+            assert json.loads(destination.read_text(encoding="utf-8"))["metadata"] == {"new": True}
+
+    def test_migrate_noop_when_nothing_to_migrate(self, tmp_path):
+        calc_dir = tmp_path / "calc"
+        out_dir = tmp_path / "outputs"
+        calc_dir.mkdir()
+        out_dir.mkdir()
+        with patch.object(skytonight_storage, "SKYTONIGHT_CALCULATIONS_DIR", str(calc_dir)), patch.object(
+            skytonight_storage, "SKYTONIGHT_OUTPUT_DIR", str(out_dir)
+        ), patch.object(skytonight_storage, "_LEGACY_RESULT_FILES", {}):
+            assert skytonight_storage.migrate_legacy_results("loc-mig") is False
+
+    def test_migrate_noop_without_target_id(self, tmp_path):
+        calc_dir = tmp_path / "calc"
+        out_dir = tmp_path / "outputs"
+        calc_dir.mkdir()
+        out_dir.mkdir()
+        legacy_results = calc_dir / "calculation_results.json"
+        legacy_results.write_text("{}", encoding="utf-8")
+        with patch.object(skytonight_storage, "SKYTONIGHT_CALCULATIONS_DIR", str(calc_dir)), patch.object(
+            skytonight_storage, "SKYTONIGHT_OUTPUT_DIR", str(out_dir)
+        ), patch.object(
+            skytonight_storage, "_LEGACY_RESULT_FILES", {str(legacy_results): "calculation_results.json"}
+        ), patch.object(skytonight_storage, "_default_location_id", lambda: None):
+            assert skytonight_storage.migrate_legacy_results(None) is False
+            assert legacy_results.exists()
+
+
+class TestRemainingStorageGapArcs:
+    """Targeted coverage for the last defensive/error-handling arcs."""
+
+    def test_default_location_id_returns_none_on_exception(self, monkeypatch):
+        import repo_config
+
+        def _raise():
+            raise RuntimeError("config unavailable")
+
+        monkeypatch.setattr(repo_config, "load_config", _raise)
+        assert skytonight_storage._default_location_id() is None
+
+    def test_legacy_alttime_files_returns_empty_on_oserror(self, tmp_path):
+        missing_dir = str(tmp_path / "does-not-exist")
+        with patch.object(skytonight_storage, "SKYTONIGHT_OUTPUT_DIR", missing_dir):
+            assert skytonight_storage._legacy_alttime_files() == []
+
+    def test_migrate_legacy_results_skips_missing_entries_in_mixed_set(self, tmp_path):
+        calc_dir = tmp_path / "calc"
+        out_dir = tmp_path / "outputs"
+        calc_dir.mkdir()
+        out_dir.mkdir()
+        present = calc_dir / "calculation_results.json"
+        present.write_text("{}", encoding="utf-8")
+        absent = calc_dir / "dso_results.json"  # never created - hits the `continue` arc
+
+        with patch.object(skytonight_storage, "SKYTONIGHT_CALCULATIONS_DIR", str(calc_dir)), patch.object(
+            skytonight_storage, "SKYTONIGHT_OUTPUT_DIR", str(out_dir)
+        ), patch.object(
+            skytonight_storage,
+            "_LEGACY_RESULT_FILES",
+            {str(present): "calculation_results.json", str(absent): "dso_results.json"},
+        ):
+            assert skytonight_storage.migrate_legacy_results("loc-mixed") is True
+            assert (calc_dir / "loc-mixed" / "calculation_results.json").is_file()
+            assert not (calc_dir / "loc-mixed" / "dso_results.json").exists()
+
+    def test_migrate_legacy_alttime_removes_source_when_destination_exists(self, tmp_path):
+        calc_dir = tmp_path / "calc"
+        out_dir = tmp_path / "outputs"
+        calc_dir.mkdir()
+        out_dir.mkdir()
+        legacy_alttime = out_dir / "dso-m31_alttime.json"
+        legacy_alttime.write_text('{"old": true}', encoding="utf-8")
+        dest_dir = out_dir / "loc-mig"
+        dest_dir.mkdir()
+        destination = dest_dir / "dso-m31_alttime.json"
+        destination.write_text('{"new": true}', encoding="utf-8")
+
+        with patch.object(skytonight_storage, "SKYTONIGHT_CALCULATIONS_DIR", str(calc_dir)), patch.object(
+            skytonight_storage, "SKYTONIGHT_OUTPUT_DIR", str(out_dir)
+        ), patch.object(skytonight_storage, "_LEGACY_RESULT_FILES", {}):
+            assert skytonight_storage.migrate_legacy_results("loc-mig") is True
+            assert not legacy_alttime.exists()
+            assert json.loads(destination.read_text(encoding="utf-8")) == {"new": True}
+
+    def test_migrate_legacy_alttime_oserror_is_swallowed(self, tmp_path):
+        calc_dir = tmp_path / "calc"
+        out_dir = tmp_path / "outputs"
+        calc_dir.mkdir()
+        out_dir.mkdir()
+        legacy_alttime = out_dir / "dso-m31_alttime.json"
+        legacy_alttime.write_text("{}", encoding="utf-8")
+
+        with patch.object(skytonight_storage, "SKYTONIGHT_CALCULATIONS_DIR", str(calc_dir)), patch.object(
+            skytonight_storage, "SKYTONIGHT_OUTPUT_DIR", str(out_dir)
+        ), patch.object(skytonight_storage, "_LEGACY_RESULT_FILES", {}), patch.object(
+            skytonight_storage.shutil, "move", side_effect=OSError("locked")
+        ):
+            # Must not raise - a locked file is left behind for the next attempt.
+            assert skytonight_storage.migrate_legacy_results("loc-mig") is False
+            assert legacy_alttime.exists()
+
+    def test_drop_location_results_oserror_is_swallowed(self, tmp_path):
+        calc_dir = tmp_path / "calc"
+        out_dir = tmp_path / "outputs"
+        (calc_dir / "loc-locked").mkdir(parents=True)
+        out_dir.mkdir()
+
+        with patch.object(skytonight_storage, "SKYTONIGHT_CALCULATIONS_DIR", str(calc_dir)), patch.object(
+            skytonight_storage, "SKYTONIGHT_OUTPUT_DIR", str(out_dir)
+        ), patch.object(skytonight_storage.shutil, "rmtree", side_effect=OSError("locked")):
+            assert skytonight_storage.drop_location_results("loc-locked") is False
 
 
 class TestAppendSchedulerLogNewlineBranch:

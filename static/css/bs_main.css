@@ -426,6 +426,14 @@ body.density-compact .alert {
     margin-bottom: 0;
 }
 
+/* Location admin card minimap (Parameters -> Locations): fixed-height preview,
+   background shows while Leaflet tiles are still loading or unavailable. */
+.location-card-map {
+    height: 120px;
+    width: 100%;
+    background-color: var(--bs-secondary-bg);
+}
+
 .btn-icon-square {
     width: 2rem;
     min-width: 2rem;

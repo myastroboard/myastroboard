@@ -2,68 +2,80 @@
 # ---------------------------------------------------------------------------
 # Coverage boost — targeted tests for specific uncovered paths in app.py
 # ---------------------------------------------------------------------------
+import time as _time
+
 import pytest
 import app as _app_mod
 import cache_store as _cache_store
+
+
+def _install_default_location_id():
+    """The admin client's active location = the install default preset (v1.2)."""
+    from repo_config import load_config, get_install_default_location
+
+    return get_install_default_location(load_config()).get('id')
+
+
+def _plant_slot(name, data, fresh=True):
+    """Plant `data` in the active location's slot; fresh=True makes the TTL valid."""
+    entry = _cache_store.get_location_cache_entry(name, _install_default_location_id())
+    entry['data'] = data
+    entry['timestamp'] = (_time.time() + 60) if fresh else 0
+    return entry
+
+
+def _isolate_shared_file(monkeypatch):
+    """Keep load_location_cache from overriding planted slots with disk state."""
+    monkeypatch.setattr(_cache_store, 'load_shared_cache_entry', lambda *_: None)
 
 
 # ---------------------------------------------------------------------------
 
 
 class TestCacheSyncPaths:
-    """Tests for cache-sync code paths (sync returns True then is_cache_valid True)."""
+    """v1.2 cache-hit arcs: a fresh per-location slot short-circuits each route."""
 
-    @staticmethod
-    def _sync_then_valid(monkeypatch, cache_attr, data, valid_method='is_cache_valid'):
-        cache = getattr(_cache_store, cache_attr)
-        cache['data'] = data
-        call_counts = {}
-
-        def is_valid_fake(c, ttl):
-            key = id(c)
-            call_counts[key] = call_counts.get(key, 0) + 1
-            return call_counts[key] >= 2
-
-        monkeypatch.setattr(_cache_store, valid_method, is_valid_fake)
-        monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda *_: True)
+    def _fresh(self, monkeypatch, name, data):
+        _isolate_shared_file(monkeypatch)
+        _plant_slot(name, data, fresh=True)
 
     def test_moon_report_sync_path(self, client_admin, monkeypatch):
-        self._sync_then_valid(monkeypatch, '_moon_report_cache', {'moon': 'data'})
+        self._fresh(monkeypatch, 'moon_report', {'moon': 'data'})
         resp = client_admin.get('/api/moon/report')
         assert resp.status_code == 200
 
     def test_dark_window_sync_path(self, client_admin, monkeypatch):
-        self._sync_then_valid(monkeypatch, '_dark_window_report_cache', {'window': 'data'})
+        self._fresh(monkeypatch, 'dark_window', {'window': 'data'})
         resp = client_admin.get('/api/moon/dark-window')
         assert resp.status_code == 200
 
     def test_horizon_graph_sync_path(self, client_admin, monkeypatch):
-        self._sync_then_valid(monkeypatch, '_horizon_graph_cache', {'graph': 'data'})
+        self._fresh(monkeypatch, 'horizon_graph', {'graph': 'data'})
         resp = client_admin.get('/api/astro/horizon-graph')
         assert resp.status_code == 200
 
     def test_seeing_forecast_sync_path(self, client_admin, monkeypatch):
-        self._sync_then_valid(monkeypatch, '_seeing_forecast_cache', {'seeing': 'data'})
+        self._fresh(monkeypatch, 'seeing_forecast', {'seeing': 'data'})
         resp = client_admin.get('/api/seeing-forecast')
         assert resp.status_code == 200
 
     def test_planetary_events_sync_path(self, client_admin, monkeypatch):
-        self._sync_then_valid(monkeypatch, '_planetary_events_cache', {'events': []})
+        self._fresh(monkeypatch, 'planetary_events', {'events': []})
         resp = client_admin.get('/api/events/planetary')
         assert resp.status_code == 200
 
     def test_special_phenomena_sync_path(self, client_admin, monkeypatch):
-        self._sync_then_valid(monkeypatch, '_special_phenomena_cache', {'events': []})
+        self._fresh(monkeypatch, 'special_phenomena', {'events': []})
         resp = client_admin.get('/api/events/phenomena')
         assert resp.status_code == 200
 
     def test_solar_system_events_sync_path(self, client_admin, monkeypatch):
-        self._sync_then_valid(monkeypatch, '_solar_system_events_cache', {'events': []})
+        self._fresh(monkeypatch, 'solar_system_events', {'events': []})
         resp = client_admin.get('/api/events/solarsystem')
         assert resp.status_code == 200
 
     def test_iss_passes_sync_path(self, client_admin, monkeypatch):
-        self._sync_then_valid(monkeypatch, '_iss_passes_cache', {'window_days': 20, 'passes': []})
+        self._fresh(monkeypatch, 'iss_passes', {'window_days': 20, 'passes': []})
         import iss_passes as _iss
         monkeypatch.setattr(_iss, 'get_celestrak_status', lambda: 'ok')
         monkeypatch.setattr(_iss, 'get_iss_tle_source_info', lambda: {})
@@ -71,42 +83,27 @@ class TestCacheSyncPaths:
         assert resp.status_code == 200
 
     def test_all_events_eclipse_sync_paths(self, client_admin, monkeypatch):
-        """Cache sync branches in get_all_events_api for multiple caches."""
-        call_counts = {}
-
-        def is_valid_per_cache(c, ttl):
-            key = id(c)
-            call_counts[key] = call_counts.get(key, 0) + 1
-            return call_counts[key] >= 2
-
-        monkeypatch.setattr(_cache_store, 'is_cache_valid', is_valid_per_cache)
-        monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda *_: True)
-        for attr in (
-            '_solar_eclipse_cache',
-            '_lunar_eclipse_cache',
-            '_aurora_cache',
-            '_iss_passes_cache',
-            '_moon_planner_report_cache',
-            '_planetary_events_cache',
-            '_special_phenomena_cache',
-            '_solar_system_events_cache',
+        """Aggregation arcs in get_all_events_api with every slot empty."""
+        _isolate_shared_file(monkeypatch)
+        monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda *_: False)
+        for name in (
+            'solar_eclipse',
+            'lunar_eclipse',
+            'aurora',
+            'iss_passes',
+            'moon_planner',
+            'planetary_events',
+            'special_phenomena',
+            'solar_system_events',
         ):
-            getattr(_cache_store, attr)['data'] = None
+            _plant_slot(name, None, fresh=False)
         resp = client_admin.get('/api/events/upcoming')
         assert resp.status_code in (200, 400, 500)
 
     def test_sidereal_time_sync_valid_for_today(self, client_admin, monkeypatch):
-        """Covers lines 2821->2824 – cache valid-for-today after sync."""
-        call_counts = {}
-
-        def is_valid_today(c, ttl):
-            key = id(c)
-            call_counts[key] = call_counts.get(key, 0) + 1
-            return call_counts[key] >= 2
-
-        _cache_store._sidereal_time_cache['data'] = {'hourly_forecast': []}
-        monkeypatch.setattr(_cache_store, 'is_cache_valid_for_today', is_valid_today)
-        monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda *_: True)
+        """Fresh sidereal slot valid-for-today → served from cache."""
+        _isolate_shared_file(monkeypatch)
+        _plant_slot('sidereal_time', {'hourly_forecast': []}, fresh=True)
         import sidereal_time as _st
         monkeypatch.setattr(
             _st.SiderealTimeService,
@@ -117,10 +114,10 @@ class TestCacheSyncPaths:
         assert resp.status_code in (200, 400)
 
     def test_seeing_forecast_not_ready_returns_202(self, client_admin, monkeypatch):
-        """Covers line 1972 – seeing forecast pending."""
+        """Seeing forecast slot empty → 202 pending."""
+        _isolate_shared_file(monkeypatch)
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda *_: False)
-        monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda *_: False)
-        _cache_store._seeing_forecast_cache['data'] = None
+        _plant_slot('seeing_forecast', None, fresh=False)
         resp = client_admin.get('/api/seeing-forecast')
         assert resp.status_code == 202
 
@@ -141,10 +138,10 @@ class TestWeatherForecastLiveData:
             'hourly': df,
             'location': {'name': 'TestCity', 'lat': '48.85'},
         }
+        _isolate_shared_file(monkeypatch)
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda *_: False)
-        monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda *_: False)
-        monkeypatch.setattr(_app_mod, 'get_hourly_forecast', lambda: mock_forecast)
-        monkeypatch.setattr(_cache_store, 'update_shared_cache_entry', lambda *_: None)
+        monkeypatch.setattr(_app_mod, 'get_hourly_forecast', lambda **_kw: mock_forecast)
+        monkeypatch.setattr(_cache_store, 'update_location_cache', lambda *_a, **_k: None)
 
         resp = client_admin.get('/api/weather/forecast')
         assert resp.status_code == 200
@@ -462,46 +459,43 @@ class TestBackupRestorePaths:
 class TestTranslationBranches:
     """Tests covering translation edge cases in solar-system and phenomena routes."""
 
-    def test_solar_system_events_non_list_events(self, client_admin, monkeypatch):
-        """Covers line 2590 – events is not a list."""
+    def _stale(self, monkeypatch, name, data):
+        """Plant stale slot data: TTL invalid → route serves+translates stale."""
+        _isolate_shared_file(monkeypatch)
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda *_: False)
-        monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda *_: False)
-        _cache_store._solar_system_events_cache['data'] = {'events': 'not-a-list', 'language': 'en'}
+        entry = _plant_slot(name, data, fresh=False)
+        entry['timestamp'] = 1.0
+
+    def test_solar_system_events_non_list_events(self, client_admin, monkeypatch):
+        """events is not a list."""
+        self._stale(monkeypatch, 'solar_system_events', {'events': 'not-a-list', 'language': 'en'})
         resp = client_admin.get('/api/events/solarsystem?lang=fr')
         assert resp.status_code == 200
 
     def test_solar_system_events_non_dict_event(self, client_admin, monkeypatch):
-        """Covers lines 2598-2599 – event in list is not a dict."""
-        monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda *_: False)
-        monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda *_: False)
-        _cache_store._solar_system_events_cache['data'] = {'events': ['string-event'], 'language': 'en'}
+        """event in list is not a dict."""
+        self._stale(monkeypatch, 'solar_system_events', {'events': ['string-event'], 'language': 'en'})
         resp = client_admin.get('/api/events/solarsystem?lang=fr')
         assert resp.status_code == 200
 
     def test_solar_system_asteroid_occultation_event(self, client_admin, monkeypatch):
-        """Covers lines 2636->2645 – Asteroid Occultation event translation branch."""
-        monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda *_: False)
-        monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda *_: False)
-        _cache_store._solar_system_events_cache['data'] = {
+        """Asteroid Occultation event translation branch."""
+        self._stale(monkeypatch, 'solar_system_events', {
             'events': [{'event_type': 'Asteroid Occultation', 'title': 'Ast', 'description': 'Desc'}],
             'language': 'en',
-        }
+        })
         resp = client_admin.get('/api/events/solarsystem?lang=fr')
         assert resp.status_code == 200
 
     def test_special_phenomena_non_list_events(self, client_admin, monkeypatch):
-        """Covers line 2657 – special phenomena events not a list."""
-        monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda *_: False)
-        monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda *_: False)
-        _cache_store._special_phenomena_cache['data'] = {'events': 'bad', 'language': 'en'}
+        """special phenomena events not a list."""
+        self._stale(monkeypatch, 'special_phenomena', {'events': 'bad', 'language': 'en'})
         resp = client_admin.get('/api/events/phenomena?lang=fr')
         assert resp.status_code == 200
 
     def test_special_phenomena_non_dict_event(self, client_admin, monkeypatch):
-        """Covers lines 2675-2676 – non-dict event in special phenomena."""
-        monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda *_: False)
-        monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda *_: False)
-        _cache_store._special_phenomena_cache['data'] = {'events': [42], 'language': 'en'}
+        """non-dict event in special phenomena."""
+        self._stale(monkeypatch, 'special_phenomena', {'events': [42], 'language': 'en'})
         resp = client_admin.get('/api/events/phenomena?lang=fr')
         assert resp.status_code == 200
 
@@ -541,7 +535,7 @@ class TestPlanMyNightCoveragePaths:
         monkeypatch.setattr(_SS, 'get_today_report', sun_raise)
         monkeypatch.setattr(
             _app_mod, 'load_calculation_results',
-            lambda: {
+            lambda *_a, **_k: {
                 'metadata': {
                     'night_start': '2026-06-07T22:00:00',
                     'night_end': '2026-06-08T04:00:00',

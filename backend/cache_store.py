@@ -1,6 +1,24 @@
 """
 Server-side cache management with TTL-based expiration and config change detection.
 All cache management is handled server-side only.
+
+Multi-location model (v1.2)
+---------------------------
+Caches are split into two buckets:
+
+- **Location-scoped** caches (moon/sun/eclipses/horizon/sidereal/planetary/
+  phenomena/solar-system/aurora/ISS/CSS passes/seeing/weather/best-window):
+  one slot per location preset, keyed by the preset's immutable ``id``.
+  On-disk keys in ``astro_cache.json`` are ``"<name>:<location_id>"``.
+  Access them via :func:`get_location_cache_entry`, :func:`load_location_cache`
+  and :func:`update_location_cache` - never via module-level singletons.
+
+- **Global** caches (spaceflight, IERS, version check, AllSky connector):
+  the external data does not vary by observer location; they keep the legacy
+  single-slot module-level shape and plain on-disk keys.
+
+Editing one preset's coordinates invalidates only that preset's caches
+(:func:`reset_caches_for_location`), not the whole install.
 """
 
 import time
@@ -42,35 +60,44 @@ if sys.platform == "win32":
 else:  # pragma: no cover
     import fcntl
 
-# Cache entries with timestamp for TTL tracking
-_moon_report_cache = {"timestamp": 0, "data": None}
-_sun_report_cache = {"timestamp": 0, "data": None}
-_best_window_cache = {
-    "strict": {"timestamp": 0, "data": None},
-    "practical": {"timestamp": 0, "data": None},
-    "illumination": {"timestamp": 0, "data": None},
-}
-_moon_planner_report_cache = {"timestamp": 0, "data": None}
-_dark_window_report_cache = {"timestamp": 0, "data": None}
-_solar_eclipse_cache = {"timestamp": 0, "data": None}
-_lunar_eclipse_cache = {"timestamp": 0, "data": None}
-_horizon_graph_cache = {"timestamp": 0, "data": None}
-_aurora_cache = {"timestamp": 0, "data": None}
-_iss_passes_cache = {"timestamp": 0, "data": None}
-_css_passes_cache = {"timestamp": 0, "data": None}
-_planetary_events_cache = {"timestamp": 0, "data": None}
-_special_phenomena_cache = {"timestamp": 0, "data": None}
-_solar_system_events_cache = {"timestamp": 0, "data": None}
-_sidereal_time_cache = {"timestamp": 0, "data": None}
-_seeing_forecast_cache = {"timestamp": 0, "data": None}
+# ---------------------------------------------------------------------------
+# Location-scoped cache registry
+# ---------------------------------------------------------------------------
 
-# Spaceflight caches (Launch Library 2)
+# Single source of truth: every location-scoped cache name and its TTL.
+LOCATION_SCOPED_CACHE_TTLS = {
+    "moon_report": CACHE_TTL_MOON_REPORT,
+    "dark_window": CACHE_TTL_DARK_WINDOW,
+    "moon_planner": CACHE_TTL_MOON_PLANNER,
+    "sun_report": CACHE_TTL_SUN_REPORT,
+    "best_window_strict": CACHE_TTL_BEST_WINDOW,
+    "best_window_practical": CACHE_TTL_BEST_WINDOW,
+    "best_window_illumination": CACHE_TTL_BEST_WINDOW,
+    "solar_eclipse": CACHE_TTL_SOLAR_ECLIPSE,
+    "lunar_eclipse": CACHE_TTL_LUNAR_ECLIPSE,
+    "horizon_graph": CACHE_TTL_HORIZON_GRAPH,
+    "aurora": CACHE_TTL_AURORA,
+    "iss_passes": CACHE_TTL_ISS_PASSES,
+    "css_passes": CACHE_TTL_CSS_PASSES,
+    "planetary_events": CACHE_TTL_PLANETARY_EVENTS,
+    "special_phenomena": CACHE_TTL_SPECIAL_PHENOMENA,
+    "solar_system_events": CACHE_TTL_SOLAR_SYSTEM_EVENTS,
+    "sidereal_time": CACHE_TTL_SIDEREAL_TIME,
+    "seeing_forecast": CACHE_TTL_SEEING_FORECAST,
+    "weather_forecast": WEATHER_CACHE_TTL,
+}
+
+# Names checked by is_astronomical_cache_ready() - weather is intentionally
+# excluded (it has a live-fetch fallback path and must not gate readiness).
+_READINESS_LOCATION_CACHES = tuple(n for n in LOCATION_SCOPED_CACHE_TTLS if n != "weather_forecast")
+
+# name -> {location_id -> {"timestamp": float, "data": Any}}
+_location_caches = {name: {} for name in LOCATION_SCOPED_CACHE_TTLS}
+
+# Global caches (external data does not vary by observer location)
 _spaceflight_launches_cache = {"timestamp": 0, "data": None}
 _spaceflight_astronauts_cache = {"timestamp": 0, "data": None}
 _spaceflight_events_cache = {"timestamp": 0, "data": None}
-
-# Weather cache (separate TTL)
-_weather_cache = {"timestamp": 0, "data": None}
 
 # IERS-A Earth-orientation data cache (managed by scheduler, long TTL)
 _iers_cache = {"timestamp": 0, "data": None}
@@ -82,10 +109,19 @@ _version_update_cache = {"timestamp": 0, "data": None}
 _allsky_sensor_cache = {"timestamp": 0, "data": None}
 _allsky_health_cache = {"timestamp": 0, "data": None}
 
-# Track the last known location config to detect changes
-# This is loaded from disk to survive restarts
+_GLOBAL_SHARED_CACHES = {
+    "spaceflight_launches": _spaceflight_launches_cache,
+    "spaceflight_astronauts": _spaceflight_astronauts_cache,
+    "spaceflight_events": _spaceflight_events_cache,
+    "iers": _iers_cache,
+}
+
+# Track the last known location signatures to detect changes, keyed by
+# location preset id (legacy single-location callers use the __legacy__ slot).
+# Loaded from disk to survive restarts.
 _LOCATION_CACHE_FILE = os.path.join(DATA_DIR_CACHE, 'location_cache.json')
-_last_known_location_config = {"latitude": None, "longitude": None, "elevation": None, "timezone": None}
+_LEGACY_SIGNATURE_KEY = "__legacy__"
+_last_known_location_signatures = {}
 
 # Shared cache file (cross-worker)
 # Note: _cache_initialization_in_progress is now stored in the shared cache file
@@ -201,67 +237,133 @@ def get_version_update_cache_entry():
     return _version_update_cache
 
 
-def _write_all_astronomical_caches_to_shared():
-    """Persist all astronomical caches to shared file"""
+# ---------------------------------------------------------------------------
+# Location-scoped cache accessors
+# ---------------------------------------------------------------------------
+
+
+def location_cache_key(name, location_id):
+    """On-disk shared-cache key for a (cache name, location preset id) pair."""
+    return f"{name}:{location_id}"
+
+
+def get_location_cache_entry(name, location_id):
+    """Return the mutable in-memory entry for (name, location), creating it if needed."""
+    if name not in _location_caches:
+        raise KeyError(f"Unknown location-scoped cache: {name}")
+    slots = _location_caches[name]
+    if location_id not in slots:
+        slots[location_id] = {"timestamp": 0, "data": None}
+    return slots[location_id]
+
+
+def load_location_cache(name, location_id):
+    """Return the (name, location) entry, syncing from the shared file when the
+    in-memory copy is empty or older than the persisted one."""
+    entry = get_location_cache_entry(name, location_id)
+    shared = load_shared_cache_entry(location_cache_key(name, location_id))
+    if shared and shared.get("data") is not None and shared.get("timestamp", 0) >= entry["timestamp"]:
+        entry["data"] = shared["data"]
+        entry["timestamp"] = shared.get("timestamp", 0)
+    return entry
+
+
+def update_location_cache(name, location_id, data, timestamp=None):
+    """Write a (name, location) cache entry to memory and to the shared file."""
+    entry = get_location_cache_entry(name, location_id)
+    entry["data"] = data
+    entry["timestamp"] = timestamp if timestamp is not None else time.time()
+    update_shared_cache_entry(location_cache_key(name, location_id), entry["data"], entry["timestamp"])
+    return entry
+
+
+def reset_caches_for_location(location_id):
+    """Invalidate every location-scoped cache slot for one preset only.
+
+    Called when a preset's coordinates/timezone change - other presets' caches
+    are untouched (this replaces the pre-v1.2 wipe-everything behavior).
+    """
+    for name in _location_caches:
+        _location_caches[name][location_id] = {"timestamp": 0, "data": None}
     with _cache_file_write_lock():
-        shared_cache = _read_shared_cache()
-        shared_cache.update(
-            {
-                "moon_report": _moon_report_cache,
-                "sun_report": _sun_report_cache,
-                "moon_planner": _moon_planner_report_cache,
-                "dark_window": _dark_window_report_cache,
-                "best_window_strict": _best_window_cache["strict"],
-                "best_window_practical": _best_window_cache["practical"],
-                "best_window_illumination": _best_window_cache["illumination"],
-                "solar_eclipse": _solar_eclipse_cache,
-                "lunar_eclipse": _lunar_eclipse_cache,
-                "horizon_graph": _horizon_graph_cache,
-                "aurora": _aurora_cache,
-                "iss_passes": _iss_passes_cache,
-                "css_passes": _css_passes_cache,
-                "planetary_events": _planetary_events_cache,
-                "special_phenomena": _special_phenomena_cache,
-                "solar_system_events": _solar_system_events_cache,
-                "sidereal_time": _sidereal_time_cache,
-                "seeing_forecast": _seeing_forecast_cache,
-                "spaceflight_launches": _spaceflight_launches_cache,
-                "spaceflight_astronauts": _spaceflight_astronauts_cache,
-                "spaceflight_events": _spaceflight_events_cache,
-                "iers": _iers_cache,
-                "allsky_sensor": _allsky_sensor_cache,
-                "allsky_health": _allsky_health_cache,
-            }
-        )
-        _write_shared_cache(shared_cache)
+        shared = _read_shared_cache()
+        removed = [key for key in shared if isinstance(key, str) and key.endswith(f":{location_id}")]
+        for key in removed:
+            del shared[key]
+        _write_shared_cache(shared)
 
 
-def _load_location_cache():
-    """Load persisted location config from disk"""
-    global _last_known_location_config
+def drop_location_caches(location_id):
+    """Remove all cache slots and the tracked signature for a deleted preset."""
+    for name in _location_caches:
+        _location_caches[name].pop(location_id, None)
+    with _cache_file_write_lock():
+        shared = _read_shared_cache()
+        removed = [key for key in shared if isinstance(key, str) and key.endswith(f":{location_id}")]
+        for key in removed:
+            del shared[key]
+        _write_shared_cache(shared)
+    remove_location_signature(location_id)
+
+
+def migrate_legacy_cache_keys(location_id):
+    """One-time upgrade: move pre-v1.2 global cache keys onto a location id.
+
+    Renames plain keys (e.g. ``"sun_report"``) to ``"sun_report:<id>"`` in the
+    shared file so an upgraded install keeps its warm cache instead of
+    triggering a full recompute/refetch storm on first boot.
+    """
+    migrated = 0
+    with _cache_file_write_lock():
+        shared = _read_shared_cache()
+        for name in LOCATION_SCOPED_CACHE_TTLS:
+            keyed = location_cache_key(name, location_id)
+            if name in shared and keyed not in shared:
+                shared[keyed] = shared.pop(name)
+                migrated += 1
+        if migrated:
+            _write_shared_cache(shared)
+    return migrated
+
+
+# ---------------------------------------------------------------------------
+# Location signature tracking (per-preset change detection)
+# ---------------------------------------------------------------------------
+
+
+def _load_location_signatures():
+    """Load persisted location signatures from disk (migrating the legacy flat shape)."""
+    global _last_known_location_signatures
     try:
         _ensure_data_dir()
         if os.path.exists(_LOCATION_CACHE_FILE):
             with open(_LOCATION_CACHE_FILE, 'r') as f:
-                _last_known_location_config = json.load(f)
+                loaded = json.load(f)
+            if isinstance(loaded, dict) and "latitude" in loaded:
+                # Pre-v1.2 flat single-location signature - keep it under the
+                # legacy slot; check_and_handle_config_changes() transfers it
+                # onto the migrated preset's id on the first scheduler cycle.
+                _last_known_location_signatures = {_LEGACY_SIGNATURE_KEY: loaded}
+            elif isinstance(loaded, dict):
+                _last_known_location_signatures = loaded
     except Exception:
-        # If loading fails, keep the default None values
+        # If loading fails, keep the default empty dict
         pass
 
 
-def _save_location_cache():
-    """Persist location config to disk"""
+def _save_location_signatures():
+    """Persist location signatures to disk"""
     try:
         _ensure_data_dir()
         with open(_LOCATION_CACHE_FILE, 'w') as f:
-            json.dump(_last_known_location_config, f, indent=2, ensure_ascii=False)
+            json.dump(_last_known_location_signatures, f, indent=2, ensure_ascii=False)
     except Exception:
         # Not critical if save fails, just means next restart might trigger false positive
         pass
 
 
-# Load persisted location on module import
-_load_location_cache()
+# Load persisted signatures on module import
+_load_location_signatures()
 
 
 def get_current_location_signature(location_config):
@@ -276,79 +378,101 @@ def get_current_location_signature(location_config):
     }
 
 
+def _signature_slot(location_config):
+    """Signature dict key for a location payload: its preset id, or the legacy slot."""
+    if isinstance(location_config, dict) and location_config.get("id"):
+        return location_config["id"]
+    return _LEGACY_SIGNATURE_KEY
+
+
 def has_location_changed(new_location_config):
-    """Check if location parameters have changed"""
+    """Check if location parameters have changed (per preset id).
+
+    Accepts either a v1.2 preset dict (compared against its own id's stored
+    signature) or a legacy flat location dict (compared against the legacy slot).
+    """
     current_signature = get_current_location_signature(new_location_config)
 
     # If current signature is None (invalid config), consider it as changed
     if current_signature is None:
         return True
 
+    stored = _last_known_location_signatures.get(_signature_slot(new_location_config))
+
     # If last config was not set, location has "changed" (first time)
-    if _last_known_location_config["latitude"] is None:
+    if not stored or stored.get("latitude") is None:
         return True
 
-    # Compare current signature with last known
     return (
-        _last_known_location_config["latitude"] != current_signature["latitude"]
-        or _last_known_location_config["longitude"] != current_signature["longitude"]
-        or _last_known_location_config["elevation"] != current_signature["elevation"]
-        or _last_known_location_config["timezone"] != current_signature["timezone"]
+        stored.get("latitude") != current_signature["latitude"]
+        or stored.get("longitude") != current_signature["longitude"]
+        or stored.get("elevation") != current_signature["elevation"]
+        or stored.get("timezone") != current_signature["timezone"]
     )
 
 
+def is_location_tracked(location_config):
+    """Return True when a signature is already stored for this location."""
+    stored = _last_known_location_signatures.get(_signature_slot(location_config))
+    return bool(stored) and stored.get("latitude") is not None
+
+
 def update_location_config(new_location_config):
-    """Update the tracked location config and persist to disk"""
-    global _last_known_location_config
+    """Update the tracked signature for this location and persist to disk"""
     signature = get_current_location_signature(new_location_config)
     if signature:
-        _last_known_location_config = signature.copy()
-        _save_location_cache()
+        _last_known_location_signatures[_signature_slot(new_location_config)] = signature.copy()
+        _save_location_signatures()
+
+
+def remove_location_signature(location_id):
+    """Forget the tracked signature of a deleted preset."""
+    if _last_known_location_signatures.pop(location_id, None) is not None:
+        _save_location_signatures()
+
+
+def pop_legacy_location_signature():
+    """Return and clear the pre-v1.2 flat signature (upgrade path helper)."""
+    legacy = _last_known_location_signatures.pop(_LEGACY_SIGNATURE_KEY, None)
+    if legacy is not None:
+        _save_location_signatures()
+    return legacy
 
 
 def reset_all_caches():
-    """Reset all astronomical caches (called when location changes)"""
-    global _moon_report_cache, _sun_report_cache, _best_window_cache
-    global _moon_planner_report_cache, _dark_window_report_cache
-    global _solar_eclipse_cache, _lunar_eclipse_cache, _horizon_graph_cache
-    global _aurora_cache, _iss_passes_cache, _css_passes_cache
-    global _planetary_events_cache, _special_phenomena_cache, _solar_system_events_cache
-    global _sidereal_time_cache, _seeing_forecast_cache
-    global _spaceflight_launches_cache, _spaceflight_astronauts_cache, _spaceflight_events_cache
-    global _allsky_sensor_cache, _allsky_health_cache
+    """Reset all astronomical caches (every location slot + refreshable globals).
 
-    _moon_report_cache = {"timestamp": 0, "data": None}
-    _sun_report_cache = {"timestamp": 0, "data": None}
-    _best_window_cache = {
-        "strict": {"timestamp": 0, "data": None},
-        "practical": {"timestamp": 0, "data": None},
-        "illumination": {"timestamp": 0, "data": None},
-    }
-    _moon_planner_report_cache = {"timestamp": 0, "data": None}
-    _dark_window_report_cache = {"timestamp": 0, "data": None}
-    _solar_eclipse_cache = {"timestamp": 0, "data": None}
-    _lunar_eclipse_cache = {"timestamp": 0, "data": None}
-    _horizon_graph_cache = {"timestamp": 0, "data": None}
-    _aurora_cache = {"timestamp": 0, "data": None}
-    _iss_passes_cache = {"timestamp": 0, "data": None}
-    _css_passes_cache = {"timestamp": 0, "data": None}
-    _planetary_events_cache = {"timestamp": 0, "data": None}
-    _special_phenomena_cache = {"timestamp": 0, "data": None}
-    _solar_system_events_cache = {"timestamp": 0, "data": None}
-    _sidereal_time_cache = {"timestamp": 0, "data": None}
-    _seeing_forecast_cache = {"timestamp": 0, "data": None}
-    _spaceflight_launches_cache = {"timestamp": 0, "data": None}
-    _spaceflight_astronauts_cache = {"timestamp": 0, "data": None}
-    _spaceflight_events_cache = {"timestamp": 0, "data": None}
-    _allsky_sensor_cache = {"timestamp": 0, "data": None}
-    _allsky_health_cache = {"timestamp": 0, "data": None}
-    _write_all_astronomical_caches_to_shared()
+    Global cache entries are mutated IN PLACE (never rebound): other modules
+    and _GLOBAL_SHARED_CACHES hold references to these dicts, and rebinding
+    would silently detach them from all future syncs/reads.
+    """
+    for name in _location_caches:
+        for location_id in list(_location_caches[name]):
+            _location_caches[name][location_id] = {"timestamp": 0, "data": None}
 
+    for entry in (
+        _spaceflight_launches_cache,
+        _spaceflight_astronauts_cache,
+        _spaceflight_events_cache,
+        _allsky_sensor_cache,
+        _allsky_health_cache,
+    ):
+        entry["timestamp"] = 0
+        entry["data"] = None
 
-def reset_weather_cache():
-    """Reset weather cache (can be called independently)"""
-    global _weather_cache
-    _weather_cache = {"timestamp": 0, "data": None}
+    with _cache_file_write_lock():
+        shared = _read_shared_cache()
+        for key in list(shared):
+            if not isinstance(key, str) or key.startswith("_"):
+                continue
+            base_name = key.split(":", 1)[0]
+            if base_name in LOCATION_SCOPED_CACHE_TTLS or base_name in (
+                "spaceflight_launches",
+                "spaceflight_astronauts",
+                "spaceflight_events",
+            ):
+                shared[key] = {"timestamp": 0, "data": None}
+        _write_shared_cache(shared)
 
 
 def is_cache_valid(cache_entry, ttl_seconds):
@@ -375,69 +499,86 @@ def is_cache_valid_for_today(cache_entry, ttl_seconds):
     return cache_date == datetime.today().date()
 
 
+def _default_status_location_ids():
+    """Location ids the readiness/status checks should cover (lazy config read)."""
+    try:
+        from repo_config import load_config, get_scheduler_locations
+
+        config = load_config()
+        ids = [loc["id"] for loc in get_scheduler_locations(config) if loc.get("id")]
+        if ids:
+            return ids
+    except Exception:
+        pass
+    return []
+
+
+def _allsky_job_availability():
+    """Whether each AllSky job can ever actually run (lazy config read).
+
+    Mirrors the exact scheduling gate in cache_updater.fully_initialize_caches:
+    allsky_health only needs the connector enabled+url, allsky_sensor also
+    needs its own module toggle. A job that can never run must not appear in
+    the metrics table - it would just sit "stale" forever with no explanation.
+    Returns (sensor_available, health_available).
+    """
+    try:
+        from repo_config import load_config
+
+        allsky_cfg = load_config().get("connectors", {}).get("allsky", {})
+    except Exception:
+        return False, False
+    connector_ready = bool(allsky_cfg.get("enabled") and allsky_cfg.get("url"))
+    sensor_ready = connector_ready and bool(allsky_cfg.get("modules", {}).get("sensor_data", {}).get("enabled"))
+    return sensor_ready, connector_ready
+
+
 def _sync_all_from_shared():
     """Read astro_cache.json ONCE and sync all in-memory caches in a single pass."""
     with _cache_file_read_lock():
         shared = _read_shared_cache()
 
-    mapping = {
-        "moon_report": _moon_report_cache,
-        "sun_report": _sun_report_cache,
-        "moon_planner": _moon_planner_report_cache,
-        "dark_window": _dark_window_report_cache,
-        "best_window_strict": _best_window_cache["strict"],
-        "best_window_practical": _best_window_cache["practical"],
-        "best_window_illumination": _best_window_cache["illumination"],
-        "solar_eclipse": _solar_eclipse_cache,
-        "lunar_eclipse": _lunar_eclipse_cache,
-        "horizon_graph": _horizon_graph_cache,
-        "aurora": _aurora_cache,
-        "iss_passes": _iss_passes_cache,
-        "css_passes": _css_passes_cache,
-        "planetary_events": _planetary_events_cache,
-        "special_phenomena": _special_phenomena_cache,
-        "solar_system_events": _solar_system_events_cache,
-        "sidereal_time": _sidereal_time_cache,
-        "seeing_forecast": _seeing_forecast_cache,
-        "spaceflight_launches": _spaceflight_launches_cache,
-        "spaceflight_astronauts": _spaceflight_astronauts_cache,
-        "spaceflight_events": _spaceflight_events_cache,
-        "weather_forecast": _weather_cache,
-        "iers": _iers_cache,
-    }
-    for key, cache_entry in mapping.items():
+    for key, cache_entry in _GLOBAL_SHARED_CACHES.items():
         entry = shared.get(key)
         if isinstance(entry, dict) and entry.get("data") is not None:
             cache_entry["data"] = entry["data"]
             cache_entry["timestamp"] = entry.get("timestamp", 0)
+
+    for key, entry in shared.items():
+        if not isinstance(key, str) or ":" not in key or not isinstance(entry, dict):
+            continue
+        name, location_id = key.split(":", 1)
+        if name in _location_caches and entry.get("data") is not None:
+            slot = get_location_cache_entry(name, location_id)
+            if entry.get("timestamp", 0) >= slot["timestamp"]:
+                slot["data"] = entry["data"]
+                slot["timestamp"] = entry.get("timestamp", 0)
     return shared
 
 
-def is_astronomical_cache_ready():
-    """Check if all astronomical caches are valid and ready"""
+def is_astronomical_cache_ready(location_ids=None):
+    """Check if all astronomical caches are valid and ready.
+
+    Covers every location the scheduler keeps warm (or the explicit
+    *location_ids*) plus the global spaceflight caches.
+    """
     _sync_all_from_shared()
-    all_valid = (
-        is_cache_valid(_moon_report_cache, CACHE_TTL_MOON_REPORT)
-        and is_cache_valid(_sun_report_cache, CACHE_TTL_SUN_REPORT)
-        and is_cache_valid(_best_window_cache["strict"], CACHE_TTL_BEST_WINDOW)
-        and is_cache_valid(_moon_planner_report_cache, CACHE_TTL_MOON_PLANNER)
-        and is_cache_valid(_dark_window_report_cache, CACHE_TTL_DARK_WINDOW)
-        and is_cache_valid(_solar_eclipse_cache, CACHE_TTL_SOLAR_ECLIPSE)
-        and is_cache_valid(_lunar_eclipse_cache, CACHE_TTL_LUNAR_ECLIPSE)
-        and is_cache_valid(_horizon_graph_cache, CACHE_TTL_HORIZON_GRAPH)
-        and is_cache_valid(_aurora_cache, CACHE_TTL_AURORA)
-        and is_cache_valid(_iss_passes_cache, CACHE_TTL_ISS_PASSES)
-        and is_cache_valid(_css_passes_cache, CACHE_TTL_CSS_PASSES)
-        and is_cache_valid(_planetary_events_cache, CACHE_TTL_PLANETARY_EVENTS)
-        and is_cache_valid(_special_phenomena_cache, CACHE_TTL_SPECIAL_PHENOMENA)
-        and is_cache_valid(_solar_system_events_cache, CACHE_TTL_SOLAR_SYSTEM_EVENTS)
-        and is_cache_valid(_sidereal_time_cache, CACHE_TTL_SIDEREAL_TIME)
-        and is_cache_valid(_seeing_forecast_cache, CACHE_TTL_SEEING_FORECAST)
-        and is_cache_valid(_spaceflight_launches_cache, CACHE_TTL_SPACEFLIGHT_LAUNCHES)
+    if location_ids is None:
+        location_ids = _default_status_location_ids()
+    if not location_ids:
+        return False
+
+    for location_id in location_ids:
+        for name in _READINESS_LOCATION_CACHES:
+            entry = get_location_cache_entry(name, location_id)
+            if not is_cache_valid(entry, LOCATION_SCOPED_CACHE_TTLS[name]):
+                return False
+
+    return (
+        is_cache_valid(_spaceflight_launches_cache, CACHE_TTL_SPACEFLIGHT_LAUNCHES)
         and is_cache_valid(_spaceflight_astronauts_cache, CACHE_TTL_SPACEFLIGHT_ASTRONAUTS)
         and is_cache_valid(_spaceflight_events_cache, CACHE_TTL_SPACEFLIGHT_EVENTS)
     )
-    return all_valid
 
 
 def _is_execution_metrics_valid(job_name, ttl):
@@ -463,9 +604,17 @@ def _is_execution_metrics_valid(job_name, ttl):
         return False
 
 
-def get_cache_init_status():
-    """Get detailed cache initialization status"""
+def get_cache_init_status(location_ids=None):
+    """Get detailed cache initialization status.
+
+    Top-level per-cache booleans reflect the install default location (first id
+    of the scheduler set) so the existing Metrics UI keeps its layout; the
+    ``locations`` block details every scheduler location.
+    """
     shared_cache = _sync_all_from_shared()
+    if location_ids is None:
+        location_ids = _default_status_location_ids()
+    primary_id = location_ids[0] if location_ids else None
 
     # Read in_progress status from shared cache for cross-worker visibility
     in_progress = False
@@ -483,85 +632,61 @@ def get_cache_init_status():
         if total_steps > 0:
             progress_percent = int((current_step / total_steps) * 100)
 
-    return {
-        "moon_report": is_cache_valid(_moon_report_cache, CACHE_TTL_MOON_REPORT),
-        "sun_report": is_cache_valid(_sun_report_cache, CACHE_TTL_SUN_REPORT),
-        "best_window_strict": is_cache_valid(_best_window_cache["strict"], CACHE_TTL_BEST_WINDOW),
-        "best_window_practical": is_cache_valid(_best_window_cache["practical"], CACHE_TTL_BEST_WINDOW),
-        "best_window_illumination": is_cache_valid(_best_window_cache["illumination"], CACHE_TTL_BEST_WINDOW),
-        "moon_planner": is_cache_valid(_moon_planner_report_cache, CACHE_TTL_MOON_PLANNER),
-        "dark_window": is_cache_valid(_dark_window_report_cache, CACHE_TTL_DARK_WINDOW),
-        "solar_eclipse": is_cache_valid(_solar_eclipse_cache, CACHE_TTL_SOLAR_ECLIPSE),
-        "lunar_eclipse": is_cache_valid(_lunar_eclipse_cache, CACHE_TTL_LUNAR_ECLIPSE),
-        "horizon_graph": is_cache_valid(_horizon_graph_cache, CACHE_TTL_HORIZON_GRAPH),
-        "aurora": is_cache_valid(_aurora_cache, CACHE_TTL_AURORA),
-        "iss_passes": is_cache_valid(_iss_passes_cache, CACHE_TTL_ISS_PASSES),
-        "css_passes": is_cache_valid(_css_passes_cache, CACHE_TTL_CSS_PASSES),
-        "planetary_events": is_cache_valid(_planetary_events_cache, CACHE_TTL_PLANETARY_EVENTS),
-        "special_phenomena": is_cache_valid(_special_phenomena_cache, CACHE_TTL_SPECIAL_PHENOMENA),
-        "solar_system_events": is_cache_valid(_solar_system_events_cache, CACHE_TTL_SOLAR_SYSTEM_EVENTS),
-        "sidereal_time": is_cache_valid(_sidereal_time_cache, CACHE_TTL_SIDEREAL_TIME),
-        "seeing_forecast": is_cache_valid(_seeing_forecast_cache, CACHE_TTL_SEEING_FORECAST),
-        "spaceflight_launches": is_cache_valid(_spaceflight_launches_cache, CACHE_TTL_SPACEFLIGHT_LAUNCHES),
-        "spaceflight_astronauts": is_cache_valid(_spaceflight_astronauts_cache, CACHE_TTL_SPACEFLIGHT_ASTRONAUTS),
-        "spaceflight_events": is_cache_valid(_spaceflight_events_cache, CACHE_TTL_SPACEFLIGHT_EVENTS),
-        "weather_forecast": is_cache_valid(_weather_cache, WEATHER_CACHE_TTL),
-        "iers": is_cache_valid(_iers_cache, CACHE_TTL_IERS),
-        "allsky_sensor": _is_execution_metrics_valid("allsky_sensor", CACHE_TTL_ALLSKY_SENSOR),
-        "allsky_health": _is_execution_metrics_valid("allsky_health", CACHE_TTL_ALLSKY_HEALTH),
-        "all_ready": (
-            is_cache_valid(_moon_report_cache, CACHE_TTL_MOON_REPORT)
-            and is_cache_valid(_sun_report_cache, CACHE_TTL_SUN_REPORT)
-            and is_cache_valid(_best_window_cache["strict"], CACHE_TTL_BEST_WINDOW)
-            and is_cache_valid(_moon_planner_report_cache, CACHE_TTL_MOON_PLANNER)
-            and is_cache_valid(_dark_window_report_cache, CACHE_TTL_DARK_WINDOW)
-            and is_cache_valid(_solar_eclipse_cache, CACHE_TTL_SOLAR_ECLIPSE)
-            and is_cache_valid(_lunar_eclipse_cache, CACHE_TTL_LUNAR_ECLIPSE)
-            and is_cache_valid(_horizon_graph_cache, CACHE_TTL_HORIZON_GRAPH)
-            and is_cache_valid(_aurora_cache, CACHE_TTL_AURORA)
-            and is_cache_valid(_iss_passes_cache, CACHE_TTL_ISS_PASSES)
-            and is_cache_valid(_css_passes_cache, CACHE_TTL_CSS_PASSES)
-            and is_cache_valid(_planetary_events_cache, CACHE_TTL_PLANETARY_EVENTS)
-            and is_cache_valid(_special_phenomena_cache, CACHE_TTL_SPECIAL_PHENOMENA)
-            and is_cache_valid(_solar_system_events_cache, CACHE_TTL_SOLAR_SYSTEM_EVENTS)
-            and is_cache_valid(_sidereal_time_cache, CACHE_TTL_SIDEREAL_TIME)
-            and is_cache_valid(_seeing_forecast_cache, CACHE_TTL_SEEING_FORECAST)
-            and is_cache_valid(_spaceflight_launches_cache, CACHE_TTL_SPACEFLIGHT_LAUNCHES)
-            and is_cache_valid(_spaceflight_astronauts_cache, CACHE_TTL_SPACEFLIGHT_ASTRONAUTS)
-            and is_cache_valid(_spaceflight_events_cache, CACHE_TTL_SPACEFLIGHT_EVENTS)
-        ),
-        "in_progress": in_progress,
-        "current_step": current_step,
-        "total_steps": total_steps,
-        "step_name": step_name,
-        "progress_percent": progress_percent,
-        "ttls": {
-            "moon_report": CACHE_TTL_MOON_REPORT,
-            "dark_window": CACHE_TTL_DARK_WINDOW,
-            "moon_planner": CACHE_TTL_MOON_PLANNER,
-            "sun_report": CACHE_TTL_SUN_REPORT,
-            "best_window": CACHE_TTL_BEST_WINDOW,
-            "solar_eclipse": CACHE_TTL_SOLAR_ECLIPSE,
-            "lunar_eclipse": CACHE_TTL_LUNAR_ECLIPSE,
-            "horizon_graph": CACHE_TTL_HORIZON_GRAPH,
-            "aurora": CACHE_TTL_AURORA,
-            "iss_passes": CACHE_TTL_ISS_PASSES,
-            "css_passes": CACHE_TTL_CSS_PASSES,
-            "planetary_events": CACHE_TTL_PLANETARY_EVENTS,
-            "special_phenomena": CACHE_TTL_SPECIAL_PHENOMENA,
-            "solar_system_events": CACHE_TTL_SOLAR_SYSTEM_EVENTS,
-            "sidereal_time": CACHE_TTL_SIDEREAL_TIME,
-            "seeing_forecast": CACHE_TTL_SEEING_FORECAST,
-            "spaceflight_launches": CACHE_TTL_SPACEFLIGHT_LAUNCHES,
-            "spaceflight_astronauts": CACHE_TTL_SPACEFLIGHT_ASTRONAUTS,
-            "spaceflight_events": CACHE_TTL_SPACEFLIGHT_EVENTS,
-            "weather_forecast": WEATHER_CACHE_TTL,
-            "iers": CACHE_TTL_IERS,
-            "allsky_sensor": CACHE_TTL_ALLSKY_SENSOR,
-            "allsky_health": CACHE_TTL_ALLSKY_HEALTH,
-        },
-        "execution_metrics": get_cache_metrics(),
+    def _loc_valid(name, location_id):
+        if location_id is None:
+            return False
+        return is_cache_valid(get_location_cache_entry(name, location_id), LOCATION_SCOPED_CACHE_TTLS[name])
+
+    allsky_sensor_available, allsky_health_available = _allsky_job_availability()
+
+    status = {name: _loc_valid(name, primary_id) for name in LOCATION_SCOPED_CACHE_TTLS}
+    status.update(
+        {
+            "spaceflight_launches": is_cache_valid(_spaceflight_launches_cache, CACHE_TTL_SPACEFLIGHT_LAUNCHES),
+            "spaceflight_astronauts": is_cache_valid(_spaceflight_astronauts_cache, CACHE_TTL_SPACEFLIGHT_ASTRONAUTS),
+            "spaceflight_events": is_cache_valid(_spaceflight_events_cache, CACHE_TTL_SPACEFLIGHT_EVENTS),
+            "iers": is_cache_valid(_iers_cache, CACHE_TTL_IERS),
+        }
+    )
+    if allsky_sensor_available:
+        status["allsky_sensor"] = _is_execution_metrics_valid("allsky_sensor", CACHE_TTL_ALLSKY_SENSOR)
+    if allsky_health_available:
+        status["allsky_health"] = _is_execution_metrics_valid("allsky_health", CACHE_TTL_ALLSKY_HEALTH)
+
+    per_location = {
+        location_id: {name: _loc_valid(name, location_id) for name in LOCATION_SCOPED_CACHE_TTLS}
+        for location_id in location_ids
     }
+
+    status.update(
+        {
+            "all_ready": is_astronomical_cache_ready(location_ids) if location_ids else False,
+            "locations": per_location,
+            "in_progress": in_progress,
+            "current_step": current_step,
+            "total_steps": total_steps,
+            "step_name": step_name,
+            "progress_percent": progress_percent,
+            "ttls": {
+                # best_window has no entry of its own: LOCATION_SCOPED_CACHE_TTLS
+                # already covers it as 3 separate rows (strict/practical/
+                # illumination) - one Astropy night-scan computes all three, but
+                # each has its own cache slot and its own staleness.
+                **{name: ttl for name, ttl in LOCATION_SCOPED_CACHE_TTLS.items()},
+                "dark_window": CACHE_TTL_DARK_WINDOW,
+                "spaceflight_launches": CACHE_TTL_SPACEFLIGHT_LAUNCHES,
+                "spaceflight_astronauts": CACHE_TTL_SPACEFLIGHT_ASTRONAUTS,
+                "spaceflight_events": CACHE_TTL_SPACEFLIGHT_EVENTS,
+                "iers": CACHE_TTL_IERS,
+                # Jobs that can never run (connector/module not configured)
+                # must not appear in the metrics table as permanently "stale".
+                **({"allsky_sensor": CACHE_TTL_ALLSKY_SENSOR} if allsky_sensor_available else {}),
+                **({"allsky_health": CACHE_TTL_ALLSKY_HEALTH} if allsky_health_available else {}),
+            },
+            "execution_metrics": get_cache_metrics(),
+        }
+    )
+    return status
 
 
 def set_cache_initialization_in_progress(value, current_step=0, total_steps=0, step_name=""):
@@ -578,8 +703,14 @@ def set_cache_initialization_in_progress(value, current_step=0, total_steps=0, s
         _write_shared_cache(shared_cache)
 
 
-def record_cache_execution(job_name, duration_seconds, success):
-    """Persist per-job execution timing and result to shared cache for metrics reporting."""
+def record_cache_execution(job_name, duration_seconds, success, location_id=None):
+    """Persist per-job execution timing and result to shared cache for metrics reporting.
+
+    ``job_name`` is the (possibly location-suffixed) job label used across the
+    scheduler and metrics UI. ``location_id`` is recorded alongside it so
+    consumers can group per-location executions back under their base job
+    without having to reverse-engineer the label's slug.
+    """
     with _cache_file_write_lock():
         shared = _read_shared_cache()
         if "_cache_metrics" not in shared:
@@ -588,6 +719,7 @@ def record_cache_execution(job_name, duration_seconds, success):
             "last_run_at": datetime.now(timezone.utc).isoformat(),
             "last_duration_s": round(duration_seconds, 3),
             "last_success": success,
+            "location_id": location_id,
         }
         _write_shared_cache(shared)
 

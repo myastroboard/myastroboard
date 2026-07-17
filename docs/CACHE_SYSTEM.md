@@ -6,6 +6,32 @@ The cache system is managed **entirely server-side** with per-job TTL-based expi
 
 The key design principle is **selective refresh**: the background scheduler polls every 5 minutes, but each job only executes when *its own TTL* has expired. Heavy computations (eclipses, planetary events) run at most once a day, while time-sensitive data (aurora, sidereal) refreshes hourly. This dramatically reduces CPU and memory pressure on low-resource machines.
 
+## Multi-location model (v1.2)
+
+Caches are split into two buckets (full details: [docs/LOCATIONS.md](LOCATIONS.md)):
+
+- **Location-scoped caches** keep one slot per location preset, keyed by the preset's
+  immutable `id`. On-disk keys in `astro_cache.json` are `"<name>:<location_id>"`.
+  Access goes through `cache_store.get_location_cache_entry(name, location_id)`,
+  `load_location_cache(...)` and `update_location_cache(...)` - the pre-v1.2
+  module-level singletons (`_sun_report_cache`, …) no longer exist for these.
+  Scoped names: `moon_report`, `dark_window`, `moon_planner`, `sun_report`,
+  `best_window_strict/practical/illumination`, `solar_eclipse`, `lunar_eclipse`,
+  `horizon_graph`, `aurora`, `iss_passes`, `css_passes`, `planetary_events`,
+  `special_phenomena`, `solar_system_events`, `sidereal_time`, `seeing_forecast`,
+  `weather_forecast` (single source of truth: `cache_store.LOCATION_SCOPED_CACHE_TTLS`).
+- **Global caches** keep the single-slot module-level shape: `spaceflight_launches`,
+  `spaceflight_astronauts`, `spaceflight_events`, `iers`, AllSky connector caches, and
+  the version-check cache. The ISS/CSS **TLE fetch** is also global (its own on-disk
+  cache inside `iss_passes.py`/`css_passes.py`); only pass-visibility math is per
+  location.
+
+The scheduler runs each location-scoped job once per *scheduler location* (install
+default + presets attributed to at least one user), gated by the `(job, location)`
+TTL. Job × location units share the same fixed-size thread pool (≤6 workers), so total
+concurrent API calls never exceed the pre-v1.2 ceiling. Metrics rows for non-default
+locations use the `"<job>@<location-slug>"` key format.
+
 ## Key Features
 
 ### Server-Side Only Management
@@ -56,11 +82,19 @@ Each cache job has an individual TTL defined in `backend/constants.py`:
 On a typical steady-state machine, most 5-minute poll cycles skip all jobs because TTLs are still valid. Hourly-class jobs run only when their own TTL expires; daily jobs run at most once every 24 hours.
 
 ### Automatic Location Change Detection
-When any of these location parameters change, **all astronomical caches are immediately reset** (timestamps zeroed), forcing a full refresh on the next scheduler cycle:
+Location change detection is **per preset** (v1.2). When any of these parameters change
+on a preset, **that preset's caches only** are immediately reset (timestamps zeroed),
+forcing a refresh of its slots on the next scheduler cycle - other presets' caches are
+untouched:
 - Latitude
 - Longitude
 - Elevation
 - Timezone
+
+Signatures are tracked per preset id in `data/cache/location_cache.json`
+(`cache_store.has_location_changed(preset)` / `update_location_config(preset)` /
+`reset_caches_for_location(id)`). Deleting a preset drops its slots and signature
+(`drop_location_caches(id)`).
 
 ### Background Cache Scheduler
 - Runs in a dedicated daemon thread

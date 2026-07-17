@@ -599,9 +599,9 @@
     "sky_quality_sqm_placeholder": "z.B. 20.8",
     "sky_quality_sqm_info": "Geben Sie diesen Wert ein, wenn Sie eine echte SQM-Messung haben. Überschreibt die Bortle-Mittelwertschätzung.",
     "sky_quality_disabled_info": "Wenn beide Felder leer bleiben, wird die Lichtverschmutzungs-Integration deaktiviert.",
-    "save_actions": "Speichern & Aktionen",
+    "save_actions": "Aktionen",
     "save_actions_info": "Wenn neue SkyTonight-Einstellungen gespeichert werden, ist möglicherweise eine manuelle Ausführung erforderlich, um Änderungen im Dashboard anzuzeigen, oder es muss auf die nächste geplante Ausführung gewartet werden.",
-    "save_configuration": "Konfiguration speichern",
+    "save_configuration": "Astrodex-Einstellungen speichern",
     "view_skytonight_configs": "Erzeugte SkyTonight-Konfigurationen anzeigen",
     "export_general_config": "Allgemeine Konfiguration exportieren",
     "features": "Merkmale",
@@ -816,7 +816,44 @@
     "pref_beginner_catalog_enabled_info": "Fügt SkyTonight eine Registerkarte \"Einsteiger\" mit einer kuratierten Liste einfacher Ziele hinzu.",
     "pref_recommendations_enabled": "Bereich „Heute Nacht für Sie\" anzeigen",
     "pref_recommendations_enabled_info": "Zeigt oben auf der Registerkarte „Deep-Sky-Objekte\" von SkyTonight einen Bereich „Heute Nacht für Sie\" mit empfohlenen Zielen an.",
-    "notifications_insecure_context": "Benachrichtigungen erfordern eine sichere Verbindung (HTTPS). Sie können bei einfachem HTTP nicht aktiviert werden."
+    "notifications_insecure_context": "Benachrichtigungen erfordern eine sichere Verbindung (HTTPS). Sie können bei einfachem HTTP nicht aktiviert werden.",
+    "locations": "Standorte",
+    "locations_info": "Erstellen Sie Beobachtungsstandorte und weisen Sie sie Benutzern zu. Jeder Standort steuert alle Berechnungen (Wetter, Astro-Vorhersagen, SkyTonight, ISS/CSS) für die dort beobachtenden Benutzer.",
+    "location_new": "Neuer Standort",
+    "location_max_reached": "Maximale Anzahl an Standorten erreicht ({max}). Diese Grenze schützt die kostenlosen Wetter-APIs, die alle MyAstroBoard-Installationen gemeinsam nutzen.",
+    "locations_load_failed": "Standorte konnten nicht geladen werden",
+    "location_edit_title": "Standort",
+    "location_edit_title_named": "{name} bearbeiten",
+    "location_edit_btn": "Bearbeiten",
+    "location_default_badge": "Standard",
+    "location_horizon_points": "Eigenes Horizontprofil: {count} Punkt(e)",
+    "location_attributed_badge": "{count} zugewiesen",
+    "location_excluded_badge": "{count} ausgeschlossen",
+    "location_set_default": "Als Standard festlegen",
+    "location_default_changed": "Installationsstandard-Standort aktualisiert",
+    "location_cannot_delete_default": "Der Installationsstandard-Standort kann nicht gelöscht werden. Befördern Sie zuerst einen anderen Standort.",
+    "location_delete_confirm": "Standort „{name}“ löschen?",
+    "location_delete_refs": "Referenziert von: {users} Benutzer(n), {astrodex} Astrodex-Eintrag/-Einträgen, {plans} Plan-My-Night-Plan/-Plänen.",
+    "location_delete_plans_note": "An diesen Standort angeheftete Pläne werden gelöscht. Astrodex-Einträge bleiben erhalten (der Standortname bleibt als Text).",
+    "location_deleted": "Standort gelöscht",
+    "location_delete_failed": "Standort konnte nicht gelöscht werden",
+    "location_save": "Standort speichern",
+    "location_saved": "Standort gespeichert",
+    "location_save_failed": "Standort konnte nicht gespeichert werden",
+    "location_attribute_title": "Zugewiesene Benutzer",
+    "location_attribute_info": "Benutzer, denen dieser Standort zur Verfügung steht. Ein Benutzer ohne zugewiesenen Standort nutzt den Installationsstandard.",
+    "my_location": "Standort",
+    "my_location_title": "Meine Standorte",
+    "my_location_info": "Dies sind die Ihnen zugewiesenen Beobachtungsstandorte. Wählen Sie, welcher beim Anmelden standardmäßig angezeigt wird, und ordnen Sie sie für den Schnellwechsler. Die Standorte selbst verwaltet ein Administrator.",
+    "my_location_default": "Standardstandort (beim Anmelden angezeigt)",
+    "my_location_order": "Standort-Reihenfolge",
+    "my_location_order_info": "Reihenfolge im Schnellwechsler des Himmels-Widgets.",
+    "my_location_save": "Standort-Einstellungen speichern",
+    "my_location_saved": "Standort-Einstellungen gespeichert",
+    "my_location_save_failed": "Standort-Einstellungen konnten nicht gespeichert werden",
+    "notifications_locations_title": "Standorte",
+    "notifications_locations_info": "Deaktivieren Sie Benachrichtigungen für bestimmte Beobachtungsstandorte. Stummgeschaltete Standorte lösen keine standortbezogenen Alarme mehr aus (Dunkelheit, ISS/CSS, Aurora, Finsternisse).",
+    "push_location_suffix": "{body} • {location_name}"
   },
   "astrodex": {
     "title": "Astrodex - Ich muss sie alle fangen!",
@@ -1202,7 +1239,9 @@
     "moon_calendar_legend_good": "≥4h dunkel",
     "moon_calendar_legend_ok": "2-4h dunkel",
     "moon_calendar_legend_bright": "Heller Mond",
-    "seeing_week_title": "Seeing-Vorhersage"
+    "seeing_week_title": "Seeing-Vorhersage",
+    "pinned_location": "Plan berechnet für {name}",
+    "location_mismatch": "Dieser Plan wurde für {pinned} erstellt; Ihr aktiver Standort ist jetzt {active} - die angezeigten Höhen stimmen möglicherweise nicht mit dem überein, was Sie tatsächlich sehen."
   },
   "users": {
     "user_management": "Benutzerverwaltung",
@@ -1350,6 +1389,7 @@
     "cache_job_status": "Status",
     "cache_job_last_run": "Letzter Lauf",
     "cache_job_duration": "Dauer",
+    "cache_job_toggle_locations": "Detailansicht pro Standort umschalten",
     "cache_jobs_loading": "Cache-Metriken laden…",
     "cache_status_valid": "Gültig",
     "cache_status_stale": "Abgelaufen",
@@ -1724,7 +1764,9 @@
     "step_special_phenomena": "Besondere Phänomene",
     "step_solar_system_events": "Sonnensystemereignisse",
     "step_sidereal_time": "Sternzeit",
-    "step_best_window": "Bestes Fenster",
+    "step_best_window_strict": "Bestes Fenster (strikt)",
+    "step_best_window_practical": "Bestes Fenster (praktisch)",
+    "step_best_window_illumination": "Bestes Fenster (Beleuchtung)",
     "step_seeing_forecast": "Seeing-Vorhersage",
     "step_weather_forecast": "Wettervorhersage",
     "step_spaceflight_launches": "Raumflugstarts",
@@ -2025,7 +2067,10 @@
     "period_astronomical_dawn": "Astronomische Morgendämmerung",
     "period_unknown": "Unbekannt",
     "next_in": "{period} in {time}",
-    "score_title": "Aktueller Himmelsqualitätswert (0–10): Seeing, Transparenz, Wolkenbedeckung, Nachführungsstabilität"
+    "score_title": "Aktueller Himmelsqualitätswert (0–10): Seeing, Transparenz, Wolkenbedeckung, Nachführungsstabilität",
+    "other_locations": "Standorte",
+    "tz_badge_title": "Die Zeitzone dieses Standorts ist {offset} - abweichend von Ihrer eigenen",
+    "tz_notice": "Die für diesen Standort angezeigten Zeiten sind in {tz} ({offset}). Ihre Zeitzone ist {your_tz} ({your_offset})."
   },
   "wizard": {
     "title": "Erste Schritte",
@@ -2237,5 +2282,11 @@
         "framing": "Eine moderate Brennweite umrahmt die Galaxie mit etwas umgebendem Raum."
       }
     }
+  },
+  "locations": {
+    "max_reached": "Maximale Anzahl an Standorten erreicht",
+    "not_found": "Standort nicht gefunden",
+    "cannot_delete_default": "Der Installationsstandard-Standort kann nicht gelöscht werden - befördern Sie zuerst einen anderen",
+    "not_accessible": "Dieser Standort ist Ihnen nicht zugewiesen"
   }
 }

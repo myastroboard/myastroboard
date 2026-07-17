@@ -43,7 +43,8 @@ Welcome to the comprehensive documentation for MyAstroBoard, the integrated astr
 
 ### Administration
 - [Authentication & Users](AUTHENTICATION.md) - Roles, user management, preferences, session security
-- [Configuration](CONFIGURATION.md) - Location setup, SkyTonight constraints, horizon profile, backup/restore, logs, metrics
+- [Configuration](CONFIGURATION.md) - Global settings, SkyTonight constraints, backup/restore, logs, metrics
+- [Locations](LOCATIONS.md) - Multi-location profiles (v1.2): presets, attribution, per-user default/active location, per-location caches, rate-limit analysis
 
 ### Technical Reference
 - [API Endpoints](API_ENDPOINTS.md) - Complete route inventory from `backend/app.py` and `backend/skytonight_api.py`
@@ -93,7 +94,8 @@ Welcome to the comprehensive documentation for MyAstroBoard, the integrated astr
 | External connectors setup | Parameters → Connectors | [CONNECTORS.md](CONNECTORS.md) |
 | Push notifications | My Settings → Notifications | [NOTIFICATIONS.md](NOTIFICATIONS.md) |
 | User roles | Parameters → Users | [AUTHENTICATION.md](AUTHENTICATION.md) |
-| Location & constraints | Parameters → Configuration | [CONFIGURATION.md](CONFIGURATION.md) |
+| Location presets & switcher | Parameters → Locations / sky widget | [LOCATIONS.md](LOCATIONS.md) |
+| Constraints | Parameters → Advanced | [CONFIGURATION.md](CONFIGURATION.md) |
 | Cache & metrics | Parameters → Metrics | [CACHE_SYSTEM.md](CACHE_SYSTEM.md) |
 | Backup & restore | Parameters → Backup | [CONFIGURATION.md](CONFIGURATION.md) |
 

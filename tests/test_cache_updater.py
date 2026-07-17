@@ -1,6 +1,8 @@
 """
 Tests for cache_updater module.
-Tests core cache update functions and exception handling.
+Tests core cache update functions and exception handling, including the
+v1.2 per-location cache slots (update functions write through
+cache_store.update_location_cache keyed by the preset id).
 """
 
 import pytest
@@ -11,117 +13,197 @@ import pandas as pd
 
 from cache_updater import check_and_handle_config_changes
 
+LOC_ID = "test-location-id"
 
-@pytest.fixture
-def mock_config():
-    """Mock configuration for testing."""
+
+def _make_location(loc_id=LOC_ID, lat=45.0, lon=-75.0, tz="America/Toronto", elevation=100):
     return {
-        "location": {
-            "latitude": 45.0,
-            "longitude": -75.0,
-            "timezone": "America/Toronto",
-            "elevation": 100
-        }
+        "id": loc_id,
+        "name": "Test Site",
+        "latitude": lat,
+        "longitude": lon,
+        "timezone": tz,
+        "elevation": elevation,
+        "bortle": None,
+        "sqm": None,
+        "horizon_profile": [],
+        "is_install_default": True,
     }
 
 
+@pytest.fixture
+def mock_config():
+    """Mock configuration for testing (v1.2 locations shape)."""
+    return {"locations": [_make_location()]}
+
+
+def _loc_payload(mock_cache_store, name=None):
+    """Return the data payload of the last update_location_cache(name, id, data) call."""
+    calls = mock_cache_store.update_location_cache.call_args_list
+    if name is not None:
+        calls = [c for c in calls if c.args and c.args[0] == name]
+    assert calls, f"update_location_cache was not called (name={name})"
+    return calls[-1].args[2]
+
+
 class TestCheckAndHandleConfigChanges:
-    """Tests for check_and_handle_config_changes function."""
+    """Tests for check_and_handle_config_changes function (per-preset, v1.2)."""
+
+    @pytest.fixture(autouse=True)
+    def _skip_legacy_migration(self, monkeypatch):
+        """Unit tests exercise per-preset detection, not the one-time upgrade path."""
+        import cache_updater
+
+        monkeypatch.setattr(cache_updater, "_legacy_cache_migration_done", True)
 
     @patch("cache_updater.load_config")
     @patch("cache_updater.cache_store")
     def test_first_time_initialization(self, mock_cache_store, mock_load_config, mock_config):
-        """Test first time initialization when no location is tracked."""
+        """First time a preset is seen: track it, no reset."""
         mock_load_config.return_value = mock_config
-        mock_cache_store._last_known_location_config = {"latitude": None, "longitude": None, "timezone": None, "elevation": None}
-        
+        mock_cache_store.is_location_tracked = Mock(return_value=False)
+
         result = check_and_handle_config_changes()
-        
+
         assert result is False
-        mock_cache_store.update_location_config.assert_called_once_with(mock_config["location"])
+        mock_cache_store.update_location_config.assert_called_once_with(mock_config["locations"][0])
+        mock_cache_store.reset_caches_for_location.assert_not_called()
 
     @patch("cache_updater.load_config")
     @patch("cache_updater.cache_store")
     def test_location_unchanged(self, mock_cache_store, mock_load_config, mock_config):
-        """Test when location hasn't changed."""
+        """Tracked preset with unchanged signature: nothing happens."""
         mock_load_config.return_value = mock_config
-        mock_cache_store._last_known_location_config = {
-            "latitude": 45.0,
-            "longitude": -75.0,
-            "timezone": "America/Toronto",
-            "elevation": 100
-        }
+        mock_cache_store.is_location_tracked = Mock(return_value=True)
         mock_cache_store.has_location_changed = Mock(return_value=False)
-        
+
         result = check_and_handle_config_changes()
-        
+
         assert result is False
-        mock_cache_store.reset_all_caches.assert_not_called()
+        mock_cache_store.reset_caches_for_location.assert_not_called()
 
     @patch("cache_updater.load_config")
     @patch("cache_updater.cache_store")
     def test_location_changed(self, mock_cache_store, mock_load_config, mock_config):
-        """Test when location configuration has changed."""
+        """Changed preset: only that preset's caches are reset."""
         mock_load_config.return_value = mock_config
-        mock_cache_store._last_known_location_config = {
-            "latitude": 40.0,  # Different latitude
-            "longitude": -75.0,
-            "timezone": "America/Toronto",
-            "elevation": 100
-        }
+        mock_cache_store.is_location_tracked = Mock(return_value=True)
         mock_cache_store.has_location_changed = Mock(return_value=True)
-        
+
         result = check_and_handle_config_changes()
-        
+
         assert result is True
-        mock_cache_store.reset_all_caches.assert_called_once()
+        mock_cache_store.reset_caches_for_location.assert_called_once_with(LOC_ID)
         mock_cache_store.update_location_config.assert_called_once()
 
     @patch("cache_updater.load_config")
     @patch("cache_updater.cache_store")
-    def test_missing_location_config(self, mock_cache_store, mock_load_config):
-        """Test handling when location config is missing."""
-        mock_load_config.return_value = {}
-        
+    def test_only_changed_preset_is_reset(self, mock_cache_store, mock_load_config):
+        """With two presets, only the changed one gets its caches reset."""
+        loc_a = _make_location("loc-a")
+        loc_b = _make_location("loc-b", lat=50.0)
+        loc_b["is_install_default"] = False
+        mock_load_config.return_value = {"locations": [loc_a, loc_b]}
+        mock_cache_store.is_location_tracked = Mock(return_value=True)
+        mock_cache_store.has_location_changed = Mock(side_effect=lambda loc: loc["id"] == "loc-b")
+
         result = check_and_handle_config_changes()
-        
+
+        assert result is True
+        mock_cache_store.reset_caches_for_location.assert_called_once_with("loc-b")
+
+    @patch("cache_updater.load_config")
+    @patch("cache_updater.cache_store")
+    def test_missing_locations_config(self, mock_cache_store, mock_load_config):
+        """Test handling when no locations are configured."""
+        mock_load_config.return_value = {}
+
+        result = check_and_handle_config_changes()
+
         assert result is False
+
+
+class TestLegacyCacheMigration:
+    """One-time pre-v1.2 -> v1.2 upgrade path inside check_and_handle_config_changes."""
+
+    @patch("cache_updater.load_config")
+    @patch("cache_updater.cache_store")
+    def test_matching_legacy_signature_migrates_keys(self, mock_cache_store, mock_load_config, monkeypatch):
+        import cache_updater
+
+        monkeypatch.setattr(cache_updater, "_legacy_cache_migration_done", False)
+        location = _make_location()
+        mock_load_config.return_value = {"locations": [location]}
+
+        signature = {
+            "latitude": location["latitude"],
+            "longitude": location["longitude"],
+            "elevation": location["elevation"],
+            "timezone": location["timezone"],
+        }
+        mock_cache_store.pop_legacy_location_signature = Mock(return_value=signature)
+        mock_cache_store.get_current_location_signature = Mock(return_value=signature)
+        mock_cache_store.migrate_legacy_cache_keys = Mock(return_value=5)
+        mock_cache_store.is_location_tracked = Mock(return_value=True)
+        mock_cache_store.has_location_changed = Mock(return_value=False)
+
+        check_and_handle_config_changes()
+
+        mock_cache_store.migrate_legacy_cache_keys.assert_called_once_with(LOC_ID)
+        # Matching signature: caches kept (no reset)
+        mock_cache_store.reset_caches_for_location.assert_not_called()
+        assert cache_updater._legacy_cache_migration_done is True
+
+    @patch("cache_updater.load_config")
+    @patch("cache_updater.cache_store")
+    def test_mismatched_legacy_signature_resets(self, mock_cache_store, mock_load_config, monkeypatch):
+        import cache_updater
+
+        monkeypatch.setattr(cache_updater, "_legacy_cache_migration_done", False)
+        location = _make_location()
+        mock_load_config.return_value = {"locations": [location]}
+
+        mock_cache_store.pop_legacy_location_signature = Mock(return_value={"latitude": 0.0})
+        mock_cache_store.get_current_location_signature = Mock(return_value={"latitude": 45.0})
+        mock_cache_store.migrate_legacy_cache_keys = Mock(return_value=5)
+        mock_cache_store.is_location_tracked = Mock(return_value=True)
+        mock_cache_store.has_location_changed = Mock(return_value=False)
+
+        check_and_handle_config_changes()
+
+        mock_cache_store.reset_caches_for_location.assert_called_once_with(LOC_ID)
 
 
 class TestCacheUpdateFunctionsBasic:
     """Tests for basic cache update functionality."""
 
+    @patch("cache_updater.cache_store")
     @patch("cache_updater.load_config")
     @patch("cache_updater.MoonService")
-    def test_update_moon_report_with_valid_config(self, mock_moon_service, mock_load_config):
+    def test_update_moon_report_with_valid_config(self, mock_moon_service, mock_load_config, mock_cache_store, mock_config):
         """Test moon report cache handles valid config."""
         from cache_updater import update_moon_report_cache
-        
-        config = {
-            "location": {
-                "latitude": 45.0,
-                "longitude": -75.0,
-                "timezone": "America/Toronto"
-            }
-        }
-        mock_load_config.return_value = config
+
+        mock_load_config.return_value = mock_config
         mock_moon_instance = MagicMock()
         mock_moon_service.return_value = mock_moon_instance
         mock_report = MagicMock()
         mock_moon_instance.get_report.return_value = mock_report
-        
+
         # Should complete without raising
         update_moon_report_cache()
-        
+
         mock_moon_service.assert_called_once()
+        # Written under the preset's id (v1.2 per-location slot)
+        assert mock_cache_store.update_location_cache.call_args_list[0].args[1] == LOC_ID
 
     @patch("cache_updater.load_config")
     def test_update_moon_report_without_location(self, mock_load_config):
         """Test moon report cache handles missing location gracefully."""
         from cache_updater import update_moon_report_cache
-        
+
         mock_load_config.return_value = {}
-        
+
         # Should not raise, just log error
         update_moon_report_cache()
 
@@ -129,19 +211,18 @@ class TestCacheUpdateFunctionsBasic:
     def test_update_weather_cache_missing_location(self, mock_load_config):
         """Test weather cache handles missing location."""
         from cache_updater import update_weather_cache
-        
+
         mock_load_config.return_value = {}
-        
+
         # Should not raise
         update_weather_cache()
 
     @patch("cache_updater.cache_store")
     @patch("cache_updater.get_hourly_forecast")
-    def test_update_weather_cache_success(self, mock_get_hourly_forecast, mock_cache_store):
+    def test_update_weather_cache_success(self, mock_get_hourly_forecast, mock_cache_store, mock_config):
         """Exercise weather serialization success path."""
         from cache_updater import update_weather_cache
 
-        mock_cache_store._weather_cache = {"data": None, "timestamp": 0}
         mock_get_hourly_forecast.return_value = {
             "hourly": pd.DataFrame(
                 {
@@ -152,18 +233,17 @@ class TestCacheUpdateFunctionsBasic:
             "location": {"name": "Test"},
         }
 
-        update_weather_cache()
+        update_weather_cache(config=mock_config)
 
-        assert mock_cache_store._weather_cache["data"] is not None
+        payload = _loc_payload(mock_cache_store, "weather_forecast")
+        assert payload["hourly"]
 
     @patch("cache_updater.cache_store")
     @patch("cache_updater.get_hourly_forecast")
-    def test_update_weather_cache_object_dtype_column(self, mock_get_hourly_forecast, mock_cache_store):
-        """Line 334: bytes decode path for object-dtype DataFrame columns."""
-        import numpy as np
+    def test_update_weather_cache_object_dtype_column(self, mock_get_hourly_forecast, mock_cache_store, mock_config):
+        """Bytes decode path for object-dtype DataFrame columns."""
         from cache_updater import update_weather_cache
 
-        mock_cache_store._weather_cache = {"data": None, "timestamp": 0}
         # Use explicit dtype=object with bytes values to force the bytes decode branch
         mock_get_hourly_forecast.return_value = {
             "hourly": pd.DataFrame(
@@ -175,10 +255,9 @@ class TestCacheUpdateFunctionsBasic:
             "location": {"name": "Test"},
         }
 
-        update_weather_cache()
+        update_weather_cache(config=mock_config)
 
-        assert mock_cache_store._weather_cache["data"] is not None
-        decoded_records = mock_cache_store._weather_cache["data"]["hourly"]
+        decoded_records = _loc_payload(mock_cache_store, "weather_forecast")["hourly"]
         assert decoded_records[0]["raw"] == "encoded_bytes"
 
 
@@ -187,69 +266,78 @@ class TestCacheUpdateErrorHandling:
 
     @patch("cache_updater.load_config")
     @patch("cache_updater.MoonService")
-    def test_moon_service_exception_handling(self, mock_moon_service, mock_load_config):
+    def test_moon_service_exception_handling(self, mock_moon_service, mock_load_config, mock_config):
         """Test that exceptions in MoonService are caught."""
         from cache_updater import update_moon_report_cache
-        
-        config = {
-            "location": {
-                "latitude": 45.0,
-                "longitude": -75.0,
-                "timezone": "America/Toronto"
-            }
-        }
-        mock_load_config.return_value = config
+
+        mock_load_config.return_value = mock_config
         mock_moon_service.side_effect = Exception("Service error")
-        
+
         # Should not raise, just log
         update_moon_report_cache()
 
     @patch("cache_updater.get_hourly_forecast")
-    def test_weather_forecast_none_handling(self, mock_get_forecast):
+    def test_weather_forecast_none_handling(self, mock_get_forecast, mock_config):
         """Test weather cache handles None forecast."""
         from cache_updater import update_weather_cache
-        
+
         mock_get_forecast.return_value = None
-        
+
         # Should handle gracefully
-        update_weather_cache()
+        update_weather_cache(config=mock_config)
+
+    @patch("cache_updater.cache_store")
+    @patch("cache_updater.get_hourly_forecast")
+    def test_weather_forecast_none_uses_stale_cache(self, mock_get_forecast, mock_cache_store, mock_config):
+        """Live weather miss with stale cached payload should not overwrite cache."""
+        from cache_updater import update_weather_cache
+
+        mock_get_forecast.return_value = None
+        mock_cache_store.load_location_cache.return_value = {
+            "timestamp": 123.0,
+            "data": {"location": {"name": "Stale"}, "hourly": [{"date": "2026-01-01T00:00:00+0000"}]},
+        }
+
+        update_weather_cache(config=mock_config)
+
+        mock_cache_store.load_location_cache.assert_called_once()
+        mock_cache_store.update_location_cache.assert_not_called()
+
+    @patch("cache_updater.cache_store")
+    @patch("cache_updater.get_hourly_forecast")
+    def test_weather_forecast_none_without_stale_cache(self, mock_get_forecast, mock_cache_store, mock_config):
+        """Live weather miss without stale cache should still be non-fatal."""
+        from cache_updater import update_weather_cache
+
+        mock_get_forecast.return_value = None
+        mock_cache_store.load_location_cache.return_value = {"timestamp": 0.0, "data": None}
+
+        update_weather_cache(config=mock_config)
+
+        mock_cache_store.load_location_cache.assert_called_once()
+        mock_cache_store.update_location_cache.assert_not_called()
 
     @patch("cache_updater.load_config")
     @patch("cache_updater.get_iss_passes_report")
-    def test_iss_passes_cache_with_none_report(self, mock_get_iss, mock_load_config):
+    def test_iss_passes_cache_with_none_report(self, mock_get_iss, mock_load_config, mock_config):
         """Test ISS passes cache handles None report."""
         from cache_updater import update_iss_passes_cache
-        
-        config = {
-            "location": {
-                "latitude": 45.0,
-                "longitude": -75.0,
-                "timezone": "America/Toronto",
-                "elevation": 0
-            }
-        }
-        mock_load_config.return_value = config
+
+        mock_load_config.return_value = mock_config
         mock_get_iss.return_value = None
-        
+
         # Should handle gracefully
         update_iss_passes_cache()
 
     @patch("cache_updater.load_config")
     @patch("cache_updater.get_aurora_report")
-    def test_aurora_cache_handles_errors(self, mock_get_aurora, mock_load_config):
+    def test_aurora_cache_handles_errors(self, mock_get_aurora, mock_load_config, mock_config):
         """Test aurora cache handles errors gracefully."""
         from cache_updater import update_aurora_cache
-        
-        config = {
-            "location": {
-                "latitude": 45.0,
-                "longitude": -75.0,
-                "timezone": "America/Toronto"
-            }
-        }
-        mock_load_config.return_value = config
+
+        mock_load_config.return_value = mock_config
         mock_get_aurora.return_value = None
-        
+
         # Should handle gracefully
         update_aurora_cache()
 
@@ -296,7 +384,6 @@ class TestAdditionalCachePaths:
         from cache_updater import update_planetary_events_cache
 
         mock_load_config.return_value = mock_config
-        mock_cache_store._planetary_events_cache = {"data": None, "timestamp": 0}
 
         fake_service = MagicMock()
         fake_service.get_planetary_events.return_value = [{"name": "Conjunction"}]
@@ -305,7 +392,8 @@ class TestAdditionalCachePaths:
         with patch.dict(sys.modules, {"planetary_events": fake_module}):
             update_planetary_events_cache()
 
-        mock_cache_store.update_shared_cache_entry.assert_called()
+        mock_cache_store.update_location_cache.assert_called()
+        assert _loc_payload(mock_cache_store, "planetary_events")["count"] == 1
 
     @patch("cache_updater.cache_store")
     @patch("cache_updater.load_config")
@@ -313,7 +401,6 @@ class TestAdditionalCachePaths:
         from cache_updater import update_special_phenomena_cache
 
         mock_load_config.return_value = mock_config
-        mock_cache_store._special_phenomena_cache = {"data": None, "timestamp": 0}
 
         fake_service = MagicMock()
         fake_service.get_special_phenomena.return_value = [{"name": "Equinox"}]
@@ -322,7 +409,7 @@ class TestAdditionalCachePaths:
         with patch.dict(sys.modules, {"special_phenomena": fake_module}):
             update_special_phenomena_cache()
 
-        mock_cache_store.update_shared_cache_entry.assert_called()
+        mock_cache_store.update_location_cache.assert_called()
 
     @patch("cache_updater.cache_store")
     @patch("cache_updater.load_config")
@@ -330,7 +417,6 @@ class TestAdditionalCachePaths:
         from cache_updater import update_solar_system_events_cache
 
         mock_load_config.return_value = mock_config
-        mock_cache_store._solar_system_events_cache = {"data": None, "timestamp": 0}
 
         fake_service = MagicMock()
         fake_service.get_solar_system_events.return_value = [{"name": "Perseids"}]
@@ -339,7 +425,7 @@ class TestAdditionalCachePaths:
         with patch.dict(sys.modules, {"solar_system_events": fake_module}):
             update_solar_system_events_cache()
 
-        mock_cache_store.update_shared_cache_entry.assert_called()
+        mock_cache_store.update_location_cache.assert_called()
 
     @patch("cache_updater.cache_store")
     @patch("cache_updater.load_config")
@@ -347,7 +433,6 @@ class TestAdditionalCachePaths:
         from cache_updater import update_sidereal_time_cache
 
         mock_load_config.return_value = mock_config
-        mock_cache_store._sidereal_time_cache = {"data": None, "timestamp": 0}
 
         fake_service = MagicMock()
         fake_service.get_current_sidereal_info.return_value = {"lst": "12:00"}
@@ -357,7 +442,7 @@ class TestAdditionalCachePaths:
         with patch.dict(sys.modules, {"sidereal_time": fake_module}):
             update_sidereal_time_cache()
 
-        mock_cache_store.update_shared_cache_entry.assert_called()
+        mock_cache_store.update_location_cache.assert_called()
 
     @patch("cache_updater.cache_store")
     @patch("cache_updater.MoonService")
@@ -366,7 +451,6 @@ class TestAdditionalCachePaths:
         from cache_updater import update_dark_window_cache
 
         mock_load_config.return_value = mock_config
-        mock_cache_store._dark_window_report_cache = {"data": None, "timestamp": 0}
 
         report = types.SimpleNamespace(
             next_dark_night_start="2026-04-17T22:00:00",
@@ -375,7 +459,8 @@ class TestAdditionalCachePaths:
         mock_moon_service.return_value.get_report.return_value = report
 
         update_dark_window_cache()
-        mock_cache_store.update_shared_cache_entry.assert_called()
+        dark = _loc_payload(mock_cache_store, "dark_window")
+        assert dark["next_dark_night"]["start"] == "2026-04-17T22:00:00"
 
     @patch("cache_updater.cache_store")
     @patch("cache_updater.MoonPlanner")
@@ -384,11 +469,10 @@ class TestAdditionalCachePaths:
         from cache_updater import update_moon_planner_cache
 
         mock_load_config.return_value = mock_config
-        mock_cache_store._moon_planner_report_cache = {"data": None, "timestamp": 0}
         mock_planner.return_value.next_7_nights.return_value = [{"date": "2026-04-17", "dark_hours": 6.0}]
 
         update_moon_planner_cache()
-        mock_cache_store.update_shared_cache_entry.assert_called()
+        mock_cache_store.update_location_cache.assert_called()
 
     @patch("cache_updater.cache_store")
     @patch("cache_updater.SunService")
@@ -397,7 +481,6 @@ class TestAdditionalCachePaths:
         from cache_updater import update_sun_report_cache
 
         mock_load_config.return_value = mock_config
-        mock_cache_store._sun_report_cache = {"data": None, "timestamp": 0}
         # Provide astronomical_dusk/dawn so _next_astronomical_dusk_utc can run
         report = types.SimpleNamespace(
             sunrise="06:00", sunset="20:00",
@@ -407,7 +490,7 @@ class TestAdditionalCachePaths:
         mock_sun.return_value.get_tomorrow_report.return_value = report
 
         update_sun_report_cache()
-        mock_cache_store.update_shared_cache_entry.assert_called()
+        mock_cache_store.update_location_cache.assert_called()
 
     @patch("cache_updater.cache_store")
     @patch("cache_updater.AstroTonightService")
@@ -416,11 +499,6 @@ class TestAdditionalCachePaths:
         from cache_updater import update_best_window_cache
 
         mock_load_config.return_value = mock_config
-        mock_cache_store._best_window_cache = {
-            "strict": {"data": None, "timestamp": 0},
-            "practical": {"data": None, "timestamp": 0},
-            "illumination": {"data": None, "timestamp": 0},
-        }
         window = types.SimpleNamespace(start="21:00", end="23:00", score=80)
         mock_service.return_value.best_windows_all_modes.return_value = {
             "strict": window,
@@ -429,7 +507,10 @@ class TestAdditionalCachePaths:
         }
 
         update_best_window_cache()
-        assert mock_cache_store.update_shared_cache_entry.call_count == 3
+        # One per mode, all keyed to the preset id
+        assert mock_cache_store.update_location_cache.call_count == 3
+        names = {c.args[0] for c in mock_cache_store.update_location_cache.call_args_list}
+        assert names == {"best_window_strict", "best_window_practical", "best_window_illumination"}
 
 
 class TestFullInitialization:
@@ -439,10 +520,12 @@ class TestFullInitialization:
     @patch("cache_updater.load_config")
     @patch("cache_updater.update_weather_cache")
     @patch("cache_updater.update_best_window_cache")
+    @patch("cache_updater.update_seeing_forecast_cache")
     @patch("cache_updater.update_sidereal_time_cache")
     @patch("cache_updater.update_solar_system_events_cache")
     @patch("cache_updater.update_special_phenomena_cache")
     @patch("cache_updater.update_planetary_events_cache")
+    @patch("cache_updater.update_css_passes_cache")
     @patch("cache_updater.update_iss_passes_cache")
     @patch("cache_updater.update_aurora_cache")
     @patch("cache_updater.update_horizon_graph_cache")
@@ -463,33 +546,43 @@ class TestFullInitialization:
         _horizon,
         _aurora,
         _iss,
+        _css,
         _planetary,
         _special,
         _solsys,
         _sidereal,
+        _seeing,
         _best,
         _weather,
         mock_load_config,
         mock_cache_store,
+        mock_config,
     ):
         from cache_updater import fully_initialize_caches
 
-        mock_load_config.return_value = {"location": {"latitude": 48.85, "longitude": 2.35, "timezone": "Europe/Paris"}}
+        mock_load_config.return_value = mock_config
         # Force all caches to be stale so jobs_to_run is populated
         mock_cache_store.is_cache_valid.return_value = False
+        mock_cache_store.is_cache_valid_for_today.return_value = False
+        mock_cache_store.load_location_cache.return_value = {"timestamp": 0, "data": None}
         mock_cache_store.sync_cache_from_shared.return_value = None
 
         fully_initialize_caches()
 
         assert mock_cache_store.set_cache_initialization_in_progress.call_count >= 2
+        # Location-scoped jobs got the preset threaded through
+        assert _moon_caches.call_args.kwargs["location"]["id"] == LOC_ID
 
     @patch("cache_updater.cache_store")
+    @patch("cache_updater.load_config")
     @patch("cache_updater.update_weather_cache")
     @patch("cache_updater.update_best_window_cache")
+    @patch("cache_updater.update_seeing_forecast_cache")
     @patch("cache_updater.update_sidereal_time_cache")
     @patch("cache_updater.update_solar_system_events_cache")
     @patch("cache_updater.update_special_phenomena_cache")
     @patch("cache_updater.update_planetary_events_cache")
+    @patch("cache_updater.update_css_passes_cache")
     @patch("cache_updater.update_iss_passes_cache")
     @patch("cache_updater.update_aurora_cache")
     @patch("cache_updater.update_horizon_graph_cache")
@@ -497,14 +590,12 @@ class TestFullInitialization:
     @patch("cache_updater.update_solar_eclipse_cache")
     @patch("cache_updater.update_sun_report_cache")
     @patch("cache_updater.update_moon_planner_cache")
-    @patch("cache_updater.update_dark_window_cache")
-    @patch("cache_updater.update_moon_report_cache")
+    @patch("cache_updater.update_moon_caches")
     @patch("cache_updater.check_and_handle_config_changes")
     def test_fully_initialize_caches_continues_on_single_failure(
         self,
         _check,
-        _moon,
-        _dark,
+        _moon_caches,
         _planner,
         _sun,
         _solar,
@@ -512,16 +603,25 @@ class TestFullInitialization:
         _horizon,
         _aurora,
         _iss,
+        _css,
         _planetary,
         _special,
         _solsys,
         _sidereal,
+        _seeing,
         _best,
         _weather,
+        mock_load_config,
         mock_cache_store,
+        mock_config,
     ):
         from cache_updater import fully_initialize_caches
 
+        mock_load_config.return_value = mock_config
+        mock_cache_store.is_cache_valid.return_value = False
+        mock_cache_store.is_cache_valid_for_today.return_value = False
+        mock_cache_store.load_location_cache.return_value = {"timestamp": 0, "data": None}
+        mock_cache_store.sync_cache_from_shared.return_value = None
         _planetary.side_effect = RuntimeError("boom")
 
         fully_initialize_caches()
@@ -530,12 +630,15 @@ class TestFullInitialization:
         mock_cache_store.set_cache_initialization_in_progress.assert_called_with(False)
 
     @patch("cache_updater.cache_store")
+    @patch("cache_updater.load_config")
     @patch("cache_updater.update_weather_cache")
     @patch("cache_updater.update_best_window_cache")
+    @patch("cache_updater.update_seeing_forecast_cache")
     @patch("cache_updater.update_sidereal_time_cache")
     @patch("cache_updater.update_solar_system_events_cache")
     @patch("cache_updater.update_special_phenomena_cache")
     @patch("cache_updater.update_planetary_events_cache")
+    @patch("cache_updater.update_css_passes_cache")
     @patch("cache_updater.update_iss_passes_cache")
     @patch("cache_updater.update_aurora_cache")
     @patch("cache_updater.update_horizon_graph_cache")
@@ -548,14 +651,16 @@ class TestFullInitialization:
     def test_fully_initialize_parallel_failure_and_sequential_moon_report(
         self,
         _check, _moon_caches, _planner, _sun, _solar, _lunar,
-        _horizon, _aurora, _iss, _planetary, _special, _solsys,
-        _sidereal, _best, _weather, mock_cache_store,
+        _horizon, _aurora, _iss, _css, _planetary, _special, _solsys,
+        _sidereal, _seeing, _best, _weather, mock_load_config, mock_cache_store, mock_config,
     ):
-        """Lines 1310-1313 (parallel failure), 1338 (moon_report success mirrors dark_window)."""
+        """Parallel job failure is recorded; the run completes."""
         from cache_updater import fully_initialize_caches
 
+        mock_load_config.return_value = mock_config
         mock_cache_store.is_cache_valid.return_value = False
         mock_cache_store.is_cache_valid_for_today.return_value = False
+        mock_cache_store.load_location_cache.return_value = {"timestamp": 0, "data": None}
         mock_cache_store.sync_cache_from_shared.return_value = None
         mock_cache_store.record_cache_execution = MagicMock()
         # Make a parallel job fail
@@ -566,12 +671,15 @@ class TestFullInitialization:
         mock_cache_store.set_cache_initialization_in_progress.assert_called_with(False)
 
     @patch("cache_updater.cache_store")
+    @patch("cache_updater.load_config")
     @patch("cache_updater.update_weather_cache")
     @patch("cache_updater.update_best_window_cache")
+    @patch("cache_updater.update_seeing_forecast_cache")
     @patch("cache_updater.update_sidereal_time_cache")
     @patch("cache_updater.update_solar_system_events_cache")
     @patch("cache_updater.update_special_phenomena_cache")
     @patch("cache_updater.update_planetary_events_cache")
+    @patch("cache_updater.update_css_passes_cache")
     @patch("cache_updater.update_iss_passes_cache")
     @patch("cache_updater.update_aurora_cache")
     @patch("cache_updater.update_horizon_graph_cache")
@@ -584,14 +692,16 @@ class TestFullInitialization:
     def test_fully_initialize_sequential_non_moon_report_failure(
         self,
         _check, _moon_caches, _planner, _sun, _solar, _lunar,
-        _horizon, _aurora, _iss, _planetary, _special, _solsys,
-        _sidereal, _best, _weather, mock_cache_store,
+        _horizon, _aurora, _iss, _css, _planetary, _special, _solsys,
+        _sidereal, _seeing, _best, _weather, mock_load_config, mock_cache_store, mock_config,
     ):
-        """Line 1344->1346: sequential non-moon_report job fails → False branch of if job_name=='moon_report'."""
+        """Sequential non-moon_report job failure does not mirror dark_window."""
         from cache_updater import fully_initialize_caches
 
+        mock_load_config.return_value = mock_config
         mock_cache_store.is_cache_valid.return_value = False
         mock_cache_store.is_cache_valid_for_today.return_value = False
+        mock_cache_store.load_location_cache.return_value = {"timestamp": 0, "data": None}
         mock_cache_store.sync_cache_from_shared.return_value = None
         mock_cache_store.record_cache_execution = MagicMock()
         # Make a non-moon_report sequential job fail
@@ -613,7 +723,6 @@ class TestNextAstronomicalDuskUtc:
         """Returns ISO string when dusk is in the future."""
         from cache_updater import _next_astronomical_dusk_utc
         from datetime import datetime as _dt, timezone, timedelta
-        import types
 
         future_dusk = (_dt.now(timezone.utc) + timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%S")
         report = types.SimpleNamespace(astronomical_dusk=future_dusk)
@@ -628,7 +737,6 @@ class TestNextAstronomicalDuskUtc:
     def test_returns_none_when_all_dusk_not_found(self):
         """Returns None when all reports have 'Not found' dusk."""
         from cache_updater import _next_astronomical_dusk_utc
-        import types
 
         report = types.SimpleNamespace(astronomical_dusk="Not found")
         sun_service = MagicMock()
@@ -641,7 +749,6 @@ class TestNextAstronomicalDuskUtc:
     def test_returns_none_when_dusk_is_empty(self):
         """Returns None when dusk is an empty string."""
         from cache_updater import _next_astronomical_dusk_utc
-        import types
 
         report = types.SimpleNamespace(astronomical_dusk="")
         sun_service = MagicMock()
@@ -655,7 +762,6 @@ class TestNextAstronomicalDuskUtc:
         """Returns None when dusk is already in the past."""
         from cache_updater import _next_astronomical_dusk_utc
         from datetime import datetime as _dt, timezone, timedelta
-        import types
 
         past_dusk = (_dt.now(timezone.utc) - timedelta(hours=3)).strftime("%Y-%m-%dT%H:%M:%S")
         report = types.SimpleNamespace(astronomical_dusk=past_dusk)
@@ -670,7 +776,6 @@ class TestNextAstronomicalDuskUtc:
         """Bad dusk string is skipped and the loop continues to the next report."""
         from cache_updater import _next_astronomical_dusk_utc
         from datetime import datetime as _dt, timezone, timedelta
-        import types
 
         bad_report = types.SimpleNamespace(astronomical_dusk="not-a-valid-datetime")
         future_dusk = (_dt.now(timezone.utc) + timedelta(hours=4)).strftime("%Y-%m-%dT%H:%M:%S")
@@ -689,16 +794,12 @@ class TestUpdateMoonCachesAdditional:
     @patch("cache_updater.cache_store")
     @patch("cache_updater.MoonService")
     @patch("cache_updater.load_config")
-    def test_update_moon_caches_with_bytes_value(self, mock_load_config, mock_moon_service, mock_cache_store):
+    def test_update_moon_caches_with_bytes_value(self, mock_load_config, mock_moon_service, mock_cache_store, mock_config):
         """MoonService report values that are bytes are decoded."""
         from cache_updater import update_moon_caches
 
-        config = {"location": {"latitude": 45.0, "longitude": -75.0, "timezone": "UTC"}}
-        mock_load_config.return_value = config
-        mock_cache_store._moon_report_cache = {"data": None, "timestamp": 0}
-        mock_cache_store._dark_window_report_cache = {"data": None, "timestamp": 0}
+        mock_load_config.return_value = mock_config
 
-        import types
         report = types.SimpleNamespace(
             some_bytes_field=b"encoded_value",
             next_dark_night_start="22:00",
@@ -707,7 +808,8 @@ class TestUpdateMoonCachesAdditional:
         mock_moon_service.return_value.get_report.return_value = report
 
         update_moon_caches()
-        mock_cache_store.update_shared_cache_entry.assert_called()
+        moon_payload = _loc_payload(mock_cache_store, "moon_report")
+        assert moon_payload["moon"]["some_bytes_field"] == "encoded_value"
 
     @patch("cache_updater.cache_store")
     @patch("cache_updater.MoonService")
@@ -715,16 +817,29 @@ class TestUpdateMoonCachesAdditional:
         """Config passed directly avoids calling load_config."""
         from cache_updater import update_moon_caches
 
-        config = {"location": {"latitude": 48.0, "longitude": 2.0, "timezone": "Europe/Paris"}}
-        mock_cache_store._moon_report_cache = {"data": None, "timestamp": 0}
-        mock_cache_store._dark_window_report_cache = {"data": None, "timestamp": 0}
+        config = {"locations": [_make_location(lat=48.0, lon=2.0, tz="Europe/Paris")]}
 
-        import types
         report = types.SimpleNamespace(next_dark_night_start="21:00", next_dark_night_end="03:00")
         mock_moon_service.return_value.get_report.return_value = report
 
         update_moon_caches(config=config)
         mock_moon_service.assert_called_once_with(latitude=48.0, longitude=2.0, timezone="Europe/Paris")
+
+    @patch("cache_updater.cache_store")
+    @patch("cache_updater.MoonService")
+    def test_update_moon_caches_with_direct_location(self, mock_moon_service, mock_cache_store):
+        """A location preset passed directly wins over the config's install default."""
+        from cache_updater import update_moon_caches
+
+        config = {"locations": [_make_location()]}
+        other = _make_location("other-loc", lat=10.0, lon=20.0, tz="UTC")
+
+        report = types.SimpleNamespace(next_dark_night_start="21:00", next_dark_night_end="03:00")
+        mock_moon_service.return_value.get_report.return_value = report
+
+        update_moon_caches(config=config, location=other)
+        mock_moon_service.assert_called_once_with(latitude=10.0, longitude=20.0, timezone="UTC")
+        assert mock_cache_store.update_location_cache.call_args_list[0].args[1] == "other-loc"
 
 
 class TestUpdateSolarEclipseCache:
@@ -738,12 +853,11 @@ class TestUpdateSolarEclipseCache:
         from cache_updater import update_solar_eclipse_cache
 
         mock_load_config.return_value = mock_config
-        mock_cache_store._solar_eclipse_cache = {"data": None, "timestamp": 0}
         mock_service.return_value.get_next_eclipse.return_value = None
 
         update_solar_eclipse_cache()
 
-        stored_data = mock_cache_store._solar_eclipse_cache["data"]
+        stored_data = _loc_payload(mock_cache_store, "solar_eclipse")
         assert stored_data["solar_eclipse"] is None
         assert "message" in stored_data
 
@@ -753,17 +867,15 @@ class TestUpdateSolarEclipseCache:
     def test_solar_eclipse_with_eclipse_data(self, mock_load_config, mock_service, mock_cache_store, mock_config):
         """When eclipse is available, response has eclipse dict."""
         from cache_updater import update_solar_eclipse_cache
-        import types
 
         mock_load_config.return_value = mock_config
-        mock_cache_store._solar_eclipse_cache = {"data": None, "timestamp": 0}
 
         eclipse = types.SimpleNamespace(type="Total", peak_time="2026-08-12T14:00:00", altitude_vs_time=[])
         mock_service.return_value.get_next_eclipse.return_value = eclipse
 
         update_solar_eclipse_cache()
 
-        mock_cache_store.update_shared_cache_entry.assert_called()
+        mock_cache_store.update_location_cache.assert_called()
 
     @patch("cache_updater.cache_store")
     @patch("cache_updater.SolarEclipseService")
@@ -771,10 +883,8 @@ class TestUpdateSolarEclipseCache:
     def test_solar_eclipse_with_altitude_vs_time(self, mock_load_config, mock_service, mock_cache_store, mock_config):
         """altitude_vs_time EclipsePoint objects are converted to dicts."""
         from cache_updater import update_solar_eclipse_cache
-        import types
 
         mock_load_config.return_value = mock_config
-        mock_cache_store._solar_eclipse_cache = {"data": None, "timestamp": 0}
 
         point = types.SimpleNamespace(time="14:00", altitude=45.0)
         eclipse = types.SimpleNamespace(type="Partial", peak_time="2026-08-12T14:00:00", altitude_vs_time=[point])
@@ -782,7 +892,7 @@ class TestUpdateSolarEclipseCache:
 
         update_solar_eclipse_cache()
 
-        stored = mock_cache_store._solar_eclipse_cache["data"]
+        stored = _loc_payload(mock_cache_store, "solar_eclipse")
         assert stored["solar_eclipse"]["altitude_vs_time"] == [{"time": "14:00", "altitude": 45.0}]
 
     @patch("cache_updater.load_config")
@@ -816,12 +926,11 @@ class TestUpdateLunarEclipseCache:
         from cache_updater import update_lunar_eclipse_cache
 
         mock_load_config.return_value = mock_config
-        mock_cache_store._lunar_eclipse_cache = {"data": None, "timestamp": 0}
         mock_service.return_value.get_next_eclipse.return_value = None
 
         update_lunar_eclipse_cache()
 
-        stored = mock_cache_store._lunar_eclipse_cache["data"]
+        stored = _loc_payload(mock_cache_store, "lunar_eclipse")
         assert stored["lunar_eclipse"] is None
 
     @patch("cache_updater.cache_store")
@@ -830,16 +939,14 @@ class TestUpdateLunarEclipseCache:
     def test_lunar_eclipse_with_data(self, mock_load_config, mock_service, mock_cache_store, mock_config):
         """When lunar eclipse available, result has eclipse dict."""
         from cache_updater import update_lunar_eclipse_cache
-        import types
 
         mock_load_config.return_value = mock_config
-        mock_cache_store._lunar_eclipse_cache = {"data": None, "timestamp": 0}
 
         eclipse = types.SimpleNamespace(type="Total", peak_time="2025-09-07T02:00:00", altitude_vs_time=[])
         mock_service.return_value.get_next_eclipse.return_value = eclipse
 
         update_lunar_eclipse_cache()
-        mock_cache_store.update_shared_cache_entry.assert_called()
+        mock_cache_store.update_location_cache.assert_called()
 
     @patch("cache_updater.cache_store")
     @patch("cache_updater.LunarEclipseService")
@@ -847,10 +954,8 @@ class TestUpdateLunarEclipseCache:
     def test_lunar_eclipse_with_altitude_vs_time(self, mock_load_config, mock_service, mock_cache_store, mock_config):
         """altitude_vs_time EclipsePoint objects are converted to dicts."""
         from cache_updater import update_lunar_eclipse_cache
-        import types
 
         mock_load_config.return_value = mock_config
-        mock_cache_store._lunar_eclipse_cache = {"data": None, "timestamp": 0}
 
         point = types.SimpleNamespace(time="02:00", altitude=30.0)
         eclipse = types.SimpleNamespace(type="Partial", peak_time="2025-09-07T02:00:00", altitude_vs_time=[point])
@@ -858,7 +963,7 @@ class TestUpdateLunarEclipseCache:
 
         update_lunar_eclipse_cache()
 
-        stored = mock_cache_store._lunar_eclipse_cache["data"]
+        stored = _loc_payload(mock_cache_store, "lunar_eclipse")
         assert stored["lunar_eclipse"]["altitude_vs_time"] == [{"time": "02:00", "altitude": 30.0}]
 
     @patch("cache_updater.load_config")
@@ -892,12 +997,11 @@ class TestUpdateHorizonGraphCache:
         from cache_updater import update_horizon_graph_cache
 
         mock_load_config.return_value = mock_config
-        mock_cache_store._horizon_graph_cache = {"data": None, "timestamp": 0}
         mock_service.return_value.get_horizon_data.return_value = None
 
         update_horizon_graph_cache()
 
-        stored = mock_cache_store._horizon_graph_cache["data"]
+        stored = _loc_payload(mock_cache_store, "horizon_graph")
         assert stored["horizon_data"] is None
 
     @patch("cache_updater.cache_store")
@@ -906,10 +1010,8 @@ class TestUpdateHorizonGraphCache:
     def test_horizon_graph_with_data(self, mock_load_config, mock_service, mock_cache_store, mock_config):
         """When horizon_data available, sun/moon point objects are converted to dicts."""
         from cache_updater import update_horizon_graph_cache
-        import types
 
         mock_load_config.return_value = mock_config
-        mock_cache_store._horizon_graph_cache = {"data": None, "timestamp": 0}
 
         sun_point = types.SimpleNamespace(time="12:00", altitude=60.0)
         moon_point = types.SimpleNamespace(time="22:00", altitude=30.0)
@@ -918,7 +1020,7 @@ class TestUpdateHorizonGraphCache:
 
         update_horizon_graph_cache()
 
-        stored = mock_cache_store._horizon_graph_cache["data"]
+        stored = _loc_payload(mock_cache_store, "horizon_graph")
         assert stored["horizon_data"]["sun_data"] == [{"time": "12:00", "altitude": 60.0}]
         assert stored["horizon_data"]["moon_data"] == [{"time": "22:00", "altitude": 30.0}]
 
@@ -953,13 +1055,11 @@ class TestUpdateAuroraCache:
         from cache_updater import update_aurora_cache
 
         mock_load_config.return_value = mock_config
-        mock_cache_store._aurora_cache = {"data": None, "timestamp": 0}
         mock_get_aurora.return_value = {"forecast": [{"kp_index": 5}]}
 
         update_aurora_cache()
 
-        assert mock_cache_store._aurora_cache["data"] == {"forecast": [{"kp_index": 5}]}
-        mock_cache_store.update_shared_cache_entry.assert_called()
+        assert _loc_payload(mock_cache_store, "aurora") == {"forecast": [{"kp_index": 5}]}
 
     @patch("cache_updater.get_aurora_report")
     @patch("cache_updater.load_config")
@@ -992,12 +1092,12 @@ class TestUpdateIssPassesCache:
         from cache_updater import update_iss_passes_cache
 
         mock_load_config.return_value = mock_config
-        mock_cache_store._iss_passes_cache = {"data": None, "timestamp": 0}
         mock_get_iss.return_value = {"passes": [{"peak_time": "2026-04-17T21:00:00"}]}
 
         update_iss_passes_cache()
 
-        mock_cache_store.update_shared_cache_entry.assert_called()
+        mock_cache_store.update_location_cache.assert_called()
+        assert mock_cache_store.update_location_cache.call_args.args[1] == LOC_ID
 
     @patch("cache_updater.get_iss_passes_report")
     @patch("cache_updater.load_config")
@@ -1032,13 +1132,12 @@ class TestUpdateCssPassesCache:
         from cache_updater import update_css_passes_cache
 
         mock_load_config.return_value = mock_config
-        mock_cache_store._css_passes_cache = {"data": None, "timestamp": 0}
         mock_get_css.return_value = {"passes": [{"peak_time": "2026-04-17T21:00:00"}]}
 
         update_css_passes_cache()
 
         mock_load_config.assert_called_once()
-        mock_cache_store.update_shared_cache_entry.assert_called()
+        mock_cache_store.update_location_cache.assert_called()
 
     @patch("cache_updater.load_config")
     def test_css_passes_missing_location(self, mock_load_config):
@@ -1058,7 +1157,7 @@ class TestUpdateCssPassesCache:
 
         update_css_passes_cache(config=mock_config)
 
-        mock_cache_store.update_shared_cache_entry.assert_not_called()
+        mock_cache_store.update_location_cache.assert_not_called()
 
     @patch("cache_updater.get_css_passes_report")
     def test_css_passes_service_exception(self, mock_get_css, mock_config):
@@ -1085,8 +1184,6 @@ class TestUpdatePlanetaryEventsCache:
     def test_planetary_events_service_exception(self, mock_load_config, mock_config):
         """Service import exception is caught and logged."""
         from cache_updater import update_planetary_events_cache
-        import sys
-        import types
 
         mock_load_config.return_value = mock_config
         broken_module = types.SimpleNamespace(
@@ -1112,8 +1209,6 @@ class TestUpdateSpecialPhenomenaCache:
     def test_special_phenomena_service_exception(self, mock_load_config, mock_config):
         """Service exception is caught and logged."""
         from cache_updater import update_special_phenomena_cache
-        import sys
-        import types
 
         mock_load_config.return_value = mock_config
         broken_module = types.SimpleNamespace(
@@ -1139,8 +1234,6 @@ class TestUpdateSolarSystemEventsCache:
     def test_solar_system_events_service_exception(self, mock_load_config, mock_config):
         """Service exception is caught and logged."""
         from cache_updater import update_solar_system_events_cache
-        import sys
-        import types
 
         mock_load_config.return_value = mock_config
         broken_module = types.SimpleNamespace(
@@ -1166,8 +1259,6 @@ class TestUpdateSiderealTimeCache:
     def test_sidereal_time_service_exception(self, mock_load_config, mock_config):
         """Service exception is caught and logged."""
         from cache_updater import update_sidereal_time_cache
-        import sys
-        import types
 
         mock_load_config.return_value = mock_config
         broken_module = types.SimpleNamespace(
@@ -1186,17 +1277,14 @@ class TestUpdateSeeingForecastCache:
     def test_seeing_forecast_with_none_data(self, mock_load_config, mock_cache_store, mock_config):
         """When seeing_data is None, response has null field with message."""
         from cache_updater import update_seeing_forecast_cache
-        import sys
-        import types
 
         mock_load_config.return_value = mock_config
-        mock_cache_store._seeing_forecast_cache = {"data": None, "timestamp": 0}
 
         fake_module = types.SimpleNamespace(get_seeing_forecast=MagicMock(return_value=None))
         with patch.dict(sys.modules, {"seeing_forecast_7timer": fake_module}):
             update_seeing_forecast_cache()
 
-        stored = mock_cache_store._seeing_forecast_cache["data"]
+        stored = _loc_payload(mock_cache_store, "seeing_forecast")
         assert stored["seeing_forecast"] is None
         assert "message" in stored
 
@@ -1205,18 +1293,15 @@ class TestUpdateSeeingForecastCache:
     def test_seeing_forecast_with_valid_data(self, mock_load_config, mock_cache_store, mock_config):
         """When seeing_data available, it is stored with units."""
         from cache_updater import update_seeing_forecast_cache
-        import sys
-        import types
 
         mock_load_config.return_value = mock_config
-        mock_cache_store._seeing_forecast_cache = {"data": None, "timestamp": 0}
         seeing_data = {"hourly": [{"time": "2026-04-17T22:00:00Z", "seeing": 1}]}
         fake_module = types.SimpleNamespace(get_seeing_forecast=MagicMock(return_value=seeing_data))
 
         with patch.dict(sys.modules, {"seeing_forecast_7timer": fake_module}):
             update_seeing_forecast_cache()
 
-        stored = mock_cache_store._seeing_forecast_cache["data"]
+        stored = _loc_payload(mock_cache_store, "seeing_forecast")
         assert stored["seeing_forecast"] == seeing_data
         assert "units" in stored
 
@@ -1232,8 +1317,6 @@ class TestUpdateSeeingForecastCache:
     def test_seeing_forecast_service_exception(self, mock_load_config, mock_config):
         """Service exception is caught and logged."""
         from cache_updater import update_seeing_forecast_cache
-        import sys
-        import types
 
         mock_load_config.return_value = mock_config
         broken_module = types.SimpleNamespace(get_seeing_forecast=MagicMock(side_effect=RuntimeError("timeout")))
@@ -1243,14 +1326,12 @@ class TestUpdateSeeingForecastCache:
 
 
 class TestUpdateSpaceflightLaunchesCache:
-    """Tests for update_spaceflight_launches_cache."""
+    """Tests for update_spaceflight_launches_cache (global cache, unchanged shape)."""
 
     @patch("cache_updater.cache_store")
     def test_launches_success_with_both_results(self, mock_cache_store):
         """Both upcoming and past launches are stored."""
         from cache_updater import update_spaceflight_launches_cache
-        import sys
-        import types
 
         mock_cache_store._spaceflight_launches_cache = {"data": None, "timestamp": 0}
 
@@ -1270,8 +1351,6 @@ class TestUpdateSpaceflightLaunchesCache:
     def test_launches_with_none_upcoming_uses_fallback(self, mock_cache_store):
         """None upcoming falls back to empty dict."""
         from cache_updater import update_spaceflight_launches_cache
-        import sys
-        import types
 
         mock_cache_store._spaceflight_launches_cache = {"data": None, "timestamp": 0}
 
@@ -1290,8 +1369,6 @@ class TestUpdateSpaceflightLaunchesCache:
     def test_launches_both_none_returns_early(self, mock_cache_store):
         """Both None returns early without storing."""
         from cache_updater import update_spaceflight_launches_cache
-        import sys
-        import types
 
         mock_cache_store._spaceflight_launches_cache = {"data": "old_data", "timestamp": 0}
 
@@ -1309,8 +1386,6 @@ class TestUpdateSpaceflightLaunchesCache:
     def test_launches_service_exception(self):
         """Service exception is caught and logged."""
         from cache_updater import update_spaceflight_launches_cache
-        import sys
-        import types
 
         broken_module = types.SimpleNamespace(
             get_upcoming_launches=MagicMock(side_effect=RuntimeError("network error")),
@@ -1328,8 +1403,6 @@ class TestUpdateSpaceflightAstronautsCache:
     def test_astronauts_success(self, mock_cache_store):
         """Successful astronaut data is stored in cache."""
         from cache_updater import update_spaceflight_astronauts_cache
-        import sys
-        import types
 
         mock_cache_store._spaceflight_astronauts_cache = {"data": None, "timestamp": 0}
 
@@ -1347,8 +1420,6 @@ class TestUpdateSpaceflightAstronautsCache:
     def test_astronauts_both_none_returns_early(self, mock_cache_store):
         """Both None returns early without storing."""
         from cache_updater import update_spaceflight_astronauts_cache
-        import sys
-        import types
 
         fake_module = types.SimpleNamespace(
             get_iss_crew=MagicMock(return_value=None),
@@ -1364,8 +1435,6 @@ class TestUpdateSpaceflightAstronautsCache:
     def test_astronauts_none_iss_crew_uses_fallback(self, mock_cache_store):
         """None iss_crew falls back to empty dict."""
         from cache_updater import update_spaceflight_astronauts_cache
-        import sys
-        import types
 
         mock_cache_store._spaceflight_astronauts_cache = {"data": None, "timestamp": 0}
 
@@ -1385,8 +1454,6 @@ class TestUpdateSpaceflightAstronautsCache:
         """astronauts=None (falsy) with a real iss_crew present -> annotation loop is
         skipped entirely, falling straight through to building the response."""
         from cache_updater import update_spaceflight_astronauts_cache
-        import sys
-        import types
 
         mock_cache_store._spaceflight_astronauts_cache = {"data": None, "timestamp": 0}
 
@@ -1410,8 +1477,6 @@ class TestUpdateSpaceflightAstronautsCache:
         """Astronauts matching a crew member by name are annotated with their station;
         a crew member with no name is skipped when building the name->station map."""
         from cache_updater import update_spaceflight_astronauts_cache
-        import sys
-        import types
 
         mock_cache_store._spaceflight_astronauts_cache = {"data": None, "timestamp": 0}
 
@@ -1454,8 +1519,6 @@ class TestUpdateSpaceflightEventsCache:
     def test_events_none_returns_early(self, mock_cache_store):
         """None events returns early without storing."""
         from cache_updater import update_spaceflight_events_cache
-        import sys
-        import types
 
         fake_module = types.SimpleNamespace(
             get_upcoming_space_events=MagicMock(return_value=None),
@@ -1470,8 +1533,6 @@ class TestUpdateSpaceflightEventsCache:
     def test_prune_exception_is_caught(self, mock_cache_store):
         """Exception during image prune is caught and logged."""
         from cache_updater import update_spaceflight_events_cache
-        import sys
-        import types
 
         mock_cache_store._spaceflight_events_cache = {"data": None, "timestamp": 0}
         mock_cache_store.load_shared_cache_entry.side_effect = RuntimeError("db error")
@@ -1488,7 +1549,7 @@ class TestUpdateSpaceflightEventsCache:
 
     @patch("cache_updater.cache_store")
     def test_collect_images_ignores_non_prefix_strings(self, mock_cache_store):
-        """Line 977->exit: _collect_images skips strings not starting with /api/spaceflight/img/."""
+        """_collect_images skips strings not starting with /api/spaceflight/img/."""
         from cache_updater import update_spaceflight_events_cache
 
         mock_cache_store._spaceflight_events_cache = {"data": None, "timestamp": 0}
@@ -1502,7 +1563,7 @@ class TestUpdateSpaceflightEventsCache:
         mock_cache_store.load_shared_cache_entry.side_effect = lambda key: {
             "spaceflight_launches": {
                 "data": {
-                    "name": "Mission X",  # non-prefix string → hits 977->exit
+                    "name": "Mission X",  # non-prefix string → skipped
                     "image_url": "/api/spaceflight/img/launch.jpg",
                 }
             },
@@ -1590,35 +1651,32 @@ class TestMissingLocationAndExceptionPaths:
         update_best_window_cache()  # Should not raise
 
     @patch("cache_updater.get_hourly_forecast")
-    def test_weather_cache_exception(self, mock_forecast):
+    def test_weather_cache_exception(self, mock_forecast, mock_config):
         """update_weather_cache exception during serialization is caught."""
         from cache_updater import update_weather_cache
 
         # Raise during forecast fetch
         mock_forecast.side_effect = RuntimeError("serialization error")
-        update_weather_cache()  # Should not raise
+        update_weather_cache(config=mock_config)  # Should not raise
 
     @patch("cache_updater.cache_store")
     @patch("cache_updater.get_hourly_forecast")
-    def test_weather_cache_with_bytes_location(self, mock_forecast, mock_cache_store):
+    def test_weather_cache_with_bytes_location(self, mock_forecast, mock_cache_store, mock_config):
         """update_weather_cache handles bytes values in location dict."""
         from cache_updater import update_weather_cache
 
-        mock_cache_store._weather_cache = {"data": None, "timestamp": 0}
         mock_forecast.return_value = {
-            "hourly": __import__("pandas").DataFrame({"date": __import__("pandas").to_datetime(["2026-04-17T21:00:00Z"]), "temp": [10.0]}),
+            "hourly": pd.DataFrame({"date": pd.to_datetime(["2026-04-17T21:00:00Z"]), "temp": [10.0]}),
             "location": {"name": b"Paris", "country": "France"},
         }
 
-        update_weather_cache()
-        stored = mock_cache_store._weather_cache["data"]
+        update_weather_cache(config=mock_config)
+        stored = _loc_payload(mock_cache_store, "weather_forecast")
         assert stored["location"]["name"] == "Paris"
 
     def test_spaceflight_astronauts_exception(self):
         """update_spaceflight_astronauts_cache exception is caught."""
         from cache_updater import update_spaceflight_astronauts_cache
-        import sys
-        import types
 
         broken_module = types.SimpleNamespace(
             get_iss_crew=MagicMock(side_effect=RuntimeError("network error")),
@@ -1631,8 +1689,6 @@ class TestMissingLocationAndExceptionPaths:
     def test_spaceflight_events_outer_exception(self):
         """update_spaceflight_events_cache outer exception is caught."""
         from cache_updater import update_spaceflight_events_cache
-        import sys
-        import types
 
         broken_module = types.SimpleNamespace(
             get_upcoming_space_events=MagicMock(side_effect=RuntimeError("outer error")),
@@ -1645,19 +1701,35 @@ class TestMissingLocationAndExceptionPaths:
     @patch("cache_updater.load_config")
     @patch("cache_updater.check_and_handle_config_changes")
     def test_fully_initialize_moon_report_mirrors_dark_window_on_failure(
-        self, _check, mock_load_config, mock_cache_store
+        self, _check, mock_load_config, mock_cache_store, mock_config
     ):
         """Exception in moon_report job also records dark_window failure."""
         from cache_updater import fully_initialize_caches
 
-        mock_load_config.return_value = {"location": {"latitude": 48.85, "longitude": 2.35, "timezone": "Europe/Paris"}}
+        mock_load_config.return_value = mock_config
         mock_cache_store.is_cache_valid.return_value = False
         mock_cache_store.is_cache_valid_for_today.return_value = False
+        mock_cache_store.load_location_cache.return_value = {"timestamp": 0, "data": None}
         mock_cache_store.sync_cache_from_shared.return_value = None
         mock_cache_store._spaceflight_launches_cache = {"data": None, "timestamp": 0}
         mock_cache_store._spaceflight_astronauts_cache = {"data": None, "timestamp": 0}
 
-        with patch("cache_updater.update_moon_caches", side_effect=RuntimeError("moon fail")):
+        # Patch every other location job so only moon_report actually errors and
+        # nothing does real astro work in this control-flow test.
+        job_patches = [
+            "update_moon_planner_cache", "update_sun_report_cache", "update_solar_eclipse_cache",
+            "update_lunar_eclipse_cache", "update_horizon_graph_cache", "update_aurora_cache",
+            "update_iss_passes_cache", "update_css_passes_cache", "update_planetary_events_cache",
+            "update_special_phenomena_cache", "update_solar_system_events_cache",
+            "update_sidereal_time_cache", "update_seeing_forecast_cache", "update_best_window_cache",
+            "update_weather_cache",
+        ]
+        from contextlib import ExitStack
+
+        with ExitStack() as stack:
+            for name in job_patches:
+                stack.enter_context(patch(f"cache_updater.{name}"))
+            stack.enter_context(patch("cache_updater.update_moon_caches", side_effect=RuntimeError("moon fail")))
             fully_initialize_caches()
 
         # record_cache_execution for both "moon_report" and "dark_window" with False
@@ -1671,14 +1743,15 @@ class TestFullyInitializeCachesAdditional:
     @patch("cache_updater.cache_store")
     @patch("cache_updater.load_config")
     @patch("cache_updater.check_and_handle_config_changes")
-    def test_all_caches_valid_skips_all_jobs(self, _check, mock_load_config, mock_cache_store):
+    def test_all_caches_valid_skips_all_jobs(self, _check, mock_load_config, mock_cache_store, mock_config):
         """When all caches are valid, no jobs are run."""
         from cache_updater import fully_initialize_caches
 
-        mock_load_config.return_value = {"location": {"latitude": 48.85, "longitude": 2.35, "timezone": "Europe/Paris"}}
+        mock_load_config.return_value = mock_config
         # All caches valid
         mock_cache_store.is_cache_valid.return_value = True
         mock_cache_store.is_cache_valid_for_today.return_value = True
+        mock_cache_store.load_location_cache.return_value = {"timestamp": 999, "data": {"x": 1}}
         mock_cache_store.sync_cache_from_shared.return_value = None
 
         fully_initialize_caches()
@@ -1689,15 +1762,14 @@ class TestFullyInitializeCachesAdditional:
     @patch("cache_updater.cache_store")
     @patch("cache_updater.load_config")
     @patch("cache_updater.check_and_handle_config_changes")
-    def test_spaceflight_image_integrity_forces_refetch(self, _check, mock_load_config, mock_cache_store):
+    def test_spaceflight_image_integrity_forces_refetch(self, _check, mock_load_config, mock_cache_store, mock_config):
         """Missing spaceflight images force timestamp=0 to trigger refetch."""
         from cache_updater import fully_initialize_caches
-        import sys
-        import types
 
-        mock_load_config.return_value = {"location": {"latitude": 48.85, "longitude": 2.35, "timezone": "Europe/Paris"}}
+        mock_load_config.return_value = mock_config
         mock_cache_store.is_cache_valid.return_value = True
         mock_cache_store.is_cache_valid_for_today.return_value = True
+        mock_cache_store.load_location_cache.return_value = {"timestamp": 999, "data": {"x": 1}}
         mock_cache_store.sync_cache_from_shared.return_value = None
 
         # Simulate cache entry with data
@@ -1718,13 +1790,14 @@ class TestFullyInitializeCachesAdditional:
     @patch("cache_updater.cache_store")
     @patch("cache_updater.load_config")
     @patch("cache_updater.check_and_handle_config_changes")
-    def test_spaceflight_image_integrity_intact_skips_reset(self, _check, mock_load_config, mock_cache_store):
-        """Branch 1286->1293: images are intact so timestamp is NOT reset."""
+    def test_spaceflight_image_integrity_intact_skips_reset(self, _check, mock_load_config, mock_cache_store, mock_config):
+        """Images are intact so timestamp is NOT reset."""
         from cache_updater import fully_initialize_caches
 
-        mock_load_config.return_value = {"location": {"latitude": 48.85, "longitude": 2.35, "timezone": "Europe/Paris"}}
+        mock_load_config.return_value = mock_config
         mock_cache_store.is_cache_valid.return_value = True
         mock_cache_store.is_cache_valid_for_today.return_value = True
+        mock_cache_store.load_location_cache.return_value = {"timestamp": 999, "data": {"x": 1}}
         mock_cache_store.sync_cache_from_shared.return_value = None
 
         original_ts = 999999
@@ -1741,276 +1814,3 @@ class TestFullyInitializeCachesAdditional:
 
         # Timestamp must NOT have been reset since images are intact
         assert launches_cache["timestamp"] == original_ts
-
-    @patch("astropy.utils.iers.IERS_Auto.iers_table", new=None)
-    @patch("cache_updater.cache_store")
-    @patch("cache_updater.load_config")
-    @patch("cache_updater.check_and_handle_config_changes")
-    def test_only_sequential_jobs_skips_parallel_block(self, _check, mock_load_config, mock_cache_store):
-        """Lines 1279->1289 and 1289->1324: when parallel is empty both branches are taken."""
-        from cache_updater import fully_initialize_caches
-
-        mock_load_config.return_value = {"location": {"latitude": 48.85, "longitude": 2.35, "timezone": "Europe/Paris"}}
-        # All day_sensitive=False jobs valid (skipped) → no parallel jobs
-        mock_cache_store.is_cache_valid.return_value = True
-        # All day_sensitive=True jobs stale → sequential-only jobs_to_run
-        mock_cache_store.is_cache_valid_for_today.return_value = False
-        mock_cache_store.sync_cache_from_shared.return_value = None
-        # Prevent spaceflight image-integrity check from importing spaceflight_tracker
-        mock_cache_store._spaceflight_launches_cache = {"data": None, "timestamp": 0}
-        mock_cache_store._spaceflight_astronauts_cache = {"data": None, "timestamp": 0}
-
-        fully_initialize_caches()  # Should complete without error
-
-        # Only sequential jobs ran → set_cache_initialization_in_progress(False) must be called
-        mock_cache_store.set_cache_initialization_in_progress.assert_called_with(False)
-
-    @patch("cache_updater.update_iers_cache", side_effect=RuntimeError("iers pre-download failed"))
-    @patch("astropy.utils.iers.IERS_Auto.iers_table", new=None)
-    @patch("cache_updater.cache_store")
-    @patch("cache_updater.load_config")
-    @patch("cache_updater.check_and_handle_config_changes")
-    def test_iers_pre_parallel_exception_is_caught(self, _check, mock_load_config, mock_cache_store, _iers_fn):
-        """Lines 1284-1285: exception in pre-parallel IERS download is caught and logged."""
-        from cache_updater import fully_initialize_caches
-
-        mock_load_config.return_value = {"location": {"latitude": 48.85, "longitude": 2.35, "timezone": "Europe/Paris"}}
-        # All day_sensitive=False jobs stale → iers is in parallel → pre-download fires
-        mock_cache_store.is_cache_valid.return_value = False
-        # Skip day_sensitive=True jobs to keep test fast
-        mock_cache_store.is_cache_valid_for_today.return_value = True
-        mock_cache_store.sync_cache_from_shared.return_value = None
-        mock_cache_store._spaceflight_launches_cache = {"data": None, "timestamp": 0}
-        mock_cache_store._spaceflight_astronauts_cache = {"data": None, "timestamp": 0}
-
-        fully_initialize_caches()  # Should not raise despite iers failure
-
-        mock_cache_store.set_cache_initialization_in_progress.assert_called_with(False)
-
-    @patch("cache_updater.cache_store")
-    @patch("cache_updater.load_config")
-    @patch("cache_updater.check_and_handle_config_changes")
-    def test_iers_table_loaded_and_fresh_skips_predownload(self, _check, mock_load_config, mock_cache_store):
-        """Branch 1357->1374: iers_table is loaded and not near expiry → pre-download skipped."""
-        from cache_updater import fully_initialize_caches
-        from unittest.mock import MagicMock
-
-        mock_load_config.return_value = {"location": {"latitude": 48.85, "longitude": 2.35, "timezone": "Europe/Paris"}}
-        mock_cache_store.is_cache_valid.return_value = True
-        mock_cache_store.is_cache_valid_for_today.return_value = True
-        mock_cache_store.sync_cache_from_shared.return_value = None
-        mock_cache_store._spaceflight_launches_cache = {"data": None, "timestamp": 0}
-        mock_cache_store._spaceflight_astronauts_cache = {"data": None, "timestamp": 0}
-
-        # Mock a loaded, fresh IERS table (far future MJD → not near expiry)
-        mock_table = MagicMock()
-        mock_table.__getitem__ = MagicMock(return_value=MagicMock(max=MagicMock(return_value=99999.0)))
-
-        with patch("astropy.utils.iers.IERS_Auto.iers_table", new=mock_table):
-            fully_initialize_caches()
-
-        mock_cache_store.set_cache_initialization_in_progress.assert_called_with(False)
-
-
-# ---------------------------------------------------------------------------
-# update_allsky_sensor_cache
-# ---------------------------------------------------------------------------
-
-
-class TestUpdateAllskySensorCache:
-    """Tests for update_allsky_sensor_cache (lines 1059-1076)."""
-
-    def test_returns_early_when_config_is_none_and_allsky_not_in_config(self):
-        """When load_config returns no allsky key, function returns without updating cache."""
-        import cache_store as cs
-        from cache_updater import update_allsky_sensor_cache
-
-        with patch("cache_updater.load_config", return_value={}):
-            before_ts = cs._allsky_sensor_cache["timestamp"]
-            update_allsky_sensor_cache()
-            assert cs._allsky_sensor_cache["timestamp"] == before_ts
-
-    def test_returns_early_when_allsky_disabled(self):
-        """enabled=False → return without touching cache."""
-        from cache_updater import update_allsky_sensor_cache
-        cfg = {"connectors": {"allsky": {"enabled": False, "url": "http://allsky.local", "modules": {}}}}
-        import cache_store as cs
-        before_ts = cs._allsky_sensor_cache["timestamp"]
-        update_allsky_sensor_cache(config=cfg)
-        assert cs._allsky_sensor_cache["timestamp"] == before_ts
-
-    def test_returns_early_when_no_url(self):
-        """enabled but no url → return without touching cache."""
-        from cache_updater import update_allsky_sensor_cache
-        cfg = {"connectors": {"allsky": {"enabled": True, "url": "", "modules": {}}}}
-        import cache_store as cs
-        before_ts = cs._allsky_sensor_cache["timestamp"]
-        update_allsky_sensor_cache(config=cfg)
-        assert cs._allsky_sensor_cache["timestamp"] == before_ts
-
-    def test_returns_early_when_sensor_module_disabled(self):
-        """sensor_data module disabled → return without touching cache."""
-        from cache_updater import update_allsky_sensor_cache
-        cfg = {"connectors": {"allsky": {
-            "enabled": True,
-            "url": "http://allsky.local",
-            "modules": {"sensor_data": {"enabled": False}},
-        }}}
-        import cache_store as cs
-        before_ts = cs._allsky_sensor_cache["timestamp"]
-        update_allsky_sensor_cache(config=cfg)
-        assert cs._allsky_sensor_cache["timestamp"] == before_ts
-
-    def test_updates_cache_when_connector_enabled(self):
-        """All conditions met → fetch sensor data and update cache."""
-        from cache_updater import update_allsky_sensor_cache
-        import cache_store as cs
-
-        cfg = {"connectors": {"allsky": {
-            "enabled": True,
-            "url": "http://allsky.local",
-            "modules": {"sensor_data": {"enabled": True}},
-        }}}
-        sensor_data = {"AS_TEMPERATURE_C": 15.2}
-        mock_connector = MagicMock()
-        mock_connector.fetch_sensor_data.return_value = sensor_data
-
-        with patch("connectors.allsky_connector.AllSkyConnector", return_value=mock_connector):
-            update_allsky_sensor_cache(config=cfg)
-
-        assert cs._allsky_sensor_cache["data"] == sensor_data
-        assert cs._allsky_sensor_cache["timestamp"] > 0
-
-    def test_uses_load_config_when_no_config_arg(self):
-        """config=None triggers load_config() call."""
-        from cache_updater import update_allsky_sensor_cache
-        cfg = {"connectors": {"allsky": {
-            "enabled": True,
-            "url": "http://allsky.local",
-            "modules": {"sensor_data": {"enabled": True}},
-        }}}
-        mock_connector = MagicMock()
-        mock_connector.fetch_sensor_data.return_value = {}
-
-        with patch("cache_updater.load_config", return_value=cfg):
-            with patch("connectors.allsky_connector.AllSkyConnector", return_value=mock_connector):
-                update_allsky_sensor_cache()  # no config arg
-
-        mock_connector.fetch_sensor_data.assert_called_once()
-
-
-class TestUpdateAllskyHealthCache:
-    """Tests for update_allsky_health_cache."""
-
-    def test_returns_early_when_allsky_disabled(self):
-        import cache_store as cs
-        from cache_updater import update_allsky_health_cache
-        cfg = {"connectors": {"allsky": {"enabled": False, "url": "http://allsky.local"}}}
-        before_ts = cs._allsky_health_cache["timestamp"]
-        update_allsky_health_cache(config=cfg)
-        assert cs._allsky_health_cache["timestamp"] == before_ts
-
-    def test_returns_early_when_no_url(self):
-        import cache_store as cs
-        from cache_updater import update_allsky_health_cache
-        cfg = {"connectors": {"allsky": {"enabled": True, "url": ""}}}
-        before_ts = cs._allsky_health_cache["timestamp"]
-        update_allsky_health_cache(config=cfg)
-        assert cs._allsky_health_cache["timestamp"] == before_ts
-
-    def test_updates_cache_when_connector_enabled(self):
-        import cache_store as cs
-        from cache_updater import update_allsky_health_cache
-        cfg = {"connectors": {"allsky": {"enabled": True, "url": "http://allsky.local"}}}
-        health_result = {"reachable": True, "modules": {"live_image": {"ok": True}}}
-        mock_connector = MagicMock()
-        mock_connector.health_check.return_value = health_result
-
-        with patch("connectors.allsky_connector.AllSkyConnector", return_value=mock_connector):
-            update_allsky_health_cache(config=cfg)
-
-        assert cs._allsky_health_cache["data"] == health_result
-        assert cs._allsky_health_cache["timestamp"] > 0
-
-    def test_uses_load_config_when_no_config_arg(self):
-        from cache_updater import update_allsky_health_cache
-        cfg = {"connectors": {"allsky": {"enabled": True, "url": "http://allsky.local"}}}
-        mock_connector = MagicMock()
-        mock_connector.health_check.return_value = {}
-
-        with patch("cache_updater.load_config", return_value=cfg):
-            with patch("connectors.allsky_connector.AllSkyConnector", return_value=mock_connector):
-                update_allsky_health_cache()
-
-        mock_connector.health_check.assert_called_once()
-
-
-class TestFullyInitializeCachesAllskyJob:
-    """Test that allsky jobs are added to cache_jobs when connector is properly configured."""
-
-    def _base_mock_setup(self, mock_load_config, mock_cache_store, sensor_data_enabled=True):
-        mock_load_config.return_value = {
-            "location": {"latitude": 48.85, "longitude": 2.35, "timezone": "Europe/Paris"},
-            "connectors": {"allsky": {
-                "enabled": True,
-                "url": "http://allsky.local",
-                "modules": {"sensor_data": {"enabled": sensor_data_enabled}},
-            }},
-        }
-        mock_cache_store.is_cache_valid.return_value = True
-        mock_cache_store.is_cache_valid_for_today.return_value = True
-        mock_cache_store.sync_cache_from_shared.return_value = None
-        mock_cache_store._spaceflight_launches_cache = {"data": None, "timestamp": 0}
-        mock_cache_store._spaceflight_astronauts_cache = {"data": None, "timestamp": 0}
-        mock_cache_store._allsky_sensor_cache = {"data": None, "timestamp": 0}
-        mock_cache_store._allsky_health_cache = {"data": None, "timestamp": 0}
-
-    @patch("cache_updater.cache_store")
-    @patch("cache_updater.load_config")
-    @patch("cache_updater.check_and_handle_config_changes")
-    def test_allsky_job_added_when_enabled(self, _check, mock_load_config, mock_cache_store):
-        """Both sensor and health jobs added when connector is enabled with sensor_data module."""
-        from cache_updater import fully_initialize_caches
-        self._base_mock_setup(mock_load_config, mock_cache_store, sensor_data_enabled=True)
-
-        fully_initialize_caches()  # must run without error
-
-        mock_cache_store.set_cache_initialization_in_progress.assert_called_with(False)
-
-    @patch("cache_updater.cache_store")
-    @patch("cache_updater.load_config")
-    @patch("cache_updater.check_and_handle_config_changes")
-    def test_allsky_health_job_added_without_sensor_module(self, _check, mock_load_config, mock_cache_store):
-        """Health job is added even when sensor_data module is disabled."""
-        from cache_updater import fully_initialize_caches
-        self._base_mock_setup(mock_load_config, mock_cache_store, sensor_data_enabled=False)
-
-        with patch("cache_updater.update_allsky_health_cache") as mock_health_fn:
-            mock_cache_store.is_cache_valid.return_value = False
-            mock_cache_store.is_cache_valid_for_today.return_value = False
-            fully_initialize_caches()
-
-        mock_health_fn.assert_called_once()
-
-    @patch("cache_updater.cache_store")
-    @patch("cache_updater.load_config")
-    @patch("cache_updater.check_and_handle_config_changes")
-    def test_allsky_jobs_not_added_when_disabled(self, _check, mock_load_config, mock_cache_store):
-        """No allsky jobs added when connector is disabled."""
-        from cache_updater import fully_initialize_caches
-        mock_load_config.return_value = {
-            "location": {"latitude": 48.85, "longitude": 2.35, "timezone": "Europe/Paris"},
-            "connectors": {"allsky": {"enabled": False, "url": "http://allsky.local"}},
-        }
-        mock_cache_store.is_cache_valid.return_value = False
-        mock_cache_store.is_cache_valid_for_today.return_value = False
-        mock_cache_store.sync_cache_from_shared.return_value = None
-        mock_cache_store._spaceflight_launches_cache = {"data": None, "timestamp": 0}
-        mock_cache_store._spaceflight_astronauts_cache = {"data": None, "timestamp": 0}
-
-        with patch("cache_updater.update_allsky_health_cache") as mock_health_fn:
-            with patch("cache_updater.update_allsky_sensor_cache") as mock_sensor_fn:
-                fully_initialize_caches()
-
-        mock_health_fn.assert_not_called()
-        mock_sensor_fn.assert_not_called()

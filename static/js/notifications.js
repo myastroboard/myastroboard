@@ -21,6 +21,7 @@ const NOTIF_BADGE     = '/static/ico/android/launchericon-72x72.png';
 const _NOTIF_DEFAULTS = Object.freeze({
     enabled:          true,
     permission_asked: false,
+    disabled_location_ids: Object.freeze([]), // v1.2: per-location notification mutes
     triggers: Object.freeze({
         N1: Object.freeze({ enabled: true, lead_minutes: 15 }),
         N2: Object.freeze({ enabled: true, lead_minutes: 5  }),
@@ -491,6 +492,56 @@ function _loadPrefsIntoUI() {
 
     const kp = document.getElementById('notif-kp-threshold');
     if (kp) kp.value = String(notificationManager.getKpThreshold());
+
+    _renderNotifLocationMutes();
+}
+
+// Per-location mute list (v1.2): checked = notifications ON for that location.
+// The block only appears when the user has more than one attributed location.
+async function _renderNotifLocationMutes() {
+    const block = document.getElementById('notif-locations-block');
+    const list = document.getElementById('notif-locations-list');
+    if (!block || !list || typeof fetchMyLocations !== 'function') return;
+
+    let data;
+    try {
+        data = await fetchMyLocations();
+    } catch (_) {
+        block.style.display = 'none';
+        return;
+    }
+    const locations = (data && data.locations) || [];
+    if (locations.length <= 1) {
+        block.style.display = 'none';
+        return;
+    }
+
+    const prefs = notificationManager.getPrefs();
+    const disabled = new Set(prefs.disabled_location_ids || []);
+
+    block.style.display = '';
+    DOMUtils.clear(list);
+    locations.forEach(loc => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'form-check form-switch';
+
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.className = 'form-check-input notif-location-toggle';
+        input.id = `notif-location-${loc.id}`;
+        input.value = loc.id;
+        input.setAttribute('role', 'switch');
+        input.checked = !disabled.has(loc.id);
+
+        const label = document.createElement('label');
+        label.className = 'form-check-label';
+        label.setAttribute('for', input.id);
+        label.textContent = loc.name || '?';
+
+        wrapper.appendChild(input);
+        wrapper.appendChild(label);
+        list.appendChild(wrapper);
+    });
 }
 
 function _collectPrefsFromUI() {
@@ -511,6 +562,14 @@ function _collectPrefsFromUI() {
 
     const kp = document.getElementById('notif-kp-threshold');
     if (kp) prefs.triggers.N7.kp_threshold = parseInt(kp.value, 10);
+
+    // Per-location mutes (v1.2): unchecked toggle = muted location
+    const locToggles = document.querySelectorAll('.notif-location-toggle');
+    if (locToggles.length > 0) {
+        prefs.disabled_location_ids = Array.from(locToggles)
+            .filter(cb => !cb.checked)
+            .map(cb => cb.value);
+    }
 
     return prefs;
 }

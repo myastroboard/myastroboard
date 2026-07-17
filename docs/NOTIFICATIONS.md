@@ -40,7 +40,16 @@ Phase C - Web Push / background (tab may be closed)  ✅ Done
 | `N6` | Astronomical darkness begins | 20 min | `sun.js` / `push_scheduler.py` |
 | `N7` | Aurora: Kp index ≥ threshold | immediate | `aurora.js` / `push_scheduler.py` |
 
-IDs are defined as `NOTIF_TRIGGERS` constants in `static/js/notifications.js` and referenced by string in `push_scheduler.py`.
+IDs are defined as `NOTIF_TRIGGERS` constants in `static/js/notifications.js` and referenced by string in `push_scheduler.py`. (`N8` mirrors `N3` for the CSS station.)
+
+### Multi-location behavior (v1.2)
+
+- Location-scoped triggers (N3–N8) are evaluated **once per (user, attributed location)** pair, reading each location's own cache slots. Plan triggers (N1/N2) stay per-plan — a plan is pinned to its own location.
+- When a user has **more than one** attributed location, the message body carries the location name (i18n key `push_location_suffix`, e.g. *"… at Dark Sky Site"*). Single-location users see messages exactly as before.
+- Per-location mute: `preferences.notifications.disabled_location_ids` (edited in My Settings → Notifications, only visible with >1 attributed location) removes a location from all trigger evaluation for that user.
+- Deduplication keys are per location (`<trigger>@<location_id>`), so the same event at two sites notifies once per site.
+
+See [LOCATIONS.md](LOCATIONS.md) for the full multi-location model.
 
 ---
 

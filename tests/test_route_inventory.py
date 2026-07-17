@@ -59,6 +59,16 @@ EXPECTED_ROUTES = {
     ('/api/config', ('POST',)),
     ('/api/config/export', ('GET',)),
 
+    # --- locations (multi-location profiles, v1.2 - see CHANGELOG_NEXT.md) ---
+    ('/api/locations', ('GET',)),
+    ('/api/locations', ('POST',)),
+    ('/api/locations/<location_id>', ('PUT',)),
+    ('/api/locations/<location_id>', ('DELETE',)),
+    ('/api/locations/<location_id>/references', ('GET',)),
+    ('/api/locations/<location_id>/attribute', ('POST',)),
+    ('/api/locations/mine', ('GET',)),
+    ('/api/locations/active', ('POST',)),
+
     # --- admin ---
     ('/api/admin/app-settings', ('GET',)),
     ('/api/admin/app-settings', ('POST',)),

@@ -356,6 +356,52 @@ class TestUserManagerCreate:
             user = manager.create_user(f'user_{role}', 'pass', role)
             assert user.role == role
 
+    def test_create_user_attributes_all_existing_locations(self, isolated_user_manager, monkeypatch):
+        """New users see every location that already exists by default - an
+        admin can manually exclude specific ones afterward, rather than
+        having to attribute each location by hand."""
+        manager = isolated_user_manager
+        monkeypatch.setattr(
+            'repo_config.load_config',
+            lambda: {'locations': [{'id': 'loc-a'}, {'id': 'loc-b'}]},
+        )
+
+        user = manager.create_user('newuser', 'password123', auth.ROLE_USER)
+
+        assert sorted(user.preferences['location']['attributed_location_ids']) == ['loc-a', 'loc-b']
+
+    def test_create_user_no_locations_leaves_empty_attribution(self, isolated_user_manager, monkeypatch):
+        manager = isolated_user_manager
+        monkeypatch.setattr('repo_config.load_config', lambda: {'locations': []})
+
+        user = manager.create_user('newuser2', 'password123', auth.ROLE_USER)
+
+        assert user.preferences['location']['attributed_location_ids'] == []
+
+    def test_create_user_survives_location_lookup_failure(self, isolated_user_manager, monkeypatch):
+        """User creation itself must not fail just because the location
+        lookup did (e.g. config unavailable at that instant)."""
+        manager = isolated_user_manager
+        monkeypatch.setattr(
+            'repo_config.load_config', lambda: (_ for _ in ()).throw(RuntimeError('boom'))
+        )
+
+        user = manager.create_user('newuser3', 'password123', auth.ROLE_USER)
+
+        assert user.preferences['location']['attributed_location_ids'] == []
+
+    def test_create_user_does_not_mutate_shared_default_preferences(self, isolated_user_manager, monkeypatch):
+        """DEFAULT_USER_PREFERENCES['location'] is shared by shallow-copy
+        reference across every user until reassigned - creating a user with
+        locations to attribute must not corrupt that shared default for
+        whoever gets created next."""
+        manager = isolated_user_manager
+        monkeypatch.setattr('repo_config.load_config', lambda: {'locations': [{'id': 'loc-a'}]})
+
+        manager.create_user('first_user', 'password123', auth.ROLE_USER)
+
+        assert auth.DEFAULT_USER_PREFERENCES['location']['attributed_location_ids'] == []
+
 
 class TestUserManagerGetUser:
 

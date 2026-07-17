@@ -89,6 +89,7 @@
             <div class="sky-widget-compact">
                 <i id="sky-widget-icon" class="bi bi-circle sky-widget-period-icon" aria-hidden="true"></i>
                 <span id="sky-widget-location" class="sky-widget-location"></span>
+                <span id="sky-widget-tz-badge" class="sky-widget-tz-badge" style="display:none;"></span>
                 <span id="sky-widget-score" class="sky-widget-score" style="display:none;" aria-label="Observation score"></span>
             </div>
             <div class="sky-widget-panel">
@@ -99,6 +100,17 @@
                 <div id="sky-widget-panel-next" class="sky-widget-panel-next" style="display:none;">
                     <i class="bi bi-arrow-right-short" aria-hidden="true"></i>
                     <span id="sky-widget-next-label"></span>
+                </div>
+                <!-- Shown only when the active location's timezone differs from the
+                     browser's own - every time in the app is the LOCATION's local time. -->
+                <div id="sky-widget-panel-tz" class="sky-widget-panel-tz" style="display:none;">
+                    <i class="bi bi-globe2" aria-hidden="true"></i>
+                    <span id="sky-widget-tz-label"></span>
+                </div>
+                <!-- Location switcher (only rendered when the user has >1 attributed location) -->
+                <div id="sky-widget-locations" class="sky-widget-locations" style="display:none;">
+                    <div class="sky-widget-locations-header" data-i18n="sky_widget.other_locations">Locations</div>
+                    <ul id="sky-widget-locations-list" class="sky-widget-locations-list" role="listbox" aria-label="Observing locations"></ul>
                 </div>
             </div>
         </div>
@@ -939,6 +951,11 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link sub-tab-btn" href="#" data-subtab="location">
+                            <i class="bi bi-geo-alt text-danger icon-inline" aria-hidden="true"></i> <span data-i18n="settings.my_location">Location</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link sub-tab-btn" href="#" data-subtab="notifications">
                             <i class="bi bi-bell text-warning icon-inline" aria-hidden="true"></i> <span data-i18n="settings.notifications">Notifications</span>
                         </a>
@@ -949,6 +966,39 @@
                         </a>
                     </li>
                 </ul>
+            </div>
+
+            <!-- My Location Sub-tab (per-user location preferences, v1.2) -->
+            <div id="location-subtab" class="sub-tab-content">
+                <div class="shadow p-2 mb-3 rounded bg-sub-container">
+                    <h2>
+                        <i class="bi bi-geo-alt text-danger icon-inline" aria-hidden="true"></i> <span data-i18n="settings.my_location_title">My Locations</span>
+                    </h2>
+
+                    <div class="alert alert-info" role="alert" data-i18n="settings.my_location_info">
+                        These are the observing locations attributed to you. Pick which one is shown by default when you connect, and reorder them for the quick switcher. Location presets themselves are managed by an administrator.
+                    </div>
+
+                    <div id="my-location-message" class="alert" role="alert" style="display: none;"></div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label for="pref-default-location" class="form-label" data-i18n="settings.my_location_default">Default location (shown when you connect)</label>
+                            <select id="pref-default-location" class="form-select"></select>
+                        </div>
+                    </div>
+
+                    <h6 data-i18n="settings.my_location_order">Location order</h6>
+                    <div class="form-text mb-2" data-i18n="settings.my_location_order_info">Order used in the quick switcher of the sky widget.</div>
+                    <ul id="my-location-order-list" class="list-group mb-3" style="max-width: 420px;"></ul>
+
+                    <div class="mt-2">
+                        <button type="button" class="btn btn-primary" id="save-my-location-btn">
+                            <i class="bi bi-save icon-inline" aria-hidden="true"></i>
+                            <span data-i18n="settings.my_location_save">Save location preferences</span>
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <!-- Customize Sub-tab -->
@@ -1290,6 +1340,13 @@
 
                     </div>
 
+                    <!-- Per-location mute (only shown when the user has >1 attributed location, v1.2) -->
+                    <div id="notif-locations-block" class="mb-4" style="display:none;">
+                        <h6 data-i18n="settings.notifications_locations_title">Locations</h6>
+                        <div class="form-text mb-2" data-i18n="settings.notifications_locations_info">Disable notifications for specific observing locations. Muted locations no longer trigger location-based alerts (darkness, ISS/CSS, aurora, eclipses).</div>
+                        <div id="notif-locations-list" class="d-flex flex-column gap-1"></div>
+                    </div>
+
                     <!-- Actions -->
                     <div class="d-flex flex-wrap gap-2">
                         <button type="button" class="btn btn-primary" id="notif-save-btn">
@@ -1378,13 +1435,13 @@
             <div class="shadow p-2 mb-3 rounded bg-sub-container">
                 <ul class="nav nav-pills sub-tabs" id="forecast-subtabs">
                     <li class="nav-item">
-                        <a class="nav-link sub-tab-btn active" aria-current="page" href="#" data-subtab="configuration">
-                            <i class="bi bi-gear text-warning icon-inline" aria-hidden="true"></i> <span data-i18n="settings.configuration">Configuration</span>
+                        <a class="nav-link sub-tab-btn active" aria-current="page" href="#" data-subtab="locations">
+                            <i class="bi bi-geo-alt text-danger icon-inline" aria-hidden="true"></i> <span data-i18n="settings.locations">Locations</span>
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link sub-tab-btn" href="#" data-subtab="advanced">
-                            <i class="bi bi-gear-wide-connected text-primary icon-inline" aria-hidden="true"></i> <span data-i18n="settings.advanced">Advanced Settings</span>
+                        <a class="nav-link sub-tab-btn" href="#" data-subtab="configuration">
+                            <i class="bi bi-gear text-warning icon-inline" aria-hidden="true"></i> <span data-i18n="settings.configuration">Configuration</span>
                         </a>
                     </li>
                     <li class="nav-item">
@@ -1420,99 +1477,31 @@
                 </ul>
             </div>
 
+            <!-- Locations Sub-tab (admin, v1.2 multi-location profiles) -->
+            <div id="locations-subtab" class="sub-tab-content active">
+                <div class="shadow p-2 mb-3 rounded bg-sub-container">
+                    <h2>
+                        <i class="bi bi-geo-alt text-danger icon-inline" aria-hidden="true"></i> <span data-i18n="settings.locations">Locations</span>
+                    </h2>
+
+                    <div class="alert alert-info" role="alert" data-i18n="settings.locations_info">
+                        Create observing location presets and attribute them to users. Each location drives all calculations (weather, astro forecasts, SkyTonight, ISS/CSS) for the users observing from it.
+                    </div>
+
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <button id="btn-new-location" class="btn btn-primary">
+                            <i class="bi bi-plus-lg icon-inline" aria-hidden="true"></i>
+                            <span data-i18n="settings.location_new">New location</span>
+                        </button>
+                        <span id="locations-count-badge" class="badge bg-secondary"></span>
+                    </div>
+
+                    <div id="locations-grid" class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3"></div>
+                </div>
+            </div>
+
             <!-- Configuration Sub-tab -->
-            <div id="configuration-subtab" class="sub-tab-content active">
-                <div class="shadow p-2 mb-3 rounded bg-sub-container">
-                    <h2>
-                        <i class="bi bi-geo-alt text-danger icon-inline" aria-hidden="true"></i> <span data-i18n="settings.location">Location Settings</span>
-                    </h2>
-
-                    <div class="alert alert-info" role="alert" data-i18n="settings.location_info">
-                        Location parameters are used for accurate weather, astronomical calculations, and SkyTonight scheduling.
-                    </div>
-
-                    <div class="row g-3">
-                        <div class="col-12">
-                            <label for="location-name" class="form-label" data-i18n="settings.location_name">Location Name:</label>
-                            <input type="text" id="location-name" class="form-control" placeholder="My Observatory" data-i18n-placeholder="settings.location_name_placeholder">
-                        </div>
-
-                        <div class="col-md-3">
-                            <label for="latitude-input" class="form-label" data-i18n="settings.latitude">Latitude (DMS or Decimal):</label>
-                            <div class="input-group">
-                                <input type="text" id="latitude-input" class="form-control" placeholder="48d38m36.16s or 48.6434" data-i18n-placeholder="settings.latitude_placeholder">
-                                <button class="btn btn-outline-secondary" type="button" id="geolocate-btn" data-i18n-title="settings.geolocation_btn_title" title="Use my location">
-                                    <i class="bi bi-pin-map" aria-hidden="true"></i>
-                                </button>
-                            </div>
-                            <div id="latitude-converted" class="valid-feedback"></div>
-                            <div id="latitude-error" class="invalid-feedback"></div>
-                        </div>
-
-                        <div class="col-md-3">
-                            <label for="longitude-input" class="form-label" data-i18n="settings.longitude">Longitude (DMS or Decimal):</label>
-                            <input type="text" id="longitude-input" class="form-control" placeholder="9d25m48.96s or 9.4303" data-i18n-placeholder="settings.longitude_placeholder">
-                            <div id="longitude-converted" class="valid-feedback"></div>
-                            <div id="longitude-error" class="invalid-feedback"></div>
-                        </div>
-
-                    </div>
-                    <div class="row g-3 mt-1 mb-2">
-
-                        <div class="col-md-3">
-                            <label for="elevation" class="form-label" data-i18n="settings.elevation">Elevation (meters):</label>
-                            <input type="number" id="elevation" class="form-control" placeholder="10" step="0.1" inputmode="decimal" data-i18n-placeholder="settings.elevation_placeholder">
-                        </div>
-
-                        <div class="col-md-3">
-                            <label for="timezone" class="form-label" data-i18n="settings.timezone">Timezone:</label>
-                            <select id="timezone" class="form-select">
-                                <option value="" data-i18n="settings.timezone_loading">Loading timezones...</option>
-                            </select>
-                        </div>
-
-                    </div>
-                </div>
-
-                <div class="shadow p-2 mb-3 rounded bg-sub-container">
-                    <h2>
-                        <i class="bi bi-moon-stars text-info icon-inline" aria-hidden="true"></i> <span data-i18n="settings.sky_quality">Sky Quality (Light Pollution)</span>
-                    </h2>
-
-                    <div class="alert alert-info" role="alert">
-                        <span data-i18n="settings.sky_quality_info">Bortle class describes your site's light pollution level. Find it at <a href="https://www.lightpollutionmap.info" target="_blank" rel="noopener noreferrer">lightpollutionmap.info</a> (World Atlas layer).</span>
-                    </div>
-
-                    <div class="row g-3 mb-2">
-                        <div class="col-md-4">
-                            <label for="bortle-class" class="form-label" data-i18n="settings.sky_quality_bortle">Bortle Class:</label>
-                            <select id="bortle-class" class="form-select">
-                                <option value="" data-i18n="settings.sky_quality_bortle_disabled">Not configured (LP disabled)</option>
-                                <option value="1" data-i18n="settings.sky_quality_bortle_1">1 - Excellent dark sky</option>
-                                <option value="2" data-i18n="settings.sky_quality_bortle_2">2 - Dark sky</option>
-                                <option value="3" data-i18n="settings.sky_quality_bortle_3">3 - Rural</option>
-                                <option value="4" data-i18n="settings.sky_quality_bortle_4">4 - Rural / suburban</option>
-                                <option value="5" data-i18n="settings.sky_quality_bortle_5">5 - Suburban</option>
-                                <option value="6" data-i18n="settings.sky_quality_bortle_6">6 - Bright suburban</option>
-                                <option value="7" data-i18n="settings.sky_quality_bortle_7">7 - Suburban / urban</option>
-                                <option value="8" data-i18n="settings.sky_quality_bortle_8">8 - City</option>
-                                <option value="9" data-i18n="settings.sky_quality_bortle_9">9 - Inner city</option>
-                            </select>
-                        </div>
-
-                        <div class="col-md-3">
-                            <label for="sqm-value" class="form-label" data-i18n="settings.sky_quality_sqm">SQM (optional):</label>
-                            <div class="input-group">
-                                <input type="number" id="sqm-value" class="form-control" step="0.1" min="15" max="23" inputmode="decimal" data-i18n-placeholder="settings.sky_quality_sqm_placeholder" placeholder="e.g. 20.8">
-                                <span class="input-group-text">mag/arcsec²</span>
-                            </div>
-                            <div class="form-text" data-i18n="settings.sky_quality_sqm_info">Enter if you have a real SQM meter reading. Overrides the Bortle midpoint estimate.</div>
-                        </div>
-                    </div>
-
-                    <div class="form-text text-muted" data-i18n="settings.sky_quality_disabled_info">Leaving both empty disables light pollution integration.</div>
-                </div>
-
+            <div id="configuration-subtab" class="sub-tab-content">
                 <div class="shadow p-2 mb-3 rounded bg-sub-container">
                     <h2>
                         <i class="bi bi-stars text-warning icon-inline" aria-hidden="true"></i> <span data-i18n="settings.astrodex">Astrodex</span>
@@ -1535,30 +1524,12 @@
                         </div>
                     </div>
 
-                </div>
-
-                <div class="shadow p-2 mb-3 rounded bg-sub-container">
-                    <h2>
-                        <i class="bi bi-save text-primary icon-inline" aria-hidden="true"></i> <span data-i18n="settings.save_actions">Save & Actions</span>
-                    </h2>
-
-                    <div class="alert alert-info" role="alert" data-i18n="settings.save_actions_info">
-                        When new SkyTonight settings are saved, a manual run may be required to see changes on dashboard, or wait for the next scheduled run.
-                    </div>
-
-                    <div>
-                        <button id="save-config" class="btn btn-primary mb-2">
-                            <i class="bi bi-save icon-inline" aria-hidden="true"></i> <span data-i18n="settings.save_configuration">Save Configuration</span>
-                        </button>
-                        <button id="run-now" class="btn btn-success mb-2">
-                            <i class="bi bi-play-circle icon-inline" aria-hidden="true"></i> <span data-i18n="scheduler.run_now">Run SkyTonight Now</span>
+                    <div class="button-group mt-2">
+                        <button id="save-astrodex" class="btn btn-primary">
+                            <i class="bi bi-save icon-inline" aria-hidden="true"></i> <span data-i18n="settings.save_configuration">Save Astrodex Settings</span>
                         </button>
                     </div>
                 </div>
-            </div>
-
-            <!-- Advanced Settings Sub-tab -->
-            <div id="advanced-subtab" class="sub-tab-content">
 
                 <div class="shadow p-2 mb-3 rounded bg-sub-container">
                     <h2>
@@ -1688,40 +1659,6 @@
                             </div>
                         </div>
                     </div>
-                </div>
-
-                <!-- Custom Horizon Profile -->
-                <div class="shadow p-2 mb-3 rounded bg-sub-container">
-                    <h2>
-                        <i class="bi bi-triangle text-secondary icon-inline" aria-hidden="true"></i>
-                        <span data-i18n="settings.horizon_profile">Custom Horizon Profile</span>
-                    </h2>
-
-                    <div class="alert alert-info" role="alert">
-                        <span data-i18n="settings.horizon_profile_info">Define the minimum observable altitude at each azimuth direction to exclude targets blocked by trees, hills, or buildings. Leave empty to use the flat altitude minimum.</span>
-                    </div>
-                    <div class="table-responsive mb-2" id="horizon-profile-table-wrapper" style="display:none">
-                        <table class="table table-sm align-middle" id="horizon-profile-table">
-                            <thead>
-                                <tr>
-                                    <th data-i18n="settings.horizon_profile_az">Azimuth (°)</th>
-                                    <th data-i18n="settings.horizon_profile_alt">Min Altitude (°)</th>
-                                    <th style="width:40px"></th>
-                                </tr>
-                            </thead>
-                            <tbody id="horizon-profile-tbody"></tbody>
-                        </table>
-                    </div>
-                    <div class="d-flex gap-2 mb-3">
-                        <button type="button" class="btn btn-sm btn-primary" id="add-horizon-row-btn">
-                            <i class="bi bi-plus-lg icon-inline" aria-hidden="true"></i>
-                            <span data-i18n="settings.horizon_profile_add">Add Point</span>
-                        </button>
-                        <button type="button" class="btn btn-sm btn-danger" id="clear-horizon-profile-btn">
-                            <i class="bi bi-trash icon-inline" aria-hidden="true"></i>
-                            <span data-i18n="settings.horizon_profile_clear">Clear</span>
-                        </button>
-                    </div>
 
                     <div class="alert alert-info mt-3" role="alert" data-i18n="settings.skytonight_reload_info">
                         When new SkyTonight settings are saved, a manual run may be required to see changes on dashboard, or wait for the next scheduled run.
@@ -1797,6 +1734,23 @@
                             <span data-i18n="settings.app_settings_save_btn">Save</span>
                         </button>
                         <span id="app-settings-proxy-feedback" class="ms-3 text-success" style="display:none;" data-i18n="settings.app_settings_saved">Settings saved.</span>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="shadow p-2 mb-3 rounded bg-sub-container">
+                    <h2>
+                        <i class="bi bi-play-circle text-success icon-inline" aria-hidden="true"></i> <span data-i18n="settings.save_actions">Actions</span>
+                    </h2>
+
+                    <div class="alert alert-info" role="alert" data-i18n="settings.save_actions_info">
+                        When new SkyTonight settings are saved, a manual run may be required to see changes on dashboard, or wait for the next scheduled run.
+                    </div>
+
+                    <div>
+                        <button id="run-now" class="btn btn-success mb-2">
+                            <i class="bi bi-play-circle icon-inline" aria-hidden="true"></i> <span data-i18n="scheduler.run_now">Run SkyTonight Now</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -2826,6 +2780,137 @@
         </div>
     </footer>
 
+    <!-- Location edit modal (create + edit share the same form) -->
+    <div class="modal fade" id="location-edit-modal" tabindex="-1" aria-labelledby="location-edit-modal-title" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-scrollable modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="location-edit-modal-title" data-i18n="settings.location_edit_title">Location</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Solid background wrapper (fixes gradient-on-text readability), same treatment as the setup wizard -->
+                    <div class="bg-sub-container rounded p-3">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label for="location-name" class="form-label" data-i18n="settings.location_name">Location Name:</label>
+                                <input type="text" id="location-name" class="form-control" placeholder="My Observatory" data-i18n-placeholder="settings.location_name_placeholder">
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="latitude-input" class="form-label" data-i18n="settings.latitude">Latitude (DMS or Decimal):</label>
+                                <div class="input-group">
+                                    <input type="text" id="latitude-input" class="form-control" placeholder="48d38m36.16s or 48.6434" data-i18n-placeholder="settings.latitude_placeholder">
+                                    <button class="btn btn-outline-secondary" type="button" id="geolocate-btn" data-i18n-title="settings.geolocation_btn_title" title="Use my location">
+                                        <i class="bi bi-pin-map" aria-hidden="true"></i>
+                                    </button>
+                                </div>
+                                <div id="latitude-converted" class="valid-feedback"></div>
+                                <div id="latitude-error" class="invalid-feedback"></div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="longitude-input" class="form-label" data-i18n="settings.longitude">Longitude (DMS or Decimal):</label>
+                                <input type="text" id="longitude-input" class="form-control" placeholder="9d25m48.96s or 9.4303" data-i18n-placeholder="settings.longitude_placeholder">
+                                <div id="longitude-converted" class="valid-feedback"></div>
+                                <div id="longitude-error" class="invalid-feedback"></div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="elevation" class="form-label" data-i18n="settings.elevation">Elevation (meters):</label>
+                                <input type="number" id="elevation" class="form-control" placeholder="10" step="0.1" inputmode="decimal" data-i18n-placeholder="settings.elevation_placeholder">
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="timezone" class="form-label" data-i18n="settings.timezone">Timezone:</label>
+                                <select id="timezone" class="form-select">
+                                    <option value="" data-i18n="settings.timezone_loading">Loading timezones...</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <hr>
+                        <h6>
+                            <i class="bi bi-moon-stars text-info icon-inline" aria-hidden="true"></i> <span data-i18n="settings.sky_quality">Sky Quality (Light Pollution)</span>
+                        </h6>
+                        <div class="form-text mb-2" data-i18n="settings.sky_quality_info">Bortle class describes your site's light pollution level. Find it at lightpollutionmap.info (World Atlas layer).</div>
+                        <div class="row g-3 mb-2">
+                            <div class="col-md-6">
+                                <label for="bortle-class" class="form-label" data-i18n="settings.sky_quality_bortle">Bortle Class:</label>
+                                <select id="bortle-class" class="form-select">
+                                    <option value="" data-i18n="settings.sky_quality_bortle_disabled">Not configured (LP disabled)</option>
+                                    <option value="1" data-i18n="settings.sky_quality_bortle_1">1 - Excellent dark sky</option>
+                                    <option value="2" data-i18n="settings.sky_quality_bortle_2">2 - Dark sky</option>
+                                    <option value="3" data-i18n="settings.sky_quality_bortle_3">3 - Rural</option>
+                                    <option value="4" data-i18n="settings.sky_quality_bortle_4">4 - Rural / suburban</option>
+                                    <option value="5" data-i18n="settings.sky_quality_bortle_5">5 - Suburban</option>
+                                    <option value="6" data-i18n="settings.sky_quality_bortle_6">6 - Bright suburban</option>
+                                    <option value="7" data-i18n="settings.sky_quality_bortle_7">7 - Suburban / urban</option>
+                                    <option value="8" data-i18n="settings.sky_quality_bortle_8">8 - City</option>
+                                    <option value="9" data-i18n="settings.sky_quality_bortle_9">9 - Inner city</option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="sqm-value" class="form-label" data-i18n="settings.sky_quality_sqm">SQM (optional):</label>
+                                <div class="input-group">
+                                    <input type="number" id="sqm-value" class="form-control" step="0.1" min="15" max="23" inputmode="decimal" data-i18n-placeholder="settings.sky_quality_sqm_placeholder" placeholder="e.g. 20.8">
+                                    <span class="input-group-text">mag/arcsec²</span>
+                                </div>
+                                <div class="form-text" data-i18n="settings.sky_quality_sqm_info">Enter if you have a real SQM meter reading. Overrides the Bortle midpoint estimate.</div>
+                            </div>
+                        </div>
+                        <div class="form-text text-muted mb-2" data-i18n="settings.sky_quality_disabled_info">Leaving both empty disables light pollution integration.</div>
+
+                        <hr>
+                        <h6>
+                            <i class="bi bi-triangle text-secondary icon-inline" aria-hidden="true"></i>
+                            <span data-i18n="settings.horizon_profile">Custom Horizon Profile</span>
+                        </h6>
+                        <div class="form-text mb-2" data-i18n="settings.horizon_profile_info">Define the minimum observable altitude at each azimuth direction to exclude targets blocked by trees, hills, or buildings. Leave empty to use the flat altitude minimum.</div>
+                        <div class="table-responsive mb-2" id="horizon-profile-table-wrapper" style="display:none">
+                            <table class="table table-sm align-middle" id="horizon-profile-table">
+                                <thead>
+                                    <tr>
+                                        <th data-i18n="settings.horizon_profile_az">Azimuth (°)</th>
+                                        <th data-i18n="settings.horizon_profile_alt">Min Altitude (°)</th>
+                                        <th style="width:40px"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="horizon-profile-tbody"></tbody>
+                            </table>
+                        </div>
+                        <div class="d-flex gap-2 mb-3">
+                            <button type="button" class="btn btn-sm btn-primary" id="add-horizon-row-btn">
+                                <i class="bi bi-plus-lg icon-inline" aria-hidden="true"></i>
+                                <span data-i18n="settings.horizon_profile_add">Add Point</span>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-danger" id="clear-horizon-profile-btn">
+                                <i class="bi bi-trash icon-inline" aria-hidden="true"></i>
+                                <span data-i18n="settings.horizon_profile_clear">Clear</span>
+                            </button>
+                        </div>
+
+                        <hr>
+                        <h6>
+                            <i class="bi bi-people text-success icon-inline" aria-hidden="true"></i>
+                            <span data-i18n="settings.location_attribute_title">Attributed users</span>
+                        </h6>
+                        <div class="form-text mb-2" data-i18n="settings.location_attribute_info">Users this location is available to. A user with no attributed location falls back to the install default.</div>
+                        <div id="location-attribution-list" class="d-flex flex-column gap-1 mb-2"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="common.cancel">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="location-modal-save-btn">
+                        <i class="bi bi-save icon-inline" aria-hidden="true"></i>
+                        <span data-i18n="settings.location_save">Save location</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Launch detail modal (Spaceflight section) -->
     <div class="modal fade" id="sf-launch-modal" tabindex="-1" aria-labelledby="sf-launch-modal-title" aria-hidden="true">
         <div class="modal-dialog modal-dialog-scrollable modal-lg modal-dialog-centered">
@@ -3008,6 +3093,7 @@
     <script src="/static/js/plan_my_night.js?v={{ version }}"></script>
     <script src="/static/js/equipment.js?v={{ version }}"></script>
     <script src="/static/js/config.js?v={{ version }}"></script>
+    <script src="/static/js/locations.js?v={{ version }}"></script>
     <script src="/static/js/app_settings.js?v={{ version }}"></script>
     <script src="/static/js/skytonight.js?v={{ version }}"></script>
     <script src="/static/js/logs.js?v={{ version }}"></script>

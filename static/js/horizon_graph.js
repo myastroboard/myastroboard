@@ -75,7 +75,7 @@ async function loadHorizonGraph() {
         
         // Render horizon graph
         if (data.horizon_data) {
-            renderHorizonChart(data.horizon_data);
+            renderHorizonChart(data.horizon_data, data.location?.timezone);
         } else {
             if (container) {
                 destroyHorizonChart();
@@ -123,25 +123,46 @@ async function loadHorizonGraph() {
 /**
  * Render horizon graph using Chart.js
  */
-function renderHorizonChart(horizonData) {
+function renderHorizonChart(horizonData, timezone) {
     const container = document.getElementById('horizon-graph-display');
     if (!container || !horizonData) return;
 
     destroyHorizonChart();
-    
+
     // Prepare data
     const sunData = horizonData.sun_data || [];
     const moonData = horizonData.moon_data || [];
-    
+
     // Extract times and altitudes (keep negative values to show below horizon)
     const sunAltitudes = sunData.map(point => ({ x: point.hour, y: point.altitude_deg })) || [];
     const moonAltitudes = moonData.map(point => ({ x: point.hour, y: point.altitude_deg })) || [];
+    // The graph's x-axis is HH:MM in the observed location's timezone (see
+    // units.time in the API response), so "now" must be read in that same
+    // timezone rather than the viewer's browser-local time, or the marker
+    // lands at the wrong spot whenever they differ (e.g. viewing a Hawaii
+    // location from a browser set to Europe/Paris).
     const now = new Date();
+    let nowHours, nowMinutes;
+    if (timezone) {
+        try {
+            const parts = new Intl.DateTimeFormat('en-US', {
+                timeZone: timezone, hour: '2-digit', minute: '2-digit', hour12: false
+            }).formatToParts(now);
+            nowHours = Number(parts.find(p => p.type === 'hour').value) % 24;
+            nowMinutes = Number(parts.find(p => p.type === 'minute').value);
+        } catch (_) {
+            // Unknown timezone - fall through to browser-local below
+        }
+    }
+    if (nowHours === undefined) {
+        nowHours = now.getHours();
+        nowMinutes = now.getMinutes();
+    }
     const currentTimeValue = sunData.length > 0
-        ? now.getHours() + now.getMinutes() / 60
+        ? nowHours + nowMinutes / 60
         : null;
     const currentTimeLabel = currentTimeValue !== null
-        ? `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+        ? `${String(nowHours).padStart(2, '0')}:${String(nowMinutes).padStart(2, '0')}`
         : '';
     const currentTimeLine = currentTimeValue !== null
         ? [{ x: currentTimeValue, y: -90 }, { x: currentTimeValue, y: 90 }]

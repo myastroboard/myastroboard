@@ -263,8 +263,22 @@ class TestSkyWidgetApi:
     # source module level.
     _PATCH_TARGET = "weather_astro.get_current_astro_conditions"
 
+    # v1.2: the widget resolves the caller's active location preset and reads
+    # the per-location sun_report cache slot.
+    _LOC_ID = "sky-widget-test-loc"
     _FAKE_CONFIG = {
-        "location": {"name": "Test City", "timezone": "UTC"},
+        "locations": [
+            {
+                "id": _LOC_ID,
+                "name": "Test City",
+                "latitude": 1.0,
+                "longitude": 2.0,
+                "elevation": 0,
+                "timezone": "UTC",
+                "is_install_default": True,
+                "horizon_profile": [],
+            }
+        ],
     }
     _GOOD_CONDITIONS = {
         "seeing_pickering": 7.0,
@@ -276,8 +290,13 @@ class TestSkyWidgetApi:
 
     def _setup_sun_cache(self, monkeypatch, sun_data):
         import cache_store as cs
-        cs._sun_report_cache["data"] = sun_data
-        monkeypatch.setattr(cs, "is_cache_valid", lambda *_: True)
+        import time as _time
+
+        entry = cs.get_location_cache_entry("sun_report", self._LOC_ID)
+        entry["data"] = sun_data
+        # Fresh timestamp so the shared-file sync in load_location_cache
+        # never overrides the in-memory payload we just planted.
+        entry["timestamp"] = _time.time() + 60
 
     def test_happy_path_returns_json(self, client_admin, monkeypatch):
         """Valid cache + valid conditions → 200 with all expected keys."""
@@ -296,6 +315,8 @@ class TestSkyWidgetApi:
         assert "observation_score" in data
         assert data["period"] == "astronomical_night"
         assert data["observation_score"] is not None
+        assert data["location"] == "Test City"
+        assert data["location_id"] == self._LOC_ID
 
     def test_score_formula_matches_night_timeline(self, client_admin, monkeypatch):
         """observation_score is read directly from current_conditions (computed by backend)."""
@@ -313,25 +334,32 @@ class TestSkyWidgetApi:
         data = resp.get_json()
         assert data["observation_score"] == 6.0
 
-    def test_sun_cache_invalid_triggers_sync(self, client_admin, monkeypatch):
-        """When sun cache is invalid, sync_cache_from_shared is called."""
+    def test_sun_cache_empty_consults_shared_file(self, client_admin, monkeypatch):
+        """v1.2: an empty in-memory slot falls back to the shared cache file
+        (load_location_cache → load_shared_cache_entry with the keyed name)."""
         import cache_store as cs
+        import time as _time
 
-        cs._sun_report_cache["data"] = _make_sun_data()
+        # Empty in-memory slot for this location
+        entry = cs.get_location_cache_entry("sun_report", self._LOC_ID)
+        entry["data"] = None
+        entry["timestamp"] = 0
+
         calls = []
-        original_sync = cs.sync_cache_from_shared
+        shared_payload = {"timestamp": _time.time(), "data": _make_sun_data()}
 
-        def mock_sync(key, cache):
+        def mock_load_shared(key):
             calls.append(key)
-            return original_sync(key, cache)
+            return shared_payload if key == f"sun_report:{self._LOC_ID}" else None
 
-        monkeypatch.setattr(cs, "is_cache_valid", lambda *_: False)
-        monkeypatch.setattr(cs, "sync_cache_from_shared", mock_sync)
+        monkeypatch.setattr(cs, "load_shared_cache_entry", mock_load_shared)
         with patch("app.load_config", return_value=self._FAKE_CONFIG), \
              patch(self._PATCH_TARGET, return_value=None):
             resp = client_admin.get("/api/sky-widget")
         assert resp.status_code == 200
-        assert "sun_report" in calls
+        assert f"sun_report:{self._LOC_ID}" in calls
+        # The shared payload actually drove the response (day fallback period)
+        assert resp.get_json()["period"] == "day"
 
     def test_score_is_none_when_conditions_unavailable(self, client_admin, monkeypatch):
         """get_current_astro_conditions returns None → score is None."""

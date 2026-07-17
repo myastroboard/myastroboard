@@ -48,7 +48,12 @@ def _safe_plan_path(path: str) -> str:
     """
     plan_dir_real = os.path.realpath(PLAN_DIR)
     resolved = os.path.realpath(path)
-    if not resolved.startswith(plan_dir_real + os.sep):
+    try:
+        inside_plan_dir = os.path.commonpath([plan_dir_real, resolved]) == plan_dir_real
+    except ValueError:
+        inside_plan_dir = False
+    # The plan root directory itself is not a valid plan file path.
+    if not inside_plan_dir or resolved == plan_dir_real:
         raise ValueError(f'Path outside plan directory: {path!r}')
     return resolved
 
@@ -481,6 +486,8 @@ def create_or_add_target(
     duration_hours: float = 0.0,
     telescope_id: Optional[str] = None,
     telescope_name: Optional[str] = None,
+    location_id: Optional[str] = None,
+    location_name: Optional[str] = None,
 ) -> Tuple[bool, str, Optional[Dict], Optional[Dict]]:
     payload = load_user_plan(user_id, username, telescope_id=telescope_id)
     plan = payload.get('plan')
@@ -505,6 +512,12 @@ def create_or_add_target(
             'updated_at': _to_iso(now_dt),
             'telescope_id': telescope_id or None,
             'telescope_name': telescope_name or None,
+            # Pinned at creation (v1.2): the plan's altitude/timeline math stays
+            # reproducible - it is never silently recomputed against a different
+            # location. location_name is a frozen snapshot for display; the UI
+            # shows a warning banner when the viewer's active location differs.
+            'location_id': location_id or None,
+            'location_name': location_name or None,
             'entries': [],
         }
         payload['plan'] = plan
@@ -541,6 +554,58 @@ def clear_all_plans(user_id: str) -> int:
             deleted += 1
         except Exception as err:
             logger.error(f'Error deleting plan file {file_path}: {err}')
+    return deleted
+
+
+def _iter_all_plan_files() -> list:
+    """Return every plan file path in PLAN_DIR (all users), safely resolved."""
+    ensure_plan_directory()
+    result = []
+    for fname in os.listdir(PLAN_DIR):
+        if not fname.endswith('.json') or '.corrupted.' in fname or '.backup' in fname or fname.endswith('.tmp'):
+            continue
+        try:
+            result.append(_safe_plan_path(os.path.join(PLAN_DIR, fname)))
+        except ValueError:
+            pass  # failed containment check — skip
+    return result
+
+
+def _plan_references_location(file_path: str, location_id: str) -> bool:
+    try:
+        with open(file_path, 'r', encoding='utf-8') as file_obj:
+            payload = json.load(file_obj)
+        plan = payload.get('plan') if isinstance(payload, dict) else None
+        return bool(isinstance(plan, dict) and plan.get('location_id') == location_id)
+    except Exception:
+        return False
+
+
+def count_plans_for_location(location_id: str) -> int:
+    """Count plans (all users) pinned to a location preset - pre-delete check."""
+    if not location_id:
+        return 0
+    return sum(1 for path in _iter_all_plan_files() if _plan_references_location(path, location_id))
+
+
+def delete_plans_for_location(location_id: str) -> int:
+    """Cascade-delete every plan (all users) pinned to a deleted location preset.
+
+    Per the v1.2 deletion workflow: unlike Astrodex items (never touched),
+    plans pinned to a removed preset are disposable.
+    """
+    if not location_id:
+        return 0
+    deleted = 0
+    for file_path in _iter_all_plan_files():
+        if _plan_references_location(file_path, location_id):
+            try:
+                os.remove(file_path)
+                deleted += 1
+            except Exception as err:
+                logger.error(f'Error cascade-deleting plan file {file_path}: {err}')
+    if deleted:
+        logger.info(f'Cascade-deleted {deleted} plan(s) pinned to location {location_id}')
     return deleted
 
 
@@ -950,10 +1015,13 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
     from matplotlib.patches import Rectangle
     from datetime import timezone
     import re as _re
-    from constants import SKYTONIGHT_OUTPUT_DIR
+    from skytonight_storage import get_alttime_dir
 
     plan = payload.get('plan')
     entries = plan.get('entries', []) if plan else []
+    # Alttime files are stored per location (v1.2); read the plan's pinned preset
+    # (None resolves to the install default, where legacy files were migrated).
+    _plan_location_id = plan.get('location_id') if isinstance(plan, dict) else None
 
     t = i18n_manager.t  # shorthand
 
@@ -993,7 +1061,7 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
     def _load_alttime(alttime_file: str):
         assert alttime_file, 'alttime_file must be provided'
         safe = _safe_re.sub('_', str(alttime_file).lower())
-        path = os.path.normpath(os.path.join(SKYTONIGHT_OUTPUT_DIR, f'{safe}_alttime.json'))
+        path = os.path.normpath(os.path.join(get_alttime_dir(_plan_location_id), f'{safe}_alttime.json'))
         if not os.path.isfile(path):
             return None
         try:

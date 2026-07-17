@@ -63,9 +63,31 @@ def _is_server_time_valid(current_time: datetime, timezone_name: str) -> bool:
     return True
 
 
+def _any_location_missing_results(config: Dict[str, Any]) -> bool:
+    """True when any scheduler location has no completed calculation results.
+
+    Covers newly created/attributed presets and presets whose results were
+    dropped after a coordinate change - the loop triggers a run to fill them.
+    """
+    try:
+        from repo_config import get_install_default_location, get_scheduler_locations
+
+        locations = get_scheduler_locations(config) or [get_install_default_location(config)]
+    except Exception:
+        return not has_calculation_results()
+    return any(not has_calculation_results(loc.get('id')) for loc in locations)
+
+
 def resolve_schedule(config: Dict[str, Any], now: Optional[datetime] = None) -> SkyTonightSchedule:
-    """Resolve the next SkyTonight run according to scheduler requirements."""
-    location = config.get('location', {}) if isinstance(config, dict) else {}
+    """Resolve the next SkyTonight run according to scheduler requirements.
+
+    Dawn/dusk anchors use the install default location preset - it is the
+    cadence anchor for the nightly batch; the run itself computes results for
+    every scheduler location (see _run_skytonight_refresh).
+    """
+    from repo_config import get_install_default_location
+
+    location = get_install_default_location(config) if isinstance(config, dict) else {}
     timezone_name = str(location.get('timezone') or 'UTC')
     zone = ZoneInfo(timezone_name)
     current_time = now.astimezone(zone) if now else datetime.now(zone)
@@ -305,9 +327,10 @@ class SkyTonightScheduler:
             self.current_reason = schedule.reason
 
             should_run = manual_trigger or self.last_run is None
-            if not should_run and not has_calculation_results():
+            if not should_run and _any_location_missing_results(config):
                 logger.info(
-                    'SkyTonight calculation results are missing; triggering run regardless of last_run timestamp.'
+                    'SkyTonight calculation results are missing for at least one location; '
+                    'triggering run regardless of last_run timestamp.'
                 )
                 should_run = True
             # Use the committed next_run (set in a previous iteration when it

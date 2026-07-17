@@ -593,8 +593,8 @@ class TestTransitHelpers:
 
 class TestAlttimeAndMoonInfo:
     def test_save_and_clear_alttime_files(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            with patch.object(calc, "SKYTONIGHT_OUTPUT_DIR", tmp):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            with patch.object(calc, 'get_alttime_dir', lambda *_a, **_k: tmp):
                 times = [datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)]
                 ok = _save_alttime_json(
                     target_id="m31",
@@ -784,6 +784,8 @@ _DEBUG_NIGHT_END   = datetime(2026, 5, 29,  5, 0, 0, tzinfo=timezone.utc)  # 8-h
 
 
 def _debug_config(**constraint_overrides):
+    # v1.2: horizon_profile lives on the location preset, not in constraints
+    horizon_profile = constraint_overrides.pop('horizon_profile', [])
     constraints = {
         'altitude_constraint_min': 30,
         'altitude_constraint_max': 80,
@@ -793,11 +795,21 @@ def _debug_config(**constraint_overrides):
         'moon_separation_min': 45,
         'fraction_of_time_observable_threshold': 0.5,
         'moon_separation_use_illumination': False,
-        'horizon_profile': [],
     }
     constraints.update(constraint_overrides)
     return {
-        'location': {'latitude': 48.0, 'longitude': 2.0, 'elevation': 100.0, 'timezone': 'UTC'},
+        'locations': [
+            {
+                'id': 'debug-loc',
+                'name': 'Debug Site',
+                'latitude': 48.0,
+                'longitude': 2.0,
+                'elevation': 100.0,
+                'timezone': 'UTC',
+                'is_install_default': True,
+                'horizon_profile': horizon_profile,
+            }
+        ],
         'skytonight': {'constraints': constraints},
     }
 
@@ -1101,8 +1113,8 @@ class TestSaveAlttimeJsonBranches:
     def test_save_alttime_with_astro_night_and_azimuth(self):
         """Covers astro_night_start/end + az_degrees branches (lines 112-116)."""
         import tempfile
-        with tempfile.TemporaryDirectory() as tmp:
-            with patch.object(calc, 'SKYTONIGHT_OUTPUT_DIR', tmp):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            with patch.object(calc, 'get_alttime_dir', lambda *_a, **_k: tmp):
                 night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
                 night_end = night_start + timedelta(hours=8)
                 ok = _save_alttime_json(
@@ -1123,8 +1135,8 @@ class TestSaveAlttimeJsonBranches:
     def test_save_alttime_with_horizon_profile(self):
         """Covers horizon_profile branch in _save_alttime_json (line 118-119)."""
         import tempfile
-        with tempfile.TemporaryDirectory() as tmp:
-            with patch.object(calc, 'SKYTONIGHT_OUTPUT_DIR', tmp):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            with patch.object(calc, 'get_alttime_dir', lambda *_a, **_k: tmp):
                 night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
                 ok = _save_alttime_json(
                     target_id='ngc-horizon',
@@ -1144,7 +1156,7 @@ class TestSaveAlttimeJsonBranches:
 
     def test_save_alttime_exception_returns_false(self):
         """Covers exception handler branch (lines 122-124)."""
-        with patch('skytonight_calculator.ensure_directory_exists', side_effect=RuntimeError('disk full')):
+        with patch('skytonight_calculator.get_alttime_dir', side_effect=RuntimeError('disk full')):
             ok = _save_alttime_json(
                 target_id='fail',
                 name='Fail',
@@ -1160,8 +1172,8 @@ class TestSaveAlttimeJsonBranches:
     def test_save_alttime_with_times_object(self):
         """Covers the else branch where times is not None (lines 96-99)."""
         import tempfile
-        with tempfile.TemporaryDirectory() as tmp:
-            with patch.object(calc, 'SKYTONIGHT_OUTPUT_DIR', tmp):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            with patch.object(calc, 'get_alttime_dir', lambda *_a, **_k: tmp):
                 night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
                 # Create a fake times object whose to_datetime() returns list of datetimes
                 fake_times = MagicMock()
@@ -1190,19 +1202,19 @@ class TestClearAlttimeFilesEdgeCases:
     def test_clear_alttime_files_handles_remove_error(self):
         """Covers the inner except block when os.remove fails (line 135-136)."""
         import tempfile
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             # Create an alttime JSON file
             fname = os.path.join(tmp, 'test_alttime.json')
             with open(fname, 'w') as f:
                 f.write('{}')
-            with patch.object(calc, 'SKYTONIGHT_OUTPUT_DIR', tmp):
+            with patch.object(calc, 'get_alttime_dir', lambda *_a, **_k: tmp):
                 with patch('os.remove', side_effect=PermissionError('no permission')):
                     # Should not raise; silently swallows the error
                     _clear_alttime_files()
 
     def test_clear_alttime_files_outer_exception(self):
         """Covers the outer except block (lines 137-138)."""
-        with patch('skytonight_calculator.ensure_directory_exists', side_effect=OSError('fail')):
+        with patch('skytonight_calculator.get_alttime_dir', side_effect=OSError('fail')):
             _clear_alttime_files()  # must not raise
 
 
@@ -2539,7 +2551,7 @@ class TestRunCalculationsMiscBranches:
         monkeypatch.setattr(calc, 'ensure_skytonight_directories', lambda: None)
         monkeypatch.setattr(calc, '_get_night_window', lambda *a: (night_start, night_end))
         monkeypatch.setattr(calc, '_get_astro_night_window', lambda *a: None)
-        monkeypatch.setattr(calc, '_clear_alttime_files', lambda: None)
+        monkeypatch.setattr(calc, '_clear_alttime_files', lambda *_a, **_k: None)
         monkeypatch.setattr(calc, 'save_json_file', lambda *a, **kw: None)
         mock_times = MagicMock()
         mock_times.__len__ = MagicMock(return_value=2)
@@ -2874,7 +2886,7 @@ class TestRunCalcMissingBranches:
         monkeypatch.setattr(calc, 'ensure_skytonight_directories', lambda: None)
         monkeypatch.setattr(calc, '_get_night_window', lambda *a: (night_start, night_end))
         monkeypatch.setattr(calc, '_get_astro_night_window', lambda *a: None)
-        monkeypatch.setattr(calc, '_clear_alttime_files', lambda: None)
+        monkeypatch.setattr(calc, '_clear_alttime_files', lambda *_a, **_k: None)
         monkeypatch.setattr(calc, 'save_json_file', lambda *a, **kw: None)
         mock_times = MagicMock()
         mock_times.__len__ = MagicMock(return_value=2)

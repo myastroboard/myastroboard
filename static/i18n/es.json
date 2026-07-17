@@ -599,9 +599,9 @@
     "sky_quality_sqm_placeholder": "p.ej. 20.8",
     "sky_quality_sqm_info": "Introduzca si tiene una lectura real de un medidor SQM. Anula la estimación del punto medio de Bortle.",
     "sky_quality_disabled_info": "Dejar ambos campos vacíos desactiva la integración de contaminación lumínica.",
-    "save_actions": "Guardar y acciones",
+    "save_actions": "Acciones",
     "save_actions_info": "Cuando se guardan nuevas configuraciones de SkyTonight, es posible que se requiera una ejecución manual para ver los cambios en el panel o esperar la siguiente ejecución programada.",
-    "save_configuration": "Guardar configuración",
+    "save_configuration": "Guardar ajustes de Astrodex",
     "view_skytonight_configs": "Ver configuraciones de SkyTonight generadas",
     "export_general_config": "Exportar configuración general",
     "features": "Características",
@@ -816,7 +816,44 @@
     "pref_beginner_catalog_enabled_info": "Añade una pestaña \"Principiante\" a SkyTonight con una lista seleccionada de objetivos fáciles.",
     "pref_recommendations_enabled": "Mostrar el panel \"Esta noche para ti\"",
     "pref_recommendations_enabled_info": "Muestra un panel \"Esta noche para ti\" con objetivos recomendados en la parte superior de la pestaña Objetos de cielo profundo de SkyTonight.",
-    "notifications_insecure_context": "Las notificaciones requieren una conexión segura (HTTPS). No se pueden activar usando HTTP simple."
+    "notifications_insecure_context": "Las notificaciones requieren una conexión segura (HTTPS). No se pueden activar usando HTTP simple.",
+    "locations": "Ubicaciones",
+    "locations_info": "Cree ubicaciones de observación y atribúyalas a los usuarios. Cada ubicación dirige todos los cálculos (meteorología, pronósticos astro, SkyTonight, ISS/CSS) para los usuarios que observan desde ella.",
+    "location_new": "Nueva ubicación",
+    "location_max_reached": "Número máximo de ubicaciones alcanzado ({max}). Este límite protege las API meteorológicas gratuitas compartidas por todas las instalaciones de MyAstroBoard.",
+    "locations_load_failed": "Error al cargar las ubicaciones",
+    "location_edit_title": "Ubicación",
+    "location_edit_title_named": "Editar {name}",
+    "location_edit_btn": "Editar",
+    "location_default_badge": "Predeterminada",
+    "location_horizon_points": "Horizonte personalizado: {count} punto(s)",
+    "location_attributed_badge": "{count} atribuido(s)",
+    "location_excluded_badge": "{count} excluido(s)",
+    "location_set_default": "Establecer como predeterminada",
+    "location_default_changed": "Ubicación predeterminada de la instalación actualizada",
+    "location_cannot_delete_default": "La ubicación predeterminada de la instalación no se puede eliminar. Promueva primero otra ubicación.",
+    "location_delete_confirm": "¿Eliminar la ubicación \"{name}\"?",
+    "location_delete_refs": "Referenciada por: {users} usuario(s), {astrodex} elemento(s) de Astrodex, {plans} plan(es) de Plan My Night.",
+    "location_delete_plans_note": "Los planes anclados a esta ubicación se eliminarán. Los elementos de Astrodex se conservan (mantienen el nombre de la ubicación como texto).",
+    "location_deleted": "Ubicación eliminada",
+    "location_delete_failed": "Error al eliminar la ubicación",
+    "location_save": "Guardar ubicación",
+    "location_saved": "Ubicación guardada",
+    "location_save_failed": "Error al guardar la ubicación",
+    "location_attribute_title": "Usuarios atribuidos",
+    "location_attribute_info": "Usuarios para los que esta ubicación está disponible. Un usuario sin ubicación atribuida usa la predeterminada de la instalación.",
+    "my_location": "Ubicación",
+    "my_location_title": "Mis ubicaciones",
+    "my_location_info": "Estas son las ubicaciones de observación que se le han atribuido. Elija cuál se muestra por defecto al conectarse y reordénelas para el selector rápido. Las ubicaciones las gestiona un administrador.",
+    "my_location_default": "Ubicación predeterminada (mostrada al conectarse)",
+    "my_location_order": "Orden de las ubicaciones",
+    "my_location_order_info": "Orden utilizado en el selector rápido del widget del cielo.",
+    "my_location_save": "Guardar preferencias de ubicación",
+    "my_location_saved": "Preferencias de ubicación guardadas",
+    "my_location_save_failed": "Error al guardar las preferencias de ubicación",
+    "notifications_locations_title": "Ubicaciones",
+    "notifications_locations_info": "Desactive las notificaciones para ubicaciones de observación específicas. Las ubicaciones silenciadas ya no activan alertas basadas en la ubicación (oscuridad, ISS/CSS, auroras, eclipses).",
+    "push_location_suffix": "{body} • {location_name}"
   },
   "astrodex": {
     "title": "Astrodex - ¡Tengo que atraparlos a todos!",
@@ -1202,7 +1239,9 @@
     "moon_calendar_legend_good": "≥4h oscuro",
     "moon_calendar_legend_ok": "2-4h oscuro",
     "moon_calendar_legend_bright": "Luna brillante",
-    "seeing_week_title": "Pronóstico de seeing"
+    "seeing_week_title": "Pronóstico de seeing",
+    "pinned_location": "Plan calculado para {name}",
+    "location_mismatch": "Este plan se creó para {pinned}; su ubicación activa ahora es {active} - las altitudes mostradas pueden no coincidir con lo que verá realmente."
   },
   "users": {
     "user_management": "Gestión de usuarios",
@@ -1350,6 +1389,7 @@
     "cache_job_status": "Estado",
     "cache_job_last_run": "Última ejecución",
     "cache_job_duration": "Duración",
+    "cache_job_toggle_locations": "Mostrar/ocultar el detalle por ubicación",
     "cache_jobs_loading": "Cargando métricas…",
     "cache_status_valid": "Válido",
     "cache_status_stale": "Caducado",
@@ -1724,7 +1764,9 @@
     "step_special_phenomena": "Fenómenos especiales",
     "step_solar_system_events": "Eventos del sistema solar",
     "step_sidereal_time": "Tiempo sidéreo",
-    "step_best_window": "Mejor ventana",
+    "step_best_window_strict": "Mejor ventana (estricta)",
+    "step_best_window_practical": "Mejor ventana (práctica)",
+    "step_best_window_illumination": "Mejor ventana (iluminación)",
     "step_seeing_forecast": "Previsión de seeing",
     "step_weather_forecast": "Pronóstico del tiempo",
     "step_spaceflight_launches": "Lanzamientos espaciales",
@@ -2025,7 +2067,10 @@
     "period_astronomical_dawn": "Alba astronómica",
     "period_unknown": "Desconocido",
     "next_in": "{period} en {time}",
-    "score_title": "Puntuación actual de calidad del cielo (0–10): seeing, transparencia, cobertura de nubes, estabilidad de seguimiento"
+    "score_title": "Puntuación actual de calidad del cielo (0–10): seeing, transparencia, cobertura de nubes, estabilidad de seguimiento",
+    "other_locations": "Ubicaciones",
+    "tz_badge_title": "La zona horaria de esta ubicación es {offset}, distinta de la tuya",
+    "tz_notice": "Las horas mostradas para esta ubicación están en {tz} ({offset}). Tu zona horaria es {your_tz} ({your_offset})."
   },
   "wizard": {
     "title": "Empezando",
@@ -2237,5 +2282,11 @@
         "framing": "Una distancia focal moderada enmarca la galaxia con algo de espacio circundante."
       }
     }
+  },
+  "locations": {
+    "max_reached": "Número máximo de ubicaciones alcanzado",
+    "not_found": "Ubicación no encontrada",
+    "cannot_delete_default": "No se puede eliminar la ubicación predeterminada de la instalación - promueva primero otra",
+    "not_accessible": "Esta ubicación no le está atribuida"
   }
 }

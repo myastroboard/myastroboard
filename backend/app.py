@@ -69,12 +69,24 @@ from weather_openmeteo import get_hourly_forecast
 from events_aggregator import EventsAggregator
 from i18n_utils import I18nManager
 from txtconf_loader import get_repo_version
-from repo_config import load_config, save_config
+from repo_config import (
+    load_config,
+    save_config,
+    get_all_locations,
+    get_location_by_id,
+    get_install_default_location,
+    get_locations_for_user,
+    get_active_location,
+    get_scheduler_locations,
+    get_user_location_prefs,
+    new_location_preset,
+)
 from constants import (
     DATA_DIR,
     DATA_DIR_CACHE,
     CONFIG_FILE,
     CACHE_TTL,
+    MAX_LOCATIONS,
     WEATHER_CACHE_TTL,
     SKYTONIGHT_LOGS_DIR,
     SKYTONIGHT_SCHEDULER_STATUS_FILE,
@@ -92,12 +104,13 @@ from constants import (
     CACHE_TTL_SPACEFLIGHT_EVENTS,
     CACHE_TTL_SIDEREAL_TIME,
     CACHE_TTL_ALLSKY_HEALTH,
-    SKYTONIGHT_DSO_RESULTS_FILE,
 )
 from logging_config import get_logger
 from version_checker import check_for_updates
 from metrics_collector import collect_metrics
 from skytonight_storage import (
+    drop_location_results as drop_skytonight_location_results,
+    get_dso_results_file,
     get_scheduler_lock_file as get_skytonight_scheduler_lock_file,
     has_dso_results,
 )
@@ -329,6 +342,13 @@ def login():
             session['user_id'] = user.user_id
             session['username'] = user.username
             session['role'] = user.role
+
+            # Fresh login: the user's default location becomes the active one
+            # (a mid-session switch from a previous session never survives login)
+            try:
+                user_manager.reset_active_location_on_login(user.user_id)
+            except Exception as loc_reset_error:
+                logger.warning(f"Could not reset active location on login: {loc_reset_error}")
 
             # Check if using default password
             using_default_password = user.is_using_default_password()
@@ -891,33 +911,111 @@ def delete_user(user_id):
 @app.route('/api/config', methods=['GET'])
 @login_required
 def get_config_api():
-    """Get current configuration"""
+    """Get current configuration.
+
+    Compatibility shim (v1.2): the response still exposes the caller's
+    *active* location under the legacy ``location`` key so unmigrated frontend
+    code keeps working; the authoritative store is the ``locations`` list.
+    """
     config = load_config()
-    return jsonify(config)
+    response = dict(config)
+    response['location'] = get_active_location(config, get_current_user())
+    return jsonify(response)
+
+
+def _validate_location_payload(payload, partial=False):
+    """Validate an incoming location preset payload. Returns (cleaned, error)."""
+    if not isinstance(payload, dict):
+        return None, "Invalid payload"
+    cleaned = {}
+
+    if not partial or 'name' in payload:
+        name = str(payload.get('name') or '').strip()
+        if not name:
+            return None, "location name is required"
+        cleaned['name'] = name
+
+    for key in ('latitude', 'longitude'):
+        if not partial or key in payload:
+            try:
+                raw_value = payload.get(key)
+                if raw_value is None:
+                    raise TypeError()
+                value = float(raw_value)
+            except (TypeError, ValueError):
+                return None, f"location.{key} must be a number"
+            limit = 90 if key == 'latitude' else 180
+            if not (-limit <= value <= limit):
+                return None, f"location.{key} out of range"
+            cleaned[key] = value
+
+    if not partial or 'elevation' in payload:
+        try:
+            raw_elevation = payload.get('elevation')
+            if raw_elevation is None:
+                raise TypeError()
+            cleaned['elevation'] = float(raw_elevation)
+        except (TypeError, ValueError):
+            return None, "location.elevation must be a number"
+
+    if not partial or 'timezone' in payload:
+        tz_name = str(payload.get('timezone') or '').strip()
+        if tz_name not in available_timezones():
+            return None, "location.timezone is not a valid IANA timezone"
+        cleaned['timezone'] = tz_name
+
+    if 'bortle' in payload:
+        _bortle_val = payload.get('bortle')
+        if _bortle_val is None:
+            cleaned['bortle'] = None
+        else:
+            try:
+                _b = int(_bortle_val)
+                if not (1 <= _b <= 9):
+                    raise ValueError()
+                cleaned['bortle'] = _b
+            except (TypeError, ValueError):
+                return None, "location.bortle must be an integer between 1 and 9"
+
+    if 'sqm' in payload:
+        _sqm_val = payload.get('sqm')
+        if _sqm_val is None:
+            cleaned['sqm'] = None
+        else:
+            try:
+                _s = float(_sqm_val)
+                if _s <= 0:
+                    raise ValueError()
+                cleaned['sqm'] = _s
+            except (TypeError, ValueError):
+                return None, "location.sqm must be a positive float (mag/arcsec²)"
+
+    if 'horizon_profile' in payload:
+        horizon = payload.get('horizon_profile')
+        if horizon is None:
+            horizon = []
+        if not isinstance(horizon, list):
+            return None, "location.horizon_profile must be a list"
+        cleaned['horizon_profile'] = horizon
+
+    return cleaned, None
 
 
 @app.route('/api/config', methods=['POST'])
 @admin_required
 def update_config_api():
     """
-    Update configuration.
-    Automatically detects and handles location changes (latitude, longitude, elevation, timezone).
-    Triggers cache reset when location parameters are modified.
+    Update configuration (global app settings).
+
+    v1.2: location presets are managed via /api/locations. For backward
+    compatibility (setup wizard, older clients), an incoming legacy
+    ``location`` payload is applied to the *install default* preset; a change
+    of its coordinates resets that preset's caches only.
     """
     config = request.json
 
     # Load old config to detect changes
     old_config = load_config()
-    old_location = old_config.get('location', {})
-    new_location = config.get('location', {})
-
-    # Check if location parameters have changed
-    location_changed = (
-        old_location.get('latitude') != new_location.get('latitude')
-        or old_location.get('longitude') != new_location.get('longitude')
-        or old_location.get('elevation') != new_location.get('elevation')
-        or old_location.get('timezone') != new_location.get('timezone')
-    )
 
     # Ensure Astrodex config exists with defaults
     if 'astrodex' not in config:
@@ -946,47 +1044,49 @@ def update_config_api():
                 merged_st[_k] = _v
         config['skytonight'] = merged_st
 
-    # Protect horizon_profile from accidental data-loss: only allow an empty
-    # array to overwrite a non-empty saved profile when the frontend explicitly
-    # sent the _horizon_cleared flag (user pressed the Clear button).
-    new_constraints = config['skytonight'].get('constraints', {})
+    # horizon_profile is per-location since v1.2 - never persist it under
+    # skytonight.constraints again (legacy clients may still send it there).
+    constraints_block = config['skytonight'].get('constraints')
     incoming_constraints_raw = (
         (incoming_skytonight or {}).get('constraints', {}) if isinstance(incoming_skytonight, dict) else {}
     )
-    horizon_cleared = bool(incoming_constraints_raw.get('_horizon_cleared', False))
-    old_horizon = old_skytonight.get('constraints', {}).get('horizon_profile', [])
-    new_horizon = new_constraints.get('horizon_profile', [])
-    if not horizon_cleared and not new_horizon and old_horizon:
-        new_constraints['horizon_profile'] = old_horizon
-    # Always strip the internal flag before saving to disk
-    new_constraints.pop('_horizon_cleared', None)
+    legacy_horizon_payload = incoming_constraints_raw.get('horizon_profile')
+    legacy_horizon_cleared = bool(incoming_constraints_raw.get('_horizon_cleared', False))
+    if isinstance(constraints_block, dict):
+        constraints_block.pop('horizon_profile', None)
+        constraints_block.pop('_horizon_cleared', None)
 
     # Apply migrated legacy constraints when skytonight.constraints was absent
     if legacy_constraints and not config['skytonight'].get('constraints'):
+        legacy_constraints.pop('horizon_profile', None)
         config['skytonight']['constraints'] = legacy_constraints
 
     config['skytonight']['enabled'] = True
 
-    # Validate light pollution fields
-    _bortle_val = new_location.get('bortle')
-    _sqm_val = new_location.get('sqm')
-    if _bortle_val is not None:
-        try:
-            _b = int(_bortle_val)
-            if not (1 <= _b <= 9):
-                raise ValueError()
-            new_location['bortle'] = _b
-        except (TypeError, ValueError):
-            return jsonify({"error": "location.bortle must be an integer between 1 and 9"}), 400
-    if _sqm_val is not None:
-        try:
-            _s = float(_sqm_val)
-            if _s <= 0:
-                raise ValueError()
-            new_location['sqm'] = _s
-        except (TypeError, ValueError):
-            return jsonify({"error": "location.sqm must be a positive float (mag/arcsec²)"}), 400
-    config['location'] = new_location
+    # --- Legacy location payload -> install default preset (compat path) ---
+    location_changed = False
+    incoming_location = config.pop('location', None)
+    locations = old_config.get('locations', [])
+    if isinstance(incoming_location, dict) and incoming_location:
+        cleaned, error = _validate_location_payload(incoming_location, partial=True)
+        if error:
+            return jsonify({"error": error}), 400
+        install_default = get_install_default_location(old_config)
+        for preset in locations:
+            if preset.get('id') == install_default.get('id'):
+                before = cache_store.get_current_location_signature(preset)
+                preset.update(cleaned)
+                if legacy_horizon_payload or legacy_horizon_cleared:
+                    preset['horizon_profile'] = legacy_horizon_payload or []
+                preset['updated_at'] = datetime.now(timezone.utc).isoformat()
+                location_changed = before != cache_store.get_current_location_signature(preset)
+                if location_changed:
+                    cache_store.reset_caches_for_location(preset['id'])
+                    cache_store.update_location_config(preset)
+                    # Stale night table: drop so the scheduler recomputes for the new coordinates
+                    drop_skytonight_location_results(preset['id'])
+                break
+    config['locations'] = locations
 
     # Preserve location_configured flag if not explicitly provided
     if 'location_configured' not in config:
@@ -995,11 +1095,8 @@ def update_config_api():
     # Save the new config
     save_config(config)
 
-    # If location changed, reset astronomical caches immediately
     if location_changed:
-        logger.warning("Location parameters changed! Resetting astronomical caches immediately.")
-        cache_store.reset_all_caches()
-        cache_store.update_location_config(new_location)
+        logger.warning("Install default location changed! Its astronomical caches were reset.")
 
     return jsonify(
         {
@@ -1009,6 +1106,311 @@ def update_config_api():
             "message": "Configuration updated" + (" and cache reset" if location_changed else ""),
         }
     )
+
+
+# ---------------------------------------------------------------------------
+# Multi-location profiles (v1.2) - admin CRUD + attribution + user switcher
+# ---------------------------------------------------------------------------
+
+
+def _location_admin_view(config, preset):
+    """Admin-facing serialization of a preset, including attribution info."""
+    attributed_to = []
+    for user in user_manager.users.values():
+        prefs = get_user_location_prefs(user)
+        if preset.get('id') in prefs['attributed_location_ids']:
+            attributed_to.append({'user_id': user.user_id, 'username': user.username})
+    view = dict(preset)
+    view['attributed_to'] = attributed_to
+    # Lets the admin UI show "N attributed, M excluded" instead of naming
+    # every user - unusable once an install has more than a handful of them.
+    view['total_users'] = len(user_manager.users)
+    return view
+
+
+@app.route('/api/locations', methods=['GET'])
+@admin_required
+def list_locations_api():
+    """List all location presets with attribution info (admin management view)."""
+    try:
+        config = load_config()
+        locations = [_location_admin_view(config, preset) for preset in get_all_locations(config)]
+        return jsonify({'locations': locations, 'max_locations': MAX_LOCATIONS})
+    except Exception as e:
+        logger.error(f"Error listing locations: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@app.route('/api/locations', methods=['POST'])
+@admin_required
+def create_location_api():
+    """Create a location preset (admin only, hard-capped at MAX_LOCATIONS)."""
+    try:
+        config = load_config()
+        locations = get_all_locations(config)
+        if len(locations) >= MAX_LOCATIONS:
+            return (
+                jsonify(
+                    {
+                        'error': f'Maximum number of locations reached ({MAX_LOCATIONS})',
+                        'error_key': 'locations.max_reached',
+                    }
+                ),
+                400,
+            )
+
+        cleaned, error = _validate_location_payload(request.json or {})
+        if error:
+            return jsonify({'error': error}), 400
+
+        preset = new_location_preset(base=cleaned)
+        config['locations'].append(preset)
+        save_config(config)
+
+        # Start signature tracking now; cache slots fill on the next scheduler tick
+        cache_store.update_location_config(preset)
+
+        # New locations are attributed to everyone by default - an admin can
+        # manually exclude specific users afterward. Saves re-attributing by
+        # hand on larger installs (e.g. an astro club with 100+ users).
+        user_manager.set_location_attribution(preset['id'], list(user_manager.users.keys()))
+
+        logger.info(f"Location preset created: {preset['name']} ({preset['id']})")
+        return jsonify({'status': 'success', 'location': _location_admin_view(config, preset)}), 201
+    except Exception as e:
+        logger.error(f"Error creating location: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@app.route('/api/locations/<location_id>', methods=['PUT'])
+@admin_required
+def update_location_api(location_id):
+    """Edit a location preset. Coordinate/timezone changes reset only that preset's caches."""
+    try:
+        config = load_config()
+        preset = get_location_by_id(config, location_id)
+        if preset is None:
+            return jsonify({'error': 'Location not found', 'error_key': 'locations.not_found'}), 404
+
+        payload = request.json or {}
+        cleaned, error = _validate_location_payload(payload, partial=True)
+        if error:
+            return jsonify({'error': error}), 400
+
+        before_signature = cache_store.get_current_location_signature(preset)
+        preset.update(cleaned)
+
+        if payload.get('is_install_default') is True and not preset.get('is_install_default'):
+            # Promote atomically: exactly one preset carries the flag
+            for other in get_all_locations(config):
+                other['is_install_default'] = other.get('id') == location_id
+
+        preset['updated_at'] = datetime.now(timezone.utc).isoformat()
+        save_config(config)
+
+        cache_reset = before_signature != cache_store.get_current_location_signature(preset)
+        if cache_reset:
+            logger.warning(f"Location preset '{preset['name']}' coordinates changed - resetting its caches")
+            cache_store.reset_caches_for_location(location_id)
+            cache_store.update_location_config(preset)
+            # Stale night table: drop so the scheduler recomputes for the new coordinates
+            drop_skytonight_location_results(location_id)
+
+        return jsonify(
+            {'status': 'success', 'location': _location_admin_view(config, preset), 'cache_reset': cache_reset}
+        )
+    except Exception as e:
+        logger.error(f"Error updating location {location_id}: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@app.route('/api/locations/<location_id>/references', methods=['GET'])
+@admin_required
+def location_references_api(location_id):
+    """Lightweight pre-delete check: who/what references this preset."""
+    try:
+        config = load_config()
+        preset = get_location_by_id(config, location_id)
+        if preset is None:
+            return jsonify({'error': 'Location not found', 'error_key': 'locations.not_found'}), 404
+
+        attributed_users = _location_admin_view(config, preset)['attributed_to']
+        astrodex_count = astrodex.count_items_for_location(location_id)
+        plan_count = plan_my_night.count_plans_for_location(location_id)
+        return jsonify(
+            {
+                'location_id': location_id,
+                'is_install_default': bool(preset.get('is_install_default')),
+                'attributed_users': attributed_users,
+                'astrodex_items': astrodex_count,
+                'plan_my_night_plans': plan_count,
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error checking location references {location_id}: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@app.route('/api/locations/<location_id>', methods=['DELETE'])
+@admin_required
+def delete_location_api(location_id):
+    """Delete a preset.
+
+    Blocked while the preset is the install default (promote another one
+    first). User pointers are cleaned eagerly; Plan My Night entries pinned to
+    the preset are cascade-deleted by default (?plans=orphan keeps them with a
+    stale-location banner); Astrodex items are NEVER touched - they keep their
+    frozen location_name snapshot.
+    """
+    try:
+        config = load_config()
+        preset = get_location_by_id(config, location_id)
+        if preset is None:
+            return jsonify({'error': 'Location not found', 'error_key': 'locations.not_found'}), 404
+
+        if preset.get('is_install_default'):
+            return (
+                jsonify(
+                    {
+                        'error': 'Cannot delete the install default location - promote another preset first',
+                        'error_key': 'locations.cannot_delete_default',
+                    }
+                ),
+                400,
+            )
+
+        plans_mode = (request.args.get('plans') or 'cascade').lower()
+        if plans_mode not in ('cascade', 'orphan'):
+            return jsonify({'error': "plans must be 'cascade' or 'orphan'"}), 400
+
+        config['locations'] = [loc for loc in get_all_locations(config) if loc.get('id') != location_id]
+        save_config(config)
+
+        install_default = get_install_default_location(config)
+        user_manager.cleanup_location_references(location_id, install_default.get('id'))
+        cache_store.drop_location_caches(location_id)
+        drop_skytonight_location_results(location_id)
+
+        deleted_plans = 0
+        if plans_mode == 'cascade':
+            deleted_plans = plan_my_night.delete_plans_for_location(location_id)
+
+        logger.info(f"Location preset deleted: {preset.get('name')} ({location_id}), plans={plans_mode}")
+        return jsonify({'status': 'success', 'deleted_plans': deleted_plans, 'plans_mode': plans_mode})
+    except Exception as e:
+        logger.error(f"Error deleting location {location_id}: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@app.route('/api/locations/<location_id>/attribute', methods=['POST'])
+@admin_required
+def attribute_location_api(location_id):
+    """Attach/detach a preset to a set of user ids (admin-controlled many-to-many)."""
+    try:
+        config = load_config()
+        preset = get_location_by_id(config, location_id)
+        if preset is None:
+            return jsonify({'error': 'Location not found', 'error_key': 'locations.not_found'}), 404
+
+        data = request.json or {}
+        user_ids = data.get('user_ids')
+        if not isinstance(user_ids, list) or not all(isinstance(uid, str) for uid in user_ids):
+            return jsonify({'error': 'user_ids must be a list of user id strings'}), 400
+
+        known_ids = set(user_manager.users.keys())
+        unknown = [uid for uid in user_ids if uid not in known_ids]
+        if unknown:
+            return jsonify({'error': f"Unknown user ids: {', '.join(unknown)}"}), 400
+
+        user_manager.set_location_attribution(location_id, user_ids)
+        return jsonify({'status': 'success', 'location': _location_admin_view(config, preset)})
+    except Exception as e:
+        logger.error(f"Error attributing location {location_id}: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+def _cached_location_score(location_id):
+    """Best-effort current observation score (0-10) for a location, from the
+    already-warm weather_forecast cache - never triggers a live Open-Meteo call.
+
+    Mirrors the 0-10 scale used by the sky widget's own score badge (derived
+    from cloudless/seeing/transparency), just read from the cheaper per-location
+    forecast cache instead of weather_astro's live analysis pipeline.
+    """
+    try:
+        entry = cache_store.load_location_cache('weather_forecast', location_id)
+        hourly = (entry.get('data') or {}).get('hourly') or []
+        if not hourly:
+            return None
+        condition = hourly[0].get('condition')
+        return round(float(condition) / 10, 1) if condition is not None else None
+    except Exception:
+        return None
+
+
+@app.route('/api/locations/mine', methods=['GET'])
+@login_required
+def my_locations_api():
+    """The caller's attributed locations (cheap - no live sky data), for the switcher."""
+    try:
+        config = load_config()
+        user = get_current_user()
+        accessible = get_locations_for_user(config, user)
+        active = get_active_location(config, user)
+        prefs = get_user_location_prefs(user)
+        return jsonify(
+            {
+                'locations': [
+                    {
+                        'id': loc['id'],
+                        'name': loc.get('name'),
+                        'bortle': loc.get('bortle'),
+                        'sqm': loc.get('sqm'),
+                        'is_install_default': bool(loc.get('is_install_default')),
+                        'score': _cached_location_score(loc['id']),
+                    }
+                    for loc in accessible
+                ],
+                'active_location_id': active.get('id'),
+                'default_location_id': prefs['default_location_id'] or active.get('id'),
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error listing user locations: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@app.route('/api/locations/active', methods=['POST'])
+@login_required
+def set_active_location_api():
+    """Set the caller's active location (drives all calculations this session)."""
+    try:
+        data = request.json or {}
+        location_id = data.get('location_id')
+        if not isinstance(location_id, str) or not location_id:
+            return jsonify({'error': 'location_id is required'}), 400
+
+        config = load_config()
+        user = get_current_user()
+        if not user:  # pragma: no cover
+            return jsonify({'error': 'User not authenticated'}), 401
+
+        accessible_ids = {loc['id'] for loc in get_locations_for_user(config, user)}
+        if location_id not in accessible_ids:
+            return jsonify({'error': 'Location not accessible', 'error_key': 'locations.not_accessible'}), 403
+
+        user_manager.set_user_location_prefs(user.user_id, active_location_id=location_id)
+        location = get_location_by_id(config, location_id)
+        return jsonify(
+            {
+                'status': 'success',
+                'active_location_id': location_id,
+                'name': location.get('name') if location else None,
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error setting active location: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
 
 
 @app.route('/api/connectors', methods=['GET'])
@@ -1055,7 +1457,6 @@ def allsky_status_api():
 
         data = AllSkyConnector(allsky_cfg).fetch_sensor_data()
         cache_store._allsky_sensor_cache["data"] = data
-        import time
 
         cache_store._allsky_sensor_cache["timestamp"] = time.time()
     return jsonify(data)
@@ -1114,8 +1515,6 @@ def allsky_health_api():
     allsky_cfg = config.get("connectors", {}).get("allsky", {})
     if not allsky_cfg.get("url"):
         return jsonify({"reachable": False, "modules": {}, "error": "AllSky URL not configured"}), 200
-
-    import time
 
     cached = cache_store._allsky_health_cache
     fresh = request.args.get("fresh") == "1"
@@ -1281,7 +1680,6 @@ def restart_app_api():
     """Gracefully restart the container process. Docker restart policy handles the relaunch."""
     import signal as _signal
     import threading
-    import time
 
     # Capture session data before leaving the request context — threads have no context.
     username = session.get('username', '?')
@@ -1353,8 +1751,7 @@ def get_sky_quality_api():
         BORTLE_DESCRIPTIONS,
     )
 
-    config = load_config()
-    location = config.get('location', {})
+    location = _resolve_active_location()
     raw_sqm = location.get('sqm')
     raw_bortle = location.get('bortle')
 
@@ -1825,6 +2222,15 @@ def cache_health_api():
     All cache management is server-side only.
     """
     status = cache_store.get_cache_init_status()
+
+    # Location id -> display name for every location this status covers, so the
+    # Metrics UI can label per-location job breakdowns without a second,
+    # admin-only /api/locations call (this endpoint is available to any user).
+    config = load_config()
+    scheduler_locations = get_scheduler_locations(config)
+    location_names = {loc["id"]: loc.get("name") or loc["id"] for loc in scheduler_locations if loc.get("id")}
+    install_default_id = get_install_default_location(config).get("id")
+
     return jsonify(
         {
             "cache_status": status["all_ready"],
@@ -1834,6 +2240,8 @@ def cache_health_api():
             "step_name": status.get("step_name", ""),
             "progress_percent": status.get("progress_percent", 0),
             "details": status,
+            "location_names": location_names,
+            "install_default_location_id": install_default_id,
         }
     )
 
@@ -1882,24 +2290,46 @@ def check_updates_api():
 # ============================================================
 
 
+def _resolve_active_location():
+    """Resolve the request's active location preset (per-user, v1.2).
+
+    Outside a request context (background threads, direct helper calls) the
+    per-user session is unavailable - fall back to anonymous resolution,
+    which yields the install default preset.
+    """
+    config = load_config()
+    try:
+        user = get_current_user()
+    except RuntimeError:
+        user = None
+    return get_active_location(config, user)
+
+
+def _active_location_cache(name):
+    """Return (active_location, synced cache entry) for the calling user."""
+    location = _resolve_active_location()
+    entry = cache_store.load_location_cache(name, location.get("id"))
+    return location, entry
+
+
 @app.route('/api/weather/forecast', methods=['GET'])
 @login_required
 def get_hourly_forecast_api():
-    """Get hourly weather forecast"""
+    """Get hourly weather forecast for the caller's active location"""
     try:
-        cache_store.sync_cache_from_shared("weather_forecast", cache_store._weather_cache)
+        active_location, weather_entry = _active_location_cache("weather_forecast")
 
         # Serve from app cache if valid - avoids a live API call on every page load
-        if cache_store.is_cache_valid(cache_store._weather_cache, WEATHER_CACHE_TTL):
-            return jsonify(cache_store._weather_cache["data"])
+        if cache_store.is_cache_valid(weather_entry, WEATHER_CACHE_TTL):
+            return jsonify(weather_entry["data"])
 
         # Cache miss or stale: fetch live (requests_cache SQLite deduplicates across workers)
-        forecast = get_hourly_forecast()
+        forecast = get_hourly_forecast(location=active_location)
         if forecast is None:
             # Serve stale cache rather than returning an error
-            if cache_store._weather_cache.get("data"):
+            if weather_entry.get("data"):
                 logger.warning("[WARNING] Weather API unavailable, serving stale cache")
-                return jsonify(cache_store._weather_cache["data"])
+                return jsonify(weather_entry["data"])
             return (
                 jsonify(
                     {"status": "pending", "message": "Weather data is temporarily unavailable. Please retry shortly."}
@@ -1918,14 +2348,7 @@ def get_hourly_forecast_api():
 
         # Keep cache status/metrics consistent even when this endpoint performs
         # an on-demand refresh outside the scheduler cycle.
-        now_ts = time.time()
-        cache_store._weather_cache["data"] = response_payload
-        cache_store._weather_cache["timestamp"] = now_ts
-        cache_store.update_shared_cache_entry(
-            "weather_forecast",
-            cache_store._weather_cache["data"],
-            cache_store._weather_cache["timestamp"],
-        )
+        cache_store.update_location_cache("weather_forecast", active_location.get("id"), response_payload)
 
         return jsonify(response_payload)
 
@@ -1950,7 +2373,7 @@ def get_astro_weather_analysis_api():
         hours = request.args.get('hours', 24, type=int)
         hours = min(max(hours, 1), 72)  # Limit between 1-72 hours
 
-        analysis = get_astro_weather_analysis(hours, language=language)
+        analysis = get_astro_weather_analysis(hours, language=language, location=_resolve_active_location())
         if analysis is None:
             return (
                 jsonify(
@@ -1978,7 +2401,7 @@ def get_current_astro_conditions_api():
     try:
         from weather_astro import get_current_astro_conditions
 
-        conditions = get_current_astro_conditions()
+        conditions = get_current_astro_conditions(location=_resolve_active_location())
         if conditions is None:
             return jsonify({"error": "Failed to fetch current astrophotography conditions"}), 500
 
@@ -2001,7 +2424,9 @@ def get_weather_alerts_api():
         supported_languages = I18nManager.get_supported_languages()
         language = requested_language if requested_language in supported_languages else "en"
 
-        analysis = get_astro_weather_analysis(6, language=language)  # Next 6 hours for alerts
+        analysis = get_astro_weather_analysis(
+            6, language=language, location=_resolve_active_location()
+        )  # Next 6 hours for alerts
         if analysis is None:
             return jsonify({"alerts": [], "status": "pending"}), 200
 
@@ -2028,17 +2453,13 @@ def get_weather_alerts_api():
 def get_moon_report_api():
     """Return astrophotography-grade Moon report from scheduler-managed cache."""
     try:
-        if cache_store.is_cache_valid(cache_store._moon_report_cache, CACHE_TTL):
-            return jsonify(cache_store._moon_report_cache["data"])
-
-        # Try shared cache first (other worker may have computed)
-        if cache_store.sync_cache_from_shared("moon_report", cache_store._moon_report_cache):
-            if cache_store.is_cache_valid(cache_store._moon_report_cache, CACHE_TTL):
-                return jsonify(cache_store._moon_report_cache["data"])
+        _, entry = _active_location_cache("moon_report")
+        if cache_store.is_cache_valid(entry, CACHE_TTL):
+            return jsonify(entry["data"])
 
         # Avoid synchronous recomputation in request path: moon calculations can
         # exceed gunicorn timeout on small hosts and cause worker restart loops.
-        stale_data = cache_store._moon_report_cache.get("data")
+        stale_data = entry.get("data")
         if stale_data:
             return jsonify(stale_data)
 
@@ -2058,17 +2479,13 @@ def get_moon_report_api():
 def get_next_dark_window_api():
     """Return next astronomical moonless dark window from scheduler-managed cache."""
     try:
-        if cache_store.is_cache_valid(cache_store._dark_window_report_cache, CACHE_TTL):
-            return jsonify(cache_store._dark_window_report_cache["data"])
-
-        # Try shared cache first (other worker may have computed)
-        if cache_store.sync_cache_from_shared("dark_window", cache_store._dark_window_report_cache):
-            if cache_store.is_cache_valid(cache_store._dark_window_report_cache, CACHE_TTL):
-                return jsonify(cache_store._dark_window_report_cache["data"])
+        _, entry = _active_location_cache("dark_window")
+        if cache_store.is_cache_valid(entry, CACHE_TTL):
+            return jsonify(entry["data"])
 
         # Avoid synchronous recomputation in request path: moon calculations can
         # exceed gunicorn timeout on small hosts and cause worker restart loops.
-        stale_data = cache_store._dark_window_report_cache.get("data")
+        stale_data = entry.get("data")
         if stale_data:
             return jsonify(stale_data)
 
@@ -2088,15 +2505,11 @@ def get_next_dark_window_api():
 def get_next_7_nights_api():
     """Return Moon Planner next 7 nights report, from cache only"""
     try:
-        if cache_store.is_cache_valid(cache_store._moon_planner_report_cache, CACHE_TTL):
-            return jsonify(cache_store._moon_planner_report_cache["data"])
+        _, entry = _active_location_cache("moon_planner")
+        if cache_store.is_cache_valid(entry, CACHE_TTL):
+            return jsonify(entry["data"])
 
-        # Try shared cache first (other worker may have computed)
-        if cache_store.sync_cache_from_shared("moon_planner", cache_store._moon_planner_report_cache):
-            if cache_store.is_cache_valid(cache_store._moon_planner_report_cache, CACHE_TTL):
-                return jsonify(cache_store._moon_planner_report_cache["data"])
-
-        stale_data = cache_store._moon_planner_report_cache.get("data")
+        stale_data = entry.get("data")
         if stale_data:
             return jsonify(stale_data)
 
@@ -2111,7 +2524,7 @@ def get_next_7_nights_api():
         return jsonify({'error': 'Internal server error'}), 500
 
 
-_moon_calendar_cache: dict = {"timestamp": 0, "data": None}
+_moon_calendar_cache: dict = {}  # location_id -> {"timestamp", "data"}
 _MOON_CALENDAR_TTL = 3600  # 1 hour - recompute once per hour at most
 
 
@@ -2122,15 +2535,16 @@ def get_moon_month_calendar_api():
     try:
         import time as _time
 
-        now = _time.time()
-        if _moon_calendar_cache["data"] and (now - _moon_calendar_cache["timestamp"]) < _MOON_CALENDAR_TTL:
-            return jsonify(_moon_calendar_cache["data"])
+        location = _resolve_active_location()
+        cache_slot = _moon_calendar_cache.setdefault(location.get("id"), {"timestamp": 0, "data": None})
 
-        cfg = load_config()
-        location = cfg.get("location", {})
+        now = _time.time()
+        if cache_slot["data"] and (now - cache_slot["timestamp"]) < _MOON_CALENDAR_TTL:
+            return jsonify(cache_slot["data"])
+
         lat = location.get("latitude")
         lon = location.get("longitude")
-        tz = location.get("timezone", cfg.get("timezone", "UTC"))
+        tz = location.get("timezone", "UTC")
         if lat is None or lon is None:
             return jsonify({"error": "Location not configured"}), 400
 
@@ -2147,8 +2561,8 @@ def get_moon_month_calendar_api():
                 for n in nights
             ]
         }
-        _moon_calendar_cache["data"] = result
-        _moon_calendar_cache["timestamp"] = now
+        cache_slot["data"] = result
+        cache_slot["timestamp"] = now
         return jsonify(result)
 
     except Exception as e:
@@ -2161,15 +2575,11 @@ def get_moon_month_calendar_api():
 def get_aurora_predictions_api():
     """Return Aurora Borealis predictions report, from cache only"""
     try:
-        if cache_store.is_cache_valid(cache_store._aurora_cache, CACHE_TTL):
-            return jsonify(cache_store._aurora_cache["data"])
+        _, entry = _active_location_cache("aurora")
+        if cache_store.is_cache_valid(entry, CACHE_TTL):
+            return jsonify(entry["data"])
 
-        # Try shared cache first (other worker may have computed)
-        if cache_store.sync_cache_from_shared("aurora", cache_store._aurora_cache):
-            if cache_store.is_cache_valid(cache_store._aurora_cache, CACHE_TTL):
-                return jsonify(cache_store._aurora_cache["data"])
-
-        stale_data = cache_store._aurora_cache.get("data")
+        stale_data = entry.get("data")
         if stale_data:
             return jsonify(stale_data)
 
@@ -2191,15 +2601,11 @@ def get_aurora_predictions_api():
 def get_seeing_forecast_api():
     """Return atmospheric seeing forecast for planetary imaging, from cache only"""
     try:
-        if cache_store.is_cache_valid(cache_store._seeing_forecast_cache, CACHE_TTL):
-            return jsonify(cache_store._seeing_forecast_cache["data"])
+        _, entry = _active_location_cache("seeing_forecast")
+        if cache_store.is_cache_valid(entry, CACHE_TTL):
+            return jsonify(entry["data"])
 
-        # Try shared cache first (other worker may have computed)
-        if cache_store.sync_cache_from_shared("seeing_forecast", cache_store._seeing_forecast_cache):
-            if cache_store.is_cache_valid(cache_store._seeing_forecast_cache, CACHE_TTL):
-                return jsonify(cache_store._seeing_forecast_cache["data"])
-
-        stale_data = cache_store._seeing_forecast_cache.get("data")
+        stale_data = entry.get("data")
         if stale_data:
             return jsonify(stale_data)
 
@@ -2300,16 +2706,11 @@ def get_iss_passes_api():
         days = request.args.get("days", default=20, type=int)
         days = max(1, min(days, 30))
 
-        if cache_store.is_cache_valid(cache_store._iss_passes_cache, CACHE_TTL_ISS_PASSES):
-            cached_data = cache_store._iss_passes_cache["data"]
+        _, entry = _active_location_cache("iss_passes")
+        if cache_store.is_cache_valid(entry, CACHE_TTL_ISS_PASSES):
+            cached_data = entry["data"]
             if isinstance(cached_data, dict) and cached_data.get("window_days") == days:
                 return jsonify(_with_celestrak_status(cached_data))
-
-        if cache_store.sync_cache_from_shared("iss_passes", cache_store._iss_passes_cache):
-            if cache_store.is_cache_valid(cache_store._iss_passes_cache, CACHE_TTL_ISS_PASSES):
-                cached_data = cache_store._iss_passes_cache["data"]
-                if isinstance(cached_data, dict) and cached_data.get("window_days") == days:
-                    return jsonify(_with_celestrak_status(cached_data))
 
         return (
             jsonify({"status": "pending", "message": "ISS passes cache is not ready yet. Please try again shortly."}),
@@ -2326,8 +2727,7 @@ def get_iss_passes_api():
 def get_iss_location_api():
     """Return current ISS ground position and ±50-minute orbit track, computed from cached TLE."""
     try:
-        config = load_config()
-        location = config.get("location", {})
+        location = _resolve_active_location()
         lat = location.get("latitude")
         lon = location.get("longitude")
         elev = float(location.get("elevation", 0) or 0)
@@ -2378,16 +2778,11 @@ def get_css_passes_api():
         days = request.args.get("days", default=20, type=int)
         days = max(1, min(days, 30))
 
-        if cache_store.is_cache_valid(cache_store._css_passes_cache, CACHE_TTL_CSS_PASSES):
-            cached_data = cache_store._css_passes_cache["data"]
+        _, entry = _active_location_cache("css_passes")
+        if cache_store.is_cache_valid(entry, CACHE_TTL_CSS_PASSES):
+            cached_data = entry["data"]
             if isinstance(cached_data, dict) and cached_data.get("window_days") == days:
                 return jsonify(_with_celestrak_status(cached_data))
-
-        if cache_store.sync_cache_from_shared("css_passes", cache_store._css_passes_cache):
-            if cache_store.is_cache_valid(cache_store._css_passes_cache, CACHE_TTL_CSS_PASSES):
-                cached_data = cache_store._css_passes_cache["data"]
-                if isinstance(cached_data, dict) and cached_data.get("window_days") == days:
-                    return jsonify(_with_celestrak_status(cached_data))
 
         return (
             jsonify({"status": "pending", "message": "CSS passes cache is not ready yet. Please try again shortly."}),
@@ -2404,8 +2799,7 @@ def get_css_passes_api():
 def get_css_location_api():
     """Return current CSS ground position and ±50-minute orbit track, computed from cached TLE."""
     try:
-        config = load_config()
-        location = config.get("location", {})
+        location = _resolve_active_location()
         lat = location.get("latitude")
         lon = location.get("longitude")
         elev = float(location.get("elevation", 0) or 0)
@@ -2516,7 +2910,12 @@ def spaceflight_image(filename):
     img_dir = os.path.realpath(os.path.join(DATA_DIR_CACHE, 'spaceflight_images'))
     local_path = os.path.realpath(os.path.join(img_dir, filename))
     # Prevent path traversal: resolved path must be inside img_dir
-    if not local_path.startswith(img_dir + os.sep):  # pragma: no cover  # regex above prevents path traversal
+    try:
+        if (
+            os.path.commonpath([img_dir, local_path]) != img_dir
+        ):  # pragma: no cover  # regex above prevents path traversal
+            return jsonify({"error": "Invalid filename"}), 400
+    except ValueError:  # pragma: no cover
         return jsonify({"error": "Invalid filename"}), 400
     if not os.path.exists(local_path):
         sidecar = local_path + '.url'
@@ -2658,24 +3057,18 @@ def _determine_sky_period(sun_data: "dict | None", timezone_str: str) -> tuple:
 def get_sky_widget_api():
     """Return current sky status for the persistent sky widget (period, score, location)"""
     try:
-        config = load_config()
-        location = config.get("location", {})
+        location, sun_entry = _active_location_cache("sun_report")
         location_name = location.get("name", "")
         timezone_str = location.get("timezone", "UTC")
 
         # Get sun report from cache (accept stale)
-        sun_data = None
-        if cache_store.is_cache_valid(cache_store._sun_report_cache, CACHE_TTL):
-            sun_data = cache_store._sun_report_cache.get("data")
-        else:
-            cache_store.sync_cache_from_shared("sun_report", cache_store._sun_report_cache)
-            sun_data = cache_store._sun_report_cache.get("data")
+        sun_data = sun_entry.get("data")
 
         observation_score = None
         try:
             from weather_astro import get_current_astro_conditions
 
-            conditions = get_current_astro_conditions()
+            conditions = get_current_astro_conditions(location=location)
             if conditions:
                 observation_score = conditions.get("observation_score")
         except Exception:
@@ -2686,10 +3079,12 @@ def get_sky_widget_api():
         return jsonify(
             {
                 "location": location_name,
+                "location_id": location.get("id"),
                 "period": period,
                 "next_period": next_period,
                 "time_until_next_seconds": seconds_until_next,
                 "observation_score": observation_score,
+                "timezone": timezone_str,
             }
         )
 
@@ -2703,15 +3098,11 @@ def get_sky_widget_api():
 def get_sun_today_api():
     """Return Sun today report, from cache only"""
     try:
-        if cache_store.is_cache_valid(cache_store._sun_report_cache, CACHE_TTL):
-            return jsonify(cache_store._sun_report_cache["data"])
+        _, entry = _active_location_cache("sun_report")
+        if cache_store.is_cache_valid(entry, CACHE_TTL):
+            return jsonify(entry["data"])
 
-        # Try shared cache first (other worker may have computed)
-        if cache_store.sync_cache_from_shared("sun_report", cache_store._sun_report_cache):
-            if cache_store.is_cache_valid(cache_store._sun_report_cache, CACHE_TTL):
-                return jsonify(cache_store._sun_report_cache["data"])
-
-        stale_data = cache_store._sun_report_cache.get("data")
+        stale_data = entry.get("data")
         if stale_data:
             return jsonify(stale_data)
 
@@ -2731,15 +3122,11 @@ def get_sun_today_api():
 def get_solar_eclipse_api():
     """Return next solar eclipse, from cache only"""
     try:
-        if cache_store.is_cache_valid(cache_store._solar_eclipse_cache, CACHE_TTL):
-            return jsonify(cache_store._solar_eclipse_cache["data"])
+        _, entry = _active_location_cache("solar_eclipse")
+        if cache_store.is_cache_valid(entry, CACHE_TTL):
+            return jsonify(entry["data"])
 
-        # Try shared cache first (other worker may have computed)
-        if cache_store.sync_cache_from_shared("solar_eclipse", cache_store._solar_eclipse_cache):
-            if cache_store.is_cache_valid(cache_store._solar_eclipse_cache, CACHE_TTL):
-                return jsonify(cache_store._solar_eclipse_cache["data"])
-
-        stale_data = cache_store._solar_eclipse_cache.get("data")
+        stale_data = entry.get("data")
         if stale_data:
             return jsonify(stale_data)
 
@@ -2761,15 +3148,11 @@ def get_solar_eclipse_api():
 def get_lunar_eclipse_api():
     """Return next lunar eclipse, from cache only"""
     try:
-        if cache_store.is_cache_valid(cache_store._lunar_eclipse_cache, CACHE_TTL):
-            return jsonify(cache_store._lunar_eclipse_cache["data"])
+        _, entry = _active_location_cache("lunar_eclipse")
+        if cache_store.is_cache_valid(entry, CACHE_TTL):
+            return jsonify(entry["data"])
 
-        # Try shared cache first (other worker may have computed)
-        if cache_store.sync_cache_from_shared("lunar_eclipse", cache_store._lunar_eclipse_cache):
-            if cache_store.is_cache_valid(cache_store._lunar_eclipse_cache, CACHE_TTL):
-                return jsonify(cache_store._lunar_eclipse_cache["data"])
-
-        stale_data = cache_store._lunar_eclipse_cache.get("data")
+        stale_data = entry.get("data")
         if stale_data:
             return jsonify(stale_data)
 
@@ -2791,8 +3174,8 @@ def get_lunar_eclipse_api():
 def get_upcoming_events_api():
     """Return aggregated upcoming astronomical events (eclipses, auroras, planetary, phenomena, solar system events)"""
     try:
-        config = load_config()
-        location = config.get("location", {})
+        location = _resolve_active_location()
+        location_id = location.get("id")
         latitude = location.get("latitude", 0)
         longitude = location.get("longitude", 0)
         user_timezone = location.get("timezone", "UTC")
@@ -2802,79 +3185,20 @@ def get_upcoming_events_api():
         supported_languages = I18nManager.get_supported_languages()
         language = requested_language if requested_language in supported_languages else "en"
 
-        # Get cached event data
-        solar_eclipse_data = None
-        lunar_eclipse_data = None
-        aurora_data = None
-        iss_passes_data = None
-        css_passes_data = None
-        moon_phases_data = None
-        planetary_events_data = None
-        special_phenomena_data = None
-        solar_system_events_data = None
+        def _valid_location_data(name, ttl):
+            entry = cache_store.load_location_cache(name, location_id)
+            return entry.get("data") if cache_store.is_cache_valid(entry, ttl) else None
 
-        # Try to get solar eclipse data
-        if cache_store.is_cache_valid(cache_store._solar_eclipse_cache, CACHE_TTL_SOLAR_ECLIPSE):
-            solar_eclipse_data = cache_store._solar_eclipse_cache.get("data")
-        elif cache_store.sync_cache_from_shared("solar_eclipse", cache_store._solar_eclipse_cache):
-            if cache_store.is_cache_valid(cache_store._solar_eclipse_cache, CACHE_TTL_SOLAR_ECLIPSE):
-                solar_eclipse_data = cache_store._solar_eclipse_cache.get("data")
-
-        # Try to get lunar eclipse data
-        if cache_store.is_cache_valid(cache_store._lunar_eclipse_cache, CACHE_TTL_LUNAR_ECLIPSE):
-            lunar_eclipse_data = cache_store._lunar_eclipse_cache.get("data")
-        elif cache_store.sync_cache_from_shared("lunar_eclipse", cache_store._lunar_eclipse_cache):
-            if cache_store.is_cache_valid(cache_store._lunar_eclipse_cache, CACHE_TTL_LUNAR_ECLIPSE):
-                lunar_eclipse_data = cache_store._lunar_eclipse_cache.get("data")
-
-        # Try to get aurora data
-        if cache_store.is_cache_valid(cache_store._aurora_cache, CACHE_TTL_AURORA):
-            aurora_data = cache_store._aurora_cache.get("data")
-        elif cache_store.sync_cache_from_shared("aurora", cache_store._aurora_cache):
-            if cache_store.is_cache_valid(cache_store._aurora_cache, CACHE_TTL_AURORA):
-                aurora_data = cache_store._aurora_cache.get("data")
-
-        # Try to get ISS passes data
-        if cache_store.is_cache_valid(cache_store._iss_passes_cache, CACHE_TTL_ISS_PASSES):
-            iss_passes_data = cache_store._iss_passes_cache.get("data")
-        elif cache_store.sync_cache_from_shared("iss_passes", cache_store._iss_passes_cache):
-            if cache_store.is_cache_valid(cache_store._iss_passes_cache, CACHE_TTL_ISS_PASSES):
-                iss_passes_data = cache_store._iss_passes_cache.get("data")
-
-        # Try to get CSS passes data
-        if cache_store.is_cache_valid(cache_store._css_passes_cache, CACHE_TTL_CSS_PASSES):
-            css_passes_data = cache_store._css_passes_cache.get("data")
-        elif cache_store.sync_cache_from_shared("css_passes", cache_store._css_passes_cache):
-            if cache_store.is_cache_valid(cache_store._css_passes_cache, CACHE_TTL_CSS_PASSES):
-                css_passes_data = cache_store._css_passes_cache.get("data")
-
-        # Try to get moon phases data
-        if cache_store.is_cache_valid(cache_store._moon_planner_report_cache, CACHE_TTL_MOON_PLANNER):
-            moon_phases_data = cache_store._moon_planner_report_cache.get("data")
-        elif cache_store.sync_cache_from_shared("moon_planner", cache_store._moon_planner_report_cache):
-            if cache_store.is_cache_valid(cache_store._moon_planner_report_cache, CACHE_TTL_MOON_PLANNER):
-                moon_phases_data = cache_store._moon_planner_report_cache.get("data")
-
-        # Try to get planetary events data
-        if cache_store.is_cache_valid(cache_store._planetary_events_cache, CACHE_TTL_PLANETARY_EVENTS):
-            planetary_events_data = cache_store._planetary_events_cache.get("data")
-        elif cache_store.sync_cache_from_shared("planetary_events", cache_store._planetary_events_cache):
-            if cache_store.is_cache_valid(cache_store._planetary_events_cache, CACHE_TTL_PLANETARY_EVENTS):
-                planetary_events_data = cache_store._planetary_events_cache.get("data")
-
-        # Try to get special phenomena data
-        if cache_store.is_cache_valid(cache_store._special_phenomena_cache, CACHE_TTL_SPECIAL_PHENOMENA):
-            special_phenomena_data = cache_store._special_phenomena_cache.get("data")
-        elif cache_store.sync_cache_from_shared("special_phenomena", cache_store._special_phenomena_cache):
-            if cache_store.is_cache_valid(cache_store._special_phenomena_cache, CACHE_TTL_SPECIAL_PHENOMENA):
-                special_phenomena_data = cache_store._special_phenomena_cache.get("data")
-
-        # Try to get solar system events data
-        if cache_store.is_cache_valid(cache_store._solar_system_events_cache, CACHE_TTL_SOLAR_SYSTEM_EVENTS):
-            solar_system_events_data = cache_store._solar_system_events_cache.get("data")
-        elif cache_store.sync_cache_from_shared("solar_system_events", cache_store._solar_system_events_cache):
-            if cache_store.is_cache_valid(cache_store._solar_system_events_cache, CACHE_TTL_SOLAR_SYSTEM_EVENTS):
-                solar_system_events_data = cache_store._solar_system_events_cache.get("data")
+        # Get cached event data (per active location)
+        solar_eclipse_data = _valid_location_data("solar_eclipse", CACHE_TTL_SOLAR_ECLIPSE)
+        lunar_eclipse_data = _valid_location_data("lunar_eclipse", CACHE_TTL_LUNAR_ECLIPSE)
+        aurora_data = _valid_location_data("aurora", CACHE_TTL_AURORA)
+        iss_passes_data = _valid_location_data("iss_passes", CACHE_TTL_ISS_PASSES)
+        css_passes_data = _valid_location_data("css_passes", CACHE_TTL_CSS_PASSES)
+        moon_phases_data = _valid_location_data("moon_planner", CACHE_TTL_MOON_PLANNER)
+        planetary_events_data = _valid_location_data("planetary_events", CACHE_TTL_PLANETARY_EVENTS)
+        special_phenomena_data = _valid_location_data("special_phenomena", CACHE_TTL_SPECIAL_PHENOMENA)
+        solar_system_events_data = _valid_location_data("solar_system_events", CACHE_TTL_SOLAR_SYSTEM_EVENTS)
 
         if special_phenomena_data:
             special_phenomena_data = _translate_special_phenomena_events(special_phenomena_data, language)
@@ -2909,15 +3233,11 @@ def get_upcoming_events_api():
 def get_planetary_events_api():
     """Return planetary events (conjunctions, oppositions, elongations, retrograde motion)"""
     try:
-        if cache_store.is_cache_valid(cache_store._planetary_events_cache, CACHE_TTL):
-            return jsonify(cache_store._planetary_events_cache["data"])
+        _, entry = _active_location_cache("planetary_events")
+        if cache_store.is_cache_valid(entry, CACHE_TTL):
+            return jsonify(entry["data"])
 
-        # Try shared cache first
-        if cache_store.sync_cache_from_shared("planetary_events", cache_store._planetary_events_cache):
-            if cache_store.is_cache_valid(cache_store._planetary_events_cache, CACHE_TTL):
-                return jsonify(cache_store._planetary_events_cache["data"])
-
-        stale_data = cache_store._planetary_events_cache.get("data")
+        stale_data = entry.get("data")
         if stale_data:
             return jsonify(stale_data)
 
@@ -2946,17 +3266,11 @@ def get_special_phenomena_api():
         supported_languages = I18nManager.get_supported_languages()
         language = requested_language if requested_language in supported_languages else "en"
 
-        if cache_store.is_cache_valid(cache_store._special_phenomena_cache, CACHE_TTL):
-            data = cache_store._special_phenomena_cache["data"]
-            return jsonify(_translate_special_phenomena_events(data, language))
+        _, entry = _active_location_cache("special_phenomena")
+        if cache_store.is_cache_valid(entry, CACHE_TTL):
+            return jsonify(_translate_special_phenomena_events(entry["data"], language))
 
-        # Try shared cache first
-        if cache_store.sync_cache_from_shared("special_phenomena", cache_store._special_phenomena_cache):
-            if cache_store.is_cache_valid(cache_store._special_phenomena_cache, CACHE_TTL):
-                data = cache_store._special_phenomena_cache["data"]
-                return jsonify(_translate_special_phenomena_events(data, language))
-
-        stale_data = cache_store._special_phenomena_cache.get("data")
+        stale_data = entry.get("data")
         if stale_data:
             return jsonify(_translate_special_phenomena_events(stale_data, language))
 
@@ -2986,17 +3300,11 @@ def get_solar_system_events_api():
         supported_languages = I18nManager.get_supported_languages()
         language = requested_language if requested_language in supported_languages else "en"
 
-        if cache_store.is_cache_valid(cache_store._solar_system_events_cache, CACHE_TTL):
-            data = cache_store._solar_system_events_cache["data"]
-            return jsonify(_translate_solar_system_events(data, language))
+        _, entry = _active_location_cache("solar_system_events")
+        if cache_store.is_cache_valid(entry, CACHE_TTL):
+            return jsonify(_translate_solar_system_events(entry["data"], language))
 
-        # Try shared cache first
-        if cache_store.sync_cache_from_shared("solar_system_events", cache_store._solar_system_events_cache):
-            if cache_store.is_cache_valid(cache_store._solar_system_events_cache, CACHE_TTL):
-                data = cache_store._solar_system_events_cache["data"]
-                return jsonify(_translate_solar_system_events(data, language))
-
-        stale_data = cache_store._solar_system_events_cache.get("data")
+        stale_data = entry.get("data")
         if stale_data:
             return jsonify(_translate_solar_system_events(stale_data, language))
 
@@ -3246,9 +3554,8 @@ def get_sidereal_time_api():
     `hourly_forecast` is served from the scheduler cache (day-sensitive TTL).
     """
     try:
-        config = load_config()
-        location = config.get("location") if config else None
-        if not location:
+        location, cached = _active_location_cache("sidereal_time")
+        if not location or location.get("latitude") is None:
             return jsonify({'error': 'Location not configured'}), 400
 
         from sidereal_time import SiderealTimeService
@@ -3265,9 +3572,6 @@ def get_sidereal_time_api():
 
         # hourly_forecast - from scheduler cache (day-sensitive, refreshed at day change)
         hourly_forecast = None
-        cached = cache_store._sidereal_time_cache
-        if not cache_store.is_cache_valid_for_today(cached, CACHE_TTL_SIDEREAL_TIME):
-            cache_store.sync_cache_from_shared("sidereal_time", cached)
         if cache_store.is_cache_valid_for_today(cached, CACHE_TTL_SIDEREAL_TIME) and cached.get("data"):
             hourly_forecast = cached["data"].get("hourly_forecast")
 
@@ -3294,15 +3598,11 @@ def get_sidereal_time_api():
 def get_horizon_graph_api():
     """Return sun and moon horizon positions for current day"""
     try:
-        if cache_store.is_cache_valid(cache_store._horizon_graph_cache, CACHE_TTL):
-            return jsonify(cache_store._horizon_graph_cache["data"])
+        _, entry = _active_location_cache("horizon_graph")
+        if cache_store.is_cache_valid(entry, CACHE_TTL):
+            return jsonify(entry["data"])
 
-        # Try shared cache first (other worker may have computed)
-        if cache_store.sync_cache_from_shared("horizon_graph", cache_store._horizon_graph_cache):
-            if cache_store.is_cache_valid(cache_store._horizon_graph_cache, CACHE_TTL):
-                return jsonify(cache_store._horizon_graph_cache["data"])
-
-        stale_data = cache_store._horizon_graph_cache.get("data")
+        stale_data = entry.get("data")
         if stale_data:
             return jsonify(stale_data)
 
@@ -3329,22 +3629,17 @@ def best_window_api():
     try:
         mode = request.args.get("mode", "strict")
         modes = ["strict", "practical", "illumination"]
+        active_location = _resolve_active_location()
 
         if mode == "all":
             results = {}
             missing_modes = []
 
             for current_mode in modes:
-                cache_entry = cache_store._best_window_cache[current_mode]
+                cache_entry = cache_store.load_location_cache(f"best_window_{current_mode}", active_location.get("id"))
                 if cache_store.is_cache_valid(cache_entry, CACHE_TTL):
                     results[current_mode] = cache_entry["data"]
                     continue
-
-                # Try shared cache first (other worker may have computed)
-                if cache_store.sync_cache_from_shared(f"best_window_{current_mode}", cache_entry):
-                    if cache_store.is_cache_valid(cache_entry, CACHE_TTL):
-                        results[current_mode] = cache_entry["data"]
-                        continue
 
                 # Serve stale data when available instead of recomputing inline.
                 if cache_entry.get("data") is not None:
@@ -3366,15 +3661,10 @@ def best_window_api():
         if mode not in modes:
             return jsonify({"error": "Invalid mode"}), 400
 
-        cache_entry = cache_store._best_window_cache[mode]
+        cache_entry = cache_store.load_location_cache(f"best_window_{mode}", active_location.get("id"))
 
         if cache_store.is_cache_valid(cache_entry, CACHE_TTL):
             return jsonify(cache_entry["data"])
-
-        # Try shared cache first (other worker may have computed)
-        if cache_store.sync_cache_from_shared(f"best_window_{mode}", cache_entry):
-            if cache_store.is_cache_valid(cache_entry, CACHE_TTL):
-                return jsonify(cache_entry["data"])
 
         # Serve stale cache when available instead of triggering a heavy inline
         # recomputation that can exceed gunicorn timeout on small hosts.
@@ -3411,9 +3701,9 @@ def _resolve_observing_night_for_plan() -> Optional[dict]:
     (astronomical window) when the location is not configured or the sun
     service fails.
     """
+    location = None
     try:
-        config = load_config()
-        location = config.get('location', {})
+        location = _resolve_active_location()
         lat = location.get('latitude')
         lon = location.get('longitude')
         tz_name = location.get('timezone')
@@ -3451,7 +3741,7 @@ def _resolve_observing_night_for_plan() -> Optional[dict]:
 
     # Fallback: use SkyTonight calculation metadata (astronomical window)
     try:
-        calc = load_calculation_results()
+        calc = load_calculation_results(location.get('id') if isinstance(location, dict) else None)
         metadata = calc.get('metadata') or {}
         night_start = metadata.get('night_start')
         night_end = metadata.get('night_end')
@@ -3640,6 +3930,9 @@ def add_target_to_plan_my_night():
         telescope_id = data.get('telescope_id') or None
         telescope_name = str(data.get('telescope_name') or '').strip() or None
 
+        # New plans are pinned to the creator's CURRENT active location (v1.2)
+        active_location = _resolve_active_location()
+
         success, reason, payload, entry = plan_my_night.create_or_add_target(
             user_id=user.user_id,
             username=user.username,
@@ -3650,6 +3943,8 @@ def add_target_to_plan_my_night():
             duration_hours=duration_hours,
             telescope_id=telescope_id,
             telescope_name=telescope_name,
+            location_id=active_location.get('id'),
+            location_name=active_location.get('name'),
         )
 
         if not success:
@@ -3850,12 +4145,15 @@ def add_plan_target_to_astrodex(entry_id):
         if astrodex.is_item_in_astrodex(user.user_id, item_name, catalogue):
             return jsonify({'status': 'success', 'reason': 'already_in_astrodex'})
 
+        active_location = _resolve_active_location()
         item_data = {
             'name': item_name,
             'type': entry.get('type', 'Unknown'),
             'catalogue': catalogue,
             'constellation': entry.get('constellation', ''),
             'notes': entry.get('notes', ''),
+            'location_id': active_location.get('id'),
+            'location_name': active_location.get('name'),
         }
 
         created_item = astrodex.create_astrodex_item(user.user_id, item_data, user.username)
@@ -3945,25 +4243,27 @@ def export_plan_my_night_pdf():
         return jsonify({'error': 'Internal server error'}), 500
 
 
-_difficulty_lookup_cache: Dict[str, Any] = {'data': None, 'key': None}
+_difficulty_lookup_cache: Dict[str, Dict[str, Any]] = {}
 
 
-def _build_difficulty_lookup() -> Dict[str, str]:
-    """Build a normalized-catalogue-name -> difficulty lookup from SkyTonight's dso_results.json.
+def _build_difficulty_lookup(location_id=None) -> Dict[str, str]:
+    """Build a normalized-catalogue-name -> difficulty lookup from a location's dso_results.json.
 
-    Cached in memory keyed by the file's mtime - dso_results.json is only rewritten by the
-    twice-daily SkyTonight calculation job, so rebuilding this on every /api/astrodex request
-    is wasted work.
+    Cached in memory per location, keyed by the file's mtime - dso_results.json is only
+    rewritten by the twice-daily SkyTonight calculation job, so rebuilding this on every
+    /api/astrodex request is wasted work.
     """
+    dso_results_file = get_dso_results_file(location_id)
     try:
-        cache_key = os.path.getmtime(SKYTONIGHT_DSO_RESULTS_FILE)
+        cache_key = os.path.getmtime(dso_results_file)
     except OSError:
         cache_key = None
 
-    if _difficulty_lookup_cache['data'] is not None and _difficulty_lookup_cache['key'] == cache_key:
-        return _difficulty_lookup_cache['data']
+    slot = _difficulty_lookup_cache.get(location_id or '')
+    if slot is not None and slot['data'] is not None and slot['key'] == cache_key:
+        return slot['data']
 
-    dso_data = load_json_file(SKYTONIGHT_DSO_RESULTS_FILE, default={})
+    dso_data = load_json_file(dso_results_file, default={})
     lookup: Dict[str, str] = {}
     for entry in dso_data.get('deep_sky', []) if isinstance(dso_data, dict) else []:
         difficulty = entry.get('difficulty')
@@ -3975,17 +4275,17 @@ def _build_difficulty_lookup() -> Dict[str, str]:
             if key:
                 lookup[key] = difficulty
 
-    _difficulty_lookup_cache['data'], _difficulty_lookup_cache['key'] = lookup, cache_key
+    _difficulty_lookup_cache[location_id or ''] = {'data': lookup, 'key': cache_key}
     return lookup
 
 
-def _enrich_astrodex_items_with_difficulty(items):
+def _enrich_astrodex_items_with_difficulty(items, location_id=None):
     """Attach a `difficulty` field to each Astrodex item by cross-referencing SkyTonight's dso_results.json.
 
     Items with no catalogue/name match (e.g. manual entries not present in SkyTonight's
     catalogue) get `difficulty: None` rather than a guessed value.
     """
-    lookup = _build_difficulty_lookup()
+    lookup = _build_difficulty_lookup(location_id)
     for item in items:
         if not isinstance(item, dict):
             continue
@@ -4020,7 +4320,9 @@ def get_astrodex():
             private_mode=private_mode,
             usernames_by_id=usernames_by_id,
         )
-        _enrich_astrodex_items_with_difficulty(astrodex_data.get('items', []))
+        _enrich_astrodex_items_with_difficulty(
+            astrodex_data.get('items', []), _resolve_active_location().get('id')
+        )
 
         return jsonify(
             {
@@ -4053,7 +4355,8 @@ def get_beginner_catalog():
         catalog = beginner_catalog.load_beginner_catalog()
         catalog = beginner_catalog.translate_catalog_entries(catalog, lang)
 
-        dso_results = load_json_file(SKYTONIGHT_DSO_RESULTS_FILE, default={})
+        active_location_id = _resolve_active_location().get('id')
+        dso_results = load_json_file(get_dso_results_file(active_location_id), default={})
         astrodex_payload = astrodex.load_user_astrodex(user.user_id, user.username)
         user_astrodex_items = astrodex_payload.get('items', []) if isinstance(astrodex_payload, dict) else []
         # Aggregate across all telescope-scoped plans and only count "current" (non-archived)
@@ -4065,7 +4368,7 @@ def get_beginner_catalog():
 
         # Only apply the visible_only filter when results actually exist - per spec, an
         # empty/missing dso_results.json (no calculation run yet) returns everything.
-        if visible_only and has_dso_results():
+        if visible_only and has_dso_results(active_location_id):
             objects = [entry for entry in catalog if entry.get('visible_tonight')]
         else:
             objects = catalog
@@ -4111,6 +4414,11 @@ def add_astrodex_item():
                 ),
                 409,
             )
+
+        # Stamp the creator's active location (frozen name snapshot, v1.2)
+        active_location = _resolve_active_location()
+        item_data['location_id'] = active_location.get('id')
+        item_data['location_name'] = active_location.get('name')
 
         new_item = astrodex.create_astrodex_item(user_id, item_data, user.username)
 
@@ -4345,10 +4653,14 @@ def upload_astrodex_image():
         astrodex.ensure_astrodex_directories()
 
         base_dir = os.path.abspath(astrodex.ASTRODEX_IMAGES_DIR)
-        file_path = os.path.normpath(os.path.join(base_dir, unique_filename))
+        file_path = os.path.realpath(os.path.join(base_dir, unique_filename))
 
         # Confinement check (anti path traversal)
-        if not file_path.startswith(base_dir):  # pragma: no cover
+        try:
+            if os.path.commonpath([base_dir, file_path]) != base_dir:  # pragma: no cover
+                logger.warning(f"Attempted path traversal attack: {file_path}")
+                return jsonify({'error': 'Invalid file path'}), 400
+        except ValueError:  # pragma: no cover
             logger.warning(f"Attempted path traversal attack: {file_path}")
             return jsonify({'error': 'Invalid file path'}), 400
 
