@@ -9,12 +9,15 @@ import shutil
 import threading
 import uuid
 import io
-from datetime import datetime, timedelta
-from typing import Any, Dict, Optional, Tuple
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional, Tuple
+
+import numpy as np
 
 import skytonight_targets
 from constants import DATA_DIR
 from logging_config import get_logger
+from skytonight_calculator import _horizon_floor_array
 
 logger = get_logger(__name__)
 
@@ -109,6 +112,245 @@ def _parse_datetime(value: Any) -> Optional[datetime]:
         return datetime.strptime(text, '%Y-%m-%d %H:%M').astimezone()
     except ValueError:
         return None
+
+
+# ---------------------------------------------------------------------------
+# Altitude-time data + target visibility (shared by the PDF export, the live
+# timeline warning badges, and the schedule optimizer below)
+# ---------------------------------------------------------------------------
+
+_ALTTIME_FILENAME_RE = re.compile(r'[^a-z0-9_-]')
+_VISIBILITY_OK_THRESHOLD = 0.95
+
+
+def _load_alttime(alttime_file: str, location_id: Optional[str]) -> Optional[Dict[str, Any]]:
+    """Load a target's cached altitude-time series JSON for the given location preset."""
+    if not alttime_file:
+        return None
+    from skytonight_storage import get_alttime_dir
+
+    safe = _ALTTIME_FILENAME_RE.sub('_', str(alttime_file).lower())
+    path = os.path.normpath(os.path.join(get_alttime_dir(location_id), f'{safe}_alttime.json'))
+    if not os.path.isfile(path):
+        return None
+    try:
+        with open(path, 'r', encoding='utf-8') as fh:
+            return json.load(fh)
+    except Exception:
+        return None
+
+
+def _parse_utc(s: Any) -> Optional[datetime]:
+    """Parse an ISO timestamp to a UTC-aware datetime.
+
+    Bare timestamps with no offset (as stored in alttime JSON, e.g.
+    '2026-07-18T06:00:00') are assumed to already be UTC.
+    """
+    if not s:
+        return None
+    try:
+        text = str(s).strip()
+        if text.endswith('Z'):
+            dt = datetime.fromisoformat(text[:-1]).replace(tzinfo=timezone.utc)
+        else:
+            dt = datetime.fromisoformat(text)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            else:
+                dt = dt.astimezone(timezone.utc)
+        return dt
+    except Exception:
+        return None
+
+
+def _clip_alttime_series(times_utc, altitudes, start_dt, end_dt):
+    """Clip parallel (time, altitude) arrays to [start_dt, end_dt], interpolating the boundary points."""
+    if not times_utc or not altitudes or not start_dt or not end_dt or start_dt >= end_dt:
+        return [], []
+    pts = []
+    for raw_t, a in zip(times_utc, altitudes):
+        dt = _parse_utc(raw_t)
+        if dt is not None and a is not None:
+            pts.append((dt, float(a)))
+    if not pts:
+        return [], []
+
+    def _lerp(p0, p1, x):
+        span = (p1[0] - p0[0]).total_seconds()
+        assert span > 0, (
+            f'Invariant violated: interpolation points must be strictly increasing in time; '
+            f'p0={p0[0]!r}, p1={p1[0]!r}, span_seconds={span!r}'
+        )
+        frac = (x - p0[0]).total_seconds() / span
+        return x, p0[1] + frac * (p1[1] - p0[1])
+
+    out = []
+    for i, p in enumerate(pts):
+        prev = pts[i - 1] if i > 0 else None
+        nxt = pts[i + 1] if i < len(pts) - 1 else None
+        if prev and prev[0] < start_dt < p[0]:
+            out.append(_lerp(prev, p, start_dt))
+        if start_dt <= p[0] <= end_dt:
+            out.append(p)
+        if nxt and p[0] < end_dt < nxt[0]:
+            out.append(_lerp(p, nxt, end_dt))
+    if not out:
+        return [], []
+    xs, ys = zip(*out)
+    return list(xs), list(ys)
+
+
+def _observable_runs(
+    times_utc: List[Any],
+    altitudes: List[Any],
+    azimuths: Optional[List[Any]],
+    alt_min: float,
+    alt_max: float,
+    horizon_profile: Optional[List[Dict[str, Any]]],
+    night_start: Optional[datetime],
+    night_end: Optional[datetime],
+) -> List[Tuple[datetime, datetime]]:
+    """Return contiguous (start, end) UTC windows where a target's altitude sits
+    within [alt_min, alt_max] (raised by the custom horizon profile, if any),
+    clipped to [night_start, night_end].
+
+    Run edges are linearly interpolated between samples so they reflect the
+    actual threshold crossing rather than the nearest 15-minute sample.
+    """
+    if not times_utc or not altitudes or not night_start or not night_end or night_end <= night_start:
+        return []
+
+    times = [_parse_utc(t) for t in times_utc]
+    floors = [alt_min] * len(altitudes)
+    if horizon_profile and azimuths:
+        try:
+            az_arr = np.array([float(a) if a is not None else 0.0 for a in azimuths], dtype=np.float64)
+            horizon_floors = _horizon_floor_array(az_arr, horizon_profile)
+            floors = [max(alt_min, float(hf)) for hf in horizon_floors]
+        except Exception:
+            floors = [alt_min] * len(altitudes)
+
+    # margin >= 0 means observable at that sample (within both the floor and the ceiling)
+    margins: List[Optional[float]] = []
+    for t, a, floor in zip(times, altitudes, floors):
+        if t is None or a is None:
+            margins.append(None)
+            continue
+        margins.append(min(float(a) - floor, alt_max - float(a)))
+
+    def _crossing(i: int, j: int) -> datetime:
+        t0, m0 = times[i], margins[i]
+        t1, m1 = times[j], margins[j]
+        if m0 is None or m1 is None or m0 == m1:
+            return t0
+        frac = max(0.0, min(1.0, m0 / (m0 - m1)))
+        return t0 + (t1 - t0) * frac
+
+    runs: List[Tuple[datetime, datetime]] = []
+    run_start: Optional[datetime] = None
+    for i, m in enumerate(margins):
+        observable = m is not None and m >= 0
+        if observable and run_start is None:
+            run_start = _crossing(i - 1, i) if i > 0 and margins[i - 1] is not None and margins[i - 1] < 0 else times[i]
+        elif not observable and run_start is not None:
+            run_end = _crossing(i - 1, i) if margins[i - 1] is not None else times[i - 1]
+            runs.append((run_start, run_end))
+            run_start = None
+    if run_start is not None:
+        runs.append((run_start, times[-1]))
+
+    clipped = []
+    for start, end in runs:
+        s = max(start, night_start)
+        e = min(end, night_end)
+        if e > s:
+            clipped.append((s, e))
+    return clipped
+
+
+def _coverage_for_window(
+    runs: List[Tuple[datetime, datetime]],
+    window_start: Optional[datetime],
+    window_end: Optional[datetime],
+) -> float:
+    """Fraction (0..1) of [window_start, window_end] covered by any of the given runs."""
+    if not runs or not window_start or not window_end or window_end <= window_start:
+        return 0.0
+    total = (window_end - window_start).total_seconds()
+    if total <= 0:
+        return 0.0
+    covered = 0.0
+    for start, end in runs:
+        s = max(start, window_start)
+        e = min(end, window_end)
+        if e > s:
+            covered += (e - s).total_seconds()
+    return max(0.0, min(1.0, covered / total))
+
+
+def _visibility_summary(
+    runs: List[Tuple[datetime, datetime]],
+    window_start: Optional[datetime],
+    window_end: Optional[datetime],
+) -> Dict[str, Any]:
+    """Summarize how well a target's real visibility runs line up with a planned window."""
+    coverage = _coverage_for_window(runs, window_start, window_end)
+    if coverage >= _VISIBILITY_OK_THRESHOLD:
+        status = 'ok'
+    elif coverage > 0:
+        status = 'partial'
+    else:
+        status = 'none'
+
+    visible_from: Optional[datetime] = None
+    visible_until: Optional[datetime] = None
+    if window_start and window_end:
+        overlapping = [r for r in runs if r[1] > window_start and r[0] < window_end]
+        if overlapping:
+            visible_from, visible_until = max(
+                overlapping, key=lambda r: min(r[1], window_end) - max(r[0], window_start)
+            )
+        else:
+            future_runs = [r for r in runs if r[0] >= window_end]
+            next_run = min(future_runs, key=lambda r: r[0]) if future_runs else (runs[0] if runs else None)
+            if next_run:
+                visible_from, visible_until = next_run
+
+    return {
+        'status': status,
+        'coverage_percent': round(coverage * 100.0, 1),
+        'visible_from': _to_iso(visible_from) if visible_from else None,
+        'visible_until': _to_iso(visible_until) if visible_until else None,
+    }
+
+
+def _compute_entry_visibility(
+    entry: Dict[str, Any],
+    location_id: Optional[str],
+    night_start: Optional[datetime],
+    night_end: Optional[datetime],
+    window_start: Optional[datetime],
+    window_end: Optional[datetime],
+    cache: Dict[str, Any],
+) -> Optional[Dict[str, Any]]:
+    """Compute a single entry's visibility summary for a given planned [window_start, window_end]."""
+    alttime_file = entry.get('alttime_file')
+    if not alttime_file or not window_start or not window_end or not night_start or not night_end:
+        return None
+    if alttime_file not in cache:
+        cache[alttime_file] = _load_alttime(alttime_file, location_id)
+    data = cache[alttime_file]
+    if not data or not data.get('times_utc'):
+        return None
+
+    alt_min = float(data.get('altitude_constraint_min', 30))
+    alt_max = float(data.get('altitude_constraint_max', 80))
+    horizon_profile = data.get('horizon_profile') or []
+    runs = _observable_runs(
+        data['times_utc'], data.get('altitudes') or [], data.get('azimuths'),
+        alt_min, alt_max, horizon_profile, night_start, night_end,
+    )
+    return _visibility_summary(runs, window_start, window_end)
 
 
 def ensure_plan_directory() -> None:
@@ -757,6 +999,8 @@ def get_plan_with_timeline(user_id: str, username: str, telescope_id: Optional[s
 
         start_delay_minutes = int(plan_copy.get('start_delay_minutes') or 0)
         cursor = night_start + timedelta(minutes=start_delay_minutes)
+        location_id = plan_copy.get('location_id')
+        alttime_cache: Dict[str, Any] = {}
         for entry in entries:
             planned_minutes = int(entry.get('planned_minutes') or 0)
             start_dt = cursor
@@ -768,6 +1012,9 @@ def get_plan_with_timeline(user_id: str, username: str, telescope_id: Optional[s
 
             entry['timeline_start'] = _to_iso(start_dt)
             entry['timeline_end'] = _to_iso(end_dt)
+            entry['visibility'] = _compute_entry_visibility(
+                entry, location_id, night_start, night_end, start_dt, end_dt, alttime_cache
+            )
 
             if is_inside_night and not entry.get('done') and start_dt <= now_dt <= end_dt:
                 current_target_id = entry.get('id')
@@ -786,6 +1033,159 @@ def get_plan_with_timeline(user_id: str, username: str, telescope_id: Optional[s
         },
         'current_banner': current_entry,
     }
+
+
+# ---------------------------------------------------------------------------
+# Schedule optimizer
+# ---------------------------------------------------------------------------
+
+
+def compute_optimized_schedule(
+    user_id: str, username: str, telescope_id: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    """Propose a target order + single initial delay that maximizes each target's
+    overlap with its real (altitude-based) visibility window for the night.
+
+    Targets keep running back-to-back (the plan has only one delay slot, before
+    the first target - see ``start_delay_minutes``); the optimizer only chooses
+    the order and that one delay, it never introduces mid-plan idle gaps.
+    """
+    payload = load_user_plan(user_id, username, telescope_id=telescope_id)
+    plan = payload.get('plan')
+    if not plan:
+        return None
+    if get_plan_state(plan) == 'previous':
+        return None
+
+    entries = plan.get('entries', [])
+    if not entries:
+        return None
+
+    night_start = _parse_datetime(plan.get('night_start'))
+    night_end = _parse_datetime(plan.get('night_end'))
+    if not night_start or not night_end or night_end <= night_start:
+        return None
+
+    location_id = plan.get('location_id')
+    alttime_cache: Dict[str, Any] = {}
+
+    candidates = []
+    for entry in entries:
+        planned_minutes = int(entry.get('planned_minutes') or 0)
+        alttime_file = entry.get('alttime_file')
+        data = None
+        if alttime_file:
+            if alttime_file not in alttime_cache:
+                alttime_cache[alttime_file] = _load_alttime(alttime_file, location_id)
+            data = alttime_cache[alttime_file]
+
+        runs: List[Tuple[datetime, datetime]] = []
+        if data and data.get('times_utc'):
+            alt_min = float(data.get('altitude_constraint_min', 30))
+            alt_max = float(data.get('altitude_constraint_max', 80))
+            horizon_profile = data.get('horizon_profile') or []
+            runs = _observable_runs(
+                data['times_utc'], data.get('altitudes') or [], data.get('azimuths'),
+                alt_min, alt_max, horizon_profile, night_start, night_end,
+            )
+
+        duration = timedelta(minutes=planned_minutes)
+        warnings: List[str] = []
+        fitting = [r for r in runs if (r[1] - r[0]) >= duration]
+        if fitting:
+            chosen_run = min(fitting, key=lambda r: r[0])
+        elif runs:
+            chosen_run = max(runs, key=lambda r: r[1] - r[0])
+            warnings.append('insufficient_window')
+        else:
+            chosen_run = (night_start, night_end)
+            warnings.append('never_observable')
+
+        candidates.append({'entry': entry, 'run_start': chosen_run[0], 'runs': runs, 'warnings': warnings})
+
+    # Stable sort: ties keep the plan's current relative order.
+    candidates.sort(key=lambda c: c['run_start'])
+
+    cursor = night_start
+    preview = []
+    for c in candidates:
+        entry = c['entry']
+        planned_minutes = int(entry.get('planned_minutes') or 0)
+        warnings = list(c['warnings'])
+        start = max(cursor, c['run_start'])
+        if start >= night_end:
+            warnings.append('pushed_past_night_end')
+            start = night_end
+            end = night_end
+        else:
+            end = start + timedelta(minutes=planned_minutes)
+            if end > night_end:
+                warnings.append('truncated')
+                end = night_end
+
+        preview.append({
+            'id': entry.get('id'),
+            'name': entry.get('name') or entry.get('target_name'),
+            'start': _to_iso(start),
+            'end': _to_iso(end),
+            'visibility': _visibility_summary(c['runs'], start, end),
+            'warnings': warnings,
+        })
+        cursor = end
+
+    start_delay_minutes = 0
+    if preview:
+        first_start = _parse_datetime(preview[0]['start'])
+        if first_start:
+            start_delay_minutes = max(0, int(round((first_start - night_start).total_seconds() / 60)))
+
+    # Derived straight from the actual placement above (not a separate minutes
+    # tally) so it can't drift out of sync with what was really scheduled - e.g.
+    # a big mandatory delay before the first visible target shrinks the usable
+    # window well below the raw night length, which a simple total-vs-night-length
+    # comparison would miss entirely.
+    plan_warnings = []
+    if any('truncated' in p['warnings'] or 'pushed_past_night_end' in p['warnings'] for p in preview):
+        plan_warnings.append('total_duration_exceeds_night')
+
+    return {
+        'order': [p['id'] for p in preview],
+        'start_delay_minutes': start_delay_minutes,
+        'preview': preview,
+        'plan_warnings': plan_warnings,
+    }
+
+
+def apply_optimized_schedule(
+    user_id: str,
+    username: str,
+    telescope_id: Optional[str],
+    order: List[str],
+    start_delay_minutes: int,
+) -> bool:
+    """Apply a previously-computed optimized order + initial delay to the plan.
+
+    Rejects the request if the plan changed since the preview was computed
+    (e.g. a target was added/removed), since ``order`` would no longer be a
+    valid permutation of the current entries.
+    """
+    payload = load_user_plan(user_id, username, telescope_id=telescope_id)
+    plan = payload.get('plan')
+    if not plan:
+        return False
+    if get_plan_state(plan) == 'previous':
+        return False
+
+    entries = plan.get('entries', [])
+    entries_by_id = {entry.get('id'): entry for entry in entries}
+    if not order or len(order) != len(entries) or set(order) != set(entries_by_id.keys()):
+        return False
+
+    plan['entries'] = [entries_by_id[entry_id] for entry_id in order]
+    plan['start_delay_minutes'] = max(0, min(int(start_delay_minutes), 23 * 60 + 59))
+    plan['updated_at'] = _to_iso(_now())
+
+    return save_user_plan(user_id, payload, username=username, telescope_id=telescope_id)
 
 
 def _csv_normalize_ra(val) -> str:
@@ -1020,9 +1420,6 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
     import matplotlib.gridspec as gridspec
     import matplotlib.dates as mdates
     from matplotlib.patches import Rectangle
-    from datetime import timezone
-    import re as _re
-    from skytonight_storage import get_alttime_dir
 
     plan = payload.get('plan')
     entries = plan.get('entries', []) if plan else []
@@ -1063,36 +1460,8 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
     C_NIGHT_LN = '#37474f'
 
     # ── helpers ──────────────────────────────────────────────────────────────
-    _safe_re = _re.compile(r'[^a-z0-9_-]')
-
-    def _load_alttime(alttime_file: str):
-        assert alttime_file, 'alttime_file must be provided'
-        safe = _safe_re.sub('_', str(alttime_file).lower())
-        path = os.path.normpath(os.path.join(get_alttime_dir(_plan_location_id), f'{safe}_alttime.json'))
-        if not os.path.isfile(path):
-            return None
-        try:
-            with open(path, 'r', encoding='utf-8') as fh:
-                return json.load(fh)
-        except Exception:
-            return None
-
-    def _parse_utc(s):
-        if not s:
-            return None
-        try:
-            text = str(s).strip()
-            if text.endswith('Z'):
-                dt = datetime.fromisoformat(text[:-1]).replace(tzinfo=timezone.utc)
-            else:
-                dt = datetime.fromisoformat(text)
-                if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=timezone.utc)
-                else:
-                    dt = dt.astimezone(timezone.utc)
-            return dt
-        except Exception:
-            return None
+    # _load_alttime / _parse_utc / _clip_alttime_series are module-level (shared
+    # with the visibility warnings + schedule optimizer above).
 
     _local_tz: Any = timezone.utc  # updated after alttime_map is loaded
 
@@ -1108,48 +1477,12 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
         m = max(0, int(minutes))
         return f"{m // 60}h{m % 60:02d}"
 
-    def _clip_alttime(times_utc, altitudes, start_dt, end_dt):
-        """Clip altitude series to [start_dt, end_dt] with boundary interpolation."""
-        if not times_utc or not altitudes or not start_dt or not end_dt or start_dt >= end_dt:
-            return [], []
-        pts = []
-        for raw_t, a in zip(times_utc, altitudes):
-            dt = _parse_utc(raw_t)
-            if dt is not None and a is not None:
-                pts.append((dt, float(a)))
-        if not pts:
-            return [], []
-
-        def _lerp(p0, p1, x):
-            span = (p1[0] - p0[0]).total_seconds()
-            assert span > 0, (
-                f'Invariant violated: interpolation points must be strictly increasing in time; '
-                f'p0={p0[0]!r}, p1={p1[0]!r}, span_seconds={span!r}'
-            )
-            frac = (x - p0[0]).total_seconds() / span
-            return x, p0[1] + frac * (p1[1] - p0[1])
-
-        out = []
-        for i, p in enumerate(pts):
-            prev = pts[i - 1] if i > 0 else None
-            nxt = pts[i + 1] if i < len(pts) - 1 else None
-            if prev and prev[0] < start_dt < p[0]:
-                out.append(_lerp(prev, p, start_dt))
-            if start_dt <= p[0] <= end_dt:
-                out.append(p)
-            if nxt and p[0] < end_dt < nxt[0]:
-                out.append(_lerp(p, nxt, end_dt))
-        if not out:
-            return [], []
-        xs, ys = zip(*out)
-        return list(xs), list(ys)
-
     # ── load altitude-time JSON files ────────────────────────────────────────
     alttime_map: Dict[str, Any] = {}
     for entry in entries:
         af = entry.get('alttime_file')
         if af:
-            data = _load_alttime(af)
+            data = _load_alttime(af, _plan_location_id)
             if data:
                 alttime_map[entry.get('id')] = data
 
@@ -1440,7 +1773,7 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
                     if t_end <= t_start:
                         continue
 
-                    xs, ys = _clip_alttime(
+                    xs, ys = _clip_alttime_series(
                         adata.get('times_utc', []),
                         adata.get('altitudes', []),
                         t_start,

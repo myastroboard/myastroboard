@@ -17,4 +17,4 @@ This release introduces multi-location profiles: admins can create up to 5 locat
 - Add per-location push notification handling: messages mention the location name when a user has several locations, and each location can be muted individually in My Settings -> Notifications
 - Add `GET/POST /api/locations`, `PUT/DELETE /api/locations/<id>`, `GET /api/locations/<id>/references`, `POST /api/locations/<id>/attribute`, `GET /api/locations/mine`, `POST /api/locations/active` endpoints (see docs/API_ENDPOINTS.md)
 - Automatic one-time migration: existing single-location installs are converted to a one-preset setup with zero manual action; all user preferences keep working
-- i18n for the whole feature in all 6 languages (en, fr, es, de, it, pt)
+- Add an optimizer service for a plan in plan-my-night

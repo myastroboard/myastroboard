@@ -179,3 +179,101 @@ def test_add_target_uses_skytonight_group_dedup(client_admin, monkeypatch):
     })
     assert second_response.status_code == 200
     assert second_response.get_json()['reason'] == 'already_in_plan'
+
+
+def test_optimize_returns_404_without_plan(client_admin):
+    response = client_admin.get('/api/plan-my-night/optimize')
+    assert response.status_code == 404
+
+
+def test_optimize_returns_preview(client_admin):
+    add_response = client_admin.post('/api/plan-my-night/targets', json=_sample_target())
+    assert add_response.status_code == 200
+
+    response = client_admin.get('/api/plan-my-night/optimize')
+    assert response.status_code == 200
+
+    payload = response.get_json()
+    assert payload['status'] == 'success'
+    assert len(payload['preview']) == 1
+    # No alttime_file on a manually-added item -> never observable this way.
+    assert payload['preview'][0]['warnings'] == ['never_observable']
+    assert 'start_delay_minutes' in payload
+    assert 'order' in payload
+
+
+def test_optimize_blocked_on_previous_plan(client_admin):
+    user = user_manager.get_user_by_username('admin')
+    assert user is not None
+
+    now = datetime.now().replace(second=0, microsecond=0)
+    payload = {
+        'user_id': user.user_id,
+        'username': user.username,
+        'plan': {
+            'plan_date': (now - timedelta(days=1)).date().isoformat(),
+            'night_start': (now - timedelta(days=1, hours=8)).astimezone().isoformat(),
+            'night_end': (now - timedelta(days=1, hours=2)).astimezone().isoformat(),
+            'duration_hours': 6.0,
+            'entries': [
+                {
+                    'id': 'entry-old',
+                    'name': 'M31',
+                    'catalogue': 'Messier',
+                    'planned_minutes': 60,
+                    'planned_duration': '01:00',
+                    'done': False,
+                }
+            ],
+        }
+    }
+    saved = plan_my_night.save_user_plan(user.user_id, payload, username=user.username)
+    assert saved is True
+
+    response = client_admin.get('/api/plan-my-night/optimize')
+    assert response.status_code == 409
+
+
+def test_read_only_cannot_view_optimize(client_read_only):
+    response = client_read_only.get('/api/plan-my-night/optimize')
+    assert response.status_code == 403
+
+
+def test_optimize_apply_reorders_and_sets_delay(client_admin):
+    add_first = client_admin.post('/api/plan-my-night/targets', json=_sample_target('M42'))
+    assert add_first.status_code == 200
+    add_second = client_admin.post('/api/plan-my-night/targets', json=_sample_target('M43'))
+    assert add_second.status_code == 200
+
+    preview = client_admin.get('/api/plan-my-night/optimize')
+    assert preview.status_code == 200
+    preview_payload = preview.get_json()
+
+    apply_response = client_admin.post('/api/plan-my-night/optimize/apply', json={
+        'order': preview_payload['order'],
+        'start_delay_minutes': preview_payload['start_delay_minutes'],
+    })
+    assert apply_response.status_code == 200
+    apply_payload = apply_response.get_json()
+    assert apply_payload['status'] == 'success'
+    entries = apply_payload['plan']['plan']['entries']
+    assert [e['id'] for e in entries] == preview_payload['order']
+
+
+def test_optimize_apply_rejects_stale_order(client_admin):
+    add_response = client_admin.post('/api/plan-my-night/targets', json=_sample_target())
+    assert add_response.status_code == 200
+
+    response = client_admin.post('/api/plan-my-night/optimize/apply', json={
+        'order': ['does-not-exist'],
+        'start_delay_minutes': 0,
+    })
+    assert response.status_code == 409
+
+
+def test_optimize_apply_requires_order(client_admin):
+    add_response = client_admin.post('/api/plan-my-night/targets', json=_sample_target())
+    assert add_response.status_code == 200
+
+    response = client_admin.post('/api/plan-my-night/optimize/apply', json={'start_delay_minutes': 0})
+    assert response.status_code == 400

@@ -4123,6 +4123,67 @@ def reorder_plan_my_night_target(entry_id):
         return jsonify({'error': 'Internal server error'}), 500
 
 
+@app.route('/api/plan-my-night/optimize', methods=['GET'])
+@user_required
+def optimize_plan_my_night():
+    """Preview a reordering + initial delay that maximizes each target's overlap
+    with its real (altitude-based) visibility window for the night."""
+    try:
+        user = get_current_user()
+        if not user:  # pragma: no cover
+            return jsonify({'error': 'User not authenticated'}), 401
+
+        telescope_id = request.args.get('telescope_id') or None
+        plan_load = plan_my_night.load_user_plan(user.user_id, user.username, telescope_id=telescope_id)
+        plan = plan_load.get('plan')
+        if not plan or not plan.get('entries'):
+            return jsonify({'error': 'No plan or targets to optimize'}), 404
+        if plan_my_night.get_plan_state(plan) == 'previous':
+            return jsonify({'error': 'Plan belongs to previous night'}), 409
+
+        result = plan_my_night.compute_optimized_schedule(user.user_id, user.username, telescope_id=telescope_id)
+        if result is None:
+            return jsonify({'error': 'No plan or targets to optimize'}), 404
+
+        return jsonify({'status': 'success', **result})
+    except Exception as error:
+        logger.error(f'Error optimizing Plan My Night: {error}')
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@app.route('/api/plan-my-night/optimize/apply', methods=['POST'])
+@user_required
+def apply_plan_my_night_optimization():
+    """Apply a previously-previewed optimized order + initial delay to the plan."""
+    try:
+        user = get_current_user()
+        if not user:  # pragma: no cover
+            return jsonify({'error': 'User not authenticated'}), 401
+
+        data = request.json or {}
+        telescope_id = data.get('telescope_id') or None
+        order = data.get('order')
+        start_delay_minutes = data.get('start_delay_minutes')
+        if not isinstance(order, list) or not order or start_delay_minutes is None:
+            return jsonify({'error': 'order and start_delay_minutes are required'}), 400
+
+        success = plan_my_night.apply_optimized_schedule(
+            user.user_id, user.username, telescope_id, order, int(start_delay_minutes)
+        )
+        if not success:
+            return jsonify({'error': 'Failed to apply optimized schedule (plan may have changed)'}), 409
+
+        return jsonify(
+            {
+                'status': 'success',
+                'plan': plan_my_night.get_plan_with_timeline(user.user_id, user.username, telescope_id=telescope_id),
+            }
+        )
+    except Exception as error:
+        logger.error(f'Error applying Plan My Night optimization: {error}')
+        return jsonify({'error': 'Internal server error'}), 500
+
+
 @app.route('/api/plan-my-night/targets/<entry_id>', methods=['DELETE'])
 @user_required
 def delete_plan_my_night_target(entry_id):
