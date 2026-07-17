@@ -14,12 +14,28 @@ import object_info
 from constellation import Constellation as _Constellation
 from i18n_utils import I18nManager
 from logging_config import get_logger
+from skytonight_storage import get_alttime_dir
 from utils import normalize_catalogue_key as _normalize_key
 
 logger = get_logger(__name__)
 
 _CATALOGUES_DIR = os.path.join(os.path.dirname(__file__), 'catalogues')
 _BEGINNER_CATALOG_FILE = os.path.join(_CATALOGUES_DIR, 'beginner_catalog.json')
+
+# Same "safe id" sanitization used to name *_alttime.json files, duplicated here rather
+# than imported to avoid a circular import (skytonight_api/skytonight_calculator don't
+# import this module, but keeping the convention local avoids adding a new cross-module
+# dependency just for one regex).
+_ALTTIME_ID_SAFE = re.compile(r'[^a-z0-9_-]')
+
+
+def _alttime_file_for_target(target_id: str, location_id: Any) -> str:
+    """Return ``target_id`` if its per-location altitude-time JSON file exists on disk, else ''."""
+    if not target_id:
+        return ''
+    safe_id = _ALTTIME_ID_SAFE.sub('_', target_id.lower())
+    path = os.path.join(get_alttime_dir(location_id), f'{safe_id}_alttime.json')
+    return target_id if os.path.isfile(path) else ''
 
 
 def _humanize_const_name(name: str) -> str:
@@ -127,6 +143,7 @@ def enrich_with_skytonight(
     dso_results: Dict[str, Any],
     user_astrodex_items: List[Dict[str, Any]],
     user_plan_entries: List[Dict[str, Any]],
+    location_id: Any = None,
 ) -> List[Dict[str, Any]]:
     """Add ``visible_tonight``, ``astro_score``, ``in_astrodex`` and ``in_plan`` to each catalog entry.
 
@@ -135,6 +152,8 @@ def enrich_with_skytonight(
         dso_results: Parsed content of ``dso_results.json`` (may be empty/missing).
         user_astrodex_items: The current user's Astrodex items (``astrodex.load_user_astrodex()['items']``).
         user_plan_entries: The current user's Plan My Night entries.
+        location_id: Active location id, used to resolve the per-location altitude-time
+            JSON directory for the ``alttime_file`` field.
     """
     dso_lookup = _build_dso_lookup(dso_results)
     astrodex_keys = _build_name_key_set(user_astrodex_items, ['name', 'catalogue'])
@@ -149,7 +168,9 @@ def enrich_with_skytonight(
         dso_match = dso_lookup.get(catalogue_key)
         new_entry['visible_tonight'] = dso_match is not None
         new_entry['astro_score'] = dso_match.get('astro_score') if dso_match else None
-        new_entry['alttime_file'] = dso_match.get('alttime_file') if dso_match else None
+        new_entry['alttime_file'] = (
+            _alttime_file_for_target(dso_match.get('target_id', ''), location_id) if dso_match else ''
+        )
 
         # Every catalog entry has its own fixed coordinates, so the thumbnail can be
         # resolved directly rather than making the client re-resolve the object via a

@@ -32,7 +32,7 @@ function _ensurePlotlyLoaded() {
  * Show a modal to pick a telescope for "Add to Plan My Night".
  * Returns a Promise that resolves with {telescope_id, telescope_name} or null if cancelled.
  */
-async function showPlanTelescopePickerModal(telescopeItems, row) {
+async function showPlanTelescopePickerModal(telescopeItems, row, activeLocationId) {
     const existingModal = document.getElementById('plan-telescope-picker-modal');
     if (existingModal) existingModal.remove();
 
@@ -116,6 +116,22 @@ async function showPlanTelescopePickerModal(telescopeItems, row) {
             nameSpan.append(' ');
             nameSpan.appendChild(stateBadgeEl);
 
+            // A plan pins its location at creation (v1.2) - adding a target from a different
+            // active location onto an already-current plan would silently mix locations on the
+            // same telescope's plan, so that combination is disabled here rather than allowed.
+            const hasLocationConflict = t.state === 'current' && t.location_id
+                && activeLocationId && t.location_id !== activeLocationId;
+            if (hasLocationConflict) {
+                const conflictEl = document.createElement('div');
+                conflictEl.className = 'small text-muted w-100 mt-1';
+                DOMUtils.append(
+                    conflictEl,
+                    DOMUtils.createIcon('bi bi-geo-alt icon-inline'),
+                    ` ${i18n.t('plan_my_night.telescope_location_in_use', { location: t.location_name || '?' })}`
+                );
+                nameSpan.appendChild(conflictEl);
+            }
+
             const rating = ratingsById[t.telescope_id];
             DOMUtils.append(btn, DOMUtils.createIcon('bi bi-telescope icon-inline flex-shrink-0'), nameSpan);
             if (rating) {
@@ -132,10 +148,16 @@ async function showPlanTelescopePickerModal(telescopeItems, row) {
                 ratingEl.textContent = '—';
                 btn.appendChild(ratingEl);
             }
-            btn.addEventListener('click', () => {
-                overlay.remove();
-                resolve({ telescope_id: t.telescope_id, telescope_name: t.telescope_name });
-            });
+            if (hasLocationConflict) {
+                btn.disabled = true;
+                btn.classList.add('disabled');
+                btn.title = i18n.t('plan_my_night.telescope_location_in_use', { location: t.location_name || '?' });
+            } else {
+                btn.addEventListener('click', () => {
+                    overlay.remove();
+                    resolve({ telescope_id: t.telescope_id, telescope_name: t.telescope_name });
+                });
+            }
             bodyContent.appendChild(btn);
         };
 
@@ -187,8 +209,27 @@ async function _resolvePlanTelescopeSelection(itemForRatings) {
     try {
         const listPayload = await fetchJSON('/api/plan-my-night/list');
         const telescopeItems = (listPayload?.plans || []).filter(p => p.telescope_id !== null);
-        if (telescopeItems.length >= 2) {
-            const picked = await showPlanTelescopePickerModal(telescopeItems, itemForRatings);
+
+        let activeLocationId = null;
+        if (typeof fetchMyLocations === 'function') {
+            try {
+                const myLocations = await fetchMyLocations();
+                activeLocationId = myLocations?.active_location_id || null;
+            } catch (_) { /* location check optional - picker just won't grey anything out */ }
+        }
+
+        // A single telescope normally auto-picks silently, but if its plan is already
+        // pinned to a different location than the one active now, show the picker instead
+        // so the (disabled, labelled) conflict is visible rather than silently mixing
+        // locations on that telescope's plan - see showPlanTelescopePickerModal.
+        const soleConflicts = telescopeItems.length === 1
+            && telescopeItems[0].state === 'current'
+            && telescopeItems[0].location_id
+            && activeLocationId
+            && telescopeItems[0].location_id !== activeLocationId;
+
+        if (telescopeItems.length >= 2 || soleConflicts) {
+            const picked = await showPlanTelescopePickerModal(telescopeItems, itemForRatings, activeLocationId);
             if (!picked) return null; // user cancelled
             telescopeId = picked.telescope_id;
             telescopeName = picked.telescope_name;
@@ -3920,7 +3961,7 @@ function _horizonAltAtAz(az, profile) {
  * @param {string} title    - Modal title (target name)
  * @param {string} targetId - SkyTonight target_id used to build the API URL
  */
-async function showAlttimePopup(title, targetId) {
+async function showAlttimePopup(title, targetId, locationId) {
     const modalElement = document.getElementById('modal_xl_close');
     if (!modalElement) {
         console.error('Alttime modal element not found');
@@ -3951,7 +3992,8 @@ async function showAlttimePopup(title, targetId) {
 
     let data;
     try {
-        data = await fetchJSON(`${API_BASE}/api/skytonight/alttime/${encodeURIComponent(targetId)}`);
+        const locationQuery = locationId ? `?location_id=${encodeURIComponent(locationId)}` : '';
+        data = await fetchJSON(`${API_BASE}/api/skytonight/alttime/${encodeURIComponent(targetId)}${locationQuery}`);
         if (data && data.error) throw new Error(data.error);
     } catch (err) {
         console.error('Failed to load alttime data:', err);
