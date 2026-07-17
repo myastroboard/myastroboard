@@ -225,10 +225,19 @@ bounded by `MAX_LOCATIONS = 5`.
 
 ## Astrodex & Plan My Night
 
-- **Astrodex items** get `location_id` (best-effort live link) and `location_name`
-  (frozen plain-text snapshot taken at creation). The UI trusts `location_name` for
-  display, so renaming or deleting a preset never breaks an item. Items are **never**
-  cascade-deleted with a preset.
+- **Astrodex pictures** (not items) carry the location - `location_id` (best-effort live
+  link, or `null` for a free-text "somewhere else" label the uploader typed instead of
+  picking a preset) and `location_name` (frozen snapshot, resolved from the preset or
+  typed by the uploader). Coordinates (`latitude`/`longitude`/`elevation`) are resolved
+  server-side from the preset and are **private to the picture's owner** - the
+  shared/merged Astrodex view strips them from every other user's pictures, keeping only
+  `location_name` visible. An item itself has no location field: the same object is
+  commonly re-photographed from different sites across sessions, so the UI derives an
+  "observed at" summary from the item's own pictures instead of storing one redundant,
+  potentially-stale value on the item. Unlike items, a picture's location is editable
+  after the fact (via the same add/edit picture form) - a photo is often uploaded well
+  after the session, and older pictures predate this field entirely. Astrodex is
+  **never** cascade-deleted with a preset.
 - **Plan My Night plans** are pinned at creation to the creator's current active
   location (`plan.location_id` + `plan.location_name`). The plan is never silently
   recomputed against different coordinates; the UI shows a warning banner when the
@@ -256,7 +265,8 @@ keys include the location id so two watched locations don't suppress each other.
 2. User pointers (`attributed_location_ids`, `default_location_id`,
    `active_location_id`, `order`) are cleaned **eagerly** at delete time; default/active
    pointers are reset to the install default.
-3. **Astrodex items are never touched** — they keep their `location_name` snapshot.
+3. **Astrodex is never touched** — pictures referencing the deleted preset keep their
+   frozen `location_name` snapshot (`location_id` just stops resolving live).
 4. **Plan My Night** plans pinned to the preset are cascade-deleted by default
    (`?plans=orphan` keeps them; the UI then shows the stale-location banner).
 5. The preset's cache slots and tracked signature are dropped

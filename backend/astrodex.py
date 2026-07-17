@@ -648,11 +648,13 @@ def create_astrodex_item(user_id: str, item_data: Dict, username: Optional[str] 
         logger.warning(f"Item {item_name} already exists in astrodex")
         return None
 
-    # Create new item
-    # location_id is best-effort (resolves live details while the preset still
-    # exists); location_name is a frozen plain-text snapshot taken at creation -
-    # it is the only field the UI trusts for display once the preset is renamed
-    # or deleted. Astrodex items are NEVER cascade-deleted with a preset (v1.2).
+    # Create new item.
+    # No location on the item itself (v1.2 originally stamped one here, but
+    # that implies a single object was only ever observed from one place -
+    # false in practice, since the same object gets re-photographed across
+    # sessions/sites over an item's lifetime). Location lives on each picture
+    # instead; the UI derives an "observed at" summary from the item's
+    # pictures rather than storing a redundant, potentially-stale item field.
     new_item = {
         'id': str(uuid.uuid4()),
         'name': item_name,
@@ -660,8 +662,6 @@ def create_astrodex_item(user_id: str, item_data: Dict, username: Optional[str] 
         'catalogue': item_data.get('catalogue', ''),
         'constellation': item_data.get('constellation', ''),
         'notes': item_data.get('notes', ''),
-        'location_id': item_data.get('location_id') or None,
-        'location_name': item_data.get('location_name') or None,
         'pictures': [],
         'created_at': datetime.now(timezone.utc).isoformat(),
         'updated_at': datetime.now(timezone.utc).isoformat(),
@@ -685,11 +685,12 @@ def get_astrodex_item(user_id: str, item_id: str) -> Optional[Dict]:
     return None
 
 
-def count_items_for_location(location_id: str) -> int:
-    """Count Astrodex items (all users) referencing a location preset.
+def count_pictures_for_location(location_id: str) -> int:
+    """Count Astrodex pictures (all users) referencing a location preset.
 
-    Read-only pre-delete check: deleting a preset never cascades to Astrodex -
-    items keep their frozen location_name snapshot (v1.2 deletion workflow).
+    Location lives on pictures, not items (v1.2) - an item itself is never
+    tied to one place. Read-only pre-delete check: deleting a preset never
+    cascades to Astrodex - pictures keep their frozen location_name snapshot.
     """
     if not location_id or not os.path.isdir(ASTRODEX_DIR):
         return 0
@@ -701,8 +702,11 @@ def count_items_for_location(location_id: str) -> int:
             with open(os.path.join(ASTRODEX_DIR, fname), 'r', encoding='utf-8') as file_obj:
                 data = json.load(file_obj)
             for item in data.get('items', []):
-                if isinstance(item, dict) and item.get('location_id') == location_id:
-                    count += 1
+                if not isinstance(item, dict):
+                    continue
+                for picture in item.get('pictures', []):
+                    if isinstance(picture, dict) and picture.get('location_id') == location_id:
+                        count += 1
         except Exception:
             continue  # unreadable file — skip, this is a best-effort count
     return count

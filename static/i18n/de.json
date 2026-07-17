@@ -833,7 +833,7 @@
     "location_default_changed": "Installationsstandard-Standort aktualisiert",
     "location_cannot_delete_default": "Der Installationsstandard-Standort kann nicht gelöscht werden. Befördern Sie zuerst einen anderen Standort.",
     "location_delete_confirm": "Standort „{name}“ löschen?",
-    "location_delete_refs": "Referenziert von: {users} Benutzer(n), {astrodex} Astrodex-Eintrag/-Einträgen, {plans} Plan-My-Night-Plan/-Plänen.",
+    "location_delete_refs": "Referenziert von: {users} Benutzer(n), {astrodex} Astrodex-Foto/-Fotos, {plans} Plan-My-Night-Plan/-Plänen.",
     "location_delete_modal_title": "Standort löschen",
     "location_delete_plans_hint": "Wählen Sie, was mit an diesen Standort angehefteten Plan-My-Night-Plänen geschehen soll:",
     "location_delete_orphan_btn": "Standort löschen, Pläne behalten",
@@ -957,7 +957,12 @@
     "notes": "Notizen",
     "location": "Standort",
     "observed_location": "Beobachtet bei {name}",
-    "no_location": "-- Kein Standort --"
+    "no_location": "-- Kein Standort --",
+    "other_location": "Anderswo…",
+    "custom_location_name": "Beschreibung",
+    "custom_location_placeholder": "z. B. Pic-du-Midi-Observatorium, Frankreich",
+    "custom_location_lat": "Breitengrad (optional)",
+    "custom_location_lng": "Längengrad (optional)"
   },
   "skytonight": {
     "info_1": "SkyTonight berechnet die besten Beobachtungsziele der Nacht basierend auf Standort, Wetter und internen Datensatzen.",

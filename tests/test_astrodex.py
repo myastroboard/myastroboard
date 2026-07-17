@@ -66,6 +66,11 @@ class TestAstrodexDataModel:
         assert 'size' not in item
         assert 'catalogue_aliases' not in item
         assert 'catalogue_group_id' not in item
+        # No location on the item itself (v1.2) - the same object can be
+        # re-photographed from different sites across sessions, so location
+        # lives only on individual pictures.
+        assert 'location_id' not in item
+        assert 'location_name' not in item
     
     def test_duplicate_item(self, temp_data_dir):
         """Test that duplicate items are rejected"""

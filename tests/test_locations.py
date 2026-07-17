@@ -765,7 +765,10 @@ class TestLocationTaggingHelpers:
         assert plan_my_night.delete_plans_for_location(loc_id) == 1
         assert plan_my_night.count_plans_for_location(loc_id) == 0
 
-    def test_astrodex_item_location_snapshot(self, temp_dir, monkeypatch):
+    def test_astrodex_picture_location_snapshot(self, temp_dir, monkeypatch):
+        """Location lives on pictures, not items (v1.2) - the same object can
+        be re-photographed from different sites across sessions, so an item
+        itself never carries a single frozen location."""
         import astrodex as astrodex_module
 
         monkeypatch.setattr(astrodex_module, 'ASTRODEX_DIR', temp_dir)
@@ -774,16 +777,21 @@ class TestLocationTaggingHelpers:
         loc_id = str(uuid.uuid4())
 
         item = astrodex_module.create_astrodex_item(
-            user_id,
-            {'name': 'NGC 7000', 'catalogue': 'OpenNGC', 'location_id': loc_id, 'location_name': 'Snap Site'},
-            'tagger',
+            user_id, {'name': 'NGC 7000', 'catalogue': 'OpenNGC'}, 'tagger',
         )
         assert item is not None
-        assert item['location_id'] == loc_id
-        assert item['location_name'] == 'Snap Site'
+        assert 'location_id' not in item
+        assert 'location_name' not in item
 
-        assert astrodex_module.count_items_for_location(loc_id) == 1
-        assert astrodex_module.count_items_for_location('other') == 0
+        picture = astrodex_module.add_picture_to_item(
+            user_id, item['id'], {'filename': 'ngc7000.jpg', 'location_id': loc_id, 'location_name': 'Snap Site'},
+        )
+        assert picture is not None
+        assert picture['location_id'] == loc_id
+        assert picture['location_name'] == 'Snap Site'
+
+        assert astrodex_module.count_pictures_for_location(loc_id) == 1
+        assert astrodex_module.count_pictures_for_location('other') == 0
 
 
 # ---------------------------------------------------------------------------

@@ -351,16 +351,23 @@ class TestHelperEdgeArcs:
         assert push_scheduler._with_location(user, 'Body', None, True) == 'Body'
 
     def test_astrodex_count_skips_non_astrodex_and_corrupt_files(self, tmp_path, monkeypatch):
+        """Location lives on pictures, not items (v1.2) - count_pictures_for_location
+        walks each item's pictures list, tolerating junk items/pictures."""
         import astrodex as astrodex_module
 
         monkeypatch.setattr(astrodex_module, 'ASTRODEX_DIR', str(tmp_path))
         (tmp_path / 'notes.txt').write_text('not astrodex', encoding='utf-8')
         (tmp_path / 'u1_astrodex.json').write_text('{corrupt', encoding='utf-8')
         (tmp_path / 'u2_astrodex.json').write_text(
-            json.dumps({'items': [{'location_id': 'L1'}, 'junk-item', {'location_id': 'other'}]}),
+            json.dumps({'items': [
+                {'pictures': [{'location_id': 'L1'}, 'junk-picture']},
+                'junk-item',
+                {'pictures': [{'location_id': 'other'}]},
+                {'pictures': [{'location_id': 'L1'}]},
+            ]}),
             encoding='utf-8',
         )
-        assert astrodex_module.count_items_for_location('L1') == 1
+        assert astrodex_module.count_pictures_for_location('L1') == 2
 
     def test_plan_helpers_skip_junk_and_handle_errors(self, tmp_path, monkeypatch):
         import plan_my_night

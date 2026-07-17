@@ -3405,6 +3405,65 @@ class TestAstrodexPictureLocation:
         finally:
             client_admin.delete(f"/api/locations/{location['id']}")
 
+    def test_add_picture_with_custom_location_name_only(self, client_admin):
+        """'Somewhere else' - a free-text label for a one-off trip that isn't
+        worth turning into an admin-managed preset. No coordinates required."""
+        item_id = self._create_item(client_admin)
+        picture = self._add_picture(client_admin, item_id, location_id=None, location_name='Chile trip 2026')
+        assert picture['location_id'] is None
+        assert picture['location_name'] == 'Chile trip 2026'
+        assert picture['latitude'] is None
+        assert picture['longitude'] is None
+
+    def test_add_picture_with_custom_location_and_coordinates(self, client_admin):
+        item_id = self._create_item(client_admin)
+        picture = self._add_picture(
+            client_admin, item_id,
+            location_id=None, location_name='Atacama Desert', latitude=-23.5, longitude=-70.4,
+        )
+        assert picture['location_name'] == 'Atacama Desert'
+        assert picture['latitude'] == -23.5
+        assert picture['longitude'] == -70.4
+
+    def test_add_picture_with_custom_location_invalid_coordinates_are_dropped(self, client_admin):
+        """A garbled or out-of-range manual coordinate is silently dropped
+        (not a 400) - same low-stakes trust level as notes/exposition_time,
+        the label itself is still kept."""
+        item_id = self._create_item(client_admin)
+        picture = self._add_picture(
+            client_admin, item_id,
+            location_id=None, location_name='Somewhere', latitude='not-a-number', longitude=999,
+        )
+        assert picture['location_name'] == 'Somewhere'
+        assert picture['latitude'] is None
+        assert picture['longitude'] is None
+
+    def test_add_picture_with_blank_custom_name_falls_back_to_active(self, client_admin):
+        """Neither a preset id nor a non-blank custom name were actually
+        provided - treated the same as not touching location at all, i.e.
+        the usual active-location default (not silently 'no location')."""
+        item_id = self._create_item(client_admin)
+        active_id = client_admin.get('/api/locations/mine').get_json()['active_location_id']
+        picture = self._add_picture(client_admin, item_id, location_id=None, location_name='   ')
+        assert picture['location_id'] == active_id
+
+    def test_update_picture_can_switch_from_preset_to_custom(self, client_admin):
+        item_id = self._create_item(client_admin)
+        location = self._create_location(client_admin, 'Preset Then Custom Site')
+        try:
+            picture = self._add_picture(client_admin, item_id, location_id=location['id'])
+            upd = client_admin.put(
+                f"/api/astrodex/items/{item_id}/pictures/{picture['id']}",
+                json={'location_id': None, 'location_name': 'Road trip'},
+            )
+            assert upd.status_code == 200
+            updated = upd.get_json()['picture']
+            assert updated['location_id'] is None
+            assert updated['location_name'] == 'Road trip'
+            assert updated['latitude'] is None
+        finally:
+            client_admin.delete(f"/api/locations/{location['id']}")
+
 
 # ---------------------------------------------------------------------------
 # Push test with actual subscriptions (via monkeypatching)

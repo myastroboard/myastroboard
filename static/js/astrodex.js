@@ -948,9 +948,16 @@ async function showAstrodexItemDetail(itemId) {
         ? i18n.t('astrodex.my_photos', { ownPicturesCount, totalPicturesCount })
         : i18n.t('astrodex.all_photos', { ownPicturesCount });
     
-    const locationBadge = item.location_name ? `
+    // No location on the item itself (v1.2) - the same object commonly gets
+    // re-photographed from different sites over its lifetime, so this is a
+    // live summary of the distinct locations across the item's own pictures
+    // rather than one frozen value.
+    const observedLocationNames = [...new Set(
+        (item.own_pictures || []).map(picture => picture.location_name).filter(Boolean)
+    )];
+    const locationBadge = observedLocationNames.length > 0 ? `
         <div class="alert alert-light border d-flex align-items-center gap-2 py-2 mb-3">
-            <i class="bi bi-pin-map icon-inline" aria-hidden="true"></i>${i18n.t('astrodex.observed_location', { name: escapeHtml(item.location_name) })}
+            <i class="bi bi-pin-map icon-inline" aria-hidden="true"></i>${i18n.t('astrodex.observed_location', { name: escapeHtml(observedLocationNames.join(', ')) })}
         </div>
     ` : '';
 
@@ -1100,10 +1107,20 @@ function renderPicturesGrid(item) {
 // Picture Management
 // ============================================
 
+// Sentinel <option> value for "somewhere else" - a free-text label + optional
+// manual coordinates, for one-off trips that aren't worth turning into an
+// admin-managed location preset (v1.2).
+const _CUSTOM_LOCATION_VALUE = '__other__';
+
+// The user's own attributed locations (with coordinates), cached by the most
+// recent _buildPictureLocationOptions() call so the minimap can look up a
+// selected preset's lat/lon without a second fetch.
+let _pictureLocationChoices = [];
+
 // Shared <option> list for the picture location picker (add + edit forms).
 // selectedId omitted -> pre-select the current active location (add-picture
-// default). selectedId passed explicitly (including '' or null) -> pre-select
-// exactly that, e.g. the picture's own stored location_id when editing.
+// default). selectedId passed explicitly (including '', null, or
+// _CUSTOM_LOCATION_VALUE) -> pre-select exactly that.
 async function _buildPictureLocationOptions(selectedId) {
     let locations = [];
     let activeId = null;
@@ -1116,6 +1133,7 @@ async function _buildPictureLocationOptions(selectedId) {
             locations = []; // picker degrades to "no location" only - not fatal
         }
     }
+    _pictureLocationChoices = locations;
     const effectiveSelected = (selectedId === undefined ? activeId : selectedId) || '';
     const noneSelected = !effectiveSelected ? ' selected' : '';
     const options = [`<option value=""${noneSelected}>${i18n.t('astrodex.no_location')}</option>`];
@@ -1123,7 +1141,171 @@ async function _buildPictureLocationOptions(selectedId) {
         const isSelected = loc.id === effectiveSelected ? ' selected' : '';
         options.push(`<option value="${escapeHtml(loc.id)}"${isSelected}>${escapeHtml(loc.name || '?')}</option>`);
     });
+    const otherSelected = effectiveSelected === _CUSTOM_LOCATION_VALUE ? ' selected' : '';
+    options.push(`<option value="${_CUSTOM_LOCATION_VALUE}"${otherSelected}>${i18n.t('astrodex.other_location')}</option>`);
     return options.join('');
+}
+
+// Location <select> alone (col-md-6, paired with the date field in the same
+// row). prefix distinguishes DOM ids ('picture' for add, 'edit-picture' for
+// edit). picture omitted -> add form (defaults to the active location);
+// picture passed -> edit form (pre-selects whatever the picture already has).
+async function _renderLocationSelectField(prefix, picture) {
+    const hasPreset = !!picture?.location_id;
+    const hasCustom = !!picture && !hasPreset && !!picture.location_name;
+    const selectedValue = picture === undefined
+        ? undefined
+        : (hasPreset ? picture.location_id : (hasCustom ? _CUSTOM_LOCATION_VALUE : ''));
+    const options = await _buildPictureLocationOptions(selectedValue);
+    return `
+        <div class="col-md-6">
+            <label for="${prefix}-location" class="form-label">${i18n.t('astrodex.location')}</label>
+            <select class="form-select" id="${prefix}-location" onchange="_onPictureLocationChanged('${prefix}')">
+                ${options}
+            </select>
+        </div>
+    `;
+}
+
+// "Somewhere else" free-text name + optional manual coordinates - its own
+// row, only visible while _CUSTOM_LOCATION_VALUE is selected.
+function _renderLocationCustomFields(prefix, picture) {
+    const hasPreset = !!picture?.location_id;
+    const hasCustom = !!picture && !hasPreset && !!picture.location_name;
+    const customName = hasCustom ? (picture.location_name || '') : '';
+    const customLat = hasCustom && picture.latitude != null ? picture.latitude : '';
+    const customLng = hasCustom && picture.longitude != null ? picture.longitude : '';
+    const display = hasCustom ? '' : 'none';
+
+    return `
+        <div class="col-md-6" id="${prefix}-location-custom-name-block" style="display:${display};">
+            <label for="${prefix}-location-custom-name" class="form-label">${i18n.t('astrodex.custom_location_name')}</label>
+            <input type="text" class="form-control" id="${prefix}-location-custom-name" placeholder="${i18n.t('astrodex.custom_location_placeholder')}" value="${escapeHtml(customName)}" oninput="_onPictureCoordinatesChanged('${prefix}')">
+        </div>
+        <div class="col-md-3" id="${prefix}-location-custom-lat-block" style="display:${display};">
+            <label for="${prefix}-location-custom-lat" class="form-label">${i18n.t('astrodex.custom_location_lat')}</label>
+            <input type="number" step="any" min="-90" max="90" class="form-control" id="${prefix}-location-custom-lat" placeholder="48.85" value="${escapeHtml(String(customLat))}" oninput="_onPictureCoordinatesChanged('${prefix}')">
+        </div>
+        <div class="col-md-3" id="${prefix}-location-custom-lng-block" style="display:${display};">
+            <label for="${prefix}-location-custom-lng" class="form-label">${i18n.t('astrodex.custom_location_lng')}</label>
+            <input type="number" step="any" min="-180" max="180" class="form-control" id="${prefix}-location-custom-lng" placeholder="2.35" value="${escapeHtml(String(customLng))}" oninput="_onPictureCoordinatesChanged('${prefix}')">
+        </div>
+    `;
+}
+
+// Minimap row - its own row, only visible while an effective coordinate is
+// resolvable (a preset with coordinates, or valid manual lat/lon).
+function _renderLocationMapField(prefix) {
+    return `
+        <div class="col-12" id="${prefix}-location-map-block" style="display:none;">
+            <div id="${prefix}-location-map" class="rounded" style="height:200px;"></div>
+        </div>
+    `;
+}
+
+function _toggleCustomLocationFields(prefix) {
+    const select = document.getElementById(`${prefix}-location`);
+    const isOther = select?.value === _CUSTOM_LOCATION_VALUE;
+    ['name', 'lat', 'lng'].forEach(part => {
+        const block = document.getElementById(`${prefix}-location-custom-${part}-block`);
+        if (block) block.style.display = isOther ? '' : 'none';
+    });
+}
+
+function _onPictureLocationChanged(prefix) {
+    _toggleCustomLocationFields(prefix);
+    _updatePictureLocationMap(prefix);
+}
+
+let _pictureCoordinatesDebounce = null;
+function _onPictureCoordinatesChanged(prefix) {
+    clearTimeout(_pictureCoordinatesDebounce);
+    _pictureCoordinatesDebounce = setTimeout(() => _updatePictureLocationMap(prefix), 400);
+}
+
+// Resolves what the location picker currently implies as a coordinate, or
+// null if nothing renderable is selected/typed yet.
+function _effectivePictureCoordinates(prefix) {
+    const value = document.getElementById(`${prefix}-location`)?.value || '';
+    if (!value) return null; // "no location"
+    if (value === _CUSTOM_LOCATION_VALUE) {
+        const lat = parseFloat(document.getElementById(`${prefix}-location-custom-lat`)?.value);
+        const lng = parseFloat(document.getElementById(`${prefix}-location-custom-lng`)?.value);
+        return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+    }
+    const loc = _pictureLocationChoices.find(l => l.id === value);
+    const lat = Number(loc?.latitude);
+    const lng = Number(loc?.longitude);
+    return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+}
+
+let _pictureLocationMap = null;
+
+// Shows/hides/re-renders the picture-location minimap for whatever the
+// picker currently implies. Only one picture modal is ever open at a time,
+// so a single shared map instance (torn down and rebuilt on change) is
+// simpler than trying to update an existing one in place.
+async function _updatePictureLocationMap(prefix) {
+    const block = document.getElementById(`${prefix}-location-map-block`);
+    const container = document.getElementById(`${prefix}-location-map`);
+    if (!block || !container) return;
+
+    const coords = _effectivePictureCoordinates(prefix);
+    if (!coords) {
+        block.style.display = 'none';
+        if (_pictureLocationMap) {
+            try { _pictureLocationMap.remove(); } catch (_) { /* already gone */ }
+            _pictureLocationMap = null;
+        }
+        return;
+    }
+
+    block.style.display = '';
+    if (typeof _ensureLocationsLeafletLoaded === 'function') {
+        try {
+            await _ensureLocationsLeafletLoaded();
+        } catch (error) {
+            console.warn('Leaflet failed to load; picture location map unavailable', error);
+            block.style.display = 'none';
+            return;
+        }
+    }
+    if (!document.body.contains(container)) return; // modal closed while Leaflet was loading
+    if (typeof L === 'undefined') return; // vendor script unavailable - map stays hidden
+
+    if (_pictureLocationMap) {
+        try { _pictureLocationMap.remove(); } catch (_) { /* already gone */ }
+        _pictureLocationMap = null;
+    }
+    _pictureLocationMap = L.map(container, { scrollWheelZoom: false, zoomControl: false })
+        .setView([coords.lat, coords.lng], 9);
+    // Voyager, not a dark basemap - stays legible for remote sites with
+    // little infrastructure (mirrors the admin location cards' minimap).
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        maxZoom: 18,
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>',
+    }).addTo(_pictureLocationMap);
+    L.marker([coords.lat, coords.lng]).addTo(_pictureLocationMap);
+}
+
+// Reads the location picker's current state into the fields the backend
+// expects. For a preset, only location_id matters (coordinates are resolved
+// server-side). For "somewhere else", sends the typed name + optional
+// coordinates as-is - the server treats them as a free-text label, same
+// trust level as notes/exposition_time.
+function _collectPictureLocationFields(prefix) {
+    const value = document.getElementById(`${prefix}-location`)?.value || '';
+    if (value === _CUSTOM_LOCATION_VALUE) {
+        const lat = document.getElementById(`${prefix}-location-custom-lat`)?.value;
+        const lng = document.getElementById(`${prefix}-location-custom-lng`)?.value;
+        return {
+            location_id: null,
+            location_name: document.getElementById(`${prefix}-location-custom-name`)?.value.trim() || '',
+            latitude: lat === '' || lat === undefined ? null : lat,
+            longitude: lng === '' || lng === undefined ? null : lng,
+        };
+    }
+    return { location_id: value || null, location_name: null };
 }
 
 async function showAddPictureModal(itemId) {
@@ -1158,10 +1340,12 @@ async function showAddPictureModal(itemId) {
     // uploader can change/clear it, since a photo is often uploaded well
     // after the session (stacking/processing takes time) and may not have
     // been taken wherever the browser's active location currently is.
-    const locationOptions = await _buildPictureLocationOptions();
+    const locationSelectField = await _renderLocationSelectField('picture');
+    const locationCustomFields = _renderLocationCustomFields('picture');
+    const locationMapField = _renderLocationMapField('picture');
 
     createModal(`${i18n.t('astrodex.add_picture')}`, `
-        <form id="add-picture-form" class="form row g-3">
+        <form id="add-picture-form" class="form row g-3 align-items-end">
             <div class="col-md-12">
                 <label for="picture-file" class="form-label">${i18n.t('astrodex.image_file')} *</label>
                 <input type="file" class="form-control" id="picture-file" accept="image/*" required>
@@ -1170,16 +1354,25 @@ async function showAddPictureModal(itemId) {
                 <label for="picture-date" class="form-label">${i18n.t('astrodex.observation_date')}</label>
                 <input type="date" class="form-control" id="picture-date" value="${escapeHtml(today)}">
             </div>
+            ${locationSelectField}
+            ${locationCustomFields}
+            ${locationMapField}
             <div class="col-md-6">
                 <label for="picture-exposition" class="form-label">${i18n.t('astrodex.exposition_time')}</label>
                 <input type="text" class="form-control" id="picture-exposition" placeholder="${i18n.t('astrodex.exposition_time_placeholder')}">
             </div>
             <div class="col-md-6">
-                <label for="picture-location" class="form-label">${i18n.t('astrodex.location')}</label>
-                <select class="form-select" id="picture-location">
-                    ${locationOptions}
-                </select>
+                <label for="picture-frames" class="form-label">${i18n.t('astrodex.number_of_frames')}</label>
+                <input type="text" class="form-control" id="picture-frames">
             </div>
+            <div class="col-md-6">
+                <label for="picture-iso" class="form-label">${i18n.t('astrodex.iso')}</label>
+                <input type="text" class="form-control" id="picture-iso" list="iso-list" autocomplete="off">
+                <datalist id="iso-list">
+                    ${isoOptions}
+                </datalist>
+            </div>
+            <div class="col-md-6"></div>
             <div class="col-md-6">
                 <label for="picture-device" class="form-label">${i18n.t('astrodex.equipment_combinations')}</label>
                 <select class="form-select" id="picture-device-select" onchange="updateDeviceField()">
@@ -1208,17 +1401,6 @@ async function showAddPictureModal(itemId) {
                     ${filterOptions}
                 </datalist>
             </div>
-            <div class="col-md-6">
-                <label for="picture-iso" class="form-label">${i18n.t('astrodex.iso')}</label>
-                <input type="text" class="form-control" id="picture-iso" list="iso-list" autocomplete="off">
-                <datalist id="iso-list">
-                    ${isoOptions}
-                </datalist>
-            </div>
-            <div class="col-md-6">
-                <label for="picture-frames" class="form-label">${i18n.t('astrodex.number_of_frames')}</label>
-                <input type="text" class="form-control" id="picture-frames">
-            </div>
             <div class="col-md-12">
                 <label for="picture-notes" class="form-label">${i18n.t('astrodex.form_notes')}</label>
                 <textarea id="picture-notes" class="form-control" rows="3"></textarea>
@@ -1236,11 +1418,18 @@ async function showAddPictureModal(itemId) {
         keyboard: true
     });
     bs_modal.show();
-    
+
+    // Leaflet must measure a fully laid-out, visible container - initializing
+    // while the modal is still mid fade-in transition gives it the wrong
+    // size and only the top-left tile renders. Wait for shown.bs.modal.
+    document.getElementById('modal_lg_close').addEventListener(
+        'shown.bs.modal', () => _updatePictureLocationMap('picture'), { once: true }
+    );
+
     document.getElementById('add-picture-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         await uploadPicture(itemId);
-    });    
+    });
 
     // Event listener when modal is closed
     document.getElementById('modal_lg_close').addEventListener('hidden.bs.modal', () => {
@@ -1304,7 +1493,7 @@ async function uploadPicture(itemId) {
             iso: document.getElementById('picture-iso').value,
             frames: document.getElementById('picture-frames').value,
             notes: document.getElementById('picture-notes').value,
-            location_id: document.getElementById('picture-location')?.value || null
+            ..._collectPictureLocationFields('picture')
         };
         
         const response = await fetchJSON(`/api/astrodex/items/${itemId}/pictures`, {
@@ -1453,27 +1642,35 @@ async function showEditPictureModal(itemId, pictureId) {
     const picture = item.pictures.find(p => p.id === pictureId);
     if (!picture) return;
 
-    // Pre-select whatever location this picture already has (or "no location"
-    // for old pictures that predate this field / were never tagged) - never
-    // silently overridden by the current active location.
-    const locationOptions = await _buildPictureLocationOptions(picture.location_id || '');
+    // Pre-select whatever location this picture already has (preset, custom
+    // free-text label, or "no location" for old pictures that predate this
+    // field entirely) - never silently overridden by the active location.
+    const locationSelectField = await _renderLocationSelectField('edit-picture', picture);
+    const locationCustomFields = _renderLocationCustomFields('edit-picture', picture);
+    const locationMapField = _renderLocationMapField('edit-picture');
 
     createModal(i18n.t('astrodex.edit_photo'), `
-        <form id="edit-picture-form" class="form row g-3">
+        <form id="edit-picture-form" class="form row g-3 align-items-end">
             <div class="col-md-6">
                 <label for="edit-picture-date" class="form-label">${i18n.t('astrodex.observation_date')}</label>
                 <input type="date" class="form-control" id="edit-picture-date" value="${escapeHtml(picture.date || '')}">
             </div>
+            ${locationSelectField}
+            ${locationCustomFields}
+            ${locationMapField}
             <div class="col-md-6">
                 <label for="edit-picture-exposition" class="form-label">${i18n.t('astrodex.exposition_time')}</label>
                 <input type="text" class="form-control" id="edit-picture-exposition" placeholder="e.g., 120x30s" value="${escapeHtml(picture.exposition_time || '')}">
             </div>
             <div class="col-md-6">
-                <label for="edit-picture-location" class="form-label">${i18n.t('astrodex.location')}</label>
-                <select class="form-select" id="edit-picture-location">
-                    ${locationOptions}
-                </select>
+                <label for="edit-picture-frames" class="form-label">${i18n.t('astrodex.number_of_frames')}</label>
+                <input type="text" class="form-control" id="edit-picture-frames" value="${escapeHtml(picture.frames || '')}">
             </div>
+            <div class="col-md-6">
+                <label for="edit-picture-iso" class="form-label">${i18n.t('astrodex.iso')}</label>
+                <input type="text" class="form-control" id="edit-picture-iso" list="iso-list" autocomplete="off" value="${escapeHtml(picture.iso || '')}">
+            </div>
+            <div class="col-md-6"></div>
             <div class="col-md-6">
                 <label for="edit-picture-device" class="form-label">${i18n.t('astrodex.equipment_combinations')}</label>
                 <select class="form-select" id="edit-picture-device-select" onchange="updateEditDeviceField()">
@@ -1496,14 +1693,6 @@ async function showEditPictureModal(itemId, pictureId) {
                 <label for="edit-picture-filters" class="form-label">${i18n.t('astrodex.custom_filters')}</label>
                 <input type="text" class="form-control" id="edit-picture-filters" placeholder="${i18n.t('astrodex.custom_filters_placeholder')}" list="filters-list" autocomplete="off" value="${escapeHtml(picture.filters || '')}">
             </div>
-            <div class="col-md-6">
-                <label for="edit-picture-iso" class="form-label">${i18n.t('astrodex.iso')}</label>
-                <input type="text" class="form-control" id="edit-picture-iso" list="iso-list" autocomplete="off" value="${escapeHtml(picture.iso || '')}">
-            </div>
-            <div class="col-md-6">
-                <label for="edit-picture-frames" class="form-label">${i18n.t('astrodex.number_of_frames')}</label>
-                <input type="text" class="form-control" id="edit-picture-frames" value="${escapeHtml(picture.frames || '')}">
-            </div>
             <div class="col-md-12">
                 <label for="edit-picture-notes" class="form-label">${i18n.t('astrodex.form_notes')}</label>
                 <textarea id="edit-picture-notes" class="form-control" rows="3">${escapeHtml(picture.notes || '')}</textarea>
@@ -1513,7 +1702,7 @@ async function showEditPictureModal(itemId, pictureId) {
             </div>
         </form>
     `, 'lg');
-    
+
     // Open the modal
     const bs_modal = new bootstrap.Modal('#modal_lg_close', {
         backdrop: 'static',
@@ -1521,6 +1710,13 @@ async function showEditPictureModal(itemId, pictureId) {
         keyboard: true
     });
     bs_modal.show();
+
+    // See showAddPictureModal - wait for the modal to finish its show
+    // transition before Leaflet measures the container, or the map only
+    // renders its top-left tile.
+    document.getElementById('modal_lg_close').addEventListener(
+        'shown.bs.modal', () => _updatePictureLocationMap('edit-picture'), { once: true }
+    );
 
     document.getElementById('edit-picture-form').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -1553,7 +1749,7 @@ async function updatePicture(itemId, pictureId) {
             iso: document.getElementById('edit-picture-iso').value,
             frames: document.getElementById('edit-picture-frames').value,
             notes: document.getElementById('edit-picture-notes').value,
-            location_id: document.getElementById('edit-picture-location')?.value || null
+            ..._collectPictureLocationFields('edit-picture')
         };
         
         await fetchJSON(`/api/astrodex/items/${itemId}/pictures/${pictureId}`, {
