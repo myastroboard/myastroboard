@@ -312,7 +312,7 @@ async function deleteLocationWithConfirm(loc) {
         confirmText.textContent = i18n.t('settings.location_delete_confirm', { name: loc.name });
         refsText.textContent = i18n.t('settings.location_delete_refs', {
             users: (refs.attributed_users || []).length,
-            astrodex: refs.astrodex_items || 0,
+            astrodex: refs.astrodex_pictures || 0,
             plans: plansCount,
         });
 

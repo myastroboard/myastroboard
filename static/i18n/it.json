@@ -833,7 +833,7 @@
     "location_default_changed": "Località predefinita dell'installazione aggiornata",
     "location_cannot_delete_default": "La località predefinita dell'installazione non può essere eliminata. Promuovi prima un'altra località.",
     "location_delete_confirm": "Eliminare la località \"{name}\"?",
-    "location_delete_refs": "Riferimenti: {users} utente/i, {astrodex} elemento/i Astrodex, {plans} piano/i Plan My Night.",
+    "location_delete_refs": "Riferimenti: {users} utente/i, {astrodex} foto Astrodex, {plans} piano/i Plan My Night.",
     "location_delete_modal_title": "Elimina località",
     "location_delete_plans_hint": "Scegli cosa fare dei piani Plan My Night ancorati a questa località:",
     "location_delete_orphan_btn": "Elimina località, mantieni i piani",
@@ -957,7 +957,12 @@
     "notes": "Note",
     "location": "Località",
     "observed_location": "Osservato a {name}",
-    "no_location": "-- Nessuna località --"
+    "no_location": "-- Nessuna località --",
+    "other_location": "Altrove…",
+    "custom_location_name": "Descrizione",
+    "custom_location_placeholder": "es. Osservatorio del Pic du Midi, Francia",
+    "custom_location_lat": "Latitudine (opzionale)",
+    "custom_location_lng": "Longitudine (opzionale)"
   },
   "skytonight": {
     "info_1": "SkyTonight calcola i migliori obiettivi di osservazione per la notte in base alla tua posizione, alle previsioni del tempo e ai set di dati interni.",

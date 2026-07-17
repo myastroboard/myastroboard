@@ -2526,6 +2526,7 @@ async function _beginnerCatalogAddToPlan(obj, buttonEl) {
                     ra: obj.ra_hours,
                     dec: obj.dec_degrees,
                     difficulty: obj.difficulty,
+                    alttime_file: obj.alttime_file || '',
                 },
                 catalogue: obj.catalogue_id,
                 telescope_id: telescopeSelection.telescope_id,

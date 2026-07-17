@@ -1235,14 +1235,14 @@ def location_references_api(location_id):
             return jsonify({'error': 'Location not found', 'error_key': 'locations.not_found'}), 404
 
         attributed_users = _location_admin_view(config, preset)['attributed_to']
-        astrodex_count = astrodex.count_items_for_location(location_id)
+        astrodex_count = astrodex.count_pictures_for_location(location_id)
         plan_count = plan_my_night.count_plans_for_location(location_id)
         return jsonify(
             {
                 'location_id': location_id,
                 'is_install_default': bool(preset.get('is_install_default')),
                 'attributed_users': attributed_users,
-                'astrodex_items': astrodex_count,
+                'astrodex_pictures': astrodex_count,
                 'plan_my_night_plans': plan_count,
             }
         )
@@ -1364,6 +1364,8 @@ def my_locations_api():
                     {
                         'id': loc['id'],
                         'name': loc.get('name'),
+                        'latitude': loc.get('latitude'),
+                        'longitude': loc.get('longitude'),
                         'bortle': loc.get('bortle'),
                         'sqm': loc.get('sqm'),
                         'timezone': loc.get('timezone'),
@@ -2315,32 +2317,63 @@ _EMPTY_PICTURE_LOCATION = {
 }
 
 
-def _resolve_picture_location_snapshot(location_id, user):
-    """Resolve a user-supplied location_id into a frozen Astrodex picture
-    snapshot (name + coordinates, v1.2).
+def _safe_picture_coordinate(value, min_value, max_value):
+    """Best-effort float parse for a manually-typed coordinate. Returns None
+    for anything empty, unparseable, or out of range - a bad value is simply
+    dropped (same low-stakes trust level as notes/exposition_time), not a 400."""
+    if value is None or value == '':
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not (min_value <= parsed <= max_value):
+        return None
+    return parsed
 
-    Coordinates are looked up server-side - never trusted from the client -
-    and restricted to locations the user can actually access, so a picture
-    can't be tagged with coordinates the uploader has no attribution to. An
-    empty/unknown/inaccessible id resolves to "no location" rather than an
-    error, since clearing a picture's location is a valid choice.
+
+def _resolve_picture_location_snapshot(location_id, user, custom_name=None, custom_latitude=None, custom_longitude=None):
+    """Resolve a picture's location into a frozen Astrodex snapshot (v1.2):
+    either a preset (looked up + access-checked server-side) or a free-text
+    "somewhere else" label the uploader typed themselves - a one-off trip
+    isn't worth turning into an admin-managed preset.
+
+    Preset coordinates are looked up server-side - never trusted from the
+    client - and restricted to locations the user can actually access, so a
+    picture can't be tagged with coordinates the uploader has no attribution
+    to. A custom label's coordinates are optional and exactly what the
+    uploader typed (same trust level as notes/exposition_time - it's a label
+    on their own picture, not an access-control boundary). Everything empty
+    resolves to "no location" rather than an error, since clearing a
+    picture's location is a valid choice.
     """
-    if not location_id:
-        return dict(_EMPTY_PICTURE_LOCATION)
-    config = load_config()
-    accessible_ids = {loc['id'] for loc in get_locations_for_user(config, user)}
-    if location_id not in accessible_ids:
-        return dict(_EMPTY_PICTURE_LOCATION)
-    location = get_location_by_id(config, location_id)
-    if not location:
-        return dict(_EMPTY_PICTURE_LOCATION)
-    return {
-        'location_id': location['id'],
-        'location_name': location.get('name'),
-        'latitude': location.get('latitude'),
-        'longitude': location.get('longitude'),
-        'elevation': location.get('elevation'),
-    }
+    if location_id:
+        config = load_config()
+        accessible_ids = {loc['id'] for loc in get_locations_for_user(config, user)}
+        if location_id in accessible_ids:
+            location = get_location_by_id(config, location_id)
+            if location:
+                return {
+                    'location_id': location['id'],
+                    'location_name': location.get('name'),
+                    'latitude': location.get('latitude'),
+                    'longitude': location.get('longitude'),
+                    'elevation': location.get('elevation'),
+                }
+        # location_id supplied but doesn't resolve to a real/accessible preset -
+        # fall through; a custom label (if any) can still stand on its own.
+
+    custom_name = (custom_name or '').strip()
+    if custom_name:
+        return {
+            'location_id': None,
+            'location_name': custom_name,
+            'latitude': _safe_picture_coordinate(custom_latitude, -90, 90),
+            'longitude': _safe_picture_coordinate(custom_longitude, -180, 180),
+            'elevation': None,
+        }
+
+    return dict(_EMPTY_PICTURE_LOCATION)
 
 
 def _active_location_cache(name):
@@ -4183,15 +4216,12 @@ def add_plan_target_to_astrodex(entry_id):
         if astrodex.is_item_in_astrodex(user.user_id, item_name, catalogue):
             return jsonify({'status': 'success', 'reason': 'already_in_astrodex'})
 
-        active_location = _resolve_active_location()
         item_data = {
             'name': item_name,
             'type': entry.get('type', 'Unknown'),
             'catalogue': catalogue,
             'constellation': entry.get('constellation', ''),
             'notes': entry.get('notes', ''),
-            'location_id': active_location.get('id'),
-            'location_name': active_location.get('name'),
         }
 
         created_item = astrodex.create_astrodex_item(user.user_id, item_data, user.username)
@@ -4453,11 +4483,6 @@ def add_astrodex_item():
                 409,
             )
 
-        # Stamp the creator's active location (frozen name snapshot, v1.2)
-        active_location = _resolve_active_location()
-        item_data['location_id'] = active_location.get('id')
-        item_data['location_name'] = active_location.get('name')
-
         new_item = astrodex.create_astrodex_item(user_id, item_data, user.username)
 
         if new_item:
@@ -4574,14 +4599,21 @@ def add_picture_to_astrodex_item(item_id):
         picture_data = request.json
 
         # Location is resolved server-side (v1.2) - never trust client-supplied
-        # coordinates. Uses the uploader's explicit choice if they picked one,
-        # else falls back to their current active location. Independent of the
+        # preset coordinates. Uses the uploader's explicit choice (a preset id
+        # or a free-text "somewhere else" label) if they picked one, else
+        # falls back to their current active location. Independent of the
         # item's own location, since a single item can be re-imaged from
         # different sites across multiple sessions.
         requested_location_id = picture_data.get('location_id')
-        if not requested_location_id:
+        custom_name = picture_data.get('location_name')
+        if not requested_location_id and not (custom_name or '').strip():
             requested_location_id = _resolve_active_location().get('id')
-        picture_data.update(_resolve_picture_location_snapshot(requested_location_id, user))
+        picture_data.update(_resolve_picture_location_snapshot(
+            requested_location_id, user,
+            custom_name=custom_name,
+            custom_latitude=picture_data.get('latitude'),
+            custom_longitude=picture_data.get('longitude'),
+        ))
 
         new_picture = astrodex.add_picture_to_item(user_id, item_id, picture_data)
 
@@ -4607,12 +4639,18 @@ def update_picture_api(item_id, picture_id):
         updates = request.json
 
         # Location is resolved server-side (v1.2) and only touched if this
-        # edit explicitly included location_id - editing unrelated fields
-        # (notes, filters, ...) must never disturb an existing location. An
-        # empty/null location_id here means "clear the location", which
-        # _resolve_picture_location_snapshot turns into the all-None snapshot.
-        if 'location_id' in updates:
-            updates.update(_resolve_picture_location_snapshot(updates.get('location_id'), user))
+        # edit explicitly included location_id and/or location_name - editing
+        # unrelated fields (notes, filters, ...) must never disturb an
+        # existing location. Both empty/absent means "clear the location",
+        # which _resolve_picture_location_snapshot turns into the all-None
+        # snapshot.
+        if 'location_id' in updates or 'location_name' in updates:
+            updates.update(_resolve_picture_location_snapshot(
+                updates.get('location_id'), user,
+                custom_name=updates.get('location_name'),
+                custom_latitude=updates.get('latitude'),
+                custom_longitude=updates.get('longitude'),
+            ))
 
         updated_picture = astrodex.update_picture(user_id, item_id, picture_id, updates)
 

@@ -149,6 +149,7 @@ def enrich_with_skytonight(
         dso_match = dso_lookup.get(catalogue_key)
         new_entry['visible_tonight'] = dso_match is not None
         new_entry['astro_score'] = dso_match.get('astro_score') if dso_match else None
+        new_entry['alttime_file'] = dso_match.get('alttime_file') if dso_match else None
 
         # Every catalog entry has its own fixed coordinates, so the thumbnail can be
         # resolved directly rather than making the client re-resolve the object via a

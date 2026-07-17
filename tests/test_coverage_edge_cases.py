@@ -47,11 +47,11 @@ def test_get_combinations_merges_share_status(client_admin, monkeypatch):
     assert data["data"][0]["is_shared"] is True
 
 
-def test_astrodex_count_items_returns_zero_when_dir_missing(monkeypatch):
+def test_astrodex_count_pictures_returns_zero_when_dir_missing(monkeypatch):
     import astrodex
 
     monkeypatch.setattr(astrodex, "ASTRODEX_DIR", os.path.join(tempfile.gettempdir(), "missing-astrodex-dir"))
-    assert astrodex.count_items_for_location("loc-1") == 0
+    assert astrodex.count_pictures_for_location("loc-1") == 0
 
 
 def test_plan_safe_path_handles_commonpath_valueerror(monkeypatch):
