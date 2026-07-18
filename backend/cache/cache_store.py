@@ -509,7 +509,8 @@ def _default_status_location_ids():
         if ids:
             return ids
     except Exception:
-        pass
+        # Status checks must degrade gracefully when config can't be loaded.
+        return []
     return []
 
 

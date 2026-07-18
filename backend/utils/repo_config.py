@@ -19,6 +19,9 @@ from datetime import datetime, timezone
 from utils.constants import CONFIG_FILE, MAX_LOCATIONS  # noqa: F401  (MAX_LOCATIONS re-exported for API/UI use)
 from utils.config_defaults import DEFAULT_CONFIG, DEFAULT_LOCATION, LOCATION_PRESET_EXTRA_FIELDS
 from utils import load_json_file, save_json_file, safe_file_exists
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 def _merge_defaults(config, defaults):
@@ -167,8 +170,9 @@ def _attribute_new_location_to_all_users(location_id):
         from utils.auth import user_manager
 
         user_manager.set_location_attribution(location_id, list(user_manager.users.keys()))
-    except Exception:
-        pass
+    except Exception as exc:
+        # Best-effort: tolerate failure (see docstring) but don't hide it silently.
+        logger.warning(f"Could not attribute location {location_id!r} to existing users: {exc}")
 
 
 def load_config():

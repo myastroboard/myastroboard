@@ -32,6 +32,23 @@ logger = get_logger(__name__)
 tracking_bp = Blueprint('tracking', __name__)
 
 
+def _safe_cache_path(base_dir: str, filename: str) -> str:
+    """Resolve *filename* under *base_dir* and verify it doesn't escape it.
+
+    CodeQL (CWE-022) requires this check to be re-applied at each file
+    operation's call site; reusing a path resolved earlier in the function is
+    not recognised as a sanitizer barrier. Raises ValueError if unsafe.
+    """
+    resolved = os.path.realpath(os.path.join(base_dir, filename))
+    try:
+        inside_base_dir = os.path.commonpath([base_dir, resolved]) == base_dir
+    except ValueError:
+        inside_base_dir = False
+    if not inside_base_dir:
+        raise ValueError(f'Path outside {base_dir!r}: {filename!r}')
+    return resolved
+
+
 @tracking_bp.route('/api/object/<path:identifier>', methods=['GET'])
 @login_required
 def get_object_info_api(identifier):
@@ -318,35 +335,33 @@ def spaceflight_image(filename):
     if not re.match(r'^[a-f0-9]{32}\.(jpg|jpeg|png|webp|gif)$', filename):
         return jsonify({"error": "Invalid filename"}), 400
     img_dir = os.path.realpath(os.path.join(DATA_DIR_CACHE, 'spaceflight_images'))
-    local_path = os.path.realpath(os.path.join(img_dir, filename))
-    # Prevent path traversal: resolved path must be inside img_dir
+    sidecar_name = filename + '.url'
     try:
-        if (
-            os.path.commonpath([img_dir, local_path]) != img_dir
-        ):  # pragma: no cover  # regex above prevents path traversal
-            return jsonify({"error": "Invalid filename"}), 400
-    except ValueError:  # pragma: no cover
-        return jsonify({"error": "Invalid filename"}), 400
-    if not os.path.exists(local_path):
-        sidecar = local_path + '.url'
-        if os.path.exists(sidecar):
-            try:
-                with open(sidecar, 'r', encoding='utf-8') as sf:
-                    original_url = sf.read().strip()
-                import requests as _req
+        # Prevent path traversal: resolved path must stay inside img_dir.
+        # The regex above already guarantees this; each call is re-validated
+        # here (rather than reusing a path resolved once) as CodeQL requires
+        # the sanitizer at the call site of every file operation.
+        if not os.path.exists(_safe_cache_path(img_dir, filename)):
+            if os.path.exists(_safe_cache_path(img_dir, sidecar_name)):
+                try:
+                    with open(_safe_cache_path(img_dir, sidecar_name), 'r', encoding='utf-8') as sf:
+                        original_url = sf.read().strip()
+                    import requests as _req
 
-                resp = _req.get(original_url, timeout=15, stream=True)
-                resp.raise_for_status()
-                os.makedirs(img_dir, exist_ok=True)
-                with open(local_path, 'wb') as fh:
-                    for chunk in resp.iter_content(chunk_size=8192):
-                        fh.write(chunk)
-                logger.info("Re-downloaded missing spaceflight image: %s", filename)
-            except Exception as exc:
-                logger.warning("Could not re-download spaceflight image %s: %s", filename, exc)
-                return jsonify({"error": "Image unavailable"}), 404
-        else:
-            return jsonify({"error": "Image not found"}), 404
+                    resp = _req.get(original_url, timeout=15, stream=True)
+                    resp.raise_for_status()
+                    os.makedirs(img_dir, exist_ok=True)
+                    with open(_safe_cache_path(img_dir, filename), 'wb') as fh:
+                        for chunk in resp.iter_content(chunk_size=8192):
+                            fh.write(chunk)
+                    logger.info("Re-downloaded missing spaceflight image: %s", filename)
+                except Exception as exc:
+                    logger.warning("Could not re-download spaceflight image %s: %s", filename, exc)
+                    return jsonify({"error": "Image unavailable"}), 404
+            else:
+                return jsonify({"error": "Image not found"}), 404
+    except ValueError:  # pragma: no cover  # regex above prevents path traversal
+        return jsonify({"error": "Invalid filename"}), 400
     return send_from_directory(img_dir, filename, max_age=86400)
 
 

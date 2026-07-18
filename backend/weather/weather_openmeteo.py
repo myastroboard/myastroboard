@@ -154,8 +154,6 @@ def parse_hourly(response, hourly_vars, timezone_str: Optional[str] = "UTC"):
         data[name] = pd.to_numeric(values, errors="coerce")
 
     df = pd.DataFrame(data)
-
-    df = pd.DataFrame(data)
     df = _normalize_hourly_dataframe(df)
 
     return _enrich_hourly_dataframe(df, timezone_str=timezone_str)

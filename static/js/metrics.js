@@ -324,7 +324,7 @@ async function updateCacheJobsMetrics() {
                 toggle.className = 'btn btn-sm btn-link p-0 me-1 text-decoration-none';
                 toggle.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
                 toggle.setAttribute('aria-label', i18n.t('metrics.cache_job_toggle_locations') || 'Toggle per-location detail');
-                toggle.innerHTML = `<i class="bi ${isExpanded ? 'bi-chevron-down' : 'bi-chevron-right'}" aria-hidden="true"></i>`;
+                toggle.appendChild(DOMUtils.createIcon(`bi ${isExpanded ? 'bi-chevron-down' : 'bi-chevron-right'}`));
                 toggle.addEventListener('click', () => {
                     if (_expandedCacheJobRows.has(jobKey)) {
                         _expandedCacheJobRows.delete(jobKey);
@@ -396,7 +396,8 @@ async function updateCacheJobsMetrics() {
 
                     const tdLocName = document.createElement('td');
                     tdLocName.className = 'ps-4 small';
-                    tdLocName.innerHTML = '<i class="bi bi-geo-alt icon-inline" aria-hidden="true"></i> ';
+                    tdLocName.appendChild(DOMUtils.createIcon('bi bi-geo-alt', 'icon-inline'));
+                    tdLocName.appendChild(document.createTextNode(' '));
                     tdLocName.appendChild(document.createTextNode(locName));
                     if (locId === installDefaultId) {
                         const defBadge = document.createElement('span');
