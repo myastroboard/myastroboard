@@ -651,6 +651,41 @@ docker compose down
 ### Testing Scheduler (Without Waiting)
 Set `SKYTONIGHT_FALLBACK_INTERVAL_SECONDS` in `backend/skytonight/skytonight_scheduler.py` to a shorter value (e.g. 300 for 5 minutes), or use the manual trigger API endpoint.
 
+## Code Validation Before Committing
+
+Full details live in [CONTRIBUTING.md](../../CONTRIBUTING.md#before-submitting) - this is the quick-reference checklist an AI assistant must run (or tell the user to run) before treating a change as done.
+
+### Required Commands
+```bash
+pytest                              # full test suite
+black backend/                      # Python formatting (PEP 8, 120-char lines)
+flake8 backend/                     # Python linting
+pyright backend/                    # static type checking (reads pyrightconfig.json at repo root)
+djlint templates/ static/offline.html --profile jinja --lint --ignore H021,H023,H030,H031,J004,J018
+```
+- `black` and `flake8` are declared in `requirements-dev.txt`; run them on every `backend/` change, not just new files.
+- `pyright` mirrors the Pylance errors shown inline in VSCode - a clean `pyright backend/` run means Pylance should be clean too. If VSCode still shows stale errors after a config edit, run "Python: Restart Language Server".
+- `djlint` lints `templates/` (Jinja2) and `static/offline.html`; the ignored rule codes are explained in [CONTRIBUTING.md](../../CONTRIBUTING.md#ignored-rules-and-why) - do not silently add more ignores without documenting why there.
+- JavaScript has no standalone lint step: formatting is applied on save by VSCode's built-in formatter (`.vscode/settings.json` + `.editorconfig`). Just make sure the file was opened/saved in VSCode, or match the existing 4-space/single-quote style by hand.
+
+### Route Inventory Check
+If a change touches `app.py` or any `backend/blueprints/*.py` file (route added, removed, renamed, or its HTTP method changed):
+```bash
+pytest tests/test_route_inventory.py
+```
+Update `EXPECTED_ROUTES` in that file to match, and document the change in `CHANGELOG_NEXT.md`. The failure output lists exactly which routes are unexpected or missing.
+
+### Minimum Bar Before Calling a Change Done
+- [ ] `pytest` passes
+- [ ] `black backend/` produces no diff
+- [ ] `flake8 backend/` reports no issues
+- [ ] `pyright backend/` reports no errors
+- [ ] `djlint` passes for any touched template
+- [ ] `pytest tests/test_route_inventory.py` passes if routes changed
+- [ ] All code/comments/UI text in English (see Language Requirement above)
+- [ ] No `print()` or direct `logging` import in backend code (use `logging_config.get_logger`)
+- [ ] No `innerHTML` / new `DOMUtils.setTrustedHTML` in `static/js/**`
+
 ## Security Considerations
 
 ### No Docker Socket Access

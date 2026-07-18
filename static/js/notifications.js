@@ -149,7 +149,7 @@ class NotificationManager {
     /**
      * Show a native browser notification for the given trigger.
      *
-     * @param {string} triggerId  - one of NOTIF_TRIGGERS (N1–N7)
+     * @param {string} triggerId  - one of NOTIF_TRIGGERS (N1–N9)
      * @param {string} title
      * @param {string} body
      * @param {object} [options]

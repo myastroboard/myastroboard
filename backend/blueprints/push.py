@@ -148,7 +148,7 @@ def push_delete_all_subscriptions():
 @push_bp.route('/api/push/test/<trigger_id>', methods=['POST'])
 @login_required
 def push_test_trigger(trigger_id):
-    """Fire a realistic test push for a specific trigger (N1–N7), bypassing condition checks."""
+    """Fire a realistic test push for a specific trigger (N1–N9), bypassing condition checks."""
     _TRIGGER_PAYLOADS = {
         'N1': ('push_n1_title', 'push_n1_body', {'minutes': 14}, '/#astrodex/plan-my-night', 'normal'),
         'N2': ('push_n2_title', 'push_n2_body', {'name': 'M42', 'minutes': 4}, '/#astrodex/plan-my-night', 'normal'),
@@ -163,6 +163,7 @@ def push_test_trigger(trigger_id):
             'normal',
         ),
         'N7': ('push_n7_title', 'push_n7_body', {'kp': '6.3', 'visibility': 'Good'}, '/#forecast-astro/aurora', 'high'),
+        'N8': ('push_n8_title', 'push_n8_solar_body', {'minutes': 8}, '/#spaceflight/orbital-stations', 'high'),
         'N9': (
             'push_n9_title',
             'push_n9_body',

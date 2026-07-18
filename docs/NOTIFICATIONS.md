@@ -39,16 +39,15 @@ Phase C - Web Push / background (tab may be closed)  ✅ Done
 | `N5` | Solar eclipse maximum | 30 min | `events_alerts.js` / `utils/push_scheduler.py` |
 | `N6` | Astronomical darkness begins | 20 min | `sun.js` / `utils/push_scheduler.py` |
 | `N7` | Aurora: Kp index ≥ threshold | immediate | `aurora.js` / `utils/push_scheduler.py` |
-| `N8` | CSS solar or lunar transit | 10 min | `orbital_stations.js` / `utils/push_scheduler.py` |
 | `N9` | Solar-system event peak (meteor shower, comet visibility window) | 2 days | `events_alerts.js` / `utils/push_scheduler.py` |
 
-IDs are defined as `NOTIF_TRIGGERS` constants in `static/js/notifications.js` and referenced by string in `utils/push_scheduler.py`. `N8` mirrors `N3`'s logic for the CSS station instead of the ISS.
+IDs are defined as `NOTIF_TRIGGERS` constants in `static/js/notifications.js` and referenced by string in `utils/push_scheduler.py`. (`N8` mirrors `N3` for the CSS station.)
 
 `N9` is unlike every other trigger: its source events (from `solar_system_events` cache) carry a `start_time`..`end_time` span of several days around `peak_time`, rather than being a single instant. It still follows the same "notify N before peak" shape as N1–N8, just with a day-granularity lead time (stored in the same `lead_minutes` preference field, as day-equivalent minutes — e.g. 2 days = 2880) instead of a minutes one. Events whose window is ≤36h (eclipses, transits — already covered by their own dedicated triggers) are skipped by `_N9_MIN_WINDOW_SECONDS` so N9 only fires for genuinely multi-day events.
 
 ### Multi-location behavior (v1.2)
 
-- Location-scoped triggers (N3–N9) are evaluated **once per (user, attributed location)** pair, reading each location's own cache slots. Plan triggers (N1/N2) stay per-plan — a plan is pinned to its own location.
+- Location-scoped triggers (N3–N8) are evaluated **once per (user, attributed location)** pair, reading each location's own cache slots. Plan triggers (N1/N2) stay per-plan — a plan is pinned to its own location.
 - When a user has **more than one** attributed location, the message body carries the location name (i18n key `push_location_suffix`, e.g. *"… at Dark Sky Site"*). Single-location users see messages exactly as before.
 - Per-location mute: `preferences.notifications.disabled_location_ids` (edited in My Settings → Notifications, only visible with >1 attributed location) removes a location from all trigger evaluation for that user.
 - Deduplication keys are per location (`<trigger>@<location_id>`), so the same event at two sites notifies once per site.
@@ -247,7 +246,7 @@ self.addEventListener('notificationclick', event => { ... });
 | `#notif-enable-btn` | `button.btn-warning` | Calls `requestPermission()` + `_subscribeToPush()`; hidden when granted/denied |
 | `#notif-master-toggle` | `input[checkbox]` | Master enable/disable |
 | `#notif-trigger-N1` … `#notif-trigger-N9` | `input[checkbox]` | Per-trigger toggle |
-| `#notif-lead-N1` … `#notif-lead-N6`, `#notif-lead-N9` | `select` | Lead time (minutes for N1–N6/N8; day-equivalent minutes for N9) |
+| `#notif-lead-N1` … `#notif-lead-N6`, `#notif-lead-N8`, `#notif-lead-N9` | `select` | Lead time (minutes for N1–N6/N8; day-equivalent minutes for N9) |
 | `#notif-kp-threshold` | `select` | Kp threshold (N7 only) |
 | `#notif-save-btn` | `button.btn-primary` | Async save to server |
 | `#notif-test-btn` | `button.btn-outline-secondary` | Fires a sample notification |
@@ -275,4 +274,4 @@ self.addEventListener('notificationclick', event => { ... });
 | `settings.notifications_*` | UI strings: banner text, button labels, toggle labels, trigger labels |
 | `notifications.nX_title` / `notifications.nX_body` | Notification payload strings (title + body with `{placeholder}`) |
 
-Keys in `notifications` namespace are ordered N1→N9 per trigger, `_title` before `_body`.
+Keys in `notifications` namespace are ordered N1→N7 per trigger, `_title` before `_body`.

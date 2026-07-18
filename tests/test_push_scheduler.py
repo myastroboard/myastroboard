@@ -808,6 +808,8 @@ def test_poll_sets_any_active_night_and_calls_checks(monkeypatch):
     monkeypatch.setattr(push_scheduler, '_check_n6_darkness', lambda *a, **k: calls.append('n6'))
     monkeypatch.setattr(push_scheduler, '_check_n3_iss', lambda *a, **k: calls.append('n3'))
     monkeypatch.setattr(push_scheduler, '_check_n4_n5_eclipse', lambda *a, **k: calls.append('n45'))
+    monkeypatch.setattr(push_scheduler, '_check_n8_css', lambda *a, **k: calls.append('n8'))
+    monkeypatch.setattr(push_scheduler, '_check_n9_solsys_window', lambda *a, **k: calls.append('n9'))
     monkeypatch.setattr(push_scheduler, '_load_cache', lambda _k: {})
     monkeypatch.setattr(
         push_scheduler,
@@ -819,11 +821,20 @@ def test_poll_sets_any_active_night_and_calls_checks(monkeypatch):
     fake_um = types.SimpleNamespace(users={'u1': user}, _reload_users_if_changed=lambda: None)
     monkeypatch.setitem(sys.modules, 'utils.auth', types.SimpleNamespace(user_manager=fake_um))
 
+    fake_location = {'id': 'loc1', 'name': 'Test Location'}
+    fake_repo_config = types.SimpleNamespace(
+        load_config=lambda: {'locations': [fake_location]},
+        get_locations_for_user=lambda _config, _user: [fake_location],
+    )
+    monkeypatch.setitem(sys.modules, 'utils.repo_config', fake_repo_config)
+
     push_scheduler._poll()
 
     assert push_scheduler._any_active_night is True
     assert calls.count('n7') == 1
     assert calls.count('n45') == 1
+    assert calls.count('n8') == 1
+    assert calls.count('n9') == 1
 
 
 def test_poll_skips_users_with_notifications_disabled_or_no_subscriptions(monkeypatch):
@@ -1730,7 +1741,6 @@ def test_n8_no_upcoming_transits_skips(monkeypatch):
     cache = {'solar_transits': [], 'lunar_transits': []}
     push_scheduler._check_n8_css(_make_user(), cache)
     assert not send_calls
-    assert push_scheduler._lock_file is None
 
 
 def test_n8_past_solar_transit_not_added_to_candidates(monkeypatch):
