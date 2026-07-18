@@ -37,14 +37,14 @@ def _safe_cache_path(base_dir: str, filename: str) -> str:
 
     CodeQL (CWE-022) requires this check to be re-applied at each file
     operation's call site; reusing a path resolved earlier in the function is
-    not recognised as a sanitizer barrier. Raises ValueError if unsafe.
+    not recognised as a sanitizer barrier. The containment check uses
+    realpath + startswith (rather than os.path.commonpath) because that is
+    the pattern CodeQL's py/path-injection query recognises as a sanitizer
+    barrier. Raises ValueError if unsafe.
     """
+    base_real = os.path.realpath(base_dir)
     resolved = os.path.realpath(os.path.join(base_dir, filename))
-    try:
-        inside_base_dir = os.path.commonpath([base_dir, resolved]) == base_dir
-    except ValueError:
-        inside_base_dir = False
-    if not inside_base_dir:
+    if not resolved.startswith(base_real + os.sep):
         raise ValueError(f'Path outside {base_dir!r}: {filename!r}')
     return resolved
 

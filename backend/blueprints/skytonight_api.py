@@ -1176,12 +1176,11 @@ def get_skytonight_alttime_api(target_id):
 
     request_location = _skytonight_request_location_override(request.args.get('location_id'))
     file_path = os.path.realpath(_alttime_json_path(target_id, request_location.get('id')))
-    output_dir_abs = os.path.abspath(OUTPUT_DIR)
-    # Path traversal guard
-    try:
-        if os.path.commonpath([output_dir_abs, file_path]) != output_dir_abs:
-            return jsonify({'error': 'Invalid target identifier'}), 400
-    except ValueError:
+    output_dir_abs = os.path.realpath(OUTPUT_DIR)
+    # Path traversal guard. realpath + startswith (rather than
+    # os.path.commonpath) is the pattern CodeQL's py/path-injection query
+    # recognises as a sanitizer barrier.
+    if not file_path.startswith(output_dir_abs + os.sep):
         return jsonify({'error': 'Invalid target identifier'}), 400
 
     if not os.path.isfile(file_path):
