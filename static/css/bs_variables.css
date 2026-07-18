@@ -239,6 +239,7 @@
     --info-card-shadow: rgba(15, 23, 42, 0.2);
     --info-card-border: rgba(255, 255, 255, 0.2);
     --info-card-sheen: rgba(255, 255, 255, 0.4);
+    --moon-glow: rgba(255, 250, 224, 0.9);
     --info-card-inner-bg: rgba(255, 255, 255, 0.85);
     --info-card-inner-border: rgba(255, 255, 255, 0.3);
     --info-card-inner-shadow: rgba(0, 0, 0, 0.1);
@@ -333,6 +334,7 @@ html[data-theme="dark"] {
     --info-card-shadow: rgba(15, 23, 42, 0.45);
     --info-card-border: rgba(148, 163, 184, 0.2);
     --info-card-sheen: rgba(248, 250, 252, 0.12);
+    --moon-glow: rgba(199, 210, 254, 0.75);
     --info-card-inner-bg: rgba(15, 23, 42, 0.75);
     --info-card-inner-border: rgba(148, 163, 184, 0.35);
     --info-card-inner-shadow: rgba(0, 0, 0, 0.3);
@@ -507,6 +509,7 @@ html[data-theme="red"] {
     --info-card-shadow: rgba(0, 0, 0, 0.45);
     --info-card-border: rgba(255, 120, 120, 0.2);
     --info-card-sheen: rgba(255, 236, 236, 0.12);
+    --moon-glow: rgba(255, 190, 190, 0.7);
     --info-card-inner-bg: rgba(32, 0, 0, 0.75);
     --info-card-inner-border: rgba(255, 120, 120, 0.35);
     --info-card-inner-shadow: rgba(0, 0, 0, 0.3);

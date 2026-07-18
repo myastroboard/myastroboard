@@ -415,6 +415,47 @@
     background: linear-gradient(90deg, transparent, var(--info-card-sheen), transparent);
 }
 
+.moon-visual-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    isolation: isolate;
+}
+
+.moon-visual-wrap::before {
+    content: '';
+    position: absolute;
+    width: 80%;
+    height: 80%;
+    border-radius: 50%;
+    background: var(--moon-glow);
+    filter: blur(20px);
+    z-index: -1;
+    pointer-events: none;
+    animation: moon-glow-pulse 4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .moon-visual-wrap::before {
+        animation: none;
+    }
+}
+
+@keyframes moon-glow-pulse {
+    0%, 100% { opacity: 0.8; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.15); }
+}
+
+.moon-visual {
+    position: relative;
+}
+
+.moon-visual svg {
+    display: block;
+    filter: drop-shadow(0 4px 18px rgba(0, 0, 0, 0.35));
+}
+
 .sun-info-card {
     background: var(--sun-gradient);
     color: var(--text-light);
