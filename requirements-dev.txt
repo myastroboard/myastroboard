@@ -13,4 +13,4 @@ pyright==1.1.411
 pylance==8.0.0
 
 # Used by scripts/translate_i18n_values.py
-deep-translator==1.11.4
+translators==6.0.4

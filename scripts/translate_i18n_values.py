@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from deep_translator import GoogleTranslator
+import translators as ts
 
 ROOT = Path(__file__).resolve().parent.parent
 I18N_DIR = ROOT / "static" / "i18n"
@@ -239,12 +239,12 @@ def needs_translation(value: str, target_lang: str) -> bool:
     return True
 
 
-def translate_value(value: str, translator: GoogleTranslator, target_lang: str) -> str:
+def translate_value(value: str, target_lang: str) -> str:
     if not needs_translation(value, target_lang):
         return value
 
     protected, mapping = protect_segments(value)
-    translated = translator.translate(protected)
+    translated = ts.translate_text(protected, translator="google", from_language="en", to_language=target_lang)
     translated = restore_segments(translated, mapping)
 
     # Cleanup occasional spacing issues around placeholders.
@@ -252,14 +252,14 @@ def translate_value(value: str, translator: GoogleTranslator, target_lang: str) 
     return translated
 
 
-def translate_node(node: Any, translator: GoogleTranslator, target_lang: str, stats: dict[str, int]) -> Any:
+def translate_node(node: Any, target_lang: str, stats: dict[str, int]) -> Any:
     if isinstance(node, dict):
-        return {k: translate_node(v, translator, target_lang, stats) for k, v in node.items()}
+        return {k: translate_node(v, target_lang, stats) for k, v in node.items()}
     if isinstance(node, list):
-        return [translate_node(v, translator, target_lang, stats) for v in node]
+        return [translate_node(v, target_lang, stats) for v in node]
     if isinstance(node, str):
         try:
-            translated = translate_value(node, translator, target_lang)
+            translated = translate_value(node, target_lang)
             if translated != node:
                 stats["translated"] += 1
             else:
@@ -281,9 +281,8 @@ def main() -> None:
     with SOURCE_FILE.open("r", encoding="utf-8") as f:
         source = json.load(f)
 
-    translator = GoogleTranslator(source="en", target=args.lang)
     stats = {"translated": 0, "kept": 0, "failed": 0}
-    translated = translate_node(source, translator, args.lang, stats)
+    translated = translate_node(source, args.lang, stats)
 
     target_path = I18N_DIR / f"{args.lang}.json"
     with target_path.open("w", encoding="utf-8") as f:
