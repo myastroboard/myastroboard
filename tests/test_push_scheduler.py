@@ -486,6 +486,146 @@ def test_eclipse_skips_past_peak(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
+# N9 - Solar system event peak heads-up (meteor shower / comet visibility window)
+# ---------------------------------------------------------------------------
+
+def _n9_event(peak_delta, start_delta=None, end_delta=None, title='Perseids Meteor Shower'):
+    """A multi-day solsys event: peak ± 2 days by default (matches the real Perseids shape)."""
+    if start_delta is None:
+        start_delta = {'days': -2}
+    if end_delta is None:
+        end_delta = {'days': 2}
+    return {
+        'title': title,
+        'peak_time': _now_iso(**peak_delta),
+        'start_time': _now_iso(**start_delta),
+        'end_time': _now_iso(**end_delta),
+    }
+
+
+def test_n9_sends_when_peak_within_default_lead(monkeypatch):
+    from utils import push_scheduler
+    send_calls = []
+    monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
+
+    cache = {'events': [_n9_event({'days': 1})]}  # default lead is 2 days
+    push_scheduler._check_n9_solsys_window(_make_user(), cache)
+
+    assert len(send_calls) == 1 and send_calls[0][1] == 'N9'
+
+
+def test_n9_skips_when_no_cache(monkeypatch):
+    from utils import push_scheduler
+    send_calls = []
+    monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
+
+    push_scheduler._check_n9_solsys_window(_make_user(), None)
+
+    assert not send_calls
+
+
+def test_n9_skips_when_trigger_disabled(monkeypatch):
+    from utils import push_scheduler
+    send_calls = []
+    monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
+
+    cache = {'events': [_n9_event({'days': 1})]}
+    user = _make_user(triggers={'N9': {'enabled': False}})
+    push_scheduler._check_n9_solsys_window(user, cache)
+
+    assert not send_calls
+
+
+def test_n9_skips_when_peak_outside_lead_window(monkeypatch):
+    from utils import push_scheduler
+    send_calls = []
+    monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
+
+    cache = {'events': [_n9_event(
+        {'days': 6}, start_delta={'days': 4}, end_delta={'days': 8}, title='Geminids Meteor Shower',
+    )]}
+    push_scheduler._check_n9_solsys_window(_make_user(), cache)
+
+    assert not send_calls
+
+
+def test_n9_skips_after_peak_has_passed(monkeypatch):
+    from utils import push_scheduler
+    send_calls = []
+    monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
+
+    cache = {'events': [_n9_event(
+        {'days': -1}, start_delta={'days': -3}, end_delta={'days': 1}, title='Lyrids Meteor Shower',
+    )]}
+    push_scheduler._check_n9_solsys_window(_make_user(), cache)
+
+    assert not send_calls
+
+
+def test_n9_respects_custom_lead_days(monkeypatch):
+    from utils import push_scheduler
+    send_calls = []
+    monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
+
+    # 3 days out - beyond the default 2-day lead but within a custom 5-day (7200 min) lead
+    cache = {'events': [_n9_event(
+        {'days': 3}, start_delta={'days': 1}, end_delta={'days': 5}, title='Geminids Meteor Shower',
+    )]}
+    user = _make_user(triggers={'N9': {'enabled': True, 'lead_minutes': 7200}})
+    push_scheduler._check_n9_solsys_window(user, cache)
+
+    assert len(send_calls) == 1 and send_calls[0][1] == 'N9'
+
+
+def test_n9_skips_short_windows_treated_as_instantaneous(monkeypatch):
+    """Windows <= 36h (eclipses, transits...) are handled by their own dedicated triggers."""
+    from utils import push_scheduler
+    send_calls = []
+    monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
+
+    cache = {'events': [_n9_event(
+        {'hours': 1}, start_delta={'hours': -1}, end_delta={'hours': 1}, title='Some Instant Event',
+    )]}
+    push_scheduler._check_n9_solsys_window(_make_user(), cache)
+
+    assert not send_calls
+
+
+def test_n9_skips_events_missing_peak_start_or_end_time(monkeypatch):
+    from utils import push_scheduler
+    send_calls = []
+    monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
+
+    cache = {'events': [{'title': 'Incomplete Event', 'start_time': _now_iso(days=-1)}]}
+    push_scheduler._check_n9_solsys_window(_make_user(), cache)
+
+    assert not send_calls
+
+
+def test_n9_respects_cooldown(monkeypatch):
+    from utils import push_scheduler
+    send_calls = []
+    monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
+
+    push_scheduler._mark_notified('u1', 'N9')
+    cache = {'events': [_n9_event({'days': 1})]}
+    push_scheduler._check_n9_solsys_window(_make_user(), cache)
+
+    assert not send_calls
+
+
+def test_n9_skips_bad_timestamps(monkeypatch):
+    from utils import push_scheduler
+    send_calls = []
+    monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
+
+    cache = {'events': [{'title': 'Bad Event', 'peak_time': 'bad-date', 'start_time': 'bad-date', 'end_time': 'also-bad'}]}
+    push_scheduler._check_n9_solsys_window(_make_user(), cache)
+
+    assert not send_calls
+
+
+# ---------------------------------------------------------------------------
 # _send - delivery and dead-subscription cleanup
 # ---------------------------------------------------------------------------
 

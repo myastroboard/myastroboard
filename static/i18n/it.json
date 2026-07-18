@@ -508,6 +508,7 @@
     "today": "Oggi!",
     "tomorrow": "Domani!",
     "in_days": "Tra {days} giorni",
+    "date_range_with_peak": "{start} – {end} (picco {peak})",
     "importance": {
       "low": "Bello saperlo",
       "medium": "Vale la pena considerare",
@@ -756,6 +757,7 @@
     "notifications_n5": "Eclissi solare",
     "notifications_n6": "Inizio oscurità astronomica",
     "notifications_n7": "Allerta aurora (indice Kp)",
+    "notifications_n9": "Picco di sciame meteorico / cometa",
     "push_n1_title": "Plan My Night",
     "push_n1_body": "La tua sessione inizia tra {minutes} min",
     "push_n2_title": "Prossimo oggetto",
@@ -774,6 +776,8 @@
     "push_n8_title": "Transito CSS",
     "push_n8_solar_body": "Transito solare CSS in {minutes} min",
     "push_n8_lunar_body": "Transito lunare CSS in {minutes} min",
+    "push_n9_title": "Evento del sistema solare",
+    "push_n9_body": "{title} raggiunge il picco tra {days} giorni",
     "push_kp_visibility_none": "Nessuna",
     "push_kp_visibility_very_low": "Molto bassa",
     "push_kp_visibility_low": "Bassa",
@@ -2025,7 +2029,9 @@
     "n7_title": "Allerta aurora",
     "n8_body_lunar": "Transito lunare CSS in {minutes} min",
     "n8_body_solar": "Transito solare CSS in {minutes} min",
-    "n8_title": "Transito CSS"
+    "n8_title": "Transito CSS",
+    "n9_body": "{title} raggiunge il picco tra {days} giorni",
+    "n9_title": "Evento del sistema solare"
   },
   "observatory": {
     "loading": "Caricamento dati osservatorio…",

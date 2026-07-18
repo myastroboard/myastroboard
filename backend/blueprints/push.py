@@ -163,6 +163,13 @@ def push_test_trigger(trigger_id):
             'normal',
         ),
         'N7': ('push_n7_title', 'push_n7_body', {'kp': '6.3', 'visibility': 'Good'}, '/#forecast-astro/aurora', 'high'),
+        'N9': (
+            'push_n9_title',
+            'push_n9_body',
+            {'title': 'Perseids Meteor Shower', 'days': 2},
+            '/#forecast-astro/calendar',
+            'normal',
+        ),
     }
     try:
         current_user = get_current_user()

@@ -13,6 +13,7 @@ const NOTIF_TRIGGERS = Object.freeze({
     N6: 'N6', // Astronomical darkness begins
     N7: 'N7', // Aurora: Kp index ≥ threshold
     N8: 'N8', // CSS solar or lunar transit
+    N9: 'N9', // Heads-up ahead of a meteor shower / comet visibility window's peak
 });
 
 const NOTIF_ICON = '/static/ico/android/launchericon-192x192.png';
@@ -31,6 +32,7 @@ const _NOTIF_DEFAULTS = Object.freeze({
         N5: Object.freeze({ enabled: true, lead_minutes: 30 }),
         N6: Object.freeze({ enabled: true, lead_minutes: 20 }),
         N7: Object.freeze({ enabled: true, kp_threshold: 6  }),
+        N9: Object.freeze({ enabled: true, lead_minutes: 2880 }), // 2 days, stored as day-equivalent minutes
     }),
 });
 
@@ -353,13 +355,17 @@ async function _runNotificationChecks() {
         } catch (_) {}
     }
 
-    // N4 + N5 - Eclipses (events_alerts.js also polls every 10 min, but only when calendar is open)
-    if (enabled?.N4?.enabled !== false || enabled?.N5?.enabled !== false) {
+    // N4 + N5 + N9 - Eclipses & solar-system event windows (events_alerts.js also polls every
+    // 10 min, but only when the calendar tab is open)
+    if (enabled?.N4?.enabled !== false || enabled?.N5?.enabled !== false || enabled?.N9?.enabled !== false) {
         try {
             const lang = (typeof i18n !== 'undefined') ? i18n.getCurrentLanguage() : 'en';
             const data = await fetch(`/api/events/upcoming?lang=${encodeURIComponent(lang)}`, { credentials: 'same-origin' })
                 .then(r => r.ok ? r.json() : null);
-            if (data && typeof _checkEclipseNotifications === 'function') _checkEclipseNotifications(data);
+            if (data) {
+                if (typeof _checkEclipseNotifications === 'function') _checkEclipseNotifications(data);
+                if (typeof _checkSolsysWindowNotifications === 'function') _checkSolsysWindowNotifications(data);
+            }
         } catch (_) {}
     }
 }
