@@ -5,22 +5,18 @@ on:
     paths:
       - "backend/**/*.py"
       - "backend/*.py"
-      - "tests/**/*.py"
       - "scripts/**/*.py"
       - "pyrightconfig.json"
       - "pyproject.toml"
       - ".flake8"
-      - "requirements-dev.txt"
   pull_request:
     paths:
       - "backend/**/*.py"
       - "backend/*.py"
-      - "tests/**/*.py"
       - "scripts/**/*.py"
       - "pyrightconfig.json"
       - "pyproject.toml"
       - ".flake8"
-      - "requirements-dev.txt"
 
 jobs:
   lint-python:
