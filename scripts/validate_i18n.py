@@ -173,14 +173,10 @@ def find_inline_objects(text: str) -> list[tuple[int, str]]:
 
 def parse_backend_languages(source: str) -> set[str]:
     """Extract declared language codes from _TRANSLATION_FILENAMES dict."""
-    match = re.search(
-        r"_TRANSLATION_FILENAMES\s*=\s*\{([^}]+)\}", source, re.DOTALL
-    )
+    match = re.search(r"_TRANSLATION_FILENAMES\s*=\s*\{([^}]+)\}", source, re.DOTALL)
     if not match:
         return set()
-    return set(
-        re.findall(rf"['\"]({_LANGUAGE_CODE_PATTERN})['\"]\s*:", match.group(1))
-    )
+    return set(re.findall(rf"['\"]({_LANGUAGE_CODE_PATTERN})['\"]\s*:", match.group(1)))
 
 
 def parse_html_supported_langs(html: str) -> set[str]:
@@ -212,9 +208,7 @@ def main() -> int:
     else:
         backend_langs = parse_backend_languages(BACKEND_FILE.read_text(encoding="utf-8"))
         if not backend_langs:
-            errors.append(
-                f"Could not parse _TRANSLATION_FILENAMES from {BACKEND_FILE.name}"
-            )
+            errors.append(f"Could not parse _TRANSLATION_FILENAMES from {BACKEND_FILE.name}")
 
     # --- Parse templates/index.html ---
     if not INDEX_HTML.exists():
@@ -226,9 +220,7 @@ def main() -> int:
         html_supported_langs = parse_html_supported_langs(html_content)
         html_selector_langs = parse_html_selector_langs(html_content)
         if not html_supported_langs:
-            errors.append(
-                "Could not find 'var supported = [...]' for webmanifests in index.html"
-            )
+            errors.append("Could not find 'var supported = [...]' for webmanifests in index.html")
 
     # --- Load reference translation keys and types ---
     ref_path = I18N_DIR / f"{REFERENCE_LANG}.json"
@@ -250,28 +242,20 @@ def main() -> int:
     for lang in sorted(json_languages):
         # Check 1: backend declaration
         if backend_langs and lang not in backend_langs:
-            errors.append(
-                f"[{lang}] Not declared in _TRANSLATION_FILENAMES in {BACKEND_FILE.name}"
-            )
+            errors.append(f"[{lang}] Not declared in _TRANSLATION_FILENAMES in {BACKEND_FILE.name}")
 
         # Check 3: language selector option in index.html
         if html_selector_langs and lang not in html_selector_langs:
-            errors.append(
-                f"[{lang}] Missing <option value=\"{lang}\"> in language selector in index.html"
-            )
+            errors.append(f"[{lang}] Missing <option value=\"{lang}\"> in language selector in index.html")
 
         # Check 2 (non-reference languages only): webmanifest file + html supported array
         if lang != REFERENCE_LANG:
             webmanifest = STATIC_DIR / f"manifest.{lang}.webmanifest"
             if not webmanifest.exists():
-                errors.append(
-                    f"[{lang}] Webmanifest file not found: static/manifest.{lang}.webmanifest"
-                )
+                errors.append(f"[{lang}] Webmanifest file not found: static/manifest.{lang}.webmanifest")
 
             if html_supported_langs and lang not in html_supported_langs:
-                errors.append(
-                    f"[{lang}] Not listed in 'var supported = [...]' for webmanifests in index.html"
-                )
+                errors.append(f"[{lang}] Not listed in 'var supported = [...]' for webmanifests in index.html")
 
         # Load raw text once for checks 5, 6, 9 (and 4/7/8 for non-reference)
         lang_path = I18N_DIR / f"{lang}.json"
@@ -321,8 +305,7 @@ def main() -> int:
                 for key in sorted(set(ref_types) & set(lang_types)):
                     if ref_types[key] != lang_types[key]:
                         errors.append(
-                            f"[{lang}] Type mismatch at '{key}':"
-                            f" expected {ref_types[key]}, got {lang_types[key]}"
+                            f"[{lang}] Type mismatch at '{key}':" f" expected {ref_types[key]}, got {lang_types[key]}"
                         )
 
     # --- Report ---
@@ -333,10 +316,7 @@ def main() -> int:
         print()
         return 1
 
-    print(
-        f"i18n validation OK - {len(json_languages)} language(s): "
-        f"{sorted(json_languages)}"
-    )
+    print(f"i18n validation OK - {len(json_languages)} language(s): " f"{sorted(json_languages)}")
     return 0
 
 
