@@ -67,7 +67,7 @@ async function createMoonPhaseSvg(illumination, waxing) {
 
         litRegion.setAttribute('d', path);
     }
-    moonSvg.setAttribute('width', '80');
+    moonSvg.setAttribute('width', '132');
     return moonSvg;
 }
 
@@ -101,8 +101,9 @@ async function loadMoon() {
         const header = document.createElement('div');
         header.className = 'd-flex flex-row align-items-center mb-3';
         const icon = document.createElement('div');
-        icon.className = 'p-2';
+        icon.className = 'p-2 moon-visual-wrap';
         const moonVisual = document.createElement('div');
+        moonVisual.className = 'moon-visual';
         moonVisual.setAttribute('role', 'img');
         moonVisual.setAttribute('aria-label', phaseTextMap[moon.phase_name] || moon.phase_name);
         const moonSvg = await createMoonPhaseSvg(illumination, waxing);
