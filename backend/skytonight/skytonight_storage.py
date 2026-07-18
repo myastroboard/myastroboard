@@ -1,9 +1,9 @@
 """Shared filesystem helpers for SkyTonight runtime state.
 
 Since v1.2 the calculation results are stored **per location preset**:
-``SKYTONIGHT_CALCULATIONS_DIR/<location_id>/<file>.json``. The legacy flat
-files (pre-multi-location) are migrated once into the install default
-preset's directory so existing installs keep their results after upgrade.
+``SKYTONIGHT_CALCULATIONS_DIR/<location_id>/<file>.json``. Pre-v1.2 flat
+result/alttime files are deleted at container startup (see entrypoint.sh);
+a location with no results yet simply gets picked up by the next scheduler run.
 """
 
 from __future__ import annotations
@@ -13,21 +13,16 @@ import shutil
 from typing import Any, Dict, Optional
 
 from utils.constants import (
-    SKYTONIGHT_BODIES_RESULTS_FILE,
     SKYTONIGHT_CALCULATIONS_DIR,
     SKYTONIGHT_CATALOGUES_DIR,
-    SKYTONIGHT_COMETS_RESULTS_FILE,
     SKYTONIGHT_DATASET_FILE,
     SKYTONIGHT_DIR,
-    SKYTONIGHT_DSO_RESULTS_FILE,
     SKYTONIGHT_LOGS_DIR,
     SKYTONIGHT_OUTPUT_DIR,
-    SKYTONIGHT_RESULTS_FILE,
     SKYTONIGHT_RUNTIME_DIR,
     SKYTONIGHT_SCHEDULER_LOCK_FILE,
     SKYTONIGHT_SCHEDULER_STATUS_FILE,
     SKYTONIGHT_SCHEDULER_TRIGGER_FILE,
-    SKYTONIGHT_SKYMAP_FILE,
 )
 from utils import ensure_directory_exists, load_json_file, save_json_file, slugify_location_name
 
@@ -125,15 +120,6 @@ _BODIES_BASENAME = 'bodies_results.json'
 _COMETS_BASENAME = 'comets_results.json'
 _SKYMAP_BASENAME = 'skymap_data.json'
 
-# Legacy flat files (single-location era) mapped to their per-location basename.
-_LEGACY_RESULT_FILES = {
-    SKYTONIGHT_RESULTS_FILE: _RESULTS_BASENAME,
-    SKYTONIGHT_DSO_RESULTS_FILE: _DSO_BASENAME,
-    SKYTONIGHT_BODIES_RESULTS_FILE: _BODIES_BASENAME,
-    SKYTONIGHT_COMETS_RESULTS_FILE: _COMETS_BASENAME,
-    SKYTONIGHT_SKYMAP_FILE: _SKYMAP_BASENAME,
-}
-
 
 def _default_location_id() -> Optional[str]:
     """Resolve the install default preset id (lazy import - avoids a cycle)."""
@@ -149,67 +135,9 @@ def _resolve_location_id(location_id: Optional[str]) -> Optional[str]:
     return location_id or _default_location_id()
 
 
-def _legacy_alttime_files() -> list:
-    """Flat *_alttime.json files left in the outputs root by pre-v1.2 runs."""
-    try:
-        return [
-            os.path.join(SKYTONIGHT_OUTPUT_DIR, name)
-            for name in os.listdir(SKYTONIGHT_OUTPUT_DIR)
-            if name.endswith('_alttime.json')
-        ]
-    except OSError:
-        return []
-
-
-def migrate_legacy_results(location_id: Optional[str] = None) -> bool:
-    """Move the pre-v1.2 flat result/alttime files into the install default's directories.
-
-    Idempotent and cheap when there is nothing to migrate. Returns True when at
-    least one file was moved.
-    """
-    legacy_alttimes = _legacy_alttime_files()
-    if not any(os.path.isfile(path) for path in _LEGACY_RESULT_FILES) and not legacy_alttimes:
-        return False
-    target_id = _resolve_location_id(location_id)
-    if not target_id:
-        return False
-
-    target_dir = os.path.join(SKYTONIGHT_CALCULATIONS_DIR, target_id)
-    ensure_directory_exists(target_dir)
-    moved = False
-    for legacy_path, basename in _LEGACY_RESULT_FILES.items():
-        if not os.path.isfile(legacy_path):
-            continue
-        destination = os.path.join(target_dir, basename)
-        try:
-            if not os.path.isfile(destination):
-                shutil.move(legacy_path, destination)
-            else:
-                os.remove(legacy_path)
-            moved = True
-        except OSError:
-            continue  # best-effort: a locked file just stays behind
-
-    if legacy_alttimes:
-        alttime_dir = os.path.join(SKYTONIGHT_OUTPUT_DIR, target_id)
-        ensure_directory_exists(alttime_dir)
-        for legacy_path in legacy_alttimes:
-            destination = os.path.join(alttime_dir, os.path.basename(legacy_path))
-            try:
-                if not os.path.isfile(destination):
-                    shutil.move(legacy_path, destination)
-                else:
-                    os.remove(legacy_path)
-                moved = True
-            except OSError:
-                continue  # best-effort: a locked file just stays behind
-    return moved
-
-
 def get_location_results_dir(location_id: Optional[str] = None) -> str:
     """Return (and create) the calculations directory for a location preset."""
     resolved = _resolve_location_id(location_id)
-    migrate_legacy_results(resolved)
     path = os.path.join(SKYTONIGHT_CALCULATIONS_DIR, resolved) if resolved else SKYTONIGHT_CALCULATIONS_DIR
     ensure_directory_exists(path)
     return path
@@ -239,7 +167,6 @@ def get_skymap_file(location_id: Optional[str] = None) -> str:
 def get_alttime_dir(location_id: Optional[str] = None) -> str:
     """Return (and create) the per-location directory for *_alttime.json files."""
     resolved = _resolve_location_id(location_id)
-    migrate_legacy_results(resolved)
     path = os.path.join(SKYTONIGHT_OUTPUT_DIR, resolved) if resolved else SKYTONIGHT_OUTPUT_DIR
     ensure_directory_exists(path)
     return path

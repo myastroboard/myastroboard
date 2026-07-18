@@ -1001,6 +1001,7 @@
     "loading_report_content": "Caricamento contenuto del rapporto...",
     "failed_to_load_report_content": "Impossibile caricare il contenuto del rapporto",
     "no_target_in_report": "Nessun obiettivo nel rapporto",
+    "no_nautical_night": "Questa notte non c'è vera oscurità in questa posizione - il sole non scende mai a 12° sotto l'orizzonte (comune in estate alle alte latitudini), quindi non è stato possibile calcolare una finestra di osservazione.",
     "add": "Aggiungere",
     "captured": "Catturato",
     "planned": "Pianificato",

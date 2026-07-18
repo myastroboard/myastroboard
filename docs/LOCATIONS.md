@@ -205,8 +205,8 @@ overlays the right site's horizon.
 - Result files are stored per preset id:
   `data/skytonight/calculations/<location_id>/{calculation_results,dso_results,bodies_results,comets_results,skymap_data}.json`
   and `data/skytonight/outputs/<location_id>/<target>_alttime.json`. Pre-v1.2 flat
-  files are migrated into the install default's directory automatically
-  (`skytonight_storage.migrate_legacy_results`).
+  files are deleted at container startup (`entrypoint.sh`); a location with no
+  results yet is simply picked up by the scheduler's next run.
 - Every `/api/skytonight/*` endpoint resolves the requesting user's **active
   location** (`get_active_location`) and serves that preset's results — including
   `horizon_profile` overlays (alt-time, skymap) and `target-debug` diagnostics.

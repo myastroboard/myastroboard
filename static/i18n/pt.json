@@ -1001,6 +1001,7 @@
     "loading_report_content": "Carregando conteúdo do relatório...",
     "failed_to_load_report_content": "Falha ao carregar o conteúdo do relatório",
     "no_target_in_report": "Nenhuma meta no relatório",
+    "no_nautical_night": "Não há noite verdadeira esta noite neste local - o sol nunca desce 12° abaixo do horizonte (comum no verão em latitudes altas), portanto não foi possível calcular uma janela de observação.",
     "add": "Adicionar",
     "captured": "Capturado",
     "planned": "Planejado",

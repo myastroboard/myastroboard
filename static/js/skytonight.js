@@ -2656,9 +2656,12 @@ async function _showSkyTonightDataSection(sectionKey, container) {
         if (!tableData || tableData.length === 0) {
             const empty = document.createElement('div');
             empty.className = 'alert alert-info mt-3';
-            empty.textContent = data.available
-                ? tSkyTonightCompat('no_target_in_report')
-                : tSkyTonightCompat('no_data_available');
+            const noNightFound = data.night_metadata && data.night_metadata.night_found === false;
+            empty.textContent = noNightFound
+                ? tSkyTonightCompat('no_nautical_night')
+                : data.available
+                    ? tSkyTonightCompat('no_target_in_report')
+                    : tSkyTonightCompat('no_data_available');
             container.appendChild(empty);
             appendDataSourceFooter(container, {
                 text: tSkyTonightCompat('footer_source')

@@ -1001,6 +1001,7 @@
     "loading_report_content": "Chargement du contenu du rapport...",
     "failed_to_load_report_content": "Échec du chargement du contenu du rapport",
     "no_target_in_report": "Aucune cible dans le rapport",
+    "no_nautical_night": "Pas de véritable nuit ce soir à cet endroit - le soleil ne descend jamais à 12° sous l'horizon (fréquent en été aux hautes latitudes), donc aucune fenêtre d'observation n'a pu être calculée.",
     "add": "Ajouter",
     "captured": "Capturé",
     "planned": "Planifié",
