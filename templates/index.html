@@ -49,6 +49,7 @@
     <link rel="stylesheet" href="/static/css/bs_logs.css?v={{ version }}" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="/static/css/bs_skytonight.css?v={{ version }}" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="/static/css/bs_astrodex.css?v={{ version }}" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="/static/css/bs_astrodex_map.css?v={{ version }}" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="/static/css/bs_plan_my_night.css?v={{ version }}" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="/static/css/bs_equipment.css?v={{ version }}" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="/static/css/bs_metrics.css?v={{ version }}" media="print" onload="this.media='all'">
@@ -62,6 +63,7 @@
         <link rel="stylesheet" href="/static/css/bs_logs.css?v={{ version }}">
         <link rel="stylesheet" href="/static/css/bs_skytonight.css?v={{ version }}">
         <link rel="stylesheet" href="/static/css/bs_astrodex.css?v={{ version }}">
+        <link rel="stylesheet" href="/static/css/bs_astrodex_map.css?v={{ version }}">
         <link rel="stylesheet" href="/static/css/bs_plan_my_night.css?v={{ version }}">
         <link rel="stylesheet" href="/static/css/bs_equipment.css?v={{ version }}">
         <link rel="stylesheet" href="/static/css/bs_metrics.css?v={{ version }}">
@@ -667,6 +669,11 @@
                             <i class="bi bi-moon-stars-fill text-info icon-inline" aria-hidden="true"></i> <span data-i18n="navbar.plan_my_night">Plan My Night</span>
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link sub-tab-btn" href="#" data-subtab="photo-map">
+                            <i class="bi bi-geo-alt-fill text-danger icon-inline" aria-hidden="true"></i> <span data-i18n="astrodex.photo_map_tab">Photo Map</span>
+                        </a>
+                    </li>
                 </ul>
             </div>
 
@@ -758,6 +765,18 @@
                     <div id="plan-moon-calendar" class="mb-3"></div>
                     <div id="plan-seeing-week" class="mb-3"></div>
                     <div id="plan-my-night-display"></div>
+                </div>
+            </div>
+
+            <!-- Photo Map Sub-tab -->
+            <div id="photo-map-subtab" class="sub-tab-content">
+                <div class="shadow p-2 mb-3 rounded bg-sub-container">
+                    <h2>
+                        <i class="bi bi-geo-alt-fill text-danger icon-inline" aria-hidden="true"></i> <span data-i18n="astrodex.map_title">Photo Map</span>
+                    </h2>
+                    <p class="text-muted" data-i18n="astrodex.map_intro">See where your Astrodex photos were taken.</p>
+                    <div id="astrodex-map-without-location-line"></div>
+                    <div id="astrodex-photo-map" class="astrodex-photo-map"></div>
                 </div>
             </div>
 
@@ -1544,6 +1563,11 @@
                             <input type="checkbox" id="astrodex-private" class="form-check-input" switch>
                             <label class="form-check-label" for="astrodex-private"> <span data-i18n="settings.astrodex_private">Private Astrodex</span></label>
                             <div class="form-text" data-i18n="settings.astrodex_private_info">Enable this option to set up a private Astrodex for each user</div>
+                        </div>
+                        <div id="feature-astrodex-map-private-wrapper" class="form-check form-switch mt-3">
+                            <input type="checkbox" id="astrodex-map-private" class="form-check-input" switch>
+                            <label class="form-check-label" for="astrodex-map-private"> <span data-i18n="settings.astrodex_map_private">Photo map private</span></label>
+                            <div class="form-text" data-i18n="settings.astrodex_map_private_info">When off (default), the Photo Map shows exact GPS locations of every shared user's photos to everyone. Turn this on if you don't want your precise photo locations visible to other users, even when Astrodex sharing is on.</div>
                         </div>
                     </div>
 
@@ -3144,6 +3168,7 @@
     <script src="/static/js/equipment.js?v={{ version }}"></script>
     <script src="/static/js/config.js?v={{ version }}"></script>
     <script src="/static/js/locations.js?v={{ version }}"></script>
+    <script src="/static/js/astrodex_map.js?v={{ version }}"></script>
     <script src="/static/js/app_settings.js?v={{ version }}"></script>
     <script src="/static/js/skytonight.js?v={{ version }}"></script>
     <script src="/static/js/logs.js?v={{ version }}"></script>

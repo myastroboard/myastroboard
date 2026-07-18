@@ -187,6 +187,43 @@ def get_astrodex():
         return jsonify({'error': 'Internal server error'}), 500
 
 
+@astrodex_bp.route('/api/astrodex/map', methods=['GET'])
+@login_required
+def get_astrodex_map():
+    """Get a flat list of geotagged Astrodex pictures for the Photo Map sub-tab.
+
+    Gated by its own dedicated config['astrodex']['map_private'] flag, independent
+    from the general astrodex 'private' flag used by /api/astrodex - see
+    get_astrodex_map_points()'s docstring for why.
+    """
+    try:
+        user = get_current_user()
+        user_id = user.user_id if user else None
+        if not user_id or not user:  # pragma: no cover
+            return jsonify({'error': 'User not authenticated'}), 401
+
+        config = load_config()
+        map_private = bool(config.get('astrodex', {}).get('map_private', False))
+        users = user_manager.list_users()
+        usernames_by_id = {
+            user_entry.get('user_id', ''): user_entry.get('username', 'unknown')
+            for user_entry in users
+            if user_entry.get('user_id')
+        }
+
+        map_data = astrodex.get_astrodex_map_points(
+            current_user_id=user_id,
+            current_username=user.username,
+            map_private=map_private,
+            usernames_by_id=usernames_by_id,
+        )
+
+        return jsonify(map_data)
+    except Exception as e:
+        logger.error(f"Error getting astrodex map points: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
 @astrodex_bp.route('/api/beginner-catalog', methods=['GET'])
 @login_required
 def get_beginner_catalog():

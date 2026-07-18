@@ -163,6 +163,97 @@ def test_get_astrodex_private_mode_hides_other_users_items(client, monkeypatch):
         assert items[0].get('is_owned_by_current_user') is True
 
 
+def test_get_astrodex_map_shared_mode_includes_other_users_coordinates(client, monkeypatch):
+    """map_private=False should expose every user's geotagged pictures with real coordinates."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        monkeypatch.setenv('DATA_DIR', tmpdir)
+        astrodex.ASTRODEX_DIR = os.path.join(tmpdir, 'astrodex')
+        astrodex.ASTRODEX_IMAGES_DIR = os.path.join(astrodex.ASTRODEX_DIR, 'images')
+        monkeypatch.setattr(astrodex_bp_module, 'load_config', lambda: {'astrodex': {'map_private': False}})
+
+        admin_user = user_manager.get_user_by_username('admin')
+        assert admin_user is not None
+
+        other_username = f"user_{uuid.uuid4().hex[:8]}"
+        other_user = user_manager.create_user(other_username, 'test123', 'user')
+
+        admin_item = astrodex.create_astrodex_item(
+            admin_user.user_id,
+            {'name': 'M31', 'type': 'Galaxy', 'catalogue': 'Messier'},
+            username=admin_user.username
+        )
+        assert admin_item is not None
+        astrodex.add_picture_to_item(admin_user.user_id, admin_item['id'], {
+            'filename': 'admin_pic.jpg', 'latitude': 45.1, 'longitude': 5.2,
+        })
+
+        other_item = astrodex.create_astrodex_item(
+            other_user.user_id,
+            {'name': 'M42', 'type': 'Nebula', 'catalogue': 'Messier'},
+            username=other_user.username
+        )
+        assert other_item is not None
+        astrodex.add_picture_to_item(other_user.user_id, other_item['id'], {
+            'filename': 'other_pic.jpg', 'latitude': 48.8, 'longitude': 2.3,
+        })
+
+        response = client.get('/api/astrodex/map')
+        assert response.status_code == 200
+        payload = response.get_json()
+
+        assert payload['map_private'] is False
+        points = payload['points']
+        assert len(points) == 2
+        by_owner = {p['owner_username']: p for p in points}
+        assert by_owner[admin_user.username]['latitude'] == 45.1
+        assert by_owner[other_user.username]['latitude'] == 48.8
+        assert by_owner[other_user.username]['is_owned_by_current_user'] is False
+
+
+def test_get_astrodex_map_private_mode_hides_other_users_points(client, monkeypatch):
+    """map_private=True should return only the current user's own geotagged pictures."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        monkeypatch.setenv('DATA_DIR', tmpdir)
+        astrodex.ASTRODEX_DIR = os.path.join(tmpdir, 'astrodex')
+        astrodex.ASTRODEX_IMAGES_DIR = os.path.join(astrodex.ASTRODEX_DIR, 'images')
+        monkeypatch.setattr(astrodex_bp_module, 'load_config', lambda: {'astrodex': {'map_private': True}})
+
+        admin_user = user_manager.get_user_by_username('admin')
+        assert admin_user is not None
+
+        other_username = f"user_{uuid.uuid4().hex[:8]}"
+        other_user = user_manager.create_user(other_username, 'test123', 'user')
+
+        admin_item = astrodex.create_astrodex_item(
+            admin_user.user_id,
+            {'name': 'M31', 'type': 'Galaxy', 'catalogue': 'Messier'},
+            username=admin_user.username
+        )
+        assert admin_item is not None
+        astrodex.add_picture_to_item(admin_user.user_id, admin_item['id'], {
+            'filename': 'admin_pic.jpg', 'latitude': 45.1, 'longitude': 5.2,
+        })
+
+        other_item = astrodex.create_astrodex_item(
+            other_user.user_id,
+            {'name': 'M42', 'type': 'Nebula', 'catalogue': 'Messier'},
+            username=other_user.username
+        )
+        assert other_item is not None
+        astrodex.add_picture_to_item(other_user.user_id, other_item['id'], {
+            'filename': 'other_pic.jpg', 'latitude': 48.8, 'longitude': 2.3,
+        })
+
+        response = client.get('/api/astrodex/map')
+        assert response.status_code == 200
+        payload = response.get_json()
+
+        assert payload['map_private'] is True
+        points = payload['points']
+        assert len(points) == 1
+        assert points[0]['owner_username'] == admin_user.username
+
+
 def test_add_astrodex_item_duplicate_returns_409_with_existing_item(client, monkeypatch):
     """Adding a duplicate object returns 409 with the existing item's id and name."""
     with tempfile.TemporaryDirectory() as tmpdir:

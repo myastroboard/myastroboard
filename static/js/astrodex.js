@@ -1811,17 +1811,62 @@ function showPictureSlideshow(itemId) {
         // No pictures, do nothing
         return;
     }
-    
+
+    const picturesWithOwner = slideshowPictures.map(picture => ({
+        ...picture,
+        owner_username: picture.owner_username || item.owner_username || '',
+    }));
+
+    _mountPictureSlideshow(picturesWithOwner, {
+        title: `${escapeHtml(item.name)} - ${i18n.t('astrodex.photos')}`,
+        objectInfoName: item.name,
+    });
+}
+
+/**
+ * Open the fullscreen slideshow for an arbitrary flat list of pictures (e.g. a
+ * Photo Map cluster or single pin), which may span several different Astrodex
+ * items/objects. Unlike showPictureSlideshow(), there is no single celestial
+ * object to inject an "Object Information" card for, so each slide instead
+ * shows its own `item_name` as an info tile.
+ *
+ * @param {Array<Object>} pictures - Picture-like objects, each carrying at least
+ *   `filename` plus the usual info fields (date, device, etc.) and `item_name`.
+ * @param {{title?: string}} [options]
+ */
+function showPictureSlideshowFromPictures(pictures, options = {}) {
+    const slideshowPictures = Array.isArray(pictures) ? pictures : [];
+    if (slideshowPictures.length === 0) {
+        return;
+    }
+
+    _mountPictureSlideshow(slideshowPictures, {
+        title: options.title || i18n.t('astrodex.photos'),
+        showItemNameTile: true,
+    });
+}
+
+/**
+ * Shared slideshow modal shell (image + arrows + keyboard nav + info panel) used
+ * by both showPictureSlideshow() (single item, own pictures) and
+ * showPictureSlideshowFromPictures() (arbitrary picture list, e.g. a map cluster).
+ *
+ * @param {Array<Object>} slideshowPictures - Non-empty array of picture objects.
+ * @param {{title: string, objectInfoName?: string, showItemNameTile?: boolean}} opts
+ */
+function _mountPictureSlideshow(slideshowPictures, opts) {
+    const showItemNameTile = !!opts.showItemNameTile;
+
     let currentIndex = 0;
     let keyHandler = null; // Store the handler reference for cleanup
     let bs_modal = null; // Store bootstrap modal reference
-    
+
     function updateModalContent() {
         const picture = slideshowPictures[currentIndex];
         const imageUrl = `/api/astrodex/images/${picture.filename}`;
-        const ownerUsername = picture.owner_username || item.owner_username || '';
+        const ownerUsername = picture.owner_username || '';
         const showOwner = !!ownerUsername && picture.is_owned_by_current_user === false;
-        
+
         const pictureInfo = `
         <div class="slideshow-info mt-4">
             <div class="row mb-3">
@@ -1910,6 +1955,17 @@ function showPictureSlideshow(itemId) {
                             <div>
                                 <small class="text-muted d-block">${i18n.t('astrodex.location')}</small>
                                 <strong>${escapeHtml(picture.location_name)}</strong>
+                            </div>
+                        </div>
+                    </div>
+                ` : ''}
+                ${showItemNameTile && picture.item_name ? `
+                    <div class="col-md-6 col-lg-4">
+                        <div class="d-flex align-items-center p-2 rounded shadow-sm astrodex-slideshow-tile">
+                            <div class="me-3 fs-4"><i class="bi bi-stars text-danger" aria-hidden="true"></i></div>
+                            <div>
+                                <small class="text-muted d-block">${i18n.t('astrodex.object')}</small>
+                                <strong>${escapeHtml(picture.item_name)}</strong>
                             </div>
                         </div>
                     </div>
@@ -2046,7 +2102,7 @@ function showPictureSlideshow(itemId) {
     
     // Create modal using existing Bootstrap structure - body has two stable sub-containers:
     // #slideshow-content-wrapper (replaced on navigation) and #slideshow-object-info-wrapper (persistent)
-    createModal(`${escapeHtml(item.name)} - ${i18n.t('astrodex.photos')}`, '', 'full');
+    createModal(opts.title, '', 'full');
 
     // Set up the two-part body structure before first render
     const modalBodyInit = document.getElementById('modal_full_close_body');
@@ -2084,11 +2140,11 @@ function showPictureSlideshow(itemId) {
     setupKeyboardNavigation();
     bs_modal.show();
 
-    // Async: inject object-info card into the stable info container
-    if (typeof injectObjectInfoIntoContainer === 'function' && item.name) {
+    // Async: inject object-info card into the stable info container (single-item flow only)
+    if (typeof injectObjectInfoIntoContainer === 'function' && opts.objectInfoName) {
         const infoContainer = document.getElementById('slideshow-object-info-wrapper');
         if (infoContainer) {
-            injectObjectInfoIntoContainer(item.name, infoContainer);
+            injectObjectInfoIntoContainer(opts.objectInfoName, infoContainer);
         }
     }
 }

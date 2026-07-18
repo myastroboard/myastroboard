@@ -1,0 +1,11 @@
+/* CSS for the Astrodex Photo Map sub-tab */
+
+.astrodex-photo-map {
+    width: 100%;
+    height: 70vh;
+    min-height: 420px;
+    border-radius: var(--border-radius);
+    z-index: 0;
+    /* Prevent Leaflet touch events from triggering page scroll */
+    touch-action: none;
+}

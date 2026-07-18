@@ -435,7 +435,7 @@ function tSkyTonightType(value) {
  *
  * @param {() => boolean} isLoaded - Returns true if the library global is already present.
  * @param {string} scriptUrl - URL of the vendor script to inject.
- * @param {string} [cssUrl] - Optional URL of a stylesheet to inject alongside it.
+ * @param {string|string[]} [cssUrl] - Optional stylesheet URL, or array of URLs, to inject alongside it.
  * @param {{promise: Promise|null}} state - Caller-owned box holding the memoized promise
  *   (a plain object so each caller keeps its own independent cache slot).
  * @param {string} libraryName - Used only in the rejection error message.
@@ -445,10 +445,13 @@ function ensureVendorScriptLoaded(isLoaded, scriptUrl, cssUrl, state, libraryNam
     if (state.promise) return state.promise;
     state.promise = new Promise((resolve, reject) => {
         if (cssUrl) {
-            const link = document.createElement('link');
-            link.rel = 'stylesheet';
-            link.href = cssUrl;
-            document.head.appendChild(link);
+            const cssUrls = Array.isArray(cssUrl) ? cssUrl : [cssUrl];
+            cssUrls.forEach((href) => {
+                const link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = href;
+                document.head.appendChild(link);
+            });
         }
         const script = document.createElement('script');
         script.src = scriptUrl;

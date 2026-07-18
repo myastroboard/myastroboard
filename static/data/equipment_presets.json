@@ -49,6 +49,18 @@
       "source_url": "https://www.dwarflab.com/us/products/dwarf-3-smart-telescope"
     },
     {
+      "id": "dwarflab_dwarf_mini",
+      "label": "Dwarf Mini",
+      "manufacturer": "DWARFLAB",
+      "aperture_mm": 30,
+      "focal_length_mm": 150,
+      "focal_ratio": 5.0,
+      "type": "refractor",
+      "weight_kg": 0.84,
+      "suggests_experience": "beginner",
+      "source_url": "https://www.dwarflab.com/us/products/dwarf-mini-smart-telescope"
+    },
+    {
       "id": "vaonis_vespera2",
       "label": "Vespera II",
       "manufacturer": "Vaonis",

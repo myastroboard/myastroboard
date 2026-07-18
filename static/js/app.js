@@ -503,6 +503,9 @@ function switchSubTab(parentTab, subtabName, options = {}) {
             loadSeeingWeek();
             loadPlanMyNight();
             break; // Plan My Night tab
+        case 'photo-map':
+            if (typeof loadAstrodexPhotoMap === 'function') loadAstrodexPhotoMap();
+            break; // Astrodex tab
         case 'notifications':
             if (typeof initNotificationSettingsUI === 'function') initNotificationSettingsUI();
             break; // My Settings tab
@@ -556,6 +559,9 @@ function cleanupTransientCharts() {
     }
     if (typeof destroyDebugAlttimeChart === 'function') {
         destroyDebugAlttimeChart();
+    }
+    if (typeof destroyAstrodexPhotoMap === 'function') {
+        destroyAstrodexPhotoMap();
     }
 }
 
