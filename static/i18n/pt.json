@@ -1657,6 +1657,7 @@
     "dew_point": "Ponto de orvalho",
     "pressure": "Pressão",
     "wind": "Vento",
+    "precipitation": "Precipitação",
     "loading_astro_chart": "Carregando cartas astronômicas...",
     "chart_cloud_title": "Nuvens e Vento",
     "chart_cloudless": "Sem nuvens",

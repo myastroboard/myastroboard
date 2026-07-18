@@ -3,6 +3,7 @@
 import time
 from unittest.mock import MagicMock, patch
 
+import numpy as np
 import pandas as pd
 
 from weather import weather_astro
@@ -39,6 +40,7 @@ def _build_sample_dataframe():
             "temperature_2m": [15.0] * 8,
             "wind_speed_10m": [5.0, 5.0, 4.0, 6.0, 8.0, 10.0, 12.0, 15.0],
             "lifted_index": [3.0, 2.5, 2.0, 2.5, 1.0, 0.0, -1.0, -2.0],
+            "precipitation": [0.0] * 8,
         }
     )
 
@@ -200,6 +202,23 @@ class TestWeatherAnalysisMetrics:
         assert "tracking_stability_score" in result.columns
         assert (result["tracking_stability_score"] >= 0).all()
         assert (result["tracking_stability_score"] <= 100).all()
+
+    def test_precipitation_impact(self):
+        analyzer = _build_analyzer()
+        df = pd.DataFrame({
+            "precipitation": [0.0, 0.5, 1.0, 2.0, 5.0, np.nan],
+        })
+        result = analyzer.analyze_precipitation_impact(df)
+        assert "precipitation_factor" in result.columns
+        assert (result["precipitation_factor"] >= 0).all()
+        assert (result["precipitation_factor"] <= 1).all()
+        # Dry hour -> no penalty; heavy rain (>= veto threshold) -> fully vetoed
+        assert result["precipitation_factor"].iloc[0] == 1.0
+        assert result["precipitation_factor"].iloc[4] == 0.0
+        # Missing precipitation reading treated as dry (no penalty)
+        assert result["precipitation_factor"].iloc[5] == 1.0
+        # Between dry and the veto threshold, the penalty decreases monotonically
+        assert result["precipitation_factor"].iloc[1] > result["precipitation_factor"].iloc[2] > result["precipitation_factor"].iloc[3]
 
 
 class TestCacheLogic:

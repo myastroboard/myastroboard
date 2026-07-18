@@ -42,6 +42,7 @@ MAGNITUDE_LIMIT_ZENITH_MIN = 4.0  # Urban limit
 MAGNITUDE_LIMIT_ZENITH_MAX = 8.0  # Perfect dark sky
 DEW_POINT_WARNING_THRESHOLD = 2.0  # °C difference from ambient
 JET_STREAM_ALTITUDE = 9000  # meters (typical jet stream altitude)
+PRECIPITATION_VETO_MM = 2.0  # mm/h of forecast precipitation that fully zeroes the observation score
 
 _ASTRO_ANALYSIS_LOCK = threading.Lock()
 _ASTRO_ANALYSIS_LAST_SUCCESS: Dict[Tuple[int, str, str], Dict[str, Any]] = {}
@@ -554,6 +555,26 @@ class AstroWeatherAnalyzer:
 
         return result
 
+    def analyze_precipitation_impact(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Analyze precipitation impact on observation viability.
+
+        Unlike the other components (seeing, transparency, cloud, tracking),
+        rain isn't just "one factor among several" - it's a hard go/no-go
+        signal, so it's applied as a multiplicative penalty on the composite
+        score rather than averaged in like the rest.
+        """
+        result = df.copy()
+
+        precipitation_mm = cast(pd.Series, result["precipitation"]).fillna(0)
+
+        # 0 mm -> no penalty (factor 1.0); PRECIPITATION_VETO_MM+ -> fully vetoed (factor 0.0)
+        precipitation_factor = (1.0 - (precipitation_mm / PRECIPITATION_VETO_MM).clip(0, 1)).round(2)
+
+        result["precipitation_factor"] = precipitation_factor
+
+        return result
+
     def generate_comprehensive_analysis(self, forecast_hours: int = 24) -> Optional[Dict]:
         """
         Generate comprehensive astrophotography weather analysis
@@ -575,6 +596,7 @@ class AstroWeatherAnalyzer:
             df = self.calculate_transparency_forecast(df)
             df = self.analyze_dew_point_alerts(df)
             df = self.analyze_wind_tracking_impact(df)
+            df = self.analyze_precipitation_impact(df)
 
             # Convert datetime for JSON serialization
             df_json = df.copy()
@@ -582,13 +604,16 @@ class AstroWeatherAnalyzer:
             df_json["datetime"] = dt_series.map(lambda x: x.strftime("%Y-%m-%dT%H:%M:%S%z") if pd.notna(x) else None)
             df_json["observation_score"] = (
                 (
-                    df_json["seeing_pickering"].fillna(0) * 10
-                    + df_json["transparency_score"].fillna(0)
-                    + df_json["cloud_discrimination"].fillna(0)
-                    + df_json["tracking_stability_score"].fillna(0)
+                    (
+                        df_json["seeing_pickering"].fillna(0) * 10
+                        + df_json["transparency_score"].fillna(0)
+                        + df_json["cloud_discrimination"].fillna(0)
+                        + df_json["tracking_stability_score"].fillna(0)
+                    )
+                    / 4
+                    / 10
                 )
-                / 4
-                / 10
+                * df_json["precipitation_factor"].fillna(1.0)
             ).round(1)
 
             # Create summary statistics
@@ -611,9 +636,16 @@ class AstroWeatherAnalyzer:
             return None
 
     @staticmethod
-    def _observation_score(seeing: float, transparency: float, cloud: float, tracking: float) -> float:
-        """0–10 composite observation quality score (canonical definition of the formula)."""
-        return ((seeing * 10 + transparency + cloud + tracking) / 4) / 10
+    def _observation_score(
+        seeing: float, transparency: float, cloud: float, tracking: float, precipitation_factor: float = 1.0
+    ) -> float:
+        """0–10 composite observation quality score (canonical definition of the formula).
+
+        ``precipitation_factor`` (0-1) multiplies the whole score - rain is a hard
+        go/no-go signal, not just another averaged component. See
+        ``analyze_precipitation_impact``.
+        """
+        return (((seeing * 10 + transparency + cloud + tracking) / 4) / 10) * precipitation_factor
 
     def _generate_current_summary(self, current_row: Optional[pd.Series]) -> Dict:
         """Generate summary of current conditions"""
@@ -624,6 +656,7 @@ class AstroWeatherAnalyzer:
         transparency = float(cast(Any, current_row.get("transparency_score", 0)))
         cloud = float(cast(Any, current_row.get("cloud_discrimination", 0)))
         tracking = float(cast(Any, current_row.get("tracking_stability_score", 0)))
+        precipitation_factor = float(cast(Any, current_row.get("precipitation_factor", 1.0)))
 
         return {
             "seeing_pickering": seeing,
@@ -634,7 +667,10 @@ class AstroWeatherAnalyzer:
             "dew_point_spread": float(cast(Any, current_row.get("dew_point_spread", 0))),
             "wind_tracking_impact": current_row.get("wind_tracking_impact", "UNKNOWN"),
             "tracking_stability_score": tracking,
-            "observation_score": round(self._observation_score(seeing, transparency, cloud, tracking), 1),
+            "precipitation_factor": precipitation_factor,
+            "observation_score": round(
+                self._observation_score(seeing, transparency, cloud, tracking, precipitation_factor), 1
+            ),
         }
 
     def _resolve_astronomical_night_window(self) -> Optional[Tuple[pd.Timestamp, pd.Timestamp]]:
@@ -691,13 +727,18 @@ class AstroWeatherAnalyzer:
         if len(working_df) == 0:
             return []
 
-        # Calculate overall quality score
+        # Calculate overall quality score. Precipitation is a multiplicative veto (see
+        # analyze_precipitation_impact) rather than a fifth averaged component - active
+        # rain shouldn't be masked by otherwise-clear metrics when picking "best" periods.
         working_df["overall_quality"] = (
-            working_df["seeing_pickering"] * 10  # Convert to percentage scale
-            + working_df["transparency_score"]
-            + working_df["cloud_discrimination"]
-            + working_df["tracking_stability_score"]
-        ) / 4
+            (
+                working_df["seeing_pickering"] * 10  # Convert to percentage scale
+                + working_df["transparency_score"]
+                + working_df["cloud_discrimination"]
+                + working_df["tracking_stability_score"]
+            )
+            / 4
+        ) * working_df.get("precipitation_factor", 1.0)
 
         # Filter to only nighttime hours (is_day == 0)
         # This ensures we only consider periods when astronomical observation is possible

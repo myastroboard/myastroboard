@@ -352,9 +352,20 @@ function renderNightTimeline(hourlyData, timezone) {
     const timeline = document.createElement('div');
     timeline.className = 'night-score-timeline';
 
-    nightHours.forEach(h => {
-        const hMs = new Date(h.datetime).getTime();
-        const isNow = Math.abs(hMs - nowMs) < 60 * 60 * 1000;
+    // Only the single closest hour is flagged "now" - a fixed distance threshold
+    // can match two adjacent hourly points at once (e.g. now sits 20min from one
+    // point and 40min from the next, both under a 60min window), highlighting both.
+    let nowIdx = -1, nowBestDiff = Infinity;
+    nightHours.forEach((h, i) => {
+        const diff = Math.abs(new Date(h.datetime).getTime() - nowMs);
+        if (diff < nowBestDiff) {
+            nowBestDiff = diff;
+            nowIdx = i;
+        }
+    });
+
+    nightHours.forEach((h, i) => {
+        const isNow = i === nowIdx;
 
         const score = h.observation_score ?? 0;
 
@@ -403,6 +414,8 @@ function renderNightTimeline(hourlyData, timezone) {
 
         const metricColor = (val) => val >= 80 ? 'text-success' : val >= 60 ? 'text-warning' : 'text-danger';
         const dewColor = (s) => s >= 70 ? 'text-success' : s >= 50 ? 'text-warning' : 'text-danger';
+        // precipitation_factor is 0-1 (1 = dry), unlike the other 0-100 metric scores
+        const precipColor = (f) => f >= 0.8 ? 'text-success' : f >= 0.4 ? 'text-warning' : 'text-danger';
 
         const iconRow = document.createElement('div');
         iconRow.className = 'night-score-icons';
@@ -412,6 +425,7 @@ function renderNightTimeline(hourlyData, timezone) {
             ['bi bi-clouds', metricColor(h.cloud_discrimination || 0), i18n.t('astro_weather.cloud_layers')],
             ['bi bi-droplet', dewColor(h.dew_risk_score || 0), i18n.t('astro_weather.dew_risk')],
             ['bi bi-crosshair2', metricColor(h.tracking_stability_score || 0), i18n.t('astro_weather.tracking')],
+            ['bi bi-cloud-rain', precipColor(h.precipitation_factor ?? 1), i18n.t('weather.precipitation')],
         ].forEach(([cls, color, title]) => {
             const ico = DOMUtils.createIcon(cls);
             ico.className += ` ${color}`;

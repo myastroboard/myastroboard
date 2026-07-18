@@ -1657,6 +1657,7 @@
     "dew_point": "Punto de rocío",
     "pressure": "Presión",
     "wind": "Viento",
+    "precipitation": "Precipitación",
     "loading_astro_chart": "Cargando cartas astronómicas...",
     "chart_cloud_title": "Nubes y viento",
     "chart_cloudless": "Despejado",

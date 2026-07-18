@@ -168,6 +168,7 @@ async function loadWeather() {
             const temp = formatMetricNumber(forecast.temperature_2m, 1);
             const pressure = formatMetricInteger(forecast.surface_pressure);
             const windSpeed = formatMetricInteger(forecast.wind_speed_10m);
+            const precipitation = formatMetricNumber(forecast.precipitation, 1);
             const dewPoint = formatMetricNumber(forecast.dew_point_2m, 1);
             const condition = toFiniteNumber(forecast.condition);
 
@@ -222,6 +223,7 @@ async function loadWeather() {
             metricGrid.appendChild(createForecastMetricCell('bi-droplet-half', 'text-primary', `${dewPoint}${i18n.t('units.temperature_celsius')}`, i18n.t('weather.dew_point')));
             metricGrid.appendChild(createForecastMetricCell('bi-speedometer2', '', `${pressure} ${i18n.t('units.hpa')}`, i18n.t('weather.pressure')));
             metricGrid.appendChild(createForecastMetricCell('bi-wind', '', `${windSpeed} ${i18n.t('units.wind_speed_kmh')}`, i18n.t('weather.wind')));
+            metricGrid.appendChild(createForecastMetricCell('bi-cloud-rain', 'text-primary', `${precipitation} ${i18n.t('units.precipitation_mm')}`, i18n.t('weather.precipitation')));
             metricGrid.appendChild(createForecastMetricCell('bi-clouds', '', `${cloudCover}${i18n.t('units.percent')}`, i18n.t('weather.cloud_cover')));
 
             // Cloud layer breakdown
@@ -610,7 +612,7 @@ async function loadAstronomicalCharts() {
                             fill: false,
                             tension: 0.4,
                             order: 5,
-                            yAxisID: 'y1'
+                            yAxisID: 'y2'
                         }
                     ]
                 },
@@ -635,12 +637,10 @@ async function loadAstronomicalCharts() {
                                     }
                                     if (context.dataset.yAxisID === 'y') {
                                         label += Math.round(context.parsed.y * 10) / 10 + '%';
+                                    } else if (context.dataset.yAxisID === 'y2') {
+                                        label += Math.round(context.parsed.y * 100) / 100 + i18n.t('units.precipitation_mm');
                                     } else if (context.dataset.yAxisID === 'y1') {
-                                        if (context.dataset.label === i18n.t('weather.chart_precipitation')) {
-                                            label += Math.round(context.parsed.y * 100) / 100 + i18n.t('units.precipitation_mm');
-                                        } else {
-                                            label += Math.round(context.parsed.y * 10) / 10 + i18n.t('units.temperature_celsius');
-                                        }
+                                        label += Math.round(context.parsed.y * 10) / 10 + i18n.t('units.temperature_celsius');
                                     }
                                     return label;
                                 }
@@ -677,7 +677,23 @@ async function loadAstronomicalCharts() {
                             position: 'right',
                             title: {
                                 display: true,
-                                text: i18n.t('weather.chart_temp_precip')
+                                text: `${i18n.t('weather.chart_lifted_index')} (${i18n.t('units.temperature_celsius')})`
+                            },
+                            grid: {
+                                drawOnChartArea: false,
+                            }
+                        },
+                        // Precipitation (mm) gets its own axis - sharing y1 with lifted_index
+                        // (which ranges roughly -8..+8) drowned out small mm values, making
+                        // real rain look flat at zero on the chart.
+                        y2: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            min: 0,
+                            title: {
+                                display: true,
+                                text: `${i18n.t('weather.chart_precipitation')} (${i18n.t('units.precipitation_mm')})`
                             },
                             grid: {
                                 drawOnChartArea: false,
