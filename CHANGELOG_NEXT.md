@@ -20,3 +20,4 @@ This release introduces multi-location profiles: admins can create up to 5 locat
 - Add an optimizer service for a plan in plan-my-night
 - Complete reorganization of `backend` folder because the app had grown too much to remain organized.
 - Add notification for meteor shower
+- Add World map to see pictures by location
