@@ -1657,6 +1657,7 @@
     "dew_point": "Dew Point",
     "pressure": "Pressure",
     "wind": "Wind",
+    "precipitation": "Precipitation",
     "loading_astro_chart": "Loading astronomical charts...",
     "chart_cloud_title": "Clouds & Wind",
     "chart_cloudless": "Cloudless",

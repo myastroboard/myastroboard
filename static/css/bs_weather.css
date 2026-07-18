@@ -178,8 +178,10 @@
 }
 
 .night-score-card {
-    flex: 1 0 88px;
-    min-width: 88px;
+    /* Widened from 88px to fit 6 metric icons (seeing/transparency/cloud/dew/tracking/precipitation)
+       in the icon row without clipping or overlap. */
+    flex: 1 0 104px;
+    min-width: 104px;
     max-width: 140px;
 }
 
@@ -226,6 +228,20 @@
     justify-content: center;
     gap: 0.25rem;
     font-size: 0.75rem;
+}
+
+@media (max-width: 575.98px) {
+    /* Mobile has less room per card; shrink the icon row instead of growing
+       cards further so more hours stay visible in the horizontal scroller. */
+    .night-score-card {
+        flex-basis: 92px;
+        min-width: 92px;
+    }
+
+    .night-score-icons {
+        gap: 0.12rem;
+        font-size: 0.65rem;
+    }
 }
 
 /* Astro weather */

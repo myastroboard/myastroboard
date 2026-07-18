@@ -1657,6 +1657,7 @@
     "dew_point": "Point de rosée",
     "pressure": "Pression",
     "wind": "Vent",
+    "precipitation": "Précipitations",
     "loading_astro_chart": "Chargement des graphiques astronomiques...",
     "chart_cloud_title": "Nuages & Vent",
     "chart_cloudless": "Sans nuages",

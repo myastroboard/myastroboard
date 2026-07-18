@@ -1657,6 +1657,7 @@
     "dew_point": "Taupunkt",
     "pressure": "Druck",
     "wind": "Wind",
+    "precipitation": "Niederschlag",
     "loading_astro_chart": "Astronomische Karten werden geladen...",
     "chart_cloud_title": "Wolken und Wind",
     "chart_cloudless": "Wolkenlos",
