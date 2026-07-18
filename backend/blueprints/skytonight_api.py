@@ -227,10 +227,16 @@ def _annotate_skytonight_item(
 _ALTTIME_ID_SAFE = re.compile(r'[^a-z0-9_-]')
 
 
-def _alttime_json_path(target_id: str, location_id: Optional[str] = None) -> str:
-    """Return absolute path for a target's altitude-time JSON file (per location)."""
+def _alttime_json_path(target_id: str, location_id: Optional[str] = None, alttime_dir: Optional[str] = None) -> str:
+    """Return absolute path for a target's altitude-time JSON file (per location).
+
+    Pass a pre-resolved *alttime_dir* (from :func:`get_alttime_dir`, called once)
+    when checking many rows in a loop - it avoids re-resolving/creating the
+    directory (a filesystem call) on every single row.
+    """
     safe_id = _ALTTIME_ID_SAFE.sub('_', target_id.lower())
-    return os.path.normpath(os.path.join(get_alttime_dir(location_id), f'{safe_id}_alttime.json'))
+    resolved_dir = alttime_dir if alttime_dir is not None else get_alttime_dir(location_id)
+    return os.path.normpath(os.path.join(resolved_dir, f'{safe_id}_alttime.json'))
 
 
 # ---------------------------------------------------------------------------
@@ -264,6 +270,7 @@ def _build_skytonight_reports_payload(catalogue: Optional[str], user_id: str, us
     if has_calculation_results(location_id):
         calc = load_calculation_results(location_id)
         night_meta = calc.get('metadata', {})
+        alttime_dir = get_alttime_dir(location_id)
 
         base_result['night_metadata'] = night_meta
 
@@ -318,7 +325,7 @@ def _build_skytonight_reports_payload(catalogue: Optional[str], user_id: str, us
                 'catalogue_names': calc_catalogue_names,
                 'alttime_file': (
                     calc_item.get('target_id', '')
-                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', ''), location_id))
+                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', ''), alttime_dir=alttime_dir))
                     else ''
                 ),
                 'source_type': 'calculated',
@@ -350,7 +357,7 @@ def _build_skytonight_reports_payload(catalogue: Optional[str], user_id: str, us
                 'solar elongation': calc_item.get('solar_elongation_deg'),
                 'alttime_file': (
                     calc_item.get('target_id', '')
-                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', ''), location_id))
+                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', ''), alttime_dir=alttime_dir))
                     else ''
                 ),
                 'source_type': 'calculated',
@@ -387,7 +394,7 @@ def _build_skytonight_reports_payload(catalogue: Optional[str], user_id: str, us
                 'observable_hours': observation.get('observable_hours'),
                 'alttime_file': (
                     calc_item.get('target_id', '')
-                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', ''), location_id))
+                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', ''), alttime_dir=alttime_dir))
                     else ''
                 ),
                 'source_type': 'calculated',
@@ -500,6 +507,7 @@ def _build_bodies_section_payload(user_id: str, username: str) -> Dict[str, Any]
 
     if has_bodies_results(location_id):
         data = load_json_file(get_bodies_results_file(location_id), default={})
+        alttime_dir = get_alttime_dir(location_id)
         rows = []
         for calc_item in data.get('bodies', []):
             observation = calc_item.get('observation', {})
@@ -522,7 +530,7 @@ def _build_bodies_section_payload(user_id: str, username: str) -> Dict[str, Any]
                 'observable_hours': observation.get('observable_hours'),
                 'alttime_file': (
                     calc_item.get('target_id', '')
-                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', ''), location_id))
+                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', ''), alttime_dir=alttime_dir))
                     else ''
                 ),
                 'source_type': 'calculated',
@@ -592,6 +600,7 @@ def _build_comets_section_payload(user_id: str, username: str) -> Dict[str, Any]
 
     if has_comets_results(location_id):
         data = load_json_file(get_comets_results_file(location_id), default={})
+        alttime_dir = get_alttime_dir(location_id)
         rows = []
         for calc_item in data.get('comets', []):
             observation = calc_item.get('observation', {})
@@ -621,7 +630,7 @@ def _build_comets_section_payload(user_id: str, username: str) -> Dict[str, Any]
                 'observable_hours': observation.get('observable_hours'),
                 'alttime_file': (
                     calc_item.get('target_id', '')
-                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', ''), location_id))
+                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', ''), alttime_dir=alttime_dir))
                     else ''
                 ),
                 'source_type': 'calculated',
@@ -696,6 +705,7 @@ def _build_dso_section_payload(catalogue: Optional[str], user_id: str, username:
 
     if has_dso_results(location_id):
         data = load_json_file(get_dso_results_file(location_id), default={})
+        alttime_dir = get_alttime_dir(location_id)
         rows = []
         rows_added = 0
         for calc_item in data.get('deep_sky', []):
@@ -743,7 +753,7 @@ def _build_dso_section_payload(catalogue: Optional[str], user_id: str, username:
                 'catalogue_names': calc_catalogue_names,
                 'alttime_file': (
                     calc_item.get('target_id', '')
-                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', ''), location_id))
+                    if os.path.isfile(_alttime_json_path(calc_item.get('target_id', ''), alttime_dir=alttime_dir))
                     else ''
                 ),
                 'source_type': 'calculated',

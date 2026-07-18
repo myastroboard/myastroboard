@@ -1001,6 +1001,7 @@
     "loading_report_content": "Loading report content...",
     "failed_to_load_report_content": "Failed to load report content",
     "no_target_in_report": "No targets in report",
+    "no_nautical_night": "No true night tonight at this location - the sun never reaches 12° below the horizon (common in summer at high latitudes), so no observing window could be calculated.",
     "add": "Add",
     "captured": "Captured",
     "planned": "Planned",

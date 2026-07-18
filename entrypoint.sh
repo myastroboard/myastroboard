@@ -13,9 +13,10 @@ find /app/data -type f \( \
 \) -delete || true
 
 # Migration for v1.2.x.
-# Remove legacy SkyTonight JSON files that are regenerated in subdirectories.
-find /app/data/skytonight/calculations -type f -name "*.json" -delete 2>/dev/null || true
-find /app/data/skytonight/outputs -type f -name "*.json" -delete 2>/dev/null || true
+# Remove legacy flat SkyTonight JSON files left at the top level by pre-v1.2 runs;
+# per-location results now live in subdirectories and must survive restarts.
+find /app/data/skytonight/calculations -maxdepth 1 -type f -name "*.json" -delete 2>/dev/null || true
+find /app/data/skytonight/outputs -maxdepth 1 -type f -name "*.json" -delete 2>/dev/null || true
 
 echo "[INFO] Starting application as non-root user"
 exec su appuser -c "$*"

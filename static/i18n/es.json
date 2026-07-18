@@ -1001,6 +1001,7 @@
     "loading_report_content": "Cargando contenido del informe...",
     "failed_to_load_report_content": "No se pudo cargar el contenido del informe",
     "no_target_in_report": "No hay objetivos en el informe",
+    "no_nautical_night": "Esta noche no hay verdadera oscuridad en esta ubicación - el sol nunca desciende 12° bajo el horizonte (algo común en verano en latitudes altas), por lo que no se pudo calcular ninguna ventana de observación.",
     "add": "Agregar",
     "captured": "Capturado",
     "planned": "Planificado",

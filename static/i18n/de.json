@@ -1001,6 +1001,7 @@
     "loading_report_content": "Berichtsinhalt wird geladen...",
     "failed_to_load_report_content": "Berichtsinhalt konnte nicht geladen werden",
     "no_target_in_report": "Keine Ziele im Bericht",
+    "no_nautical_night": "Heute Nacht gibt es an diesem Standort keine echte Dunkelheit - die Sonne sinkt nie 12° unter den Horizont (häufig im Sommer in hohen Breiten), daher konnte kein Beobachtungsfenster berechnet werden.",
     "add": "Hinzufügen",
     "captured": "Erfasst",
     "planned": "Geplant",
