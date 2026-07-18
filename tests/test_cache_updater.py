@@ -54,7 +54,7 @@ class TestCheckAndHandleConfigChanges:
         """Unit tests exercise per-preset detection, not the one-time upgrade path."""
         from cache import cache_updater
 
-        monkeypatch.setattr(cache_updater, "_legacy_cache_migration_done", True)
+        monkeypatch.setitem(cache_updater._legacy_cache_migration_state, "done", True)
 
     @patch("cache.cache_updater.load_config")
     @patch("cache.cache_updater.cache_store")
@@ -131,7 +131,7 @@ class TestLegacyCacheMigration:
     def test_matching_legacy_signature_migrates_keys(self, mock_cache_store, mock_load_config, monkeypatch):
         from cache import cache_updater
 
-        monkeypatch.setattr(cache_updater, "_legacy_cache_migration_done", False)
+        monkeypatch.setitem(cache_updater._legacy_cache_migration_state, "done", False)
         location = _make_location()
         mock_load_config.return_value = {"locations": [location]}
 
@@ -152,14 +152,14 @@ class TestLegacyCacheMigration:
         mock_cache_store.migrate_legacy_cache_keys.assert_called_once_with(LOC_ID)
         # Matching signature: caches kept (no reset)
         mock_cache_store.reset_caches_for_location.assert_not_called()
-        assert cache_updater._legacy_cache_migration_done is True
+        assert cache_updater._legacy_cache_migration_state['done'] is True
 
     @patch("cache.cache_updater.load_config")
     @patch("cache.cache_updater.cache_store")
     def test_mismatched_legacy_signature_resets(self, mock_cache_store, mock_load_config, monkeypatch):
         from cache import cache_updater
 
-        monkeypatch.setattr(cache_updater, "_legacy_cache_migration_done", False)
+        monkeypatch.setitem(cache_updater._legacy_cache_migration_state, "done", False)
         location = _make_location()
         mock_load_config.return_value = {"locations": [location]}
 

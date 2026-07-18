@@ -26,7 +26,7 @@ def _reset_disk_details_cache():
     the pre-cache behavior these tests were written against."""
     mc._disk_details_cache['data'] = None
     mc._disk_details_cache['ts'] = 0.0
-    mc._disk_details_refreshing = False
+    mc._disk_details_cache['refreshing'] = False
     yield
 
 
@@ -569,12 +569,12 @@ class TestGetDiskSpaceDetailsCache:
         assert result == stale_value
         # ...and the cache is updated in the background for the next call.
         assert mc._disk_details_cache['data'] == fresh_value
-        assert mc._disk_details_refreshing is False
+        assert mc._disk_details_cache['refreshing'] is False
 
     def test_does_not_start_a_second_refresh_while_one_is_in_flight(self):
         mc._disk_details_cache['data'] = {'root': {}, 'folders': {}, 'total_tracked': 0}
         mc._disk_details_cache['ts'] = time.monotonic() - mc._DISK_DETAILS_CACHE_TTL - 1
-        mc._disk_details_refreshing = True
+        mc._disk_details_cache['refreshing'] = True
 
         with patch('utils.metrics_collector.threading.Thread') as mock_thread:
             mc.get_disk_space_details()

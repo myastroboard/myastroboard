@@ -58,7 +58,7 @@ from utils.constants import (
 logger = get_logger(__name__)
 
 # One-time-per-process guard for the pre-v1.2 cache key migration
-_legacy_cache_migration_done = False
+_legacy_cache_migration_state = {'done': False}
 
 
 def _resolve_job_location(config, location):
@@ -98,8 +98,6 @@ def check_and_handle_config_changes():
     Resets the caches of each changed preset only (not the whole install).
     Also performs the one-time pre-v1.2 -> v1.2 cache key migration.
     """
-    global _legacy_cache_migration_done
-
     config = load_config()
     locations = get_all_locations(config)
     if not locations:
@@ -108,7 +106,7 @@ def check_and_handle_config_changes():
     # --- One-time upgrade path -------------------------------------------
     # Transfer the pre-v1.2 flat signature + plain cache keys onto the
     # migrated install-default preset so the warm cache survives the upgrade.
-    if not _legacy_cache_migration_done:
+    if not _legacy_cache_migration_state['done']:
         install_default = get_install_default_location(config)
         legacy_signature = cache_store.pop_legacy_location_signature()
         if legacy_signature is not None:
@@ -129,7 +127,7 @@ def check_and_handle_config_changes():
         else:
             # No legacy signature but plain keys may still exist (idempotent no-op otherwise)
             cache_store.migrate_legacy_cache_keys(install_default["id"])
-        _legacy_cache_migration_done = True
+        _legacy_cache_migration_state['done'] = True
 
     # --- Per-preset change detection --------------------------------------
     any_changed = False

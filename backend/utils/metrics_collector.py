@@ -163,9 +163,14 @@ def _compute_disk_space_details():
         return {'root': {'total': 0, 'used': 0, 'free': 0, 'percent': 0}, 'folders': {}, 'total_tracked': 0}
 
 
+class _DiskDetailsCache(TypedDict):
+    data: dict | None
+    ts: float
+    refreshing: bool
+
+
 _disk_details_cache_lock = threading.Lock()
-_disk_details_cache: _MetricsCache = {'data': None, 'ts': 0.0}
-_disk_details_refreshing = False
+_disk_details_cache: _DiskDetailsCache = {'data': None, 'ts': 0.0, 'refreshing': False}
 # Recursively sizing every tracked folder is the slow part of /api/metrics -
 # on a Docker-Desktop-on-Windows bind mount, walking many-small-file
 # directories (skyfield ephemeris, cached images) can take several seconds
@@ -182,14 +187,12 @@ def get_disk_space_details():
     goes stale - except on the very first call, which has no cached value to
     fall back on and must compute synchronously once.
     """
-    global _disk_details_refreshing
-
     with _disk_details_cache_lock:
         cached = _disk_details_cache['data']
         is_stale = (time.monotonic() - _disk_details_cache['ts']) >= _DISK_DETAILS_CACHE_TTL
-        start_refresh = cached is not None and is_stale and not _disk_details_refreshing
+        start_refresh = cached is not None and is_stale and not _disk_details_cache['refreshing']
         if start_refresh:
-            _disk_details_refreshing = True
+            _disk_details_cache['refreshing'] = True
 
     if cached is None:
         result = _compute_disk_space_details()
@@ -205,7 +208,6 @@ def get_disk_space_details():
 
 
 def _refresh_disk_details_cache():
-    global _disk_details_refreshing
     try:
         result = _compute_disk_space_details()
         with _disk_details_cache_lock:
@@ -213,7 +215,7 @@ def _refresh_disk_details_cache():
             _disk_details_cache['ts'] = time.monotonic()
     finally:
         with _disk_details_cache_lock:
-            _disk_details_refreshing = False
+            _disk_details_cache['refreshing'] = False
 
 
 def get_environment_processes():
