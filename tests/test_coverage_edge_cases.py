@@ -516,6 +516,7 @@ def test_push_scheduler_reuses_cached_location_payload_for_same_location(monkeyp
     monkeypatch.setattr(push_scheduler, "_check_n3_iss", lambda *_a, **_k: None)
     monkeypatch.setattr(push_scheduler, "_check_n8_css", lambda *_a, **_k: None)
     monkeypatch.setattr(push_scheduler, "_check_n4_n5_eclipse", lambda *_a, **_k: None)
+    monkeypatch.setattr(push_scheduler, "_check_n9_solsys_window", lambda *_a, **_k: None)
     monkeypatch.setattr(push_scheduler, "_get_muted_location_ids", lambda _u: set())
     monkeypatch.setattr(push_scheduler, "_load_cache", lambda key: load_calls.append(key) or {})
 
@@ -541,5 +542,5 @@ def test_push_scheduler_reuses_cached_location_payload_for_same_location(monkeyp
     with patch.dict("sys.modules", {"utils.repo_config": fake_repo_config, "utils.auth": fake_auth}):
         push_scheduler._poll()
 
-    # 6 per-location cache names should be loaded once for the shared location id.
-    assert len(load_calls) == 6
+    # 7 per-location cache names should be loaded once for the shared location id.
+    assert len(load_calls) == 7

@@ -283,7 +283,7 @@ def parse_hourly_json(payload, hourly_vars, timezone_str: Optional[str] = "UTC")
     if not isinstance(time_values, list) or not time_values:
         raise ValueError("Open-Meteo JSON fallback: hourly time series is missing")
 
-    dates = pd.to_datetime(time_values, errors="coerce")
+    dates = pd.to_datetime(time_values, format="mixed", errors="coerce")
     if cast(np.ndarray, dates.isna()).all():
         raise ValueError("Open-Meteo JSON fallback: unable to parse hourly timestamps")
 

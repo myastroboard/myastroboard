@@ -967,7 +967,7 @@ def test_n1_naive_datetime_handled(monkeypatch):
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     from datetime import datetime, timedelta
     # Naive ISO string (no +00:00)
-    naive_start = (datetime.utcnow() + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S')
+    naive_start = (datetime.now(timezone.utc) + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S')
     payload = {'state': 'pending', 'timeline': {'is_inside_night': False},
                'plan': {'night_start': naive_start}}
     push_scheduler._check_n1_plan_start(_make_user(), payload)
@@ -1066,7 +1066,7 @@ def test_n6_naive_dusk_handled(monkeypatch):
     from datetime import datetime, timedelta
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
-    naive = (datetime.utcnow() + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S')
+    naive = (datetime.now(timezone.utc) + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S')
     push_scheduler._check_n6_darkness(_make_user(), {'next_astronomical_dusk_utc': naive})
     # Should not crash - may or may not send
 
@@ -1375,7 +1375,7 @@ def test_n2_naive_datetime_in_entry_gets_utc(monkeypatch):
     from datetime import datetime, timedelta, timezone as tz
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
-    soon = (datetime.utcnow() + timedelta(minutes=3)).strftime('%Y-%m-%dT%H:%M:%S')  # naive
+    soon = (datetime.now(timezone.utc) + timedelta(minutes=3)).strftime('%Y-%m-%dT%H:%M:%S')  # naive
     plan_payload = {
         'state': 'current',
         'timeline': {'is_inside_night': True},
@@ -1413,7 +1413,7 @@ def test_n3_solar_naive_datetime_gets_utc(monkeypatch):
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     push_scheduler._last_sent.clear()
-    soon = (datetime.utcnow() + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S')  # naive
+    soon = (datetime.now(timezone.utc) + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S')  # naive
     cache = {'solar_transits': [{'start_time': soon}], 'lunar_transits': []}
     push_scheduler._check_n3_iss(_make_user(), cache)
     # Must not raise
@@ -1426,7 +1426,7 @@ def test_n3_lunar_naive_datetime_gets_utc(monkeypatch):
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     push_scheduler._last_sent.clear()
-    soon = (datetime.utcnow() + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S')  # naive
+    soon = (datetime.now(timezone.utc) + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S')  # naive
     cache = {'solar_transits': [], 'lunar_transits': [{'start_time': soon}]}
     push_scheduler._check_n3_iss(_make_user(), cache)
     # Must not raise
@@ -1449,7 +1449,7 @@ def test_n4_naive_peak_datetime_gets_utc(monkeypatch):
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     push_scheduler._last_sent.clear()
-    soon = (datetime.utcnow() + timedelta(minutes=20)).strftime('%Y-%m-%dT%H:%M:%S')  # naive
+    soon = (datetime.now(timezone.utc) + timedelta(minutes=20)).strftime('%Y-%m-%dT%H:%M:%S')  # naive
     lunar_data = {'eclipse': {'peak_time': soon}}
     push_scheduler._check_n4_n5_eclipse(_make_user(), None, lunar_data)
     # Must not raise
@@ -1547,7 +1547,7 @@ def test_n3_past_lunar_transit_not_added_to_candidates(monkeypatch):
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     push_scheduler._last_sent.clear()
     # Past transit → dt < now → loop continues without appending
-    past = (datetime.utcnow() - timedelta(hours=1)).strftime('%Y-%m-%dT%H:%M:%SZ')
+    past = (datetime.now(timezone.utc) - timedelta(hours=1)).strftime('%Y-%m-%dT%H:%M:%SZ')
     cache = {'solar_transits': [], 'lunar_transits': [{'start_time': past}]}
     push_scheduler._check_n3_iss(_make_user(), cache)
     assert not send_calls  # No candidate → no notification
@@ -1577,7 +1577,7 @@ def test_poll_night_start_naive_gets_utc(monkeypatch):
         monkeypatch.setattr(push_scheduler, fn, lambda *a, **k: None)
     monkeypatch.setattr(push_scheduler, '_load_cache', lambda _k: {})
     # Naive datetime string for night_start, 10 min from now → active
-    soon_naive = (datetime.utcnow() + timedelta(minutes=10)).strftime('%Y-%m-%dT%H:%M:%S')
+    soon_naive = (datetime.now(timezone.utc) + timedelta(minutes=10)).strftime('%Y-%m-%dT%H:%M:%S')
     monkeypatch.setattr(
         push_scheduler, '_pick_active_plan',
         lambda _uid, _name: {
@@ -1728,7 +1728,7 @@ def test_n8_naive_solar_datetime_gets_utc(monkeypatch):
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     push_scheduler._last_sent.clear()
-    soon = (datetime.utcnow() + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S')  # naive
+    soon = (datetime.now(timezone.utc) + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S')  # naive
     cache = {'solar_transits': [{'start_time': soon}], 'lunar_transits': []}
     push_scheduler._check_n8_css(_make_user(), cache)
     # Must not raise
@@ -1760,7 +1760,7 @@ def test_n8_naive_lunar_datetime_gets_utc(monkeypatch):
     push_scheduler._last_sent.clear()
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
-    soon_naive = (datetime.utcnow() + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S')
+    soon_naive = (datetime.now(timezone.utc) + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S')
     cache = {'solar_transits': [], 'lunar_transits': [{'start_time': soon_naive}]}
     push_scheduler._check_n8_css(_make_user(), cache)
 

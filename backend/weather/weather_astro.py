@@ -683,7 +683,7 @@ class AstroWeatherAnalyzer:
             return []
 
         working_df = df.copy()
-        working_df["datetime"] = pd.to_datetime(working_df["datetime"], errors="coerce")
+        working_df["datetime"] = pd.to_datetime(working_df["datetime"], format="mixed", errors="coerce")
         working_df = working_df[working_df["datetime"].notna()].copy()
         if len(working_df) == 0:
             return []
