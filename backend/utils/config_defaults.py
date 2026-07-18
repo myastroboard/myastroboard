@@ -28,7 +28,7 @@ LOCATION_PRESET_EXTRA_FIELDS = {
 }
 
 # Default feature flags
-DEFAULT_ASTRODEX = {"private": False}
+DEFAULT_ASTRODEX = {"private": False, "map_private": False}
 
 
 # Default constraint values

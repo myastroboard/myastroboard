@@ -261,11 +261,13 @@ class AstroWeatherAnalyzer:
         low_clouds = cast(pd.Series, result["cloud_cover_low"])
 
         # Cloud discrimination score (0-100%)
-        # High clouds have least impact, low clouds have most impact
+        # High clouds have least impact, low clouds have most impact.
+        # Weighted average: result = sum(w_i * x_i) / sum(w_i), so each weight
+        # is divided by 1.3 (= 0.3 + 0.4 + 0.6) to normalize to sum to 1.0.
         cloud_discrimination = (
-            (100 - high_clouds) * 0.3  # High clouds less problematic
-            + (100 - mid_clouds) * 0.4  # Mid clouds moderate impact
-            + (100 - low_clouds) * 0.6  # Low clouds worst for astronomy
+            (100 - high_clouds) * (0.3 / 1.3)  # High clouds less problematic
+            + (100 - mid_clouds) * (0.4 / 1.3)  # Mid clouds moderate impact
+            + (100 - low_clouds) * (0.6 / 1.3)  # Low clouds worst for astronomy
         ).clip(0, 100)
 
         # Individual cloud layer impacts
@@ -304,7 +306,10 @@ class AstroWeatherAnalyzer:
 
         # Wind factor (surface and upper level)
         surface_wind = cast(pd.Series, result["wind_speed_10m"])
-        upper_wind_80m = cast(pd.Series, result.get("wind_speed_80m", surface_wind * 1.2))
+        if "wind_speed_80m" in result:
+            upper_wind_80m = cast(pd.Series, result["wind_speed_80m"]).fillna(surface_wind * 1.2)
+        else:
+            upper_wind_80m = surface_wind * 1.2
 
         # Wind seeing impact (lower is better for seeing)
         wind_seeing_score = self._wind_to_seeing_score(surface_wind, upper_wind_80m)
@@ -315,7 +320,6 @@ class AstroWeatherAnalyzer:
         # Jet stream impact
         jet_stream_score = self._jet_stream_impact(
             cast(pd.Series, result.get("wind_speed_500hPa", surface_wind * 2)),
-            cast(pd.Series, result.get("temperature_500hPa", result["temperature_2m"] - 30)),
         )
 
         # Combined seeing score (Pickering scale 1-10)
@@ -361,10 +365,9 @@ class AstroWeatherAnalyzer:
 
         return pd.Series(seeing_score, index=lifted_index.index)
 
-    def _jet_stream_impact(self, wind_500hpa: pd.Series, temp_500hpa: pd.Series) -> pd.Series:
-        """Calculate jet stream impact on seeing conditions"""
+    def _jet_stream_impact(self, wind_500hpa: pd.Series) -> pd.Series:
+        """Calculate jet stream impact on seeing conditions from 500 hPa wind speed."""
         # Strong jet stream winds indicate turbulence
-        # Temperature gradient also affects stability
 
         # Jet stream strength indicator
         jet_strength = wind_500hpa

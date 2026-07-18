@@ -237,10 +237,10 @@ def _enrich_hourly_dataframe(df: pd.DataFrame, timezone_str: Optional[str] = "UT
     fog_percent = pd.Series(0, index=df.index)
 
     mask1 = df["relative_humidity_2m"] > 90
-    fog_percent[mask1] = ((df["relative_humidity_2m"] - 90) * 10).clip(0, 100)
+    fog_percent.loc[mask1] = ((df["relative_humidity_2m"] - 90) * 10).clip(0, 100)
 
     mask2 = (df["relative_humidity_2m"] > 80) & (~mask1)
-    fog_percent[mask2] = ((df["relative_humidity_2m"] - 80) * 5).clip(0, 100)
+    fog_percent.loc[mask2] = ((df["relative_humidity_2m"] - 80) * 5).clip(0, 100)
 
     # -----------------------------
     # Overall astro condition score

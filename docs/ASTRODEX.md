@@ -101,6 +101,16 @@ The object editor allows updating:
 
 `GET /api/astrodex/constellations` returns all constellations represented in the current user's collection, useful for building the constellation filter dropdown.
 
+### Photo Map
+
+**Astrodex tab → Photo Map sub-tab**
+
+Shows every geotagged picture (one with `latitude`/`longitude` set via a location preset or manually-typed custom coordinates in the Add/Edit Picture modal) on a world map, with marker clustering: bubbles show a photo count and separate into individual pins as you zoom the map in, mirroring the Apple/Google Photos map view. Clicking a bubble opens the existing photo slideshow directly for every photo in that cluster; clicking a single pin opens the slideshow for that one photo.
+
+This does **not** perform any EXIF GPS extraction — it only visualizes coordinates a user already entered manually. It is powered by a dedicated, lightweight endpoint:
+
+`GET /api/astrodex/map` returns a flat list of geotagged pictures across all visible users, gated by its own **`config['astrodex']['map_private']`** flag (Configuration → Astrodex → "Photo map private", off by default) — deliberately **independent** from the general `config['astrodex']['private']` sharing flag used by `/api/astrodex`. When `map_private` is off (default), every shared user's pictures appear on the map with their real coordinates, even though `/api/astrodex` itself always strips other users' exact coordinates for privacy in its own merged view. This app targets small trusted deployments (family/astro-club), so exposing real-world photo locations to other users on the map is an explicit, separately-labeled opt-out rather than tied to the general sharing toggle.
+
 ---
 
 ## Shared items
@@ -137,6 +147,7 @@ Per-user write locks (`threading.Lock` per `user_id`) prevent concurrent save ra
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `GET` | `/api/astrodex` | login | List all items (merged across users sharing same objects) |
+| `GET` | `/api/astrodex/map` | login | Flat list of geotagged pictures for the Photo Map sub-tab, gated by its own `map_private` flag (never strips coordinates when off) |
 | `POST` | `/api/astrodex/items` | login | Create a new item |
 | `GET` | `/api/astrodex/items/<item_id>` | login | Get a single item |
 | `PUT` | `/api/astrodex/items/<item_id>` | login | Update item fields |

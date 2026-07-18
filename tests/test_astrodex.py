@@ -764,6 +764,114 @@ class TestAstrodexVisibilityModes:
         assert merged['own_pictures'][0]['latitude'] == 45.1
 
 
+class TestAstrodexMapPoints:
+    """Test get_astrodex_map_points() - the Photo Map's dedicated, map_private-gated view."""
+
+    def test_map_private_true_shows_only_own_points(self, temp_data_dir):
+        user1_item = astrodex.create_astrodex_item('user1', {'name': 'M51', 'type': 'Galaxy'}, username='alice')
+        user2_item = astrodex.create_astrodex_item('user2', {'name': 'M42', 'type': 'Nebula'}, username='bob')
+        assert user1_item is not None
+        assert user2_item is not None
+
+        astrodex.add_picture_to_item('user1', user1_item['id'], {
+            'filename': 'alice_pic.jpg', 'latitude': 45.1, 'longitude': 5.2,
+        })
+        astrodex.add_picture_to_item('user2', user2_item['id'], {
+            'filename': 'bob_pic.jpg', 'latitude': 48.8, 'longitude': 2.3,
+        })
+
+        payload = astrodex.get_astrodex_map_points(
+            current_user_id='user1',
+            current_username='alice',
+            map_private=True,
+            usernames_by_id={'user1': 'alice', 'user2': 'bob'},
+        )
+
+        assert payload['map_private'] is True
+        assert len(payload['points']) == 1
+        assert payload['points'][0]['filename'] == 'alice_pic.jpg'
+        assert payload['points'][0]['owner_username'] == 'alice'
+
+    def test_map_private_false_shows_all_users_points_with_real_coordinates(self, temp_data_dir):
+        """Unlike get_visible_astrodex(), the map never strips other users' coordinates."""
+        user1_item = astrodex.create_astrodex_item('user1', {'name': 'M51', 'type': 'Galaxy'}, username='alice')
+        user2_item = astrodex.create_astrodex_item('user2', {'name': 'M51', 'type': 'Galaxy'}, username='bob')
+        assert user1_item is not None
+        assert user2_item is not None
+
+        astrodex.add_picture_to_item('user1', user1_item['id'], {
+            'filename': 'alice_pic.jpg', 'location_name': 'Alice Backyard',
+            'latitude': 45.1, 'longitude': 5.2,
+        })
+        astrodex.add_picture_to_item('user2', user2_item['id'], {
+            'filename': 'bob_pic.jpg', 'location_name': 'Bob Backyard',
+            'latitude': 48.8, 'longitude': 2.3,
+        })
+
+        payload = astrodex.get_astrodex_map_points(
+            current_user_id='user1',
+            current_username='alice',
+            map_private=False,
+            usernames_by_id={'user1': 'alice', 'user2': 'bob'},
+        )
+
+        assert payload['map_private'] is False
+        assert len(payload['points']) == 2
+        by_owner = {p['owner_username']: p for p in payload['points']}
+        assert by_owner['alice']['latitude'] == 45.1
+        # Bob's coordinates are NOT stripped for the map, unlike get_visible_astrodex().
+        assert by_owner['bob']['latitude'] == 48.8
+        assert by_owner['bob']['longitude'] == 2.3
+        assert by_owner['bob']['is_owned_by_current_user'] is False
+
+    def test_pictures_without_coordinates_are_excluded_and_counted(self, temp_data_dir):
+        item = astrodex.create_astrodex_item('user1', {'name': 'M31', 'type': 'Galaxy'}, username='alice')
+        assert item is not None
+
+        astrodex.add_picture_to_item('user1', item['id'], {
+            'filename': 'geotagged.jpg', 'latitude': 45.1, 'longitude': 5.2,
+        })
+        astrodex.add_picture_to_item('user1', item['id'], {'filename': 'no_location.jpg'})
+
+        payload = astrodex.get_astrodex_map_points(
+            current_user_id='user1', current_username='alice', map_private=True,
+        )
+
+        assert len(payload['points']) == 1
+        assert payload['points'][0]['filename'] == 'geotagged.jpg'
+        assert payload['total_geotagged'] == 1
+        assert payload['total_without_location'] == 1
+
+    def test_map_privacy_is_independent_from_general_astrodex_private_flag(self, temp_data_dir):
+        """The map's own map_private flag governs it - the general 'private' flag must not matter."""
+        user1_item = astrodex.create_astrodex_item('user1', {'name': 'M31', 'type': 'Galaxy'}, username='alice')
+        user2_item = astrodex.create_astrodex_item('user2', {'name': 'M42', 'type': 'Nebula'}, username='bob')
+        assert user1_item is not None
+        assert user2_item is not None
+
+        astrodex.add_picture_to_item('user1', user1_item['id'], {
+            'filename': 'alice_pic.jpg', 'latitude': 45.1, 'longitude': 5.2,
+        })
+        astrodex.add_picture_to_item('user2', user2_item['id'], {
+            'filename': 'bob_pic.jpg', 'latitude': 48.8, 'longitude': 2.3,
+        })
+
+        # General astrodex visibility set to private=True would hide Bob's item entirely
+        # from get_visible_astrodex(); the map's map_private=False must still show him.
+        general_view = astrodex.get_visible_astrodex(
+            current_user_id='user1', current_username='alice', private_mode=True,
+            usernames_by_id={'user1': 'alice', 'user2': 'bob'},
+        )
+        assert len(general_view['items']) == 1  # only alice's, general flag is private
+
+        map_view = astrodex.get_astrodex_map_points(
+            current_user_id='user1', current_username='alice', map_private=False,
+            usernames_by_id={'user1': 'alice', 'user2': 'bob'},
+        )
+        owners = {p['owner_username'] for p in map_view['points']}
+        assert owners == {'alice', 'bob'}
+
+
 class TestAstrodexMissingBranches:
     """Tests targeting uncovered branches in astrodex.py helper functions."""
 

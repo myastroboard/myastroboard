@@ -13,6 +13,7 @@ const _wizard = {
     flow: null,
     steps: [],
     stepIndex: 0,
+    saving: false,
     presets: { telescopes: [], cameras: [] },
     existingTelescopes: [],
     existingCameras: [],
@@ -593,6 +594,9 @@ const _WIZARD_TELESCOPE_TYPE_MAP = {
     cassegrain: 'Cassegrain',
     dobsonian: 'Dobsonian',
 };
+// Preset payloads may include more specific color-camera types (e.g. DSLR/mirrorless),
+// but the manual wizard camera form intentionally normalizes to canonical sensor options:
+// CMOS Color, CMOS Mono, CCD Color, CCD Mono.
 const _WIZARD_CAMERA_SENSOR_TYPE_MAP = {
     cmos_color: 'CMOS Color',
     dslr_color: 'CMOS Color',
@@ -794,37 +798,48 @@ function _buildManualEquipmentFields(kind, container) {
         const typeSelect = document.createElement('select');
         typeSelect.id = 'wizard-telescope-manual-type';
         typeSelect.className = 'form-select form-select-sm';
-        ['Refractor', 'Newtonian', 'Schmidt-Cassegrain (SCT)', 'Maksutov-Cassegrain', 'Dobsonian'].forEach((t) => {
+        [
+            ['Refractor', 'equipment.form_refractor'],
+            ['Newtonian', 'equipment.form_newtonian'],
+            ['Schmidt-Cassegrain (SCT)', 'equipment.form_sct'],
+            ['Maksutov-Cassegrain', 'equipment.form_maksutov'],
+            ['Dobsonian', 'equipment.form_dobsonian'],
+        ].forEach(([value, key]) => {
             const opt = document.createElement('option');
-            opt.value = t;
-            opt.textContent = t;
+            opt.value = value;
+            opt.textContent = i18n.t(key, value);
             typeSelect.appendChild(opt);
         });
         typeCol.appendChild(typeSelect);
         container.appendChild(typeCol);
 
-        addNumberField('wizard-telescope-manual-aperture', 'Aperture (mm)');
-        addNumberField('wizard-telescope-manual-focal', 'Focal length (mm)');
+        addNumberField('wizard-telescope-manual-aperture', i18n.t('equipment.form_aperture', 'Aperture (mm)'));
+        addNumberField('wizard-telescope-manual-focal', i18n.t('equipment.form_focal_length', 'Focal length (mm)'));
     } else {
         const sensorTypeCol = document.createElement('div');
         sensorTypeCol.className = 'col-12';
         const sensorTypeSelect = document.createElement('select');
         sensorTypeSelect.id = 'wizard-camera-manual-sensor-type';
         sensorTypeSelect.className = 'form-select form-select-sm';
-        ['CMOS Color', 'CMOS Mono', 'CCD Color', 'CCD Mono'].forEach((t) => {
+        [
+            ['CMOS Color', 'equipment.form_cmos_color'],
+            ['CMOS Mono', 'equipment.form_cmos_mono'],
+            ['CCD Color', 'equipment.form_ccd_color'],
+            ['CCD Mono', 'equipment.form_ccd_mono'],
+        ].forEach(([value, key]) => {
             const opt = document.createElement('option');
-            opt.value = t;
-            opt.textContent = t;
+            opt.value = value;
+            opt.textContent = i18n.t(key, value);
             sensorTypeSelect.appendChild(opt);
         });
         sensorTypeCol.appendChild(sensorTypeSelect);
         container.appendChild(sensorTypeCol);
 
-        addNumberField('wizard-camera-manual-width', 'Sensor width (mm)');
-        addNumberField('wizard-camera-manual-height', 'Sensor height (mm)');
-        addNumberField('wizard-camera-manual-res-w', 'Resolution width (px)');
-        addNumberField('wizard-camera-manual-res-h', 'Resolution height (px)');
-        addNumberField('wizard-camera-manual-pixel', 'Pixel size (µm)');
+        addNumberField('wizard-camera-manual-width', i18n.t('equipment.form_sensor_width', 'Sensor width (mm)'));
+        addNumberField('wizard-camera-manual-height', i18n.t('equipment.form_sensor_height', 'Sensor height (mm)'));
+        addNumberField('wizard-camera-manual-res-w', i18n.t('equipment.form_resolution_width', 'Resolution width (px)'));
+        addNumberField('wizard-camera-manual-res-h', i18n.t('equipment.form_resolution_height', 'Resolution height (px)'));
+        addNumberField('wizard-camera-manual-pixel', i18n.t('equipment.form_pixel_size', 'Pixel size (µm)'));
     }
 }
 
@@ -928,7 +943,7 @@ async function _saveEquipmentStep() {
         return true;
     } catch (err) {
         console.error('Wizard equipment save error:', err);
-        showMessage('error', i18n.t('equipment.failed_to_save_telescope'));
+        showMessage('error', i18n.t('equipment.failed_to_save_equipment'));
         return false;
     }
 }
@@ -986,8 +1001,12 @@ function _buildNotificationsStep(container) {
         vapidInput.id = 'wizard-vapid-email';
         vapidInput.className = 'form-control';
         vapidInput.placeholder = i18n.t('wizard.notifications_vapid_placeholder');
+        const vapidErr = document.createElement('div');
+        vapidErr.id = 'wizard-vapid-email-error';
+        vapidErr.className = 'invalid-feedback';
         vapidWrap.appendChild(vapidLabel);
         vapidWrap.appendChild(vapidInput);
+        vapidWrap.appendChild(vapidErr);
         container.appendChild(vapidWrap);
     }
 }
@@ -1096,8 +1115,23 @@ async function _saveNotificationsStep() {
     }
 
     if (_wizard.flow === 'full') {
-        const vapidVal = document.getElementById('wizard-vapid-email')?.value.trim();
+        const vapidInput = document.getElementById('wizard-vapid-email');
+        const vapidVal = vapidInput?.value.trim();
+        const vapidErrEl = document.getElementById('wizard-vapid-email-error');
+        vapidInput?.classList.remove('is-invalid');
+        if (vapidErrEl) vapidErrEl.textContent = '';
+
         if (vapidVal) {
+            const hasNativeValidity = vapidInput && typeof vapidInput.checkValidity === 'function';
+            const isValidEmail = hasNativeValidity
+                ? vapidInput.checkValidity()
+                : /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(vapidVal);
+            if (!isValidEmail) {
+                vapidInput?.classList.add('is-invalid');
+                if (vapidErrEl) vapidErrEl.textContent = i18n.t('wizard.notifications_vapid_invalid');
+                return false;
+            }
+
             try {
                 await fetchJSON('/api/admin/app-settings', {
                     method: 'POST',

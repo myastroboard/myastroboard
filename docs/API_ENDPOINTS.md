@@ -166,6 +166,7 @@ This page lists the HTTP routes currently declared across `backend/blueprints/*.
 ## Astrodex
 
 - `GET /api/astrodex`
+- `GET /api/astrodex/map` - Flat list of geotagged pictures for the Photo Map sub-tab, gated by its own `map_private` config flag (independent from the general `private` sharing flag)
 - `POST /api/astrodex/items`
 - `POST /api/astrodex/items/<item_id>/catalogue-name`
 - `GET /api/astrodex/items/<item_id>`

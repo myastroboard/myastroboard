@@ -371,6 +371,75 @@ def get_visible_astrodex(
     }
 
 
+def get_astrodex_map_points(
+    current_user_id: str,
+    current_username: Optional[str] = None,
+    map_private: bool = False,
+    usernames_by_id: Optional[Dict[str, str]] = None,
+) -> Dict:
+    """
+    Return a flat list of geotagged Astrodex pictures for the Photo Map view.
+
+    map_private=True -> only current user's own geotagged pictures.
+    map_private=False -> geotagged pictures from every user, WITH real coordinates.
+
+    This deliberately never calls _strip_private_picture_fields(): coordinate
+    exposure on the map is governed entirely by the dedicated `map_private`
+    config flag (independent from the general astrodex `private` flag used by
+    get_visible_astrodex()), per product decision - this app targets small
+    trusted deployments (family/astro-club), not public multi-tenant use.
+    Do not "fix" this by reintroducing the strip call.
+    """
+    if map_private:
+        collections = [
+            {
+                'user_id': current_user_id,
+                'username': current_username or 'unknown',
+                'items': load_user_astrodex(current_user_id, current_username).get('items', []),
+            }
+        ]
+    else:
+        collections = load_all_users_astrodex(usernames_by_id or {})
+
+    points: List[Dict] = []
+    total_without_location = 0
+
+    for collection in collections:
+        owner_user_id = collection.get('user_id', '')
+        owner_username = collection.get('username', 'unknown')
+        for item in collection.get('items', []):
+            item_name = item.get('name', '')
+            item_id = item.get('id', '')
+            for picture in item.get('pictures', []):
+                latitude = picture.get('latitude')
+                longitude = picture.get('longitude')
+                if latitude is None or longitude is None:
+                    total_without_location += 1
+                    continue
+                points.append(
+                    {
+                        'id': picture.get('id', ''),
+                        'item_id': item_id,
+                        'item_name': item_name,
+                        'filename': picture.get('filename', ''),
+                        'date': picture.get('date'),
+                        'latitude': latitude,
+                        'longitude': longitude,
+                        'location_name': picture.get('location_name'),
+                        'owner_user_id': owner_user_id,
+                        'owner_username': owner_username,
+                        'is_owned_by_current_user': owner_user_id == current_user_id,
+                    }
+                )
+
+    return {
+        'points': points,
+        'total_geotagged': len(points),
+        'total_without_location': total_without_location,
+        'map_private': map_private,
+    }
+
+
 def can_user_view_image(
     user_id: str, filename: str, private_mode: bool, usernames_by_id: Optional[Dict[str, str]] = None
 ) -> bool:

@@ -971,7 +971,7 @@ def test_n1_naive_datetime_handled(monkeypatch):
     payload = {'state': 'pending', 'timeline': {'is_inside_night': False},
                'plan': {'night_start': naive_start}}
     push_scheduler._check_n1_plan_start(_make_user(), payload)
-    # May or may not send depending on lead window, but should not crash
+    assert len(send_calls) == 1
 
 
 def test_n1_exception_in_date_parsing_swallowed(monkeypatch):
@@ -1068,7 +1068,7 @@ def test_n6_naive_dusk_handled(monkeypatch):
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     naive = (datetime.now(timezone.utc) + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S')
     push_scheduler._check_n6_darkness(_make_user(), {'next_astronomical_dusk_utc': naive})
-    # Should not crash - may or may not send
+    assert len(send_calls) == 1
 
 
 def test_n3_no_cache_skips(monkeypatch):
@@ -1386,7 +1386,7 @@ def test_n2_naive_datetime_in_entry_gets_utc(monkeypatch):
     # Clear N2 notified state so cooldown doesn't interfere
     push_scheduler._n2_notified.clear()
     push_scheduler._check_n2_next_target(_make_user(), plan_payload)
-    # send may or may not fire, but must not raise
+    assert len(send_calls) == 1
 
 
 def test_n6_bad_timezone_name_falls_back_to_empty(monkeypatch):
@@ -1416,7 +1416,7 @@ def test_n3_solar_naive_datetime_gets_utc(monkeypatch):
     soon = (datetime.now(timezone.utc) + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S')  # naive
     cache = {'solar_transits': [{'start_time': soon}], 'lunar_transits': []}
     push_scheduler._check_n3_iss(_make_user(), cache)
-    # Must not raise
+    assert len(send_calls) == 1
 
 
 def test_n3_lunar_naive_datetime_gets_utc(monkeypatch):
@@ -1429,7 +1429,7 @@ def test_n3_lunar_naive_datetime_gets_utc(monkeypatch):
     soon = (datetime.now(timezone.utc) + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S')  # naive
     cache = {'solar_transits': [], 'lunar_transits': [{'start_time': soon}]}
     push_scheduler._check_n3_iss(_make_user(), cache)
-    # Must not raise
+    assert len(send_calls) == 1
 
 
 def test_n3_bad_lunar_timestamp_exception_swallowed(monkeypatch):
@@ -1452,7 +1452,7 @@ def test_n4_naive_peak_datetime_gets_utc(monkeypatch):
     soon = (datetime.now(timezone.utc) + timedelta(minutes=20)).strftime('%Y-%m-%dT%H:%M:%S')  # naive
     lunar_data = {'eclipse': {'peak_time': soon}}
     push_scheduler._check_n4_n5_eclipse(_make_user(), None, lunar_data)
-    # Must not raise
+    assert len(send_calls) == 1
 
 
 def test_pick_active_plan_fallback_returns_current_state(monkeypatch):
@@ -1731,7 +1731,7 @@ def test_n8_naive_solar_datetime_gets_utc(monkeypatch):
     soon = (datetime.now(timezone.utc) + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S')  # naive
     cache = {'solar_transits': [{'start_time': soon}], 'lunar_transits': []}
     push_scheduler._check_n8_css(_make_user(), cache)
-    # Must not raise
+    assert len(send_calls) == 1
 
 
 def test_n8_no_upcoming_transits_skips(monkeypatch):
@@ -1763,6 +1763,7 @@ def test_n8_naive_lunar_datetime_gets_utc(monkeypatch):
     soon_naive = (datetime.now(timezone.utc) + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S')
     cache = {'solar_transits': [], 'lunar_transits': [{'start_time': soon_naive}]}
     push_scheduler._check_n8_css(_make_user(), cache)
+    assert len(send_calls) == 1
 
 
 def test_n8_past_lunar_transit_not_added_to_candidates(monkeypatch):

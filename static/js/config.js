@@ -44,6 +44,9 @@ async function loadConfiguration() {
         const astrodexPrivate = document.getElementById('astrodex-private');
         if (astrodexPrivate) astrodexPrivate.checked = config.astrodex?.private !== false;
 
+        const astrodexMapPrivate = document.getElementById('astrodex-map-private');
+        if (astrodexMapPrivate) astrodexMapPrivate.checked = config.astrodex?.map_private === true;
+
         const constraints = config.skytonight?.constraints || {};
 
         const altMin = document.getElementById('altitude-min');
@@ -84,7 +87,8 @@ async function saveConfiguration() {
     // payload only carries global app settings + SkyTonight constraints.
     const config = {
         astrodex: {
-            private: document.getElementById('astrodex-private').checked
+            private: document.getElementById('astrodex-private').checked,
+            map_private: document.getElementById('astrodex-map-private').checked
         },
         skytonight: {
             constraints: {
