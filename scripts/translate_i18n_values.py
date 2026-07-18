@@ -245,6 +245,7 @@ def translate_value(value: str, target_lang: str) -> str:
 
     protected, mapping = protect_segments(value)
     translated = ts.translate_text(protected, translator="google", from_language="en", to_language=target_lang)
+    assert isinstance(translated, str)
     translated = restore_segments(translated, mapping)
 
     # Cleanup occasional spacing issues around placeholders.
