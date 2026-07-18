@@ -16,7 +16,7 @@ import uuid
 from copy import deepcopy
 from datetime import datetime, timezone
 
-from utils.constants import CONFIG_FILE, MAX_LOCATIONS  # noqa: F401  (MAX_LOCATIONS re-exported for API/UI use)
+from utils.constants import CONFIG_FILE
 from utils.config_defaults import DEFAULT_CONFIG, DEFAULT_LOCATION, LOCATION_PRESET_EXTRA_FIELDS
 from utils import load_json_file, save_json_file, safe_file_exists
 from utils.logging_config import get_logger

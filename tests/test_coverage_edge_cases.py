@@ -55,10 +55,9 @@ def test_astrodex_count_pictures_returns_zero_when_dir_missing(monkeypatch):
     assert astrodex.count_pictures_for_location("loc-1") == 0
 
 
-def test_plan_safe_path_handles_commonpath_valueerror(monkeypatch):
+def test_plan_safe_path_rejects_path_outside_plan_dir():
     from observation import plan_my_night
 
-    monkeypatch.setattr(plan_my_night.os.path, "commonpath", lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError()))
     with pytest.raises(ValueError):
         plan_my_night._safe_plan_path("D:/not-important.json")
 
@@ -118,27 +117,18 @@ def test_cache_store_allsky_job_availability_handles_exception(monkeypatch):
     assert cache_store._allsky_job_availability() == (False, False)
 
 
-def test_skytonight_alttime_commonpath_valueerror_returns_400(client_admin, monkeypatch):
+def test_skytonight_alttime_path_escape_returns_400(client_admin, monkeypatch):
+    """_alttime_json_path resolving outside OUTPUT_DIR is rejected by the
+    realpath + startswith confinement guard (the pattern CodeQL's
+    py/path-injection query recognises as a sanitizer barrier)."""
     from blueprints import skytonight_api
 
-    monkeypatch.setattr(
-        skytonight_api.os.path,
-        "commonpath",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("bad paths")),
-    )
+    monkeypatch.setattr(skytonight_api, "_alttime_json_path", lambda *_a, **_k: "/definitely/outside/output_dir.json")
     resp = client_admin.get("/api/skytonight/alttime/valid_target")
     assert resp.status_code == 400
 
 
-def test_skytonight_alttime_commonpath_mismatch_returns_400(client_admin, monkeypatch):
-    from blueprints import skytonight_api
-
-    monkeypatch.setattr(skytonight_api.os.path, "commonpath", lambda *_args, **_kwargs: "D:/other")
-    resp = client_admin.get("/api/skytonight/alttime/valid_target")
-    assert resp.status_code == 400
-
-
-def test_auth_delete_user_handles_commonpath_valueerror_in_both_loops(tmp_path, monkeypatch):
+def test_auth_delete_user_cleans_up_astrodex_files_and_images(tmp_path, monkeypatch):
     from utils import auth
 
     users_file = tmp_path / "users.json"
@@ -162,17 +152,11 @@ def test_auth_delete_user_handles_commonpath_valueerror_in_both_loops(tmp_path, 
     (images_dir / f"{user.user_id}_img.jpg").write_bytes(b"x")
     (images_dir / f"{user.user_id}_other.jpg").write_bytes(b"y")
 
-    base_astrodex = os.path.realpath(str(astrodex_dir))
-
-    def _commonpath(paths):
-        # Keep initial astrodex-file confinement check valid, then fail per-image checks.
-        if paths and paths[0] == base_astrodex:
-            return base_astrodex
-        raise ValueError("x")
-
-    monkeypatch.setattr(auth.os.path, "commonpath", _commonpath)
     manager.delete_user(user.user_id, current_user_id=admin.user_id)
     assert manager.get_user_by_id(user.user_id) is None
+    assert not (astrodex_dir / f"{user.user_id}_astrodex.json").exists()
+    assert not (images_dir / f"{user.user_id}_img.jpg").exists()
+    assert not (images_dir / f"{user.user_id}_other.jpg").exists()
 
 
 def test_cache_updater_masked_location_log_safe_coord_exceptions():

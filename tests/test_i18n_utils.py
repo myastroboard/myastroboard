@@ -121,12 +121,8 @@ def test_create_translated_alert_invalid_time_keeps_original_string():
 # Additional tests for missing coverage
 # ---------------------------------------------------------------------------
 
-def test_is_safe_path_different_drives_returns_false(monkeypatch):
-    """Lines 48-50: ValueError from os.path.commonpath on different drives → False."""
-    def _raise_value_error(paths):
-        raise ValueError("Paths are on different drives")
-
-    monkeypatch.setattr(module.os.path, "commonpath", _raise_value_error)
+def test_is_safe_path_different_drives_returns_false():
+    """Paths resolving under a different root than base_dir are rejected."""
     result = _is_safe_path("C:\\base", "D:\\other")
     assert result is False
 

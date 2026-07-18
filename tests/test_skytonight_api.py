@@ -830,8 +830,8 @@ class TestAlttimeRoute:
 
         monkeypatch.setattr(skytonight_api_module, '_alttime_json_path',
                             lambda tid, *_a, **_k: str(alttime_file))
+        monkeypatch.setattr(skytonight_api_module, 'OUTPUT_DIR', str(tmp_path))
         monkeypatch.setattr(skytonight_api_module.os.path, 'isfile', lambda p: True)
-        monkeypatch.setattr(skytonight_api_module.os.path, 'abspath', lambda p: str(tmp_path))
         monkeypatch.setattr(skytonight_api_module, 'load_config',
                             lambda: {'skytonight': {'constraints': {}}})
 
