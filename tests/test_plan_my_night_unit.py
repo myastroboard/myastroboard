@@ -2302,6 +2302,9 @@ class TestScheduleOptimizer:
         )
         night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
         night_end = datetime(2026, 7, 18, 10, 0, tzinfo=timezone.utc)
+        # Pin "now" inside the night window so the plan isn't seen as stale
+        # once real wall-clock time passes this hardcoded night_end.
+        monkeypatch.setattr(plan_my_night, "_now", lambda: night_start)
         times = [(night_start + timedelta(minutes=30 * i)).strftime("%Y-%m-%dT%H:%M:%S") for i in range(9)]
 
         # "Triangulum": not observable until ~08:20, stays visible through the end of the night.
@@ -2345,6 +2348,7 @@ class TestScheduleOptimizer:
         )
         night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
         night_end = datetime(2026, 7, 18, 8, 0, tzinfo=timezone.utc)
+        monkeypatch.setattr(plan_my_night, "_now", lambda: night_start)
         times = [(night_start + timedelta(minutes=30 * i)).strftime("%Y-%m-%dT%H:%M:%S") for i in range(5)]
         always_low_alts = [-10.0, -8.0, -6.0, -4.0, -2.0]  # never reaches the 25 deg floor
         _write_alttime(temp_plan_dir, "low", times, always_low_alts)
@@ -2380,6 +2384,7 @@ class TestScheduleOptimizer:
         )
         night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
         night_end = datetime(2026, 7, 18, 8, 0, tzinfo=timezone.utc)  # 120-minute night
+        monkeypatch.setattr(plan_my_night, "_now", lambda: night_start)
         times = [(night_start + timedelta(minutes=30 * i)).strftime("%Y-%m-%dT%H:%M:%S") for i in range(5)]
         # Not observable until the very last sample (07:30) - forces a long mandatory delay.
         late_alts = [-10.0, -5.0, -2.0, 0.0, 30.0]
@@ -2410,7 +2415,10 @@ class TestScheduleOptimizer:
     def test_compute_returns_none_without_plan(self, temp_plan_dir):
         assert compute_optimized_schedule("eeee3004-0000-4000-8000-000000000000", "user") is None
 
-    def test_apply_reorders_entries_and_sets_delay(self, temp_plan_dir):
+    def test_apply_reorders_entries_and_sets_delay(self, temp_plan_dir, monkeypatch):
+        monkeypatch.setattr(
+            plan_my_night, "_now", lambda: datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
+        )
         uid = "eeee3005-0000-4000-8000-000000000000"
         payload = {
             "user_id": uid, "username": "user",
