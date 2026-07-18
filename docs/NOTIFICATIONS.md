@@ -17,7 +17,7 @@ Phase C - Web Push / background (tab may be closed)  ✅ Done
 - Notifications fire when the tab is open; poller runs regardless of which tab is active
 
 ### Phase B - Settings UI
-- My Settings → Notifications sub-tab (N1–N7 toggles, lead times, Kp threshold, test button)
+- My Settings → Notifications sub-tab (N1–N9 toggles, lead times, Kp threshold, test button)
 - Preferences stored server-side in `data/users.json` under `preferences.notifications`
 
 ### Phase C - Web Push
@@ -39,12 +39,16 @@ Phase C - Web Push / background (tab may be closed)  ✅ Done
 | `N5` | Solar eclipse maximum | 30 min | `events_alerts.js` / `utils/push_scheduler.py` |
 | `N6` | Astronomical darkness begins | 20 min | `sun.js` / `utils/push_scheduler.py` |
 | `N7` | Aurora: Kp index ≥ threshold | immediate | `aurora.js` / `utils/push_scheduler.py` |
+| `N8` | CSS solar or lunar transit | 10 min | `orbital_stations.js` / `utils/push_scheduler.py` |
+| `N9` | Solar-system event peak (meteor shower, comet visibility window) | 2 days | `events_alerts.js` / `utils/push_scheduler.py` |
 
-IDs are defined as `NOTIF_TRIGGERS` constants in `static/js/notifications.js` and referenced by string in `utils/push_scheduler.py`. (`N8` mirrors `N3` for the CSS station.)
+IDs are defined as `NOTIF_TRIGGERS` constants in `static/js/notifications.js` and referenced by string in `utils/push_scheduler.py`. `N8` mirrors `N3`'s logic for the CSS station instead of the ISS.
+
+`N9` is unlike every other trigger: its source events (from `solar_system_events` cache) carry a `start_time`..`end_time` span of several days around `peak_time`, rather than being a single instant. It still follows the same "notify N before peak" shape as N1–N8, just with a day-granularity lead time (stored in the same `lead_minutes` preference field, as day-equivalent minutes — e.g. 2 days = 2880) instead of a minutes one. Events whose window is ≤36h (eclipses, transits — already covered by their own dedicated triggers) are skipped by `_N9_MIN_WINDOW_SECONDS` so N9 only fires for genuinely multi-day events.
 
 ### Multi-location behavior (v1.2)
 
-- Location-scoped triggers (N3–N8) are evaluated **once per (user, attributed location)** pair, reading each location's own cache slots. Plan triggers (N1/N2) stay per-plan — a plan is pinned to its own location.
+- Location-scoped triggers (N3–N9) are evaluated **once per (user, attributed location)** pair, reading each location's own cache slots. Plan triggers (N1/N2) stay per-plan — a plan is pinned to its own location.
 - When a user has **more than one** attributed location, the message body carries the location name (i18n key `push_location_suffix`, e.g. *"… at Dark Sky Site"*). Single-location users see messages exactly as before.
 - Per-location mute: `preferences.notifications.disabled_location_ids` (edited in My Settings → Notifications, only visible with >1 attributed location) removes a location from all trigger evaluation for that user.
 - Deduplication keys are per location (`<trigger>@<location_id>`), so the same event at two sites notifies once per site.
@@ -59,10 +63,10 @@ See [LOCATIONS.md](LOCATIONS.md) for the full multi-location model.
 |------|------|
 | `static/js/notifications.js` | `NotificationManager`, settings UI, background poller, Web Push subscription |
 | `backend/utils/push_manager.py` | VAPID key generation/persistence, `send_push()` wrapper around pywebpush |
-| `backend/utils/push_scheduler.py` | Background thread; evaluates N1–N7 server-side every 5 min; sends push |
+| `backend/utils/push_scheduler.py` | Background thread; evaluates N1–N9 server-side every 5 min; sends push |
 | `templates/index.html` | Notifications sub-tab (My Settings → Notifications) |
 | `static/sw.js` | `push` + `notificationclick` event listeners |
-| `static/i18n/*.json` | `notifications.*` namespace (N1–N7 titles/bodies) + `settings.notifications_*` |
+| `static/i18n/*.json` | `notifications.*` namespace (N1–N9 titles/bodies) + `settings.notifications_*` |
 | `data/vapid.json` | Generated VAPID key pair - **never delete or regenerate** (invalidates all subscriptions) |
 
 ---
@@ -94,7 +98,8 @@ const prefs = notificationManager.getPrefs();
 //   triggers: {
 //     N1: { enabled: true, lead_minutes: 15 },
 //     ...
-//     N7: { enabled: true, kp_threshold: 5 }
+//     N7: { enabled: true, kp_threshold: 5 },
+//     N9: { enabled: true, lead_minutes: 2880 } // day-equivalent minutes (2 days)
 //   }
 // }
 
@@ -181,7 +186,7 @@ The private key is stored as a raw base64url-encoded 32-byte EC scalar (the form
 | `GET`  | `/api/push/subscriptions` | `@login_required` | Lists subscriptions for the current user. Returns `{"subscriptions": [{index, provider, created_at, endpoint_tail}]}`. `provider` is one of `apple`, `google`, `mozilla`, `other`. Full endpoints are not exposed - only the last 20 chars as `endpoint_tail`. |
 | `DELETE` | `/api/push/subscriptions` | `@login_required` | Removes **all** server-side subscriptions for the current user. The UI also calls `pushManager.getSubscription().unsubscribe()` to clean the browser side. Returns `{"removed": N}`. |
 | `POST` | `/api/push/test` | `@login_required` | Sends a generic test push to all subscriptions; removes dead endpoints. Returns `{"delivered": N, "total": N, "cleaned": N}` |
-| `POST` | `/api/push/test/<trigger_id>` | `@login_required` | Fires a realistic test push for a specific trigger (`N1`–`N7`) with hardcoded sample data, bypassing all condition/cooldown checks. Useful for end-to-end validation. Returns `{"trigger", "delivered", "total", "title", "body"}`. Fire all from console: `['N1','N2','N3','N4','N5','N6','N7'].forEach((n,i) => setTimeout(() => fetch('/api/push/test/'+n,{method:'POST'}).then(r=>r.json()).then(d=>console.log(n,d)), i*2000))` |
+| `POST` | `/api/push/test/<trigger_id>` | `@login_required` | Fires a realistic test push for a specific trigger (`N1`–`N7`, `N9`) with hardcoded sample data, bypassing all condition/cooldown checks. Useful for end-to-end validation. Returns `{"trigger", "delivered", "total", "title", "body"}`. Fire all from console: `['N1','N2','N3','N4','N5','N6','N7','N9'].forEach((n,i) => setTimeout(() => fetch('/api/push/test/'+n,{method:'POST'}).then(r=>r.json()).then(d=>console.log(n,d)), i*2000))` |
 
 ### User model
 
@@ -201,7 +206,7 @@ The private key is stored as a raw base64url-encoded 32-byte EC scalar (the form
 
 Daemon thread started at app startup. Polls every 5 minutes:
 
-- Loads cached data once per cycle (aurora, sun, ISS, solar/lunar eclipse)
+- Loads cached data once per cycle (aurora, sun, ISS, CSS, solar/lunar eclipse, solar system events)
 - Loads per-user plan data via `get_plan_with_timeline()`
 - Skips users with no push subscriptions or notifications disabled
 - Notification title/body are translated using the user's `preferences.language` field via `i18n_utils.get_translated_message()` (keys: `settings.push_n*`)
@@ -241,8 +246,8 @@ self.addEventListener('notificationclick', event => { ... });
 | `#notif-permission-banner` | `div.alert` | Permission state + push status (two lines when granted) |
 | `#notif-enable-btn` | `button.btn-warning` | Calls `requestPermission()` + `_subscribeToPush()`; hidden when granted/denied |
 | `#notif-master-toggle` | `input[checkbox]` | Master enable/disable |
-| `#notif-trigger-N1` … `#notif-trigger-N7` | `input[checkbox]` | Per-trigger toggle |
-| `#notif-lead-N1` … `#notif-lead-N6` | `select` | Lead time in minutes |
+| `#notif-trigger-N1` … `#notif-trigger-N9` | `input[checkbox]` | Per-trigger toggle |
+| `#notif-lead-N1` … `#notif-lead-N6`, `#notif-lead-N9` | `select` | Lead time (minutes for N1–N6/N8; day-equivalent minutes for N9) |
 | `#notif-kp-threshold` | `select` | Kp threshold (N7 only) |
 | `#notif-save-btn` | `button.btn-primary` | Async save to server |
 | `#notif-test-btn` | `button.btn-outline-secondary` | Fires a sample notification |
@@ -270,4 +275,4 @@ self.addEventListener('notificationclick', event => { ... });
 | `settings.notifications_*` | UI strings: banner text, button labels, toggle labels, trigger labels |
 | `notifications.nX_title` / `notifications.nX_body` | Notification payload strings (title + body with `{placeholder}`) |
 
-Keys in `notifications` namespace are ordered N1→N7 per trigger, `_title` before `_body`.
+Keys in `notifications` namespace are ordered N1→N9 per trigger, `_title` before `_body`.

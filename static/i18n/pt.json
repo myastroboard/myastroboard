@@ -508,6 +508,7 @@
     "today": "Hoje!",
     "tomorrow": "Amanhã!",
     "in_days": "Em {days} dias",
+    "date_range_with_peak": "{start} – {end} (pico {peak})",
     "importance": {
       "low": "É bom saber",
       "medium": "Vale a pena considerar",
@@ -756,6 +757,7 @@
     "notifications_n5": "Eclipse solar",
     "notifications_n6": "Início da escuridão astronômica",
     "notifications_n7": "Alerta aurora (índice Kp)",
+    "notifications_n9": "Pico de chuva de meteoros / cometa",
     "push_n1_title": "Plan My Night",
     "push_n1_body": "Sua sessão começa em {minutes} min",
     "push_n2_title": "Próximo objeto",
@@ -774,6 +776,8 @@
     "push_n8_title": "Trânsito CSS",
     "push_n8_solar_body": "Trânsito solar CSS em {minutes} min",
     "push_n8_lunar_body": "Trânsito lunar CSS em {minutes} min",
+    "push_n9_title": "Evento do sistema solar",
+    "push_n9_body": "{title} atinge o pico em {days} dias",
     "push_kp_visibility_none": "Nenhuma",
     "push_kp_visibility_very_low": "Muito baixa",
     "push_kp_visibility_low": "Baixa",
@@ -2025,7 +2029,9 @@
     "n7_title": "Alerta aurora",
     "n8_body_lunar": "Trânsito lunar CSS em {minutes} min",
     "n8_body_solar": "Trânsito solar CSS em {minutes} min",
-    "n8_title": "Trânsito CSS"
+    "n8_title": "Trânsito CSS",
+    "n9_body": "{title} atinge o pico em {days} dias",
+    "n9_title": "Evento do sistema solar"
   },
   "observatory": {
     "loading": "Carregando dados do observatório…",

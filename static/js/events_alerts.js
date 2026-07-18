@@ -28,6 +28,59 @@ function resolveEventBannerModifier(event) {
     return map[event?.icon_color_class] || 'medium';
 }
 
+// Multi-day astro events (meteor showers, comet visibility windows) carry a start_time/end_time
+// span around peak_time. Below this threshold the window is effectively instantaneous (eclipses,
+// transits, moon phases...) and gets displayed/handled as a single moment instead.
+const EVENT_RANGE_THRESHOLD_MS = 36 * 60 * 60 * 1000; // 36h
+
+function _eventSpansMultipleDays(event) {
+    if (!event?.start_time || !event?.end_time) return false;
+    const start = new Date(event.start_time).getTime();
+    const end = new Date(event.end_time).getTime();
+    return Number.isFinite(start) && Number.isFinite(end) && (end - start) > EVENT_RANGE_THRESHOLD_MS;
+}
+
+// Short "Mon D" label in the observer's configured timezone, for date-range display.
+function _formatShortDate(isoString, locale = navigator.language) {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    if (isNaN(date.getTime())) return '';
+    const tz = (typeof _getObservationTimezone === 'function') ? _getObservationTimezone() : undefined;
+    const tzOpt = tz ? { timeZone: tz } : {};
+    return new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', ...tzOpt }).format(date);
+}
+
+/**
+ * Render an event's timing: a single instant for most events, or a date range
+ * (with peak called out) for multi-day windows like meteor showers/comets.
+ */
+function formatEventTiming(event) {
+    if (!event.peak_time) return '';
+    if (!_eventSpansMultipleDays(event)) {
+        return formatTimeThenDate(event.peak_time);
+    }
+    return i18n.t('calendar.date_range_with_peak', {
+        start: _formatShortDate(event.start_time),
+        end: _formatShortDate(event.end_time),
+        peak: _formatShortDate(event.peak_time),
+    });
+}
+
+/**
+ * Like getDaysUntilText, but a multi-day event reads as "happening now" for its whole
+ * start_time..end_time span instead of only on the exact peak day.
+ */
+function getEventStatusText(event) {
+    if (_eventSpansMultipleDays(event)) {
+        const now = Date.now();
+        const start = new Date(event.start_time).getTime();
+        const end = new Date(event.end_time).getTime();
+        if (now >= start && now <= end) return i18n.t('calendar.happening_now');
+        if (now < start) return getDaysUntilText(Math.ceil((start - now) / 86400000));
+    }
+    return getDaysUntilText(event.days_until_event);
+}
+
 /**
  * Initialize events alert system
  */
@@ -236,7 +289,7 @@ function createEventAlertCard(event) {
         const metaEl = document.createElement('div');
         metaEl.className = 'event-banner__meta';
         metaEl.appendChild(DOMUtils.createIcon('bi bi-calendar-event text-danger', 'icon-inline me-1'));
-        metaEl.appendChild(document.createTextNode(`${formatTimeThenDate(new Date(event.peak_time))} · ${getDaysUntilText(event.days_until_event)}`));
+        metaEl.appendChild(document.createTextNode(`${formatEventTiming(event)} · ${getEventStatusText(event)}`));
         content.appendChild(metaEl);
     }
 
@@ -320,7 +373,7 @@ function createEventTimeline(events) {
             const date = document.createElement('p');
             date.className = 'text-muted fw-bold';
             date.appendChild(DOMUtils.createIcon('bi bi-calendar-event text-danger', 'icon-inline'));
-            date.appendChild(document.createTextNode(`${formatTimeThenDate(new Date(event.peak_time))} - ${getDaysUntilText(event.days_until_event)}`));
+            date.appendChild(document.createTextNode(`${formatEventTiming(event)} - ${getEventStatusText(event)}`));
             item.appendChild(date);
         }
 
@@ -472,5 +525,41 @@ function _checkEclipseNotifications(eventsData) {
             { url: '#forecast-astro/moon' }
         );
         break; // one eclipse notification per check cycle
+    }
+}
+
+/**
+ * N9 - heads-up ahead of a multi-day solar-system event's peak (meteor shower, comet
+ * visibility window...). Unlike eclipses/transits, these events carry a start_time..end_time
+ * span around peak_time, but the trigger still follows the same "notify N before peak" shape
+ * as every other trigger - just in days instead of minutes, via the same lead_minutes field
+ * (stored as day-equivalent minutes, see the N9 lead select in the settings UI).
+ */
+function _checkSolsysWindowNotifications(eventsData) {
+    if (typeof notificationManager === 'undefined') return;
+    if (!notificationManager.isTriggerEnabled('N9')) return;
+    const events = eventsData?.upcoming_events;
+    if (!Array.isArray(events)) return;
+
+    const now = Date.now();
+    const leadMs = notificationManager.getLeadMinutes('N9') * 60 * 1000;
+
+    for (const event of events) {
+        if (!_eventSpansMultipleDays(event)) continue;
+        const peak = event.peak_time ? new Date(event.peak_time).getTime() : null;
+        if (!peak || peak <= now) continue; // already at/past peak - too late for a heads-up
+
+        const msUntil = peak - now;
+        if (msUntil > leadMs) continue;
+        if (notificationManager.wasRecentlyNotified('N9', 20 * 60 * 60 * 1000)) continue;
+
+        const days = Math.round(msUntil / 86400000);
+        notificationManager.notify(
+            'N9',
+            i18n.t('notifications.n9_title'),
+            i18n.t('notifications.n9_body', { title: event.title, days }),
+            { url: '#forecast-astro/calendar', tag: `mab-N9-${event.event_type}-${event.peak_time}` }
+        );
+        break; // one solar-system-window notification per check cycle
     }
 }

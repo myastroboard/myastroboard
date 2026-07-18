@@ -44,7 +44,7 @@ myastroboard/
 │   │   ├── metrics_collector.py         # Metrics collection service
 │   │   ├── on_demand_translate.py       # On-demand DeepL/LibreTranslate integration
 │   │   ├── push_manager.py              # VAPID key management, Web Push send wrapper
-│   │   ├── push_scheduler.py            # Push notification scheduler (N1–N7 trigger evaluation)
+│   │   ├── push_scheduler.py            # Push notification scheduler (N1–N9 trigger evaluation)
 │   │   ├── repo_config.py               # Config file load/save helpers
 │   │   ├── txtconf_loader.py            # txtconf loader
 │   │   └── version_checker.py           # GitHub release checks

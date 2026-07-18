@@ -2,7 +2,7 @@
 Server-side push notification scheduler.
 
 Runs every POLL_INTERVAL_SECONDS in a background thread.
-Evaluates N1-N8 trigger conditions using cached data, then sends Web Push
+Evaluates N1-N9 trigger conditions using cached data, then sends Web Push
 to subscribed users whose notifications are enabled and cooldown has elapsed.
 
 Cooldown is tracked in-memory (resets on server restart, acceptable for a
@@ -555,6 +555,79 @@ def _check_n4_n5_eclipse(
             logger.debug(f"{trigger_id} check error for {user.username}: {e}")
 
 
+# Windows shorter than this are effectively instantaneous events (eclipses, transits...)
+# and are handled by their own dedicated triggers instead of N9.
+_N9_MIN_WINDOW_SECONDS = 36 * 60 * 60
+
+
+def _check_n9_solsys_window(user: Any, cache_data: Optional[dict], loc: Optional[dict] = None) -> None:
+    """N9 - heads-up ahead of a multi-day solar-system event's peak (meteor shower, comet
+    visibility window...). Unlike eclipses/transits, these events carry a start_time..end_time
+    span around peak_time rather than being a single instant, but the trigger still follows the
+    same 'notify N before peak' shape as every other trigger - just in days instead of minutes,
+    via the same lead_minutes preference field (stored as day-equivalent minutes).
+    """
+    if not cache_data:
+        logger.debug(f"N9 skip {user.username}: no solar_system_events cache")
+        return
+    triggers = _get_notif_prefs(user)
+    t = triggers.get('N9', {})
+    if not t.get('enabled', True):
+        logger.debug(f"N9 skip {user.username}: trigger disabled")
+        return
+
+    loc = loc or {}
+    now = datetime.now(timezone.utc)
+    lead_s = t.get('lead_minutes', 2880) * 60
+
+    for event in cache_data.get('events', []):
+        start_str = event.get('start_time')
+        end_str = event.get('end_time')
+        peak_str = event.get('peak_time')
+        if not start_str or not end_str or not peak_str:
+            continue
+        try:
+            start = datetime.fromisoformat(start_str)
+            end = datetime.fromisoformat(end_str)
+            peak = datetime.fromisoformat(peak_str)
+            if start.tzinfo is None:
+                start = start.replace(tzinfo=timezone.utc)
+            if end.tzinfo is None:
+                end = end.replace(tzinfo=timezone.utc)
+            if peak.tzinfo is None:
+                peak = peak.replace(tzinfo=timezone.utc)
+        except Exception as e:
+            logger.debug(f"N9 {user.username}: bad window timestamps: {e}")
+            continue
+
+        if (end - start).total_seconds() <= _N9_MIN_WINDOW_SECONDS:
+            continue  # effectively instantaneous, not a multi-day window - own trigger handles it
+
+        ms_until = (peak - now).total_seconds()
+        logger.debug(f"N9 {user.username}: peak in {ms_until:.0f}s, lead={lead_s}s")
+        if ms_until <= 0 or ms_until > lead_s:
+            continue
+
+        trigger_key = _loc_trigger_key('N9', loc.get('id'))
+        if _was_recently_notified(user.user_id, trigger_key, 20 * 60 * 60):
+            logger.debug(f"N9 skip {user.username}: cooldown active")
+            continue
+
+        title = event.get('title') or 'Solar system event'
+        days = round(ms_until / 86400)
+        _send(
+            user,
+            trigger_key,
+            _t(user, 'push_n9_title'),
+            _with_location(
+                user, _t(user, 'push_n9_body', title=title, days=days), loc.get('name'), loc.get('multi')
+            ),
+            '/#forecast-astro/calendar',
+            ttl=int(ms_until),
+        )
+        break  # one solar-system-window push per poll cycle
+
+
 # ---------------------------------------------------------------------------
 # Main poll loop
 # ---------------------------------------------------------------------------
@@ -631,7 +704,7 @@ def _pick_active_plan(user_id: str, username: str) -> Optional[dict]:
 def _poll() -> None:
     """Single poll cycle: evaluate all triggers for all users.
 
-    Multi-location (v1.2): location-scoped triggers (N3-N8) run once per
+    Multi-location (v1.2): location-scoped triggers (N3-N9) run once per
     (user, attributed location) pair - minus locations the user muted via
     preferences.notifications.disabled_location_ids. Per-location caches are
     preloaded once per cycle. Plan triggers (N1/N2) stay per-plan (the plan is
@@ -647,7 +720,15 @@ def _poll() -> None:
         config = load_config()
 
         # Preload per-location caches once per cycle: {location_id: {name: data}}
-        _LOCATION_CACHE_NAMES = ('aurora', 'sun_report', 'iss_passes', 'css_passes', 'solar_eclipse', 'lunar_eclipse')
+        _LOCATION_CACHE_NAMES = (
+            'aurora',
+            'sun_report',
+            'iss_passes',
+            'css_passes',
+            'solar_eclipse',
+            'lunar_eclipse',
+            'solar_system_events',
+        )
         location_caches: Dict[str, Dict[str, Optional[dict]]] = {}
 
         def _caches_for(location_id: str) -> Dict[str, Optional[dict]]:
@@ -708,6 +789,7 @@ def _poll() -> None:
                 _check_n3_iss(user, caches['iss_passes'], loc_ctx)
                 _check_n8_css(user, caches['css_passes'], loc_ctx)
                 _check_n4_n5_eclipse(user, caches['solar_eclipse'], caches['lunar_eclipse'], loc_ctx)
+                _check_n9_solsys_window(user, caches['solar_system_events'], loc_ctx)
 
     except Exception as e:
         logger.error(f"Push scheduler poll error: {e}")

@@ -508,6 +508,7 @@
     "today": "Aujourd'hui !",
     "tomorrow": "Demain !",
     "in_days": "Dans {days} jours",
+    "date_range_with_peak": "{start} – {end} (pic {peak})",
     "importance": {
       "low": "À savoir",
       "medium": "À considérer",
@@ -756,6 +757,7 @@
     "notifications_n5": "Éclipse solaire",
     "notifications_n6": "Début de la nuit astronomique",
     "notifications_n7": "Alerte aurore (indice Kp)",
+    "notifications_n9": "Pic d'essaim de météores / comète",
     "push_n1_title": "Plan My Night",
     "push_n1_body": "Votre session commence dans {minutes} min",
     "push_n2_title": "Prochain objet",
@@ -774,6 +776,8 @@
     "push_n8_title": "Transit CSS",
     "push_n8_solar_body": "Transit solaire CSS dans {minutes} min",
     "push_n8_lunar_body": "Transit lunaire CSS dans {minutes} min",
+    "push_n9_title": "Événement du système solaire",
+    "push_n9_body": "{title} atteint son pic dans {days} jours",
     "push_kp_visibility_none": "Aucune",
     "push_kp_visibility_very_low": "Très faible",
     "push_kp_visibility_low": "Faible",
@@ -2025,7 +2029,9 @@
     "n7_title": "Alerte aurore",
     "n8_body_lunar": "Transit lunaire CSS dans {minutes} min",
     "n8_body_solar": "Transit solaire CSS dans {minutes} min",
-    "n8_title": "Transit CSS"
+    "n8_title": "Transit CSS",
+    "n9_body": "{title} atteint son pic dans {days} jours",
+    "n9_title": "Événement du système solaire"
   },
   "observatory": {
     "loading": "Chargement des données de l'observatoire…",

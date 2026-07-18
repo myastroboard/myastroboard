@@ -508,6 +508,7 @@
     "today": "Heute!",
     "tomorrow": "Morgen!",
     "in_days": "In {days} Tagen",
+    "date_range_with_peak": "{start} – {end} (Höhepunkt {peak})",
     "importance": {
       "low": "Zu wissen",
       "medium": "Zu berücksichtigen",
@@ -756,6 +757,7 @@
     "notifications_n5": "Sonnenfinsternis",
     "notifications_n6": "Astronomische Dunkelheit beginnt",
     "notifications_n7": "Aurora-Alarm (Kp-Index)",
+    "notifications_n9": "Meteorschauer-/Kometenhöhepunkt",
     "push_n1_title": "Plan My Night",
     "push_n1_body": "Deine Session beginnt in {minutes} Min.",
     "push_n2_title": "Nächstes Objekt",
@@ -774,6 +776,8 @@
     "push_n8_title": "CSS-Transit",
     "push_n8_solar_body": "CSS-Sonnentransit in {minutes} Min",
     "push_n8_lunar_body": "CSS-Mondtransit in {minutes} Min",
+    "push_n9_title": "Ereignis im Sonnensystem",
+    "push_n9_body": "{title} erreicht den Höhepunkt in {days} Tagen",
     "push_kp_visibility_none": "Keine",
     "push_kp_visibility_very_low": "Sehr niedrig",
     "push_kp_visibility_low": "Niedrig",
@@ -2025,7 +2029,9 @@
     "n7_title": "Aurora-Alarm",
     "n8_body_lunar": "CSS-Mondtransit in {minutes} Min",
     "n8_body_solar": "CSS-Sonnentransit in {minutes} Min",
-    "n8_title": "CSS-Transit"
+    "n8_title": "CSS-Transit",
+    "n9_body": "{title} erreicht den Höhepunkt in {days} Tagen",
+    "n9_title": "Ereignis im Sonnensystem"
   },
   "observatory": {
     "loading": "Observatorium-Daten werden geladen…",

@@ -508,6 +508,7 @@
     "today": "Today!",
     "tomorrow": "Tomorrow!",
     "in_days": "In {days} days",
+    "date_range_with_peak": "{start} – {end} (peak {peak})",
     "importance": {
       "low": "Nice to know",
       "medium": "Worth considering",
@@ -756,6 +757,7 @@
     "notifications_n5": "Solar eclipse",
     "notifications_n6": "Astronomical darkness begins",
     "notifications_n7": "Aurora alert (Kp index)",
+    "notifications_n9": "Meteor shower / comet peak",
     "push_n1_title": "Plan My Night",
     "push_n1_body": "Your session starts in {minutes} min",
     "push_n2_title": "Next target",
@@ -774,6 +776,8 @@
     "push_n8_title": "CSS Transit",
     "push_n8_solar_body": "CSS solar transit in {minutes} min",
     "push_n8_lunar_body": "CSS lunar transit in {minutes} min",
+    "push_n9_title": "Solar System Event",
+    "push_n9_body": "{title} peaks in {days} days",
     "push_kp_visibility_none": "None",
     "push_kp_visibility_very_low": "Very Low",
     "push_kp_visibility_low": "Low",
@@ -2025,7 +2029,9 @@
     "n7_title": "Aurora Alert",
     "n8_body_lunar": "CSS lunar transit in {minutes} min",
     "n8_body_solar": "CSS solar transit in {minutes} min",
-    "n8_title": "CSS Transit"
+    "n8_title": "CSS Transit",
+    "n9_body": "{title} peaks in {days} days",
+    "n9_title": "Solar System Event"
   },
   "observatory": {
     "loading": "Loading observatory data…",

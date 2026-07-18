@@ -19,3 +19,4 @@ This release introduces multi-location profiles: admins can create up to 5 locat
 - Automatic one-time migration: existing single-location installs are converted to a one-preset setup with zero manual action; all user preferences keep working
 - Add an optimizer service for a plan in plan-my-night
 - Complete reorganization of `backend` folder because app grow too much to don't be organized!
+- Add notification for meteor shower
