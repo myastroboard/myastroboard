@@ -8,6 +8,11 @@ let astrodexData = {
     currentUserId: null
 };
 
+// Standard ISO full-stop series (ISO 12232) - always offered as a baseline
+// so the ISO field has useful suggestions even before the user has logged
+// any photos of their own.
+const STANDARD_ISO_VALUES = ['100', '200', '400', '800', '1600', '3200', '6400', '12800'];
+
 let currentAstrodexItem = null;
 let astrodexFilters = {
     search: '',
@@ -1308,12 +1313,7 @@ function _collectPictureLocationFields(prefix) {
     return { location_id: value || null, location_name: null };
 }
 
-async function showAddPictureModal(itemId) {
-    closeModal(); // Close current modal to avoid stacking
-
-    // Get current date in YYYY-MM-DD format
-    const today = new Date().toISOString().split('T')[0];
-
+function buildPictureAutocompleteDatalists() {
     // Get autocomplete suggestions from user's previous photos
     const allPictures = [];
     astrodexData.items.forEach(item => {
@@ -1322,15 +1322,38 @@ async function showAddPictureModal(itemId) {
         }
     });
 
-    // Extract unique values for autocomplete
-    const devices = [...new Set(allPictures.map(p => p.device).filter(d => d))];
-    const filters = [...new Set(allPictures.map(p => p.filters).filter(f => f))];
-    const isos = [...new Set(allPictures.map(p => p.iso).filter(i => i))];
+    // Extract unique values for autocomplete: names from the user's saved
+    // equipment/filter library (own + shared) plus whatever free text has
+    // actually been typed into past photos, so gear that's set up but not
+    // yet used in a photo still shows up as a suggestion.
+    const equipmentNames = [
+        ...astrodexEquipmentCache.combinations.map(c => c.name),
+        ...astrodexEquipmentCache.sharedCombinations.map(c => c.name),
+    ];
+    const filterNames = [
+        ...astrodexEquipmentCache.filters.map(f => f.name),
+        ...astrodexEquipmentCache.sharedFilters.map(f => f.name),
+    ];
+    const devices = [...new Set([...equipmentNames, ...allPictures.map(p => p.device).filter(d => d)])];
+    const filters = [...new Set([...filterNames, ...allPictures.map(p => p.filters).filter(f => f)])];
+    // Always offer the standard ISO series, plus anything else the user has
+    // actually logged (e.g. non-standard values from third-party software).
+    const isos = [...new Set([...STANDARD_ISO_VALUES, ...allPictures.map(p => p.iso).filter(i => i)])];
 
-    // Create datalist options
-    const deviceOptions = devices.map(d => `<option value="${escapeHtml(d)}">`).join('');
-    const filterOptions = filters.map(f => `<option value="${escapeHtml(f)}">`).join('');
-    const isoOptions = isos.map(i => `<option value="${escapeHtml(i)}">`).join('');
+    return {
+        deviceOptions: devices.map(d => `<option value="${escapeHtml(d)}">`).join(''),
+        filterOptions: filters.map(f => `<option value="${escapeHtml(f)}">`).join(''),
+        isoOptions: isos.map(i => `<option value="${escapeHtml(i)}">`).join(''),
+    };
+}
+
+async function showAddPictureModal(itemId) {
+    closeModal(); // Close current modal to avoid stacking
+
+    // Get current date in YYYY-MM-DD format
+    const today = new Date().toISOString().split('T')[0];
+
+    const { deviceOptions, filterOptions, isoOptions } = buildPictureAutocompleteDatalists();
 
     // Equipment combination and filter options
     const equipmentComboOptions = buildEquipmentCombinationOptions();
@@ -1642,6 +1665,8 @@ async function showEditPictureModal(itemId, pictureId) {
     const picture = item.pictures.find(p => p.id === pictureId);
     if (!picture) return;
 
+    const { deviceOptions, filterOptions, isoOptions } = buildPictureAutocompleteDatalists();
+
     // Pre-select whatever location this picture already has (preset, custom
     // free-text label, or "no location" for old pictures that predate this
     // field entirely) - never silently overridden by the active location.
@@ -1669,6 +1694,9 @@ async function showEditPictureModal(itemId, pictureId) {
             <div class="col-md-6">
                 <label for="edit-picture-iso" class="form-label">${i18n.t('astrodex.iso')}</label>
                 <input type="text" class="form-control" id="edit-picture-iso" list="iso-list" autocomplete="off" value="${escapeHtml(picture.iso || '')}">
+                <datalist id="iso-list">
+                    ${isoOptions}
+                </datalist>
             </div>
             <div class="col-md-6"></div>
             <div class="col-md-6">
@@ -1681,6 +1709,9 @@ async function showEditPictureModal(itemId, pictureId) {
             <div class="col-md-6">
                 <label for="edit-picture-device" class="form-label">${i18n.t('astrodex.custom_equipment')}</label>
                 <input type="text" class="form-control" id="edit-picture-device" list="device-list" autocomplete="off" value="${escapeHtml(picture.device || '')}">
+                <datalist id="device-list">
+                    ${deviceOptions}
+                </datalist>
             </div>
             <div class="col-md-6">
                 <label for="edit-picture-filters" class="form-label">${i18n.t('astrodex.filters')}</label>
@@ -1692,6 +1723,9 @@ async function showEditPictureModal(itemId, pictureId) {
             <div class="col-md-6">
                 <label for="edit-picture-filters" class="form-label">${i18n.t('astrodex.custom_filters')}</label>
                 <input type="text" class="form-control" id="edit-picture-filters" placeholder="${i18n.t('astrodex.custom_filters_placeholder')}" list="filters-list" autocomplete="off" value="${escapeHtml(picture.filters || '')}">
+                <datalist id="filters-list">
+                    ${filterOptions}
+                </datalist>
             </div>
             <div class="col-md-12">
                 <label for="edit-picture-notes" class="form-label">${i18n.t('astrodex.form_notes')}</label>
