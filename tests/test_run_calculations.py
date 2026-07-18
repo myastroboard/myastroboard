@@ -92,6 +92,24 @@ def test_run_calculations_no_night_counts_all_zero(monkeypatch):
         assert result['counts'][key] == 0
 
 
+def test_run_calculations_with_explicit_location_skips_install_default_lookup(monkeypatch):
+    """Callers (e.g. the scheduler running per-location) can pass a location
+    dict directly - it must be used as-is instead of resolving the install
+    default preset."""
+    monkeypatch.setattr(calc, 'ensure_skytonight_directories', lambda: None)
+    monkeypatch.setattr(calc, '_get_night_window', lambda lat, lon, tz: None)
+    monkeypatch.setattr(calc, 'save_json_file', lambda *a, **kw: None)
+
+    explicit_location = {
+        'id': 'explicit-loc', 'name': 'Explicit', 'latitude': 10.0, 'longitude': 20.0,
+        'elevation': 0.0, 'timezone': 'UTC',
+    }
+
+    result = run_calculations(_MINIMAL_CONFIG, location=explicit_location)
+
+    assert result['night_found'] is False
+
+
 # ---------------------------------------------------------------------------
 # run_calculations - empty dataset with night window
 # ---------------------------------------------------------------------------

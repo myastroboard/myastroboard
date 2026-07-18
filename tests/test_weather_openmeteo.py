@@ -714,6 +714,11 @@ class TestParseHourlyJson:
         for col in ("condition", "seeing", "transparency", "cloudless"):
             assert col in result.columns
 
+    def test_unknown_timezone_falls_back_to_utc(self):
+        payload = self._payload(n_hours=2)
+        result = wom.parse_hourly_json(payload, self._CORE_VARS, timezone_str="Not/AZone")
+        assert str(result["date"].dt.tz) == "UTC"
+
 
 class TestMetadataAccessorFailures:
     """Longitude/Elevation decode failures (lines 385-387, 391-392) - mirrors the
