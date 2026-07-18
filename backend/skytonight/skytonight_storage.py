@@ -172,6 +172,26 @@ def get_alttime_dir(location_id: Optional[str] = None) -> str:
     return path
 
 
+def _safe_location_dir(base_dir: str, location_id: str) -> str:
+    """Resolve *location_id* under *base_dir* and verify it doesn't escape it.
+
+    location_id is always a server-generated UUID (see
+    repo_config.new_location_preset), but this is re-verified here rather than
+    trusted from the caller: CodeQL (CWE-022) requires the sanitizer to be
+    called directly at each file operation's call site. Raises ValueError if
+    the resolved path would escape base_dir.
+    """
+    base_real = os.path.realpath(base_dir)
+    resolved = os.path.realpath(os.path.join(base_dir, location_id))
+    try:
+        inside_base_dir = os.path.commonpath([base_real, resolved]) == base_real
+    except ValueError:
+        inside_base_dir = False
+    if not inside_base_dir:
+        raise ValueError(f'Path outside {base_dir!r}: {location_id!r}')
+    return resolved
+
+
 def drop_location_results(location_id: str) -> bool:
     """Delete a preset's calculation results and alttime outputs.
 
@@ -181,10 +201,11 @@ def drop_location_results(location_id: str) -> bool:
     if not location_id:
         return False
     dropped = False
-    for path in (
-        os.path.join(SKYTONIGHT_CALCULATIONS_DIR, location_id),
-        os.path.join(SKYTONIGHT_OUTPUT_DIR, location_id),
-    ):
+    for base_dir in (SKYTONIGHT_CALCULATIONS_DIR, SKYTONIGHT_OUTPUT_DIR):
+        try:
+            path = _safe_location_dir(base_dir, location_id)
+        except ValueError:
+            continue
         if not os.path.isdir(path):
             continue
         try:
