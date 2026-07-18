@@ -6,6 +6,30 @@
     min-height: 420px;
     border-radius: var(--border-radius);
     z-index: 0;
-    /* Prevent Leaflet touch events from triggering page scroll */
+    /* Prevent Leaflet touch events (drag-to-pan, pinch-zoom) from triggering
+       page scroll/zoom instead of map interaction. */
     touch-action: none;
+}
+
+/* `vh` is measured against the browser chrome's largest/initial viewport on
+   many mobile browsers, so 70vh can render taller than what's actually
+   visible once the address bar is showing - `dvh` tracks the real visible
+   area and is used as a progressive enhancement where supported. */
+@supports (height: 70dvh) {
+    .astrodex-photo-map {
+        height: 70dvh;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .astrodex-photo-map {
+        height: 60vh;
+        min-height: 320px;
+    }
+
+    @supports (height: 60dvh) {
+        .astrodex-photo-map {
+            height: 60dvh;
+        }
+    }
 }
