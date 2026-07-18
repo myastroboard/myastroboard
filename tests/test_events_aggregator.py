@@ -648,6 +648,39 @@ class TestExtractSolarEclipseEvents:
         assert len(events) == 1
         assert events[0].importance == "low"
 
+    def test_solar_eclipse_partial_near_total_gets_high_importance(self, aggregator):
+        """Partial eclipse with obscuration >= 80% gets HIGH importance regardless of score (issue #153)."""
+        peak = (aggregator.local_now + timedelta(days=5)).isoformat()
+        data = {
+            "solar_eclipse": {
+                "visible": True,
+                "peak_time": peak,
+                "type": "Partial",
+                "astrophotography_score": 4,
+                "obscuration_percent": 90.7,
+                "peak_altitude_deg": 20.0,
+            }
+        }
+        events = aggregator._extract_solar_eclipse_events(data)
+        assert len(events) == 1
+        assert events[0].importance == "high"
+
+    def test_solar_eclipse_title_uses_localized_word_order(self, aggregator_french):
+        """French title must be 'Éclipse Solaire Partielle', not 'Partielle Éclipse Solaire' (issue #153)."""
+        peak = (aggregator_french.local_now + timedelta(days=5)).isoformat()
+        data = {
+            "solar_eclipse": {
+                "visible": True,
+                "peak_time": peak,
+                "type": "Partial",
+                "astrophotography_score": 6,
+                "obscuration_percent": 50.0,
+                "peak_altitude_deg": 30.0,
+            }
+        }
+        events = aggregator_french._extract_solar_eclipse_events(data)
+        assert events[0].title == "Éclipse Solaire Partielle"
+
     def test_solar_eclipse_event_structure_key(self, aggregator):
         """Solar eclipse events have structure_key='sun'."""
         peak = (aggregator.local_now + timedelta(days=3)).isoformat()
@@ -708,6 +741,35 @@ class TestExtractLunarEclipseEvents:
         events = aggregator._extract_lunar_eclipse_events(data)
         assert len(events) == 1
         assert events[0].importance == "medium"
+
+    def test_lunar_eclipse_partial_near_total_gets_high_importance(self, aggregator):
+        """Partial lunar eclipse with obscuration >= 80% gets HIGH importance (issue #153)."""
+        peak = (aggregator.local_now + timedelta(days=10)).isoformat()
+        data = {
+            "lunar_eclipse": {
+                "visible": True,
+                "peak_time": peak,
+                "type": "Partial",
+                "obscuration_percent": 85.0,
+            }
+        }
+        events = aggregator._extract_lunar_eclipse_events(data)
+        assert len(events) == 1
+        assert events[0].importance == "high"
+
+    def test_lunar_eclipse_title_uses_localized_word_order(self, aggregator_french):
+        """French title must be 'Éclipse Lunaire Totale', not 'Totale Éclipse Lunaire' (issue #153)."""
+        peak = (aggregator_french.local_now + timedelta(days=10)).isoformat()
+        data = {
+            "lunar_eclipse": {
+                "visible": True,
+                "peak_time": peak,
+                "type": "Total",
+                "obscuration_percent": 100.0,
+            }
+        }
+        events = aggregator_french._extract_lunar_eclipse_events(data)
+        assert events[0].title == "Éclipse Lunaire Totale"
 
     def test_lunar_eclipse_penumbral_importance(self, aggregator):
         """Penumbral lunar eclipse gets LOW importance."""

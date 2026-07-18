@@ -1668,6 +1668,8 @@
     "footer_source": "Fuente de datos: API meteorológica de Open-Meteo."
   },
   "events_api": {
+    "solar_eclipse_title": "Eclipse Solar {eclipse_type}",
+    "lunar_eclipse_title": "Eclipse Lunar {eclipse_type}",
     "solar_eclipse_description": "{eclipse_type} eclipse con {obscuration_percent}% de oscurecimiento. Pico a {peak_altitude_deg}° de altitud.",
     "lunar_eclipse_description": "{eclipse_type} eclipse lunar con una cobertura del {obscuration_percent}% en su punto máximo.",
     "aurora_description": "Visibilidad de la aurora: {visibility_percent}% de probabilidad. Kp índice: {kp_index}",

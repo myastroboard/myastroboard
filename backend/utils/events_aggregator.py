@@ -491,14 +491,18 @@ class EventsAggregator:
         peak_time = self._parse_iso_time(peak_time_str)
         days_until = (peak_time.date() - self.local_now.date()).days
 
-        # Determine importance based on type and score
+        # Determine importance based on type, score and obscuration
         eclipse_type = solar_eclipse.get("type", "Partial")
         score = solar_eclipse.get("astrophotography_score", 0)
+        obscuration_percent = solar_eclipse.get("obscuration_percent", 0)
 
         if eclipse_type == "Total":
             importance = EventImportance.CRITICAL.value
         elif eclipse_type == "Annular":
             importance = EventImportance.HIGH.value if score >= 6 else EventImportance.MEDIUM.value
+        elif obscuration_percent >= 80:
+            # A near-total partial eclipse is a rare, highly noticeable event
+            importance = EventImportance.HIGH.value
         else:
             importance = EventImportance.MEDIUM.value if score >= 5 else EventImportance.LOW.value
 
@@ -507,9 +511,10 @@ class EventsAggregator:
             event_type=EventType.SOLAR_ECLIPSE.value,
             icon_class="bi bi-sun",
             icon_color_class=self._importance_icon_color_class(importance),
-            title=(
-                f"{self._translate_eclipse_type(eclipse_type, 'sun')} "
-                f"{self._t('sun.solar_eclipse', 'Solar Eclipse')}"
+            title=self._t(
+                "events_api.solar_eclipse_title",
+                f"{eclipse_type} Solar Eclipse",
+                eclipse_type=self._translate_eclipse_type(eclipse_type, "sun"),
             ),
             description=(
                 self._t(
@@ -552,9 +557,13 @@ class EventsAggregator:
         days_until = (peak_time.date() - self.local_now.date()).days
 
         eclipse_type = lunar_eclipse.get("type", "Penumbral")
+        obscuration_percent = lunar_eclipse.get("obscuration_percent", 0)
 
         # Lunar eclipses are usually visible from wide areas
         if eclipse_type == "Total":
+            importance = EventImportance.HIGH.value
+        elif eclipse_type == "Partial" and obscuration_percent >= 80:
+            # A near-total partial eclipse is a rare, highly noticeable event
             importance = EventImportance.HIGH.value
         elif eclipse_type == "Partial":
             importance = EventImportance.MEDIUM.value
@@ -566,9 +575,10 @@ class EventsAggregator:
             event_type=EventType.LUNAR_ECLIPSE.value,
             icon_class="bi bi-moon-stars",
             icon_color_class=self._importance_icon_color_class(importance),
-            title=(
-                f"{self._translate_eclipse_type(eclipse_type, 'moon')} "
-                f"{self._t('moon.lunar_eclipse', 'Lunar Eclipse')}"
+            title=self._t(
+                "events_api.lunar_eclipse_title",
+                f"{eclipse_type} Lunar Eclipse",
+                eclipse_type=self._translate_eclipse_type(eclipse_type, "moon"),
             ),
             description=(
                 self._t(

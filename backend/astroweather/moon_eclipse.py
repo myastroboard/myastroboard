@@ -33,6 +33,7 @@ Example output:
     "peak_azimuth_deg": 180.2,
     "total_duration_minutes": 285,
     "partial_duration_minutes": 120,
+    "obscuration_percent": 100.0,
     "astrophotography_score": 8.5,
     "score_classification": "Very good - Highly recommended",
     "altitude_vs_time": [
@@ -80,6 +81,7 @@ class LunarEclipseInfo:
     peak_azimuth_deg: float
     total_duration_minutes: int
     partial_duration_minutes: int
+    obscuration_percent: float
     astrophotography_score: float
     score_classification: str
     altitude_vs_time: List[EclipsePoint]
@@ -162,6 +164,9 @@ class LunarEclipseService:
         # Determine eclipse type
         eclipse_type = self._get_eclipse_type(eclipse)
 
+        # Calculate obscuration (fraction of the Moon's disc covered by Earth's umbra)
+        obscuration_percent = eclipse.obscuration * 100
+
         # Check visibility
         visible = peak_alt_deg > 0
 
@@ -195,6 +200,7 @@ class LunarEclipseService:
             peak_azimuth_deg=round(peak_az_deg, 2),
             total_duration_minutes=total_duration_minutes,
             partial_duration_minutes=partial_duration_minutes,
+            obscuration_percent=round(obscuration_percent, 1),
             astrophotography_score=round(score, 1),
             score_classification=classification,
             altitude_vs_time=altitude_vs_time,

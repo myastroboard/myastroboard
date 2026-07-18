@@ -17,12 +17,22 @@ class _Peak:
 
 
 class _Eclipse:
-    def __init__(self, *, kind: str, peak: datetime.datetime, sd_partial: int, sd_total: int, sd_penum: int):
+    def __init__(
+        self,
+        *,
+        kind: str,
+        peak: datetime.datetime,
+        sd_partial: int,
+        sd_total: int,
+        sd_penum: int,
+        obscuration: float = 1.0,
+    ):
         self.kind = kind
         self.peak = _Peak(peak)
         self.sd_partial = sd_partial
         self.sd_total = sd_total
         self.sd_penum = sd_penum
+        self.obscuration = obscuration
 
 
 class TestLunarEclipseInit:
@@ -227,6 +237,7 @@ class TestGetNextEclipse:
             sd_partial=60,
             sd_total=30,
             sd_penum=80,
+            obscuration=1.0,
         )
         mock_peak_alt_az.return_value = (55.55, 182.45)
         mock_generate.return_value = [
@@ -245,6 +256,7 @@ class TestGetNextEclipse:
         assert info.total_duration_minutes == 60
         assert info.peak_altitude_deg == 55.55
         assert info.peak_azimuth_deg == 182.45
+        assert info.obscuration_percent == 100.0
         assert len(info.altitude_vs_time) == 2
 
     @patch.object(LunarEclipseService, "_generate_altitude_vs_time")
@@ -263,6 +275,7 @@ class TestGetNextEclipse:
             sd_partial=0,
             sd_total=0,
             sd_penum=45,
+            obscuration=0.0,
         )
         mock_peak_alt_az.return_value = (-2.0, 220.0)
         mock_generate.return_value = [EclipsePoint(time="00:15", altitude_deg=0.0, azimuth_deg=220.0)]
@@ -272,6 +285,7 @@ class TestGetNextEclipse:
         assert isinstance(info, LunarEclipseInfo)
         assert info.type == "Penumbral"
         assert info.visible is False
+        assert info.obscuration_percent == 0.0
         assert info.total_begin is None
         assert info.total_end is None
         assert info.partial_duration_minutes == 90
