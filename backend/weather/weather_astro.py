@@ -730,6 +730,7 @@ class AstroWeatherAnalyzer:
         # Calculate overall quality score. Precipitation is a multiplicative veto (see
         # analyze_precipitation_impact) rather than a fifth averaged component - active
         # rain shouldn't be masked by otherwise-clear metrics when picking "best" periods.
+        precipitation_factor = working_df["precipitation_factor"] if "precipitation_factor" in working_df.columns else 1.0
         working_df["overall_quality"] = (
             (
                 working_df["seeing_pickering"] * 10  # Convert to percentage scale
@@ -738,7 +739,7 @@ class AstroWeatherAnalyzer:
                 + working_df["tracking_stability_score"]
             )
             / 4
-        ) * working_df.get("precipitation_factor", 1.0)
+        ) * precipitation_factor
 
         # Filter to only nighttime hours (is_day == 0)
         # This ensures we only consider periods when astronomical observation is possible
