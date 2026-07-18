@@ -1668,6 +1668,8 @@
     "footer_source": "Datenquelle: Open-Meteo-Wetter-API."
   },
   "events_api": {
+    "solar_eclipse_title": "{eclipse_type} Sonnenfinsternis",
+    "lunar_eclipse_title": "{eclipse_type} Mondfinsternis",
     "solar_eclipse_description": "{eclipse_type} Sonnenfinsternis mit {obscuration_percent} % Verdunkelung. Höhepunkt bei {peak_altitude_deg}° Höhe.",
     "lunar_eclipse_description": "{eclipse_type} Mondfinsternis mit {obscuration_percent} % Abdeckung am Höhepunkt.",
     "aurora_description": "Sichtbarkeit der Aurora: Wahrscheinlichkeit {visibility_percent} %. Kp Index: {kp_index}",
