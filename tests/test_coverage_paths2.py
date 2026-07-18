@@ -4,7 +4,6 @@
 # ---------------------------------------------------------------------------
 import time as _time
 
-import app as _app_mod
 from cache import cache_store as _cache_store
 from utils import route_helpers as _route_helpers_mod
 from blueprints import locations as _locations_mod

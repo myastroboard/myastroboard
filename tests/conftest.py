@@ -59,13 +59,13 @@ def _clean_stale_test_state():
         try:
             os.remove(os.path.join(data_root, name))
         except OSError:
-            pass
+            pass  # file may not exist from a prior run; nothing to clean up
     cache_dir = os.path.join(data_root, 'cache')
     for name in ('astro_cache.json', 'astro_cache.lock', 'location_cache.json'):
         try:
             os.remove(os.path.join(cache_dir, name))
         except OSError:
-            pass
+            pass  # file may not exist from a prior run; nothing to clean up
 
 
 _clean_stale_test_state()

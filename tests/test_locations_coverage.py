@@ -411,14 +411,22 @@ class TestLocationsApiErrorArcs:
 
     def test_all_route_exception_handlers_return_500(self, client_admin, monkeypatch):
         monkeypatch.setattr(_locations_mod, 'load_config', self._raise)
-        assert client_admin.get('/api/locations').status_code == 500
-        assert client_admin.post('/api/locations', json={}).status_code == 500
-        assert client_admin.put('/api/locations/x', json={}).status_code == 500
-        assert client_admin.delete('/api/locations/x').status_code == 500
-        assert client_admin.get('/api/locations/x/references').status_code == 500
-        assert client_admin.post('/api/locations/x/attribute', json={'user_ids': []}).status_code == 500
-        assert client_admin.get('/api/locations/mine').status_code == 500
-        assert client_admin.post('/api/locations/active', json={'location_id': 'x'}).status_code == 500
+        resp = client_admin.get('/api/locations')
+        assert resp.status_code == 500
+        resp = client_admin.post('/api/locations', json={})
+        assert resp.status_code == 500
+        resp = client_admin.put('/api/locations/x', json={})
+        assert resp.status_code == 500
+        resp = client_admin.delete('/api/locations/x')
+        assert resp.status_code == 500
+        resp = client_admin.get('/api/locations/x/references')
+        assert resp.status_code == 500
+        resp = client_admin.post('/api/locations/x/attribute', json={'user_ids': []})
+        assert resp.status_code == 500
+        resp = client_admin.get('/api/locations/mine')
+        assert resp.status_code == 500
+        resp = client_admin.post('/api/locations/active', json={'location_id': 'x'})
+        assert resp.status_code == 500
 
     def test_validate_payload_edges(self):
         validate = _locations_mod._validate_location_payload
@@ -449,7 +457,8 @@ class TestLocationsApiErrorArcs:
         assert client_admin.get('/api/locations/ghost/references').status_code == 404
 
     def test_delete_unknown_location_returns_404(self, client_admin):
-        assert client_admin.delete('/api/locations/ghost').status_code == 404
+        resp = client_admin.delete('/api/locations/ghost')
+        assert resp.status_code == 404
 
     def test_delete_invalid_plans_mode_returns_400(self, client_admin):
         resp = client_admin.post('/api/locations', json={
@@ -494,7 +503,7 @@ class TestLocationsApiErrorArcs:
             try:
                 user_manager.delete_user(user.user_id)
             except Exception:
-                pass
+                pass  # test may have already deleted the user; nothing to clean up
 
     def test_moon_calendar_warm_cache_and_computed_paths(self, client_admin, monkeypatch):
         from utils.repo_config import load_config

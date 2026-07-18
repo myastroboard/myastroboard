@@ -290,6 +290,7 @@ let weatherAlertsSystem = null;
 function initWeatherAlerts() {
     if (!weatherAlertsSystem) {
         weatherAlertsSystem = new WeatherAlertsSystem();
+        window.weatherAlertsSystem = weatherAlertsSystem;
     }
 }
 
@@ -301,5 +302,4 @@ if (document.readyState === 'loading') {
 }
 
 // Export for global use
-window.weatherAlertsSystem = weatherAlertsSystem;
 window.initWeatherAlerts = initWeatherAlerts;

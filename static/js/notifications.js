@@ -660,7 +660,12 @@ async function _loadSubscriptionList() {
             btn.addEventListener('click', async (e) => {
                 const clickedBtn = e.currentTarget;
                 clickedBtn.disabled = true;
-                await fetch('/api/push/subscriptions', { method: 'DELETE', credentials: 'same-origin' });
+                await fetch('/api/push/subscriptions', {
+                    method: 'DELETE',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ index: Number(clickedBtn.dataset.index) }),
+                });
                 await _subscribeToPush();
                 _loadSubscriptionList();
             });

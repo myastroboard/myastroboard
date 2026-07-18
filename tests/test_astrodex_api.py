@@ -17,7 +17,6 @@ from utils.auth import user_manager  # type: ignore[import-not-found]
 if 'psutil' not in sys.modules:
     sys.modules['psutil'] = types.ModuleType('psutil')
 
-import app as app_module  # type: ignore[import-not-found]
 from app import app  # type: ignore[import-not-found]
 from blueprints import astrodex as astrodex_bp_module  # type: ignore[import-not-found]
 

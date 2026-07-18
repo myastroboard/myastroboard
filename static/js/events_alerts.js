@@ -113,7 +113,7 @@ function displayEvents(eventsData) {
     //console.log("Visible events in next 30 days:", visibleEvents);
 
 
-    // TIMELINE EVENTS MANAGEMENTS
+    // TIMELINE EVENTS MANAGEMENT
     // No events to display in timeline
     if (!nextEvent || eventsIn30Days.length === 0) {
         const noEventsMsg = document.createElement('div');
@@ -344,7 +344,6 @@ function getDaysUntilText(daysUntil) {
     if (daysUntil < 0) return i18n.t('calendar.happening_now');
     if (daysUntil === 0) return i18n.t('calendar.today');
     if (daysUntil === 1) return i18n.t('calendar.tomorrow');
-    if (daysUntil <= 7) return i18n.t('calendar.in_days', { days: daysUntil });
     return i18n.t('calendar.in_days', { days: daysUntil });
 }
 
@@ -440,7 +439,7 @@ window.addEventListener('i18nLanguageChanged', () => {
 
 function _checkEclipseNotifications(eventsData) {
     if (typeof notificationManager === 'undefined') return;
-    const events = eventsData?.events;
+    const events = eventsData?.upcoming_events;
     if (!Array.isArray(events)) return;
 
     const now    = Date.now();

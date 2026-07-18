@@ -112,17 +112,34 @@ def push_list_subscriptions():
 @push_bp.route('/api/push/subscriptions', methods=['DELETE'])
 @login_required
 def push_delete_all_subscriptions():
-    """Remove all server-side push subscriptions for the current user."""
+    """Remove push subscription(s) for the current user.
+
+    With no body (or no ``index``), removes all subscriptions. With a JSON
+    body ``{"index": N}`` (matching the ``index`` returned by the GET list),
+    removes only that one subscription.
+    """
     try:
         current_user = get_current_user()
         if not current_user:  # pragma: no cover
             return jsonify({'error': 'Authentication required'}), 401
 
-        count = len(current_user.push_subscriptions)
-        current_user.push_subscriptions = []
+        data = request.get_json(silent=True) or {}
+        index = data.get('index')
+
+        if index is None:
+            count = len(current_user.push_subscriptions)
+            current_user.push_subscriptions = []
+            user_manager.save_users()
+            logger.info(f"All {count} push subscription(s) removed for {current_user.username}")
+            return jsonify({'removed': count})
+
+        if not isinstance(index, int) or not (0 <= index < len(current_user.push_subscriptions)):
+            return jsonify({'error': 'Invalid subscription index'}), 400
+
+        del current_user.push_subscriptions[index]
         user_manager.save_users()
-        logger.info(f"All {count} push subscription(s) removed for {current_user.username}")
-        return jsonify({'removed': count})
+        logger.info(f"Push subscription at index {index} removed for {current_user.username}")
+        return jsonify({'removed': 1})
     except Exception as e:
         logger.error(f"Error removing push subscriptions: {e}")
         return jsonify({'error': 'Internal server error'}), 500

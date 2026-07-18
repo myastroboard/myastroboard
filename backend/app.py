@@ -68,6 +68,20 @@ from space import iss_passes  # noqa: F401
 from astroweather import moon_planner  # noqa: F401
 from observation import plan_my_night  # noqa: F401
 
+# Declares the re-exports above as intentional (not dead code) for static analysis -
+# their only consumers are tests doing monkeypatch.setattr(app.<name>, ...).
+__all__ = [
+    "app",
+    "user_manager",
+    "astrodex",
+    "cache_store",
+    "css_passes",
+    "equipment_profiles",
+    "iss_passes",
+    "moon_planner",
+    "plan_my_night",
+]
+
 # Initialize logger for this module
 logger = get_logger(__name__)
 

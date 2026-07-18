@@ -24,7 +24,6 @@ from utils import repo_config
 from utils.repo_config import (
     _ensure_locations,
     get_active_location,
-    get_all_locations,
     get_install_default_location,
     get_locations_for_user,
     get_scheduler_locations,
@@ -445,7 +444,7 @@ class TestUserManagerLocationPrefs:
         try:
             manager.delete_user(user.user_id)
         except Exception:
-            pass
+            pass  # test may have already deleted the user; nothing to clean up
 
     def test_set_user_location_prefs(self, manager, temp_user):
         block = manager.set_user_location_prefs(temp_user.user_id, default_location_id='loc-1')
@@ -715,7 +714,7 @@ class TestLocationsAPI:
             try:
                 user_manager.delete_user(user.user_id)
             except Exception:
-                pass
+                pass  # test may have already deleted the user; nothing to clean up
 
     def test_attribute_unknown_user_rejected(self, client_admin):
         listed = client_admin.get('/api/locations').get_json()

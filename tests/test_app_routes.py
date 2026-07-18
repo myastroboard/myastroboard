@@ -2197,6 +2197,38 @@ class TestPushSubscriptionsManagement:
         data = resp.get_json()
         assert 'removed' in data
 
+    def test_delete_single_subscription_by_index_only_removes_that_one(self, client_admin):
+        from utils.auth import user_manager as _um
+
+        user = _um.get_user_by_username('admin')
+        original = list(user.push_subscriptions)
+        user.push_subscriptions = [
+            {'endpoint': 'https://example.com/push/a', 'keys': {}},
+            {'endpoint': 'https://example.com/push/b', 'keys': {}},
+            {'endpoint': 'https://example.com/push/c', 'keys': {}},
+        ]
+        try:
+            resp = client_admin.delete('/api/push/subscriptions', json={'index': 1})
+            assert resp.status_code == 200
+            assert resp.get_json()['removed'] == 1
+            remaining = [s['endpoint'] for s in user.push_subscriptions]
+            assert remaining == ['https://example.com/push/a', 'https://example.com/push/c']
+        finally:
+            user.push_subscriptions = original
+
+    def test_delete_single_subscription_invalid_index_returns_400(self, client_admin):
+        from utils.auth import user_manager as _um
+
+        user = _um.get_user_by_username('admin')
+        original = list(user.push_subscriptions)
+        user.push_subscriptions = [{'endpoint': 'https://example.com/push/a', 'keys': {}}]
+        try:
+            resp = client_admin.delete('/api/push/subscriptions', json={'index': 5})
+            assert resp.status_code == 400
+            assert len(user.push_subscriptions) == 1
+        finally:
+            user.push_subscriptions = original
+
     def test_push_subscribe_valid_subscription(self, client_admin):
         resp = client_admin.post(
             '/api/push/subscribe',
@@ -6364,7 +6396,7 @@ class TestResolveObservingNightBranches:
         mock_svc.get_today_report.return_value = self._make_report('', 'Not found')
         # Tomorrow also returns empty → no valid window
         mock_svc.get_tomorrow_report.return_value = self._make_report('', '')
-        monkeypatch.setattr(_route_helpers_mod, 'load_config', lambda: _v12_config())
+        monkeypatch.setattr(_route_helpers_mod, 'load_config', _v12_config)
         monkeypatch.setattr(_plan_my_night_mod, 'SunService', lambda **kw: mock_svc)
         monkeypatch.setattr(_plan_my_night_mod, 'load_calculation_results', lambda *_a, **_k: {'metadata': {}})
         result = _plan_my_night_mod._resolve_observing_night_for_plan()
@@ -6376,7 +6408,7 @@ class TestResolveObservingNightBranches:
         mock_svc = MagicMock()
         mock_svc.get_today_report.return_value = self._make_report('NOT-A-DATE', 'ALSO-BAD')
         mock_svc.get_tomorrow_report.return_value = self._make_report('NOT-A-DATE', 'ALSO-BAD')
-        monkeypatch.setattr(_route_helpers_mod, 'load_config', lambda: _v12_config())
+        monkeypatch.setattr(_route_helpers_mod, 'load_config', _v12_config)
         monkeypatch.setattr(_plan_my_night_mod, 'SunService', lambda **kw: mock_svc)
         monkeypatch.setattr(_plan_my_night_mod, 'load_calculation_results', lambda *_a, **_k: {'metadata': {}})
         result = _plan_my_night_mod._resolve_observing_night_for_plan()
@@ -6392,7 +6424,7 @@ class TestResolveObservingNightBranches:
         mock_svc.get_tomorrow_report.return_value = self._make_report(
             '2026-06-10 21:30', '2026-06-11 04:00'
         )
-        monkeypatch.setattr(_route_helpers_mod, 'load_config', lambda: _v12_config())
+        monkeypatch.setattr(_route_helpers_mod, 'load_config', _v12_config)
         monkeypatch.setattr(_plan_my_night_mod, 'SunService', lambda **kw: mock_svc)
         result = _plan_my_night_mod._resolve_observing_night_for_plan()
         assert result is not None
@@ -6404,7 +6436,7 @@ class TestResolveObservingNightBranches:
         mock_svc = MagicMock()
         mock_svc.get_today_report.return_value = self._make_report('', '')
         mock_svc.get_tomorrow_report.return_value = self._make_report('', '')
-        monkeypatch.setattr(_route_helpers_mod, 'load_config', lambda: _v12_config())
+        monkeypatch.setattr(_route_helpers_mod, 'load_config', _v12_config)
         monkeypatch.setattr(_plan_my_night_mod, 'SunService', lambda **kw: mock_svc)
         monkeypatch.setattr(_plan_my_night_mod, 'load_calculation_results', lambda *_a, **_k: {
             'metadata': {'night_start': '2026-06-09T21:00:00+00:00', 'night_end': '2026-06-10T04:00:00+00:00'}
