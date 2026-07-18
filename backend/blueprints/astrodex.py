@@ -534,15 +534,13 @@ def upload_astrodex_image():
         # Ensure directory exists
         astrodex.ensure_astrodex_directories()
 
-        base_dir = os.path.abspath(astrodex.ASTRODEX_IMAGES_DIR)
+        base_dir = os.path.realpath(astrodex.ASTRODEX_IMAGES_DIR)
         file_path = os.path.realpath(os.path.join(base_dir, unique_filename))
 
-        # Confinement check (anti path traversal)
-        try:
-            if os.path.commonpath([base_dir, file_path]) != base_dir:  # pragma: no cover
-                logger.warning(f"Attempted path traversal attack: {file_path}")
-                return jsonify({'error': 'Invalid file path'}), 400
-        except ValueError:  # pragma: no cover
+        # Confinement check (anti path traversal). realpath + startswith
+        # (rather than os.path.commonpath) is the pattern CodeQL's
+        # py/path-injection query recognises as a sanitizer barrier.
+        if not file_path.startswith(base_dir + os.sep):  # pragma: no cover
             logger.warning(f"Attempted path traversal attack: {file_path}")
             return jsonify({'error': 'Invalid file path'}), 400
 

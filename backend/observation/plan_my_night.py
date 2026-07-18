@@ -42,21 +42,20 @@ def _safe_plan_path(path: str) -> str:
 
     This is the canonical sanitizer for path expressions in this module.
     CodeQL (CWE-022) requires the realpath check to occur at the call site of
-    each file operation; callers must use the *returned* resolved path.
+    each file operation; callers must use the *returned* resolved path. The
+    containment check uses realpath + startswith (rather than
+    os.path.commonpath) because that is the pattern CodeQL's py/path-injection
+    query recognises as a sanitizer barrier.
 
     PLAN_DIR is read at call time (not cached) so that test fixtures that
     monkeypatch plan_my_night.PLAN_DIR are honoured correctly.
 
-    Raises ValueError if the path would escape the plan directory.
+    Raises ValueError if the path would escape the plan directory (this also
+    excludes the plan root directory itself, which is never a valid file path).
     """
     plan_dir_real = os.path.realpath(PLAN_DIR)
     resolved = os.path.realpath(path)
-    try:
-        inside_plan_dir = os.path.commonpath([plan_dir_real, resolved]) == plan_dir_real
-    except ValueError:
-        inside_plan_dir = False
-    # The plan root directory itself is not a valid plan file path.
-    if not inside_plan_dir or resolved == plan_dir_real:
+    if not resolved.startswith(plan_dir_real + os.sep):
         raise ValueError(f'Path outside plan directory: {path!r}')
     return resolved
 

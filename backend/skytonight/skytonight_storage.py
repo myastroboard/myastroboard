@@ -178,16 +178,14 @@ def _safe_location_dir(base_dir: str, location_id: str) -> str:
     location_id is always a server-generated UUID (see
     repo_config.new_location_preset), but this is re-verified here rather than
     trusted from the caller: CodeQL (CWE-022) requires the sanitizer to be
-    called directly at each file operation's call site. Raises ValueError if
-    the resolved path would escape base_dir.
+    called directly at each file operation's call site. The containment check
+    uses realpath + startswith (rather than os.path.commonpath) because that
+    is the pattern CodeQL's py/path-injection query recognises as a sanitizer
+    barrier. Raises ValueError if the resolved path would escape base_dir.
     """
     base_real = os.path.realpath(base_dir)
     resolved = os.path.realpath(os.path.join(base_dir, location_id))
-    try:
-        inside_base_dir = os.path.commonpath([base_real, resolved]) == base_real
-    except ValueError:
-        inside_base_dir = False
-    if not inside_base_dir:
+    if not resolved.startswith(base_real + os.sep):
         raise ValueError(f'Path outside {base_dir!r}: {location_id!r}')
     return resolved
 

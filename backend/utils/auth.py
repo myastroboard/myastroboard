@@ -752,11 +752,8 @@ class UserManager:
             astrodex_file = os.path.realpath(os.path.join(base_astrodex_dir, f"{user_id}_astrodex.json"))
 
             # Ensure confinement
-            try:
-                if os.path.commonpath([base_astrodex_dir, astrodex_file]) != base_astrodex_dir:
-                    raise ValueError("Invalid astrodex file path")
-            except ValueError as path_error:
-                raise ValueError("Invalid astrodex file path") from path_error
+            if not astrodex_file.startswith(base_astrodex_dir + os.sep):
+                raise ValueError("Invalid astrodex file path")
 
             image_filenames = set()
 
@@ -779,10 +776,7 @@ class UserManager:
             for filename in image_filenames:
                 file_path = os.path.realpath(os.path.join(base_images_dir, filename))
 
-                try:
-                    if os.path.commonpath([base_images_dir, file_path]) != base_images_dir:
-                        continue
-                except ValueError:
+                if not file_path.startswith(base_images_dir + os.sep):
                     continue
 
                 if os.path.exists(file_path):
@@ -797,10 +791,7 @@ class UserManager:
                     if filename.startswith(f"{user_id}_") and re.match(r"^[a-zA-Z0-9_.-]+$", filename):
                         file_path = os.path.realpath(os.path.join(base_images_dir, filename))
 
-                        try:
-                            if os.path.commonpath([base_images_dir, file_path]) != base_images_dir:
-                                continue
-                        except ValueError:
+                        if not file_path.startswith(base_images_dir + os.sep):
                             continue
 
                         try:
