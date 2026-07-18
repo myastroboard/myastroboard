@@ -260,7 +260,7 @@ def test_check_and_handle_config_changes_no_legacy_signature_migrates(monkeypatc
     mock_cs.is_location_tracked.return_value = True
     mock_cs.has_location_changed.return_value = False
 
-    monkeypatch.setattr(cache_updater, "_legacy_cache_migration_done", False)
+    monkeypatch.setitem(cache_updater._legacy_cache_migration_state, "done", False)
     monkeypatch.setattr(cache_updater, "cache_store", mock_cs)
     monkeypatch.setattr(
         cache_updater,
