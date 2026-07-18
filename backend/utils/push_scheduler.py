@@ -619,9 +619,7 @@ def _check_n9_solsys_window(user: Any, cache_data: Optional[dict], loc: Optional
             user,
             trigger_key,
             _t(user, 'push_n9_title'),
-            _with_location(
-                user, _t(user, 'push_n9_body', title=title, days=days), loc.get('name'), loc.get('multi')
-            ),
+            _with_location(user, _t(user, 'push_n9_body', title=title, days=days), loc.get('name'), loc.get('multi')),
             '/#forecast-astro/calendar',
             ttl=int(ms_until),
         )
