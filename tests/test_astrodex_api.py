@@ -238,3 +238,17 @@ def test_get_astrodex_image_private_mode_blocks_other_user_images(client, monkey
         other_response.get_data()
         other_response.close()
         assert other_response.status_code == 403
+
+
+def test_resolve_picture_location_snapshot_falls_through_on_lookup_miss(monkeypatch):
+    """Defensive branch: location_id resolves as accessible but a direct lookup
+    still misses (e.g. a race with a concurrent delete) - must fall through to
+    the custom-label/empty path rather than crash."""
+    fake_user = types.SimpleNamespace(user_id='u1')
+    monkeypatch.setattr(astrodex_bp_module, 'load_config', lambda: {'locations': []})
+    monkeypatch.setattr(astrodex_bp_module, 'get_locations_for_user', lambda config, user: [{'id': 'loc-1'}])
+    monkeypatch.setattr(astrodex_bp_module, 'get_location_by_id', lambda config, loc_id: None)
+
+    result = astrodex_bp_module._resolve_picture_location_snapshot('loc-1', fake_user)
+
+    assert result == astrodex_bp_module._EMPTY_PICTURE_LOCATION

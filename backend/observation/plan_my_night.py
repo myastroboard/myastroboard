@@ -284,7 +284,7 @@ def _coverage_for_window(
         return 0.0
     total = (window_end - window_start).total_seconds()
     if total <= 0:
-        return 0.0
+        return 0.0  # pragma: no cover - unreachable: window_end > window_start is already guaranteed above
     covered = 0.0
     for start, end in runs:
         s = max(start, window_start)
@@ -1154,9 +1154,9 @@ def compute_optimized_schedule(
         cursor = end
 
     start_delay_minutes = 0
-    if preview:
+    if preview:  # pragma: no branch - unreachable: preview always has one entry per (already checked non-empty) entries
         first_start = _parse_datetime(preview[0]['start'])
-        if first_start:
+        if first_start:  # pragma: no branch - unreachable: preview[0]['start'] is always a valid _to_iso() round-trip
             start_delay_minutes = max(0, int(round((first_start - night_start).total_seconds() / 60)))
 
     # Derived straight from the actual placement above (not a separate minutes

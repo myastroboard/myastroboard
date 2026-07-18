@@ -189,6 +189,60 @@ def test_skytonight_request_location_falls_back_outside_request_context(monkeypa
     assert location['id'] == 'solo-loc'
 
 
+def test_skytonight_request_location_override_falls_back_outside_request_context(monkeypatch):
+    """Same outside-request-context fallback as _skytonight_request_location,
+    but for the pinned-location variant used by e.g. Plan My Night's alttime lookups."""
+    monkeypatch.setattr(
+        skytonight_api_module, 'load_config',
+        lambda: {'locations': [{'id': 'solo-loc', 'is_install_default': True}]},
+    )
+
+    def _raise_outside_request_context():
+        raise RuntimeError('Working outside of request context.')
+
+    monkeypatch.setattr(skytonight_api_module, 'get_current_user', _raise_outside_request_context)
+
+    location = skytonight_api_module._skytonight_request_location_override(None)
+
+    assert location['id'] == 'solo-loc'
+
+
+def test_skytonight_request_location_override_uses_accessible_pinned_location(monkeypatch):
+    """A caller-supplied location_id that the viewer can access must override
+    their currently-active preset (e.g. reading a plan's pinned location)."""
+    monkeypatch.setattr(
+        skytonight_api_module, 'load_config',
+        lambda: {'locations': [
+            {'id': 'loc-a', 'is_install_default': True},
+            {'id': 'loc-b', 'is_install_default': False},
+        ]},
+    )
+    monkeypatch.setattr(skytonight_api_module, 'get_current_user', lambda: None)
+    monkeypatch.setattr(
+        skytonight_api_module, 'get_locations_for_user',
+        lambda config, user: config['locations'],
+    )
+
+    location = skytonight_api_module._skytonight_request_location_override('loc-b')
+
+    assert location['id'] == 'loc-b'
+
+
+def test_skytonight_request_location_override_falls_back_when_not_accessible(monkeypatch):
+    """A location_id the viewer can't access (foreign/stale id) must fall back
+    to their active preset rather than leaking another location's data."""
+    monkeypatch.setattr(
+        skytonight_api_module, 'load_config',
+        lambda: {'locations': [{'id': 'loc-a', 'is_install_default': True}]},
+    )
+    monkeypatch.setattr(skytonight_api_module, 'get_current_user', lambda: None)
+    monkeypatch.setattr(skytonight_api_module, 'get_locations_for_user', lambda config, user: config['locations'])
+
+    location = skytonight_api_module._skytonight_request_location_override('not-accessible-loc')
+
+    assert location['id'] == 'loc-a'
+
+
 def test_skytonight_log_endpoint_returns_content(client_admin, monkeypatch, tmp_path):
     log_file = tmp_path / 'last_calculation.log'
     log_file.write_text('{"status":"success"}\n', encoding='utf-8')

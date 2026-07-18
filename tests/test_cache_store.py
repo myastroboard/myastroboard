@@ -236,6 +236,16 @@ class TestCacheReset:
         assert cache_store.load_location_cache("horizon_graph", loc_a)["data"] is None
         assert cache_store.load_location_cache("horizon_graph", loc_b)["data"] == {"v": 2}
 
+    def test_reset_all_caches_skips_unrecognized_shared_keys(self):
+        """A shared-cache key whose base name isn't a known scoped cache or
+        spaceflight entry (e.g. leftover/foreign data) must be left untouched."""
+        cache_store.update_shared_cache_entry("totally_unrelated_key", {"kept": True}, 111.0)
+
+        reset_all_caches()
+
+        entry = cache_store.load_shared_cache_entry("totally_unrelated_key")
+        assert entry["data"] == {"kept": True}
+
 
 class TestCacheInitStatus:
     """Test cache initialization status reporting"""

@@ -13,6 +13,7 @@ import json
 import os
 import sys
 import uuid
+from unittest.mock import Mock
 
 import pytest
 
@@ -388,6 +389,18 @@ class TestLocationScopedCaches:
         assert cache_store.load_shared_cache_entry('horizon_graph') is None
         keyed = cache_store.load_shared_cache_entry(cache_store.location_cache_key('horizon_graph', loc_id))
         assert keyed is not None and keyed['data'] == {'legacy': True}
+
+    def test_migrate_legacy_cache_keys_no_legacy_keys_skips_write(self, monkeypatch):
+        """When there's nothing to migrate, the shared cache file must not be
+        rewritten at all - not just rewritten with the same content."""
+        monkeypatch.setattr(cache_store, '_read_shared_cache', lambda: {})
+        write_mock = Mock()
+        monkeypatch.setattr(cache_store, '_write_shared_cache', write_mock)
+
+        migrated = cache_store.migrate_legacy_cache_keys(str(uuid.uuid4()))
+
+        assert migrated == 0
+        write_mock.assert_not_called()
 
     def test_signature_change_detection_per_preset(self):
         preset = {'id': str(uuid.uuid4()), 'latitude': 45.0, 'longitude': 3.0, 'elevation': 10, 'timezone': 'UTC'}

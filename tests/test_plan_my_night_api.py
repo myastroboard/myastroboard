@@ -278,3 +278,47 @@ def test_optimize_apply_requires_order(client_admin):
 
     response = client_admin.post('/api/plan-my-night/optimize/apply', json={'start_delay_minutes': 0})
     assert response.status_code == 400
+
+
+def test_optimize_returns_404_when_compute_returns_none(client_admin, monkeypatch):
+    """Deeper checks inside compute_optimized_schedule (e.g. corrupted night
+    bounds) can return None even though a plan with entries exists and isn't
+    in 'previous' state - the blueprint must still surface a 404, not a 500."""
+    add_response = client_admin.post('/api/plan-my-night/targets', json=_sample_target())
+    assert add_response.status_code == 200
+
+    monkeypatch.setattr(plan_my_night_bp_module.plan_my_night, 'compute_optimized_schedule', lambda *a, **kw: None)
+
+    response = client_admin.get('/api/plan-my-night/optimize')
+    assert response.status_code == 404
+
+
+def test_optimize_exception_returns_500(client_admin, monkeypatch):
+    add_response = client_admin.post('/api/plan-my-night/targets', json=_sample_target())
+    assert add_response.status_code == 200
+
+    def _boom(*a, **kw):
+        raise RuntimeError('boom')
+
+    monkeypatch.setattr(plan_my_night_bp_module.plan_my_night, 'compute_optimized_schedule', _boom)
+
+    response = client_admin.get('/api/plan-my-night/optimize')
+    assert response.status_code == 500
+
+
+def test_optimize_apply_exception_returns_500(client_admin, monkeypatch):
+    add_response = client_admin.post('/api/plan-my-night/targets', json=_sample_target())
+    assert add_response.status_code == 200
+    preview = client_admin.get('/api/plan-my-night/optimize')
+    preview_payload = preview.get_json()
+
+    def _boom(*a, **kw):
+        raise RuntimeError('boom')
+
+    monkeypatch.setattr(plan_my_night_bp_module.plan_my_night, 'apply_optimized_schedule', _boom)
+
+    response = client_admin.post('/api/plan-my-night/optimize/apply', json={
+        'order': preview_payload['order'],
+        'start_delay_minutes': preview_payload['start_delay_minutes'],
+    })
+    assert response.status_code == 500

@@ -230,3 +230,16 @@ class TestBeginnerCatalogEndpoint:
 
         response = client_admin.get('/api/beginner-catalog')
         assert response.status_code == 200
+
+
+def test_alttime_file_for_target_returns_id_when_file_exists(tmp_path, monkeypatch):
+    monkeypatch.setattr(beginner_catalog, 'get_alttime_dir', lambda location_id: str(tmp_path))
+    (tmp_path / 'target1_alttime.json').write_text('{}', encoding='utf-8')
+
+    assert beginner_catalog._alttime_file_for_target('target1', None) == 'target1'
+
+
+def test_alttime_file_for_target_returns_empty_when_file_missing(tmp_path, monkeypatch):
+    monkeypatch.setattr(beginner_catalog, 'get_alttime_dir', lambda location_id: str(tmp_path))
+
+    assert beginner_catalog._alttime_file_for_target('missing-target', None) == ''

@@ -43,6 +43,8 @@ _csv_fmt_observable_pct = plan_my_night._csv_fmt_observable_pct
 _observable_runs = plan_my_night._observable_runs
 _coverage_for_window = plan_my_night._coverage_for_window
 _visibility_summary = plan_my_night._visibility_summary
+_compute_entry_visibility = plan_my_night._compute_entry_visibility
+_load_alttime = plan_my_night._load_alttime
 compute_optimized_schedule = plan_my_night.compute_optimized_schedule
 apply_optimized_schedule = plan_my_night.apply_optimized_schedule
 
@@ -2464,3 +2466,237 @@ class TestScheduleOptimizer:
 
         unchanged = load_user_plan(uid, "user")
         assert [e["id"] for e in unchanged["plan"]["entries"]] == ["a", "b"]
+
+    def test_compute_returns_none_for_previous_plan_state(self, temp_plan_dir, monkeypatch):
+        monkeypatch.setattr(plan_my_night, "_now", lambda: datetime(2026, 7, 19, 6, 0, tzinfo=timezone.utc))
+        uid = "eeee3011-0000-4000-8000-000000000000"
+        payload = {
+            "user_id": uid, "username": "user",
+            "plan": {
+                "night_start": "2026-07-18T06:00:00+00:00",
+                "night_end": "2026-07-18T10:00:00+00:00",
+                "start_delay_minutes": 0,
+                "entries": [{"id": "a", "name": "A", "planned_minutes": 60, "done": False}],
+            },
+        }
+        save_user_plan(uid, payload, username="user")
+        assert compute_optimized_schedule(uid, "user") is None
+
+    def test_compute_returns_none_for_empty_entries(self, temp_plan_dir, monkeypatch):
+        monkeypatch.setattr(plan_my_night, "_now", lambda: datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc))
+        uid = "eeee3012-0000-4000-8000-000000000000"
+        payload = {
+            "user_id": uid, "username": "user",
+            "plan": {
+                "night_start": "2026-07-18T06:00:00+00:00",
+                "night_end": "2026-07-18T10:00:00+00:00",
+                "start_delay_minutes": 0,
+                "entries": [],
+            },
+        }
+        save_user_plan(uid, payload, username="user")
+        assert compute_optimized_schedule(uid, "user") is None
+
+    def test_compute_returns_none_for_invalid_night_bounds(self, temp_plan_dir, monkeypatch):
+        monkeypatch.setattr(plan_my_night, "_now", lambda: datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc))
+        uid = "eeee3013-0000-4000-8000-000000000000"
+        payload = {
+            "user_id": uid, "username": "user",
+            "plan": {
+                # night_end <= night_start - malformed/corrupted plan data.
+                "night_start": "2026-07-18T10:00:00+00:00",
+                "night_end": "2026-07-18T06:00:00+00:00",
+                "start_delay_minutes": 0,
+                "entries": [{"id": "a", "name": "A", "planned_minutes": 60, "done": False}],
+            },
+        }
+        save_user_plan(uid, payload, username="user")
+        assert compute_optimized_schedule(uid, "user") is None
+
+    def test_compute_entry_without_alttime_file_is_never_observable(self, temp_plan_dir, monkeypatch):
+        monkeypatch.setattr(plan_my_night, "_now", lambda: datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc))
+        uid = "eeee3014-0000-4000-8000-000000000000"
+        payload = {
+            "user_id": uid, "username": "user",
+            "plan": {
+                "night_start": "2026-07-18T06:00:00+00:00",
+                "night_end": "2026-07-18T08:00:00+00:00",
+                "start_delay_minutes": 0,
+                # No alttime_file at all - a manually-added target.
+                "entries": [{"id": "a", "name": "A", "planned_minutes": 30, "done": False}],
+            },
+        }
+        save_user_plan(uid, payload, username="user")
+
+        result = compute_optimized_schedule(uid, "user")
+
+        assert result["preview"][0]["warnings"] == ["never_observable"]
+
+    def test_compute_reuses_cached_alttime_for_repeated_file(self, temp_plan_dir, monkeypatch):
+        monkeypatch.setattr(
+            "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: temp_plan_dir, raising=True
+        )
+        monkeypatch.setattr(plan_my_night, "_now", lambda: datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc))
+        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
+        times = [(night_start + timedelta(minutes=30 * i)).strftime("%Y-%m-%dT%H:%M:%S") for i in range(5)]
+        always_visible = [40.0, 41.0, 42.0, 43.0, 44.0]
+        _write_alttime(temp_plan_dir, "shared", times, always_visible)
+
+        uid = "eeee3015-0000-4000-8000-000000000000"
+        payload = {
+            "user_id": uid, "username": "user",
+            "plan": {
+                "night_start": "2026-07-18T06:00:00+00:00",
+                "night_end": "2026-07-18T08:00:00+00:00",
+                "start_delay_minutes": 0,
+                # Both entries share the same cached alttime file - the second
+                # lookup must hit the cache rather than re-reading disk.
+                "entries": [
+                    {"id": "e1", "name": "E1", "planned_minutes": 15, "alttime_file": "shared", "done": False},
+                    {"id": "e2", "name": "E2", "planned_minutes": 15, "alttime_file": "shared", "done": False},
+                ],
+            },
+        }
+        save_user_plan(uid, payload, username="user")
+
+        result = compute_optimized_schedule(uid, "user")
+
+        assert {p["id"] for p in result["preview"]} == {"e1", "e2"}
+
+    def test_compute_flags_entries_pushed_past_night_end(self, temp_plan_dir, monkeypatch):
+        monkeypatch.setattr(plan_my_night, "_now", lambda: datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc))
+        uid = "eeee3016-0000-4000-8000-000000000000"
+        payload = {
+            "user_id": uid, "username": "user",
+            "plan": {
+                "night_start": "2026-07-18T06:00:00+00:00",
+                "night_end": "2026-07-18T08:00:00+00:00",
+                "start_delay_minutes": 0,
+                "entries": [
+                    # First entry (no alttime_file) fills the entire 2-hour night...
+                    {"id": "e1", "name": "E1", "planned_minutes": 120, "done": False},
+                    # ...leaving nothing for the second, which gets pushed past night_end.
+                    {"id": "e2", "name": "E2", "planned_minutes": 30, "done": False},
+                ],
+            },
+        }
+        save_user_plan(uid, payload, username="user")
+
+        result = compute_optimized_schedule(uid, "user")
+
+        preview_by_id = {p["id"]: p for p in result["preview"]}
+        assert "pushed_past_night_end" in preview_by_id["e2"]["warnings"]
+
+    def test_apply_returns_false_without_plan(self, temp_plan_dir):
+        assert apply_optimized_schedule("eeee3017-0000-4000-8000-000000000000", "user", None, ["a"], 0) is False
+
+
+class TestLoadAlttime:
+    def test_returns_none_for_falsy_filename(self):
+        assert _load_alttime('', None) is None
+        assert _load_alttime(None, None) is None
+
+
+class TestObservableRunsEdgeCases:
+    def test_returns_empty_for_invalid_night_window(self):
+        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
+        # night_end == night_start is invalid (not strictly after start).
+        result = _observable_runs(['x'], [50.0], None, 30, 80, None, night_start, night_start)
+        assert result == []
+
+    def test_returns_empty_when_a_timestamp_is_unparseable(self):
+        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
+        night_end = datetime(2026, 7, 18, 8, 0, tzinfo=timezone.utc)
+        result = _observable_runs(
+            [night_start.isoformat(), 'not-a-timestamp'], [50.0, 55.0], None, 30, 80, None, night_start, night_end
+        )
+        assert result == []
+
+    def test_horizon_floor_exception_falls_back_to_alt_min(self, monkeypatch):
+        def _boom(*_a, **_kw):
+            raise RuntimeError('boom')
+
+        monkeypatch.setattr(plan_my_night, '_horizon_floor_array', _boom)
+        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
+        night_end = datetime(2026, 7, 18, 8, 0, tzinfo=timezone.utc)
+        times = [night_start.isoformat(), (night_start + timedelta(hours=1)).isoformat()]
+
+        result = _observable_runs(
+            times, [50.0, 55.0], [10.0, 20.0], 30, 80, [{'az': 0, 'alt': 5}], night_start, night_end
+        )
+
+        # Falls back to alt_min as the floor - target stays above it for both
+        # samples, giving one run from the first sample to the last (07:00,
+        # not clipped to night_end since there's no later sample).
+        assert result == [(night_start, night_start + timedelta(hours=1))]
+
+    def test_horizon_profile_raises_floor_and_excludes_low_target(self):
+        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
+        night_end = datetime(2026, 7, 18, 8, 0, tzinfo=timezone.utc)
+        times = [night_start.isoformat(), (night_start + timedelta(hours=1)).isoformat()]
+        # Horizon profile raises the floor to 20 deg at az=0/180 - well above alt_min.
+        horizon_profile = [{'az': 0, 'alt': 20}, {'az': 180, 'alt': 20}]
+        altitudes = [15.0, 15.0]  # above alt_min(10) but below the horizon-raised floor(20)
+        azimuths = [0.0, 0.0]
+
+        result = _observable_runs(times, altitudes, azimuths, 10, 80, horizon_profile, night_start, night_end)
+
+        assert result == []
+
+    def test_skips_none_altitude_samples_and_crosses_via_none_margin(self):
+        """A None altitude sample (missing data point in the cached series) must
+        not crash the run-detection/interpolation logic. The crossing on either
+        side of the gap has no valid altitude to interpolate against, so it
+        collapses to a zero-length run at the missing sample's neighbors -
+        which then get clipped away entirely, rather than raising."""
+        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
+        night_end = datetime(2026, 7, 18, 8, 0, tzinfo=timezone.utc)
+        times = [
+            night_start.isoformat(),
+            (night_start + timedelta(minutes=30)).isoformat(),
+            (night_start + timedelta(minutes=60)).isoformat(),
+        ]
+        altitudes = [50.0, None, 55.0]
+
+        result = _observable_runs(times, altitudes, None, 30, 80, None, night_start, night_end)
+
+        assert result == []
+
+    def test_clips_out_run_entirely_before_night_start(self):
+        before_start = datetime(2026, 7, 18, 2, 0, tzinfo=timezone.utc)
+        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
+        night_end = datetime(2026, 7, 18, 8, 0, tzinfo=timezone.utc)
+        times = [(before_start + timedelta(minutes=15 * i)).isoformat() for i in range(4)]
+        altitudes = [50.0, 51.0, 52.0, 53.0]  # observable throughout, but entirely before night_start
+
+        result = _observable_runs(times, altitudes, None, 30, 80, None, night_start, night_end)
+
+        assert result == []
+
+
+class TestVisibilitySummaryEdgeCases:
+    def test_without_window_bounds_skips_visible_from_lookup(self):
+        result = _visibility_summary([], None, None)
+        assert result['status'] == 'none'
+        assert result['visible_from'] is None
+        assert result['visible_until'] is None
+
+
+class TestComputeEntryVisibilityCache:
+    def test_uses_cached_alttime_data_without_reloading(self):
+        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
+        night_end = datetime(2026, 7, 18, 8, 0, tzinfo=timezone.utc)
+        cached_data = {
+            'times_utc': [night_start.isoformat(), night_end.isoformat()],
+            'altitudes': [50.0, 55.0],
+            'altitude_constraint_min': 30,
+            'altitude_constraint_max': 80,
+        }
+        # Pre-populate the cache so the "not in cache" load branch is skipped.
+        cache = {'preloaded': cached_data}
+        entry = {'alttime_file': 'preloaded'}
+
+        result = _compute_entry_visibility(entry, None, night_start, night_end, night_start, night_end, cache)
+
+        assert result is not None
+        assert result['status'] == 'ok'
