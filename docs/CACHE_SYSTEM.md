@@ -23,7 +23,7 @@ Caches are split into two buckets (full details: [docs/LOCATIONS.md](LOCATIONS.m
 - **Global caches** keep the single-slot module-level shape: `spaceflight_launches`,
   `spaceflight_astronauts`, `spaceflight_events`, `iers`, AllSky connector caches, and
   the version-check cache. The ISS/CSS **TLE fetch** is also global (its own on-disk
-  cache inside `iss_passes.py`/`css_passes.py`); only pass-visibility math is per
+  cache inside `space/iss_passes.py`/`space/css_passes.py`); only pass-visibility math is per
   location.
 
 The scheduler runs each location-scoped job once per *scheduler location* (install
@@ -40,7 +40,7 @@ locations use the `"<job>@<location-slug>"` key format.
 - Cache is automatically refreshed on schedule (selective per-job TTL)
 
 ### Per-Job TTL Configuration
-Each cache job has an individual TTL defined in `backend/constants.py`:
+Each cache job has an individual TTL defined in `backend/utils/constants.py`:
 
 | Job | TTL | Rationale |
 |-----|-----|-----------|
@@ -73,7 +73,7 @@ Each cache job has an individual TTL defined in `backend/constants.py`:
   - Each SkyTonight run bypasses cache to get live conditions from Open-Meteo API
 
 ### Selective Refresh (Resource Efficiency)
-`fully_initialize_caches()` in `cache_updater.py` now:
+`fully_initialize_caches()` in `cache/cache_updater.py` now:
 1. Syncs each in-memory cache entry from the shared JSON file (gets persisted timestamp)
 2. Checks each job's TTL individually
 3. **Skips jobs whose TTL has not yet expired**
@@ -107,7 +107,7 @@ Signatures are tracked per preset id in `data/cache/location_cache.json`
 
 ### Components
 
-#### 1. **`cache_store.py`** - Cache Storage & Validation
+#### 1. **`cache/cache_store.py`** - Cache Storage & Validation
 - Maintains in-memory cache entries with timestamps
 - Persists cache entries to `data/cache/astro_cache.json` for cross-worker visibility
 - Tracks location configuration changes
@@ -121,23 +121,23 @@ Signatures are tracked per preset id in `data/cache/location_cache.json`
   - `reset_all_caches()` - immediately reset all astronomical caches
   - `get_cache_init_status()` - detailed cache status including `ttls` and `execution_metrics`
 
-#### 2. **`cache_updater.py`** - Cache Calculation (Selective)
+#### 2. **`cache/cache_updater.py`** - Cache Calculation (Selective)
 - Contains all individual cache update functions
 - `fully_initialize_caches()` - **selective**: syncs timestamps, skips valid caches, records per-job timing
 - `check_and_handle_config_changes()` - detects and resets caches on location change
 
-#### 3. **`cache_scheduler.py`** - Background Task Management
+#### 3. **`cache/cache_scheduler.py`** - Background Task Management
 - `CacheScheduler` class polls at 300-second interval
 - Uses file locking to prevent multiple instances
 - Calls `fully_initialize_caches()` which handles selective execution
 - Sets `cache_ready_event` after the first successful cycle
 
-#### 4. **`constants.py`** - TTL Constants
+#### 4. **`utils/constants.py`** - TTL Constants
 - `CACHE_TTL_<JOB_NAME>` constants define the TTL for each job
 - `WEATHER_CACHE_TTL` = 3600s (1 hour) for weather
 - `CACHE_TTL` = 1800s kept for backward compatibility only (not used for job scheduling)
 
-#### 5. **`weather_utils.py`** - Dual Weather Client System
+#### 5. **`weather/weather_utils.py`** - Dual Weather Client System
 - **Cached Client** (`create_weather_client()`): 1-hour HTTP-level cache for UI forecasts
 - **Fresh Client** (`create_fresh_weather_client()`): no caching, used by SkyTonight for real-time conditions
 
@@ -355,9 +355,9 @@ new_signature = {
 ```
 
 ### Adding a New Cache Job
-1. Add a `CACHE_TTL_<NAME>` constant in `constants.py` with a justified value
-2. Add a `_<name>_cache` entry in `cache_store.py`
-3. Add `update_<name>_cache(config=None)` in `cache_updater.py` - guard with `if config is None: config = load_config()`
+1. Add a `CACHE_TTL_<NAME>` constant in `utils/constants.py` with a justified value
+2. Add a `_<name>_cache` entry in `cache/cache_store.py`
+3. Add `update_<name>_cache(config=None)` in `cache/cache_updater.py` - guard with `if config is None: config = load_config()`
 4. Register it in the `cache_jobs` list in `fully_initialize_caches()` using `partial(update_<name>_cache, config=config)`
 5. Add it to `is_astronomical_cache_ready()` and `get_cache_init_status()` with its TTL constant
 6. Add it to `reset_all_caches()` and `_write_all_astronomical_caches_to_shared()`

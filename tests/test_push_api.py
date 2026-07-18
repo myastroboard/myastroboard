@@ -12,7 +12,7 @@ if backend_path not in sys.path:
 if 'psutil' not in sys.modules:
     sys.modules['psutil'] = types.ModuleType('psutil')
 
-import auth  # type: ignore[import-not-found]
+from utils import auth  # type: ignore[import-not-found]
 from app import app  # type: ignore[import-not-found]
 
 User = auth.User
@@ -71,7 +71,7 @@ def client_push_user(push_user):
 # ---------------------------------------------------------------------------
 
 def test_vapid_public_key_endpoint_returns_key(client_admin, monkeypatch):
-    import push_manager
+    from utils import push_manager
     monkeypatch.setattr(push_manager, 'get_vapid_public_key', lambda: 'FAKE_BASE64_PUBLIC_KEY')
 
     resp = client_admin.get('/api/push/vapid-public-key')
@@ -82,7 +82,7 @@ def test_vapid_public_key_endpoint_returns_key(client_admin, monkeypatch):
 
 
 def test_vapid_public_key_endpoint_no_auth_required(monkeypatch):
-    import push_manager
+    from utils import push_manager
     monkeypatch.setattr(push_manager, 'get_vapid_public_key', lambda: 'ANON_KEY')
 
     app.config['TESTING'] = True
@@ -93,7 +93,7 @@ def test_vapid_public_key_endpoint_no_auth_required(monkeypatch):
 
 
 def test_vapid_public_key_endpoint_returns_503_on_error(client_admin, monkeypatch):
-    import push_manager
+    from utils import push_manager
 
     def boom():
         raise RuntimeError('VAPID not configured')

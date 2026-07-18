@@ -8,7 +8,7 @@ from datetime import timedelta
 from zoneinfo import ZoneInfo
 from unittest.mock import patch
 
-from events_aggregator import (
+from utils.events_aggregator import (
     EventType,
     EventImportance,
     AstronomicalEvent,

@@ -1,6 +1,6 @@
 """Tests for SkyTonight bodies ingestion."""
 
-import skytonight_bodies
+from skytonight import skytonight_bodies
 
 build_body_targets = skytonight_bodies.build_body_targets
 

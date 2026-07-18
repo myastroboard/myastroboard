@@ -24,7 +24,7 @@ Phase C - Web Push / background (tab may be closed)  ✅ Done
 - Notifications fire even when the app tab is closed
 - VAPID key pair persisted in `data/vapid.json` (generated once on first startup)
 - Push subscriptions stored per-user in `data/users.json` under `push_subscriptions[]`
-- Background scheduler (`push_scheduler.py`) evaluates triggers every 5 minutes
+- Background scheduler (`utils/push_scheduler.py`) evaluates triggers every 5 minutes
 
 ---
 
@@ -32,15 +32,15 @@ Phase C - Web Push / background (tab may be closed)  ✅ Done
 
 | ID | Event | Default lead | Module (`_check_*` fn) |
 |----|-------|-------------|----------------------|
-| `N1` | Plan My Night session starts | 15 min | `plan_my_night.js` / `push_scheduler.py` |
-| `N2` | Plan My Night: next target | 5 min | `plan_my_night.js` / `push_scheduler.py` |
-| `N3` | ISS solar or lunar transit | 10 min | `iss.js` / `push_scheduler.py` |
-| `N4` | Lunar eclipse totality | 30 min | `events_alerts.js` / `push_scheduler.py` |
-| `N5` | Solar eclipse maximum | 30 min | `events_alerts.js` / `push_scheduler.py` |
-| `N6` | Astronomical darkness begins | 20 min | `sun.js` / `push_scheduler.py` |
-| `N7` | Aurora: Kp index ≥ threshold | immediate | `aurora.js` / `push_scheduler.py` |
+| `N1` | Plan My Night session starts | 15 min | `plan_my_night.js` / `utils/push_scheduler.py` |
+| `N2` | Plan My Night: next target | 5 min | `plan_my_night.js` / `utils/push_scheduler.py` |
+| `N3` | ISS solar or lunar transit | 10 min | `iss.js` / `utils/push_scheduler.py` |
+| `N4` | Lunar eclipse totality | 30 min | `events_alerts.js` / `utils/push_scheduler.py` |
+| `N5` | Solar eclipse maximum | 30 min | `events_alerts.js` / `utils/push_scheduler.py` |
+| `N6` | Astronomical darkness begins | 20 min | `sun.js` / `utils/push_scheduler.py` |
+| `N7` | Aurora: Kp index ≥ threshold | immediate | `aurora.js` / `utils/push_scheduler.py` |
 
-IDs are defined as `NOTIF_TRIGGERS` constants in `static/js/notifications.js` and referenced by string in `push_scheduler.py`. (`N8` mirrors `N3` for the CSS station.)
+IDs are defined as `NOTIF_TRIGGERS` constants in `static/js/notifications.js` and referenced by string in `utils/push_scheduler.py`. (`N8` mirrors `N3` for the CSS station.)
 
 ### Multi-location behavior (v1.2)
 
@@ -58,8 +58,8 @@ See [LOCATIONS.md](LOCATIONS.md) for the full multi-location model.
 | File | Role |
 |------|------|
 | `static/js/notifications.js` | `NotificationManager`, settings UI, background poller, Web Push subscription |
-| `backend/push_manager.py` | VAPID key generation/persistence, `send_push()` wrapper around pywebpush |
-| `backend/push_scheduler.py` | Background thread; evaluates N1–N7 server-side every 5 min; sends push |
+| `backend/utils/push_manager.py` | VAPID key generation/persistence, `send_push()` wrapper around pywebpush |
+| `backend/utils/push_scheduler.py` | Background thread; evaluates N1–N7 server-side every 5 min; sends push |
 | `templates/index.html` | Notifications sub-tab (My Settings → Notifications) |
 | `static/sw.js` | `push` + `notificationclick` event listeners |
 | `static/i18n/*.json` | `notifications.*` namespace (N1–N7 titles/bodies) + `settings.notifications_*` |
@@ -106,7 +106,7 @@ notificationManager.getKpThreshold()
 
 ### Deduplication
 
-In-memory, resets on page reload. The background poller uses server-side cooldowns in `push_scheduler.py`.
+In-memory, resets on page reload. The background poller uses server-side cooldowns in `utils/push_scheduler.py`.
 
 ```javascript
 if (notificationManager.wasRecentlyNotified('N7', 30 * 60 * 1000)) return;
@@ -197,7 +197,7 @@ The private key is stored as a raw base64url-encoded 32-byte EC scalar (the form
 }
 ```
 
-### Push scheduler (`push_scheduler.py`)
+### Push scheduler (`utils/push_scheduler.py`)
 
 Daemon thread started at app startup. Polls every 5 minutes:
 
@@ -258,7 +258,7 @@ self.addEventListener('notificationclick', event => { ... });
 4. Add `notifications.nX_title` and `notifications.nX_body` keys to all 6 i18n files
 5. Add `_check_nX()` function in the relevant feature module (called by the background poller)
 6. Add the poller call in `_runNotificationChecks()` in `notifications.js`
-7. Add the server-side check in `push_scheduler.py`
+7. Add the server-side check in `utils/push_scheduler.py`
 8. Update the trigger table in this document
 
 ---

@@ -5,7 +5,7 @@ from unittest.mock import Mock, patch
 import pytest
 import requests
 
-from seeing_forecast_7timer import SeeingForecastService, get_seeing_forecast, SEEING_SCALE
+from astroweather.seeing_forecast_7timer import SeeingForecastService, get_seeing_forecast, SEEING_SCALE
 
 
 class TestSeeingForecastService:
@@ -92,7 +92,7 @@ class TestSeeingForecastService:
         assert result is not None
         assert result["duration_hours"] == 9  # Longer window wins
 
-    @patch('seeing_forecast_7timer.requests.get')
+    @patch('astroweather.seeing_forecast_7timer.requests.get')
     def test_fetch_tonight_seeing_success(self, mock_get, service):
         """Test successful fetch from 7Timer API."""
         now_utc = datetime.now(timezone.utc)
@@ -120,7 +120,7 @@ class TestSeeingForecastService:
         assert result["location"]["latitude"] == 48.866667
         assert len(result["forecast"]) >= 1
 
-    @patch('seeing_forecast_7timer.requests.get')
+    @patch('astroweather.seeing_forecast_7timer.requests.get')
     def test_fetch_tonight_seeing_api_error(self, mock_get, service):
         """Test fetch handles API errors gracefully."""
         mock_get.side_effect = requests.RequestException("API unavailable")
@@ -129,7 +129,7 @@ class TestSeeingForecastService:
         
         assert result is None
 
-    @patch('seeing_forecast_7timer.requests.get')
+    @patch('astroweather.seeing_forecast_7timer.requests.get')
     def test_fetch_tonight_seeing_invalid_response(self, mock_get, service):
         """Test fetch handles invalid API response."""
         mock_response = Mock()
@@ -140,7 +140,7 @@ class TestSeeingForecastService:
         
         assert result is None
 
-    @patch('seeing_forecast_7timer.requests.get')
+    @patch('astroweather.seeing_forecast_7timer.requests.get')
     def test_fetch_tonight_seeing_empty_dataseries(self, mock_get, service):
         """Test fetch handles empty dataseries."""
         now_utc = datetime.now(timezone.utc)
@@ -157,7 +157,7 @@ class TestSeeingForecastService:
         
         assert result is None
 
-    @patch('seeing_forecast_7timer.requests.get')
+    @patch('astroweather.seeing_forecast_7timer.requests.get')
     def test_fetch_tonight_seeing_builds_correct_params(self, mock_get, service):
         """Test fetch sends correct parameters to API."""
         mock_response = Mock()
@@ -235,7 +235,7 @@ class TestSeeingForecastBranchCoverage:
         assert result is not None
         assert result["seeing"] == 1  # lower seeing was tracked
 
-    @patch('seeing_forecast_7timer.requests.get')
+    @patch('astroweather.seeing_forecast_7timer.requests.get')
     def test_fetch_bad_init_string_uses_fallback(self, mock_get, service):
         """Malformed init string falls back to requested_init (lines 113-114)."""
         mock_response = Mock()
@@ -248,7 +248,7 @@ class TestSeeingForecastBranchCoverage:
         # Should succeed with fallback init time
         assert result is not None
 
-    @patch('seeing_forecast_7timer.requests.get')
+    @patch('astroweather.seeing_forecast_7timer.requests.get')
     def test_fetch_bad_timepoint_is_skipped(self, mock_get, service):
         """Bad timepoint/seeing values are skipped via continue (lines 131-132)."""
         now_utc = datetime.now(timezone.utc)
@@ -268,7 +268,7 @@ class TestSeeingForecastBranchCoverage:
         # Only the valid entry should be in forecast
         assert any(p["seeing"] == 2 for p in result.get("forecast", []))
 
-    @patch('seeing_forecast_7timer.requests.get')
+    @patch('astroweather.seeing_forecast_7timer.requests.get')
     def test_fetch_out_of_range_seeing_skipped(self, mock_get, service):
         """Seeing values outside 1-8 are skipped (line 136)."""
         now_utc = datetime.now(timezone.utc)
@@ -289,7 +289,7 @@ class TestSeeingForecastBranchCoverage:
         valid_points = [p for p in result.get("forecast", []) if p["seeing"] in (2,)]
         assert len(valid_points) >= 1
 
-    @patch('seeing_forecast_7timer.requests.get')
+    @patch('astroweather.seeing_forecast_7timer.requests.get')
     def test_fetch_all_seeing_out_of_range_returns_empty_struct(self, mock_get, service):
         """When all seeing values are out of range, returns empty forecast struct (lines 154-155)."""
         now_utc = datetime.now(timezone.utc)
@@ -308,7 +308,7 @@ class TestSeeingForecastBranchCoverage:
         assert result["forecast"] == []
         assert result["now"] is None
 
-    @patch('seeing_forecast_7timer.requests.get')
+    @patch('astroweather.seeing_forecast_7timer.requests.get')
     def test_fetch_generic_exception_returns_none(self, mock_get, service):
         """Generic Exception during processing returns None (lines 192-194)."""
         mock_response = Mock()
@@ -325,7 +325,7 @@ class TestSeeingForecastRemainingBranches:
     def service(self):
         return SeeingForecastService(48.866667, 2.333333, "Europe/Paris")
 
-    @patch('seeing_forecast_7timer.requests.get')
+    @patch('astroweather.seeing_forecast_7timer.requests.get')
     def test_none_timepoint_skipped(self, mock_get, service):
         """Line 126->122: data point with None timepoint → skip (if body not entered)."""
         now_utc = datetime.now(timezone.utc)
@@ -384,7 +384,7 @@ class TestSeeingForecastRemainingBranches:
 class TestSeeingForecastIntegration:
     """Integration tests for seeing forecast with cache."""
 
-    @patch('seeing_forecast_7timer.requests.get')
+    @patch('astroweather.seeing_forecast_7timer.requests.get')
     def test_forecast_response_structure(self, mock_get):
         """Test the complete response structure is correct."""
         now_utc = datetime.now(timezone.utc)

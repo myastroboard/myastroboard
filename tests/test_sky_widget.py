@@ -46,8 +46,8 @@ class TestDetermineSkySeriod:
 
     @pytest.fixture(autouse=True)
     def _import(self):
-        import app as _app
-        self._fn = _app._determine_sky_period
+        from blueprints import astronomy as _astronomy
+        self._fn = _astronomy._determine_sky_period
 
     def _call(self, sun_data, tz="UTC"):
         return self._fn(sun_data, tz)
@@ -259,9 +259,9 @@ class TestSkyWidgetApi:
     """Integration tests for GET /api/sky-widget."""
 
     # Patch target: get_current_astro_conditions is imported locally inside the
-    # route function via `from weather_astro import ...`, so we patch it at the
+    # route function via `from weather.weather_astro import ...`, so we patch it at the
     # source module level.
-    _PATCH_TARGET = "weather_astro.get_current_astro_conditions"
+    _PATCH_TARGET = "weather.weather_astro.get_current_astro_conditions"
 
     # v1.2: the widget resolves the caller's active location preset and reads
     # the per-location sun_report cache slot.
@@ -289,7 +289,7 @@ class TestSkyWidgetApi:
     }
 
     def _setup_sun_cache(self, monkeypatch, sun_data):
-        import cache_store as cs
+        from cache import cache_store as cs
         import time as _time
 
         entry = cs.get_location_cache_entry("sun_report", self._LOC_ID)
@@ -306,7 +306,7 @@ class TestSkyWidgetApi:
             astronomical_dawn=_fmt(now + timedelta(hours=2)),
         )
         self._setup_sun_cache(monkeypatch, sd)
-        with patch("app.load_config", return_value=self._FAKE_CONFIG), \
+        with patch("utils.route_helpers.load_config", return_value=self._FAKE_CONFIG), \
              patch(self._PATCH_TARGET, return_value=self._GOOD_CONDITIONS):
             resp = client_admin.get("/api/sky-widget")
         assert resp.status_code == 200
@@ -328,7 +328,7 @@ class TestSkyWidgetApi:
             "observation_score": 6.0,
         }
         self._setup_sun_cache(monkeypatch, _make_sun_data())
-        with patch("app.load_config", return_value=self._FAKE_CONFIG), \
+        with patch("utils.route_helpers.load_config", return_value=self._FAKE_CONFIG), \
              patch(self._PATCH_TARGET, return_value=conditions):
             resp = client_admin.get("/api/sky-widget")
         data = resp.get_json()
@@ -337,7 +337,7 @@ class TestSkyWidgetApi:
     def test_sun_cache_empty_consults_shared_file(self, client_admin, monkeypatch):
         """v1.2: an empty in-memory slot falls back to the shared cache file
         (load_location_cache → load_shared_cache_entry with the keyed name)."""
-        import cache_store as cs
+        from cache import cache_store as cs
         import time as _time
 
         # Empty in-memory slot for this location
@@ -353,7 +353,7 @@ class TestSkyWidgetApi:
             return shared_payload if key == f"sun_report:{self._LOC_ID}" else None
 
         monkeypatch.setattr(cs, "load_shared_cache_entry", mock_load_shared)
-        with patch("app.load_config", return_value=self._FAKE_CONFIG), \
+        with patch("utils.route_helpers.load_config", return_value=self._FAKE_CONFIG), \
              patch(self._PATCH_TARGET, return_value=None):
             resp = client_admin.get("/api/sky-widget")
         assert resp.status_code == 200
@@ -364,7 +364,7 @@ class TestSkyWidgetApi:
     def test_score_is_none_when_conditions_unavailable(self, client_admin, monkeypatch):
         """get_current_astro_conditions returns None → score is None."""
         self._setup_sun_cache(monkeypatch, _make_sun_data())
-        with patch("app.load_config", return_value=self._FAKE_CONFIG), \
+        with patch("utils.route_helpers.load_config", return_value=self._FAKE_CONFIG), \
              patch(self._PATCH_TARGET, return_value=None):
             resp = client_admin.get("/api/sky-widget")
         assert resp.status_code == 200
@@ -373,7 +373,7 @@ class TestSkyWidgetApi:
     def test_score_is_none_when_conditions_missing_seeing(self, client_admin, monkeypatch):
         """Conditions without 'observation_score' → score stays None."""
         self._setup_sun_cache(monkeypatch, _make_sun_data())
-        with patch("app.load_config", return_value=self._FAKE_CONFIG), \
+        with patch("utils.route_helpers.load_config", return_value=self._FAKE_CONFIG), \
              patch(self._PATCH_TARGET, return_value={"other": 1}):
             resp = client_admin.get("/api/sky-widget")
         assert resp.status_code == 200
@@ -382,7 +382,7 @@ class TestSkyWidgetApi:
     def test_score_is_none_when_conditions_raises(self, client_admin, monkeypatch):
         """Exception in get_current_astro_conditions is swallowed, score is None."""
         self._setup_sun_cache(monkeypatch, _make_sun_data())
-        with patch("app.load_config", return_value=self._FAKE_CONFIG), \
+        with patch("utils.route_helpers.load_config", return_value=self._FAKE_CONFIG), \
              patch(self._PATCH_TARGET, side_effect=RuntimeError("boom")):
             resp = client_admin.get("/api/sky-widget")
         assert resp.status_code == 200
@@ -390,6 +390,6 @@ class TestSkyWidgetApi:
 
     def test_returns_500_on_unexpected_error(self, client_admin):
         """Outer exception in get_sky_widget_api → 500."""
-        with patch("app.load_config", side_effect=RuntimeError("unexpected")):
+        with patch("utils.route_helpers.load_config", side_effect=RuntimeError("unexpected")):
             resp = client_admin.get("/api/sky-widget")
         assert resp.status_code == 500

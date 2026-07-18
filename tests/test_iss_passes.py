@@ -4,12 +4,12 @@ from datetime import datetime, timedelta, timezone
 from requests import HTTPError
 import pytest
 
-import iss_passes as iss_module
+from space import iss_passes as iss_module
 
 ISSPassService = iss_module.ISSPassService
 get_iss_passes_report = iss_module.get_iss_passes_report
 LUNAR_ANGULAR_RADIUS_FALLBACK_DEG = iss_module.LUNAR_ANGULAR_RADIUS_FALLBACK_DEG
-from events_aggregator import EventsAggregator
+from utils.events_aggregator import EventsAggregator
 
 
 class TestISSPassServiceScoring:
@@ -145,17 +145,17 @@ class TestISSPassServiceTleFallback:
 
     @pytest.fixture(autouse=True)
     def _isolate_celestrak_block_state(self, monkeypatch):
-        monkeypatch.setattr("iss_passes.get_celestrak_status", lambda: {"blocked": False})
-        monkeypatch.setattr("iss_passes._set_celestrak_block", lambda *args, **kwargs: None)
-        monkeypatch.setattr("iss_passes._clear_celestrak_block", lambda *args, **kwargs: None)
+        monkeypatch.setattr("space.iss_passes.get_celestrak_status", lambda: {"blocked": False})
+        monkeypatch.setattr("space.iss_passes._set_celestrak_block", lambda *args, **kwargs: None)
+        monkeypatch.setattr("space.iss_passes._clear_celestrak_block", lambda *args, **kwargs: None)
 
     def test_fetch_iss_tle_stops_immediately_after_celestrak_http_403(self, monkeypatch):
         service = ISSPassService(45.5, -73.5, 30, "America/Montreal")
         calls = {"count": 0}
 
-        monkeypatch.setattr("iss_passes._get_cached_tle", lambda max_age_seconds=None: None)
-        monkeypatch.setattr("iss_passes._in_tle_failure_cooldown", lambda: False)
-        monkeypatch.setattr("iss_passes._set_tle_error_timestamp", lambda: None)
+        monkeypatch.setattr("space.iss_passes._get_cached_tle", lambda max_age_seconds=None: None)
+        monkeypatch.setattr("space.iss_passes._in_tle_failure_cooldown", lambda: False)
+        monkeypatch.setattr("space.iss_passes._set_tle_error_timestamp", lambda: None)
 
         class _Response:
             def __init__(self, text: str, error=None):
@@ -176,7 +176,7 @@ class TestISSPassServiceTleFallback:
                 "2 25544  51.6400 120.0000 0005000 200.0000 160.0000 15.50000000000000\n"
             )
 
-        monkeypatch.setattr("iss_passes.requests.get", _mock_get)
+        monkeypatch.setattr("space.iss_passes.requests.get", _mock_get)
 
         with pytest.raises(RuntimeError):
             service._fetch_iss_tle()
@@ -187,15 +187,15 @@ class TestISSPassServiceTleFallback:
     def test_fetch_iss_tle_raises_when_all_sources_fail(self, monkeypatch):
         service = ISSPassService(45.5, -73.5, 30, "America/Montreal")
 
-        monkeypatch.setattr("iss_passes._get_cached_tle", lambda max_age_seconds=None: None)
-        monkeypatch.setattr("iss_passes._in_tle_failure_cooldown", lambda: False)
-        monkeypatch.setattr("iss_passes._set_tle_error_timestamp", lambda: None)
+        monkeypatch.setattr("space.iss_passes._get_cached_tle", lambda max_age_seconds=None: None)
+        monkeypatch.setattr("space.iss_passes._in_tle_failure_cooldown", lambda: False)
+        monkeypatch.setattr("space.iss_passes._set_tle_error_timestamp", lambda: None)
 
         class _Response:
             def raise_for_status(self):
                 raise HTTPError("503 Service Unavailable")
 
-        monkeypatch.setattr("iss_passes.requests.get", lambda *args, **kwargs: _Response())
+        monkeypatch.setattr("space.iss_passes.requests.get", lambda *args, **kwargs: _Response())
 
         try:
             service._fetch_iss_tle()
@@ -206,12 +206,12 @@ class TestISSPassServiceTleFallback:
     def test_fetch_iss_tle_uses_cache_in_cooldown(self, monkeypatch):
         service = ISSPassService(45.5, -73.5, 30, "America/Montreal")
 
-        monkeypatch.setattr("iss_passes._get_cached_tle", lambda max_age_seconds=None: (
+        monkeypatch.setattr("space.iss_passes._get_cached_tle", lambda max_age_seconds=None: (
             "1 25544U 98067A   26100.00000000  .00010000  00000+0  18000-3 0  9991",
             "2 25544  51.6400 120.0000 0005000 200.0000 160.0000 15.50000000000000",
             0,
         ))
-        monkeypatch.setattr("iss_passes._in_tle_failure_cooldown", lambda: True)
+        monkeypatch.setattr("space.iss_passes._in_tle_failure_cooldown", lambda: True)
 
         called = {"count": 0}
 
@@ -219,7 +219,7 @@ class TestISSPassServiceTleFallback:
             called["count"] += 1
             raise AssertionError("Network should not be called in cooldown with cache")
 
-        monkeypatch.setattr("iss_passes.requests.get", _should_not_call)
+        monkeypatch.setattr("space.iss_passes.requests.get", _should_not_call)
 
         line1, line2 = service._fetch_iss_tle()
         assert line1.startswith("1 25544")
@@ -229,13 +229,13 @@ class TestISSPassServiceTleFallback:
     def test_fetch_iss_tle_uses_stale_cache_after_source_failures(self, monkeypatch):
         service = ISSPassService(45.5, -73.5, 30, "America/Montreal")
 
-        monkeypatch.setattr("iss_passes._in_tle_failure_cooldown", lambda: False)
-        monkeypatch.setattr("iss_passes._set_tle_error_timestamp", lambda: None)
+        monkeypatch.setattr("space.iss_passes._in_tle_failure_cooldown", lambda: False)
+        monkeypatch.setattr("space.iss_passes._set_tle_error_timestamp", lambda: None)
 
         def _mock_get(*args, **kwargs):
             raise HTTPError("503 Service Unavailable")
 
-        monkeypatch.setattr("iss_passes.requests.get", _mock_get)
+        monkeypatch.setattr("space.iss_passes.requests.get", _mock_get)
 
         def _cached(max_age_seconds=None):
             if max_age_seconds is None:
@@ -246,7 +246,7 @@ class TestISSPassServiceTleFallback:
                 )
             return None
 
-        monkeypatch.setattr("iss_passes._get_cached_tle", _cached)
+        monkeypatch.setattr("space.iss_passes._get_cached_tle", _cached)
 
         line1, line2 = service._fetch_iss_tle()
         assert line1.startswith("1 25544")
@@ -293,10 +293,10 @@ class TestISSPassServiceTleFallback:
         line1_str = "1 25544U 98067A   26100.00000000  .00010000  00000+0  18000-3 0  9991"
         line2_str = "2 25544  51.6400 120.0000 0005000 200.0000 160.0000 15.50000000000000"
 
-        monkeypatch.setattr("iss_passes._get_cached_tle", lambda max_age_seconds=None: None)
-        monkeypatch.setattr("iss_passes._in_tle_failure_cooldown", lambda: False)
-        monkeypatch.setattr("iss_passes._set_tle_error_timestamp", lambda: None)
-        monkeypatch.setattr("iss_passes._set_cached_tle", lambda l1, l2: None)
+        monkeypatch.setattr("space.iss_passes._get_cached_tle", lambda max_age_seconds=None: None)
+        monkeypatch.setattr("space.iss_passes._in_tle_failure_cooldown", lambda: False)
+        monkeypatch.setattr("space.iss_passes._set_tle_error_timestamp", lambda: None)
+        monkeypatch.setattr("space.iss_passes._set_cached_tle", lambda l1, l2: None)
 
         calls = []
 
@@ -313,7 +313,7 @@ class TestISSPassServiceTleFallback:
                 "raise_for_status": lambda self: None,
             })()
 
-        monkeypatch.setattr("iss_passes.requests.get", _mock_get)
+        monkeypatch.setattr("space.iss_passes.requests.get", _mock_get)
 
         l1, l2 = service._fetch_iss_tle()
 
@@ -330,11 +330,11 @@ class TestISSPassServiceTleFallback:
         line1_str = "1 25544U 98067A   26100.00000000  .00010000  00000+0  18000-3 0  9991"
         line2_str = "2 25544  51.6400 120.0000 0005000 200.0000 160.0000 15.50000000000000"
 
-        monkeypatch.setattr("iss_passes._get_cached_tle", lambda max_age_seconds=None: None)
-        monkeypatch.setattr("iss_passes._in_tle_failure_cooldown", lambda: False)
-        monkeypatch.setattr("iss_passes._set_tle_error_timestamp", lambda: None)
-        monkeypatch.setattr("iss_passes._set_cached_tle", lambda l1, l2: None)
-        monkeypatch.setattr("iss_passes.get_celestrak_status", lambda: {"blocked": True})
+        monkeypatch.setattr("space.iss_passes._get_cached_tle", lambda max_age_seconds=None: None)
+        monkeypatch.setattr("space.iss_passes._in_tle_failure_cooldown", lambda: False)
+        monkeypatch.setattr("space.iss_passes._set_tle_error_timestamp", lambda: None)
+        monkeypatch.setattr("space.iss_passes._set_cached_tle", lambda l1, l2: None)
+        monkeypatch.setattr("space.iss_passes.get_celestrak_status", lambda: {"blocked": True})
 
         calls = []
 
@@ -348,7 +348,7 @@ class TestISSPassServiceTleFallback:
                 "raise_for_status": lambda self: None,
             })()
 
-        monkeypatch.setattr("iss_passes.requests.get", _mock_get)
+        monkeypatch.setattr("space.iss_passes.requests.get", _mock_get)
 
         l1, l2 = service._fetch_iss_tle()
         assert l1 == line1_str
@@ -359,8 +359,8 @@ class TestISSPassServiceTleFallback:
     def test_fetch_iss_tle_marks_celestrak_blocked_after_3_timeouts(self, monkeypatch):
         service = ISSPassService(45.5, -73.5, 30, "America/Montreal")
 
-        monkeypatch.setattr("iss_passes._get_cached_tle", lambda max_age_seconds=None: None)
-        monkeypatch.setattr("iss_passes._in_tle_failure_cooldown", lambda: False)
+        monkeypatch.setattr("space.iss_passes._get_cached_tle", lambda max_age_seconds=None: None)
+        monkeypatch.setattr("space.iss_passes._in_tle_failure_cooldown", lambda: False)
 
         cache_payload = {}
 
@@ -371,8 +371,8 @@ class TestISSPassServiceTleFallback:
             cache_payload.clear()
             cache_payload.update(payload)
 
-        monkeypatch.setattr("iss_passes._read_tle_cache", _mock_read_cache)
-        monkeypatch.setattr("iss_passes._write_tle_cache", _mock_write_cache)
+        monkeypatch.setattr("space.iss_passes._read_tle_cache", _mock_read_cache)
+        monkeypatch.setattr("space.iss_passes._write_tle_cache", _mock_write_cache)
 
         block_calls = []
 
@@ -383,7 +383,7 @@ class TestISSPassServiceTleFallback:
                 "source_url": source_url,
             })
 
-        monkeypatch.setattr("iss_passes._set_celestrak_block", _mock_set_celestrak_block)
+        monkeypatch.setattr("space.iss_passes._set_celestrak_block", _mock_set_celestrak_block)
 
         class _Response:
             status_code = 200
@@ -397,7 +397,7 @@ class TestISSPassServiceTleFallback:
                 raise Exception("Connection to celestrak.org timed out. (connect timeout=10)")
             return _Response()
 
-        monkeypatch.setattr("iss_passes.requests.get", _mock_get)
+        monkeypatch.setattr("space.iss_passes.requests.get", _mock_get)
 
         for _ in range(3):
             with pytest.raises(RuntimeError):
@@ -798,7 +798,7 @@ class TestISSPassServiceLunarTransit:
 
         from skyfield.api import Loader
         import os
-        from constants import DATA_DIR_CACHE
+        from utils.constants import DATA_DIR_CACHE
         SKYFIELD_CACHE_DIR = os.path.join(DATA_DIR_CACHE, "skyfield")
         os.makedirs(SKYFIELD_CACHE_DIR, exist_ok=True)
 

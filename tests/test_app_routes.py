@@ -18,13 +18,26 @@ if 'psutil' not in sys.modules:
     sys.modules['psutil'] = types.ModuleType('psutil')
 
 import app as _app_mod
-import cache_store as _cache_store
+from cache import cache_store as _cache_store
 import time as _time
+from utils import route_helpers as _route_helpers_mod
+from blueprints import admin as _admin_mod
+from blueprints import astrodex as _astrodex_mod
+from blueprints import astronomy as _astronomy_mod
+from blueprints import auth as _auth_mod
+from blueprints import connectors as _connectors_mod
+from blueprints import equipment as _equipment_mod
+from blueprints import locations as _locations_mod
+from blueprints import misc as _misc_mod
+from blueprints import plan_my_night as _plan_my_night_mod
+from blueprints import push as _push_mod
+from blueprints import tracking as _tracking_mod
+from blueprints import weather as _weather_mod
 
 
 def _install_default_location_id():
     """The admin client's active location = the install default preset (v1.2)."""
-    from repo_config import load_config, get_install_default_location
+    from utils.repo_config import load_config, get_install_default_location
 
     return get_install_default_location(load_config()).get('id')
 
@@ -115,7 +128,7 @@ def _isolate_location_cache_hydration(monkeypatch):
     monkeypatch.setattr(_cache_store, 'load_shared_cache_entry', lambda *_a, **_k: None)
     yield
 from app import app
-from auth import user_manager
+from utils.auth import user_manager
 
 
 # ---------------------------------------------------------------------------
@@ -333,8 +346,8 @@ class TestConfigEndpoints:
             },
         }
         captured = {}
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: old_cfg)
-        monkeypatch.setattr(_app_mod, 'save_config', lambda cfg: captured.setdefault('cfg', cfg))
+        monkeypatch.setattr(_locations_mod, 'load_config', lambda: old_cfg)
+        monkeypatch.setattr(_locations_mod, 'save_config', lambda cfg: captured.setdefault('cfg', cfg))
         monkeypatch.setattr(_app_mod.cache_store, 'reset_caches_for_location', lambda *_a, **_k: None)
         monkeypatch.setattr(_app_mod.cache_store, 'update_location_config', lambda *_a, **_k: None)
 
@@ -371,8 +384,8 @@ class TestConfigEndpoints:
             'skytonight': {'enabled': True, 'constraints': {}, 'scheduler': {'enabled': True}},
         }
         captured = {}
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: old_cfg)
-        monkeypatch.setattr(_app_mod, 'save_config', lambda cfg: captured.setdefault('cfg', cfg))
+        monkeypatch.setattr(_locations_mod, 'load_config', lambda: old_cfg)
+        monkeypatch.setattr(_locations_mod, 'save_config', lambda cfg: captured.setdefault('cfg', cfg))
         monkeypatch.setattr(_app_mod.cache_store, 'reset_caches_for_location', lambda *_a, **_k: None)
         monkeypatch.setattr(_app_mod.cache_store, 'update_location_config', lambda *_a, **_k: None)
 
@@ -407,8 +420,8 @@ class TestConfigEndpoints:
         }
         reset_calls = []
         update_calls = []
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: old_cfg)
-        monkeypatch.setattr(_app_mod, 'save_config', lambda *_a, **_k: None)
+        monkeypatch.setattr(_locations_mod, 'load_config', lambda: old_cfg)
+        monkeypatch.setattr(_locations_mod, 'save_config', lambda *_a, **_k: None)
         monkeypatch.setattr(
             _app_mod.cache_store, 'reset_caches_for_location', lambda loc_id: reset_calls.append(loc_id)
         )
@@ -437,8 +450,8 @@ class TestConfigEndpoints:
             'skytonight': {'constraints': {}},
         }
         reset_calls = []
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: old_cfg)
-        monkeypatch.setattr(_app_mod, 'save_config', lambda *_a, **_k: None)
+        monkeypatch.setattr(_locations_mod, 'load_config', lambda: old_cfg)
+        monkeypatch.setattr(_locations_mod, 'save_config', lambda *_a, **_k: None)
         monkeypatch.setattr(
             _app_mod.cache_store, 'reset_caches_for_location', lambda loc_id: reset_calls.append(loc_id)
         )
@@ -463,13 +476,13 @@ class TestConfigEndpoints:
             'skytonight': {'constraints': {}},
         }
         reset_calls = []
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: old_cfg)
-        monkeypatch.setattr(_app_mod, 'save_config', lambda *_a, **_k: None)
+        monkeypatch.setattr(_locations_mod, 'load_config', lambda: old_cfg)
+        monkeypatch.setattr(_locations_mod, 'save_config', lambda *_a, **_k: None)
         monkeypatch.setattr(
             _app_mod.cache_store, 'reset_caches_for_location', lambda loc_id: reset_calls.append(loc_id)
         )
         # Simulate the defensive edge case: install default id not in old_config['locations']
-        monkeypatch.setattr(_app_mod, 'get_install_default_location', lambda config: {'id': 'ghost-id'})
+        monkeypatch.setattr(_locations_mod, 'get_install_default_location', lambda config: {'id': 'ghost-id'})
 
         incoming = {'location': {'latitude': 3, 'longitude': 2, 'timezone': 'UTC'}}
         resp = client_admin.post('/api/config', json=incoming)
@@ -479,12 +492,12 @@ class TestConfigEndpoints:
         assert reset_calls == []
 
     def test_post_config_invalid_bortle_returns_400(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: _v12_config({}, skytonight={'constraints': {}}))
+        monkeypatch.setattr(_locations_mod, 'load_config', lambda: _v12_config({}, skytonight={'constraints': {}}))
         resp = client_admin.post('/api/config', json={'location': {'bortle': 11}})
         assert resp.status_code == 400
 
     def test_post_config_invalid_sqm_returns_400(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: _v12_config({}, skytonight={'constraints': {}}))
+        monkeypatch.setattr(_locations_mod, 'load_config', lambda: _v12_config({}, skytonight={'constraints': {}}))
         resp = client_admin.post('/api/config', json={'location': {'sqm': -1}})
         assert resp.status_code == 400
 
@@ -526,7 +539,7 @@ class TestAdminEndpoints:
 
     def test_get_metrics_returns_200(self, client_admin, monkeypatch):
         monkeypatch.setattr(
-            _app_mod,
+            _admin_mod,
             'collect_metrics',
             lambda: {'cpu_percent': 10.0, 'memory_mb': 100.0},
         )
@@ -534,7 +547,7 @@ class TestAdminEndpoints:
         assert resp.status_code == 200
 
     def test_get_metrics_returns_500_on_exception(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'collect_metrics', lambda: (_ for _ in ()).throw(RuntimeError('boom')))
+        monkeypatch.setattr(_admin_mod, 'collect_metrics', lambda: (_ for _ in ()).throw(RuntimeError('boom')))
         resp = client_admin.get('/api/metrics')
         assert resp.status_code == 500
 
@@ -547,14 +560,14 @@ class TestAdminEndpoints:
 class TestVersionEndpoints:
 
     def test_get_version_returns_200(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_repo_version', lambda: '1.0.0')
+        monkeypatch.setattr(_misc_mod, 'get_repo_version', lambda: '1.0.0')
         resp = client_admin.get('/api/version')
         assert resp.status_code == 200
         assert resp.get_json()['version'] == '1.0.0'
 
     def test_check_updates_returns_200_or_error(self, client_admin, monkeypatch):
         monkeypatch.setattr(
-            _app_mod,
+            _misc_mod,
             'check_for_updates',
             lambda: {'update_available': False, 'current_version': '1.0.0'},
         )
@@ -627,7 +640,7 @@ class TestCachedReportEndpoints:
 class TestPushEndpoints:
 
     def test_vapid_public_key_returns_200(self, client, monkeypatch):
-        import push_manager as _pm
+        from utils import push_manager as _pm
 
         monkeypatch.setattr(_pm, 'get_vapid_public_key', lambda: 'BTestPublicKey123')
         resp = client.get('/api/push/vapid-public-key')
@@ -636,7 +649,7 @@ class TestPushEndpoints:
         assert 'public_key' in data
 
     def test_vapid_config_status_returns_200(self, client_admin, monkeypatch):
-        import push_manager as _pm
+        from utils import push_manager as _pm
 
         monkeypatch.setattr(_pm, 'get_vapid_contact_status', lambda: {'ok': True})
         resp = client_admin.get('/api/push/vapid-config-status')
@@ -910,7 +923,7 @@ class TestPushSubscribe:
 class TestObjectInfoEndpoint:
 
     def test_valid_object_returns_response(self, client_admin, monkeypatch):
-        import object_info as _oi
+        from observation import object_info as _oi
         monkeypatch.setattr(_oi, 'get_object_info', lambda identifier, language='en': {'name': identifier})
         resp = client_admin.get('/api/object/M42')
         assert resp.status_code in (200, 404, 500)
@@ -1833,16 +1846,16 @@ class TestDifficultyLookupCache:
     """Tests for _build_difficulty_lookup / _enrich_astrodex_items_with_difficulty."""
 
     def setup_method(self):
-        _app_mod._difficulty_lookup_cache = {'data': None, 'key': None}
+        _astrodex_mod._difficulty_lookup_cache = {'data': None, 'key': None}
 
     def test_missing_dso_results_file_returns_empty_lookup(self, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_dso_results_file', lambda *_a, **_k: '/nonexistent/dso_results.json')
-        lookup = _app_mod._build_difficulty_lookup()
+        monkeypatch.setattr(_astrodex_mod, 'get_dso_results_file', lambda *_a, **_k: '/nonexistent/dso_results.json')
+        lookup = _astrodex_mod._build_difficulty_lookup()
         assert lookup == {}
 
     def test_skips_entries_missing_difficulty_or_bad_catalogue_names(self, monkeypatch):
         monkeypatch.setattr(
-            _app_mod, 'load_json_file',
+            _astrodex_mod, 'load_json_file',
             lambda *a, **k: {
                 'deep_sky': [
                     {'catalogue_names': {'Messier': 'M 42'}},  # no difficulty -> skipped
@@ -1852,14 +1865,14 @@ class TestDifficultyLookupCache:
                 ]
             },
         )
-        lookup = _app_mod._build_difficulty_lookup()
+        lookup = _astrodex_mod._build_difficulty_lookup()
         assert lookup.get('M99') == 'advanced'
         assert 'M42' not in lookup
 
     def test_enrich_skips_non_dict_items(self, monkeypatch):
-        monkeypatch.setattr(_app_mod, '_build_difficulty_lookup', lambda *_a, **_k: {'M42': 'beginner'})
+        monkeypatch.setattr(_astrodex_mod, '_build_difficulty_lookup', lambda *_a, **_k: {'M42': 'beginner'})
         items = [None, 'not-a-dict', {'name': 'Orion Nebula', 'catalogue': 'M42'}]
-        result = _app_mod._enrich_astrodex_items_with_difficulty(items)
+        result = _astrodex_mod._enrich_astrodex_items_with_difficulty(items)
         assert result[2]['difficulty'] == 'beginner'
 
 
@@ -1931,7 +1944,7 @@ class TestAstrodexCrud:
         assert data.get('found') is False
 
     def test_catalogue_lookup_known_object(self, client_admin, monkeypatch):
-        import skytonight_targets as _skt
+        from skytonight import skytonight_targets as _skt
         monkeypatch.setattr(
             _skt,
             'get_lookup_entry',
@@ -2361,7 +2374,7 @@ class TestSkyQualityVariants:
 
     def test_sky_quality_both_bortle_and_sqm(self, client_admin, monkeypatch):
         monkeypatch.setattr(
-            _app_mod,
+            _route_helpers_mod,
             'load_config',
             lambda: _v12_config({'bortle': 4, 'sqm': 21.5}),
         )
@@ -2373,7 +2386,7 @@ class TestSkyQualityVariants:
 
     def test_sky_quality_sqm_only(self, client_admin, monkeypatch):
         monkeypatch.setattr(
-            _app_mod,
+            _route_helpers_mod,
             'load_config',
             lambda: _v12_config({'sqm': 21.0}),
         )
@@ -2384,7 +2397,7 @@ class TestSkyQualityVariants:
 
     def test_sky_quality_bortle_only(self, client_admin, monkeypatch):
         monkeypatch.setattr(
-            _app_mod,
+            _route_helpers_mod,
             'load_config',
             lambda: _v12_config({'bortle': 6}),
         )
@@ -2395,7 +2408,7 @@ class TestSkyQualityVariants:
 
     def test_sky_quality_not_configured(self, client_admin, monkeypatch):
         monkeypatch.setattr(
-            _app_mod,
+            _route_helpers_mod,
             'load_config',
             lambda: _v12_config({'latitude': None, 'longitude': None}),
         )
@@ -2472,8 +2485,8 @@ class TestConfigPostHorizonProfile:
         old_cfg = _v12_config({'horizon_profile': [{'az': 10, 'alt': 20}]},
                               skytonight={'constraints': {}})
         captured = {}
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: old_cfg)
-        monkeypatch.setattr(_app_mod, 'save_config', lambda cfg: captured.setdefault('cfg', cfg))
+        monkeypatch.setattr(_locations_mod, 'load_config', lambda: old_cfg)
+        monkeypatch.setattr(_locations_mod, 'save_config', lambda cfg: captured.setdefault('cfg', cfg))
         monkeypatch.setattr(_app_mod.cache_store, 'reset_caches_for_location', lambda *a, **k: None)
         monkeypatch.setattr(_app_mod.cache_store, 'update_location_config', lambda *a, **k: None)
 
@@ -2585,7 +2598,7 @@ class TestWeatherStaleData:
         monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda name, cache: False)
         monkeypatch.setitem(_LEGACY['weather_forecast'], 'data', {'forecast': []})
         # Mock get_hourly_forecast to return None so stale path is triggered
-        monkeypatch.setattr(_app_mod, 'get_hourly_forecast', lambda **_kw: None)
+        monkeypatch.setattr(_weather_mod, 'get_hourly_forecast', lambda **_kw: None)
         resp = client_admin.get('/api/weather/forecast')
         assert resp.status_code in (200, 202)
 
@@ -2593,7 +2606,7 @@ class TestWeatherStaleData:
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: False)
         monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda name, cache: False)
         _LEGACY['weather_forecast'].pop('data', None)
-        monkeypatch.setattr(_app_mod, 'get_hourly_forecast', lambda **_kw: None)
+        monkeypatch.setattr(_weather_mod, 'get_hourly_forecast', lambda **_kw: None)
         resp = client_admin.get('/api/weather/forecast')
         assert resp.status_code in (200, 202)
 
@@ -2672,8 +2685,8 @@ class TestVersionCheckUpdatesErrorPath:
         def _boom():
             raise RuntimeError('network error')
 
-        monkeypatch.setattr(_app_mod, 'check_for_updates', _boom)
-        monkeypatch.setattr(_app_mod, 'get_repo_version', lambda: '1.0.0')
+        monkeypatch.setattr(_misc_mod, 'check_for_updates', _boom)
+        monkeypatch.setattr(_misc_mod, 'get_repo_version', lambda: '1.0.0')
         resp = client_admin.get('/api/version/check-updates')
         assert resp.status_code == 500
         data = resp.get_json()
@@ -2750,7 +2763,7 @@ class TestPlanMyNightClearAll:
     def test_plan_add_target_with_catalogue(self, client_admin, monkeypatch):
         # Mock the night resolution to avoid real calculation
         monkeypatch.setattr(
-            _app_mod,
+            _plan_my_night_mod,
             '_resolve_observing_night_for_plan',
             lambda: {
                 'start': '2026-06-06T21:00:00',
@@ -2853,7 +2866,7 @@ class TestTranslateOnDemand:
 
     def test_translate_valid_en_to_fr_returns_200(self, client_admin, monkeypatch):
         monkeypatch.setattr(
-            _app_mod,
+            _tracking_mod,
             'translate_text_on_demand',
             lambda text, source_lang, target_lang: {'translated': text, 'source_lang': source_lang},
         )
@@ -2881,7 +2894,7 @@ class TestSpaceflightLaunchVidurls:
 
     def test_vidurls_valid_uuid_returns_200(self, client_admin, monkeypatch):
         import uuid as _uuid
-        import spaceflight_tracker as _st
+        from space import spaceflight_tracker as _st
         fake_uuid = str(_uuid.uuid4())
         monkeypatch.setattr(_st, 'get_launch_vidurls', lambda lid: ['https://youtube.com/watch?v=test'])
         resp = client_admin.get(f'/api/spaceflight/launch/{fake_uuid}/vidurls')
@@ -3030,7 +3043,7 @@ class TestAstrodexUploadValidation:
 
     def test_upload_valid_jpg_returns_200(self, client_admin, monkeypatch):
         import io as _io
-        import astrodex as _ad
+        from observation import astrodex as _ad
         monkeypatch.setattr(_ad, 'ensure_astrodex_directories', lambda: None)
 
         import werkzeug.datastructures as _wd
@@ -3484,7 +3497,7 @@ class TestPushTestWithSubscriptions:
             }
         ]
 
-        import push_manager as _pm
+        from utils import push_manager as _pm
         monkeypatch.setattr(_pm, 'send_push', lambda sub, payload, ttl=60, urgency='high': True)
 
         try:
@@ -3506,7 +3519,7 @@ class TestPushTestWithSubscriptions:
             }
         ]
 
-        import push_manager as _pm
+        from utils import push_manager as _pm
         monkeypatch.setattr(_pm, 'send_push', lambda sub, payload, ttl=300, urgency='normal': True)
 
         try:
@@ -3528,7 +3541,7 @@ class TestPushTestWithSubscriptions:
             }
         ]
 
-        import push_manager as _pm
+        from utils import push_manager as _pm
         monkeypatch.setattr(_pm, 'send_push', lambda sub, payload, ttl=300, urgency='normal': False)
 
         try:
@@ -3593,7 +3606,7 @@ class TestSpaceflightImage:
 class TestObjectInfoDeep:
 
     def test_object_m31_returns_response(self, client_admin, monkeypatch):
-        import object_info as _oi
+        from observation import object_info as _oi
         monkeypatch.setattr(
             _oi,
             'get_object_info',
@@ -3603,7 +3616,7 @@ class TestObjectInfoDeep:
         assert resp.status_code in (200, 404, 500)
 
     def test_object_info_none_returns_404(self, client_admin, monkeypatch):
-        import object_info as _oi
+        from observation import object_info as _oi
         monkeypatch.setattr(_oi, 'get_object_info', lambda identifier, language='en': None)
         resp = client_admin.get('/api/object/XYZ999')
         assert resp.status_code in (404, 500)
@@ -3681,7 +3694,9 @@ class TestMoonPlannerStaleData:
 class TestSiderealTimeWithLocation:
 
     def test_sidereal_time_with_no_location_returns_400(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: _v12_config({'latitude': None, 'longitude': None}))
+        monkeypatch.setattr(
+            _route_helpers_mod, 'load_config', lambda: _v12_config({'latitude': None, 'longitude': None})
+        )
         resp = client_admin.get('/api/astro/sidereal-time')
         assert resp.status_code == 400
 
@@ -3746,7 +3761,7 @@ class TestChangePasswordValidation:
 class TestPlanMyNightRouteHandlers:
 
     def test_plan_add_target_with_data_returns_response(self, client_admin, monkeypatch, tmp_path):
-        import plan_my_night as _pmn
+        from observation import plan_my_night as _pmn
         monkeypatch.setattr(_pmn, 'PLAN_DIR', str(tmp_path))
         from datetime import datetime, timezone, timedelta
         future = (datetime.now(timezone.utc) + timedelta(hours=6)).isoformat()
@@ -3945,8 +3960,7 @@ class TestParseDurationMinutes:
     """Lines 3053-3070: _parse_duration_minutes."""
 
     def setup_method(self):
-        from app import _parse_duration_minutes
-        self._fn = _parse_duration_minutes
+        self._fn = _plan_my_night_mod._parse_duration_minutes
 
     def test_none_returns_zero(self):
         assert self._fn(None) == 0
@@ -3983,8 +3997,7 @@ class TestFormatMinutesHhmm:
     """Lines 3074-3075: _format_minutes_hhmm."""
 
     def setup_method(self):
-        from app import _format_minutes_hhmm
-        self._fn = _format_minutes_hhmm
+        self._fn = _plan_my_night_mod._format_minutes_hhmm
 
     def test_zero(self):
         assert self._fn(0) == '0h00'
@@ -4003,8 +4016,7 @@ class TestComputePlanFillMetrics:
     """Lines 3079-3112: _compute_plan_fill_metrics."""
 
     def setup_method(self):
-        from app import _compute_plan_fill_metrics
-        self._fn = _compute_plan_fill_metrics
+        self._fn = _plan_my_night_mod._compute_plan_fill_metrics
 
     def test_non_dict_plan_returns_zeros(self):
         result = self._fn(None)
@@ -4172,7 +4184,7 @@ class TestPushApiErrors:
         import sys, types
         fake_pm = types.ModuleType('push_manager')
         fake_pm.get_vapid_public_key = lambda: (_ for _ in ()).throw(RuntimeError("no vapid"))
-        monkeypatch.setitem(sys.modules, 'push_manager', fake_pm)
+        monkeypatch.setitem(sys.modules, 'utils.push_manager', fake_pm)
         resp = client_admin.get('/api/push/vapid-public-key')
         assert resp.status_code == 503
 
@@ -4181,7 +4193,7 @@ class TestPushApiErrors:
         import sys, types
         fake_pm = types.ModuleType('push_manager')
         fake_pm.get_vapid_contact_status = lambda: (_ for _ in ()).throw(RuntimeError("error"))
-        monkeypatch.setitem(sys.modules, 'push_manager', fake_pm)
+        monkeypatch.setitem(sys.modules, 'utils.push_manager', fake_pm)
         resp = client_admin.get('/api/push/vapid-config-status')
         assert resp.status_code == 500
 
@@ -4608,7 +4620,7 @@ class TestEquipmentApiRoutes:
         assert resp.status_code == 500
 
     def test_equipment_summary_no_user_id_returns_401(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', lambda: None)
+        monkeypatch.setattr(_equipment_mod, 'get_current_user', lambda: None)
         resp = client_admin.get('/api/equipment/summary')
         assert resp.status_code == 401
 
@@ -4622,8 +4634,7 @@ class TestEnrichPlanEntriesWithAstrodexStatus:
     """Cover branch paths in _enrich_plan_entries_with_astrodex_status (lines 3027-3047)."""
 
     def setup_method(self):
-        from app import _enrich_plan_entries_with_astrodex_status
-        self._fn = _enrich_plan_entries_with_astrodex_status
+        self._fn = _plan_my_night_mod._enrich_plan_entries_with_astrodex_status
 
     def test_non_dict_payload_returned_unchanged(self):
         result = self._fn("not-a-dict", 'user1')
@@ -4657,21 +4668,21 @@ class TestEnrichPlanEntriesWithAstrodexStatus:
 class TestSkyQualityInvalidValues:
 
     def test_both_sqm_and_bortle_invalid_returns_not_configured(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'load_config',
+        monkeypatch.setattr(_route_helpers_mod, 'load_config',
                             lambda: _v12_config({'sqm': 'bad', 'bortle': 'worse'}))
         resp = client_admin.get('/api/skyquality')
         assert resp.status_code == 200
         assert resp.get_json()['sqm_source'] == 'not_configured'
 
     def test_sqm_only_invalid_returns_null_sqm(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'load_config',
+        monkeypatch.setattr(_route_helpers_mod, 'load_config',
                             lambda: _v12_config({'sqm': 'invalid'}))
         resp = client_admin.get('/api/skyquality')
         assert resp.status_code == 200
         assert resp.get_json()['sqm'] is None
 
     def test_bortle_only_invalid_returns_null_bortle(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'load_config',
+        monkeypatch.setattr(_route_helpers_mod, 'load_config',
                             lambda: _v12_config({'bortle': 'invalid'}))
         resp = client_admin.get('/api/skyquality')
         assert resp.status_code == 200
@@ -4688,7 +4699,14 @@ class TestGetCurrentUserNullPaths:
 
     @pytest.fixture(autouse=True)
     def no_current_user(self, monkeypatch):
+        # get_current_user is imported into every blueprint's own namespace, so every
+        # module that resolves a route in this class needs its own binding patched.
         monkeypatch.setattr(_app_mod, 'get_current_user', lambda: None)
+        monkeypatch.setattr(_auth_mod, 'get_current_user', lambda: None)
+        monkeypatch.setattr(_push_mod, 'get_current_user', lambda: None)
+        monkeypatch.setattr(_plan_my_night_mod, 'get_current_user', lambda: None)
+        monkeypatch.setattr(_astrodex_mod, 'get_current_user', lambda: None)
+        monkeypatch.setattr(_equipment_mod, 'get_current_user', lambda: None)
 
     def test_change_password_returns_401(self, client_admin):
         resp = client_admin.post('/api/auth/change-password',
@@ -4847,8 +4865,8 @@ class TestCacheRouteExceptionHandlers:
 
     def test_moon_calendar_exception_returns_500(self, client_admin, monkeypatch):
         # v1.2: _moon_calendar_cache is keyed by location id - clear it whole
-        monkeypatch.setattr(_app_mod, '_moon_calendar_cache', {})
-        monkeypatch.setattr(_app_mod, 'load_config',
+        monkeypatch.setattr(_weather_mod, '_moon_calendar_cache', {})
+        monkeypatch.setattr(_route_helpers_mod, 'load_config',
                             lambda: (_ for _ in ()).throw(RuntimeError("cfg fail")))
         resp = client_admin.get('/api/moon/month-calendar')
         assert resp.status_code == 500
@@ -4898,12 +4916,14 @@ class TestCacheRouteExceptionHandlers:
 class TestMoonCalendarNoLocation:
 
     def test_no_location_returns_400(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: _v12_config({'latitude': None, 'longitude': None}))
+        monkeypatch.setattr(
+            _route_helpers_mod, 'load_config', lambda: _v12_config({'latitude': None, 'longitude': None})
+        )
         resp = client_admin.get('/api/moon/month-calendar')
         assert resp.status_code == 400
 
     def test_no_longitude_returns_400(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'load_config',
+        monkeypatch.setattr(_route_helpers_mod, 'load_config',
                             lambda: _v12_config({'latitude': 48.5, 'longitude': None}))
         resp = client_admin.get('/api/moon/month-calendar')
         assert resp.status_code == 400
@@ -4921,7 +4941,7 @@ class TestObjectInfoEdgeCases:
         assert resp.status_code == 400
 
     def test_valid_identifier_returns_data(self, client_admin, monkeypatch):
-        import object_info as _oi
+        from observation import object_info as _oi
         monkeypatch.setattr(_oi, 'get_object_info',
                             lambda identifier, lang='en': {'name': identifier, 'type': 'Galaxy'})
         resp = client_admin.get('/api/object/M31')
@@ -4953,7 +4973,7 @@ class TestObjectImageApi:
         assert resp.status_code == 400
 
     def test_valid_filename_returns_image(self, client_admin, monkeypatch, tmp_path):
-        import object_info as _oi
+        from observation import object_info as _oi
         monkeypatch.setattr(_oi, 'OBJECT_IMAGE_CACHE_DIR', str(tmp_path))
         cached_file = tmp_path / '10.684000_41.269000.jpg'
         cached_file.write_bytes(b'\xff\xd8\xff\xe0fakejpeg')
@@ -4966,7 +4986,7 @@ class TestObjectImageApi:
         assert 'max-age' in resp.headers.get('Cache-Control', '')
 
     def test_upstream_failure_returns_502(self, client_admin, monkeypatch):
-        import object_info as _oi
+        from observation import object_info as _oi
         monkeypatch.setattr(_oi, 'ensure_cached_object_image', lambda ra, dec: None)
         resp = client_admin.get('/api/object-image/10.684000_41.269000.jpg')
         assert resp.status_code == 502
@@ -4982,7 +5002,7 @@ class TestLogsApiEdgeCases:
     def test_level_filter_returns_matching(self, client_admin, monkeypatch, tmp_path):
         log_file = tmp_path / "myastroboard.log"
         log_file.write_text("INFO line\nDEBUG line\nINFO another\n")
-        monkeypatch.setattr(_app_mod, 'DATA_DIR', str(tmp_path))
+        monkeypatch.setattr(_admin_mod, 'DATA_DIR', str(tmp_path))
         resp = client_admin.get('/api/logs?level=DEBUG')
         assert resp.status_code == 200
         data = resp.get_json()
@@ -4991,21 +5011,21 @@ class TestLogsApiEdgeCases:
     def test_limit_zero_returns_all(self, client_admin, monkeypatch, tmp_path):
         log_file = tmp_path / "myastroboard.log"
         log_file.write_text("line1\nline2\nline3\n")
-        monkeypatch.setattr(_app_mod, 'DATA_DIR', str(tmp_path))
+        monkeypatch.setattr(_admin_mod, 'DATA_DIR', str(tmp_path))
         resp = client_admin.get('/api/logs?limit=0')
         assert resp.status_code == 200
         data = resp.get_json()
         assert data['showing'] == data['total']
 
     def test_no_log_file_returns_empty(self, client_admin, monkeypatch, tmp_path):
-        monkeypatch.setattr(_app_mod, 'DATA_DIR', str(tmp_path))
+        monkeypatch.setattr(_admin_mod, 'DATA_DIR', str(tmp_path))
         resp = client_admin.get('/api/logs')
         assert resp.status_code == 200
         data = resp.get_json()
         assert data['total'] == 0
 
     def test_clear_logs_no_file_returns_success(self, client_admin, monkeypatch, tmp_path):
-        monkeypatch.setattr(_app_mod, 'DATA_DIR', str(tmp_path))
+        monkeypatch.setattr(_admin_mod, 'DATA_DIR', str(tmp_path))
         resp = client_admin.post('/api/logs/clear')
         assert resp.status_code == 200
 
@@ -5167,7 +5187,7 @@ class TestIssSpaceflightExceptions:
 class TestOnDemandTranslateException:
 
     def test_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'translate_text_on_demand',
+        monkeypatch.setattr(_tracking_mod, 'translate_text_on_demand',
                             lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("fail")))
         resp = client_admin.post('/api/translate/on-demand',
                                  json={'text': 'hello', 'target_lang': 'fr'})
@@ -5183,7 +5203,7 @@ class TestTranslateSolarSystemEvents:
     """Direct tests for app._translate_solar_system_events."""
 
     def setup_method(self):
-        self._fn = _app_mod._translate_solar_system_events
+        self._fn = _astronomy_mod._translate_solar_system_events
 
     def test_meteor_shower_missing_fields_returns_unchanged(self):
         data = {'events': [{'event_type': 'Meteor Shower', 'raw_data': {}}]}
@@ -5203,7 +5223,7 @@ class TestTranslateSolarSystemEvents:
 
     def test_exception_in_translation_is_swallowed(self, monkeypatch):
         """Lines 2642-2643: exception during translation is caught and swallowed."""
-        monkeypatch.setattr(_app_mod, 'I18nManager',
+        monkeypatch.setattr(_astronomy_mod, 'I18nManager',
                             lambda *_: (_ for _ in ()).throw(RuntimeError("i18n fail")))
         data = {'events': [{'event_type': 'Meteor Shower', 'raw_data': {
             'shower': 'Perseids'}, 'zenith_hourly_rate': '100', 'parent_body': 'Comet'}]}
@@ -5224,7 +5244,7 @@ class TestTranslateSolarSystemEvents:
             def t(self, *a, **kw):
                 raise RuntimeError('i18n broken')
 
-        monkeypatch.setattr(_app_mod, 'I18nManager', lambda lang: _BrokenI18n())
+        monkeypatch.setattr(_astronomy_mod, 'I18nManager', lambda lang: _BrokenI18n())
         data = {'events': [{'event_type': 'Asteroid Occultation', 'title': 'Original'}]}
         result = self._fn(data, 'fr')
         # Event appended despite exception
@@ -5235,7 +5255,7 @@ class TestTranslateSpecialPhenomenaEvents:
     """Direct tests for app._translate_special_phenomena_events."""
 
     def setup_method(self):
-        self._fn = _app_mod._translate_special_phenomena_events
+        self._fn = _astronomy_mod._translate_special_phenomena_events
 
     def test_unknown_event_type_not_translated(self):
         """2758->2786: event_type doesn't match any branch → unchanged."""
@@ -5267,7 +5287,7 @@ class TestTranslateSpecialPhenomenaEvents:
 
     def test_exception_in_translation_swallowed(self, monkeypatch):
         """2783-2784: exception in event translation is caught."""
-        monkeypatch.setattr(_app_mod, 'I18nManager',
+        monkeypatch.setattr(_astronomy_mod, 'I18nManager',
                             lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
         data = {'events': [{'event_type': 'Spring Equinox', 'raw_data': {'event': 'spring_equinox'}}]}
         try:
@@ -5314,13 +5334,13 @@ class TestPlanMyNightRoutes:
         return {'start': '2025-01-01T20:00:00', 'end': '2025-01-02T06:00:00', 'duration_hours': 10.0}
 
     def test_add_target_no_night_window_returns_409(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, '_resolve_observing_night_for_plan', lambda: None)
+        monkeypatch.setattr(_plan_my_night_mod, '_resolve_observing_night_for_plan', lambda: None)
         resp = client_admin.post('/api/plan-my-night/targets', json={'catalogue': 'Messier', 'item': {'name': 'M42'}})
         assert resp.status_code == 409
         assert 'Night window' in resp.get_json()['error']
 
     def test_add_target_invalid_night_window_returns_409(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, '_resolve_observing_night_for_plan', self._fake_night)
+        monkeypatch.setattr(_plan_my_night_mod, '_resolve_observing_night_for_plan', self._fake_night)
         monkeypatch.setattr(_app_mod.plan_my_night, 'create_or_add_target',
                             lambda **_kw: (False, 'invalid_night_window', {}, None))
         resp = client_admin.post('/api/plan-my-night/targets', json={'catalogue': 'Messier', 'item': {'name': 'M42'}})
@@ -5328,7 +5348,7 @@ class TestPlanMyNightRoutes:
         assert 'Invalid night window' in resp.get_json()['error']
 
     def test_add_target_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, '_resolve_observing_night_for_plan',
+        monkeypatch.setattr(_plan_my_night_mod, '_resolve_observing_night_for_plan',
                             lambda: (_ for _ in ()).throw(RuntimeError('fail')))
         resp = client_admin.post('/api/plan-my-night/targets', json={'catalogue': 'Messier', 'item': {'name': 'M42'}})
         assert resp.status_code == 500
@@ -5484,26 +5504,26 @@ class TestAstrodexCrudRoutes:
     """Tests for astrodex item CRUD routes."""
 
     def test_add_item_no_name_returns_400(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
+        monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         resp = client_admin.post('/api/astrodex/items', json={'type': 'Galaxy'})
         assert resp.status_code == 400
 
     def test_add_item_already_exists_returns_409(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
+        monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'find_item_in_astrodex', lambda *_a, **_k: {'id': 'x1', 'name': 'M42'})
         resp = client_admin.post('/api/astrodex/items', json={'name': 'M42'})
         assert resp.status_code == 409
         assert resp.get_json()['error'] == 'duplicate'
 
     def test_add_item_create_fails_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
+        monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'is_item_in_astrodex', lambda *_a, **_k: False)
         monkeypatch.setattr(_app_mod.astrodex, 'create_astrodex_item', lambda *_a, **_k: None)
         resp = client_admin.post('/api/astrodex/items', json={'name': 'M42'})
         assert resp.status_code == 500
 
     def test_add_item_success_returns_200(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
+        monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'is_item_in_astrodex', lambda *_a, **_k: False)
         monkeypatch.setattr(_app_mod.astrodex, 'create_astrodex_item', lambda *_a, **_k: {'id': 'new1', 'name': 'M42'})
         resp = client_admin.post('/api/astrodex/items', json={'name': 'M42'})
@@ -5511,163 +5531,163 @@ class TestAstrodexCrudRoutes:
         assert resp.get_json()['status'] == 'success'
 
     def test_add_item_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
+        monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'is_item_in_astrodex',
                             lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
         resp = client_admin.post('/api/astrodex/items', json={'name': 'M42'})
         assert resp.status_code == 500
 
     def test_switch_catalogue_name_no_catalogue_returns_400(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
+        monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         resp = client_admin.post('/api/astrodex/items/item1/catalogue-name', json={})
         assert resp.status_code == 400
 
     def test_switch_catalogue_name_not_found_returns_404(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
+        monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'switch_item_catalogue_name', lambda *_a, **_k: None)
         resp = client_admin.post('/api/astrodex/items/item1/catalogue-name', json={'catalogue': 'NGC'})
         assert resp.status_code == 404
 
     def test_switch_catalogue_name_value_error_returns_400(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
+        monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'switch_item_catalogue_name',
                             lambda *_a, **_k: (_ for _ in ()).throw(ValueError('bad')))
         resp = client_admin.post('/api/astrodex/items/item1/catalogue-name', json={'catalogue': 'NGC'})
         assert resp.status_code == 400
 
     def test_get_item_found_returns_200(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
+        monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'get_astrodex_item', lambda *_a, **_k: {'id': 'item1', 'name': 'M42'})
         resp = client_admin.get('/api/astrodex/items/item1')
         assert resp.status_code == 200
         assert resp.get_json()['name'] == 'M42'
 
     def test_get_item_not_found_returns_404(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
+        monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'get_astrodex_item', lambda *_a, **_k: None)
         resp = client_admin.get('/api/astrodex/items/item1')
         assert resp.status_code == 404
 
     def test_get_item_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
+        monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'get_astrodex_item',
                             lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
         resp = client_admin.get('/api/astrodex/items/item1')
         assert resp.status_code == 500
 
     def test_update_item_success_returns_200(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
+        monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'update_astrodex_item', lambda *_a, **_k: {'id': 'item1', 'notes': 'test'})
         resp = client_admin.put('/api/astrodex/items/item1', json={'notes': 'test'})
         assert resp.status_code == 200
         assert resp.get_json()['status'] == 'success'
 
     def test_update_item_not_found_returns_404(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
+        monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'update_astrodex_item', lambda *_a, **_k: None)
         resp = client_admin.put('/api/astrodex/items/item1', json={'notes': 'test'})
         assert resp.status_code == 404
 
     def test_update_item_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
+        monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'update_astrodex_item',
                             lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
         resp = client_admin.put('/api/astrodex/items/item1', json={'notes': 'test'})
         assert resp.status_code == 500
 
     def test_delete_item_success_returns_200(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
+        monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'delete_astrodex_item', lambda *_a, **_k: True)
         resp = client_admin.delete('/api/astrodex/items/item1')
         assert resp.status_code == 200
         assert resp.get_json()['status'] == 'success'
 
     def test_delete_item_not_found_returns_404(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
+        monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'delete_astrodex_item', lambda *_a, **_k: False)
         resp = client_admin.delete('/api/astrodex/items/item1')
         assert resp.status_code == 404
 
     def test_delete_item_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
+        monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'delete_astrodex_item',
                             lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
         resp = client_admin.delete('/api/astrodex/items/item1')
         assert resp.status_code == 500
 
     def test_add_picture_success_returns_200(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
+        monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'add_picture_to_item', lambda *_a, **_k: {'id': 'pic1'})
         resp = client_admin.post('/api/astrodex/items/item1/pictures', json={'url': 'http://example.com/img.jpg'})
         assert resp.status_code == 200
         assert resp.get_json()['status'] == 'success'
 
     def test_add_picture_not_found_returns_404(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
+        monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'add_picture_to_item', lambda *_a, **_k: None)
         resp = client_admin.post('/api/astrodex/items/item1/pictures', json={'url': 'http://example.com/img.jpg'})
         assert resp.status_code == 404
 
     def test_add_picture_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
+        monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'add_picture_to_item',
                             lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
         resp = client_admin.post('/api/astrodex/items/item1/pictures', json={})
         assert resp.status_code == 500
 
     def test_update_picture_success_returns_200(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
+        monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'update_picture', lambda *_a, **_k: {'id': 'pic1', 'caption': 'test'})
         resp = client_admin.put('/api/astrodex/items/item1/pictures/pic1', json={'caption': 'test'})
         assert resp.status_code == 200
         assert resp.get_json()['status'] == 'success'
 
     def test_update_picture_not_found_returns_404(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
+        monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'update_picture', lambda *_a, **_k: None)
         resp = client_admin.put('/api/astrodex/items/item1/pictures/pic1', json={'caption': 'test'})
         assert resp.status_code == 404
 
     def test_update_picture_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
+        monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'update_picture',
                             lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
         resp = client_admin.put('/api/astrodex/items/item1/pictures/pic1', json={})
         assert resp.status_code == 500
 
     def test_delete_picture_success_returns_200(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
+        monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'delete_picture', lambda *_a, **_k: True)
         resp = client_admin.delete('/api/astrodex/items/item1/pictures/pic1')
         assert resp.status_code == 200
 
     def test_delete_picture_not_found_returns_404(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
+        monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'delete_picture', lambda *_a, **_k: False)
         resp = client_admin.delete('/api/astrodex/items/item1/pictures/pic1')
         assert resp.status_code == 404
 
     def test_delete_picture_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
+        monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'delete_picture',
                             lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
         resp = client_admin.delete('/api/astrodex/items/item1/pictures/pic1')
         assert resp.status_code == 500
 
     def test_set_main_picture_success_returns_200(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
+        monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'set_main_picture', lambda *_a, **_k: True)
         resp = client_admin.post('/api/astrodex/items/item1/pictures/pic1/main')
         assert resp.status_code == 200
 
     def test_set_main_picture_not_found_returns_404(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
+        monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'set_main_picture', lambda *_a, **_k: False)
         resp = client_admin.post('/api/astrodex/items/item1/pictures/pic1/main')
         assert resp.status_code == 404
 
     def test_set_main_picture_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
+        monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
         monkeypatch.setattr(_app_mod.astrodex, 'set_main_picture',
                             lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
         resp = client_admin.post('/api/astrodex/items/item1/pictures/pic1/main')
@@ -5680,8 +5700,8 @@ class TestAstrodexCrudRoutes:
         assert resp.status_code == 500
 
     def test_astrodex_image_exception_returns_404(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
-        monkeypatch.setattr(_app_mod, 'load_config',
+        monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
+        monkeypatch.setattr(_astrodex_mod, 'load_config',
                             lambda: (_ for _ in ()).throw(RuntimeError('fail')))
         resp = client_admin.get('/api/astrodex/images/somefile.jpg')
         assert resp.status_code == 404
@@ -5711,7 +5731,7 @@ class TestUserManagementMoreBranches:
         assert resp.get_json()['error_key'] == 'users.invalid_role'
 
     def test_config_update_bortle_invalid_returns_400(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: _v12_config({}, skytonight={}))
+        monkeypatch.setattr(_locations_mod, 'load_config', lambda: _v12_config({}, skytonight={}))
         resp = client_admin.post('/api/config', json={
             'location': {'bortle': 99},
             'skytonight': {}
@@ -5720,7 +5740,7 @@ class TestUserManagementMoreBranches:
         assert 'bortle' in resp.get_json()['error']
 
     def test_config_update_sqm_invalid_returns_400(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: _v12_config({}, skytonight={}))
+        monkeypatch.setattr(_locations_mod, 'load_config', lambda: _v12_config({}, skytonight={}))
         resp = client_admin.post('/api/config', json={
             'location': {'sqm': -5.0},
             'skytonight': {}
@@ -5739,7 +5759,7 @@ class TestSpaceflightMoreRoutes:
         assert resp.status_code == 500
 
     def test_spaceflight_launch_vidurls_exception_returns_200(self, client_admin, monkeypatch):
-        import spaceflight_tracker as _st
+        from space import spaceflight_tracker as _st
         monkeypatch.setattr(_st, 'get_launch_vidurls',
                             lambda *_: (_ for _ in ()).throw(RuntimeError('fail')))
         resp = client_admin.get('/api/spaceflight/launch/12345678-1234-1234-1234-123456789abc/vidurls')
@@ -5758,13 +5778,13 @@ class TestSpaceflightMoreRoutes:
         assert resp.status_code == 200
 
     def test_object_info_invalid_identifier_returns_400(self, client_admin, monkeypatch):
-        import object_info as _oi
+        from observation import object_info as _oi
         monkeypatch.setattr(_oi, 'get_object_info', lambda *_a, **_k: {'error': 'invalid_identifier'})
         resp = client_admin.get('/api/object/!!!bad!!!')
         assert resp.status_code == 400
 
     def test_catalogue_lookup_found_in_local_returns_200(self, client_admin, monkeypatch):
-        import skytonight_targets as _st
+        from skytonight import skytonight_targets as _st
         monkeypatch.setattr(_st, 'get_lookup_entry', lambda cat, name: {
             'preferred_name': 'M31',
             'object_type': 'Galaxy',
@@ -5782,7 +5802,7 @@ class TestSpaceflightMoreRoutes:
         assert resp.get_json()['found'] is False
 
     def test_catalogue_lookup_exception_returns_500(self, client_admin, monkeypatch):
-        import skytonight_targets as _st
+        from skytonight import skytonight_targets as _st
         monkeypatch.setattr(_st, 'get_lookup_entry',
                             lambda *_: (_ for _ in ()).throw(RuntimeError('fail')))
         resp = client_admin.get('/api/astrodex/catalogue-lookup?name=M31')
@@ -5867,12 +5887,14 @@ class TestAstroAndBestWindowRoutes:
     """Tests for sidereal time, horizon graph, and best-window routes."""
 
     def test_sidereal_time_no_location_returns_400(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: _v12_config({'latitude': None, 'longitude': None}))
+        monkeypatch.setattr(
+            _route_helpers_mod, 'load_config', lambda: _v12_config({'latitude': None, 'longitude': None})
+        )
         resp = client_admin.get('/api/astro/sidereal-time')
         assert resp.status_code == 400
 
     def test_sidereal_time_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'load_config',
+        monkeypatch.setattr(_route_helpers_mod, 'load_config',
                             lambda: (_ for _ in ()).throw(RuntimeError('fail')))
         resp = client_admin.get('/api/astro/sidereal-time')
         assert resp.status_code == 500
@@ -5924,7 +5946,7 @@ class TestWeatherRoutes:
     def test_hourly_forecast_none_returns_202(self, client_admin, monkeypatch):
         monkeypatch.setattr(_app_mod.cache_store, 'is_cache_valid', lambda *_: False)
         monkeypatch.setattr(_app_mod.cache_store, 'sync_cache_from_shared', lambda *_: False)
-        monkeypatch.setattr(_app_mod, 'get_hourly_forecast', lambda **_kw: None)
+        monkeypatch.setattr(_weather_mod, 'get_hourly_forecast', lambda **_kw: None)
         _LEGACY['weather_forecast']['data'] = None
         resp = client_admin.get('/api/weather/forecast')
         assert resp.status_code == 202
@@ -5932,46 +5954,46 @@ class TestWeatherRoutes:
     def test_hourly_forecast_exception_returns_500(self, client_admin, monkeypatch):
         monkeypatch.setattr(_app_mod.cache_store, 'is_cache_valid', lambda *_: False)
         monkeypatch.setattr(_app_mod.cache_store, 'sync_cache_from_shared', lambda *_: False)
-        monkeypatch.setattr(_app_mod, 'get_hourly_forecast',
+        monkeypatch.setattr(_weather_mod, 'get_hourly_forecast',
                             lambda **_kw: (_ for _ in ()).throw(RuntimeError('fail')))
         resp = client_admin.get('/api/weather/forecast')
         assert resp.status_code == 500
 
     def test_astro_weather_analysis_none_returns_202(self, client_admin, monkeypatch):
-        import weather_astro as _wa
+        from weather import weather_astro as _wa
         monkeypatch.setattr(_wa, 'get_astro_weather_analysis', lambda *_a, **_k: None)
         resp = client_admin.get('/api/weather/astro-analysis')
         assert resp.status_code == 202
 
     def test_astro_weather_analysis_exception_returns_500(self, client_admin, monkeypatch):
-        import weather_astro as _wa
+        from weather import weather_astro as _wa
         monkeypatch.setattr(_wa, 'get_astro_weather_analysis',
                             lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
         resp = client_admin.get('/api/weather/astro-analysis')
         assert resp.status_code == 500
 
     def test_current_astro_conditions_none_returns_500(self, client_admin, monkeypatch):
-        import weather_astro as _wa
+        from weather import weather_astro as _wa
         monkeypatch.setattr(_wa, 'get_current_astro_conditions', lambda *_a, **_k: None)
         resp = client_admin.get('/api/weather/astro-current')
         assert resp.status_code == 500
 
     def test_current_astro_conditions_exception_returns_500(self, client_admin, monkeypatch):
-        import weather_astro as _wa
+        from weather import weather_astro as _wa
         monkeypatch.setattr(_wa, 'get_current_astro_conditions',
                             lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
         resp = client_admin.get('/api/weather/astro-current')
         assert resp.status_code == 500
 
     def test_weather_alerts_none_returns_200_pending(self, client_admin, monkeypatch):
-        import weather_astro as _wa
+        from weather import weather_astro as _wa
         monkeypatch.setattr(_wa, 'get_astro_weather_analysis', lambda *_a, **_k: None)
         resp = client_admin.get('/api/weather/alerts')
         assert resp.status_code == 200
         assert resp.get_json()['status'] == 'pending'
 
     def test_weather_alerts_exception_returns_500(self, client_admin, monkeypatch):
-        import weather_astro as _wa
+        from weather import weather_astro as _wa
         monkeypatch.setattr(_wa, 'get_astro_weather_analysis',
                             lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
         resp = client_admin.get('/api/weather/alerts')
@@ -6008,7 +6030,7 @@ class TestPushExceptionHandlers:
 
     def test_push_test_trigger_exception_returns_500(self, client_admin, monkeypatch):
         """Lines 677-679: exception inside push_test_trigger try block → 500."""
-        import i18n_utils as _i18n
+        from utils import i18n_utils as _i18n
         admin = user_manager.get_user_by_username('admin')
         monkeypatch.setattr(admin, 'push_subscriptions', [
             {'endpoint': 'https://example.com/push', 'keys': {}}
@@ -6023,7 +6045,7 @@ class TestPushExceptionHandlers:
 
     def test_push_test_exception_returns_500(self, client_admin, monkeypatch):
         """Lines 724-726: exception inside push_test try block → 500."""
-        import push_manager as _pm
+        from utils import push_manager as _pm
         admin = user_manager.get_user_by_username('admin')
         monkeypatch.setattr(admin, 'push_subscriptions', [
             {'endpoint': 'https://example.com/push', 'keys': {}}
@@ -6073,7 +6095,7 @@ class TestConfigPostAdditionalBranches:
 
     def test_config_with_astrodex_present_skips_default(self, client_admin, monkeypatch):
         """Lines 904->908: 'astrodex' IS in submitted config → if-body skipped."""
-        monkeypatch.setattr(_app_mod, 'save_config', lambda *a, **kw: None)
+        monkeypatch.setattr(_locations_mod, 'save_config', lambda *a, **kw: None)
         monkeypatch.setattr(_app_mod.cache_store, 'reset_all_caches', lambda: None)
         resp = client_admin.post('/api/config', json={
             'location': {'latitude': 48.8, 'longitude': 2.3, 'timezone': 'Europe/Paris', 'elevation': 30},
@@ -6085,8 +6107,8 @@ class TestConfigPostAdditionalBranches:
         """Line 916: old_skytonight is not a dict → assigned {}."""
         old_cfg = {'location': {'latitude': 48.8, 'longitude': 2.3, 'timezone': 'UTC', 'elevation': 0},
                    'skytonight': 'not-a-dict'}  # non-dict skytonight
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: old_cfg)
-        monkeypatch.setattr(_app_mod, 'save_config', lambda *a, **kw: None)
+        monkeypatch.setattr(_locations_mod, 'load_config', lambda: old_cfg)
+        monkeypatch.setattr(_locations_mod, 'save_config', lambda *a, **kw: None)
         monkeypatch.setattr(_app_mod.cache_store, 'reset_all_caches', lambda: None)
         resp = client_admin.post('/api/config', json={
             'location': {'latitude': 48.8, 'longitude': 2.3, 'timezone': 'UTC', 'elevation': 0},
@@ -6096,9 +6118,9 @@ class TestConfigPostAdditionalBranches:
     def test_config_with_legacy_top_level_constraints(self, client_admin, monkeypatch):
         """Line 947: top-level 'constraints' migrated when skytonight.constraints absent."""
         old_cfg = {'location': {'latitude': 48.8, 'longitude': 2.3, 'timezone': 'UTC', 'elevation': 0}}
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: old_cfg)
+        monkeypatch.setattr(_locations_mod, 'load_config', lambda: old_cfg)
         saved = {}
-        monkeypatch.setattr(_app_mod, 'save_config', lambda cfg: saved.update({'cfg': cfg}))
+        monkeypatch.setattr(_locations_mod, 'save_config', lambda cfg: saved.update({'cfg': cfg}))
         monkeypatch.setattr(_app_mod.cache_store, 'reset_all_caches', lambda: None)
         resp = client_admin.post('/api/config', json={
             'location': {'latitude': 48.8, 'longitude': 2.3, 'timezone': 'UTC', 'elevation': 0},
@@ -6120,7 +6142,7 @@ class TestBackupDownloadNonexistentEntries:
 
     def test_backup_with_empty_data_dir(self, client_admin, monkeypatch, tmp_path):
         """1204->1202 (no astrodex/equipments dirs), 1211->1202 (no config/users files)."""
-        monkeypatch.setattr(_app_mod, 'DATA_DIR', str(tmp_path))
+        monkeypatch.setattr(_admin_mod, 'DATA_DIR', str(tmp_path))
         resp = client_admin.get('/api/backup/download')
         # Empty backup (no entries found) should still succeed with an empty zip
         assert resp.status_code == 200
@@ -6166,7 +6188,7 @@ class TestSpaceflightImageSidecar:
         img_dir = tmp_path / 'spaceflight_images'
         img_dir.mkdir()
         (img_dir / self.VALID_HEX).write_bytes(b'\xff\xd8\xff\xe0fake_jpeg')
-        monkeypatch.setattr(_app_mod, 'DATA_DIR_CACHE', str(tmp_path))
+        monkeypatch.setattr(_tracking_mod, 'DATA_DIR_CACHE', str(tmp_path))
         resp = client_admin.get(f'/api/spaceflight/img/{self.VALID_HEX}')
         assert resp.status_code in (200, 404)  # 200 if Flask test client serves it, 404 fallback
 
@@ -6181,7 +6203,7 @@ class TestSpaceflightImageSidecar:
         def _raise(*a, **kw):
             raise RuntimeError('network error')
 
-        monkeypatch.setattr(_app_mod, 'DATA_DIR_CACHE', str(tmp_path))
+        monkeypatch.setattr(_tracking_mod, 'DATA_DIR_CACHE', str(tmp_path))
         monkeypatch.setattr(_reqs, 'get', _raise)
         resp = client_admin.get(f'/api/spaceflight/img/{self.VALID_HEX}')
         assert resp.status_code == 404
@@ -6199,7 +6221,7 @@ class TestSpaceflightImageSidecar:
             'iter_content': lambda self, chunk_size=8192: [b'\xff\xd8\xff\xe0fake_jpeg'],
         })()
 
-        monkeypatch.setattr(_app_mod, 'DATA_DIR_CACHE', str(tmp_path))
+        monkeypatch.setattr(_tracking_mod, 'DATA_DIR_CACHE', str(tmp_path))
         import requests as _reqs
         monkeypatch.setattr(_reqs, 'get', lambda *a, **kw: mock_response)
         resp = client_admin.get(f'/api/spaceflight/img/{self.VALID_HEX}')
@@ -6224,36 +6246,36 @@ class TestTranslateSpecialPhenomenaT:
 
     def test_t_with_kwargs_format_success(self, monkeypatch):
         """Lines 2662-2664: kwargs truthy, fallback.format(**kwargs) succeeds."""
-        monkeypatch.setattr(_app_mod, 'I18nManager', self._i18n_returns_key())
+        monkeypatch.setattr(_astronomy_mod, 'I18nManager', self._i18n_returns_key())
         data = {'events': [{
             'event_type': 'Milky Way Core Visibility',
             'galactic_center_altitude': 45.0,
             'description': 'Galactic center visible at {gc_altitude}° altitude.',
         }]}
-        result = _app_mod._translate_special_phenomena_events(data, 'fr')
+        result = _astronomy_mod._translate_special_phenomena_events(data, 'fr')
         assert '45' in result['events'][0]['description']
 
     def test_t_with_kwargs_format_fail_returns_fallback(self, monkeypatch):
         """Lines 2662-2663, 2665-2666: kwargs truthy, format raises → return fallback."""
-        monkeypatch.setattr(_app_mod, 'I18nManager', self._i18n_returns_key())
+        monkeypatch.setattr(_astronomy_mod, 'I18nManager', self._i18n_returns_key())
         data = {'events': [{
             'event_type': 'Milky Way Core Visibility',
             'galactic_center_altitude': 45.0,
             'description': '{nonexistent_key_xyz} broken format',  # key not in kwargs → KeyError
         }]}
-        result = _app_mod._translate_special_phenomena_events(data, 'fr')
+        result = _astronomy_mod._translate_special_phenomena_events(data, 'fr')
         # fallback returned as-is on format error
         assert '{nonexistent_key_xyz}' in result['events'][0]['description']
 
     def test_t_without_kwargs_returns_fallback(self, monkeypatch):
         """Line 2667: kwargs falsy → return fallback directly."""
-        monkeypatch.setattr(_app_mod, 'I18nManager', self._i18n_returns_key())
+        monkeypatch.setattr(_astronomy_mod, 'I18nManager', self._i18n_returns_key())
         data = {'events': [{
             'event_type': 'Seasonal',
             'raw_data': {'event': 'spring_equinox'},
             'title': 'Vernal Equinox Spring',
         }]}
-        result = _app_mod._translate_special_phenomena_events(data, 'fr')
+        result = _astronomy_mod._translate_special_phenomena_events(data, 'fr')
         # fallback (original title) returned when no kwargs
         assert result['events'][0]['title'] == 'Vernal Equinox Spring'
 
@@ -6268,11 +6290,11 @@ class TestSiderealTimeCacheSkipSync:
 
     def test_valid_today_cache_skips_sync(self, client_admin, monkeypatch):
         from unittest.mock import MagicMock
-        import sidereal_time as _st
+        from observation import sidereal_time as _st
         mock_svc = MagicMock()
         mock_svc.get_current_sidereal_info.return_value = {'sidereal_time': 12.0}
         monkeypatch.setattr(_st, 'SiderealTimeService', lambda **kw: mock_svc)
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {
+        monkeypatch.setattr(_route_helpers_mod, 'load_config', lambda: {
             'location': {'latitude': 48.0, 'longitude': 2.0, 'elevation': 100, 'timezone': 'UTC'}
         })
         # Make is_cache_valid_for_today return True → False branch of `if not ...` → skip line 2818
@@ -6325,11 +6347,13 @@ class TestResolveObservingNightBranches:
 
     def test_no_location_falls_to_skytonight_fallback(self, monkeypatch):
         """Lines 2968->3001: lat/lon/tz absent → skip sun service, fall to SkyTonight."""
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: _v12_config({'latitude': None, 'longitude': None}))
-        monkeypatch.setattr(_app_mod, 'load_calculation_results', lambda *_a, **_k: {
+        monkeypatch.setattr(
+            _route_helpers_mod, 'load_config', lambda: _v12_config({'latitude': None, 'longitude': None})
+        )
+        monkeypatch.setattr(_plan_my_night_mod, 'load_calculation_results', lambda *_a, **_k: {
             'metadata': {'night_start': '2026-06-09T21:00:00+02:00', 'night_end': '2026-06-10T04:00:00+02:00'}
         })
-        result = _app_mod._resolve_observing_night_for_plan()
+        result = _plan_my_night_mod._resolve_observing_night_for_plan()
         assert result is not None
         assert 'start' in result
 
@@ -6340,10 +6364,10 @@ class TestResolveObservingNightBranches:
         mock_svc.get_today_report.return_value = self._make_report('', 'Not found')
         # Tomorrow also returns empty → no valid window
         mock_svc.get_tomorrow_report.return_value = self._make_report('', '')
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: _v12_config())
-        monkeypatch.setattr(_app_mod, 'SunService', lambda **kw: mock_svc)
-        monkeypatch.setattr(_app_mod, 'load_calculation_results', lambda *_a, **_k: {'metadata': {}})
-        result = _app_mod._resolve_observing_night_for_plan()
+        monkeypatch.setattr(_route_helpers_mod, 'load_config', lambda: _v12_config())
+        monkeypatch.setattr(_plan_my_night_mod, 'SunService', lambda **kw: mock_svc)
+        monkeypatch.setattr(_plan_my_night_mod, 'load_calculation_results', lambda *_a, **_k: {'metadata': {}})
+        result = _plan_my_night_mod._resolve_observing_night_for_plan()
         assert result is None
 
     def test_invalid_date_parse_returns_none(self, monkeypatch):
@@ -6352,10 +6376,10 @@ class TestResolveObservingNightBranches:
         mock_svc = MagicMock()
         mock_svc.get_today_report.return_value = self._make_report('NOT-A-DATE', 'ALSO-BAD')
         mock_svc.get_tomorrow_report.return_value = self._make_report('NOT-A-DATE', 'ALSO-BAD')
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: _v12_config())
-        monkeypatch.setattr(_app_mod, 'SunService', lambda **kw: mock_svc)
-        monkeypatch.setattr(_app_mod, 'load_calculation_results', lambda *_a, **_k: {'metadata': {}})
-        result = _app_mod._resolve_observing_night_for_plan()
+        monkeypatch.setattr(_route_helpers_mod, 'load_config', lambda: _v12_config())
+        monkeypatch.setattr(_plan_my_night_mod, 'SunService', lambda **kw: mock_svc)
+        monkeypatch.setattr(_plan_my_night_mod, 'load_calculation_results', lambda *_a, **_k: {'metadata': {}})
+        result = _plan_my_night_mod._resolve_observing_night_for_plan()
         assert result is None
 
     def test_today_dusk_none_fetches_tomorrow(self, monkeypatch):
@@ -6368,9 +6392,9 @@ class TestResolveObservingNightBranches:
         mock_svc.get_tomorrow_report.return_value = self._make_report(
             '2026-06-10 21:30', '2026-06-11 04:00'
         )
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: _v12_config())
-        monkeypatch.setattr(_app_mod, 'SunService', lambda **kw: mock_svc)
-        result = _app_mod._resolve_observing_night_for_plan()
+        monkeypatch.setattr(_route_helpers_mod, 'load_config', lambda: _v12_config())
+        monkeypatch.setattr(_plan_my_night_mod, 'SunService', lambda **kw: mock_svc)
+        result = _plan_my_night_mod._resolve_observing_night_for_plan()
         assert result is not None
         assert 'duration_hours' in result
 
@@ -6380,12 +6404,12 @@ class TestResolveObservingNightBranches:
         mock_svc = MagicMock()
         mock_svc.get_today_report.return_value = self._make_report('', '')
         mock_svc.get_tomorrow_report.return_value = self._make_report('', '')
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: _v12_config())
-        monkeypatch.setattr(_app_mod, 'SunService', lambda **kw: mock_svc)
-        monkeypatch.setattr(_app_mod, 'load_calculation_results', lambda *_a, **_k: {
+        monkeypatch.setattr(_route_helpers_mod, 'load_config', lambda: _v12_config())
+        monkeypatch.setattr(_plan_my_night_mod, 'SunService', lambda **kw: mock_svc)
+        monkeypatch.setattr(_plan_my_night_mod, 'load_calculation_results', lambda *_a, **_k: {
             'metadata': {'night_start': '2026-06-09T21:00:00+00:00', 'night_end': '2026-06-10T04:00:00+00:00'}
         })
-        result = _app_mod._resolve_observing_night_for_plan()
+        result = _plan_my_night_mod._resolve_observing_night_for_plan()
         assert result is not None  # SkyTonight fallback succeeds
 
 
@@ -6400,8 +6424,8 @@ class TestAddPlanTargetToAstrodexBranches:
 
     def test_entry_found_in_secondary_plan(self, client_admin, monkeypatch):
         """Lines 3383-3392: entry not in default plan → search all plans → found."""
-        import plan_my_night as _pmn
-        import astrodex as _ad
+        from observation import plan_my_night as _pmn
+        from observation import astrodex as _ad
 
         entry_id = 'test-search-loop-entry'
 
@@ -6424,7 +6448,7 @@ class TestAddPlanTargetToAstrodexBranches:
 
     def test_exception_returns_500(self, client_admin, monkeypatch):
         """Lines 3414-3416: exception in add_plan_target_to_astrodex → 500."""
-        import plan_my_night as _pmn
+        from observation import plan_my_night as _pmn
 
         def _raise(*a, **kw):
             raise RuntimeError('plan load failed')
@@ -6443,7 +6467,7 @@ class TestCreateAccessoryNone:
     """Cover line 4445: equipment_profiles.create_accessory returns None → 500."""
 
     def test_create_accessory_none_returns_500(self, client_admin, monkeypatch):
-        import equipment_profiles as _ep
+        from equipment import equipment_profiles as _ep
         monkeypatch.setattr(_ep, 'create_accessory', lambda *a, **kw: None)
         resp = client_admin.post('/api/equipment/accessories', json={'name': 'TestBarlow'})
         assert resp.status_code == 500
@@ -6535,7 +6559,7 @@ class TestBackupRestoreDirNotExist:
         import zipfile
         import json
 
-        monkeypatch.setattr(_app_mod, 'DATA_DIR', str(tmp_path))
+        monkeypatch.setattr(_admin_mod, 'DATA_DIR', str(tmp_path))
 
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, 'w') as zf:
@@ -6561,7 +6585,7 @@ class TestLogExportEdgeCases:
 
     def test_log_export_missing_dir_skips_it(self, client_admin, monkeypatch):
         """1406->1404: one LOG_EXPORT_ENTRIES is_dir=True path doesn't exist."""
-        monkeypatch.setattr(_app_mod, 'SKYTONIGHT_LOGS_DIR', '/nonexistent/path/xyz123')
+        monkeypatch.setattr(_admin_mod, 'SKYTONIGHT_LOGS_DIR', '/nonexistent/path/xyz123')
         resp = client_admin.get('/api/logs/export')
         assert resp.status_code == 200
 
@@ -6572,7 +6596,7 @@ class TestLogExportEdgeCases:
         def _raise(*a, **kw):
             raise OSError("forced zip failure")
 
-        monkeypatch.setattr(_app_mod.zipfile, 'ZipFile', _raise)
+        monkeypatch.setattr(_admin_mod.zipfile, 'ZipFile', _raise)
         resp = client_admin.get('/api/logs/export')
         assert resp.status_code == 500
 
@@ -6586,7 +6610,7 @@ class TestTimezoneFilterBranch:
     """Cover 1563->1562: a tz matching posix/right/localtime skips body (False branch)."""
 
     def test_localtime_tz_skipped_by_filter(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'available_timezones',
+        monkeypatch.setattr(_misc_mod, 'available_timezones',
                             lambda: {'UTC', 'Europe/Paris', 'localtime'})
         resp = client_admin.get('/api/timezones')
         assert resp.status_code == 200
@@ -6609,7 +6633,7 @@ class TestTranslateSolarSystemMissingFields:
         """2608->2641: shower_name/zenith_hourly_rate/parent_body falsy → skip title/desc."""
         from unittest.mock import MagicMock
         mock_i18n = MagicMock()
-        monkeypatch.setattr(_app_mod, 'I18nManager', lambda lang: mock_i18n)
+        monkeypatch.setattr(_astronomy_mod, 'I18nManager', lambda lang: mock_i18n)
         data = {'events': [{
             'event_type': 'Meteor Shower',
             'raw_data': {'shower': ''},  # empty → condition False
@@ -6618,7 +6642,7 @@ class TestTranslateSolarSystemMissingFields:
             'title': 'Meteor Shower',
             'description': 'Some shower',
         }]}
-        result = _app_mod._translate_solar_system_events(data, 'fr')
+        result = _astronomy_mod._translate_solar_system_events(data, 'fr')
         assert result['events'][0]['title'] == 'Meteor Shower'
         mock_i18n.t.assert_not_called()
 
@@ -6626,7 +6650,7 @@ class TestTranslateSolarSystemMissingFields:
         """2624->2641: comet_name/magnitude/visibility falsy → skip title/desc."""
         from unittest.mock import MagicMock
         mock_i18n = MagicMock()
-        monkeypatch.setattr(_app_mod, 'I18nManager', lambda lang: mock_i18n)
+        monkeypatch.setattr(_astronomy_mod, 'I18nManager', lambda lang: mock_i18n)
         data = {'events': [{
             'event_type': 'Comet Appearance',
             'raw_data': {'comet': ''},  # empty → condition False
@@ -6635,7 +6659,7 @@ class TestTranslateSolarSystemMissingFields:
             'title': 'Comet Appearance',
             'description': 'Some comet',
         }]}
-        result = _app_mod._translate_solar_system_events(data, 'fr')
+        result = _astronomy_mod._translate_solar_system_events(data, 'fr')
         assert result['events'][0]['title'] == 'Comet Appearance'
         mock_i18n.t.assert_not_called()
 
@@ -6673,8 +6697,8 @@ class TestAddPlanTargetDefaultAndMultiPlan:
 
     def test_default_plan_file_gets_tid_none(self, client_admin, monkeypatch):
         """3385->3387: fname is the default plan file → tid stays None."""
-        import plan_my_night as _pmn
-        import astrodex as _ad
+        from observation import plan_my_night as _pmn
+        from observation import astrodex as _ad
 
         entry_id = 'test-default-plan-entry'
 
@@ -6696,8 +6720,8 @@ class TestAddPlanTargetDefaultAndMultiPlan:
 
     def test_entry_found_in_second_plan_file(self, client_admin, monkeypatch):
         """3390->3382: first sub-plan has no match → loop continues to second."""
-        import plan_my_night as _pmn
-        import astrodex as _ad
+        from observation import plan_my_night as _pmn
+        from observation import astrodex as _ad
 
         entry_id = 'test-second-plan-entry'
 
@@ -6739,7 +6763,7 @@ class TestCacheSchedulerStartTrue:
     """Cover line 4695: CacheScheduler.start() returns True → success debug log."""
 
     def test_start_returns_true_logs_success(self, client_admin, monkeypatch):
-        from cache_scheduler import CacheScheduler as CS
+        from cache.cache_scheduler import CacheScheduler as CS
 
         monkeypatch.setattr(CS, 'start', lambda self: True)
 
@@ -6755,7 +6779,7 @@ class TestCacheSchedulerStartTrue:
 
     def test_start_returns_false_logs_already_running(self, client_admin, monkeypatch):
         """Cover line 4697: CacheScheduler.start() returns False → already-running debug log."""
-        from cache_scheduler import CacheScheduler as CS
+        from cache.cache_scheduler import CacheScheduler as CS
 
         monkeypatch.setattr(CS, 'start', lambda self: False)
 
@@ -6788,7 +6812,7 @@ _ALLSKY_CFG_FULL = {
 class TestListConnectorsApi:
 
     def test_returns_list_with_allsky(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
+        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         resp = client_admin.get('/api/connectors')
         assert resp.status_code == 200
         data = resp.get_json()
@@ -6797,14 +6821,14 @@ class TestListConnectorsApi:
         assert 'allsky' in names
 
     def test_connector_fields_present(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
+        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         resp = client_admin.get('/api/connectors')
         item = next(d for d in resp.get_json() if d['name'] == 'allsky')
         for field in ('label', 'description', 'min_version', 'homepage', 'modules', 'installed', 'enabled', 'config'):
             assert field in item
 
     def test_not_installed_when_no_url(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {}})
+        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {}})
         resp = client_admin.get('/api/connectors')
         item = next(d for d in resp.get_json() if d['name'] == 'allsky')
         assert item['installed'] is False
@@ -6818,13 +6842,13 @@ class TestListConnectorsApi:
 class TestAllSkyStatusApi:
 
     def test_returns_404_when_not_configured(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {}})
+        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {}})
         resp = client_admin.get('/api/connectors/allsky/status')
         assert resp.status_code == 404
 
     def test_returns_404_when_sensor_data_not_enabled(self, client_admin, monkeypatch):
         cfg = {"url": "http://allsky.local", "enabled": True, "modules": {}}
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
+        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
         resp = client_admin.get('/api/connectors/allsky/status')
         assert resp.status_code == 404
 
@@ -6833,8 +6857,8 @@ class TestAllSkyStatusApi:
             "url": "http://allsky.local", "enabled": True,
             "modules": {"sensor_data": {"enabled": True}},
         }
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
-        import cache_store as cs
+        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
+        from cache import cache_store as cs
         original = dict(cs._allsky_sensor_cache)
         cs._allsky_sensor_cache["data"] = {"AS_TEMPERATURE_C": 15.0}
         try:
@@ -6851,8 +6875,8 @@ class TestAllSkyStatusApi:
             "url": "http://allsky.local", "enabled": True,
             "modules": {"sensor_data": {"enabled": True}},
         }
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
-        import cache_store as cs
+        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
+        from cache import cache_store as cs
         cs._allsky_sensor_cache["data"] = None
         with patch('connectors.allsky_connector.AllSkyConnector.fetch_sensor_data', return_value={"AS_TEMPERATURE_C": 20.0}):
             resp = client_admin.get('/api/connectors/allsky/status')
@@ -6863,15 +6887,15 @@ class TestAllSkyStatusApi:
 class TestAllSkyHealthApi:
 
     def test_get_no_url_returns_200_not_reachable(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {}})
+        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {}})
         resp = client_admin.get('/api/connectors/allsky/health')
         assert resp.status_code == 200
         assert resp.get_json()['reachable'] is False
 
     def test_get_returns_cached_health(self, client_admin, monkeypatch):
         cfg = {"url": "http://allsky.local", "enabled": True, "modules": {}}
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
-        import cache_store as cs
+        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
+        from cache import cache_store as cs
         import time
         cs._allsky_health_cache["data"] = {"reachable": True, "modules": {}}
         cs._allsky_health_cache["timestamp"] = time.time()
@@ -6886,8 +6910,8 @@ class TestAllSkyHealthApi:
     def test_get_fresh_bypasses_cache(self, client_admin, monkeypatch):
         from unittest.mock import patch
         cfg = {"url": "http://allsky.local", "enabled": True, "modules": {}}
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
-        import cache_store as cs
+        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
+        from cache import cache_store as cs
         import time
         cs._allsky_health_cache["data"] = {"reachable": True, "modules": {}}
         cs._allsky_health_cache["timestamp"] = time.time()
@@ -6904,8 +6928,8 @@ class TestAllSkyHealthApi:
     def test_get_live_health_check(self, client_admin, monkeypatch):
         from unittest.mock import patch
         cfg = {"url": "http://allsky.local", "enabled": True, "modules": {}}
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
-        import cache_store as cs
+        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
+        from cache import cache_store as cs
         cs._allsky_health_cache["data"] = None
         cs._allsky_health_cache["timestamp"] = 0
         with patch('connectors.allsky_connector.AllSkyConnector.health_check',
@@ -6968,12 +6992,12 @@ class TestAllSkyHealthApi:
 class TestAllSkyUrlsApi:
 
     def test_returns_404_when_not_configured(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {}})
+        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {}})
         resp = client_admin.get('/api/connectors/allsky/urls')
         assert resp.status_code == 404
 
     def test_returns_proxy_urls_for_enabled_modules(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
+        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         resp = client_admin.get('/api/connectors/allsky/urls')
         assert resp.status_code == 200
         data = resp.get_json()
@@ -6981,7 +7005,7 @@ class TestAllSkyUrlsApi:
         assert data["live_image"].startswith("/api/connectors/allsky/proxy?module=live_image")
 
     def test_date_suffix_appended_when_provided(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
+        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         resp = client_admin.get('/api/connectors/allsky/urls?date=20260101')
         assert resp.status_code == 200
         data = resp.get_json()
@@ -6996,18 +7020,18 @@ class TestAllSkyProxyApi:
         assert resp.status_code == 400
 
     def test_not_configured_returns_503(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {}})
+        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {}})
         resp = client_admin.get('/api/connectors/allsky/proxy?module=live_image')
         assert resp.status_code == 503
 
     def test_unknown_module_returns_404(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
+        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         resp = client_admin.get('/api/connectors/allsky/proxy?module=nonexistent')
         assert resp.status_code == 404
 
     def test_proxy_streams_content(self, client_admin, monkeypatch):
         from unittest.mock import patch, MagicMock
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
+        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.headers = {"Content-Type": "image/jpeg", "Content-Length": "1234"}
@@ -7021,7 +7045,7 @@ class TestAllSkyProxyApi:
     def test_proxy_timeout_returns_504(self, client_admin, monkeypatch):
         import requests as _req
         from unittest.mock import patch
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
+        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         with patch('socket.getaddrinfo', return_value=[(None, None, None, None, ("1.2.3.4", 80))]):
             with patch('requests.get', side_effect=_req.exceptions.Timeout):
                 resp = client_admin.get('/api/connectors/allsky/proxy?module=live_image')
@@ -7030,7 +7054,7 @@ class TestAllSkyProxyApi:
     def test_proxy_connection_error_returns_502(self, client_admin, monkeypatch):
         import requests as _req
         from unittest.mock import patch
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
+        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         with patch('socket.getaddrinfo', return_value=[(None, None, None, None, ("1.2.3.4", 80))]):
             with patch('requests.get', side_effect=_req.exceptions.ConnectionError):
                 resp = client_admin.get('/api/connectors/allsky/proxy?module=live_image')
@@ -7038,7 +7062,7 @@ class TestAllSkyProxyApi:
 
     def test_proxy_range_header_forwarded(self, client_admin, monkeypatch):
         from unittest.mock import patch, MagicMock
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
+        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         mock_resp = MagicMock()
         mock_resp.status_code = 206
         mock_resp.headers = {
@@ -7059,7 +7083,7 @@ class TestAllSkyProxyApi:
 
     def test_proxy_dns_failure_uses_original_url(self, client_admin, monkeypatch):
         from unittest.mock import patch, MagicMock
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
+        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.headers = {"Content-Type": "image/jpeg"}
@@ -7071,7 +7095,7 @@ class TestAllSkyProxyApi:
 
     def test_proxy_empty_dns_result_uses_original_url(self, client_admin, monkeypatch):
         from unittest.mock import patch, MagicMock
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
+        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.headers = {"Content-Type": "image/jpeg"}
@@ -7083,7 +7107,7 @@ class TestAllSkyProxyApi:
 
     def test_proxy_non200_upstream_still_returned(self, client_admin, monkeypatch):
         from unittest.mock import patch, MagicMock
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
+        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         mock_resp = MagicMock()
         mock_resp.status_code = 404
         mock_resp.headers = {"Content-Type": "text/html"}

@@ -7,9 +7,9 @@ import pytest
 import time
 import os
 import uuid
-import cache_store
-import cache_store as cs
-from constants import CACHE_TTL, DATA_DIR_CACHE
+from cache import cache_store
+from cache import cache_store as cs
+from utils.constants import CACHE_TTL, DATA_DIR_CACHE
 
 is_cache_valid = cache_store.is_cache_valid
 is_astronomical_cache_ready = cache_store.is_astronomical_cache_ready
@@ -276,7 +276,7 @@ class TestCacheInitStatus:
         """AllSky connector fully enabled (incl. the sensor_data module toggle)
         -> both jobs appear in status and ttls."""
         monkeypatch.setattr(
-            "repo_config.load_config",
+            "utils.repo_config.load_config",
             lambda: {
                 "connectors": {
                     "allsky": {

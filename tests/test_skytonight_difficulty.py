@@ -7,8 +7,8 @@ backend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'backend
 if backend_path not in sys.path:
     sys.path.insert(0, backend_path)
 
-from skytonight_calculator import compute_difficulty_score  # noqa: E402
-from skytonight_models import SkyTonightTarget  # noqa: E402
+from skytonight.skytonight_calculator import compute_difficulty_score  # noqa: E402
+from skytonight.skytonight_models import SkyTonightTarget  # noqa: E402
 
 
 def _target(magnitude=None, size_arcmin=None, object_type='Neb'):

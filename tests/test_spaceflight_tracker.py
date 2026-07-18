@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from unittest.mock import patch, MagicMock
 import requests
 
-import spaceflight_tracker
+from space import spaceflight_tracker
 
 _cache_image = spaceflight_tracker._cache_image
 _get = spaceflight_tracker._get
@@ -24,7 +24,7 @@ spaceflight_cache_images_intact = spaceflight_tracker.spaceflight_cache_images_i
 
 @contextmanager
 def _no_cache():
-    with patch("spaceflight_tracker._cache_image", side_effect=lambda url: url):
+    with patch("space.spaceflight_tracker._cache_image", side_effect=lambda url: url):
         yield
 
 
@@ -296,7 +296,7 @@ class TestNormaliseEvent:
 class TestPruneImageCache:
 
     def test_no_dir_does_nothing(self, tmp_path):
-        with patch("spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(tmp_path / "nonexistent")):
+        with patch("space.spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(tmp_path / "nonexistent")):
             prune_image_cache([])
 
     def test_removes_unreferenced_files(self, tmp_path):
@@ -305,7 +305,7 @@ class TestPruneImageCache:
         (img_dir / "old.jpg").write_bytes(b"data")
         (img_dir / "keep.jpg").write_bytes(b"data")
 
-        with patch("spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(img_dir)):
+        with patch("space.spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(img_dir)):
             prune_image_cache(["/api/spaceflight/img/keep.jpg"])
 
         assert not (img_dir / "old.jpg").exists()
@@ -317,7 +317,7 @@ class TestPruneImageCache:
         (img_dir / "a.jpg").write_bytes(b"x")
         (img_dir / "b.jpg").write_bytes(b"x")
 
-        with patch("spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(img_dir)):
+        with patch("space.spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(img_dir)):
             prune_image_cache(["/api/spaceflight/img/a.jpg", "/api/spaceflight/img/b.jpg"])
 
         assert (img_dir / "a.jpg").exists()
@@ -328,7 +328,7 @@ class TestPruneImageCache:
         img_dir.mkdir()
         (img_dir / "orphan.jpg").write_bytes(b"x")
 
-        with patch("spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(img_dir)):
+        with patch("space.spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(img_dir)):
             prune_image_cache([])
 
         assert not (img_dir / "orphan.jpg").exists()
@@ -356,7 +356,7 @@ class TestSpaceflightCacheImagesIntact:
         img_dir.mkdir()
         (img_dir / "abc.jpg").write_bytes(b"data")
 
-        with patch("spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(img_dir)):
+        with patch("space.spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(img_dir)):
             data = {"image_url": "/api/spaceflight/img/abc.jpg"}
             assert spaceflight_cache_images_intact(data) is True
 
@@ -364,7 +364,7 @@ class TestSpaceflightCacheImagesIntact:
         img_dir = tmp_path / "images"
         img_dir.mkdir()
 
-        with patch("spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(img_dir)):
+        with patch("space.spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(img_dir)):
             data = {"image_url": "/api/spaceflight/img/missing.jpg"}
             assert spaceflight_cache_images_intact(data) is False
 
@@ -372,7 +372,7 @@ class TestSpaceflightCacheImagesIntact:
         img_dir = tmp_path / "images"
         img_dir.mkdir()
 
-        with patch("spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(img_dir)):
+        with patch("space.spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(img_dir)):
             data = {"results": [{"image_url": "/api/spaceflight/img/gone.jpg"}]}
             assert spaceflight_cache_images_intact(data) is False
 
@@ -400,7 +400,7 @@ class TestCacheImage:
         """Cache a new image: downloads and writes file, returns local path."""
         mock_resp = MagicMock()
         mock_resp.iter_content.return_value = [b"fakebytes"]
-        with patch("spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(tmp_path)):
+        with patch("space.spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(tmp_path)):
             with patch("requests.get", return_value=mock_resp):
                 result = _cache_image("https://example.com/test.jpg")
         assert result.startswith("/api/spaceflight/img/")
@@ -413,7 +413,7 @@ class TestCacheImage:
         url_hash = hashlib.md5(url.encode()).hexdigest()
         cached_file = tmp_path / f"{url_hash}.jpg"
         cached_file.write_bytes(b"existing")
-        with patch("spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(tmp_path)):
+        with patch("space.spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(tmp_path)):
             with patch("requests.get") as mock_get:
                 result = _cache_image(url)
         mock_get.assert_not_called()
@@ -423,7 +423,7 @@ class TestCacheImage:
         """Non-standard extension falls back to .jpg."""
         mock_resp = MagicMock()
         mock_resp.iter_content.return_value = [b"data"]
-        with patch("spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(tmp_path)):
+        with patch("space.spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(tmp_path)):
             with patch("requests.get", return_value=mock_resp):
                 result = _cache_image("https://example.com/image.bmp")
         assert result.endswith(".jpg")
@@ -431,7 +431,7 @@ class TestCacheImage:
     def test_request_error_returns_original_url(self, tmp_path):
         """On download failure, graceful fallback to original URL."""
         url = "https://example.com/fail.jpg"
-        with patch("spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(tmp_path)):
+        with patch("space.spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(tmp_path)):
             with patch("requests.get", side_effect=requests.RequestException("timeout")):
                 result = _cache_image(url)
         assert result == url
@@ -446,7 +446,7 @@ class TestCacheImage:
     def test_png_extension_preserved(self, tmp_path):
         mock_resp = MagicMock()
         mock_resp.iter_content.return_value = [b"pngdata"]
-        with patch("spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(tmp_path)):
+        with patch("space.spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(tmp_path)):
             with patch("requests.get", return_value=mock_resp):
                 result = _cache_image("https://example.com/image.png")
         assert result.endswith(".png")
@@ -462,8 +462,8 @@ class TestGet:
     def setup_method(self):
         """Clear backoff dict and isolate from disk state before each test."""
         spaceflight_tracker._backoff_until.clear()
-        self._patcher_load = patch("spaceflight_tracker._load_backoff_state", return_value={})
-        self._patcher_save = patch("spaceflight_tracker._save_backoff_state")
+        self._patcher_load = patch("space.spaceflight_tracker._load_backoff_state", return_value={})
+        self._patcher_save = patch("space.spaceflight_tracker._save_backoff_state")
         self._patcher_load.start()
         self._patcher_save.start()
 
@@ -475,8 +475,8 @@ class TestGet:
     def test_successful_get_returns_json(self):
         mock_resp = MagicMock()
         mock_resp.json.return_value = {"count": 1, "results": []}
-        with patch("spaceflight_tracker._load_backoff_state", return_value={}):
-            with patch("spaceflight_tracker._save_backoff_state"):
+        with patch("space.spaceflight_tracker._load_backoff_state", return_value={}):
+            with patch("space.spaceflight_tracker._save_backoff_state"):
                 with patch("requests.get", return_value=mock_resp):
                     result = _get("/launch/upcoming/", params={"limit": 5})
         assert result == {"count": 1, "results": []}
@@ -562,7 +562,7 @@ class TestGetUpcomingLaunches:
         spaceflight_tracker._backoff_until.clear()
 
     def test_returns_none_when_api_fails(self):
-        with patch("spaceflight_tracker._get", return_value=None):
+        with patch("space.spaceflight_tracker._get", return_value=None):
             result = get_upcoming_launches()
         assert result is None
 
@@ -583,7 +583,7 @@ class TestGetUpcomingLaunches:
             ],
         }
         with _no_cache():
-            with patch("spaceflight_tracker._get", return_value=raw):
+            with patch("space.spaceflight_tracker._get", return_value=raw):
                 result = get_upcoming_launches(limit=5)
         assert result["count"] == 1
         assert len(result["results"]) == 1
@@ -592,7 +592,7 @@ class TestGetUpcomingLaunches:
 
     def test_empty_results_list(self):
         with _no_cache():
-            with patch("spaceflight_tracker._get", return_value={"count": 0, "results": []}):
+            with patch("space.spaceflight_tracker._get", return_value={"count": 0, "results": []}):
                 result = get_upcoming_launches()
         assert result["count"] == 0
         assert result["results"] == []
@@ -604,7 +604,7 @@ class TestGetPastLaunches:
         spaceflight_tracker._backoff_until.clear()
 
     def test_returns_none_when_api_fails(self):
-        with patch("spaceflight_tracker._get", return_value=None):
+        with patch("space.spaceflight_tracker._get", return_value=None):
             assert get_past_launches() is None
 
     def test_normalises_results(self):
@@ -618,7 +618,7 @@ class TestGetPastLaunches:
             ],
         }
         with _no_cache():
-            with patch("spaceflight_tracker._get", return_value=raw):
+            with patch("space.spaceflight_tracker._get", return_value=raw):
                 result = get_past_launches(limit=10)
         assert result["count"] == 2
         assert len(result["results"]) == 2
@@ -630,11 +630,11 @@ class TestGetIssCrew:
         spaceflight_tracker._backoff_until.clear()
 
     def test_returns_none_when_api_fails(self):
-        with patch("spaceflight_tracker._get", return_value=None):
+        with patch("space.spaceflight_tracker._get", return_value=None):
             assert get_iss_crew() is None
 
     def test_empty_expeditions(self):
-        with patch("spaceflight_tracker._get", return_value={"results": []}):
+        with patch("space.spaceflight_tracker._get", return_value={"results": []}):
             result = get_iss_crew()
         assert result["expeditions"] == []
         assert "fetched_at" in result
@@ -699,7 +699,7 @@ class TestGetIssCrew:
             return None
 
         with _no_cache():
-            with patch("spaceflight_tracker._get", side_effect=_mock_get):
+            with patch("space.spaceflight_tracker._get", side_effect=_mock_get):
                 result = get_iss_crew()
         assert len(result["expeditions"]) == 2
         assert result["expeditions"][0]["name"] == "Expedition 71"
@@ -734,7 +734,7 @@ class TestGetIssCrew:
             raise AssertionError(f"detail endpoint should not be called: {path}")
 
         with _no_cache():
-            with patch("spaceflight_tracker._get", side_effect=_mock_get):
+            with patch("space.spaceflight_tracker._get", side_effect=_mock_get):
                 result = get_iss_crew()
         assert len(result["expeditions"]) == 1
         assert result["expeditions"][0]["crew_count"] == 1
@@ -764,7 +764,7 @@ class TestGetIssCrew:
             return None
 
         with _no_cache():
-            with patch("spaceflight_tracker._get", side_effect=_mock_get):
+            with patch("space.spaceflight_tracker._get", side_effect=_mock_get):
                 result = get_iss_crew()
         assert len(result["expeditions"]) == 1
         assert result["expeditions"][0]["name"] == "Expedition 71"
@@ -777,7 +777,7 @@ class TestGetAstronautsInSpace:
         spaceflight_tracker._backoff_until.clear()
 
     def test_returns_none_when_api_fails(self):
-        with patch("spaceflight_tracker._get", return_value=None):
+        with patch("space.spaceflight_tracker._get", return_value=None):
             assert get_astronauts_in_space() is None
 
     def test_normalises_astronauts(self):
@@ -799,7 +799,7 @@ class TestGetAstronautsInSpace:
             ],
         }
         with _no_cache():
-            with patch("spaceflight_tracker._get", return_value=raw):
+            with patch("space.spaceflight_tracker._get", return_value=raw):
                 result = get_astronauts_in_space()
         assert result["count"] == 1
         assert result["results"][0]["name"] == "Test Astronaut"
@@ -811,7 +811,7 @@ class TestGetUpcomingSpaceEvents:
         spaceflight_tracker._backoff_until.clear()
 
     def test_returns_none_when_api_fails(self):
-        with patch("spaceflight_tracker._get", return_value=None):
+        with patch("space.spaceflight_tracker._get", return_value=None):
             assert get_upcoming_space_events() is None
 
     def test_normalises_events(self):
@@ -834,7 +834,7 @@ class TestGetUpcomingSpaceEvents:
                 }
             ],
         }
-        with patch("spaceflight_tracker._get", return_value=raw):
+        with patch("space.spaceflight_tracker._get", return_value=raw):
             result = get_upcoming_space_events(limit=5)
         assert result["count"] == 1
         assert result["results"][0]["name"] == "ISS Docking"
@@ -852,7 +852,7 @@ class TestGetLaunchVidurls:
         spaceflight_tracker._vidurls_cache.clear()
 
     def test_returns_empty_list_when_api_fails(self):
-        with patch("spaceflight_tracker._get", return_value=None):
+        with patch("space.spaceflight_tracker._get", return_value=None):
             result = get_launch_vidurls("launch-abc")
         assert result == []
 
@@ -865,7 +865,7 @@ class TestGetLaunchVidurls:
                  "source": "youtube", "publisher": "SpX", "type": {"name": "Live"}, "priority": 5},
             ]
         }
-        with patch("spaceflight_tracker._get", return_value=raw):
+        with patch("space.spaceflight_tracker._get", return_value=raw):
             result = get_launch_vidurls("launch-123")
         assert result[0]["url"] == "https://www.youtube.com/watch?v=abc"
 
@@ -874,7 +874,7 @@ class TestGetLaunchVidurls:
             "data": [{"url": "https://example.com", "title": "Test"}],
             "ts": time.time(),
         }
-        with patch("spaceflight_tracker._get") as mock_get:
+        with patch("space.spaceflight_tracker._get") as mock_get:
             result = get_launch_vidurls("cached-id")
         mock_get.assert_not_called()
         assert result[0]["url"] == "https://example.com"
@@ -886,7 +886,7 @@ class TestGetLaunchVidurls:
         }
         raw = {"vidURLs": [{"url": "https://new.com", "title": "New", "source": "x",
                              "publisher": "y", "type": {"name": "Live"}, "priority": 1}]}
-        with patch("spaceflight_tracker._get", return_value=raw):
+        with patch("space.spaceflight_tracker._get", return_value=raw):
             result = get_launch_vidurls("old-id")
         assert result[0]["url"] == "https://new.com"
 
@@ -898,20 +898,20 @@ class TestGetLaunchVidurls:
                  "publisher": "y", "type": {"name": "Live"}, "priority": 0},
             ]
         }
-        with patch("spaceflight_tracker._get", return_value=raw):
+        with patch("space.spaceflight_tracker._get", return_value=raw):
             result = get_launch_vidurls("filter-id")
         assert len(result) == 1
         assert result[0]["url"] == "https://example.com/v"
 
     def test_empty_vidurls(self):
         raw = {"vidURLs": []}
-        with patch("spaceflight_tracker._get", return_value=raw):
+        with patch("space.spaceflight_tracker._get", return_value=raw):
             result = get_launch_vidurls("empty-id")
         assert result == []
 
     def test_no_vidurls_key(self):
         raw = {}
-        with patch("spaceflight_tracker._get", return_value=raw):
+        with patch("space.spaceflight_tracker._get", return_value=raw):
             result = get_launch_vidurls("nokey-id")
         assert result == []
 
@@ -924,7 +924,7 @@ class TestGetLaunchVidurls:
                  "source": "youtube", "publisher": "y", "type": None, "priority": 1},
             ]
         }
-        with patch("spaceflight_tracker._get", return_value=raw):
+        with patch("space.spaceflight_tracker._get", return_value=raw):
             result = get_launch_vidurls("bare-yt-id")
         assert result[0]["url"].startswith("https://youtube.com/")
 
@@ -941,7 +941,7 @@ class TestPruneImageCacheOsError:
         img_dir.mkdir()
         (img_dir / "orphan.jpg").write_bytes(b"x")
 
-        with patch("spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(img_dir)):
+        with patch("space.spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(img_dir)):
             with patch("os.remove", side_effect=OSError("locked")):
                 # Should not raise
                 prune_image_cache([])
@@ -952,7 +952,7 @@ class TestPruneImageCacheOsError:
         img_dir.mkdir()
         (img_dir / "active.jpg").write_bytes(b"x")
 
-        with patch("spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(img_dir)):
+        with patch("space.spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(img_dir)):
             prune_image_cache([
                 None,
                 42,
@@ -991,7 +991,7 @@ class TestLoadBackoffState:
 
     def test_returns_empty_when_file_missing(self, tmp_path):
         missing = str(tmp_path / "no_backoff.json")
-        with patch("spaceflight_tracker._SPACEFLIGHT_BACKOFF_FILE", missing):
+        with patch("space.spaceflight_tracker._SPACEFLIGHT_BACKOFF_FILE", missing):
             result = spaceflight_tracker._load_backoff_state()
         assert result == {}
 
@@ -1060,7 +1060,7 @@ class TestSaveBackoffState:
             spaceflight_tracker._backoff_until.pop("/expired/", None)
 
     def test_handles_write_error_gracefully(self, monkeypatch):
-        with patch("spaceflight_tracker.os.makedirs", side_effect=OSError("disk full")):
+        with patch("space.spaceflight_tracker.os.makedirs", side_effect=OSError("disk full")):
             spaceflight_tracker._save_backoff_state()  # must not raise
 
 
@@ -1071,7 +1071,7 @@ class TestSpaceflightCacheImagesIntactTuple:
         img_dir.mkdir()
         (img_dir / "abc.jpg").write_bytes(b"data")
 
-        with patch("spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(img_dir)):
+        with patch("space.spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(img_dir)):
             # tuple of image paths
             data = ("/api/spaceflight/img/abc.jpg",)
             result = spaceflight_cache_images_intact(data)
@@ -1081,7 +1081,7 @@ class TestSpaceflightCacheImagesIntactTuple:
         img_dir = tmp_path / "images"
         img_dir.mkdir()
 
-        with patch("spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(img_dir)):
+        with patch("space.spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(img_dir)):
             data = ("/api/spaceflight/img/missing.jpg",)
             result = spaceflight_cache_images_intact(data)
         assert result is False

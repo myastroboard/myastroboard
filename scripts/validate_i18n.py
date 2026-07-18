@@ -3,7 +3,7 @@ Validate i18n consistency across backend, frontend, and webmanifests.
 
 Checks (all are hard failures):
   1. Every language in static/i18n/*.json is declared in _TRANSLATION_FILENAMES
-     in backend/i18n_utils.py.
+     in backend/utils/i18n_utils.py.
   2. Every non-English language has a static/manifest.<lang>.webmanifest file
      AND the language code appears in the 'supported' array of templates/index.html.
   3. Every language has an <option value="<lang>"> entry in the language selector
@@ -29,7 +29,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 I18N_DIR = ROOT / "static" / "i18n"
-BACKEND_FILE = ROOT / "backend" / "i18n_utils.py"
+BACKEND_FILE = ROOT / "backend" / "utils" / "i18n_utils.py"
 INDEX_HTML = ROOT / "templates" / "index.html"
 STATIC_DIR = ROOT / "static"
 REFERENCE_LANG = "en"
@@ -205,7 +205,7 @@ def main() -> int:
         print("ERROR: No i18n JSON files found in static/i18n/.")
         return 1
 
-    # --- Parse backend/i18n_utils.py ---
+    # --- Parse backend/utils/i18n_utils.py ---
     if not BACKEND_FILE.exists():
         errors.append(f"Backend file not found: {BACKEND_FILE}")
         backend_langs: set[str] = set()

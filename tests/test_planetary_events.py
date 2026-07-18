@@ -4,7 +4,7 @@ Covers pure-logic rating, constants, and vectorized find_runs helper.
 """
 
 import numpy as np
-from planetary_events import PlanetaryEventsService, PLANETS
+from observation.planetary_events import PlanetaryEventsService, PLANETS
 
 
 class TestPlanetaryEventsConstants:
@@ -222,7 +222,7 @@ class TestFindMoonConjunctionsExceptionHandlers:
         from unittest.mock import patch
         svc = PlanetaryEventsService(45.0, -73.5)
         now = Time(datetime(2026, 1, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
-        with patch("planetary_events.get_body", side_effect=Exception("moon fetch fail")):
+        with patch("observation.planetary_events.get_body", side_effect=Exception("moon fetch fail")):
             events = svc._find_moon_conjunctions(now, 10)
         assert events == []
 
@@ -240,7 +240,7 @@ class TestFindMoonConjunctionsExceptionHandlers:
                 return real_get_body(name, *args, **kwargs)
             raise Exception("planet fetch fail")
 
-        with patch("planetary_events.get_body", side_effect=get_body_side):
+        with patch("observation.planetary_events.get_body", side_effect=get_body_side):
             events = svc._find_moon_conjunctions(now, 10)
         assert events == []
 
@@ -260,7 +260,7 @@ class TestPlanetaryHelperMethods:
 
     def test_angular_separation_returns_inf_on_exception(self):
         from unittest.mock import patch
-        with patch("planetary_events.get_body", side_effect=Exception("fail")):
+        with patch("observation.planetary_events.get_body", side_effect=Exception("fail")):
             result = self.svc._angular_separation("Jupiter", "Saturn", self.t)
         assert result == float('inf')
 
@@ -271,7 +271,7 @@ class TestPlanetaryHelperMethods:
 
     def test_get_elongation_returns_zero_on_exception(self):
         from unittest.mock import patch
-        with patch("planetary_events.get_body", side_effect=Exception("fail")):
+        with patch("observation.planetary_events.get_body", side_effect=Exception("fail")):
             result = self.svc._get_elongation("Jupiter", self.t)
         assert result == 0.0
 
@@ -282,13 +282,13 @@ class TestPlanetaryHelperMethods:
 
     def test_is_event_visible_returns_false_on_exception(self):
         from unittest.mock import patch
-        with patch("planetary_events.get_body", side_effect=Exception("fail")):
+        with patch("observation.planetary_events.get_body", side_effect=Exception("fail")):
             result = self.svc._is_event_visible("Jupiter", "Saturn", self.t)
         assert result is False
 
     def test_is_event_visible_returns_false_when_planet_is_none(self):
         from unittest.mock import patch
-        with patch("planetary_events.get_body", return_value=None):
+        with patch("observation.planetary_events.get_body", return_value=None):
             result = self.svc._is_event_visible("Jupiter", "Saturn", self.t)
         assert result is False
 
@@ -299,13 +299,13 @@ class TestPlanetaryHelperMethods:
 
     def test_is_planet_visible_returns_false_on_exception(self):
         from unittest.mock import patch
-        with patch("planetary_events.get_body", side_effect=Exception("fail")):
+        with patch("observation.planetary_events.get_body", side_effect=Exception("fail")):
             result = self.svc._is_planet_visible("Jupiter", self.t)
         assert result is False
 
     def test_is_planet_visible_returns_false_when_none(self):
         from unittest.mock import patch
-        with patch("planetary_events.get_body", return_value=None):
+        with patch("observation.planetary_events.get_body", return_value=None):
             result = self.svc._is_planet_visible("Jupiter", self.t)
         assert result is False
 
@@ -409,7 +409,7 @@ class TestPlanetaryHelperArrayBranches:
         fake_sep.degree = np.array([5.0])
         fake_body = MagicMock()
         fake_body.separation.return_value = fake_sep
-        with patch("planetary_events.get_body", return_value=fake_body):
+        with patch("observation.planetary_events.get_body", return_value=fake_body):
             result = self.svc._angular_separation("Jupiter", "Saturn", self.t)
         assert isinstance(result, float)
 
@@ -420,7 +420,7 @@ class TestPlanetaryHelperArrayBranches:
         fake_sep.degree = complex(5.0, 0.0)
         fake_body = MagicMock()
         fake_body.separation.return_value = fake_sep
-        with patch("planetary_events.get_body", return_value=fake_body):
+        with patch("observation.planetary_events.get_body", return_value=fake_body):
             result = self.svc._angular_separation("Jupiter", "Saturn", self.t)
         assert isinstance(result, float)
 
@@ -431,7 +431,7 @@ class TestPlanetaryHelperArrayBranches:
         fake_elong.degree = np.array([45.0])
         fake_body = MagicMock()
         fake_body.separation.return_value = fake_elong
-        with patch("planetary_events.get_body", return_value=fake_body):
+        with patch("observation.planetary_events.get_body", return_value=fake_body):
             result = self.svc._get_elongation("Jupiter", self.t)
         assert isinstance(result, float)
 
@@ -442,7 +442,7 @@ class TestPlanetaryHelperArrayBranches:
         fake_elong.degree = complex(45.0, 0.0)
         fake_body = MagicMock()
         fake_body.separation.return_value = fake_elong
-        with patch("planetary_events.get_body", return_value=fake_body):
+        with patch("observation.planetary_events.get_body", return_value=fake_body):
             result = self.svc._get_elongation("Jupiter", self.t)
         assert isinstance(result, float)
 
@@ -451,7 +451,7 @@ class TestPlanetaryHelperArrayBranches:
         from unittest.mock import patch, MagicMock
         fake_body = MagicMock()
         fake_body.transform_to.return_value = None
-        with patch("planetary_events.get_body", return_value=fake_body):
+        with patch("observation.planetary_events.get_body", return_value=fake_body):
             result = self.svc._is_event_visible("Jupiter", "Saturn", self.t)
         assert result is False
 
@@ -462,7 +462,7 @@ class TestPlanetaryHelperArrayBranches:
         fake_altaz.alt.degree = np.array([30.0])
         fake_body = MagicMock()
         fake_body.transform_to.return_value = fake_altaz
-        with patch("planetary_events.get_body", return_value=fake_body):
+        with patch("observation.planetary_events.get_body", return_value=fake_body):
             result = self.svc._is_event_visible("Jupiter", "Saturn", self.t)
         assert isinstance(result, bool)
 
@@ -473,7 +473,7 @@ class TestPlanetaryHelperArrayBranches:
         fake_altaz.alt.degree = complex(30.0, 0.0)
         fake_body = MagicMock()
         fake_body.transform_to.return_value = fake_altaz
-        with patch("planetary_events.get_body", return_value=fake_body):
+        with patch("observation.planetary_events.get_body", return_value=fake_body):
             result = self.svc._is_event_visible("Jupiter", "Saturn", self.t)
         assert isinstance(result, bool)
 
@@ -490,7 +490,7 @@ class TestPlanetaryHelperArrayBranches:
             return fake_altaz1 if calls[0] == 1 else fake_altaz2
         fake_body = MagicMock()
         fake_body.transform_to.side_effect = transform_side_effect
-        with patch("planetary_events.get_body", return_value=fake_body):
+        with patch("observation.planetary_events.get_body", return_value=fake_body):
             result = self.svc._is_event_visible("Jupiter", "Saturn", self.t)
         assert isinstance(result, bool)
 
@@ -507,7 +507,7 @@ class TestPlanetaryHelperArrayBranches:
             return fake_altaz1 if calls[0] == 1 else fake_altaz2
         fake_body = MagicMock()
         fake_body.transform_to.side_effect = transform_side_effect
-        with patch("planetary_events.get_body", return_value=fake_body):
+        with patch("observation.planetary_events.get_body", return_value=fake_body):
             result = self.svc._is_event_visible("Jupiter", "Saturn", self.t)
         assert isinstance(result, bool)
 
@@ -516,7 +516,7 @@ class TestPlanetaryHelperArrayBranches:
         from unittest.mock import patch, MagicMock
         fake_body = MagicMock()
         fake_body.transform_to.return_value = None
-        with patch("planetary_events.get_body", return_value=fake_body):
+        with patch("observation.planetary_events.get_body", return_value=fake_body):
             result = self.svc._is_planet_visible("Jupiter", self.t)
         assert result is False
 
@@ -531,7 +531,7 @@ class TestPlanetaryHelperArrayBranches:
             if name == 'sun':
                 return None
             return fake_planet
-        with patch("planetary_events.get_body", side_effect=get_body_side):
+        with patch("observation.planetary_events.get_body", side_effect=get_body_side):
             result = self.svc._is_planet_visible("Jupiter", self.t)
         assert result is False
 
@@ -548,7 +548,7 @@ class TestPlanetaryHelperArrayBranches:
         fake_sun = MagicMock()
         def get_body_side(name, *args, **kwargs):
             return fake_sun if name == 'sun' else fake_planet
-        with patch("planetary_events.get_body", side_effect=get_body_side):
+        with patch("observation.planetary_events.get_body", side_effect=get_body_side):
             result = self.svc._is_planet_visible("Jupiter", self.t)
         assert isinstance(result, bool)
 
@@ -565,7 +565,7 @@ class TestPlanetaryHelperArrayBranches:
         fake_sun = MagicMock()
         def get_body_side(name, *args, **kwargs):
             return fake_sun if name == 'sun' else fake_planet
-        with patch("planetary_events.get_body", side_effect=get_body_side):
+        with patch("observation.planetary_events.get_body", side_effect=get_body_side):
             result = self.svc._is_planet_visible("Jupiter", self.t)
         assert isinstance(result, bool)
 
@@ -582,7 +582,7 @@ class TestPlanetaryHelperArrayBranches:
         fake_sun = MagicMock()
         def get_body_side(name, *args, **kwargs):
             return fake_sun if name == 'sun' else fake_planet
-        with patch("planetary_events.get_body", side_effect=get_body_side):
+        with patch("observation.planetary_events.get_body", side_effect=get_body_side):
             result = self.svc._is_planet_visible("Jupiter", self.t)
         assert isinstance(result, bool)
 
@@ -599,6 +599,6 @@ class TestPlanetaryHelperArrayBranches:
         fake_sun = MagicMock()
         def get_body_side(name, *args, **kwargs):
             return fake_sun if name == 'sun' else fake_planet
-        with patch("planetary_events.get_body", side_effect=get_body_side):
+        with patch("observation.planetary_events.get_body", side_effect=get_body_side):
             result = self.svc._is_planet_visible("Jupiter", self.t)
         assert isinstance(result, bool)

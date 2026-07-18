@@ -6,7 +6,7 @@ Covers pure-logic scoring and helper methods.
 import pytest
 import datetime
 from unittest.mock import patch, MagicMock
-from sun_eclipse import SolarEclipseService, SolarEclipseInfo, EclipsePoint
+from astroweather.sun_eclipse import SolarEclipseService, SolarEclipseInfo, EclipsePoint
 
 
 class TestSolarEclipseInit:
@@ -166,7 +166,7 @@ class TestSunGeometry:
     def setup_method(self):
         self.svc = SolarEclipseService(45.0, -73.5, "UTC")
 
-    @patch("sun_eclipse.get_sun")
+    @patch("astroweather.sun_eclipse.get_sun")
     def test_get_sun_azimuth_returns_transformed_value(self, mock_get_sun):
         transformed = MagicMock()
         transformed.az = MagicMock()
@@ -179,7 +179,7 @@ class TestSunGeometry:
         az = self.svc._get_sun_azimuth(datetime.datetime(2026, 8, 12, 14, 32, tzinfo=datetime.timezone.utc))
         assert az == pytest.approx(210.2)
 
-    @patch("sun_eclipse.get_sun")
+    @patch("astroweather.sun_eclipse.get_sun")
     def test_get_sun_azimuth_defaults_to_zero_when_missing(self, mock_get_sun):
         transformed = MagicMock(spec=[])
         sun = MagicMock()
@@ -189,7 +189,7 @@ class TestSunGeometry:
         az = self.svc._get_sun_azimuth(datetime.datetime(2026, 8, 12, 14, 32, tzinfo=datetime.timezone.utc))
         assert az == 0.0
 
-    @patch("sun_eclipse.get_sun")
+    @patch("astroweather.sun_eclipse.get_sun")
     def test_generate_altitude_vs_time_includes_end_point(self, mock_get_sun):
         transformed = MagicMock()
         transformed.alt = MagicMock()
@@ -210,7 +210,7 @@ class TestSunGeometry:
         assert points[0].altitude_deg == 30.0
         assert points[0].azimuth_deg == 110.1
 
-    @patch("sun_eclipse.get_sun")
+    @patch("astroweather.sun_eclipse.get_sun")
     def test_generate_altitude_vs_time_defaults_missing_coords_to_zero(self, mock_get_sun):
         transformed = MagicMock(spec=[])
         sun = MagicMock()
@@ -258,13 +258,13 @@ class TestGetNextEclipse:
     def setup_method(self):
         self.svc = SolarEclipseService(45.0, -73.5, "UTC")
 
-    @patch("sun_eclipse.SearchLocalSolarEclipse", return_value=None)
+    @patch("astroweather.sun_eclipse.SearchLocalSolarEclipse", return_value=None)
     def test_returns_none_when_no_eclipse_found(self, _mock_search):
         assert self.svc.get_next_eclipse() is None
 
     @patch.object(SolarEclipseService, "_generate_altitude_vs_time")
     @patch.object(SolarEclipseService, "_get_sun_azimuth")
-    @patch("sun_eclipse.SearchLocalSolarEclipse")
+    @patch("astroweather.sun_eclipse.SearchLocalSolarEclipse")
     def test_get_next_eclipse_total_path(self, mock_search, mock_az, mock_alttime):
         peak_naive_utc = datetime.datetime(2026, 8, 12, 14, 32, 15)
         start_naive_utc = datetime.datetime(2026, 8, 12, 13, 5, 0)
@@ -299,7 +299,7 @@ class TestGetNextEclipse:
 
     @patch.object(SolarEclipseService, "_generate_altitude_vs_time")
     @patch.object(SolarEclipseService, "_get_sun_azimuth")
-    @patch("sun_eclipse.SearchLocalSolarEclipse")
+    @patch("astroweather.sun_eclipse.SearchLocalSolarEclipse")
     def test_get_next_eclipse_non_visible_clamps_negative_altitude(
         self,
         mock_search,

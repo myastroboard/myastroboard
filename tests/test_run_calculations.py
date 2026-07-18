@@ -3,7 +3,7 @@
 import os
 from datetime import datetime, timezone
 
-import skytonight_calculator as calc
+from skytonight import skytonight_calculator as calc
 
 load_calculation_results = calc.load_calculation_results
 run_calculations = calc.run_calculations
@@ -167,7 +167,7 @@ def test_run_calculations_empty_dataset_writes_final_files(monkeypatch):
 
 
 def test_run_calculations_comet_without_coordinates_is_skipped(monkeypatch):
-    from skytonight_models import SkyTonightTarget
+    from skytonight.skytonight_models import SkyTonightTarget
 
     comet_no_coords = SkyTonightTarget(
         target_id='comet-nocoords',

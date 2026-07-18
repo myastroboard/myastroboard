@@ -1,6 +1,6 @@
 ﻿# API Endpoints
 
-This page lists the HTTP routes currently declared in `backend/app.py` and `backend/skytonight_api.py`.
+This page lists the HTTP routes currently declared across `backend/blueprints/*.py` (registered in `backend/app.py`), including `backend/blueprints/skytonight_api.py`.
 
 ## Web & PWA Routes
 

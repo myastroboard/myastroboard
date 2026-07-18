@@ -14,11 +14,11 @@ if 'psutil' not in sys.modules:
     sys.modules['psutil'] = types.ModuleType('psutil')
 
 import app as app_module  # type: ignore[import-not-found]
-import skytonight_api as skytonight_api_module  # type: ignore[import-not-found]
-from auth import user_manager  # type: ignore[import-not-found]
+from blueprints import skytonight_api as skytonight_api_module  # type: ignore[import-not-found]
+from utils.auth import user_manager  # type: ignore[import-not-found]
 
 app = app_module.app
-from skytonight_models import SkyTonightTarget  # type: ignore[import-not-found]
+from skytonight.skytonight_models import SkyTonightTarget  # type: ignore[import-not-found]
 
 
 @pytest.fixture
@@ -1577,7 +1577,7 @@ class TestCataloguesRouteEdgeCases:
 
     def test_empty_catalogue_name_not_added(self, client_admin, monkeypatch):
         """Line 925->923: catalogue_name empty string → not added to set."""
-        from skytonight_models import SkyTonightTarget
+        from skytonight.skytonight_models import SkyTonightTarget
         target_with_empty_catalogue = SkyTonightTarget(
             target_id='dso-test', category='deep_sky', object_type='Galaxy',
             preferred_name='Test Galaxy', catalogue_names={'': 'Test Galaxy'},

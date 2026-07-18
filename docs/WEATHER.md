@@ -19,9 +19,9 @@ The Weather tab provides atmospheric conditions specifically analysed for astron
 
 **Source**: [Open-Meteo](https://open-meteo.com/) — free, no API key required.
 
-**Cache TTL**: 1 hour (`WEATHER_CACHE_TTL` in `constants.py`).
+**Cache TTL**: 1 hour (`WEATHER_CACHE_TTL` in `utils/constants.py`).
 
-**Module**: `backend/weather_openmeteo.py`
+**Module**: `backend/weather/weather_openmeteo.py`
 
 ### Variables fetched
 
@@ -52,7 +52,7 @@ Total cloud cover is shown as the primary go/no-go indicator.
 
 ### Rate-limiting behaviour
 
-Open-Meteo free tier allows a limited number of concurrent requests. `weather_openmeteo.py` implements two protections:
+Open-Meteo free tier allows a limited number of concurrent requests. `weather/weather_openmeteo.py` implements two protections:
 
 | Guard | Behaviour |
 |-------|-----------|
@@ -65,7 +65,7 @@ When rate-limited, the API returns the **last successful response** (stale-while
 
 ## Astro weather analysis
 
-**Module**: `backend/weather_astro.py`
+**Module**: `backend/weather/weather_astro.py`
 
 **Class**: `AstroWeatherAnalyzer`
 
@@ -124,7 +124,7 @@ This "best period" badge is displayed in the Trend sub-tab.
 
 **Cache TTL**: 6 hours (`CACHE_TTL_SEEING_FORECAST`).
 
-**Module**: `backend/seeing_forecast_7timer.py`
+**Module**: `backend/astroweather/seeing_forecast_7timer.py`
 
 **Class**: `SeeingForecastService`
 
@@ -161,7 +161,7 @@ The service computes a **tonight summary** by extracting the forecast slots that
 
 ## Weather alerts
 
-**Module**: `backend/weather_astro.py` (alert generation)
+**Module**: `backend/weather/weather_astro.py` (alert generation)
 
 Alerts are generated from the Open-Meteo data and include:
 

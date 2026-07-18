@@ -5,12 +5,15 @@
 import time as _time
 
 import app as _app_mod
-import cache_store as _cache_store
+from cache import cache_store as _cache_store
+from utils import route_helpers as _route_helpers_mod
+from blueprints import locations as _locations_mod
+from blueprints import plan_my_night as _plan_my_night_mod
 
 
 def _install_default_location_id():
     """The admin client's active location = the install default preset."""
-    from repo_config import load_config, get_install_default_location
+    from utils.repo_config import load_config, get_install_default_location
 
     return get_install_default_location(load_config()).get('id')
 
@@ -83,7 +86,7 @@ class TestSyncTruePostSyncFalseBranches:
         """iss_passes slot empty → 202 pending."""
         self._setup(monkeypatch)
         _set_location_slot('iss_passes', None)
-        import iss_passes as _iss
+        from space import iss_passes as _iss
         monkeypatch.setattr(_iss, 'get_celestrak_status', lambda: 'ok')
         monkeypatch.setattr(_iss, 'get_iss_tle_source_info', lambda: {})
         resp = client_admin.get('/api/iss/passes')
@@ -147,7 +150,7 @@ class TestSyncTruePostSyncFalseBranches:
         """sidereal_time slot empty → live computation fallback."""
         self._setup(monkeypatch)
         _set_location_slot('sidereal_time', None)
-        import sidereal_time as _st
+        from observation import sidereal_time as _st
         monkeypatch.setattr(
             _st.SiderealTimeService,
             'get_current_sidereal_info',
@@ -252,7 +255,7 @@ class TestBackupRestoreAstrodexSubpath:
         """Covers lines 1361-1363 – app_settings reload after restore."""
         import json as _json
         settings_content = _json.dumps({'session_cookie_secure': False}).encode()
-        import app_settings as _as
+        from utils import app_settings as _as
         monkeypatch.setattr(_as, 'reload_app_settings', lambda: None)
         monkeypatch.setattr(_as, 'get_app_settings', lambda: {'session_cookie_secure': False})
         buf = self._make_zip([('app_settings.json', settings_content)])
@@ -266,8 +269,8 @@ class TestSimbadFalseBranch:
 
     def test_simbad_unsafe_identifier_returns_not_found(self, client_admin, monkeypatch):
         """Covers 3916->3936 – is_safe_identifier False → immediate not_found."""
-        import skytonight_targets as _skt
-        import object_info as _oi
+        from skytonight import skytonight_targets as _skt
+        from observation import object_info as _oi
 
         monkeypatch.setattr(_skt, 'get_lookup_entry', lambda *a, **kw: None)
         monkeypatch.setattr(_oi, 'is_safe_identifier', lambda name: False)
@@ -281,7 +284,7 @@ class TestAstrodexSwitchException:
     """Covers 3595-3597 – unexpected exception in switch_catalogue_name."""
 
     def test_switch_catalogue_name_exception_returns_500(self, client_admin, monkeypatch):
-        import astrodex as _adx
+        from observation import astrodex as _adx
 
         def raise_unexpected(*_, **__):
             raise IOError('unexpected')
@@ -309,7 +312,7 @@ class TestConfigProxyAndAstrodex:
 
     def test_config_astrodex_not_in_existing_config(self, client_admin, monkeypatch):
         """Covers 904->908 – 'astrodex' not in existing config → add defaults."""
-        import repo_config as _rc
+        from utils import repo_config as _rc
 
         original_load = _rc.load_config
 
@@ -319,7 +322,7 @@ class TestConfigProxyAndAstrodex:
             return cfg
 
         monkeypatch.setattr(_rc, 'load_config', load_without_astrodex)
-        monkeypatch.setattr(_app_mod, 'load_config', load_without_astrodex)
+        monkeypatch.setattr(_locations_mod, 'load_config', load_without_astrodex)
         resp = client_admin.post('/api/config', json=self._base_config())
         assert resp.status_code == 200
 
@@ -350,16 +353,16 @@ class TestPlanResolveNightFallback:
 
     def test_resolve_night_both_except_returns_none(self, client_admin, monkeypatch):
         """Covers 2990-2992, 3001, 3011, 3020-3022 – both sun and calc fail → None."""
-        from sun_phases import SunService as _SS
+        from astroweather.sun_phases import SunService as _SS
 
         def sun_raise(self):
             raise RuntimeError('sun fail')
 
         monkeypatch.setattr(_SS, 'get_today_report', sun_raise)
-        monkeypatch.setattr(_app_mod, 'load_calculation_results',
+        monkeypatch.setattr(_plan_my_night_mod, 'load_calculation_results',
                             lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('calc fail')))
 
-        import plan_my_night as _pmn
+        from observation import plan_my_night as _pmn
 
         monkeypatch.setattr(
             _pmn, 'create_or_add_target',
@@ -375,16 +378,16 @@ class TestPlanResolveNightFallback:
 
     def test_resolve_night_missing_metadata_returns_none(self, client_admin, monkeypatch):
         """Covers 3011 – calc results missing night_start/end → None."""
-        from sun_phases import SunService as _SS
+        from astroweather.sun_phases import SunService as _SS
 
         def sun_raise(self):
             raise RuntimeError('sun fail')
 
         monkeypatch.setattr(_SS, 'get_today_report', sun_raise)
-        monkeypatch.setattr(_app_mod, 'load_calculation_results',
+        monkeypatch.setattr(_plan_my_night_mod, 'load_calculation_results',
                             lambda *_a, **_k: {'metadata': {'night_start': None, 'night_end': None}})
 
-        import plan_my_night as _pmn
+        from observation import plan_my_night as _pmn
 
         monkeypatch.setattr(
             _pmn, 'create_or_add_target',
@@ -403,7 +406,7 @@ class TestEquipmentPaths:
 
     def test_get_telescope_by_id_found(self, client_admin, monkeypatch):
         """Covers line 4008 – telescope found by ID."""
-        import equipment_profiles as _ep
+        from equipment import equipment_profiles as _ep
 
         fake = {'id': 'scope-1', 'name': 'Test Scope', 'focal_length': 800}
         monkeypatch.setattr(_ep, 'get_telescope', lambda uid, tid: fake)
@@ -413,7 +416,7 @@ class TestEquipmentPaths:
 
     def test_update_telescope_shared_by_other_returns_403(self, client_admin, monkeypatch):
         """Covers line 4029 – 403 when updating another user's shared telescope."""
-        import equipment_profiles as _ep
+        from equipment import equipment_profiles as _ep
 
         monkeypatch.setattr(_ep, 'load_all_shared_equipment',
                             lambda kind, uid: [{'id': 'scope-1', 'name': 'Shared'}])
@@ -422,7 +425,7 @@ class TestEquipmentPaths:
 
     def test_get_camera_by_id_found(self, client_admin, monkeypatch):
         """Covers line 4123 – camera found by ID."""
-        import equipment_profiles as _ep
+        from equipment import equipment_profiles as _ep
 
         fake = {'id': 'cam-1', 'name': 'ASI294'}
         monkeypatch.setattr(_ep, 'get_camera', lambda uid, cid: fake)
@@ -432,7 +435,7 @@ class TestEquipmentPaths:
 
     def test_update_camera_shared_by_other_returns_403(self, client_admin, monkeypatch):
         """Covers line 4144 – 403 when updating another user's shared camera."""
-        import equipment_profiles as _ep
+        from equipment import equipment_profiles as _ep
 
         monkeypatch.setattr(_ep, 'load_all_shared_equipment',
                             lambda kind, uid: [{'id': 'cam-1', 'name': 'Shared'}])
@@ -441,7 +444,7 @@ class TestEquipmentPaths:
 
     def test_get_mount_by_id_found(self, client_admin, monkeypatch):
         """Covers line 4238 – mount found by ID."""
-        import equipment_profiles as _ep
+        from equipment import equipment_profiles as _ep
 
         fake = {'id': 'mnt-1', 'name': 'EQ6-R'}
         monkeypatch.setattr(_ep, 'get_mount', lambda uid, mid: fake)
@@ -451,7 +454,7 @@ class TestEquipmentPaths:
 
     def test_update_mount_shared_by_other_returns_403(self, client_admin, monkeypatch):
         """Covers line 4259 – 403 when updating another user's shared mount."""
-        import equipment_profiles as _ep
+        from equipment import equipment_profiles as _ep
 
         monkeypatch.setattr(_ep, 'load_all_shared_equipment',
                             lambda kind, uid: [{'id': 'mnt-1', 'name': 'Shared'}])
@@ -460,7 +463,7 @@ class TestEquipmentPaths:
 
     def test_get_filter_by_id_found(self, client_admin, monkeypatch):
         """Covers line 4353 – filter found by ID."""
-        import equipment_profiles as _ep
+        from equipment import equipment_profiles as _ep
 
         fake = {'id': 'filter-1', 'name': 'OIII'}
         monkeypatch.setattr(_ep, 'get_filter', lambda uid, fid: fake)
@@ -470,7 +473,7 @@ class TestEquipmentPaths:
 
     def test_update_filter_shared_by_other_returns_403(self, client_admin, monkeypatch):
         """Covers line 4374 – 403 when updating another user's shared filter."""
-        import equipment_profiles as _ep
+        from equipment import equipment_profiles as _ep
 
         monkeypatch.setattr(_ep, 'load_all_shared_equipment',
                             lambda kind, uid: [{'id': 'filter-1', 'name': 'Shared'}])
@@ -479,7 +482,7 @@ class TestEquipmentPaths:
 
     def test_get_accessory_by_id_found(self, client_admin, monkeypatch):
         """Covers line 4449 – accessory found by ID."""
-        import equipment_profiles as _ep
+        from equipment import equipment_profiles as _ep
 
         fake = {'id': 'acc-1', 'name': 'Barlow 2x'}
         monkeypatch.setattr(_ep, 'get_accessory', lambda uid, aid: fake)
@@ -489,7 +492,7 @@ class TestEquipmentPaths:
 
     def test_update_accessory_shared_by_other_returns_403(self, client_admin, monkeypatch):
         """Covers line 4489 – 403 when updating another user's shared accessory."""
-        import equipment_profiles as _ep
+        from equipment import equipment_profiles as _ep
 
         monkeypatch.setattr(_ep, 'load_all_shared_equipment',
                             lambda kind, uid: [{'id': 'acc-1', 'name': 'Shared'}])
@@ -502,7 +505,7 @@ class TestMiscRemainingPaths:
 
     def test_plan_observation_window_exception(self, client_admin, monkeypatch):
         """Covers 3418-3420 – exception in plan observation window."""
-        import plan_my_night as _pmn
+        from observation import plan_my_night as _pmn
 
         def raise_err(*a, **kw):
             raise RuntimeError('calc error')
@@ -513,7 +516,7 @@ class TestMiscRemainingPaths:
 
     def test_plan_export_csv_exception(self, client_admin, monkeypatch):
         """Covers 3495-3497 – exception in plan CSV export."""
-        import plan_my_night as _pmn
+        from observation import plan_my_night as _pmn
 
         def raise_err(*a, **kw):
             raise RuntimeError('io error')
@@ -540,7 +543,7 @@ class TestMiscRemainingPaths:
 
     def test_iss_location_no_config(self, client_admin, monkeypatch):
         """Covers lines around ISS location when no config."""
-        monkeypatch.setattr(_app_mod, 'load_config', lambda: None)
+        monkeypatch.setattr(_route_helpers_mod, 'load_config', lambda: None)
         resp = client_admin.get('/api/iss/location')
         assert resp.status_code in (200, 400, 500)
 
@@ -568,7 +571,7 @@ class TestMiscRemainingPaths:
 
     def test_push_notification_trigger_no_target(self, client_admin, monkeypatch):
         """Covers lines 627, 677-679 – push notification trigger."""
-        import push_manager as _pm
+        from utils import push_manager as _pm
 
         monkeypatch.setattr(_pm, 'send_push', lambda *a, **kw: True)
         resp = client_admin.post('/api/push/test/iss_pass')
@@ -576,7 +579,7 @@ class TestMiscRemainingPaths:
 
     def test_plan_clear_all_success(self, client_admin, monkeypatch):
         """Covers plan clear-all success path."""
-        import plan_my_night as _pmn
+        from observation import plan_my_night as _pmn
 
         monkeypatch.setattr(_pmn, 'clear_all_plans', lambda uid: 3)
         resp = client_admin.delete('/api/plan-my-night/clear-all')
@@ -585,7 +588,7 @@ class TestMiscRemainingPaths:
 
     def test_password_change_wrong_current_password(self, client_admin, monkeypatch):
         """Covers line 402 error branch – wrong current password."""
-        from auth import user_manager as _um
+        from utils.auth import user_manager as _um
 
         def raise_auth(*_):
             raise ValueError('Wrong current password')
@@ -604,7 +607,7 @@ class TestMiscRemainingPaths:
 
     def test_accessory_by_id_found(self, client_admin, monkeypatch):
         """Covers line 4449 – accessory found by ID."""
-        import equipment_profiles as _ep
+        from equipment import equipment_profiles as _ep
 
         fake = {'id': 'acc-1', 'name': 'Barlow 2x'}
         monkeypatch.setattr(_ep, 'get_accessory', lambda uid, aid: fake)
@@ -614,7 +617,7 @@ class TestMiscRemainingPaths:
 
     def test_combination_by_id_found(self, client_admin, monkeypatch):
         """Covers lines 4590-4591 – combination found by ID."""
-        import equipment_profiles as _ep
+        from equipment import equipment_profiles as _ep
 
         fake = {'id': 'combo-1', 'name': 'My Setup', 'telescope_id': 't1', 'camera_id': 'c1'}
         monkeypatch.setattr(_ep, 'get_combination', lambda uid, cid: fake)
@@ -635,7 +638,7 @@ class TestMiscRemainingPaths:
         entry = _set_location_slot('iss_passes', {'window_days': 99, 'passes': []})
         entry['timestamp'] = _time.time() + 60  # valid TTL, wrong window
         monkeypatch.setattr(_cache_store, 'load_shared_cache_entry', lambda *_: None)
-        import iss_passes as _iss
+        from space import iss_passes as _iss
         monkeypatch.setattr(_iss, 'get_celestrak_status', lambda: 'ok')
         monkeypatch.setattr(_iss, 'get_iss_tle_source_info', lambda: {})
         resp = client_admin.get('/api/iss/passes?days=7')
@@ -643,7 +646,7 @@ class TestMiscRemainingPaths:
 
     def test_push_test_no_subscriptions(self, client_admin, monkeypatch):
         """Covers line 627 – push test with no subscriptions returns 400."""
-        from auth import user_manager as _um
+        from utils.auth import user_manager as _um
 
         user = _um.get_user_by_username('admin')
         if user:
@@ -686,15 +689,15 @@ class TestMiscRemainingPaths:
 
     def test_resolve_night_calc_empty_metadata(self, client_admin, monkeypatch):
         """Covers 2979, 2982-2983, 2990-2992 – calc returns empty metadata."""
-        from sun_phases import SunService as _SS
+        from astroweather.sun_phases import SunService as _SS
 
         def sun_raise(self):
             raise RuntimeError('sun fail')
 
         monkeypatch.setattr(_SS, 'get_today_report', sun_raise)
-        monkeypatch.setattr(_app_mod, 'load_calculation_results', lambda *_a, **_k: {})
+        monkeypatch.setattr(_plan_my_night_mod, 'load_calculation_results', lambda *_a, **_k: {})
 
-        import plan_my_night as _pmn
+        from observation import plan_my_night as _pmn
 
         monkeypatch.setattr(
             _pmn, 'create_or_add_target',
@@ -708,7 +711,7 @@ class TestMiscRemainingPaths:
 
     def test_plan_export_pdf_exception(self, client_admin, monkeypatch):
         """Covers 3495-3497 – exception in plan PDF export."""
-        import plan_my_night as _pmn
+        from observation import plan_my_night as _pmn
 
         def raise_err(*a, **kw):
             raise RuntimeError('pdf error')
@@ -719,7 +722,7 @@ class TestMiscRemainingPaths:
 
     def test_astrodex_image_serve_found(self, client_admin, monkeypatch):
         """Covers line 3832 – image found and send_from_directory called."""
-        import astrodex as _adx
+        from observation import astrodex as _adx
         import flask as _flask
         import os as _os
 
@@ -737,7 +740,7 @@ class TestMiscRemainingPaths:
         monkeypatch.setattr(_cache_store, 'is_cache_valid_for_today', lambda *_: False)
         monkeypatch.setattr(_cache_store, 'load_shared_cache_entry', lambda *_: None)
         _set_location_slot('sidereal_time', None)
-        import sidereal_time as _st
+        from observation import sidereal_time as _st
         monkeypatch.setattr(
             _st.SiderealTimeService,
             'get_current_sidereal_info',

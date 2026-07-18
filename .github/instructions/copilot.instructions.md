@@ -30,50 +30,83 @@ MyAstroBoard is a web-based astronomy observation planning system with a fully b
 myastroboard/
 ├── backend/
 │   ├── __pycache__/                 # Python bytecode cache
-│   ├── app.py                       # Main Flask API entry point
-│   ├── astrodex.py                  # Astrodex business logic and storage
-│   ├── aurora_predictions.py        # Aurora forecast logic
-│   ├── auth.py                      # Authentication and user management
-│   ├── cache_scheduler.py           # Periodic cache scheduler
-│   ├── cache_store.py               # Shared cache persistence
-│   ├── cache_updater.py             # Cache refresh orchestration
-│   ├── catalogue_aliases.py         # Catalogue alias helpers (legacy, kept for astrodex cross-reference)
-│   ├── config_defaults.py           # Default config values
-│   ├── constants.py                 # Shared constants (paths, URLs, timeouts)
-│   ├── equipment_profiles.py        # Equipment profiles API helpers
-│   ├── events_aggregator.py         # Unified upcoming events data
-│   ├── horizon_graph.py             # Horizon graph generation
-│   ├── i18n_utils.py                # Translation backend helpers
-│   ├── iss_passes.py                # ISS passes, solar transit, and lunar transit integration
-│   ├── css_passes.py                # CSS (China Space Station, NORAD 48274) passes – full parallel mirror of iss_passes.py
-│   ├── logging_config.py            # Centralized logger setup
-│   ├── metrics_collector.py         # Metrics collection service
-│   ├── moon_astrotonight.py         # Best astrophotography window calculations
-│   ├── moon_eclipse.py              # Lunar eclipse calculations
-│   ├── moon_phases.py               # Moon phase calculations
-│   ├── moon_planner.py              # Moon planner over date ranges
-│   ├── plan_my_night.py             # Plan My Night storage and business logic
-│   ├── planetary_events.py          # Planetary events cache service
-│   ├── repo_config.py               # Config file load/save helpers
-│   ├── sidereal_time.py             # Sidereal time service
-│   ├── skytonight_bodies.py         # SkyTonight: solar-system body target records
-│   ├── skytonight_calculator.py     # SkyTonight: observability + AstroScore calculator
-│   ├── skytonight_catalogue_builder.py # SkyTonight: dataset builder (PyOngc + comets + bodies)
-│   ├── skytonight_comets.py         # SkyTonight: comet ingestion (MPC primary, JPL fallback)
-│   ├── skytonight_models.py         # SkyTonight: data models (SkyTonightTarget, SkyTonightCoordinates)
-│   ├── skytonight_scheduler.py      # SkyTonight: scheduler (smart time + 6h fallback)
-│   ├── skytonight_storage.py        # SkyTonight: filesystem helpers for runtime state
-│   ├── skytonight_targets.py        # SkyTonight: dataset access, name resolution, lookup table
-│   ├── solar_system_events.py       # Solar system events cache service
-│   ├── special_phenomena.py         # Special phenomena cache service
-│   ├── sun_eclipse.py               # Solar eclipse calculations
-│   ├── sun_phases.py                # Sun phase calculations
-│   ├── txtconf_loader.py            # txtconf loader
-│   ├── utils.py                     # Common backend utility functions (includes slugify_location_name)
-│   ├── version_checker.py           # GitHub release checks
-│   ├── weather_astro.py             # Astro weather analysis
-│   ├── weather_openmeteo.py         # Open-Meteo adapter
-│   └── weather_utils.py             # Weather utility helpers
+│   ├── app.py                       # Flask app factory: settings, extensions, blueprint registration, startup/scheduler init (no routes)
+│   ├── utils/                       # Cross-cutting support modules (config, i18n, logging, auth, generic helpers)
+│   │   ├── __init__.py                  # Common backend utility functions (includes slugify_location_name) - former utils.py
+│   │   ├── route_helpers.py             # Shared cross-domain route helpers (_resolve_active_location, _active_location_cache)
+│   │   ├── app_settings.py              # Persistent app settings (VAPID email, proxy headers)
+│   │   ├── auth.py                      # Authentication and user management
+│   │   ├── config_defaults.py           # Default config values
+│   │   ├── constants.py                 # Shared constants (paths, URLs, timeouts)
+│   │   ├── events_aggregator.py         # Unified upcoming events data
+│   │   ├── i18n_utils.py                # Translation backend helpers
+│   │   ├── logging_config.py            # Centralized logger setup
+│   │   ├── metrics_collector.py         # Metrics collection service
+│   │   ├── on_demand_translate.py       # On-demand DeepL/LibreTranslate integration
+│   │   ├── push_manager.py              # VAPID key management, Web Push send wrapper
+│   │   ├── push_scheduler.py            # Push notification scheduler (N1–N7 trigger evaluation)
+│   │   ├── repo_config.py               # Config file load/save helpers
+│   │   ├── txtconf_loader.py            # txtconf loader
+│   │   └── version_checker.py           # GitHub release checks
+│   ├── blueprints/                  # HTTP routes, one Flask Blueprint module per domain
+│   │   ├── auth.py                  # /api/auth/*, /api/users/*
+│   │   ├── push.py                  # /api/push/*
+│   │   ├── locations.py             # /api/config, /api/locations/*
+│   │   ├── connectors.py            # /api/connectors/* (AllSky)
+│   │   ├── admin.py                 # /api/admin/*, /api/metrics, /api/backup/*, /api/logs/*, /api/config/export
+│   │   ├── misc.py                  # /api/skyquality, /api/convert-coordinates, /api/timezones, /api/health, /api/cache, /api/version
+│   │   ├── weather.py               # /api/weather/*, /api/moon/*, /api/aurora/predictions, /api/seeing-forecast
+│   │   ├── tracking.py              # /api/object/*, /api/iss/*, /api/css/*, /api/spaceflight/*, /api/translate/on-demand
+│   │   ├── astronomy.py             # /api/sky-widget, /api/sun/*, /api/events/*, /api/astro/*, /api/tonight/best-window
+│   │   ├── plan_my_night.py         # /api/plan-my-night/*
+│   │   ├── astrodex.py              # /api/astrodex/*, /api/beginner-catalog
+│   │   ├── equipment.py             # /api/equipment/*
+│   │   └── skytonight_api.py        # /api/skytonight/*, /api/catalogues (still skytonight_-prefixed; see backend/skytonight/ below)
+│   ├── astroweather/                # Astronomical/atmospheric forecast services
+│   │   ├── aurora_predictions.py        # Aurora forecast logic
+│   │   ├── horizon_graph.py             # Horizon graph generation
+│   │   ├── moon_astrotonight.py         # Best astrophotography window calculations
+│   │   ├── moon_eclipse.py              # Lunar eclipse calculations
+│   │   ├── moon_phases.py               # Moon phase calculations
+│   │   ├── moon_planner.py              # Moon planner over date ranges
+│   │   ├── seeing_forecast_7timer.py    # 7Timer ASTRO seeing and transparency forecast
+│   │   ├── sun_eclipse.py               # Solar eclipse calculations
+│   │   └── sun_phases.py                # Sun phase calculations
+│   ├── weather/                     # Weather forecast clients and astrophotography weather analysis
+│   │   ├── sky_quality.py               # Light pollution (Bortle/SQM) integration with AstroScore
+│   │   ├── weather_astro.py             # Astro weather analysis
+│   │   ├── weather_openmeteo.py         # Open-Meteo adapter
+│   │   └── weather_utils.py             # Weather utility helpers
+│   ├── observation/                 # Observation logbook, planning, and events business logic
+│   │   ├── astrodex.py                  # Astrodex business logic and storage
+│   │   ├── beginner_catalog.py          # Curated starter DSO list (loading, i18n, enrichment)
+│   │   ├── catalogue_aliases.py         # Catalogue alias helpers (legacy, kept for astrodex cross-reference)
+│   │   ├── object_info.py               # Single-object coordinate and catalogue lookup
+│   │   ├── plan_my_night.py             # Plan My Night storage and business logic
+│   │   ├── planetary_events.py          # Planetary events cache service
+│   │   ├── sidereal_time.py             # Sidereal time service
+│   │   ├── solar_system_events.py       # Solar system events cache service
+│   │   └── special_phenomena.py         # Special phenomena cache service
+│   ├── cache/                       # Shared JSON cache store and background scheduler/updater
+│   │   ├── cache_scheduler.py           # Periodic cache scheduler
+│   │   ├── cache_store.py               # Shared cache persistence
+│   │   └── cache_updater.py             # Cache refresh orchestration
+│   ├── space/                       # Spaceflight tracking
+│   │   ├── css_passes.py                # CSS (China Space Station, NORAD 48274) passes – full parallel mirror of iss_passes.py
+│   │   ├── iss_passes.py                # ISS passes, solar transit, and lunar transit integration
+│   │   └── spaceflight_tracker.py       # Launch Library 2 client (launches, astronauts, events)
+│   ├── equipment/                   # Equipment profiles business logic
+│   │   └── equipment_profiles.py        # Equipment profiles API helpers
+│   ├── skytonight/                  # SkyTonight calculation pipeline (routes live in blueprints/skytonight_api.py)
+│   │   ├── skytonight_bodies.py         # SkyTonight: solar-system body target records
+│   │   ├── skytonight_calculator.py     # SkyTonight: observability + AstroScore calculator
+│   │   ├── skytonight_catalogue_builder.py # SkyTonight: dataset builder (PyOngc + comets + bodies)
+│   │   ├── skytonight_comets.py         # SkyTonight: comet ingestion (MPC primary, JPL fallback)
+│   │   ├── skytonight_models.py         # SkyTonight: data models (SkyTonightTarget, SkyTonightCoordinates)
+│   │   ├── skytonight_scheduler.py      # SkyTonight: scheduler (smart time + 6h fallback)
+│   │   ├── skytonight_scheduler_manager.py # SkyTonight: multi-worker scheduler coordination
+│   │   ├── skytonight_storage.py        # SkyTonight: filesystem helpers for runtime state
+│   │   └── skytonight_targets.py        # SkyTonight: dataset access, name resolution, lookup table
 ├── data/                            # Runtime persisted data (volume-mounted)
 │   ├── astrodex/                    # Astrodex JSON + images
 │   ├── cache/                       # Runtime cache payloads
@@ -228,7 +261,7 @@ skytonight/
 - Prefer explicit over implicit
 
 ### Unified Logging System
-- **MANDATORY**: Use centralized logging configuration from `logging_config.py`
+- **MANDATORY**: Use centralized logging configuration from `utils/logging_config.py`
 - **NEVER** use `print()` statements for logging in backend code
 - **NEVER** import `logging` directly - always use the centralized system
 
@@ -317,7 +350,7 @@ except Exception as e:
   - `constraints`: Altitude (min/max), airmass, size (min/max), moon separation, observability threshold, azimuth convention (under `skytonight.constraints`; `horizon_profile` moved to location presets in v1.2)
   - `skytonight`: Enabled flag, constraints_always_enabled, preferred_name_order, scheduler state, dataset sources
   - `astrodex`: Private flag
-- **Default values**: Managed by `backend/config_defaults.py` (`DEFAULT_CONFIG`, `DEFAULT_CONSTRAINTS`, `DEFAULT_SKYTONIGHT`)
+- **Default values**: Managed by `backend/utils/config_defaults.py` (`DEFAULT_CONFIG`, `DEFAULT_CONSTRAINTS`, `DEFAULT_SKYTONIGHT`)
 - **Persistence**: Stored in Docker volume, survives container rebuilds
 - **Why**: Simple, human-readable, easy to backup/restore, flexible
 - **CRITICAL RULE (v1.2)**: Backend code MUST NEVER read `config["location"]` directly. Resolve the request's location with `repo_config.get_active_location(config, get_current_user())` (per-user active location), or `repo_config.get_install_default_location(config)` for install-wide jobs (SkyTonight calculation, scheduler anchors). The cache scheduler iterates `repo_config.get_scheduler_locations(config)`. Cap: `constants.MAX_LOCATIONS = 5` (hard-coded, never admin-configurable - rationale in `docs/LOCATIONS.md`).
@@ -375,7 +408,7 @@ except Exception as e:
 - **Fallback**: Every 6 hours when `year < 2024` or timezone is untrusted
 - **Multi-worker safety**: File lock at `data/skytonight/runtime/scheduler.lock` (one worker runs at a time)
 - **Manual trigger**: Admin can write trigger file via `POST /api/skytonight/scheduler/trigger`
-- **Constant**: `SKYTONIGHT_FALLBACK_INTERVAL_SECONDS = 21600` in `skytonight_scheduler.py`
+- **Constant**: `SKYTONIGHT_FALLBACK_INTERVAL_SECONDS = 21600` in `backend/skytonight/skytonight_scheduler.py`
 - **Why**: No external dependencies, survives across container restarts, clock-aware
 
 ### 4. AstroScore
@@ -383,12 +416,12 @@ except Exception as e:
 - **Calculation**: Weighted sum of 4 sub-scores - visibility (0.40), sky quality (0.25), object brightness (0.25), comfort (0.10)
 - **Bonuses**: +0.20 for planet at opposition, +0.05 for Messier objects; final value clamped to [0.0, 1.0]
 - **Full documentation**: `docs/SKYTONIGHT.md`
-- **Implementation**: `backend/skytonight_calculator.py`
+- **Implementation**: `backend/skytonight/skytonight_calculator.py`
 
 ### 5. API Design
 - **Pattern**: RESTful JSON API with role-based access control
 - **Endpoint Coverage**:
-    - Routes are defined in `backend/app.py` and `backend/skytonight_api.py`, grouped by domain: auth, users, config, logs/metrics, scheduler, skytonight, weather, astronomy, events, spaceflight, object lookup, astrodex, plan-my-night, and equipment.
+    - Routes are defined as Flask Blueprints in `backend/blueprints/*.py` (registered in `backend/app.py`), one module per domain: `auth.py` (auth+users), `push.py`, `locations.py` (config+locations), `connectors.py`, `admin.py` (app-settings/restart/metrics/backup/logs), `misc.py` (skyquality/convert-coordinates/timezones/health/cache/version), `weather.py` (weather+moon+aurora+seeing), `tracking.py` (object/iss/css/spaceflight/translate), `astronomy.py` (sky-widget/sun/events/astro/tonight), `plan_my_night.py`, `astrodex.py` (astrodex+beginner-catalog), `equipment.py`, `skytonight_api.py` (SkyTonight routes; the SkyTonight *calculation pipeline* it calls into still lives in `backend/skytonight/`). `app.py` itself only holds the Flask app factory, extension setup, static/PWA routes, and startup/scheduler init. Cross-domain route helpers (`_resolve_active_location`, `_active_location_cache`) live in `backend/utils/route_helpers.py`.
   - The current endpoint inventory is maintained in `docs/API_ENDPOINTS.md` and should be updated whenever a route is added, removed, or renamed.
   - Key security constraints:
     - Most `/api/*` routes require login (`@login_required`).
@@ -454,7 +487,7 @@ except Exception as e:
 ```
 Scheduler trigger (startup / smart schedule / manual)
   ├─ ensure_skytonight_directories()
-  ├─ run_calculations() ← skytonight_calculator.py
+  ├─ run_calculations() ← skytonight/skytonight_calculator.py
   │     ├─ load_targets_dataset()  → DSOs (targets.json)
   │     ├─ load_comets_dataset()   → MPC comets
   │     ├─ build_body_targets()    → planets / Moon
@@ -509,9 +542,9 @@ Key environment variables (set in docker-compose.yml or .env):
 
 ### Adding a New API Endpoint
 
-1. Define route in `backend/app.py`:
+1. Define the route in the matching domain module under `backend/blueprints/` (e.g. `backend/blueprints/misc.py` for a standalone utility endpoint) - do not add new routes to `backend/app.py` itself:
 ```python
-@app.route('/api/new-endpoint', methods=['GET'])
+@misc_bp.route('/api/new-endpoint', methods=['GET'])
 @login_required
 def new_endpoint():
     """Brief description"""
@@ -535,7 +568,7 @@ async function callNewEndpoint() {
 
 ### Adding a New Configuration Parameter
 
-1. Update default config in `backend/config_defaults.py`:
+1. Update default config in `backend/utils/config_defaults.py`:
 ```python
 DEFAULT_CONFIG["section"]["new_parameter"] = default_value
 ```
@@ -573,7 +606,7 @@ POST /api/skytonight/dataset/rebuild
 # Via API (admin required)
 curl -X POST http://localhost:5000/api/skytonight/scheduler/trigger
 ```
-Or set `SKYTONIGHT_FALLBACK_INTERVAL_SECONDS` to a shorter value in `backend/skytonight_scheduler.py` for testing.
+Or set `SKYTONIGHT_FALLBACK_INTERVAL_SECONDS` to a shorter value in `backend/skytonight/skytonight_scheduler.py` for testing.
 
 ### Updating the Application Version
 
@@ -616,7 +649,7 @@ docker compose down
 ```
 
 ### Testing Scheduler (Without Waiting)
-Set `SKYTONIGHT_FALLBACK_INTERVAL_SECONDS` in `backend/skytonight_scheduler.py` to a shorter value (e.g. 300 for 5 minutes), or use the manual trigger API endpoint.
+Set `SKYTONIGHT_FALLBACK_INTERVAL_SECONDS` in `backend/skytonight/skytonight_scheduler.py` to a shorter value (e.g. 300 for 5 minutes), or use the manual trigger API endpoint.
 
 ## Security Considerations
 
@@ -885,7 +918,8 @@ static/js/
 └── i18n.js          # Global i18n manager (must load early)
 
 backend/
-└── i18n_utils.py    # Backend translation utilities
+└── utils/
+    └── i18n_utils.py    # Backend translation utilities
 ```
 
 ### Frontend Usage
@@ -1127,7 +1161,7 @@ Every step below is mandatory - missing any one of them causes a partial or brok
 
 1. Add the language code to the `choices` list in `scripts/translate_i18n_values.py`
 2. Run the translation script: `python scripts/translate_i18n_values.py --lang XX`; review output carefully
-3. Add the language to `_TRANSLATION_FILENAMES` in `backend/i18n_utils.py`
+3. Add the language to `_TRANSLATION_FILENAMES` in `backend/utils/i18n_utils.py`
 4. **Add the language code to the `allowed` set in `backend/app.py` → `web_manifest_localized()`** - omitting this returns 404 for the manifest and breaks the PWA service worker install
 5. Add `'/manifest.XX.webmanifest'` and `'/static/i18n/XX.json'` to `APP_SHELL_URLS` in `static/sw.js`
 6. Add a `<option value="XX">` to the language selector in `templates/index.html`
@@ -1154,7 +1188,7 @@ Every step below is mandatory - missing any one of them causes a partial or brok
 - Update dynamic content by re-rendering components
 
 **Issue**: Backend returns untranslated messages
-- Check if `i18n_utils.py` is imported correctly
+- Check if `utils/i18n_utils.py` is imported correctly
 - Verify language parameter is being passed properly
 - Check translation files exist in `/app/static/i18n/`
 
@@ -1167,9 +1201,9 @@ The background cache is **selective-refresh**: the scheduler polls every 25 min 
 - Global caches (spaceflight, IERS, AllSky, version) keep the single-slot module-level shape and plain keys. The ISS/CSS TLE fetch stays global; only pass geometry is per-location.
 - `check_and_handle_config_changes()` detects changes **per preset** and calls `reset_caches_for_location(id)` - never wipe all caches for a single preset edit. Deleting a preset calls `drop_location_caches(id)`.
 - The scheduler expands each location-scoped job over `get_scheduler_locations(config)`; job × location units share the same ≤6-worker pool. The Open-Meteo single-flight lock/cooldown gate stays GLOBAL (one shared budget for all locations).
-- API routes serve the requester's location via the `_active_location_cache(name)` helper in `app.py`.
+- API routes serve the requester's location via the `_active_location_cache(name)` / `_resolve_active_location()` helpers in `backend/utils/route_helpers.py`, imported by whichever `backend/blueprints/*.py` module needs them.
 
-### Per-Job TTLs (defined in `backend/constants.py`)
+### Per-Job TTLs (defined in `backend/utils/constants.py`)
 | Job | Constant | TTL |
 |-----|----------|-----|
 | `moon_report` | `CACHE_TTL_MOON_REPORT` | 1 hour |
@@ -1192,8 +1226,8 @@ The background cache is **selective-refresh**: the scheduler polls every 25 min 
 
 ### Computation Optimisations (do not regress)
 - **Config loaded once per cycle**: `fully_initialize_caches()` calls `load_config()` once and passes the result to every update function via `functools.partial(fn, config=config)`. All `update_*_cache()` functions accept `config=None` and fall back to `load_config()` only when called directly.
-- **Moon caches merged**: `update_moon_caches(config=None)` in `cache_updater.py` instantiates `MoonService` and calls `get_report()` once, then writes both `moon_report` and `dark_window` caches. The individual `update_moon_report_cache()` / `update_dark_window_cache()` functions delegate to it and exist only for direct/test compatibility.
-- **Best-window single pass**: `AstroTonightService.best_windows_all_modes()` in `moon_astrotonight.py` runs one 12-hour night-scan loop, computing Astropy AltAz transforms once per step while evaluating all three modes simultaneously. `best_window_tonight(mode)` delegates to it.
+- **Moon caches merged**: `update_moon_caches(config=None)` in `cache/cache_updater.py` instantiates `MoonService` and calls `get_report()` once, then writes both `moon_report` and `dark_window` caches. The individual `update_moon_report_cache()` / `update_dark_window_cache()` functions delegate to it and exist only for direct/test compatibility.
+- **Best-window single pass**: `AstroTonightService.best_windows_all_modes()` in `astroweather/moon_astrotonight.py` runs one 12-hour night-scan loop, computing Astropy AltAz transforms once per step while evaluating all three modes simultaneously. `best_window_tonight(mode)` delegates to it.
 - Execution metrics for `moon_report` **and** `dark_window` are both recorded (same timing) because they are computed together - the `moon_report` job entry records both after success or failure.
 - **ISS pass event extraction early exit**: `events_aggregator._extract_iss_pass_events()` breaks out of the passes loop as soon as `days_until > 7` since passes are generated in chronological order by Skyfield's `find_events`.
 - **ISS lunar transit**: `iss_passes.ISSPassService` detects ISS transits across the **lunar** disk in addition to the solar disk. Detection requires the `de421.bsp` ephemeris (gracefully skipped if absent). The report includes `lunar_transits` (list), `next_lunar_transit`, and `total_lunar_transits`. Each entry carries `start_time`/`peak_time`/`end_time` in the configured local timezone, `minimum_separation_arcmin`, `lunar_radius_arcmin`, `moon_altitude_deg`, `moon_azimuth_deg`, `moon_illumination_pct`, `iss_altitude_deg`, `iss_azimuth_deg`. The `events_aggregator` converts these to `EventType.ISS_LUNAR_TRANSIT` events (importance: CRITICAL, score 9.0, icon `bi bi-moon-stars`, `structure_key="iss"`). All i18n keys (`events_api.iss_lunar_transit_title`, `events_api.iss_lunar_transit_description`) are provided for all 6 supported languages.
@@ -1203,15 +1237,15 @@ The background cache is **selective-refresh**: the scheduler polls every 25 min 
 - `version_checker.is_newer_version()` uses `packaging.version.parse()` (from the `packaging` library, declared in `requirements.txt`) for correct PEP 440 semantic version comparison. Do not revert to manual string parsing.
 - `version_checker._save_version_result(result)` is a private helper that writes a result dict to both the in-memory `_version_update_cache` and the shared on-disk cache - always use this helper instead of repeating the three-line save pattern.
 
-### utils.py Conventions
+### utils/__init__.py Conventions
 - numpy is imported **once** at module level as `_np` with `_HAS_NUMPY` flag. Both `_NumpySafeEncoder` and `_sanitize_for_json` reference `_np` directly - never re-introduce per-call `import numpy` inside these functions.
 
 ### Mandatory Rules for New Cache Jobs
-1. **Add a `CACHE_TTL_<NAME>` constant** in `constants.py` - never reuse the generic `CACHE_TTL`; choose TTL based on how frequently the underlying data actually changes
-2. **Register** in `cache_updater.py` → `fully_initialize_caches()` `cache_jobs` list with `(name, shared_key, partial(fn, config=config), ttl, cache_entry_ref)`
+1. **Add a `CACHE_TTL_<NAME>` constant** in `utils/constants.py` - never reuse the generic `CACHE_TTL`; choose TTL based on how frequently the underlying data actually changes
+2. **Register** in `cache/cache_updater.py` → `fully_initialize_caches()` `cache_jobs` list with `(name, shared_key, partial(fn, config=config), ttl, cache_entry_ref)`
 3. **Accept `config=None`** in the update function and guard with `if config is None: config = load_config()`
 4. **Add validity check** in `cache_store.is_astronomical_cache_ready()` and `get_cache_init_status()` using the job's own TTL constant
-5. **Add to `reset_all_caches()`** and `_write_all_astronomical_caches_to_shared()` in `cache_store.py`
+5. **Add to `reset_all_caches()`** and `_write_all_astronomical_caches_to_shared()` in `cache/cache_store.py`
 6. **Document TTL rationale** in `docs/CACHE_SYSTEM.md` TTL table
 
 ### Cache Metrics

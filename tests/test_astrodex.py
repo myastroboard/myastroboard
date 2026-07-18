@@ -10,9 +10,9 @@ import sys
 # Add backend to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
-import astrodex
-import catalogue_aliases
-import skytonight_targets
+from observation import astrodex
+from observation import catalogue_aliases
+from skytonight import skytonight_targets
 
 
 @pytest.fixture

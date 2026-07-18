@@ -5,8 +5,8 @@ Covers AuroraService pure-logic methods and mocked HTTP calls.
 
 import pytest
 from unittest.mock import patch, MagicMock
-import aurora_predictions
-from aurora_predictions import AuroraService
+from astroweather import aurora_predictions
+from astroweather.aurora_predictions import AuroraService
 
 
 @pytest.fixture(autouse=True)
@@ -166,7 +166,7 @@ class TestFetchCurrentKpIndex:
     def setup_method(self):
         self.svc = AuroraService(60.0, 25.0, "UTC")
 
-    @patch("aurora_predictions.requests.get")
+    @patch("astroweather.aurora_predictions.requests.get")
     def test_parses_new_dict_format(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.json.return_value = [{"Kp": "3.33"}]
@@ -175,7 +175,7 @@ class TestFetchCurrentKpIndex:
         result = self.svc.fetch_current_kp_index()
         assert result == pytest.approx(3.33)
 
-    @patch("aurora_predictions.requests.get")
+    @patch("astroweather.aurora_predictions.requests.get")
     def test_parses_legacy_list_format(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.json.return_value = [["2026-01-01 00:00:00", "5.00"]]
@@ -184,14 +184,14 @@ class TestFetchCurrentKpIndex:
         result = self.svc.fetch_current_kp_index()
         assert result == pytest.approx(5.0)
 
-    @patch("aurora_predictions.requests.get")
+    @patch("astroweather.aurora_predictions.requests.get")
     def test_returns_none_on_request_exception(self, mock_get):
         import requests
         mock_get.side_effect = requests.RequestException("timeout")
         result = self.svc.fetch_current_kp_index()
         assert result is None
 
-    @patch("aurora_predictions.requests.get")
+    @patch("astroweather.aurora_predictions.requests.get")
     def test_returns_none_on_empty_response(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.json.return_value = []
@@ -207,7 +207,7 @@ class TestFetchKpForecast:
     def setup_method(self):
         self.svc = AuroraService(60.0, 25.0, "UTC")
 
-    @patch("aurora_predictions.requests.get")
+    @patch("astroweather.aurora_predictions.requests.get")
     def test_parses_new_dict_format(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.json.return_value = [
@@ -221,14 +221,14 @@ class TestFetchKpForecast:
         assert len(result) == 2
         assert result[0]["kp"] == 3.0
 
-    @patch("aurora_predictions.requests.get")
+    @patch("astroweather.aurora_predictions.requests.get")
     def test_returns_none_on_request_error(self, mock_get):
         import requests
         mock_get.side_effect = requests.RequestException("network error")
         result = self.svc.fetch_kp_forecast()
         assert result is None
 
-    @patch("aurora_predictions.requests.get")
+    @patch("astroweather.aurora_predictions.requests.get")
     def test_parses_legacy_list_format_with_header(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.json.return_value = [
@@ -247,7 +247,7 @@ class TestKpDataSharedAcrossLocations:
     instance (a different observer location) must reuse the first instance's
     fetch instead of hitting NOAA again, within the cache TTL."""
 
-    @patch("aurora_predictions.requests.get")
+    @patch("astroweather.aurora_predictions.requests.get")
     def test_current_kp_fetched_once_for_two_locations(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.json.return_value = [{"Kp": "4.0"}]
@@ -261,7 +261,7 @@ class TestKpDataSharedAcrossLocations:
         assert tokyo.fetch_current_kp_index() == pytest.approx(4.0)
         assert mock_get.call_count == 1
 
-    @patch("aurora_predictions.requests.get")
+    @patch("astroweather.aurora_predictions.requests.get")
     def test_kp_forecast_fetched_once_for_two_locations(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.json.return_value = [{"time_tag": "2026-01-01T00:00:00", "kp": "3.0"}]
@@ -275,7 +275,7 @@ class TestKpDataSharedAcrossLocations:
         assert tokyo.fetch_kp_forecast() is not None
         assert mock_get.call_count == 1
 
-    @patch("aurora_predictions.requests.get")
+    @patch("astroweather.aurora_predictions.requests.get")
     def test_current_kp_refetched_after_ttl_expires(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.json.return_value = [{"Kp": "4.0"}]
@@ -297,7 +297,7 @@ class TestFetchCurrentKpIndexEdgeCases:
     def setup_method(self):
         self.svc = AuroraService(60.0, 25.0, "UTC")
 
-    @patch("aurora_predictions.requests.get")
+    @patch("astroweather.aurora_predictions.requests.get")
     def test_raw_none_when_latest_neither_dict_nor_list(self, mock_get):
         """Line 64: latest element is neither dict nor list → raw = None → return None."""
         mock_resp = MagicMock()
@@ -308,7 +308,7 @@ class TestFetchCurrentKpIndexEdgeCases:
         result = self.svc.fetch_current_kp_index()
         assert result is None
 
-    @patch("aurora_predictions.requests.get")
+    @patch("astroweather.aurora_predictions.requests.get")
     def test_value_error_on_unparseable_kp(self, mock_get):
         """Lines 71-72: float() raises ValueError on bad Kp string."""
         mock_resp = MagicMock()
@@ -318,7 +318,7 @@ class TestFetchCurrentKpIndexEdgeCases:
         result = self.svc.fetch_current_kp_index()
         assert result is None
 
-    @patch("aurora_predictions.requests.get")
+    @patch("astroweather.aurora_predictions.requests.get")
     def test_general_exception_returns_none(self, mock_get):
         """Lines 77-79: non-requests Exception inside fetch → return None."""
         mock_resp = MagicMock()
@@ -329,7 +329,7 @@ class TestFetchCurrentKpIndexEdgeCases:
         result = self.svc.fetch_current_kp_index()
         assert result is None
 
-    @patch("aurora_predictions.requests.get")
+    @patch("astroweather.aurora_predictions.requests.get")
     def test_legacy_list_too_short_returns_none(self, mock_get):
         """Line 64 via list branch: list element with len <= 1 → raw = None."""
         mock_resp = MagicMock()
@@ -347,7 +347,7 @@ class TestFetchKpForecastEdgeCases:
     def setup_method(self):
         self.svc = AuroraService(60.0, 25.0, "UTC")
 
-    @patch("aurora_predictions.requests.get")
+    @patch("astroweather.aurora_predictions.requests.get")
     def test_none_kp_row_is_skipped(self, mock_get):
         """Lines 100, 103-104: row with kp=None is skipped via continue."""
         mock_resp = MagicMock()
@@ -363,7 +363,7 @@ class TestFetchKpForecastEdgeCases:
         assert len(result) == 1
         assert result[0]["kp"] == pytest.approx(3.0)
 
-    @patch("aurora_predictions.requests.get")
+    @patch("astroweather.aurora_predictions.requests.get")
     def test_unparseable_kp_row_is_skipped(self, mock_get):
         """Lines 103-104: float() raises on bad kp → continue."""
         mock_resp = MagicMock()
@@ -378,7 +378,7 @@ class TestFetchKpForecastEdgeCases:
         assert len(result) == 1
         assert result[0]["kp"] == pytest.approx(5.0)
 
-    @patch("aurora_predictions.requests.get")
+    @patch("astroweather.aurora_predictions.requests.get")
     def test_legacy_list_format_full_path(self, mock_get):
         """Lines 106-122: legacy list-of-lists with header row."""
         mock_resp = MagicMock()
@@ -395,7 +395,7 @@ class TestFetchKpForecastEdgeCases:
         assert result[0]["timestamp"] == "2026-01-01 00:00:00"
         assert result[1]["kp"] == pytest.approx(2.0)
 
-    @patch("aurora_predictions.requests.get")
+    @patch("astroweather.aurora_predictions.requests.get")
     def test_legacy_list_short_row_skipped(self, mock_get):
         """Line 113-114: legacy row too short for kp_idx → continue."""
         mock_resp = MagicMock()
@@ -411,7 +411,7 @@ class TestFetchKpForecastEdgeCases:
         assert len(result) == 1
         assert result[0]["kp"] == pytest.approx(4.0)
 
-    @patch("aurora_predictions.requests.get")
+    @patch("astroweather.aurora_predictions.requests.get")
     def test_legacy_list_bad_kp_value_skipped(self, mock_get):
         """Lines 117-118: float() raises on bad kp in legacy format → continue."""
         mock_resp = MagicMock()
@@ -427,7 +427,7 @@ class TestFetchKpForecastEdgeCases:
         assert len(result) == 1
         assert result[0]["kp"] == pytest.approx(2.0)
 
-    @patch("aurora_predictions.requests.get")
+    @patch("astroweather.aurora_predictions.requests.get")
     def test_general_exception_returns_none(self, mock_get):
         """Lines 129-131: non-requests Exception inside fetch_kp_forecast → return None."""
         mock_resp = MagicMock()
@@ -437,7 +437,7 @@ class TestFetchKpForecastEdgeCases:
         result = self.svc.fetch_kp_forecast()
         assert result is None
 
-    @patch("aurora_predictions.requests.get")
+    @patch("astroweather.aurora_predictions.requests.get")
     def test_returns_none_when_all_kp_values_none(self, mock_get):
         """forecast_data stays empty → return None."""
         mock_resp = MagicMock()
@@ -500,8 +500,8 @@ class TestGetDetailedReport:
     def setup_method(self):
         self.svc = AuroraService(60.0, 25.0, "UTC")
 
-    @patch("aurora_predictions.AuroraService.fetch_current_kp_index")
-    @patch("aurora_predictions.AuroraService.fetch_kp_forecast")
+    @patch("astroweather.aurora_predictions.AuroraService.fetch_current_kp_index")
+    @patch("astroweather.aurora_predictions.AuroraService.fetch_kp_forecast")
     def test_current_kp_none_uses_forecast_fallback(self, mock_forecast, mock_current):
         """Lines 303-323: current_kp is None → use forecast entries as fallback."""
         mock_current.return_value = None
@@ -512,8 +512,8 @@ class TestGetDetailedReport:
         assert report is not None
         assert report["current"]["kp_index"] == pytest.approx(4.5)
 
-    @patch("aurora_predictions.AuroraService.fetch_current_kp_index")
-    @patch("aurora_predictions.AuroraService.fetch_kp_forecast")
+    @patch("astroweather.aurora_predictions.AuroraService.fetch_current_kp_index")
+    @patch("astroweather.aurora_predictions.AuroraService.fetch_kp_forecast")
     def test_current_kp_none_forecast_also_none_uses_default(self, mock_forecast, mock_current):
         """Lines 320-323: both current and forecast None → default Kp=3.0."""
         mock_current.return_value = None
@@ -522,8 +522,8 @@ class TestGetDetailedReport:
         assert report is not None
         assert report["current"]["kp_index"] == pytest.approx(3.0)
 
-    @patch("aurora_predictions.AuroraService.fetch_current_kp_index")
-    @patch("aurora_predictions.AuroraService.fetch_kp_forecast")
+    @patch("astroweather.aurora_predictions.AuroraService.fetch_current_kp_index")
+    @patch("astroweather.aurora_predictions.AuroraService.fetch_kp_forecast")
     def test_current_kp_none_forecast_all_none_kp_values(self, mock_forecast, mock_current):
         """Lines 305-320: forecast entries have no valid kp → still falls back to 3.0."""
         mock_current.return_value = None
@@ -536,8 +536,8 @@ class TestGetDetailedReport:
         assert report is not None
         assert report["current"]["kp_index"] == pytest.approx(3.0)
 
-    @patch("aurora_predictions.AuroraService.fetch_current_kp_index")
-    @patch("aurora_predictions.AuroraService.fetch_kp_forecast")
+    @patch("astroweather.aurora_predictions.AuroraService.fetch_current_kp_index")
+    @patch("astroweather.aurora_predictions.AuroraService.fetch_kp_forecast")
     def test_report_includes_forecast_entries(self, mock_forecast, mock_current):
         """Lines 353-383: forecast entries after now are appended to report."""
         from datetime import datetime, timezone, timedelta
@@ -550,8 +550,8 @@ class TestGetDetailedReport:
         assert report is not None
         assert len(report["forecast"]) >= 1
 
-    @patch("aurora_predictions.AuroraService.fetch_current_kp_index")
-    @patch("aurora_predictions.AuroraService.fetch_kp_forecast")
+    @patch("astroweather.aurora_predictions.AuroraService.fetch_current_kp_index")
+    @patch("astroweather.aurora_predictions.AuroraService.fetch_kp_forecast")
     def test_report_skips_past_forecast_entries(self, mock_forecast, mock_current):
         """Lines 367-376: past forecast timestamps are skipped."""
         mock_current.return_value = 3.0
@@ -562,8 +562,8 @@ class TestGetDetailedReport:
         assert report is not None
         assert len(report["forecast"]) == 0
 
-    @patch("aurora_predictions.AuroraService.fetch_current_kp_index")
-    @patch("aurora_predictions.AuroraService.fetch_kp_forecast")
+    @patch("astroweather.aurora_predictions.AuroraService.fetch_current_kp_index")
+    @patch("astroweather.aurora_predictions.AuroraService.fetch_kp_forecast")
     def test_forecast_with_invalid_timezone_falls_back(self, mock_forecast, mock_current):
         """Lines 356-361: invalid timezone in forecast → tzinfo = UTC."""
         svc = AuroraService(60.0, 25.0, "Invalid/Zone")
@@ -574,15 +574,15 @@ class TestGetDetailedReport:
         report = svc.get_detailed_report()
         assert report is not None
 
-    @patch("aurora_predictions.AuroraService.fetch_current_kp_index")
+    @patch("astroweather.aurora_predictions.AuroraService.fetch_current_kp_index")
     def test_outer_exception_returns_none(self, mock_current):
         """Lines 386-388: outer Exception in get_detailed_report → None."""
         mock_current.side_effect = RuntimeError("catastrophic failure")
         report = self.svc.get_detailed_report()
         assert report is None
 
-    @patch("aurora_predictions.AuroraService.fetch_current_kp_index")
-    @patch("aurora_predictions.AuroraService.fetch_kp_forecast")
+    @patch("astroweather.aurora_predictions.AuroraService.fetch_current_kp_index")
+    @patch("astroweather.aurora_predictions.AuroraService.fetch_kp_forecast")
     def test_forecast_entry_with_bad_timestamp_skipped(self, mock_forecast, mock_current):
         """Lines 367-376 continue: unparseable forecast timestamp → skip entry."""
         mock_current.return_value = 3.0
@@ -593,8 +593,8 @@ class TestGetDetailedReport:
         assert report is not None
         assert len(report["forecast"]) == 0
 
-    @patch("aurora_predictions.AuroraService.fetch_current_kp_index")
-    @patch("aurora_predictions.AuroraService.fetch_kp_forecast")
+    @patch("astroweather.aurora_predictions.AuroraService.fetch_current_kp_index")
+    @patch("astroweather.aurora_predictions.AuroraService.fetch_kp_forecast")
     def test_report_structure_complete(self, mock_forecast, mock_current):
         """Lines 297-388: happy path report structure validation."""
         mock_current.return_value = 5.0
@@ -615,7 +615,7 @@ class TestFetchKpForecastMoreBranches:
     def setup_method(self):
         self.svc = AuroraService(60.0, 25.0, "UTC")
 
-    @patch("aurora_predictions.requests.get")
+    @patch("astroweather.aurora_predictions.requests.get")
     def test_legacy_list_no_kp_column_returns_none(self, mock_get):
         """Lines 106->124, 111->124: header without 'Kp' → kp_idx=None → skip inner loop."""
         mock_resp = MagicMock()
@@ -628,7 +628,7 @@ class TestFetchKpForecastMoreBranches:
         result = self.svc.fetch_kp_forecast()
         assert result is None
 
-    @patch("aurora_predictions.requests.get")
+    @patch("astroweather.aurora_predictions.requests.get")
     def test_legacy_list_no_time_tag_column_timestamp_empty(self, mock_get):
         """Line 120->122: header without 'time_tag' → time_idx=None → timestamp stays ''."""
         mock_resp = MagicMock()
@@ -650,8 +650,8 @@ class TestGetDetailedReportMoreBranches:
     def setup_method(self):
         self.svc = AuroraService(60.0, 25.0, "UTC")
 
-    @patch("aurora_predictions.AuroraService.fetch_current_kp_index")
-    @patch("aurora_predictions.AuroraService.fetch_kp_forecast")
+    @patch("astroweather.aurora_predictions.AuroraService.fetch_current_kp_index")
+    @patch("astroweather.aurora_predictions.AuroraService.fetch_kp_forecast")
     def test_forecast_fallback_kp_with_bad_float_entry(self, mock_forecast, mock_current):
         """Lines 313-314: entry with non-numeric kp in fallback → ValueError → continue."""
         mock_current.return_value = None
@@ -666,8 +666,8 @@ class TestGetDetailedReportMoreBranches:
         # Should ultimately use the valid entry (5.0)
         assert report["current"]["kp_index"] == pytest.approx(5.0)
 
-    @patch("aurora_predictions.AuroraService.fetch_current_kp_index")
-    @patch("aurora_predictions.AuroraService.fetch_kp_forecast")
+    @patch("astroweather.aurora_predictions.AuroraService.fetch_current_kp_index")
+    @patch("astroweather.aurora_predictions.AuroraService.fetch_kp_forecast")
     def test_forecast_entry_with_no_timestamp_skipped(self, mock_forecast, mock_current):
         """Lines 367->365: entry without timestamp string → skip."""
         from datetime import datetime, timezone, timedelta
@@ -682,8 +682,8 @@ class TestGetDetailedReportMoreBranches:
         # Only the entry with a valid future timestamp should appear in forecast
         assert len(report["forecast"]) == 1
 
-    @patch("aurora_predictions.AuroraService.fetch_current_kp_index")
-    @patch("aurora_predictions.AuroraService.fetch_kp_forecast")
+    @patch("astroweather.aurora_predictions.AuroraService.fetch_current_kp_index")
+    @patch("astroweather.aurora_predictions.AuroraService.fetch_kp_forecast")
     def test_forecast_tz_aware_timestamp_handled(self, mock_forecast, mock_current):
         """Lines 370->372: tz-aware ISO timestamp → tzinfo already set → skip replace."""
         from datetime import datetime, timezone, timedelta
@@ -713,7 +713,7 @@ class TestFetchKpForecastUnmatchedFormat:
     def setup_method(self):
         self.svc = AuroraService(60.0, 25.0, "UTC")
 
-    @patch("aurora_predictions.requests.get")
+    @patch("astroweather.aurora_predictions.requests.get")
     def test_unmatched_data_format_returns_none(self, mock_get):
         """Line 106->124: data is list of scalars → neither elif branch taken → returns None."""
         mock_resp = MagicMock()
@@ -727,17 +727,17 @@ class TestFetchKpForecastUnmatchedFormat:
 class TestGetAuroraReport:
     """Tests for the module-level get_aurora_report convenience function."""
 
-    @patch("aurora_predictions.AuroraService.get_detailed_report")
+    @patch("astroweather.aurora_predictions.AuroraService.get_detailed_report")
     def test_delegates_to_service(self, mock_report):
-        from aurora_predictions import get_aurora_report
+        from astroweather.aurora_predictions import get_aurora_report
         mock_report.return_value = {"mocked": True}
         result = get_aurora_report(55.0, 10.0, "Europe/Paris")
         assert result == {"mocked": True}
         mock_report.assert_called_once()
 
-    @patch("aurora_predictions.AuroraService.get_detailed_report")
+    @patch("astroweather.aurora_predictions.AuroraService.get_detailed_report")
     def test_returns_none_on_failure(self, mock_report):
-        from aurora_predictions import get_aurora_report
+        from astroweather.aurora_predictions import get_aurora_report
         mock_report.return_value = None
         result = get_aurora_report(55.0, 10.0, "UTC")
         assert result is None

@@ -27,7 +27,7 @@ def _backend_import_path() -> str:
 
 sys.path.insert(0, _backend_import_path())
 
-import skytonight_targets  # type: ignore  # noqa: E402
+from skytonight import skytonight_targets  # type: ignore  # noqa: E402
 
 
 KNOWN_CATALOGUES = [

@@ -3,7 +3,7 @@
 import math
 from unittest.mock import MagicMock, patch
 
-import skytonight_comets as _mod
+from skytonight import skytonight_comets as _mod
 
 _coerce_coordinates = _mod._coerce_coordinates
 _curated_fallback_rows = _mod._curated_fallback_rows
@@ -27,7 +27,7 @@ _fetch_jpl_comet_snapshot = _mod._fetch_jpl_comet_snapshot
 # ---------------------------------------------------------------------------
 
 def test_build_comet_targets_uses_curated_fallback_when_network_unavailable(monkeypatch):
-    monkeypatch.setattr('skytonight_comets.fetch_mpc_comets', lambda timeout_seconds=12: [])
+    monkeypatch.setattr('skytonight.skytonight_comets.fetch_mpc_comets', lambda timeout_seconds=12: [])
 
     targets = build_comet_targets('mpc+jpl')
 
@@ -44,7 +44,7 @@ def test_enrich_with_jpl_fallback_fills_missing_fields(monkeypatch):
     }
 
     monkeypatch.setattr(
-        'skytonight_comets._fetch_jpl_comet_snapshot',
+        'skytonight.skytonight_comets._fetch_jpl_comet_snapshot',
         lambda name, timeout_seconds=8: {
             'name': '13P/Olbers',
             'designation': '13P',
@@ -319,7 +319,7 @@ def test_enrich_with_jpl_fallback_skips_when_all_fields_present(monkeypatch):
         calls.append(name)
         return {}
 
-    monkeypatch.setattr('skytonight_comets._fetch_jpl_comet_snapshot', _fake_jpl)
+    monkeypatch.setattr('skytonight.skytonight_comets._fetch_jpl_comet_snapshot', _fake_jpl)
     rows = [{'name': 'Halley', 'absolute_magnitude': 5.5, 'orbit_class': 'HTC'}]
     result = enrich_with_jpl_fallback(rows)
     assert len(calls) == 0
@@ -333,7 +333,7 @@ def test_enrich_with_jpl_fallback_caps_at_50_requests(monkeypatch):
         calls.append(name)
         return {}
 
-    monkeypatch.setattr('skytonight_comets._fetch_jpl_comet_snapshot', _fake_jpl)
+    monkeypatch.setattr('skytonight.skytonight_comets._fetch_jpl_comet_snapshot', _fake_jpl)
     rows = [
         {'name': f'Comet{i}', 'absolute_magnitude': None, 'orbit_class': None}
         for i in range(60)
@@ -343,7 +343,7 @@ def test_enrich_with_jpl_fallback_caps_at_50_requests(monkeypatch):
 
 
 def test_enrich_with_jpl_fallback_skips_non_dict_rows(monkeypatch):
-    monkeypatch.setattr('skytonight_comets._fetch_jpl_comet_snapshot', lambda *a, **kw: {})
+    monkeypatch.setattr('skytonight.skytonight_comets._fetch_jpl_comet_snapshot', lambda *a, **kw: {})
     result = enrich_with_jpl_fallback(['not-a-dict', None])  # type: ignore[list-item]
     assert result == []
 
@@ -353,8 +353,8 @@ def test_enrich_with_jpl_fallback_skips_non_dict_rows(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_build_comet_targets_deduplicates_by_target_id(monkeypatch):
-    monkeypatch.setattr('skytonight_comets.fetch_mpc_comets', lambda **kw: [])
-    monkeypatch.setattr('skytonight_comets._curated_fallback_rows', lambda: [
+    monkeypatch.setattr('skytonight.skytonight_comets.fetch_mpc_comets', lambda **kw: [])
+    monkeypatch.setattr('skytonight.skytonight_comets._curated_fallback_rows', lambda: [
         {'name': '13P/Olbers', 'magnitude': 7.0},
         {'name': '13P/Olbers', 'magnitude': 8.0},
     ])
@@ -367,11 +367,11 @@ def test_build_comet_targets_deduplicates_by_target_id(monkeypatch):
 def test_build_comet_targets_mpc_only_skips_jpl(monkeypatch):
     jpl_calls = []
     monkeypatch.setattr(
-        'skytonight_comets.fetch_mpc_comets',
+        'skytonight.skytonight_comets.fetch_mpc_comets',
         lambda **kw: [{'name': 'TestComet', 'absolute_magnitude': 8.0, 'orbit_class': 'P'}],
     )
     monkeypatch.setattr(
-        'skytonight_comets.enrich_with_jpl_fallback',
+        'skytonight.skytonight_comets.enrich_with_jpl_fallback',
         lambda rows: jpl_calls.append(rows) or rows,
     )
     build_comet_targets('mpc')
@@ -379,7 +379,7 @@ def test_build_comet_targets_mpc_only_skips_jpl(monkeypatch):
 
 
 def test_build_comet_targets_all_are_comets(monkeypatch):
-    monkeypatch.setattr('skytonight_comets.fetch_mpc_comets', lambda **kw: [])
+    monkeypatch.setattr('skytonight.skytonight_comets.fetch_mpc_comets', lambda **kw: [])
     targets = build_comet_targets('mpc+jpl')
     assert all(t.category == 'comets' for t in targets)
 
@@ -394,7 +394,7 @@ def test_fetch_mpc_comets_returns_empty_on_network_error(monkeypatch):
     def _raise(*args, **kwargs):
         raise _requests.RequestException('connection timeout')
 
-    monkeypatch.setattr('skytonight_comets.requests.get', _raise)
+    monkeypatch.setattr('skytonight.skytonight_comets.requests.get', _raise)
     result = fetch_mpc_comets()
     assert result == []
 
@@ -409,13 +409,13 @@ def test_fetch_mpc_comets_parses_valid_response(monkeypatch):
         def raise_for_status(self):
             pass
 
-    monkeypatch.setattr('skytonight_comets.requests.get', lambda *a, **kw: _FakeResponse())
+    monkeypatch.setattr('skytonight.skytonight_comets.requests.get', lambda *a, **kw: _FakeResponse())
     monkeypatch.setattr(
-        'skytonight_comets._get_earth_heliocentric',
+        'skytonight.skytonight_comets._get_earth_heliocentric',
         lambda obs_time: (1.0, 0.0, 0.0),
     )
     monkeypatch.setattr(
-        'skytonight_comets._comet_ra_dec',
+        'skytonight.skytonight_comets._comet_ra_dec',
         lambda *a, **kw: (5.5, 10.0, 1.2, 0.8),
     )
 
@@ -589,7 +589,7 @@ def test_fetch_mpc_comets_returns_empty_on_generic_exception(monkeypatch):
     def _raise(*args, **kwargs):
         raise RuntimeError('unexpected error')
 
-    monkeypatch.setattr('skytonight_comets.requests.get', _raise)
+    monkeypatch.setattr('skytonight.skytonight_comets.requests.get', _raise)
     result = fetch_mpc_comets()
     assert result == []
 
@@ -603,7 +603,7 @@ def test_fetch_mpc_comets_returns_empty_when_no_parseable_lines(monkeypatch):
         def raise_for_status(self):
             pass
 
-    monkeypatch.setattr('skytonight_comets.requests.get', lambda *a, **kw: _EmptyResponse())
+    monkeypatch.setattr('skytonight.skytonight_comets.requests.get', lambda *a, **kw: _EmptyResponse())
     result = fetch_mpc_comets()
     assert result == []
 
@@ -619,9 +619,9 @@ def test_fetch_mpc_comets_position_computed_none_still_appended(monkeypatch):
         def raise_for_status(self):
             pass
 
-    monkeypatch.setattr('skytonight_comets.requests.get', lambda *a, **kw: _FakeResponse())
-    monkeypatch.setattr('skytonight_comets._get_earth_heliocentric', lambda obs_time: (1.0, 0.0, 0.0))
-    monkeypatch.setattr('skytonight_comets._comet_ra_dec', lambda *a, **kw: (None, None, None, None))
+    monkeypatch.setattr('skytonight.skytonight_comets.requests.get', lambda *a, **kw: _FakeResponse())
+    monkeypatch.setattr('skytonight.skytonight_comets._get_earth_heliocentric', lambda obs_time: (1.0, 0.0, 0.0))
+    monkeypatch.setattr('skytonight.skytonight_comets._comet_ra_dec', lambda *a, **kw: (None, None, None, None))
 
     result = fetch_mpc_comets()
     assert len(result) == 1
@@ -640,7 +640,7 @@ def test_fetch_jpl_comet_snapshot_empty_name_returns_empty():
 def test_fetch_jpl_comet_snapshot_returns_empty_on_request_error(monkeypatch):
     import requests as _req
 
-    monkeypatch.setattr('skytonight_comets.requests.get', lambda *a, **kw: (_ for _ in ()).throw(_req.RequestException()))
+    monkeypatch.setattr('skytonight.skytonight_comets.requests.get', lambda *a, **kw: (_ for _ in ()).throw(_req.RequestException()))
     result = _fetch_jpl_comet_snapshot('13P/Olbers')
     assert result == {}
 
@@ -653,7 +653,7 @@ def test_fetch_jpl_comet_snapshot_returns_empty_when_payload_not_dict(monkeypatc
         def json(self):
             return ['not', 'a', 'dict']
 
-    monkeypatch.setattr('skytonight_comets.requests.get', lambda *a, **kw: _FakeResp())
+    monkeypatch.setattr('skytonight.skytonight_comets.requests.get', lambda *a, **kw: _FakeResp())
     result = _fetch_jpl_comet_snapshot('13P/Olbers')
     assert result == {}
 
@@ -670,7 +670,7 @@ def test_fetch_jpl_comet_snapshot_returns_data_from_full_payload(monkeypatch):
                 'phys_par': {'H': '8.5'},
             }
 
-    monkeypatch.setattr('skytonight_comets.requests.get', lambda *a, **kw: _FakeResp())
+    monkeypatch.setattr('skytonight.skytonight_comets.requests.get', lambda *a, **kw: _FakeResp())
     result = _fetch_jpl_comet_snapshot('13P/Olbers')
     assert result['name'] == '13P/Olbers'
     assert result['designation'] == '13P'
@@ -691,7 +691,7 @@ def test_fetch_jpl_comet_snapshot_handles_non_dict_orbit_and_phys(monkeypatch):
                 'phys_par': None,
             }
 
-    monkeypatch.setattr('skytonight_comets.requests.get', lambda *a, **kw: _FakeResp())
+    monkeypatch.setattr('skytonight.skytonight_comets.requests.get', lambda *a, **kw: _FakeResp())
     result = _fetch_jpl_comet_snapshot('1P/Halley')
     assert result['name'] == '1P/Halley'
     assert result['orbit_class'] == ''
@@ -705,7 +705,7 @@ def test_fetch_jpl_comet_snapshot_handles_non_dict_orbit_and_phys(monkeypatch):
 def test_build_comet_targets_jpl_only_mode_uses_fallback(monkeypatch):
     """Mode 'jpl' alone (no 'mpc') must skip fetch_mpc_comets and use fallback."""
     mpc_calls = []
-    monkeypatch.setattr('skytonight_comets.fetch_mpc_comets', lambda **kw: mpc_calls.append(1) or [])
+    monkeypatch.setattr('skytonight.skytonight_comets.fetch_mpc_comets', lambda **kw: mpc_calls.append(1) or [])
     targets = build_comet_targets('jpl')
     # mpc not in 'jpl', so fetch_mpc_comets should not be called
     assert len(mpc_calls) == 0
@@ -717,9 +717,9 @@ def test_build_comet_targets_mpc_jpl_when_mpc_returns_rows(monkeypatch):
     enriched_calls = []
     fake_rows = [{'name': '1P/Halley', 'absolute_magnitude': 5.0, 'orbit_class': 'HTC'}]
 
-    monkeypatch.setattr('skytonight_comets.fetch_mpc_comets', lambda **kw: fake_rows)
+    monkeypatch.setattr('skytonight.skytonight_comets.fetch_mpc_comets', lambda **kw: fake_rows)
     monkeypatch.setattr(
-        'skytonight_comets.enrich_with_jpl_fallback',
+        'skytonight.skytonight_comets.enrich_with_jpl_fallback',
         lambda rows: enriched_calls.append(rows) or rows,
     )
     targets = build_comet_targets('mpc+jpl')
@@ -730,7 +730,7 @@ def test_build_comet_targets_mpc_jpl_when_mpc_returns_rows(monkeypatch):
 def test_build_comet_targets_row_source_mpc_only(monkeypatch):
     """When mode is 'mpc' and MPC returns rows, source label is 'mpc'."""
     fake_rows = [{'name': '1P/Halley', 'absolute_magnitude': 5.0, 'orbit_class': 'HTC'}]
-    monkeypatch.setattr('skytonight_comets.fetch_mpc_comets', lambda **kw: fake_rows)
+    monkeypatch.setattr('skytonight.skytonight_comets.fetch_mpc_comets', lambda **kw: fake_rows)
     targets = build_comet_targets('mpc')
     assert any(t.metadata.get('source') == 'mpc' for t in targets)
 
@@ -741,7 +741,7 @@ def test_build_comet_targets_skips_none_targets(monkeypatch):
         {'name': '', 'designation': ''},   # â†’ _to_comet_target returns None
         {'name': '1P/Halley', 'absolute_magnitude': 5.0, 'orbit_class': 'HTC'},
     ]
-    monkeypatch.setattr('skytonight_comets.fetch_mpc_comets', lambda **kw: fake_rows)
+    monkeypatch.setattr('skytonight.skytonight_comets.fetch_mpc_comets', lambda **kw: fake_rows)
     targets = build_comet_targets('mpc')
     # Only the second row produces a target
     assert len(targets) == 1

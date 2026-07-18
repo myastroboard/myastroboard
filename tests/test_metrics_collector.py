@@ -7,7 +7,7 @@ import os
 import time
 from unittest.mock import patch, MagicMock
 import pytest
-import metrics_collector as mc
+from utils import metrics_collector as mc
 
 is_running_in_container = mc.is_running_in_container
 get_folder_disk_usage = mc.get_folder_disk_usage
@@ -33,14 +33,14 @@ def _reset_disk_details_cache():
 class TestIsRunningInContainer:
     """Tests for is_running_in_container detection logic."""
 
-    @patch("metrics_collector.os.path.exists")
+    @patch("utils.metrics_collector.os.path.exists")
     def test_detects_docker_via_dockerenv(self, mock_exists):
         mock_exists.side_effect = lambda p: p == "/.dockerenv"
         result, container_type = is_running_in_container()
         assert result is True
         assert container_type == "Docker"
 
-    @patch("metrics_collector.os.path.exists")
+    @patch("utils.metrics_collector.os.path.exists")
     def test_detects_podman_via_containerenv(self, mock_exists):
         mock_exists.side_effect = lambda p: p == "/run/.containerenv"
         result, container_type = is_running_in_container()
@@ -48,13 +48,13 @@ class TestIsRunningInContainer:
         assert container_type == "Podman"
 
     @patch("builtins.open", side_effect=FileNotFoundError)
-    @patch("metrics_collector.os.path.exists", return_value=False)
+    @patch("utils.metrics_collector.os.path.exists", return_value=False)
     def test_returns_false_when_no_indicators(self, mock_exists, mock_open):
         result, container_type = is_running_in_container()
         assert result is False
         assert container_type is None
 
-    @patch("metrics_collector.os.path.exists", return_value=False)
+    @patch("utils.metrics_collector.os.path.exists", return_value=False)
     def test_detects_docker_via_cgroup(self, mock_exists):
         mock_file = MagicMock()
         mock_file.__enter__ = MagicMock(return_value=mock_file)
@@ -65,7 +65,7 @@ class TestIsRunningInContainer:
         assert result is True
         assert container_type == "Docker"
 
-    @patch("metrics_collector.os.path.exists", return_value=False)
+    @patch("utils.metrics_collector.os.path.exists", return_value=False)
     def test_detects_lxc_via_cgroup(self, mock_exists):
         mock_file = MagicMock()
         mock_file.__enter__ = MagicMock(return_value=mock_file)
@@ -76,7 +76,7 @@ class TestIsRunningInContainer:
         assert result is True
         assert container_type == "LXC"
 
-    @patch("metrics_collector.os.path.exists", return_value=False)
+    @patch("utils.metrics_collector.os.path.exists", return_value=False)
     def test_detects_kubernetes_via_cgroup(self, mock_exists):
         mock_file = MagicMock()
         mock_file.__enter__ = MagicMock(return_value=mock_file)
@@ -87,7 +87,7 @@ class TestIsRunningInContainer:
         assert result is True
         assert container_type == "Kubernetes"
 
-    @patch("metrics_collector.os.path.exists", return_value=False)
+    @patch("utils.metrics_collector.os.path.exists", return_value=False)
     def test_detects_systemd_nspawn_via_cgroup(self, mock_exists):
         mock_file = MagicMock()
         mock_file.__enter__ = MagicMock(return_value=mock_file)
@@ -98,7 +98,7 @@ class TestIsRunningInContainer:
         assert result is True
         assert container_type == "systemd-nspawn"
 
-    @patch("metrics_collector.os.path.exists", return_value=False)
+    @patch("utils.metrics_collector.os.path.exists", return_value=False)
     def test_detects_hypervisor_via_cpuinfo(self, mock_exists):
         call_count = [0]
         def open_side_effect(path, *args, **kwargs):
@@ -127,7 +127,7 @@ class TestGetFolderDiskUsage:
 
     def test_returns_zero_on_scandir_os_error(self, tmp_path):
         """OSError from os.scandir is caught internally; function returns 0 (not None)."""
-        with patch("metrics_collector.os.scandir", side_effect=OSError("permission denied")):
+        with patch("utils.metrics_collector.os.scandir", side_effect=OSError("permission denied")):
             result = get_folder_disk_usage(str(tmp_path))
         assert result == 0
 
@@ -176,7 +176,7 @@ class TestGetFolderDiskUsage:
 
             return _WrappedCtx()
 
-        with patch("metrics_collector.os.scandir", side_effect=_patched_scandir):
+        with patch("utils.metrics_collector.os.scandir", side_effect=_patched_scandir):
             result = get_folder_disk_usage(str(tmp_path))
         assert result == 0  # file skipped, no size added
 
@@ -203,7 +203,7 @@ class TestGetFolderDiskUsage:
 
             return _WrappedCtx()
 
-        with patch("metrics_collector.os.scandir", side_effect=_patched_scandir):
+        with patch("utils.metrics_collector.os.scandir", side_effect=_patched_scandir):
             result = get_folder_disk_usage(str(tmp_path))
         assert result == 0  # neither branch adds anything
 
@@ -212,7 +212,7 @@ class TestDetectDockerInDocker:
     """Tests for detect_docker_in_docker logic."""
 
     def test_no_indicators_returns_disabled(self):
-        with patch("metrics_collector.os.path.exists", return_value=False):
+        with patch("utils.metrics_collector.os.path.exists", return_value=False):
             with patch.dict("os.environ", {}, clear=False):
                 os.environ.pop("DOCKER_HOST", None)
                 result = detect_docker_in_docker([])
@@ -220,14 +220,14 @@ class TestDetectDockerInDocker:
         assert result["indicators"] == []
 
     def test_detects_docker_socket(self):
-        with patch("metrics_collector.os.path.exists", side_effect=lambda p: p == "/var/run/docker.sock"):
+        with patch("utils.metrics_collector.os.path.exists", side_effect=lambda p: p == "/var/run/docker.sock"):
             result = detect_docker_in_docker([])
         assert result["enabled"] is True
         assert "docker_socket" in result["indicators"]
 
     def test_detects_container_related_processes(self):
         processes = [{"is_container_related": True, "name": "dockerd"}]
-        with patch("metrics_collector.os.path.exists", return_value=False):
+        with patch("utils.metrics_collector.os.path.exists", return_value=False):
             with patch.dict("os.environ", {}, clear=False):
                 os.environ.pop("DOCKER_HOST", None)
                 result = detect_docker_in_docker(processes)
@@ -236,7 +236,7 @@ class TestDetectDockerInDocker:
         assert result["container_related_count"] == 1
 
     def test_detects_docker_host_env(self):
-        with patch("metrics_collector.os.path.exists", return_value=False):
+        with patch("utils.metrics_collector.os.path.exists", return_value=False):
             with patch.dict("os.environ", {"DOCKER_HOST": "tcp://localhost:2376"}):
                 result = detect_docker_in_docker([])
         assert result["enabled"] is True
@@ -486,7 +486,7 @@ class TestCollectMetricsMocked:
 class TestIsRunningInContainerBranchCoverage:
     """Cover lines 57->63 and 66->71 (cgroup/cpuinfo readable but no pattern matches)."""
 
-    @patch("metrics_collector.os.path.exists", return_value=False)
+    @patch("utils.metrics_collector.os.path.exists", return_value=False)
     def test_cgroup_no_pattern_and_cpuinfo_no_hypervisor_returns_false(self, mock_exists):
         """
         Lines 57->63: cgroup read but 'systemd-nspawn' absent → falls to cpuinfo block.
@@ -522,7 +522,7 @@ class TestGetDiskSpaceDetailsFolderNone:
         mock_disk.percent = 50.0
 
         with patch.object(mc.psutil, 'disk_usage', create=True, return_value=mock_disk), \
-             patch('metrics_collector.get_folder_disk_usage', return_value=None):
+             patch('utils.metrics_collector.get_folder_disk_usage', return_value=None):
             result = mc.get_disk_space_details()
 
         assert "folders" in result
@@ -541,7 +541,7 @@ class TestGetDiskSpaceDetailsCache:
         mc._disk_details_cache['data'] = {'root': {}, 'folders': {'sentinel': True}, 'total_tracked': 0}
         mc._disk_details_cache['ts'] = time.monotonic()
 
-        with patch('metrics_collector._compute_disk_space_details') as mock_compute:
+        with patch('utils.metrics_collector._compute_disk_space_details') as mock_compute:
             result = mc.get_disk_space_details()
 
         mock_compute.assert_not_called()
@@ -561,8 +561,8 @@ class TestGetDiskSpaceDetailsCache:
             def start(self):
                 self._target()
 
-        with patch('metrics_collector._compute_disk_space_details', return_value=fresh_value), \
-             patch('metrics_collector.threading.Thread', _ImmediateThread):
+        with patch('utils.metrics_collector._compute_disk_space_details', return_value=fresh_value), \
+             patch('utils.metrics_collector.threading.Thread', _ImmediateThread):
             result = mc.get_disk_space_details()
 
         # The caller gets the stale value immediately, never blocking on the scan...
@@ -576,7 +576,7 @@ class TestGetDiskSpaceDetailsCache:
         mc._disk_details_cache['ts'] = time.monotonic() - mc._DISK_DETAILS_CACHE_TTL - 1
         mc._disk_details_refreshing = True
 
-        with patch('metrics_collector.threading.Thread') as mock_thread:
+        with patch('utils.metrics_collector.threading.Thread') as mock_thread:
             mc.get_disk_space_details()
 
         mock_thread.assert_not_called()

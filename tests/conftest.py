@@ -112,13 +112,13 @@ def setup_test_environment():
 def reset_app_settings_module_cache():
     """Reset the app_settings module-level cache between tests."""
     try:
-        import app_settings
+        from utils import app_settings
         app_settings._cache = None
     except ImportError:
         pass  # app_settings not available in all test configurations
     yield
     try:
-        import app_settings
+        from utils import app_settings
         app_settings._cache = None
     except ImportError:
         pass  # app_settings not available in all test configurations
@@ -254,7 +254,7 @@ def client():
 def client_admin():
     """Admin-authenticated Flask test client."""
     from app import app as _flask_app
-    from auth import user_manager as _um
+    from utils.auth import user_manager as _um
     _flask_app.config['TESTING'] = True
     with _tmpfile.TemporaryDirectory():
         with _flask_app.test_client() as c:

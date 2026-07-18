@@ -4,7 +4,7 @@ Covers pure-logic rating methods, constants, and mocked event finders.
 """
 
 from unittest.mock import patch
-import solar_system_events as module
+from observation import solar_system_events as module
 
 SolarSystemEventsService = module.SolarSystemEventsService
 
@@ -264,7 +264,7 @@ class TestIsRadiantVisible:
         from astropy.time import Time
         svc = SolarSystemEventsService(45.0, -73.5)
         t = Time("2026-08-12T02:00:00", format="isot", scale="utc")
-        with patch("solar_system_events.SkyCoord", side_effect=Exception("bad")):
+        with patch("observation.solar_system_events.SkyCoord", side_effect=Exception("bad")):
             result = svc._is_radiant_visible(48, 58, t)
         assert result is False
 

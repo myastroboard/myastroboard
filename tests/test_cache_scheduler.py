@@ -2,7 +2,7 @@
 
 import pytest
 
-import cache_scheduler as module
+from cache import cache_scheduler as module
 
 
 class DummyThread:

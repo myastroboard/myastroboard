@@ -18,7 +18,7 @@ if 'psutil' not in sys.modules:
 
 @pytest.fixture(autouse=True)
 def reset_scheduler_state():
-    import push_scheduler
+    from utils import push_scheduler
     push_scheduler._last_sent.clear()
     push_scheduler._n2_notified.clear()
     push_scheduler._any_active_night = False
@@ -49,24 +49,24 @@ def _now_iso(**delta):
 # ---------------------------------------------------------------------------
 
 def test_was_recently_notified_returns_false_when_never_sent():
-    import push_scheduler
+    from utils import push_scheduler
     assert not push_scheduler._was_recently_notified('u1', 'N7', 3600)
 
 
 def test_was_recently_notified_returns_true_within_cooldown():
-    import push_scheduler
+    from utils import push_scheduler
     push_scheduler._mark_notified('u1', 'N7')
     assert push_scheduler._was_recently_notified('u1', 'N7', 3600)
 
 
 def test_was_recently_notified_returns_false_after_cooldown_expires():
-    import push_scheduler
+    from utils import push_scheduler
     push_scheduler._last_sent['u1'] = {'N7': time.monotonic() - 7200}
     assert not push_scheduler._was_recently_notified('u1', 'N7', 3600)
 
 
 def test_mark_notified_is_per_user_and_trigger():
-    import push_scheduler
+    from utils import push_scheduler
     push_scheduler._mark_notified('u1', 'N7')
     assert push_scheduler._was_recently_notified('u1', 'N7', 3600)
     assert not push_scheduler._was_recently_notified('u2', 'N7', 3600)
@@ -78,7 +78,7 @@ def test_mark_notified_is_per_user_and_trigger():
 # ---------------------------------------------------------------------------
 
 def test_n7_sends_when_kp_meets_threshold(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
 
@@ -89,7 +89,7 @@ def test_n7_sends_when_kp_meets_threshold(monkeypatch):
 
 
 def test_n7_skips_when_kp_below_default_threshold(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
 
@@ -100,7 +100,7 @@ def test_n7_skips_when_kp_below_default_threshold(monkeypatch):
 
 
 def test_n7_respects_custom_kp_threshold(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
 
@@ -112,7 +112,7 @@ def test_n7_respects_custom_kp_threshold(monkeypatch):
 
 
 def test_n7_skips_when_disabled(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
 
@@ -124,7 +124,7 @@ def test_n7_skips_when_disabled(monkeypatch):
 
 
 def test_n7_skips_on_cooldown(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     push_scheduler._mark_notified('u1', 'N7')
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
@@ -136,7 +136,7 @@ def test_n7_skips_on_cooldown(monkeypatch):
 
 
 def test_n7_skips_when_cache_is_none(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
 
@@ -149,7 +149,7 @@ def test_n7_skips_when_cache_is_none(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_n1_sends_when_night_starts_within_lead_window(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
 
@@ -164,7 +164,7 @@ def test_n1_sends_when_night_starts_within_lead_window(monkeypatch):
 
 
 def test_n1_skips_when_already_inside_night(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
 
@@ -179,7 +179,7 @@ def test_n1_skips_when_already_inside_night(monkeypatch):
 
 
 def test_n1_skips_when_night_starts_too_far_away(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
 
@@ -194,7 +194,7 @@ def test_n1_skips_when_night_starts_too_far_away(monkeypatch):
 
 
 def test_n1_skips_when_state_is_none_or_payload_none(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
 
@@ -205,7 +205,7 @@ def test_n1_skips_when_state_is_none_or_payload_none(monkeypatch):
 
 
 def test_n1_respects_custom_lead_minutes(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
 
@@ -225,7 +225,7 @@ def test_n1_respects_custom_lead_minutes(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_n2_sends_for_upcoming_entry(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
 
@@ -242,7 +242,7 @@ def test_n2_sends_for_upcoming_entry(monkeypatch):
 
 
 def test_n2_deduplicates_same_entry_across_calls(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
 
@@ -261,7 +261,7 @@ def test_n2_deduplicates_same_entry_across_calls(monkeypatch):
 
 
 def test_n2_skips_done_entries(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
 
@@ -278,7 +278,7 @@ def test_n2_skips_done_entries(monkeypatch):
 
 
 def test_n2_skips_when_outside_night(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
 
@@ -295,7 +295,7 @@ def test_n2_skips_when_outside_night(monkeypatch):
 
 
 def test_n2_skips_entry_outside_lead_window(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
 
@@ -312,7 +312,7 @@ def test_n2_skips_entry_outside_lead_window(monkeypatch):
 
 
 def test_n2_uses_target_name_fallback_for_dedup(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
 
@@ -336,7 +336,7 @@ def test_n2_uses_target_name_fallback_for_dedup(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_n6_sends_when_dusk_within_lead_window(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
 
@@ -347,7 +347,7 @@ def test_n6_sends_when_dusk_within_lead_window(monkeypatch):
 
 
 def test_n6_skips_when_dusk_too_far_away(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
 
@@ -358,7 +358,7 @@ def test_n6_skips_when_dusk_too_far_away(monkeypatch):
 
 
 def test_n6_skips_on_cooldown(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     push_scheduler._mark_notified('u1', 'N6')
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
@@ -374,7 +374,7 @@ def test_n6_skips_on_cooldown(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_n3_sends_for_upcoming_solar_transit(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
 
@@ -386,7 +386,7 @@ def test_n3_sends_for_upcoming_solar_transit(monkeypatch):
 
 
 def test_n3_sends_for_upcoming_lunar_transit(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
 
@@ -398,7 +398,7 @@ def test_n3_sends_for_upcoming_lunar_transit(monkeypatch):
 
 
 def test_n3_picks_the_sooner_transit(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
 
@@ -413,7 +413,7 @@ def test_n3_picks_the_sooner_transit(monkeypatch):
 
 
 def test_n3_skips_when_no_transits(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
 
@@ -424,7 +424,7 @@ def test_n3_skips_when_no_transits(monkeypatch):
 
 
 def test_n3_skips_past_transits(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
 
@@ -442,7 +442,7 @@ def test_n3_skips_past_transits(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_n4_sends_for_upcoming_lunar_eclipse_peak(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
 
@@ -453,7 +453,7 @@ def test_n4_sends_for_upcoming_lunar_eclipse_peak(monkeypatch):
 
 
 def test_n5_sends_for_upcoming_solar_eclipse_peak(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
 
@@ -464,7 +464,7 @@ def test_n5_sends_for_upcoming_solar_eclipse_peak(monkeypatch):
 
 
 def test_eclipse_skips_when_peak_too_far_away(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
 
@@ -475,7 +475,7 @@ def test_eclipse_skips_when_peak_too_far_away(monkeypatch):
 
 
 def test_eclipse_skips_past_peak(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
 
@@ -490,8 +490,8 @@ def test_eclipse_skips_past_peak(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_send_delivers_to_all_subscriptions_and_marks_notified(monkeypatch):
-    import push_manager
-    import push_scheduler
+    from utils import push_manager
+    from utils import push_scheduler
 
     delivered = []
     monkeypatch.setattr(push_manager, 'send_push', lambda sub_info, payload, **kw: delivered.append(sub_info['endpoint']) or True)
@@ -507,8 +507,8 @@ def test_send_delivers_to_all_subscriptions_and_marks_notified(monkeypatch):
 
 
 def test_send_skips_user_with_no_subscriptions(monkeypatch):
-    import push_manager
-    import push_scheduler
+    from utils import push_manager
+    from utils import push_scheduler
 
     delivered = []
     monkeypatch.setattr(push_manager, 'send_push', lambda *a: delivered.append(1) or True)
@@ -519,8 +519,8 @@ def test_send_skips_user_with_no_subscriptions(monkeypatch):
 
 
 def test_send_removes_dead_subscriptions(monkeypatch):
-    import push_manager
-    import push_scheduler
+    from utils import push_manager
+    from utils import push_scheduler
 
     monkeypatch.setattr(
         push_manager, 'send_push',
@@ -540,8 +540,8 @@ def test_send_removes_dead_subscriptions(monkeypatch):
 
 
 def test_send_does_not_call_cleanup_when_all_succeed(monkeypatch):
-    import push_manager
-    import push_scheduler
+    from utils import push_manager
+    from utils import push_scheduler
 
     monkeypatch.setattr(push_manager, 'send_push', lambda *a, **kw: True)
 
@@ -558,8 +558,8 @@ def test_send_does_not_call_cleanup_when_all_succeed(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_cleanup_removes_dead_endpoints_and_saves(monkeypatch):
-    import auth
-    import push_scheduler
+    from utils import auth
+    from utils import push_scheduler
 
     saved = []
     monkeypatch.setattr(auth.user_manager, 'save_users', lambda: saved.append(1))
@@ -576,8 +576,8 @@ def test_cleanup_removes_dead_endpoints_and_saves(monkeypatch):
 
 
 def test_cleanup_handles_all_dead(monkeypatch):
-    import auth
-    import push_scheduler
+    from utils import auth
+    from utils import push_scheduler
 
     monkeypatch.setattr(auth.user_manager, 'save_users', lambda: None)
 
@@ -598,8 +598,8 @@ def test_cleanup_handles_all_dead(monkeypatch):
 
 
 def test_send_does_not_mark_notified_when_all_deliveries_fail(monkeypatch):
-    import push_manager
-    import push_scheduler
+    from utils import push_manager
+    from utils import push_scheduler
 
     monkeypatch.setattr(push_manager, 'send_push', lambda *a, **kw: False)
     push_scheduler._send(_make_user(), 'N7', 'Title', 'Body', '/url')
@@ -608,23 +608,23 @@ def test_send_does_not_mark_notified_when_all_deliveries_fail(monkeypatch):
 
 
 def test_load_cache_returns_none_on_exception(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
 
     class _FailingCacheModule:
         @staticmethod
         def load_shared_cache_entry(_k):
             raise RuntimeError('boom')
 
-    monkeypatch.setitem(sys.modules, 'cache_store', _FailingCacheModule)
+    monkeypatch.setitem(sys.modules, 'cache.cache_store', _FailingCacheModule)
     assert push_scheduler._load_cache('any') is None
 
 
 def test_pick_active_plan_prefers_inside_night(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
 
     monkeypatch.setitem(
         sys.modules,
-        'plan_my_night',
+        'observation.plan_my_night',
         types.SimpleNamespace(
             get_all_plan_files=lambda _uid: [
                 '/x/u1_plan_telescope1.json',
@@ -645,12 +645,12 @@ def test_pick_active_plan_prefers_inside_night(monkeypatch):
 
 def test_pick_active_plan_returns_none_when_import_fails(monkeypatch):
     import builtins
-    import push_scheduler
+    from utils import push_scheduler
 
     real_import = builtins.__import__
 
     def _fake_import(name, *args, **kwargs):
-        if name == 'plan_my_night':
+        if name == 'observation.plan_my_night':
             raise ImportError('missing')
         return real_import(name, *args, **kwargs)
 
@@ -659,7 +659,7 @@ def test_pick_active_plan_returns_none_when_import_fails(monkeypatch):
 
 
 def test_poll_sets_any_active_night_and_calls_checks(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
 
     calls = []
     monkeypatch.setattr(push_scheduler, '_check_n7_aurora', lambda *a, **k: calls.append('n7'))
@@ -677,7 +677,7 @@ def test_poll_sets_any_active_night_and_calls_checks(monkeypatch):
 
     user = _make_user(user_id='u1', username='alice')
     fake_um = types.SimpleNamespace(users={'u1': user}, _reload_users_if_changed=lambda: None)
-    monkeypatch.setitem(sys.modules, 'auth', types.SimpleNamespace(user_manager=fake_um))
+    monkeypatch.setitem(sys.modules, 'utils.auth', types.SimpleNamespace(user_manager=fake_um))
 
     push_scheduler._poll()
 
@@ -687,7 +687,7 @@ def test_poll_sets_any_active_night_and_calls_checks(monkeypatch):
 
 
 def test_poll_skips_users_with_notifications_disabled_or_no_subscriptions(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
 
     called = []
     monkeypatch.setattr(push_scheduler, '_check_n7_aurora', lambda *a, **k: called.append(1))
@@ -699,14 +699,14 @@ def test_poll_skips_users_with_notifications_disabled_or_no_subscriptions(monkey
     u_no_sub = _make_user(user_id='u2', username='nosub', subscriptions=[])
 
     fake_um = types.SimpleNamespace(users={'u1': u_disabled, 'u2': u_no_sub}, _reload_users_if_changed=lambda: None)
-    monkeypatch.setitem(sys.modules, 'auth', types.SimpleNamespace(user_manager=fake_um))
+    monkeypatch.setitem(sys.modules, 'utils.auth', types.SimpleNamespace(user_manager=fake_um))
 
     push_scheduler._poll()
     assert not called
 
 
 def test_start_does_not_spawn_when_lock_unavailable(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
 
     push_scheduler._scheduler_thread = None
     monkeypatch.setattr(push_scheduler, '_acquire_lock', lambda: False)
@@ -716,7 +716,7 @@ def test_start_does_not_spawn_when_lock_unavailable(monkeypatch):
 
 
 def test_start_spawns_thread_and_stop_sets_event(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
 
     release_calls = []
 
@@ -747,7 +747,7 @@ def test_start_spawns_thread_and_stop_sets_event(monkeypatch):
 
 
 def test_release_lock_handles_unlock_errors(monkeypatch, tmp_path):
-    import push_scheduler
+    from utils import push_scheduler
 
     lock_path = tmp_path / 'lock.tmp'
     fp = open(lock_path, 'w', encoding='utf-8')
@@ -761,10 +761,10 @@ def test_release_lock_handles_unlock_errors(monkeypatch, tmp_path):
 
 
 def test_acquire_lock_success_and_failure(monkeypatch, tmp_path):
-    import push_scheduler
+    from utils import push_scheduler
 
     fake_constants = types.SimpleNamespace(DATA_DIR_CACHE=str(tmp_path))
-    monkeypatch.setitem(sys.modules, 'constants', fake_constants)
+    monkeypatch.setitem(sys.modules, 'utils.constants', fake_constants)
     monkeypatch.setattr(push_scheduler.sys, 'platform', 'win32')
     monkeypatch.setattr(push_scheduler.msvcrt, 'locking', lambda *a, **k: None)
 
@@ -781,7 +781,7 @@ def test_acquire_lock_success_and_failure(monkeypatch, tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_n7_non_numeric_kp_skips(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     cache = {'current': {'kp_index': 'not-a-number', 'visibility_level': 'Low'}}
@@ -790,7 +790,7 @@ def test_n7_non_numeric_kp_skips(monkeypatch):
 
 
 def test_n1_disabled_skips(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     user = _make_user(triggers={'N1': {'enabled': False}})
@@ -801,7 +801,7 @@ def test_n1_disabled_skips(monkeypatch):
 
 
 def test_n1_no_night_start_skips(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     payload = {'state': 'pending', 'timeline': {'is_inside_night': False}, 'plan': {}}
@@ -811,7 +811,7 @@ def test_n1_no_night_start_skips(monkeypatch):
 
 def test_n1_naive_datetime_handled(monkeypatch):
     """Naive datetime in night_start is treated as UTC."""
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     from datetime import datetime, timedelta
@@ -824,7 +824,7 @@ def test_n1_naive_datetime_handled(monkeypatch):
 
 
 def test_n1_exception_in_date_parsing_swallowed(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     payload = {'state': 'pending', 'timeline': {'is_inside_night': False},
@@ -834,7 +834,7 @@ def test_n1_exception_in_date_parsing_swallowed(monkeypatch):
 
 
 def test_n2_disabled_skips(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     user = _make_user(triggers={'N2': {'enabled': False}})
@@ -846,7 +846,7 @@ def test_n2_disabled_skips(monkeypatch):
 
 
 def test_n2_past_entry_skipped(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     payload = {'state': 'active', 'timeline': {'is_inside_night': True},
@@ -857,7 +857,7 @@ def test_n2_past_entry_skipped(monkeypatch):
 
 
 def test_n2_no_start_str_entry_skipped(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     payload = {'state': 'active', 'timeline': {'is_inside_night': True},
@@ -867,7 +867,7 @@ def test_n2_no_start_str_entry_skipped(monkeypatch):
 
 
 def test_n2_bad_date_exception_swallowed(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     payload = {'state': 'active', 'timeline': {'is_inside_night': True},
@@ -878,7 +878,7 @@ def test_n2_bad_date_exception_swallowed(monkeypatch):
 
 
 def test_n6_no_cache_skips(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     push_scheduler._check_n6_darkness(_make_user(), None)
@@ -886,7 +886,7 @@ def test_n6_no_cache_skips(monkeypatch):
 
 
 def test_n6_disabled_skips(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     user = _make_user(triggers={'N6': {'enabled': False}})
@@ -895,7 +895,7 @@ def test_n6_disabled_skips(monkeypatch):
 
 
 def test_n6_no_dusk_str_skips(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     push_scheduler._check_n6_darkness(_make_user(), {'location': {}})
@@ -903,7 +903,7 @@ def test_n6_no_dusk_str_skips(monkeypatch):
 
 
 def test_n6_exception_in_parsing_swallowed(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     push_scheduler._check_n6_darkness(_make_user(), {'next_astronomical_dusk_utc': 'bad-date'})
@@ -911,7 +911,7 @@ def test_n6_exception_in_parsing_swallowed(monkeypatch):
 
 
 def test_n6_naive_dusk_handled(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     from datetime import datetime, timedelta
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
@@ -921,7 +921,7 @@ def test_n6_naive_dusk_handled(monkeypatch):
 
 
 def test_n3_no_cache_skips(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     push_scheduler._check_n3_iss(_make_user(), None)
@@ -929,7 +929,7 @@ def test_n3_no_cache_skips(monkeypatch):
 
 
 def test_n3_disabled_skips(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     user = _make_user(triggers={'N3': {'enabled': False}})
@@ -939,7 +939,7 @@ def test_n3_disabled_skips(monkeypatch):
 
 
 def test_n3_transit_outside_lead_no_notification(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     cache = {'solar_transits': [{'start_time': _now_iso(minutes=30)}], 'lunar_transits': []}
@@ -948,7 +948,7 @@ def test_n3_transit_outside_lead_no_notification(monkeypatch):
 
 
 def test_n3_cooldown_active_skips(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     push_scheduler._mark_notified('u1', 'N3')
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
@@ -958,7 +958,7 @@ def test_n3_cooldown_active_skips(monkeypatch):
 
 
 def test_n3_no_start_str_in_transit_skipped(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     cache = {'solar_transits': [{}], 'lunar_transits': [{}]}
@@ -967,7 +967,7 @@ def test_n3_no_start_str_in_transit_skipped(monkeypatch):
 
 
 def test_n3_bad_timestamp_in_transit_swallowed(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     cache = {'solar_transits': [{'start_time': 'bad-date'}], 'lunar_transits': []}
@@ -976,7 +976,7 @@ def test_n3_bad_timestamp_in_transit_swallowed(monkeypatch):
 
 
 def test_n4n5_disabled_skips(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     user = _make_user(triggers={'N4': {'enabled': False}, 'N5': {'enabled': False}})
@@ -986,7 +986,7 @@ def test_n4n5_disabled_skips(monkeypatch):
 
 
 def test_n4_no_peak_time_skips(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     push_scheduler._check_n4_n5_eclipse(_make_user(), None, {'eclipse': {}})
@@ -994,7 +994,7 @@ def test_n4_no_peak_time_skips(monkeypatch):
 
 
 def test_n4_bad_peak_time_exception_swallowed(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     push_scheduler._check_n4_n5_eclipse(_make_user(), None, {'eclipse': {'peak_time': 'bad-date'}})
@@ -1003,8 +1003,8 @@ def test_n4_bad_peak_time_exception_swallowed(monkeypatch):
 
 def test_cleanup_exception_handler(monkeypatch):
     """_cleanup_dead_subscriptions swallows exceptions."""
-    import push_scheduler
-    import auth
+    from utils import push_scheduler
+    from utils import auth
     monkeypatch.setattr(auth.user_manager, 'save_users', lambda: (_ for _ in ()).throw(Exception('db fail')))
     user = _make_user(subscriptions=[{'endpoint': 'https://push.example.com/dead', 'keys': {}}])
     # Should not raise
@@ -1012,23 +1012,23 @@ def test_cleanup_exception_handler(monkeypatch):
 
 
 def test_load_cache_returns_none_when_entry_is_none(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
 
     class _NullCacheModule:
         @staticmethod
         def load_shared_cache_entry(_k):
             return None
 
-    monkeypatch.setitem(sys.modules, 'cache_store', _NullCacheModule)
+    monkeypatch.setitem(sys.modules, 'cache.cache_store', _NullCacheModule)
     result = push_scheduler._load_cache('any')
     assert result is None
 
 
 def test_pick_active_plan_no_plan_files(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     monkeypatch.setitem(
         sys.modules,
-        'plan_my_night',
+        'observation.plan_my_night',
         types.SimpleNamespace(
             get_all_plan_files=lambda _uid: [],
             get_plan_with_timeline=lambda *a, **k: {},
@@ -1040,10 +1040,10 @@ def test_pick_active_plan_no_plan_files(monkeypatch):
 
 def test_pick_active_plan_file_wrong_prefix_skipped(monkeypatch):
     """Files not matching user prefix are skipped."""
-    import push_scheduler
+    from utils import push_scheduler
     monkeypatch.setitem(
         sys.modules,
-        'plan_my_night',
+        'observation.plan_my_night',
         types.SimpleNamespace(
             get_all_plan_files=lambda _uid: ['/x/u2_plan_my_night.json'],
             get_plan_with_timeline=lambda *a, **k: {'state': 'current',
@@ -1056,10 +1056,10 @@ def test_pick_active_plan_file_wrong_prefix_skipped(monkeypatch):
 
 def test_pick_active_plan_state_none_excluded(monkeypatch):
     """Plans with state='none' are excluded from candidates."""
-    import push_scheduler
+    from utils import push_scheduler
     monkeypatch.setitem(
         sys.modules,
-        'plan_my_night',
+        'observation.plan_my_night',
         types.SimpleNamespace(
             get_all_plan_files=lambda _uid: ['/x/u1_plan_my_night.json'],
             get_plan_with_timeline=lambda *a, **k: {'state': 'none',
@@ -1072,10 +1072,10 @@ def test_pick_active_plan_state_none_excluded(monkeypatch):
 
 def test_pick_active_plan_exception_loading_plan(monkeypatch):
     """Exception when loading a plan is swallowed."""
-    import push_scheduler
+    from utils import push_scheduler
     monkeypatch.setitem(
         sys.modules,
-        'plan_my_night',
+        'observation.plan_my_night',
         types.SimpleNamespace(
             get_all_plan_files=lambda _uid: ['/x/u1_plan_my_night.json'],
             get_plan_with_timeline=lambda *a, **k: (_ for _ in ()).throw(RuntimeError('boom')),
@@ -1087,7 +1087,7 @@ def test_pick_active_plan_exception_loading_plan(monkeypatch):
 
 def test_start_skips_when_thread_already_alive(monkeypatch):
     """start() is a no-op if scheduler thread is alive."""
-    import push_scheduler
+    from utils import push_scheduler
     alive_thread = MagicMock()
     alive_thread.is_alive.return_value = True
     push_scheduler._scheduler_thread = alive_thread
@@ -1099,7 +1099,7 @@ def test_start_skips_when_thread_already_alive(monkeypatch):
 
 def test_poll_no_night_start_skips_active_check(monkeypatch):
     """Line 549->562: is_inside_night=False and no night_start → False branch."""
-    import push_scheduler
+    from utils import push_scheduler
 
     calls = []
     monkeypatch.setattr(push_scheduler, '_check_n7_aurora', lambda *a, **k: calls.append('n7'))
@@ -1119,7 +1119,7 @@ def test_poll_no_night_start_skips_active_check(monkeypatch):
     )
     user = _make_user(user_id='u1', username='alice')
     fake_um = types.SimpleNamespace(users={'u1': user}, _reload_users_if_changed=lambda: None)
-    monkeypatch.setitem(sys.modules, 'auth', types.SimpleNamespace(user_manager=fake_um))
+    monkeypatch.setitem(sys.modules, 'utils.auth', types.SimpleNamespace(user_manager=fake_um))
 
     push_scheduler._poll()
 
@@ -1129,7 +1129,7 @@ def test_poll_no_night_start_skips_active_check(monkeypatch):
 
 def test_run_calls_poll_once_then_exits(monkeypatch):
     """Lines 576-581: _run() executes loop body once then exits when stop event set."""
-    import push_scheduler
+    from utils import push_scheduler
 
     push_scheduler._stop_event.clear()
     poll_calls = []
@@ -1147,7 +1147,7 @@ def test_run_calls_poll_once_then_exits(monkeypatch):
 
 def test_acquire_lock_open_fails_returns_false(monkeypatch, tmp_path):
     """Line 610->613: open() raises → _lock_file stays None → if block skipped → return False."""
-    import push_scheduler
+    from utils import push_scheduler
     import builtins
 
     push_scheduler._lock_file = None
@@ -1161,7 +1161,7 @@ def test_acquire_lock_open_fails_returns_false(monkeypatch, tmp_path):
 
     monkeypatch.setattr(builtins, 'open', _failing_open)
     fake_constants = types.SimpleNamespace(DATA_DIR_CACHE=str(tmp_path))
-    monkeypatch.setitem(sys.modules, 'constants', fake_constants)
+    monkeypatch.setitem(sys.modules, 'utils.constants', fake_constants)
 
     result = push_scheduler._acquire_lock()
 
@@ -1171,7 +1171,7 @@ def test_acquire_lock_open_fails_returns_false(monkeypatch, tmp_path):
 
 def test_poll_fast_mode_via_pending_night(monkeypatch):
     """Poll detects a plan with night starting within 30 min and sets any_active."""
-    import push_scheduler
+    from utils import push_scheduler
     from datetime import datetime, timedelta, timezone as tz
 
     soon_start = (datetime.now(tz.utc) + timedelta(minutes=10)).isoformat()
@@ -1190,7 +1190,7 @@ def test_poll_fast_mode_via_pending_night(monkeypatch):
 
     user = _make_user(user_id='u1', username='alice')
     fake_um = types.SimpleNamespace(users={'u1': user}, _reload_users_if_changed=lambda: None)
-    monkeypatch.setitem(sys.modules, 'auth', types.SimpleNamespace(user_manager=fake_um))
+    monkeypatch.setitem(sys.modules, 'utils.auth', types.SimpleNamespace(user_manager=fake_um))
 
     push_scheduler._poll()
     assert push_scheduler._any_active_night is True
@@ -1202,7 +1202,7 @@ def test_poll_fast_mode_via_pending_night(monkeypatch):
 
 def test_n2_skips_when_payload_none(monkeypatch):
     """Lines 232-233: _check_n2_next_target returns early when payload is None."""
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     push_scheduler._check_n2_next_target(_make_user(), None)
@@ -1211,7 +1211,7 @@ def test_n2_skips_when_payload_none(monkeypatch):
 
 def test_n2_skips_when_state_none(monkeypatch):
     """Lines 232-233: _check_n2_next_target returns early when state='none'."""
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     push_scheduler._check_n2_next_target(_make_user(), {'state': 'none'})
@@ -1220,7 +1220,7 @@ def test_n2_skips_when_state_none(monkeypatch):
 
 def test_n2_naive_datetime_in_entry_gets_utc(monkeypatch):
     """Line 259: naive timeline_start is treated as UTC (tzinfo=None branch)."""
-    import push_scheduler
+    from utils import push_scheduler
     from datetime import datetime, timedelta, timezone as tz
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
@@ -1240,7 +1240,7 @@ def test_n2_naive_datetime_in_entry_gets_utc(monkeypatch):
 
 def test_n6_bad_timezone_name_falls_back_to_empty(monkeypatch):
     """Lines 324-325: ZoneInfo(bad_tz_name) raises, dusk_local_time falls back to ''."""
-    import push_scheduler
+    from utils import push_scheduler
     from datetime import datetime, timedelta, timezone as tz
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
@@ -1257,7 +1257,7 @@ def test_n6_bad_timezone_name_falls_back_to_empty(monkeypatch):
 
 def test_n3_solar_naive_datetime_gets_utc(monkeypatch):
     """Line 358: naive solar transit start_time is replaced with UTC."""
-    import push_scheduler
+    from utils import push_scheduler
     from datetime import datetime, timedelta
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
@@ -1270,7 +1270,7 @@ def test_n3_solar_naive_datetime_gets_utc(monkeypatch):
 
 def test_n3_lunar_naive_datetime_gets_utc(monkeypatch):
     """Line 369: naive lunar transit start_time is replaced with UTC."""
-    import push_scheduler
+    from utils import push_scheduler
     from datetime import datetime, timedelta
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
@@ -1283,7 +1283,7 @@ def test_n3_lunar_naive_datetime_gets_utc(monkeypatch):
 
 def test_n3_bad_lunar_timestamp_exception_swallowed(monkeypatch):
     """Lines 372-373: bad lunar transit timestamp is swallowed."""
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     cache = {'solar_transits': [], 'lunar_transits': [{'start_time': 'not-a-date'}]}
@@ -1293,7 +1293,7 @@ def test_n3_bad_lunar_timestamp_exception_swallowed(monkeypatch):
 
 def test_n4_naive_peak_datetime_gets_utc(monkeypatch):
     """Line 424: naive peak_time in lunar eclipse data is replaced with UTC."""
-    import push_scheduler
+    from utils import push_scheduler
     from datetime import datetime, timedelta
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
@@ -1306,10 +1306,10 @@ def test_n4_naive_peak_datetime_gets_utc(monkeypatch):
 
 def test_pick_active_plan_fallback_returns_current_state(monkeypatch):
     """Lines 504-506: when no candidate is_inside_night, return first with state='current'."""
-    import push_scheduler
+    from utils import push_scheduler
     monkeypatch.setitem(
         sys.modules,
-        'plan_my_night',
+        'observation.plan_my_night',
         types.SimpleNamespace(
             get_all_plan_files=lambda _uid: [
                 '/x/u1_plan_my_night.json',
@@ -1328,10 +1328,10 @@ def test_pick_active_plan_fallback_returns_current_state(monkeypatch):
 
 def test_pick_active_plan_fallback_returns_first_candidate(monkeypatch):
     """Line 507: when no candidate is state='current', return candidates[0]."""
-    import push_scheduler
+    from utils import push_scheduler
     monkeypatch.setitem(
         sys.modules,
-        'plan_my_night',
+        'observation.plan_my_night',
         types.SimpleNamespace(
             get_all_plan_files=lambda _uid: ['/x/u1_plan_my_night.json'],
             get_plan_with_timeline=lambda uid, uname, telescope_id=None: {
@@ -1347,7 +1347,7 @@ def test_pick_active_plan_fallback_returns_first_candidate(monkeypatch):
 
 def test_poll_outer_exception_swallowed(monkeypatch):
     """Lines 569-570: outer exception in _poll() is caught and logged."""
-    import push_scheduler
+    from utils import push_scheduler
     # Make user_manager import raise inside the poll try block
     bad_auth = types.SimpleNamespace(
         user_manager=types.SimpleNamespace(
@@ -1355,13 +1355,13 @@ def test_poll_outer_exception_swallowed(monkeypatch):
             _reload_users_if_changed=lambda: (_ for _ in ()).throw(RuntimeError('reload boom')),
         )
     )
-    monkeypatch.setitem(sys.modules, 'auth', bad_auth)
+    monkeypatch.setitem(sys.modules, 'utils.auth', bad_auth)
     push_scheduler._poll()  # Must not raise
 
 
 def test_poll_bad_night_start_exception_swallowed(monkeypatch):
     """Lines 559-560: unparseable night_start causes inner exception that is swallowed."""
-    import push_scheduler
+    from utils import push_scheduler
     for fn in ('_check_n7_aurora', '_check_n1_plan_start', '_check_n2_next_target',
                '_check_n6_darkness', '_check_n3_iss', '_check_n4_n5_eclipse'):
         monkeypatch.setattr(push_scheduler, fn, lambda *a, **k: None)
@@ -1377,20 +1377,20 @@ def test_poll_bad_night_start_exception_swallowed(monkeypatch):
     )
     user = _make_user(user_id='u1', username='alice')
     fake_um = types.SimpleNamespace(users={'u1': user}, _reload_users_if_changed=lambda: None)
-    monkeypatch.setitem(sys.modules, 'auth', types.SimpleNamespace(user_manager=fake_um))
+    monkeypatch.setitem(sys.modules, 'utils.auth', types.SimpleNamespace(user_manager=fake_um))
     push_scheduler._poll()  # Must not raise
 
 
 def test_release_lock_when_no_lock_file(monkeypatch):
     """Line 619: _release_lock() is a no-op when _lock_file is None."""
-    import push_scheduler
+    from utils import push_scheduler
     push_scheduler._lock_file = None
     push_scheduler._release_lock()  # Must not raise
 
 
 def test_n3_past_lunar_transit_not_added_to_candidates(monkeypatch):
     """Branch 370→363: lunar transit in the PAST is not added to candidates (dt <= now)."""
-    import push_scheduler
+    from utils import push_scheduler
     from datetime import datetime, timedelta
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
@@ -1404,7 +1404,7 @@ def test_n3_past_lunar_transit_not_added_to_candidates(monkeypatch):
 
 def test_poll_no_plan_skips_fast_mode_detection(monkeypatch):
     """Branch 542→562: when plan_payload is None, fast-mode block is skipped."""
-    import push_scheduler
+    from utils import push_scheduler
     for fn in ('_check_n7_aurora', '_check_n1_plan_start', '_check_n2_next_target',
                '_check_n6_darkness', '_check_n3_iss', '_check_n4_n5_eclipse'):
         monkeypatch.setattr(push_scheduler, fn, lambda *a, **k: None)
@@ -1412,14 +1412,14 @@ def test_poll_no_plan_skips_fast_mode_detection(monkeypatch):
     monkeypatch.setattr(push_scheduler, '_pick_active_plan', lambda _uid, _name: None)
     user = _make_user(user_id='u1', username='alice')
     fake_um = types.SimpleNamespace(users={'u1': user}, _reload_users_if_changed=lambda: None)
-    monkeypatch.setitem(sys.modules, 'auth', types.SimpleNamespace(user_manager=fake_um))
+    monkeypatch.setitem(sys.modules, 'utils.auth', types.SimpleNamespace(user_manager=fake_um))
     push_scheduler._poll()
     assert push_scheduler._any_active_night is False
 
 
 def test_poll_night_start_naive_gets_utc(monkeypatch):
     """Line 555: naive night_start string is given UTC tz (tzinfo=None branch)."""
-    import push_scheduler
+    from utils import push_scheduler
     from datetime import datetime, timedelta
     for fn in ('_check_n7_aurora', '_check_n1_plan_start', '_check_n2_next_target',
                '_check_n6_darkness', '_check_n3_iss', '_check_n4_n5_eclipse'):
@@ -1437,13 +1437,13 @@ def test_poll_night_start_naive_gets_utc(monkeypatch):
     )
     user = _make_user(user_id='u1', username='alice')
     fake_um = types.SimpleNamespace(users={'u1': user}, _reload_users_if_changed=lambda: None)
-    monkeypatch.setitem(sys.modules, 'auth', types.SimpleNamespace(user_manager=fake_um))
+    monkeypatch.setitem(sys.modules, 'utils.auth', types.SimpleNamespace(user_manager=fake_um))
     push_scheduler._poll()  # Must not raise
 
 
 def test_poll_night_start_far_future_not_fast_mode(monkeypatch):
     """Branch 557→562: secs_until > 30*60 → any_active stays False."""
-    import push_scheduler
+    from utils import push_scheduler
     from datetime import datetime, timedelta, timezone as tz
     for fn in ('_check_n7_aurora', '_check_n1_plan_start', '_check_n2_next_target',
                '_check_n6_darkness', '_check_n3_iss', '_check_n4_n5_eclipse'):
@@ -1460,14 +1460,14 @@ def test_poll_night_start_far_future_not_fast_mode(monkeypatch):
     )
     user = _make_user(user_id='u1', username='alice')
     fake_um = types.SimpleNamespace(users={'u1': user}, _reload_users_if_changed=lambda: None)
-    monkeypatch.setitem(sys.modules, 'auth', types.SimpleNamespace(user_manager=fake_um))
+    monkeypatch.setitem(sys.modules, 'utils.auth', types.SimpleNamespace(user_manager=fake_um))
     push_scheduler._poll()
     assert push_scheduler._any_active_night is False
 
 
 def test_release_lock_logger_failure_swallowed(monkeypatch):
     """Lines 629-630: nested logger error in _release_lock is silently swallowed."""
-    import push_scheduler
+    from utils import push_scheduler
     from unittest.mock import MagicMock
     mock_file = MagicMock()
     mock_file.fileno.side_effect = OSError('fd closed')
@@ -1483,7 +1483,7 @@ def test_release_lock_logger_failure_swallowed(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_n8_sends_for_upcoming_solar_transit(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
 
@@ -1496,7 +1496,7 @@ def test_n8_sends_for_upcoming_solar_transit(monkeypatch):
 
 
 def test_n8_sends_for_upcoming_lunar_transit(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
 
@@ -1508,7 +1508,7 @@ def test_n8_sends_for_upcoming_lunar_transit(monkeypatch):
 
 
 def test_n8_no_cache_skips(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     push_scheduler._check_n8_css(_make_user(), None)
@@ -1516,7 +1516,7 @@ def test_n8_no_cache_skips(monkeypatch):
 
 
 def test_n8_disabled_skips(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     user = _make_user(triggers={'N8': {'enabled': False}})
@@ -1526,7 +1526,7 @@ def test_n8_disabled_skips(monkeypatch):
 
 
 def test_n8_transit_outside_lead_no_notification(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     cache = {'solar_transits': [{'start_time': _now_iso(minutes=30)}], 'lunar_transits': []}
@@ -1535,7 +1535,7 @@ def test_n8_transit_outside_lead_no_notification(monkeypatch):
 
 
 def test_n8_cooldown_active_skips(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     push_scheduler._mark_notified('u1', 'N8')
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
@@ -1545,7 +1545,7 @@ def test_n8_cooldown_active_skips(monkeypatch):
 
 
 def test_n8_no_start_str_in_transit_skipped(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     cache = {'solar_transits': [{}], 'lunar_transits': [{}]}
@@ -1554,7 +1554,7 @@ def test_n8_no_start_str_in_transit_skipped(monkeypatch):
 
 
 def test_n8_bad_solar_timestamp_exception_swallowed(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     cache = {'solar_transits': [{'start_time': 'bad-date'}], 'lunar_transits': []}
@@ -1563,7 +1563,7 @@ def test_n8_bad_solar_timestamp_exception_swallowed(monkeypatch):
 
 
 def test_n8_bad_lunar_timestamp_exception_swallowed(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     cache = {'solar_transits': [], 'lunar_transits': [{'start_time': 'not-a-date'}]}
@@ -1572,7 +1572,7 @@ def test_n8_bad_lunar_timestamp_exception_swallowed(monkeypatch):
 
 
 def test_n8_naive_solar_datetime_gets_utc(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     from datetime import datetime, timedelta
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
@@ -1584,7 +1584,7 @@ def test_n8_naive_solar_datetime_gets_utc(monkeypatch):
 
 
 def test_n8_no_upcoming_transits_skips(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     cache = {'solar_transits': [], 'lunar_transits': []}
@@ -1595,7 +1595,7 @@ def test_n8_no_upcoming_transits_skips(monkeypatch):
 
 def test_n8_past_solar_transit_not_added_to_candidates(monkeypatch):
     """Solar transit that already passed is not added to candidates."""
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     past = _now_iso(minutes=-30)
@@ -1606,7 +1606,7 @@ def test_n8_past_solar_transit_not_added_to_candidates(monkeypatch):
 
 def test_n8_naive_lunar_datetime_gets_utc(monkeypatch):
     """Naive lunar transit datetime is treated as UTC before comparison."""
-    import push_scheduler
+    from utils import push_scheduler
     push_scheduler._last_sent.clear()
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
@@ -1617,7 +1617,7 @@ def test_n8_naive_lunar_datetime_gets_utc(monkeypatch):
 
 def test_n8_past_lunar_transit_not_added_to_candidates(monkeypatch):
     """Lunar transit that already passed is not added to candidates."""
-    import push_scheduler
+    from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     past = _now_iso(minutes=-30)

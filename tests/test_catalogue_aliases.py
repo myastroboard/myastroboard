@@ -2,7 +2,7 @@
 
 from unittest.mock import mock_open, patch
 
-import catalogue_aliases as module
+from observation import catalogue_aliases as module
 
 get_alias_entry = module.get_alias_entry
 get_aliases_map = module.get_aliases_map
@@ -25,15 +25,15 @@ def test_make_lookup_key_normalizes_catalogue_and_name():
 
 
 def test_load_aliases_table_missing_file_returns_empty():
-    with patch("catalogue_aliases.os.path.exists", return_value=False):
+    with patch("observation.catalogue_aliases.os.path.exists", return_value=False):
         assert load_aliases_table(force_reload=True) == {}
 
 
 def test_load_aliases_table_non_dict_payload_returns_empty():
     module._aliases_cache = {}
     module._aliases_mtime = None
-    with patch("catalogue_aliases.os.path.exists", return_value=True), patch(
-        "catalogue_aliases.os.path.getmtime", return_value=123.0
+    with patch("observation.catalogue_aliases.os.path.exists", return_value=True), patch(
+        "observation.catalogue_aliases.os.path.getmtime", return_value=123.0
     ), patch("builtins.open", mock_open(read_data='["not-a-dict"]')):
         assert load_aliases_table(force_reload=True) == {}
 
@@ -43,8 +43,8 @@ def test_load_aliases_table_uses_cache_when_mtime_unchanged():
     module._aliases_cache = cached
     module._aliases_mtime = 111.0
 
-    with patch("catalogue_aliases.os.path.exists", return_value=True), patch(
-        "catalogue_aliases.os.path.getmtime", return_value=111.0
+    with patch("observation.catalogue_aliases.os.path.exists", return_value=True), patch(
+        "observation.catalogue_aliases.os.path.getmtime", return_value=111.0
     ), patch("builtins.open", side_effect=AssertionError("open should not be called")):
         result = load_aliases_table(force_reload=False)
 
@@ -61,8 +61,8 @@ def test_get_alias_helpers_return_expected_values():
         }
     }
 
-    with patch("catalogue_aliases.load_aliases_table", return_value=aliases_table), \
-         patch("catalogue_aliases.skytonight_targets.get_lookup_entry", return_value={}):
+    with patch("observation.catalogue_aliases.load_aliases_table", return_value=aliases_table), \
+         patch("observation.catalogue_aliases.skytonight_targets.get_lookup_entry", return_value={}):
         entry = get_alias_entry("Messier", "M 31")
         aliases = get_aliases_map("Messier", "M 31")
         group_id = get_group_id("Messier", "M 31")
@@ -85,7 +85,7 @@ def test_merge_item_with_alias_entry_adds_or_removes_aliases():
     }
 
     with patch(
-        "catalogue_aliases.get_alias_entry",
+        "observation.catalogue_aliases.get_alias_entry",
         return_value={"aliases": {"openngc": "NGC224"}},
     ):
         merged = merge_item_with_alias_entry(item.copy())
@@ -93,7 +93,7 @@ def test_merge_item_with_alias_entry_adds_or_removes_aliases():
     assert "catalogue_group_id" not in merged
     assert merged["catalogue_aliases"] == {"openngc": "NGC224"}
 
-    with patch("catalogue_aliases.get_alias_entry", return_value={}):
+    with patch("observation.catalogue_aliases.get_alias_entry", return_value={}):
         merged_no_entry = merge_item_with_alias_entry(item.copy())
 
     assert "catalogue_aliases" not in merged_no_entry
@@ -107,8 +107,8 @@ def test_load_aliases_table_exception_returns_empty(monkeypatch):
     """Lines 51-53: exception during file open → return empty dict."""
     module._aliases_cache = {}
     module._aliases_mtime = None
-    with patch("catalogue_aliases.os.path.exists", return_value=True), \
-         patch("catalogue_aliases.os.path.getmtime", return_value=99.0), \
+    with patch("observation.catalogue_aliases.os.path.exists", return_value=True), \
+         patch("observation.catalogue_aliases.os.path.getmtime", return_value=99.0), \
          patch("builtins.open", side_effect=IOError("disk error")):
         result = load_aliases_table(force_reload=True)
     assert result == {}
@@ -132,6 +132,6 @@ def test_merge_item_no_name_removes_aliases_key():
 def test_merge_item_empty_aliases_dict_removes_aliases_key():
     """Line 108: aliases is empty dict → pop catalogue_aliases from item."""
     item = {'catalogue': 'Messier', 'name': 'M31', 'catalogue_aliases': {'old': 'data'}}
-    with patch("catalogue_aliases.get_alias_entry", return_value={"aliases": {}}):
+    with patch("observation.catalogue_aliases.get_alias_entry", return_value={"aliases": {}}):
         result = merge_item_with_alias_entry(item)
     assert 'catalogue_aliases' not in result

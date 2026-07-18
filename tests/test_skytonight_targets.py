@@ -2,8 +2,8 @@
 
 import json
 
-from skytonight_models import SkyTonightCoordinates, SkyTonightTarget
-import skytonight_targets
+from skytonight.skytonight_models import SkyTonightCoordinates, SkyTonightTarget
+from skytonight import skytonight_targets
 
 
 def _sample_targets():
@@ -198,7 +198,7 @@ def test_merge_item_empty_aliases(monkeypatch):
 
 def test_build_lookup_no_preferred_name():
     """Target with no preferred_name uses choose_preferred_catalogue_name as fallback."""
-    from skytonight_models import SkyTonightCoordinates, SkyTonightTarget
+    from skytonight.skytonight_models import SkyTonightCoordinates, SkyTonightTarget
     target = SkyTonightTarget(
         target_id='DSO-TEST',
         category='deep_sky',
@@ -219,7 +219,7 @@ def test_build_lookup_no_preferred_name():
 
 def test_build_lookup_no_preferred_name_and_no_catalogues():
     """Line 108->98: preferred_name='' and catalogue_names={} → if preferred_name: False."""
-    from skytonight_models import SkyTonightCoordinates, SkyTonightTarget
+    from skytonight.skytonight_models import SkyTonightCoordinates, SkyTonightTarget
     target = SkyTonightTarget(
         target_id='DSO-EMPTY',
         category='deep_sky',

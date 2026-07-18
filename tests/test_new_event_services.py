@@ -8,12 +8,12 @@ import pytest
 from astropy.time import Time
 
 from app import app
-from app import _translate_special_phenomena_events
-from app import cache_store
-from auth import user_manager
-from planetary_events import PlanetaryEventsService
-from special_phenomena import SpecialPhenomenaService
-from sidereal_time import SiderealTimeService
+from blueprints.astronomy import _translate_special_phenomena_events
+from cache import cache_store
+from utils.auth import user_manager
+from observation.planetary_events import PlanetaryEventsService
+from observation.special_phenomena import SpecialPhenomenaService
+from observation.sidereal_time import SiderealTimeService
 
 
 @pytest.fixture
@@ -152,7 +152,7 @@ class TestSpecialPhenomenaService:
     def test_special_phenomena_api_translates_cached_event_payload(self, authenticated_client, monkeypatch):
         # v1.2: the route reads the per-location slot of the caller's active
         # location - plant the payload in the install default preset's slot.
-        from repo_config import load_config, get_install_default_location
+        from utils.repo_config import load_config, get_install_default_location
 
         loc_id = get_install_default_location(load_config()).get("id")
         entry = cache_store.get_location_cache_entry("special_phenomena", loc_id)

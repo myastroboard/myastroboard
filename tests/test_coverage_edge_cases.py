@@ -11,6 +11,7 @@ import types
 from unittest.mock import MagicMock, patch
 
 import app as _app_mod
+from blueprints import locations as _locations_mod
 import pytest
 
 
@@ -23,7 +24,7 @@ def test_validate_location_payload_accepts_none_bortle():
         "timezone": "UTC",
         "bortle": None,
     }
-    cleaned, error = _app_mod._validate_location_payload(payload, partial=False)
+    cleaned, error = _locations_mod._validate_location_payload(payload, partial=False)
     assert error is None
     assert "bortle" in cleaned and cleaned["bortle"] is None
 
@@ -48,14 +49,14 @@ def test_get_combinations_merges_share_status(client_admin, monkeypatch):
 
 
 def test_astrodex_count_pictures_returns_zero_when_dir_missing(monkeypatch):
-    import astrodex
+    from observation import astrodex
 
     monkeypatch.setattr(astrodex, "ASTRODEX_DIR", os.path.join(tempfile.gettempdir(), "missing-astrodex-dir"))
     assert astrodex.count_pictures_for_location("loc-1") == 0
 
 
 def test_plan_safe_path_handles_commonpath_valueerror(monkeypatch):
-    import plan_my_night
+    from observation import plan_my_night
 
     monkeypatch.setattr(plan_my_night.os.path, "commonpath", lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError()))
     with pytest.raises(ValueError):
@@ -63,7 +64,7 @@ def test_plan_safe_path_handles_commonpath_valueerror(monkeypatch):
 
 
 def test_iter_all_plan_files_skips_valueerror(monkeypatch):
-    import plan_my_night
+    from observation import plan_my_night
 
     monkeypatch.setattr(plan_my_night, "ensure_plan_directory", lambda: None)
     monkeypatch.setattr(plan_my_night.os, "listdir", lambda _p: ["ok.json"])
@@ -72,7 +73,7 @@ def test_iter_all_plan_files_skips_valueerror(monkeypatch):
 
 
 def test_repo_config_get_scheduler_locations_import_failure_falls_back(monkeypatch):
-    import repo_config
+    from utils import repo_config
 
     cfg = {
         "locations": [
@@ -84,7 +85,7 @@ def test_repo_config_get_scheduler_locations_import_failure_falls_back(monkeypat
     real_import = __import__
 
     def _mock_import(name, *args, **kwargs):
-        if name == "auth":
+        if name == "utils.auth":
             raise ImportError("forced")
         return real_import(name, *args, **kwargs)
 
@@ -94,31 +95,31 @@ def test_repo_config_get_scheduler_locations_import_failure_falls_back(monkeypat
 
 
 def test_cache_store_default_status_location_ids_handles_exception(monkeypatch):
-    import cache_store
+    from cache import cache_store
 
-    monkeypatch.setattr("repo_config.load_config", lambda: (_ for _ in ()).throw(RuntimeError("boom")))
+    monkeypatch.setattr("utils.repo_config.load_config", lambda: (_ for _ in ()).throw(RuntimeError("boom")))
     assert cache_store._default_status_location_ids() == []
 
 
 def test_cache_store_default_status_location_ids_falls_through_when_no_ids(monkeypatch):
     """No exception, but every scheduler location lacks a truthy id -> falls
     through the `if ids:` check to the trailing `return []` (not the except arc)."""
-    import cache_store
+    from cache import cache_store
 
-    monkeypatch.setattr("repo_config.load_config", lambda: {})
-    monkeypatch.setattr("repo_config.get_scheduler_locations", lambda config: [{'name': 'no-id-here'}])
+    monkeypatch.setattr("utils.repo_config.load_config", lambda: {})
+    monkeypatch.setattr("utils.repo_config.get_scheduler_locations", lambda config: [{'name': 'no-id-here'}])
     assert cache_store._default_status_location_ids() == []
 
 
 def test_cache_store_allsky_job_availability_handles_exception(monkeypatch):
-    import cache_store
+    from cache import cache_store
 
-    monkeypatch.setattr("repo_config.load_config", lambda: (_ for _ in ()).throw(RuntimeError("boom")))
+    monkeypatch.setattr("utils.repo_config.load_config", lambda: (_ for _ in ()).throw(RuntimeError("boom")))
     assert cache_store._allsky_job_availability() == (False, False)
 
 
 def test_skytonight_alttime_commonpath_valueerror_returns_400(client_admin, monkeypatch):
-    import skytonight_api
+    from blueprints import skytonight_api
 
     monkeypatch.setattr(
         skytonight_api.os.path,
@@ -130,7 +131,7 @@ def test_skytonight_alttime_commonpath_valueerror_returns_400(client_admin, monk
 
 
 def test_skytonight_alttime_commonpath_mismatch_returns_400(client_admin, monkeypatch):
-    import skytonight_api
+    from blueprints import skytonight_api
 
     monkeypatch.setattr(skytonight_api.os.path, "commonpath", lambda *_args, **_kwargs: "D:/other")
     resp = client_admin.get("/api/skytonight/alttime/valid_target")
@@ -138,7 +139,7 @@ def test_skytonight_alttime_commonpath_mismatch_returns_400(client_admin, monkey
 
 
 def test_auth_delete_user_handles_commonpath_valueerror_in_both_loops(tmp_path, monkeypatch):
-    import auth
+    from utils import auth
 
     users_file = tmp_path / "users.json"
     monkeypatch.setattr(auth, "USERS_FILE", str(users_file))
@@ -151,8 +152,8 @@ def test_auth_delete_user_handles_commonpath_valueerror_in_both_loops(tmp_path, 
     astrodex_dir.mkdir()
     images_dir.mkdir()
 
-    monkeypatch.setattr("astrodex.ASTRODEX_DIR", str(astrodex_dir))
-    monkeypatch.setattr("astrodex.ASTRODEX_IMAGES_DIR", str(images_dir))
+    monkeypatch.setattr("observation.astrodex.ASTRODEX_DIR", str(astrodex_dir))
+    monkeypatch.setattr("observation.astrodex.ASTRODEX_IMAGES_DIR", str(images_dir))
 
     astrodex_payload = {
         "items": [{"pictures": [{"filename": f"{user.user_id}_img.jpg"}]}]
@@ -175,15 +176,15 @@ def test_auth_delete_user_handles_commonpath_valueerror_in_both_loops(tmp_path, 
 
 
 def test_cache_updater_masked_location_log_safe_coord_exceptions():
-    import cache_updater
+    from cache import cache_updater
 
     masked = cache_updater._masked_location_log({"latitude": "x", "longitude": object()})
     assert "lat=?" in masked and "lon=?" in masked
 
 
 def test_update_allsky_sensor_cache_paths(monkeypatch):
-    import cache_updater
-    import cache_store
+    from cache import cache_updater
+    from cache import cache_store
 
     fake_connector = types.SimpleNamespace(
         AllSkyConnector=lambda _cfg: types.SimpleNamespace(fetch_sensor_data=lambda: {"temp": 1})
@@ -205,7 +206,7 @@ def test_update_allsky_sensor_cache_paths(monkeypatch):
 
 
 def test_update_allsky_sensor_cache_none_config_and_early_returns(monkeypatch):
-    import cache_updater
+    from cache import cache_updater
 
     monkeypatch.setattr(cache_updater, "load_config", lambda: {"connectors": {"allsky": {"enabled": False}}})
     cache_updater.update_allsky_sensor_cache()
@@ -214,8 +215,8 @@ def test_update_allsky_sensor_cache_none_config_and_early_returns(monkeypatch):
 
 
 def test_update_allsky_health_cache_paths(monkeypatch):
-    import cache_updater
-    import cache_store
+    from cache import cache_updater
+    from cache import cache_store
 
     fake_connector = types.SimpleNamespace(
         AllSkyConnector=lambda _cfg: types.SimpleNamespace(health_check=lambda: {"ok": True})
@@ -229,7 +230,7 @@ def test_update_allsky_health_cache_paths(monkeypatch):
 
 
 def test_update_allsky_health_cache_none_config_and_early_return(monkeypatch):
-    import cache_updater
+    from cache import cache_updater
 
     monkeypatch.setattr(cache_updater, "load_config", lambda: {"connectors": {"allsky": {"enabled": False}}})
     cache_updater.update_allsky_health_cache()
@@ -256,7 +257,7 @@ def test_update_allsky_health_cache_none_config_and_early_return(monkeypatch):
     ],
 )
 def test_cache_updater_config_provided_branch_calls_resolve(monkeypatch, fn_name):
-    import cache_updater
+    from cache import cache_updater
 
     fn = getattr(cache_updater, fn_name)
     monkeypatch.setattr(
@@ -268,7 +269,7 @@ def test_cache_updater_config_provided_branch_calls_resolve(monkeypatch, fn_name
 
 
 def test_check_and_handle_config_changes_no_legacy_signature_migrates(monkeypatch):
-    import cache_updater
+    from cache import cache_updater
 
     mock_cs = MagicMock()
     mock_cs.pop_legacy_location_signature.return_value = None
@@ -288,7 +289,7 @@ def test_check_and_handle_config_changes_no_legacy_signature_migrates(monkeypatc
 
 
 def test_fully_initialize_caches_multi_location_labels_and_missing_id(monkeypatch):
-    import cache_updater
+    from cache import cache_updater
 
     calls = []
 
@@ -344,7 +345,7 @@ def test_fully_initialize_caches_multi_location_labels_and_missing_id(monkeypatc
 
 
 def test_fully_initialize_caches_preparallel_iers_failure(monkeypatch):
-    import cache_updater
+    from cache import cache_updater
 
     mock_cs = MagicMock()
     mock_cs.load_location_cache.return_value = {"data": {}, "timestamp": 1}
@@ -373,7 +374,7 @@ def test_fully_initialize_caches_preparallel_iers_failure(monkeypatch):
 
 
 def test_fully_initialize_caches_allsky_enabled_without_sensor_module(monkeypatch):
-    import cache_updater
+    from cache import cache_updater
 
     mock_cs = MagicMock()
     mock_cs.load_location_cache.return_value = {"data": {}, "timestamp": 1}
@@ -405,7 +406,7 @@ def test_fully_initialize_caches_allsky_enabled_without_sensor_module(monkeypatc
 
 
 def test_fully_initialize_caches_iers_absent_but_not_in_parallel(monkeypatch):
-    import cache_updater
+    from cache import cache_updater
 
     called = []
 
@@ -441,13 +442,13 @@ def test_fully_initialize_caches_iers_absent_but_not_in_parallel(monkeypatch):
 
 
 def test_run_calculations_bortle_to_sqm_and_invalid_bortle(monkeypatch):
-    import skytonight_calculator as calc
+    from skytonight import skytonight_calculator as calc
 
     monkeypatch.setattr(calc, "ensure_skytonight_directories", lambda: None)
     monkeypatch.setattr(calc, "save_json_file", lambda *_a, **_k: None)
     monkeypatch.setattr(calc, "_get_night_window", lambda *_a, **_k: None)
 
-    with patch("sky_quality.bortle_to_sqm", return_value=21.2) as mock_conv:
+    with patch("weather.sky_quality.bortle_to_sqm", return_value=21.2) as mock_conv:
         calc.run_calculations(
             {
                 "locations": [
@@ -490,7 +491,7 @@ def test_run_calculations_bortle_to_sqm_and_invalid_bortle(monkeypatch):
 
 
 def test_run_calculations_sqm_parse_success_and_failure(monkeypatch):
-    import skytonight_calculator as calc
+    from skytonight import skytonight_calculator as calc
 
     monkeypatch.setattr(calc, "ensure_skytonight_directories", lambda: None)
     monkeypatch.setattr(calc, "save_json_file", lambda *_a, **_k: None)
@@ -519,7 +520,7 @@ def test_run_calculations_sqm_parse_success_and_failure(monkeypatch):
 
 
 def test_push_scheduler_reuses_cached_location_payload_for_same_location(monkeypatch):
-    import push_scheduler
+    from utils import push_scheduler
 
     load_calls = []
 
@@ -553,7 +554,7 @@ def test_push_scheduler_reuses_cached_location_payload_for_same_location(monkeyp
         load_config=lambda: {},
         get_locations_for_user=lambda _cfg, _u: [{"id": "L1", "name": "Loc"}],
     )
-    with patch.dict("sys.modules", {"repo_config": fake_repo_config, "auth": fake_auth}):
+    with patch.dict("sys.modules", {"utils.repo_config": fake_repo_config, "utils.auth": fake_auth}):
         push_scheduler._poll()
 
     # 6 per-location cache names should be loaded once for the shared location id.

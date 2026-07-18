@@ -5,7 +5,7 @@ Supplements the existing 26-test file to push coverage above 50%.
 
 import pytest
 import json
-from iss_passes import (
+from space.iss_passes import (
     ISSPassService,
     _source_name_from_url,
     _is_celestrak_url,

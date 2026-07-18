@@ -7,7 +7,7 @@ on:
       - 'static/manifest.*.webmanifest'
       - 'static/manifest.webmanifest'
       - 'templates/index.html'
-      - 'backend/i18n_utils.py'
+      - 'backend/utils/i18n_utils.py'
       - 'scripts/validate_i18n.py'
   pull_request:
     paths:
@@ -15,7 +15,7 @@ on:
       - 'static/manifest.*.webmanifest'
       - 'static/manifest.webmanifest'
       - 'templates/index.html'
-      - 'backend/i18n_utils.py'
+      - 'backend/utils/i18n_utils.py'
       - 'scripts/validate_i18n.py'
 
 env:

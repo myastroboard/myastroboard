@@ -7,8 +7,8 @@ SkyTonight is the built-in observability calculator. It computes, for every targ
 ## Architecture overview
 
 ```
-Scheduler (skytonight_scheduler.py)
-  └─ run_calculations()  (skytonight_calculator.py)
+Scheduler (backend/skytonight/skytonight_scheduler.py)
+  └─ run_calculations()  (backend/skytonight/skytonight_calculator.py)
        ├─ load_targets_dataset()       ← DSOs (OpenNGC / OpenIC / Caldwell / Messier / Herschel400 / Pensack500 / LBN)
        ├─ load_comets_dataset()        ← MPC / JPL comets (auto-updated)
        ├─ Solar-system bodies          ← Skyfield ephemeris (de421.bsp)

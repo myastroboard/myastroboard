@@ -4,8 +4,8 @@ Unit tests for configuration management (repo_config.py, config_defaults.py)
 import json
 import os
 
-import repo_config
-import config_defaults
+from utils import repo_config
+from utils import config_defaults
 
 load_config = repo_config.load_config
 save_config = repo_config.save_config
@@ -22,7 +22,7 @@ DEFAULT_CONFIG = config_defaults.DEFAULT_CONFIG
 
 def _set_config_file(monkeypatch, path):
     """Patch CONFIG_FILE in both constants and repo_config modules."""
-    import constants
+    from utils import constants
     monkeypatch.setattr(constants, "CONFIG_FILE", path)
     monkeypatch.setattr(repo_config, "CONFIG_FILE", path)
 

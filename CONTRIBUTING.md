@@ -413,8 +413,13 @@ The failure output lists exactly which routes are unexpected or missing, so you 
    pytest
    black backend/
    flake8 backend/
+   pyright backend/
    djlint templates/ static/offline.html --profile jinja --lint --ignore H021,H023,H030,H031,J004,J018
    ```
+   `pyright` is the CLI equivalent of the Pylance errors VSCode shows inline — both come from
+   `requirements-dev.txt` and read the same `pyrightconfig.json` at the repo root, so a clean
+   `pyright backend/` run means Pylance should show no problems either. If VSCode still shows
+   stale errors after a config change, run "Python: Restart Language Server" from the command palette.
    For JavaScript, open the file in VSCode — formatting is applied on save automatically.
    No separate JS lint step is required.
 

@@ -4,12 +4,12 @@ from datetime import datetime, timedelta, timezone
 from requests import HTTPError
 import pytest
 
-import css_passes as css_module
+from space import css_passes as css_module
 
 CSSPassService = css_module.CSSPassService
 get_css_passes_report = css_module.get_css_passes_report
 LUNAR_ANGULAR_RADIUS_FALLBACK_DEG = css_module.LUNAR_ANGULAR_RADIUS_FALLBACK_DEG
-from events_aggregator import EventsAggregator
+from utils.events_aggregator import EventsAggregator
 
 
 # ─── Minimal valid CSS TLE (NORAD 48274) ────────────────────────────────────
@@ -172,17 +172,17 @@ class TestCSSPassServiceTleFallback:
 
     @pytest.fixture(autouse=True)
     def _isolate_celestrak_block_state(self, monkeypatch):
-        monkeypatch.setattr("css_passes.get_css_celestrak_status", lambda: {"blocked": False})
-        monkeypatch.setattr("css_passes._set_css_celestrak_block", lambda *args, **kwargs: None)
-        monkeypatch.setattr("css_passes._clear_css_celestrak_block", lambda *args, **kwargs: None)
+        monkeypatch.setattr("space.css_passes.get_css_celestrak_status", lambda: {"blocked": False})
+        monkeypatch.setattr("space.css_passes._set_css_celestrak_block", lambda *args, **kwargs: None)
+        monkeypatch.setattr("space.css_passes._clear_css_celestrak_block", lambda *args, **kwargs: None)
 
     def test_fetch_css_tle_stops_immediately_after_celestrak_http_403(self, monkeypatch):
         service = CSSPassService(45.5, -73.5, 30, "America/Montreal")
         calls = {"count": 0}
 
-        monkeypatch.setattr("css_passes._get_cached_css_tle", lambda max_age_seconds=None: None)
-        monkeypatch.setattr("css_passes._in_css_tle_failure_cooldown", lambda: False)
-        monkeypatch.setattr("css_passes._set_css_tle_error_timestamp", lambda: None)
+        monkeypatch.setattr("space.css_passes._get_cached_css_tle", lambda max_age_seconds=None: None)
+        monkeypatch.setattr("space.css_passes._in_css_tle_failure_cooldown", lambda: False)
+        monkeypatch.setattr("space.css_passes._set_css_tle_error_timestamp", lambda: None)
 
         class _Response:
             def __init__(self, text: str, error=None):
@@ -203,7 +203,7 @@ class TestCSSPassServiceTleFallback:
                 + _CSS_TLE_L2 + "\n"
             )
 
-        monkeypatch.setattr("css_passes.requests.get", _mock_get)
+        monkeypatch.setattr("space.css_passes.requests.get", _mock_get)
 
         with pytest.raises(RuntimeError):
             service._fetch_css_tle()
@@ -214,15 +214,15 @@ class TestCSSPassServiceTleFallback:
     def test_fetch_css_tle_raises_when_all_sources_fail(self, monkeypatch):
         service = CSSPassService(45.5, -73.5, 30, "America/Montreal")
 
-        monkeypatch.setattr("css_passes._get_cached_css_tle", lambda max_age_seconds=None: None)
-        monkeypatch.setattr("css_passes._in_css_tle_failure_cooldown", lambda: False)
-        monkeypatch.setattr("css_passes._set_css_tle_error_timestamp", lambda: None)
+        monkeypatch.setattr("space.css_passes._get_cached_css_tle", lambda max_age_seconds=None: None)
+        monkeypatch.setattr("space.css_passes._in_css_tle_failure_cooldown", lambda: False)
+        monkeypatch.setattr("space.css_passes._set_css_tle_error_timestamp", lambda: None)
 
         class _Response:
             def raise_for_status(self):
                 raise HTTPError("503 Service Unavailable")
 
-        monkeypatch.setattr("css_passes.requests.get", lambda *args, **kwargs: _Response())
+        monkeypatch.setattr("space.css_passes.requests.get", lambda *args, **kwargs: _Response())
 
         try:
             service._fetch_css_tle()
@@ -233,10 +233,10 @@ class TestCSSPassServiceTleFallback:
     def test_fetch_css_tle_uses_cache_in_cooldown(self, monkeypatch):
         service = CSSPassService(45.5, -73.5, 30, "America/Montreal")
 
-        monkeypatch.setattr("css_passes._get_cached_css_tle", lambda max_age_seconds=None: (
+        monkeypatch.setattr("space.css_passes._get_cached_css_tle", lambda max_age_seconds=None: (
             _CSS_TLE_L1, _CSS_TLE_L2, 0,
         ))
-        monkeypatch.setattr("css_passes._in_css_tle_failure_cooldown", lambda: True)
+        monkeypatch.setattr("space.css_passes._in_css_tle_failure_cooldown", lambda: True)
 
         called = {"count": 0}
 
@@ -244,7 +244,7 @@ class TestCSSPassServiceTleFallback:
             called["count"] += 1
             raise AssertionError("Network should not be called in cooldown with cache")
 
-        monkeypatch.setattr("css_passes.requests.get", _should_not_call)
+        monkeypatch.setattr("space.css_passes.requests.get", _should_not_call)
 
         line1, line2 = service._fetch_css_tle()
         assert line1.startswith("1 48274")
@@ -254,20 +254,20 @@ class TestCSSPassServiceTleFallback:
     def test_fetch_css_tle_uses_stale_cache_after_source_failures(self, monkeypatch):
         service = CSSPassService(45.5, -73.5, 30, "America/Montreal")
 
-        monkeypatch.setattr("css_passes._in_css_tle_failure_cooldown", lambda: False)
-        monkeypatch.setattr("css_passes._set_css_tle_error_timestamp", lambda: None)
+        monkeypatch.setattr("space.css_passes._in_css_tle_failure_cooldown", lambda: False)
+        monkeypatch.setattr("space.css_passes._set_css_tle_error_timestamp", lambda: None)
 
         def _mock_get(*args, **kwargs):
             raise HTTPError("503 Service Unavailable")
 
-        monkeypatch.setattr("css_passes.requests.get", _mock_get)
+        monkeypatch.setattr("space.css_passes.requests.get", _mock_get)
 
         def _cached(max_age_seconds=None):
             if max_age_seconds is None:
                 return (_CSS_TLE_L1, _CSS_TLE_L2, 0)
             return None
 
-        monkeypatch.setattr("css_passes._get_cached_css_tle", _cached)
+        monkeypatch.setattr("space.css_passes._get_cached_css_tle", _cached)
 
         line1, line2 = service._fetch_css_tle()
         assert line1.startswith("1 48274")
@@ -304,10 +304,10 @@ class TestCSSPassServiceTleFallback:
         import json as _json
         service = CSSPassService(45.5, -73.5, 30, "America/Montreal")
 
-        monkeypatch.setattr("css_passes._get_cached_css_tle", lambda max_age_seconds=None: None)
-        monkeypatch.setattr("css_passes._in_css_tle_failure_cooldown", lambda: False)
-        monkeypatch.setattr("css_passes._set_css_tle_error_timestamp", lambda: None)
-        monkeypatch.setattr("css_passes._set_cached_css_tle_with_source", lambda l1, l2, url: None)
+        monkeypatch.setattr("space.css_passes._get_cached_css_tle", lambda max_age_seconds=None: None)
+        monkeypatch.setattr("space.css_passes._in_css_tle_failure_cooldown", lambda: False)
+        monkeypatch.setattr("space.css_passes._set_css_tle_error_timestamp", lambda: None)
+        monkeypatch.setattr("space.css_passes._set_cached_css_tle_with_source", lambda l1, l2, url: None)
 
         calls = []
 
@@ -323,7 +323,7 @@ class TestCSSPassServiceTleFallback:
                 "raise_for_status": lambda self: None,
             })()
 
-        monkeypatch.setattr("css_passes.requests.get", _mock_get)
+        monkeypatch.setattr("space.css_passes.requests.get", _mock_get)
 
         l1, l2 = service._fetch_css_tle()
 
@@ -336,11 +336,11 @@ class TestCSSPassServiceTleFallback:
         import json as _json
         service = CSSPassService(45.5, -73.5, 30, "America/Montreal")
 
-        monkeypatch.setattr("css_passes._get_cached_css_tle", lambda max_age_seconds=None: None)
-        monkeypatch.setattr("css_passes._in_css_tle_failure_cooldown", lambda: False)
-        monkeypatch.setattr("css_passes._set_css_tle_error_timestamp", lambda: None)
-        monkeypatch.setattr("css_passes._set_cached_css_tle_with_source", lambda l1, l2, url: None)
-        monkeypatch.setattr("css_passes.get_css_celestrak_status", lambda: {"blocked": True})
+        monkeypatch.setattr("space.css_passes._get_cached_css_tle", lambda max_age_seconds=None: None)
+        monkeypatch.setattr("space.css_passes._in_css_tle_failure_cooldown", lambda: False)
+        monkeypatch.setattr("space.css_passes._set_css_tle_error_timestamp", lambda: None)
+        monkeypatch.setattr("space.css_passes._set_cached_css_tle_with_source", lambda l1, l2, url: None)
+        monkeypatch.setattr("space.css_passes.get_css_celestrak_status", lambda: {"blocked": True})
 
         calls = []
 
@@ -354,7 +354,7 @@ class TestCSSPassServiceTleFallback:
                 "raise_for_status": lambda self: None,
             })()
 
-        monkeypatch.setattr("css_passes.requests.get", _mock_get)
+        monkeypatch.setattr("space.css_passes.requests.get", _mock_get)
 
         l1, l2 = service._fetch_css_tle()
         assert l1 == _CSS_TLE_L1
@@ -365,8 +365,8 @@ class TestCSSPassServiceTleFallback:
     def test_fetch_css_tle_marks_celestrak_blocked_after_3_timeouts(self, monkeypatch):
         service = CSSPassService(45.5, -73.5, 30, "America/Montreal")
 
-        monkeypatch.setattr("css_passes._get_cached_css_tle", lambda max_age_seconds=None: None)
-        monkeypatch.setattr("css_passes._in_css_tle_failure_cooldown", lambda: False)
+        monkeypatch.setattr("space.css_passes._get_cached_css_tle", lambda max_age_seconds=None: None)
+        monkeypatch.setattr("space.css_passes._in_css_tle_failure_cooldown", lambda: False)
 
         cache_payload = {}
 
@@ -377,8 +377,8 @@ class TestCSSPassServiceTleFallback:
             cache_payload.clear()
             cache_payload.update(payload)
 
-        monkeypatch.setattr("css_passes._read_css_tle_cache", _mock_read_cache)
-        monkeypatch.setattr("css_passes._write_css_tle_cache", _mock_write_cache)
+        monkeypatch.setattr("space.css_passes._read_css_tle_cache", _mock_read_cache)
+        monkeypatch.setattr("space.css_passes._write_css_tle_cache", _mock_write_cache)
 
         block_calls = []
 
@@ -389,7 +389,7 @@ class TestCSSPassServiceTleFallback:
                 "source_url": source_url,
             })
 
-        monkeypatch.setattr("css_passes._set_css_celestrak_block", _mock_set_css_celestrak_block)
+        monkeypatch.setattr("space.css_passes._set_css_celestrak_block", _mock_set_css_celestrak_block)
 
         class _Response:
             status_code = 200
@@ -403,7 +403,7 @@ class TestCSSPassServiceTleFallback:
                 raise Exception("Connection to celestrak.org timed out. (connect timeout=10)")
             return _Response()
 
-        monkeypatch.setattr("css_passes.requests.get", _mock_get)
+        monkeypatch.setattr("space.css_passes.requests.get", _mock_get)
 
         for _ in range(3):
             with pytest.raises(RuntimeError):
@@ -419,7 +419,7 @@ class TestCSSCelestrakStatus:
     """Test Celestrak status and block/clear lifecycle."""
 
     def test_get_css_celestrak_status_returns_default_when_no_cache(self, monkeypatch):
-        monkeypatch.setattr("css_passes._read_css_tle_cache", lambda: {})
+        monkeypatch.setattr("space.css_passes._read_css_tle_cache", lambda: {})
         status = css_module.get_css_celestrak_status()
 
         assert status["blocked"] is False
@@ -434,8 +434,8 @@ class TestCSSCelestrakStatus:
             cleared["called"] = True
             cleared["reset"] = reset_failure_cooldown
 
-        monkeypatch.setattr("css_passes._clear_css_celestrak_block", _mock_clear_block)
-        monkeypatch.setattr("css_passes._read_css_tle_cache", lambda: {})
+        monkeypatch.setattr("space.css_passes._clear_css_celestrak_block", _mock_clear_block)
+        monkeypatch.setattr("space.css_passes._read_css_tle_cache", lambda: {})
 
         css_module.clear_css_celestrak_block_flag()
         assert cleared.get("called") is True
@@ -896,7 +896,7 @@ class TestCSSPassServiceLunarTransit:
         monkeypatch.setattr(service, "_find_lunar_transits", lambda *args, **kwargs: [])
 
         import os
-        from constants import DATA_DIR_CACHE
+        from utils.constants import DATA_DIR_CACHE
         SKYFIELD_CACHE_DIR = os.path.join(DATA_DIR_CACHE, "skyfield")
         os.makedirs(SKYFIELD_CACHE_DIR, exist_ok=True)
 

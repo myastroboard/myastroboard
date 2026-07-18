@@ -2,7 +2,7 @@
 
 The **Equipment** tab lets you catalogue all your astronomy gear. Profiles pre-fill fields across Astrodex, the Exposure Calculator, and the SkyTonight target scorer.
 
-**Module**: `backend/equipment_profiles.py`
+**Module**: `backend/equipment/equipment_profiles.py`
 
 ---
 
