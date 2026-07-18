@@ -8,6 +8,9 @@ pytest-cov==7.1.0
 # Development tools (optional)
 black==26.5.1
 flake8==7.3.0
-djlint==1.40.7
+djlint==1.40.8
 pyright==1.1.411
 pylance==8.0.0
+
+# Used by scripts/translate_i18n_values.py
+deep-translator==1.11.4

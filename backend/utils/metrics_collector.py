@@ -397,4 +397,4 @@ def collect_metrics():
         return result
     except Exception as e:
         logger.error(f"Error collecting metrics: {e}", exc_info=True)
-        return {'error': str(e), 'timestamp': datetime.now().isoformat()}
+        return {'error': 'Failed to collect metrics', 'timestamp': datetime.now().isoformat()}
