@@ -1044,13 +1044,29 @@ function _buildWizardNotifRow(id, prefs) {
         leadSelect.className = 'form-select form-select-sm';
         leadSelect.id = `wizard-notif-lead-${id}`;
         leadSelect.style.width = 'auto';
-        [5, 10, 15, 20, 30, 45, 60].forEach((min) => {
-            const opt = document.createElement('option');
-            opt.value = String(min);
-            opt.textContent = `${min} ${i18n.t('settings.notifications_minutes')}`;
-            leadSelect.appendChild(opt);
-        });
-        leadSelect.value = String(prefs.triggers?.[id]?.lead_minutes ?? 15);
+
+        // N9's lead is day-granularity (stored as day-equivalent minutes), unlike every
+        // other trigger's minute-granularity lead - see the equivalent select in the
+        // Settings UI (templates/index.html #notif-lead-N9).
+        const defaultLead = id === 'N9' ? 2880 : 15;
+        if (id === 'N9') {
+            [
+                [1440, '1 day'], [2880, '2 days'], [4320, '3 days'], [7200, '5 days'], [10080, '7 days'],
+            ].forEach(([minutes, label]) => {
+                const opt = document.createElement('option');
+                opt.value = String(minutes);
+                opt.textContent = label;
+                leadSelect.appendChild(opt);
+            });
+        } else {
+            [5, 10, 15, 20, 30, 45, 60].forEach((min) => {
+                const opt = document.createElement('option');
+                opt.value = String(min);
+                opt.textContent = `${min} ${i18n.t('settings.notifications_minutes')}`;
+                leadSelect.appendChild(opt);
+            });
+        }
+        leadSelect.value = String(prefs.triggers?.[id]?.lead_minutes ?? defaultLead);
         leadWrap.appendChild(leadLabel);
         leadWrap.appendChild(leadSelect);
         rowWrap.appendChild(leadWrap);
