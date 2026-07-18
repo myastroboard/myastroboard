@@ -47,7 +47,7 @@ Welcome to the comprehensive documentation for MyAstroBoard, the integrated astr
 - [Locations](LOCATIONS.md) - Multi-location profiles (v1.2): presets, attribution, per-user default/active location, per-location caches, rate-limit analysis
 
 ### Technical Reference
-- [API Endpoints](API_ENDPOINTS.md) - Complete route inventory from `backend/app.py` and `backend/skytonight_api.py`
+- [API Endpoints](API_ENDPOINTS.md) - Complete route inventory from `backend/blueprints/*.py`
 - [Cache System](CACHE_SYSTEM.md) - Cache architecture, per-job TTLs, selective refresh, location change detection
 - [Notifications](NOTIFICATIONS.md) - Browser and Web Push notification system (N1–N7 triggers, VAPID, iOS)
 

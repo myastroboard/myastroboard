@@ -19,7 +19,7 @@ The **Astrophotography** tab is the central planning dashboard. It consolidates 
 
 ## Best imaging window
 
-**Module**: `backend/moon_astrotonight.py`
+**Module**: `backend/astroweather/moon_astrotonight.py`
 
 **Class**: `AstroTonightService`
 
@@ -73,11 +73,11 @@ The window score (0–100) reflects how good the dark window is:
 
 ## Moon
 
-**Modules**: `backend/moon_phases.py`, `backend/moon_planner.py`, `backend/moon_eclipse.py`
+**Modules**: `backend/astroweather/moon_phases.py`, `backend/astroweather/moon_planner.py`, `backend/astroweather/moon_eclipse.py`
 
 **Cache TTL**: 2 hours (`CACHE_TTL_MOON_REPORT`).
 
-### Moon report (`moon_phases.py`)
+### Moon report (`astroweather/moon_phases.py`)
 
 `MoonService` computes:
 
@@ -93,19 +93,19 @@ The window score (0–100) reflects how good the dark window is:
 
 **Libraries used**: `astronomy` (Astronomy Engine) for rise/set and phase search; `astropy` for AltAz position.
 
-### Moon planner (`moon_planner.py`)
+### Moon planner (`astroweather/moon_planner.py`)
 
 7-night forecast table. For each night it computes moonrise, moonset, illumination, and whether there is a usable dark window. This lets astrophotographers pick the best night within the coming week.
 
 **API**: `GET /api/moon/next-7-nights`
 
-### Moon calendar (`moon_planner.py`)
+### Moon calendar (`astroweather/moon_planner.py`)
 
 Monthly calendar view with phase icons and illumination values for each day.
 
 **API**: `GET /api/moon/month-calendar`
 
-### Lunar eclipse (`moon_eclipse.py`)
+### Lunar eclipse (`astroweather/moon_eclipse.py`)
 
 `LunarEclipseService` finds the **next lunar eclipse** visible from the configured location.
 
@@ -127,11 +127,11 @@ Monthly calendar view with phase icons and illumination values for each day.
 
 ## Sun
 
-**Modules**: `backend/sun_phases.py`, `backend/sun_eclipse.py`
+**Modules**: `backend/astroweather/sun_phases.py`, `backend/astroweather/sun_eclipse.py`
 
 **Cache TTL**: 6 hours (`CACHE_TTL_SUN_REPORT`).
 
-### Sun report (`sun_phases.py`)
+### Sun report (`astroweather/sun_phases.py`)
 
 `SunService` computes for the current date at the configured location:
 
@@ -147,7 +147,7 @@ Monthly calendar view with phase icons and illumination values for each day.
 
 **API**: `GET /api/sun/today`
 
-### Solar eclipse (`sun_eclipse.py`)
+### Solar eclipse (`astroweather/sun_eclipse.py`)
 
 `SolarEclipseService` finds the **next solar eclipse** visible from the configured location.
 
@@ -167,7 +167,7 @@ Monthly calendar view with phase icons and illumination values for each day.
 
 ## Horizon graph
 
-**Module**: `backend/horizon_graph.py`
+**Module**: `backend/astroweather/horizon_graph.py`
 
 **Cache TTL**: 6 hours (`CACHE_TTL_HORIZON_GRAPH`).
 
@@ -181,7 +181,7 @@ The horizon graph displays the **altitude vs. time curves** for the Sun and Moon
 
 ## Sidereal time
 
-**Module**: `backend/sidereal_time.py`
+**Module**: `backend/observation/sidereal_time.py`
 
 **Cache TTL**: 1 hour (`CACHE_TTL_SIDEREAL_TIME`).
 
@@ -193,7 +193,7 @@ Local Apparent Sidereal Time (LAST) is displayed as a quick reference. LAST equa
 
 ## Aurora
 
-**Module**: `backend/aurora_predictions.py`
+**Module**: `backend/astroweather/aurora_predictions.py`
 
 **Class**: `AuroraService`
 
@@ -246,7 +246,7 @@ Three separate services feed the **Calendar** sub-tab.
 
 ### Planetary events
 
-**Module**: `backend/planetary_events.py`
+**Module**: `backend/observation/planetary_events.py`
 
 **Class**: `PlanetaryEventsService`
 
@@ -267,7 +267,7 @@ Events are computed over a **365-day rolling window** from today using `astropy`
 
 ### Special phenomena
 
-**Module**: `backend/special_phenomena.py`
+**Module**: `backend/observation/special_phenomena.py`
 
 **Class**: `SpecialPhenomenaService`
 
@@ -288,7 +288,7 @@ Events are computed over a **365-day rolling window** from today using `astropy`
 
 ### Solar system events (meteor showers)
 
-**Module**: `backend/solar_system_events.py`
+**Module**: `backend/observation/solar_system_events.py`
 
 **Class**: `SolarSystemEventsService`
 
@@ -314,7 +314,7 @@ Radiant altitude is computed using `astropy` AltAz transforms — a shower with 
 
 ### Upcoming events aggregator
 
-**Module**: `backend/events_aggregator.py`
+**Module**: `backend/utils/events_aggregator.py`
 
 `GET /api/events/upcoming` merges all three event sources and returns a single sorted list of events in the coming days/weeks — used for the Calendar sub-tab and for push notification triggers N4 and N5.
 

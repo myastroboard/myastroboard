@@ -66,7 +66,7 @@ sessions/devices, not a `sessionStorage` flag. Users can run it again anytime fr
 
 ## Difficulty model
 
-**Module**: `backend/skytonight_calculator.py` → `compute_difficulty_score()`
+**Module**: `backend/skytonight/skytonight_calculator.py` → `compute_difficulty_score()`
 
 Every target that SkyTonight computes gets a static difficulty score alongside its AstroScore.
 Unlike AstroScore, difficulty does **not** depend on location, date, or Bortle class — the same
@@ -125,7 +125,7 @@ The preference is set in **My Settings → Customize** alongside density/theme, 
 
 ## Beginner Catalog
 
-**Module**: `backend/beginner_catalog.py` · **Data**: `backend/catalogues/beginner_catalog.json`
+**Module**: `backend/observation/beginner_catalog.py` · **Data**: `backend/catalogues/beginner_catalog.json`
 (34 hand-picked entries) · **Endpoint**: `GET /api/beginner-catalog` — see
 [API_ENDPOINTS.md](API_ENDPOINTS.md)
 
@@ -179,10 +179,10 @@ New keys added to `preferences` (see [AUTHENTICATION.md](AUTHENTICATION.md#user-
 |---|---|
 | `static/js/first_run.js` | Wizard flow selection, step rendering, skip/completion persistence |
 | `static/data/equipment_presets.json` | Gear presets offered in the wizard's equipment step and in the Equipment tab's "New ..." modals — see [EQUIPMENT.md#presets](EQUIPMENT.md#presets) |
-| `backend/skytonight_calculator.py` | `compute_difficulty_score()` |
-| `backend/skytonight_api.py` | `GET /api/skytonight/recommendations` |
-| `backend/beginner_catalog.py` | Catalogue loading, i18n resolution, SkyTonight/Astrodex/Plan enrichment |
+| `backend/skytonight/skytonight_calculator.py` | `compute_difficulty_score()` |
+| `backend/blueprints/skytonight_api.py` | `GET /api/skytonight/recommendations` |
+| `backend/observation/beginner_catalog.py` | Catalogue loading, i18n resolution, SkyTonight/Astrodex/Plan enrichment |
 | `backend/catalogues/beginner_catalog.json` | The 34-entry curated dataset |
-| `backend/app.py` | `GET /api/beginner-catalog` route |
+| `backend/blueprints/astrodex.py` | `GET /api/beginner-catalog` route |
 | `static/js/skytonight.js` | Recommendations panel, difficulty badges/filter, Beginner sub-tab |
 | `static/js/auth.js` | `experience_level` / `beginner_catalog_enabled` controls in My Settings → Customize |

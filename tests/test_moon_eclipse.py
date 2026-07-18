@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from moon_eclipse import EclipsePoint, LunarEclipseInfo, LunarEclipseService
+from astroweather.moon_eclipse import EclipsePoint, LunarEclipseInfo, LunarEclipseService
 
 
 class _Peak:
@@ -84,7 +84,7 @@ class TestCoordinateHelpers:
         assert self.svc._coord_attribute(coord_type_error, "alt") is None
         assert self.svc._coord_attribute(coord_attr_error, "alt") is None
 
-    @patch("moon_eclipse.get_body")
+    @patch("astroweather.moon_eclipse.get_body")
     def test_get_moon_altitude_azimuth_uses_coord_values(self, mock_get_body):
         transformed = MagicMock()
         transformed.alt = MagicMock()
@@ -102,7 +102,7 @@ class TestCoordinateHelpers:
         assert alt == pytest.approx(20.2)
         assert az == pytest.approx(181.8)
 
-    @patch("moon_eclipse.get_body")
+    @patch("astroweather.moon_eclipse.get_body")
     def test_get_moon_altitude_azimuth_defaults_to_zero_when_missing(self, mock_get_body):
         transformed = MagicMock(spec=[])
         body = MagicMock()
@@ -115,7 +115,7 @@ class TestCoordinateHelpers:
         assert alt == 0.0
         assert az == 0.0
 
-    @patch("moon_eclipse.get_body")
+    @patch("astroweather.moon_eclipse.get_body")
     def test_generate_altitude_vs_time_points_include_end_time(self, mock_get_body):
         transformed = MagicMock()
         transformed.alt = MagicMock()
@@ -136,7 +136,7 @@ class TestCoordinateHelpers:
         assert points[0].altitude_deg == 10.0
         assert points[0].azimuth_deg == 100.1
 
-    @patch("moon_eclipse.get_body")
+    @patch("astroweather.moon_eclipse.get_body")
     def test_generate_altitude_vs_time_handles_missing_coordinates(self, mock_get_body):
         transformed = MagicMock(spec=[])
         body = MagicMock()
@@ -207,13 +207,13 @@ class TestGetNextEclipse:
     def setup_method(self):
         self.svc = LunarEclipseService(latitude=48.0, longitude=2.0, timezone="UTC")
 
-    @patch("moon_eclipse.SearchLunarEclipse", return_value=None)
+    @patch("astroweather.moon_eclipse.SearchLunarEclipse", return_value=None)
     def test_get_next_eclipse_returns_none_when_no_eclipse(self, _mock_search):
         assert self.svc.get_next_eclipse() is None
 
     @patch.object(LunarEclipseService, "_generate_altitude_vs_time")
     @patch.object(LunarEclipseService, "_get_moon_altitude_azimuth")
-    @patch("moon_eclipse.SearchLunarEclipse")
+    @patch("astroweather.moon_eclipse.SearchLunarEclipse")
     def test_get_next_eclipse_total_phase_path(
         self,
         mock_search,
@@ -249,7 +249,7 @@ class TestGetNextEclipse:
 
     @patch.object(LunarEclipseService, "_generate_altitude_vs_time")
     @patch.object(LunarEclipseService, "_get_moon_altitude_azimuth")
-    @patch("moon_eclipse.SearchLunarEclipse")
+    @patch("astroweather.moon_eclipse.SearchLunarEclipse")
     def test_get_next_eclipse_penumbral_fallback_and_not_visible(
         self,
         mock_search,

@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-import weather_openmeteo as wom
+from weather import weather_openmeteo as wom
 
 
 class TestRateLimitHelpers:

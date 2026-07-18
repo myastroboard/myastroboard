@@ -6,7 +6,7 @@ Covers directory creation, file helpers, and trimming.
 import os
 import json
 from unittest.mock import patch
-import skytonight_storage
+from skytonight import skytonight_storage
 
 ensure_skytonight_directories = skytonight_storage.ensure_skytonight_directories
 get_location_directory = skytonight_storage.get_location_directory
@@ -294,7 +294,7 @@ class TestRemainingStorageGapArcs:
     """Targeted coverage for the last defensive/error-handling arcs."""
 
     def test_default_location_id_returns_none_on_exception(self, monkeypatch):
-        import repo_config
+        from utils import repo_config
 
         def _raise():
             raise RuntimeError("config unavailable")

@@ -21,8 +21,10 @@ if 'psutil' not in sys.modules:
     sys.modules['psutil'] = types.ModuleType('psutil')
 
 import app as _app_mod
-import cache_store
-from repo_config import (
+from blueprints import locations as _locations_mod
+from blueprints import weather as _weather_mod
+from cache import cache_store
+from utils.repo_config import (
     _ensure_locations,
     get_active_location,
     get_install_default_location,
@@ -129,7 +131,7 @@ class TestRepoConfigEdgeArcs:
         assert [loc['id'] for loc in accessible] == ['a']
 
     def test_scheduler_locations_includes_active_and_default_pointers(self, monkeypatch):
-        import auth as auth_module
+        from utils import auth as auth_module
 
         config = {
             'locations': [
@@ -275,7 +277,7 @@ class TestCacheStoreEdgeArcs:
 class TestAuthLocationEdgeArcs:
     @pytest.fixture
     def manager(self, tmp_path, monkeypatch):
-        import auth as auth_module
+        from utils import auth as auth_module
 
         users_file = str(tmp_path / 'users.json')
         monkeypatch.setattr(auth_module, 'USERS_FILE', users_file)
@@ -329,7 +331,7 @@ class TestAuthLocationEdgeArcs:
 
 class TestHelperEdgeArcs:
     def test_push_with_location_interpolates_for_multi(self, monkeypatch):
-        import push_scheduler
+        from utils import push_scheduler
 
         captured = {}
 
@@ -345,7 +347,7 @@ class TestHelperEdgeArcs:
         assert captured['key'] == 'push_location_suffix'
 
     def test_push_with_location_multi_but_no_name(self):
-        import push_scheduler
+        from utils import push_scheduler
 
         user = _FakeUser()
         assert push_scheduler._with_location(user, 'Body', None, True) == 'Body'
@@ -353,7 +355,7 @@ class TestHelperEdgeArcs:
     def test_astrodex_count_skips_non_astrodex_and_corrupt_files(self, tmp_path, monkeypatch):
         """Location lives on pictures, not items (v1.2) - count_pictures_for_location
         walks each item's pictures list, tolerating junk items/pictures."""
-        import astrodex as astrodex_module
+        from observation import astrodex as astrodex_module
 
         monkeypatch.setattr(astrodex_module, 'ASTRODEX_DIR', str(tmp_path))
         (tmp_path / 'notes.txt').write_text('not astrodex', encoding='utf-8')
@@ -370,7 +372,7 @@ class TestHelperEdgeArcs:
         assert astrodex_module.count_pictures_for_location('L1') == 2
 
     def test_plan_helpers_skip_junk_and_handle_errors(self, tmp_path, monkeypatch):
-        import plan_my_night
+        from observation import plan_my_night
 
         monkeypatch.setattr(plan_my_night, 'PLAN_DIR', str(tmp_path))
 
@@ -408,7 +410,7 @@ class TestLocationsApiErrorArcs:
         raise RuntimeError('boom')
 
     def test_all_route_exception_handlers_return_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod, 'load_config', self._raise)
+        monkeypatch.setattr(_locations_mod, 'load_config', self._raise)
         assert client_admin.get('/api/locations').status_code == 500
         assert client_admin.post('/api/locations', json={}).status_code == 500
         assert client_admin.put('/api/locations/x', json={}).status_code == 500
@@ -419,7 +421,7 @@ class TestLocationsApiErrorArcs:
         assert client_admin.post('/api/locations/active', json={'location_id': 'x'}).status_code == 500
 
     def test_validate_payload_edges(self):
-        validate = _app_mod._validate_location_payload
+        validate = _locations_mod._validate_location_payload
         assert validate('junk')[1] is not None                      # non-dict payload
         assert validate({'name': 'X', 'latitude': None, 'longitude': 2,
                          'elevation': 0, 'timezone': 'UTC'})[1] is not None  # lat not a number
@@ -477,7 +479,7 @@ class TestLocationsApiErrorArcs:
     def test_login_survives_location_reset_failure(self, monkeypatch):
         """A failing active-location reset must never block a login (warning only)."""
         from app import app as flask_app
-        from auth import user_manager
+        from utils.auth import user_manager
 
         username = f'loginedge_{uuid.uuid4().hex[:8]}'
         user = user_manager.create_user(username, 'password123', 'user')
@@ -495,13 +497,13 @@ class TestLocationsApiErrorArcs:
                 pass
 
     def test_moon_calendar_warm_cache_and_computed_paths(self, client_admin, monkeypatch):
-        from repo_config import load_config
+        from utils.repo_config import load_config
 
         loc_id = get_install_default_location(load_config()).get('id')
 
         # Warm per-location slot -> served directly
         monkeypatch.setitem(
-            _app_mod._moon_calendar_cache, loc_id,
+            _weather_mod._moon_calendar_cache, loc_id,
             {'timestamp': time.time(), 'data': {'nights': [{'date': '2030-01-01'}]}},
         )
         resp = client_admin.get('/api/moon/month-calendar')
@@ -509,7 +511,7 @@ class TestLocationsApiErrorArcs:
         assert resp.get_json()['nights'][0]['date'] == '2030-01-01'
 
         # Cold slot -> computed via MoonPlanner (stubbed) and cached
-        monkeypatch.setitem(_app_mod._moon_calendar_cache, loc_id, {'timestamp': 0, 'data': None})
+        monkeypatch.setitem(_weather_mod._moon_calendar_cache, loc_id, {'timestamp': 0, 'data': None})
 
         class _StubPlanner:
             def __init__(self, *_a, **_k):
@@ -537,47 +539,47 @@ class TestCachedLocationScore:
 
     def test_returns_none_when_no_forecast_cached(self, monkeypatch):
         monkeypatch.setattr(cache_store, 'load_location_cache', lambda name, loc_id: {'data': None})
-        assert _app_mod._cached_location_score('loc-cold') is None
+        assert _locations_mod._cached_location_score('loc-cold') is None
 
     def test_returns_none_when_hourly_list_empty(self, monkeypatch):
         monkeypatch.setattr(cache_store, 'load_location_cache', lambda name, loc_id: {'data': {'hourly': []}})
-        assert _app_mod._cached_location_score('loc-empty') is None
+        assert _locations_mod._cached_location_score('loc-empty') is None
 
     def test_returns_none_when_condition_missing(self, monkeypatch):
         monkeypatch.setattr(
             cache_store, 'load_location_cache',
             lambda name, loc_id: {'data': {'hourly': [{'temperature_2m': 12.0}]}},
         )
-        assert _app_mod._cached_location_score('loc-nocond') is None
+        assert _locations_mod._cached_location_score('loc-nocond') is None
 
     def test_converts_condition_to_0_10_scale(self, monkeypatch):
         monkeypatch.setattr(
             cache_store, 'load_location_cache',
             lambda name, loc_id: {'data': {'hourly': [{'condition': 87.3}]}},
         )
-        assert _app_mod._cached_location_score('loc-warm') == pytest.approx(8.7)
+        assert _locations_mod._cached_location_score('loc-warm') == pytest.approx(8.7)
 
     def test_returns_none_on_unexpected_exception(self, monkeypatch):
         def _raise(name, loc_id):
             raise RuntimeError('cache file corrupt')
 
         monkeypatch.setattr(cache_store, 'load_location_cache', _raise)
-        assert _app_mod._cached_location_score('loc-boom') is None
+        assert _locations_mod._cached_location_score('loc-boom') is None
 
 
 class TestSkyTonightPerLocationBranchGaps:
     """Targeted arcs for the per-location SkyTonight refactor's helper functions."""
 
     def test_any_location_missing_results_exception_falls_back_to_default_check(self, monkeypatch):
-        import skytonight_scheduler as sched_mod
+        from skytonight import skytonight_scheduler as sched_mod
 
         def _raise(config):
             raise RuntimeError('config unavailable')
 
-        # The function does `from repo_config import get_scheduler_locations` lazily
+        # The function does `from utils.repo_config import get_scheduler_locations` lazily
         # inside its try block, which re-reads repo_config's current attribute at
         # call time - patch it there to force the except arc.
-        import repo_config as _repo_config_mod
+        from utils import repo_config as _repo_config_mod
 
         monkeypatch.setattr(_repo_config_mod, 'get_scheduler_locations', _raise)
         monkeypatch.setattr(sched_mod, 'has_calculation_results', lambda *_a, **_k: True)
@@ -587,7 +589,7 @@ class TestSkyTonightPerLocationBranchGaps:
     def test_compute_target_debug_uses_explicit_location_without_fallback(self, monkeypatch):
         """Line 1731 false branch: a valid location dict is passed directly and
         must NOT be replaced by the install-default fallback lookup."""
-        import skytonight_calculator as calc_mod
+        from skytonight import skytonight_calculator as calc_mod
 
         install_default_calls = []
         monkeypatch.setattr(
@@ -603,7 +605,7 @@ class TestSkyTonightPerLocationBranchGaps:
             install_default_calls.append(config)
             return {'latitude': 0.0, 'longitude': 0.0, 'timezone': 'UTC'}
 
-        import repo_config as _repo_config_mod2
+        from utils import repo_config as _repo_config_mod2
         monkeypatch.setattr(_repo_config_mod2, 'get_install_default_location', _track_install_default)
 
         result = calc_mod.compute_target_debug(

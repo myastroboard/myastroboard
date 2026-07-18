@@ -10,7 +10,7 @@ backend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'backend
 if backend_path not in sys.path:
     sys.path.insert(0, backend_path)
 
-from moon_phases import MoonService
+from astroweather.moon_phases import MoonService
 
 
 @staticmethod
@@ -193,10 +193,10 @@ class TestNextAstronomicalDarkWindow:
         svc = MoonService(48.85, 2.35, 'Europe/Paris')
         start = datetime.datetime(2026, 1, 1, 22, 0, 0, tzinfo=ZoneInfo('Europe/Paris'))
 
-        with patch('moon_phases.AstroTime', return_value=MagicMock()), \
-             patch('moon_phases.AltAz', return_value=MagicMock()), \
-             patch('moon_phases.get_sun', return_value=_make_alt_mock(sun_alts)), \
-             patch('moon_phases.get_body', return_value=_make_alt_mock(moon_alts)), \
+        with patch('astroweather.moon_phases.AstroTime', return_value=MagicMock()), \
+             patch('astroweather.moon_phases.AltAz', return_value=MagicMock()), \
+             patch('astroweather.moon_phases.get_sun', return_value=_make_alt_mock(sun_alts)), \
+             patch('astroweather.moon_phases.get_body', return_value=_make_alt_mock(moon_alts)), \
              patch.object(MoonService, '_coord_altitude_deg', return_value=None):
             result = svc._next_astronomical_dark_window(start)
 

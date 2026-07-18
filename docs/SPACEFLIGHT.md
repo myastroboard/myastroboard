@@ -17,7 +17,7 @@ The **Spaceflight** tab keeps you connected to what is happening above the atmos
 
 ## Launches
 
-**Module**: `backend/spaceflight_tracker.py`
+**Module**: `backend/space/spaceflight_tracker.py`
 
 **Data source**: [Launch Library 2 (The Space Devs)](https://thespacedevs.com/llapi)
 
@@ -56,7 +56,7 @@ If the LL2 API returns HTTP 429 (rate limit), all further calls to the same endp
 
 ## Astronauts
 
-**Module**: `backend/spaceflight_tracker.py`
+**Module**: `backend/space/spaceflight_tracker.py`
 
 **Cache TTL**: 6 hours (`CACHE_TTL_SPACEFLIGHT_ASTRONAUTS`).
 
@@ -77,7 +77,7 @@ Fetches from Launch Library 2 the list of all people currently in orbit:
 
 ## Space events
 
-**Module**: `backend/spaceflight_tracker.py`
+**Module**: `backend/space/spaceflight_tracker.py`
 
 **Cache TTL**: 2 hours (`CACHE_TTL_SPACEFLIGHT_EVENTS`).
 
@@ -89,7 +89,7 @@ Space events include EVAs (spacewalks), dockings, undockings, and other mission 
 
 ## ISS passes
 
-**Module**: `backend/iss_passes.py`
+**Module**: `backend/space/iss_passes.py`
 
 **Cache TTL**: 6 hours (`CACHE_TTL_ISS_PASSES`).
 

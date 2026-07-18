@@ -9,7 +9,7 @@ from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
-import equipment_profiles
+from equipment import equipment_profiles
 
 
 USER_A = "user-a-uuid"
@@ -82,7 +82,7 @@ def test_load_shared_from_other_users(temp_data_dir):
     _create_telescope(USER_B, 'Scope B not shared', is_shared=False)
     _create_telescope(USER_B, 'Scope B shared', is_shared=True)
 
-    with patch('auth.user_manager', _mock_user_manager()):
+    with patch('utils.auth.user_manager', _mock_user_manager()):
         shared = equipment_profiles.load_all_shared_equipment('telescopes', USER_A)
 
     names = [s['name'] for s in shared]
@@ -94,7 +94,7 @@ def test_load_shared_from_other_users(temp_data_dir):
 def test_non_shared_item_not_visible_to_others(temp_data_dir):
     _create_telescope(USER_B, 'Private Scope', is_shared=False)
 
-    with patch('auth.user_manager', _mock_user_manager()):
+    with patch('utils.auth.user_manager', _mock_user_manager()):
         shared = equipment_profiles.load_all_shared_equipment('telescopes', USER_A)
 
     assert shared == []
@@ -103,7 +103,7 @@ def test_non_shared_item_not_visible_to_others(temp_data_dir):
 def test_shared_item_annotated_with_owner(temp_data_dir):
     _create_telescope(USER_B, 'Bob Scope', is_shared=True)
 
-    with patch('auth.user_manager', _mock_user_manager()):
+    with patch('utils.auth.user_manager', _mock_user_manager()):
         shared = equipment_profiles.load_all_shared_equipment('telescopes', USER_A)
 
     assert len(shared) == 1
@@ -137,7 +137,7 @@ def test_combination_is_shared_all_own_true(temp_data_dir):
         'accessory_ids': [],
     }
 
-    with patch('auth.user_manager', _mock_user_manager()):
+    with patch('utils.auth.user_manager', _mock_user_manager()):
         status = equipment_profiles.compute_combination_share_status(combo, USER_A)
 
     assert status['is_shared'] is True
@@ -157,7 +157,7 @@ def test_combination_not_shared_when_one_not_shared(temp_data_dir):
         'accessory_ids': [],
     }
 
-    with patch('auth.user_manager', _mock_user_manager()):
+    with patch('utils.auth.user_manager', _mock_user_manager()):
         status = equipment_profiles.compute_combination_share_status(combo, USER_A)
 
     assert status['is_shared'] is False
@@ -176,7 +176,7 @@ def test_combination_broken_share_when_item_gone(temp_data_dir):
         'accessory_ids': [],
     }
 
-    with patch('auth.user_manager', _mock_user_manager()):
+    with patch('utils.auth.user_manager', _mock_user_manager()):
         status = equipment_profiles.compute_combination_share_status(combo, USER_A)
 
     assert status['is_shared'] is False
@@ -195,7 +195,7 @@ def test_combination_using_shared_equipment_from_other_user(temp_data_dir):
         'accessory_ids': [],
     }
 
-    with patch('auth.user_manager', _mock_user_manager()):
+    with patch('utils.auth.user_manager', _mock_user_manager()):
         status = equipment_profiles.compute_combination_share_status(combo, USER_A)
 
     assert status['is_shared'] is True

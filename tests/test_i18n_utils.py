@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import mock_open, patch
 
-import i18n_utils as module
+from utils import i18n_utils as module
 
 I18nManager = module.I18nManager
 _is_safe_path = module._is_safe_path
@@ -30,7 +30,7 @@ def test_is_safe_path_true_for_nested_path(tmp_path):
 
 def test_load_translation_file_unsupported_language_falls_back_to_default():
     payload = '{"common": {"hello": "Hello"}}'
-    with patch("i18n_utils.os.path.exists", return_value=True), patch(
+    with patch("utils.i18n_utils.os.path.exists", return_value=True), patch(
         "builtins.open", mock_open(read_data=payload)
     ):
         data = module._load_translation_file("xx")
@@ -39,7 +39,7 @@ def test_load_translation_file_unsupported_language_falls_back_to_default():
 
 
 def test_load_translation_file_not_found_returns_empty():
-    with patch("i18n_utils.os.path.exists", return_value=False):
+    with patch("utils.i18n_utils.os.path.exists", return_value=False):
         assert module._load_translation_file("en") == {}
 
 
@@ -49,7 +49,7 @@ def test_i18n_manager_fallback_and_params():
             return {"weather_alerts": {}}
         return {"weather_alerts": {"critical_dew_risk": "Dew risk at {time}"}}
 
-    with patch("i18n_utils._load_translation_file", side_effect=fake_loader):
+    with patch("utils.i18n_utils._load_translation_file", side_effect=fake_loader):
         manager = I18nManager("fr")
         result = manager.t("weather_alerts.critical_dew_risk", time="22:15")
 
@@ -57,27 +57,27 @@ def test_i18n_manager_fallback_and_params():
 
 
 def test_i18n_manager_missing_key_returns_key():
-    with patch("i18n_utils._load_translation_file", return_value={}):
+    with patch("utils.i18n_utils._load_translation_file", return_value={}):
         manager = I18nManager("en")
     assert manager.t("missing.namespace") == "missing.namespace"
 
 
 def test_i18n_manager_set_language_unsupported_keeps_current():
-    with patch("i18n_utils._load_translation_file", return_value={}):
+    with patch("utils.i18n_utils._load_translation_file", return_value={}):
         manager = I18nManager("en")
         manager.set_language("xx")
     assert manager.get_language() == "en"
 
 
 def test_get_namespace_and_supported_languages():
-    with patch("i18n_utils._load_translation_file", return_value={"weather_alerts": {"x": "y"}}):
+    with patch("utils.i18n_utils._load_translation_file", return_value={"weather_alerts": {"x": "y"}}):
         manager = I18nManager("en")
     assert manager.get_namespace("weather_alerts") == {"x": "y"}
     assert "en" in manager.get_supported_languages()
 
 
 def test_get_translated_message_calls_manager():
-    with patch("i18n_utils.I18nManager") as manager_cls:
+    with patch("utils.i18n_utils.I18nManager") as manager_cls:
         manager_instance = manager_cls.return_value
         manager_instance.t.return_value = "Translated"
         result = get_translated_message("weather_alerts.section_title", "en")
@@ -87,7 +87,7 @@ def test_get_translated_message_calls_manager():
 
 
 def test_create_translated_alert_uses_formatted_time_and_fallback_key():
-    with patch("i18n_utils.I18nManager") as manager_cls:
+    with patch("utils.i18n_utils.I18nManager") as manager_cls:
         manager_instance = manager_cls.return_value
         manager_instance.t.return_value = "Alert text"
 
@@ -103,7 +103,7 @@ def test_create_translated_alert_uses_formatted_time_and_fallback_key():
 
 
 def test_create_translated_alert_invalid_time_keeps_original_string():
-    with patch("i18n_utils.I18nManager") as manager_cls:
+    with patch("utils.i18n_utils.I18nManager") as manager_cls:
         manager_instance = manager_cls.return_value
         manager_instance.t.return_value = "Section"
 
@@ -135,7 +135,7 @@ def test_load_translation_file_cache_hit(tmp_path):
     """Line 69: second call for same language uses cached result."""
     module._translation_cache.clear()
     payload = '{"x": "y"}'
-    with patch("i18n_utils.os.path.exists", return_value=True), patch(
+    with patch("utils.i18n_utils.os.path.exists", return_value=True), patch(
         "builtins.open", mock_open(read_data=payload)
     ):
         module._load_translation_file("en")
@@ -149,7 +149,7 @@ def test_load_translation_file_cache_hit(tmp_path):
 def test_load_translation_file_json_decode_error_returns_empty(tmp_path):
     """Lines 99-101: JSONDecodeError → empty dict returned."""
     module._translation_cache.clear()
-    with patch("i18n_utils.os.path.exists", return_value=True), patch(
+    with patch("utils.i18n_utils.os.path.exists", return_value=True), patch(
         "builtins.open", mock_open(read_data="INVALID JSON {{{")
     ):
         result = module._load_translation_file("en")
@@ -159,7 +159,7 @@ def test_load_translation_file_json_decode_error_returns_empty(tmp_path):
 
 def test_t_key_found_in_main_translations_loop_exits_normally():
     """Line 146->161: all keys found in main translations → loop exits normally → line 161 executed."""
-    with patch("i18n_utils._load_translation_file", return_value={"ns": {"key": "value"}}):
+    with patch("utils.i18n_utils._load_translation_file", return_value={"ns": {"key": "value"}}):
         manager = I18nManager("en")
     result = manager.t("ns.key")
     assert result == "value"
@@ -167,7 +167,7 @@ def test_t_key_found_in_main_translations_loop_exits_normally():
 
 def test_t_key_resolves_to_non_string_returns_key():
     """Line 162: key resolves to a dict (not str) → return key."""
-    with patch("i18n_utils._load_translation_file", return_value={"ns": {"sub": "v"}}):
+    with patch("utils.i18n_utils._load_translation_file", return_value={"ns": {"sub": "v"}}):
         manager = I18nManager("en")
     # Key "ns" alone resolves to a dict, not a str
     result = manager.t("ns")
@@ -176,7 +176,7 @@ def test_t_key_resolves_to_non_string_returns_key():
 
 def test_set_language_valid_language_updates_state():
     """Lines 181-182: set_language with a supported language updates self.language."""
-    with patch("i18n_utils._load_translation_file", return_value={}):
+    with patch("utils.i18n_utils._load_translation_file", return_value={}):
         manager = I18nManager("en")
         manager.set_language("fr")
     assert manager.get_language() == "fr"
@@ -184,13 +184,13 @@ def test_set_language_valid_language_updates_state():
 
 def test_get_namespace_missing_returns_empty():
     """Line 202: namespace not in translations → return {}."""
-    with patch("i18n_utils._load_translation_file", return_value={"other": {}}):
+    with patch("utils.i18n_utils._load_translation_file", return_value={"other": {}}):
         manager = I18nManager("en")
     assert manager.get_namespace("nonexistent") == {}
 
 
 def test_init_i18n_for_request_returns_manager():
     """Line 283: init_i18n_for_request returns an I18nManager instance."""
-    with patch("i18n_utils._load_translation_file", return_value={}):
+    with patch("utils.i18n_utils._load_translation_file", return_value={}):
         result = init_i18n_for_request("en")
     assert isinstance(result, I18nManager)

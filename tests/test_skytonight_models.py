@@ -1,6 +1,6 @@
 """Tests for skytonight_models.py — SkyTonightCoordinates and SkyTonightTarget."""
 
-from skytonight_models import SkyTonightCoordinates, SkyTonightTarget
+from skytonight.skytonight_models import SkyTonightCoordinates, SkyTonightTarget
 
 
 class TestSkyTonightCoordinates:

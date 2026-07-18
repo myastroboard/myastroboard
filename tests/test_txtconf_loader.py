@@ -3,7 +3,7 @@ Unit tests for txtconf_loader.py
 """
 from unittest.mock import patch, mock_open
 
-from txtconf_loader import get_repo_version
+from utils.txtconf_loader import get_repo_version
 
 
 class TestGetRepoVersion:

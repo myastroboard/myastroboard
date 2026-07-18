@@ -140,13 +140,13 @@ The Open-Meteo single-flight lock, failure cooldown and shared concurrency gate 
 **global** (not per-location) so multi-location installs respect the provider's
 concurrency limit as one shared budget.
 
-`weather_astro.py`'s in-memory analysis cache is keyed by
+`weather/weather_astro.py`'s in-memory analysis cache is keyed by
 `(hours, language, location_id)` — pre-v1.2 it lacked the location dimension, which
 would have served one location's analysis to another location's tab.
 
 ## Rate-limit analysis & the MAX_LOCATIONS cap
 
-`MAX_LOCATIONS = 5` (`backend/constants.py`). **Not admin-configurable**: every
+`MAX_LOCATIONS = 5` (`backend/utils/constants.py`). **Not admin-configurable**: every
 self-hosted MyAstroBoard instance shares the same free, keyless Open-Meteo/7Timer
 capacity pool. This is a collective-good constraint (avoid provider-side blacklisting
 for everyone), not a per-install tuning knob.
@@ -165,7 +165,7 @@ Only two external services take lat/lon as request parameters:
 
 Neither provider publishes a hard numeric quota today; the documented Open-Meteo
 protection is *concurrency*-based (single-flight + 90 s shared cooldown in
-`weather_utils.py` / `weather_openmeteo.py`).
+`weather/weather_utils.py` / `weather/weather_openmeteo.py`).
 
 ```
 calls_per_hour_per_location(job) = 3600 / TTL_seconds(job)

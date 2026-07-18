@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 import requests
 
-import version_checker as module
+from utils import version_checker as module
 
 
 @pytest.fixture(autouse=True)

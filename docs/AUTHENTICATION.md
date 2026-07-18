@@ -2,7 +2,7 @@
 
 MyAstroBoard uses a simple session-based multi-user system with three roles.
 
-**Module**: `backend/auth.py`
+**Module**: `backend/utils/auth.py`
 
 ---
 
@@ -132,7 +132,7 @@ The **Parameters → Users** panel (admin only) allows:
 
 ## Advanced settings (admin)
 
-Stored in `data/app_settings.json` via `backend/app_settings.py`:
+Stored in `data/app_settings.json` via `backend/utils/app_settings.py`:
 
 | Setting | Default | Description |
 |---------|---------|-------------|

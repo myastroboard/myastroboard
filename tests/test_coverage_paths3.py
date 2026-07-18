@@ -11,7 +11,7 @@ import time
 from unittest.mock import MagicMock, patch
 
 import pytest
-import spaceflight_tracker
+from space import spaceflight_tracker
 
 # ---------------------------------------------------------------------------
 # push_scheduler.py — lines 613-614
@@ -22,7 +22,7 @@ class TestAcquireLockCloseFailsOnCleanup:
     """Lines 613-614: outer except fires AND lock_file.close() also raises."""
 
     def test_close_failure_logged_and_false_returned(self, monkeypatch, tmp_path):
-        import push_scheduler
+        from utils import push_scheduler
 
         push_scheduler._lock_file = None
         real_open = builtins.open
@@ -69,18 +69,18 @@ class TestGetOrCreateSchedulerLockCleanup:
 
     def test_ioerror_after_open_close_succeeds(self, tmp_path):
         """Lines 178-180: IOError after open → lock_file.close() called (succeeds)."""
-        from skytonight_scheduler_manager import get_or_create_skytonight_scheduler
+        from skytonight.skytonight_scheduler_manager import get_or_create_skytonight_scheduler
 
         lock_path = str(tmp_path / "sched.lock")
         with patch(
-            "skytonight_scheduler_manager.get_skytonight_scheduler_lock_file",
+            "skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_lock_file",
             return_value=lock_path,
         ):
-            with patch("skytonight_scheduler_manager.msvcrt") as mock_msvcrt:
+            with patch("skytonight.skytonight_scheduler_manager.msvcrt") as mock_msvcrt:
                 mock_msvcrt.locking.return_value = None
                 mock_msvcrt.LK_NBLCK = 1
                 with patch(
-                    "skytonight_scheduler.SkyTonightScheduler",
+                    "skytonight.skytonight_scheduler.SkyTonightScheduler",
                     side_effect=IOError("io error during scheduler creation"),
                 ):
                     result = get_or_create_skytonight_scheduler(self._make_app())
@@ -88,7 +88,7 @@ class TestGetOrCreateSchedulerLockCleanup:
 
     def test_ioerror_after_open_close_also_fails(self, tmp_path):
         """Lines 181-182: IOError after open → lock_file.close() also raises."""
-        from skytonight_scheduler_manager import get_or_create_skytonight_scheduler
+        from skytonight.skytonight_scheduler_manager import get_or_create_skytonight_scheduler
 
         lock_path = str(tmp_path / "sched2.lock")
         mock_lf = MagicMock()
@@ -98,15 +98,15 @@ class TestGetOrCreateSchedulerLockCleanup:
             return mock_lf
 
         with patch(
-            "skytonight_scheduler_manager.get_skytonight_scheduler_lock_file",
+            "skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_lock_file",
             return_value=lock_path,
         ):
             with patch("builtins.open", side_effect=_mock_open):
-                with patch("skytonight_scheduler_manager.msvcrt") as mock_msvcrt:
+                with patch("skytonight.skytonight_scheduler_manager.msvcrt") as mock_msvcrt:
                     mock_msvcrt.locking.return_value = None
                     mock_msvcrt.LK_NBLCK = 1
                     with patch(
-                        "skytonight_scheduler.SkyTonightScheduler",
+                        "skytonight.skytonight_scheduler.SkyTonightScheduler",
                         side_effect=IOError("io error"),
                     ):
                         result = get_or_create_skytonight_scheduler(self._make_app())
@@ -114,11 +114,11 @@ class TestGetOrCreateSchedulerLockCleanup:
 
     def test_exception_handler_lock_file_none(self, tmp_path):
         """Branch 185->190: open() raises non-IOError/OSError → lock_file stays None."""
-        from skytonight_scheduler_manager import get_or_create_skytonight_scheduler
+        from skytonight.skytonight_scheduler_manager import get_or_create_skytonight_scheduler
 
         lock_path = str(tmp_path / "sched3.lock")
         with patch(
-            "skytonight_scheduler_manager.get_skytonight_scheduler_lock_file",
+            "skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_lock_file",
             return_value=lock_path,
         ):
             with patch("builtins.open", side_effect=ValueError("unexpected value error")):
@@ -127,22 +127,22 @@ class TestGetOrCreateSchedulerLockCleanup:
 
     def test_exception_handler_close_also_fails(self, tmp_path):
         """Lines 188-189: general Exception after open + lock_file.close() raises."""
-        from skytonight_scheduler_manager import get_or_create_skytonight_scheduler
+        from skytonight.skytonight_scheduler_manager import get_or_create_skytonight_scheduler
 
         lock_path = str(tmp_path / "sched4.lock")
         mock_lf = MagicMock()
         mock_lf.close.side_effect = ValueError("close also failed")
 
         with patch(
-            "skytonight_scheduler_manager.get_skytonight_scheduler_lock_file",
+            "skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_lock_file",
             return_value=lock_path,
         ):
             with patch("builtins.open", return_value=mock_lf):
-                with patch("skytonight_scheduler_manager.msvcrt") as mock_msvcrt:
+                with patch("skytonight.skytonight_scheduler_manager.msvcrt") as mock_msvcrt:
                     mock_msvcrt.locking.return_value = None
                     mock_msvcrt.LK_NBLCK = 1
                     with patch(
-                        "skytonight_scheduler.SkyTonightScheduler",
+                        "skytonight.skytonight_scheduler.SkyTonightScheduler",
                         side_effect=RuntimeError("scheduler init crashed"),
                     ):
                         result = get_or_create_skytonight_scheduler(self._make_app())
@@ -159,7 +159,7 @@ class TestWeatherAstroBranches:
 
     @classmethod
     def setup_class(cls):
-        import weather_astro
+        from weather import weather_astro
         cls.weather_astro = weather_astro
 
     def test_parse_extended_data_timezone_already_string(self):
@@ -194,10 +194,10 @@ class TestWeatherAstroBranches:
         """Branch 814->820: TTL not expired but cached data is None → fall through."""
         key = self.weather_astro._analysis_cache_key(24, "nocache_lang")
         now = time.time()
-        with patch("weather_astro.time.time", return_value=now), \
-             patch("weather_astro.is_openmeteo_rate_limited", return_value=True), \
-             patch("weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS_TS", {key: now}), \
-             patch("weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS", {}):
+        with patch("weather.weather_astro.time.time", return_value=now), \
+             patch("weather.weather_astro.is_openmeteo_rate_limited", return_value=True), \
+             patch("weather.weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS_TS", {key: now}), \
+             patch("weather.weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS", {}):
             result = self.weather_astro.get_astro_weather_analysis(24, "nocache_lang")
         # rate limited + no cache → None
         assert result is None
@@ -213,7 +213,7 @@ class TestAuthSaveUsersMissingBranches:
 
     def test_makedirs_fails_no_backup_no_temp(self, tmp_path, monkeypatch):
         """Branches 260->267, 267->273: makedirs fails → backup_created=False, temp not created."""
-        import auth
+        from utils import auth
 
         users_file = tmp_path / "users.json"
         monkeypatch.setattr(auth, "USERS_FILE", str(users_file))
@@ -233,7 +233,7 @@ class TestAuthDeleteUserMissingBranches:
 
     @pytest.fixture
     def setup_auth_manager(self, tmp_path, monkeypatch):
-        import auth
+        from utils import auth
 
         isolated_users = tmp_path / "users.json"
         monkeypatch.setattr(auth, "USERS_FILE", str(isolated_users))
@@ -246,8 +246,8 @@ class TestAuthDeleteUserMissingBranches:
         astrodex_dir.mkdir()
         images_dir.mkdir()
 
-        monkeypatch.setattr("astrodex.ASTRODEX_DIR", str(astrodex_dir))
-        monkeypatch.setattr("astrodex.ASTRODEX_IMAGES_DIR", str(images_dir))
+        monkeypatch.setattr("observation.astrodex.ASTRODEX_DIR", str(astrodex_dir))
+        monkeypatch.setattr("observation.astrodex.ASTRODEX_IMAGES_DIR", str(images_dir))
 
         return manager, admin, alice, astrodex_dir, images_dir
 
@@ -282,7 +282,7 @@ class TestAuthDeleteUserMissingBranches:
 
     def test_listdir_path_traversal_guard(self, tmp_path, monkeypatch, setup_auth_manager):
         """Branch 584->580: normpath resolves outside images_dir → skip."""
-        import auth as auth_mod
+        from utils import auth as auth_mod
 
         manager, admin, alice, astrodex_dir, images_dir = setup_auth_manager
         user_id = alice.user_id
@@ -315,7 +315,7 @@ class TestCacheUpdaterIersBranches:
 
     def test_update_iers_no_mirror_url(self):
         """Branch 1015->1018: mirror_url is None → single URL list."""
-        from cache_updater import update_iers_cache
+        from cache.cache_updater import update_iers_cache
         import astropy.utils.iers as _iers_mod
 
         mock_conf = MagicMock()
@@ -340,7 +340,7 @@ class TestCacheUpdaterIersBranches:
 
     def test_iers_table_mjd_max_without_value_attr(self):
         """Line 1276: mjd_max without .value attribute (plain float)."""
-        from cache_updater import fully_initialize_caches
+        from cache.cache_updater import fully_initialize_caches
         import astropy.utils.iers as _iers_mod
 
         class _FakeMJD:
@@ -355,9 +355,9 @@ class TestCacheUpdaterIersBranches:
                     return _FakeMJD()
                 return None
 
-        with patch("cache_updater.cache_store") as mock_cs:
-            with patch("cache_updater.load_config") as mock_cfg:
-                with patch("cache_updater.check_and_handle_config_changes") as mock_chk:
+        with patch("cache.cache_updater.cache_store") as mock_cs:
+            with patch("cache.cache_updater.load_config") as mock_cfg:
+                with patch("cache.cache_updater.check_and_handle_config_changes") as mock_chk:
                     mock_cfg.return_value = {
                         "location": {"latitude": 48.0, "longitude": 2.0, "timezone": "UTC"}
                     }
@@ -377,15 +377,15 @@ class TestCacheUpdaterIersBranches:
 
     def test_iers_stale_exception_during_eval(self):
         """Lines 1281-1282: exception while evaluating IERS table staleness."""
-        from cache_updater import fully_initialize_caches
+        from cache.cache_updater import fully_initialize_caches
 
         class _BadTable:
             def __getitem__(self, key):
                 raise KeyError("table access error")
 
-        with patch("cache_updater.cache_store") as mock_cs:
-            with patch("cache_updater.load_config") as mock_cfg:
-                with patch("cache_updater.check_and_handle_config_changes"):
+        with patch("cache.cache_updater.cache_store") as mock_cs:
+            with patch("cache.cache_updater.load_config") as mock_cfg:
+                with patch("cache.cache_updater.check_and_handle_config_changes"):
                     mock_cfg.return_value = {
                         "location": {"latitude": 48.0, "longitude": 2.0, "timezone": "UTC"}
                     }
@@ -401,7 +401,7 @@ class TestCacheUpdaterIersBranches:
 
     def test_iers_stale_forces_iers_job(self):
         """Lines 1285-1286: stale IERS table → iers job appended to jobs_to_run."""
-        from cache_updater import fully_initialize_caches
+        from cache.cache_updater import fully_initialize_caches
 
         class _StaleTable:
             def __getitem__(self, key):
@@ -416,10 +416,10 @@ class TestCacheUpdaterIersBranches:
         class _HasValue:
             value = 50000.0  # very old date → stale
 
-        with patch("cache_updater.cache_store") as mock_cs:
-            with patch("cache_updater.load_config") as mock_cfg:
-                with patch("cache_updater.check_and_handle_config_changes"):
-                    with patch("cache_updater.update_iers_cache") as mock_iers:
+        with patch("cache.cache_updater.cache_store") as mock_cs:
+            with patch("cache.cache_updater.load_config") as mock_cfg:
+                with patch("cache.cache_updater.check_and_handle_config_changes"):
+                    with patch("cache.cache_updater.update_iers_cache") as mock_iers:
                         mock_cfg.return_value = {
                             "location": {"latitude": 48.0, "longitude": 2.0, "timezone": "UTC"}
                         }
@@ -435,14 +435,14 @@ class TestCacheUpdaterIersBranches:
 
     def test_iers_pre_parallel_success_increments_count(self):
         """Line 1324: pre-parallel IERS download succeeds → success_count incremented."""
-        from cache_updater import fully_initialize_caches
+        from cache.cache_updater import fully_initialize_caches
 
-        with patch("cache_updater.update_iers_cache") as mock_iers:
+        with patch("cache.cache_updater.update_iers_cache") as mock_iers:
             mock_iers.return_value = None  # success
             with patch("astropy.utils.iers.IERS_Auto.iers_table", new=None):
-                with patch("cache_updater.cache_store") as mock_cs:
-                    with patch("cache_updater.load_config") as mock_cfg:
-                        with patch("cache_updater.check_and_handle_config_changes"):
+                with patch("cache.cache_updater.cache_store") as mock_cs:
+                    with patch("cache.cache_updater.load_config") as mock_cfg:
+                        with patch("cache.cache_updater.check_and_handle_config_changes"):
                             mock_cfg.return_value = {
                                 "location": {
                                     "latitude": 48.0,
@@ -470,7 +470,7 @@ class TestObjectInfoMissingBranches:
 
     def test_alias_equal_to_identifier_skipped(self):
         """Branch 238->232: alias_val == identifier → skip redundant entry in _resolve_via_simbad."""
-        from object_info import _resolve_via_simbad
+        from observation.object_info import _resolve_via_simbad
 
         identifier = "M31"
         main_result = {
@@ -493,7 +493,7 @@ class TestObjectInfoMissingBranches:
             call_idx[0] += 1
             return query_results[idx] if idx < len(query_results) else None
 
-        with patch("object_info._simbad_query", side_effect=_mock_query):
+        with patch("observation.object_info._simbad_query", side_effect=_mock_query):
             result = _resolve_via_simbad(identifier)
 
         assert result is not None
@@ -503,7 +503,7 @@ class TestObjectInfoMissingBranches:
 
     def test_alias_empty_string_skipped(self):
         """Branch 332->330: alias_val is empty → skip in resolve_identifier_for_catalogue_lookup."""
-        from object_info import resolve_identifier_for_catalogue_lookup
+        from observation.object_info import resolve_identifier_for_catalogue_lookup
 
         main_result = {
             "data": [["M 31", "Galaxy", None, None]],
@@ -525,7 +525,7 @@ class TestObjectInfoMissingBranches:
             call_idx[0] += 1
             return query_results[idx] if idx < len(query_results) else None
 
-        with patch("object_info._simbad_query", side_effect=_mock_query):
+        with patch("observation.object_info._simbad_query", side_effect=_mock_query):
             result = resolve_identifier_for_catalogue_lookup("M31")
 
         assert result is not None
@@ -534,15 +534,15 @@ class TestObjectInfoMissingBranches:
 
     def test_wikipedia_fallback_en_loop_none_result(self):
         """Branch 450->446: lang != 'en', alias is candidate but wiki returns None → loop continues."""
-        from object_info import _wikipedia_with_fallback
+        from observation.object_info import _wikipedia_with_fallback
 
         aliases = ["Andromeda Galaxy", "M31"]
 
         def _no_wiki(term, lang):
             return None  # always return None
 
-        with patch("object_info._get_wikipedia_summary", side_effect=_no_wiki):
-            with patch("object_info._is_wikipedia_candidate", return_value=True):
+        with patch("observation.object_info._get_wikipedia_summary", side_effect=_no_wiki):
+            with patch("observation.object_info._is_wikipedia_candidate", return_value=True):
                 result = _wikipedia_with_fallback(aliases, lang="fr")
 
         assert result is None  # all attempts returned None
@@ -596,7 +596,7 @@ class TestSpaceflightTrackerBackoffHelpers:
             {"/test/": time.time() + 3600},
         )
 
-        with patch("spaceflight_tracker.os.makedirs", side_effect=OSError("no space")):
+        with patch("space.spaceflight_tracker.os.makedirs", side_effect=OSError("no space")):
             spaceflight_tracker._save_backoff_state()  # must not raise
 
     def test_load_backoff_expired_entry_excluded(self, tmp_path, monkeypatch):

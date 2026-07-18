@@ -3,7 +3,7 @@ Unit tests for weather utilities (weather_utils.py)
 """
 from unittest.mock import Mock, patch
 
-from weather_utils import create_weather_client, create_fresh_weather_client
+from weather.weather_utils import create_weather_client, create_fresh_weather_client
 
 RETRY_COUNT = 2
 BACKOFF_FACTOR = 0.5
@@ -14,9 +14,9 @@ DEFAULT_CACHE_FILENAME = ".weather_cache"
 class TestWeatherClientCreation:
     """Test weather client creation"""
 
-    @patch('weather_utils.openmeteo_requests.Client')
-    @patch('weather_utils.retry')
-    @patch('weather_utils.requests_cache.CachedSession')
+    @patch('weather.weather_utils.openmeteo_requests.Client')
+    @patch('weather.weather_utils.retry')
+    @patch('weather.weather_utils.requests_cache.CachedSession')
     def test_create_weather_client_returns_client(self, mock_cached_session, mock_retry, mock_client):
         """Test that create_weather_client returns a client object"""
         # Setup mocks
@@ -40,9 +40,9 @@ class TestWeatherClientCreation:
         mock_client.assert_called_once_with(session=mock_retry_session)
         assert result == mock_client_instance
 
-    @patch('weather_utils.openmeteo_requests.Client')
-    @patch('weather_utils.retry')
-    @patch('weather_utils.requests_cache.CachedSession')
+    @patch('weather.weather_utils.openmeteo_requests.Client')
+    @patch('weather.weather_utils.retry')
+    @patch('weather.weather_utils.requests_cache.CachedSession')
     def test_create_weather_client_uses_cache(self, mock_cached_session, mock_retry, mock_client):
         """Test that client is created with caching enabled"""
         mock_session = Mock()
@@ -60,9 +60,9 @@ class TestWeatherClientCreation:
         assert 'expire_after' in call_args[1]
         assert call_args[1]['expire_after'] == CACHE_EXPIRE_AFTER
 
-    @patch('weather_utils.openmeteo_requests.Client')
-    @patch('weather_utils.retry')
-    @patch('weather_utils.requests_cache.CachedSession')
+    @patch('weather.weather_utils.openmeteo_requests.Client')
+    @patch('weather.weather_utils.retry')
+    @patch('weather.weather_utils.requests_cache.CachedSession')
     def test_create_weather_client_uses_retry(self, mock_cached_session, mock_retry, mock_client):
         """Test that client is created with retry logic"""
         mock_session = Mock()
@@ -84,9 +84,9 @@ class TestWeatherClientCreation:
 class TestFreshWeatherClientCreation:
     """Test fresh weather client creation (no cache)"""
 
-    @patch('weather_utils.openmeteo_requests.Client')
-    @patch('weather_utils.retry')
-    @patch('weather_utils.requests.Session')
+    @patch('weather.weather_utils.openmeteo_requests.Client')
+    @patch('weather.weather_utils.retry')
+    @patch('weather.weather_utils.requests.Session')
     def test_create_fresh_weather_client_returns_client(self, mock_session_cls, mock_retry, mock_client):
         """Test that create_fresh_weather_client returns a client object"""
         mock_session = Mock()
@@ -103,10 +103,10 @@ class TestFreshWeatherClientCreation:
         mock_client.assert_called_once_with(session=mock_retry_session)
         assert result == mock_client_instance
 
-    @patch('weather_utils.requests_cache.CachedSession')
-    @patch('weather_utils.openmeteo_requests.Client')
-    @patch('weather_utils.retry')
-    @patch('weather_utils.requests.Session')
+    @patch('weather.weather_utils.requests_cache.CachedSession')
+    @patch('weather.weather_utils.openmeteo_requests.Client')
+    @patch('weather.weather_utils.retry')
+    @patch('weather.weather_utils.requests.Session')
     def test_create_fresh_weather_client_does_not_use_cache(self, mock_session_cls, mock_retry, mock_client, mock_cached_session):
         """Test that fresh client path does not create a cached session"""
         mock_session_cls.return_value = Mock()

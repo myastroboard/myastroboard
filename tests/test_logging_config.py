@@ -4,7 +4,7 @@ import logging
 
 import pytest
 
-import logging_config as module
+from utils import logging_config as module
 
 _ConfiguredTzFormatter = module._ConfiguredTzFormatter
 

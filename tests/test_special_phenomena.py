@@ -5,7 +5,7 @@ Covers init, translation helper, approximate event methods, and pure-logic helpe
 
 import pytest
 from unittest.mock import patch, MagicMock
-from special_phenomena import SpecialPhenomenaService
+from observation.special_phenomena import SpecialPhenomenaService
 
 
 class TestSpecialPhenomenaInit:
@@ -115,7 +115,7 @@ class TestGetEclipticAltitude:
 
     def test_returns_0_on_exception(self):
         svc = SpecialPhenomenaService(45.0, -73.5)
-        with patch("special_phenomena.get_sun", side_effect=Exception("error")):
+        with patch("observation.special_phenomena.get_sun", side_effect=Exception("error")):
             result = svc._get_ecliptic_altitude(MagicMock())
         assert result == 0.0
 
@@ -132,7 +132,7 @@ class TestGetGalacticCenterAltitude:
 
     def test_returns_0_on_exception(self):
         svc = SpecialPhenomenaService(45.0, -73.5)
-        with patch("special_phenomena.AltAz", side_effect=Exception("bad")):
+        with patch("observation.special_phenomena.AltAz", side_effect=Exception("bad")):
             result = svc._get_galactic_center_altitude(MagicMock())
         assert result == 0.0
 
@@ -291,7 +291,7 @@ class TestSpecialPhenomenaBranchCoverage:
     # --- _find_zodiacal_light_windows: sun is None (lines 379-380) ---
     def test_zodiacal_sun_none_skips_day(self):
         from astropy.time import Time
-        with patch("special_phenomena.get_sun", return_value=None):
+        with patch("observation.special_phenomena.get_sun", return_value=None):
             result = self.svc._find_zodiacal_light_windows(
                 Time("2026-03-01T00:00:00", format="isot", scale="utc"),
                 Time("2026-03-03T00:00:00", format="isot", scale="utc"),
@@ -314,8 +314,8 @@ class TestSpecialPhenomenaBranchCoverage:
         fake_moon = MagicMock()
         fake_moon.transform_to.return_value = make_altaz_mock(-10.0)  # moon below horizon
 
-        with patch("special_phenomena.get_sun", return_value=fake_sun), \
-             patch("special_phenomena.get_body", return_value=fake_moon), \
+        with patch("observation.special_phenomena.get_sun", return_value=fake_sun), \
+             patch("observation.special_phenomena.get_body", return_value=fake_moon), \
              patch.object(self.svc, "_get_ecliptic_altitude", return_value=30.0):
             result = self.svc._find_zodiacal_light_windows(
                 Time("2026-03-01T00:00:00", format="isot", scale="utc"),
@@ -328,7 +328,7 @@ class TestSpecialPhenomenaBranchCoverage:
     # --- _find_milky_way_core_visibility: sun is None path (lines 515-516) ---
     def test_milky_way_sun_none_skips_day(self):
         from astropy.time import Time
-        with patch("special_phenomena.get_sun", return_value=None):
+        with patch("observation.special_phenomena.get_sun", return_value=None):
             result = self.svc._find_milky_way_core_visibility(
                 Time("2026-07-01T00:00:00", format="isot", scale="utc"),
                 Time("2026-07-03T00:00:00", format="isot", scale="utc"),
@@ -347,8 +347,8 @@ class TestSpecialPhenomenaBranchCoverage:
         fake_sun = MagicMock()
         fake_sun.transform_to.return_value = make_altaz_mock(-15.0)
 
-        with patch("special_phenomena.get_sun", return_value=fake_sun), \
-             patch("special_phenomena.get_body", return_value=None):
+        with patch("observation.special_phenomena.get_sun", return_value=fake_sun), \
+             patch("observation.special_phenomena.get_body", return_value=None):
             result = self.svc._find_milky_way_core_visibility(
                 Time("2026-07-01T00:00:00", format="isot", scale="utc"),
                 Time("2026-07-03T00:00:00", format="isot", scale="utc"),
@@ -372,8 +372,8 @@ class TestSpecialPhenomenaBranchCoverage:
             gc_mock.alt.degree = -10.0  # below minimum
             return gc_mock
 
-        with patch("special_phenomena.get_sun", return_value=fake_sun), \
-             patch("special_phenomena.SkyCoord") as mock_skycoord:
+        with patch("observation.special_phenomena.get_sun", return_value=fake_sun), \
+             patch("observation.special_phenomena.SkyCoord") as mock_skycoord:
             instance = mock_skycoord.return_value
             instance.transform_to.side_effect = fake_gc_transform
             result = self.svc._find_milky_way_core_visibility(
@@ -386,7 +386,7 @@ class TestSpecialPhenomenaBranchCoverage:
     def test_ecliptic_altitude_sun_none_returns_zero(self):
         from astropy.time import Time
         t = Time("2026-06-01T12:00:00", format="isot", scale="utc")
-        with patch("special_phenomena.get_sun", return_value=None):
+        with patch("observation.special_phenomena.get_sun", return_value=None):
             result = self.svc._get_ecliptic_altitude(t)
         assert result == 0.0
 
@@ -394,7 +394,7 @@ class TestSpecialPhenomenaBranchCoverage:
     def test_refine_equinox_exception_in_loop_returns_best_time(self):
         from astropy.time import Time
         approx = Time("2026-03-20T12:00:00", format="isot", scale="utc")
-        with patch("special_phenomena.get_sun", side_effect=Exception("calc fail")):
+        with patch("observation.special_phenomena.get_sun", side_effect=Exception("calc fail")):
             result = self.svc._refine_equinox_time(approx, "spring")
         from astropy.time import Time as ATime
         assert isinstance(result, ATime)
@@ -403,7 +403,7 @@ class TestSpecialPhenomenaBranchCoverage:
     def test_refine_solstice_exception_in_loop_returns_best_time(self):
         from astropy.time import Time
         approx = Time("2026-06-21T12:00:00", format="isot", scale="utc")
-        with patch("special_phenomena.get_sun", side_effect=Exception("calc fail")):
+        with patch("observation.special_phenomena.get_sun", side_effect=Exception("calc fail")):
             result = self.svc._refine_solstice_time(approx, "summer")
         from astropy.time import Time as ATime
         assert isinstance(result, ATime)
@@ -421,7 +421,7 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         """get_sun() returns None on the very first call → immediate early return."""
         from astropy.time import Time
         approx = Time("2026-03-20T12:00:00", format="isot", scale="utc")
-        with patch("special_phenomena.get_sun", return_value=None):
+        with patch("observation.special_phenomena.get_sun", return_value=None):
             result = self.svc._refine_equinox_time(approx, "spring")
         assert isinstance(result, Time)
 
@@ -432,7 +432,7 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         approx = Time("2026-03-20T12:00:00", format="isot", scale="utc")
         fake_sun = MagicMock()
         fake_sun.dec.degree = np.array([5.0])
-        with patch("special_phenomena.get_sun", return_value=fake_sun):
+        with patch("observation.special_phenomena.get_sun", return_value=fake_sun):
             result = self.svc._refine_equinox_time(approx, "spring")
         assert isinstance(result, Time)
 
@@ -445,7 +445,7 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         real_sun.dec.degree = 0.5
         # First call (initial) succeeds, subsequent calls alternate None / real
         call_results = [real_sun, None, real_sun]
-        with patch("special_phenomena.get_sun", side_effect=lambda t: call_results.pop(0) if call_results else real_sun):
+        with patch("observation.special_phenomena.get_sun", side_effect=lambda t: call_results.pop(0) if call_results else real_sun):
             result = self.svc._refine_equinox_time(approx, "spring")
         assert isinstance(result, Time)
 
@@ -456,7 +456,7 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         approx = Time("2026-03-20T12:00:00", format="isot", scale="utc")
         fake_sun = MagicMock()
         fake_sun.dec.degree = np.array([1.0])
-        with patch("special_phenomena.get_sun", return_value=fake_sun):
+        with patch("observation.special_phenomena.get_sun", return_value=fake_sun):
             result = self.svc._refine_equinox_time(approx, "spring")
         assert isinstance(result, Time)
 
@@ -466,7 +466,7 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         """get_sun() returns None on first call in _refine_solstice_time."""
         from astropy.time import Time
         approx = Time("2026-06-21T12:00:00", format="isot", scale="utc")
-        with patch("special_phenomena.get_sun", return_value=None):
+        with patch("observation.special_phenomena.get_sun", return_value=None):
             result = self.svc._refine_solstice_time(approx, "summer")
         assert isinstance(result, Time)
 
@@ -477,7 +477,7 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         approx = Time("2026-06-21T12:00:00", format="isot", scale="utc")
         fake_sun = MagicMock()
         fake_sun.dec.degree = np.array([23.0])
-        with patch("special_phenomena.get_sun", return_value=fake_sun):
+        with patch("observation.special_phenomena.get_sun", return_value=fake_sun):
             result = self.svc._refine_solstice_time(approx, "summer")
         assert isinstance(result, Time)
 
@@ -489,7 +489,7 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         real_sun = MagicMock()
         real_sun.dec.degree = 23.0
         call_results = [real_sun, None, real_sun]
-        with patch("special_phenomena.get_sun", side_effect=lambda t: call_results.pop(0) if call_results else real_sun):
+        with patch("observation.special_phenomena.get_sun", side_effect=lambda t: call_results.pop(0) if call_results else real_sun):
             result = self.svc._refine_solstice_time(approx, "summer")
         assert isinstance(result, Time)
 
@@ -500,7 +500,7 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         approx = Time("2026-06-21T12:00:00", format="isot", scale="utc")
         fake_sun = MagicMock()
         fake_sun.dec.degree = np.array([23.0])
-        with patch("special_phenomena.get_sun", return_value=fake_sun):
+        with patch("observation.special_phenomena.get_sun", return_value=fake_sun):
             result = self.svc._refine_solstice_time(approx, "summer")
         assert isinstance(result, Time)
 
@@ -511,7 +511,7 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         from astropy.time import Time
         fake_sun = MagicMock()
         fake_sun.transform_to.return_value = None
-        with patch("special_phenomena.get_sun", return_value=fake_sun):
+        with patch("observation.special_phenomena.get_sun", return_value=fake_sun):
             result = self.svc._find_zodiacal_light_windows(
                 Time("2026-03-01T00:00:00", format="isot", scale="utc"),
                 Time("2026-03-03T00:00:00", format="isot", scale="utc"),
@@ -526,7 +526,7 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         fake_altaz.alt.degree = np.array([-15.0])
         fake_sun = MagicMock()
         fake_sun.transform_to.return_value = fake_altaz
-        with patch("special_phenomena.get_sun", return_value=fake_sun), \
+        with patch("observation.special_phenomena.get_sun", return_value=fake_sun), \
              patch.object(self.svc, "_get_ecliptic_altitude", return_value=5.0):
             result = self.svc._find_zodiacal_light_windows(
                 Time("2026-03-01T00:00:00", format="isot", scale="utc"),
@@ -541,8 +541,8 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         fake_altaz.alt.degree = -15.0
         fake_sun = MagicMock()
         fake_sun.transform_to.return_value = fake_altaz
-        with patch("special_phenomena.get_sun", return_value=fake_sun), \
-             patch("special_phenomena.get_body", return_value=None), \
+        with patch("observation.special_phenomena.get_sun", return_value=fake_sun), \
+             patch("observation.special_phenomena.get_body", return_value=None), \
              patch.object(self.svc, "_get_ecliptic_altitude", return_value=30.0):
             result = self.svc._find_zodiacal_light_windows(
                 Time("2026-03-01T00:00:00", format="isot", scale="utc"),
@@ -559,8 +559,8 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         fake_sun.transform_to.return_value = fake_altaz
         fake_moon = MagicMock()
         fake_moon.transform_to.return_value = None
-        with patch("special_phenomena.get_sun", return_value=fake_sun), \
-             patch("special_phenomena.get_body", return_value=fake_moon), \
+        with patch("observation.special_phenomena.get_sun", return_value=fake_sun), \
+             patch("observation.special_phenomena.get_body", return_value=fake_moon), \
              patch.object(self.svc, "_get_ecliptic_altitude", return_value=30.0):
             result = self.svc._find_zodiacal_light_windows(
                 Time("2026-03-01T00:00:00", format="isot", scale="utc"),
@@ -580,8 +580,8 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         fake_moon_altaz.alt.degree = np.array([-10.0])
         fake_moon = MagicMock()
         fake_moon.transform_to.return_value = fake_moon_altaz
-        with patch("special_phenomena.get_sun", return_value=fake_sun), \
-             patch("special_phenomena.get_body", return_value=fake_moon), \
+        with patch("observation.special_phenomena.get_sun", return_value=fake_sun), \
+             patch("observation.special_phenomena.get_body", return_value=fake_moon), \
              patch.object(self.svc, "_get_ecliptic_altitude", return_value=30.0):
             result = self.svc._find_zodiacal_light_windows(
                 Time("2026-03-01T00:00:00", format="isot", scale="utc"),
@@ -594,7 +594,7 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         from astropy.time import Time
         fake_sun = MagicMock()
         fake_sun.transform_to.side_effect = RuntimeError("boom")
-        with patch("special_phenomena.get_sun", return_value=fake_sun):
+        with patch("observation.special_phenomena.get_sun", return_value=fake_sun):
             result = self.svc._find_zodiacal_light_windows(
                 Time("2026-03-01T00:00:00", format="isot", scale="utc"),
                 Time("2026-03-03T00:00:00", format="isot", scale="utc"),
@@ -611,8 +611,8 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         fake_altaz.alt.degree = np.array([-15.0])
         fake_sun = MagicMock()
         fake_sun.transform_to.return_value = fake_altaz
-        with patch("special_phenomena.get_sun", return_value=fake_sun), \
-             patch("special_phenomena.get_body", return_value=None):
+        with patch("observation.special_phenomena.get_sun", return_value=fake_sun), \
+             patch("observation.special_phenomena.get_body", return_value=None):
             result = self.svc._find_milky_way_core_visibility(
                 Time("2026-07-01T00:00:00", format="isot", scale="utc"),
                 Time("2026-07-03T00:00:00", format="isot", scale="utc"),
@@ -626,7 +626,7 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         fake_altaz.alt.degree = -5.0  # above -12: not dark enough
         fake_sun = MagicMock()
         fake_sun.transform_to.return_value = fake_altaz
-        with patch("special_phenomena.get_sun", return_value=fake_sun):
+        with patch("observation.special_phenomena.get_sun", return_value=fake_sun):
             result = self.svc._find_milky_way_core_visibility(
                 Time("2026-07-01T00:00:00", format="isot", scale="utc"),
                 Time("2026-07-03T00:00:00", format="isot", scale="utc"),
@@ -643,8 +643,8 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         fake_sun.transform_to.return_value = fake_sun_altaz
         fake_gc_altaz = MagicMock()
         fake_gc_altaz.alt.degree = np.array([-5.0])  # below threshold → skip
-        with patch("special_phenomena.get_sun", return_value=fake_sun), \
-             patch("special_phenomena.SkyCoord") as mock_sc:
+        with patch("observation.special_phenomena.get_sun", return_value=fake_sun), \
+             patch("observation.special_phenomena.SkyCoord") as mock_sc:
             mock_sc.return_value.transform_to.return_value = fake_gc_altaz
             result = self.svc._find_milky_way_core_visibility(
                 Time("2026-07-01T00:00:00", format="isot", scale="utc"),
@@ -666,9 +666,9 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         fake_moon_altaz.alt.degree = np.array([10.0])  # above 5 → skip
         fake_moon = MagicMock()
         fake_moon.transform_to.return_value = fake_moon_altaz
-        with patch("special_phenomena.get_sun", return_value=fake_sun), \
-             patch("special_phenomena.SkyCoord") as mock_sc, \
-             patch("special_phenomena.get_body", return_value=fake_moon):
+        with patch("observation.special_phenomena.get_sun", return_value=fake_sun), \
+             patch("observation.special_phenomena.SkyCoord") as mock_sc, \
+             patch("observation.special_phenomena.get_body", return_value=fake_moon):
             mock_sc.return_value.transform_to.return_value = fake_gc_altaz
             result = self.svc._find_milky_way_core_visibility(
                 Time("2026-07-01T00:00:00", format="isot", scale="utc"),
@@ -681,7 +681,7 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         from astropy.time import Time
         fake_sun = MagicMock()
         fake_sun.transform_to.side_effect = RuntimeError("astro error")
-        with patch("special_phenomena.get_sun", return_value=fake_sun):
+        with patch("observation.special_phenomena.get_sun", return_value=fake_sun):
             result = self.svc._find_milky_way_core_visibility(
                 Time("2026-07-01T00:00:00", format="isot", scale="utc"),
                 Time("2026-07-03T00:00:00", format="isot", scale="utc"),
@@ -696,7 +696,7 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         t = Time("2026-06-01T00:00:00", format="isot", scale="utc")
         fake_sun = MagicMock()
         fake_sun.transform_to.return_value = None
-        with patch("special_phenomena.get_sun", return_value=fake_sun):
+        with patch("observation.special_phenomena.get_sun", return_value=fake_sun):
             result = self.svc._get_ecliptic_altitude(t)
         assert result == 0.0
 
@@ -709,7 +709,7 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         fake_altaz.alt.degree = np.array([30.0])
         fake_sun = MagicMock()
         fake_sun.transform_to.return_value = fake_altaz
-        with patch("special_phenomena.get_sun", return_value=fake_sun):
+        with patch("observation.special_phenomena.get_sun", return_value=fake_sun):
             result = self.svc._get_ecliptic_altitude(t)
         assert isinstance(result, float)
 
@@ -725,7 +725,7 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         fake_gc = MagicMock()
         fake_gc.transform_to.return_value = fake_altaz
         with patch("astropy.coordinates.SkyCoord", return_value=fake_gc), \
-             patch("special_phenomena.AltAz"):
+             patch("observation.special_phenomena.AltAz"):
             result = self.svc._get_galactic_center_altitude(t)
         assert isinstance(result, float)
         assert result == pytest.approx(20.0)
@@ -744,8 +744,8 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         fake_moon = MagicMock()
         fake_moon.transform_to.return_value = make_altaz_mock(10.0)  # moon above 5° → is_moon_ok=False
 
-        with patch("special_phenomena.get_sun", return_value=fake_sun), \
-             patch("special_phenomena.get_body", return_value=fake_moon), \
+        with patch("observation.special_phenomena.get_sun", return_value=fake_sun), \
+             patch("observation.special_phenomena.get_body", return_value=fake_moon), \
              patch.object(self.svc, "_get_ecliptic_altitude", return_value=30.0):
             result = self.svc._find_zodiacal_light_windows(
                 Time("2026-03-01T00:00:00", format="isot", scale="utc"),

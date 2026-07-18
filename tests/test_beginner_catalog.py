@@ -15,8 +15,9 @@ if 'psutil' not in sys.modules:
     sys.modules['psutil'] = types.ModuleType('psutil')
 
 import app as app_module  # type: ignore[import-not-found]  # noqa: E402
-import beginner_catalog  # type: ignore[import-not-found]  # noqa: E402
-from auth import user_manager  # type: ignore[import-not-found]  # noqa: E402
+from observation import beginner_catalog  # type: ignore[import-not-found]  # noqa: E402
+from blueprints import astrodex as astrodex_bp_module  # type: ignore[import-not-found]  # noqa: E402
+from utils.auth import user_manager  # type: ignore[import-not-found]  # noqa: E402
 
 app = app_module.app
 
@@ -198,8 +199,8 @@ class TestBeginnerCatalogEndpoint:
 
     def test_returns_all_entries_with_visible_only_false(self, client_admin, monkeypatch):
         monkeypatch.setattr(beginner_catalog, 'load_beginner_catalog', _fake_catalog)
-        monkeypatch.setattr(app_module, 'load_json_file', lambda *a, **k: {})
-        monkeypatch.setattr(app_module, 'has_dso_results', lambda *_a, **_k: False)
+        monkeypatch.setattr(astrodex_bp_module, 'load_json_file', lambda *a, **k: {})
+        monkeypatch.setattr(astrodex_bp_module, 'has_dso_results', lambda *_a, **_k: False)
 
         response = client_admin.get('/api/beginner-catalog?lang=en&visible_only=false')
         assert response.status_code == 200
@@ -210,10 +211,10 @@ class TestBeginnerCatalogEndpoint:
     def test_visible_only_true_filters_when_results_exist(self, client_admin, monkeypatch):
         monkeypatch.setattr(beginner_catalog, 'load_beginner_catalog', _fake_catalog)
         monkeypatch.setattr(
-            app_module, 'load_json_file',
+            astrodex_bp_module, 'load_json_file',
             lambda *a, **k: {'deep_sky': [{'catalogue_names': {'Messier': 'M 42'}, 'astro_score': 0.5}]},
         )
-        monkeypatch.setattr(app_module, 'has_dso_results', lambda *_a, **_k: True)
+        monkeypatch.setattr(astrodex_bp_module, 'has_dso_results', lambda *_a, **_k: True)
 
         response = client_admin.get('/api/beginner-catalog?lang=en&visible_only=true')
         assert response.status_code == 200
@@ -224,8 +225,8 @@ class TestBeginnerCatalogEndpoint:
 
     def test_missing_lang_param_does_not_error(self, client_admin, monkeypatch):
         monkeypatch.setattr(beginner_catalog, 'load_beginner_catalog', _fake_catalog)
-        monkeypatch.setattr(app_module, 'load_json_file', lambda *a, **k: {})
-        monkeypatch.setattr(app_module, 'has_dso_results', lambda *_a, **_k: False)
+        monkeypatch.setattr(astrodex_bp_module, 'load_json_file', lambda *a, **k: {})
+        monkeypatch.setattr(astrodex_bp_module, 'has_dso_results', lambda *_a, **_k: False)
 
         response = client_admin.get('/api/beginner-catalog')
         assert response.status_code == 200

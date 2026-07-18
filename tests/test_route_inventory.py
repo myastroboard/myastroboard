@@ -143,6 +143,8 @@ EXPECTED_ROUTES = {
     ('/api/plan-my-night/export.csv', ('GET',)),
     ('/api/plan-my-night/export.pdf', ('GET',)),
     ('/api/plan-my-night/list', ('GET',)),
+    ('/api/plan-my-night/optimize', ('GET',)),
+    ('/api/plan-my-night/optimize/apply', ('POST',)),
     ('/api/plan-my-night/targets', ('POST',)),
     ('/api/plan-my-night/targets/<entry_id>', ('DELETE',)),
     ('/api/plan-my-night/targets/<entry_id>', ('PUT',)),

@@ -18,9 +18,9 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), 'backend'))
 
-import cache_store
-import repo_config
-from repo_config import (
+from cache import cache_store
+from utils import repo_config
+from utils.repo_config import (
     _ensure_locations,
     get_active_location,
     get_all_locations,
@@ -29,7 +29,7 @@ from repo_config import (
     get_scheduler_locations,
     new_location_preset,
 )
-from config_defaults import DEFAULT_LOCATION
+from utils.config_defaults import DEFAULT_LOCATION
 
 
 class _FakeUser:
@@ -137,7 +137,7 @@ class TestEnsureLocationsMigration:
         """A real pre-v1.2 install had exactly one location every user
         implicitly used - migrating it must attribute it to everyone that
         already exists, not leave them all suddenly unattributed."""
-        import auth as auth_module
+        from utils import auth as auth_module
 
         calls = []
 
@@ -162,7 +162,7 @@ class TestEnsureLocationsMigration:
         whoever exists (typically just the bootstrap admin). Don't rely on
         admin-bypass alone: that only covers reads, not every future
         consumer of attribution data."""
-        import auth as auth_module
+        from utils import auth as auth_module
 
         calls = []
 
@@ -182,7 +182,7 @@ class TestEnsureLocationsMigration:
     def test_migration_succeeds_even_if_attribution_fails(self, monkeypatch):
         """Best-effort: the migration itself (config.json) must not be lost
         just because attributing it to users.json failed for some reason."""
-        import auth as auth_module
+        from utils import auth as auth_module
 
         class _FailingManager:
             users = {'u1': object()}
@@ -308,7 +308,7 @@ class TestActiveLocationResolver:
                 'u2': _FakeUser(preferences={'location': {'active_location_id': ids[2]}}),
             }
 
-        import auth as auth_module
+        from utils import auth as auth_module
 
         monkeypatch.setattr(auth_module, 'user_manager', _FakeManager())
         scheduled = {p['id'] for p in get_scheduler_locations(config)}
@@ -329,7 +329,7 @@ class TestActiveLocationResolver:
                 'u1': _FakeUser(preferences={'location': {'attributed_location_ids': [ids[1]]}}),
             }
 
-        import auth as auth_module
+        from utils import auth as auth_module
 
         monkeypatch.setattr(auth_module, 'user_manager', _FakeManager())
         scheduled = {p['id'] for p in get_scheduler_locations(config)}
@@ -419,7 +419,7 @@ class TestLocationScopedCaches:
 class TestUserManagerLocationPrefs:
     @pytest.fixture
     def manager(self):
-        from auth import user_manager
+        from utils.auth import user_manager
 
         user_manager._reload_users_if_changed()
         return user_manager
@@ -545,7 +545,7 @@ class TestLocationsAPI:
         """New locations are attributed to everyone by default - an admin can
         manually exclude specific users afterward, rather than having to
         attribute each location by hand (e.g. an astro club with 100+ users)."""
-        from auth import user_manager
+        from utils.auth import user_manager
 
         other_user = user_manager.create_user(f'loc_attr_{uuid.uuid4().hex[:8]}', 'password123', 'user')
         try:
@@ -577,7 +577,7 @@ class TestLocationsAPI:
 
         cascade_calls = []
         monkeypatch.setattr(
-            'plan_my_night.delete_plans_for_location',
+            'observation.plan_my_night.delete_plans_for_location',
             lambda location_id: cascade_calls.append(location_id) or 0,
         )
 
@@ -603,7 +603,7 @@ class TestLocationsAPI:
         assert bad_lat.status_code == 400
 
     def test_max_locations_enforced(self, client_admin):
-        from constants import MAX_LOCATIONS
+        from utils.constants import MAX_LOCATIONS
 
         created = []
         try:
@@ -649,7 +649,7 @@ class TestLocationsAPI:
             client_admin.delete(f'/api/locations/{loc_id}')
 
     def test_attribute_and_mine_and_active(self, client_admin):
-        from auth import user_manager
+        from utils.auth import user_manager
 
         username = f'apiuser_{uuid.uuid4().hex[:8]}'
         user = user_manager.create_user(username, 'password123', 'user')
@@ -739,7 +739,7 @@ class TestLocationsAPI:
 
 class TestLocationTaggingHelpers:
     def test_plan_pinned_location_and_cascade_delete(self, temp_dir, monkeypatch):
-        import plan_my_night
+        from observation import plan_my_night
 
         monkeypatch.setattr(plan_my_night, 'PLAN_DIR', temp_dir)
         user_id = str(uuid.uuid4())
@@ -769,7 +769,7 @@ class TestLocationTaggingHelpers:
         """Location lives on pictures, not items (v1.2) - the same object can
         be re-photographed from different sites across sessions, so an item
         itself never carries a single frozen location."""
-        import astrodex as astrodex_module
+        from observation import astrodex as astrodex_module
 
         monkeypatch.setattr(astrodex_module, 'ASTRODEX_DIR', temp_dir)
         monkeypatch.setattr(astrodex_module, 'ASTRODEX_IMAGES_DIR', os.path.join(temp_dir, 'images'))

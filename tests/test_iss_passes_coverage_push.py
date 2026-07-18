@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-import iss_passes as mod
+from space import iss_passes as mod
 
 
 class _Deg:

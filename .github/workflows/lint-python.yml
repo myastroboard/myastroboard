@@ -1,0 +1,74 @@
+name: Lint Python
+
+on:
+  push:
+    paths:
+      - "backend/**/*.py"
+      - "backend/*.py"
+      - "tests/**/*.py"
+      - "scripts/**/*.py"
+      - "pyrightconfig.json"
+      - "pyproject.toml"
+      - ".flake8"
+      - "requirements-dev.txt"
+  pull_request:
+    paths:
+      - "backend/**/*.py"
+      - "backend/*.py"
+      - "tests/**/*.py"
+      - "scripts/**/*.py"
+      - "pyrightconfig.json"
+      - "pyproject.toml"
+      - ".flake8"
+      - "requirements-dev.txt"
+
+jobs:
+  lint-python:
+    name: black / flake8 / pyright (changed files)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Determine changed Python files
+        id: changed
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch origin "${{ github.base_ref }}" --depth=1
+            BASE_SHA=$(git merge-base "origin/${{ github.base_ref }}" HEAD)
+          else
+            BASE_SHA="${{ github.event.before }}"
+            if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$BASE_SHA" 2>/dev/null; then
+              # First push to a new branch, or a force-push that rewrote history: fall back
+              # to the previous commit so the diff stays scoped instead of erroring out.
+              BASE_SHA=$(git rev-parse HEAD^ 2>/dev/null || git rev-parse HEAD)
+            fi
+          fi
+          FILES=$(git diff --name-only --diff-filter=ACMR "$BASE_SHA" HEAD -- ':(glob)backend/**/*.py' ':(glob)tests/**/*.py' ':(glob)scripts/**/*.py' | tr '\n' ' ')
+          echo "files=$FILES" >> "$GITHUB_OUTPUT"
+          echo "Changed Python files: $FILES"
+
+      - name: black --check
+        if: steps.changed.outputs.files != ''
+        run: black --check --diff ${{ steps.changed.outputs.files }}
+
+      - name: flake8
+        if: steps.changed.outputs.files != ''
+        run: flake8 ${{ steps.changed.outputs.files }}
+
+      - name: pyright
+        if: steps.changed.outputs.files != ''
+        run: pyright ${{ steps.changed.outputs.files }}

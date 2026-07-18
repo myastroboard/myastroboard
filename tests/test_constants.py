@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 
 
 # Import constants to test
-from constants import (
+from utils.constants import (
     DATA_DIR,
     OUTPUT_DIR,
     CONFIG_DIR,

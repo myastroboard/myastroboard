@@ -12,7 +12,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
-from sky_quality import (
+from weather.sky_quality import (
     BORTLE_SQM_MIDPOINTS,
     bortle_to_sqm,
     sqm_to_bortle,

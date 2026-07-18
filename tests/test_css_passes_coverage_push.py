@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-import css_passes as mod
+from space import css_passes as mod
 
 
 class _Deg:

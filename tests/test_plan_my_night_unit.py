@@ -16,7 +16,7 @@ import pytest
 backend_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, backend_path)
 
-import plan_my_night
+from observation import plan_my_night
 _parse_datetime = plan_my_night._parse_datetime
 validate_plan_json = plan_my_night.validate_plan_json
 _normalize_name = plan_my_night._normalize_name
@@ -271,7 +271,7 @@ class TestEntryMatches:
             "catalogue_aliases": {}
         }
         # Mock the _target_group_id to return matching group
-        with patch("plan_my_night._target_group_id", return_value="group123"):
+        with patch("observation.plan_my_night._target_group_id", return_value="group123"):
             result = _entry_matches(entry, "Messier", "M31")
             assert result is True
 
@@ -282,7 +282,7 @@ class TestEntryMatches:
             "catalogue_group_id": "different-group",
             "catalogue_aliases": {}
         }
-        with patch("plan_my_night._target_group_id", return_value=None):
+        with patch("observation.plan_my_night._target_group_id", return_value=None):
             result = _entry_matches(entry, "Messier", "m 31")
             assert result is True
 
@@ -762,7 +762,9 @@ class TestGeneratePlanPdf:
 
         matplotlib.use("Agg", force=True)
 
-        monkeypatch.setattr("skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True)
+        monkeypatch.setattr(
+            "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True
+        )
 
         alttime_payload = {
             "timezone": "UTC",
@@ -878,7 +880,7 @@ class TestLoadUserPlanExceptionPaths:
         with open(file_path, 'w', encoding='utf-8') as f:
             f.write('{invalid json')
 
-        with patch('plan_my_night.shutil.copy2', side_effect=PermissionError("no copy")):
+        with patch('observation.plan_my_night.shutil.copy2', side_effect=PermissionError("no copy")):
             result = load_user_plan(_TEST_UID, "testuser")
 
         assert result['user_id'] == _TEST_UID
@@ -890,7 +892,7 @@ class TestLoadUserPlanExceptionPaths:
         with open(file_path, 'w', encoding='utf-8') as f:
             json.dump({'user_id': _TEST_UID}, f)
 
-        with patch('plan_my_night.json.load', side_effect=PermissionError("no access")):
+        with patch('observation.plan_my_night.json.load', side_effect=PermissionError("no access")):
             result = load_user_plan(_TEST_UID, "testuser")
 
         assert result['user_id'] == _TEST_UID
@@ -947,7 +949,7 @@ class TestSaveUserPlanLockedBranches:
         save_user_plan(uid, payload, username="u1")
 
         # Now try again; shutil.copy2 fails but save should still succeed
-        with patch('plan_my_night.shutil.copy2', side_effect=PermissionError("no backup")):
+        with patch('observation.plan_my_night.shutil.copy2', side_effect=PermissionError("no backup")):
             result = save_user_plan(uid, {'user_id': uid, 'plan': None}, username="u1")
         assert result is True
 
@@ -958,7 +960,7 @@ class TestSaveUserPlanLockedBranches:
         save_user_plan(uid, payload, username="u1")
 
         # Force json.dump to fail after backup is created
-        with patch('plan_my_night.json.dump', side_effect=RuntimeError("disk full")):
+        with patch('observation.plan_my_night.json.dump', side_effect=RuntimeError("disk full")):
             result = save_user_plan(uid, {'user_id': uid, 'plan': None}, username="u1")
         assert result is False
 
@@ -968,8 +970,8 @@ class TestSaveUserPlanLockedBranches:
         payload = {'user_id': uid, 'plan': None}
 
         # Force a failure during write AND make os.remove fail for the temp file
-        with patch('plan_my_night.json.dump', side_effect=RuntimeError("disk full")):
-            with patch('plan_my_night.os.remove', side_effect=OSError("cleanup fail")):
+        with patch('observation.plan_my_night.json.dump', side_effect=RuntimeError("disk full")):
+            with patch('observation.plan_my_night.os.remove', side_effect=OSError("cleanup fail")):
                 result = save_user_plan(uid, payload, username="u1")
         assert result is False
 
@@ -994,7 +996,7 @@ class TestClearAllPlans:
         payload = {'user_id': uid, 'plan': None}
         save_user_plan(uid, payload, username="user")
 
-        with patch('plan_my_night.os.remove', side_effect=OSError("permission denied")):
+        with patch('observation.plan_my_night.os.remove', side_effect=OSError("permission denied")):
             deleted = plan_my_night.clear_all_plans(uid)
         assert deleted == 0  # Nothing deleted due to error
 
@@ -1141,7 +1143,7 @@ class TestUpdateTargetEdgeCases:
         """Line 604: save failure returns None."""
         uid = "bbbb0008-0000-4000-8000-000000000000"
         self._make_current_plan(uid)
-        with patch('plan_my_night.save_user_plan', return_value=False):
+        with patch('observation.plan_my_night.save_user_plan', return_value=False):
             result = update_target(uid, "user", "e1", {"done": True})
         assert result is None
 
@@ -1210,7 +1212,7 @@ class TestUpdatePlanMetaEdgeCases:
     def test_update_meta_save_failure_returns_none(self, temp_plan_dir):
         uid = "cccc0006-0000-4000-8000-000000000000"
         self._make_current_plan(uid)
-        with patch('plan_my_night.save_user_plan', return_value=False):
+        with patch('observation.plan_my_night.save_user_plan', return_value=False):
             result = plan_my_night.update_plan_meta(uid, "user", {"start_delay_minutes": 5})
         assert result is None
 
@@ -1467,7 +1469,7 @@ class TestEntryMatchesAlias:
             'catalogue_group_id': '',
             'catalogue_aliases': {'Messier': 'M31', 'NGC': 'NGC 224'},
         }
-        with patch('plan_my_night._target_group_id', return_value=''):
+        with patch('observation.plan_my_night._target_group_id', return_value=''):
             result = _entry_matches(entry, 'NGC', 'NGC 224')
         assert result is True
 
@@ -1478,7 +1480,7 @@ class TestEntryMatchesAlias:
             'catalogue_group_id': '',
             'catalogue_aliases': {'Messier': 'M31'},
         }
-        with patch('plan_my_night._target_group_id', return_value=''):
+        with patch('observation.plan_my_night._target_group_id', return_value=''):
             result = _entry_matches(entry, 'NGC', 'NGC 999')
         assert result is False
 
@@ -1498,7 +1500,7 @@ class TestEntryMatchesAlias:
             },
         }
         save_user_plan(user_id, payload, username='testuser')
-        with patch('plan_my_night._target_group_id', return_value=''):
+        with patch('observation.plan_my_night._target_group_id', return_value=''):
             result = plan_my_night.is_target_in_current_plan(user_id, 'testuser', 'Messier', 'M42')
         assert result is True
 
@@ -1507,7 +1509,7 @@ class TestEntryMatchesAlias:
         now = datetime.now(timezone.utc)
         night_start = (now - timedelta(hours=1)).isoformat()
         night_end = (now + timedelta(hours=5)).isoformat()
-        with patch('plan_my_night._target_group_id', return_value=''):
+        with patch('observation.plan_my_night._target_group_id', return_value=''):
             ok1, reason1, _, _ = create_or_add_target(
                 user_id=user_id, username='testuser',
                 item_data={'name': 'M42'}, catalogue='Messier',
@@ -1515,7 +1517,7 @@ class TestEntryMatchesAlias:
             )
         assert ok1 is True
         assert reason1 == 'added'
-        with patch('plan_my_night._target_group_id', return_value=''):
+        with patch('observation.plan_my_night._target_group_id', return_value=''):
             ok2, reason2, _, entry2 = create_or_add_target(
                 user_id=user_id, username='testuser',
                 item_data={'name': 'M42'}, catalogue='Messier',
@@ -1621,7 +1623,7 @@ class TestCreateOrAddTargetExtra:
         assert reason == "added"
 
         # Add same target again (same name → same normalized name)
-        with patch("plan_my_night._entry_matches", return_value=True):
+        with patch("observation.plan_my_night._entry_matches", return_value=True):
             ok2, reason2, _, matched_entry = create_or_add_target(
                 user_id=uid, username="user",
                 item_data={"name": "M31"},
@@ -1636,7 +1638,7 @@ class TestCreateOrAddTargetExtra:
     def test_add_save_failure_returns_false(self, temp_plan_dir):
         uid = "a1b2c3d4-0002-4000-8000-000000000002"
         now = datetime.now().astimezone()
-        with patch("plan_my_night.save_user_plan", return_value=False):
+        with patch("observation.plan_my_night.save_user_plan", return_value=False):
             ok, reason, _, _ = create_or_add_target(
                 user_id=uid, username="user",
                 item_data={"name": "M45"},
@@ -1679,8 +1681,8 @@ class TestSaveUserPlanLockedErrorPaths:
         # Create an initial plan so backup is attempted
         save_user_plan(uid, {'user_id': uid, 'plan': None}, username="u1")
         # Fail the dump AND the backup restore
-        with patch('plan_my_night.json.dump', side_effect=RuntimeError("disk full")):
-            with patch('plan_my_night.os.replace', side_effect=OSError("restore fail")):
+        with patch('observation.plan_my_night.json.dump', side_effect=RuntimeError("disk full")):
+            with patch('observation.plan_my_night.os.replace', side_effect=OSError("restore fail")):
                 result = save_user_plan(uid, {'user_id': uid, 'plan': None}, username="u1")
         assert result is False
 
@@ -1696,10 +1698,10 @@ class TestSaveUserPlanLockedErrorPaths:
             raise OSError("cannot remove")
 
         # Fail dump so we enter the except block, then fail ALL os.remove calls
-        with patch('plan_my_night.json.dump', side_effect=RuntimeError("disk full")):
+        with patch('observation.plan_my_night.json.dump', side_effect=RuntimeError("disk full")):
             # Also fail os.replace(backup→file) so the backup still exists at line 328
-            with patch('plan_my_night.os.replace', side_effect=OSError("restore fail")):
-                with patch('plan_my_night.os.remove', side_effect=mock_remove):
+            with patch('observation.plan_my_night.os.replace', side_effect=OSError("restore fail")):
+                with patch('observation.plan_my_night.os.remove', side_effect=mock_remove):
                     result = save_user_plan(uid, {'user_id': uid, 'plan': None}, username="u1")
         assert result is False
 
@@ -1742,7 +1744,7 @@ class TestGetAllPlanStatesOrphanFilenameSkip:
             json.dump({'user_id': uid, 'plan': None}, f)
 
         # Patch get_all_plan_files to return the weird file
-        with patch('plan_my_night.get_all_plan_files',
+        with patch('observation.plan_my_night.get_all_plan_files',
                    return_value=[os.path.join(temp_plan_dir, weird_name)]):
             result = plan_my_night.get_all_plan_states(uid, "user", [])
         # It should process without crashing; weird file should be skipped (line 907)
@@ -1756,7 +1758,9 @@ class TestGeneratePlanPdfBranchCoverage:
         """Line 999: _load_alttime returns None when file doesn't exist on disk."""
         import matplotlib
         matplotlib.use("Agg", force=True)
-        monkeypatch.setattr("skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True)
+        monkeypatch.setattr(
+            "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True
+        )
         now = datetime(2026, 8, 12, 21, 0, tzinfo=timezone.utc)
         payload = {
             "plan": {
@@ -1778,7 +1782,9 @@ class TestGeneratePlanPdfBranchCoverage:
         """Lines 1087-1089: alttime with bad timezone name → falls back to UTC."""
         import matplotlib
         matplotlib.use("Agg", force=True)
-        monkeypatch.setattr("skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True)
+        monkeypatch.setattr(
+            "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True
+        )
         now = datetime(2026, 8, 12, 21, 0, tzinfo=timezone.utc)
         # Write an alttime file with a bad timezone
         alttime_data = {
@@ -1809,7 +1815,9 @@ class TestGeneratePlanPdfBranchCoverage:
         """Lines 1015-1016 and 1017-1018: naive and offset timezone datetime strings."""
         import matplotlib
         matplotlib.use("Agg", force=True)
-        monkeypatch.setattr("skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True)
+        monkeypatch.setattr(
+            "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True
+        )
         now = datetime(2026, 8, 12, 21, 0, tzinfo=timezone.utc)
         alttime_data = {
             "timezone": "UTC",
@@ -1956,7 +1964,9 @@ class TestGeneratePlanPdfAdditionalBranches:
         """Lines 1003-1004: invalid JSON in alttime file → exception caught, return None."""
         import matplotlib
         matplotlib.use("Agg", force=True)
-        monkeypatch.setattr("skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True)
+        monkeypatch.setattr(
+            "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True
+        )
         # Write invalid JSON
         (tmp_path / "m31_alttime.json").write_text("{invalid json", encoding="utf-8")
         now = datetime.now(timezone.utc).replace(microsecond=0)
@@ -1980,7 +1990,9 @@ class TestGeneratePlanPdfAdditionalBranches:
         """Line 1271 (telescope name), 1308->1312 (fill_w<=0.01), 1318 (overflow>0)."""
         import matplotlib
         matplotlib.use("Agg", force=True)
-        monkeypatch.setattr("skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True)
+        monkeypatch.setattr(
+            "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True
+        )
         now = datetime.now(timezone.utc).replace(microsecond=0)
         payload = {
             "plan": {
@@ -2001,7 +2013,9 @@ class TestGeneratePlanPdfAdditionalBranches:
            Also covers line 1008 via _fmt_hm/_fmt_date called with None."""
         import matplotlib
         matplotlib.use("Agg", force=True)
-        monkeypatch.setattr("skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True)
+        monkeypatch.setattr(
+            "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True
+        )
         now = datetime.now(timezone.utc).replace(microsecond=0)
         alttime_data = {
             "timezone": "UTC",
@@ -2031,7 +2045,9 @@ class TestGeneratePlanPdfAdditionalBranches:
         """Lines 1362, 1365, 1374: entries without start/end, reversed range, empty clip result."""
         import matplotlib
         matplotlib.use("Agg", force=True)
-        monkeypatch.setattr("skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True)
+        monkeypatch.setattr(
+            "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True
+        )
         now = datetime.now(timezone.utc).replace(microsecond=0)
         alttime_data = {
             "timezone": "UTC",
@@ -2079,7 +2095,9 @@ class TestGeneratePlanPdfAdditionalBranches:
            Also covers 1044->1042 (None dt) and 1047 (no valid pts)."""
         import matplotlib
         matplotlib.use("Agg", force=True)
-        monkeypatch.setattr("skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True)
+        monkeypatch.setattr(
+            "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True
+        )
         now = datetime.now(timezone.utc).replace(microsecond=0)
         # Empty times_utc → _clip_alttime([], altitudes, ...) → line 1040 → return [], []
         alttime_empty = {
@@ -2128,7 +2146,9 @@ class TestGeneratePlanPdfAdditionalBranches:
         """Line 1067: _clip_alttime with points all before the window → out=[] → return [], []."""
         import matplotlib
         matplotlib.use("Agg", force=True)
-        monkeypatch.setattr("skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True)
+        monkeypatch.setattr(
+            "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True
+        )
         early = datetime(2026, 1, 1, 20, 0, 0, tzinfo=timezone.utc)
         late = datetime(2026, 1, 1, 23, 0, 0, tzinfo=timezone.utc)
         # alttime data: two points at early hours (20:00 and 20:30)
@@ -2242,7 +2262,9 @@ class TestVisibilityWarnings:
         """The exact reported shape: a target planned for the first hour of the
         night while its altitude only crosses the observable floor at the 75-minute
         mark - get_plan_with_timeline must flag it as 'none', not silently plan it."""
-        monkeypatch.setattr("skytonight_storage.get_alttime_dir", lambda *_a, **_k: temp_plan_dir, raising=True)
+        monkeypatch.setattr(
+            "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: temp_plan_dir, raising=True
+        )
         night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
         night_end = datetime(2026, 7, 18, 8, 0, tzinfo=timezone.utc)
         times = [(night_start + timedelta(minutes=30 * i)).strftime("%Y-%m-%dT%H:%M:%S") for i in range(5)]
@@ -2275,7 +2297,9 @@ class TestScheduleOptimizer:
     without introducing mid-plan idle gaps."""
 
     def test_reorders_by_visibility_and_computes_initial_delay(self, temp_plan_dir, monkeypatch):
-        monkeypatch.setattr("skytonight_storage.get_alttime_dir", lambda *_a, **_k: temp_plan_dir, raising=True)
+        monkeypatch.setattr(
+            "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: temp_plan_dir, raising=True
+        )
         night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
         night_end = datetime(2026, 7, 18, 10, 0, tzinfo=timezone.utc)
         times = [(night_start + timedelta(minutes=30 * i)).strftime("%Y-%m-%dT%H:%M:%S") for i in range(9)]
@@ -2316,7 +2340,9 @@ class TestScheduleOptimizer:
         assert preview_by_id["triangulum"]["visibility"]["status"] == "ok"
 
     def test_never_observable_target_is_flagged(self, temp_plan_dir, monkeypatch):
-        monkeypatch.setattr("skytonight_storage.get_alttime_dir", lambda *_a, **_k: temp_plan_dir, raising=True)
+        monkeypatch.setattr(
+            "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: temp_plan_dir, raising=True
+        )
         night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
         night_end = datetime(2026, 7, 18, 8, 0, tzinfo=timezone.utc)
         times = [(night_start + timedelta(minutes=30 * i)).strftime("%Y-%m-%dT%H:%M:%S") for i in range(5)]
@@ -2349,7 +2375,9 @@ class TestScheduleOptimizer:
         mandatory delay) would miss it entirely, matching the real-world bug
         where the Plan My Night 'Overloaded' badge appeared only after applying,
         with no warning in the optimizer preview beforehand."""
-        monkeypatch.setattr("skytonight_storage.get_alttime_dir", lambda *_a, **_k: temp_plan_dir, raising=True)
+        monkeypatch.setattr(
+            "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: temp_plan_dir, raising=True
+        )
         night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
         night_end = datetime(2026, 7, 18, 8, 0, tzinfo=timezone.utc)  # 120-minute night
         times = [(night_start + timedelta(minutes=30 * i)).strftime("%Y-%m-%dT%H:%M:%S") for i in range(5)]

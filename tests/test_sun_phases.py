@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import numpy as np
 
-from sun_phases import SunService, SunAstroInfo
+from astroweather.sun_phases import SunService, SunAstroInfo
 
 
 class _FakeAlt:
@@ -39,7 +39,7 @@ class TestSunServiceBranches:
         svc = SunService(45.5, -73.5, "UTC")
         assert svc._fmt(None) == "Not found"
 
-    @patch("sun_phases.get_sun")
+    @patch("astroweather.sun_phases.get_sun")
     def test_compute_day_handles_no_crossings(self, mock_get_sun):
         svc = SunService(45.5, -73.5, "UTC")
 
@@ -59,7 +59,7 @@ class TestSunServiceBranches:
         assert report.astronomical_dusk == "Not found"
         assert report.true_night_hours == 0
 
-    @patch("sun_phases.get_sun")
+    @patch("astroweather.sun_phases.get_sun")
     def test_sun_altitude_uses_astropy_path(self, mock_get_sun):
         svc = SunService(45.5, -73.5, "UTC")
         mock_get_sun.return_value = _FakeSun(12.34)

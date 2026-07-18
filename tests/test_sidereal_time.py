@@ -6,7 +6,7 @@ Covers SiderealTimeService pure-logic and calculation methods.
 import pytest
 from datetime import datetime, date
 from zoneinfo import ZoneInfo
-from sidereal_time import SiderealTimeService
+from observation.sidereal_time import SiderealTimeService
 
 
 class TestSiderealTimeServiceInit:

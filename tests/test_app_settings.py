@@ -14,7 +14,7 @@ if backend_path not in sys.path:
 @pytest.fixture(autouse=True)
 def reset_app_settings_cache():
     """Clear the module-level cache before and after each test."""
-    import app_settings
+    from utils import app_settings
     app_settings._cache = None
     yield
     app_settings._cache = None
@@ -25,7 +25,7 @@ def reset_app_settings_cache():
 # ---------------------------------------------------------------------------
 
 def test_secret_key_generated_on_first_run(tmp_path, monkeypatch):
-    import app_settings
+    from utils import app_settings
     monkeypatch.setattr(app_settings, '_DATA_DIR', str(tmp_path))
     monkeypatch.setattr(app_settings, '_SECRET_KEY_FILE', str(tmp_path / 'secret_key.txt'))
 
@@ -37,7 +37,7 @@ def test_secret_key_generated_on_first_run(tmp_path, monkeypatch):
 
 
 def test_secret_key_persists_across_calls(tmp_path, monkeypatch):
-    import app_settings
+    from utils import app_settings
     monkeypatch.setattr(app_settings, '_DATA_DIR', str(tmp_path))
     monkeypatch.setattr(app_settings, '_SECRET_KEY_FILE', str(tmp_path / 'secret_key.txt'))
 
@@ -48,7 +48,7 @@ def test_secret_key_persists_across_calls(tmp_path, monkeypatch):
 
 
 def test_secret_key_loads_existing_file(tmp_path, monkeypatch):
-    import app_settings
+    from utils import app_settings
     key_file = tmp_path / 'secret_key.txt'
     key_file.write_text('aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899')
     monkeypatch.setattr(app_settings, '_SECRET_KEY_FILE', str(key_file))
@@ -63,7 +63,7 @@ def test_secret_key_loads_existing_file(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_app_settings_defaults_when_no_file(tmp_path, monkeypatch):
-    import app_settings
+    from utils import app_settings
     monkeypatch.setattr(app_settings, '_APP_SETTINGS_FILE', str(tmp_path / 'app_settings.json'))
 
     settings = app_settings.load_app_settings()
@@ -74,7 +74,7 @@ def test_app_settings_defaults_when_no_file(tmp_path, monkeypatch):
 
 
 def test_app_settings_loads_from_disk(tmp_path, monkeypatch):
-    import app_settings
+    from utils import app_settings
     settings_file = tmp_path / 'app_settings.json'
     settings_file.write_text(json.dumps({
         'vapid_contact_email': 'admin@example.com',
@@ -92,7 +92,7 @@ def test_app_settings_loads_from_disk(tmp_path, monkeypatch):
 
 def test_app_settings_merges_missing_keys(tmp_path, monkeypatch):
     """Partial file should be merged with defaults."""
-    import app_settings
+    from utils import app_settings
     settings_file = tmp_path / 'app_settings.json'
     settings_file.write_text(json.dumps({'vapid_contact_email': 'test@test.com'}))
     monkeypatch.setattr(app_settings, '_APP_SETTINGS_FILE', str(settings_file))
@@ -105,7 +105,7 @@ def test_app_settings_merges_missing_keys(tmp_path, monkeypatch):
 
 
 def test_get_app_settings_uses_cache(tmp_path, monkeypatch):
-    import app_settings
+    from utils import app_settings
     monkeypatch.setattr(app_settings, '_APP_SETTINGS_FILE', str(tmp_path / 'no_file.json'))
     app_settings._cache = {'vapid_contact_email': 'cached@test.com', 'trust_proxy_headers': True, 'session_cookie_secure': False}
 
@@ -119,7 +119,7 @@ def test_get_app_settings_uses_cache(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_save_app_settings_writes_file(tmp_path, monkeypatch):
-    import app_settings
+    from utils import app_settings
     settings_file = tmp_path / 'app_settings.json'
     monkeypatch.setattr(app_settings, '_DATA_DIR', str(tmp_path))
     monkeypatch.setattr(app_settings, '_APP_SETTINGS_FILE', str(settings_file))
@@ -136,7 +136,7 @@ def test_save_app_settings_writes_file(tmp_path, monkeypatch):
 
 
 def test_save_app_settings_updates_cache(tmp_path, monkeypatch):
-    import app_settings
+    from utils import app_settings
     monkeypatch.setattr(app_settings, '_DATA_DIR', str(tmp_path))
     monkeypatch.setattr(app_settings, '_APP_SETTINGS_FILE', str(tmp_path / 'app_settings.json'))
 
@@ -151,7 +151,7 @@ def test_save_app_settings_updates_cache(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_reload_clears_cache_and_rereads(tmp_path, monkeypatch):
-    import app_settings
+    from utils import app_settings
     settings_file = tmp_path / 'app_settings.json'
     settings_file.write_text(json.dumps({'vapid_contact_email': 'v1@test.com'}))
     monkeypatch.setattr(app_settings, '_APP_SETTINGS_FILE', str(settings_file))
@@ -171,8 +171,8 @@ def test_reload_clears_cache_and_rereads(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_get_vapid_claims_email_with_email(tmp_path, monkeypatch):
-    import app_settings
-    import push_manager
+    from utils import app_settings
+    from utils import push_manager
     monkeypatch.setattr(app_settings, '_APP_SETTINGS_FILE', str(tmp_path / 'no_file.json'))
     app_settings._cache = {
         'vapid_contact_email': 'push@mysite.com',
@@ -186,8 +186,8 @@ def test_get_vapid_claims_email_with_email(tmp_path, monkeypatch):
 
 
 def test_get_vapid_claims_email_already_has_mailto(tmp_path, monkeypatch):
-    import app_settings
-    import push_manager
+    from utils import app_settings
+    from utils import push_manager
     app_settings._cache = {
         'vapid_contact_email': 'mailto:already@set.com',
         'trust_proxy_headers': False,
@@ -200,8 +200,8 @@ def test_get_vapid_claims_email_already_has_mailto(tmp_path, monkeypatch):
 
 
 def test_get_vapid_claims_email_empty_returns_default(tmp_path, monkeypatch):
-    import app_settings
-    import push_manager
+    from utils import app_settings
+    from utils import push_manager
     app_settings._cache = {
         'vapid_contact_email': '',
         'trust_proxy_headers': False,
@@ -218,8 +218,8 @@ def test_get_vapid_claims_email_empty_returns_default(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_vapid_contact_status_not_set(monkeypatch):
-    import app_settings
-    import push_manager
+    from utils import app_settings
+    from utils import push_manager
     app_settings._cache = {'vapid_contact_email': '', 'trust_proxy_headers': False, 'session_cookie_secure': False}
 
     status = push_manager.get_vapid_contact_status()
@@ -229,8 +229,8 @@ def test_vapid_contact_status_not_set(monkeypatch):
 
 
 def test_vapid_contact_status_invalid_domain(monkeypatch):
-    import app_settings
-    import push_manager
+    from utils import app_settings
+    from utils import push_manager
     app_settings._cache = {'vapid_contact_email': 'admin@localhost', 'trust_proxy_headers': False, 'session_cookie_secure': False}
 
     status = push_manager.get_vapid_contact_status()
@@ -240,8 +240,8 @@ def test_vapid_contact_status_invalid_domain(monkeypatch):
 
 
 def test_vapid_contact_status_valid(monkeypatch):
-    import app_settings
-    import push_manager
+    from utils import app_settings
+    from utils import push_manager
     app_settings._cache = {'vapid_contact_email': 'admin@mysite.com', 'trust_proxy_headers': False, 'session_cookie_secure': False}
 
     status = push_manager.get_vapid_contact_status()
@@ -255,7 +255,7 @@ def test_vapid_contact_status_valid(monkeypatch):
 
 def test_secret_key_regenerated_when_file_empty(tmp_path, monkeypatch):
     """Line 41->47: file exists but stripped key is empty → regenerate."""
-    import app_settings
+    from utils import app_settings
     key_file = tmp_path / 'secret_key.txt'
     key_file.write_text('   ')  # whitespace only → strip() gives ''
     monkeypatch.setattr(app_settings, '_DATA_DIR', str(tmp_path))
@@ -268,7 +268,7 @@ def test_secret_key_regenerated_when_file_empty(tmp_path, monkeypatch):
 
 def test_secret_key_read_exception_regenerates(tmp_path, monkeypatch):
     """Lines 44-45: PermissionError reading key file → regenerate."""
-    import app_settings
+    from utils import app_settings
     import builtins
 
     key_file = tmp_path / 'secret_key.txt'
@@ -293,7 +293,7 @@ def test_secret_key_read_exception_regenerates(tmp_path, monkeypatch):
 
 def test_secret_key_write_exception_still_returns_key(tmp_path, monkeypatch):
     """Lines 52-53: PermissionError writing key file → key returned from memory."""
-    import app_settings
+    from utils import app_settings
     import builtins
 
     # No key file → skip to generate path
@@ -316,7 +316,7 @@ def test_secret_key_write_exception_still_returns_key(tmp_path, monkeypatch):
 
 def test_load_app_settings_json_exception_uses_defaults(tmp_path, monkeypatch):
     """Lines 70-71: malformed JSON in settings file → return defaults."""
-    import app_settings
+    from utils import app_settings
     settings_file = tmp_path / 'app_settings.json'
     settings_file.write_text('{ INVALID JSON }}}')
     monkeypatch.setattr(app_settings, '_APP_SETTINGS_FILE', str(settings_file))
@@ -328,7 +328,7 @@ def test_load_app_settings_json_exception_uses_defaults(tmp_path, monkeypatch):
 
 def test_warn_deprecated_env_vars_logs_warning(monkeypatch):
     """Line 112: deprecated env var present → warning is logged."""
-    import app_settings
+    from utils import app_settings
 
     monkeypatch.setenv('SECRET_KEY', 'old_key_in_env')
     logged = []

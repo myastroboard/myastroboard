@@ -6,7 +6,7 @@ from datetime import datetime, timezone, timedelta
 
 import pytest
 
-import plan_my_night
+from observation import plan_my_night
 _build_target_payload = plan_my_night._build_target_payload
 _is_valid_telescope_id = plan_my_night._is_valid_telescope_id
 _is_valid_user_id = plan_my_night._is_valid_user_id

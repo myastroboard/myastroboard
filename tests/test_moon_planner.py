@@ -3,7 +3,7 @@ Tests for moon_planner.py
 Focuses on pure-logic (score) and mocked _night_data for next_n_nights.
 """
 
-from moon_planner import MoonPlanner
+from astroweather.moon_planner import MoonPlanner
 
 
 class TestMoonPlannerScore:

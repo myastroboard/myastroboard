@@ -6,12 +6,15 @@ import time as _time
 
 import pytest
 import app as _app_mod
-import cache_store as _cache_store
+from cache import cache_store as _cache_store
+from blueprints import auth as _auth_mod
+from blueprints import plan_my_night as _plan_my_night_mod
+from blueprints import weather as _weather_mod
 
 
 def _install_default_location_id():
     """The admin client's active location = the install default preset (v1.2)."""
-    from repo_config import load_config, get_install_default_location
+    from utils.repo_config import load_config, get_install_default_location
 
     return get_install_default_location(load_config()).get('id')
 
@@ -76,7 +79,7 @@ class TestCacheSyncPaths:
 
     def test_iss_passes_sync_path(self, client_admin, monkeypatch):
         self._fresh(monkeypatch, 'iss_passes', {'window_days': 20, 'passes': []})
-        import iss_passes as _iss
+        from space import iss_passes as _iss
         monkeypatch.setattr(_iss, 'get_celestrak_status', lambda: 'ok')
         monkeypatch.setattr(_iss, 'get_iss_tle_source_info', lambda: {})
         resp = client_admin.get('/api/iss/passes')
@@ -104,7 +107,7 @@ class TestCacheSyncPaths:
         """Fresh sidereal slot valid-for-today → served from cache."""
         _isolate_shared_file(monkeypatch)
         _plant_slot('sidereal_time', {'hourly_forecast': []}, fresh=True)
-        import sidereal_time as _st
+        from observation import sidereal_time as _st
         monkeypatch.setattr(
             _st.SiderealTimeService,
             'get_current_sidereal_info',
@@ -140,7 +143,7 @@ class TestWeatherForecastLiveData:
         }
         _isolate_shared_file(monkeypatch)
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda *_: False)
-        monkeypatch.setattr(_app_mod, 'get_hourly_forecast', lambda **_kw: mock_forecast)
+        monkeypatch.setattr(_weather_mod, 'get_hourly_forecast', lambda **_kw: mock_forecast)
         monkeypatch.setattr(_cache_store, 'update_location_cache', lambda *_a, **_k: None)
 
         resp = client_admin.get('/api/weather/forecast')
@@ -155,8 +158,8 @@ class TestCatalogueLookupSimbad:
 
     def test_simbad_lookup_name_in_catalogue(self, client_admin, monkeypatch):
         """Covers lines 3910-3936 – SIMBAD found, name matches catalogue value."""
-        import skytonight_targets as _skt
-        import object_info as _oi
+        from skytonight import skytonight_targets as _skt
+        from observation import object_info as _oi
 
         monkeypatch.setattr(_skt, 'get_lookup_entry', lambda *a, **kw: None)
         monkeypatch.setattr(_oi, 'is_safe_identifier', lambda name: True)
@@ -177,8 +180,8 @@ class TestCatalogueLookupSimbad:
 
     def test_simbad_lookup_name_not_in_catalogue(self, client_admin, monkeypatch):
         """Covers SIMBAD path where name does NOT match any catalogue value → use alias."""
-        import skytonight_targets as _skt
-        import object_info as _oi
+        from skytonight import skytonight_targets as _skt
+        from observation import object_info as _oi
 
         monkeypatch.setattr(_skt, 'get_lookup_entry', lambda *a, **kw: None)
         monkeypatch.setattr(_oi, 'is_safe_identifier', lambda name: True)
@@ -199,8 +202,8 @@ class TestCatalogueLookupSimbad:
 
     def test_simbad_lookup_no_aliases_uses_name(self, client_admin, monkeypatch):
         """Covers branch where aliases list is empty → preferred_name = name."""
-        import skytonight_targets as _skt
-        import object_info as _oi
+        from skytonight import skytonight_targets as _skt
+        from observation import object_info as _oi
 
         monkeypatch.setattr(_skt, 'get_lookup_entry', lambda *a, **kw: None)
         monkeypatch.setattr(_oi, 'is_safe_identifier', lambda name: True)
@@ -220,8 +223,8 @@ class TestCatalogueLookupSimbad:
 
     def test_simbad_returns_none_gives_not_found(self, client_admin, monkeypatch):
         """Covers is_safe_identifier=True but SIMBAD returns None."""
-        import skytonight_targets as _skt
-        import object_info as _oi
+        from skytonight import skytonight_targets as _skt
+        from observation import object_info as _oi
 
         monkeypatch.setattr(_skt, 'get_lookup_entry', lambda *a, **kw: None)
         monkeypatch.setattr(_oi, 'is_safe_identifier', lambda name: True)
@@ -288,7 +291,7 @@ class TestPasswordChangeSuccess:
     """Covers line 402 – successful password change."""
 
     def test_password_change_success(self, client_admin, monkeypatch):
-        from auth import user_manager as _um
+        from utils.auth import user_manager as _um
         monkeypatch.setattr(_um, 'change_own_password', lambda *_: None)
         resp = client_admin.post(
             '/api/auth/change-password',
@@ -304,7 +307,7 @@ class TestAuthStatusStaleSess:
     def test_auth_status_stale_username_in_session(self, monkeypatch):
         """Username in session but no matching user → authenticated=False."""
         _app = _app_mod.app
-        monkeypatch.setattr(_app_mod, 'get_current_user', lambda: None)
+        monkeypatch.setattr(_auth_mod, 'get_current_user', lambda: None)
         with _app.test_client() as c:
             with c.session_transaction() as sess:
                 sess['username'] = 'ghost_user_not_in_db'
@@ -318,7 +321,7 @@ class TestPushExceptionPaths:
 
     def test_push_subscribe_save_exception(self, client_admin, monkeypatch):
         """Covers lines 538-540 – exception in push subscribe save."""
-        from auth import user_manager as _um
+        from utils.auth import user_manager as _um
 
         user = _um.get_user_by_username('admin')
         original_subs = list(user.push_subscriptions)
@@ -344,7 +347,7 @@ class TestPushExceptionPaths:
 
     def test_push_list_exception(self, client_admin, monkeypatch):
         """Covers lines 577-579 – exception iterating subscriptions list."""
-        from auth import user_manager as _um
+        from utils.auth import user_manager as _um
 
         class _BrokenList:
             def __iter__(self):
@@ -363,7 +366,7 @@ class TestPushExceptionPaths:
 
     def test_push_delete_all_exception(self, client_admin, monkeypatch):
         """Covers lines 596-598 – exception during delete-all push subscriptions."""
-        from auth import user_manager as _um
+        from utils.auth import user_manager as _um
 
         def raise_error():
             raise RuntimeError('disk full')
@@ -381,7 +384,7 @@ class TestPushExceptionPaths:
 
     def test_push_unsubscribe_exception(self, client_admin, monkeypatch):
         """Covers lines 750-752 – exception in unsubscribe."""
-        from auth import user_manager as _um
+        from utils.auth import user_manager as _um
 
         def raise_error():
             raise RuntimeError('disk full')
@@ -400,8 +403,8 @@ class TestPushExceptionPaths:
 
     def test_push_test_with_dead_endpoint(self, client_admin, monkeypatch):
         """Covers lines 715-726 – dead endpoint cleaned up in push_test."""
-        from auth import user_manager as _um
-        import push_manager as _pm
+        from utils.auth import user_manager as _um
+        from utils import push_manager as _pm
 
         monkeypatch.setattr(_pm, 'send_push', lambda *_a, **_k: False)
         monkeypatch.setattr(_um, 'save_users', lambda: None)
@@ -505,14 +508,14 @@ class TestPlanMyNightCoveragePaths:
 
     def test_plan_add_target_previous_plan_locked(self, client_admin, monkeypatch):
         """Covers line 3209 – plan belongs to a previous night."""
-        import plan_my_night as _pmn
+        from observation import plan_my_night as _pmn
 
         monkeypatch.setattr(
             _pmn, 'create_or_add_target',
             lambda **_kw: (False, 'previous_plan_locked', None, None),
         )
         monkeypatch.setattr(
-            _app_mod, '_resolve_observing_night_for_plan',
+            _plan_my_night_mod, '_resolve_observing_night_for_plan',
             lambda: {
                 'start': '2026-06-07T22:00:00',
                 'end': '2026-06-08T04:00:00',
@@ -527,14 +530,14 @@ class TestPlanMyNightCoveragePaths:
 
     def test_resolve_observing_night_fallback_path(self, client_admin, monkeypatch):
         """Covers lines 3001-3019 – sun service fails, fallback to calc results."""
-        from sun_phases import SunService as _SS
+        from astroweather.sun_phases import SunService as _SS
 
         def sun_raise(self):
             raise RuntimeError('sun fail')
 
         monkeypatch.setattr(_SS, 'get_today_report', sun_raise)
         monkeypatch.setattr(
-            _app_mod, 'load_calculation_results',
+            _plan_my_night_mod, 'load_calculation_results',
             lambda *_a, **_k: {
                 'metadata': {
                     'night_start': '2026-06-07T22:00:00',
@@ -542,7 +545,7 @@ class TestPlanMyNightCoveragePaths:
                 }
             },
         )
-        import plan_my_night as _pmn
+        from observation import plan_my_night as _pmn
 
         monkeypatch.setattr(
             _pmn, 'create_or_add_target',
@@ -557,8 +560,8 @@ class TestPlanMyNightCoveragePaths:
 
     def test_plan_search_across_telescopes(self, client_admin, monkeypatch):
         """Covers lines 3387-3396 – entry not in default plan, found in telescope plan."""
-        import plan_my_night as _pmn
-        import astrodex as _adx
+        from observation import plan_my_night as _pmn
+        from observation import astrodex as _adx
         import os as _os
 
         entry_id = 'test-entry-scope-123'
@@ -593,7 +596,7 @@ class TestAstrodexUploadPaths:
     def test_upload_exception_returns_500(self, client_admin, monkeypatch):
         """Covers lines 3805-3807 – exception during upload."""
         import io as _io
-        import astrodex as _adx
+        from observation import astrodex as _adx
 
         def raise_error():
             raise RuntimeError('disk error')
@@ -605,7 +608,7 @@ class TestAstrodexUploadPaths:
 
     def test_switch_catalogue_name_success(self, client_admin, monkeypatch):
         """Covers lines 3589, 3595-3597 – switch catalogue name success."""
-        import astrodex as _adx
+        from observation import astrodex as _adx
 
         monkeypatch.setattr(
             _adx, 'switch_item_catalogue_name',
@@ -620,7 +623,7 @@ class TestAstrodexUploadPaths:
 
     def test_switch_catalogue_name_no_result(self, client_admin, monkeypatch):
         """Covers line 3589 False branch – switch returns None/empty."""
-        import astrodex as _adx
+        from observation import astrodex as _adx
 
         monkeypatch.setattr(
             _adx, 'switch_item_catalogue_name',
@@ -696,7 +699,7 @@ class TestObjectInfoPaths:
 
     def test_object_info_invalid_identifier_from_backend(self, client_admin, monkeypatch):
         """Covers line 2025 – get_object_info returns error=invalid_identifier."""
-        import object_info as _oi
+        from observation import object_info as _oi
 
         monkeypatch.setattr(_oi, 'is_safe_identifier', lambda name: True)
         monkeypatch.setattr(_oi, 'get_object_info',

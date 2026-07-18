@@ -2,7 +2,7 @@
 
 import datetime
 
-import horizon_graph as module
+from astroweather import horizon_graph as module
 
 
 class FakeAngle:

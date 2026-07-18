@@ -10,15 +10,16 @@ import pytest
 backend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'backend')
 sys.path.insert(0, backend_path)
 
-import astrodex  # type: ignore[import-not-found]
-import skytonight_targets  # type: ignore[import-not-found]
-from auth import user_manager  # type: ignore[import-not-found]
+from observation import astrodex  # type: ignore[import-not-found]
+from skytonight import skytonight_targets  # type: ignore[import-not-found]
+from utils.auth import user_manager  # type: ignore[import-not-found]
 
 if 'psutil' not in sys.modules:
     sys.modules['psutil'] = types.ModuleType('psutil')
 
 import app as app_module  # type: ignore[import-not-found]
 from app import app  # type: ignore[import-not-found]
+from blueprints import astrodex as astrodex_bp_module  # type: ignore[import-not-found]
 
 
 @pytest.fixture
@@ -92,7 +93,7 @@ def test_get_astrodex_public_mode_includes_other_users_items(client, monkeypatch
         monkeypatch.setenv('DATA_DIR', tmpdir)
         astrodex.ASTRODEX_DIR = os.path.join(tmpdir, 'astrodex')
         astrodex.ASTRODEX_IMAGES_DIR = os.path.join(astrodex.ASTRODEX_DIR, 'images')
-        monkeypatch.setattr(app_module, 'load_config', lambda: {'astrodex': {'private': False}})
+        monkeypatch.setattr(astrodex_bp_module, 'load_config', lambda: {'astrodex': {'private': False}})
 
         admin_user = user_manager.get_user_by_username('admin')
         assert admin_user is not None
@@ -131,7 +132,7 @@ def test_get_astrodex_private_mode_hides_other_users_items(client, monkeypatch):
         monkeypatch.setenv('DATA_DIR', tmpdir)
         astrodex.ASTRODEX_DIR = os.path.join(tmpdir, 'astrodex')
         astrodex.ASTRODEX_IMAGES_DIR = os.path.join(astrodex.ASTRODEX_DIR, 'images')
-        monkeypatch.setattr(app_module, 'load_config', lambda: {'astrodex': {'private': True}})
+        monkeypatch.setattr(astrodex_bp_module, 'load_config', lambda: {'astrodex': {'private': True}})
 
         admin_user = user_manager.get_user_by_username('admin')
         assert admin_user is not None
@@ -196,7 +197,7 @@ def test_get_astrodex_image_private_mode_blocks_other_user_images(client, monkey
         astrodex.ASTRODEX_DIR = os.path.join(tmpdir, 'astrodex')
         astrodex.ASTRODEX_IMAGES_DIR = os.path.join(astrodex.ASTRODEX_DIR, 'images')
         astrodex.ensure_astrodex_directories()
-        monkeypatch.setattr(app_module, 'load_config', lambda: {'astrodex': {'private': True}})
+        monkeypatch.setattr(astrodex_bp_module, 'load_config', lambda: {'astrodex': {'private': True}})
 
         admin_user = user_manager.get_user_by_username('admin')
         assert admin_user is not None

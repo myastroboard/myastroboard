@@ -11,7 +11,7 @@ import types
 # Add backend to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
-import equipment_profiles
+from equipment import equipment_profiles
 
 
 @pytest.fixture
@@ -712,7 +712,7 @@ def test_shared_equipment_and_combination_status(temp_data_dir, monkeypatch):
             ]
         )
     )
-    monkeypatch.setitem(sys.modules, 'auth', fake_auth)
+    monkeypatch.setitem(sys.modules, 'utils.auth', fake_auth)
 
     tel_file = equipment_profiles.get_user_equipment_file(user_a, 'telescopes')
     cam_file = equipment_profiles.get_user_equipment_file(user_a, 'cameras')
@@ -914,7 +914,7 @@ class TestLoadAllSharedEquipmentExceptions:
                 list_users=lambda: [{'user_id': 'owner1', 'username': 'alice'}]
             )
         )
-        monkeypatch.setitem(sys.modules, 'auth', fake_auth)
+        monkeypatch.setitem(sys.modules, 'utils.auth', fake_auth)
         equipment_profiles.ensure_equipment_directories()
         bad_file = os.path.join(equipment_profiles.EQUIPMENT_DIR, 'owner1_telescopes.json')
         with open(bad_file, 'w') as f:
@@ -927,7 +927,7 @@ class TestLoadAllSharedEquipmentExceptions:
         fake_auth = types.SimpleNamespace(
             user_manager=types.SimpleNamespace(list_users=lambda: [])
         )
-        monkeypatch.setitem(sys.modules, 'auth', fake_auth)
+        monkeypatch.setitem(sys.modules, 'utils.auth', fake_auth)
 
         def raise_oops(_path):
             raise Exception("oops")
@@ -948,7 +948,7 @@ class TestComputeShareStatusBranches:
                 list_users=lambda: [{'user_id': user_a, 'username': 'alice'}]
             )
         )
-        monkeypatch.setitem(sys.modules, 'auth', fake_auth)
+        monkeypatch.setitem(sys.modules, 'utils.auth', fake_auth)
         tel_file = equipment_profiles.get_user_equipment_file(user_a, 'telescopes')
         with open(tel_file, 'w', encoding='utf-8') as f:
             json.dump({'items': [{'id': 't1', 'name': 'Scope', 'is_shared': False}]}, f)
@@ -1287,7 +1287,7 @@ class TestEquipmentDeleteExceptions:
         import sys, types
         fake_pmn = types.ModuleType('plan_my_night')
         fake_pmn.delete_plan_for_telescope = lambda *_: (_ for _ in ()).throw(RuntimeError("plan error"))
-        monkeypatch.setitem(sys.modules, 'plan_my_night', fake_pmn)
+        monkeypatch.setitem(sys.modules, 'observation.plan_my_night', fake_pmn)
         result = equipment_profiles.delete_telescope(test_user_id, scope['id'])
         assert result is True
 
@@ -1726,7 +1726,7 @@ class TestSharedEquipmentAdditionalBranches:
                 list_users=lambda: [{'user_id': 'owner1', 'username': 'alice'}]
             )
         )
-        monkeypatch.setitem(sys.modules, 'auth', fake_auth)
+        monkeypatch.setitem(sys.modules, 'utils.auth', fake_auth)
         equipment_profiles.ensure_equipment_directories()
         tel_file = os.path.join(equipment_profiles.EQUIPMENT_DIR, 'owner1_telescopes.json')
         with open(tel_file, 'w', encoding='utf-8') as f:
@@ -1746,7 +1746,7 @@ class TestSharedEquipmentAdditionalBranches:
                 ]
             )
         )
-        monkeypatch.setitem(sys.modules, 'auth', fake_auth)
+        monkeypatch.setitem(sys.modules, 'utils.auth', fake_auth)
         equipment_profiles.ensure_equipment_directories()
         tel_file = equipment_profiles.get_user_equipment_file(owner_id, 'telescopes')
         with open(tel_file, 'w', encoding='utf-8') as f:
@@ -1767,7 +1767,7 @@ class TestSharedEquipmentAdditionalBranches:
                 list_users=lambda: [{'user_id': 'excludeme', 'username': 'excluded'}]
             )
         )
-        monkeypatch.setitem(sys.modules, 'auth', fake_auth)
+        monkeypatch.setitem(sys.modules, 'utils.auth', fake_auth)
         equipment_profiles.ensure_equipment_directories()
         combo_file = os.path.join(equipment_profiles.EQUIPMENT_DIR, 'excludeme_combinations.json')
         with open(combo_file, 'w', encoding='utf-8') as f:
@@ -1784,7 +1784,7 @@ class TestSharedEquipmentAdditionalBranches:
                 list_users=lambda: [{'user_id': 'owner1', 'username': 'alice'}]
             )
         )
-        monkeypatch.setitem(sys.modules, 'auth', fake_auth)
+        monkeypatch.setitem(sys.modules, 'utils.auth', fake_auth)
         equipment_profiles.ensure_equipment_directories()
         combo_file = os.path.join(equipment_profiles.EQUIPMENT_DIR, 'owner1_combinations.json')
         with open(combo_file, 'w', encoding='utf-8') as f:
@@ -1800,7 +1800,7 @@ class TestSharedEquipmentAdditionalBranches:
                 list_users=lambda: [{'user_id': owner_id, 'username': 'alice'}]
             )
         )
-        monkeypatch.setitem(sys.modules, 'auth', fake_auth)
+        monkeypatch.setitem(sys.modules, 'utils.auth', fake_auth)
         equipment_profiles.ensure_equipment_directories()
         combo_file = os.path.join(equipment_profiles.EQUIPMENT_DIR, f'{owner_id}_combinations.json')
         with open(combo_file, 'w', encoding='utf-8') as f:
@@ -1817,7 +1817,7 @@ class TestSharedEquipmentAdditionalBranches:
                 list_users=lambda: []
             )
         )
-        monkeypatch.setitem(sys.modules, 'auth', fake_auth)
+        monkeypatch.setitem(sys.modules, 'utils.auth', fake_auth)
         monkeypatch.setattr(equipment_profiles.os, 'listdir',
                             lambda _: (_ for _ in ()).throw(Exception("listdir fail")))
         result = equipment_profiles.load_all_shared_combinations(exclude_user_id='other')

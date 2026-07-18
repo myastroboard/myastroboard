@@ -13,7 +13,7 @@ sys.path.insert(0, backend_path)
 if 'psutil' not in sys.modules:
     sys.modules['psutil'] = types.ModuleType('psutil')
 
-import skytonight_api as _skytonight_api_mod
+from blueprints import skytonight_api as _skytonight_api_mod
 _annotate_skytonight_item = _skytonight_api_mod._annotate_skytonight_item
 _get_catalogue_alias_payload = _skytonight_api_mod._get_catalogue_alias_payload
 _humanize_const_name = _skytonight_api_mod._humanize_const_name
@@ -22,7 +22,7 @@ _resolve_source_catalogue = _skytonight_api_mod._resolve_source_catalogue
 _target_attr = _skytonight_api_mod._target_attr
 _target_catalogue_names = _skytonight_api_mod._target_catalogue_names
 from app import app
-from auth import user_manager
+from utils.auth import user_manager
 
 
 @pytest.fixture
@@ -442,7 +442,7 @@ class TestAdditionalSkytonightRouteBranches:
 class TestPreloadAllCurrentPlanEntries:
 
     def test_returns_empty_for_user_with_no_plans(self, monkeypatch, tmp_path):
-        import plan_my_night as pmn
+        from observation import plan_my_night as pmn
         monkeypatch.setattr(pmn, 'PLAN_DIR', str(tmp_path))
         import uuid
         user_id = str(uuid.uuid4())
@@ -450,7 +450,7 @@ class TestPreloadAllCurrentPlanEntries:
         assert result == []
 
     def test_returns_entries_from_current_plan(self, monkeypatch, tmp_path):
-        import plan_my_night as pmn
+        from observation import plan_my_night as pmn
         import uuid
         from datetime import datetime, timezone, timedelta
         monkeypatch.setattr(pmn, 'PLAN_DIR', str(tmp_path))
@@ -467,7 +467,7 @@ class TestPreloadAllCurrentPlanEntries:
         assert result[0]['id'] == 'e1'
 
     def test_skips_previous_plans(self, monkeypatch, tmp_path):
-        import plan_my_night as pmn
+        from observation import plan_my_night as pmn
         import uuid
         from datetime import datetime, timezone, timedelta
         monkeypatch.setattr(pmn, 'PLAN_DIR', str(tmp_path))
@@ -484,7 +484,7 @@ class TestPreloadAllCurrentPlanEntries:
 
     def test_skips_plan_obj_not_dict(self, monkeypatch, tmp_path):
         """Covers line 112: plan_obj not a dict → continue."""
-        import plan_my_night as pmn
+        from observation import plan_my_night as pmn
         import uuid
         monkeypatch.setattr(pmn, 'PLAN_DIR', str(tmp_path))
         user_id = str(uuid.uuid4())
@@ -495,7 +495,7 @@ class TestPreloadAllCurrentPlanEntries:
 
     def test_exception_in_plan_load_is_silenced(self, monkeypatch, tmp_path):
         """Covers lines 120-121: except Exception: pass and return all_entries."""
-        import plan_my_night as pmn
+        from observation import plan_my_night as pmn
         import uuid
         monkeypatch.setattr(pmn, 'PLAN_DIR', str(tmp_path))
         user_id = str(uuid.uuid4())
@@ -506,7 +506,7 @@ class TestPreloadAllCurrentPlanEntries:
         assert result == []  # exception silenced, returns empty list
 
     def test_deduplicates_entries_across_telescopes(self, monkeypatch, tmp_path):
-        import plan_my_night as pmn
+        from observation import plan_my_night as pmn
         import uuid
         from datetime import datetime, timezone, timedelta
         monkeypatch.setattr(pmn, 'PLAN_DIR', str(tmp_path))
@@ -1201,7 +1201,7 @@ class TestBuildSkytonightReportsPayloadCalculated:
         assert result['report'][0]['alttime_file'] == 'dso-1'
 
     def test_fallback_static_dataset_with_catalogue_filter(self, monkeypatch):
-        from skytonight_models import SkyTonightTarget
+        from skytonight.skytonight_models import SkyTonightTarget
         targets = [
             SkyTonightTarget(
                 target_id='dso-test',
@@ -1230,7 +1230,7 @@ class TestBuildSkytonightReportsPayloadCalculated:
         assert result['report'][0]['id'] == 'M 31'
 
     def test_fallback_static_dataset_no_catalogue(self, monkeypatch):
-        from skytonight_models import SkyTonightTarget
+        from skytonight.skytonight_models import SkyTonightTarget
         targets = [
             SkyTonightTarget(
                 target_id='body-mars',
@@ -1338,7 +1338,7 @@ class TestBuildBodiesSectionPayload:
         assert result['bodies'][0]['alttime_file'] == 'body-mars'
 
     def test_fallback_static_dataset_bodies(self, monkeypatch):
-        from skytonight_models import SkyTonightTarget
+        from skytonight.skytonight_models import SkyTonightTarget
         targets = [
             SkyTonightTarget(
                 target_id='body-saturn',
@@ -1458,7 +1458,7 @@ class TestBuildCometsSectionPayload:
         assert result['comets'][0]['absolute magnitude'] is None
 
     def test_fallback_static_dataset_comets(self, monkeypatch):
-        from skytonight_models import SkyTonightTarget
+        from skytonight.skytonight_models import SkyTonightTarget
         targets = [
             SkyTonightTarget(
                 target_id='comet-halley',
@@ -1487,7 +1487,7 @@ class TestBuildCometsSectionPayload:
         assert result['comets'][0]['q'] == '2061-07-28'
 
     def test_fallback_comet_metadata_not_dict(self, monkeypatch):
-        from skytonight_models import SkyTonightTarget
+        from skytonight.skytonight_models import SkyTonightTarget
 
         target = SkyTonightTarget(
             target_id='comet-bad2',
@@ -1617,7 +1617,7 @@ class TestBuildDsoSectionPayload:
         assert len(result['report']) == 0
 
     def test_fallback_dataset_with_catalogue_filter(self, monkeypatch):
-        from skytonight_models import SkyTonightTarget
+        from skytonight.skytonight_models import SkyTonightTarget
         targets = [
             SkyTonightTarget(
                 target_id='dso-test',
@@ -1647,7 +1647,7 @@ class TestBuildDsoSectionPayload:
         assert result['report'][0]['id'] == 'M 31'
 
     def test_fallback_dataset_no_catalogue_no_annotations(self, monkeypatch):
-        from skytonight_models import SkyTonightTarget
+        from skytonight.skytonight_models import SkyTonightTarget
         targets = [
             SkyTonightTarget(
                 target_id='dso-test2',
@@ -1677,7 +1677,7 @@ class TestBuildDsoSectionPayload:
         assert result['report'][0]['in_plan_my_night'] is False
 
     def test_fallback_dataset_excludes_non_matching_catalogue(self, monkeypatch):
-        from skytonight_models import SkyTonightTarget
+        from skytonight.skytonight_models import SkyTonightTarget
         targets = [
             SkyTonightTarget(
                 target_id='dso-test3',
@@ -2039,7 +2039,7 @@ class TestLegacyTriggerEndpoint:
 class TestCataloguesEndpointWithData:
 
     def test_returns_sorted_catalogues(self, client_admin, monkeypatch):
-        from skytonight_models import SkyTonightTarget
+        from skytonight.skytonight_models import SkyTonightTarget
         targets = [
             SkyTonightTarget(
                 target_id='dso-1',

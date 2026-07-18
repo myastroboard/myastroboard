@@ -20,7 +20,7 @@ Items are **per-user**: each account has its own private collection in `data/ast
 
 ### Catalogue integration
 
-When you add an item by name, Astrodex looks up the name in the SkyTonight catalogue alias table (`catalogue_aliases.py`) to find the canonical identifier. This allows adding "M31", "Andromeda Galaxy", "NGC 224", or "Andromeda" — and they all resolve to the same record, preventing duplicates.
+When you add an item by name, Astrodex looks up the name in the SkyTonight catalogue alias table (`observation/catalogue_aliases.py`) to find the canonical identifier. This allows adding "M31", "Andromeda Galaxy", "NGC 224", or "Andromeda" — and they all resolve to the same record, preventing duplicates.
 
 The **check duplicate** endpoint (`GET /api/astrodex/check/<name>`) lets the UI warn before adding a name that already exists.
 

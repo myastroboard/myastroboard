@@ -6,7 +6,7 @@ import os
 import pytest
 from werkzeug.security import check_password_hash, generate_password_hash
 
-import auth
+from utils import auth
 
 
 @pytest.fixture
@@ -362,7 +362,7 @@ class TestUserManagerCreate:
         having to attribute each location by hand."""
         manager = isolated_user_manager
         monkeypatch.setattr(
-            'repo_config.load_config',
+            'utils.repo_config.load_config',
             lambda: {'locations': [{'id': 'loc-a'}, {'id': 'loc-b'}]},
         )
 
@@ -372,7 +372,7 @@ class TestUserManagerCreate:
 
     def test_create_user_no_locations_leaves_empty_attribution(self, isolated_user_manager, monkeypatch):
         manager = isolated_user_manager
-        monkeypatch.setattr('repo_config.load_config', lambda: {'locations': []})
+        monkeypatch.setattr('utils.repo_config.load_config', lambda: {'locations': []})
 
         user = manager.create_user('newuser2', 'password123', auth.ROLE_USER)
 
@@ -383,7 +383,7 @@ class TestUserManagerCreate:
         lookup did (e.g. config unavailable at that instant)."""
         manager = isolated_user_manager
         monkeypatch.setattr(
-            'repo_config.load_config', lambda: (_ for _ in ()).throw(RuntimeError('boom'))
+            'utils.repo_config.load_config', lambda: (_ for _ in ()).throw(RuntimeError('boom'))
         )
 
         user = manager.create_user('newuser3', 'password123', auth.ROLE_USER)
@@ -396,7 +396,7 @@ class TestUserManagerCreate:
         locations to attribute must not corrupt that shared default for
         whoever gets created next."""
         manager = isolated_user_manager
-        monkeypatch.setattr('repo_config.load_config', lambda: {'locations': [{'id': 'loc-a'}]})
+        monkeypatch.setattr('utils.repo_config.load_config', lambda: {'locations': [{'id': 'loc-a'}]})
 
         manager.create_user('first_user', 'password123', auth.ROLE_USER)
 
@@ -556,8 +556,8 @@ class TestUserManagerDeleteUser:
         img_file.write_bytes(b'fake image data')
 
         # Monkeypatch the directories
-        monkeypatch.setattr('astrodex.ASTRODEX_DIR', str(astrodex_dir))
-        monkeypatch.setattr('astrodex.ASTRODEX_IMAGES_DIR', str(images_dir))
+        monkeypatch.setattr('observation.astrodex.ASTRODEX_DIR', str(astrodex_dir))
+        monkeypatch.setattr('observation.astrodex.ASTRODEX_IMAGES_DIR', str(images_dir))
 
         manager.delete_user(user_id, current_user_id=admin.user_id)
 
@@ -893,7 +893,7 @@ class TestAuthDecorators:
             assert resp.status_code == 403
 
     def test_admin_required_allows_admin(self, flask_app, monkeypatch):
-        import skytonight_api as _mod
+        from blueprints import skytonight_api as _mod
         monkeypatch.setattr(_mod, 'get_skytonight_scheduler_for_api', lambda: None)
         with flask_app.test_client() as c:
             admin = auth.user_manager.get_user_by_username(auth.DEFAULT_ADMIN_USERNAME)
@@ -1008,8 +1008,8 @@ class TestDeleteUserAstrodexCleanup:
         img_file2 = images_dir / f'{user_id}_pic2.jpg'
         img_file2.write_bytes(b'another image')
 
-        monkeypatch.setattr('astrodex.ASTRODEX_DIR', str(astrodex_dir))
-        monkeypatch.setattr('astrodex.ASTRODEX_IMAGES_DIR', str(images_dir))
+        monkeypatch.setattr('observation.astrodex.ASTRODEX_DIR', str(astrodex_dir))
+        monkeypatch.setattr('observation.astrodex.ASTRODEX_IMAGES_DIR', str(images_dir))
 
         manager.delete_user(user_id, current_user_id=admin.user_id)
 
@@ -1035,8 +1035,8 @@ class TestDeleteUserAstrodexCleanup:
         astrodex_file = astrodex_dir / f'{user_id}_astrodex.json'
         astrodex_file.write_text('{invalid json', encoding='utf-8')
 
-        monkeypatch.setattr('astrodex.ASTRODEX_DIR', str(astrodex_dir))
-        monkeypatch.setattr('astrodex.ASTRODEX_IMAGES_DIR', str(images_dir))
+        monkeypatch.setattr('observation.astrodex.ASTRODEX_DIR', str(astrodex_dir))
+        monkeypatch.setattr('observation.astrodex.ASTRODEX_IMAGES_DIR', str(images_dir))
 
         # Should not raise
         manager.delete_user(user_id, current_user_id=admin.user_id)
@@ -1062,8 +1062,8 @@ class TestDeleteUserAstrodexCleanup:
         img_file = images_dir / valid_filename
         img_file.write_bytes(b'data')
 
-        monkeypatch.setattr('astrodex.ASTRODEX_DIR', str(astrodex_dir))
-        monkeypatch.setattr('astrodex.ASTRODEX_IMAGES_DIR', str(images_dir))
+        monkeypatch.setattr('observation.astrodex.ASTRODEX_DIR', str(astrodex_dir))
+        monkeypatch.setattr('observation.astrodex.ASTRODEX_IMAGES_DIR', str(images_dir))
 
         original_remove = os.remove
         call_count = [0]
@@ -1458,8 +1458,8 @@ class TestDeleteUserPathConfinement:
         astrodex_dir.mkdir()
         images_dir.mkdir()
 
-        monkeypatch.setattr('astrodex.ASTRODEX_DIR', str(astrodex_dir))
-        monkeypatch.setattr('astrodex.ASTRODEX_IMAGES_DIR', str(images_dir))
+        monkeypatch.setattr('observation.astrodex.ASTRODEX_DIR', str(astrodex_dir))
+        monkeypatch.setattr('observation.astrodex.ASTRODEX_IMAGES_DIR', str(images_dir))
 
         # Patch os.path.normpath to return a path outside the base dir
         original_normpath = os.path.normpath
@@ -1498,8 +1498,8 @@ class TestDeleteUserImageTraversalGuard:
         astrodex_file = astrodex_dir / f'{user_id}_astrodex.json'
         astrodex_file.write_text(json.dumps(astrodex_data), encoding='utf-8')
 
-        monkeypatch.setattr('astrodex.ASTRODEX_DIR', str(astrodex_dir))
-        monkeypatch.setattr('astrodex.ASTRODEX_IMAGES_DIR', str(images_dir))
+        monkeypatch.setattr('observation.astrodex.ASTRODEX_DIR', str(astrodex_dir))
+        monkeypatch.setattr('observation.astrodex.ASTRODEX_IMAGES_DIR', str(images_dir))
 
         # Make normpath return a path outside images_dir for the image file
         original_normpath = os.path.normpath
@@ -1538,8 +1538,8 @@ class TestDeleteUserListdirRemoveFails:
         img_file = images_dir / img_filename
         img_file.write_bytes(b'data')
 
-        monkeypatch.setattr('astrodex.ASTRODEX_DIR', str(astrodex_dir))
-        monkeypatch.setattr('astrodex.ASTRODEX_IMAGES_DIR', str(images_dir))
+        monkeypatch.setattr('observation.astrodex.ASTRODEX_DIR', str(astrodex_dir))
+        monkeypatch.setattr('observation.astrodex.ASTRODEX_IMAGES_DIR', str(images_dir))
 
         original_remove = os.remove
 

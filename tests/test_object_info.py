@@ -4,9 +4,9 @@ import os
 
 import pytest
 
-import skytonight_targets as _st_module  # needed for patching the locally-imported get_lookup_entry
+from skytonight import skytonight_targets as _st_module  # needed for patching the locally-imported get_lookup_entry
 
-import object_info as oi
+from observation import object_info as oi
 
 # Captured at import time, before the autouse fixture below mocks these out, so tests
 # that need the *real* disk-persistence behaviour can restore them explicitly.
@@ -239,7 +239,7 @@ def test_parse_object_image_filename_wraps_exact_360_boundary():
 
 def test_ensure_cached_object_image_returns_none_on_request_failure(monkeypatch, tmp_path):
     monkeypatch.setattr(oi, 'OBJECT_IMAGE_CACHE_DIR', str(tmp_path))
-    with patch('object_info.requests.get', side_effect=_req_module.RequestException('timeout')):
+    with patch('observation.object_info.requests.get', side_effect=_req_module.RequestException('timeout')):
         result = oi.ensure_cached_object_image(ra=10.684, dec=41.269)
     assert result is None
 
@@ -250,7 +250,7 @@ def test_ensure_cached_object_image_fetches_and_writes_cache(monkeypatch, tmp_pa
     mock_resp.raise_for_status.return_value = None
     mock_resp.iter_content.return_value = [b'fake-jpeg-bytes']
 
-    with patch('object_info.requests.get', return_value=mock_resp) as mock_get:
+    with patch('observation.object_info.requests.get', return_value=mock_resp) as mock_get:
         result = oi.ensure_cached_object_image(ra=10.684, dec=41.269)
 
     expected_path = os.path.join(str(tmp_path), '10.684000_41.269000.jpg')
@@ -268,7 +268,7 @@ def test_ensure_cached_object_image_serves_from_disk_without_network(monkeypatch
     with open(expected_path, 'wb') as f:
         f.write(b'already-cached-bytes')
 
-    with patch('object_info.requests.get') as mock_get:
+    with patch('observation.object_info.requests.get') as mock_get:
         result = oi.ensure_cached_object_image(ra=10.684, dec=41.269)
 
     assert result == expected_path
@@ -464,14 +464,14 @@ class TestSimbadQuery:
         }
         mock_resp.raise_for_status.return_value = None
 
-        with patch("object_info.requests.get", return_value=mock_resp):
+        with patch("observation.object_info.requests.get", return_value=mock_resp):
             result = oi._simbad_query("SELECT * FROM basic")
 
         assert result is not None
         assert "data" in result
 
     def test_returns_none_on_request_exception(self):
-        with patch("object_info.requests.get", side_effect=_req_module.RequestException("timeout")):
+        with patch("observation.object_info.requests.get", side_effect=_req_module.RequestException("timeout")):
             result = oi._simbad_query("SELECT * FROM basic")
 
         assert result is None
@@ -486,11 +486,11 @@ class TestResolveViaSimbad:
     """Direct tests for _resolve_via_simbad with mocked _simbad_query."""
 
     def test_returns_none_when_simbad_fails(self):
-        with patch("object_info._simbad_query", return_value=None):
+        with patch("observation.object_info._simbad_query", return_value=None):
             assert oi._resolve_via_simbad("M31") is None
 
     def test_returns_none_when_data_empty(self):
-        with patch("object_info._simbad_query", return_value={"data": [], "metadata": []}):
+        with patch("observation.object_info._simbad_query", return_value={"data": [], "metadata": []}):
             assert oi._resolve_via_simbad("M31") is None
 
     def test_returns_resolved_dict(self):
@@ -511,7 +511,7 @@ class TestResolveViaSimbad:
             call_count[0] += 1
             return main_result if call_count[0] == 1 else alias_result
 
-        with patch("object_info._simbad_query", side_effect=mock_query):
+        with patch("observation.object_info._simbad_query", side_effect=mock_query):
             result = oi._resolve_via_simbad("M31")
 
         assert result is not None
@@ -538,7 +538,7 @@ class TestResolveViaSimbad:
             call_count[0] += 1
             return main_result if call_count[0] == 1 else alias_result
 
-        with patch("object_info._simbad_query", side_effect=mock_query):
+        with patch("observation.object_info._simbad_query", side_effect=mock_query):
             result = oi._resolve_via_simbad("M 100")
 
         assert "M 100" not in result["aliases"]
@@ -558,7 +558,7 @@ class TestResolveViaSimbad:
             call_count[0] += 1
             return main_result if call_count[0] == 1 else None
 
-        with patch("object_info._simbad_query", side_effect=mock_query):
+        with patch("observation.object_info._simbad_query", side_effect=mock_query):
             result = oi._resolve_via_simbad("SomeStar")
 
         assert result is not None
@@ -575,11 +575,11 @@ class TestResolveIdentifierForCatalogueLookup:
     """Tests for resolve_identifier_for_catalogue_lookup."""
 
     def test_returns_none_when_simbad_returns_none(self):
-        with patch("object_info._simbad_query", return_value=None):
+        with patch("observation.object_info._simbad_query", return_value=None):
             assert oi.resolve_identifier_for_catalogue_lookup("M31") is None
 
     def test_returns_none_when_data_empty(self):
-        with patch("object_info._simbad_query", return_value={"data": [], "metadata": []}):
+        with patch("observation.object_info._simbad_query", return_value={"data": [], "metadata": []}):
             assert oi.resolve_identifier_for_catalogue_lookup("M31") is None
 
     def test_returns_dict_with_required_keys(self):
@@ -599,7 +599,7 @@ class TestResolveIdentifierForCatalogueLookup:
             call_count[0] += 1
             return main_result if call_count[0] == 1 else alias_result
 
-        with patch("object_info._simbad_query", side_effect=mock_query):
+        with patch("observation.object_info._simbad_query", side_effect=mock_query):
             result = oi.resolve_identifier_for_catalogue_lookup("M31")
 
         assert result is not None
@@ -625,7 +625,7 @@ class TestResolveIdentifierForCatalogueLookup:
             call_count[0] += 1
             return main_result if call_count[0] == 1 else alias_result
 
-        with patch("object_info._simbad_query", side_effect=mock_query):
+        with patch("observation.object_info._simbad_query", side_effect=mock_query):
             result = oi.resolve_identifier_for_catalogue_lookup("M31")
 
         assert result["aliases"] == ["NGC 224"]
@@ -637,7 +637,7 @@ class TestResolveIdentifierForCatalogueLookup:
                 {"name": "main_id"}, {"name": "otype_txt"}, {"name": "ra"}, {"name": "dec"}
             ],
         }
-        with patch("object_info._simbad_query", return_value=main_result):
+        with patch("observation.object_info._simbad_query", return_value=main_result):
             result = oi.resolve_identifier_for_catalogue_lookup("SomeStar")
 
         assert result is not None
@@ -663,7 +663,7 @@ class TestGetWikipediaSummary:
             "extract": "The Andromeda Galaxy is a large spiral galaxy.",
         }
 
-        with patch("object_info.requests.get", return_value=mock_resp):
+        with patch("observation.object_info.requests.get", return_value=mock_resp):
             result = oi._get_wikipedia_summary("Andromeda Galaxy")
 
         assert result is not None
@@ -674,7 +674,7 @@ class TestGetWikipediaSummary:
         mock_resp = MagicMock()
         mock_resp.status_code = 404
 
-        with patch("object_info.requests.get", return_value=mock_resp):
+        with patch("observation.object_info.requests.get", return_value=mock_resp):
             result = oi._get_wikipedia_summary("NonExistentObject99999")
 
         assert result is None
@@ -683,7 +683,7 @@ class TestGetWikipediaSummary:
         mock_resp = MagicMock()
         mock_resp.status_code = 403
 
-        with patch("object_info.requests.get", return_value=mock_resp):
+        with patch("observation.object_info.requests.get", return_value=mock_resp):
             result = oi._get_wikipedia_summary("SomeThing")
 
         assert result is None
@@ -694,7 +694,7 @@ class TestGetWikipediaSummary:
         mock_resp.raise_for_status.return_value = None
         mock_resp.json.return_value = {"type": "disambiguation"}
 
-        with patch("object_info.requests.get", return_value=mock_resp):
+        with patch("observation.object_info.requests.get", return_value=mock_resp):
             result = oi._get_wikipedia_summary("Andromeda")
 
         assert result is None
@@ -705,13 +705,13 @@ class TestGetWikipediaSummary:
         mock_resp.raise_for_status.return_value = None
         mock_resp.json.return_value = {"type": "standard", "extract": "   "}
 
-        with patch("object_info.requests.get", return_value=mock_resp):
+        with patch("observation.object_info.requests.get", return_value=mock_resp):
             result = oi._get_wikipedia_summary("EmptyPage")
 
         assert result is None
 
     def test_returns_none_on_request_exception(self):
-        with patch("object_info.requests.get", side_effect=_req_module.RequestException("network err")):
+        with patch("observation.object_info.requests.get", side_effect=_req_module.RequestException("network err")):
             result = oi._get_wikipedia_summary("M31")
 
         assert result is None
@@ -727,7 +727,7 @@ class TestGetWikipediaSummary:
             "extract": "La galaxie d'Andromède est une grande galaxie spirale.",
         }
 
-        with patch("object_info.requests.get", return_value=mock_resp) as mock_get:
+        with patch("observation.object_info.requests.get", return_value=mock_resp) as mock_get:
             result = oi._get_wikipedia_summary("Andromeda Galaxy", lang="fr")
 
         assert result is not None
@@ -754,7 +754,7 @@ class TestWikipediaWithFallback:
                 return found
             return None
 
-        with patch("object_info._get_wikipedia_summary", side_effect=mock_summary):
+        with patch("observation.object_info._get_wikipedia_summary", side_effect=mock_summary):
             result = oi._wikipedia_with_fallback(["M 31", "NGC 224"], "en")
 
         assert result is not None
@@ -768,13 +768,13 @@ class TestWikipediaWithFallback:
                 return None
             return en_result
 
-        with patch("object_info._get_wikipedia_summary", side_effect=mock_summary):
+        with patch("observation.object_info._get_wikipedia_summary", side_effect=mock_summary):
             result = oi._wikipedia_with_fallback(["M 31"], "fr")
 
         assert result is not None
 
     def test_returns_none_when_all_fail(self):
-        with patch("object_info._get_wikipedia_summary", return_value=None):
+        with patch("observation.object_info._get_wikipedia_summary", return_value=None):
             result = oi._wikipedia_with_fallback(["UnknownObj1", "UnknownObj2"], "en")
 
         assert result is None
@@ -791,7 +791,7 @@ class TestWikipediaWithFallback:
                 return None  # first English attempt misses
             return en_result  # second English attempt hits
 
-        with patch("object_info._get_wikipedia_summary", side_effect=mock_summary):
+        with patch("observation.object_info._get_wikipedia_summary", side_effect=mock_summary):
             result = oi._wikipedia_with_fallback(["Andromeda I", "NGC 224"], "fr")
 
         assert result is not None
@@ -864,7 +864,7 @@ class TestResolveIdentifierSkyCoordException:
             call_count[0] += 1
             return main_result if call_count[0] == 1 else alias_result
 
-        with patch("object_info._simbad_query", side_effect=mock_query):
+        with patch("observation.object_info._simbad_query", side_effect=mock_query):
             with patch("astropy.coordinates.SkyCoord", side_effect=RuntimeError("coords failed")):
                 result = oi.resolve_identifier_for_catalogue_lookup("M31")
 
@@ -877,14 +877,14 @@ class TestWikipediaWithFallbackNonCandidates:
 
     def test_simbad_style_alias_skipped_in_first_loop(self):
         """Line 441: term starting with '[' fails _is_wikipedia_candidate → continue."""
-        with patch("object_info._get_wikipedia_summary") as mock_wiki:
+        with patch("observation.object_info._get_wikipedia_summary") as mock_wiki:
             result = oi._wikipedia_with_fallback(["[HB89] 0951+699"], "en")
         assert result is None
         mock_wiki.assert_not_called()
 
     def test_simbad_style_alias_skipped_in_second_loop(self):
         """Line 448: term skipped in English fallback loop when lang != 'en'."""
-        with patch("object_info._get_wikipedia_summary") as mock_wiki:
+        with patch("observation.object_info._get_wikipedia_summary") as mock_wiki:
             result = oi._wikipedia_with_fallback(["[HB89] 0951+699"], "fr")
         assert result is None
 
@@ -898,11 +898,11 @@ class TestWikipediaWithFallbackNonCandidates:
 class TestSimbadBackoff:
 
     def test_failure_triggers_backoff_for_subsequent_calls(self):
-        with patch("object_info.requests.get", side_effect=_req_module.RequestException("down")):
+        with patch("observation.object_info.requests.get", side_effect=_req_module.RequestException("down")):
             assert oi._simbad_query("SELECT * FROM basic") is None
 
         # Second call must not touch the network at all - backoff should short-circuit it.
-        with patch("object_info.requests.get") as mock_get:
+        with patch("observation.object_info.requests.get") as mock_get:
             assert oi._simbad_query("SELECT * FROM basic") is None
         mock_get.assert_not_called()
 
@@ -911,13 +911,13 @@ class TestSimbadBackoff:
         mock_resp = MagicMock()
         mock_resp.raise_for_status.return_value = None
         mock_resp.json.return_value = {"data": [], "metadata": []}
-        with patch("object_info.requests.get", return_value=mock_resp):
+        with patch("observation.object_info.requests.get", return_value=mock_resp):
             oi._simbad_query("SELECT * FROM basic")
         assert 'simbad' not in oi._backoff_until
 
     def test_active_backoff_short_circuits_resolve(self):
         oi._backoff_until['simbad'] = oi.time.time() + 300
-        with patch("object_info.requests.get") as mock_get:
+        with patch("observation.object_info.requests.get") as mock_get:
             assert oi._resolve_via_simbad("M31") is None
         mock_get.assert_not_called()
 
@@ -925,10 +925,10 @@ class TestSimbadBackoff:
 class TestWikipediaBackoff:
 
     def test_failure_triggers_backoff_for_subsequent_calls(self):
-        with patch("object_info.requests.get", side_effect=_req_module.RequestException("down")):
+        with patch("observation.object_info.requests.get", side_effect=_req_module.RequestException("down")):
             assert oi._get_wikipedia_summary("M 31") is None
 
-        with patch("object_info.requests.get") as mock_get:
+        with patch("observation.object_info.requests.get") as mock_get:
             assert oi._get_wikipedia_summary("NGC 224") is None
         mock_get.assert_not_called()
 
@@ -938,7 +938,7 @@ class TestWikipediaBackoff:
         mock_resp.status_code = 200
         mock_resp.raise_for_status.return_value = None
         mock_resp.json.return_value = {"type": "standard", "extract": "text"}
-        with patch("object_info.requests.get", return_value=mock_resp):
+        with patch("observation.object_info.requests.get", return_value=mock_resp):
             oi._get_wikipedia_summary("M 31")
         assert 'wikipedia' not in oi._backoff_until
 
@@ -947,10 +947,10 @@ class TestHips2fitsBackoff:
 
     def test_failure_triggers_backoff_for_subsequent_calls(self, tmp_path):
         with patch.object(oi, 'OBJECT_IMAGE_CACHE_DIR', str(tmp_path)):
-            with patch("object_info.requests.get", side_effect=_req_module.RequestException("down")):
+            with patch("observation.object_info.requests.get", side_effect=_req_module.RequestException("down")):
                 assert oi.ensure_cached_object_image(10.684, 41.269) is None
 
-            with patch("object_info.requests.get") as mock_get:
+            with patch("observation.object_info.requests.get") as mock_get:
                 assert oi.ensure_cached_object_image(20.0, 30.0) is None
             mock_get.assert_not_called()
 
@@ -960,7 +960,7 @@ class TestHips2fitsBackoff:
         mock_resp.raise_for_status.return_value = None
         mock_resp.iter_content.return_value = [b'jpeg-bytes']
         with patch.object(oi, 'OBJECT_IMAGE_CACHE_DIR', str(tmp_path)):
-            with patch("object_info.requests.get", return_value=mock_resp):
+            with patch("observation.object_info.requests.get", return_value=mock_resp):
                 oi.ensure_cached_object_image(10.684, 41.269)
         assert 'hips2fits' not in oi._backoff_until
 

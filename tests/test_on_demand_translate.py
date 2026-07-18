@@ -4,7 +4,7 @@ Covers pure-logic branches and mocked HTTP calls.
 """
 
 from unittest.mock import patch, MagicMock
-import on_demand_translate as odt
+from utils import on_demand_translate as odt
 
 translate_text_on_demand = odt.translate_text_on_demand
 _cache_get = odt._cache_get
@@ -54,7 +54,7 @@ class TestTranslateTextOnDemand:
         assert result["success"] is False
         assert result["error"] == "text_too_long"
 
-    @patch("on_demand_translate._translate_with_mymemory")
+    @patch("utils.on_demand_translate._translate_with_mymemory")
     def test_successful_translation(self, mock_mymemory):
         mock_mymemory.return_value = "Bonjour le monde"
         result = translate_text_on_demand("Hello world", "en", "fr")
@@ -63,7 +63,7 @@ class TestTranslateTextOnDemand:
         assert result["provider"] == "mymemory"
         assert result["cached"] is False
 
-    @patch("on_demand_translate._translate_with_mymemory")
+    @patch("utils.on_demand_translate._translate_with_mymemory")
     def test_caches_successful_translation(self, mock_mymemory):
         mock_mymemory.return_value = "Bonjour"
         translate_text_on_demand("Hello", "en", "fr")
@@ -74,7 +74,7 @@ class TestTranslateTextOnDemand:
         # Provider call should only happen once
         assert mock_mymemory.call_count == 1
 
-    @patch("on_demand_translate._translate_with_mymemory")
+    @patch("utils.on_demand_translate._translate_with_mymemory")
     def test_provider_failure_returns_fallback(self, mock_mymemory):
         mock_mymemory.return_value = None
         result = translate_text_on_demand("Hello world", "en", "fr")
@@ -198,7 +198,7 @@ class TestChunkTextForProvider:
 class TestTranslateWithMymemory:
     """Direct tests for _translate_with_mymemory."""
 
-    @patch("on_demand_translate.requests.get")
+    @patch("utils.on_demand_translate.requests.get")
     def test_successful_response(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.ok = True
@@ -207,7 +207,7 @@ class TestTranslateWithMymemory:
         result = _translate_with_mymemory("Hello", "en", "fr")
         assert result == "Bonjour"
 
-    @patch("on_demand_translate.requests.get")
+    @patch("utils.on_demand_translate.requests.get")
     def test_non_ok_response_returns_none(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.ok = False
@@ -215,7 +215,7 @@ class TestTranslateWithMymemory:
         result = _translate_with_mymemory("Hello", "en", "fr")
         assert result is None
 
-    @patch("on_demand_translate.requests.get")
+    @patch("utils.on_demand_translate.requests.get")
     def test_non_string_translated_returns_none(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.ok = True
@@ -224,7 +224,7 @@ class TestTranslateWithMymemory:
         result = _translate_with_mymemory("Hello", "en", "fr")
         assert result is None
 
-    @patch("on_demand_translate.requests.get")
+    @patch("utils.on_demand_translate.requests.get")
     def test_empty_translated_returns_none(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.ok = True
@@ -233,12 +233,12 @@ class TestTranslateWithMymemory:
         result = _translate_with_mymemory("Hello", "en", "fr")
         assert result is None
 
-    @patch("on_demand_translate.requests.get", side_effect=Exception("network error"))
+    @patch("utils.on_demand_translate.requests.get", side_effect=Exception("network error"))
     def test_exception_returns_none(self, mock_get):
         result = _translate_with_mymemory("Hello", "en", "fr")
         assert result is None
 
-    @patch("on_demand_translate.requests.get")
+    @patch("utils.on_demand_translate.requests.get")
     def test_html_entities_unescaped(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.ok = True
@@ -251,8 +251,8 @@ class TestTranslateWithMymemory:
 class TestTranslateWithMymemoryChunked:
     """Tests for _translate_with_mymemory_chunked including blank-line passthrough."""
 
-    @patch("on_demand_translate._chunk_text_for_provider")
-    @patch("on_demand_translate._translate_with_mymemory")
+    @patch("utils.on_demand_translate._chunk_text_for_provider")
+    @patch("utils.on_demand_translate._translate_with_mymemory")
     def test_blank_chunks_pass_through_without_translation(self, mock_translate, mock_chunk):
         """Empty chunks (blank lines) should be kept without calling the provider."""
         mock_chunk.return_value = ["Hello", "", "World"]
@@ -263,7 +263,7 @@ class TestTranslateWithMymemoryChunked:
         assert "\n" in result
         assert mock_translate.call_count == 2  # only non-empty chunks translated
 
-    @patch("on_demand_translate._translate_with_mymemory")
+    @patch("utils.on_demand_translate._translate_with_mymemory")
     def test_provider_failure_on_any_chunk_returns_none(self, mock_translate):
         mock_translate.return_value = None
         result = _translate_with_mymemory_chunked("Hello", "en", "fr")

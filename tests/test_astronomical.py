@@ -7,8 +7,8 @@ from zoneinfo import ZoneInfo
 
 
 # Import services to test
-from moon_phases import MoonService, MoonAstroPhotoInfo
-from sun_phases import SunService, SunAstroInfo
+from astroweather.moon_phases import MoonService, MoonAstroPhotoInfo
+from astroweather.sun_phases import SunService, SunAstroInfo
 
 
 class TestMoonService:
