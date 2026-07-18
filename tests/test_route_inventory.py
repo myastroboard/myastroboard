@@ -170,6 +170,7 @@ EXPECTED_ROUTES = {
     ('/api/astrodex/items/<item_id>/pictures/<picture_id>', ('DELETE',)),
     ('/api/astrodex/items/<item_id>/pictures/<picture_id>', ('PUT',)),
     ('/api/astrodex/items/<item_id>/pictures/<picture_id>/main', ('POST',)),
+    ('/api/astrodex/map', ('GET',)),
     ('/api/astrodex/upload', ('POST',)),
 
     # --- equipment ---
