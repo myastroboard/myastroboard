@@ -10,7 +10,43 @@
       "type": "refractor",
       "weight_kg": 2.5,
       "suggests_experience": "beginner",
-      "source_url": "https://us.zwoastro.com/products/seestar-s50"
+      "source_url": "https://us.zwoastro.com/products/seestar-s50",
+      "auto_combination": true,
+      "bundle": [
+        {
+          "kind": "camera",
+          "id": "seestar_s50_camera",
+          "label": "Seestar S50 built-in camera (Sony IMX462)",
+          "manufacturer": "ZWO",
+          "sensor_width_mm": 5.6,
+          "sensor_height_mm": 3.15,
+          "pixel_size_um": 2.9,
+          "resolution_w": 1920,
+          "resolution_h": 1080,
+          "type": "cmos_color",
+          "weight_kg": 0,
+          "source_url": "https://www.seestar.com/blogs/faq/s50"
+        },
+        {
+          "kind": "mount",
+          "id": "seestar_s50_mount",
+          "label": "Seestar S50 built-in AZ mount/tripod",
+          "manufacturer": "ZWO",
+          "mount_type": "Alt-Azimuth",
+          "payload_capacity_kg": 5,
+          "guiding_supported": false,
+          "weight_kg": 0
+        },
+        {
+          "kind": "filter",
+          "id": "seestar_s50_solar_filter",
+          "label": "Seestar S50 Solar Filter",
+          "manufacturer": "ZWO",
+          "filter_type": "Solar",
+          "intended_use": "Included in the Seestar S50 box for solar imaging/viewing",
+          "weight_kg": 0
+        }
+      ]
     },
     {
       "id": "seestar_s30",
@@ -22,7 +58,34 @@
       "type": "refractor",
       "weight_kg": 1.5,
       "suggests_experience": "beginner",
-      "source_url": "https://www.seestar.com/blogs/faq/s30"
+      "source_url": "https://www.seestar.com/blogs/faq/s30",
+      "auto_combination": true,
+      "bundle": [
+        {
+          "kind": "camera",
+          "id": "seestar_s30_camera",
+          "label": "Seestar S30 built-in camera (Sony IMX662)",
+          "manufacturer": "ZWO",
+          "sensor_width_mm": 5.6,
+          "sensor_height_mm": 3.15,
+          "pixel_size_um": 2.9,
+          "resolution_w": 1920,
+          "resolution_h": 1080,
+          "type": "cmos_color",
+          "weight_kg": 0,
+          "source_url": "https://www.seestar.com/blogs/faq/s30"
+        },
+        {
+          "kind": "mount",
+          "id": "seestar_s30_mount",
+          "label": "Seestar S30 built-in AZ mount/tripod",
+          "manufacturer": "ZWO",
+          "mount_type": "Alt-Azimuth",
+          "payload_capacity_kg": 3,
+          "guiding_supported": false,
+          "weight_kg": 0
+        }
+      ]
     },
     {
       "id": "seestar_s30_pro",
@@ -34,7 +97,34 @@
       "type": "refractor",
       "weight_kg": 1.6,
       "suggests_experience": "beginner",
-      "source_url": "https://www.seestar.com/products/seestar-s30-pro"
+      "source_url": "https://www.seestar.com/products/seestar-s30-pro",
+      "auto_combination": true,
+      "bundle": [
+        {
+          "kind": "camera",
+          "id": "seestar_s30_pro_camera",
+          "label": "Seestar S30 Pro built-in telephoto camera (Sony IMX585)",
+          "manufacturer": "ZWO",
+          "sensor_width_mm": 11.2,
+          "sensor_height_mm": 6.3,
+          "pixel_size_um": 2.9,
+          "resolution_w": 3840,
+          "resolution_h": 2160,
+          "type": "cmos_color",
+          "weight_kg": 0,
+          "source_url": "https://www.seestar.com/products/seestar-s30-pro"
+        },
+        {
+          "kind": "mount",
+          "id": "seestar_s30_pro_mount",
+          "label": "Seestar S30 Pro built-in AZ mount/tripod",
+          "manufacturer": "ZWO",
+          "mount_type": "Alt-Azimuth",
+          "payload_capacity_kg": 3.2,
+          "guiding_supported": false,
+          "weight_kg": 0
+        }
+      ]
     },
     {
       "id": "dwarflab_dwarf3",
@@ -46,7 +136,34 @@
       "type": "refractor",
       "weight_kg": 1.3,
       "suggests_experience": "beginner",
-      "source_url": "https://www.dwarflab.com/us/products/dwarf-3-smart-telescope"
+      "source_url": "https://www.dwarflab.com/us/products/dwarf-3-smart-telescope",
+      "auto_combination": true,
+      "bundle": [
+        {
+          "kind": "camera",
+          "id": "dwarflab_dwarf3_camera",
+          "label": "Dwarf 3 built-in camera (Sony IMX678)",
+          "manufacturer": "DWARFLAB",
+          "sensor_width_mm": 7.68,
+          "sensor_height_mm": 4.32,
+          "pixel_size_um": 2.0,
+          "resolution_w": 3840,
+          "resolution_h": 2160,
+          "type": "cmos_color",
+          "weight_kg": 0,
+          "source_url": "https://www.dwarflab.com/us/products/dwarf-3-smart-telescope"
+        },
+        {
+          "kind": "mount",
+          "id": "dwarflab_dwarf3_mount",
+          "label": "Dwarf 3 built-in AZ/EQ mount",
+          "manufacturer": "DWARFLAB",
+          "mount_type": "Alt-Azimuth",
+          "payload_capacity_kg": 3,
+          "guiding_supported": false,
+          "weight_kg": 0
+        }
+      ]
     },
     {
       "id": "dwarflab_dwarf_mini",
@@ -58,7 +175,34 @@
       "type": "refractor",
       "weight_kg": 0.84,
       "suggests_experience": "beginner",
-      "source_url": "https://www.dwarflab.com/us/products/dwarf-mini-smart-telescope"
+      "source_url": "https://www.dwarflab.com/us/products/dwarf-mini-smart-telescope",
+      "auto_combination": true,
+      "bundle": [
+        {
+          "kind": "camera",
+          "id": "dwarflab_dwarf_mini_camera",
+          "label": "Dwarf Mini built-in camera (Sony IMX662)",
+          "manufacturer": "DWARFLAB",
+          "sensor_width_mm": 5.6,
+          "sensor_height_mm": 3.15,
+          "pixel_size_um": 2.9,
+          "resolution_w": 1920,
+          "resolution_h": 1080,
+          "type": "cmos_color",
+          "weight_kg": 0,
+          "source_url": "https://www.dwarflab.com/us/products/dwarf-mini-smart-telescope"
+        },
+        {
+          "kind": "mount",
+          "id": "dwarflab_dwarf_mini_mount",
+          "label": "Dwarf Mini built-in AZ/EQ mount",
+          "manufacturer": "DWARFLAB",
+          "mount_type": "Alt-Azimuth",
+          "payload_capacity_kg": 2,
+          "guiding_supported": false,
+          "weight_kg": 0
+        }
+      ]
     },
     {
       "id": "vaonis_vespera2",
@@ -70,7 +214,34 @@
       "type": "refractor",
       "weight_kg": 5.0,
       "suggests_experience": "beginner",
-      "source_url": "https://vaonis.com/products/vespera-2"
+      "source_url": "https://vaonis.com/products/vespera-2",
+      "auto_combination": true,
+      "bundle": [
+        {
+          "kind": "camera",
+          "id": "vaonis_vespera2_camera",
+          "label": "Vespera II built-in camera (Sony IMX585)",
+          "manufacturer": "Vaonis",
+          "sensor_width_mm": 11.2,
+          "sensor_height_mm": 6.3,
+          "pixel_size_um": 2.9,
+          "resolution_w": 3840,
+          "resolution_h": 2160,
+          "type": "cmos_color",
+          "weight_kg": 0,
+          "source_url": "https://vaonis.com/pages/product/vespera-ii"
+        },
+        {
+          "kind": "mount",
+          "id": "vaonis_vespera2_mount",
+          "label": "Vespera II built-in AZ mount/tripod",
+          "manufacturer": "Vaonis",
+          "mount_type": "Alt-Azimuth",
+          "payload_capacity_kg": 6,
+          "guiding_supported": false,
+          "weight_kg": 0
+        }
+      ]
     },
     {
       "id": "skywatcher_evostar72ed",

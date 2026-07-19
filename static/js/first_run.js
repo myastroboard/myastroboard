@@ -17,6 +17,8 @@ const _wizard = {
     presets: { telescopes: [], cameras: [] },
     existingTelescopes: [],
     existingCameras: [],
+    existingMounts: [],
+    existingCombinations: [],
 };
 
 /**
@@ -625,57 +627,107 @@ async function _wizardLoadEquipmentData() {
     } catch (_) {
         _wizard.existingCameras = [];
     }
-}
-
-/** Build a small "Telescope"/"Camera" + "Shared" badge pair for an existing-equipment list entry. */
-function _buildEquipmentKindBadges(kindLabelKey, item) {
-    const wrap = document.createElement('span');
-    wrap.className = 'd-inline-flex gap-1 ms-1';
-    const kindBadge = document.createElement('span');
-    kindBadge.className = 'badge bg-secondary';
-    kindBadge.textContent = i18n.t(kindLabelKey);
-    wrap.appendChild(kindBadge);
-    if (item.owner_username) {
-        const sharedBadge = document.createElement('span');
-        sharedBadge.className = 'badge bg-info text-dark';
-        sharedBadge.textContent = i18n.t('equipment.shared_fov_suffix', { username: item.owner_username });
-        wrap.appendChild(sharedBadge);
+    try {
+        const mountResp = await fetchJSON('/api/equipment/mounts');
+        _wizard.existingMounts = [...(mountResp.data || []), ...(mountResp.shared_from_others || [])];
+    } catch (_) {
+        _wizard.existingMounts = [];
     }
-    return wrap;
+    try {
+        const comboResp = await fetchJSON('/api/equipment/combinations');
+        _wizard.existingCombinations = [...(comboResp.data || []), ...(comboResp.shared_from_others || [])];
+    } catch (_) {
+        _wizard.existingCombinations = [];
+    }
 }
 
-function _buildEquipmentStep(container) {
+/** Find an equipment item's display name by id in one of the wizard's already-loaded lists. */
+function _wizardFindEquipmentName(list, id) {
+    if (!id) return '';
+    const found = (list || []).find((item) => item.id === id);
+    return found ? found.name : '';
+}
+
+/** Build the "existing combinations" summary list - shown instead of a raw equipment list
+ * since the combination is now the key unit (feature.md). Shows each combination's name plus
+ * a telescope/camera/mount detail line resolved from the wizard's already-loaded equipment lists. */
+function _buildExistingCombinationsList(container) {
     const title = document.createElement('h6');
     title.textContent = i18n.t('wizard.equipment_existing_title');
     container.appendChild(title);
 
-    const existingWrap = document.createElement('div');
-    existingWrap.className = 'mb-3';
-    const allExisting = [
-        ..._wizard.existingTelescopes.map((item) => ({ item, kindKey: 'wizard.equipment_telescope_label' })),
-        ..._wizard.existingCameras.map((item) => ({ item, kindKey: 'wizard.equipment_camera_label' })),
-    ];
-    if (allExisting.length === 0) {
+    const wrap = document.createElement('div');
+    wrap.className = 'mb-3';
+    const combos = _wizard.existingCombinations || [];
+    if (combos.length === 0) {
         const empty = document.createElement('p');
         empty.className = 'text-muted small';
         empty.textContent = i18n.t('wizard.equipment_existing_empty');
-        existingWrap.appendChild(empty);
+        wrap.appendChild(empty);
     } else {
         const ul = document.createElement('ul');
         ul.className = 'list-unstyled small text-muted mb-0';
-        allExisting.forEach(({ item, kindKey }) => {
+        combos.forEach((combo) => {
             const li = document.createElement('li');
-            li.className = 'd-flex align-items-center flex-wrap gap-1 mb-1';
-            li.appendChild(document.createTextNode(`• ${item.name}`));
-            li.appendChild(_buildEquipmentKindBadges(kindKey, item));
+            li.className = 'mb-2';
+
+            const nameLine = document.createElement('div');
+            nameLine.className = 'd-flex align-items-center flex-wrap gap-1';
+            nameLine.appendChild(document.createTextNode(`• ${combo.name}`));
+            if (combo.owner_username) {
+                const sharedBadge = document.createElement('span');
+                sharedBadge.className = 'badge bg-info text-dark';
+                sharedBadge.textContent = i18n.t('equipment.shared_fov_suffix', { username: combo.owner_username });
+                nameLine.appendChild(sharedBadge);
+            }
+            li.appendChild(nameLine);
+
+            const detailParts = [
+                _wizardFindEquipmentName(_wizard.existingTelescopes, combo.telescope_id),
+                _wizardFindEquipmentName(_wizard.existingCameras, combo.camera_id),
+                _wizardFindEquipmentName(_wizard.existingMounts, combo.mount_id),
+            ].filter(Boolean);
+            if (detailParts.length > 0) {
+                const detail = document.createElement('div');
+                detail.className = 'ps-3';
+                detail.textContent = detailParts.join(' + ');
+                li.appendChild(detail);
+            }
             ul.appendChild(li);
         });
-        existingWrap.appendChild(ul);
+        wrap.appendChild(ul);
     }
-    container.appendChild(existingWrap);
+    container.appendChild(wrap);
+}
 
-    container.appendChild(_buildEquipmentPickerBlock('telescope', i18n.t('wizard.equipment_telescope_label'), _wizard.presets?.telescopes || []));
-    container.appendChild(_buildEquipmentPickerBlock('camera', i18n.t('wizard.equipment_camera_label'), _wizard.presets?.cameras || []));
+function _buildEquipmentStep(container) {
+    _buildExistingCombinationsList(container);
+
+    const telescopeBlock = _buildEquipmentPickerBlock('telescope', i18n.t('wizard.equipment_telescope_label'), _wizard.presets?.telescopes || []);
+    container.appendChild(telescopeBlock);
+
+    // Shown instead of the camera picker when the selected telescope preset already bundles
+    // its own camera (smart telescopes like Seestar/Dwarf/Vespera) - picking a second camera
+    // there would be meaningless since the combination can only have one imaging camera.
+    const bundledNote = document.createElement('p');
+    bundledNote.id = 'wizard-camera-bundled-note';
+    bundledNote.className = 'text-muted small mt-2 mb-0';
+    bundledNote.style.display = 'none';
+    bundledNote.textContent = i18n.t('wizard.equipment_camera_bundled_note');
+    container.appendChild(bundledNote);
+
+    const cameraBlock = _buildEquipmentPickerBlock('camera', i18n.t('wizard.equipment_camera_label'), _wizard.presets?.cameras || []);
+    container.appendChild(cameraBlock);
+
+    const telescopeSelect = document.getElementById('wizard-telescope-preset');
+    const _updateCameraBlockVisibility = () => {
+        const preset = (_wizard.presets?.telescopes || []).find((p) => p.id === telescopeSelect?.value);
+        const isBundling = !!(preset?.bundle && preset.bundle.length > 0);
+        cameraBlock.style.display = isBundling ? 'none' : '';
+        bundledNote.style.display = isBundling ? '' : 'none';
+    };
+    telescopeSelect?.addEventListener('change', _updateCameraBlockVisibility);
+    _updateCameraBlockVisibility();
 
     const expWrap = document.createElement('div');
     expWrap.className = 'mt-3';
@@ -903,6 +955,9 @@ const _WIZARD_EQUIPMENT_KIND_CONFIG = {
     },
 };
 
+/** Create one piece of equipment for `kind` from whatever the wizard's picker is currently set
+ * to (a preset or manual entry). Returns the created item's id, or null if nothing was created
+ * (picker left on "none"). */
 async function _saveEquipmentOfKind(kind) {
     const config = _WIZARD_EQUIPMENT_KIND_CONFIG[kind];
     const select = document.getElementById(config.selectId);
@@ -910,30 +965,139 @@ async function _saveEquipmentOfKind(kind) {
     if (select?.value === '__manual__') {
         const name = document.getElementById(`wizard-${kind}-manual-name`)?.value.trim();
         if (name) {
-            await fetchJSON(config.endpoint, {
+            const result = await fetchJSON(config.endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(config.buildManualPayload(name)),
             });
+            return result?.data?.id || null;
         }
     } else if (select?.value) {
         const preset = (_wizard.presets?.[config.presetsKey] || []).find((p) => p.id === select.value);
         if (preset) {
-            await fetchJSON(config.endpoint, {
+            const result = await fetchJSON(config.endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(config.mapPreset(preset)),
             });
+            return result?.data?.id || null;
         }
     }
+    return null;
+}
+
+const _WIZARD_BUNDLE_ENDPOINT_BY_KIND = {
+    camera: '/api/equipment/cameras',
+    mount: '/api/equipment/mounts',
+    filter: '/api/equipment/filters',
+    accessory: '/api/equipment/accessories',
+};
+
+/** Map a bundle sub-item (same field shape as a standalone preset of that kind, see
+ * docs/EQUIPMENT.md#presets) to its create payload. */
+function _mapBundleItemToPayload(kind, item) {
+    if (kind === 'camera') return _mapCameraPresetToPayload(item);
+    if (kind === 'mount') {
+        return {
+            name: item.label,
+            manufacturer: item.manufacturer || '',
+            mount_type: item.mount_type || 'Alt-Azimuth',
+            payload_capacity_kg: item.payload_capacity_kg || 0,
+            guiding_supported: item.guiding_supported || false,
+        };
+    }
+    if (kind === 'filter') {
+        return {
+            name: item.label,
+            manufacturer: item.manufacturer || '',
+            filter_type: item.filter_type || 'Other',
+            central_wavelength_nm: item.central_wavelength_nm ?? null,
+            bandwidth_nm: item.bandwidth_nm ?? null,
+            intended_use: item.intended_use || '',
+        };
+    }
+    if (kind === 'accessory') {
+        return {
+            name: item.label,
+            manufacturer: item.manufacturer || '',
+            accessory_type: item.accessory_type || '',
+            weight_kg: item.weight_kg || 0,
+        };
+    }
+    return null;
+}
+
+/** Create every item in a bundling telescope preset's `bundle` array (e.g. a Seestar's built-in
+ * camera + mount + solar filter). Returns the created ids grouped by combination field, so the
+ * caller can link them all into one auto-created combination. Best-effort: one failed item logs
+ * and is skipped rather than aborting the rest of the bundle. */
+async function _createBundleItems(bundle) {
+    const created = { camera_id: null, mount_id: null, filter_ids: [] };
+    for (const item of bundle || []) {
+        const endpoint = _WIZARD_BUNDLE_ENDPOINT_BY_KIND[item.kind];
+        const payload = _mapBundleItemToPayload(item.kind, item);
+        if (!endpoint || !payload) continue;
+        try {
+            const result = await fetchJSON(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            const id = result?.data?.id;
+            if (!id) continue;
+            if (item.kind === 'camera') created.camera_id = id;
+            else if (item.kind === 'mount') created.mount_id = id;
+            else if (item.kind === 'filter') created.filter_ids.push(id);
+        } catch (err) {
+            console.error(`Wizard bundle item (${item.kind}) create error:`, err);
+        }
+    }
+    return created;
 }
 
 async function _saveEquipmentStep() {
     const expSelect = document.getElementById('wizard-experience-level');
+    const telescopeSelect = document.getElementById('wizard-telescope-preset');
+    const telescopePreset = (_wizard.presets?.telescopes || []).find((p) => p.id === telescopeSelect?.value);
+    const isBundling = !!(telescopePreset?.bundle && telescopePreset.bundle.length > 0);
 
     try {
-        await _saveEquipmentOfKind('telescope');
-        await _saveEquipmentOfKind('camera');
+        const telescopeId = await _saveEquipmentOfKind('telescope');
+
+        let cameraId = null;
+        let mountId = null;
+        let filterIds = [];
+        if (isBundling) {
+            const created = await _createBundleItems(telescopePreset.bundle);
+            cameraId = created.camera_id;
+            mountId = created.mount_id;
+            filterIds = created.filter_ids;
+        } else {
+            cameraId = await _saveEquipmentOfKind('camera');
+        }
+
+        // Goal (feature.md): every time the wizard creates equipment, a combination links it.
+        if (telescopeId || cameraId) {
+            const comboName = telescopePreset?.label
+                || document.getElementById('wizard-telescope-manual-name')?.value.trim()
+                || document.getElementById('wizard-camera-manual-name')?.value.trim()
+                || i18n.t('wizard.equipment_default_combination_name');
+            try {
+                await fetchJSON('/api/equipment/combinations', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: comboName,
+                        telescope_id: telescopeId || null,
+                        camera_id: cameraId || null,
+                        mount_id: mountId || null,
+                        filter_ids: filterIds,
+                    }),
+                });
+            } catch (err) {
+                console.error('Wizard combination create error:', err);
+            }
+        }
 
         if (expSelect?.value) {
             setCurrentUserPreferences(await saveUserPreferences({ experience_level: expSelect.value }));
