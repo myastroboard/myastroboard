@@ -467,6 +467,28 @@ def _index_owned_and_shared_equipment(user_id: str) -> Tuple[Dict[str, Dict], Di
     return own_by_id, shared_by_id
 
 
+def index_telescopes_and_cameras(user_id: str) -> Tuple[Dict[str, Dict], Dict[str, Dict]]:
+    """Return (telescopes_by_id, cameras_by_id) merging this user's own + all shared items.
+
+    Used by SkyTonight's combination-aware scoring to resolve a combination's
+    telescope_id/camera_id into full equipment dicts without re-scanning EQUIPMENT_DIR
+    per combination.
+    """
+    telescopes_by_id: Dict[str, Dict] = {}
+    for item in load_user_telescopes(user_id).get('items', []):
+        telescopes_by_id[item['id']] = item
+    for item in load_all_shared_equipment('telescopes', user_id):
+        telescopes_by_id[item['id']] = item
+
+    cameras_by_id: Dict[str, Dict] = {}
+    for item in load_user_cameras(user_id).get('items', []):
+        cameras_by_id[item['id']] = item
+    for item in load_all_shared_equipment('cameras', user_id):
+        cameras_by_id[item['id']] = item
+
+    return telescopes_by_id, cameras_by_id
+
+
 def _combination_reference_ids(combination: Dict) -> List[str]:
     """Flatten every equipment id a combination references into one list."""
     ref_ids: List[str] = []

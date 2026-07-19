@@ -841,43 +841,101 @@ class TestAlttimeRoute:
         assert 'horizon_profile' in data
 
 
-class TestTelescopeRecommendationsRoute:
-    """Cover /api/skytonight/telescope-recommendations."""
+class TestCombinationRecommendationsRoute:
+    """Cover /api/skytonight/combination-recommendations."""
 
-    def test_no_telescopes_returns_empty_recommendations(self, client_admin, monkeypatch):
-        """no telescopes → empty recommendations."""
-        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_user_telescopes',
+    def test_no_combinations_returns_empty_recommendations(self, client_admin, monkeypatch):
+        """no combinations → empty recommendations."""
+        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_user_combinations',
                             lambda uid: {'items': []})
-        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_all_shared_equipment',
+        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_all_shared_combinations',
                             lambda *a, **k: [])
         response = client_admin.post(
-            '/api/skytonight/telescope-recommendations',
+            '/api/skytonight/combination-recommendations',
             json={'id': 'NGC 224', 'type': 'Galaxy', 'mag': 3.4, 'size': 189.0},
         )
         assert response.status_code == 200
         data = response.get_json()
-        assert data['has_telescopes'] is False
+        assert data['has_combinations'] is False
         assert data['recommendations'] == []
 
-    def test_with_telescopes_returns_recommendations(self, client_admin, monkeypatch):
-        """with telescopes → recommendations."""
-        mock_telescope = {
-            'id': 'scope-1', 'name': 'My Scope', 'aperture': 200, 'focal_length': 1000,
-            'telescope_type': 'Reflector',
-        }
-        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_user_telescopes',
-                            lambda uid: {'items': [mock_telescope]})
-        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_all_shared_equipment',
+    def test_with_combinations_returns_recommendations(self, client_admin, monkeypatch):
+        """with an enabled, valid combination → recommendations."""
+        mock_combo = {'id': 'combo-1', 'name': 'My Combo', 'telescope_id': 'scope-1', 'is_disabled': False}
+        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_user_combinations',
+                            lambda uid: {'items': [mock_combo]})
+        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_all_shared_combinations',
                             lambda *a, **k: [])
-        monkeypatch.setattr(skytonight_api_module, '_recommend_telescopes_for_target',
-                            lambda t, scopes: [{'telescope': mock_telescope, 'rating': 4}])
+        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'compute_combination_validity_status',
+                            lambda combo, uid: {'is_valid': True, 'invalid_reasons': [],
+                                                 'disabled_component_ids': []})
+        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'index_telescopes_and_cameras',
+                            lambda uid: ({}, {}))
+        monkeypatch.setattr(skytonight_api_module, '_recommend_combinations_for_target',
+                            lambda t, combos, tel, cam: [{'combination_id': 'combo-1', 'rating_1_to_5': 4}])
         response = client_admin.post(
-            '/api/skytonight/telescope-recommendations',
+            '/api/skytonight/combination-recommendations',
             json={'id': 'NGC 224', 'type': 'Galaxy', 'mag': 3.4, 'size': 189.0},
         )
         assert response.status_code == 200
         data = response.get_json()
-        assert data['has_telescopes'] is True
+        assert data['has_combinations'] is True
+
+    def test_disabled_combination_excluded(self, client_admin, monkeypatch):
+        """own combination with is_disabled=True → excluded, no telescopes-recommendations call."""
+        mock_combo = {'id': 'combo-1', 'name': 'My Combo', 'telescope_id': 'scope-1', 'is_disabled': True}
+        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_user_combinations',
+                            lambda uid: {'items': [mock_combo]})
+        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_all_shared_combinations',
+                            lambda *a, **k: [])
+        response = client_admin.post(
+            '/api/skytonight/combination-recommendations',
+            json={'id': 'NGC 224', 'type': 'Galaxy', 'mag': 3.4, 'size': 189.0},
+        )
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['has_combinations'] is False
+        assert data['recommendations'] == []
+
+    def test_invalid_combination_excluded(self, client_admin, monkeypatch):
+        """own combination failing validity → excluded from recommendations."""
+        mock_combo = {'id': 'combo-1', 'name': 'My Combo', 'telescope_id': 'scope-1', 'is_disabled': False}
+        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_user_combinations',
+                            lambda uid: {'items': [mock_combo]})
+        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_all_shared_combinations',
+                            lambda *a, **k: [])
+        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'compute_combination_validity_status',
+                            lambda combo, uid: {'is_valid': False, 'invalid_reasons': ['disabled:scope-1'],
+                                                 'disabled_component_ids': ['scope-1']})
+        response = client_admin.post(
+            '/api/skytonight/combination-recommendations',
+            json={'id': 'NGC 224', 'type': 'Galaxy', 'mag': 3.4, 'size': 189.0},
+        )
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['has_combinations'] is False
+
+    def test_shared_combination_included(self, client_admin, monkeypatch):
+        """valid shared combination (from another user) → included in recommendations."""
+        shared_combo = {
+            'id': 'combo-2', 'name': 'Shared Combo', 'telescope_id': 'scope-2',
+            'is_disabled': False, 'is_valid': True, 'owner_username': 'alice',
+        }
+        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_user_combinations',
+                            lambda uid: {'items': []})
+        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_all_shared_combinations',
+                            lambda *a, **k: [shared_combo])
+        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'index_telescopes_and_cameras',
+                            lambda uid: ({}, {}))
+        monkeypatch.setattr(skytonight_api_module, '_recommend_combinations_for_target',
+                            lambda t, combos, tel, cam: [{'combination_id': 'combo-2', 'rating_1_to_5': 3}])
+        response = client_admin.post(
+            '/api/skytonight/combination-recommendations',
+            json={'id': 'NGC 224', 'type': 'Galaxy', 'mag': 3.4, 'size': 189.0},
+        )
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['has_combinations'] is True
 
 
 class TestSkymapRoute:
@@ -1136,45 +1194,51 @@ class TestRouteExceptionHandlers:
             response = client_admin.get('/api/skytonight/alttime/dso-ngc224')
         assert response.status_code == 500
 
-    def test_telescope_recommendations_invalid_payload(self, client_admin, monkeypatch):
+    def test_combination_recommendations_invalid_payload(self, client_admin, monkeypatch):
         """non-dict JSON payload → 400."""
-        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_user_telescopes',
+        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_user_combinations',
                             lambda uid: {'items': []})
-        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_all_shared_equipment',
+        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_all_shared_combinations',
                             lambda *a, **k: [])
         response = client_admin.post(
-            '/api/skytonight/telescope-recommendations',
+            '/api/skytonight/combination-recommendations',
             data='"just_a_string"',
             content_type='application/json',
         )
         assert response.status_code == 400
 
-    def test_telescope_recommendations_visual_magnitude_fallback(self, client_admin, monkeypatch):
+    def test_combination_recommendations_visual_magnitude_fallback(self, client_admin, monkeypatch):
         """mag=None → fallback to 'visual magnitude' key."""
+        mock_combo = {'id': 'combo-1', 'name': 'My Combo', 'telescope_id': 'scope-1', 'is_disabled': False}
         mock_telescope = {
             'id': 'scope-1', 'name': 'My Scope',
             'aperture_mm': 200, 'focal_length_mm': 1000,
             'effective_focal_length': 1000, 'effective_focal_ratio': 5.0,
             'native_focal_ratio': 5.0,
         }
-        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_user_telescopes',
-                            lambda uid: {'items': [mock_telescope]})
-        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_all_shared_equipment',
+        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_user_combinations',
+                            lambda uid: {'items': [mock_combo]})
+        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_all_shared_combinations',
                             lambda *a, **k: [])
+        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'compute_combination_validity_status',
+                            lambda combo, uid: {'is_valid': True, 'invalid_reasons': [],
+                                                 'disabled_component_ids': []})
+        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'index_telescopes_and_cameras',
+                            lambda uid: ({'scope-1': mock_telescope}, {}))
         response = client_admin.post(
-            '/api/skytonight/telescope-recommendations',
+            '/api/skytonight/combination-recommendations',
             json={'id': 'NGC 224', 'type': 'Galaxy', 'visual magnitude': 3.4, 'size': 189.0},
         )
         assert response.status_code == 200
         data = response.get_json()
-        assert data['has_telescopes'] is True
+        assert data['has_combinations'] is True
 
-    def test_telescope_recommendations_exception_returns_500(self, client_admin, monkeypatch):
+    def test_combination_recommendations_exception_returns_500(self, client_admin, monkeypatch):
         """exception → 500."""
-        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_user_telescopes',
+        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_user_combinations',
                             lambda uid: (_ for _ in ()).throw(RuntimeError('boom')))
         response = client_admin.post(
-            '/api/skytonight/telescope-recommendations',
+            '/api/skytonight/combination-recommendations',
             json={'id': 'NGC 224', 'type': 'Galaxy', 'mag': 3.4},
         )
         assert response.status_code == 500
@@ -1267,7 +1331,7 @@ class TestRouteExceptionHandlers:
 # ---------------------------------------------------------------------------
 
 
-class TestTelescopeHelpers:
+class TestCombinationScoringHelpers:
     """Cover _to_float, _score_in_range, _ideal_focal_range, etc."""
 
     def test_to_float_none_returns_none(self):
@@ -1393,30 +1457,116 @@ class TestTelescopeHelpers:
         _speed_score = skytonight_api_module._speed_score
         assert _speed_score(10.0, 'Galaxy') == 3.5
 
-    def test_recommend_skips_scope_with_missing_specs(self):
-        """scope without aperture/focal/f_ratio → skipped."""
-        _recommend_telescopes_for_target = skytonight_api_module._recommend_telescopes_for_target
-        result = _recommend_telescopes_for_target(
+    def test_recommend_skips_combo_with_missing_specs(self):
+        """combo without a resolvable telescope or lens specs → skipped."""
+        _recommend_combinations_for_target = skytonight_api_module._recommend_combinations_for_target
+        result = _recommend_combinations_for_target(
             {'type': 'Galaxy', 'size': 50.0, 'mag': 6.0},
             [{'id': 'bad', 'name': 'No Specs'}],
+            {},
+            {},
         )
         assert result == []
 
     def test_recommend_returns_sorted_recommendations(self):
-        """two scopes → recommendations sorted by rating."""
-        _recommend_telescopes_for_target = skytonight_api_module._recommend_telescopes_for_target
-        scopes = [
-            {'id': 's1', 'name': 'Small Scope', 'effective_focal_length': 500.0,
-             'effective_focal_ratio': 7.0, 'aperture_mm': 80.0},
-            {'id': 's2', 'name': 'Big Scope', 'effective_focal_length': 1500.0,
-             'effective_focal_ratio': 5.0, 'aperture_mm': 300.0},
+        """two telescope-based combos → recommendations sorted by rating."""
+        _recommend_combinations_for_target = skytonight_api_module._recommend_combinations_for_target
+        telescopes_by_id = {
+            's1': {'id': 's1', 'name': 'Small Scope', 'effective_focal_length': 500.0,
+                   'effective_focal_ratio': 7.0, 'aperture_mm': 80.0},
+            's2': {'id': 's2', 'name': 'Big Scope', 'effective_focal_length': 1500.0,
+                   'effective_focal_ratio': 5.0, 'aperture_mm': 300.0},
+        }
+        combos = [
+            {'id': 'c1', 'name': 'Combo Small', 'telescope_id': 's1'},
+            {'id': 'c2', 'name': 'Combo Big', 'telescope_id': 's2'},
         ]
-        result = _recommend_telescopes_for_target(
+        result = _recommend_combinations_for_target(
             {'type': 'Galaxy', 'size': 50.0, 'mag': 6.0},
-            scopes,
+            combos,
+            telescopes_by_id,
+            {},
         )
         assert len(result) == 2
         assert result[0]['rating_1_to_5'] >= result[-1]['rating_1_to_5']
+        assert all(rec['telescope_name'] for rec in result)
+        assert all(rec['is_camera_only'] is False for rec in result)
+
+    def test_recommend_camera_only_combo_uses_lens_specs(self):
+        """no telescope_id, but lens_focal_length_mm/lens_focal_ratio set → still scored."""
+        _recommend_combinations_for_target = skytonight_api_module._recommend_combinations_for_target
+        combo = {
+            'id': 'c1', 'name': 'DSLR + Lens', 'telescope_id': None, 'camera_id': 'cam-1',
+            'lens_focal_length_mm': 200.0, 'lens_focal_ratio': 2.8,
+        }
+        result = _recommend_combinations_for_target(
+            {'type': 'Nebula', 'size': 120.0, 'mag': 5.0},
+            [combo],
+            {},
+            {'cam-1': {'id': 'cam-1', 'name': 'My DSLR'}},
+        )
+        assert len(result) == 1
+        rec = result[0]
+        assert rec['is_camera_only'] is True
+        assert rec['telescope_name'] is None
+        assert rec['camera_name'] == 'My DSLR'
+        assert rec['effective_focal_length'] == 200.0
+        assert rec['effective_focal_ratio'] == 2.8
+        assert rec['aperture_mm'] == pytest.approx(200.0 / 2.8, abs=0.1)
+
+    def test_recommend_camera_only_combo_without_lens_specs_skipped(self):
+        """no telescope_id and no lens specs → skipped (nothing to score)."""
+        _recommend_combinations_for_target = skytonight_api_module._recommend_combinations_for_target
+        combo = {'id': 'c1', 'name': 'Mount Only', 'telescope_id': None, 'camera_id': None}
+        result = _recommend_combinations_for_target(
+            {'type': 'Galaxy', 'size': 50.0, 'mag': 6.0},
+            [combo],
+            {},
+            {},
+        )
+        assert result == []
+
+    def test_recommend_blends_fov_score_when_camera_resolvable(self):
+        """combo with a resolvable camera → fov_diagonal_deg/image_scale/sampling populated."""
+        _recommend_combinations_for_target = skytonight_api_module._recommend_combinations_for_target
+        telescopes_by_id = {
+            's1': {'id': 's1', 'name': 'Scope', 'effective_focal_length': 1000.0,
+                   'effective_focal_ratio': 5.0, 'aperture_mm': 200.0},
+        }
+        cameras_by_id = {
+            'cam-1': {'id': 'cam-1', 'name': 'Cam', 'sensor_width_mm': 23.5,
+                      'sensor_height_mm': 15.6, 'pixel_size_um': 3.76},
+        }
+        combo = {'id': 'c1', 'name': 'Scope + Cam', 'telescope_id': 's1', 'camera_id': 'cam-1'}
+        result = _recommend_combinations_for_target(
+            {'type': 'Galaxy', 'size': 30.0, 'mag': 8.0},
+            [combo],
+            telescopes_by_id,
+            cameras_by_id,
+        )
+        assert len(result) == 1
+        rec = result[0]
+        assert rec['fov_diagonal_deg'] is not None
+        assert rec['image_scale_arcsec_per_px'] is not None
+        assert rec['sampling_classification'] is not None
+
+    def test_recommend_no_fov_score_when_camera_missing_sensor_specs(self):
+        """camera resolvable but missing sensor dimensions → FOV fields stay None, no crash."""
+        _recommend_combinations_for_target = skytonight_api_module._recommend_combinations_for_target
+        telescopes_by_id = {
+            's1': {'id': 's1', 'name': 'Scope', 'effective_focal_length': 1000.0,
+                   'effective_focal_ratio': 5.0, 'aperture_mm': 200.0},
+        }
+        cameras_by_id = {'cam-1': {'id': 'cam-1', 'name': 'Cam'}}
+        combo = {'id': 'c1', 'name': 'Scope + Cam', 'telescope_id': 's1', 'camera_id': 'cam-1'}
+        result = _recommend_combinations_for_target(
+            {'type': 'Galaxy', 'size': 30.0, 'mag': 8.0},
+            [combo],
+            telescopes_by_id,
+            cameras_by_id,
+        )
+        assert len(result) == 1
+        assert result[0]['fov_diagonal_deg'] is None
 
 
 # ---------------------------------------------------------------------------

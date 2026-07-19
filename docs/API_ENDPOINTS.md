@@ -100,7 +100,7 @@ This page lists the HTTP routes currently declared across `backend/blueprints/*.
 - `GET /api/skytonight/reports`
 - `GET /api/skytonight/reports/<catalogue>`
 - `GET /api/skytonight/alttime/<target_id>`
-- `POST /api/skytonight/telescope-recommendations`
+- `POST /api/skytonight/combination-recommendations`
 - `GET /api/skytonight/skymap`
 - `GET /api/skytonight/data/dso`
 - `GET /api/skytonight/data/bodies`

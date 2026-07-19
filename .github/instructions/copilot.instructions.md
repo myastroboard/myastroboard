@@ -434,7 +434,7 @@ except Exception as e:
   - `POST /api/skytonight/scheduler/trigger` (`@admin_required`)
   - `GET /api/skytonight/dataset/status`
   - `POST /api/skytonight/dataset/rebuild` (`@admin_required`)
-    - `POST /api/skytonight/telescope-recommendations`
+    - `POST /api/skytonight/combination-recommendations`
   - `GET /api/skytonight/data/dso`
   - `GET /api/skytonight/data/bodies`
   - `GET /api/skytonight/data/comets`

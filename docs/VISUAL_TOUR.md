@@ -180,7 +180,7 @@ Every piece of equipment can be marked **"Share with all users"** in its edit fo
 | Feature | What you get |
 |---------|-------------|
 | **Field of View Calculator** | Shared telescopes & cameras appear in the dropdowns, labelled *(shared by X)* |
-| **SkyTonight - Best Telescope For This Target** | Recommendations include shared telescopes. Own telescopes are listed first. |
+| **SkyTonight - Best Equipment For This Target** | Recommendations include shared equipment combinations. Own combinations are listed first. |
 | **Astrodex - Add Picture** | Shared equipment combinations and filters appear in the selection dropdowns. |
 | **Plan My Night** | Shared telescopes appear in the telescope selector (own first, then shared), so any member can plan a session around the club's scope. |
 
