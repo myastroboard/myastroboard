@@ -254,6 +254,18 @@ def test_get_astrodex_map_private_mode_hides_other_users_points(client, monkeypa
         assert points[0]['owner_username'] == admin_user.username
 
 
+def test_get_astrodex_map_internal_error_returns_500(client, monkeypatch):
+    """An unexpected exception building the map payload is caught and returns a generic 500."""
+    def _raise(*args, **kwargs):
+        raise RuntimeError('boom')
+
+    monkeypatch.setattr(astrodex_bp_module.astrodex, 'get_astrodex_map_points', _raise)
+
+    response = client.get('/api/astrodex/map')
+    assert response.status_code == 500
+    assert response.get_json()['error'] == 'Internal server error'
+
+
 def test_add_astrodex_item_duplicate_returns_409_with_existing_item(client, monkeypatch):
     """Adding a duplicate object returns 409 with the existing item's id and name."""
     with tempfile.TemporaryDirectory() as tmpdir:

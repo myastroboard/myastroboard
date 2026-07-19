@@ -625,6 +625,24 @@ def test_n9_skips_bad_timestamps(monkeypatch):
     assert not send_calls
 
 
+def test_n9_naive_timestamps_are_treated_as_utc(monkeypatch):
+    """peak/start/end timestamps without tzinfo get UTC applied rather than crashing on comparison."""
+    from utils import push_scheduler
+    send_calls = []
+    monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
+
+    naive_now = datetime.now(timezone.utc).replace(tzinfo=None)
+    cache = {'events': [{
+        'title': 'Naive Timestamps Event',
+        'peak_time': (naive_now + timedelta(days=1)).isoformat(),
+        'start_time': (naive_now - timedelta(days=2)).isoformat(),
+        'end_time': (naive_now + timedelta(days=2)).isoformat(),
+    }]}
+    push_scheduler._check_n9_solsys_window(_make_user(), cache)
+
+    assert len(send_calls) == 1 and send_calls[0][1] == 'N9'
+
+
 # ---------------------------------------------------------------------------
 # _send - delivery and dead-subscription cleanup
 # ---------------------------------------------------------------------------
