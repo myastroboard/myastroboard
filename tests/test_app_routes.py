@@ -6259,6 +6259,24 @@ class TestSpaceflightImageSidecar:
         resp = client_admin.get(f'/api/spaceflight/img/{self.VALID_HEX}')
         assert resp.status_code in (200, 404)  # 200 if downloaded file is served
 
+    def test_safe_cache_path_rejects_traversal(self, tmp_path):
+        """_safe_cache_path's own sanitizer contract: an escaping filename raises ValueError.
+
+        The route regex already blocks traversal before this helper ever sees
+        untrusted input, so this exercises the helper directly rather than via HTTP.
+        """
+        base_dir = str(tmp_path / 'spaceflight_images')
+        os.makedirs(base_dir, exist_ok=True)
+        with pytest.raises(ValueError):
+            _tracking_mod._safe_cache_path(base_dir, '../../etc/passwd')
+
+    def test_safe_cache_path_allows_contained_filename(self, tmp_path):
+        """_safe_cache_path returns the resolved path for a filename that stays inside base_dir."""
+        base_dir = str(tmp_path / 'spaceflight_images')
+        os.makedirs(base_dir, exist_ok=True)
+        resolved = _tracking_mod._safe_cache_path(base_dir, self.VALID_HEX)
+        assert resolved == os.path.realpath(os.path.join(base_dir, self.VALID_HEX))
+
 
 # ---------------------------------------------------------------------------
 # Lines 2662-2667: _t helper in _translate_special_phenomena_events

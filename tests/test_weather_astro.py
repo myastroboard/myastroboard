@@ -159,6 +159,24 @@ class TestWeatherAnalysisMetrics:
         assert (result["seeing_pickering"] >= 1).all()
         assert (result["seeing_pickering"] <= 10).all()
 
+    def test_seeing_forecast_without_upper_wind_falls_back_to_surface_estimate(self):
+        """When wind_speed_80m is absent, upper wind is estimated as surface_wind * 1.2."""
+        analyzer = _build_analyzer()
+        df = pd.DataFrame(
+            {
+                "wind_speed_10m": [5.0, 15.0, 25.0],
+                "lifted_index": [3.0, 0.0, -3.0],
+                "wind_speed_500hPa": [30.0, 60.0, 100.0],
+                "temperature_500hPa": [-40.0, -45.0, -50.0],
+                "temperature_2m": [15.0, 10.0, 5.0],
+            }
+        )
+        assert "wind_speed_80m" not in df
+        result = analyzer.calculate_seeing_forecast(df)
+        assert "seeing_pickering" in result.columns
+        assert (result["seeing_pickering"] >= 1).all()
+        assert (result["seeing_pickering"] <= 10).all()
+
     def test_transparency_forecast(self):
         analyzer = _build_analyzer()
         df = pd.DataFrame(

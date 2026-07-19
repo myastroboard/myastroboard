@@ -5,6 +5,7 @@ Covers directory creation, file helpers, and trimming.
 
 import os
 import json
+import pytest
 from unittest.mock import patch
 from skytonight import skytonight_storage
 
@@ -246,6 +247,29 @@ class TestRemainingStorageGapArcs:
             skytonight_storage, "SKYTONIGHT_OUTPUT_DIR", str(out_dir)
         ), patch.object(skytonight_storage.shutil, "rmtree", side_effect=OSError("locked")):
             assert skytonight_storage.drop_location_results("loc-locked") is False
+
+    def test_drop_location_results_path_traversal_id_is_swallowed(self, tmp_path):
+        """A location_id that would escape base_dir hits _safe_location_dir's ValueError,
+        which drop_location_results catches per base_dir and continues (no directories touched).
+
+        location_id is always a server-generated UUID in production, but the guard is
+        re-verified at each call site (CodeQL CWE-022 requirement) - this exercises it directly.
+        """
+        calc_dir = tmp_path / "calc"
+        out_dir = tmp_path / "outputs"
+        calc_dir.mkdir()
+        out_dir.mkdir()
+
+        with patch.object(skytonight_storage, "SKYTONIGHT_CALCULATIONS_DIR", str(calc_dir)), patch.object(
+            skytonight_storage, "SKYTONIGHT_OUTPUT_DIR", str(out_dir)
+        ):
+            assert skytonight_storage.drop_location_results("../escape") is False
+
+    def test_safe_location_dir_rejects_traversal(self, tmp_path):
+        base_dir = str(tmp_path / "calc")
+        os.makedirs(base_dir, exist_ok=True)
+        with pytest.raises(ValueError):
+            skytonight_storage._safe_location_dir(base_dir, "../escape")
 
 
 class TestAppendSchedulerLogNewlineBranch:
