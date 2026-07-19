@@ -1111,7 +1111,7 @@ class TestSaveAlttimeJsonBranches:
     """Cover _save_alttime_json optional-field branches."""
 
     def test_save_alttime_with_astro_night_and_azimuth(self):
-        """Covers astro_night_start/end + az_degrees branches (lines 112-116)."""
+        """Covers astro_night_start/end + az_degrees branches."""
         import tempfile
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             with patch.object(calc, 'get_alttime_dir', lambda *_a, **_k: tmp):
@@ -1133,7 +1133,7 @@ class TestSaveAlttimeJsonBranches:
                 assert ok is True
 
     def test_save_alttime_with_horizon_profile(self):
-        """Covers horizon_profile branch in _save_alttime_json (line 118-119)."""
+        """Covers horizon_profile branch in _save_alttime_json."""
         import tempfile
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             with patch.object(calc, 'get_alttime_dir', lambda *_a, **_k: tmp):
@@ -1155,7 +1155,7 @@ class TestSaveAlttimeJsonBranches:
                 assert ok is True
 
     def test_save_alttime_exception_returns_false(self):
-        """Covers exception handler branch (lines 122-124)."""
+        """Covers exception handler branch."""
         with patch('skytonight.skytonight_calculator.get_alttime_dir', side_effect=RuntimeError('disk full')):
             ok = _save_alttime_json(
                 target_id='fail',
@@ -1170,7 +1170,7 @@ class TestSaveAlttimeJsonBranches:
             assert ok is False
 
     def test_save_alttime_with_times_object(self):
-        """Covers the else branch where times is not None (lines 96-99)."""
+        """Covers the else branch where times is not None."""
         import tempfile
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             with patch.object(calc, 'get_alttime_dir', lambda *_a, **_k: tmp):
@@ -1200,7 +1200,7 @@ class TestClearAlttimeFilesEdgeCases:
     """Cover _clear_alttime_files exception path."""
 
     def test_clear_alttime_files_handles_remove_error(self):
-        """Covers the inner except block when os.remove fails (line 135-136)."""
+        """Covers the inner except block when os.remove fails."""
         import tempfile
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             # Create an alttime JSON file
@@ -1213,7 +1213,7 @@ class TestClearAlttimeFilesEdgeCases:
                     _clear_alttime_files()
 
     def test_clear_alttime_files_outer_exception(self):
-        """Covers the outer except block (lines 137-138)."""
+        """Covers the outer except block."""
         with patch('skytonight.skytonight_calculator.get_alttime_dir', side_effect=OSError('fail')):
             _clear_alttime_files()  # must not raise
 
@@ -1303,7 +1303,7 @@ class TestGetNightWindowEdgeCases:
 
 
 class TestMoonInfoExceptionPath:
-    """Cover _MoonInfo._compute exception branch (lines 465-466)."""
+    """Cover _MoonInfo._compute exception branch."""
 
     def test_moon_info_graceful_on_exception(self):
         with patch('skytonight.skytonight_calculator.moon_illumination', side_effect=RuntimeError('ephemeris fail')):
@@ -1319,20 +1319,20 @@ class TestMeridianTransitExceptionPaths:
     """Cover exception paths in meridian/antimeridian transit functions."""
 
     def test_meridian_transit_fast_exception(self):
-        """Covers lines 424-426: exception in _meridian_transit_fast."""
+        """Covers exception in _meridian_transit_fast."""
         # Pass bad data that will cause an exception inside numpy operations
         result = _meridian_transit_fast(5.0, None, [])  # type: ignore
         assert result is None
 
     def test_antimeridian_transit_fast_exception(self):
-        """Covers lines 442-444: exception in _antimeridian_transit_fast."""
+        """Covers exception in _antimeridian_transit_fast."""
         result = _antimeridian_transit_fast(5.0, None, [])  # type: ignore
         assert result is None
 
     @patch('skytonight.skytonight_calculator.EarthLocation')
     @patch('skytonight.skytonight_calculator.Time')
     def test_meridian_transit_time_exception(self, mock_time, mock_location):
-        """Covers exception handler in _meridian_transit_time (lines 373-376)."""
+        """Covers exception handler in _meridian_transit_time."""
         mock_time.side_effect = Exception('time broken')
         start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
         end = start + timedelta(hours=1)
@@ -1342,7 +1342,7 @@ class TestMeridianTransitExceptionPaths:
     @patch('skytonight.skytonight_calculator.EarthLocation')
     @patch('skytonight.skytonight_calculator.Time')
     def test_antimeridian_transit_time_exception(self, mock_time, mock_location):
-        """Covers exception handler in _antimeridian_transit_time (lines 406-409)."""
+        """Covers exception handler in _antimeridian_transit_time."""
         mock_time.side_effect = Exception('time broken')
         start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
         end = start + timedelta(hours=1)
@@ -1417,7 +1417,7 @@ class TestComputeTargetResultEdgeCases:
         assert result is None
 
     def test_moon_separation_illumination_mode(self):
-        """Covers the moon_use_illum branch (lines 630-631)."""
+        """Covers the moon_use_illum branch."""
         from types import SimpleNamespace
         target = self._base_target()
         # Moon at same position as target → will fail moon separation
@@ -1437,7 +1437,7 @@ class TestComputeTargetResultEdgeCases:
         assert result is None
 
     def test_north_to_east_ccw_azimuth(self):
-        """Covers north_to_east_ccw branch for azimuth computation (line 682)."""
+        """Covers north_to_east_ccw branch for azimuth computation."""
         from types import SimpleNamespace
         target = self._base_target()
         moon = SimpleNamespace(phase=0.1, ra_deg=None, dec_deg=None)
@@ -1459,7 +1459,7 @@ class TestComputeTargetResultEdgeCases:
         assert result['observation']['azimuth'] == 210.0
 
     def test_fallback_az_computation_without_az_values(self):
-        """Covers the else branch computing az from SkyCoord when az_values is None (lines 677-681)."""
+        """Covers the else branch computing az from SkyCoord when az_values is None."""
         from types import SimpleNamespace
         target = self._base_target()
         moon = SimpleNamespace(phase=0.1, ra_deg=None, dec_deg=None)
@@ -1499,7 +1499,7 @@ class TestComputeTargetResultEdgeCases:
         assert result is not None
 
     def test_horizon_profile_applies_floor(self):
-        """Covers horizon_profile branch in observable fraction (lines 644-647)."""
+        """Covers horizon_profile branch in observable fraction."""
         from types import SimpleNamespace
         target = self._base_target()
         moon = SimpleNamespace(phase=0.1, ra_deg=None, dec_deg=None)
@@ -1523,7 +1523,7 @@ class TestComputeTargetResultEdgeCases:
         assert result is None
 
     def test_preferred_name_order_applied(self):
-        """Covers preferred_name_order branch in result building (lines 746-753)."""
+        """Covers preferred_name_order branch in result building."""
         from types import SimpleNamespace
         target = self._base_target()
         moon = SimpleNamespace(phase=0.1, ra_deg=None, dec_deg=None)
@@ -1545,7 +1545,7 @@ class TestComputeTargetResultEdgeCases:
         assert result['preferred_name'] == 'M42'
 
     def test_rise_set_times_without_times_local(self):
-        """Covers the else branch for rise/set time when times_local is None (lines 696-710)."""
+        """Covers the else branch for rise/set time when times_local is None."""
         from types import SimpleNamespace
         target = self._base_target()
         moon = SimpleNamespace(phase=0.1, ra_deg=None, dec_deg=None)
@@ -1570,7 +1570,7 @@ class TestComputeTargetResultEdgeCases:
         assert obs['set_time'] is not None
 
     def test_sqm_applies_light_pollution_factor(self):
-        """Covers the sqm branch in compute_astro_score via _compute_target_result (line 527-529)."""
+        """Covers the sqm branch in compute_astro_score via _compute_target_result."""
         from types import SimpleNamespace
         target = self._base_target()
         moon = SimpleNamespace(phase=0.1, ra_deg=None, dec_deg=None)
@@ -1611,7 +1611,7 @@ class TestComputeBodyResultEdgeCases:
     @patch('skytonight.skytonight_calculator._antimeridian_transit_time')
     @patch('skytonight.skytonight_calculator._meridian_transit_time')
     def test_body_result_with_north_to_east_ccw(self, mock_mer, mock_antimer, mock_series):
-        """Covers north_to_east_ccw branch for body azimuth (line 860)."""
+        """Covers north_to_east_ccw branch for body azimuth."""
         mock_series.return_value = (
             np.array([25.0, 40.0, 35.0]),
             np.array([90.0, 120.0, 150.0]),
@@ -1638,7 +1638,7 @@ class TestComputeBodyResultEdgeCases:
 
     @patch('skytonight.skytonight_calculator._compute_body_altaz_series')
     def test_body_result_returns_none_when_series_raises(self, mock_series):
-        """Covers exception path in _compute_body_result (lines 808-810)."""
+        """Covers exception path in _compute_body_result."""
         mock_series.side_effect = RuntimeError('ephemeris broken')
         target = self._base_body_target()
         from types import SimpleNamespace
@@ -1661,7 +1661,7 @@ class TestComputeBodyResultEdgeCases:
     @patch('skytonight.skytonight_calculator._antimeridian_transit_time')
     @patch('skytonight.skytonight_calculator._meridian_transit_time')
     def test_body_result_moon_always_included_below_alt(self, mock_mer, mock_antimer, mock_series):
-        """Covers is_moon always-included logic (lines 850-855)."""
+        """Covers is_moon always-included logic."""
         # Moon alt below alt_min all night → but still returned
         mock_series.return_value = (
             np.array([5.0, 8.0, 3.0]),   # all below alt_min=20
@@ -1690,7 +1690,7 @@ class TestComputeBodyResultEdgeCases:
     @patch('skytonight.skytonight_calculator._meridian_transit_time')
     @patch('skytonight.skytonight_calculator.get_body')
     def test_body_result_opposition_detected(self, mock_get_body, mock_mer, mock_antimer, mock_series):
-        """Covers is_opposition detection branch (line 911) and solar elongation."""
+        """Covers is_opposition detection branch and solar elongation."""
         from types import SimpleNamespace as NS
         mock_series.return_value = (
             np.array([50.0, 60.0, 55.0]),
@@ -1720,7 +1720,7 @@ class TestComputeBodyResultEdgeCases:
 
     @patch('skytonight.skytonight_calculator._compute_body_altaz_series')
     def test_body_result_returns_none_for_too_few_steps(self, mock_series):
-        """Covers early return when total_steps < _MIN_STEPS (lines 838-839)."""
+        """Covers early return when total_steps < _MIN_STEPS."""
         mock_series.return_value = (
             np.array([50.0]),   # Only 1 step
             np.array([90.0]),
@@ -1745,7 +1745,7 @@ class TestComputeBodyResultEdgeCases:
     @patch('skytonight.skytonight_calculator._antimeridian_transit_time')
     @patch('skytonight.skytonight_calculator._meridian_transit_time')
     def test_body_result_with_horizon_profile(self, mock_mer, mock_antimer, mock_series):
-        """Covers horizon_profile branch in _compute_body_result (lines 842-844)."""
+        """Covers horizon_profile branch in _compute_body_result."""
         mock_series.return_value = (
             np.array([50.0, 60.0, 55.0]),
             np.array([90.0, 120.0, 150.0]),
@@ -1774,7 +1774,7 @@ class TestComputeBodyResultEdgeCases:
 
 
 class TestCleanupCalculationMemory:
-    """Cover _cleanup_calculation_memory (lines 1002-1012)."""
+    """Cover _cleanup_calculation_memory."""
 
     def test_cleanup_clears_all_lists(self):
         a = [1, 2]
@@ -1815,7 +1815,7 @@ class TestCleanupCalculationMemory:
 
 
 class TestLoadCalculationResults:
-    """Cover load_calculation_results (lines 1514-1534)."""
+    """Cover load_calculation_results."""
 
     def test_load_calculation_results_merges_files(self):
         meta = {'metadata': {'calculated_at': '2026-01-01', 'counts': {}}}
@@ -1841,7 +1841,7 @@ class TestLoadCalculationResults:
 
 
 class TestRunCalculationsNoNight:
-    """Cover run_calculations when _get_night_window returns None (lines 1101-1121)."""
+    """Cover run_calculations when _get_night_window returns None."""
 
     @patch('skytonight.skytonight_calculator.ensure_skytonight_directories')
     @patch('skytonight.skytonight_calculator.load_config')
@@ -1862,7 +1862,7 @@ class TestRunCalculationsNoNight:
 
 
 class TestRunCalculationsWithData:
-    """Cover run_calculations with a minimal dataset (lines 1038-1511)."""
+    """Cover run_calculations with a minimal dataset."""
 
     def _make_dso_target(self):
         from skytonight.skytonight_models import SkyTonightTarget, SkyTonightCoordinates
@@ -1935,7 +1935,7 @@ class TestRunCalculationsWithData:
         self, mock_config, mock_dataset, mock_night, mock_times,
         mock_location, mock_moon, mock_clear, mock_astro, mock_save, mock_dirs
     ):
-        """Cover the sqm/bortle derivation path (lines 1056-1067)."""
+        """Cover the sqm/bortle derivation path."""
         from types import SimpleNamespace
 
         night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
@@ -1978,7 +1978,7 @@ class TestRunCalculationsWithData:
         self, mock_config, mock_dataset, mock_night, mock_times,
         mock_location, mock_moon, mock_body_result, mock_clear, mock_astro, mock_save, mock_dirs
     ):
-        """Cover the bodies loop in run_calculations (lines 1187-1231)."""
+        """Cover the bodies loop in run_calculations."""
         from types import SimpleNamespace
 
         night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
@@ -2030,7 +2030,7 @@ class TestRunCalculationsWithData:
 
 
 class TestComputeAstroScoreWithSqm:
-    """Cover the sqm branch in compute_astro_score (lines 526-529)."""
+    """Cover the sqm branch in compute_astro_score."""
 
     def test_sqm_branch_with_known_object_type(self):
         """Covers sqm + object_type → object_lp_factor call."""
@@ -2059,7 +2059,7 @@ class TestComputeAstroScoreTimeBonusBranches:
     """Cover the remaining time_bonus branches in compute_astro_score."""
 
     def test_time_bonus_early_morning_window(self):
-        """Covers the 1 < window_start_hour <= 3 branch (line 545)."""
+        """Covers the 1 < window_start_hour <= 3 branch."""
         score = compute_astro_score(
             max_altitude=50.0,
             observable_hours=3.0,
@@ -2101,7 +2101,7 @@ class TestComputeAstroScoreTimeBonusBranches:
 
 
 class TestComputeTargetResultWindowStartHourFallback:
-    """Line 700: window_start_hour = night_start.hour when first_obs_idx is None."""
+    """window_start_hour = night_start.hour when first_obs_idx is None."""
 
     def test_no_observable_steps_sets_window_start_to_night_start(self):
         """alt_max < alt_min → no obs steps; frac_threshold=0 bypasses early return."""
@@ -2142,14 +2142,14 @@ class TestComputeTargetResultWindowStartHourFallback:
 
 
 class TestRunCalculationsSqmBortle:
-    """Cover lines 1057-1067: exception branches for sqm/bortle parsing in run_calculations."""
+    """Cover exception branches for sqm/bortle parsing in run_calculations."""
 
     @patch('skytonight.skytonight_calculator.ensure_skytonight_directories')
     @patch('skytonight.skytonight_calculator.load_config')
     @patch('skytonight.skytonight_calculator._get_night_window', return_value=None)
     @patch('skytonight.skytonight_calculator.save_json_file')
     def test_sqm_bad_value_is_swallowed(self, mock_save, mock_night, mock_config, mock_dirs):
-        """sqm='bad' triggers TypeError/ValueError, swallowed by except (lines 1059-1060)."""
+        """sqm='bad' triggers TypeError/ValueError, swallowed by except."""
         mock_config.return_value = {
             'location': {
                 'latitude': 45.0, 'longitude': -75.0, 'timezone': 'UTC',
@@ -2165,7 +2165,7 @@ class TestRunCalculationsSqmBortle:
     @patch('skytonight.skytonight_calculator._get_night_window', return_value=None)
     @patch('skytonight.skytonight_calculator.save_json_file')
     def test_bortle_bad_value_is_swallowed(self, mock_save, mock_night, mock_config, mock_dirs):
-        """bortle='bad' (with no sqm) triggers except in bortle branch (lines 1063-1067)."""
+        """bortle='bad' (with no sqm) triggers except in bortle branch."""
         mock_config.return_value = {
             'location': {
                 'latitude': 45.0, 'longitude': -75.0, 'timezone': 'UTC',
@@ -2178,7 +2178,7 @@ class TestRunCalculationsSqmBortle:
 
 
 class TestRunCalculationsDictTargetFromDictException:
-    """Lines 1141-1147: dict-based target that fails from_dict is silently skipped."""
+    """dict-based target that fails from_dict is silently skipped."""
 
     @patch('skytonight.skytonight_calculator.ensure_skytonight_directories')
     @patch('skytonight.skytonight_calculator.save_json_file')
@@ -2216,7 +2216,7 @@ class TestRunCalculationsDictTargetFromDictException:
 
 
 class TestRunCalculationsCometAltazException:
-    """Lines 1271-1273: comet altaz computation exception causes continue."""
+    """comet altaz computation exception causes continue."""
 
     @patch('skytonight.skytonight_calculator.ensure_skytonight_directories')
     @patch('skytonight.skytonight_calculator.save_json_file')
@@ -2232,7 +2232,7 @@ class TestRunCalculationsCometAltazException:
         self, mock_config, mock_dataset, mock_night, mock_times,
         mock_location, mock_moon, mock_clear, mock_astro, mock_save, mock_dirs
     ):
-        """Comet with bad coords: _compute_altaz_series raises, target is skipped (line 1271-1273)."""
+        """Comet with bad coords: _compute_altaz_series raises, target is skipped."""
         from skytonight.skytonight_models import SkyTonightTarget, SkyTonightCoordinates
         night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
         night_end = datetime(2026, 4, 18, 5, 0, tzinfo=timezone.utc)
@@ -2261,13 +2261,13 @@ class TestRunCalculationsCometAltazException:
 
 
 class TestBodyAliasMapBranchCoverage:
-    """Lines 1559 and 1565-1566: branches in _build_body_alias_map."""
+    """: branches in _build_body_alias_map."""
 
     def setup_method(self):
         calc._body_alias_map_cache = None
 
     def test_non_string_localized_name_is_skipped(self):
-        """Line 1559: continue when localized_name is not a str or is empty."""
+        """continue when localized_name is not a str or is empty."""
         with patch('utils.i18n_utils.I18nManager') as MockI18n:
             mock_mgr = MagicMock()
             # Return a namespace where some values are non-str or empty
@@ -2282,7 +2282,7 @@ class TestBodyAliasMapBranchCoverage:
         assert isinstance(result, dict)
 
     def test_get_namespace_exception_is_swallowed(self):
-        """Lines 1565-1566: exception from get_namespace is swallowed per lang."""
+        """exception from get_namespace is swallowed per lang."""
         with patch('utils.i18n_utils.I18nManager') as MockI18n:
             mock_mgr = MagicMock()
             mock_mgr.get_namespace.side_effect = Exception('i18n broken')
@@ -2314,7 +2314,7 @@ class TestComputeTargetDebugExtraBranches:
         return compute_target_debug(name, config=config)
 
     def test_lookup_fallback_iteration_matches_custom_prefix(self):
-        """Lines 1617-1619 + 1617→1616: lookup key with custom prefix found via iteration."""
+        """ + 1617→1616: lookup key with custom prefix found via iteration."""
         target = _debug_dso()
         norm = normalize_object_name(target.preferred_name)
         dataset = {
@@ -2342,7 +2342,7 @@ class TestComputeTargetDebugExtraBranches:
         assert result['found'] is True
 
     def test_lookup_entry_target_id_not_in_all_targets_returns_not_found(self):
-        """Line 1634: entry points to a target_id that doesn't match any target in all_targets."""
+        """entry points to a target_id that doesn't match any target in all_targets."""
         dataset = {
             'targets': [],  # empty — no target with target_id 'missing-target'
             'lookup': {'preferred::ngc224': {'target_id': 'missing-target'}},
@@ -2357,7 +2357,7 @@ class TestComputeTargetDebugExtraBranches:
         assert result == {'found': False}
 
     def test_altaz_computation_exception_returns_error(self):
-        """Lines 1742-1744: altaz computation exception returns found=True with overall='error'."""
+        """altaz computation exception returns found=True with overall='error'."""
         target = _debug_dso()
         dataset = _debug_dataset(target)
         night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
@@ -2376,7 +2376,7 @@ class TestComputeTargetDebugExtraBranches:
         assert result['overall'] == 'error'
 
     def test_dso_without_size_data_skips_size_filter(self):
-        """Lines 1792-1793: DSO with size_arcmin=None gets 'No size data, filter skipped' check."""
+        """DSO with size_arcmin=None gets 'No size data, filter skipped' check."""
         target = _debug_dso(size_arcmin=None)
         dataset = _debug_dataset(target)
         night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
@@ -2399,7 +2399,7 @@ class TestComputeTargetDebugExtraBranches:
         assert size_check.get('note') == 'No size data, filter skipped'
 
     def test_moon_use_illum_true_uses_phase_for_threshold(self):
-        """Line 1800: moon_use_illum=True sets effective_min_sep to moon.phase * 100."""
+        """moon_use_illum=True sets effective_min_sep to moon.phase * 100."""
         target = _debug_dso()
         dataset = _debug_dataset(target)
         night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
@@ -2424,11 +2424,11 @@ class TestComputeTargetDebugExtraBranches:
 
 
 # ---------------------------------------------------------------------------
-# Branch 608->613: airmass_constr < 1.0 in _compute_target_result
+# airmass_constr < 1.0 in _compute_target_result
 # ---------------------------------------------------------------------------
 
 class TestComputeTargetResultAirmassLow:
-    """Branch 608->613: airmass_constr < 1.0 → skip airmass-derived alt floor."""
+    """airmass_constr < 1.0 → skip airmass-derived alt floor."""
 
     def test_airmass_below_1_skips_floor_calculation(self):
         target = SimpleNamespace(
@@ -2460,11 +2460,11 @@ class TestComputeTargetResultAirmassLow:
 
 
 # ---------------------------------------------------------------------------
-# Line 666: max_altitude < alt_min when fraction check is bypassed
+# max_altitude < alt_min when fraction check is bypassed
 # ---------------------------------------------------------------------------
 
 class TestComputeTargetResultMaxAltFilter:
-    """Line 666: max_altitude < alt_min returns None when frac_threshold=0 bypasses line 661."""
+    """max_altitude < alt_min returns None when frac_threshold=0 bypasses ."""
 
     def test_max_altitude_below_alt_min_returns_none(self):
         target = SimpleNamespace(
@@ -2476,8 +2476,8 @@ class TestComputeTargetResultMaxAltFilter:
             source_catalogues=['Messier'], metadata={},
         )
         moon = SimpleNamespace(phase=0.1, ra_deg=None, dec_deg=None)
-        # frac_threshold=0.0 means fraction check (line 661) is False → don't return early
-        # all altitudes < alt_min=30 → max_altitude=28 < 30 → return None at line 666
+        # frac_threshold=0.0 means fraction check is False → don't return early
+        # all altitudes < alt_min=30 → max_altitude=28 < 30 → return None
         result = _compute_target_result(
             target=target, times=None,
             altaz_values=np.array([25.0, 28.0, 27.0, 24.0]),
@@ -2498,11 +2498,11 @@ class TestComputeTargetResultMaxAltFilter:
 
 
 # ---------------------------------------------------------------------------
-# Branch 832->837: airmass_constr < 1.0 in _compute_body_result
+# airmass_constr < 1.0 in _compute_body_result
 # ---------------------------------------------------------------------------
 
 class TestComputeBodyResultAirmassLow:
-    """Branch 832->837: airmass_constr < 1.0 → skip airmass-derived alt floor for bodies."""
+    """airmass_constr < 1.0 → skip airmass-derived alt floor for bodies."""
 
     @patch('skytonight.skytonight_calculator._compute_body_altaz_series')
     @patch('skytonight.skytonight_calculator._antimeridian_transit_time')
@@ -2539,7 +2539,7 @@ class TestComputeBodyResultAirmassLow:
 
 
 # ---------------------------------------------------------------------------
-# Branches 1142->1139, 1147-1148, 1204->1217, 1217->1231 in run_calculations
+#  in run_calculations
 # ---------------------------------------------------------------------------
 
 class TestRunCalculationsMiscBranches:
@@ -2568,7 +2568,7 @@ class TestRunCalculationsMiscBranches:
     }
 
     def test_non_dict_non_target_in_dataset_is_skipped(self, monkeypatch):
-        """Branch 1142->1139: raw is a string (not SkyTonightTarget, not dict) → skip."""
+        """raw is a string (not SkyTonightTarget, not dict) → skip."""
         self._setup(monkeypatch)
         monkeypatch.setattr(calc, 'load_targets_dataset',
                             lambda: {'targets': ['not-a-target'], 'lookup': {}})
@@ -2576,7 +2576,7 @@ class TestRunCalculationsMiscBranches:
         assert result['counts'] == {'deep_sky': 0, 'bodies': 0, 'comets': 0}
 
     def test_malformed_dict_in_dataset_is_skipped(self, monkeypatch):
-        """Lines 1147-1148: from_dict raises ValueError for invalid magnitude → except+pass."""
+        """from_dict raises ValueError for invalid magnitude → except+pass."""
         self._setup(monkeypatch)
         monkeypatch.setattr(calc, 'load_targets_dataset',
                             lambda: {'targets': [{'magnitude': 'bad'}], 'lookup': {}})
@@ -2584,7 +2584,7 @@ class TestRunCalculationsMiscBranches:
         assert result['counts'] == {'deep_sky': 0, 'bodies': 0, 'comets': 0}
 
     def test_body_with_none_alt_skips_skymap_and_alttime(self, monkeypatch):
-        """Branches 1204->1217, 1217->1231: _compute_body_result returns (result, None, None)."""
+        """_compute_body_result returns (result, None, None)."""
         self._setup(monkeypatch)
         from skytonight.skytonight_models import SkyTonightTarget as ST
         body = ST(
@@ -2605,11 +2605,11 @@ class TestRunCalculationsMiscBranches:
 
 
 # ---------------------------------------------------------------------------
-# Branch 1564->1558: normalize_object_name returns '' for a localized planet name
+# normalize_object_name returns '' for a localized planet name
 # ---------------------------------------------------------------------------
 
 class TestBuildBodyAliasMapNormFalsy:
-    """Branch 1564->1558: norm is '' → entry is skipped."""
+    """norm is '' → entry is skipped."""
 
     def test_empty_norm_skips_entry(self):
         from utils import i18n_utils
@@ -2636,16 +2636,16 @@ class TestBuildBodyAliasMapNormFalsy:
 
 
 # ---------------------------------------------------------------------------
-# Line 1594: compute_target_debug with config=None calls load_config()
-# Branch 1650->1654: airmass_constraint < 1.0 → skip effective_alt_min update
-# Lines 1878, 1880: astro_night_start/end not None → written to alttime
+# compute_target_debug with config=None calls load_config()
+# airmass_constraint < 1.0 → skip effective_alt_min update
+# astro_night_start/end not None → written to alttime
 # ---------------------------------------------------------------------------
 
 class TestComputeTargetDebugExtraCoverage:
     """Cover the remaining missed branches/lines in compute_target_debug."""
 
     def test_config_none_calls_load_config(self, monkeypatch):
-        """Line 1594: config=None → load_config() is called to get the config."""
+        """config=None → load_config() is called to get the config."""
         monkeypatch.setattr(calc, 'load_config', lambda: {
             'location': {'latitude': 48.0, 'longitude': 2.0, 'elevation': 100.0, 'timezone': 'UTC'},
             'skytonight': {'constraints': {}},
@@ -2656,7 +2656,7 @@ class TestComputeTargetDebugExtraCoverage:
         assert result == {'found': False}
 
     def test_airmass_below_1_skips_floor_update(self):
-        """Branch 1650->1654: airmass < 1.0 → effective_alt_min stays at alt_min."""
+        """airmass < 1.0 → effective_alt_min stays at alt_min."""
         target = _debug_dso()
         config = _debug_config(airmass_constraint=0.5)
         dataset = _debug_dataset(target)
@@ -2681,7 +2681,7 @@ class TestComputeTargetDebugExtraCoverage:
         assert result['constraints']['effective_alt_min'] == 30.0
 
     def test_astro_night_start_end_included_in_alttime(self):
-        """Lines 1878, 1880: astro window non-None → alttime includes night_astro_start/end."""
+        """astro window non-None → alttime includes night_astro_start/end."""
         target = _debug_dso()
         config = _debug_config()
         dataset = _debug_dataset(target)
@@ -2712,8 +2712,8 @@ class TestComputeTargetDebugExtraCoverage:
 
 
 # ---------------------------------------------------------------------------
-# Lines 310-313: _compute_altaz_series body (needs real astropy call to cover)
-# Lines 326-338: _compute_body_altaz_series body
+# _compute_altaz_series body (needs real astropy call to cover)
+# _compute_body_altaz_series body
 # ---------------------------------------------------------------------------
 
 
@@ -2721,7 +2721,7 @@ class TestAltazSeriesFunctions:
     """Cover the bodies of _compute_altaz_series and _compute_body_altaz_series."""
 
     def test_compute_altaz_series_calls_skycoord_altaz(self):
-        """Lines 310-313: SkyCoord + AltAz transform path."""
+        """SkyCoord + AltAz transform path."""
         mock_altaz = MagicMock()
         mock_altaz.alt.deg = np.array([30.0, 40.0, 50.0])
         mock_altaz.az.deg = np.array([100.0, 110.0, 120.0])
@@ -2736,7 +2736,7 @@ class TestAltazSeriesFunctions:
         np.testing.assert_array_equal(az, np.array([100.0, 110.0, 120.0]))
 
     def test_compute_body_altaz_series_calls_get_body(self):
-        """Lines 326-338: get_body + AltAz transform path."""
+        """get_body + AltAz transform path."""
         times = MagicMock()
         times.__len__ = MagicMock(return_value=3)
 
@@ -2773,12 +2773,12 @@ class TestAltazSeriesFunctions:
 
 
 # ---------------------------------------------------------------------------
-# Branch 613->618: _compute_target_result with non-deep_sky target
+# _compute_target_result with non-deep_sky target
 # ---------------------------------------------------------------------------
 
 
 class TestComputeTargetResultNonDSO:
-    """Cover 613->618: category != 'deep_sky' skips size filter."""
+    """Cover category != 'deep_sky' skips size filter."""
 
     def test_bodies_target_skips_size_filter(self):
         target = SimpleNamespace(
@@ -2831,12 +2831,12 @@ class TestComputeTargetResultNonDSO:
 
 
 # ---------------------------------------------------------------------------
-# Line 852: _compute_body_result returns (None, None, None) when fraction < threshold
+# _compute_body_result returns (None, None, None) when fraction < threshold
 # ---------------------------------------------------------------------------
 
 
 class TestComputeBodyResultLowFraction:
-    """Cover line 852: observable_fraction < _BODIES_MIN_FRACTION → return None."""
+    """Cover observable_fraction < _BODIES_MIN_FRACTION → return None."""
 
     @patch('skytonight.skytonight_calculator._compute_body_altaz_series')
     @patch('skytonight.skytonight_calculator._antimeridian_transit_time')
@@ -2871,9 +2871,9 @@ class TestComputeBodyResultLowFraction:
 
 
 # ---------------------------------------------------------------------------
-# Branch 1202->1231: body_result is None
-# Lines 1275-1318: comet result not None → appended and alttime saved
-# Lines 1357-1445: DSO batch processing (n_dso_batch > 0)
+# body_result is None
+# comet result not None → appended and alttime saved
+# DSO batch processing (n_dso_batch > 0)
 # ---------------------------------------------------------------------------
 
 
@@ -2904,7 +2904,7 @@ class TestRunCalcMissingBranches:
     }
 
     def test_body_result_none_skips_append(self, monkeypatch):
-        """Branch 1202->1231: _compute_body_result returns (None, None, None) → skip."""
+        """_compute_body_result returns (None, None, None) → skip."""
         self._setup(monkeypatch)
         body = SkyTonightTarget(
             target_id='body-jupiter', category='bodies', object_type='Planet',
@@ -2919,7 +2919,7 @@ class TestRunCalcMissingBranches:
         assert result['counts']['bodies'] == 0
 
     def test_comet_result_not_none_appended(self, monkeypatch):
-        """Lines 1275-1318: comet with non-None result → appended to comets_results."""
+        """comet with non-None result → appended to comets_results."""
         self._setup(monkeypatch)
         comet = SkyTonightTarget(
             target_id='comet-c2023', category='comets', object_type='comet',
@@ -2944,7 +2944,7 @@ class TestRunCalcMissingBranches:
         assert result['counts']['comets'] == 1
 
     def test_dso_batch_processing(self, monkeypatch):
-        """Lines 1357-1445: n_dso_batch > 0 → batch AltAz and per-target scoring."""
+        """n_dso_batch > 0 → batch AltAz and per-target scoring."""
         self._setup(monkeypatch)
         dso = SkyTonightTarget(
             target_id='dso-m31', category='deep_sky', object_type='galaxy',
@@ -2975,7 +2975,7 @@ class TestRunCalcMissingBranches:
         assert result['counts']['deep_sky'] == 1
 
     def test_comet_result_none_skips_append(self, monkeypatch):
-        """Branch 1290->1317: comet _compute_target_result returns None → skip append."""
+        """comet _compute_target_result returns None → skip append."""
         self._setup(monkeypatch)
         comet = SkyTonightTarget(
             target_id='comet-none', category='comets', object_type='comet',
@@ -2994,7 +2994,7 @@ class TestRunCalcMissingBranches:
         assert result['counts']['comets'] == 0
 
     def test_dso_result_none_skips_append(self, monkeypatch):
-        """Branch 1412->1442: DSO _compute_target_result returns None → skip append."""
+        """DSO _compute_target_result returns None → skip append."""
         self._setup(monkeypatch)
         dso = SkyTonightTarget(
             target_id='dso-none', category='deep_sky', object_type='galaxy',
@@ -3017,7 +3017,7 @@ class TestRunCalcMissingBranches:
         assert result['counts']['deep_sky'] == 0
 
     def test_dso_log_interval_fires(self, monkeypatch):
-        """Line 1444: patch _DSO_LOG_INTERVAL to 1 so debug log fires on first DSO."""
+        """patch _DSO_LOG_INTERVAL to 1 so debug log fires on first DSO."""
         self._setup(monkeypatch)
         dso = SkyTonightTarget(
             target_id='dso-log', category='deep_sky', object_type='galaxy',

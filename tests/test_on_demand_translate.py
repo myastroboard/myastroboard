@@ -160,7 +160,7 @@ class TestSplitLongSegment:
             assert len(chunk) <= 10
 
     def test_empty_part_from_trailing_punctuation_skipped(self):
-        """Line 84: re.split produces empty string at end → if not part: continue."""
+        """re.split produces empty string at end → if not part: continue."""
         text = "Hello world! "
         result = _split_long_segment(text, 5)
         assert all(chunk for chunk in result)

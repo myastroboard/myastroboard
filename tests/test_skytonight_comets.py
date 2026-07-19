@@ -787,7 +787,7 @@ def test_parse_comets_txt_line_returns_none_on_value_error():
 
 
 # ---------------------------------------------------------------------------
-# _solve_kepler_hyperbolic - near-zero denominator (line 58)
+# _solve_kepler_hyperbolic - near-zero denominator
 # ---------------------------------------------------------------------------
 
 def test_solve_kepler_hyperbolic_denom_near_zero():
@@ -799,13 +799,13 @@ def test_solve_kepler_hyperbolic_denom_near_zero():
 
 
 # ---------------------------------------------------------------------------
-# _comet_ra_dec - hyperbolic r <= 0 path (line 151)
+# _comet_ra_dec - hyperbolic r <= 0 path
 # ---------------------------------------------------------------------------
 
 def test_comet_ra_dec_hyperbolic_r_nonpositive_returns_none(monkeypatch):
     """When r = a*(e*cosh(F) - 1) <= 0, must return (None, None, None, None).
 
-    The r <= 0 guard (line 151) is only reachable when e*cosh(F) <= 1 which
+    The r <= 0 guard is only reachable when e*cosh(F) <= 1 which
     cannot happen for real (e > 1, cosh(F) >= 1 â†’ e*cosh(F) >= e > 1).
     We trigger the OverflowError path (caught by except clause) instead,
     which also returns the None tuple and covers nearby lines.
@@ -823,7 +823,7 @@ def test_comet_ra_dec_hyperbolic_r_nonpositive_returns_none(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# _get_earth_heliocentric - astropy available path (lines 74-81)
+# _get_earth_heliocentric - astropy available path
 # ---------------------------------------------------------------------------
 
 def test_get_earth_heliocentric_with_mocked_astropy(monkeypatch):

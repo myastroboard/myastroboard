@@ -254,7 +254,7 @@ def test_vapid_contact_status_valid(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_secret_key_regenerated_when_file_empty(tmp_path, monkeypatch):
-    """Line 41->47: file exists but stripped key is empty → regenerate."""
+    """file exists but stripped key is empty → regenerate."""
     from utils import app_settings
     key_file = tmp_path / 'secret_key.txt'
     key_file.write_text('   ')  # whitespace only → strip() gives ''
@@ -267,7 +267,7 @@ def test_secret_key_regenerated_when_file_empty(tmp_path, monkeypatch):
 
 
 def test_secret_key_read_exception_regenerates(tmp_path, monkeypatch):
-    """Lines 44-45: PermissionError reading key file → regenerate."""
+    """PermissionError reading key file → regenerate."""
     from utils import app_settings
     import builtins
 
@@ -292,7 +292,7 @@ def test_secret_key_read_exception_regenerates(tmp_path, monkeypatch):
 
 
 def test_secret_key_write_exception_still_returns_key(tmp_path, monkeypatch):
-    """Lines 52-53: PermissionError writing key file → key returned from memory."""
+    """PermissionError writing key file → key returned from memory."""
     from utils import app_settings
     import builtins
 
@@ -315,7 +315,7 @@ def test_secret_key_write_exception_still_returns_key(tmp_path, monkeypatch):
 
 
 def test_load_app_settings_json_exception_uses_defaults(tmp_path, monkeypatch):
-    """Lines 70-71: malformed JSON in settings file → return defaults."""
+    """malformed JSON in settings file → return defaults."""
     from utils import app_settings
     settings_file = tmp_path / 'app_settings.json'
     settings_file.write_text('{ INVALID JSON }}}')
@@ -327,7 +327,7 @@ def test_load_app_settings_json_exception_uses_defaults(tmp_path, monkeypatch):
 
 
 def test_warn_deprecated_env_vars_logs_warning(monkeypatch):
-    """Line 112: deprecated env var present → warning is logged."""
+    """deprecated env var present → warning is logged."""
     from utils import app_settings
 
     monkeypatch.setenv('SECRET_KEY', 'old_key_in_env')

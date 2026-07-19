@@ -347,13 +347,13 @@ def test_acquire_lock_fcntl_ioerror_closes_file_and_returns_false(monkeypatch, t
 
 
 def test_release_lock_logger_raises_is_swallowed(monkeypatch, tmp_path):
-    """Lines 91-92: ValueError from logger.error is caught silently."""
+    """ValueError from logger.error is caught silently."""
     scheduler = module.CacheScheduler(interval_seconds=1)
     scheduler._lock_file = DummyFile()
     scheduler._has_lock = True
 
     monkeypatch.setattr(module.sys, "platform", "win32")
-    # locking raises → outer except → logger.error raises ValueError → lines 91-92
+    # locking raises → outer except → logger.error raises ValueError
     monkeypatch.setattr(module.msvcrt, "locking", lambda *_a, **_k: (_ for _ in ()).throw(Exception("fail")))
     monkeypatch.setattr(module.logger, "error", lambda *_a, **_k: (_ for _ in ()).throw(ValueError("log closed")))
 
@@ -361,7 +361,7 @@ def test_release_lock_logger_raises_is_swallowed(monkeypatch, tmp_path):
 
 
 def test_run_exception_in_update_all_caches_is_logged(monkeypatch):
-    """Line 118 (except Exception): update_all_caches raises → logged, loop continues."""
+    """update_all_caches raises → logged, loop continues."""
     scheduler = module.CacheScheduler(interval_seconds=1)
     calls = [0]
 

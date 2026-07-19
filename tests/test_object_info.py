@@ -446,7 +446,7 @@ def test_get_object_info_no_image_when_coordinates_absent(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# _simbad_query — covers lines 109-125
+# _simbad_query — covers 
 # ---------------------------------------------------------------------------
 
 from unittest.mock import patch, MagicMock
@@ -478,7 +478,7 @@ class TestSimbadQuery:
 
 
 # ---------------------------------------------------------------------------
-# _resolve_via_simbad — covers lines 203-241
+# _resolve_via_simbad — covers 
 # ---------------------------------------------------------------------------
 
 
@@ -567,7 +567,7 @@ class TestResolveViaSimbad:
 
 
 # ---------------------------------------------------------------------------
-# resolve_identifier_for_catalogue_lookup — covers lines 292-335
+# resolve_identifier_for_catalogue_lookup — covers 
 # ---------------------------------------------------------------------------
 
 
@@ -645,7 +645,7 @@ class TestResolveIdentifierForCatalogueLookup:
 
 
 # ---------------------------------------------------------------------------
-# _get_wikipedia_summary — covers lines 400-431
+# _get_wikipedia_summary — covers 
 # ---------------------------------------------------------------------------
 
 
@@ -737,7 +737,7 @@ class TestGetWikipediaSummary:
 
 
 # ---------------------------------------------------------------------------
-# _wikipedia_with_fallback — covers lines 439-452
+# _wikipedia_with_fallback — covers 
 # ---------------------------------------------------------------------------
 
 
@@ -799,7 +799,7 @@ class TestWikipediaWithFallback:
 
 
 # ---------------------------------------------------------------------------
-# _translate_object_type — covers lines 511-516
+# _translate_object_type — covers 
 # ---------------------------------------------------------------------------
 
 
@@ -818,12 +818,12 @@ def test_translate_object_type_non_english_returns_string():
 
 
 # ---------------------------------------------------------------------------
-# get_object_info — cover branches 620->623, 625 (_local_entry fallback)
+# get_object_info — cover  (_local_entry fallback)
 # ---------------------------------------------------------------------------
 
 
 def test_get_object_info_uses_local_type_when_available(monkeypatch):
-    """Cover lines 620-625: _local_entry found by SIMBAD main_id."""
+    """Cover _local_entry found by SIMBAD main_id."""
     monkeypatch.setattr(oi, '_resolve_via_simbad', lambda identifier: {
         'id': 'NGC 224',
         'name': 'NGC 224',
@@ -848,7 +848,7 @@ def test_get_object_info_uses_local_type_when_available(monkeypatch):
 
 
 class TestResolveIdentifierSkyCoordException:
-    """Lines 320-321: exception in astropy SkyCoord → constellation stays empty."""
+    """exception in astropy SkyCoord → constellation stays empty."""
 
     def test_skycoord_raises_constellation_defaults_to_empty(self):
         main_result = {
@@ -873,17 +873,17 @@ class TestResolveIdentifierSkyCoordException:
 
 
 class TestWikipediaWithFallbackNonCandidates:
-    """Lines 441, 448: SIMBAD-style aliases skipped as non-Wikipedia candidates."""
+    """SIMBAD-style aliases skipped as non-Wikipedia candidates."""
 
     def test_simbad_style_alias_skipped_in_first_loop(self):
-        """Line 441: term starting with '[' fails _is_wikipedia_candidate → continue."""
+        """term starting with '[' fails _is_wikipedia_candidate → continue."""
         with patch("observation.object_info._get_wikipedia_summary") as mock_wiki:
             result = oi._wikipedia_with_fallback(["[HB89] 0951+699"], "en")
         assert result is None
         mock_wiki.assert_not_called()
 
     def test_simbad_style_alias_skipped_in_second_loop(self):
-        """Line 448: term skipped in English fallback loop when lang != 'en'."""
+        """term skipped in English fallback loop when lang != 'en'."""
         with patch("observation.object_info._get_wikipedia_summary") as mock_wiki:
             result = oi._wikipedia_with_fallback(["[HB89] 0951+699"], "fr")
         assert result is None

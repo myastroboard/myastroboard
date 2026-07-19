@@ -282,7 +282,7 @@ class TestEnvironmentInfo:
 
 
 class TestNumpySafeEncoder:
-    """Test the JSON encoder with numpy types (covers lines 35-44, 50-65)."""
+    """Test the JSON encoder with numpy types."""
 
     def test_integer_type(self):
         import numpy as np

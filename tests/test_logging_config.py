@@ -112,7 +112,7 @@ def test_configured_tz_formatter_falls_back_to_utc_on_invalid_tz(monkeypatch):
 
 
 def test_format_time_with_datefmt():
-    """Line 54: formatTime returns strftime-formatted string when datefmt is provided."""
+    """formatTime returns strftime-formatted string when datefmt is provided."""
     import time
 
     formatter = _ConfiguredTzFormatter()

@@ -27,7 +27,7 @@ def compute_exposure(
     focal_length_mm: float,
     pixel_size_um: float,
     read_noise_e: float,
-    qe: float,           # 0–1
+    qe: float,           # 0-1
     bortle: int,
     total_hours: float,
 ) -> dict:

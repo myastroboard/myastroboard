@@ -161,17 +161,17 @@ class TestBestWindowsAllModesReal:
 
 
 class TestBestWindowsAllModesBranchCoverage:
-    """Cover lines 141->144 and 150-153 in best_windows_all_modes via mocked arrays."""
+    """Covers branches in best_windows_all_modes via mocked arrays."""
 
     def test_shorter_second_window_does_not_replace_best(self):
         """
-        Lines 141->144: duration <= best_duration branch.
+        duration <= best_duration branch.
         Array layout:
          - slots 0-19: dark → window1 (100 min)
          - slots 20-29: not dark → close window1 (100 min best)
          - slots 30-34: dark → window2 (25 min)
          - slots 35-39: not dark → close window2 (25 < 100 → False branch at 141)
-         - slots 40+:  dark → window3 opens and stays open → closes at end of scan (lines 150-153)
+         - slots 40+:  dark → window3 opens and stays open → closes at end of scan
         """
         import numpy as np
         from unittest.mock import patch, MagicMock
@@ -214,7 +214,7 @@ class TestBestWindowsAllModesBranchCoverage:
             assert mode in result
 
     def test_end_window_shorter_than_best_does_not_replace(self):
-        """Line 151->147: end-of-scan window duration < best mid-scan → no update."""
+        """end-of-scan window duration < best mid-scan → no update."""
         import numpy as np
         from unittest.mock import patch, MagicMock
 

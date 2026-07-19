@@ -620,7 +620,7 @@ class TestValidatePlanJsonExtended:
         with open(fname, "w") as f:
             json.dump({
                 "user_id": str(uuid.uuid4()),
-                "plan": {"entries": [42]}  # entry is int, not dict → line 241
+                "plan": {"entries": [42]}  # entry is int, not dict
             }, f)
         ok, msg = validate_plan_json(fname)
         assert ok is False
@@ -628,7 +628,7 @@ class TestValidatePlanJsonExtended:
 
 
 # ---------------------------------------------------------------------------
-# get_user_plan_file — invalid user_id raises (line 116)
+# get_user_plan_file — invalid user_id raises
 # ---------------------------------------------------------------------------
 
 
@@ -646,7 +646,7 @@ class TestGetUserPlanFile:
 
 
 # ---------------------------------------------------------------------------
-# load_user_plan — plan is not a dict (line 215)
+# load_user_plan — plan is not a dict
 # ---------------------------------------------------------------------------
 
 
@@ -658,7 +658,7 @@ class TestLoadUserPlanPlanNotDict:
         plan_file = tmp_path / f"{user_id}_plan_my_night.json"
         plan_file.write_text(json.dumps({
             "user_id": user_id,
-            "plan": "this_is_not_a_dict"  # triggers line 215
+            "plan": "this_is_not_a_dict"  # triggers 
         }))
         result = load_user_plan(user_id, "alice")
         assert result["plan"] is None

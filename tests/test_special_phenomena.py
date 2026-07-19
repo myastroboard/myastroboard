@@ -186,7 +186,7 @@ class TestGetSpecialPhenomena:
             assert "peak_time" in e or "start_time" in e
 
     def test_returns_empty_on_error(self):
-        """Cover exception handler (lines 103-105): patch a sub-function to raise."""
+        """Cover exception handler: patch a sub-function to raise."""
         svc = SpecialPhenomenaService(45.0, -73.5, 50, "America/Montreal", "en")
         with patch.object(svc, '_find_seasonal_events', side_effect=Exception("force error")):
             result = svc.get_special_phenomena(days_ahead=90)
@@ -194,7 +194,7 @@ class TestGetSpecialPhenomena:
 
 
 class TestFindMilkyWayCoreVisibility:
-    """Tests for _find_milky_way_core_visibility — covers lines 479-603."""
+    """Tests for _find_milky_way_core_visibility — covers ."""
 
     def test_returns_list(self):
         from astropy.time import Time
@@ -235,7 +235,7 @@ class TestFindMilkyWayCoreVisibility:
 
 
 class TestFindZodiacalLightWindows:
-    """Tests for _find_zodiacal_light_windows — covers lines 355-462."""
+    """Tests for _find_zodiacal_light_windows — covers ."""
 
     def test_returns_list(self):
         from astropy.time import Time
@@ -270,7 +270,7 @@ class TestSpecialPhenomenaBranchCoverage:
     def setup_method(self):
         self.svc = SpecialPhenomenaService(45.0, -73.5, 50, "America/Montreal", "en")
 
-    # --- _t exception branch (lines 70-71) ---
+    # --- _t exception branch ---
     def test_t_format_exception_returns_unformatted_fallback(self):
         """When fallback.format(**kwargs) raises, the raw fallback string is returned."""
         result = self.svc._t("missing.key", "{undefined_placeholder}", name="World")
@@ -278,7 +278,7 @@ class TestSpecialPhenomenaBranchCoverage:
         # raises KeyError — the except branch returns the raw fallback
         assert result == "{undefined_placeholder}"
 
-    # --- _find_seasonal_events exception branch (lines 231-232) ---
+    # --- _find_seasonal_events exception branch ---
     def test_seasonal_exception_swallowed(self):
         from astropy.time import Time
         with patch.object(self.svc, "_approximate_equinox", side_effect=Exception("astro fail")):
@@ -288,7 +288,7 @@ class TestSpecialPhenomenaBranchCoverage:
             )
         assert isinstance(events, list)
 
-    # --- _find_zodiacal_light_windows: sun is None (lines 379-380) ---
+    # --- _find_zodiacal_light_windows: sun is None ---
     def test_zodiacal_sun_none_skips_day(self):
         from astropy.time import Time
         with patch("observation.special_phenomena.get_sun", return_value=None):
@@ -298,7 +298,7 @@ class TestSpecialPhenomenaBranchCoverage:
             )
         assert result == []
 
-    # --- _find_zodiacal_light_windows: force moon path (lines 401-458) ---
+    # --- _find_zodiacal_light_windows: force moon path ---
     def test_zodiacal_light_moon_conditions_met_appends_event(self):
         """Force ecliptic_alt>20 and moon below horizon to trigger event append."""
         from astropy.time import Time
@@ -325,7 +325,7 @@ class TestSpecialPhenomenaBranchCoverage:
         if result:
             assert result[0]["event_type"] == "Zodiacal Light Window"
 
-    # --- _find_milky_way_core_visibility: sun is None path (lines 515-516) ---
+    # --- _find_milky_way_core_visibility: sun is None path ---
     def test_milky_way_sun_none_skips_day(self):
         from astropy.time import Time
         with patch("observation.special_phenomena.get_sun", return_value=None):
@@ -335,7 +335,7 @@ class TestSpecialPhenomenaBranchCoverage:
             )
         assert result == []
 
-    # --- _find_milky_way_core_visibility: moon is None path (lines 544-545) ---
+    # --- _find_milky_way_core_visibility: moon is None path ---
     def test_milky_way_moon_none_skips_day(self):
         from astropy.time import Time
 
@@ -355,7 +355,7 @@ class TestSpecialPhenomenaBranchCoverage:
             )
         assert result == []
 
-    # --- _find_milky_way_core_visibility: galactic center not visible (lines 537-539) ---
+    # --- _find_milky_way_core_visibility: galactic center not visible ---
     def test_milky_way_gc_below_min_altitude_skips(self):
         from astropy.time import Time
 
@@ -382,7 +382,7 @@ class TestSpecialPhenomenaBranchCoverage:
             )
         assert isinstance(result, list)
 
-    # --- _get_ecliptic_altitude: sun is None (line 611) ---
+    # --- _get_ecliptic_altitude: sun is None ---
     def test_ecliptic_altitude_sun_none_returns_zero(self):
         from astropy.time import Time
         t = Time("2026-06-01T12:00:00", format="isot", scale="utc")
@@ -390,7 +390,7 @@ class TestSpecialPhenomenaBranchCoverage:
             result = self.svc._get_ecliptic_altitude(t)
         assert result == 0.0
 
-    # --- _refine_equinox_time: exception in while loop (lines 290-291) ---
+    # --- _refine_equinox_time: exception in while loop ---
     def test_refine_equinox_exception_in_loop_returns_best_time(self):
         from astropy.time import Time
         approx = Time("2026-03-20T12:00:00", format="isot", scale="utc")
@@ -399,7 +399,7 @@ class TestSpecialPhenomenaBranchCoverage:
         from astropy.time import Time as ATime
         assert isinstance(result, ATime)
 
-    # --- _refine_solstice_time: exception in while loop (lines 338-339) ---
+    # --- _refine_solstice_time: exception in while loop ---
     def test_refine_solstice_exception_in_loop_returns_best_time(self):
         from astropy.time import Time
         approx = Time("2026-06-21T12:00:00", format="isot", scale="utc")
@@ -437,7 +437,7 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         assert isinstance(result, Time)
 
     def test_refine_equinox_loop_sun_none_then_real(self):
-        """Sun is None on one loop iteration (lines 278-279) → continue."""
+        """Sun is None on one loop iteration → continue."""
         import numpy as np
         from astropy.time import Time
         approx = Time("2026-03-20T12:00:00", format="isot", scale="utc")
@@ -450,7 +450,7 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         assert isinstance(result, Time)
 
     def test_refine_equinox_loop_dec_as_ndarray(self):
-        """Loop dec_val is ndarray (line 283) → exercises array branch."""
+        """Loop dec_val is ndarray → exercises array branch."""
         import numpy as np
         from astropy.time import Time
         approx = Time("2026-03-20T12:00:00", format="isot", scale="utc")
@@ -507,7 +507,7 @@ class TestSpecialPhenomenaNullAndArrayBranches:
     # ── _find_zodiacal_light_windows ────────────────────────────────────
 
     def test_zodiacal_sun_altaz_none_skips(self):
-        """sun.transform_to() returns None → lines 384-385."""
+        """sun.transform_to() returns None."""
         from astropy.time import Time
         fake_sun = MagicMock()
         fake_sun.transform_to.return_value = None
@@ -519,7 +519,7 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         assert isinstance(result, list)
 
     def test_zodiacal_sun_alt_as_ndarray(self):
-        """sun_altaz.alt.degree is ndarray → line 390."""
+        """sun_altaz.alt.degree is ndarray."""
         import numpy as np
         from astropy.time import Time
         fake_altaz = MagicMock()
@@ -535,7 +535,7 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         assert isinstance(result, list)
 
     def test_zodiacal_moon_none_skips(self):
-        """get_body('moon') returns None → lines 403-404."""
+        """get_body('moon') returns None."""
         from astropy.time import Time
         fake_altaz = MagicMock()
         fake_altaz.alt.degree = -15.0
@@ -551,7 +551,7 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         assert isinstance(result, list)
 
     def test_zodiacal_moon_altaz_none_skips(self):
-        """moon.transform_to() returns None → lines 408-409."""
+        """moon.transform_to() returns None."""
         from astropy.time import Time
         fake_altaz = MagicMock()
         fake_altaz.alt.degree = -15.0
@@ -569,7 +569,7 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         assert isinstance(result, list)
 
     def test_zodiacal_moon_alt_as_ndarray(self):
-        """moon_altaz.alt.degree is ndarray → line 414."""
+        """moon_altaz.alt.degree is ndarray."""
         import numpy as np
         from astropy.time import Time
         fake_sun_altaz = MagicMock()
@@ -590,7 +590,7 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         assert isinstance(result, list)
 
     def test_zodiacal_exception_handler(self):
-        """Exception inside zodiacal loop → lines 457-458."""
+        """Exception inside zodiacal loop."""
         from astropy.time import Time
         fake_sun = MagicMock()
         fake_sun.transform_to.side_effect = RuntimeError("boom")
@@ -604,7 +604,7 @@ class TestSpecialPhenomenaNullAndArrayBranches:
     # ── _find_milky_way_core_visibility ─────────────────────────────────
 
     def test_milky_way_sun_alt_as_ndarray(self):
-        """sun_altaz.alt.degree is ndarray → line 521."""
+        """sun_altaz.alt.degree is ndarray."""
         import numpy as np
         from astropy.time import Time
         fake_altaz = MagicMock()
@@ -620,7 +620,7 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         assert isinstance(result, list)
 
     def test_milky_way_sun_above_nautical_twilight_skips(self):
-        """sun_alt >= -12 at 2am (e.g., midsummer extreme lat) → lines 526-527."""
+        """sun_alt >= -12 at 2am (e.g., midsummer extreme lat)."""
         from astropy.time import Time
         fake_altaz = MagicMock()
         fake_altaz.alt.degree = -5.0  # above -12: not dark enough
@@ -634,7 +634,7 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         assert result == []
 
     def test_milky_way_gc_alt_as_ndarray(self):
-        """gc_altaz.alt.degree is ndarray → line 533."""
+        """gc_altaz.alt.degree is ndarray."""
         import numpy as np
         from astropy.time import Time
         fake_sun_altaz = MagicMock()
@@ -653,7 +653,7 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         assert isinstance(result, list)
 
     def test_milky_way_moon_alt_as_ndarray(self):
-        """moon_altaz.alt.degree is ndarray → line 550."""
+        """moon_altaz.alt.degree is ndarray."""
         import numpy as np
         from astropy.time import Time
         fake_sun_altaz = MagicMock()
@@ -677,7 +677,7 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         assert isinstance(result, list)
 
     def test_milky_way_exception_handler(self):
-        """Exception inside MW loop → lines 598-599."""
+        """Exception inside MW loop."""
         from astropy.time import Time
         fake_sun = MagicMock()
         fake_sun.transform_to.side_effect = RuntimeError("astro error")
@@ -691,7 +691,7 @@ class TestSpecialPhenomenaNullAndArrayBranches:
     # ── _get_ecliptic_altitude ───────────────────────────────────────────
 
     def test_ecliptic_altaz_none_returns_zero(self):
-        """sun.transform_to() returns None → line 615."""
+        """sun.transform_to() returns None."""
         from astropy.time import Time
         t = Time("2026-06-01T00:00:00", format="isot", scale="utc")
         fake_sun = MagicMock()
@@ -701,7 +701,7 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         assert result == 0.0
 
     def test_ecliptic_alt_as_ndarray(self):
-        """alt_val is ndarray → line 619."""
+        """alt_val is ndarray."""
         import numpy as np
         from astropy.time import Time
         t = Time("2026-06-01T00:00:00", format="isot", scale="utc")
@@ -716,7 +716,7 @@ class TestSpecialPhenomenaNullAndArrayBranches:
     # ── _get_galactic_center_altitude ────────────────────────────────────
 
     def test_galactic_center_alt_as_ndarray(self):
-        """alt_val is ndarray → line 637 (patch astropy.coordinates directly)."""
+        """alt_val is ndarray →  (patch astropy.coordinates directly)."""
         import numpy as np
         from astropy.time import Time
         t = Time("2026-07-01T04:00:00", format="isot", scale="utc")
@@ -731,7 +731,7 @@ class TestSpecialPhenomenaNullAndArrayBranches:
         assert result == pytest.approx(20.0)
 
     def test_zodiacal_moon_above_5_skips_event(self):
-        """Line 420->460: moon_alt >= 5 → is_moon_ok=False → event not appended."""
+        """moon_alt >= 5 → is_moon_ok=False → event not appended."""
         from astropy.time import Time
 
         def make_altaz_mock(altitude_deg):

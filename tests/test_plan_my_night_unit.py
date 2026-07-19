@@ -828,7 +828,7 @@ _TEST_SCOPE = "bbbb2222-3333-4444-5555-666677778888"
 
 
 class TestGetAllPlanFilesPathError:
-    """Covers lines 145-146: ValueError from _safe_plan_path is silently skipped."""
+    """Covers ValueError from _safe_plan_path is silently skipped."""
 
     def test_skips_file_with_traversal_path(self, temp_plan_dir, monkeypatch):
         fname = f"{_TEST_UID}_plan_my_night.json"
@@ -848,10 +848,10 @@ class TestGetAllPlanFilesPathError:
 
 
 class TestDeletePlanForTelescopeEdgeCases:
-    """Covers lines 157-159 and 165-167 in delete_plan_for_telescope."""
+    """Covers edge cases in delete_plan_for_telescope."""
 
     def test_value_error_from_get_user_plan_file(self, temp_plan_dir, monkeypatch):
-        """Covers lines 157-159: ValueError causes return False."""
+        """Covers ValueError causes return False."""
         monkeypatch.setattr(
             plan_my_night, 'get_user_plan_file',
             lambda *_a: (_ for _ in ()).throw(ValueError("path traversal"))
@@ -860,7 +860,7 @@ class TestDeletePlanForTelescopeEdgeCases:
         assert result is False
 
     def test_os_remove_exception_returns_false(self, temp_plan_dir, monkeypatch):
-        """Covers lines 165-167: Exception on os.remove causes return False."""
+        """Covers Exception on os.remove causes return False."""
         file_path = plan_my_night.get_user_plan_file(_TEST_UID, _TEST_SCOPE)
         with open(file_path, 'w') as f:
             json.dump({'user_id': _TEST_UID}, f)
@@ -874,10 +874,10 @@ class TestDeletePlanForTelescopeEdgeCases:
 
 
 class TestLoadUserPlanExceptionPaths:
-    """Covers lines 196-197, 199-201, and 207->209 in load_user_plan."""
+    """Covers exception paths and the username=None case in load_user_plan."""
 
     def test_json_corrupted_backup_fails(self, temp_plan_dir, monkeypatch):
-        """Covers lines 196-197: corrupted JSON + backup copy fails."""
+        """Covers corrupted JSON + backup copy fails."""
         file_path = plan_my_night.get_user_plan_file(_TEST_UID)
         with open(file_path, 'w', encoding='utf-8') as f:
             f.write('{invalid json')
@@ -889,7 +889,7 @@ class TestLoadUserPlanExceptionPaths:
         assert result['plan'] is None
 
     def test_general_exception_returns_default(self, temp_plan_dir, monkeypatch):
-        """Covers lines 199-201: non-JSON exception → default payload."""
+        """Covers non-JSON exception → default payload."""
         file_path = plan_my_night.get_user_plan_file(_TEST_UID)
         with open(file_path, 'w', encoding='utf-8') as f:
             json.dump({'user_id': _TEST_UID}, f)
@@ -901,7 +901,7 @@ class TestLoadUserPlanExceptionPaths:
         assert result['plan'] is None
 
     def test_load_without_username_when_file_exists(self, temp_plan_dir):
-        """Covers 207->209: username=None skips overwriting username field."""
+        """Covers username=None skips overwriting username field."""
         payload = {'user_id': _TEST_UID, 'plan': None, 'username': 'existing_user'}
         save_user_plan(_TEST_UID, payload, username='existing_user')
 
@@ -910,7 +910,7 @@ class TestLoadUserPlanExceptionPaths:
 
 
 class TestSaveUserPlanWithoutUsername:
-    """Covers 287->289: username=None skips setting username in payload."""
+    """Covers username=None skips setting username in payload."""
 
     def test_save_without_username(self, temp_plan_dir):
         payload = {'user_id': _TEST_UID, 'plan': None}
@@ -926,10 +926,10 @@ class TestSaveUserPlanWithoutUsername:
 
 
 class TestSaveUserPlanLockedBranches:
-    """Covers lines 278-280, 297-298, 316-332 in _save_user_plan_locked."""
+    """Covers branches in _save_user_plan_locked."""
 
     def test_path_validation_failure_returns_false(self, temp_plan_dir):
-        """Lines 278-280: ValueError from _safe_plan_path returns False."""
+        """ValueError from _safe_plan_path returns False."""
         uid = "eeee0001-0000-4000-8000-000000000000"
         payload = {'user_id': uid, 'plan': None}
         # Patch _save_user_plan_locked directly to trigger the path validation failure
@@ -944,7 +944,7 @@ class TestSaveUserPlanLockedBranches:
         assert result is False
 
     def test_backup_copy_failure_continues(self, temp_plan_dir):
-        """Lines 297-298: backup copy fails but save still continues."""
+        """backup copy fails but save still continues."""
         uid = "eeee0002-0000-4000-8000-000000000000"
         # First, create an existing plan file so backup is attempted
         payload = {'user_id': uid, 'plan': None}
@@ -956,7 +956,7 @@ class TestSaveUserPlanLockedBranches:
         assert result is True
 
     def test_exception_during_save_restores_backup(self, temp_plan_dir):
-        """Lines 316-320: when an error occurs after backup, backup is restored."""
+        """when an error occurs after backup, backup is restored."""
         uid = "eeee0003-0000-4000-8000-000000000000"
         payload = {'user_id': uid, 'plan': None}
         save_user_plan(uid, payload, username="u1")
@@ -967,7 +967,7 @@ class TestSaveUserPlanLockedBranches:
         assert result is False
 
     def test_exception_cleanup_temp_file_failure_logged(self, temp_plan_dir):
-        """Lines 322-326: temp file cleanup failure is warned but not raised."""
+        """temp file cleanup failure is warned but not raised."""
         uid = "eeee0004-0000-4000-8000-000000000000"
         payload = {'user_id': uid, 'plan': None}
 
@@ -984,7 +984,7 @@ class TestSaveUserPlanLockedBranches:
 
 
 class TestClearAllPlans:
-    """Covers lines 541-542: clear_all_plans error logging path."""
+    """Covers clear_all_plans error logging path."""
 
     def test_deletes_all_plan_files(self, temp_plan_dir):
         uid = "ffff0001-0000-4000-8000-000000000000"
@@ -1009,7 +1009,7 @@ class TestClearAllPlans:
 
 
 class TestRemoveTargetEdgeCases:
-    """Covers lines 553, 559-560 in remove_target."""
+    """Covers edge cases in remove_target."""
 
     def _make_current_plan(self, uid, temp_plan_dir):
         now = datetime.now().astimezone()
@@ -1027,7 +1027,7 @@ class TestRemoveTargetEdgeCases:
         save_user_plan(uid, payload, username="user")
 
     def test_remove_from_previous_plan_returns_false(self, temp_plan_dir):
-        """Line 553: previous plan state → return False."""
+        """previous plan state → return False."""
         uid = "aaaa0001-0000-4000-8000-111111111111"
         now = datetime.now().astimezone()
         payload = {
@@ -1043,14 +1043,14 @@ class TestRemoveTargetEdgeCases:
         assert result is False
 
     def test_remove_nonexistent_entry_returns_false(self, temp_plan_dir):
-        """Line 559-560: entry not found → return False."""
+        """entry not found → return False."""
         uid = "aaaa0002-0000-4000-8000-111111111111"
         self._make_current_plan(uid, temp_plan_dir)
         result = remove_target(uid, "user", "nonexistent-id")
         assert result is False
 
     def test_remove_no_plan_returns_false(self, temp_plan_dir):
-        """Line 550: no plan at all → return False."""
+        """no plan at all → return False."""
         uid = "aaaa0003-0000-4000-8000-111111111111"
         result = remove_target(uid, "user", "e1")
         assert result is False
@@ -1062,7 +1062,7 @@ class TestRemoveTargetEdgeCases:
 
 
 class TestUpdateTargetEdgeCases:
-    """Covers lines 575, 580, 582-598, 604."""
+    """Covers ."""
 
     def _make_current_plan(self, uid):
         now = datetime.now().astimezone()
@@ -1080,13 +1080,13 @@ class TestUpdateTargetEdgeCases:
         save_user_plan(uid, payload, username="user")
 
     def test_update_returns_none_for_no_plan(self, temp_plan_dir):
-        """Lines 574: no plan → return None."""
+        """no plan → return None."""
         uid = "bbbb0001-0000-4000-8000-000000000000"
         result = update_target(uid, "user", "e1", {"done": True})
         assert result is None
 
     def test_update_returns_none_for_previous_plan(self, temp_plan_dir):
-        """Line 575: previous plan → return None."""
+        """previous plan → return None."""
         uid = "bbbb0002-0000-4000-8000-000000000000"
         now = datetime.now().astimezone()
         payload = {
@@ -1102,14 +1102,14 @@ class TestUpdateTargetEdgeCases:
         assert result is None
 
     def test_update_returns_none_for_missing_entry(self, temp_plan_dir):
-        """Line 580: entry not found → return None."""
+        """entry not found → return None."""
         uid = "bbbb0003-0000-4000-8000-000000000000"
         self._make_current_plan(uid)
         result = update_target(uid, "user", "not-existing", {"done": True})
         assert result is None
 
     def test_update_planned_minutes_directly(self, temp_plan_dir):
-        """Lines 591-598: update via planned_minutes key (int)."""
+        """update via planned_minutes key (int)."""
         uid = "bbbb0004-0000-4000-8000-000000000000"
         self._make_current_plan(uid)
         result = update_target(uid, "user", "e1", {"planned_minutes": 90})
@@ -1124,7 +1124,7 @@ class TestUpdateTargetEdgeCases:
         assert result["planned_minutes"] == 24 * 60
 
     def test_update_planned_minutes_invalid_type(self, temp_plan_dir):
-        """Lines 597: invalid planned_minutes type silently skipped."""
+        """invalid planned_minutes type silently skipped."""
         uid = "bbbb0006-0000-4000-8000-000000000000"
         self._make_current_plan(uid)
         result = update_target(uid, "user", "e1", {"planned_minutes": "not-a-number"})
@@ -1142,7 +1142,7 @@ class TestUpdateTargetEdgeCases:
         assert result["planned_minutes"] == 60
 
     def test_update_save_failure_returns_none(self, temp_plan_dir):
-        """Line 604: save failure returns None."""
+        """save failure returns None."""
         uid = "bbbb0008-0000-4000-8000-000000000000"
         self._make_current_plan(uid)
         with patch('observation.plan_my_night.save_user_plan', return_value=False):
@@ -1156,7 +1156,7 @@ class TestUpdateTargetEdgeCases:
 
 
 class TestUpdatePlanMetaEdgeCases:
-    """Covers lines 616-629."""
+    """Covers ."""
 
     def _make_current_plan(self, uid):
         now = datetime.now().astimezone()
@@ -1231,7 +1231,7 @@ class TestUpdatePlanMetaEdgeCases:
 
 
 class TestReorderTargetEdgeCases:
-    """Covers lines 638, 641, 646, 650."""
+    """Covers ."""
 
     def _make_two_entry_plan(self, uid):
         now = datetime.now().astimezone()
@@ -1298,7 +1298,7 @@ class TestReorderTargetEdgeCases:
 
 
 class TestGetPlanWithTimelineBranches:
-    """Covers lines 686-712."""
+    """Covers ."""
 
     def test_timeline_with_night_window(self, temp_plan_dir):
         uid = "eeee1001-0000-4000-8000-000000000000"
@@ -1381,7 +1381,7 @@ class TestGetPlanWithTimelineBranches:
 
 
 class TestCsvNormalizeFunctions:
-    """Covers lines 730-746, 753-774, 783-784, 793-794."""
+    """Covers ."""
 
     def test_csv_normalize_ra_none(self):
         assert _csv_normalize_ra(None) == ''
@@ -1462,7 +1462,7 @@ class TestCsvNormalizeFunctions:
 
 
 class TestEntryMatchesAlias:
-    """Tests for _entry_matches alias matching branch (lines 362->367, 364-365)."""
+    """Tests for _entry_matches alias matching branch."""
 
     def test_entry_matches_by_alias(self):
         entry = {
@@ -1535,7 +1535,7 @@ class TestEntryMatchesAlias:
 
 
 class TestGetAllPlanStates:
-    """Covers lines 862-865, 878-886, 905-915."""
+    """Covers ."""
 
     def test_no_plans_no_telescopes_returns_empty(self, temp_plan_dir):
         uid = "ffff1001-0000-4000-8000-000000000000"
@@ -1607,7 +1607,7 @@ class TestGetAllPlanStates:
 
 
 class TestCreateOrAddTargetExtra:
-    """Covers lines 515-516, 522-523."""
+    """Covers ."""
 
     def test_add_duplicate_returns_already_in_plan(self, temp_plan_dir):
         uid = "a1b2c3d4-0001-4000-8000-000000000001"
@@ -1675,10 +1675,10 @@ class TestCreateOrAddTargetExtra:
 
 
 class TestSaveUserPlanLockedErrorPaths:
-    """Cover lines 319-320 and 329-332: restore/cleanup failure handlers in _save_user_plan_locked."""
+    """Cover : restore/cleanup failure handlers in _save_user_plan_locked."""
 
     def test_restore_backup_failure_is_logged(self, temp_plan_dir):
-        """Lines 319-320: when os.replace(backup, file) itself raises, error is logged."""
+        """when os.replace(backup, file) itself raises, error is logged."""
         uid = "aaaaffff-0001-4000-8000-000000000001"
         # Create an initial plan so backup is attempted
         save_user_plan(uid, {'user_id': uid, 'plan': None}, username="u1")
@@ -1689,7 +1689,7 @@ class TestSaveUserPlanLockedErrorPaths:
         assert result is False
 
     def test_backup_cleanup_failure_is_silenced(self, temp_plan_dir):
-        """Lines 329-332: os.remove(backup) raises during error cleanup — silently swallowed."""
+        """os.remove(backup) raises during error cleanup — silently swallowed."""
         uid = "aaaaffff-0002-4000-8000-000000000002"
         # Create an initial plan so backup is attempted
         save_user_plan(uid, {'user_id': uid, 'plan': None}, username="u1")
@@ -1701,7 +1701,7 @@ class TestSaveUserPlanLockedErrorPaths:
 
         # Fail dump so we enter the except block, then fail ALL os.remove calls
         with patch('observation.plan_my_night.json.dump', side_effect=RuntimeError("disk full")):
-            # Also fail os.replace(backup→file) so the backup still exists at line 328
+            # Also fail os.replace(backup→file) so the backup still exists
             with patch('observation.plan_my_night.os.replace', side_effect=OSError("restore fail")):
                 with patch('observation.plan_my_night.os.remove', side_effect=mock_remove):
                     result = save_user_plan(uid, {'user_id': uid, 'plan': None}, username="u1")
@@ -1709,10 +1709,10 @@ class TestSaveUserPlanLockedErrorPaths:
 
 
 class TestTimelineBeyondNightEnd:
-    """Line 702: entry with duration extending past night_end gets capped."""
+    """entry with duration extending past night_end gets capped."""
 
     def test_long_entry_is_capped_at_night_end(self, temp_plan_dir):
-        """planned_minutes > remaining night → end_dt capped to night_end (line 702)."""
+        """planned_minutes > remaining night → end_dt capped to night_end."""
         uid = "aaaaffff-0003-4000-8000-000000000003"
         now = datetime.now().astimezone()
         payload = {
@@ -1735,10 +1735,10 @@ class TestTimelineBeyondNightEnd:
 
 
 class TestGetAllPlanStatesOrphanFilenameSkip:
-    """Line 907: file with non-matching name pattern is skipped in orphan detection."""
+    """file with non-matching name pattern is skipped in orphan detection."""
 
     def test_non_matching_filename_is_skipped(self, temp_plan_dir):
-        """A file named {uid}_plan.json (no underscore after _plan) is skipped (line 907)."""
+        """A file named {uid}_plan.json (no underscore after _plan) is skipped."""
         uid = "aaaaffff-0004-4000-8000-000000000004"
         # Create a file with a slightly wrong name (no underscore between _plan and suffix)
         weird_name = f"{uid}_plan.json"
@@ -1749,7 +1749,7 @@ class TestGetAllPlanStatesOrphanFilenameSkip:
         with patch('observation.plan_my_night.get_all_plan_files',
                    return_value=[os.path.join(temp_plan_dir, weird_name)]):
             result = plan_my_night.get_all_plan_states(uid, "user", [])
-        # It should process without crashing; weird file should be skipped (line 907)
+        # It should process without crashing; weird file should be skipped
         assert isinstance(result, list)
 
 
@@ -1757,7 +1757,7 @@ class TestGeneratePlanPdfBranchCoverage:
     """Cover branches in generate_plan_pdf helpers (_load_alttime, _parse_utc, _clip_alttime)."""
 
     def test_alttime_file_not_found_returns_none(self, tmp_path, monkeypatch):
-        """Line 999: _load_alttime returns None when file doesn't exist on disk."""
+        """_load_alttime returns None when file doesn't exist on disk."""
         import matplotlib
         matplotlib.use("Agg", force=True)
         monkeypatch.setattr(
@@ -1781,7 +1781,7 @@ class TestGeneratePlanPdfBranchCoverage:
         assert result.getvalue().startswith(b"%PDF")
 
     def test_bad_timezone_in_alttime_falls_back_to_utc(self, tmp_path, monkeypatch):
-        """Lines 1087-1089: alttime with bad timezone name → falls back to UTC."""
+        """alttime with bad timezone name → falls back to UTC."""
         import matplotlib
         matplotlib.use("Agg", force=True)
         monkeypatch.setattr(
@@ -1814,7 +1814,7 @@ class TestGeneratePlanPdfBranchCoverage:
         assert result.getvalue().startswith(b"%PDF")
 
     def test_naive_timeline_datetimes_are_handled(self, tmp_path, monkeypatch):
-        """Lines 1015-1016 and 1017-1018: naive and offset timezone datetime strings."""
+        """: naive and offset timezone datetime strings."""
         import matplotlib
         matplotlib.use("Agg", force=True)
         monkeypatch.setattr(
@@ -1834,18 +1834,18 @@ class TestGeneratePlanPdfBranchCoverage:
                 "night_start": now.isoformat(),
                 "night_end": (now + timedelta(hours=2)).isoformat(),
                 "entries": [
-                    {   # naive datetime string (no tz) → lines 1015-1016
+                    {   # naive datetime string (no tz)
                         "id": "e1", "name": "M31", "done": False,
                         "alttime_file": "m31",
                         "timeline_start": "2026-08-12T21:00:00",   # naive
                         "timeline_end": "2026-08-12T21:30:00",     # naive
                     },
-                    {   # with offset → lines 1017-1018
+                    {   # with offset
                         "id": "e2", "name": "M42", "done": False,
                         "timeline_start": "2026-08-12T21:30:00+02:00",
                         "timeline_end": "2026-08-12T22:00:00+02:00",
                     },
-                    {   # malformed → lines 1020-1021
+                    {   # malformed
                         "id": "e3", "name": "M45", "done": False,
                         "timeline_start": "not-a-date",
                         "timeline_end": "also-bad",
@@ -1866,7 +1866,7 @@ class TestPlanMyNightMiscBranches:
     """Cover missing branches in plan_my_night functions."""
 
     def test_entry_matches_aliases_not_dict_returns_false(self):
-        """Branch 362->367: catalogue_aliases is not a dict → skip alias loop, return False."""
+        """catalogue_aliases is not a dict → skip alias loop, return False."""
         entry = {
             'name': 'M31',
             'catalogue_aliases': ['list', 'not', 'dict'],  # list, not dict
@@ -1875,7 +1875,7 @@ class TestPlanMyNightMiscBranches:
         assert result is False
 
     def test_is_target_in_current_plan_loop_continues_past_nonmatch(self, tmp_path, monkeypatch):
-        """Branch 393->392: first entry doesn't match → loop continues to find the second."""
+        """first entry doesn't match → loop continues to find the second."""
         monkeypatch.setattr(plan_my_night, 'PLAN_DIR', str(tmp_path))
         user_id = "aabbccdd-1234-4aaa-8aaa-aabbccddaabb"
         now = datetime.now().astimezone()
@@ -1889,11 +1889,11 @@ class TestPlanMyNightMiscBranches:
         }
         plan_my_night.save_user_plan(user_id, {'plan': plan}, username='user')
         result = plan_my_night.is_target_in_current_plan(user_id, 'user', 'Messier', 'M42')
-        # M31 doesn't match → loop continues (branch 393→392) → M42 matches
+        # M31 doesn't match → loop continues (→392) → M42 matches
         assert result is True
 
     def test_create_or_add_target_loop_continues_past_nonmatch(self, tmp_path, monkeypatch):
-        """Branch 515->514: existing entry doesn't match → loop continues, new entry added."""
+        """existing entry doesn't match → loop continues, new entry added."""
         monkeypatch.setattr(plan_my_night, 'PLAN_DIR', str(tmp_path))
         user_id = "bbccddee-1234-4bbb-8bbb-bbccddeebbcc"
         now = datetime.now().astimezone()
@@ -1903,7 +1903,7 @@ class TestPlanMyNightMiscBranches:
             'entries': [{'name': 'M31', 'catalogue': 'Messier', 'id': 'e1'}],
         }
         plan_my_night.save_user_plan(user_id, {'plan': plan}, username='user')
-        # Add M42 → loop iterates past M31 (branch 515→514) → M42 is new, gets added
+        # Add M42 → loop iterates past M31 (→514) → M42 is new, gets added
         ok, reason, _, _ = plan_my_night.create_or_add_target(
             user_id=user_id, username='user',
             item_data={'name': 'M42'},
@@ -1916,7 +1916,7 @@ class TestPlanMyNightMiscBranches:
         assert reason == 'added'
 
     def test_get_plan_with_timeline_zero_planned_minutes(self, tmp_path, monkeypatch):
-        """Branch 699->701: planned_minutes=0 → end_dt stays equal to start_dt."""
+        """planned_minutes=0 → end_dt stays equal to start_dt."""
         monkeypatch.setattr(plan_my_night, 'PLAN_DIR', str(tmp_path))
         user_id = "ccddeeaa-1234-4ccc-8ccc-ccddeeaaccdd"
         now = datetime.now().astimezone()
@@ -1932,7 +1932,7 @@ class TestPlanMyNightMiscBranches:
         assert entry['timeline_start'] == entry['timeline_end']
 
     def test_save_user_plan_temp_file_missing_during_error_recovery(self, tmp_path, monkeypatch):
-        """Branch 322->328: exception before temp file created → os.path.exists(temp_path) is False.
+        """exception before temp file created → os.path.exists(temp_path) is False.
 
         ensure_plan_directory is called twice: once in get_user_plan_file (must succeed)
         and once in _save_user_plan_locked (where we raise to trigger the error path).
@@ -1963,7 +1963,7 @@ class TestGeneratePlanPdfAdditionalBranches:
     """Cover remaining missing branches in generate_plan_pdf."""
 
     def test_json_parse_error_in_load_alttime(self, tmp_path, monkeypatch):
-        """Lines 1003-1004: invalid JSON in alttime file → exception caught, return None."""
+        """invalid JSON in alttime file → exception caught, return None."""
         import matplotlib
         matplotlib.use("Agg", force=True)
         monkeypatch.setattr(
@@ -1989,7 +1989,7 @@ class TestGeneratePlanPdfAdditionalBranches:
         assert result.getvalue().startswith(b"%PDF")
 
     def test_telescope_name_and_fill_zero_and_overflow(self, tmp_path, monkeypatch):
-        """Line 1271 (telescope name), 1308->1312 (fill_w<=0.01), 1318 (overflow>0)."""
+        """Renders the telescope name, and exercises the fill_w<=0.01 and overflow>0 branches."""
         import matplotlib
         matplotlib.use("Agg", force=True)
         monkeypatch.setattr(
@@ -2004,15 +2004,15 @@ class TestGeneratePlanPdfAdditionalBranches:
                 "entries": [],
             }
         }
-        # fill_percent=0.0 → fill_w = 0 ≤ 0.01 → branch 1308->1312
-        # overflow_minutes=30 > 0 → line 1318
+        # fill_percent=0.0 → fill_w = 0 ≤ 0.01
+        # overflow_minutes=30 > 0
         metrics = {"fill_percent": 0.0, "planned_minutes": 0, "night_minutes": 120, "overflow_minutes": 30}
         result = generate_plan_pdf(payload, metrics, _DummyI18n())
         assert result.getvalue().startswith(b"%PDF")
 
     def test_chart_skipped_when_no_night_times_in_plan(self, tmp_path, monkeypatch):
-        """Branch 1343->1433: alttime_map exists but plan has no night_start/end → skip chart.
-           Also covers line 1008 via _fmt_hm/_fmt_date called with None."""
+        """alttime_map exists but plan has no night_start/end → skip chart.
+           Also covers  via _fmt_hm/_fmt_date called with None."""
         import matplotlib
         matplotlib.use("Agg", force=True)
         monkeypatch.setattr(
@@ -2030,7 +2030,7 @@ class TestGeneratePlanPdfAdditionalBranches:
         (tmp_path / "m31_alttime.json").write_text(json.dumps(alttime_data), encoding="utf-8")
         payload = {
             "plan": {
-                # NO night_start / night_end → ns_dt = None → branch 1343->1433
+                # NO night_start / night_end → ns_dt = None
                 "entries": [{
                     "id": "e1", "name": "M31", "done": False,
                     "alttime_file": "m31",
@@ -2044,7 +2044,7 @@ class TestGeneratePlanPdfAdditionalBranches:
         assert result.getvalue().startswith(b"%PDF")
 
     def test_chart_entry_skips_with_invalid_and_zero_range_times(self, tmp_path, monkeypatch):
-        """Lines 1362, 1365, 1374: entries without start/end, reversed range, empty clip result."""
+        """entries without start/end, reversed range, empty clip result."""
         import matplotlib
         matplotlib.use("Agg", force=True)
         monkeypatch.setattr(
@@ -2067,18 +2067,18 @@ class TestGeneratePlanPdfAdditionalBranches:
                 "night_start": night_start.isoformat(),
                 "night_end": night_end.isoformat(),
                 "entries": [
-                    {   # line 1362: no timeline_start → _parse_utc returns None → continue
+                    {   # no timeline_start → _parse_utc returns None → continue
                         "id": "e1", "name": "M31", "done": False,
                         "alttime_file": "m31",
                         # No timeline_start or timeline_end
                     },
-                    {   # line 1365: t_end <= t_start → continue
+                    {   # t_end <= t_start → continue
                         "id": "e2", "name": "M42", "done": False,
                         "alttime_file": "m31",
                         "timeline_start": (now + timedelta(hours=1)).isoformat(),
                         "timeline_end": now.isoformat(),  # end BEFORE start
                     },
-                    {   # line 1374: _clip_alttime returns empty xs → continue
+                    {   # _clip_alttime returns empty xs → continue
                         "id": "e3", "name": "M45", "done": False,
                         "alttime_file": "m31",
                         # Alttime data is at 'now' to 'now+30min', but entry window is far future
@@ -2093,15 +2093,15 @@ class TestGeneratePlanPdfAdditionalBranches:
         assert result.getvalue().startswith(b"%PDF")
 
     def test_clip_alttime_empty_inputs(self, tmp_path, monkeypatch):
-        """Line 1040: _clip_alttime with empty times_utc → returns [], [].
-           Also covers 1044->1042 (None dt) and 1047 (no valid pts)."""
+        """_clip_alttime with empty times_utc → returns [], [].
+           Also covers the None-dt skip and the no-valid-points return [], [] case."""
         import matplotlib
         matplotlib.use("Agg", force=True)
         monkeypatch.setattr(
             "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True
         )
         now = datetime.now(timezone.utc).replace(microsecond=0)
-        # Empty times_utc → _clip_alttime([], altitudes, ...) → line 1040 → return [], []
+        # Empty times_utc → _clip_alttime([], altitudes, ...) → return [], []
         alttime_empty = {
             "timezone": "UTC",
             "times_utc": [],
@@ -2110,8 +2110,8 @@ class TestGeneratePlanPdfAdditionalBranches:
             "altitude_constraint_max": 80,
         }
         (tmp_path / "m31empty_alttime.json").write_text(json.dumps(alttime_empty), encoding="utf-8")
-        # Invalid timestamps → _parse_utc returns None → dt is None → line 1044->1042 skip
-        # All invalid → no valid pts → line 1047 return [], []
+        # Invalid timestamps → _parse_utc returns None → dt is None → skip
+        # All invalid → no valid pts → return [], []
         alttime_bad_ts = {
             "timezone": "UTC",
             "times_utc": ["NOT-A-DATE", "ALSO-BAD"],
@@ -2127,13 +2127,13 @@ class TestGeneratePlanPdfAdditionalBranches:
                 "entries": [
                     {
                         "id": "e1", "name": "M31", "done": False,
-                        "alttime_file": "m31empty",  # empty times_utc → line 1040
+                        "alttime_file": "m31empty",  # empty times_utc
                         "timeline_start": now.isoformat(),
                         "timeline_end": (now + timedelta(minutes=30)).isoformat(),
                     },
                     {
                         "id": "e2", "name": "M42", "done": False,
-                        "alttime_file": "m31badts",  # invalid timestamps → 1044->1042, 1047
+                        "alttime_file": "m31badts",  # invalid timestamps → skipped
                         "timeline_start": now.isoformat(),
                         "timeline_end": (now + timedelta(minutes=30)).isoformat(),
                     },
@@ -2145,7 +2145,7 @@ class TestGeneratePlanPdfAdditionalBranches:
         assert result.getvalue().startswith(b"%PDF")
 
     def test_clip_alttime_no_pts_in_window(self, tmp_path, monkeypatch):
-        """Line 1067: _clip_alttime with points all before the window → out=[] → return [], []."""
+        """_clip_alttime with points all before the window → out=[] → return [], []."""
         import matplotlib
         matplotlib.use("Agg", force=True)
         monkeypatch.setattr(
@@ -2215,7 +2215,7 @@ class TestVisibilityWarnings:
 
         assert len(runs) == 1
         run_start, run_end = runs[0]
-        expected_crossing = night_start + timedelta(minutes=75)  # 07:15
+        expected_crossing = night_start + timedelta(minutes=75)  # 15
         assert abs((run_start - expected_crossing).total_seconds()) < 1
         assert run_end == night_end  # altitude keeps rising through the end of the night
 

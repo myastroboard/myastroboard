@@ -19,7 +19,7 @@ def _make_service():
 
 
 class TestPhaseName:
-    """Cover all _phase_name branches (lines 140-165)."""
+    """Cover all _phase_name branches."""
 
     def setup_method(self):
         self.svc = MoonService(48.85, 2.35, 'Europe/Paris')
@@ -34,7 +34,7 @@ class TestPhaseName:
         assert self.svc._phase_name(95.0) == "First Quarter"
 
     def test_waxing_gibbous(self):
-        # Line 155: angle in [100, 170), waxing=True
+        # angle in [100, 170), waxing=True
         name = self.svc._phase_name(135.0)
         assert name == "Waxing Gibbous"
 
@@ -43,17 +43,17 @@ class TestPhaseName:
         assert name == "Full Moon"
 
     def test_waning_gibbous(self):
-        # Lines 158-159: angle in [190, 260), waxing=False
+        # angle in [190, 260), waxing=False
         name = self.svc._phase_name(220.0)
         assert name == "Waning Gibbous"
 
     def test_last_quarter(self):
-        # Lines 160-161: angle in [260, 280), waxing=False
+        # angle in [260, 280), waxing=False
         name = self.svc._phase_name(270.0)
         assert name == "Last Quarter"
 
     def test_waning_crescent(self):
-        # Lines 162-163: angle >= 280, waxing=False
+        # angle >= 280, waxing=False
         name = self.svc._phase_name(320.0)
         assert name == "Waning Crescent"
 
@@ -64,18 +64,18 @@ class TestPhaseName:
         assert name == "Full Moon"
 
     def test_angle_at_boundary_100(self):
-        # angle=100: < 170 → waxing → Waxing Gibbous (also covers line 155)
+        # angle=100: < 170 → waxing → Waxing Gibbous
         assert self.svc._phase_name(100.0) == "Waxing Gibbous"
 
 
 class TestFmt:
-    """Cover _fmt method branches (line 173: astro_time_obj is None)."""
+    """Cover _fmt method branches (astro_time_obj is None)."""
 
     def setup_method(self):
         self.svc = MoonService(48.85, 2.35, 'Europe/Paris')
 
     def test_fmt_none_returns_not_found(self):
-        # Line 173
+        # 
         result = self.svc._fmt(None)
         assert result == "Not found"
 
@@ -91,13 +91,13 @@ class TestFmt:
 
 
 class TestFmtTime:
-    """Cover _fmt_time method (line 184: naive datetime gets tzinfo attached)."""
+    """Cover _fmt_time method (naive datetime gets tzinfo attached)."""
 
     def setup_method(self):
         self.svc = MoonService(48.85, 2.35, 'Europe/Paris')
 
     def test_fmt_time_naive_datetime_attaches_tzinfo(self):
-        # Line 184: dt_local.tzinfo is None → dt_local.replace(tzinfo=self.timezone)
+        # dt_local.tzinfo is None → dt_local.replace(tzinfo=self.timezone)
         naive_dt = datetime.datetime(2026, 6, 1, 22, 0, 0)
         result = self.svc._fmt_time(naive_dt)
         assert isinstance(result, str)
@@ -110,13 +110,13 @@ class TestFmtTime:
 
 
 class TestCoordAltitudeDeg:
-    """Cover _coord_altitude_deg edge cases (lines 247, 252, 256)."""
+    """Cover _coord_altitude_deg edge cases."""
 
     def setup_method(self):
         self.svc = MoonService(48.85, 2.35, 'Europe/Paris')
 
     def test_none_coord_returns_none(self):
-        # Line 247: coord is None
+        # coord is None
         from astropy.coordinates import AltAz
         from astropy.time import Time
         from astropy.coordinates import EarthLocation
@@ -127,7 +127,7 @@ class TestCoordAltitudeDeg:
         assert result is None
 
     def test_coord_alt_none_returns_none(self):
-        # Line 252: transformed.alt is None
+        # transformed.alt is None
         from astropy.coordinates import AltAz
         from astropy.time import Time
         import astropy.units as u
@@ -144,7 +144,7 @@ class TestCoordAltitudeDeg:
         assert result is None
 
     def test_coord_alt_value_none_returns_none(self):
-        # Line 256: alt.to_value returns None (no to_value attribute)
+        # alt.to_value returns None (no to_value attribute)
         from astropy.coordinates import AltAz
         from astropy.time import Time
         t = Time('2026-06-01T20:00:00', format='isot', scale='utc')
@@ -162,12 +162,12 @@ class TestCoordAltitudeDeg:
 
 
 class TestNextAstronomicalDarkWindow:
-    """Cover lines 199, 208, 216 in _next_astronomical_dark_window closures."""
+    """Covers the closures inside _next_astronomical_dark_window."""
 
     def test_refine_exhausts_when_coord_alt_returns_none(self):
         """
-        Lines 199 (_is_dark_moonless returns None), 208 (_refine_first_true exhausts),
-        and 216 (_refine_first_false exhausts) are reached when _coord_altitude_deg
+        _is_dark_moonless returning None, and both _refine_first_true and
+        _refine_first_false exhausting their search, are all reached when _coord_altitude_deg
         always returns None during fine-grained refinement.
 
         The coarse grid is mocked so that the first 3 slots are 'dark' and the rest are not,

@@ -269,7 +269,7 @@ class TestIsRadiantVisible:
         assert result is False
 
     def test_altaz_none_returns_false(self):
-        """Line 375: if altaz is None → return False."""
+        """if altaz is None → return False."""
         import numpy as np
         from astropy.time import Time
         from astropy.coordinates import SkyCoord
@@ -282,7 +282,7 @@ class TestIsRadiantVisible:
         assert result is False
 
     def test_ndarray_altitude_branch(self):
-        """Line 380: alt_val is ndarray → float(np.real(...)) extraction."""
+        """alt_val is ndarray → float(np.real(...)) extraction."""
         import numpy as np
         from astropy.time import Time
         from astropy.coordinates import SkyCoord
@@ -294,7 +294,7 @@ class TestIsRadiantVisible:
         def patched_transform(self_coord, frame):
             mock_altaz = MagicMock()
             mock_alt = MagicMock()
-            mock_alt.degree = np.array([45.0])  # ndarray → triggers line 380
+            mock_alt.degree = np.array([45.0])  # ndarray → triggers 
             mock_altaz.alt = mock_alt
             return mock_altaz
 
@@ -304,10 +304,10 @@ class TestIsRadiantVisible:
 
 
 class TestMeteorShowerExceptionHandler:
-    """Cover lines 283-284 (exception in meteor shower loop)."""
+    """Cover  (exception in meteor shower loop)."""
 
     def test_exception_in_shower_loop_is_swallowed(self):
-        """Lines 283-284: exception inside the per-shower try block is caught and logged."""
+        """exception inside the per-shower try block is caught and logged."""
         svc = SolarSystemEventsService(45.0, -73.5, timezone="America/Montreal")
         from datetime import date
 
@@ -328,10 +328,10 @@ class TestMeteorShowerExceptionHandler:
 
 
 class TestCometExceptionHandler:
-    """Cover lines 345-346 (exception in comet visibility loop)."""
+    """Cover  (exception in comet visibility loop)."""
 
     def test_exception_in_comet_loop_is_swallowed(self):
-        """Lines 345-346: exception inside the per-comet try block is caught and logged."""
+        """exception inside the per-comet try block is caught and logged."""
         from datetime import date
 
         svc = SolarSystemEventsService(45.0, -73.5)

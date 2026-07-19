@@ -181,7 +181,7 @@ class TestSyncTruePostSyncFalseBranches:
 
 
 class TestConfigValidBortleAndSqm:
-    """Covers lines 959, 967 – valid bortle and sqm values stored into location."""
+    """Covers valid bortle and sqm values stored into location."""
 
     def _base_config(self):
         return {
@@ -194,14 +194,14 @@ class TestConfigValidBortleAndSqm:
         }
 
     def test_valid_bortle_stored(self, client_admin):
-        """Covers line 959 – new_location['bortle'] = valid int."""
+        """Covers new_location['bortle'] = valid int."""
         cfg = self._base_config()
         cfg['location']['bortle'] = 5
         resp = client_admin.post('/api/config', json=cfg)
         assert resp.status_code == 200
 
     def test_valid_sqm_stored(self, client_admin):
-        """Covers line 967 – new_location['sqm'] = valid float."""
+        """Covers new_location['sqm'] = valid float."""
         cfg = self._base_config()
         cfg['location']['sqm'] = 21.5
         resp = client_admin.post('/api/config', json=cfg)
@@ -231,15 +231,15 @@ class TestBackupRestoreAstrodexSubpath:
         return buf
 
     def test_restore_astrodex_file_with_subpath(self, client_admin):
-        """Covers lines 1295-1299 (sub-path parts), 1306->1314 (non-JSON recognized),
-        1333-1338 (dir clear), 1356-1357 (binary write)."""
+        """Covers astrodex entries nested under a sub-path, non-JSON files being
+        recognized and written as binary, and the target directory being cleared first."""
         buf = self._make_zip([('astrodex/user123/item.json', b'{"name": "M42"}')])
         data = {'file': (buf, 'backup.zip')}
         resp = client_admin.post('/api/backup/restore', data=data, content_type='multipart/form-data')
         assert resp.status_code in (200, 400, 500)
 
     def test_restore_config_and_astrodex_together(self, client_admin):
-        """Covers json_blobs path (1351-1354) and non-json path (1356-1357) together."""
+        """Covers the json_blobs path and non-json path together."""
         import json as _json
         config_content = _json.dumps({'location': {'latitude': 48.0}}).encode()
         buf = self._make_zip([
@@ -251,7 +251,7 @@ class TestBackupRestoreAstrodexSubpath:
         assert resp.status_code in (200, 400, 500)
 
     def test_restore_app_settings_reloads(self, client_admin, monkeypatch):
-        """Covers lines 1361-1363 – app_settings reload after restore."""
+        """Covers app_settings reload after restore."""
         import json as _json
         settings_content = _json.dumps({'session_cookie_secure': False}).encode()
         from utils import app_settings as _as
@@ -264,10 +264,10 @@ class TestBackupRestoreAstrodexSubpath:
 
 
 class TestSimbadFalseBranch:
-    """Covers 3916->3936 – is_safe_identifier returns False."""
+    """Covers is_safe_identifier returns False."""
 
     def test_simbad_unsafe_identifier_returns_not_found(self, client_admin, monkeypatch):
-        """Covers 3916->3936 – is_safe_identifier False → immediate not_found."""
+        """Covers is_safe_identifier False → immediate not_found."""
         from skytonight import skytonight_targets as _skt
         from observation import object_info as _oi
 
@@ -280,7 +280,7 @@ class TestSimbadFalseBranch:
 
 
 class TestAstrodexSwitchException:
-    """Covers 3595-3597 – unexpected exception in switch_catalogue_name."""
+    """Covers unexpected exception in switch_catalogue_name."""
 
     def test_switch_catalogue_name_exception_returns_500(self, client_admin, monkeypatch):
         from observation import astrodex as _adx
@@ -310,7 +310,7 @@ class TestConfigProxyAndAstrodex:
         }
 
     def test_config_astrodex_not_in_existing_config(self, client_admin, monkeypatch):
-        """Covers 904->908 – 'astrodex' not in existing config → add defaults."""
+        """Covers 'astrodex' not in existing config → add defaults."""
         from utils import repo_config as _rc
 
         original_load = _rc.load_config
@@ -326,21 +326,21 @@ class TestConfigProxyAndAstrodex:
         assert resp.status_code == 200
 
     def test_config_update_saves_skytonight_with_non_dict_sub_value(self, client_admin):
-        """Covers line 916 – skytonight top-level key with non-dict value."""
+        """Covers skytonight top-level key with non-dict value."""
         cfg = self._base_config()
         cfg['skytonight'] = {'enabled': True, 'some_flag': 'scalar'}
         resp = client_admin.post('/api/config', json=cfg)
         assert resp.status_code == 200
 
     def test_config_sqm_as_string_parses_ok(self, client_admin):
-        """Covers line 967 True branch with string-formatted sqm."""
+        """Covers the True branch with string-formatted sqm."""
         cfg = self._base_config()
         cfg['location']['sqm'] = '21.0'
         resp = client_admin.post('/api/config', json=cfg)
         assert resp.status_code == 200
 
     def test_config_bortle_as_string_parses_ok(self, client_admin):
-        """Covers line 959 True branch with string-formatted bortle."""
+        """Covers the True branch with string-formatted bortle."""
         cfg = self._base_config()
         cfg['location']['bortle'] = '7'
         resp = client_admin.post('/api/config', json=cfg)
@@ -351,7 +351,7 @@ class TestPlanResolveNightFallback:
     """Covers the full fallback path in _resolve_observing_night_for_plan."""
 
     def test_resolve_night_both_except_returns_none(self, client_admin, monkeypatch):
-        """Covers 2990-2992, 3001, 3011, 3020-3022 – both sun and calc fail → None."""
+        """Covers both sun and calc fail → None."""
         from astroweather.sun_phases import SunService as _SS
 
         def sun_raise(self):
@@ -376,7 +376,7 @@ class TestPlanResolveNightFallback:
         assert resp.status_code in (200, 400, 409, 500)
 
     def test_resolve_night_missing_metadata_returns_none(self, client_admin, monkeypatch):
-        """Covers 3011 – calc results missing night_start/end → None."""
+        """Covers calc results missing night_start/end → None."""
         from astroweather.sun_phases import SunService as _SS
 
         def sun_raise(self):
@@ -404,7 +404,7 @@ class TestEquipmentPaths:
     """Covers equipment endpoint paths using equipment_profiles module."""
 
     def test_get_telescope_by_id_found(self, client_admin, monkeypatch):
-        """Covers line 4008 – telescope found by ID."""
+        """Covers telescope found by ID."""
         from equipment import equipment_profiles as _ep
 
         fake = {'id': 'scope-1', 'name': 'Test Scope', 'focal_length': 800}
@@ -414,7 +414,7 @@ class TestEquipmentPaths:
         assert resp.status_code == 200
 
     def test_update_telescope_shared_by_other_returns_403(self, client_admin, monkeypatch):
-        """Covers line 4029 – 403 when updating another user's shared telescope."""
+        """Covers when updating another user's shared telescope."""
         from equipment import equipment_profiles as _ep
 
         monkeypatch.setattr(_ep, 'load_all_shared_equipment',
@@ -423,7 +423,7 @@ class TestEquipmentPaths:
         assert resp.status_code == 403
 
     def test_get_camera_by_id_found(self, client_admin, monkeypatch):
-        """Covers line 4123 – camera found by ID."""
+        """Covers camera found by ID."""
         from equipment import equipment_profiles as _ep
 
         fake = {'id': 'cam-1', 'name': 'ASI294'}
@@ -433,7 +433,7 @@ class TestEquipmentPaths:
         assert resp.status_code == 200
 
     def test_update_camera_shared_by_other_returns_403(self, client_admin, monkeypatch):
-        """Covers line 4144 – 403 when updating another user's shared camera."""
+        """Covers when updating another user's shared camera."""
         from equipment import equipment_profiles as _ep
 
         monkeypatch.setattr(_ep, 'load_all_shared_equipment',
@@ -442,7 +442,7 @@ class TestEquipmentPaths:
         assert resp.status_code == 403
 
     def test_get_mount_by_id_found(self, client_admin, monkeypatch):
-        """Covers line 4238 – mount found by ID."""
+        """Covers mount found by ID."""
         from equipment import equipment_profiles as _ep
 
         fake = {'id': 'mnt-1', 'name': 'EQ6-R'}
@@ -452,7 +452,7 @@ class TestEquipmentPaths:
         assert resp.status_code == 200
 
     def test_update_mount_shared_by_other_returns_403(self, client_admin, monkeypatch):
-        """Covers line 4259 – 403 when updating another user's shared mount."""
+        """Covers when updating another user's shared mount."""
         from equipment import equipment_profiles as _ep
 
         monkeypatch.setattr(_ep, 'load_all_shared_equipment',
@@ -461,7 +461,7 @@ class TestEquipmentPaths:
         assert resp.status_code == 403
 
     def test_get_filter_by_id_found(self, client_admin, monkeypatch):
-        """Covers line 4353 – filter found by ID."""
+        """Covers filter found by ID."""
         from equipment import equipment_profiles as _ep
 
         fake = {'id': 'filter-1', 'name': 'OIII'}
@@ -471,7 +471,7 @@ class TestEquipmentPaths:
         assert resp.status_code == 200
 
     def test_update_filter_shared_by_other_returns_403(self, client_admin, monkeypatch):
-        """Covers line 4374 – 403 when updating another user's shared filter."""
+        """Covers when updating another user's shared filter."""
         from equipment import equipment_profiles as _ep
 
         monkeypatch.setattr(_ep, 'load_all_shared_equipment',
@@ -480,7 +480,7 @@ class TestEquipmentPaths:
         assert resp.status_code == 403
 
     def test_get_accessory_by_id_found(self, client_admin, monkeypatch):
-        """Covers line 4449 – accessory found by ID."""
+        """Covers accessory found by ID."""
         from equipment import equipment_profiles as _ep
 
         fake = {'id': 'acc-1', 'name': 'Barlow 2x'}
@@ -490,7 +490,7 @@ class TestEquipmentPaths:
         assert resp.status_code == 200
 
     def test_update_accessory_shared_by_other_returns_403(self, client_admin, monkeypatch):
-        """Covers line 4489 – 403 when updating another user's shared accessory."""
+        """Covers when updating another user's shared accessory."""
         from equipment import equipment_profiles as _ep
 
         monkeypatch.setattr(_ep, 'load_all_shared_equipment',
@@ -503,7 +503,7 @@ class TestMiscRemainingPaths:
     """Miscellaneous remaining uncovered paths."""
 
     def test_plan_observation_window_exception(self, client_admin, monkeypatch):
-        """Covers 3418-3420 – exception in plan observation window."""
+        """Covers exception in plan observation window."""
         from observation import plan_my_night as _pmn
 
         def raise_err(*a, **kw):
@@ -514,7 +514,7 @@ class TestMiscRemainingPaths:
         assert resp.status_code in (200, 500)
 
     def test_plan_export_csv_exception(self, client_admin, monkeypatch):
-        """Covers 3495-3497 – exception in plan CSV export."""
+        """Covers exception in plan CSV export."""
         from observation import plan_my_night as _pmn
 
         def raise_err(*a, **kw):
@@ -525,7 +525,7 @@ class TestMiscRemainingPaths:
         assert resp.status_code in (200, 500)
 
     def test_backup_download_exception(self, client_admin, monkeypatch):
-        """Covers 1217-1219 – exception in backup download."""
+        """Covers exception in backup download."""
         import zipfile as _zf
 
         def bad_zipfile(*a, **kw):
@@ -536,7 +536,7 @@ class TestMiscRemainingPaths:
         assert resp.status_code == 500
 
     def test_spaceflight_image_path_traversal(self, client_admin):
-        """Covers line 2187 – path traversal attempt in spaceflight image."""
+        """Covers path traversal attempt in spaceflight image."""
         resp = client_admin.get('/api/spaceflight/image/../../etc/passwd')
         assert resp.status_code in (400, 404)
 
@@ -547,12 +547,12 @@ class TestMiscRemainingPaths:
         assert resp.status_code in (200, 400, 500)
 
     def test_logs_api_returns_content(self, client_admin):
-        """Covers 1494-1496 path (logs endpoint)."""
+        """Covers path (logs endpoint)."""
         resp = client_admin.get('/api/logs')
         assert resp.status_code in (200, 500)
 
     def test_coordinate_conversion_exception_via_bad_regex(self, client_admin, monkeypatch):
-        """Covers 1551-1553 – exception in coordinate conversion."""
+        """Covers exception in coordinate conversion."""
         import re as _re
 
         original_match = _re.match
@@ -569,7 +569,7 @@ class TestMiscRemainingPaths:
         assert resp.status_code in (200, 400, 500)
 
     def test_push_notification_trigger_no_target(self, client_admin, monkeypatch):
-        """Covers lines 627, 677-679 – push notification trigger."""
+        """Covers push notification trigger."""
         from utils import push_manager as _pm
 
         monkeypatch.setattr(_pm, 'send_push', lambda *a, **kw: True)
@@ -586,7 +586,7 @@ class TestMiscRemainingPaths:
         assert resp.get_json()['deleted'] == 3
 
     def test_password_change_wrong_current_password(self, client_admin, monkeypatch):
-        """Covers line 402 error branch – wrong current password."""
+        """Covers the error branch for a wrong current password."""
         from utils.auth import user_manager as _um
 
         def raise_auth(*_):
@@ -605,7 +605,7 @@ class TestMiscRemainingPaths:
         assert resp.status_code in (200, 400, 404, 500)
 
     def test_accessory_by_id_found(self, client_admin, monkeypatch):
-        """Covers line 4449 – accessory found by ID."""
+        """Covers accessory found by ID."""
         from equipment import equipment_profiles as _ep
 
         fake = {'id': 'acc-1', 'name': 'Barlow 2x'}
@@ -615,7 +615,7 @@ class TestMiscRemainingPaths:
         assert resp.status_code == 200
 
     def test_combination_by_id_found(self, client_admin, monkeypatch):
-        """Covers lines 4590-4591 – combination found by ID."""
+        """Covers combination found by ID."""
         from equipment import equipment_profiles as _ep
 
         fake = {'id': 'combo-1', 'name': 'My Setup', 'telescope_id': 't1', 'camera_id': 'c1'}
@@ -644,7 +644,7 @@ class TestMiscRemainingPaths:
         assert resp.status_code in (200, 202)
 
     def test_push_test_no_subscriptions(self, client_admin, monkeypatch):
-        """Covers line 627 – push test with no subscriptions returns 400."""
+        """Covers push test with no subscriptions returns 400."""
         from utils.auth import user_manager as _um
 
         user = _um.get_user_by_username('admin')
@@ -687,7 +687,7 @@ class TestMiscRemainingPaths:
         assert resp.status_code == 200
 
     def test_resolve_night_calc_empty_metadata(self, client_admin, monkeypatch):
-        """Covers 2979, 2982-2983, 2990-2992 – calc returns empty metadata."""
+        """Covers calc returns empty metadata."""
         from astroweather.sun_phases import SunService as _SS
 
         def sun_raise(self):
@@ -709,7 +709,7 @@ class TestMiscRemainingPaths:
         assert resp.status_code in (200, 400, 409, 500)
 
     def test_plan_export_pdf_exception(self, client_admin, monkeypatch):
-        """Covers 3495-3497 – exception in plan PDF export."""
+        """Covers exception in plan PDF export."""
         from observation import plan_my_night as _pmn
 
         def raise_err(*a, **kw):
@@ -720,7 +720,7 @@ class TestMiscRemainingPaths:
         assert resp.status_code in (200, 500)
 
     def test_astrodex_image_serve_found(self, client_admin, monkeypatch):
-        """Covers line 3832 – image found and send_from_directory called."""
+        """Covers image found and send_from_directory called."""
         from observation import astrodex as _adx
         import flask as _flask
         import os as _os
