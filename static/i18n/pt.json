@@ -1638,7 +1638,18 @@
     "exposure_calc_help_read_noise": "Elétrons de ruído adicionados em cada leitura. Menos é melhor. Tipicamente 1–6 e⁻ para CMOS modernos.",
     "exposure_calc_help_qe": "Fração de fótons convertidos em elétrons. 60–75% é típico para câmeras CMOS modernas.",
     "exposure_calc_help_hours": "Duração total planejada da sessão. O calculador a divide em poses individuais recomendadas.",
-    "exposure_calc_help_bortle": "Bortle 1 = céu escuro pristino (SQM 22). Bortle 9 = brilho urbano (SQM 17,5)."
+    "exposure_calc_help_bortle": "Bortle 1 = céu escuro pristino (SQM 22). Bortle 9 = brilho urbano (SQM 17,5).",
+    "is_disabled": "Desativar este item (oculto das listas e dos seletores de combinação por padrão)",
+    "hidden_badge": "Oculto",
+    "show_hidden_items": "Mostrar ocultos ({count})",
+    "hide_hidden_items": "Ocultar itens ocultos",
+    "combination_invalid": "Contém equipamento desativado",
+    "combination_invalid_hint": "Esta combinação faz referência a equipamento agora desativado ou não mais disponível",
+    "delete_blocked_by_combination": "Não é possível excluir: ainda usado na(s) combinação(ões): {combinations}",
+    "form_guide_camera": "Câmera de guiagem",
+    "form_lens_focal_length": "Distância focal da objetiva (mm)",
+    "form_lens_focal_ratio": "Razão focal da objetiva (f/)",
+    "form_lens_focal_help": "Usado apenas quando nenhum telescópio está selecionado (ex.: câmera + objetiva em um rastreador estelar)."
   },
   "weather": {
     "observation_conditions": "Condições de observação",

@@ -169,10 +169,12 @@ def delete_telescope(telescope_id):
         if not user_id:  # pragma: no cover
             return jsonify({'error': 'User not authenticated'}), 401
 
-        success = equipment_profiles.delete_telescope(user_id, telescope_id)
+        success, blocked_by = equipment_profiles.delete_telescope(user_id, telescope_id)
 
         if success:
             return jsonify({'status': 'success'})
+        elif blocked_by:
+            return jsonify({'error': 'in_use_by_combination', 'combinations': blocked_by}), 409
         else:
             return jsonify({'error': 'Failed to delete telescope'}), 500
     except Exception as e:
@@ -290,10 +292,12 @@ def delete_camera(camera_id):
         if not user_id:  # pragma: no cover
             return jsonify({'error': 'User not authenticated'}), 401
 
-        success = equipment_profiles.delete_camera(user_id, camera_id)
+        success, blocked_by = equipment_profiles.delete_camera(user_id, camera_id)
 
         if success:
             return jsonify({'status': 'success'})
+        elif blocked_by:
+            return jsonify({'error': 'in_use_by_combination', 'combinations': blocked_by}), 409
         else:
             return jsonify({'error': 'Failed to delete camera'}), 500
     except Exception as e:
@@ -405,10 +409,12 @@ def delete_mount(mount_id):
         if not user_id:  # pragma: no cover
             return jsonify({'error': 'User not authenticated'}), 401
 
-        success = equipment_profiles.delete_mount(user_id, mount_id)
+        success, blocked_by = equipment_profiles.delete_mount(user_id, mount_id)
 
         if success:
             return jsonify({'status': 'success'})
+        elif blocked_by:
+            return jsonify({'error': 'in_use_by_combination', 'combinations': blocked_by}), 409
         else:
             return jsonify({'error': 'Failed to delete mount'}), 500
     except Exception as e:
@@ -520,10 +526,12 @@ def delete_filter(filter_id):
         if not user_id:  # pragma: no cover
             return jsonify({'error': 'User not authenticated'}), 401
 
-        success = equipment_profiles.delete_filter(user_id, filter_id)
+        success, blocked_by = equipment_profiles.delete_filter(user_id, filter_id)
 
         if success:
             return jsonify({'status': 'success'})
+        elif blocked_by:
+            return jsonify({'error': 'in_use_by_combination', 'combinations': blocked_by}), 409
         else:
             return jsonify({'error': 'Failed to delete filter'}), 500
     except Exception as e:
@@ -635,10 +643,12 @@ def delete_accessory(accessory_id):
         if not user_id:  # pragma: no cover
             return jsonify({'error': 'User not authenticated'}), 401
 
-        success = equipment_profiles.delete_accessory(user_id, accessory_id)
+        success, blocked_by = equipment_profiles.delete_accessory(user_id, accessory_id)
 
         if success:
             return jsonify({'status': 'success'})
+        elif blocked_by:
+            return jsonify({'error': 'in_use_by_combination', 'combinations': blocked_by}), 409
         else:
             return jsonify({'error': 'Failed to delete accessory'}), 500
     except Exception as e:
@@ -661,7 +671,8 @@ def get_combinations():
         items_with_status = []
         for combo in data.get('items', []):
             status = equipment_profiles.compute_combination_share_status(combo, user_id)
-            items_with_status.append({**combo, **status})
+            validity = equipment_profiles.compute_combination_validity_status(combo, user_id)
+            items_with_status.append({**combo, **status, **validity})
         shared_with_status = equipment_profiles.load_all_shared_combinations(user_id)
         return jsonify(
             {
@@ -715,7 +726,8 @@ def get_combination(combination_id):
 
         if combination:
             status = equipment_profiles.compute_combination_share_status(combination, user_id)
-            return jsonify({**combination, **status})
+            validity = equipment_profiles.compute_combination_validity_status(combination, user_id)
+            return jsonify({**combination, **status, **validity})
         else:
             return jsonify({'error': 'Combination not found'}), 404
     except Exception as e:

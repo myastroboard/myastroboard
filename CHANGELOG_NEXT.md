@@ -1,8 +1,27 @@
-#### 1.2 Version - Multi-location Profiles
+#### 1.2 Version - Multi-location Profiles and more!
 
 Observers travel - to the backyard, to the club field, to that dark-sky site three hours away. Until now, MyAstroBoard only knew about one of those places at a time.
 
 This release introduces multi-location profiles: admins can create up to 5 location presets (each with its own coordinates, timezone, Bortle/SQM sky quality and custom horizon profile) and attribute them to users. Every user picks a favorite default and can switch the active location instantly from the sky status widget - forecasts, SkyTonight, ISS/CSS passes, events and notifications all follow. Switching is instant because every location keeps its own warm cache; no recompute, no waiting.
+
+#### Refactor equipments
+
+Equipments was one of the first piece of the MyAstroBoard puzzle! As I was a telescope owner without camera I focused my project on telescope and telescope combination. On some place we could choose telescope, on other combination, but only telescope was computed.
+
+I unfortunately still don't own a camera (dream, dream...), but I worked a lot to solve this situation which could be a non-sence. Now the key of the system is "combination". Combinations already exists but have been improved, it's not only question of a telescope + mount, this can be your combination, with only camera, with a telescope, a camera, a guide, ...
+
+A combination is now computed for SkyTonight, for Plan my Night, using the entire equipment, not only the telescope.
+A combination is now linked to a photo also.
+
+#### Astrodex improvments
+
+As now MyAstroBoard is multi-location, and can use combination, all these data are now linked to a photo.
+And even a photo can be rated by yourself.
+Why ? Because now (and more later, see roadmap), all these data will be allow you to lear more on your equipment and the result.
+
+As location can be added to your picture, a World Photo Map is now available to see your different spot. On photo, you are not limited by recorded location, you can also indicate GPS coordinate if you take pictures in holidays!
+
+A note about privacy. As Astrodex, World Photo Map can be private or public. That's mean, if map is set as public, all users of your server can see the position on the map. This point is documented in UI. As this is a local tool, this shouldn't be an issue, specially because you can turn it in private. In all of case the location is provided to "logged" users only for the map, never to others.
 
 #### Notable change
 
@@ -17,5 +36,4 @@ This release introduces multi-location profiles: admins can create up to 5 locat
 - Add an optimizer service for a plan in plan-my-night
 - Complete reorganization of `backend` folder because the app had grown too much to remain organized.
 - Add notification for meteor shower
-- Add World map to see pictures by location
 - Precipitation is now used for astroscore calculation

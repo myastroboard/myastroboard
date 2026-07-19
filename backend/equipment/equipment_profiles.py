@@ -112,6 +112,7 @@ class Telescope:
     created_at: str = ""
     updated_at: str = ""
     is_shared: bool = False
+    is_disabled: bool = False
 
     def __post_init__(self):
         """Calculate derived values"""
@@ -144,6 +145,7 @@ class Camera:
     created_at: str = ""
     updated_at: str = ""
     is_shared: bool = False
+    is_disabled: bool = False
 
     def __post_init__(self):
         """Calculate derived values"""
@@ -168,6 +170,7 @@ class Mount:
     created_at: str = ""
     updated_at: str = ""
     is_shared: bool = False
+    is_disabled: bool = False
 
     def __post_init__(self):
         """Calculate recommended payload"""
@@ -192,6 +195,7 @@ class Filter:
     created_at: str = ""
     updated_at: str = ""
     is_shared: bool = False
+    is_disabled: bool = False
 
 
 @dataclass
@@ -207,6 +211,7 @@ class Accessory:
     created_at: str = ""
     updated_at: str = ""
     is_shared: bool = False
+    is_disabled: bool = False
 
 
 @dataclass
@@ -223,6 +228,10 @@ class EquipmentCombination:
     notes: str = ""
     created_at: str = ""
     updated_at: str = ""
+    is_disabled: bool = False
+    guide_camera_id: Optional[str] = None  # Separate guide camera, purely informational
+    lens_focal_length_mm: Optional[float] = None  # Camera-only combos (no telescope): lens on the camera
+    lens_focal_ratio: Optional[float] = None  # Camera-only combos: lens f-ratio
 
     def __post_init__(self):
         if self.filter_ids is None:
@@ -422,6 +431,118 @@ def load_all_shared_equipment(equipment_type: str, exclude_user_id: str) -> List
     return shared_items
 
 
+_BASIC_EQUIPMENT_TYPES = ('telescopes', 'cameras', 'mounts', 'filters', 'accessories')
+
+# Fields on a combination referencing a single equipment id, keyed by the equipment type
+# scanned in EQUIPMENT_DIR (matches the `_{type}.json` file suffix / load_all_shared_equipment
+# parameter convention). 'cameras' includes guide_camera_id since either field can reference one.
+_COMBINATION_SCALAR_REFERENCE_FIELDS: Dict[str, Tuple[str, ...]] = {
+    'telescopes': ('telescope_id',),
+    'cameras': ('camera_id', 'guide_camera_id'),
+    'mounts': ('mount_id',),
+}
+# Fields on a combination referencing a list of equipment ids.
+_COMBINATION_LIST_REFERENCE_FIELDS: Dict[str, str] = {
+    'filters': 'filter_ids',
+    'accessories': 'accessory_ids',
+}
+
+
+def _index_owned_and_shared_equipment(user_id: str) -> Tuple[Dict[str, Dict], Dict[str, Dict]]:
+    """Build (own_by_id, shared_by_id) indexes across all 5 basic equipment types."""
+    loaders = {
+        'telescopes': load_user_telescopes,
+        'cameras': load_user_cameras,
+        'mounts': load_user_mounts,
+        'filters': load_user_filters,
+        'accessories': load_user_accessories,
+    }
+    own_by_id: Dict[str, Dict] = {}
+    shared_by_id: Dict[str, Dict] = {}
+    for eq_type in _BASIC_EQUIPMENT_TYPES:
+        for item in loaders[eq_type](user_id).get('items', []):
+            own_by_id[item['id']] = item
+        for item in load_all_shared_equipment(eq_type, user_id):
+            shared_by_id[item['id']] = item
+    return own_by_id, shared_by_id
+
+
+def _combination_reference_ids(combination: Dict) -> List[str]:
+    """Flatten every equipment id a combination references into one list."""
+    ref_ids: List[str] = []
+    for field in ('telescope_id', 'camera_id', 'guide_camera_id', 'mount_id'):
+        val = combination.get(field)
+        if val:
+            ref_ids.append(val)
+    ref_ids.extend(combination.get('filter_ids') or [])
+    ref_ids.extend(combination.get('accessory_ids') or [])
+    return ref_ids
+
+
+def _find_combinations_referencing(equipment_type: str, equipment_id: str) -> List[Dict]:
+    """Return {name, owner_id} for every combination (any user) referencing this equipment id.
+
+    Used as a delete-guard: equipment referenced by a combination cannot be removed while the
+    reference exists. Scans every user's combinations file (not just the owner's) because a
+    *shared* item can be referenced by another user's combination.
+    """
+    ensure_equipment_directories()
+    scalar_fields = _COMBINATION_SCALAR_REFERENCE_FIELDS.get(equipment_type, ())
+    list_field = _COMBINATION_LIST_REFERENCE_FIELDS.get(equipment_type)
+
+    matches: List[Dict] = []
+    try:
+        for fname in os.listdir(EQUIPMENT_DIR):
+            if not fname.endswith('_combinations.json'):
+                continue
+            owner_id = fname[: -(len('combinations') + 6)]
+            fpath = os.path.join(EQUIPMENT_DIR, fname)
+            try:
+                with open(fpath, 'r') as f:
+                    data = json.load(f)
+            except Exception:
+                continue
+            for combo in data.get('items', []):
+                referenced = any(combo.get(field) == equipment_id for field in scalar_fields)
+                if not referenced and list_field:
+                    referenced = equipment_id in (combo.get(list_field) or [])
+                if referenced:
+                    matches.append({'name': combo.get('name', ''), 'owner_id': owner_id})
+    except Exception as e:
+        logger.error(f"Error scanning combinations referencing {equipment_type}/{equipment_id}: {e}")
+
+    return matches
+
+
+def compute_combination_validity_status(combination: Dict, user_id: str) -> Dict:
+    """Compute is_valid/invalid_reasons for a combination (feature.md's 'autocheck' requirement).
+
+    Distinct from is_disabled (the combination's own explicit toggle): is_valid is computed
+    automatically and turns False as soon as any referenced equipment item is disabled - or,
+    defensively, no longer resolvable at all (covers combinations created before delete-guards
+    existed, where a referenced item may already be gone).
+    """
+    own_by_id, shared_by_id = _index_owned_and_shared_equipment(user_id)
+
+    invalid_reasons: List[str] = []
+    disabled_component_ids: List[str] = []
+
+    for eq_id in _combination_reference_ids(combination):
+        item = own_by_id.get(eq_id) or shared_by_id.get(eq_id)
+        if item is None:
+            invalid_reasons.append(f'missing:{eq_id}')
+            disabled_component_ids.append(eq_id)
+        elif item.get('is_disabled', False):
+            invalid_reasons.append(f'disabled:{eq_id}')
+            disabled_component_ids.append(eq_id)
+
+    return {
+        'is_valid': not invalid_reasons,
+        'invalid_reasons': invalid_reasons,
+        'disabled_component_ids': disabled_component_ids,
+    }
+
+
 def compute_combination_share_status(combination: Dict, user_id: str) -> Dict:
     """Compute is_shared, has_broken_share, and broken_items for a combination.
 
@@ -430,30 +551,8 @@ def compute_combination_share_status(combination: Dict, user_id: str) -> Dict:
     'has_broken_share' is True when a referenced item can no longer be found in
     any user's shared pool (it was previously accessible but is now gone/unshared).
     """
-    own_by_id: Dict[str, Dict] = {}
-    for eq_type in ('telescopes', 'cameras', 'mounts', 'filters', 'accessories'):
-        loader = {
-            'telescopes': load_user_telescopes,
-            'cameras': load_user_cameras,
-            'mounts': load_user_mounts,
-            'filters': load_user_filters,
-            'accessories': load_user_accessories,
-        }[eq_type]
-        for item in loader(user_id).get('items', []):
-            own_by_id[item['id']] = item
-
-    shared_by_id: Dict[str, Dict] = {}
-    for eq_type in ('telescopes', 'cameras', 'mounts', 'filters', 'accessories'):
-        for item in load_all_shared_equipment(eq_type, user_id):
-            shared_by_id[item['id']] = item
-
-    ref_ids: List[str] = []
-    for field in ('telescope_id', 'camera_id', 'mount_id'):
-        val = combination.get(field)
-        if val:
-            ref_ids.append(val)
-    ref_ids.extend(combination.get('filter_ids') or [])
-    ref_ids.extend(combination.get('accessory_ids') or [])
+    own_by_id, shared_by_id = _index_owned_and_shared_equipment(user_id)
+    ref_ids = _combination_reference_ids(combination)
 
     is_shared = True
     has_broken_share = False
@@ -527,7 +626,8 @@ def load_all_shared_combinations(exclude_user_id: str) -> List[Dict]:
                 # Compute from the owner's perspective
                 status = compute_combination_share_status(combo, owner_id)
                 if status['is_shared']:
-                    annotated = {**combo, **status}
+                    validity = compute_combination_validity_status(combo, owner_id)
+                    annotated = {**combo, **status, **validity}
                     annotated['owner_id'] = owner_id
                     annotated['owner_username'] = user_map.get(owner_id, owner_id)
                     result.append(annotated)
@@ -590,6 +690,7 @@ def create_telescope(user_id: str, telescope_data: Dict) -> Optional[Dict]:
             created_at=datetime.now(timezone.utc).isoformat(),
             updated_at=datetime.now(timezone.utc).isoformat(),
             is_shared=bool(telescope_data.get('is_shared', False)),
+            is_disabled=bool(telescope_data.get('is_disabled', False)),
         )
 
         # Load existing data
@@ -647,6 +748,7 @@ def update_telescope(user_id: str, telescope_id: str, telescope_data: Dict) -> O
                     created_at=item.get('created_at', datetime.now(timezone.utc).isoformat()),
                     updated_at=datetime.now(timezone.utc).isoformat(),
                     is_shared=bool(telescope_data.get('is_shared', item.get('is_shared', False))),
+                    is_disabled=bool(telescope_data.get('is_disabled', item.get('is_disabled', False))),
                 )
 
                 data['items'][i] = asdict(telescope)
@@ -662,24 +764,24 @@ def update_telescope(user_id: str, telescope_id: str, telescope_data: Dict) -> O
         return None
 
 
-def delete_telescope(user_id: str, telescope_id: str) -> bool:
-    """Delete a telescope profile and its associated plan if it exists."""
+def delete_telescope(user_id: str, telescope_id: str) -> Tuple[bool, Optional[List[str]]]:
+    """Delete a telescope profile.
+
+    Refuses deletion when any combination (owned by this user or another, since a shared
+    telescope can be referenced by someone else's combination) still references this
+    telescope. Returns (False, [combination names]) in that case so the caller can show a
+    specific message, or (False, None) on a generic failure.
+    """
+    blocking = _find_combinations_referencing('telescopes', telescope_id)
+    if blocking:
+        return False, [combo['name'] for combo in blocking]
     try:
         data = load_user_telescopes(user_id)
         data['items'] = [item for item in data['items'] if item['id'] != telescope_id]
-        result = save_user_telescopes(user_id, data)
-        if result:
-            # Cascade: remove the per-telescope plan file if present
-            try:
-                from observation.plan_my_night import delete_plan_for_telescope
-
-                delete_plan_for_telescope(user_id, telescope_id)
-            except Exception as plan_error:
-                logger.warning(f'Could not delete plan for telescope {telescope_id}: {plan_error}')
-        return result
+        return save_user_telescopes(user_id, data), None
     except Exception as e:
         logger.error(f"Error deleting telescope: {e}")
-        return False
+        return False, None
 
 
 # ============================================================
@@ -738,6 +840,7 @@ def create_camera(user_id: str, camera_data: Dict) -> Optional[Dict]:
             created_at=datetime.now(timezone.utc).isoformat(),
             updated_at=datetime.now(timezone.utc).isoformat(),
             is_shared=bool(camera_data.get('is_shared', False)),
+            is_disabled=bool(camera_data.get('is_disabled', False)),
         )
 
         data = load_user_cameras(user_id)
@@ -794,6 +897,7 @@ def update_camera(user_id: str, camera_id: str, camera_data: Dict) -> Optional[D
                     created_at=item.get('created_at', datetime.now(timezone.utc).isoformat()),
                     updated_at=datetime.now(timezone.utc).isoformat(),
                     is_shared=bool(camera_data.get('is_shared', item.get('is_shared', False))),
+                    is_disabled=bool(camera_data.get('is_disabled', item.get('is_disabled', False))),
                 )
 
                 data['items'][i] = asdict(camera)
@@ -809,15 +913,22 @@ def update_camera(user_id: str, camera_id: str, camera_data: Dict) -> Optional[D
         return None
 
 
-def delete_camera(user_id: str, camera_id: str) -> bool:
-    """Delete a camera profile"""
+def delete_camera(user_id: str, camera_id: str) -> Tuple[bool, Optional[List[str]]]:
+    """Delete a camera profile.
+
+    Refuses deletion when any combination references this camera, either as its imaging
+    camera or as its guide camera.
+    """
+    blocking = _find_combinations_referencing('cameras', camera_id)
+    if blocking:
+        return False, [combo['name'] for combo in blocking]
     try:
         data = load_user_cameras(user_id)
         data['items'] = [item for item in data['items'] if item['id'] != camera_id]
-        return save_user_cameras(user_id, data)
+        return save_user_cameras(user_id, data), None
     except Exception as e:
         logger.error(f"Error deleting camera: {e}")
-        return False
+        return False, None
 
 
 # ============================================================
@@ -865,6 +976,7 @@ def create_mount(user_id: str, mount_data: Dict) -> Optional[Dict]:
             created_at=datetime.now(timezone.utc).isoformat(),
             updated_at=datetime.now(timezone.utc).isoformat(),
             is_shared=bool(mount_data.get('is_shared', False)),
+            is_disabled=bool(mount_data.get('is_disabled', False)),
         )
 
         data = load_user_mounts(user_id)
@@ -909,6 +1021,7 @@ def update_mount(user_id: str, mount_id: str, mount_data: Dict) -> Optional[Dict
                     ),
                     guiding_supported=mount_data.get('guiding_supported', False),
                     is_shared=bool(mount_data.get('is_shared', item.get('is_shared', False))),
+                    is_disabled=bool(mount_data.get('is_disabled', item.get('is_disabled', False))),
                     notes=mount_data.get('notes', ''),
                     created_at=item.get('created_at', datetime.now(timezone.utc).isoformat()),
                     updated_at=datetime.now(timezone.utc).isoformat(),
@@ -927,15 +1040,18 @@ def update_mount(user_id: str, mount_id: str, mount_data: Dict) -> Optional[Dict
         return None
 
 
-def delete_mount(user_id: str, mount_id: str) -> bool:
-    """Delete a mount profile"""
+def delete_mount(user_id: str, mount_id: str) -> Tuple[bool, Optional[List[str]]]:
+    """Delete a mount profile. Refuses deletion when a combination still references it."""
+    blocking = _find_combinations_referencing('mounts', mount_id)
+    if blocking:
+        return False, [combo['name'] for combo in blocking]
     try:
         data = load_user_mounts(user_id)
         data['items'] = [item for item in data['items'] if item['id'] != mount_id]
-        return save_user_mounts(user_id, data)
+        return save_user_mounts(user_id, data), None
     except Exception as e:
         logger.error(f"Error deleting mount: {e}")
-        return False
+        return False, None
 
 
 # ============================================================
@@ -983,6 +1099,7 @@ def create_filter(user_id: str, filter_data: Dict) -> Optional[Dict]:
             created_at=datetime.now(timezone.utc).isoformat(),
             updated_at=datetime.now(timezone.utc).isoformat(),
             is_shared=bool(filter_data.get('is_shared', False)),
+            is_disabled=bool(filter_data.get('is_disabled', False)),
         )
 
         data = load_user_filters(user_id)
@@ -1030,6 +1147,7 @@ def update_filter(user_id: str, filter_id: str, filter_data: Dict) -> Optional[D
                     created_at=item.get('created_at', datetime.now(timezone.utc).isoformat()),
                     updated_at=datetime.now(timezone.utc).isoformat(),
                     is_shared=bool(filter_data.get('is_shared', item.get('is_shared', False))),
+                    is_disabled=bool(filter_data.get('is_disabled', item.get('is_disabled', False))),
                 )
 
                 data['items'][i] = asdict(filter_obj)
@@ -1045,15 +1163,18 @@ def update_filter(user_id: str, filter_id: str, filter_data: Dict) -> Optional[D
         return None
 
 
-def delete_filter(user_id: str, filter_id: str) -> bool:
-    """Delete a filter profile"""
+def delete_filter(user_id: str, filter_id: str) -> Tuple[bool, Optional[List[str]]]:
+    """Delete a filter profile. Refuses deletion when a combination still references it."""
+    blocking = _find_combinations_referencing('filters', filter_id)
+    if blocking:
+        return False, [combo['name'] for combo in blocking]
     try:
         data = load_user_filters(user_id)
         data['items'] = [item for item in data['items'] if item['id'] != filter_id]
-        return save_user_filters(user_id, data)
+        return save_user_filters(user_id, data), None
     except Exception as e:
         logger.error(f"Error deleting filter: {e}")
-        return False
+        return False, None
 
 
 # ============================================================
@@ -1107,6 +1228,7 @@ def create_accessory(user_id: str, accessory_data: Dict) -> Optional[Dict]:
             created_at=datetime.now(timezone.utc).isoformat(),
             updated_at=datetime.now(timezone.utc).isoformat(),
             is_shared=bool(accessory_data.get('is_shared', False)),
+            is_disabled=bool(accessory_data.get('is_disabled', False)),
         )
 
         data = load_user_accessories(user_id)
@@ -1152,6 +1274,7 @@ def update_accessory(user_id: str, accessory_id: str, accessory_data: Dict) -> O
                     created_at=item.get('created_at', datetime.now(timezone.utc).isoformat()),
                     updated_at=datetime.now(timezone.utc).isoformat(),
                     is_shared=bool(accessory_data.get('is_shared', item.get('is_shared', False))),
+                    is_disabled=bool(accessory_data.get('is_disabled', item.get('is_disabled', False))),
                 )
 
                 data['items'][i] = asdict(accessory)
@@ -1166,15 +1289,18 @@ def update_accessory(user_id: str, accessory_id: str, accessory_data: Dict) -> O
         return None
 
 
-def delete_accessory(user_id: str, accessory_id: str) -> bool:
-    """Delete an accessory profile"""
+def delete_accessory(user_id: str, accessory_id: str) -> Tuple[bool, Optional[List[str]]]:
+    """Delete an accessory profile. Refuses deletion when a combination still references it."""
+    blocking = _find_combinations_referencing('accessories', accessory_id)
+    if blocking:
+        return False, [combo['name'] for combo in blocking]
     try:
         data = load_user_accessories(user_id)
         data['items'] = [item for item in data['items'] if item['id'] != accessory_id]
-        return save_user_accessories(user_id, data)
+        return save_user_accessories(user_id, data), None
     except Exception as e:
         logger.error(f"Error deleting accessory: {e}")
-        return False
+        return False, None
 
 
 # ============================================================
@@ -1273,6 +1399,12 @@ def create_combination(user_id: str, combination_data: Dict) -> Optional[Dict]:
             logger.error("At minimum a telescope or camera must be selected")
             return None
 
+        # Helper to convert empty strings to None for optional float fields
+        def get_float_or_none(value, default=None):
+            if not value or value == '':
+                return default
+            return float(value)
+
         combination = EquipmentCombination(
             id=str(uuid.uuid4()),
             name=combination_data['name'],
@@ -1284,6 +1416,10 @@ def create_combination(user_id: str, combination_data: Dict) -> Optional[Dict]:
             notes=combination_data.get('notes', ''),
             created_at=datetime.now(timezone.utc).isoformat(),
             updated_at=datetime.now(timezone.utc).isoformat(),
+            is_disabled=bool(combination_data.get('is_disabled', False)),
+            guide_camera_id=combination_data.get('guide_camera_id') or None,
+            lens_focal_length_mm=get_float_or_none(combination_data.get('lens_focal_length_mm')),
+            lens_focal_ratio=get_float_or_none(combination_data.get('lens_focal_ratio')),
         )
 
         data = load_user_combinations(user_id)
@@ -1312,6 +1448,12 @@ def update_combination(user_id: str, combination_id: str, combination_data: Dict
     try:
         data = load_user_combinations(user_id)
 
+        # Helper to convert empty strings to None for optional float fields
+        def get_float_or_none(value, default=None):
+            if not value or value == '':
+                return default
+            return float(value)
+
         for i, item in enumerate(data['items']):
             if item['id'] == combination_id:
                 # Validate: at minimum telescope or camera must be selected
@@ -1330,6 +1472,10 @@ def update_combination(user_id: str, combination_id: str, combination_data: Dict
                     notes=combination_data.get('notes', ''),
                     created_at=item.get('created_at', datetime.now(timezone.utc).isoformat()),
                     updated_at=datetime.now(timezone.utc).isoformat(),
+                    is_disabled=bool(combination_data.get('is_disabled', item.get('is_disabled', False))),
+                    guide_camera_id=combination_data.get('guide_camera_id') or None,
+                    lens_focal_length_mm=get_float_or_none(combination_data.get('lens_focal_length_mm')),
+                    lens_focal_ratio=get_float_or_none(combination_data.get('lens_focal_ratio')),
                 )
 
                 data['items'][i] = asdict(combination)

@@ -4282,9 +4282,17 @@ class TestEquipmentApiRoutes:
         assert resp.status_code == 200
 
     def test_delete_telescope_failure_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'delete_telescope', lambda *_: False)
+        monkeypatch.setattr(_app_mod.equipment_profiles, 'delete_telescope', lambda *_: (False, None))
         resp = client_admin.delete('/api/equipment/telescopes/some-id')
         assert resp.status_code == 500
+
+    def test_delete_telescope_blocked_by_combination_returns_409(self, client_admin, monkeypatch):
+        monkeypatch.setattr(_app_mod.equipment_profiles, 'delete_telescope', lambda *_: (False, ['Combo A']))
+        resp = client_admin.delete('/api/equipment/telescopes/some-id')
+        assert resp.status_code == 409
+        body = resp.get_json()
+        assert body['error'] == 'in_use_by_combination'
+        assert body['combinations'] == ['Combo A']
 
     def test_get_telescopes_exception_returns_500(self, client_admin, monkeypatch):
         monkeypatch.setattr(_app_mod.equipment_profiles, 'load_user_telescopes',
@@ -4343,7 +4351,7 @@ class TestEquipmentApiRoutes:
         assert resp.status_code == 200
 
     def test_delete_camera_failure_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'delete_camera', lambda *_: False)
+        monkeypatch.setattr(_app_mod.equipment_profiles, 'delete_camera', lambda *_: (False, None))
         resp = client_admin.delete('/api/equipment/cameras/any-id')
         assert resp.status_code == 500
 
@@ -4398,7 +4406,7 @@ class TestEquipmentApiRoutes:
         assert resp.status_code == 404
 
     def test_delete_mount_failure_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'delete_mount', lambda *_: False)
+        monkeypatch.setattr(_app_mod.equipment_profiles, 'delete_mount', lambda *_: (False, None))
         resp = client_admin.delete('/api/equipment/mounts/any-id')
         assert resp.status_code == 500
 
@@ -4455,7 +4463,7 @@ class TestEquipmentApiRoutes:
         assert resp.status_code == 404
 
     def test_delete_filter_failure_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'delete_filter', lambda *_: False)
+        monkeypatch.setattr(_app_mod.equipment_profiles, 'delete_filter', lambda *_: (False, None))
         resp = client_admin.delete('/api/equipment/filters/any-id')
         assert resp.status_code == 500
 
@@ -4510,7 +4518,7 @@ class TestEquipmentApiRoutes:
         assert resp.status_code == 500
 
     def test_delete_accessory_failure_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'delete_accessory', lambda *_: False)
+        monkeypatch.setattr(_app_mod.equipment_profiles, 'delete_accessory', lambda *_: (False, None))
         resp = client_admin.delete('/api/equipment/accessories/any-id')
         assert resp.status_code == 500
 
@@ -4552,6 +4560,30 @@ class TestEquipmentApiRoutes:
             'name': 'Main Combo', 'telescope_id': scope['id']
         })
         assert resp.status_code == 201
+
+    def test_get_combinations_includes_validity_status(self, client_admin):
+        # client_admin's equipment pool accumulates across tests in this class, so identify
+        # this test's own combination by id rather than assuming a fresh/empty list.
+        scope = client_admin.post('/api/equipment/telescopes', json=_TELESCOPE_DATA).get_json()['data']
+        created = client_admin.post(
+            '/api/equipment/combinations', json={'name': 'Validity Combo', 'telescope_id': scope['id']}
+        ).get_json()['data']
+
+        resp = client_admin.get('/api/equipment/combinations')
+        assert resp.status_code == 200
+        combos = resp.get_json()['data']
+        combo = next(c for c in combos if c['id'] == created['id'])
+        assert combo['is_valid'] is True
+        assert combo['invalid_reasons'] == []
+
+    def test_get_combination_includes_validity_status(self, client_admin):
+        scope = client_admin.post('/api/equipment/telescopes', json=_TELESCOPE_DATA).get_json()['data']
+        r = client_admin.post('/api/equipment/combinations', json={'name': 'Combo', 'telescope_id': scope['id']})
+        cid = r.get_json()['data']['id']
+
+        resp = client_admin.get(f'/api/equipment/combinations/{cid}')
+        assert resp.status_code == 200
+        assert resp.get_json()['is_valid'] is True
 
     def test_get_combination_not_found_returns_404(self, client_admin):
         resp = client_admin.get('/api/equipment/combinations/nonexistent-combo-id')

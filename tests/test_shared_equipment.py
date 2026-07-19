@@ -216,3 +216,55 @@ def test_update_shared_to_false(temp_data_dir):
     scope = _create_telescope(USER_A, 'Scope', is_shared=True)
     updated = equipment_profiles.update_telescope(USER_A, scope['id'], {**scope, 'is_shared': False})
     assert updated['is_shared'] is False
+
+
+# ============================================================
+# Cross-user delete-guard and validity status (feature.md rules)
+# ============================================================
+
+def test_shared_telescope_delete_blocked_by_other_users_combination(temp_data_dir):
+    """USER_B's shared telescope, referenced by USER_A's own combination, can't be deleted by USER_B."""
+    scope_b = _create_telescope(USER_B, 'Bob Scope', is_shared=True)
+    equipment_profiles.create_combination(USER_A, {
+        'name': "Alice's Combo", 'telescope_id': scope_b['id'],
+    })
+
+    success, blocked_by = equipment_profiles.delete_telescope(USER_B, scope_b['id'])
+    assert success is False
+    assert blocked_by == ["Alice's Combo"]
+
+
+def test_validity_status_from_owner_perspective_when_shared_item_disabled(temp_data_dir):
+    """USER_A's combination references USER_B's shared telescope; disabling it (by USER_B) makes
+    USER_A's combination invalid when computed from USER_A's perspective."""
+    scope_b = _create_telescope(USER_B, 'Bob Scope', is_shared=True)
+    combo = equipment_profiles.create_combination(USER_A, {
+        'name': "Alice's Combo", 'telescope_id': scope_b['id'],
+    })
+
+    with patch('utils.auth.user_manager', _mock_user_manager()):
+        status = equipment_profiles.compute_combination_validity_status(combo, USER_A)
+    assert status['is_valid'] is True
+
+    equipment_profiles.update_telescope(USER_B, scope_b['id'], {**scope_b, 'is_disabled': True})
+
+    with patch('utils.auth.user_manager', _mock_user_manager()):
+        status = equipment_profiles.compute_combination_validity_status(combo, USER_A)
+    assert status['is_valid'] is False
+    assert scope_b['id'] in status['disabled_component_ids']
+
+
+def test_load_all_shared_combinations_attaches_validity_status(temp_data_dir):
+    """load_all_shared_combinations includes is_valid alongside is_shared for each entry."""
+    scope_b = _create_telescope(USER_B, 'Bob Scope', is_shared=True)
+    equipment_profiles.create_combination(USER_B, {
+        'name': 'Shared Combo', 'telescope_id': scope_b['id'],
+    })
+
+    with patch('utils.auth.user_manager', _mock_user_manager()):
+        shared = equipment_profiles.load_all_shared_combinations(exclude_user_id=USER_A)
+
+    assert len(shared) == 1
+    assert shared[0]['name'] == 'Shared Combo'
+    assert shared[0]['is_valid'] is True
+    assert shared[0]['owner_username'] == 'bob'

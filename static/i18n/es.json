@@ -1638,7 +1638,18 @@
     "exposure_calc_help_read_noise": "Electrones de ruido añadidos en cada lectura. Menor es mejor. Típicamente 1–6 e⁻ en CMOS modernas.",
     "exposure_calc_help_qe": "Fracción de fotones convertidos en electrones. 60–75 % es típico para CMOS modernas.",
     "exposure_calc_help_hours": "Duración total planeada de la sesión. El calculador la divide en exposiciones unitarias.",
-    "exposure_calc_help_bortle": "Bortle 1 = cielo oscuro prístino (SQM 22). Bortle 9 = resplandor urbano (SQM 17,5)."
+    "exposure_calc_help_bortle": "Bortle 1 = cielo oscuro prístino (SQM 22). Bortle 9 = resplandor urbano (SQM 17,5).",
+    "is_disabled": "Deshabilitar este elemento (oculto de las listas y los selectores de combinación por defecto)",
+    "hidden_badge": "Oculto",
+    "show_hidden_items": "Mostrar ocultos ({count})",
+    "hide_hidden_items": "Ocultar elementos ocultos",
+    "combination_invalid": "Contiene equipo deshabilitado",
+    "combination_invalid_hint": "Esta combinación hace referencia a equipo que ahora está deshabilitado o ya no está disponible",
+    "delete_blocked_by_combination": "No se puede eliminar: todavía se usa en la(s) combinación(es): {combinations}",
+    "form_guide_camera": "Cámara de guiado",
+    "form_lens_focal_length": "Distancia focal del objetivo (mm)",
+    "form_lens_focal_ratio": "Relación focal del objetivo (f/)",
+    "form_lens_focal_help": "Solo se usa cuando no se selecciona ningún telescopio (p. ej., cámara + objetivo sobre un seguidor estelar)."
   },
   "weather": {
     "observation_conditions": "Condiciones de observación",

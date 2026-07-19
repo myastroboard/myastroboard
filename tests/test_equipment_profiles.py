@@ -201,10 +201,11 @@ def test_delete_telescope(temp_data_dir, test_user_id):
     }
     
     created = equipment_profiles.create_telescope(test_user_id, telescope_data)
-    success = equipment_profiles.delete_telescope(test_user_id, created['id'])
-    
+    success, blocked_by = equipment_profiles.delete_telescope(test_user_id, created['id'])
+
     assert success is True
-    
+    assert blocked_by is None
+
     # Verify it's gone
     retrieved = equipment_profiles.get_telescope(test_user_id, created['id'])
     assert retrieved is None
@@ -422,6 +423,294 @@ def test_combination_requires_telescope_or_camera(temp_data_dir, test_user_id):
     
     # Should fail because neither telescope nor camera is specified
     assert combination is None
+
+
+def test_combination_new_fields_roundtrip(temp_data_dir, test_user_id):
+    """guide_camera_id, lens_focal_length_mm, lens_focal_ratio and is_disabled persist on create/update."""
+    camera = equipment_profiles.create_camera(test_user_id, {
+        'name': 'Main Cam', 'manufacturer': 'ZWO', 'sensor_width_mm': 13.2, 'sensor_height_mm': 8.8,
+        'resolution_width_px': 3096, 'resolution_height_px': 2080, 'pixel_size_um': 4.5,
+        'sensor_type': 'CMOS Color',
+    })
+    guide_cam = equipment_profiles.create_camera(test_user_id, {
+        'name': 'Guide Cam', 'manufacturer': 'ZWO', 'sensor_width_mm': 6.4, 'sensor_height_mm': 4.8,
+        'resolution_width_px': 1280, 'resolution_height_px': 960, 'pixel_size_um': 3.75,
+        'sensor_type': 'CMOS Mono',
+    })
+
+    combo = equipment_profiles.create_combination(test_user_id, {
+        'name': 'Wide-Field Rig',
+        'camera_id': camera['id'],
+        'guide_camera_id': guide_cam['id'],
+        'lens_focal_length_mm': '135',
+        'lens_focal_ratio': '2.8',
+        'is_disabled': True,
+    })
+
+    assert combo is not None
+    assert combo['telescope_id'] is None
+    assert combo['guide_camera_id'] == guide_cam['id']
+    assert combo['lens_focal_length_mm'] == 135.0
+    assert combo['lens_focal_ratio'] == 2.8
+    assert combo['is_disabled'] is True
+
+    updated = equipment_profiles.update_combination(test_user_id, combo['id'], {
+        'name': 'Wide-Field Rig',
+        'camera_id': camera['id'],
+        'guide_camera_id': '',
+        'lens_focal_length_mm': '',
+        'lens_focal_ratio': '',
+        'is_disabled': False,
+    })
+    assert updated['guide_camera_id'] is None
+    assert updated['lens_focal_length_mm'] is None
+    assert updated['lens_focal_ratio'] is None
+    assert updated['is_disabled'] is False
+
+
+def test_is_disabled_create_and_update_roundtrip_all_types(temp_data_dir, test_user_id):
+    """is_disabled defaults False, persists True on create, and can be toggled back on update."""
+    telescope = equipment_profiles.create_telescope(test_user_id, {
+        'name': 'T', 'telescope_type': 'Refractor', 'aperture_mm': 100, 'focal_length_mm': 1000,
+    })
+    assert telescope['is_disabled'] is False
+
+    camera = equipment_profiles.create_camera(test_user_id, {
+        'name': 'C', 'manufacturer': 'M', 'sensor_width_mm': 10, 'sensor_height_mm': 8,
+        'resolution_width_px': 3000, 'resolution_height_px': 2000, 'pixel_size_um': 3.8,
+        'sensor_type': 'CMOS Color', 'is_disabled': True,
+    })
+    assert camera['is_disabled'] is True
+
+    mount = equipment_profiles.create_mount(test_user_id, {
+        'name': 'Mount', 'mount_type': 'Equatorial', 'payload_capacity_kg': 10, 'is_disabled': True,
+    })
+    assert mount['is_disabled'] is True
+    mount = equipment_profiles.update_mount(test_user_id, mount['id'], {
+        'name': 'Mount', 'mount_type': 'Equatorial', 'payload_capacity_kg': 10, 'is_disabled': False,
+    })
+    assert mount['is_disabled'] is False
+
+    filt = equipment_profiles.create_filter(test_user_id, {
+        'name': 'Filter', 'filter_type': 'LRGB', 'is_disabled': True,
+    })
+    assert filt['is_disabled'] is True
+    filt = equipment_profiles.update_filter(test_user_id, filt['id'], {
+        'name': 'Filter', 'filter_type': 'LRGB', 'is_disabled': False,
+    })
+    assert filt['is_disabled'] is False
+
+    accessory = equipment_profiles.create_accessory(test_user_id, {
+        'name': 'Focuser', 'accessory_type': 'Focuser', 'is_disabled': True,
+    })
+    assert accessory['is_disabled'] is True
+    accessory = equipment_profiles.update_accessory(test_user_id, accessory['id'], {
+        'name': 'Focuser', 'accessory_type': 'Focuser', 'is_disabled': False,
+    })
+    assert accessory['is_disabled'] is False
+
+    telescope = equipment_profiles.update_telescope(test_user_id, telescope['id'], {
+        'name': 'T', 'telescope_type': 'Refractor', 'aperture_mm': 100, 'focal_length_mm': 1000,
+        'is_disabled': True,
+    })
+    assert telescope['is_disabled'] is True
+
+
+class TestEquipmentDeleteGuard:
+    """A combination referencing equipment blocks that equipment's deletion (feature.md rule)."""
+
+    def test_delete_telescope_blocked_then_succeeds_after_combo_removed(self, temp_data_dir, test_user_id):
+        telescope = equipment_profiles.create_telescope(test_user_id, {
+            'name': 'T', 'telescope_type': 'Refractor', 'aperture_mm': 100, 'focal_length_mm': 1000,
+        })
+        combo = equipment_profiles.create_combination(test_user_id, {
+            'name': 'Combo', 'telescope_id': telescope['id'],
+        })
+
+        success, blocked_by = equipment_profiles.delete_telescope(test_user_id, telescope['id'])
+        assert success is False
+        assert blocked_by == ['Combo']
+        assert equipment_profiles.get_telescope(test_user_id, telescope['id']) is not None
+
+        assert equipment_profiles.delete_combination(test_user_id, combo['id']) is True
+        success, blocked_by = equipment_profiles.delete_telescope(test_user_id, telescope['id'])
+        assert success is True
+        assert blocked_by is None
+
+    def test_delete_camera_blocked_as_imaging_camera(self, temp_data_dir, test_user_id):
+        camera = equipment_profiles.create_camera(test_user_id, {
+            'name': 'C', 'manufacturer': 'M', 'sensor_width_mm': 10, 'sensor_height_mm': 8,
+            'resolution_width_px': 3000, 'resolution_height_px': 2000, 'pixel_size_um': 3.8,
+            'sensor_type': 'CMOS Color',
+        })
+        equipment_profiles.create_combination(test_user_id, {'name': 'Combo', 'camera_id': camera['id']})
+
+        success, blocked_by = equipment_profiles.delete_camera(test_user_id, camera['id'])
+        assert success is False
+        assert blocked_by == ['Combo']
+
+    def test_delete_camera_blocked_as_guide_camera(self, temp_data_dir, test_user_id):
+        """A camera referenced only as guide_camera_id still blocks deletion."""
+        main_camera = equipment_profiles.create_camera(test_user_id, {
+            'name': 'Main', 'manufacturer': 'M', 'sensor_width_mm': 10, 'sensor_height_mm': 8,
+            'resolution_width_px': 3000, 'resolution_height_px': 2000, 'pixel_size_um': 3.8,
+            'sensor_type': 'CMOS Color',
+        })
+        guide_camera = equipment_profiles.create_camera(test_user_id, {
+            'name': 'Guide', 'manufacturer': 'M', 'sensor_width_mm': 6, 'sensor_height_mm': 4,
+            'resolution_width_px': 1280, 'resolution_height_px': 960, 'pixel_size_um': 3.75,
+            'sensor_type': 'CMOS Mono',
+        })
+        equipment_profiles.create_combination(test_user_id, {
+            'name': 'Combo', 'camera_id': main_camera['id'], 'guide_camera_id': guide_camera['id'],
+        })
+
+        success, blocked_by = equipment_profiles.delete_camera(test_user_id, guide_camera['id'])
+        assert success is False
+        assert blocked_by == ['Combo']
+
+    def test_delete_mount_blocked(self, temp_data_dir, test_user_id):
+        telescope = equipment_profiles.create_telescope(test_user_id, {
+            'name': 'T', 'telescope_type': 'Refractor', 'aperture_mm': 100, 'focal_length_mm': 1000,
+        })
+        mount = equipment_profiles.create_mount(test_user_id, {
+            'name': 'Mount', 'mount_type': 'Equatorial', 'payload_capacity_kg': 10,
+        })
+        equipment_profiles.create_combination(test_user_id, {
+            'name': 'Combo', 'telescope_id': telescope['id'], 'mount_id': mount['id'],
+        })
+
+        success, blocked_by = equipment_profiles.delete_mount(test_user_id, mount['id'])
+        assert success is False
+        assert blocked_by == ['Combo']
+
+    def test_delete_filter_blocked(self, temp_data_dir, test_user_id):
+        telescope = equipment_profiles.create_telescope(test_user_id, {
+            'name': 'T', 'telescope_type': 'Refractor', 'aperture_mm': 100, 'focal_length_mm': 1000,
+        })
+        filt = equipment_profiles.create_filter(test_user_id, {'name': 'H-Alpha', 'filter_type': 'Narrowband'})
+        equipment_profiles.create_combination(test_user_id, {
+            'name': 'Combo', 'telescope_id': telescope['id'], 'filter_ids': [filt['id']],
+        })
+
+        success, blocked_by = equipment_profiles.delete_filter(test_user_id, filt['id'])
+        assert success is False
+        assert blocked_by == ['Combo']
+
+    def test_delete_accessory_blocked(self, temp_data_dir, test_user_id):
+        telescope = equipment_profiles.create_telescope(test_user_id, {
+            'name': 'T', 'telescope_type': 'Refractor', 'aperture_mm': 100, 'focal_length_mm': 1000,
+        })
+        accessory = equipment_profiles.create_accessory(test_user_id, {
+            'name': 'Focuser', 'accessory_type': 'Focuser',
+        })
+        equipment_profiles.create_combination(test_user_id, {
+            'name': 'Combo', 'telescope_id': telescope['id'], 'accessory_ids': [accessory['id']],
+        })
+
+        success, blocked_by = equipment_profiles.delete_accessory(test_user_id, accessory['id'])
+        assert success is False
+        assert blocked_by == ['Combo']
+
+    def test_delete_unreferenced_equipment_not_blocked(self, temp_data_dir, test_user_id):
+        """Equipment not used by any combination deletes normally (no false positives)."""
+        telescope = equipment_profiles.create_telescope(test_user_id, {
+            'name': 'Lonely Scope', 'telescope_type': 'Refractor', 'aperture_mm': 100, 'focal_length_mm': 1000,
+        })
+        success, blocked_by = equipment_profiles.delete_telescope(test_user_id, telescope['id'])
+        assert success is True
+        assert blocked_by is None
+
+
+class TestFindCombinationsReferencing:
+    """Direct coverage of _find_combinations_referencing branches."""
+
+    def test_matches_via_list_field(self, temp_data_dir, test_user_id):
+        accessory = equipment_profiles.create_accessory(test_user_id, {
+            'name': 'OAG', 'accessory_type': 'Off-Axis Guider',
+        })
+        telescope = equipment_profiles.create_telescope(test_user_id, {
+            'name': 'T', 'telescope_type': 'Refractor', 'aperture_mm': 100, 'focal_length_mm': 1000,
+        })
+        equipment_profiles.create_combination(test_user_id, {
+            'name': 'Combo', 'telescope_id': telescope['id'], 'accessory_ids': [accessory['id']],
+        })
+        matches = equipment_profiles._find_combinations_referencing('accessories', accessory['id'])
+        assert len(matches) == 1
+        assert matches[0]['name'] == 'Combo'
+        assert matches[0]['owner_id'] == test_user_id
+
+    def test_no_matches_returns_empty_list(self, temp_data_dir, test_user_id):
+        equipment_profiles.create_telescope(test_user_id, {
+            'name': 'T', 'telescope_type': 'Refractor', 'aperture_mm': 100, 'focal_length_mm': 1000,
+        })
+        assert equipment_profiles._find_combinations_referencing('telescopes', 'no-such-id') == []
+
+    def test_inner_exception_on_invalid_combinations_file_continues(self, temp_data_dir, test_user_id):
+        equipment_profiles.ensure_equipment_directories()
+        bad_file = os.path.join(equipment_profiles.EQUIPMENT_DIR, 'someone_combinations.json')
+        with open(bad_file, 'w') as f:
+            f.write('{invalid')
+        assert equipment_profiles._find_combinations_referencing('telescopes', 'any-id') == []
+
+    def test_outer_exception_returns_empty_list(self, temp_data_dir, monkeypatch):
+        def raise_oops(_path):
+            raise Exception("oops")
+
+        monkeypatch.setattr(equipment_profiles.os, 'listdir', raise_oops)
+        assert equipment_profiles._find_combinations_referencing('telescopes', 'any-id') == []
+
+
+class TestComputeValidityStatusBranches:
+    """Covers compute_combination_validity_status: valid, disabled component, missing component."""
+
+    def test_combination_with_only_enabled_components_is_valid(self, temp_data_dir, test_user_id):
+        telescope = equipment_profiles.create_telescope(test_user_id, {
+            'name': 'T', 'telescope_type': 'Refractor', 'aperture_mm': 100, 'focal_length_mm': 1000,
+        })
+        combo = equipment_profiles.create_combination(test_user_id, {
+            'name': 'Combo', 'telescope_id': telescope['id'],
+        })
+        status = equipment_profiles.compute_combination_validity_status(combo, test_user_id)
+        assert status == {'is_valid': True, 'invalid_reasons': [], 'disabled_component_ids': []}
+
+    def test_disabled_component_makes_combination_invalid(self, temp_data_dir, test_user_id):
+        telescope = equipment_profiles.create_telescope(test_user_id, {
+            'name': 'T', 'telescope_type': 'Refractor', 'aperture_mm': 100, 'focal_length_mm': 1000,
+        })
+        combo = equipment_profiles.create_combination(test_user_id, {
+            'name': 'Combo', 'telescope_id': telescope['id'],
+        })
+        equipment_profiles.update_telescope(test_user_id, telescope['id'], {
+            'name': 'T', 'telescope_type': 'Refractor', 'aperture_mm': 100, 'focal_length_mm': 1000,
+            'is_disabled': True,
+        })
+
+        status = equipment_profiles.compute_combination_validity_status(combo, test_user_id)
+        assert status['is_valid'] is False
+        assert f"disabled:{telescope['id']}" in status['invalid_reasons']
+        assert telescope['id'] in status['disabled_component_ids']
+
+    def test_missing_component_makes_combination_invalid(self, temp_data_dir, test_user_id):
+        """Defensive fallback for combinations referencing equipment that no longer resolves
+        (e.g. data created before delete-guards existed)."""
+        combo = {
+            'telescope_id': 'ghost-id', 'camera_id': None, 'mount_id': None,
+            'guide_camera_id': None, 'filter_ids': [], 'accessory_ids': [],
+        }
+        status = equipment_profiles.compute_combination_validity_status(combo, test_user_id)
+        assert status['is_valid'] is False
+        assert 'missing:ghost-id' in status['invalid_reasons']
+        assert 'ghost-id' in status['disabled_component_ids']
+
+    def test_combination_with_no_references_is_valid(self, temp_data_dir, test_user_id):
+        """A combination with an empty reference list has nothing to invalidate."""
+        combo = {
+            'telescope_id': None, 'camera_id': None, 'mount_id': None,
+            'guide_camera_id': None, 'filter_ids': [], 'accessory_ids': [],
+        }
+        status = equipment_profiles.compute_combination_validity_status(combo, test_user_id)
+        assert status == {'is_valid': True, 'invalid_reasons': [], 'disabled_component_ids': []}
 
 
 def test_analyze_combination(temp_data_dir, test_user_id):
@@ -677,10 +966,10 @@ def test_update_and_delete_camera_mount_filter_accessory_and_combination(temp_da
     assert updated_combo['name'] == 'Combo B'
 
     assert equipment_profiles.delete_combination(test_user_id, combo['id']) is True
-    assert equipment_profiles.delete_accessory(test_user_id, accessory['id']) is True
-    assert equipment_profiles.delete_filter(test_user_id, filt['id']) is True
-    assert equipment_profiles.delete_mount(test_user_id, mount['id']) is True
-    assert equipment_profiles.delete_camera(test_user_id, camera['id']) is True
+    assert equipment_profiles.delete_accessory(test_user_id, accessory['id']) == (True, None)
+    assert equipment_profiles.delete_filter(test_user_id, filt['id']) == (True, None)
+    assert equipment_profiles.delete_mount(test_user_id, mount['id']) == (True, None)
+    assert equipment_profiles.delete_camera(test_user_id, camera['id']) == (True, None)
 
 
 def test_load_helpers_return_defaults_on_invalid_json(temp_data_dir, test_user_id):
@@ -1274,46 +1563,34 @@ class TestEquipmentDeleteExceptions:
     """Cover exception handlers in delete operations."""
 
     def test_delete_telescope_load_exception_returns_false(self, temp_data_dir, test_user_id, monkeypatch):
-        """exception in load_user_telescopes → False."""
+        """exception in load_user_telescopes → (False, None)."""
         monkeypatch.setattr(equipment_profiles, 'load_user_telescopes',
                             lambda *_: (_ for _ in ()).throw(RuntimeError("disk error")))
-        assert equipment_profiles.delete_telescope(test_user_id, 'x') is False
-
-    def test_delete_telescope_cascade_plan_exception_still_returns_true(self, temp_data_dir, test_user_id, monkeypatch):
-        """plan deletion raises → logged, delete still returns True."""
-        scope = equipment_profiles.create_telescope(test_user_id, {
-            'name': 'T', 'telescope_type': 'Refractor', 'aperture_mm': 100, 'focal_length_mm': 1000
-        })
-        import sys, types
-        fake_pmn = types.ModuleType('plan_my_night')
-        fake_pmn.delete_plan_for_telescope = lambda *_: (_ for _ in ()).throw(RuntimeError("plan error"))
-        monkeypatch.setitem(sys.modules, 'observation.plan_my_night', fake_pmn)
-        result = equipment_profiles.delete_telescope(test_user_id, scope['id'])
-        assert result is True
+        assert equipment_profiles.delete_telescope(test_user_id, 'x') == (False, None)
 
     def test_delete_camera_load_exception_returns_false(self, temp_data_dir, test_user_id, monkeypatch):
-        """exception in load_user_cameras → False."""
+        """exception in load_user_cameras → (False, None)."""
         monkeypatch.setattr(equipment_profiles, 'load_user_cameras',
                             lambda *_: (_ for _ in ()).throw(RuntimeError("disk error")))
-        assert equipment_profiles.delete_camera(test_user_id, 'x') is False
+        assert equipment_profiles.delete_camera(test_user_id, 'x') == (False, None)
 
     def test_delete_mount_load_exception_returns_false(self, temp_data_dir, test_user_id, monkeypatch):
-        """exception in load_user_mounts → False."""
+        """exception in load_user_mounts → (False, None)."""
         monkeypatch.setattr(equipment_profiles, 'load_user_mounts',
                             lambda *_: (_ for _ in ()).throw(RuntimeError("disk error")))
-        assert equipment_profiles.delete_mount(test_user_id, 'x') is False
+        assert equipment_profiles.delete_mount(test_user_id, 'x') == (False, None)
 
     def test_delete_filter_load_exception_returns_false(self, temp_data_dir, test_user_id, monkeypatch):
-        """exception in load_user_filters → False."""
+        """exception in load_user_filters → (False, None)."""
         monkeypatch.setattr(equipment_profiles, 'load_user_filters',
                             lambda *_: (_ for _ in ()).throw(RuntimeError("disk error")))
-        assert equipment_profiles.delete_filter(test_user_id, 'x') is False
+        assert equipment_profiles.delete_filter(test_user_id, 'x') == (False, None)
 
     def test_delete_accessory_load_exception_returns_false(self, temp_data_dir, test_user_id, monkeypatch):
-        """exception in load_user_accessories → False."""
+        """exception in load_user_accessories → (False, None)."""
         monkeypatch.setattr(equipment_profiles, 'load_user_accessories',
                             lambda *_: (_ for _ in ()).throw(RuntimeError("disk error")))
-        assert equipment_profiles.delete_accessory(test_user_id, 'x') is False
+        assert equipment_profiles.delete_accessory(test_user_id, 'x') == (False, None)
 
     def test_delete_combination_load_exception_returns_false(self, temp_data_dir, test_user_id, monkeypatch):
         """exception in load_user_combinations → False."""
@@ -1465,14 +1742,14 @@ class TestEquipmentExceptionHandlers:
         })
         assert result is None
 
-    def test_delete_telescope_save_fails_skips_cascade(self, temp_data_dir, test_user_id, monkeypatch):
-        """save returns False → skip cascade → return False."""
+    def test_delete_telescope_save_fails_returns_false(self, temp_data_dir, test_user_id, monkeypatch):
+        """save returns False → (False, None)."""
         scope = equipment_profiles.create_telescope(test_user_id, {
             'name': 'T', 'telescope_type': 'Refractor', 'aperture_mm': 100, 'focal_length_mm': 1000
         })
         monkeypatch.setattr(equipment_profiles, 'save_user_telescopes', lambda *_: False)
         result = equipment_profiles.delete_telescope(test_user_id, scope['id'])
-        assert result is False
+        assert result == (False, None)
 
     def test_update_camera_with_weight_covers_float_return(self, temp_data_dir, test_user_id):
         """get_float_or_none returns float(value) when value is non-empty string."""

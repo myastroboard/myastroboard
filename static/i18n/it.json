@@ -1638,7 +1638,18 @@
     "exposure_calc_help_read_noise": "Elettroni di rumore aggiunti a ogni lettura. Meno è meglio. Tipicamente 1–6 e⁻ per CMOS moderni.",
     "exposure_calc_help_qe": "Frazione di fotoni convertiti in elettroni. 60–75 % è tipico per i CMOS moderni.",
     "exposure_calc_help_hours": "Durata totale prevista della sessione. Il calcolatore la divide in pose singole raccomandate.",
-    "exposure_calc_help_bortle": "Bortle 1 = cielo buio incontaminato (SQM 22). Bortle 9 = inquinamento urbano (SQM 17,5)."
+    "exposure_calc_help_bortle": "Bortle 1 = cielo buio incontaminato (SQM 22). Bortle 9 = inquinamento urbano (SQM 17,5).",
+    "is_disabled": "Disattiva questo elemento (nascosto per impostazione predefinita da elenchi e selettori di combinazione)",
+    "hidden_badge": "Nascosto",
+    "show_hidden_items": "Mostra nascosti ({count})",
+    "hide_hidden_items": "Nascondi elementi nascosti",
+    "combination_invalid": "Contiene attrezzatura disattivata",
+    "combination_invalid_hint": "Questa combinazione fa riferimento ad attrezzatura ora disattivata o non più disponibile",
+    "delete_blocked_by_combination": "Impossibile eliminare: ancora utilizzato dalla/e combinazione/i: {combinations}",
+    "form_guide_camera": "Camera di guida",
+    "form_lens_focal_length": "Lunghezza focale dell'obiettivo (mm)",
+    "form_lens_focal_ratio": "Rapporto focale dell'obiettivo (f/)",
+    "form_lens_focal_help": "Utilizzato solo quando non è selezionato alcun telescopio (es. fotocamera + obiettivo su un inseguitore stellare)."
   },
   "weather": {
     "observation_conditions": "Condizioni di osservazione",

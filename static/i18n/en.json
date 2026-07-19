@@ -1638,7 +1638,18 @@
     "exposure_calc_help_read_noise": "Electrons of noise added per readout. Lower is better. Typically 1–6 e⁻ for modern CMOS.",
     "exposure_calc_help_qe": "Fraction of incoming photons converted to electrons. 60–75% is typical for modern CMOS cameras.",
     "exposure_calc_help_hours": "Total planned session length. The calculator divides it into the recommended sub-exposures.",
-    "exposure_calc_help_bortle": "Bortle 1 = pristine dark sky (SQM 22). Bortle 9 = inner-city glow (SQM 17.5). The sky background rate scales with this."
+    "exposure_calc_help_bortle": "Bortle 1 = pristine dark sky (SQM 22). Bortle 9 = inner-city glow (SQM 17.5). The sky background rate scales with this.",
+    "is_disabled": "Disable this item (hidden from lists and combination pickers by default)",
+    "hidden_badge": "Hidden",
+    "show_hidden_items": "Show hidden ({count})",
+    "hide_hidden_items": "Hide hidden items",
+    "combination_invalid": "Contains disabled equipment",
+    "combination_invalid_hint": "This combination references equipment that is now disabled or no longer available",
+    "delete_blocked_by_combination": "Cannot delete: still used by combination(s): {combinations}",
+    "form_guide_camera": "Guide Camera",
+    "form_lens_focal_length": "Lens Focal Length (mm)",
+    "form_lens_focal_ratio": "Lens Focal Ratio (f/)",
+    "form_lens_focal_help": "Only used when no telescope is selected (e.g. a camera + lens on a star tracker)."
   },
   "weather": {
     "observation_conditions": "Observation Conditions",
