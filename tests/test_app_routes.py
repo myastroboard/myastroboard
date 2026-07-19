@@ -1182,7 +1182,7 @@ class TestConfigPost:
 
 
 # ---------------------------------------------------------------------------
-# Successful login (covers lines 312-335)
+# Successful login
 # ---------------------------------------------------------------------------
 
 
@@ -1225,7 +1225,7 @@ class TestSuccessfulLogin:
 
 
 # ---------------------------------------------------------------------------
-# Events endpoints (cover lines 2354-2456 + 2530+)
+# Events endpoints
 # ---------------------------------------------------------------------------
 
 
@@ -1275,7 +1275,7 @@ class TestEventsEndpoints:
 
 
 # ---------------------------------------------------------------------------
-# Plan-my-night API routes (covers lines 3028+)
+# Plan-my-night API routes
 # ---------------------------------------------------------------------------
 
 
@@ -1315,7 +1315,7 @@ class TestPlanMyNightApiRoutes:
 
 
 # ---------------------------------------------------------------------------
-# Astrodex API routes (covers lines 3500+)
+# Astrodex API routes
 # ---------------------------------------------------------------------------
 
 
@@ -1363,7 +1363,7 @@ class TestStaleDataBranch:
 
 
 # ---------------------------------------------------------------------------
-# Events/upcoming with full cached data (covers lines 2354-2456)
+# Events/upcoming with full cached data
 # ---------------------------------------------------------------------------
 
 
@@ -3786,7 +3786,7 @@ class TestChangePasswordValidation:
 
 
 # ---------------------------------------------------------------------------
-# Plan-my-night routes that call route handler bodies (lines 3028+)
+# Plan-my-night routes that call route handler bodies
 # ---------------------------------------------------------------------------
 
 
@@ -3903,7 +3903,7 @@ class TestIssPassesSyncPath:
 
 
 class TestPushSubscribeAndList:
-    """Test push subscribe success path and list subscriptions (covers lines 522-576)."""
+    """Test push subscribe success path and list subscriptions."""
 
     @pytest.fixture
     def client_with_subscription(self, client_admin):
@@ -3968,14 +3968,14 @@ class TestStaticVersionedUrl:
         assert resp.status_code in (200, 304, 404)
 
     def test_static_unversioned_non_icon(self, client):
-        """Line 219: unversioned, non-icon → short cache header."""
+        """unversioned, non-icon → short cache header."""
         resp = client.get('/static/css/theme.css')
         assert resp.status_code in (200, 304, 404)
         if resp.status_code != 404:
             assert 'public, max-age=3600' in resp.headers.get('Cache-Control', '')
 
     def test_static_file_debug_mode_sets_no_store(self, client, monkeypatch):
-        """Lines 205-208: debug mode → no-store headers."""
+        """debug mode → no-store headers."""
         monkeypatch.setenv('FLASK_DEBUG', '1')
         resp = client.get('/static/css/theme.css')
         assert resp.status_code in (200, 304, 404)
@@ -3989,7 +3989,7 @@ class TestStaticVersionedUrl:
 
 
 class TestParseDurationMinutes:
-    """Lines 3053-3070: _parse_duration_minutes."""
+    """Tests for _parse_duration_minutes."""
 
     def setup_method(self):
         self._fn = _plan_my_night_mod._parse_duration_minutes
@@ -4026,7 +4026,7 @@ class TestParseDurationMinutes:
 
 
 class TestFormatMinutesHhmm:
-    """Lines 3074-3075: _format_minutes_hhmm."""
+    """Tests for _format_minutes_hhmm."""
 
     def setup_method(self):
         self._fn = _plan_my_night_mod._format_minutes_hhmm
@@ -4045,7 +4045,7 @@ class TestFormatMinutesHhmm:
 
 
 class TestComputePlanFillMetrics:
-    """Lines 3079-3112: _compute_plan_fill_metrics."""
+    """Tests for _compute_plan_fill_metrics."""
 
     def setup_method(self):
         self._fn = _plan_my_night_mod._compute_plan_fill_metrics
@@ -4060,12 +4060,12 @@ class TestComputePlanFillMetrics:
         assert result['planned_minutes'] == 0
 
     def test_entries_not_list_becomes_empty(self):
-        """Line 3081: entries is not a list → reset to []."""
+        """entries is not a list → reset to []."""
         result = self._fn({'entries': 'not_a_list'})
         assert result['planned_minutes'] == 0
 
     def test_non_dict_entry_is_skipped(self):
-        """Lines 3085-3086: non-dict entry → continue."""
+        """non-dict entry → continue."""
         result = self._fn({'entries': ['not_a_dict', None]})
         assert result['planned_minutes'] == 0
 
@@ -4074,7 +4074,7 @@ class TestComputePlanFillMetrics:
         assert result['planned_minutes'] == 30
 
     def test_entry_falls_back_to_planned_duration(self):
-        """Lines 3091-3093: int(planned_minutes) fails → use planned_duration."""
+        """int(planned_minutes) fails → use planned_duration."""
         result = self._fn({'entries': [{'planned_minutes': None, 'planned_duration': '1:30'}]})
         assert result['planned_minutes'] == 90
 
@@ -4117,7 +4117,7 @@ class TestAuthErrorHandlers:
     """Cover missing error handler branches in auth routes."""
 
     def test_change_password_generic_value_error_uses_default_key(self, client_admin, monkeypatch):
-        """Lines 411->414: ValueError with unrecognised message → default error_key."""
+        """ValueError with unrecognised message → default error_key."""
         monkeypatch.setattr(user_manager, 'change_own_password',
                             lambda *_a, **_k: (_ for _ in ()).throw(ValueError("Something else")))
         resp = client_admin.post('/api/auth/change-password', json={
@@ -4127,7 +4127,7 @@ class TestAuthErrorHandlers:
         assert resp.get_json().get('error_key') == 'users.error_update_password'
 
     def test_change_password_unexpected_exception_returns_500(self, client_admin, monkeypatch):
-        """Lines 416-418: unexpected exception in change_own_password → 500."""
+        """unexpected exception in change_own_password → 500."""
         monkeypatch.setattr(user_manager, 'change_own_password',
                             lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("db down")))
         resp = client_admin.post('/api/auth/change-password', json={
@@ -4136,19 +4136,19 @@ class TestAuthErrorHandlers:
         assert resp.status_code == 500
 
     def test_preferences_get_unexpected_exception_returns_500(self, client_admin, monkeypatch):
-        """Lines 432-437: exception in get_user_preferences → 500."""
+        """exception in get_user_preferences → 500."""
         monkeypatch.setattr(user_manager, 'get_user_preferences',
                             lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("db error")))
         resp = client_admin.get('/api/auth/preferences')
         assert resp.status_code == 500
 
     def test_preferences_put_missing_preferences_key_returns_400(self, client_admin):
-        """Line 452: no 'preferences' key in request body → 400."""
+        """no 'preferences' key in request body → 400."""
         resp = client_admin.put('/api/auth/preferences', json={'other': 'data'})
         assert resp.status_code == 400
 
     def test_preferences_put_invalid_subtab_returns_400(self, client_admin, monkeypatch):
-        """Line 463: Invalid startup_subtab → 400 with specific error_key."""
+        """Invalid startup_subtab → 400 with specific error_key."""
         monkeypatch.setattr(user_manager, 'update_user_preferences',
                             lambda *_a, **_k: (_ for _ in ()).throw(ValueError("Invalid startup_subtab: x")))
         resp = client_admin.put('/api/auth/preferences', json={'preferences': {}})
@@ -4156,7 +4156,7 @@ class TestAuthErrorHandlers:
         assert resp.get_json().get('error_key') == 'settings.pref_invalid_startup_subtab'
 
     def test_preferences_put_invalid_time_format_returns_400(self, client_admin, monkeypatch):
-        """Line 465: Invalid time_format → 400 with specific error_key."""
+        """Invalid time_format → 400 with specific error_key."""
         monkeypatch.setattr(user_manager, 'update_user_preferences',
                             lambda *_a, **_k: (_ for _ in ()).throw(ValueError("Invalid time_format: x")))
         resp = client_admin.put('/api/auth/preferences', json={'preferences': {}})
@@ -4164,7 +4164,7 @@ class TestAuthErrorHandlers:
         assert resp.get_json().get('error_key') == 'settings.pref_invalid_time_format'
 
     def test_preferences_put_invalid_density_returns_400(self, client_admin, monkeypatch):
-        """Line 467: Invalid density → 400 with specific error_key."""
+        """Invalid density → 400 with specific error_key."""
         monkeypatch.setattr(user_manager, 'update_user_preferences',
                             lambda *_a, **_k: (_ for _ in ()).throw(ValueError("Invalid density: x")))
         resp = client_admin.put('/api/auth/preferences', json={'preferences': {}})
@@ -4172,7 +4172,7 @@ class TestAuthErrorHandlers:
         assert resp.get_json().get('error_key') == 'settings.pref_invalid_density'
 
     def test_preferences_put_invalid_experience_level_returns_400(self, client_admin, monkeypatch):
-        """Line 486: Invalid experience_level → 400 with specific error_key."""
+        """Invalid experience_level → 400 with specific error_key."""
         monkeypatch.setattr(user_manager, 'update_user_preferences',
                             lambda *_a, **_k: (_ for _ in ()).throw(ValueError("Invalid experience_level: x")))
         resp = client_admin.put('/api/auth/preferences', json={'preferences': {}})
@@ -4180,7 +4180,7 @@ class TestAuthErrorHandlers:
         assert resp.get_json().get('error_key') == 'settings.pref_invalid_experience_level'
 
     def test_preferences_put_invalid_wizard_returns_400(self, client_admin, monkeypatch):
-        """Line 488: Invalid wizard → 400 with specific error_key."""
+        """Invalid wizard → 400 with specific error_key."""
         monkeypatch.setattr(user_manager, 'update_user_preferences',
                             lambda *_a, **_k: (_ for _ in ()).throw(ValueError("Invalid wizard: must be a dictionary")))
         resp = client_admin.put('/api/auth/preferences', json={'preferences': {}})
@@ -4188,7 +4188,7 @@ class TestAuthErrorHandlers:
         assert resp.get_json().get('error_key') == 'settings.pref_invalid_wizard'
 
     def test_preferences_put_generic_value_error_returns_400(self, client_admin, monkeypatch):
-        """Lines 468->471: ValueError with unrecognised text → default error_key."""
+        """ValueError with unrecognised text → default error_key."""
         monkeypatch.setattr(user_manager, 'update_user_preferences',
                             lambda *_a, **_k: (_ for _ in ()).throw(ValueError("Some unknown error")))
         resp = client_admin.put('/api/auth/preferences', json={'preferences': {}})
@@ -4196,7 +4196,7 @@ class TestAuthErrorHandlers:
         assert resp.get_json().get('error_key') == 'settings.pref_save_error'
 
     def test_preferences_put_unexpected_exception_returns_500(self, client_admin, monkeypatch):
-        """Lines 473-475: unexpected exception in update_user_preferences → 500."""
+        """unexpected exception in update_user_preferences → 500."""
         monkeypatch.setattr(user_manager, 'update_user_preferences',
                             lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("crash")))
         resp = client_admin.put('/api/auth/preferences', json={'preferences': {}})
@@ -4212,7 +4212,7 @@ class TestPushApiErrors:
     """Cover missing error handler branches in push API routes."""
 
     def test_vapid_public_key_exception_returns_503(self, client_admin, monkeypatch):
-        """Lines 490-492: exception in get_vapid_public_key → 503."""
+        """exception in get_vapid_public_key → 503."""
         import sys, types
         fake_pm = types.ModuleType('push_manager')
         fake_pm.get_vapid_public_key = lambda: (_ for _ in ()).throw(RuntimeError("no vapid"))
@@ -4221,7 +4221,7 @@ class TestPushApiErrors:
         assert resp.status_code == 503
 
     def test_vapid_config_status_exception_returns_500(self, client_admin, monkeypatch):
-        """Lines 503-505: exception in get_vapid_contact_status → 500."""
+        """exception in get_vapid_contact_status → 500."""
         import sys, types
         fake_pm = types.ModuleType('push_manager')
         fake_pm.get_vapid_contact_status = lambda: (_ for _ in ()).throw(RuntimeError("error"))
@@ -4250,7 +4250,7 @@ _ACCESSORY_DATA = {'name': '2x Barlow'}
 
 
 class TestEquipmentApiRoutes:
-    """Cover create/get/update/delete paths for all equipment API routes (lines 3942-4679)."""
+    """Cover create/get/update/delete paths for all equipment API routes."""
 
     # ---- Telescopes ----
 
@@ -4663,7 +4663,7 @@ class TestEquipmentApiRoutes:
 
 
 class TestEnrichPlanEntriesWithAstrodexStatus:
-    """Cover branch paths in _enrich_plan_entries_with_astrodex_status (lines 3027-3047)."""
+    """Cover branch paths in _enrich_plan_entries_with_astrodex_status."""
 
     def setup_method(self):
         self._fn = _plan_my_night_mod._enrich_plan_entries_with_astrodex_status
@@ -5254,7 +5254,7 @@ class TestTranslateSolarSystemEvents:
         assert result['events'][0]['event_type'] == 'Asteroid Occultation'
 
     def test_exception_in_translation_is_swallowed(self, monkeypatch):
-        """Lines 2642-2643: exception during translation is caught and swallowed."""
+        """exception during translation is caught and swallowed."""
         monkeypatch.setattr(_astronomy_mod, 'I18nManager',
                             lambda *_: (_ for _ in ()).throw(RuntimeError("i18n fail")))
         data = {'events': [{'event_type': 'Meteor Shower', 'raw_data': {
@@ -5265,13 +5265,13 @@ class TestTranslateSolarSystemEvents:
             pass  # test verifies the exception is raised or swallowed — either is acceptable
 
     def test_unknown_event_type_passes_through(self):
-        """Lines 2632->2641: event_type not in known list → appended unchanged."""
+        """event_type not in known list → appended unchanged."""
         data = {'events': [{'event_type': 'Unknown Galaxy Event', 'title': 'Original'}]}
         result = self._fn(data, 'fr')
         assert result['events'][0]['title'] == 'Original'
 
     def test_i18n_exception_caught_by_inner_handler(self, monkeypatch):
-        """Lines 2638-2639: i18n.t raises inside try → except logged, event appended."""
+        """i18n.t raises inside try → except logged, event appended."""
         class _BrokenI18n:
             def t(self, *a, **kw):
                 raise RuntimeError('i18n broken')
@@ -5290,13 +5290,13 @@ class TestTranslateSpecialPhenomenaEvents:
         self._fn = _astronomy_mod._translate_special_phenomena_events
 
     def test_unknown_event_type_not_translated(self):
-        """2758->2786: event_type doesn't match any branch → unchanged."""
+        """event_type doesn't match any branch → unchanged."""
         data = {'events': [{'event_type': 'Unknown Type', 'raw_data': {}}]}
         result = self._fn(data, 'fr')
         assert result['events'][0]['event_type'] == 'Unknown Type'
 
     def test_milky_way_with_null_gc_altitude_skips_translation(self):
-        """2766->2786: Milky Way event with no gc_altitude → no title/description update."""
+        """Milky Way event with no gc_altitude → no title/description update."""
         data = {'events': [{'event_type': 'Milky Way Core Visibility',
                              'raw_data': {}}]}
         result = self._fn(data, 'fr')
@@ -5304,21 +5304,21 @@ class TestTranslateSpecialPhenomenaEvents:
         assert 'title' not in result['events'][0]
 
     def test_milky_way_with_gc_altitude_in_raw_data(self):
-        """2762: gc_altitude fallback to raw_data.galactic_center_altitude."""
+        """gc_altitude fallback to raw_data.galactic_center_altitude."""
         data = {'events': [{'event_type': 'Milky Way Core Visibility',
                              'raw_data': {'galactic_center_altitude': 30.0}}]}
         result = self._fn(data, 'en')
         assert result['events'][0]['event_type'] == 'Milky Way Core Visibility'
 
     def test_milky_way_with_gc_altitude_second_fallback(self):
-        """2764: gc_altitude second fallback (raw_data.gc_altitude)."""
+        """gc_altitude second fallback (raw_data.gc_altitude)."""
         data = {'events': [{'event_type': 'Milky Way Core Visibility',
                              'raw_data': {'gc_altitude': 25.0}}]}
         result = self._fn(data, 'en')
         assert result['events'][0]['event_type'] == 'Milky Way Core Visibility'
 
     def test_exception_in_translation_swallowed(self, monkeypatch):
-        """2783-2784: exception in event translation is caught."""
+        """exception in event translation is caught."""
         monkeypatch.setattr(_astronomy_mod, 'I18nManager',
                             lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
         data = {'events': [{'event_type': 'Spring Equinox', 'raw_data': {'event': 'spring_equinox'}}]}
@@ -6033,12 +6033,12 @@ class TestWeatherRoutes:
 
 
 # ---------------------------------------------------------------------------
-# Line 560: _provider returns 'apple' (push subscriptions with apple endpoint)
+# _provider returns 'apple' (push subscriptions with apple endpoint)
 # ---------------------------------------------------------------------------
 
 
 class TestPushSubscriptionsAppleProvider:
-    """Cover line 560: _provider returns 'apple' for push.apple.com endpoints."""
+    """Cover _provider returns 'apple' for push.apple.com endpoints."""
 
     def test_apple_endpoint_classified_as_apple(self, client_admin, monkeypatch):
         admin = user_manager.get_user_by_username('admin')
@@ -6052,8 +6052,8 @@ class TestPushSubscriptionsAppleProvider:
 
 
 # ---------------------------------------------------------------------------
-# Lines 677-679: except in push_test_trigger
-# Lines 724-726: except in push_test
+# except in push_test_trigger
+# except in push_test
 # ---------------------------------------------------------------------------
 
 
@@ -6061,7 +6061,7 @@ class TestPushExceptionHandlers:
     """Cover exception handlers in push notification endpoints."""
 
     def test_push_test_trigger_exception_returns_500(self, client_admin, monkeypatch):
-        """Lines 677-679: exception inside push_test_trigger try block → 500."""
+        """exception inside push_test_trigger try block → 500."""
         from utils import i18n_utils as _i18n
         admin = user_manager.get_user_by_username('admin')
         monkeypatch.setattr(admin, 'push_subscriptions', [
@@ -6076,7 +6076,7 @@ class TestPushExceptionHandlers:
         assert resp.status_code == 500
 
     def test_push_test_exception_returns_500(self, client_admin, monkeypatch):
-        """Lines 724-726: exception inside push_test try block → 500."""
+        """exception inside push_test try block → 500."""
         from utils import push_manager as _pm
         admin = user_manager.get_user_by_username('admin')
         monkeypatch.setattr(admin, 'push_subscriptions', [
@@ -6092,8 +6092,8 @@ class TestPushExceptionHandlers:
 
 
 # ---------------------------------------------------------------------------
-# Lines 838->841: update_user ValueError with 'Invalid role'
-# Lines 862->865: delete_user ValueError with 'Cannot delete your own account'
+# update_user ValueError with 'Invalid role'
+# delete_user ValueError with 'Cannot delete your own account'
 # ---------------------------------------------------------------------------
 
 
@@ -6101,14 +6101,14 @@ class TestUserCrudValueErrors:
     """Cover ValueError branches in update_user and delete_user."""
 
     def test_update_user_invalid_role_returns_error_key(self, client_admin):
-        """Line 838->841: 'Invalid role' branch → error_key = users.invalid_role."""
+        """'Invalid role' branch → error_key = users.invalid_role."""
         admin = user_manager.get_user_by_username('admin')
         resp = client_admin.put(f'/api/users/{admin.user_id}', json={'role': 'wizard'})
         assert resp.status_code == 400
         assert resp.get_json()['error_key'] == 'users.invalid_role'
 
     def test_delete_own_account_returns_error_key(self, client_admin):
-        """Lines 862->865: deleting own user_id → 'Cannot delete your own account'."""
+        """deleting own user_id → 'Cannot delete your own account'."""
         admin = user_manager.get_user_by_username('admin')
         resp = client_admin.delete(f'/api/users/{admin.user_id}')
         assert resp.status_code == 400
@@ -6116,9 +6116,9 @@ class TestUserCrudValueErrors:
 
 
 # ---------------------------------------------------------------------------
-# Lines 904->908: config with astrodex present (False branch)
-# Line 916: old_skytonight not a dict → set to {}
-# Line 947: legacy top-level constraints migrated to skytonight.constraints
+# config with astrodex present (False branch)
+# old_skytonight not a dict → set to {}
+# legacy top-level constraints migrated to skytonight.constraints
 # ---------------------------------------------------------------------------
 
 
@@ -6126,7 +6126,7 @@ class TestConfigPostAdditionalBranches:
     """Cover additional branches in update_config_api."""
 
     def test_config_with_astrodex_present_skips_default(self, client_admin, monkeypatch):
-        """Lines 904->908: 'astrodex' IS in submitted config → if-body skipped."""
+        """'astrodex' IS in submitted config → if-body skipped."""
         monkeypatch.setattr(_locations_mod, 'save_config', lambda *a, **kw: None)
         monkeypatch.setattr(_app_mod.cache_store, 'reset_all_caches', lambda: None)
         resp = client_admin.post('/api/config', json={
@@ -6136,7 +6136,7 @@ class TestConfigPostAdditionalBranches:
         assert resp.status_code == 200
 
     def test_config_with_non_dict_old_skytonight(self, client_admin, monkeypatch):
-        """Line 916: old_skytonight is not a dict → assigned {}."""
+        """old_skytonight is not a dict → assigned {}."""
         old_cfg = {'location': {'latitude': 48.8, 'longitude': 2.3, 'timezone': 'UTC', 'elevation': 0},
                    'skytonight': 'not-a-dict'}  # non-dict skytonight
         monkeypatch.setattr(_locations_mod, 'load_config', lambda: old_cfg)
@@ -6148,7 +6148,7 @@ class TestConfigPostAdditionalBranches:
         assert resp.status_code == 200
 
     def test_config_with_legacy_top_level_constraints(self, client_admin, monkeypatch):
-        """Line 947: top-level 'constraints' migrated when skytonight.constraints absent."""
+        """top-level 'constraints' migrated when skytonight.constraints absent."""
         old_cfg = {'location': {'latitude': 48.8, 'longitude': 2.3, 'timezone': 'UTC', 'elevation': 0}}
         monkeypatch.setattr(_locations_mod, 'load_config', lambda: old_cfg)
         saved = {}
@@ -6165,7 +6165,7 @@ class TestConfigPostAdditionalBranches:
 
 
 # ---------------------------------------------------------------------------
-# Lines 1204->1202, 1211->1202: backup download with nonexistent dirs/files
+# backup download with nonexistent dirs/files
 # ---------------------------------------------------------------------------
 
 
@@ -6173,7 +6173,7 @@ class TestBackupDownloadNonexistentEntries:
     """Cover branches where is_dir/is_file checks are False (entries missing)."""
 
     def test_backup_with_empty_data_dir(self, client_admin, monkeypatch, tmp_path):
-        """1204->1202 (no astrodex/equipments dirs), 1211->1202 (no config/users files)."""
+        """No astrodex/equipments dirs and no config/users files → both loops add nothing."""
         monkeypatch.setattr(_admin_mod, 'DATA_DIR', str(tmp_path))
         resp = client_admin.get('/api/backup/download')
         # Empty backup (no entries found) should still succeed with an empty zip
@@ -6181,12 +6181,12 @@ class TestBackupDownloadNonexistentEntries:
 
 
 # ---------------------------------------------------------------------------
-# Lines 1297-1298: backup restore path sanitization (empty component)
+# backup restore path sanitization (empty component)
 # ---------------------------------------------------------------------------
 
 
 class TestBackupRestorePathSanitization:
-    """Cover lines 1297-1298: secure_filename produces empty component → reject."""
+    """Cover secure_filename produces empty component → reject."""
 
     def test_empty_path_component_rejected(self, client_admin):
         import io as _io
@@ -6206,7 +6206,7 @@ class TestBackupRestorePathSanitization:
 
 
 # ---------------------------------------------------------------------------
-# Lines 2189-2203, 2206: spaceflight image sidecar handling
+# spaceflight image sidecar handling
 # ---------------------------------------------------------------------------
 
 
@@ -6216,7 +6216,7 @@ class TestSpaceflightImageSidecar:
     VALID_HEX = 'a' * 32 + '.jpg'
 
     def test_image_exists_served_directly(self, client_admin, monkeypatch, tmp_path):
-        """Line 2206: image file exists → send_from_directory."""
+        """image file exists → send_from_directory."""
         img_dir = tmp_path / 'spaceflight_images'
         img_dir.mkdir()
         (img_dir / self.VALID_HEX).write_bytes(b'\xff\xd8\xff\xe0fake_jpeg')
@@ -6225,7 +6225,7 @@ class TestSpaceflightImageSidecar:
         assert resp.status_code in (200, 404)  # 200 if Flask test client serves it, 404 fallback
 
     def test_sidecar_download_exception_returns_404(self, client_admin, monkeypatch, tmp_path):
-        """Lines 2201-2203: sidecar exists but download fails → 404 Image unavailable."""
+        """sidecar exists but download fails → 404 Image unavailable."""
         import requests as _reqs
         img_dir = tmp_path / 'spaceflight_images'
         img_dir.mkdir()
@@ -6242,7 +6242,7 @@ class TestSpaceflightImageSidecar:
         assert 'unavailable' in resp.get_json().get('error', '')
 
     def test_sidecar_download_success_serves_image(self, client_admin, monkeypatch, tmp_path):
-        """Lines 2189-2200, 2206: sidecar exists, download succeeds → serve image."""
+        """sidecar exists, download succeeds → serve image."""
         img_dir = tmp_path / 'spaceflight_images'
         img_dir.mkdir()
         sidecar = img_dir / (self.VALID_HEX + '.url')
@@ -6279,7 +6279,7 @@ class TestSpaceflightImageSidecar:
 
 
 # ---------------------------------------------------------------------------
-# Lines 2662-2667: _t helper in _translate_special_phenomena_events
+# _t helper in _translate_special_phenomena_events
 # ---------------------------------------------------------------------------
 
 
@@ -6295,7 +6295,7 @@ class TestTranslateSpecialPhenomenaT:
         return lambda lang: _KeyI18n()
 
     def test_t_with_kwargs_format_success(self, monkeypatch):
-        """Lines 2662-2664: kwargs truthy, fallback.format(**kwargs) succeeds."""
+        """kwargs truthy, fallback.format(**kwargs) succeeds."""
         monkeypatch.setattr(_astronomy_mod, 'I18nManager', self._i18n_returns_key())
         data = {'events': [{
             'event_type': 'Milky Way Core Visibility',
@@ -6306,7 +6306,7 @@ class TestTranslateSpecialPhenomenaT:
         assert '45' in result['events'][0]['description']
 
     def test_t_with_kwargs_format_fail_returns_fallback(self, monkeypatch):
-        """Lines 2662-2663, 2665-2666: kwargs truthy, format raises → return fallback."""
+        """kwargs truthy, format raises → return fallback."""
         monkeypatch.setattr(_astronomy_mod, 'I18nManager', self._i18n_returns_key())
         data = {'events': [{
             'event_type': 'Milky Way Core Visibility',
@@ -6318,7 +6318,7 @@ class TestTranslateSpecialPhenomenaT:
         assert '{nonexistent_key_xyz}' in result['events'][0]['description']
 
     def test_t_without_kwargs_returns_fallback(self, monkeypatch):
-        """Line 2667: kwargs falsy → return fallback directly."""
+        """kwargs falsy → return fallback directly."""
         monkeypatch.setattr(_astronomy_mod, 'I18nManager', self._i18n_returns_key())
         data = {'events': [{
             'event_type': 'Seasonal',
@@ -6331,12 +6331,12 @@ class TestTranslateSpecialPhenomenaT:
 
 
 # ---------------------------------------------------------------------------
-# Lines 2817->2819: sidereal time endpoint with cache already valid today
+# sidereal time endpoint with cache already valid today
 # ---------------------------------------------------------------------------
 
 
 class TestSiderealTimeCacheSkipSync:
-    """Cover branch 2817->2819: is_cache_valid_for_today True → skip sync."""
+    """Cover is_cache_valid_for_today True → skip sync."""
 
     def test_valid_today_cache_skips_sync(self, client_admin, monkeypatch):
         from unittest.mock import MagicMock
@@ -6347,7 +6347,7 @@ class TestSiderealTimeCacheSkipSync:
         monkeypatch.setattr(_route_helpers_mod, 'load_config', lambda: {
             'location': {'latitude': 48.0, 'longitude': 2.0, 'elevation': 100, 'timezone': 'UTC'}
         })
-        # Make is_cache_valid_for_today return True → False branch of `if not ...` → skip line 2818
+        # Make is_cache_valid_for_today return True → False branch of `if not ...` → skip 
         monkeypatch.setattr(_app_mod.cache_store, 'is_cache_valid_for_today', lambda *_: True)
         _LEGACY['sidereal_time']['data'] = {'hourly_forecast': []}
         resp = client_admin.get('/api/astro/sidereal-time')
@@ -6355,12 +6355,12 @@ class TestSiderealTimeCacheSkipSync:
 
 
 # ---------------------------------------------------------------------------
-# Lines 2893-2895: best_window "all" mode with sync_cache_from_shared True
+# best_window "all" mode with sync_cache_from_shared True
 # ---------------------------------------------------------------------------
 
 
 class TestBestWindowAllModeSyncCache:
-    """Cover lines 2893-2895: sync_cache_from_shared returns True → is_cache_valid."""
+    """Cover sync_cache_from_shared returns True → is_cache_valid."""
 
     def test_all_mode_sync_then_valid(self, client_admin, monkeypatch):
         call_counter = [0]
@@ -6383,8 +6383,7 @@ class TestBestWindowAllModeSyncCache:
 
 
 # ---------------------------------------------------------------------------
-# Lines 2968->3001, 2975, 2978-2979, 2986-2988, 2990->3001:
-#   _resolve_observing_night_for_plan various branches
+# _resolve_observing_night_for_plan various branches
 # ---------------------------------------------------------------------------
 
 
@@ -6396,7 +6395,7 @@ class TestResolveObservingNightBranches:
         return SN(nautical_dusk=dusk, nautical_dawn=dawn)
 
     def test_no_location_falls_to_skytonight_fallback(self, monkeypatch):
-        """Lines 2968->3001: lat/lon/tz absent → skip sun service, fall to SkyTonight."""
+        """lat/lon/tz absent → skip sun service, fall to SkyTonight."""
         monkeypatch.setattr(
             _route_helpers_mod, 'load_config', lambda: _v12_config({'latitude': None, 'longitude': None})
         )
@@ -6408,7 +6407,7 @@ class TestResolveObservingNightBranches:
         assert 'start' in result
 
     def test_empty_dusk_dawn_returns_none_parse(self, monkeypatch):
-        """Line 2975: _parse('') → return None; triggers tomorrow fetch."""
+        """_parse('') → return None; triggers tomorrow fetch."""
         from unittest.mock import MagicMock
         mock_svc = MagicMock()
         mock_svc.get_today_report.return_value = self._make_report('', 'Not found')
@@ -6421,7 +6420,7 @@ class TestResolveObservingNightBranches:
         assert result is None
 
     def test_invalid_date_parse_returns_none(self, monkeypatch):
-        """Lines 2978-2979: strptime fails → return None; triggers tomorrow fetch."""
+        """strptime fails → return None; triggers tomorrow fetch."""
         from unittest.mock import MagicMock
         mock_svc = MagicMock()
         mock_svc.get_today_report.return_value = self._make_report('NOT-A-DATE', 'ALSO-BAD')
@@ -6433,7 +6432,7 @@ class TestResolveObservingNightBranches:
         assert result is None
 
     def test_today_dusk_none_fetches_tomorrow(self, monkeypatch):
-        """Lines 2986-2988: today dusk is None → fetch tomorrow report."""
+        """today dusk is None → fetch tomorrow report."""
         from unittest.mock import MagicMock
         mock_svc = MagicMock()
         # Today: dusk=None → triggers tomorrow fetch
@@ -6449,7 +6448,7 @@ class TestResolveObservingNightBranches:
         assert 'duration_hours' in result
 
     def test_tomorrow_also_invalid_falls_to_skytonight(self, monkeypatch):
-        """Lines 2990->3001: tomorrow's dusk/dawn also invalid → None → SkyTonight fallback."""
+        """tomorrow's dusk/dawn also invalid → None → SkyTonight fallback."""
         from unittest.mock import MagicMock
         mock_svc = MagicMock()
         mock_svc.get_today_report.return_value = self._make_report('', '')
@@ -6464,8 +6463,8 @@ class TestResolveObservingNightBranches:
 
 
 # ---------------------------------------------------------------------------
-# Lines 3383-3392: add_plan_target_to_astrodex loop across all plans
-# Lines 3414-3416: exception handler in add_plan_target_to_astrodex
+# add_plan_target_to_astrodex loop across all plans
+# exception handler in add_plan_target_to_astrodex
 # ---------------------------------------------------------------------------
 
 
@@ -6473,7 +6472,7 @@ class TestAddPlanTargetToAstrodexBranches:
     """Cover all-plans search loop and exception handler."""
 
     def test_entry_found_in_secondary_plan(self, client_admin, monkeypatch):
-        """Lines 3383-3392: entry not in default plan → search all plans → found."""
+        """entry not in default plan → search all plans → found."""
         from observation import plan_my_night as _pmn
         from observation import astrodex as _ad
 
@@ -6497,7 +6496,7 @@ class TestAddPlanTargetToAstrodexBranches:
         assert data.get('status') == 'success'
 
     def test_exception_returns_500(self, client_admin, monkeypatch):
-        """Lines 3414-3416: exception in add_plan_target_to_astrodex → 500."""
+        """exception in add_plan_target_to_astrodex → 500."""
         from observation import plan_my_night as _pmn
 
         def _raise(*a, **kw):
@@ -6509,12 +6508,12 @@ class TestAddPlanTargetToAstrodexBranches:
 
 
 # ---------------------------------------------------------------------------
-# Line 4445: create_accessory returns None → 500
+# create_accessory returns None → 500
 # ---------------------------------------------------------------------------
 
 
 class TestCreateAccessoryNone:
-    """Cover line 4445: equipment_profiles.create_accessory returns None → 500."""
+    """Cover equipment_profiles.create_accessory returns None → 500."""
 
     def test_create_accessory_none_returns_500(self, client_admin, monkeypatch):
         from equipment import equipment_profiles as _ep
@@ -6524,12 +6523,12 @@ class TestCreateAccessoryNone:
 
 
 # ---------------------------------------------------------------------------
-# Lines 563-565: _provider returns 'mozilla' and 'other' for non-apple/google
+# _provider returns 'mozilla' and 'other' for non-apple/google
 # ---------------------------------------------------------------------------
 
 
 class TestPushSubscriptionsMozillaOtherProvider:
-    """Cover lines 563-565: mozilla and 'other' provider branches in _provider."""
+    """Cover mozilla and 'other' provider branches in _provider."""
 
     def test_mozilla_and_other_endpoints_classified(self, client_admin, monkeypatch):
         admin = user_manager.get_user_by_username('admin')
@@ -6546,12 +6545,12 @@ class TestPushSubscriptionsMozillaOtherProvider:
 
 
 # ---------------------------------------------------------------------------
-# Line 627: push_test_trigger with valid trigger_id but no push subscriptions
+# push_test_trigger with valid trigger_id but no push subscriptions
 # ---------------------------------------------------------------------------
 
 
 class TestPushTestTriggerNoSubscriptions:
-    """Cover line 627: valid trigger_id but empty push_subscriptions → 400."""
+    """Cover valid trigger_id but empty push_subscriptions → 400."""
 
     def test_valid_trigger_no_subs_returns_400(self, client_admin, monkeypatch):
         admin = user_manager.get_user_by_username('admin')
@@ -6563,16 +6562,16 @@ class TestPushTestTriggerNoSubscriptions:
 
 
 # ---------------------------------------------------------------------------
-# Branch 838->841: update_user raises generic ValueError (no matching pattern)
-# Branch 862->865: delete_user raises generic ValueError (no matching pattern)
+# update_user raises generic ValueError (no matching pattern)
+# delete_user raises generic ValueError (no matching pattern)
 # ---------------------------------------------------------------------------
 
 
 class TestUserCrudGenericValueError:
-    """Cover 838->841 and 862->865: ValueError that matches no known error pattern."""
+    """Cover ValueError that matches no known error pattern."""
 
     def test_update_user_generic_valueerror_uses_default_key(self, client_admin, monkeypatch):
-        """838->841: no elif condition matches → error_key stays 'users.invalid_input'."""
+        """no elif condition matches → error_key stays 'users.invalid_input'."""
         admin = user_manager.get_user_by_username('admin')
 
         def _raise(*a, **kw):
@@ -6584,7 +6583,7 @@ class TestUserCrudGenericValueError:
         assert resp.get_json()['error_key'] == 'users.invalid_input'
 
     def test_delete_user_generic_valueerror_uses_default_key(self, client_admin, monkeypatch):
-        """862->865: no elif condition matches → error_key stays 'users.invalid_input'."""
+        """no elif condition matches → error_key stays 'users.invalid_input'."""
         admin = user_manager.get_user_by_username('admin')
 
         def _raise(*a, **kw):
@@ -6597,12 +6596,12 @@ class TestUserCrudGenericValueError:
 
 
 # ---------------------------------------------------------------------------
-# Branch 1334->1336: backup restore where target dir does not yet exist
+# backup restore where target dir does not yet exist
 # ---------------------------------------------------------------------------
 
 
 class TestBackupRestoreDirNotExist:
-    """Cover 1334->1336: os.path.isdir(target_dir) is False → skip rmtree."""
+    """Cover os.path.isdir(target_dir) is False → skip rmtree."""
 
     def test_astrodex_restore_when_dir_missing(self, client_admin, monkeypatch, tmp_path):
         import io
@@ -6625,22 +6624,22 @@ class TestBackupRestoreDirNotExist:
 
 
 # ---------------------------------------------------------------------------
-# Branch 1406->1404: log export where is_dir source doesn't exist
-# Lines 1424-1426: log export exception handler
+# log export where is_dir source doesn't exist
+# log export exception handler
 # ---------------------------------------------------------------------------
 
 
 class TestLogExportEdgeCases:
-    """Cover 1406->1404 (dir not found → next entry) and 1424-1426 (exception)."""
+    """Cover (dir not found → next entry) and 1424-1426 (exception)."""
 
     def test_log_export_missing_dir_skips_it(self, client_admin, monkeypatch):
-        """1406->1404: one LOG_EXPORT_ENTRIES is_dir=True path doesn't exist."""
+        """one LOG_EXPORT_ENTRIES is_dir=True path doesn't exist."""
         monkeypatch.setattr(_admin_mod, 'SKYTONIGHT_LOGS_DIR', '/nonexistent/path/xyz123')
         resp = client_admin.get('/api/logs/export')
         assert resp.status_code == 200
 
     def test_log_export_exception_returns_500(self, client_admin, monkeypatch):
-        """Lines 1424-1426: ZipFile creation raises → 500."""
+        """ZipFile creation raises → 500."""
         import zipfile as _zf
 
         def _raise(*a, **kw):
@@ -6652,12 +6651,12 @@ class TestLogExportEdgeCases:
 
 
 # ---------------------------------------------------------------------------
-# Branch 1563->1562: get_timezones_api where filter condition is False
+# get_timezones_api where filter condition is False
 # ---------------------------------------------------------------------------
 
 
 class TestTimezoneFilterBranch:
-    """Cover 1563->1562: a tz matching posix/right/localtime skips body (False branch)."""
+    """Cover a tz matching posix/right/localtime skips body (False branch)."""
 
     def test_localtime_tz_skipped_by_filter(self, client_admin, monkeypatch):
         monkeypatch.setattr(_misc_mod, 'available_timezones',
@@ -6671,8 +6670,8 @@ class TestTimezoneFilterBranch:
 
 
 # ---------------------------------------------------------------------------
-# Lines 2608->2641: meteor shower event with missing fields
-# Lines 2624->2641: comet appearance event with missing fields
+# meteor shower event with missing fields
+# comet appearance event with missing fields
 # ---------------------------------------------------------------------------
 
 
@@ -6680,7 +6679,7 @@ class TestTranslateSolarSystemMissingFields:
     """Cover False branches of inner if-checks for incomplete event data."""
 
     def test_meteor_shower_missing_fields_skips_translation(self, monkeypatch):
-        """2608->2641: shower_name/zenith_hourly_rate/parent_body falsy → skip title/desc."""
+        """shower_name/zenith_hourly_rate/parent_body falsy → skip title/desc."""
         from unittest.mock import MagicMock
         mock_i18n = MagicMock()
         monkeypatch.setattr(_astronomy_mod, 'I18nManager', lambda lang: mock_i18n)
@@ -6697,7 +6696,7 @@ class TestTranslateSolarSystemMissingFields:
         mock_i18n.t.assert_not_called()
 
     def test_comet_appearance_missing_fields_skips_translation(self, monkeypatch):
-        """2624->2641: comet_name/magnitude/visibility falsy → skip title/desc."""
+        """comet_name/magnitude/visibility falsy → skip title/desc."""
         from unittest.mock import MagicMock
         mock_i18n = MagicMock()
         monkeypatch.setattr(_astronomy_mod, 'I18nManager', lambda lang: mock_i18n)
@@ -6715,12 +6714,12 @@ class TestTranslateSolarSystemMissingFields:
 
 
 # ---------------------------------------------------------------------------
-# Branch 2893->2898: sync_cache_from_shared True but is_cache_valid still False
+# sync_cache_from_shared True but is_cache_valid still False
 # ---------------------------------------------------------------------------
 
 
 class TestBestWindowSyncTrueButCacheStillInvalid:
-    """Cover 2893->2898: after sync, cache still invalid → fall to stale check."""
+    """Cover after sync, cache still invalid → fall to stale check."""
 
     def test_sync_true_cache_still_invalid_serves_stale(self, client_admin, monkeypatch):
         def _is_valid(cache_entry, ttl):
@@ -6737,16 +6736,16 @@ class TestBestWindowSyncTrueButCacheStillInvalid:
 
 
 # ---------------------------------------------------------------------------
-# Branch 3385->3387: default plan file in get_all_plan_files loop
-# Branch 3390->3382: entry not found in first sub-plan, found in second
+# default plan file in get_all_plan_files loop
+# entry not found in first sub-plan, found in second
 # ---------------------------------------------------------------------------
 
 
 class TestAddPlanTargetDefaultAndMultiPlan:
-    """Cover 3385->3387 (default plan file) and 3390->3382 (loop continues)."""
+    """Cover the default plan file case and the loop-continues-to-next-plan case."""
 
     def test_default_plan_file_gets_tid_none(self, client_admin, monkeypatch):
-        """3385->3387: fname is the default plan file → tid stays None."""
+        """fname is the default plan file → tid stays None."""
         from observation import plan_my_night as _pmn
         from observation import astrodex as _ad
 
@@ -6769,7 +6768,7 @@ class TestAddPlanTargetDefaultAndMultiPlan:
         assert resp.get_json().get('status') == 'success'
 
     def test_entry_found_in_second_plan_file(self, client_admin, monkeypatch):
-        """3390->3382: first sub-plan has no match → loop continues to second."""
+        """first sub-plan has no match → loop continues to second."""
         from observation import plan_my_night as _pmn
         from observation import astrodex as _ad
 
@@ -6805,12 +6804,12 @@ class TestAddPlanTargetDefaultAndMultiPlan:
 
 
 # ---------------------------------------------------------------------------
-# Line 4695: get_or_create_cache_scheduler where start() returns True
+# get_or_create_cache_scheduler where start() returns True
 # ---------------------------------------------------------------------------
 
 
 class TestCacheSchedulerStartTrue:
-    """Cover line 4695: CacheScheduler.start() returns True → success debug log."""
+    """Cover CacheScheduler.start() returns True → success debug log."""
 
     def test_start_returns_true_logs_success(self, client_admin, monkeypatch):
         from cache.cache_scheduler import CacheScheduler as CS
@@ -6828,7 +6827,7 @@ class TestCacheSchedulerStartTrue:
                 _app_mod.app.config.pop('cache_scheduler')
 
     def test_start_returns_false_logs_already_running(self, client_admin, monkeypatch):
-        """Cover line 4697: CacheScheduler.start() returns False → already-running debug log."""
+        """Cover CacheScheduler.start() returns False → already-running debug log."""
         from cache.cache_scheduler import CacheScheduler as CS
 
         monkeypatch.setattr(CS, 'start', lambda self: False)
@@ -7203,7 +7202,7 @@ class TestCSSPasses:
         assert resp.status_code == 500
 
     def test_css_passes_sync_succeeds_but_still_invalid_returns_202(self, client_admin, monkeypatch):
-        """Line 2387->2392: sync_cache_from_shared succeeds, but the post-sync cache is
+        """sync_cache_from_shared succeeds, but the post-sync cache is
         still not valid (e.g. TTL check fails) -> falls through to the 202 response."""
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: False)
         monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda *a, **k: True)
@@ -7211,7 +7210,7 @@ class TestCSSPasses:
         assert resp.status_code == 202
 
     def test_css_passes_sync_succeeds_valid_but_window_mismatch_returns_202(self, client_admin, monkeypatch):
-        """Line 2389->2392: sync_cache_from_shared succeeds and the cache is valid, but the
+        """sync_cache_from_shared succeeds and the cache is valid, but the
         synced data's window_days doesn't match the request -> falls through to 202."""
         monkeypatch.setitem(_LEGACY['css_passes'], 'data', {'passes': [], 'window_days': 5})
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
@@ -7220,7 +7219,7 @@ class TestCSSPasses:
         assert resp.status_code == 202
 
     def test_css_passes_sync_from_shared_fails_returns_202(self, client_admin, monkeypatch):
-        """Line 2392: cache invalid and sync_cache_from_shared can't produce a fresh one
+        """cache invalid and sync_cache_from_shared can't produce a fresh one
         either -> falls through to the 'not ready yet' 202 response."""
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: False)
         monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda *a, **k: False)

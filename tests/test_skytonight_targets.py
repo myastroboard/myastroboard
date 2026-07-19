@@ -218,7 +218,7 @@ def test_build_lookup_no_preferred_name():
 
 
 def test_build_lookup_no_preferred_name_and_no_catalogues():
-    """Line 108->98: preferred_name='' and catalogue_names={} → if preferred_name: False."""
+    """preferred_name='' and catalogue_names={} → if preferred_name: False."""
     from skytonight.skytonight_models import SkyTonightCoordinates, SkyTonightTarget
     target = SkyTonightTarget(
         target_id='DSO-EMPTY',
@@ -239,13 +239,13 @@ def test_build_lookup_no_preferred_name_and_no_catalogues():
 
 
 def test_coerce_targets_from_dict_raises_skipped():
-    """Lines 123-125: from_dict raises ValueError → except block executed."""
+    """from_dict raises ValueError → except block executed."""
     result = skytonight_targets._coerce_targets([{'magnitude': 'not_a_float'}])
     assert result == []
 
 
 def test_get_lookup_entry_empty_catalogue_returns_empty():
-    """Line 177: empty catalogue → return {}."""
+    """empty catalogue → return {}."""
     result = skytonight_targets.get_lookup_entry('', 'M 31')
     assert result == {}
 

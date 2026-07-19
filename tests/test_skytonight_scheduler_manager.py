@@ -185,7 +185,7 @@ class TestGetRemoteSchedulerStatus:
         assert "last_execution_duration_seconds" in result["progress"]
 
     def test_progress_not_dict_gets_replaced(self, tmp_path):
-        """When progress is not a dict, replace it with defaults (lines 253-257)."""
+        """When progress is not a dict, replace it with defaults."""
         from skytonight.skytonight_scheduler_manager import get_remote_skytonight_scheduler_status
         status_data = {"running": True, "last_result": {"k": "v"}, "progress": "bad"}
         status_file = tmp_path / "status_badprog.json"
@@ -198,7 +198,7 @@ class TestGetRemoteSchedulerStatus:
         assert "execution_duration_seconds" in result["progress"]
 
     def test_last_result_not_dict_reset_to_empty(self, tmp_path):
-        """last_result that is not a dict is reset to {} (line 224-225)."""
+        """last_result that is not a dict is reset to {}."""
         from skytonight.skytonight_scheduler_manager import get_remote_skytonight_scheduler_status
         status_data = {"running": True, "last_result": "invalid_string", "progress": {}}
         status_file = tmp_path / "status_last_result.json"
@@ -211,7 +211,7 @@ class TestGetRemoteSchedulerStatus:
         assert result.get("worker") == "remote"
 
     def test_exception_on_file_read_returns_fallback(self, tmp_path):
-        """Exception during file read returns fallback dict (lines 264-285)."""
+        """Exception during file read returns fallback dict."""
         from skytonight.skytonight_scheduler_manager import get_remote_skytonight_scheduler_status
         status_file = tmp_path / "status_corrupt.json"
         status_file.write_text("{ broken json", encoding="utf-8")
@@ -258,7 +258,7 @@ class TestGetRemoteSchedulerStatus:
 
 
 class TestRunSkytonigtRefresh:
-    """Tests for _run_skytonight_refresh (lines 79-123)."""
+    """Tests for _run_skytonight_refresh."""
 
     def test_successful_refresh_returns_dict(self):
         """Full happy-path: build dataset + calculations succeed."""
@@ -326,7 +326,7 @@ class TestRunSkytonigtRefresh:
         assert result["dataset_generated"] is True
 
     def test_set_progress_import_error_suppressed(self):
-        """If importing _set_progress fails, refresh continues (lines 87-91)."""
+        """If importing _set_progress fails, refresh continues."""
         from skytonight.skytonight_scheduler_manager import _run_skytonight_refresh
 
         mock_dataset_result = {"metadata": {"generated_at": None, "sources": [], "counts": {}}}
@@ -346,10 +346,10 @@ class TestRunSkytonigtRefresh:
         assert "dataset_generated" in result
 
     def test_refresh_multi_location_keeps_install_default_as_primary(self):
-        """Lines 130-151: with 2+ scheduler locations, every location's result is
+        """with 2+ scheduler locations, every location's result is
         collected in 'calculations', but 'calculation' (the legacy single-summary
         key) stays pinned to the install default's result even when a later,
-        non-default location is processed afterwards (line 150's False arc)."""
+        non-default location is processed afterwards ('s False arc)."""
         from skytonight.skytonight_scheduler_manager import _run_skytonight_refresh
 
         mock_dataset_result = {"metadata": {"generated_at": None, "sources": [], "counts": {}}}
@@ -396,10 +396,10 @@ class TestRunSkytonigtRefresh:
 
 
 class TestGetOrCreateSkytonigtSchedulerExtended:
-    """Additional coverage for get_or_create_skytonight_scheduler (lines 155-181)."""
+    """Additional coverage for get_or_create_skytonight_scheduler."""
 
     def test_general_exception_returns_none(self, tmp_path):
-        """Lines 178-181: a generic exception during scheduler creation returns None."""
+        """a generic exception during scheduler creation returns None."""
         from skytonight.skytonight_scheduler_manager import get_or_create_skytonight_scheduler
         mock_app = MagicMock()
         mock_app.config = {}
@@ -418,7 +418,7 @@ class TestGetOrCreateSkytonigtSchedulerExtended:
         assert result is None
 
     def test_oserror_on_lock_sets_worker_flag_false(self, tmp_path):
-        """OSError from msvcrt.locking → logs and returns None (lines 146-155)."""
+        """OSError from msvcrt.locking → logs and returns None."""
         import sys
         if sys.platform != "win32":
             pytest.skip("Windows-only code path")
@@ -437,7 +437,7 @@ class TestRunSkytonigtRefreshProgressException:
     """Cover exception path for _set_progress call inside _run_skytonight_refresh."""
 
     def test_set_progress_exception_is_swallowed(self):
-        """_set_progress('build_dataset') raises → lines 90-91 (except/pass) are covered."""
+        """_set_progress('build_dataset') raises →  (except/pass) are covered."""
         from skytonight.skytonight_scheduler_manager import _run_skytonight_refresh
         from skytonight import skytonight_calculator
 
@@ -457,7 +457,7 @@ class TestRunSkytonigtRefreshProgressException:
         assert "dataset_generated" in result
 
     def test_win32_lock_acquired_creates_scheduler(self, tmp_path):
-        """Lines 157-169 (win32 path): when lock is acquired, scheduler is created."""
+        """ (win32 path): when lock is acquired, scheduler is created."""
         import sys
         if sys.platform != "win32":
             pytest.skip("Windows-only test")
@@ -486,7 +486,7 @@ class TestRunSkytonigtRefreshProgressException:
         assert mock_app.config.get("is_skytonight_scheduler_worker") is True
 
     def test_lock_already_logged_not_logged_again(self, tmp_path):
-        """When lock_logged is already True, skip logging again (lines 146-150)."""
+        """When lock_logged is already True, skip logging again."""
         from skytonight.skytonight_scheduler_manager import get_or_create_skytonight_scheduler
         mock_app = MagicMock()
         mock_app.config = {"skytonight_scheduler_lock_logged": True}
@@ -499,7 +499,7 @@ class TestRunSkytonigtRefreshProgressException:
 
 
 class TestGetSkytonigtSchedulerForApi:
-    """Tests for get_skytonight_scheduler_for_api (lines 186-214)."""
+    """Tests for get_skytonight_scheduler_for_api."""
 
     def test_returns_scheduler_when_available(self):
         """When get_or_create returns a real scheduler, return it."""
@@ -582,7 +582,7 @@ class TestGetSkytonigtSchedulerForApi:
         assert result is None
 
     def test_ioerror_opening_lock_file_returns_remote(self, tmp_path):
-        """IOError opening the lock file for test → return 'remote_scheduler' (line 208-209)."""
+        """IOError opening the lock file for test → return 'remote_scheduler'."""
         from skytonight.skytonight_scheduler_manager import get_skytonight_scheduler_for_api
 
         lock_file = tmp_path / "ioerr.lock"
@@ -601,11 +601,11 @@ class TestGetSkytonigtSchedulerForApi:
 
 
 class TestGetOrCreateSchedulerLockLoggedBranch:
-    """Cover line 146->151: already-logged OSError branch."""
+    """Cover already-logged OSError branch."""
 
     def test_second_lock_failure_skips_debug_log(self, tmp_path):
-        """Line 146->151: when skytonight_scheduler_lock_logged is True,
-        the if-block body is skipped and we jump directly to line 151."""
+        """when skytonight_scheduler_lock_logged is True,
+        the if-block body is skipped and we jump directly to ."""
         import sys
         module = sys.modules['skytonight.skytonight_scheduler_manager']
         from skytonight.skytonight_scheduler_manager import get_or_create_skytonight_scheduler

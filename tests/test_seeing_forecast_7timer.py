@@ -224,7 +224,7 @@ class TestSeeingForecastBranchCoverage:
         return SeeingForecastService(48.866667, 2.333333, "Europe/Paris")
 
     def test_find_best_window_improves_within_window(self, service):
-        """Second consecutive good point has lower seeing → line 225."""
+        """Second consecutive good point has lower seeing."""
         now_utc = datetime.now(timezone.utc)
         forecast_list = [
             {"time": now_utc.isoformat(), "seeing": 3, "description": "OK", "conditions": "OK"},
@@ -237,7 +237,7 @@ class TestSeeingForecastBranchCoverage:
 
     @patch('astroweather.seeing_forecast_7timer.requests.get')
     def test_fetch_bad_init_string_uses_fallback(self, mock_get, service):
-        """Malformed init string falls back to requested_init (lines 113-114)."""
+        """Malformed init string falls back to requested_init."""
         mock_response = Mock()
         mock_response.json.return_value = {
             "init": "BADFORMAT",
@@ -250,7 +250,7 @@ class TestSeeingForecastBranchCoverage:
 
     @patch('astroweather.seeing_forecast_7timer.requests.get')
     def test_fetch_bad_timepoint_is_skipped(self, mock_get, service):
-        """Bad timepoint/seeing values are skipped via continue (lines 131-132)."""
+        """Bad timepoint/seeing values are skipped via continue."""
         now_utc = datetime.now(timezone.utc)
         init_time = now_utc.replace(minute=0, second=0, microsecond=0)
         mock_response = Mock()
@@ -270,7 +270,7 @@ class TestSeeingForecastBranchCoverage:
 
     @patch('astroweather.seeing_forecast_7timer.requests.get')
     def test_fetch_out_of_range_seeing_skipped(self, mock_get, service):
-        """Seeing values outside 1-8 are skipped (line 136)."""
+        """Seeing values outside 1-8 are skipped."""
         now_utc = datetime.now(timezone.utc)
         init_time = now_utc.replace(minute=0, second=0, microsecond=0)
         mock_response = Mock()
@@ -291,7 +291,7 @@ class TestSeeingForecastBranchCoverage:
 
     @patch('astroweather.seeing_forecast_7timer.requests.get')
     def test_fetch_all_seeing_out_of_range_returns_empty_struct(self, mock_get, service):
-        """When all seeing values are out of range, returns empty forecast struct (lines 154-155)."""
+        """When all seeing values are out of range, returns empty forecast struct."""
         now_utc = datetime.now(timezone.utc)
         init_time = now_utc.replace(minute=0, second=0, microsecond=0)
         mock_response = Mock()
@@ -310,7 +310,7 @@ class TestSeeingForecastBranchCoverage:
 
     @patch('astroweather.seeing_forecast_7timer.requests.get')
     def test_fetch_generic_exception_returns_none(self, mock_get, service):
-        """Generic Exception during processing returns None (lines 192-194)."""
+        """Generic Exception during processing returns None."""
         mock_response = Mock()
         mock_response.json.side_effect = ValueError("bad JSON")
         mock_get.return_value = mock_response
@@ -319,7 +319,7 @@ class TestSeeingForecastBranchCoverage:
 
 
 class TestSeeingForecastRemainingBranches:
-    """Cover lines 126->122, 234->239, 248->253."""
+    """Cover ."""
 
     @pytest.fixture
     def service(self):
@@ -327,7 +327,7 @@ class TestSeeingForecastRemainingBranches:
 
     @patch('astroweather.seeing_forecast_7timer.requests.get')
     def test_none_timepoint_skipped(self, mock_get, service):
-        """Line 126->122: data point with None timepoint → skip (if body not entered)."""
+        """data point with None timepoint → skip (if body not entered)."""
         now_utc = datetime.now(timezone.utc)
         init_time = (now_utc + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
         mock_response = Mock()
@@ -344,11 +344,11 @@ class TestSeeingForecastRemainingBranches:
         assert len(result.get("forecast", [])) == 1
 
     def test_find_best_window_shorter_mid_window_does_not_replace(self, service):
-        """Line 234->239: mid-scan window shorter than best → False branch."""
+        """mid-scan window shorter than best → False branch."""
         now_utc = datetime.now(timezone.utc)
         # Window 1: 4 good points (12h) → best_duration=12
         # Bad seeing (closes window 1)
-        # Window 2: 1 good point (3h) → 3 > 12 is False → 234->239
+        # Window 2: 1 good point (3h) → 3 > 12 is False → doesn't replace best
         # Bad seeing (closes window 2)
         forecast_list = [
             {"time": now_utc.isoformat(), "seeing": 1, "description": "Excellent", "conditions": "Perfect"},
@@ -364,10 +364,10 @@ class TestSeeingForecastRemainingBranches:
         assert result["duration_hours"] == 12  # window 1 wins
 
     def test_find_best_window_shorter_end_window(self, service):
-        """Line 248->253: end-of-list window shorter than best → False branch."""
+        """end-of-list window shorter than best → False branch."""
         now_utc = datetime.now(timezone.utc)
         # Window 1: 4 good points (12h) → best_duration=12 (closes via bad seeing)
-        # Window 2: 1 good point (3h) at end → 3 > 12 is False → 248->253 False
+        # Window 2: 1 good point (3h) at end → 3 > 12 is False → doesn't replace best
         forecast_list = [
             {"time": now_utc.isoformat(), "seeing": 1, "description": "Excellent", "conditions": "Perfect"},
             {"time": (now_utc + timedelta(hours=3)).isoformat(), "seeing": 2, "description": "Good", "conditions": "Very good"},

@@ -160,7 +160,7 @@ class TestGetHourlySiderealTimes:
 
 
 class TestGetBestObservationTimes:
-    """Tests for get_best_observation_times — covers lines 253-322."""
+    """Tests for get_best_observation_times — covers ."""
 
     def test_returns_dict(self):
         svc = SiderealTimeService(45.0, -73.5, timezone="America/Montreal")
@@ -178,7 +178,7 @@ class TestGetBestObservationTimes:
             assert "target_dec_degrees" in result
 
     def test_altaz_none_path_is_handled(self):
-        """Line 280: altaz is None → continue (defensive guard in the hourly loop)."""
+        """altaz is None → continue (defensive guard in the hourly loop)."""
         import numpy as np
         from unittest.mock import MagicMock, patch
         from astropy.coordinates import SkyCoord
@@ -193,7 +193,7 @@ class TestGetBestObservationTimes:
         def patched_transform_to(self_coord, frame):
             real_altaz_call_count[0] += 1
             if real_altaz_call_count[0] == 1:
-                return None  # First call returns None → exercises line 280
+                return None  # First call returns None → exercises 
             return original_transform_to(self_coord, frame)
 
         with patch.object(SkyCoord, 'transform_to', patched_transform_to):
@@ -202,7 +202,7 @@ class TestGetBestObservationTimes:
         assert isinstance(result, dict)
 
     def test_ndarray_alt_val_branch(self):
-        """Line 285: alt_val is ndarray → float extraction via np.real/atleast_1d."""
+        """alt_val is ndarray → float extraction via np.real/atleast_1d."""
         import numpy as np
         from unittest.mock import MagicMock, patch
         from astropy.coordinates import SkyCoord
@@ -213,7 +213,7 @@ class TestGetBestObservationTimes:
         def patched_transform_to(self_coord, frame):
             mock_altaz = MagicMock()
             mock_alt = MagicMock()
-            mock_alt.degree = np.array([42.0])  # ndarray → triggers line 285
+            mock_alt.degree = np.array([42.0])  # ndarray → triggers 
             mock_altaz.alt = mock_alt
             return mock_altaz
 
@@ -224,7 +224,7 @@ class TestGetBestObservationTimes:
 
 
 class TestCalculateSiderealInfoNdarrayBranch:
-    """Line 182: gst.hour returns ndarray → float extraction via np.real/atleast_1d."""
+    """gst.hour returns ndarray → float extraction via np.real/atleast_1d."""
 
     def test_ndarray_gst_hour_is_handled(self):
         import numpy as np
@@ -235,7 +235,7 @@ class TestCalculateSiderealInfoNdarrayBranch:
 
         mock_time = MagicMock()
         mock_gst = MagicMock()
-        mock_gst.hour = np.array([12.5])  # ndarray → triggers line 182
+        mock_gst.hour = np.array([12.5])  # ndarray → triggers 
 
         mock_time.sidereal_time.return_value = mock_gst
         mock_time.jd = 2460676.0
@@ -307,7 +307,7 @@ class TestExceptionHandlerBranches:
     """Covers exception handler lines: 61-63, 78-80, 109-110, 171-173, 234-236, 320-322."""
 
     def test_get_current_sidereal_info_exception_returns_empty(self, monkeypatch):
-        """Lines 61-63: exception in Time.now() → empty dict."""
+        """exception in Time.now() → empty dict."""
         from astropy.time import Time
         monkeypatch.setattr(Time, 'now', staticmethod(lambda: (_ for _ in ()).throw(RuntimeError("time error"))))
         svc = SiderealTimeService(45.0, -73.5)
@@ -315,13 +315,13 @@ class TestExceptionHandlerBranches:
         assert result == {}
 
     def test_get_sidereal_info_for_time_exception_returns_empty(self, monkeypatch):
-        """Lines 78-80: invalid input that raises → empty dict."""
+        """invalid input that raises → empty dict."""
         svc = SiderealTimeService(45.0, -73.5)
         result = svc.get_sidereal_info_for_time("not-a-datetime")  # type: ignore
         assert result == {}
 
     def test_get_hourly_sidereal_times_exception_returns_empty_list(self, monkeypatch):
-        """Lines 109-110: exception in loop → empty list returned."""
+        """exception in loop → empty list returned."""
         from astropy.time import Time
         svc = SiderealTimeService(45.0, -73.5)
         monkeypatch.setattr(svc, '_calculate_sidereal_info', lambda t: (_ for _ in ()).throw(RuntimeError("calc error")))
@@ -329,14 +329,14 @@ class TestExceptionHandlerBranches:
         assert result == []
 
     def test_get_object_lst_for_transit_exception_returns_empty(self, monkeypatch):
-        """Lines 171-173: exception in calculation → empty dict."""
+        """exception in calculation → empty dict."""
         svc = SiderealTimeService(45.0, -73.5)
         monkeypatch.setattr(svc, '_calculate_sidereal_info', lambda t: (_ for _ in ()).throw(RuntimeError("calc error")))
         result = svc.get_object_lst_for_transit(180.0, date(2026, 6, 15))
         assert result == {}
 
     def test_calculate_sidereal_info_exception_returns_empty(self, monkeypatch):
-        """Lines 234-236: exception in _calculate_sidereal_info → empty dict."""
+        """exception in _calculate_sidereal_info → empty dict."""
         from astropy.time import Time
         svc = SiderealTimeService(45.0, -73.5)
         t = Time(datetime(2026, 6, 1, 0, 0, 0, tzinfo=ZoneInfo("UTC")))
@@ -345,7 +345,7 @@ class TestExceptionHandlerBranches:
         assert result == {}
 
     def test_get_best_observation_times_exception_returns_empty(self, monkeypatch):
-        """Lines 320-322: exception in SkyCoord → empty dict."""
+        """exception in SkyCoord → empty dict."""
         svc = SiderealTimeService(45.0, -73.5)
         monkeypatch.setattr(svc, '_calculate_sidereal_info', lambda t: (_ for _ in ()).throw(RuntimeError("calc error")))
         # Pass an invalid date type to trigger exception
@@ -357,7 +357,7 @@ class TestNormalizationBranches:
     """Covers normalization while-loop lines: 140."""
 
     def test_gst_normalization_negative(self):
-        """Line 140: gst_at_transit < 0 → += 24 triggered by east longitude."""
+        """gst_at_transit < 0 → += 24 triggered by east longitude."""
         # longitude=135, ra=0 → lst_at_transit=0, lon_hours=9 → gst=-9 < 0
         svc = SiderealTimeService(35.0, 135.0)  # Japan longitude
         result = svc.get_object_lst_for_transit(0.0, date(2026, 6, 15))

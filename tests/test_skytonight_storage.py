@@ -273,7 +273,7 @@ class TestRemainingStorageGapArcs:
 
 
 class TestAppendSchedulerLogNewlineBranch:
-    """Tests for the message-ends-with-newline branch (line 91->93)."""
+    """Tests for the message-ends-with-newline branch."""
 
     def test_message_already_ends_with_newline_is_not_doubled(self, tmp_path):
         with patch.object(skytonight_storage, 'SKYTONIGHT_LOGS_DIR', str(tmp_path)):
@@ -284,7 +284,7 @@ class TestAppendSchedulerLogNewlineBranch:
 
 
 class TestTrimLogFileException:
-    """Test that _trim_log_file silently handles unreadable files (lines 105-106)."""
+    """Test that _trim_log_file silently handles unreadable files."""
 
     def test_trim_log_file_ignores_exception_on_missing_path(self):
         # FileNotFoundError when opening a non-existent path triggers except Exception: pass
@@ -293,7 +293,7 @@ class TestTrimLogFileException:
 
 
 class TestGetResultsFile:
-    """Test get_results_file returns the expected path (lines 111-112)."""
+    """Test get_results_file returns the expected path."""
 
     def test_get_results_file_returns_string(self):
         result = get_results_file()

@@ -104,7 +104,7 @@ def test_merge_item_with_alias_entry_non_dict_passthrough():
 
 
 def test_load_aliases_table_exception_returns_empty(monkeypatch):
-    """Lines 51-53: exception during file open → return empty dict."""
+    """exception during file open → return empty dict."""
     module._aliases_cache = {}
     module._aliases_mtime = None
     with patch("observation.catalogue_aliases.os.path.exists", return_value=True), \
@@ -115,7 +115,7 @@ def test_load_aliases_table_exception_returns_empty(monkeypatch):
 
 
 def test_merge_item_no_catalogue_removes_aliases_key():
-    """Lines 95-96: missing catalogue → pop catalogue_aliases and return item."""
+    """missing catalogue → pop catalogue_aliases and return item."""
     item = {'name': 'M31', 'catalogue_aliases': {'x': 'y'}}
     result = merge_item_with_alias_entry(item)
     assert 'catalogue_aliases' not in result
@@ -123,14 +123,14 @@ def test_merge_item_no_catalogue_removes_aliases_key():
 
 
 def test_merge_item_no_name_removes_aliases_key():
-    """Lines 95-96: missing name → pop catalogue_aliases and return item."""
+    """missing name → pop catalogue_aliases and return item."""
     item = {'catalogue': 'Messier', 'catalogue_aliases': {'x': 'y'}}
     result = merge_item_with_alias_entry(item)
     assert 'catalogue_aliases' not in result
 
 
 def test_merge_item_empty_aliases_dict_removes_aliases_key():
-    """Line 108: aliases is empty dict → pop catalogue_aliases from item."""
+    """aliases is empty dict → pop catalogue_aliases from item."""
     item = {'catalogue': 'Messier', 'name': 'M31', 'catalogue_aliases': {'old': 'data'}}
     with patch("observation.catalogue_aliases.get_alias_entry", return_value={"aliases": {}}):
         result = merge_item_with_alias_entry(item)

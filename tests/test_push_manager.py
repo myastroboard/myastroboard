@@ -200,11 +200,11 @@ def test_send_push_serializes_payload_as_json(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# _pem_to_raw_b64 (lines 44-48)
+# _pem_to_raw_b64
 # ---------------------------------------------------------------------------
 
 def test_pem_to_raw_b64_converts_key(monkeypatch):
-    """Lines 44-48: convert PEM EC key to raw base64url scalar."""
+    """convert PEM EC key to raw base64url scalar."""
     from utils import push_manager
     from unittest.mock import MagicMock
 
@@ -227,11 +227,11 @@ def test_pem_to_raw_b64_converts_key(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# _generate_keys (lines 53-67)
+# _generate_keys
 # ---------------------------------------------------------------------------
 
 def test_generate_keys_returns_base64_key_pair(monkeypatch):
-    """Lines 53-67: _generate_keys produces private_key and public_key."""
+    """_generate_keys produces private_key and public_key."""
     from utils import push_manager
     from unittest.mock import MagicMock
 
@@ -266,7 +266,7 @@ def test_generate_keys_returns_base64_key_pair(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_load_warns_when_vapid_contact_email_empty(tmp_path, monkeypatch):
-    """Lines 76->82: empty vapid_contact_email → warning emitted once."""
+    """empty vapid_contact_email → warning emitted once."""
     from utils import push_manager
     from utils import app_settings
 
@@ -293,7 +293,7 @@ def test_load_warns_when_vapid_contact_email_empty(tmp_path, monkeypatch):
 
 
 def test_load_migrates_pem_private_key_to_raw_b64(tmp_path, monkeypatch):
-    """Lines 92-95: PEM private key in file gets migrated to raw base64url."""
+    """PEM private key in file gets migrated to raw base64url."""
     from utils import push_manager
 
     pem_keys = {
@@ -313,7 +313,7 @@ def test_load_migrates_pem_private_key_to_raw_b64(tmp_path, monkeypatch):
 
 
 def test_save_vapid_keys_disk_error_logs_and_returns_keys(tmp_path, monkeypatch):
-    """Lines 108-109: exception writing VAPID keys → error logged, keys still returned."""
+    """exception writing VAPID keys → error logged, keys still returned."""
     from utils import push_manager
     import builtins
 
@@ -341,7 +341,7 @@ def test_save_vapid_keys_disk_error_logs_and_returns_keys(tmp_path, monkeypatch)
 
 
 def test_vapid_contact_email_configured_skips_warning(tmp_path, monkeypatch):
-    """Line 76->82: VAPID contact email IS set → skip the warning block."""
+    """VAPID contact email IS set → skip the warning block."""
     from utils import push_manager
     from utils import app_settings
 

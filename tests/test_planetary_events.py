@@ -403,7 +403,7 @@ class TestPlanetaryHelperArrayBranches:
         self.t = Time("2026-06-21T02:00:00", format="isot", scale="utc")
 
     def test_angular_separation_ndarray_branch(self):
-        """sep.degree is ndarray → line 309."""
+        """sep.degree is ndarray."""
         from unittest.mock import patch, MagicMock
         fake_sep = MagicMock()
         fake_sep.degree = np.array([5.0])
@@ -414,7 +414,7 @@ class TestPlanetaryHelperArrayBranches:
         assert isinstance(result, float)
 
     def test_angular_separation_complex_branch(self):
-        """sep.degree is complex → line 311."""
+        """sep.degree is complex."""
         from unittest.mock import patch, MagicMock
         fake_sep = MagicMock()
         fake_sep.degree = complex(5.0, 0.0)
@@ -425,7 +425,7 @@ class TestPlanetaryHelperArrayBranches:
         assert isinstance(result, float)
 
     def test_get_elongation_ndarray_branch(self):
-        """elong_val is ndarray → line 328."""
+        """elong_val is ndarray."""
         from unittest.mock import patch, MagicMock
         fake_elong = MagicMock()
         fake_elong.degree = np.array([45.0])
@@ -436,7 +436,7 @@ class TestPlanetaryHelperArrayBranches:
         assert isinstance(result, float)
 
     def test_get_elongation_complex_branch(self):
-        """elong_val is complex → line 330."""
+        """elong_val is complex."""
         from unittest.mock import patch, MagicMock
         fake_elong = MagicMock()
         fake_elong.degree = complex(45.0, 0.0)
@@ -447,7 +447,7 @@ class TestPlanetaryHelperArrayBranches:
         assert isinstance(result, float)
 
     def test_is_event_visible_altaz_none_returns_false(self):
-        """p1.transform_to() returns None → line 350."""
+        """p1.transform_to() returns None."""
         from unittest.mock import patch, MagicMock
         fake_body = MagicMock()
         fake_body.transform_to.return_value = None
@@ -456,7 +456,7 @@ class TestPlanetaryHelperArrayBranches:
         assert result is False
 
     def test_is_event_visible_alt1_ndarray(self):
-        """alt1_val is ndarray → line 357."""
+        """alt1_val is ndarray."""
         from unittest.mock import patch, MagicMock
         fake_altaz = MagicMock()
         fake_altaz.alt.degree = np.array([30.0])
@@ -467,7 +467,7 @@ class TestPlanetaryHelperArrayBranches:
         assert isinstance(result, bool)
 
     def test_is_event_visible_alt1_complex(self):
-        """alt1_val is complex → line 359."""
+        """alt1_val is complex."""
         from unittest.mock import patch, MagicMock
         fake_altaz = MagicMock()
         fake_altaz.alt.degree = complex(30.0, 0.0)
@@ -478,7 +478,7 @@ class TestPlanetaryHelperArrayBranches:
         assert isinstance(result, bool)
 
     def test_is_event_visible_alt2_ndarray(self):
-        """alt2_val is ndarray → line 364."""
+        """alt2_val is ndarray."""
         from unittest.mock import patch, MagicMock
         fake_altaz1 = MagicMock()
         fake_altaz1.alt.degree = 30.0
@@ -495,7 +495,7 @@ class TestPlanetaryHelperArrayBranches:
         assert isinstance(result, bool)
 
     def test_is_event_visible_alt2_complex(self):
-        """alt2_val is complex → line 366."""
+        """alt2_val is complex."""
         from unittest.mock import patch, MagicMock
         fake_altaz1 = MagicMock()
         fake_altaz1.alt.degree = 30.0
@@ -512,7 +512,7 @@ class TestPlanetaryHelperArrayBranches:
         assert isinstance(result, bool)
 
     def test_is_planet_visible_altaz_none_returns_false(self):
-        """altaz is None → line 383."""
+        """altaz is None."""
         from unittest.mock import patch, MagicMock
         fake_body = MagicMock()
         fake_body.transform_to.return_value = None
@@ -521,7 +521,7 @@ class TestPlanetaryHelperArrayBranches:
         assert result is False
 
     def test_is_planet_visible_sun_obj_none_returns_false(self):
-        """sun_obj is None → line 388."""
+        """sun_obj is None."""
         from unittest.mock import patch, MagicMock
         fake_planet = MagicMock()
         fake_planet.transform_to.return_value = MagicMock()
@@ -536,7 +536,7 @@ class TestPlanetaryHelperArrayBranches:
         assert result is False
 
     def test_is_planet_visible_elong_ndarray(self):
-        """elong_val is ndarray → line 393."""
+        """elong_val is ndarray."""
         from unittest.mock import patch, MagicMock
         fake_elong = MagicMock()
         fake_elong.degree = np.array([45.0])
@@ -553,7 +553,7 @@ class TestPlanetaryHelperArrayBranches:
         assert isinstance(result, bool)
 
     def test_is_planet_visible_elong_complex(self):
-        """elong_val is complex → line 395."""
+        """elong_val is complex."""
         from unittest.mock import patch, MagicMock
         fake_elong = MagicMock()
         fake_elong.degree = complex(45.0, 0.0)
@@ -570,7 +570,7 @@ class TestPlanetaryHelperArrayBranches:
         assert isinstance(result, bool)
 
     def test_is_planet_visible_alt_ndarray(self):
-        """alt_val is ndarray → line 401."""
+        """alt_val is ndarray."""
         from unittest.mock import patch, MagicMock
         fake_elong = MagicMock()
         fake_elong.degree = 45.0
@@ -587,7 +587,7 @@ class TestPlanetaryHelperArrayBranches:
         assert isinstance(result, bool)
 
     def test_is_planet_visible_alt_complex(self):
-        """alt_val is complex → line 403."""
+        """alt_val is complex."""
         from unittest.mock import patch, MagicMock
         fake_elong = MagicMock()
         fake_elong.degree = 45.0

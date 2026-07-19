@@ -14,12 +14,12 @@ import pytest
 from space import spaceflight_tracker
 
 # ---------------------------------------------------------------------------
-# push_scheduler.py — lines 613-614
+# push_scheduler.py — 
 # ---------------------------------------------------------------------------
 
 
 class TestAcquireLockCloseFailsOnCleanup:
-    """Lines 613-614: outer except fires AND lock_file.close() also raises."""
+    """outer except fires AND lock_file.close() also raises."""
 
     def test_close_failure_logged_and_false_returned(self, monkeypatch, tmp_path):
         from utils import push_scheduler
@@ -55,7 +55,7 @@ class TestAcquireLockCloseFailsOnCleanup:
 
 
 # ---------------------------------------------------------------------------
-# skytonight_scheduler_manager.py — lines 179-182, 185->190, 188-189
+# skytonight_scheduler_manager.py — 
 # ---------------------------------------------------------------------------
 
 
@@ -68,7 +68,7 @@ class TestGetOrCreateSchedulerLockCleanup:
         return mock_app
 
     def test_ioerror_after_open_close_succeeds(self, tmp_path):
-        """Lines 178-180: IOError after open → lock_file.close() called (succeeds)."""
+        """IOError after open → lock_file.close() called (succeeds)."""
         from skytonight.skytonight_scheduler_manager import get_or_create_skytonight_scheduler
 
         lock_path = str(tmp_path / "sched.lock")
@@ -87,7 +87,7 @@ class TestGetOrCreateSchedulerLockCleanup:
         assert result is None
 
     def test_ioerror_after_open_close_also_fails(self, tmp_path):
-        """Lines 181-182: IOError after open → lock_file.close() also raises."""
+        """IOError after open → lock_file.close() also raises."""
         from skytonight.skytonight_scheduler_manager import get_or_create_skytonight_scheduler
 
         lock_path = str(tmp_path / "sched2.lock")
@@ -113,7 +113,7 @@ class TestGetOrCreateSchedulerLockCleanup:
         assert result is None
 
     def test_exception_handler_lock_file_none(self, tmp_path):
-        """Branch 185->190: open() raises non-IOError/OSError → lock_file stays None."""
+        """open() raises non-IOError/OSError → lock_file stays None."""
         from skytonight.skytonight_scheduler_manager import get_or_create_skytonight_scheduler
 
         lock_path = str(tmp_path / "sched3.lock")
@@ -126,7 +126,7 @@ class TestGetOrCreateSchedulerLockCleanup:
         assert result is None
 
     def test_exception_handler_close_also_fails(self, tmp_path):
-        """Lines 188-189: general Exception after open + lock_file.close() raises."""
+        """general Exception after open + lock_file.close() raises."""
         from skytonight.skytonight_scheduler_manager import get_or_create_skytonight_scheduler
 
         lock_path = str(tmp_path / "sched4.lock")
@@ -150,7 +150,7 @@ class TestGetOrCreateSchedulerLockCleanup:
 
 
 # ---------------------------------------------------------------------------
-# weather_astro.py — branches 213->217, 814->820
+# weather_astro.py — 
 # ---------------------------------------------------------------------------
 
 
@@ -163,7 +163,7 @@ class TestWeatherAstroBranches:
         cls.weather_astro = weather_astro
 
     def test_parse_extended_data_timezone_already_string(self):
-        """Branch 213->217: Timezone() returns str, not bytes — no decode needed."""
+        """Timezone() returns str, not bytes — no decode needed."""
         analyzer = MagicMock()
         analyzer.location = {"name": "Paris", "latitude": 48.0, "longitude": 2.0}
 
@@ -191,7 +191,7 @@ class TestWeatherAstroBranches:
         assert result["location"]["timezone"] == "UTC"
 
     def test_fresh_ts_but_no_cached_data_falls_through(self):
-        """Branch 814->820: TTL not expired but cached data is None → fall through."""
+        """TTL not expired but cached data is None → fall through."""
         key = self.weather_astro._analysis_cache_key(24, "nocache_lang")
         now = time.time()
         with patch("weather.weather_astro.time.time", return_value=now), \
@@ -204,7 +204,7 @@ class TestWeatherAstroBranches:
 
 
 # ---------------------------------------------------------------------------
-# auth.py — branches 260->267, 267->273, 572->566, 581->580, 584->580
+# auth.py — 
 # ---------------------------------------------------------------------------
 
 
@@ -212,7 +212,7 @@ class TestAuthSaveUsersMissingBranches:
     """Cover save_users error-recovery branches not yet hit."""
 
     def test_makedirs_fails_no_backup_no_temp(self, tmp_path, monkeypatch):
-        """Branches 260->267, 267->273: makedirs fails → backup_created=False, temp not created."""
+        """makedirs fails → backup_created=False, temp not created."""
         from utils import auth
 
         users_file = tmp_path / "users.json"
@@ -252,7 +252,7 @@ class TestAuthDeleteUserMissingBranches:
         return manager, admin, alice, astrodex_dir, images_dir
 
     def test_image_file_referenced_but_missing(self, tmp_path, monkeypatch, setup_auth_manager):
-        """Branch 572->566: image listed in astrodex but doesn't exist on disk → skip."""
+        """image listed in astrodex but doesn't exist on disk → skip."""
         manager, admin, alice, astrodex_dir, images_dir = setup_auth_manager
         user_id = alice.user_id
 
@@ -267,7 +267,7 @@ class TestAuthDeleteUserMissingBranches:
         assert manager.get_user_by_id(user_id) is None
 
     def test_listdir_filename_not_matching_user_prefix(self, tmp_path, monkeypatch, setup_auth_manager):
-        """Branch 581->580: filename in listdir doesn't start with user_id prefix → skip."""
+        """filename in listdir doesn't start with user_id prefix → skip."""
         manager, admin, alice, astrodex_dir, images_dir = setup_auth_manager
         user_id = alice.user_id
 
@@ -281,7 +281,7 @@ class TestAuthDeleteUserMissingBranches:
         assert other_user_file.exists()
 
     def test_listdir_path_traversal_guard(self, tmp_path, monkeypatch, setup_auth_manager):
-        """Branch 584->580: normpath resolves outside images_dir → skip."""
+        """normpath resolves outside images_dir → skip."""
         from utils import auth as auth_mod
 
         manager, admin, alice, astrodex_dir, images_dir = setup_auth_manager
@@ -306,7 +306,7 @@ class TestAuthDeleteUserMissingBranches:
 
 
 # ---------------------------------------------------------------------------
-# cache_updater.py — lines 1015->1018, 1276, 1281-1286, 1324
+# cache_updater.py — 
 # ---------------------------------------------------------------------------
 
 
@@ -314,7 +314,7 @@ class TestCacheUpdaterIersBranches:
     """Cover IERS-related branches in update_iers_cache and fully_initialize_caches."""
 
     def test_update_iers_no_mirror_url(self):
-        """Branch 1015->1018: mirror_url is None → single URL list."""
+        """mirror_url is None → single URL list."""
         from cache.cache_updater import update_iers_cache
         import astropy.utils.iers as _iers_mod
 
@@ -339,7 +339,7 @@ class TestCacheUpdaterIersBranches:
                                     pass  # not the point; just need the mirror branch covered
 
     def test_iers_table_mjd_max_without_value_attr(self):
-        """Line 1276: mjd_max without .value attribute (plain float)."""
+        """mjd_max without .value attribute (plain float)."""
         from cache.cache_updater import fully_initialize_caches
         import astropy.utils.iers as _iers_mod
 
@@ -376,7 +376,7 @@ class TestCacheUpdaterIersBranches:
                             fully_initialize_caches()
 
     def test_iers_stale_exception_during_eval(self):
-        """Lines 1281-1282: exception while evaluating IERS table staleness."""
+        """exception while evaluating IERS table staleness."""
         from cache.cache_updater import fully_initialize_caches
 
         class _BadTable:
@@ -400,7 +400,7 @@ class TestCacheUpdaterIersBranches:
                         fully_initialize_caches()  # should not raise
 
     def test_iers_stale_forces_iers_job(self):
-        """Lines 1285-1286: stale IERS table → iers job appended to jobs_to_run."""
+        """stale IERS table → iers job appended to jobs_to_run."""
         from cache.cache_updater import fully_initialize_caches
 
         class _StaleTable:
@@ -434,7 +434,7 @@ class TestCacheUpdaterIersBranches:
                             fully_initialize_caches()
 
     def test_iers_pre_parallel_success_increments_count(self):
-        """Line 1324: pre-parallel IERS download succeeds → success_count incremented."""
+        """pre-parallel IERS download succeeds → success_count incremented."""
         from cache.cache_updater import fully_initialize_caches
 
         with patch("cache.cache_updater.update_iers_cache") as mock_iers:
@@ -461,7 +461,7 @@ class TestCacheUpdaterIersBranches:
 
 
 # ---------------------------------------------------------------------------
-# object_info.py — branches 238->232, 332->330, 450->446
+# object_info.py — 
 # ---------------------------------------------------------------------------
 
 
@@ -469,7 +469,7 @@ class TestObjectInfoMissingBranches:
     """Cover missed object_info.py branches."""
 
     def test_alias_equal_to_identifier_skipped(self):
-        """Branch 238->232: alias_val == identifier → skip redundant entry in _resolve_via_simbad."""
+        """alias_val == identifier → skip redundant entry in _resolve_via_simbad."""
         from observation.object_info import _resolve_via_simbad
 
         identifier = "M31"
@@ -502,7 +502,7 @@ class TestObjectInfoMissingBranches:
         assert "M31" not in aliases
 
     def test_alias_empty_string_skipped(self):
-        """Branch 332->330: alias_val is empty → skip in resolve_identifier_for_catalogue_lookup."""
+        """alias_val is empty → skip in resolve_identifier_for_catalogue_lookup."""
         from observation.object_info import resolve_identifier_for_catalogue_lookup
 
         main_result = {
@@ -514,7 +514,7 @@ class TestObjectInfoMissingBranches:
                 {"name": "dec"},
             ],
         }
-        # Alias data includes an empty string (falsy) → branch 332->330
+        # Alias data includes an empty string (falsy)
         alias_result = {"data": [[""], ["NGC 224"]]}
 
         query_results = [main_result, alias_result]
@@ -533,7 +533,7 @@ class TestObjectInfoMissingBranches:
         assert "" not in result.get("aliases", [])
 
     def test_wikipedia_fallback_en_loop_none_result(self):
-        """Branch 450->446: lang != 'en', alias is candidate but wiki returns None → loop continues."""
+        """lang != 'en', alias is candidate but wiki returns None → loop continues."""
         from observation.object_info import _wikipedia_with_fallback
 
         aliases = ["Andromeda Galaxy", "M31"]
@@ -549,7 +549,7 @@ class TestObjectInfoMissingBranches:
 
 
 # ---------------------------------------------------------------------------
-# spaceflight_tracker.py — lines 75, 83-84, 88-90, 101-102
+# spaceflight_tracker.py — 
 # ---------------------------------------------------------------------------
 
 
@@ -565,7 +565,7 @@ class TestSpaceflightTrackerBackoffHelpers:
         assert result == {}
 
     def test_load_backoff_invalid_float_entry_skipped(self, tmp_path, monkeypatch):
-        """Lines 83-84: float(exp) raises TypeError/ValueError → continue."""
+        """float(exp) raises TypeError/ValueError → continue."""
         backoff_file = tmp_path / "backoff.json"
         future_ts = time.time() + 3600
         # One valid entry, one with non-numeric value
@@ -579,7 +579,7 @@ class TestSpaceflightTrackerBackoffHelpers:
         assert "/bad/" not in result
 
     def test_load_backoff_json_parse_exception(self, tmp_path, monkeypatch):
-        """Lines 88-90: outer exception (JSON parse error) → return {}."""
+        """outer exception (JSON parse error) → return {}."""
         backoff_file = tmp_path / "bad_backoff.json"
         backoff_file.write_text("{not valid json", encoding="utf-8")
         monkeypatch.setattr(spaceflight_tracker, "_SPACEFLIGHT_BACKOFF_FILE", str(backoff_file))
@@ -588,7 +588,7 @@ class TestSpaceflightTrackerBackoffHelpers:
         assert result == {}
 
     def test_save_backoff_state_write_exception(self, tmp_path, monkeypatch):
-        """Lines 101-102: exception in _save_backoff_state → logged, no raise."""
+        """exception in _save_backoff_state → logged, no raise."""
         monkeypatch.setattr(spaceflight_tracker, "_SPACEFLIGHT_BACKOFF_FILE", str(tmp_path / "x.json"))
         monkeypatch.setattr(
             spaceflight_tracker,
@@ -600,7 +600,7 @@ class TestSpaceflightTrackerBackoffHelpers:
             spaceflight_tracker._save_backoff_state()  # must not raise
 
     def test_load_backoff_expired_entry_excluded(self, tmp_path, monkeypatch):
-        """Branch 85->80: exp_val <= now_ts (expired entry) → if is False → loop continues."""
+        """exp_val <= now_ts (expired entry) → if is False → loop continues."""
         backoff_file = tmp_path / "backoff_expired.json"
         expired_ts = time.time() - 3600  # 1 hour in the past → expired
         backoff_file.write_text(

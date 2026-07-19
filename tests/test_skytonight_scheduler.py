@@ -972,7 +972,7 @@ class TestSchedulerInitFromStoredStatus:
     """Cover missing lines in __init__ status-restore branches."""
 
     def test_last_error_non_empty_string_is_stored(self, monkeypatch):
-        """Line 172: last_error is a non-empty string → self.last_error = stored_last_error."""
+        """last_error is a non-empty string → self.last_error = stored_last_error."""
         stored = {'last_error': 'something went wrong'}
         monkeypatch.setattr('skytonight.skytonight_scheduler.load_scheduler_status', lambda default=None: stored)
         monkeypatch.setattr('skytonight.skytonight_scheduler.ensure_skytonight_directories', lambda: None)
@@ -981,7 +981,7 @@ class TestSchedulerInitFromStoredStatus:
         assert sched.last_error == 'something went wrong'
 
     def test_last_error_non_string_non_none_is_converted(self, monkeypatch):
-        """Line 176: last_error is non-None non-str → str(stored_last_error)."""
+        """last_error is non-None non-str → str(stored_last_error)."""
         stored = {'last_error': 42}
         monkeypatch.setattr('skytonight.skytonight_scheduler.load_scheduler_status', lambda default=None: stored)
         monkeypatch.setattr('skytonight.skytonight_scheduler.ensure_skytonight_directories', lambda: None)
@@ -990,7 +990,7 @@ class TestSchedulerInitFromStoredStatus:
         assert sched.last_error == '42'
 
     def test_invalid_duration_is_none(self, monkeypatch):
-        """Lines 188-189: stored duration raises TypeError/ValueError → last_execution_duration_seconds = None."""
+        """stored duration raises TypeError/ValueError → last_execution_duration_seconds = None."""
         stored = {'progress': {'last_execution_duration_seconds': 'not_a_number'}}
         monkeypatch.setattr('skytonight.skytonight_scheduler.load_scheduler_status', lambda default=None: stored)
         monkeypatch.setattr('skytonight.skytonight_scheduler.ensure_skytonight_directories', lambda: None)
@@ -999,7 +999,7 @@ class TestSchedulerInitFromStoredStatus:
         assert sched.last_execution_duration_seconds is None
 
     def test_backfill_exception_is_swallowed(self, monkeypatch):
-        """Lines 212-213: exception in backfill → pass (no crash)."""
+        """exception in backfill → pass (no crash)."""
         stored = {}  # empty → enters backfill try block
 
         def _raise_disk_error(*_a, **_k):
@@ -1109,10 +1109,10 @@ class TestRunLoopMissedRunFalseBranch:
 
 
 class TestRunLoopTriggerFileException:
-    """Cover 297-298: exception when removing trigger file."""
+    """Cover exception when removing trigger file."""
 
     def test_trigger_file_remove_exception_is_logged(self, monkeypatch, tmp_path):
-        """Lines 297-298: os.remove raises → error logged, scheduler continues."""
+        """os.remove raises → error logged, scheduler continues."""
         trigger_file = tmp_path / "skt.trigger"
         trigger_file.touch()
 
@@ -1165,10 +1165,10 @@ class TestRunLoopTriggerFileException:
 
 
 class TestRunLoopMissedRunRecoveryException:
-    """Cover 277-278: exception in startup missed-run recovery block."""
+    """Cover exception in startup missed-run recovery block."""
 
     def test_exception_in_load_status_is_swallowed(self, monkeypatch):
-        """Lines 277-278: load_scheduler_status raises inside try → warning logged, loop continues."""
+        """load_scheduler_status raises inside try → warning logged, loop continues."""
         future_next_run = datetime.now(ZoneInfo('UTC')) + timedelta(hours=4)
         last_run = datetime.now(ZoneInfo('UTC')) - timedelta(hours=6)
 

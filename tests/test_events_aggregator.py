@@ -1144,7 +1144,7 @@ class TestExtractIssPassEvents:
         assert events == []
 
     def test_lunar_transit_out_of_range_skipped(self, aggregator):
-        """Line 869: lunar transit more than 7 days away is skipped."""
+        """lunar transit more than 7 days away is skipped."""
         peak = (aggregator.local_now + timedelta(days=10)).isoformat()
         transit = {"peak_time": peak, "minimum_separation_arcmin": 0.3}
         events = aggregator._extract_iss_pass_events({"lunar_transits": [transit]})
@@ -1358,7 +1358,7 @@ class TestExtractSpecialPhenomenaEvents:
         assert events[0].title == "My Custom Event"
 
     def test_malformed_event_hits_except_handler(self, aggregator):
-        """Lines 1044-1045: non-dict entry triggers AttributeError → except handler."""
+        """non-dict entry triggers AttributeError → except handler."""
         peak = (aggregator.local_now + timedelta(days=1)).isoformat()
         data = {
             "events": [
@@ -1450,7 +1450,7 @@ class TestExtractSolarSystemEvents:
         assert events[0].icon_color_class == "text-warning"
 
     def test_malformed_event_hits_except_handler(self, aggregator):
-        """Lines 1096-1097: non-dict entry triggers AttributeError → except handler."""
+        """non-dict entry triggers AttributeError → except handler."""
         peak = (aggregator.local_now + timedelta(days=2)).isoformat()
         data = {
             "events": [

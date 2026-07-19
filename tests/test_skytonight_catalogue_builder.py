@@ -701,11 +701,11 @@ def test_build_standalone_targets_skips_entries_missing_ra_dec(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# _collect_catalogue_names — OpenNGC already set when IC row processed (line 485)
+# _collect_catalogue_names — OpenNGC already set when IC row processed
 # ---------------------------------------------------------------------------
 
 def test_collect_catalogue_names_ic_row_with_ngc_names_skips_openngc_fallback():
-    """Line 485 False branch: IC-named row already has OpenNGC set from ngc_names."""
+    """ False branch: IC-named row already has OpenNGC set from ngc_names."""
     row = _make_row(name='IC1234', ngc_names=['NGC 224'], ic_names=[])
     names = _collect_catalogue_names(row)
     assert names.get('OpenNGC') == 'NGC 224'
@@ -713,11 +713,11 @@ def test_collect_catalogue_names_ic_row_with_ngc_names_skips_openngc_fallback():
 
 
 # ---------------------------------------------------------------------------
-# _build_cross_ref_map — if key: False branches (lines 630, 642, 654, 666)
+# _build_cross_ref_map — if key: False branches
 # ---------------------------------------------------------------------------
 
 def test_build_cross_ref_map_pensack_skips_empty_key(monkeypatch):
-    """Line 630 False branch: Pensack entry normalizes to empty key -> skipped."""
+    """ False branch: Pensack entry normalizes to empty key -> skipped."""
     pensack_data = ['---', 'NGC 5128']
 
     def fake_load(filename):
@@ -732,7 +732,7 @@ def test_build_cross_ref_map_pensack_skips_empty_key(monkeypatch):
 
 
 def test_build_cross_ref_map_lbn_skips_empty_key(monkeypatch):
-    """Line 642 False branch: LBN entry raw_ngc_name normalizes to empty key -> skipped."""
+    """ False branch: LBN entry raw_ngc_name normalizes to empty key -> skipped."""
     lbn_data = {'---': 'LBN 999', 'NGC 5128': 'LBN 357'}
 
     def fake_load(filename):
@@ -747,7 +747,7 @@ def test_build_cross_ref_map_lbn_skips_empty_key(monkeypatch):
 
 
 def test_build_cross_ref_map_garyimm_skips_empty_key(monkeypatch):
-    """Line 654 False branch: GaryImm entry normalizes to empty key -> skipped."""
+    """ False branch: GaryImm entry normalizes to empty key -> skipped."""
     garyimm_data = ['---', 'NGC 5128']
 
     def fake_load(filename):
@@ -762,7 +762,7 @@ def test_build_cross_ref_map_garyimm_skips_empty_key(monkeypatch):
 
 
 def test_build_cross_ref_map_arp_skips_empty_key(monkeypatch):
-    """Line 666 False branch: Arp entry raw_ngc_name normalizes to empty key -> skipped."""
+    """ False branch: Arp entry raw_ngc_name normalizes to empty key -> skipped."""
     arp_data = {'---': 'Arp 999', 'NGC 2': 'Arp 2'}
 
     def fake_load(filename):
@@ -1121,11 +1121,11 @@ def test_build_and_save_default_dataset_raises_on_save_failure(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# _build_cross_ref_map — skip guards (lines 652, 664)
+# _build_cross_ref_map — skip guards
 # ---------------------------------------------------------------------------
 
 def test_build_cross_ref_map_garyimm_skips_non_string_and_empty(monkeypatch):
-    """Line 652: non-string and empty entries in garyimm list are skipped."""
+    """non-string and empty entries in garyimm list are skipped."""
     garyimm_data = [42, '', 'NGC 5128']
 
     def fake_load(filename):
@@ -1140,7 +1140,7 @@ def test_build_cross_ref_map_garyimm_skips_non_string_and_empty(monkeypatch):
 
 
 def test_build_cross_ref_map_arp_skips_empty_key_or_value(monkeypatch):
-    """Line 664: falsy dict key or falsy value in arp data are skipped."""
+    """falsy dict key or falsy value in arp data are skipped."""
     arp_data = {'': 'Arp 1', 'NGC 1': None, 'NGC 2': 'Arp 2'}
 
     def fake_load(filename):
@@ -1155,11 +1155,11 @@ def test_build_cross_ref_map_arp_skips_empty_key_or_value(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# build_targets_from_rows — empty canonical_name skip (line 740)
+# build_targets_from_rows — empty canonical_name skip
 # ---------------------------------------------------------------------------
 
 def test_build_targets_from_rows_skips_row_with_empty_canonical_name(monkeypatch):
-    """Line 740: when _canonical_key returns empty canonical_name the row is skipped."""
+    """when _canonical_key returns empty canonical_name the row is skipped."""
     monkeypatch.setattr(
         'skytonight.skytonight_catalogue_builder._canonical_key',
         lambda names, fallback: ('OpenNGC', ''),
@@ -1170,11 +1170,11 @@ def test_build_targets_from_rows_skips_row_with_empty_canonical_name(monkeypatch
 
 
 # ---------------------------------------------------------------------------
-# _build_standalone_targets_from_json — non-normalizable name (lines 878-879)
+# _build_standalone_targets_from_json — non-normalizable name
 # ---------------------------------------------------------------------------
 
 def test_build_standalone_targets_skips_name_normalizing_to_empty(monkeypatch):
-    """Lines 878-879: normalize_object_name returns '' for punctuation-only name → skipped."""
+    """normalize_object_name returns '' for punctuation-only name → skipped."""
     data = [
         {
             'name': '---',

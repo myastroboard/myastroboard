@@ -1152,7 +1152,7 @@ class TestEquipmentSaveFailurePaths:
     """Cover return-None when save returns False for each CRUD."""
 
     def test_create_telescope_save_fails_returns_none(self, temp_data_dir, test_user_id, monkeypatch):
-        """Line 601: save_user_telescopes returns False → create returns None."""
+        """save_user_telescopes returns False → create returns None."""
         monkeypatch.setattr(equipment_profiles, 'save_user_telescopes', lambda *_: False)
         result = equipment_profiles.create_telescope(test_user_id, {
             'name': 'T', 'telescope_type': 'Refractor', 'aperture_mm': 100, 'focal_length_mm': 1000
@@ -1160,7 +1160,7 @@ class TestEquipmentSaveFailurePaths:
         assert result is None
 
     def test_update_telescope_save_fails_returns_none(self, temp_data_dir, test_user_id, monkeypatch):
-        """Line 653: update_telescope save fails → returns None."""
+        """update_telescope save fails → returns None."""
         scope = equipment_profiles.create_telescope(test_user_id, {
             'name': 'T', 'telescope_type': 'Refractor', 'aperture_mm': 100, 'focal_length_mm': 1000
         })
@@ -1171,7 +1171,7 @@ class TestEquipmentSaveFailurePaths:
         assert result is None
 
     def test_create_camera_save_fails_returns_none(self, temp_data_dir, test_user_id, monkeypatch):
-        """Line 745: save_user_cameras returns False → create returns None."""
+        """save_user_cameras returns False → create returns None."""
         monkeypatch.setattr(equipment_profiles, 'save_user_cameras', lambda *_: False)
         result = equipment_profiles.create_camera(test_user_id, {
             'name': 'C', 'manufacturer': 'M', 'sensor_width_mm': 10, 'sensor_height_mm': 8,
@@ -1181,7 +1181,7 @@ class TestEquipmentSaveFailurePaths:
         assert result is None
 
     def test_update_camera_save_fails_returns_none(self, temp_data_dir, test_user_id, monkeypatch):
-        """Line 800: update_camera save fails → returns None."""
+        """update_camera save fails → returns None."""
         cam = equipment_profiles.create_camera(test_user_id, {
             'name': 'C', 'manufacturer': 'M', 'sensor_width_mm': 10, 'sensor_height_mm': 8,
             'resolution_width_px': 3000, 'resolution_height_px': 2000, 'pixel_size_um': 3.8,
@@ -1196,7 +1196,7 @@ class TestEquipmentSaveFailurePaths:
         assert result is None
 
     def test_create_mount_save_fails_returns_none(self, temp_data_dir, test_user_id, monkeypatch):
-        """Line 872: save_user_mounts returns False → create returns None."""
+        """save_user_mounts returns False → create returns None."""
         monkeypatch.setattr(equipment_profiles, 'save_user_mounts', lambda *_: False)
         result = equipment_profiles.create_mount(test_user_id, {
             'name': 'M', 'mount_type': 'Equatorial', 'payload_capacity_kg': 10
@@ -1204,7 +1204,7 @@ class TestEquipmentSaveFailurePaths:
         assert result is None
 
     def test_update_mount_save_fails_returns_none(self, temp_data_dir, test_user_id, monkeypatch):
-        """Line 918: update_mount save fails → returns None."""
+        """update_mount save fails → returns None."""
         mount = equipment_profiles.create_mount(test_user_id, {
             'name': 'M', 'mount_type': 'Equatorial', 'payload_capacity_kg': 10
         })
@@ -1215,7 +1215,7 @@ class TestEquipmentSaveFailurePaths:
         assert result is None
 
     def test_create_filter_save_fails_returns_none(self, temp_data_dir, test_user_id, monkeypatch):
-        """Line 990: save_user_filters returns False → create returns None."""
+        """save_user_filters returns False → create returns None."""
         monkeypatch.setattr(equipment_profiles, 'save_user_filters', lambda *_: False)
         result = equipment_profiles.create_filter(test_user_id, {
             'name': 'H-alpha', 'filter_type': 'Narrowband'
@@ -1223,7 +1223,7 @@ class TestEquipmentSaveFailurePaths:
         assert result is None
 
     def test_update_filter_save_fails_returns_none(self, temp_data_dir, test_user_id, monkeypatch):
-        """Line 1036: update_filter save fails → returns None."""
+        """update_filter save fails → returns None."""
         f = equipment_profiles.create_filter(test_user_id, {'name': 'F', 'filter_type': 'Narrowband'})
         monkeypatch.setattr(equipment_profiles, 'save_user_filters', lambda *_: False)
         result = equipment_profiles.update_filter(test_user_id, f['id'], {
@@ -1232,20 +1232,20 @@ class TestEquipmentSaveFailurePaths:
         assert result is None
 
     def test_create_accessory_save_fails_returns_none(self, temp_data_dir, test_user_id, monkeypatch):
-        """Line 1114: save_user_accessories returns False → create returns None."""
+        """save_user_accessories returns False → create returns None."""
         monkeypatch.setattr(equipment_profiles, 'save_user_accessories', lambda *_: False)
         result = equipment_profiles.create_accessory(test_user_id, {'name': 'Barlow', 'weight_kg': '1.5'})
         assert result is None
 
     def test_update_accessory_save_fails_returns_none(self, temp_data_dir, test_user_id, monkeypatch):
-        """Line 1158: update_accessory save fails → returns None."""
+        """update_accessory save fails → returns None."""
         a = equipment_profiles.create_accessory(test_user_id, {'name': 'A', 'weight_kg': '0.5'})
         monkeypatch.setattr(equipment_profiles, 'save_user_accessories', lambda *_: False)
         result = equipment_profiles.update_accessory(test_user_id, a['id'], {'name': 'B'})
         assert result is None
 
     def test_create_combination_save_fails_returns_none(self, temp_data_dir, test_user_id, monkeypatch):
-        """Line 1291: save_user_combinations returns False → create returns None."""
+        """save_user_combinations returns False → create returns None."""
         scope = equipment_profiles.create_telescope(test_user_id, {
             'name': 'T', 'telescope_type': 'Refractor', 'aperture_mm': 100, 'focal_length_mm': 1000
         })
@@ -1256,7 +1256,7 @@ class TestEquipmentSaveFailurePaths:
         assert result is None
 
     def test_update_combination_save_fails_returns_none(self, temp_data_dir, test_user_id, monkeypatch):
-        """Line 1336: update_combination save fails → returns None."""
+        """update_combination save fails → returns None."""
         scope = equipment_profiles.create_telescope(test_user_id, {
             'name': 'T', 'telescope_type': 'Refractor', 'aperture_mm': 100, 'focal_length_mm': 1000
         })
@@ -1274,13 +1274,13 @@ class TestEquipmentDeleteExceptions:
     """Cover exception handlers in delete operations."""
 
     def test_delete_telescope_load_exception_returns_false(self, temp_data_dir, test_user_id, monkeypatch):
-        """Lines 677-679: exception in load_user_telescopes → False."""
+        """exception in load_user_telescopes → False."""
         monkeypatch.setattr(equipment_profiles, 'load_user_telescopes',
                             lambda *_: (_ for _ in ()).throw(RuntimeError("disk error")))
         assert equipment_profiles.delete_telescope(test_user_id, 'x') is False
 
     def test_delete_telescope_cascade_plan_exception_still_returns_true(self, temp_data_dir, test_user_id, monkeypatch):
-        """Lines 674-675: plan deletion raises → logged, delete still returns True."""
+        """plan deletion raises → logged, delete still returns True."""
         scope = equipment_profiles.create_telescope(test_user_id, {
             'name': 'T', 'telescope_type': 'Refractor', 'aperture_mm': 100, 'focal_length_mm': 1000
         })
@@ -1292,31 +1292,31 @@ class TestEquipmentDeleteExceptions:
         assert result is True
 
     def test_delete_camera_load_exception_returns_false(self, temp_data_dir, test_user_id, monkeypatch):
-        """Lines 815-817: exception in load_user_cameras → False."""
+        """exception in load_user_cameras → False."""
         monkeypatch.setattr(equipment_profiles, 'load_user_cameras',
                             lambda *_: (_ for _ in ()).throw(RuntimeError("disk error")))
         assert equipment_profiles.delete_camera(test_user_id, 'x') is False
 
     def test_delete_mount_load_exception_returns_false(self, temp_data_dir, test_user_id, monkeypatch):
-        """Lines 933-935: exception in load_user_mounts → False."""
+        """exception in load_user_mounts → False."""
         monkeypatch.setattr(equipment_profiles, 'load_user_mounts',
                             lambda *_: (_ for _ in ()).throw(RuntimeError("disk error")))
         assert equipment_profiles.delete_mount(test_user_id, 'x') is False
 
     def test_delete_filter_load_exception_returns_false(self, temp_data_dir, test_user_id, monkeypatch):
-        """Lines 1051-1053: exception in load_user_filters → False."""
+        """exception in load_user_filters → False."""
         monkeypatch.setattr(equipment_profiles, 'load_user_filters',
                             lambda *_: (_ for _ in ()).throw(RuntimeError("disk error")))
         assert equipment_profiles.delete_filter(test_user_id, 'x') is False
 
     def test_delete_accessory_load_exception_returns_false(self, temp_data_dir, test_user_id, monkeypatch):
-        """Lines 1172-1174: exception in load_user_accessories → False."""
+        """exception in load_user_accessories → False."""
         monkeypatch.setattr(equipment_profiles, 'load_user_accessories',
                             lambda *_: (_ for _ in ()).throw(RuntimeError("disk error")))
         assert equipment_profiles.delete_accessory(test_user_id, 'x') is False
 
     def test_delete_combination_load_exception_returns_false(self, temp_data_dir, test_user_id, monkeypatch):
-        """Lines 1351-1353: exception in load_user_combinations → False."""
+        """exception in load_user_combinations → False."""
         monkeypatch.setattr(equipment_profiles, 'load_user_combinations',
                             lambda *_: (_ for _ in ()).throw(RuntimeError("disk error")))
         assert equipment_profiles.delete_combination(test_user_id, 'x') is False
@@ -1326,19 +1326,19 @@ class TestEquipmentGetSuccessPaths:
     """Cover the success (item found) paths for get_X functions."""
 
     def test_get_filter_found(self, temp_data_dir, test_user_id):
-        """Lines 999-1002: get_filter returns item when found."""
+        """get_filter returns item when found."""
         f = equipment_profiles.create_filter(test_user_id, {'name': 'H-alpha', 'filter_type': 'Narrowband'})
         result = equipment_profiles.get_filter(test_user_id, f['id'])
         assert result is not None and result['id'] == f['id']
 
     def test_get_accessory_found(self, temp_data_dir, test_user_id):
-        """Lines 1122-1125: get_accessory returns item when found."""
+        """get_accessory returns item when found."""
         a = equipment_profiles.create_accessory(test_user_id, {'name': 'Barlow', 'weight_kg': '0.5'})
         result = equipment_profiles.get_accessory(test_user_id, a['id'])
         assert result is not None and result['id'] == a['id']
 
     def test_get_combination_found(self, temp_data_dir, test_user_id):
-        """Lines 1302->item found: get_combination returns item."""
+        """->item found: get_combination returns item."""
         scope = equipment_profiles.create_telescope(test_user_id, {
             'name': 'T', 'telescope_type': 'Refractor', 'aperture_mm': 100, 'focal_length_mm': 1000
         })
@@ -1349,7 +1349,7 @@ class TestEquipmentGetSuccessPaths:
         assert result is not None and result['id'] == combo['id']
 
     def test_update_combination_no_telescope_no_camera_returns_none(self, temp_data_dir, test_user_id):
-        """Lines 1316-1317: update combination without telescope or camera → None."""
+        """update combination without telescope or camera → None."""
         scope = equipment_profiles.create_telescope(test_user_id, {
             'name': 'T', 'telescope_type': 'Refractor', 'aperture_mm': 100, 'focal_length_mm': 1000
         })
@@ -1363,7 +1363,7 @@ class TestEquipmentGetSuccessPaths:
         assert result is None
 
     def test_get_mount_found(self, temp_data_dir, test_user_id):
-        """Line 884: get_mount returns item when found."""
+        """get_mount returns item when found."""
         mount = equipment_profiles.create_mount(test_user_id, {
             'name': 'M', 'mount_type': 'Equatorial', 'payload_capacity_kg': 10
         })
@@ -1371,19 +1371,19 @@ class TestEquipmentGetSuccessPaths:
         assert result is not None and result['id'] == mount['id']
 
     def test_get_filter_not_found_returns_none(self, temp_data_dir, test_user_id):
-        """Lines 1001->1000, 1003: get_filter iterates but item not found → None."""
+        """get_filter iterates but item not found → None."""
         equipment_profiles.create_filter(test_user_id, {'name': 'F', 'filter_type': 'Narrowband'})
         result = equipment_profiles.get_filter(test_user_id, 'nonexistent-filter-id')
         assert result is None
 
     def test_get_accessory_not_found_returns_none(self, temp_data_dir, test_user_id):
-        """Lines 1124->1123, 1126: get_accessory iterates but item not found → None."""
+        """get_accessory iterates but item not found → None."""
         equipment_profiles.create_accessory(test_user_id, {'name': 'A'})
         result = equipment_profiles.get_accessory(test_user_id, 'nonexistent-accessory-id')
         assert result is None
 
     def test_get_combination_not_found_with_items(self, temp_data_dir, test_user_id):
-        """Line 1302->1301: get_combination iterates but item not found → None."""
+        """get_combination iterates but item not found → None."""
         scope = equipment_profiles.create_telescope(test_user_id, {
             'name': 'T', 'telescope_type': 'Refractor', 'aperture_mm': 100, 'focal_length_mm': 1000
         })
@@ -1396,29 +1396,29 @@ class TestEquipmentExceptionHandlers:
     """Cover exception handlers triggered by invalid data in create/update."""
 
     def test_create_filter_exception_returns_none(self, temp_data_dir, test_user_id):
-        """Lines 992-994: missing required filter_type → KeyError → exception handler."""
+        """missing required filter_type → KeyError → exception handler."""
         result = equipment_profiles.create_filter(test_user_id, {'name': 'F'})  # missing filter_type
         assert result is None
 
     def test_create_accessory_exception_returns_none(self, temp_data_dir, test_user_id):
-        """Lines 1115-1117: missing required name → KeyError → exception handler."""
+        """missing required name → KeyError → exception handler."""
         result = equipment_profiles.create_accessory(test_user_id, {})  # missing name
         assert result is None
 
     def test_update_filter_exception_returns_none(self, temp_data_dir, test_user_id):
-        """Lines 1038-1042: missing required name → KeyError in update → exception handler."""
+        """missing required name → KeyError in update → exception handler."""
         f = equipment_profiles.create_filter(test_user_id, {'name': 'F', 'filter_type': 'Narrowband'})
         result = equipment_profiles.update_filter(test_user_id, f['id'], {})  # missing name
         assert result is None
 
     def test_update_accessory_exception_returns_none(self, temp_data_dir, test_user_id):
-        """Lines 1160-1163: missing required name → KeyError in update → exception handler."""
+        """missing required name → KeyError in update → exception handler."""
         a = equipment_profiles.create_accessory(test_user_id, {'name': 'A'})
         result = equipment_profiles.update_accessory(test_user_id, a['id'], {})  # missing name
         assert result is None
 
     def test_create_combination_exception_returns_none(self, temp_data_dir, test_user_id):
-        """Lines 1293-1295: telescope_id provided (passes validation) but name missing → KeyError."""
+        """telescope_id provided (passes validation) but name missing → KeyError."""
         scope = equipment_profiles.create_telescope(test_user_id, {
             'name': 'T', 'telescope_type': 'Refractor', 'aperture_mm': 100, 'focal_length_mm': 1000
         })
@@ -1428,7 +1428,7 @@ class TestEquipmentExceptionHandlers:
         assert result is None
 
     def test_update_combination_exception_returns_none(self, temp_data_dir, test_user_id):
-        """Lines 1338-1342: telescope_id provided, item found, name missing → KeyError."""
+        """telescope_id provided, item found, name missing → KeyError."""
         scope = equipment_profiles.create_telescope(test_user_id, {
             'name': 'T', 'telescope_type': 'Refractor', 'aperture_mm': 100, 'focal_length_mm': 1000
         })
@@ -1441,7 +1441,7 @@ class TestEquipmentExceptionHandlers:
         assert result is None
 
     def test_update_filter_not_found_returns_none(self, temp_data_dir, test_user_id):
-        """Lines 1012->1011, 1038: update_filter iterates but ID not found → return None."""
+        """update_filter iterates but ID not found → return None."""
         equipment_profiles.create_filter(test_user_id, {'name': 'F', 'filter_type': 'Narrowband'})
         result = equipment_profiles.update_filter(test_user_id, 'nonexistent-id', {
             'name': 'X', 'filter_type': 'LP'
@@ -1449,13 +1449,13 @@ class TestEquipmentExceptionHandlers:
         assert result is None
 
     def test_update_accessory_not_found_returns_none(self, temp_data_dir, test_user_id):
-        """Lines 1141->1140, 1160: update_accessory iterates but ID not found → return None."""
+        """update_accessory iterates but ID not found → return None."""
         equipment_profiles.create_accessory(test_user_id, {'name': 'A'})
         result = equipment_profiles.update_accessory(test_user_id, 'nonexistent-id', {'name': 'X'})
         assert result is None
 
     def test_update_combination_not_found_returns_none(self, temp_data_dir, test_user_id):
-        """Line 1313->1312, 1338: update_combination iterates but ID not found → return None."""
+        """update_combination iterates but ID not found → return None."""
         scope = equipment_profiles.create_telescope(test_user_id, {
             'name': 'T', 'telescope_type': 'Refractor', 'aperture_mm': 100, 'focal_length_mm': 1000
         })
@@ -1466,7 +1466,7 @@ class TestEquipmentExceptionHandlers:
         assert result is None
 
     def test_delete_telescope_save_fails_skips_cascade(self, temp_data_dir, test_user_id, monkeypatch):
-        """Line 668->676: save returns False → skip cascade → return False."""
+        """save returns False → skip cascade → return False."""
         scope = equipment_profiles.create_telescope(test_user_id, {
             'name': 'T', 'telescope_type': 'Refractor', 'aperture_mm': 100, 'focal_length_mm': 1000
         })
@@ -1475,7 +1475,7 @@ class TestEquipmentExceptionHandlers:
         assert result is False
 
     def test_update_camera_with_weight_covers_float_return(self, temp_data_dir, test_user_id):
-        """Line 768: get_float_or_none returns float(value) when value is non-empty string."""
+        """get_float_or_none returns float(value) when value is non-empty string."""
         cam = equipment_profiles.create_camera(test_user_id, {
             'name': 'C', 'manufacturer': 'M', 'sensor_width_mm': 10, 'sensor_height_mm': 8,
             'resolution_width_px': 3000, 'resolution_height_px': 2000, 'pixel_size_um': 3.8,
@@ -1490,7 +1490,7 @@ class TestEquipmentExceptionHandlers:
 
 
 class TestAnalyzeCombination:
-    """Cover the analyze_combination function branches (lines 1382-1459)."""
+    """Cover the analyze_combination function branches."""
 
     def _make_telescope(self, user_id, focal_length=800, weight_kg=None):
         data = {
@@ -1523,7 +1523,7 @@ class TestAnalyzeCombination:
         })
 
     def test_analyze_with_filters_and_accessories(self, temp_data_dir, test_user_id):
-        """Lines 1382-1384, 1388-1390: combination with filter_ids and accessory_ids."""
+        """combination with filter_ids and accessory_ids."""
         scope = self._make_telescope(test_user_id)
         cam = self._make_camera(test_user_id)
         f = equipment_profiles.create_filter(test_user_id, {'name': 'F', 'filter_type': 'LP'})
@@ -1541,7 +1541,7 @@ class TestAnalyzeCombination:
         assert len(result.accessories) == 1
 
     def test_analyze_optimal_sampling_medium_fov(self, temp_data_dir, test_user_id):
-        """Lines 1413-1414, 1444: OPTIMAL classification + medium FOV → no recommendations."""
+        """OPTIMAL classification + medium FOV → no recommendations."""
         # pixel_scale = 206.265 * 3.0 / 800 = 0.774 arcsec/px → OPTIMAL (0.667–1.0)
         # FOV diagonal = 57.3 * sqrt(10²+7²) / 800 = 0.874° → between 0.5 and 2.0
         scope = self._make_telescope(test_user_id, focal_length=800)
@@ -1555,7 +1555,7 @@ class TestAnalyzeCombination:
         assert any("No critical issues" in r for r in result.recommendations)
 
     def test_analyze_oversampled_compact_fov(self, temp_data_dir, test_user_id):
-        """Lines 1419-1420, 1424-1425: OVERSAMPLED + compact FOV ≤ 0.5°."""
+        """OVERSAMPLED + compact FOV ≤ 0.5°."""
         # pixel_scale = 206.265 * 3.0 / 2000 = 0.309 arcsec/px → OVERSAMPLED (<0.667)
         # FOV diagonal = 57.3 * sqrt(3²+2²) / 2000 = 0.103° → ≤ 0.5°
         scope = self._make_telescope(test_user_id, focal_length=2000)
@@ -1569,7 +1569,7 @@ class TestAnalyzeCombination:
         assert any("compact targets" in s for s in result.suitability)
 
     def test_analyze_missing_pixel_size_skips_fov(self, temp_data_dir, test_user_id, monkeypatch):
-        """Lines 1426-1427: telescope + camera but camera has no pixel_size_um → else branch."""
+        """telescope + camera but camera has no pixel_size_um → else branch."""
         scope = self._make_telescope(test_user_id, focal_length=800)
         cam = self._make_camera(test_user_id, pixel_size_um=3.0)
         combo = equipment_profiles.create_combination(test_user_id, {
@@ -1583,7 +1583,7 @@ class TestAnalyzeCombination:
         assert any("Complete telescope" in r for r in result.recommendations)
 
     def test_analyze_mount_payload_within_limits(self, temp_data_dir, test_user_id):
-        """Lines 1432-1437: mount + telescope, payload within recommended limits."""
+        """mount + telescope, payload within recommended limits."""
         # telescope weight=3, mount recommended=20 → 3≤20 → "within limits"
         scope = self._make_telescope(test_user_id, focal_length=800, weight_kg=3.0)
         mount = self._make_mount(test_user_id, recommended_payload=20)
@@ -1595,7 +1595,7 @@ class TestAnalyzeCombination:
         assert any("within recommended mount limits" in s for s in result.suitability)
 
     def test_analyze_mount_payload_exceeds_limits(self, temp_data_dir, test_user_id):
-        """Lines 1435-1439: mount + telescope, payload exceeds recommended limits."""
+        """mount + telescope, payload exceeds recommended limits."""
         # telescope weight=15, mount recommended=5 → 15>5 → "too high"
         scope = self._make_telescope(test_user_id, focal_length=800, weight_kg=15.0)
         mount = self._make_mount(test_user_id, recommended_payload=5)
@@ -1607,7 +1607,7 @@ class TestAnalyzeCombination:
         assert any("too high" in r for r in result.recommendations)
 
     def test_analyze_exception_returns_none(self, temp_data_dir, test_user_id, monkeypatch):
-        """Lines 1457-1459: exception inside try → exception handler → None."""
+        """exception inside try → exception handler → None."""
         scope = self._make_telescope(test_user_id)
         combo = equipment_profiles.create_combination(test_user_id, {
             'name': 'C', 'telescope_id': scope['id'],
@@ -1618,7 +1618,7 @@ class TestAnalyzeCombination:
         assert result is None
 
     def test_analyze_filter_not_found_skips_append(self, temp_data_dir, test_user_id):
-        """Line 1383->1381: filter_id in combination but filter not found → skip append."""
+        """filter_id in combination but filter not found → skip append."""
         scope = self._make_telescope(test_user_id)
         combo = equipment_profiles.create_combination(test_user_id, {
             'name': 'C', 'telescope_id': scope['id'],
@@ -1629,7 +1629,7 @@ class TestAnalyzeCombination:
         assert result.filters == []
 
     def test_analyze_accessory_not_found_skips_append(self, temp_data_dir, test_user_id):
-        """Line 1389->1387: accessory_id in combination but accessory not found → skip append."""
+        """accessory_id in combination but accessory not found → skip append."""
         scope = self._make_telescope(test_user_id)
         combo = equipment_profiles.create_combination(test_user_id, {
             'name': 'C', 'telescope_id': scope['id'],
@@ -1640,7 +1640,7 @@ class TestAnalyzeCombination:
         assert result.accessories == []
 
     def test_analyze_mount_zero_payload_skips_comparison(self, temp_data_dir, test_user_id):
-        """Line 1435->1441: mount present but both payload values are 0 → skip comparison."""
+        """mount present but both payload values are 0 → skip comparison."""
         # telescope with no weight (defaults to 0), mount with no recommended payload
         scope = equipment_profiles.create_telescope(test_user_id, {
             'name': 'T', 'telescope_type': 'Refractor', 'aperture_mm': 100, 'focal_length_mm': 800,
@@ -1659,10 +1659,10 @@ class TestAnalyzeCombination:
 
 
 class TestSafeSaveRecoveryBranches:
-    """Lines 364->372, 368-369, 372->378, 375-376: error-recovery paths in safe_save_equipment."""
+    """error-recovery paths in safe_save_equipment."""
 
     def test_no_backup_exists_on_move_failure_skips_restore(self, tmp_path, monkeypatch):
-        """Line 364->372: new file, no backup, shutil.move fails → if backup: False → skip to 372."""
+        """new file, no backup, shutil.move fails → if backup: False → skip to 372."""
         new_file = str(tmp_path / 'new_equip.json')
         monkeypatch.setattr(equipment_profiles.shutil, 'move',
                             lambda *a: (_ for _ in ()).throw(IOError("disk full")))
@@ -1670,7 +1670,7 @@ class TestSafeSaveRecoveryBranches:
         assert ok is False
 
     def test_restore_copy2_fails_logs_error(self, tmp_path, monkeypatch):
-        """Lines 368-369: existing file, backup created, move fails, restore copy2 also fails."""
+        """existing file, backup created, move fails, restore copy2 also fails."""
         target = tmp_path / 'equip.json'
         target.write_text(json.dumps({'items': []}), encoding='utf-8')
         copy2_calls = [0]
@@ -1687,7 +1687,7 @@ class TestSafeSaveRecoveryBranches:
         assert ok is False
 
     def test_no_temp_file_on_open_failure(self, tmp_path, monkeypatch):
-        """Line 372->378: exception before temp created (step 2 fails) → temp doesn't exist."""
+        """exception before temp created (step 2 fails) → temp doesn't exist."""
         import builtins
         target = tmp_path / 'equip.json'
         target.write_text(json.dumps({'items': []}), encoding='utf-8')
@@ -1701,7 +1701,7 @@ class TestSafeSaveRecoveryBranches:
         assert ok is False
 
     def test_temp_remove_fails_is_swallowed(self, tmp_path, monkeypatch):
-        """Lines 375-376: temp cleanup raises → swallowed → still returns False."""
+        """temp cleanup raises → swallowed → still returns False."""
         target = tmp_path / 'equip.json'
         target.write_text(json.dumps({'items': []}), encoding='utf-8')
         monkeypatch.setattr(equipment_profiles.shutil, 'move',
@@ -1717,10 +1717,10 @@ class TestSafeSaveRecoveryBranches:
 
 
 class TestSharedEquipmentAdditionalBranches:
-    """Lines 411->410, 464, 482-483, 516, 521-522, 526->523, 531-532."""
+    """."""
 
     def test_load_shared_equipment_item_not_shared_skipped(self, temp_data_dir, monkeypatch):
-        """Line 411->410: item in file has is_shared=False → not added to result."""
+        """item in file has is_shared=False → not added to result."""
         fake_auth = types.SimpleNamespace(
             user_manager=types.SimpleNamespace(
                 list_users=lambda: [{'user_id': 'owner1', 'username': 'alice'}]
@@ -1735,7 +1735,7 @@ class TestSharedEquipmentAdditionalBranches:
         assert result == []
 
     def test_compute_share_status_item_in_shared_by_id(self, temp_data_dir, monkeypatch):
-        """Lines 464, 482-483: equipment item referenced from shared_by_id (other user's shared pool)."""
+        """equipment item referenced from shared_by_id (other user's shared pool)."""
         owner_id = 'sharer'
         viewer_id = 'viewer'
         fake_auth = types.SimpleNamespace(
@@ -1761,7 +1761,7 @@ class TestSharedEquipmentAdditionalBranches:
         assert 't1' in status['items_share_info']
 
     def test_load_shared_combinations_excludes_owner(self, temp_data_dir, monkeypatch):
-        """Line 516: combo file belongs to excluded user → skipped."""
+        """combo file belongs to excluded user → skipped."""
         fake_auth = types.SimpleNamespace(
             user_manager=types.SimpleNamespace(
                 list_users=lambda: [{'user_id': 'excludeme', 'username': 'excluded'}]
@@ -1778,7 +1778,7 @@ class TestSharedEquipmentAdditionalBranches:
         assert result == []
 
     def test_load_shared_combinations_invalid_json_continues(self, temp_data_dir, monkeypatch):
-        """Lines 521-522: bad JSON in combo file → exception caught → continue."""
+        """bad JSON in combo file → exception caught → continue."""
         fake_auth = types.SimpleNamespace(
             user_manager=types.SimpleNamespace(
                 list_users=lambda: [{'user_id': 'owner1', 'username': 'alice'}]
@@ -1793,7 +1793,7 @@ class TestSharedEquipmentAdditionalBranches:
         assert result == []
 
     def test_load_shared_combinations_not_shared_excluded(self, temp_data_dir, monkeypatch):
-        """Line 526->523: combination status is_shared=False → not added."""
+        """combination status is_shared=False → not added."""
         owner_id = 'owner1'
         fake_auth = types.SimpleNamespace(
             user_manager=types.SimpleNamespace(
@@ -1811,7 +1811,7 @@ class TestSharedEquipmentAdditionalBranches:
         assert result == []
 
     def test_load_shared_combinations_outer_exception_returns_empty(self, temp_data_dir, monkeypatch):
-        """Lines 531-532: os.listdir raises → outer except → return []."""
+        """os.listdir raises → outer except → return []."""
         fake_auth = types.SimpleNamespace(
             user_manager=types.SimpleNamespace(
                 list_users=lambda: []

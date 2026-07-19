@@ -970,10 +970,10 @@ class TestSaveUsersFailurePaths:
 
 
 class TestDeleteUserAstrodexCleanup:
-    """Target lines 551-596: astrodex file exists, images, listdir cleanup."""
+    """Target astrodex file exists, images, listdir cleanup."""
 
     def test_delete_user_with_astrodex_file_and_images(self, isolated_user_manager, tmp_path, monkeypatch):
-        """Covers lines 552-563, 566-576, 579-588, 591-593: full astrodex cleanup."""
+        """Covers full astrodex cleanup."""
         manager = isolated_user_manager
         admin = manager.get_user_by_username(auth.DEFAULT_ADMIN_USERNAME)
         alice = manager.create_user('alice', 'pass', auth.ROLE_USER)
@@ -1020,7 +1020,7 @@ class TestDeleteUserAstrodexCleanup:
         assert not img_file2.exists()
 
     def test_delete_user_astrodex_file_read_error_logged(self, isolated_user_manager, tmp_path, monkeypatch):
-        """Covers line 562-563: exception when reading astrodex file."""
+        """Covers exception when reading astrodex file."""
         manager = isolated_user_manager
         admin = manager.get_user_by_username(auth.DEFAULT_ADMIN_USERNAME)
         alice = manager.create_user('alice', 'pass', auth.ROLE_USER)
@@ -1043,7 +1043,7 @@ class TestDeleteUserAstrodexCleanup:
         assert manager.get_user_by_id(user_id) is None
 
     def test_delete_user_image_remove_failure_logged(self, isolated_user_manager, tmp_path, monkeypatch):
-        """Covers lines 575-576: os.remove fails for image → warning logged."""
+        """Covers os.remove fails for image → warning logged."""
         manager = isolated_user_manager
         admin = manager.get_user_by_username(auth.DEFAULT_ADMIN_USERNAME)
         alice = manager.create_user('alice', 'pass', auth.ROLE_USER)
@@ -1081,10 +1081,10 @@ class TestDeleteUserAstrodexCleanup:
 
 
 class TestSaveUsersCleanupPaths:
-    """Covers lines 260->267, 264-265, 267->273, 270-271, 274-277: cleanup paths in save_users."""
+    """Covers cleanup paths in save_users."""
 
     def test_save_users_temp_file_removed_on_error(self, tmp_path, monkeypatch):
-        """Covers lines 267-277: temp file cleanup after validation failure."""
+        """Covers temp file cleanup after validation failure."""
         users_file = tmp_path / 'users.json'
         monkeypatch.setattr(auth, 'USERS_FILE', str(users_file))
         manager = auth.UserManager()
@@ -1100,7 +1100,7 @@ class TestSaveUsersCleanupPaths:
         assert not os.path.exists(str(users_file) + '.tmp')
 
     def test_save_users_backup_removed_on_success(self, tmp_path, monkeypatch):
-        """Covers line 252-253: backup cleaned up after successful save."""
+        """Covers backup cleaned up after successful save."""
         users_file = tmp_path / 'users.json'
         monkeypatch.setattr(auth, 'USERS_FILE', str(users_file))
         manager = auth.UserManager()
@@ -1115,7 +1115,7 @@ class TestSaveUsersCleanupPaths:
         assert not os.path.exists(backup_path)
 
     def test_save_users_restore_backup_on_error(self, tmp_path, monkeypatch):
-        """Covers lines 260-265: backup restored when save fails."""
+        """Covers backup restored when save fails."""
         users_file = tmp_path / 'users.json'
         monkeypatch.setattr(auth, 'USERS_FILE', str(users_file))
         manager = auth.UserManager()
@@ -1133,7 +1133,7 @@ class TestSaveUsersCleanupPaths:
         assert users_file.exists()
 
     def test_save_users_restore_replace_fails(self, tmp_path, monkeypatch):
-        """Lines 264-265: os.replace raises during backup restore."""
+        """os.replace raises during backup restore."""
         users_file = tmp_path / 'users.json'
         monkeypatch.setattr(auth, 'USERS_FILE', str(users_file))
         manager = auth.UserManager()
@@ -1150,7 +1150,7 @@ class TestSaveUsersCleanupPaths:
             manager.save_users()
 
     def test_save_users_temp_remove_fails(self, tmp_path, monkeypatch):
-        """Lines 270-271: os.remove raises on temp file cleanup."""
+        """os.remove raises on temp file cleanup."""
         users_file = tmp_path / 'users.json'
         monkeypatch.setattr(auth, 'USERS_FILE', str(users_file))
         manager = auth.UserManager()
@@ -1171,7 +1171,7 @@ class TestSaveUsersCleanupPaths:
             manager.save_users()
 
     def test_save_users_backup_cleanup_fails_after_restore_failure(self, tmp_path, monkeypatch):
-        """Lines 264-265 and 274-277: restore replace fails AND backup remove fails."""
+        """: restore replace fails AND backup remove fails."""
         users_file = tmp_path / 'users.json'
         monkeypatch.setattr(auth, 'USERS_FILE', str(users_file))
         manager = auth.UserManager()
@@ -1194,7 +1194,7 @@ class TestSaveUsersCleanupPaths:
 
 
 class TestUserRequiredDecorator:
-    """Covers lines 654-668: user_required decorator - tested directly via decorator logic."""
+    """Covers user_required decorator - tested directly via decorator logic."""
 
     def test_user_required_blocks_unauthenticated(self, isolated_user_manager):
         """Test decorator logic by calling the inner decorated_function directly."""
@@ -1294,7 +1294,7 @@ class TestUserRequiredDecorator:
 
 
 class TestGetUserPreferencesSaveOnSanitize:
-    """Covers line 479-481: save_users called when sanitized prefs differ."""
+    """Covers save_users called when sanitized prefs differ."""
 
     def test_get_user_preferences_saves_when_sanitized(self, isolated_user_manager):
         manager = isolated_user_manager
@@ -1316,7 +1316,7 @@ class TestGetUserPreferencesSaveOnSanitize:
 
 
 class TestValidateUsersJsonDataPreferencesInvalid:
-    """Covers line 312: invalid preferences inside validate_users_json_data."""
+    """Covers invalid preferences inside validate_users_json_data."""
 
     def test_invalid_preferences_in_user_data_fails(self):
         data = {
@@ -1335,7 +1335,7 @@ class TestValidateUsersJsonDataPreferencesInvalid:
 
 
 class TestLoginRequiredDecoratorPassThrough:
-    """Covers line 643: login_required passes through to the wrapped function."""
+    """Covers login_required passes through to the wrapped function."""
 
     def test_login_required_passes_through_authenticated(self, isolated_user_manager):
         from flask import Flask
@@ -1359,7 +1359,7 @@ class TestLoginRequiredDecoratorPassThrough:
 
 
 class TestAdminRequiredDecoratorUnauthenticated:
-    """Covers lines 680-682: admin_required blocks unauthenticated requests."""
+    """Covers admin_required blocks unauthenticated requests."""
 
     def test_admin_required_blocks_no_session(self, isolated_user_manager):
         from flask import Flask
@@ -1419,7 +1419,7 @@ class TestAdminRequiredDecoratorUnauthenticated:
 
 
 class TestUpdateUserPreferencesMergedValidation:
-    """Covers line 504: update_user_preferences merged validation failure."""
+    """Covers update_user_preferences merged validation failure."""
 
     def test_update_preferences_merged_validation_fails(self, isolated_user_manager, monkeypatch):
         """Covers the case where merged preferences fail validation."""
@@ -1443,10 +1443,10 @@ class TestUpdateUserPreferencesMergedValidation:
 
 
 class TestDeleteUserPathConfinement:
-    """Covers line 546: path confinement check raises ValueError."""
+    """Covers path confinement check raises ValueError."""
 
     def test_delete_user_path_confinement_check(self, isolated_user_manager, tmp_path, monkeypatch):
-        """Covers line 546: astrodex_file not within base_astrodex_dir → ValueError → caught."""
+        """Covers astrodex_file not within base_astrodex_dir → ValueError → caught."""
         manager = isolated_user_manager
         admin = manager.get_user_by_username(auth.DEFAULT_ADMIN_USERNAME)
         alice = manager.create_user('alice', 'pass', auth.ROLE_USER)
@@ -1478,10 +1478,10 @@ class TestDeleteUserPathConfinement:
 
 
 class TestDeleteUserImageTraversalGuard:
-    """Covers line 570: file_path doesn't start with base_images_dir → continue."""
+    """Covers file_path doesn't start with base_images_dir → continue."""
 
     def test_delete_user_image_traversal_skipped(self, isolated_user_manager, tmp_path, monkeypatch):
-        """Test that images with paths outside images_dir are skipped (line 570)."""
+        """Test that images with paths outside images_dir are skipped."""
         manager = isolated_user_manager
         admin = manager.get_user_by_username(auth.DEFAULT_ADMIN_USERNAME)
         alice = manager.create_user('alice', 'pass', auth.ROLE_USER)
@@ -1518,10 +1518,10 @@ class TestDeleteUserImageTraversalGuard:
 
 
 class TestDeleteUserListdirRemoveFails:
-    """Lines 587-588: os.remove raises in the listdir loop."""
+    """os.remove raises in the listdir loop."""
 
     def test_delete_user_listdir_remove_fails(self, isolated_user_manager, tmp_path, monkeypatch):
-        """Lines 587-588: os.remove on a listdir-found image raises → warning logged."""
+        """os.remove on a listdir-found image raises → warning logged."""
         manager = isolated_user_manager
         admin = manager.get_user_by_username(auth.DEFAULT_ADMIN_USERNAME)
         alice = manager.create_user('alice', 'pass', auth.ROLE_USER)

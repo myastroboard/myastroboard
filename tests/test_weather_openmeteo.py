@@ -56,14 +56,14 @@ class TestGetHourlyForecastCooldowns:
             wom._FORECAST_LOCK.release()
 
     def test_timezone_none_defaults_to_utc(self, monkeypatch):
-        """Covers line 264: timezone_str = 'UTC' when Timezone() returns None."""
+        """Covers timezone_str = 'UTC' when Timezone() returns None."""
         wom._FORECAST_LAST_FAILURE_TS = 0.0
 
         mock_response = MagicMock()
         mock_response.Latitude.return_value = 45.5
         mock_response.Longitude.return_value = -73.5
         mock_response.Elevation.return_value = 50.0
-        mock_response.Timezone.return_value = None  # triggers line 264
+        mock_response.Timezone.return_value = None  # triggers 
 
         monkeypatch.setattr(wom, 'fetch_weather', lambda **kw: mock_response)
         monkeypatch.setattr(wom, 'parse_hourly', lambda resp, vars, timezone_str=None: MagicMock())
@@ -133,7 +133,7 @@ class TestGetHourlyForecastCooldowns:
         assert result['location']['timezone'] == 'Pacific/Honolulu'
 
     def test_concurrency_error_triggers_rate_limit(self, monkeypatch):
-        """Covers line 275: record_openmeteo_rate_limit() on concurrency error."""
+        """Covers record_openmeteo_rate_limit() on concurrency error."""
         wom._FORECAST_LAST_FAILURE_TS = 0.0
         wom._GLOBAL_CONCURRENCY_TS = 0.0
 
@@ -171,7 +171,7 @@ class TestGetHourlyForecastCooldowns:
         wom._FORECAST_LAST_FAILURE_TS = 0.0
 
     def test_transient_error_logs_warning(self, monkeypatch):
-        """Covers line 278: transient API error branch."""
+        """Covers transient API error branch."""
         wom._FORECAST_LAST_FAILURE_TS = 0.0
 
         monkeypatch.setattr(wom, 'fetch_weather', lambda **kw: (_ for _ in ()).throw(Exception("503 Service Unavailable")))
@@ -367,10 +367,10 @@ def _make_parse_hourly_response(n_hours: int = 3, humidity: float = 65.0):
 
 
 class TestFetchWeather:
-    """Tests for fetch_weather — covers lines 95 and 106."""
+    """Tests for fetch_weather — covers ."""
 
     def test_use_cache_false_calls_fresh_client(self, monkeypatch):
-        """Cover line 95: create_fresh_weather_client path."""
+        """Cover create_fresh_weather_client path."""
         mock_response = MagicMock()
         mock_client = MagicMock()
         mock_client.weather_api.return_value = [mock_response]
@@ -380,7 +380,7 @@ class TestFetchWeather:
         mock_client.weather_api.assert_called_once()
 
     def test_use_cache_true_calls_cached_client(self, monkeypatch):
-        """Cover line 93 and line 106."""
+        """Covers fetch_weather using the cached client when use_cache=True."""
         mock_response = MagicMock()
         mock_client = MagicMock()
         mock_client.weather_api.return_value = [mock_response]
@@ -390,7 +390,7 @@ class TestFetchWeather:
 
 
 class TestParseHourly:
-    """Tests for parse_hourly — covers lines 112-203."""
+    """Tests for parse_hourly — covers ."""
 
     def test_returns_dataframe(self):
         import pandas as pd
@@ -417,13 +417,13 @@ class TestParseHourly:
         assert np.allclose(result["cloudless"].values, 100 - result["cloud_cover"].values)
 
     def test_timezone_conversion_to_local(self):
-        """Cover the tz_convert branch (line 137)."""
+        """Cover the tz_convert branch."""
         response = _make_parse_hourly_response()
         result = wom.parse_hourly(response, _FULL_HOURLY_VARS, timezone_str="America/Montreal")
         assert "date" in result.columns
 
     def test_invalid_timezone_keeps_utc(self):
-        """Cover the ZoneInfoNotFoundError branch (line 138-139)."""
+        """Cover the ZoneInfoNotFoundError branch."""
         response = _make_parse_hourly_response()
         result = wom.parse_hourly(response, _FULL_HOURLY_VARS, timezone_str="Invalid/Zone")
         assert "date" in result.columns
@@ -602,7 +602,7 @@ class TestGetSkytonightConditions:
 
 
 class TestParseHourlyAllVariablesFail:
-    """Lines 123-127: every hourly variable fails to decode -> ValueError."""
+    """every hourly variable fails to decode -> ValueError."""
 
     def test_raises_when_every_variable_decode_fails(self):
         response = _make_parse_hourly_response(n_hours=3)
@@ -615,7 +615,7 @@ class TestParseHourlyAllVariablesFail:
 
 
 class TestParseHourlyLongerArrayTruncated:
-    """Line 150: a variable longer than expected_len is truncated, not padded."""
+    """a variable longer than expected_len is truncated, not padded."""
 
     def test_longer_array_is_truncated(self):
         import numpy as np
@@ -631,7 +631,7 @@ class TestParseHourlyLongerArrayTruncated:
 
 
 class TestFetchWeatherJson:
-    """Tests for fetch_weather_json — the plain-HTTP fallback (line 262)."""
+    """Tests for fetch_weather_json — the plain-HTTP fallback."""
 
     def test_raises_when_hourly_payload_missing(self, monkeypatch):
         class _MockResponse:
@@ -721,7 +721,7 @@ class TestParseHourlyJson:
 
 
 class TestMetadataAccessorFailures:
-    """Longitude/Elevation decode failures (lines 385-387, 391-392) - mirrors the
+    """Longitude/Elevation decode failures - mirrors the
     existing Latitude-failure test above."""
 
     def test_longitude_decode_failure_falls_back_to_location(self, monkeypatch):
@@ -768,12 +768,12 @@ class TestMetadataAccessorFailures:
 
 
 class TestCoreFallbackConcurrencyReraise:
-    """Line 451: a concurrency error on the core-variable retry must propagate,
+    """a concurrency error on the core-variable retry must propagate,
     not fall through to the JSON fallback.
 
     Note this is a DIFFERENT trigger than a concurrency error on the *full*
-    request: that one re-raises immediately (line 431) and never reaches the
-    core retry at all. To exercise line 451 specifically, the full request
+    request: that one re-raises immediately and never reaches the
+    core retry at all. To exercise  specifically, the full request
     must fail with a non-concurrency error (so it falls through to the core
     retry), and the core retry itself must then hit the concurrency limit.
     """
@@ -811,14 +811,14 @@ class TestCoreFallbackConcurrencyReraise:
 
 
 class TestParseHourlyTimezoneExceptionBranch:
-    """Lines 142-143: outer except in parse_hourly timezone conversion."""
+    """outer except in parse_hourly timezone conversion."""
 
     def test_generic_exception_in_tz_convert_keeps_utc(self, monkeypatch):
-        """Lines 142-143: non-ZoneInfoNotFoundError in inner block → outer except."""
+        """non-ZoneInfoNotFoundError in inner block → outer except."""
         response = _make_parse_hourly_response()
         # Patch zoneinfo.ZoneInfo to raise a generic Exception (not ZoneInfoNotFoundError)
         # so it propagates out of the inner try (which only catches ZoneInfoNotFoundError)
-        # and is caught by the outer except at line 142.
+        # and is caught by the outer except.
         monkeypatch.setattr('zoneinfo.ZoneInfo', lambda tz: (_ for _ in ()).throw(Exception("zoneinfo fail")))
         result = wom.parse_hourly(response, _FULL_HOURLY_VARS, timezone_str="America/Montreal")
         assert result is not None  # falls back to UTC, still returns dataframe

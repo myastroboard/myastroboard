@@ -155,7 +155,7 @@ def test_check_for_updates_request_exception(monkeypatch):
 
 
 def test_check_for_updates_version_changed_invalidates_cache(monkeypatch):
-    """Line 64: cache is valid but installed version changed → refetch."""
+    """cache is valid but installed version changed → refetch."""
     cached = {"current_version": "0.9.0", "update_available": False}
     module.cache_store._version_update_cache = {"timestamp": 100, "data": cached}
 
@@ -184,7 +184,7 @@ def test_check_for_updates_version_changed_invalidates_cache(monkeypatch):
 
 
 def test_check_for_updates_no_update_available_logs_correctly(monkeypatch):
-    """Line 111: update_available=False → 'No update available' log path."""
+    """update_available=False → 'No update available' log path."""
     monkeypatch.setattr(module.cache_store, "is_cache_valid", lambda *_args, **_kwargs: False)
     monkeypatch.setattr(module, "get_repo_version", lambda: "1.2.0")
     monkeypatch.setattr(module.time, "time", lambda: 130.0)
@@ -211,7 +211,7 @@ def test_check_for_updates_no_update_available_logs_correctly(monkeypatch):
 
 
 def test_check_for_updates_unexpected_exception(monkeypatch):
-    """Lines 129-133: unexpected non-requests exception → Internal error result."""
+    """unexpected non-requests exception → Internal error result."""
     monkeypatch.setattr(module.cache_store, "is_cache_valid", lambda *_args, **_kwargs: False)
     monkeypatch.setattr(module, "get_repo_version", lambda: "1.0.0")
     monkeypatch.setattr(module.time, "time", lambda: 131.0)

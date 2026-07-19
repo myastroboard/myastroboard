@@ -128,7 +128,7 @@ def test_is_safe_path_different_drives_returns_false():
 
 
 def test_load_translation_file_cache_hit(tmp_path):
-    """Line 69: second call for same language uses cached result."""
+    """second call for same language uses cached result."""
     module._translation_cache.clear()
     payload = '{"x": "y"}'
     with patch("utils.i18n_utils.os.path.exists", return_value=True), patch(
@@ -143,7 +143,7 @@ def test_load_translation_file_cache_hit(tmp_path):
 
 
 def test_load_translation_file_json_decode_error_returns_empty(tmp_path):
-    """Lines 99-101: JSONDecodeError → empty dict returned."""
+    """JSONDecodeError → empty dict returned."""
     module._translation_cache.clear()
     with patch("utils.i18n_utils.os.path.exists", return_value=True), patch(
         "builtins.open", mock_open(read_data="INVALID JSON {{{")
@@ -154,7 +154,7 @@ def test_load_translation_file_json_decode_error_returns_empty(tmp_path):
 
 
 def test_t_key_found_in_main_translations_loop_exits_normally():
-    """Line 146->161: all keys found in main translations → loop exits normally → line 161 executed."""
+    """all keys found in main translations → loop exits normally."""
     with patch("utils.i18n_utils._load_translation_file", return_value={"ns": {"key": "value"}}):
         manager = I18nManager("en")
     result = manager.t("ns.key")
@@ -162,7 +162,7 @@ def test_t_key_found_in_main_translations_loop_exits_normally():
 
 
 def test_t_key_resolves_to_non_string_returns_key():
-    """Line 162: key resolves to a dict (not str) → return key."""
+    """key resolves to a dict (not str) → return key."""
     with patch("utils.i18n_utils._load_translation_file", return_value={"ns": {"sub": "v"}}):
         manager = I18nManager("en")
     # Key "ns" alone resolves to a dict, not a str
@@ -171,7 +171,7 @@ def test_t_key_resolves_to_non_string_returns_key():
 
 
 def test_set_language_valid_language_updates_state():
-    """Lines 181-182: set_language with a supported language updates self.language."""
+    """set_language with a supported language updates self.language."""
     with patch("utils.i18n_utils._load_translation_file", return_value={}):
         manager = I18nManager("en")
         manager.set_language("fr")
@@ -179,14 +179,14 @@ def test_set_language_valid_language_updates_state():
 
 
 def test_get_namespace_missing_returns_empty():
-    """Line 202: namespace not in translations → return {}."""
+    """namespace not in translations → return {}."""
     with patch("utils.i18n_utils._load_translation_file", return_value={"other": {}}):
         manager = I18nManager("en")
     assert manager.get_namespace("nonexistent") == {}
 
 
 def test_init_i18n_for_request_returns_manager():
-    """Line 283: init_i18n_for_request returns an I18nManager instance."""
+    """init_i18n_for_request returns an I18nManager instance."""
     with patch("utils.i18n_utils._load_translation_file", return_value={}):
         result = init_i18n_for_request("en")
     assert isinstance(result, I18nManager)

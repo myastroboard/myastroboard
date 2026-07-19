@@ -596,7 +596,7 @@ class TestSkyTonightPerLocationBranchGaps:
         assert sched_mod._any_location_missing_results({}) is False
 
     def test_compute_target_debug_uses_explicit_location_without_fallback(self, monkeypatch):
-        """Line 1731 false branch: a valid location dict is passed directly and
+        """ false branch: a valid location dict is passed directly and
         must NOT be replaced by the install-default fallback lookup."""
         from skytonight import skytonight_calculator as calc_mod
 

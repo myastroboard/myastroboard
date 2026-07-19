@@ -483,7 +483,7 @@ class TestPreloadAllCurrentPlanEntries:
         assert result == []
 
     def test_skips_plan_obj_not_dict(self, monkeypatch, tmp_path):
-        """Covers line 112: plan_obj not a dict → continue."""
+        """Covers plan_obj not a dict → continue."""
         from observation import plan_my_night as pmn
         import uuid
         monkeypatch.setattr(pmn, 'PLAN_DIR', str(tmp_path))
@@ -494,7 +494,7 @@ class TestPreloadAllCurrentPlanEntries:
         assert result == []
 
     def test_exception_in_plan_load_is_silenced(self, monkeypatch, tmp_path):
-        """Covers lines 120-121: except Exception: pass and return all_entries."""
+        """Covers except Exception: pass and return all_entries."""
         from observation import plan_my_night as pmn
         import uuid
         monkeypatch.setattr(pmn, 'PLAN_DIR', str(tmp_path))

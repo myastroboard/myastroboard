@@ -129,7 +129,7 @@ class TestWeatherForecastLiveData:
     """Test the DataFrame-processing path in get_weather_forecast."""
 
     def test_weather_forecast_with_dataframe_response(self, client_admin, monkeypatch):
-        """Covers lines 1675-1695."""
+        """Covers ."""
         pd = pytest.importorskip('pandas')
 
         df = pd.DataFrame({
@@ -157,7 +157,7 @@ class TestCatalogueLookupSimbad:
     """Tests for the SIMBAD fallback path in catalogue lookup."""
 
     def test_simbad_lookup_name_in_catalogue(self, client_admin, monkeypatch):
-        """Covers lines 3910-3936 – SIMBAD found, name matches catalogue value."""
+        """Covers SIMBAD found, name matches catalogue value."""
         from skytonight import skytonight_targets as _skt
         from observation import object_info as _oi
 
@@ -250,7 +250,7 @@ class TestConfigUpdateEdgeCases:
         }
 
     def test_bortle_out_of_range_returns_400(self, client_admin):
-        """Covers line 959 – bortle out of range."""
+        """Covers bortle out of range."""
         cfg = self._base_config()
         cfg['location']['bortle'] = 15
         resp = client_admin.post('/api/config', json=cfg)
@@ -258,7 +258,7 @@ class TestConfigUpdateEdgeCases:
         assert 'bortle' in resp.get_json().get('error', '').lower()
 
     def test_sqm_negative_returns_400(self, client_admin):
-        """Covers line 967 – sqm <= 0."""
+        """Covers sqm <= 0."""
         cfg = self._base_config()
         cfg['location']['sqm'] = -1.0
         resp = client_admin.post('/api/config', json=cfg)
@@ -266,7 +266,7 @@ class TestConfigUpdateEdgeCases:
         assert 'sqm' in resp.get_json().get('error', '').lower()
 
     def test_config_with_location_configured_already_set(self, client_admin):
-        """Covers line 973->977 False arc – location_configured already in config."""
+        """Covers the False arc where location_configured is already in config."""
         cfg = self._base_config()
         cfg['location_configured'] = True
         resp = client_admin.post('/api/config', json=cfg)
@@ -280,7 +280,7 @@ class TestConfigUpdateEdgeCases:
         assert resp.status_code == 200
 
     def test_config_skytonight_nested_non_dict_values(self, client_admin):
-        """Covers line 927 – merging non-dict values in skytonight dict."""
+        """Covers merging non-dict values in skytonight dict."""
         cfg = self._base_config()
         cfg['skytonight'] = {'some_key': 'scalar-value', 'enabled': True}
         resp = client_admin.post('/api/config', json=cfg)
@@ -288,7 +288,7 @@ class TestConfigUpdateEdgeCases:
 
 
 class TestPasswordChangeSuccess:
-    """Covers line 402 – successful password change."""
+    """Covers successful password change."""
 
     def test_password_change_success(self, client_admin, monkeypatch):
         from utils.auth import user_manager as _um
@@ -302,7 +302,7 @@ class TestPasswordChangeSuccess:
 
 
 class TestAuthStatusStaleSess:
-    """Covers lines 363->373 – username in session but get_current_user returns None."""
+    """Covers username in session but get_current_user returns None."""
 
     def test_auth_status_stale_username_in_session(self, monkeypatch):
         """Username in session but no matching user → authenticated=False."""
@@ -320,7 +320,7 @@ class TestPushExceptionPaths:
     """Tests for push endpoint exception handlers."""
 
     def test_push_subscribe_save_exception(self, client_admin, monkeypatch):
-        """Covers lines 538-540 – exception in push subscribe save."""
+        """Covers exception in push subscribe save."""
         from utils.auth import user_manager as _um
 
         user = _um.get_user_by_username('admin')
@@ -346,7 +346,7 @@ class TestPushExceptionPaths:
             user.push_subscriptions = original_subs
 
     def test_push_list_exception(self, client_admin, monkeypatch):
-        """Covers lines 577-579 – exception iterating subscriptions list."""
+        """Covers exception iterating subscriptions list."""
         from utils.auth import user_manager as _um
 
         class _BrokenList:
@@ -365,7 +365,7 @@ class TestPushExceptionPaths:
             user.push_subscriptions = original
 
     def test_push_delete_all_exception(self, client_admin, monkeypatch):
-        """Covers lines 596-598 – exception during delete-all push subscriptions."""
+        """Covers exception during delete-all push subscriptions."""
         from utils.auth import user_manager as _um
 
         def raise_error():
@@ -383,7 +383,7 @@ class TestPushExceptionPaths:
                 user.push_subscriptions = original
 
     def test_push_unsubscribe_exception(self, client_admin, monkeypatch):
-        """Covers lines 750-752 – exception in unsubscribe."""
+        """Covers exception in unsubscribe."""
         from utils.auth import user_manager as _um
 
         def raise_error():
@@ -402,7 +402,7 @@ class TestPushExceptionPaths:
                 user.push_subscriptions = original
 
     def test_push_test_with_dead_endpoint(self, client_admin, monkeypatch):
-        """Covers lines 715-726 – dead endpoint cleaned up in push_test."""
+        """Covers dead endpoint cleaned up in push_test."""
         from utils.auth import user_manager as _um
         from utils import push_manager as _pm
 
@@ -436,7 +436,7 @@ class TestBackupRestorePaths:
         return buf
 
     def test_restore_with_invalid_json_content_returns_400(self, client_admin):
-        """Covers lines 1310-1311 – JSON validation failure."""
+        """Covers JSON validation failure."""
         buf = self._make_zip([('config.json', b'this is not json')])
         data = {'file': (buf, 'backup.zip')}
         resp = client_admin.post('/api/backup/restore', data=data, content_type='multipart/form-data')
@@ -444,7 +444,7 @@ class TestBackupRestorePaths:
         assert 'JSON' in resp.get_json().get('error', '')
 
     def test_restore_directory_entry_skipped(self, client_admin):
-        """Covers line 1284 – directory entries skipped."""
+        """Covers directory entries skipped."""
         import io as _io
         import zipfile as _zf
 
@@ -507,7 +507,7 @@ class TestPlanMyNightCoveragePaths:
     """Tests for Plan My Night endpoint edge cases."""
 
     def test_plan_add_target_previous_plan_locked(self, client_admin, monkeypatch):
-        """Covers line 3209 – plan belongs to a previous night."""
+        """Covers plan belongs to a previous night."""
         from observation import plan_my_night as _pmn
 
         monkeypatch.setattr(
@@ -529,7 +529,7 @@ class TestPlanMyNightCoveragePaths:
         assert resp.status_code == 409
 
     def test_resolve_observing_night_fallback_path(self, client_admin, monkeypatch):
-        """Covers lines 3001-3019 – sun service fails, fallback to calc results."""
+        """Covers sun service fails, fallback to calc results."""
         from astroweather.sun_phases import SunService as _SS
 
         def sun_raise(self):
@@ -559,7 +559,7 @@ class TestPlanMyNightCoveragePaths:
         assert resp.status_code in (200, 400, 409, 500)
 
     def test_plan_search_across_telescopes(self, client_admin, monkeypatch):
-        """Covers lines 3387-3396 – entry not in default plan, found in telescope plan."""
+        """Covers entry not in default plan, found in telescope plan."""
         from observation import plan_my_night as _pmn
         from observation import astrodex as _adx
         import os as _os
@@ -586,7 +586,7 @@ class TestAstrodexUploadPaths:
     """Tests for specific astrodex upload/image paths."""
 
     def test_upload_empty_filename_returns_400(self, client_admin):
-        """Covers lines 3758-3759 – file present but empty filename."""
+        """Covers file present but empty filename."""
         import io as _io
 
         data = {'file': (_io.BytesIO(b''), '')}
@@ -594,7 +594,7 @@ class TestAstrodexUploadPaths:
         assert resp.status_code in (400, 401, 500)
 
     def test_upload_exception_returns_500(self, client_admin, monkeypatch):
-        """Covers lines 3805-3807 – exception during upload."""
+        """Covers exception during upload."""
         import io as _io
         from observation import astrodex as _adx
 
@@ -607,7 +607,7 @@ class TestAstrodexUploadPaths:
         assert resp.status_code in (400, 500)
 
     def test_switch_catalogue_name_success(self, client_admin, monkeypatch):
-        """Covers lines 3589, 3595-3597 – switch catalogue name success."""
+        """Covers switch catalogue name success."""
         from observation import astrodex as _adx
 
         monkeypatch.setattr(
@@ -622,7 +622,7 @@ class TestAstrodexUploadPaths:
         assert resp.get_json()['status'] == 'success'
 
     def test_switch_catalogue_name_no_result(self, client_admin, monkeypatch):
-        """Covers line 3589 False branch – switch returns None/empty."""
+        """Covers the False branch where switch returns None/empty."""
         from observation import astrodex as _adx
 
         monkeypatch.setattr(
@@ -640,7 +640,7 @@ class TestSpaceflightCachePaths:
     """Tests for spaceflight cache-not-ready and sync paths."""
 
     def test_spaceflight_launches_not_ready(self, client_admin, monkeypatch):
-        """Covers line 2124 – launches cache not ready."""
+        """Covers launches cache not ready."""
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda *_: False)
         monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda *_: False)
         _cache_store._spaceflight_launches_cache['data'] = None
@@ -648,7 +648,7 @@ class TestSpaceflightCachePaths:
         assert resp.status_code in (200, 202, 503)
 
     def test_spaceflight_events_not_ready(self, client_admin, monkeypatch):
-        """Covers line 2166 – events cache not ready."""
+        """Covers events cache not ready."""
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda *_: False)
         monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda *_: False)
         _cache_store._spaceflight_events_cache['data'] = None
@@ -656,7 +656,7 @@ class TestSpaceflightCachePaths:
         assert resp.status_code in (200, 202, 503)
 
     def test_spaceflight_events_after_sync(self, client_admin, monkeypatch):
-        """Covers line 2160 – events cached after sync."""
+        """Covers events cached after sync."""
         call_counts = {}
 
         def is_valid_per_cache(c, ttl):
@@ -671,7 +671,7 @@ class TestSpaceflightCachePaths:
         assert resp.status_code == 200
 
     def test_spaceflight_astronauts_after_sync(self, client_admin, monkeypatch):
-        """Covers line 2139 – astronauts cached after sync."""
+        """Covers astronauts cached after sync."""
         call_counts = {}
 
         def is_valid_per_cache(c, ttl):
@@ -686,7 +686,7 @@ class TestSpaceflightCachePaths:
         assert resp.status_code == 200
 
     def test_spaceflight_astronauts_not_ready(self, client_admin, monkeypatch):
-        """Covers line 2145 – astronauts cache not ready."""
+        """Covers astronauts cache not ready."""
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda *_: False)
         monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda *_: False)
         _cache_store._spaceflight_astronauts_cache['data'] = None
@@ -698,7 +698,7 @@ class TestObjectInfoPaths:
     """Tests for object info endpoint edge cases."""
 
     def test_object_info_invalid_identifier_from_backend(self, client_admin, monkeypatch):
-        """Covers line 2025 – get_object_info returns error=invalid_identifier."""
+        """Covers get_object_info returns error=invalid_identifier."""
         from observation import object_info as _oi
 
         monkeypatch.setattr(_oi, 'is_safe_identifier', lambda name: True)
@@ -712,7 +712,7 @@ class TestTimezonesAndCoordinates:
     """Tests for timezones listing and coordinate conversion."""
 
     def test_timezones_filters_posix_and_right(self, client_admin):
-        """Covers line 1563->1562 – posix/right timezones are filtered out in loop."""
+        """Covers posix/right timezones are filtered out in loop."""
         resp = client_admin.get('/api/timezones')
         assert resp.status_code == 200
         data = resp.get_json()
@@ -724,7 +724,7 @@ class TestTimezonesAndCoordinates:
             assert not name.startswith('right/')
 
     def test_coordinate_out_of_range_returns_400(self, client_admin):
-        """Covers line 1545 – coordinate value out of valid range."""
+        """Covers coordinate value out of valid range."""
         resp = client_admin.post(
             '/api/convert-coordinates',
             json={'dms': '181d00m00.0s'},

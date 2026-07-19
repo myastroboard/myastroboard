@@ -150,7 +150,7 @@ class TestGetFolderDiskUsage:
         assert result == 300
 
     def test_skips_entry_on_stat_os_error(self, tmp_path):
-        """OSError from entry.stat() is caught; file is skipped (branch 101-102)."""
+        """OSError from entry.stat() is caught; file is skipped."""
         f = tmp_path / "unreadable.txt"
         f.write_bytes(b"data")
 
@@ -181,7 +181,7 @@ class TestGetFolderDiskUsage:
         assert result == 0  # file skipped, no size added
 
     def test_entry_neither_file_nor_dir_is_skipped(self, tmp_path):
-        """Entry that is neither file nor dir (e.g. socket/pipe) hits branch 99->95."""
+        """Entry that is neither file nor dir (e.g. socket/pipe) hits ."""
         real_scandir = os.scandir
 
         def _patched_scandir(path):
@@ -331,7 +331,7 @@ class TestGetEnvironmentProcesses:
         assert is_container_related is False
 
     def test_get_environment_processes_returns_list(self):
-        """Cover lines 152-204 by calling get_environment_processes with mocked psutil."""
+        """Covers get_environment_processes with mocked psutil."""
         mock_proc = MagicMock()
         mock_proc.info = {
             'pid': 1234,
@@ -379,10 +379,10 @@ class TestGetEnvironmentProcesses:
 
 
 class TestGetDiskSpaceDetailsMocked:
-    """Cover lines 104-132 in get_disk_space_details by mocking psutil."""
+    """Covers get_disk_space_details by mocking psutil."""
 
     def test_full_body_with_mocked_disk(self, tmp_path):
-        """psutil.disk_usage('/') may fail on Windows; mock it to cover lines 104-132."""
+        """psutil.disk_usage('/') may fail on Windows; mock it."""
         mock_disk = MagicMock()
         mock_disk.total = 100 * 1024 ** 3
         mock_disk.used = 50 * 1024 ** 3
@@ -408,7 +408,7 @@ class TestGetDiskSpaceDetailsMocked:
 
 
 class TestCollectMetricsMocked:
-    """Cover lines 241-277 by mocking psutil calls that may fail on this platform."""
+    """Covers collect_metrics by mocking psutil calls that may fail on this platform."""
 
     def _mock_psutil(self, monkeypatch):
         mock_cpu_freq = MagicMock()
@@ -454,7 +454,7 @@ class TestCollectMetricsMocked:
         monkeypatch.setattr(mc, "get_environment_processes", lambda: [])
 
     def test_collect_metrics_full_body(self, monkeypatch):
-        """Cover lines 241-277 with mocked psutil."""
+        """Covers collect_metrics with mocked psutil."""
         self._mock_psutil(monkeypatch)
         result = mc.collect_metrics()
         assert "cpu" in result
@@ -484,13 +484,13 @@ class TestCollectMetricsMocked:
 
 
 class TestIsRunningInContainerBranchCoverage:
-    """Cover lines 57->63 and 66->71 (cgroup/cpuinfo readable but no pattern matches)."""
+    """Cover  (cgroup/cpuinfo readable but no pattern matches)."""
 
     @patch("utils.metrics_collector.os.path.exists", return_value=False)
     def test_cgroup_no_pattern_and_cpuinfo_no_hypervisor_returns_false(self, mock_exists):
         """
-        Lines 57->63: cgroup read but 'systemd-nspawn' absent → falls to cpuinfo block.
-        Lines 66->71: cpuinfo read but 'hypervisor' absent → returns (False, None).
+        cgroup read but 'systemd-nspawn' absent → falls to cpuinfo block.
+        cpuinfo read but 'hypervisor' absent → returns (False, None).
         """
         def open_side_effect(path, *args, **kwargs):
             mock_file = MagicMock()
@@ -512,7 +512,7 @@ class TestIsRunningInContainerBranchCoverage:
 
 
 class TestGetDiskSpaceDetailsFolderNone:
-    """Cover line 130: get_folder_disk_usage returns None for folders that don't exist."""
+    """Cover get_folder_disk_usage returns None for folders that don't exist."""
 
     def test_folder_size_none_falls_into_else_branch(self):
         mock_disk = MagicMock()
@@ -583,7 +583,7 @@ class TestGetDiskSpaceDetailsCache:
 
 
 class TestGetEnvironmentProcessesBranchCoverage:
-    """Cover lines 169->171, 172->175, 198-201."""
+    """Cover ."""
 
     def _ensure_psutil_exceptions(self, mc):
         for exc_name in ('NoSuchProcess', 'AccessDenied', 'ZombieProcess'):
@@ -591,7 +591,7 @@ class TestGetEnvironmentProcessesBranchCoverage:
                 setattr(mc.psutil, exc_name, type(exc_name, (Exception,), {}))
 
     def test_process_with_cpu_times_none_skips_cpu_total(self):
-        """Lines 169->171: cpu_times is None → cpu_total stays 0.0."""
+        """cpu_times is None → cpu_total stays 0.0."""
         mock_proc = MagicMock()
         mock_proc.info = {
             'pid': 1, 'name': 'worker', 'status': 'running', 'username': 'user',
@@ -607,7 +607,7 @@ class TestGetEnvironmentProcessesBranchCoverage:
         assert result[0]['cpu_percent'] == 0.0
 
     def test_process_with_no_create_time_zero_uptime(self):
-        """Lines 172->175: create_time is None → uptime_seconds=0 → cpu_percent stays 0.0."""
+        """create_time is None → uptime_seconds=0 → cpu_percent stays 0.0."""
         mock_proc = MagicMock()
         mock_proc.info = {
             'pid': 2, 'name': 'worker', 'status': 'running', 'username': 'user',
@@ -624,7 +624,7 @@ class TestGetEnvironmentProcessesBranchCoverage:
         assert result[0]['created_at'] is None
 
     def test_nosuchprocess_exception_skips_process(self):
-        """Lines 198-199: psutil.NoSuchProcess → process is skipped via continue."""
+        """psutil.NoSuchProcess → process is skipped via continue."""
         from unittest.mock import PropertyMock
 
         self._ensure_psutil_exceptions(mc)
@@ -648,7 +648,7 @@ class TestGetEnvironmentProcessesBranchCoverage:
         assert result[0]['name'] == 'ok'
 
     def test_generic_exception_in_process_loop_is_swallowed(self):
-        """Lines 200-201: generic Exception → logged, process is skipped."""
+        """generic Exception → logged, process is skipped."""
         from unittest.mock import PropertyMock
 
         self._ensure_psutil_exceptions(mc)

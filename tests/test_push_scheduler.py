@@ -1267,7 +1267,7 @@ def test_start_skips_when_thread_already_alive(monkeypatch):
 
 
 def test_poll_no_night_start_skips_active_check(monkeypatch):
-    """Line 549->562: is_inside_night=False and no night_start → False branch."""
+    """is_inside_night=False and no night_start → False branch."""
     from utils import push_scheduler
 
     calls = []
@@ -1297,7 +1297,7 @@ def test_poll_no_night_start_skips_active_check(monkeypatch):
 
 
 def test_run_calls_poll_once_then_exits(monkeypatch):
-    """Lines 576-581: _run() executes loop body once then exits when stop event set."""
+    """_run() executes loop body once then exits when stop event set."""
     from utils import push_scheduler
 
     push_scheduler._stop_event.clear()
@@ -1315,7 +1315,7 @@ def test_run_calls_poll_once_then_exits(monkeypatch):
 
 
 def test_acquire_lock_open_fails_returns_false(monkeypatch, tmp_path):
-    """Line 610->613: open() raises → _lock_file stays None → if block skipped → return False."""
+    """open() raises → _lock_file stays None → if block skipped → return False."""
     from utils import push_scheduler
     import builtins
 
@@ -1370,7 +1370,7 @@ def test_poll_fast_mode_via_pending_night(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_n2_skips_when_payload_none(monkeypatch):
-    """Lines 232-233: _check_n2_next_target returns early when payload is None."""
+    """_check_n2_next_target returns early when payload is None."""
     from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
@@ -1379,7 +1379,7 @@ def test_n2_skips_when_payload_none(monkeypatch):
 
 
 def test_n2_skips_when_state_none(monkeypatch):
-    """Lines 232-233: _check_n2_next_target returns early when state='none'."""
+    """_check_n2_next_target returns early when state='none'."""
     from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
@@ -1388,7 +1388,7 @@ def test_n2_skips_when_state_none(monkeypatch):
 
 
 def test_n2_naive_datetime_in_entry_gets_utc(monkeypatch):
-    """Line 259: naive timeline_start is treated as UTC (tzinfo=None branch)."""
+    """naive timeline_start is treated as UTC (tzinfo=None branch)."""
     from utils import push_scheduler
     from datetime import datetime, timedelta, timezone as tz
     send_calls = []
@@ -1408,7 +1408,7 @@ def test_n2_naive_datetime_in_entry_gets_utc(monkeypatch):
 
 
 def test_n6_bad_timezone_name_falls_back_to_empty(monkeypatch):
-    """Lines 324-325: ZoneInfo(bad_tz_name) raises, dusk_local_time falls back to ''."""
+    """ZoneInfo(bad_tz_name) raises, dusk_local_time falls back to ''."""
     from utils import push_scheduler
     from datetime import datetime, timedelta, timezone as tz
     send_calls = []
@@ -1425,7 +1425,7 @@ def test_n6_bad_timezone_name_falls_back_to_empty(monkeypatch):
 
 
 def test_n3_solar_naive_datetime_gets_utc(monkeypatch):
-    """Line 358: naive solar transit start_time is replaced with UTC."""
+    """naive solar transit start_time is replaced with UTC."""
     from utils import push_scheduler
     from datetime import datetime, timedelta
     send_calls = []
@@ -1438,7 +1438,7 @@ def test_n3_solar_naive_datetime_gets_utc(monkeypatch):
 
 
 def test_n3_lunar_naive_datetime_gets_utc(monkeypatch):
-    """Line 369: naive lunar transit start_time is replaced with UTC."""
+    """naive lunar transit start_time is replaced with UTC."""
     from utils import push_scheduler
     from datetime import datetime, timedelta
     send_calls = []
@@ -1451,7 +1451,7 @@ def test_n3_lunar_naive_datetime_gets_utc(monkeypatch):
 
 
 def test_n3_bad_lunar_timestamp_exception_swallowed(monkeypatch):
-    """Lines 372-373: bad lunar transit timestamp is swallowed."""
+    """bad lunar transit timestamp is swallowed."""
     from utils import push_scheduler
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
@@ -1461,7 +1461,7 @@ def test_n3_bad_lunar_timestamp_exception_swallowed(monkeypatch):
 
 
 def test_n4_naive_peak_datetime_gets_utc(monkeypatch):
-    """Line 424: naive peak_time in lunar eclipse data is replaced with UTC."""
+    """naive peak_time in lunar eclipse data is replaced with UTC."""
     from utils import push_scheduler
     from datetime import datetime, timedelta
     send_calls = []
@@ -1474,7 +1474,7 @@ def test_n4_naive_peak_datetime_gets_utc(monkeypatch):
 
 
 def test_pick_active_plan_fallback_returns_current_state(monkeypatch):
-    """Lines 504-506: when no candidate is_inside_night, return first with state='current'."""
+    """when no candidate is_inside_night, return first with state='current'."""
     from utils import push_scheduler
     monkeypatch.setitem(
         sys.modules,
@@ -1496,7 +1496,7 @@ def test_pick_active_plan_fallback_returns_current_state(monkeypatch):
 
 
 def test_pick_active_plan_fallback_returns_first_candidate(monkeypatch):
-    """Line 507: when no candidate is state='current', return candidates[0]."""
+    """when no candidate is state='current', return candidates[0]."""
     from utils import push_scheduler
     monkeypatch.setitem(
         sys.modules,
@@ -1515,7 +1515,7 @@ def test_pick_active_plan_fallback_returns_first_candidate(monkeypatch):
 
 
 def test_poll_outer_exception_swallowed(monkeypatch):
-    """Lines 569-570: outer exception in _poll() is caught and logged."""
+    """outer exception in _poll() is caught and logged."""
     from utils import push_scheduler
     # Make user_manager import raise inside the poll try block
     bad_auth = types.SimpleNamespace(
@@ -1529,7 +1529,7 @@ def test_poll_outer_exception_swallowed(monkeypatch):
 
 
 def test_poll_bad_night_start_exception_swallowed(monkeypatch):
-    """Lines 559-560: unparseable night_start causes inner exception that is swallowed."""
+    """unparseable night_start causes inner exception that is swallowed."""
     from utils import push_scheduler
     for fn in ('_check_n7_aurora', '_check_n1_plan_start', '_check_n2_next_target',
                '_check_n6_darkness', '_check_n3_iss', '_check_n4_n5_eclipse'):
@@ -1541,7 +1541,7 @@ def test_poll_bad_night_start_exception_swallowed(monkeypatch):
         lambda _uid, _name: {
             'state': 'current',
             'timeline': {'is_inside_night': False},
-            'plan': {'night_start': 'NOT_A_DATE'},  # triggers except at line 559
+            'plan': {'night_start': 'NOT_A_DATE'},  # triggers except
         },
     )
     user = _make_user(user_id='u1', username='alice')
@@ -1551,14 +1551,14 @@ def test_poll_bad_night_start_exception_swallowed(monkeypatch):
 
 
 def test_release_lock_when_no_lock_file(monkeypatch):
-    """Line 619: _release_lock() is a no-op when _lock_file is None."""
+    """_release_lock() is a no-op when _lock_file is None."""
     from utils import push_scheduler
     push_scheduler._lock_file = None
     push_scheduler._release_lock()  # Must not raise
 
 
 def test_n3_past_lunar_transit_not_added_to_candidates(monkeypatch):
-    """Branch 370→363: lunar transit in the PAST is not added to candidates (dt <= now)."""
+    """→363: lunar transit in the PAST is not added to candidates (dt <= now)."""
     from utils import push_scheduler
     from datetime import datetime, timedelta
     send_calls = []
@@ -1572,7 +1572,7 @@ def test_n3_past_lunar_transit_not_added_to_candidates(monkeypatch):
 
 
 def test_poll_no_plan_skips_fast_mode_detection(monkeypatch):
-    """Branch 542→562: when plan_payload is None, fast-mode block is skipped."""
+    """→562: when plan_payload is None, fast-mode block is skipped."""
     from utils import push_scheduler
     for fn in ('_check_n7_aurora', '_check_n1_plan_start', '_check_n2_next_target',
                '_check_n6_darkness', '_check_n3_iss', '_check_n4_n5_eclipse'):
@@ -1587,7 +1587,7 @@ def test_poll_no_plan_skips_fast_mode_detection(monkeypatch):
 
 
 def test_poll_night_start_naive_gets_utc(monkeypatch):
-    """Line 555: naive night_start string is given UTC tz (tzinfo=None branch)."""
+    """naive night_start string is given UTC tz (tzinfo=None branch)."""
     from utils import push_scheduler
     from datetime import datetime, timedelta
     for fn in ('_check_n7_aurora', '_check_n1_plan_start', '_check_n2_next_target',
@@ -1601,7 +1601,7 @@ def test_poll_night_start_naive_gets_utc(monkeypatch):
         lambda _uid, _name: {
             'state': 'current',
             'timeline': {'is_inside_night': False},
-            'plan': {'night_start': soon_naive},  # naive → branch 555
+            'plan': {'night_start': soon_naive},  # naive
         },
     )
     user = _make_user(user_id='u1', username='alice')
@@ -1611,7 +1611,7 @@ def test_poll_night_start_naive_gets_utc(monkeypatch):
 
 
 def test_poll_night_start_far_future_not_fast_mode(monkeypatch):
-    """Branch 557→562: secs_until > 30*60 → any_active stays False."""
+    """→562: secs_until > 30*60 → any_active stays False."""
     from utils import push_scheduler
     from datetime import datetime, timedelta, timezone as tz
     for fn in ('_check_n7_aurora', '_check_n1_plan_start', '_check_n2_next_target',
@@ -1635,7 +1635,7 @@ def test_poll_night_start_far_future_not_fast_mode(monkeypatch):
 
 
 def test_release_lock_logger_failure_swallowed(monkeypatch):
-    """Lines 629-630: nested logger error in _release_lock is silently swallowed."""
+    """nested logger error in _release_lock is silently swallowed."""
     from utils import push_scheduler
     from unittest.mock import MagicMock
     mock_file = MagicMock()
