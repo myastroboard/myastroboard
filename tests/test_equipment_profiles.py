@@ -532,10 +532,36 @@ class TestEquipmentDeleteGuard:
         assert blocked_by == ['Combo']
         assert equipment_profiles.get_telescope(test_user_id, telescope['id']) is not None
 
-        assert equipment_profiles.delete_combination(test_user_id, combo['id']) is True
+        assert equipment_profiles.delete_combination(test_user_id, combo['id']) == (True, None)
         success, blocked_by = equipment_profiles.delete_telescope(test_user_id, telescope['id'])
         assert success is True
         assert blocked_by is None
+
+    def test_delete_combination_blocked_by_picture(self, temp_data_dir, test_user_id, monkeypatch):
+        """A combination referenced by any Astrodex picture can't be deleted (feature.md rule).
+
+        Patches observation.astrodex.count_pictures_for_combination directly (the module
+        delete_combination lazily imports from) rather than creating real Astrodex picture
+        data, since this test's temp_data_dir fixture only isolates EQUIPMENT_DIR.
+        """
+        import observation.astrodex as astrodex_module
+
+        telescope = equipment_profiles.create_telescope(test_user_id, {
+            'name': 'T', 'telescope_type': 'Refractor', 'aperture_mm': 100, 'focal_length_mm': 1000,
+        })
+        combo = equipment_profiles.create_combination(test_user_id, {
+            'name': 'Combo', 'telescope_id': telescope['id'],
+        })
+
+        monkeypatch.setattr(astrodex_module, 'count_pictures_for_combination', lambda combination_id: 1)
+        success, reason = equipment_profiles.delete_combination(test_user_id, combo['id'])
+        assert success is False
+        assert reason == 'in_use_by_picture'
+
+        monkeypatch.setattr(astrodex_module, 'count_pictures_for_combination', lambda combination_id: 0)
+        success, reason = equipment_profiles.delete_combination(test_user_id, combo['id'])
+        assert success is True
+        assert reason is None
 
     def test_delete_camera_blocked_as_imaging_camera(self, temp_data_dir, test_user_id):
         camera = equipment_profiles.create_camera(test_user_id, {
@@ -965,7 +991,7 @@ def test_update_and_delete_camera_mount_filter_accessory_and_combination(temp_da
     assert updated_combo is not None
     assert updated_combo['name'] == 'Combo B'
 
-    assert equipment_profiles.delete_combination(test_user_id, combo['id']) is True
+    assert equipment_profiles.delete_combination(test_user_id, combo['id']) == (True, None)
     assert equipment_profiles.delete_accessory(test_user_id, accessory['id']) == (True, None)
     assert equipment_profiles.delete_filter(test_user_id, filt['id']) == (True, None)
     assert equipment_profiles.delete_mount(test_user_id, mount['id']) == (True, None)
@@ -1593,10 +1619,10 @@ class TestEquipmentDeleteExceptions:
         assert equipment_profiles.delete_accessory(test_user_id, 'x') == (False, None)
 
     def test_delete_combination_load_exception_returns_false(self, temp_data_dir, test_user_id, monkeypatch):
-        """exception in load_user_combinations → False."""
+        """exception in load_user_combinations → (False, None)."""
         monkeypatch.setattr(equipment_profiles, 'load_user_combinations',
                             lambda *_: (_ for _ in ()).throw(RuntimeError("disk error")))
-        assert equipment_profiles.delete_combination(test_user_id, 'x') is False
+        assert equipment_profiles.delete_combination(test_user_id, 'x') == (False, None)
 
 
 class TestEquipmentGetSuccessPaths:

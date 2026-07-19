@@ -781,6 +781,76 @@ def count_pictures_for_location(location_id: str) -> int:
     return count
 
 
+def count_pictures_for_combination(combination_id: str) -> int:
+    """Count Astrodex pictures (all users) referencing an equipment combination.
+
+    Delete-guard pre-check for equipment_profiles.delete_combination(). Mirrors
+    count_pictures_for_location(): scans every user's file directly (not
+    get_visible_astrodex()'s privacy-aware merge) since a delete-guard must catch
+    every reference regardless of what the deleting user can currently see.
+    """
+    if not combination_id or not os.path.isdir(ASTRODEX_DIR):
+        return 0
+    count = 0
+    for fname in os.listdir(ASTRODEX_DIR):
+        if not fname.endswith('_astrodex.json'):
+            continue
+        try:
+            with open(os.path.join(ASTRODEX_DIR, fname), 'r', encoding='utf-8') as file_obj:
+                data = json.load(file_obj)
+            for item in data.get('items', []):
+                if not isinstance(item, dict):
+                    continue
+                for picture in item.get('pictures', []):
+                    if isinstance(picture, dict) and picture.get('combination_id') == combination_id:
+                        count += 1
+        except Exception:
+            continue  # unreadable file — skip, this is a best-effort count
+    return count
+
+
+def build_combination_photo_index(
+    current_user_id: str,
+    current_username: Optional[str] = None,
+    private_mode: bool = False,
+    usernames_by_id: Optional[Dict[str, str]] = None,
+) -> Dict[str, List[Dict]]:
+    """Index every visible Astrodex picture by its combination_id (pictures with none are
+    skipped). Reuses get_visible_astrodex()'s privacy rules (own-only vs merged-across-users),
+    so combination photo stats never expose more than the rest of Astrodex already does.
+
+    Call once per request and look up per combination via summarize_combination_pictures() -
+    computing this fresh for every combination in a list would re-scan all Astrodex data
+    once per combination.
+    """
+    visible = get_visible_astrodex(current_user_id, current_username, private_mode, usernames_by_id)
+    index: Dict[str, List[Dict]] = {}
+    for item in visible.get('items', []):
+        for picture in item.get('pictures', []):
+            combination_id = picture.get('combination_id')
+            if not combination_id:
+                continue
+            annotated = dict(picture)
+            annotated['item_id'] = item.get('id')
+            annotated['item_name'] = item.get('name')
+            index.setdefault(combination_id, []).append(annotated)
+    return index
+
+
+def summarize_combination_pictures(pictures: List[Dict]) -> Dict:
+    """Compute {photo_count, average_rating, picture_refs} for one combination's pictures.
+
+    average_rating is the mean of only the *rated* pictures (unrated ones count toward
+    photo_count but are excluded from the average, not treated as a zero).
+    """
+    ratings = [float(picture['rating']) for picture in pictures if picture.get('rating') is not None]
+    return {
+        'photo_count': len(pictures),
+        'average_rating': round(sum(ratings) / len(ratings), 2) if ratings else None,
+        'picture_refs': pictures,
+    }
+
+
 def update_astrodex_item(user_id: str, item_id: str, updates: Dict) -> Optional[Dict]:
     """Update an existing item in user's astrodex"""
     astrodex = load_user_astrodex(user_id)
@@ -857,6 +927,16 @@ def add_picture_to_item(user_id: str, item_id: str, picture_data: Dict) -> Optio
               for the same best-effort-id/frozen-name split). Coordinates are
               private to the picture's owner - get_visible_astrodex() strips
               them from every picture it shows to a different user.
+            - combination_id: linked equipment combination (validated server-side
+              in blueprints/astrodex.py before this is called), or None for the
+              free-text "Other equipment" path.
+            - combination_used_components: frozen snapshot of which parts of the
+              combination were actually used for this photo (e.g.
+              {"telescope": true, "camera": true, "filter_ids": [...]})  - purely
+              informational, never recomputed even if the combination is edited
+              later.
+            - rating: 0.0-5.0 in 0.5 steps, or None if not yet rated (validated
+              server-side).
 
     Returns:
         Created picture with ID, or None on error
@@ -884,6 +964,9 @@ def add_picture_to_item(user_id: str, item_id: str, picture_data: Dict) -> Optio
                 'latitude': picture_data.get('latitude'),
                 'longitude': picture_data.get('longitude'),
                 'elevation': picture_data.get('elevation'),
+                'combination_id': picture_data.get('combination_id') or None,
+                'combination_used_components': picture_data.get('combination_used_components') or None,
+                'rating': picture_data.get('rating'),
                 'is_main': False,  # New pictures are not main by default
                 'created_at': datetime.now(timezone.utc).isoformat(),
             }
@@ -929,6 +1012,9 @@ def update_picture(user_id: str, item_id: str, picture_id: str, updates: Dict) -
                         'latitude',
                         'longitude',
                         'elevation',
+                        'combination_id',
+                        'combination_used_components',
+                        'rating',
                     ]
                     for field in allowed_fields:
                         if field in updates:

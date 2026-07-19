@@ -289,13 +289,16 @@ const equipmentShowHidden = {
 function _buildShowHiddenToggle(kind, hiddenCount, rerenderFn) {
     if (hiddenCount === 0 && !equipmentShowHidden[kind]) return null;
     const wrap = document.createElement('div');
-    wrap.className = 'mb-2';
+    wrap.className = 'mb-3';
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'btn btn-link btn-sm p-0';
-    btn.textContent = equipmentShowHidden[kind]
+    btn.className = 'btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1';
+    const label = document.createElement('span');
+    label.textContent = equipmentShowHidden[kind]
         ? i18n.t('equipment.hide_hidden_items')
         : i18n.t('equipment.show_hidden_items', { count: hiddenCount });
+    btn.appendChild(DOMUtils.createIcon(equipmentShowHidden[kind] ? 'bi bi-eye-slash' : 'bi bi-eye'));
+    btn.appendChild(label);
     btn.addEventListener('click', () => {
         equipmentShowHidden[kind] = !equipmentShowHidden[kind];
         rerenderFn();
@@ -496,6 +499,26 @@ function renderCombinationCard(combo, isReadOnly) {
         titleRow.appendChild(invalidBadge);
     }
     appendHiddenBadge(titleRow, combo);
+    if (combo.photo_count > 0) {
+        const photoBadge = document.createElement('span');
+        photoBadge.className = 'badge bg-secondary';
+        photoBadge.style.cursor = 'pointer';
+        photoBadge.title = i18n.t('equipment.combination_photo_count_hint');
+        DOMUtils.append(photoBadge, DOMUtils.createIcon('bi bi-camera'), ` ${combo.photo_count}`);
+        photoBadge.addEventListener('click', () => {
+            if (typeof showPictureSlideshowFromPictures === 'function' && Array.isArray(combo.picture_refs)) {
+                showPictureSlideshowFromPictures(combo.picture_refs, { title: combo.name });
+            }
+        });
+        titleRow.appendChild(photoBadge);
+    }
+    if (combo.average_rating != null) {
+        const ratingBadge = document.createElement('span');
+        ratingBadge.className = 'badge bg-warning text-dark';
+        ratingBadge.title = i18n.t('equipment.combination_average_rating_hint');
+        DOMUtils.append(ratingBadge, DOMUtils.createIcon('bi bi-star-fill'), ` ${combo.average_rating.toFixed(1)}`);
+        titleRow.appendChild(ratingBadge);
+    }
     body.appendChild(titleRow);
 
     const p = document.createElement('p');

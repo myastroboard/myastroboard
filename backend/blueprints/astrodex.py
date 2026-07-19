@@ -2,11 +2,12 @@
 
 import os
 import uuid
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from flask import Blueprint, request, jsonify, send_from_directory
 from werkzeug.utils import secure_filename
 
+from equipment import equipment_profiles
 from observation import astrodex
 from observation import beginner_catalog
 from utils.auth import login_required, user_required, get_current_user, user_manager
@@ -45,6 +46,41 @@ def _safe_picture_coordinate(value, min_value, max_value):
     if not (min_value <= parsed <= max_value):
         return None
     return parsed
+
+
+def _validate_and_coerce_picture_rating(picture_data: Dict) -> Any:
+    """Validate picture_data['rating'] in place (0.0-5.0 in 0.5 steps) and coerce it to a clean
+    float, or None if left blank. Returns an error message string on failure, else None.
+
+    Unlike coordinates/notes, a bad rating is rejected (400) rather than silently dropped - it's a
+    value the user explicitly set via a star-rating widget, not a loosely-typed free-text field.
+    """
+    value = picture_data.get('rating')
+    if value is None or value == '':
+        picture_data['rating'] = None
+        return None
+    try:
+        rating = float(value)
+    except (TypeError, ValueError):
+        return 'rating must be a number between 0 and 5'
+    if not (0 <= rating <= 5) or (rating * 2) != int(round(rating * 2)):
+        return 'rating must be between 0 and 5 in 0.5 steps'
+    picture_data['rating'] = rating
+    return None
+
+
+def _resolve_picture_combination_reference(combination_id, user_id) -> Optional[str]:
+    """Return combination_id if it resolves to an accessible (own or shared) combination for this
+    user, else None. Resolved server-side so a picture can never end up tagged with a combination
+    id that doesn't actually exist or that the uploader has no access to."""
+    if not combination_id:
+        return None
+    if equipment_profiles.get_combination(user_id, combination_id):
+        return combination_id
+    shared = equipment_profiles.load_all_shared_combinations(user_id)
+    if any(combo['id'] == combination_id for combo in shared):
+        return combination_id
+    return None
 
 
 def _resolve_picture_location_snapshot(
@@ -417,6 +453,19 @@ def add_picture_to_astrodex_item(item_id):
 
         picture_data = request.json
 
+        rating_error = _validate_and_coerce_picture_rating(picture_data)
+        if rating_error:
+            return jsonify({'error': rating_error}), 400
+
+        # Equipment: either a real combination (validated/resolved server-side, same trust model
+        # as location below) or the free-text "Other equipment" path - never both meaningfully,
+        # though the backend stays permissive about device/filters like any other free-text field.
+        picture_data['combination_id'] = _resolve_picture_combination_reference(
+            picture_data.get('combination_id'), user_id
+        )
+        used_components = picture_data.get('combination_used_components')
+        picture_data['combination_used_components'] = used_components if isinstance(used_components, dict) else None
+
         # Location is resolved server-side (v1.2) - never trust client-supplied
         # preset coordinates. Uses the uploader's explicit choice (a preset id
         # or a free-text "somewhere else" label) if they picked one, else
@@ -459,6 +508,20 @@ def update_picture_api(item_id, picture_id):
             return jsonify({'error': 'User not authenticated'}), 401
 
         updates = request.json
+
+        if 'rating' in updates:
+            rating_error = _validate_and_coerce_picture_rating(updates)
+            if rating_error:
+                return jsonify({'error': rating_error}), 400
+
+        # Equipment fields, like location below, are only touched if this edit explicitly
+        # included them - editing unrelated fields (notes, exposure, ...) must never disturb an
+        # existing combination link.
+        if 'combination_id' in updates:
+            updates['combination_id'] = _resolve_picture_combination_reference(updates.get('combination_id'), user_id)
+        if 'combination_used_components' in updates:
+            used_components = updates.get('combination_used_components')
+            updates['combination_used_components'] = used_components if isinstance(used_components, dict) else None
 
         # Location is resolved server-side (v1.2) and only touched if this
         # edit explicitly included location_id and/or location_name - editing
