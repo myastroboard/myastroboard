@@ -136,6 +136,40 @@ To add a preset, append an entry to the relevant array in the JSON file — no c
 (it's fetched fresh by the browser). Keep enum-like fields (`type`, `sensor_type`, `mount_type`, `filter_type`)
 consistent with the values each form's `<select>` accepts, or the preset will silently fail to prefill that field.
 
+### Bundles (smart telescopes)
+
+A **telescope** preset can declare a `bundle`: an array of sibling equipment items that ship built into the
+same physical unit — most commonly an all-in-one "smart telescope" (Seestar, Dwarf, Vespera, …) whose fixed
+built-in camera sensor has no other way to be represented, since a plain telescope preset only carries
+optical specs (aperture/focal length), not sensor data.
+
+```json
+{
+  "id": "seestar_s50",
+  "...": "... normal telescope fields ...",
+  "auto_combination": true,
+  "bundle": [
+    { "kind": "camera", "label": "Seestar S50 built-in camera (Sony IMX462)", "sensor_width_mm": 5.6, "...": "..." },
+    { "kind": "mount", "label": "Seestar S50 built-in AZ mount/tripod", "mount_type": "Alt-Azimuth", "...": "..." },
+    { "kind": "filter", "label": "Seestar S50 Solar Filter", "filter_type": "Solar", "...": "..." }
+  ]
+}
+```
+
+- `kind` is one of `camera` / `mount` / `filter` / `accessory`; the rest of each bundle entry's fields match
+  that kind's normal preset shape one-to-one (same as a standalone entry in the `cameras`/`mounts`/
+  `filters`/`accessories` arrays above).
+- Set **`weight_kg: 0`** on every bundle entry — the parent telescope's own `weight_kg` already represents
+  the whole fused unit's mass; giving bundle items their own non-zero weight would multiply-count it in a
+  combination card's total payload calculation.
+- `auto_combination: true` on the parent tells the **guided setup wizard** (`static/js/first_run.js`) to
+  create every bundle item alongside the telescope and link them all into one auto-created combination —
+  this is what makes "every time the wizard creates equipment, a combination is created" true even for a
+  single-preset pick. When a bundling preset is selected, the wizard's separate camera picker is hidden
+  (a combination can only have one imaging camera, and the bundle already supplies it).
+- Bundle items are never independently selectable elsewhere (no separate preset dropdown entry) — they only
+  ever get created as part of their parent telescope's wizard flow.
+
 ---
 
 ## Equipment combinations
