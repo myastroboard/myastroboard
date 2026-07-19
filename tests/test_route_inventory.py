@@ -234,7 +234,7 @@ EXPECTED_ROUTES = {
     ('/api/skytonight/scheduler/trigger', ('POST',)),
     ('/api/skytonight/skymap', ('GET',)),
     ('/api/skytonight/target-debug', ('GET',)),
-    ('/api/skytonight/telescope-recommendations', ('POST',)),
+    ('/api/skytonight/combination-recommendations', ('POST',)),
 }
 
 

@@ -177,7 +177,7 @@ optical specs (aperture/focal length), not sensor data.
 A **combination** is a named configuration that groups a telescope, camera, mount, filters, and accessories. It is the unit used by:
 
 - The **FOV Calculator** (computes field of view for that telescope + camera pair)
-- **SkyTonight** ("Best telescope for this target" uses all your combinations)
+- **SkyTonight** ("Best Equipment For This Target" rates all your enabled and valid combinations)
 - **Astrodex** picture metadata (which setup was used for an image session)
 - **Plan My Night** telescope selector
 
@@ -268,7 +268,7 @@ Shared equipment flows through the whole app:
 | Feature | Effect |
 |---------|--------|
 | FOV Calculator | Shared telescopes & cameras appear in dropdowns |
-| SkyTonight — Best Telescope | Recommendations include shared scopes (own listed first) |
+| SkyTonight — Combination recommendations | Recommendations include shared combinations (own listed first) |
 | Astrodex — Add Picture | Shared combinations and filters available in selectors |
 | Plan My Night | Shared telescopes appear in the telescope selector |
 | Exposure Calculator | Shared cameras appear in the camera selector |
@@ -277,10 +277,13 @@ Shared equipment flows through the whole app:
 
 ## SkyTonight integration
 
-SkyTonight uses the **active equipment combination** (telescope + camera) to:
+For each DSO, `POST /api/skytonight/combination-recommendations` rates every enabled and valid equipment combination (own + shared) on a 1-5 scale:
 
-1. Compute the **plate scale** for the Exposure Calculator.
-2. Rank targets in the "Best telescope for this target" modal: for each DSO, it evaluates each combination's plate scale against the object's angular size and returns a suitability score.
+1. Resolves each combination's effective optics - a telescope's aperture/focal length/f-ratio, or for a camera-only combination (no telescope), its `lens_focal_length_mm`/`lens_focal_ratio`.
+2. Scores focal length against an ideal range derived from the target's apparent size/type, and aperture against the target's magnitude.
+3. When the combination's camera has sensor dimensions, blends in a real field-of-view match (via the FOV Calculator's formulas) against the target's apparent size, instead of relying on the focal-length heuristic alone.
+
+Disabled or invalid combinations (see [Disabling equipment](#disabling-equipment)) never appear in recommendations. See [SKYTONIGHT.md](SKYTONIGHT.md#equipment-combination-recommendations) for the full scoring model.
 
 ---
 

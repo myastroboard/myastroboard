@@ -181,6 +181,27 @@ the Beginner Catalog. Full model and thresholds: [BEGINNER_EXPERIENCE.md](BEGINN
 
 ---
 
+## Equipment combination recommendations
+
+For any target, `POST /api/skytonight/combination-recommendations` rates how well each of the user's enabled and valid equipment combinations (own + shared, see [EQUIPMENT.md](EQUIPMENT.md#equipment-combinations)) suits that target, on a 1-5 scale.
+
+Unlike AstroScore (which rates the *night*), this rates the *gear* - it runs on demand per target, independent of the scheduler-based calculations above.
+
+### Scoring factors
+
+| Factor | Weight (no camera) | Weight (with camera) | Basis |
+|---|---|---|---|
+| Focal length vs. ideal range | 50% | 30% | Target apparent size/type -> an ideal focal-length band |
+| Field-of-view match | - | 30% | Real sensor FOV (via `calculate_fov`) vs. target apparent size - only when the combination's camera has sensor dimensions |
+| Aperture vs. brightness | 35% | 25% | Target magnitude -> ideal aperture range |
+| Optical speed (f-ratio) | 15% | 15% | Faster f-ratios favor nebulae/wide-field targets |
+
+A combination without a telescope but with `lens_focal_length_mm`/`lens_focal_ratio` set (e.g. a DSLR + lens on a star tracker) is scored the same way, using the lens specs in place of a telescope's optics. A combination that resolves neither a telescope nor usable lens specs is omitted from the results rather than scored arbitrarily.
+
+Disabled or invalid combinations (see [EQUIPMENT.md](EQUIPMENT.md#disabling-equipment)) never appear in recommendations.
+
+---
+
 ## Output files
 
 All paths are relative to `/data/skytonight/`.
@@ -209,6 +230,7 @@ All paths are relative to `/data/skytonight/`.
 | `GET` | `/api/skytonight/data/dso` | Deep-sky results for the UI (reactive, per-section) - optional `?catalogue=` filter |
 | `GET` | `/api/skytonight/data/bodies` | Solar-system body results (reactive, per-section) |
 | `GET` | `/api/skytonight/data/comets` | Comet results (reactive, per-section) |
+| `POST` | `/api/skytonight/combination-recommendations` | Rate the user's equipment combinations (1-5) for one target |
 | `GET` | `/api/skytonight/alttime/<id>` | Altitude-time data for one target |
 | `GET` | `/api/skytonight/skymap` | Sky map trajectory data |
 | `GET` | `/api/skytonight/log` | Last calculation log content (JSONL) |

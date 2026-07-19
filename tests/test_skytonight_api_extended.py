@@ -386,16 +386,17 @@ class TestAdditionalSkytonightRouteBranches:
         resp = client_admin.get('/api/skytonight/alttime/ok')
         assert resp.status_code == 500
 
-    def test_telescope_recommendations_invalid_payload_returns_400(self, client_admin):
-        resp = client_admin.post('/api/skytonight/telescope-recommendations', json=[1, 2, 3])
+    def test_combination_recommendations_invalid_payload_returns_400(self, client_admin):
+        resp = client_admin.post('/api/skytonight/combination-recommendations', json=[1, 2, 3])
         assert resp.status_code == 400
 
-    def test_telescope_recommendations_no_telescopes_returns_empty(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_skytonight_api_mod.equipment_profiles, 'load_user_telescopes', lambda _u: {'items': []})
-        monkeypatch.setattr(_skytonight_api_mod.equipment_profiles, 'load_all_shared_equipment', lambda *_a, **_k: [])
-        resp = client_admin.post('/api/skytonight/telescope-recommendations', json={'target name': 'M31'})
+    def test_combination_recommendations_no_combinations_returns_empty(self, client_admin, monkeypatch):
+        monkeypatch.setattr(_skytonight_api_mod.equipment_profiles, 'load_user_combinations', lambda _u: {'items': []})
+        monkeypatch.setattr(_skytonight_api_mod.equipment_profiles, 'load_all_shared_combinations',
+                             lambda *_a, **_k: [])
+        resp = client_admin.post('/api/skytonight/combination-recommendations', json={'target name': 'M31'})
         assert resp.status_code == 200
-        assert resp.get_json()['has_telescopes'] is False
+        assert resp.get_json()['has_combinations'] is False
 
     def test_skymap_read_error_returns_500(self, client_admin, monkeypatch):
         monkeypatch.setattr(_skytonight_api_mod.os.path, 'isfile', lambda _p: True)
@@ -737,7 +738,7 @@ class TestSkytonightTargetDebug:
 
 # ---------------------------------------------------------------------------
 # Helper functions: _to_float, _score_in_range, _ideal_focal_range,
-# _aperture_score, _speed_score, _recommend_telescopes_for_target
+# _aperture_score, _speed_score, _recommend_combinations_for_target
 # ---------------------------------------------------------------------------
 
 
@@ -746,7 +747,7 @@ _score_in_range = _skytonight_api_mod._score_in_range
 _ideal_focal_range = _skytonight_api_mod._ideal_focal_range
 _aperture_score = _skytonight_api_mod._aperture_score
 _speed_score = _skytonight_api_mod._speed_score
-_recommend_telescopes_for_target = _skytonight_api_mod._recommend_telescopes_for_target
+_recommend_combinations_for_target = _skytonight_api_mod._recommend_combinations_for_target
 _alttime_json_path = _skytonight_api_mod._alttime_json_path
 _build_skytonight_reports_payload = _skytonight_api_mod._build_skytonight_reports_payload
 _build_bodies_section_payload = _skytonight_api_mod._build_bodies_section_payload
@@ -926,9 +927,9 @@ class TestSpeedScore:
         assert _speed_score(6.0, '') == 3.5
 
 
-class TestRecommendTelescopesForTarget:
+class TestRecommendCombinationsForTarget:
 
-    def _make_scope(self, tid, aperture=200.0, focal=1000.0, ratio=5.0, shared=False, owner=None):
+    def _make_telescope(self, tid, aperture=200.0, focal=1000.0, ratio=5.0):
         return {
             'id': tid,
             'name': f'Scope {tid}',
@@ -936,88 +937,146 @@ class TestRecommendTelescopesForTarget:
             'aperture_mm': aperture,
             'effective_focal_length': focal,
             'effective_focal_ratio': ratio,
+        }
+
+    def _make_combo(self, cid, telescope_id, shared=False, owner=None):
+        return {
+            'id': cid,
+            'name': f'Combo {cid}',
+            'telescope_id': telescope_id,
             'is_shared': shared,
             'owner_username': owner,
         }
 
-    def test_empty_telescopes_returns_empty(self):
-        result = _recommend_telescopes_for_target({'size': 30.0, 'mag': 8.0, 'type': 'Galaxy'}, [])
+    def test_empty_combinations_returns_empty(self):
+        result = _recommend_combinations_for_target({'size': 30.0, 'mag': 8.0, 'type': 'Galaxy'}, [], {}, {})
         assert result == []
 
-    def test_scope_missing_aperture_skipped(self):
-        scope = self._make_scope('t1')
-        scope.pop('aperture_mm')
-        result = _recommend_telescopes_for_target({'size': 30.0, 'mag': 8.0, 'type': 'Galaxy'}, [scope])
+    def test_combo_missing_aperture_skipped(self):
+        telescope = self._make_telescope('t1')
+        telescope.pop('aperture_mm')
+        combo = self._make_combo('c1', 't1')
+        result = _recommend_combinations_for_target(
+            {'size': 30.0, 'mag': 8.0, 'type': 'Galaxy'}, [combo], {'t1': telescope}, {}
+        )
         assert result == []
 
-    def test_scope_missing_focal_length_skipped(self):
-        scope = {'id': 't1', 'name': 'T1', 'manufacturer': 'C',
-                 'aperture_mm': 200.0, 'native_focal_ratio': 5.0}
+    def test_combo_missing_focal_length_skipped(self):
+        telescope = {'id': 't1', 'name': 'T1', 'manufacturer': 'C',
+                     'aperture_mm': 200.0, 'native_focal_ratio': 5.0}
         # no effective or native focal length
-        result = _recommend_telescopes_for_target({'size': 30.0, 'mag': 8.0, 'type': 'Galaxy'}, [scope])
+        combo = self._make_combo('c1', 't1')
+        result = _recommend_combinations_for_target(
+            {'size': 30.0, 'mag': 8.0, 'type': 'Galaxy'}, [combo], {'t1': telescope}, {}
+        )
         assert result == []
 
-    def test_scope_missing_ratio_skipped(self):
-        scope = {'id': 't1', 'name': 'T1', 'manufacturer': 'C',
-                 'aperture_mm': 200.0, 'effective_focal_length': 1000.0}
-        result = _recommend_telescopes_for_target({'size': 30.0, 'mag': 8.0, 'type': 'Galaxy'}, [scope])
+    def test_combo_missing_ratio_skipped(self):
+        telescope = {'id': 't1', 'name': 'T1', 'manufacturer': 'C',
+                     'aperture_mm': 200.0, 'effective_focal_length': 1000.0}
+        combo = self._make_combo('c1', 't1')
+        result = _recommend_combinations_for_target(
+            {'size': 30.0, 'mag': 8.0, 'type': 'Galaxy'}, [combo], {'t1': telescope}, {}
+        )
         assert result == []
 
-    def test_valid_scope_produces_recommendation(self):
-        scope = self._make_scope('t1', aperture=200.0, focal=1000.0, ratio=5.0)
-        result = _recommend_telescopes_for_target({'size': 30.0, 'mag': 8.0, 'type': 'Galaxy'}, [scope])
+    def test_valid_combo_produces_recommendation(self):
+        telescope = self._make_telescope('t1', aperture=200.0, focal=1000.0, ratio=5.0)
+        combo = self._make_combo('c1', 't1')
+        result = _recommend_combinations_for_target(
+            {'size': 30.0, 'mag': 8.0, 'type': 'Galaxy'}, [combo], {'t1': telescope}, {}
+        )
         assert len(result) == 1
         rec = result[0]
-        assert rec['telescope_id'] == 't1'
+        assert rec['combination_id'] == 'c1'
+        assert rec['telescope_name'] == 'Scope t1'
         assert 1 <= rec['rating_1_to_5'] <= 5
         assert rec['is_shared'] is False
         assert rec['target_magnitude'] == pytest.approx(8.0, abs=0.01)
         assert rec['target_size_arcmin'] == pytest.approx(30.0, abs=0.01)
 
-    def test_multiple_scopes_sorted_by_rating(self):
+    def test_multiple_combos_sorted_by_rating(self):
         # fast scope for nebula should score higher
-        slow = self._make_scope('slow', aperture=100.0, focal=1500.0, ratio=15.0)
-        fast = self._make_scope('fast', aperture=150.0, focal=600.0, ratio=4.0)
-        result = _recommend_telescopes_for_target({'size': None, 'mag': None, 'type': 'Emission Nebula'}, [slow, fast])
-        assert result[0]['telescope_id'] == 'fast'
+        slow_scope = self._make_telescope('slow', aperture=100.0, focal=1500.0, ratio=15.0)
+        fast_scope = self._make_telescope('fast', aperture=150.0, focal=600.0, ratio=4.0)
+        slow_combo = self._make_combo('c-slow', 'slow')
+        fast_combo = self._make_combo('c-fast', 'fast')
+        result = _recommend_combinations_for_target(
+            {'size': None, 'mag': None, 'type': 'Emission Nebula'},
+            [slow_combo, fast_combo],
+            {'slow': slow_scope, 'fast': fast_scope},
+            {},
+        )
+        assert result[0]['combination_id'] == 'c-fast'
 
     def test_native_focal_ratio_used_as_fallback(self):
-        scope = {
+        telescope = {
             'id': 't2', 'name': 'T2', 'manufacturer': 'C',
             'aperture_mm': 200.0,
             'effective_focal_length': 1000.0,
             'native_focal_ratio': 5.0,  # no effective_focal_ratio
         }
-        result = _recommend_telescopes_for_target({'size': 10.0, 'mag': 8.0, 'type': 'Galaxy'}, [scope])
+        combo = self._make_combo('c2', 't2')
+        result = _recommend_combinations_for_target(
+            {'size': 10.0, 'mag': 8.0, 'type': 'Galaxy'}, [combo], {'t2': telescope}, {}
+        )
         assert len(result) == 1
 
     def test_focal_length_mm_used_as_fallback(self):
-        scope = {
+        telescope = {
             'id': 't3', 'name': 'T3', 'manufacturer': 'C',
             'aperture_mm': 150.0,
             'focal_length_mm': 750.0,  # no effective_focal_length
             'effective_focal_ratio': 5.0,
         }
-        result = _recommend_telescopes_for_target({'size': 10.0, 'mag': 8.0, 'type': 'Galaxy'}, [scope])
+        combo = self._make_combo('c3', 't3')
+        result = _recommend_combinations_for_target(
+            {'size': 10.0, 'mag': 8.0, 'type': 'Galaxy'}, [combo], {'t3': telescope}, {}
+        )
         assert len(result) == 1
 
-    def test_shared_scope_flag(self):
-        scope = self._make_scope('t4', shared=True, owner='alice')
-        result = _recommend_telescopes_for_target({'size': None, 'mag': None, 'type': ''}, [scope])
+    def test_shared_combo_flag(self):
+        telescope = self._make_telescope('t4')
+        combo = self._make_combo('c4', 't4', shared=True, owner='alice')
+        result = _recommend_combinations_for_target(
+            {'size': None, 'mag': None, 'type': ''}, [combo], {'t4': telescope}, {}
+        )
         assert result[0]['is_shared'] is True
         assert result[0]['owner_username'] == 'alice'
 
     def test_none_magnitude_in_target(self):
-        scope = self._make_scope('t5')
-        result = _recommend_telescopes_for_target({'size': None, 'mag': None, 'type': 'Galaxy'}, [scope])
+        telescope = self._make_telescope('t5')
+        combo = self._make_combo('c5', 't5')
+        result = _recommend_combinations_for_target(
+            {'size': None, 'mag': None, 'type': 'Galaxy'}, [combo], {'t5': telescope}, {}
+        )
         assert len(result) == 1
         assert result[0]['target_magnitude'] is None
 
-    def test_uses_visual_magnitude_key(self):
-        scope = self._make_scope('t6')
-        # 'mag' key is None but 'visual magnitude' would be in a pre-normalized payload
-        result = _recommend_telescopes_for_target({'size': None, 'mag': None, 'type': ''}, [scope])
+    def test_camera_only_combo_uses_lens_specs(self):
+        combo = {
+            'id': 'c6', 'name': 'Camera Only', 'telescope_id': None, 'camera_id': 'cam-1',
+            'lens_focal_length_mm': 135.0, 'lens_focal_ratio': 2.0,
+        }
+        result = _recommend_combinations_for_target(
+            {'size': None, 'mag': None, 'type': 'Nebula'}, [combo], {}, {'cam-1': {'id': 'cam-1', 'name': 'Cam'}}
+        )
         assert len(result) == 1
+        assert result[0]['is_camera_only'] is True
+        assert result[0]['effective_focal_length'] == 135.0
+
+    def test_combo_with_camera_blends_fov_score(self):
+        telescope = self._make_telescope('t7')
+        camera = {'id': 'cam-2', 'name': 'Cam2', 'sensor_width_mm': 23.5,
+                  'sensor_height_mm': 15.6, 'pixel_size_um': 3.76}
+        combo = self._make_combo('c7', 't7')
+        combo['camera_id'] = 'cam-2'
+        result = _recommend_combinations_for_target(
+            {'size': 30.0, 'mag': 8.0, 'type': 'Galaxy'}, [combo], {'t7': telescope}, {'cam-2': camera}
+        )
+        assert len(result) == 1
+        assert result[0]['camera_name'] == 'Cam2'
+        assert result[0]['fov_diagonal_deg'] is not None
 
 
 # ---------------------------------------------------------------------------
@@ -1946,15 +2005,15 @@ class TestAlttimeEndpointAdditionalBranches:
 # ---------------------------------------------------------------------------
 
 
-class TestTelescopeRecommendationsEndpointBranches:
+class TestCombinationRecommendationsEndpointBranches:
 
     def test_unauthenticated_returns_401(self):
         app.config['TESTING'] = True
         with app.test_client() as c:
-            resp = c.post('/api/skytonight/telescope-recommendations', json={'type': 'Galaxy'})
+            resp = c.post('/api/skytonight/combination-recommendations', json={'type': 'Galaxy'})
             assert resp.status_code == 401
 
-    def test_with_telescopes_returns_recommendations(self, client_admin, monkeypatch):
+    def test_with_combinations_returns_recommendations(self, client_admin, monkeypatch):
         telescope = {
             'id': 'scope-1',
             'name': 'My Scope',
@@ -1965,16 +2024,21 @@ class TestTelescopeRecommendationsEndpointBranches:
             'is_shared': False,
             'owner_username': None,
         }
+        combo = {'id': 'combo-1', 'name': 'My Combo', 'telescope_id': 'scope-1', 'is_disabled': False}
         monkeypatch.setattr(_skytonight_api_mod.equipment_profiles, 'load_user_telescopes',
                             lambda u: {'items': [telescope]})
         monkeypatch.setattr(_skytonight_api_mod.equipment_profiles, 'load_all_shared_equipment',
                             lambda *a, **k: [])
+        monkeypatch.setattr(_skytonight_api_mod.equipment_profiles, 'load_user_combinations',
+                            lambda u: {'items': [combo]})
+        monkeypatch.setattr(_skytonight_api_mod.equipment_profiles, 'load_all_shared_combinations',
+                            lambda *a, **k: [])
 
         payload = {'type': 'Galaxy', 'size': 30.0, 'mag': 8.0}
-        resp = client_admin.post('/api/skytonight/telescope-recommendations', json=payload)
+        resp = client_admin.post('/api/skytonight/combination-recommendations', json=payload)
         assert resp.status_code == 200
         data = resp.get_json()
-        assert data['has_telescopes'] is True
+        assert data['has_combinations'] is True
         assert len(data['recommendations']) == 1
 
     def test_visual_magnitude_fallback_key(self, client_admin, monkeypatch):
@@ -1986,27 +2050,32 @@ class TestTelescopeRecommendationsEndpointBranches:
             'effective_focal_length': 750.0,
             'effective_focal_ratio': 5.0,
         }
+        combo = {'id': 'combo-2', 'name': 'Combo 2', 'telescope_id': 'scope-2', 'is_disabled': False}
         monkeypatch.setattr(_skytonight_api_mod.equipment_profiles, 'load_user_telescopes',
                             lambda u: {'items': [telescope]})
         monkeypatch.setattr(_skytonight_api_mod.equipment_profiles, 'load_all_shared_equipment',
                             lambda *a, **k: [])
+        monkeypatch.setattr(_skytonight_api_mod.equipment_profiles, 'load_user_combinations',
+                            lambda u: {'items': [combo]})
+        monkeypatch.setattr(_skytonight_api_mod.equipment_profiles, 'load_all_shared_combinations',
+                            lambda *a, **k: [])
 
         # 'mag' is None but 'visual magnitude' present → picked up in endpoint
         payload = {'type': 'Planet', 'mag': None, 'visual magnitude': -2.0}
-        resp = client_admin.post('/api/skytonight/telescope-recommendations', json=payload)
+        resp = client_admin.post('/api/skytonight/combination-recommendations', json=payload)
         assert resp.status_code == 200
         data = resp.get_json()
-        assert data['has_telescopes'] is True
+        assert data['has_combinations'] is True
 
     def test_user_not_authenticated_returns_401(self, client_admin, monkeypatch):
         monkeypatch.setattr(_skytonight_api_mod, 'get_current_user', lambda: None)
-        resp = client_admin.post('/api/skytonight/telescope-recommendations', json={})
+        resp = client_admin.post('/api/skytonight/combination-recommendations', json={})
         assert resp.status_code == 401
 
     def test_internal_error_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_skytonight_api_mod.equipment_profiles, 'load_user_telescopes',
+        monkeypatch.setattr(_skytonight_api_mod.equipment_profiles, 'load_user_combinations',
                             lambda u: (_ for _ in ()).throw(RuntimeError('crash')))
-        resp = client_admin.post('/api/skytonight/telescope-recommendations', json={'type': 'Galaxy'})
+        resp = client_admin.post('/api/skytonight/combination-recommendations', json={'type': 'Galaxy'})
         assert resp.status_code == 500
 
 

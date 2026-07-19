@@ -37,3 +37,4 @@ A note about privacy. As Astrodex, World Photo Map can be private or public. Tha
 - Complete reorganization of `backend` folder because the app had grown too much to remain organized.
 - Add notification for meteor shower
 - Precipitation is now used for astroscore calculation
+- Add combination-aware SkyTonight equipment recommendations (renamed `/api/skytonight/telescope-recommendations` -> `/api/skytonight/combination-recommendations`): camera-only rigs (lens on a tracker) can now be scored too, and recommendations blend real sensor field-of-view against the target's apparent size instead of relying only on a focal-length heuristic

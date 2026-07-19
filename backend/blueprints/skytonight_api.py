@@ -911,8 +911,23 @@ def _speed_score(f_ratio: float, object_type: str) -> float:
     return 3.5
 
 
-def _recommend_telescopes_for_target(
-    target_payload: Dict[str, Any], telescopes: list[Dict[str, Any]]
+def _fov_match_score(fov_diagonal_deg: float, size_arcmin: Optional[float]) -> Optional[float]:
+    """Score how well a combination's diagonal FOV frames the target (None if size unknown).
+
+    A target filling roughly 10-60% of the frame's diagonal is considered a good framing;
+    much smaller and the target is lost in empty sky, much larger and it gets cropped.
+    """
+    if size_arcmin is None or size_arcmin <= 0 or fov_diagonal_deg <= 0:
+        return None
+    fill_ratio = size_arcmin / (fov_diagonal_deg * 60.0)
+    return _score_in_range(fill_ratio, 0.10, 0.60)
+
+
+def _recommend_combinations_for_target(
+    target_payload: Dict[str, Any],
+    combinations: list[Dict[str, Any]],
+    telescopes_by_id: Dict[str, Dict[str, Any]],
+    cameras_by_id: Dict[str, Dict[str, Any]],
 ) -> list[Dict[str, Any]]:
     size_arcmin = _to_float(target_payload.get('size'))
     magnitude = _to_float(target_payload.get('mag'))
@@ -921,10 +936,25 @@ def _recommend_telescopes_for_target(
     ideal_f_min, ideal_f_max = _ideal_focal_range(size_arcmin, object_type)
     recommendations: list[Dict[str, Any]] = []
 
-    for scope in telescopes:
-        aperture_mm = _to_float(scope.get('aperture_mm'))
-        focal_length = _to_float(scope.get('effective_focal_length')) or _to_float(scope.get('focal_length_mm'))
-        f_ratio = _to_float(scope.get('effective_focal_ratio')) or _to_float(scope.get('native_focal_ratio'))
+    for combo in combinations:
+        telescope = telescopes_by_id.get(combo.get('telescope_id') or '')
+        camera = cameras_by_id.get(combo.get('camera_id') or '')
+
+        if telescope:
+            aperture_mm = _to_float(telescope.get('aperture_mm'))
+            focal_length = _to_float(telescope.get('effective_focal_length')) or _to_float(
+                telescope.get('focal_length_mm')
+            )
+            f_ratio = _to_float(telescope.get('effective_focal_ratio')) or _to_float(
+                telescope.get('native_focal_ratio')
+            )
+        else:
+            # Camera-only combination (e.g. DSLR + lens on a tracker): fall back to the
+            # combination's own lens fields, deriving an effective aperture so the same
+            # aperture/speed scoring can still run.
+            focal_length = _to_float(combo.get('lens_focal_length_mm'))
+            f_ratio = _to_float(combo.get('lens_focal_ratio'))
+            aperture_mm = (focal_length / f_ratio) if focal_length and f_ratio else None
 
         if not aperture_mm or not focal_length or not f_ratio:
             continue
@@ -932,23 +962,53 @@ def _recommend_telescopes_for_target(
         focal_score = _score_in_range(focal_length, ideal_f_min, ideal_f_max)
         aperture_sc = _aperture_score(aperture_mm, magnitude)
         speed_sc = _speed_score(f_ratio, object_type)
-        final_score = int(round(max(1.0, min(5.0, (0.50 * focal_score) + (0.35 * aperture_sc) + (0.15 * speed_sc)))))
+
+        fov_calculation = None
+        fov_score = None
+        if camera:
+            try:
+                sensor_width = float(camera.get('sensor_width_mm') or 0)
+                sensor_height = float(camera.get('sensor_height_mm') or 0)
+                pixel_size = float(camera.get('pixel_size_um') or 0)
+                if sensor_width > 0 and sensor_height > 0 and pixel_size > 0:
+                    fov_calculation = equipment_profiles.calculate_fov(
+                        focal_length, sensor_width, sensor_height, pixel_size
+                    )
+                    fov_score = _fov_match_score(fov_calculation.diagonal_fov_deg, size_arcmin)
+            except (TypeError, ValueError, ZeroDivisionError):
+                fov_calculation = None
+                fov_score = None
+
+        if fov_score is not None:
+            final_raw = (0.30 * focal_score) + (0.30 * fov_score) + (0.25 * aperture_sc) + (0.15 * speed_sc)
+        else:
+            final_raw = (0.50 * focal_score) + (0.35 * aperture_sc) + (0.15 * speed_sc)
+        final_score = int(round(max(1.0, min(5.0, final_raw))))
 
         recommendations.append(
             {
-                'telescope_id': str(scope.get('id') or ''),
-                'name': str(scope.get('name') or ''),
-                'manufacturer': str(scope.get('manufacturer') or ''),
+                'combination_id': str(combo.get('id') or ''),
+                'combination_name': str(combo.get('name') or ''),
+                'telescope_id': combo.get('telescope_id'),
+                'telescope_name': str(telescope.get('name')) if telescope else None,
+                'camera_id': combo.get('camera_id'),
+                'camera_name': str(camera.get('name')) if camera else None,
+                'is_camera_only': telescope is None,
                 'aperture_mm': round(aperture_mm, 1),
                 'effective_focal_length': round(focal_length, 1),
                 'effective_focal_ratio': round(f_ratio, 2),
                 'ideal_focal_min': int(ideal_f_min),
                 'ideal_focal_max': int(ideal_f_max),
+                'fov_diagonal_deg': round(fov_calculation.diagonal_fov_deg, 3) if fov_calculation else None,
+                'image_scale_arcsec_per_px': (
+                    round(fov_calculation.image_scale_arcsec_per_px, 3) if fov_calculation else None
+                ),
+                'sampling_classification': fov_calculation.sampling_classification if fov_calculation else None,
                 'target_magnitude': round(magnitude, 2) if magnitude is not None else None,
                 'target_size_arcmin': round(size_arcmin, 1) if size_arcmin is not None else None,
                 'rating_1_to_5': final_score,
-                'is_shared': bool(scope.get('is_shared', False)),
-                'owner_username': scope.get('owner_username'),
+                'is_shared': bool(combo.get('is_shared', False)),
+                'owner_username': combo.get('owner_username'),
             }
         )
 
@@ -1204,13 +1264,14 @@ def get_skytonight_alttime_api(target_id):
         return jsonify({'error': 'Internal server error'}), 500
 
 
-@skytonight_bp.route('/api/skytonight/telescope-recommendations', methods=['POST'])
+@skytonight_bp.route('/api/skytonight/combination-recommendations', methods=['POST'])
 @login_required
-def get_skytonight_telescope_recommendations_api():
-    """Return per-user telescope recommendations (1-5 rating) for one target.
+def get_skytonight_combination_recommendations_api():
+    """Return per-user equipment-combination recommendations (1-5 rating) for one target.
 
     This endpoint is user-specific and on-demand, independent from the
-    scheduler-based SkyTonight calculations.
+    scheduler-based SkyTonight calculations. Only enabled and valid combinations
+    (own or shared) are considered - see equipment_profiles.compute_combination_validity_status.
     """
     try:
         user = get_current_user()
@@ -1222,14 +1283,25 @@ def get_skytonight_telescope_recommendations_api():
         if not isinstance(target_payload, dict):
             return jsonify({'error': 'Invalid payload'}), 400
 
-        telescopes_blob = equipment_profiles.load_user_telescopes(user_id)
-        telescopes = list(telescopes_blob.get('items', []) if isinstance(telescopes_blob, dict) else [])
-        shared_telescopes = equipment_profiles.load_all_shared_equipment('telescopes', user_id)
-        telescopes = telescopes + shared_telescopes
-        if not telescopes:
+        combos_blob = equipment_profiles.load_user_combinations(user_id)
+        own_combinations = list(combos_blob.get('items', []) if isinstance(combos_blob, dict) else [])
+
+        active_combinations: list[Dict[str, Any]] = []
+        for combo in own_combinations:
+            if combo.get('is_disabled'):
+                continue
+            validity = equipment_profiles.compute_combination_validity_status(combo, user_id)
+            if validity['is_valid']:
+                active_combinations.append(combo)
+        for combo in equipment_profiles.load_all_shared_combinations(user_id):
+            if combo.get('is_disabled') or not combo.get('is_valid', True):
+                continue
+            active_combinations.append(combo)
+
+        if not active_combinations:
             return jsonify(
                 {
-                    'has_telescopes': False,
+                    'has_combinations': False,
                     'target': target_payload,
                     'recommendations': [],
                 }
@@ -1246,17 +1318,20 @@ def get_skytonight_telescope_recommendations_api():
             'size': target_payload.get('size'),
             'mag': mag_value,
         }
-        recommendations = _recommend_telescopes_for_target(normalized_target, telescopes)
+        telescopes_by_id, cameras_by_id = equipment_profiles.index_telescopes_and_cameras(user_id)
+        recommendations = _recommend_combinations_for_target(
+            normalized_target, active_combinations, telescopes_by_id, cameras_by_id
+        )
 
         return jsonify(
             {
-                'has_telescopes': bool(telescopes),
+                'has_combinations': bool(active_combinations),
                 'target': normalized_target,
                 'recommendations': recommendations,
             }
         )
     except Exception:
-        logger.exception('Error computing telescope recommendations')
+        logger.exception('Error computing combination recommendations')
         return jsonify({'error': 'Internal server error'}), 500
 
 

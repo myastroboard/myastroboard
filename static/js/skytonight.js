@@ -11,8 +11,8 @@ let _skytCurrentPages = {};       // sectionKey -> current page number
 let _skytMoreRowData = {};        // moreKey -> { type, moreFields, row } for lazy popup
 let _skytFilteredData = {};       // sectionKey -> filtered row array (null = no active filter)
 let _skytFilterState = {};        // sectionKey -> saved filter values for cross-page persistence
-let _skytHasTelescopesCache = null;
-let _skytHasTelescopesPromise = null;
+let _skytHasCombinationsCache = null;
+let _skytHasCombinationsPromise = null;
 const _skytListenerTimers = {};  // catalogue+type -> pending setTimeout id (cancelled on re-render)
 
 const _plotlyLoadState = { promise: null };
@@ -40,10 +40,15 @@ async function showPlanTelescopePickerModal(telescopeItems, row, activeLocationI
     let ratingsById = {};
     if (row) {
         try {
-            const recoResp = await _skytFetchTelescopeRecommendations(row);
+            // Recommendations are combination-based; several combinations can share the same
+            // telescope, so this picker (still telescope-keyed until it becomes a combination
+            // picker) shows the best rating among combinations using that telescope.
+            const recoResp = await _skytFetchCombinationRecommendations(row);
             if (recoResp && Array.isArray(recoResp.recommendations)) {
                 recoResp.recommendations.forEach(item => {
-                    if (item.telescope_id) ratingsById[item.telescope_id] = parseInt(item.rating_1_to_5, 10) || 1;
+                    if (!item.telescope_id) return;
+                    const rating = parseInt(item.rating_1_to_5, 10) || 1;
+                    ratingsById[item.telescope_id] = Math.max(ratingsById[item.telescope_id] || 0, rating);
                 });
             }
         } catch (_) { /* ratings optional */ }
@@ -249,29 +254,30 @@ function _translatedConstellation(value) {
     return i18n.has(key) ? i18n.t(key) : value;
 }
 
-async function _skytUserHasTelescopes() {
-    if (_skytHasTelescopesCache !== null) {
-        return _skytHasTelescopesCache;
+async function _skytUserHasCombinations() {
+    if (_skytHasCombinationsCache !== null) {
+        return _skytHasCombinationsCache;
     }
-    if (_skytHasTelescopesPromise) {
-        return _skytHasTelescopesPromise;
+    if (_skytHasCombinationsPromise) {
+        return _skytHasCombinationsPromise;
     }
 
-    _skytHasTelescopesPromise = (async () => {
+    _skytHasCombinationsPromise = (async () => {
         try {
-            const payload = await fetchJSON('/api/equipment/telescopes');
-            const hasTelescopes = Array.isArray(payload?.data) && payload.data.length > 0;
-            _skytHasTelescopesCache = hasTelescopes;
-            return hasTelescopes;
+            const payload = await fetchJSON('/api/equipment/combinations');
+            const hasCombinations = (Array.isArray(payload?.data) && payload.data.length > 0) ||
+                (Array.isArray(payload?.shared_from_others) && payload.shared_from_others.length > 0);
+            _skytHasCombinationsCache = hasCombinations;
+            return hasCombinations;
         } catch (_err) {
-            _skytHasTelescopesCache = false;
+            _skytHasCombinationsCache = false;
             return false;
         } finally {
-            _skytHasTelescopesPromise = null;
+            _skytHasCombinationsPromise = null;
         }
     })();
 
-    return _skytHasTelescopesPromise;
+    return _skytHasCombinationsPromise;
 }
 
 function _skytTargetPayloadFromRow(row) {
@@ -289,28 +295,36 @@ function _skytStarsFromRating(ratingValue) {
     return `${'★'.repeat(safeRating)}${'☆'.repeat(5 - safeRating)}`;
 }
 
-function _skytBuildTelescopeRecommendationNote(item) {
+function _skytBuildCombinationRecommendationNote(item) {
     const parts = [];
 
-    parts.push(i18n.t('skytonight.telescope_reco_note_focal', {
+    parts.push(i18n.t('skytonight.combination_reco_note_focal', {
         focal: item.effective_focal_length,
         ideal_min: item.ideal_focal_min,
         ideal_max: item.ideal_focal_max,
     }));
 
-    parts.push(i18n.t('skytonight.telescope_reco_note_aperture', {
+    parts.push(i18n.t('skytonight.combination_reco_note_aperture', {
         aperture: item.aperture_mm,
         f_ratio: item.effective_focal_ratio,
     }));
 
+    if (item.image_scale_arcsec_per_px !== null && item.image_scale_arcsec_per_px !== undefined) {
+        parts.push(i18n.t('skytonight.combination_reco_note_sampling', {
+            scale: item.image_scale_arcsec_per_px,
+            unit: i18n.t('units.arcsec_per_pixel'),
+            classification: item.sampling_classification,
+        }));
+    }
+
     if (item.target_magnitude !== null && item.target_magnitude !== undefined) {
-        parts.push(i18n.t('skytonight.telescope_reco_note_target_mag', {
+        parts.push(i18n.t('skytonight.combination_reco_note_target_mag', {
             mag: item.target_magnitude,
         }));
     }
 
     if (item.target_size_arcmin !== null && item.target_size_arcmin !== undefined) {
-        parts.push(i18n.t('skytonight.telescope_reco_note_target_size', {
+        parts.push(i18n.t('skytonight.combination_reco_note_target_size', {
             size: item.target_size_arcmin,
         }));
     }
@@ -318,22 +332,22 @@ function _skytBuildTelescopeRecommendationNote(item) {
     return parts.join(' ');
 }
 
-async function _skytFetchTelescopeRecommendations(row) {
+async function _skytFetchCombinationRecommendations(row) {
     const payload = _skytTargetPayloadFromRow(row);
     try {
-        return await fetchJSON('/api/skytonight/telescope-recommendations', {
+        return await fetchJSON('/api/skytonight/combination-recommendations', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
     } catch (error) {
-        console.error('Error loading telescope recommendations:', error);
+        console.error('Error loading combination recommendations:', error);
         return null;
     }
 }
 
-function _skytBuildTelescopeRecommendationsHtml(response, row) {
-    if (!response || !response.has_telescopes) {
+function _skytBuildCombinationRecommendationsHtml(response, row) {
+    if (!response || !response.has_combinations) {
         return null;
     }
 
@@ -345,7 +359,7 @@ function _skytBuildTelescopeRecommendationsHtml(response, row) {
 
     const h6 = document.createElement('h6');
     h6.className = 'mb-2';
-    h6.textContent = tSkyTonightCompat('telescope_reco_title');
+    h6.textContent = tSkyTonightCompat('combination_reco_title');
     wrapper.appendChild(h6);
 
     const titleDiv = document.createElement('div');
@@ -356,7 +370,7 @@ function _skytBuildTelescopeRecommendationsHtml(response, row) {
     if (recommendations.length === 0) {
         const p = document.createElement('p');
         p.className = 'text-muted mb-0';
-        p.textContent = tSkyTonightCompat('telescope_reco_no_result');
+        p.textContent = tSkyTonightCompat('combination_reco_no_result');
         wrapper.appendChild(p);
         return wrapper;
     }
@@ -368,9 +382,9 @@ function _skytBuildTelescopeRecommendationsHtml(response, row) {
     const thead = document.createElement('thead');
     const trh = document.createElement('tr');
     [
-        { text: tSkyTonightCompat('telescope_reco_table_telescope'), cls: '' },
-        { text: tSkyTonightCompat('telescope_reco_table_rating'), cls: 'text-center' },
-        { text: tSkyTonightCompat('telescope_reco_table_note'), cls: '' }
+        { text: tSkyTonightCompat('combination_reco_table_combination'), cls: '' },
+        { text: tSkyTonightCompat('combination_reco_table_rating'), cls: 'text-center' },
+        { text: tSkyTonightCompat('combination_reco_table_note'), cls: '' }
     ].forEach(({ text, cls }) => {
         const th = document.createElement('th');
         if (cls) th.className = cls;
@@ -389,18 +403,35 @@ function _skytBuildTelescopeRecommendationsHtml(response, row) {
     });
 
     sorted.forEach((item) => {
-        const scopeName = `${item.name || ''}${item.manufacturer ? ` (${item.manufacturer})` : ''}`.trim();
         const rating = parseInt(item.rating_1_to_5, 10) || 1;
-        const noteText = _skytBuildTelescopeRecommendationNote(item);
+        const noteText = _skytBuildCombinationRecommendationNote(item);
         const tr = document.createElement('tr');
 
         const tdName = document.createElement('td');
-        tdName.appendChild(document.createTextNode(scopeName));
+        const nameLine = document.createElement('div');
+        nameLine.textContent = item.combination_name || '';
+        tdName.appendChild(nameLine);
+
+        const compositionParts = [];
+        if (item.telescope_name) compositionParts.push(item.telescope_name);
+        if (item.camera_name) {
+            compositionParts.push(
+                item.is_camera_only
+                    ? `${item.camera_name} ${tSkyTonightCompat('combination_reco_lens_suffix')}`
+                    : item.camera_name
+            );
+        }
+        if (compositionParts.length > 0) {
+            const compLine = document.createElement('div');
+            compLine.className = 'small text-muted';
+            compLine.textContent = compositionParts.join(' + ');
+            tdName.appendChild(compLine);
+        }
         if (item.owner_username) {
             const _sb = document.createElement('span');
             _sb.className = 'badge bg-info text-dark';
             _sb.style.fontSize = '0.7em';
-            _sb.textContent = tSkyTonightCompat('telescope_reco_shared_by').replace('{username}', item.owner_username);
+            _sb.textContent = tSkyTonightCompat('combination_reco_shared_by').replace('{username}', item.owner_username);
             tdName.append(' ');
             tdName.appendChild(_sb);
         }
@@ -2879,8 +2910,8 @@ async function showMorePopupFromRowData(moreData) {
     }
     bs_modal.show();
 
-    const hasTelescopes = await _skytUserHasTelescopes();
-    if (!hasTelescopes) {
+    const hasCombinations = await _skytUserHasCombinations();
+    if (!hasCombinations) {
         return;
     }
 
@@ -2892,17 +2923,17 @@ async function showMorePopupFromRowData(moreData) {
     recoContainer.appendChild(_loadDiv);
     contentEl.appendChild(recoContainer);
 
-    const response = await _skytFetchTelescopeRecommendations(row);
+    const response = await _skytFetchCombinationRecommendations(row);
     if (!response) {
         DOMUtils.clear(recoContainer);
         const _errDiv = document.createElement('div');
         _errDiv.className = 'text-danger small';
-        _errDiv.textContent = tSkyTonightCompat('telescope_reco_load_error');
+        _errDiv.textContent = tSkyTonightCompat('combination_reco_load_error');
         recoContainer.appendChild(_errDiv);
         return;
     }
 
-    const _recoEl = _skytBuildTelescopeRecommendationsHtml(response, row);
+    const _recoEl = _skytBuildCombinationRecommendationsHtml(response, row);
     if (_recoEl) {
         recoContainer.replaceWith(_recoEl);
     } else {
