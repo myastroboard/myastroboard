@@ -90,6 +90,29 @@ Generic category for any optical or mechanical accessory not covered above: fiel
 
 ---
 
+## Disabling equipment
+
+Every gear type (Telescope, Camera, Mount, Filter, Accessory) and every Combination has an `is_disabled`
+flag, set from its own edit form.
+
+- **Deletion is blocked while an item is still referenced by a combination** (your own, or another user's
+  if the item is shared) — the delete request returns the combination name(s) so you know what to unlink
+  first. Disabling is the alternative when you don't want to fully delete something that's still tied to
+  a combination.
+- Disabled items are excluded from every combination editor's dropdowns/checkboxes, **unless** they are
+  already selected on the combination currently being edited — an existing combination never silently
+  loses a component from the editor UI just because that component got disabled later.
+- Disabled items are hidden from their list tab by default. A **"Show hidden (N)"** toggle at the top of
+  each tab (Telescopes, Cameras, Mounts, Filters, Accessories, Combinations) reveals them, tagged with a
+  "Hidden" badge.
+- A combination that references a disabled (or no longer resolvable) piece of equipment is automatically
+  flagged **invalid** — a computed status, independent of the combination's own `is_disabled` toggle — and
+  shown with a warning badge in the Equipment tab. Invalid/disabled combinations are not hidden or blocked
+  from further use here; other features (SkyTonight, Plan My Night, Astrodex) are expected to start
+  filtering on this status as each becomes combination-aware.
+
+---
+
 ## Presets
 
 **File**: `static/data/equipment_presets.json` (static asset, no backend involvement — fetched directly by the frontend)
@@ -123,6 +146,15 @@ A **combination** is a named configuration that groups a telescope, camera, moun
 - **SkyTonight** ("Best telescope for this target" uses all your combinations)
 - **Astrodex** picture metadata (which setup was used for an image session)
 - **Plan My Night** telescope selector
+
+At least one of **telescope** or **camera** is required; both are single-value fields (max one telescope,
+max one imaging camera per combination). Two additional fields cover setups the base telescope+camera model
+doesn't:
+
+| Field | Description |
+|-------|-------------|
+| `guide_camera_id` | Optional second camera used purely for guiding (OAG or guide scope). Informational only — never factored into FOV or scoring math, since a guide camera never determines framing. |
+| `lens_focal_length_mm` / `lens_focal_ratio` | Optional focal length/ratio of a lens mounted directly on the camera, used **only** when no telescope is selected (e.g. a DSLR/mirrorless camera + lens on a star tracker for wide-field imaging). Lets a camera-only combination still be scored like a telescope+camera one. |
 
 A combination is flagged **Shared** only when **every component** in it is individually shared. If one component is later made private, the combination shows a ⚠ warning.
 

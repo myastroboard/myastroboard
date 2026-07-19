@@ -273,6 +273,71 @@ function findEquipmentById(type, id) {
 // Render Equipment Tabs
 // ============================================
 
+// Per-tab "Show hidden" state - disabled items are excluded from each list by default.
+const equipmentShowHidden = {
+    telescopes: false,
+    cameras: false,
+    mounts: false,
+    filters: false,
+    accessories: false,
+    combinations: false,
+};
+
+/** Build a "Show hidden (N)" / "Hide hidden items" toggle for a list tab.
+ * Returns null (nothing to render) when there is nothing hidden and the toggle isn't
+ * already active - a tab with no disabled items never shows the control. */
+function _buildShowHiddenToggle(kind, hiddenCount, rerenderFn) {
+    if (hiddenCount === 0 && !equipmentShowHidden[kind]) return null;
+    const wrap = document.createElement('div');
+    wrap.className = 'mb-2';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-link btn-sm p-0';
+    btn.textContent = equipmentShowHidden[kind]
+        ? i18n.t('equipment.hide_hidden_items')
+        : i18n.t('equipment.show_hidden_items', { count: hiddenCount });
+    btn.addEventListener('click', () => {
+        equipmentShowHidden[kind] = !equipmentShowHidden[kind];
+        rerenderFn();
+    });
+    wrap.appendChild(btn);
+    return wrap;
+}
+
+/** Render one equipment list tab, applying the "Show hidden" filter and toggle.
+ * `rerenderFn` must be the tab's own render function (e.g. renderTelescopesTab), passed by
+ * the caller so the toggle can re-render just this tab after flipping the state. */
+function _renderEquipmentListTab(containerId, kind, ownItems, sharedItems, emptyMessageKey, renderCard, rerenderFn) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    DOMUtils.clear(container);
+
+    if (ownItems.length === 0 && sharedItems.length === 0) {
+        container.appendChild(createEmptyStateCard(i18n.t(emptyMessageKey)));
+        return;
+    }
+
+    const hiddenCount = [...ownItems, ...sharedItems].filter(item => item.is_disabled).length;
+    const toggle = _buildShowHiddenToggle(kind, hiddenCount, rerenderFn);
+    if (toggle) container.appendChild(toggle);
+
+    const showHidden = equipmentShowHidden[kind];
+    const visibleOwn = showHidden ? ownItems : ownItems.filter(item => !item.is_disabled);
+    const visibleShared = showHidden ? sharedItems : sharedItems.filter(item => !item.is_disabled);
+
+    renderEquipmentSection(container, visibleOwn, false, renderCard);
+    renderEquipmentSection(container, visibleShared, true, renderCard);
+}
+
+/** Append a muted "Hidden" badge to a card's title row when the item is disabled. */
+function appendHiddenBadge(titleRow, item) {
+    if (!item.is_disabled) return;
+    const badge = document.createElement('span');
+    badge.className = 'badge bg-secondary';
+    badge.textContent = i18n.t('equipment.hidden_badge');
+    titleRow.appendChild(badge);
+}
+
 function renderAllEquipmentTabs() {
     renderCombinationsTab();
     renderFOVCalculatorTab();
@@ -370,6 +435,7 @@ function createReadOnlyFooter(ownerUsername) {
 function renderCombinationCard(combo, isReadOnly) {
     const telescope = combo.telescope_id ? findEquipmentById('telescopes', combo.telescope_id) : null;
     const camera = combo.camera_id ? findEquipmentById('cameras', combo.camera_id) : null;
+    const guideCamera = combo.guide_camera_id ? findEquipmentById('cameras', combo.guide_camera_id) : null;
     const mount = combo.mount_id ? findEquipmentById('mounts', combo.mount_id) : null;
 
     const telescopeWeight = telescope?.weight_kg || 0;
@@ -422,12 +488,27 @@ function renderCombinationCard(combo, isReadOnly) {
         brokenBadge.textContent = '⚠ ' + i18n.t('equipment.combination_broken_share');
         titleRow.appendChild(brokenBadge);
     }
+    if (combo.is_valid === false) {
+        const invalidBadge = document.createElement('span');
+        invalidBadge.className = 'badge bg-danger';
+        invalidBadge.title = i18n.t('equipment.combination_invalid_hint');
+        invalidBadge.textContent = '⚠ ' + i18n.t('equipment.combination_invalid');
+        titleRow.appendChild(invalidBadge);
+    }
+    appendHiddenBadge(titleRow, combo);
     body.appendChild(titleRow);
 
     const p = document.createElement('p');
     p.className = 'card-text';
     if (telescope) appendInfoLine(p, i18n.t('equipment.telescope'), `${telescope.name}${telescopeWeight > 0 ? ` (${telescopeWeight}${i18n.t('units.kg')})` : ''}`);
     if (camera) appendInfoLine(p, i18n.t('equipment.camera'), `${camera.name}${cameraWeight > 0 ? ` (${cameraWeight}${i18n.t('units.kg')})` : ''}`);
+    if (!telescope && (combo.lens_focal_length_mm || combo.lens_focal_ratio)) {
+        const lensParts = [];
+        if (combo.lens_focal_length_mm) lensParts.push(`${combo.lens_focal_length_mm}${i18n.t('units.mm')}`);
+        if (combo.lens_focal_ratio) lensParts.push(`f/${combo.lens_focal_ratio}`);
+        appendInfoLine(p, i18n.t('equipment.form_lens_focal_length'), lensParts.join(' '));
+    }
+    if (guideCamera) appendInfoLine(p, i18n.t('equipment.form_guide_camera'), guideCamera.name);
     if (mount) appendInfoLine(p, i18n.t('equipment.mount'), mount.name);
     if (combo.filter_ids && combo.filter_ids.length > 0) {
         const allFilters = [...(equipmentData.filters || []), ...(equipmentData.sharedFilters || [])];
@@ -461,13 +542,24 @@ function renderCombinationsTab() {
 
     DOMUtils.clear(container);
 
-    const hasOwn = equipmentData.combinations.length > 0;
-    const hasShared = equipmentData.sharedCombinations.length > 0;
+    const allOwn = equipmentData.combinations;
+    const allShared = equipmentData.sharedCombinations;
 
-    if (!hasOwn && !hasShared) {
+    if (allOwn.length === 0 && allShared.length === 0) {
         container.appendChild(createEmptyStateCard(i18n.t('equipment.no_equipment_yet')));
         return;
     }
+
+    const hiddenCount = [...allOwn, ...allShared].filter(combo => combo.is_disabled).length;
+    const toggle = _buildShowHiddenToggle('combinations', hiddenCount, renderCombinationsTab);
+    if (toggle) container.appendChild(toggle);
+
+    const showHidden = equipmentShowHidden.combinations;
+    const ownCombos = showHidden ? allOwn : allOwn.filter(combo => !combo.is_disabled);
+    const sharedCombos = showHidden ? allShared : allShared.filter(combo => !combo.is_disabled);
+
+    const hasOwn = ownCombos.length > 0;
+    const hasShared = sharedCombos.length > 0;
 
     if (hasOwn) {
         if (hasShared) {
@@ -478,7 +570,7 @@ function renderCombinationsTab() {
         }
         const row = document.createElement('div');
         row.className = 'row row-cols-1 row-cols-md-2 row-cols-lg-3';
-        equipmentData.combinations.forEach(combo => row.appendChild(renderCombinationCard(combo, false)));
+        ownCombos.forEach(combo => row.appendChild(renderCombinationCard(combo, false)));
         container.appendChild(row);
     }
 
@@ -489,7 +581,7 @@ function renderCombinationsTab() {
         container.appendChild(hdr);
         const row = document.createElement('div');
         row.className = 'row row-cols-1 row-cols-md-2 row-cols-lg-3';
-        equipmentData.sharedCombinations.forEach(combo => row.appendChild(renderCombinationCard(combo, true)));
+        sharedCombos.forEach(combo => row.appendChild(renderCombinationCard(combo, true)));
         container.appendChild(row);
     }
 }
@@ -736,6 +828,7 @@ function renderTelescopeCard(scope, isReadOnly) {
         titleRow.appendChild(b);
     }
     if (isReadOnly) titleRow.appendChild(createSharedBadge(scope.owner_username));
+    appendHiddenBadge(titleRow, scope);
     body.appendChild(titleRow);
 
     if (scope.manufacturer) {
@@ -763,15 +856,12 @@ function renderTelescopeCard(scope, isReadOnly) {
 }
 
 function renderTelescopesTab() {
-    const container = document.getElementById('equipment-telescopes-display');
-    if (!container) return;
-    DOMUtils.clear(container);
-    if (equipmentData.telescopes.length === 0 && equipmentData.sharedTelescopes.length === 0) {
-        container.appendChild(createEmptyStateCard(i18n.t('equipment.no_telescopes_created_yet')));
-        return;
-    }
-    renderEquipmentSection(container, equipmentData.telescopes, false, renderTelescopeCard);
-    renderEquipmentSection(container, equipmentData.sharedTelescopes, true, renderTelescopeCard);
+    _renderEquipmentListTab(
+        'equipment-telescopes-display', 'telescopes',
+        equipmentData.telescopes, equipmentData.sharedTelescopes,
+        'equipment.no_telescopes_created_yet', renderTelescopeCard,
+        renderTelescopesTab
+    );
 }
 
 // --- Cameras Tab (Position 4) ---
@@ -797,6 +887,7 @@ function renderCameraCard(cam, isReadOnly) {
         titleRow.appendChild(b);
     }
     if (isReadOnly) titleRow.appendChild(createSharedBadge(cam.owner_username));
+    appendHiddenBadge(titleRow, cam);
     body.appendChild(titleRow);
 
     if (cam.manufacturer) {
@@ -824,15 +915,12 @@ function renderCameraCard(cam, isReadOnly) {
 }
 
 function renderCamerasTab() {
-    const container = document.getElementById('equipment-cameras-display');
-    if (!container) return;
-    DOMUtils.clear(container);
-    if (equipmentData.cameras.length === 0 && equipmentData.sharedCameras.length === 0) {
-        container.appendChild(createEmptyStateCard(i18n.t('equipment.no_cameras_created_yet')));
-        return;
-    }
-    renderEquipmentSection(container, equipmentData.cameras, false, renderCameraCard);
-    renderEquipmentSection(container, equipmentData.sharedCameras, true, renderCameraCard);
+    _renderEquipmentListTab(
+        'equipment-cameras-display', 'cameras',
+        equipmentData.cameras, equipmentData.sharedCameras,
+        'equipment.no_cameras_created_yet', renderCameraCard,
+        renderCamerasTab
+    );
 }
 
 // --- Mounts Tab (Position 5) ---
@@ -858,6 +946,7 @@ function renderMountCard(mount, isReadOnly) {
         titleRow.appendChild(b);
     }
     if (isReadOnly) titleRow.appendChild(createSharedBadge(mount.owner_username));
+    appendHiddenBadge(titleRow, mount);
     body.appendChild(titleRow);
 
     if (mount.manufacturer) {
@@ -883,15 +972,12 @@ function renderMountCard(mount, isReadOnly) {
 }
 
 function renderMountsTab() {
-    const container = document.getElementById('equipment-mounts-display');
-    if (!container) return;
-    DOMUtils.clear(container);
-    if (equipmentData.mounts.length === 0 && equipmentData.sharedMounts.length === 0) {
-        container.appendChild(createEmptyStateCard(i18n.t('equipment.no_mounts_created_yet')));
-        return;
-    }
-    renderEquipmentSection(container, equipmentData.mounts, false, renderMountCard);
-    renderEquipmentSection(container, equipmentData.sharedMounts, true, renderMountCard);
+    _renderEquipmentListTab(
+        'equipment-mounts-display', 'mounts',
+        equipmentData.mounts, equipmentData.sharedMounts,
+        'equipment.no_mounts_created_yet', renderMountCard,
+        renderMountsTab
+    );
 }
 
 // --- Filters Tab (Position 6) ---
@@ -917,6 +1003,7 @@ function renderFilterCard(filter, isReadOnly) {
         titleRow.appendChild(b);
     }
     if (isReadOnly) titleRow.appendChild(createSharedBadge(filter.owner_username));
+    appendHiddenBadge(titleRow, filter);
     body.appendChild(titleRow);
 
     if (filter.manufacturer) {
@@ -943,15 +1030,12 @@ function renderFilterCard(filter, isReadOnly) {
 }
 
 function renderFiltersTab() {
-    const container = document.getElementById('equipment-filters-display');
-    if (!container) return;
-    DOMUtils.clear(container);
-    if (equipmentData.filters.length === 0 && equipmentData.sharedFilters.length === 0) {
-        container.appendChild(createEmptyStateCard(i18n.t('equipment.no_filters_created_yet')));
-        return;
-    }
-    renderEquipmentSection(container, equipmentData.filters, false, renderFilterCard);
-    renderEquipmentSection(container, equipmentData.sharedFilters, true, renderFilterCard);
+    _renderEquipmentListTab(
+        'equipment-filters-display', 'filters',
+        equipmentData.filters, equipmentData.sharedFilters,
+        'equipment.no_filters_created_yet', renderFilterCard,
+        renderFiltersTab
+    );
 }
 
 // --- Accessories Tab (Position 7) ---
@@ -977,6 +1061,7 @@ function renderAccessoryCard(accessory, isReadOnly) {
         titleRow.appendChild(b);
     }
     if (isReadOnly) titleRow.appendChild(createSharedBadge(accessory.owner_username));
+    appendHiddenBadge(titleRow, accessory);
     body.appendChild(titleRow);
 
     if (accessory.manufacturer) {
@@ -1001,15 +1086,12 @@ function renderAccessoryCard(accessory, isReadOnly) {
 }
 
 function renderAccessoriesTab() {
-    const container = document.getElementById('equipment-accessories-display');
-    if (!container) return;
-    DOMUtils.clear(container);
-    if (equipmentData.accessories.length === 0 && equipmentData.sharedAccessories.length === 0) {
-        container.appendChild(createEmptyStateCard(i18n.t('equipment.no_accessories_created_yet')));
-        return;
-    }
-    renderEquipmentSection(container, equipmentData.accessories, false, renderAccessoryCard);
-    renderEquipmentSection(container, equipmentData.sharedAccessories, true, renderAccessoryCard);
+    _renderEquipmentListTab(
+        'equipment-accessories-display', 'accessories',
+        equipmentData.accessories, equipmentData.sharedAccessories,
+        'equipment.no_accessories_created_yet', renderAccessoryCard,
+        renderAccessoriesTab
+    );
 }
 
 // ============================================
@@ -1076,6 +1158,10 @@ async function showTelescopeModal(id = null) {
                     <input class="form-check-input" type="checkbox" id="telescope-is-shared" name="is_shared" value="true" ${telescope?.is_shared ? 'checked' : ''}>
                     <label class="form-check-label" for="telescope-is-shared">${i18n.t('equipment.is_shared')}</label>
                 </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="telescope-is-disabled" name="is_disabled" value="true" ${telescope?.is_disabled ? 'checked' : ''}>
+                    <label class="form-check-label" for="telescope-is-disabled">${i18n.t('equipment.is_disabled')}</label>
+                </div>
             </div>
             <div class="text-end mt-3">
                 <button type="submit" class="btn btn-primary">${i18n.t('equipment.form_save')}</button>
@@ -1108,6 +1194,7 @@ async function saveTelescope(id) {
     const formData = new FormData(form);
     const data = Object.fromEntries(formData);
     data.is_shared = form.querySelector('#telescope-is-shared')?.checked ?? false;
+    data.is_disabled = form.querySelector('#telescope-is-disabled')?.checked ?? false;
 
     try {
         const url = id ? `/api/equipment/telescopes/${id}` : '/api/equipment/telescopes';
@@ -1207,6 +1294,10 @@ async function showCameraModal(id = null) {
                     <input class="form-check-input" type="checkbox" id="camera-is-shared" name="is_shared" value="true" ${camera?.is_shared ? 'checked' : ''}>
                     <label class="form-check-label" for="camera-is-shared">${i18n.t('equipment.is_shared')}</label>
                 </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="camera-is-disabled" name="is_disabled" value="true" ${camera?.is_disabled ? 'checked' : ''}>
+                    <label class="form-check-label" for="camera-is-disabled">${i18n.t('equipment.is_disabled')}</label>
+                </div>
             </div>
             <div class="text-end mt-3">
                 <button type="submit" class="btn btn-primary">${i18n.t('equipment.form_save')}</button>
@@ -1240,6 +1331,7 @@ async function saveCamera(id) {
     const data = Object.fromEntries(formData);
     data.cooling_supported = data.cooling_supported === 'true';
     data.is_shared = form.querySelector('#camera-is-shared')?.checked ?? false;
+    data.is_disabled = form.querySelector('#camera-is-disabled')?.checked ?? false;
     
     try {
         const url = id ? `/api/equipment/cameras/${id}` : '/api/equipment/cameras';
@@ -1319,6 +1411,10 @@ async function showMountModal(id = null) {
                     <input class="form-check-input" type="checkbox" id="mount-is-shared" name="is_shared" value="true" ${mount?.is_shared ? 'checked' : ''}>
                     <label class="form-check-label" for="mount-is-shared">${i18n.t('equipment.is_shared')}</label>
                 </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="mount-is-disabled" name="is_disabled" value="true" ${mount?.is_disabled ? 'checked' : ''}>
+                    <label class="form-check-label" for="mount-is-disabled">${i18n.t('equipment.is_disabled')}</label>
+                </div>
             </div>
             <div class="text-end mt-3">
                 <button type="submit" class="btn btn-primary">${i18n.t('equipment.form_save')}</button>
@@ -1352,6 +1448,7 @@ async function saveMount(id) {
     const data = Object.fromEntries(formData);
     data.guiding_supported = data.guiding_supported === 'true';
     data.is_shared = form.querySelector('#mount-is-shared')?.checked ?? false;
+    data.is_disabled = form.querySelector('#mount-is-disabled')?.checked ?? false;
     
     try {
         const url = id ? `/api/equipment/mounts/${id}` : '/api/equipment/mounts';
@@ -1435,6 +1532,10 @@ async function showFilterModal(id = null) {
                     <input class="form-check-input" type="checkbox" id="filter-is-shared" name="is_shared" value="true" ${filter?.is_shared ? 'checked' : ''}>
                     <label class="form-check-label" for="filter-is-shared">${i18n.t('equipment.is_shared')}</label>
                 </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="filter-is-disabled" name="is_disabled" value="true" ${filter?.is_disabled ? 'checked' : ''}>
+                    <label class="form-check-label" for="filter-is-disabled">${i18n.t('equipment.is_disabled')}</label>
+                </div>
             </div>
             <div class="text-end mt-3">
                 <button type="submit" class="btn btn-primary">${i18n.t('equipment.form_save')}</button>
@@ -1467,6 +1568,7 @@ async function saveFilter(id) {
     const formData = new FormData(form);
     const data = Object.fromEntries(formData);
     data.is_shared = form.querySelector('#filter-is-shared')?.checked ?? false;
+    data.is_disabled = form.querySelector('#filter-is-disabled')?.checked ?? false;
     
     try {
         const url = id ? `/api/equipment/filters/${id}` : '/api/equipment/filters';
@@ -1531,6 +1633,10 @@ async function showAccessoryModal(id = null) {
                     <input class="form-check-input" type="checkbox" id="accessory-is-shared" name="is_shared" value="true" ${accessory?.is_shared ? 'checked' : ''}>
                     <label class="form-check-label" for="accessory-is-shared">${i18n.t('equipment.is_shared')}</label>
                 </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="accessory-is-disabled" name="is_disabled" value="true" ${accessory?.is_disabled ? 'checked' : ''}>
+                    <label class="form-check-label" for="accessory-is-disabled">${i18n.t('equipment.is_disabled')}</label>
+                </div>
             </div>
             <div class="text-end mt-3">
                 <button type="submit" class="btn btn-primary">${i18n.t('equipment.form_save')}</button>
@@ -1563,6 +1669,7 @@ async function saveAccessory(id) {
     const formData = new FormData(form);
     const data = Object.fromEntries(formData);
     data.is_shared = form.querySelector('#accessory-is-shared')?.checked ?? false;
+    data.is_disabled = form.querySelector('#accessory-is-disabled')?.checked ?? false;
 
     try {
         const url = id ? `/api/equipment/accessories/${id}` : '/api/equipment/accessories';
@@ -1595,21 +1702,32 @@ async function saveAccessory(id) {
 async function showCombinationModal(id = null) {
     const combination = id ? equipmentData.combinations.find(c => c.id === id) : null;
     const title = combination ? i18n.t('equipment.edit_combination') : i18n.t('equipment.new_combination');
-    
-    const telescopes = [...equipmentData.telescopes, ...equipmentData.sharedTelescopes];
-    const cameras = [...equipmentData.cameras, ...equipmentData.sharedCameras];
-    const mounts = [...equipmentData.mounts, ...equipmentData.sharedMounts];
-    const filters = [...equipmentData.filters, ...equipmentData.sharedFilters];
-    const accessories = [...equipmentData.accessories, ...equipmentData.sharedAccessories];
-    
+
+    // Disabled equipment is excluded from these pickers unless it's already selected on the
+    // combination being edited - it must stay visible there so an existing combination never
+    // silently drops a component from the editor UI.
+    const telescopes = [...equipmentData.telescopes, ...equipmentData.sharedTelescopes]
+        .filter(t => !t.is_disabled || t.id === combination?.telescope_id);
+    const cameras = [...equipmentData.cameras, ...equipmentData.sharedCameras]
+        .filter(c => !c.is_disabled || c.id === combination?.camera_id || c.id === combination?.guide_camera_id);
+    const mounts = [...equipmentData.mounts, ...equipmentData.sharedMounts]
+        .filter(m => !m.is_disabled || m.id === combination?.mount_id);
+    const filters = [...equipmentData.filters, ...equipmentData.sharedFilters]
+        .filter(f => !f.is_disabled || (combination?.filter_ids || []).includes(f.id));
+    const accessories = [...equipmentData.accessories, ...equipmentData.sharedAccessories]
+        .filter(a => !a.is_disabled || (combination?.accessory_ids || []).includes(a.id));
+
     const sharedSuffix = (item) => {
+        let suffix = '';
         if (item.owner_username) {
-            return ` ${i18n.t('equipment.shared_fov_suffix', { username: item.owner_username })}`;
+            suffix += ` ${i18n.t('equipment.shared_fov_suffix', { username: item.owner_username })}`;
+        } else if (item.is_shared) {
+            suffix += ` (${i18n.t('equipment.shared_badge').toLowerCase()})`;
         }
-        if (item.is_shared) {
-            return ` (${i18n.t('equipment.shared_badge').toLowerCase()})`;
+        if (item.is_disabled) {
+            suffix += ` (${i18n.t('equipment.hidden_badge').toLowerCase()})`;
         }
-        return '';
+        return suffix;
     };
 
     const modalContent = `
@@ -1630,6 +1748,24 @@ async function showCombinationModal(id = null) {
                 <select class="form-select" id="combination-camera" name="camera_id">
                     <option value="">${i18n.t('equipment.none')}</option>
                     ${cameras.map(c => `<option value="${c.id}" ${combination?.camera_id === c.id ? 'selected' : ''}>${escapeHtml(c.name)}${escapeHtml(sharedSuffix(c))}</option>`).join('')}
+                </select>
+            </div>
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label for="combination-lens-focal-length" class="form-label">${i18n.t('equipment.form_lens_focal_length')}</label>
+                    <input type="number" class="form-control" id="combination-lens-focal-length" name="lens_focal_length_mm" value="${combination?.lens_focal_length_mm ?? ''}" min="1" max="2000" step="0.1" inputmode="decimal">
+                </div>
+                <div class="col-md-6">
+                    <label for="combination-lens-focal-ratio" class="form-label">${i18n.t('equipment.form_lens_focal_ratio')}</label>
+                    <input type="number" class="form-control" id="combination-lens-focal-ratio" name="lens_focal_ratio" value="${combination?.lens_focal_ratio ?? ''}" min="0.5" max="32" step="0.1" inputmode="decimal">
+                </div>
+                <small class="form-text text-muted">${i18n.t('equipment.form_lens_focal_help')}</small>
+            </div>
+            <div class="mb-3">
+                <label for="combination-guide-camera" class="form-label">${i18n.t('equipment.form_guide_camera')}</label>
+                <select class="form-select" id="combination-guide-camera" name="guide_camera_id">
+                    <option value="">${i18n.t('equipment.none')}</option>
+                    ${cameras.map(c => `<option value="${c.id}" ${combination?.guide_camera_id === c.id ? 'selected' : ''}>${escapeHtml(c.name)}${escapeHtml(sharedSuffix(c))}</option>`).join('')}
                 </select>
             </div>
             <div class="mb-3">
@@ -1669,6 +1805,12 @@ async function showCombinationModal(id = null) {
                 <label for="combination-notes" class="form-label">${i18n.t('equipment.form_notes')}</label>
                 <textarea class="form-control" id="combination-notes" name="notes" rows="2">${escapeHtml(combination?.notes || '')}</textarea>
             </div>
+            <div class="mb-3">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="combination-is-disabled" name="is_disabled" value="true" ${combination?.is_disabled ? 'checked' : ''}>
+                    <label class="form-check-label" for="combination-is-disabled">${i18n.t('equipment.is_disabled')}</label>
+                </div>
+            </div>
             <div class="text-end mt-3">
                 <button type="submit" class="btn btn-primary">${i18n.t('equipment.form_save')}</button>
             </div>
@@ -1697,15 +1839,16 @@ async function saveCombination(id) {
     const form = document.getElementById('combinationForm');
     const formData = new FormData(form);
     const data = Object.fromEntries(formData);
-    
+    data.is_disabled = form.querySelector('#combination-is-disabled')?.checked ?? false;
+
     // Collect filter checkboxes
     const filterCheckboxes = form.querySelectorAll('.filter-checkbox:checked');
     data.filter_ids = Array.from(filterCheckboxes).map(cb => cb.value);
-    
+
     // Collect accessory checkboxes
     const accessoryCheckboxes = form.querySelectorAll('.accessory-checkbox:checked');
     data.accessory_ids = Array.from(accessoryCheckboxes).map(cb => cb.value);
-    
+
     try {
         const url = id ? `/api/equipment/combinations/${id}` : '/api/equipment/combinations';
         const method = id ? 'PUT' : 'POST';
@@ -1740,7 +1883,7 @@ async function saveCombination(id) {
 
 async function deleteEquipment(type, id) {
     if (!confirm(i18n.t('equipment.confirm_delete_item'))) return;
-    
+
     try {
         const typeMap = {
             'telescopes': 'telescopes',
@@ -1750,9 +1893,23 @@ async function deleteEquipment(type, id) {
             'accessories': 'accessories',
             'combinations': 'combinations'
         };
-        
-        await fetchJSON(`/api/equipment/${typeMap[type]}/${id}`, { method: 'DELETE' });
-        
+
+        // Raw fetch (not fetchJSON) so a blocked-delete 409's body is readable - fetchJSON
+        // throws before parsing the response on any non-2xx status.
+        const response = await fetch(`${API_BASE}/api/equipment/${typeMap[type]}/${id}`, { method: 'DELETE' });
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            if (response.status === 409 && result.error === 'in_use_by_combination') {
+                showMessage('error', i18n.t('equipment.delete_blocked_by_combination', {
+                    combinations: (result.combinations || []).join(', ')
+                }));
+            } else {
+                showMessage('error', i18n.t('equipment.failed_to_delete_item'));
+            }
+            return;
+        }
+
         await loadEquipmentType(type);
         
         // Reload combinations if deleting equipment that affects payload or names

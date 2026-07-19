@@ -1638,7 +1638,18 @@
     "exposure_calc_help_read_noise": "Électrons de bruit ajoutés à chaque lecture. Moins c'est mieux. Typiquement 1–6 e⁻ pour les CMOS modernes.",
     "exposure_calc_help_qe": "Part des photons convertis en électrons. 60–75 % est typique pour les CMOS modernes.",
     "exposure_calc_help_hours": "Durée totale de la session prévue. Le calculateur la divise en poses unitaires recommandées.",
-    "exposure_calc_help_bortle": "Bortle 1 = ciel pristine (SQM 22). Bortle 9 = pollution urbaine (SQM 17,5). Le taux de fond ciel varie en conséquence."
+    "exposure_calc_help_bortle": "Bortle 1 = ciel pristine (SQM 22). Bortle 9 = pollution urbaine (SQM 17,5). Le taux de fond ciel varie en conséquence.",
+    "is_disabled": "Désactiver cet élément (masqué par défaut des listes et des sélecteurs de combinaison)",
+    "hidden_badge": "Masqué",
+    "show_hidden_items": "Afficher les éléments masqués ({count})",
+    "hide_hidden_items": "Masquer les éléments masqués",
+    "combination_invalid": "Contient du matériel désactivé",
+    "combination_invalid_hint": "Cette combinaison référence du matériel désormais désactivé ou indisponible",
+    "delete_blocked_by_combination": "Suppression impossible : encore utilisé par la/les combinaison(s) : {combinations}",
+    "form_guide_camera": "Caméra de guidage",
+    "form_lens_focal_length": "Focale de l'objectif (mm)",
+    "form_lens_focal_ratio": "Rapport focal de l'objectif (f/)",
+    "form_lens_focal_help": "Utilisé uniquement si aucun télescope n'est sélectionné (ex. : appareil photo + objectif sur une monture de suivi)."
   },
   "weather": {
     "observation_conditions": "Conditions d'observation",

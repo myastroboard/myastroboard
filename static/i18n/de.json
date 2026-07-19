@@ -1638,7 +1638,18 @@
     "exposure_calc_help_read_noise": "Rausch-Elektronen pro Auslese. Weniger ist besser. Typisch 1–6 e⁻ bei modernen CMOS.",
     "exposure_calc_help_qe": "Anteil der Photonen, die in Elektronen umgewandelt werden. 60–75 % sind typisch für moderne CMOS.",
     "exposure_calc_help_hours": "Geplante Gesamtdauer der Session. Der Rechner teilt sie in Einzelbelichtungen auf.",
-    "exposure_calc_help_bortle": "Bortle 1 = dunkler Sternenhimmel (SQM 22). Bortle 9 = Stadtkern (SQM 17,5)."
+    "exposure_calc_help_bortle": "Bortle 1 = dunkler Sternenhimmel (SQM 22). Bortle 9 = Stadtkern (SQM 17,5).",
+    "is_disabled": "Dieses Element deaktivieren (standardmäßig in Listen und Kombinationsauswahlen ausgeblendet)",
+    "hidden_badge": "Ausgeblendet",
+    "show_hidden_items": "Ausgeblendete anzeigen ({count})",
+    "hide_hidden_items": "Ausgeblendete Elemente verbergen",
+    "combination_invalid": "Enthält deaktivierte Ausrüstung",
+    "combination_invalid_hint": "Diese Kombination verweist auf Ausrüstung, die jetzt deaktiviert oder nicht mehr verfügbar ist",
+    "delete_blocked_by_combination": "Löschen nicht möglich: wird noch von folgender(n) Kombination(en) verwendet: {combinations}",
+    "form_guide_camera": "Leitkamera",
+    "form_lens_focal_length": "Objektivbrennweite (mm)",
+    "form_lens_focal_ratio": "Objektiv-Blendenzahl (f/)",
+    "form_lens_focal_help": "Wird nur verwendet, wenn kein Teleskop ausgewählt ist (z. B. Kamera + Objektiv auf einer Nachführmontierung)."
   },
   "weather": {
     "observation_conditions": "Beobachtungsbedingungen",
