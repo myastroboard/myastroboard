@@ -50,85 +50,245 @@ let astrodexEquipmentCache = {
     combinations: [],
     sharedCombinations: [],
     filters: [],
-    sharedFilters: []
+    sharedFilters: [],
+    telescopes: [],
+    sharedTelescopes: [],
+    cameras: [],
+    sharedCameras: [],
 };
 
 async function loadEquipmentForAstrodex() {
     try {
-        // Load combinations (own + shared)
-        const combosRes = await fetchJSON('/api/equipment/combinations');
+        const [combosRes, filtersRes, telescopesRes, camerasRes] = await Promise.all([
+            fetchJSON('/api/equipment/combinations'),
+            fetchJSON('/api/equipment/filters'),
+            fetchJSON('/api/equipment/telescopes'),
+            fetchJSON('/api/equipment/cameras'),
+        ]);
         astrodexEquipmentCache.combinations = combosRes.data || [];
         astrodexEquipmentCache.sharedCombinations = combosRes.shared_from_others || [];
-
-        // Load filters (own + shared)
-        const filtersRes = await fetchJSON('/api/equipment/filters');
         astrodexEquipmentCache.filters = filtersRes.data || [];
         astrodexEquipmentCache.sharedFilters = filtersRes.shared_from_others || [];
+        astrodexEquipmentCache.telescopes = telescopesRes.data || [];
+        astrodexEquipmentCache.sharedTelescopes = telescopesRes.shared_from_others || [];
+        astrodexEquipmentCache.cameras = camerasRes.data || [];
+        astrodexEquipmentCache.sharedCameras = camerasRes.shared_from_others || [];
     } catch (error) {
         console.error('Error loading equipment for Astrodex:', error);
     }
 }
 
-function buildEquipmentCombinationOptions() {
-    const own = astrodexEquipmentCache.combinations
-        .map(combo => `<option value="${escapeHtml(combo.name)}" data-combo-id="${combo.id}">${escapeHtml(combo.name)}</option>`)
-        .join('');
-    const shared = astrodexEquipmentCache.sharedCombinations
-        .map(combo => {
-            const label = combo.owner_username
-                ? `${escapeHtml(combo.name)} ${i18n.t('equipment.shared_fov_suffix', { username: escapeHtml(combo.owner_username) })}`
-                : escapeHtml(combo.name);
-            return `<option value="${escapeHtml(combo.name)}" data-combo-id="${combo.id}">${label}</option>`;
-        })
-        .join('');
-    return own + shared;
+/** Find an equipment item's display name by id across a cached own+shared pool.
+ * `kind` is 'telescopes' | 'cameras' | 'filters' | 'combinations'. */
+function _findAstrodexEquipmentName(kind, id) {
+    if (!id) return '';
+    const sharedKey = 'shared' + kind.charAt(0).toUpperCase() + kind.slice(1);
+    const found = (astrodexEquipmentCache[kind] || []).find(item => item.id === id)
+        || (astrodexEquipmentCache[sharedKey] || []).find(item => item.id === id);
+    return found ? found.name : '';
 }
 
-function buildEquipmentFilterOptions() {
-    const own = astrodexEquipmentCache.filters
-        .map(filter => `<option value="${escapeHtml(filter.name)}" data-filter-id="${filter.id}">${escapeHtml(filter.name)}</option>`)
-        .join('');
-    const shared = astrodexEquipmentCache.sharedFilters
-        .map(filter => {
-            const label = filter.owner_username
-                ? `${escapeHtml(filter.name)} ${i18n.t('equipment.shared_fov_suffix', { username: escapeHtml(filter.owner_username) })}`
-                : escapeHtml(filter.name);
-            return `<option value="${escapeHtml(filter.name)}" data-filter-id="${filter.id}">${label}</option>`;
-        })
-        .join('');
-    return own + shared;
+const _OTHER_EQUIPMENT_VALUE = '__other__';
+
+/** Build <option> markup for the picture Equipment combination select: enabled combinations
+ * (own + shared) only, unless `forceIncludeId` (the picture's own already-saved combination) is
+ * disabled - it stays visible then so an existing selection never silently disappears (same rule
+ * as the Equipment tab's combination-editor pickers). */
+function _buildPictureCombinationOptions(forceIncludeId, selectedId) {
+    const all = [...astrodexEquipmentCache.combinations, ...astrodexEquipmentCache.sharedCombinations];
+    const visible = all.filter(combo => !combo.is_disabled || combo.id === forceIncludeId);
+    return visible.map(combo => {
+        const label = combo.owner_username
+            ? `${escapeHtml(combo.name)} ${i18n.t('equipment.shared_fov_suffix', { username: escapeHtml(combo.owner_username) })}`
+            : escapeHtml(combo.name);
+        return `<option value="${combo.id}" ${combo.id === selectedId ? 'selected' : ''}>${label}</option>`;
+    }).join('');
 }
 
-function updateDeviceField() {
-    const select = document.getElementById('picture-device-select');
-    const textField = document.getElementById('picture-device');
-    if (select && textField && select.value) {
-        textField.value = select.value;
+/** Build the per-component checkbox area for a selected combination - lets the user mark which
+ * parts were actually used for this specific photo (purely informational; combination_id itself
+ * is what drives the "best combination" stats). Prechecks whatever `usedComponents` (a
+ * previously-saved combination_used_components snapshot) recorded, defaulting to all-checked for
+ * a freshly-selected combination. */
+function _buildCombinationComponentsChecklist(prefix, combo, usedComponents) {
+    const wrap = document.createElement('div');
+    wrap.className = 'd-flex flex-wrap gap-3 mt-1';
+    if (!combo) return wrap;
+    const used = usedComponents || {};
+
+    const addCheckbox = (id, checked, labelText) => {
+        const div = document.createElement('div');
+        div.className = 'form-check';
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.className = 'form-check-input';
+        input.id = id;
+        input.checked = checked;
+        const label = document.createElement('label');
+        label.className = 'form-check-label';
+        label.htmlFor = id;
+        label.textContent = labelText;
+        div.appendChild(input);
+        div.appendChild(label);
+        wrap.appendChild(div);
+    };
+
+    if (combo.telescope_id) {
+        const name = _findAstrodexEquipmentName('telescopes', combo.telescope_id);
+        addCheckbox(`${prefix}-combo-used-telescope`, used.telescope !== false, name || i18n.t('equipment.telescope'));
     }
+    if (combo.camera_id) {
+        const name = _findAstrodexEquipmentName('cameras', combo.camera_id);
+        addCheckbox(`${prefix}-combo-used-camera`, used.camera !== false, name || i18n.t('equipment.camera'));
+    }
+    if (combo.guide_camera_id) {
+        const name = _findAstrodexEquipmentName('cameras', combo.guide_camera_id);
+        addCheckbox(`${prefix}-combo-used-guide-camera`, used.guide_camera !== false, name || i18n.t('equipment.form_guide_camera'));
+    }
+    const usedFilterIds = used.filter_ids || combo.filter_ids || [];
+    (combo.filter_ids || []).forEach((filterId) => {
+        const name = _findAstrodexEquipmentName('filters', filterId);
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.className = `form-check-input ${prefix}-combo-used-filter-cb`;
+        input.dataset.filterId = filterId;
+        input.id = `${prefix}-combo-used-filter-${filterId}`;
+        input.checked = usedFilterIds.includes(filterId);
+        const div = document.createElement('div');
+        div.className = 'form-check';
+        const label = document.createElement('label');
+        label.className = 'form-check-label';
+        label.htmlFor = input.id;
+        label.textContent = name || filterId;
+        div.appendChild(input);
+        div.appendChild(label);
+        wrap.appendChild(div);
+    });
+    return wrap;
 }
 
-function updateFilterField() {
-    const select = document.getElementById('picture-filters-select');
-    const textField = document.getElementById('picture-filters');
-    if (select && textField && select.value) {
-        textField.value = select.value;
+/** Collect the current checklist state back into a combination_used_components snapshot. */
+function _collectCombinationUsedComponents(prefix) {
+    const result = {};
+    const telescopeCb = document.getElementById(`${prefix}-combo-used-telescope`);
+    const cameraCb = document.getElementById(`${prefix}-combo-used-camera`);
+    const guideCameraCb = document.getElementById(`${prefix}-combo-used-guide-camera`);
+    if (telescopeCb) result.telescope = telescopeCb.checked;
+    if (cameraCb) result.camera = cameraCb.checked;
+    if (guideCameraCb) result.guide_camera = guideCameraCb.checked;
+    const filterCbs = document.querySelectorAll(`.${prefix}-combo-used-filter-cb`);
+    if (filterCbs.length > 0) {
+        result.filter_ids = Array.from(filterCbs).filter(cb => cb.checked).map(cb => cb.dataset.filterId);
     }
+    return result;
 }
 
-function updateEditDeviceField() {
-    const select = document.getElementById('edit-picture-device-select');
-    const textField = document.getElementById('edit-picture-device');
-    if (select && textField && select.value) {
-        textField.value = select.value;
-    }
+/** Wire the picture Equipment section's combination select: toggles between the per-component
+ * checklist (real combination picked) and the free-text "Other equipment" fallback fields, and
+ * (re)builds the checklist whenever the selection changes. Call once after the modal is mounted.
+ * `existingCombinationId`/`existingUsedComponents` seed the initial render when editing a picture
+ * that already has a saved combination link. */
+function _wirePictureEquipmentSection(prefix, existingCombinationId, existingUsedComponents) {
+    const select = document.getElementById(`${prefix}-combination-select`);
+    const checklistWrap = document.getElementById(`${prefix}-combo-checklist-wrap`);
+    const checklistContainer = document.getElementById(`${prefix}-combo-checklist`);
+    const deviceWrap = document.getElementById(`${prefix}-other-device-wrap`);
+    const filtersWrap = document.getElementById(`${prefix}-other-filters-wrap`);
+    if (!select || !checklistWrap || !checklistContainer || !deviceWrap || !filtersWrap) return;
+
+    const allCombos = [...astrodexEquipmentCache.combinations, ...astrodexEquipmentCache.sharedCombinations];
+
+    const applySelection = (usedComponents) => {
+        const isOther = select.value === _OTHER_EQUIPMENT_VALUE || select.value === '';
+        deviceWrap.style.display = isOther ? '' : 'none';
+        filtersWrap.style.display = isOther ? '' : 'none';
+        DOMUtils.clear(checklistContainer);
+
+        if (isOther) {
+            checklistWrap.style.display = 'none';
+            return;
+        }
+        const combo = allCombos.find(c => c.id === select.value);
+        if (combo) {
+            checklistContainer.appendChild(_buildCombinationComponentsChecklist(prefix, combo, usedComponents));
+            checklistWrap.style.display = '';
+        } else {
+            checklistWrap.style.display = 'none';
+        }
+    };
+
+    select.addEventListener('change', () => applySelection(null));
+    applySelection(select.value && select.value === existingCombinationId ? existingUsedComponents : null);
 }
 
-function updateEditFilterField() {
-    const select = document.getElementById('edit-picture-filters-select');
-    const textField = document.getElementById('edit-picture-filters');
-    if (select && textField && select.value) {
-        textField.value = select.value;
+/** Build a read-only star-rating display (used in the slideshow/detail view). */
+function _buildStarRatingDisplayHtml(rating) {
+    const value = Number(rating) || 0;
+    let icons = '';
+    for (let i = 1; i <= 5; i++) {
+        if (value >= i) icons += '<i class="bi bi-star-fill text-warning" aria-hidden="true"></i>';
+        else if (value >= i - 0.5) icons += '<i class="bi bi-star-half text-warning" aria-hidden="true"></i>';
+        else icons += '<i class="bi bi-star text-warning" aria-hidden="true"></i>';
     }
+    return `${icons} <span class="ms-1">${value.toFixed(1)}</span>`;
+}
+
+/** Build an interactive 0-5 (half-star step) rating widget. Clicking the left half of a star
+ * sets a .5 value, the right half sets the full integer; clicking the star that already matches
+ * the current rating clears it back to "not rated". Read back with _getRatingWidgetValue(). */
+function _buildRatingWidget(prefix, currentRating) {
+    const wrap = document.createElement('div');
+    wrap.className = 'd-flex align-items-center gap-1';
+    wrap.id = `${prefix}-rating-widget`;
+    wrap.dataset.rating = currentRating != null ? String(currentRating) : '';
+
+    const renderStars = () => {
+        DOMUtils.clear(wrap);
+        const value = parseFloat(wrap.dataset.rating) || 0;
+        for (let i = 1; i <= 5; i++) {
+            // Sized to a full 44x44px touch target (not just the glyph) so left-half/right-half
+            // (half-star vs full-star) selection stays reachable on a touchscreen.
+            const starWrap = document.createElement('span');
+            starWrap.className = 'd-inline-flex align-items-center justify-content-center';
+            starWrap.style.cursor = 'pointer';
+            starWrap.style.fontSize = '1.75rem';
+            starWrap.style.minWidth = '44px';
+            starWrap.style.minHeight = '44px';
+            starWrap.style.touchAction = 'manipulation';
+            starWrap.style.userSelect = 'none';
+            starWrap.title = i18n.t('astrodex.rating');
+
+            const icon = document.createElement('i');
+            if (value >= i) icon.className = 'bi bi-star-fill text-warning';
+            else if (value >= i - 0.5) icon.className = 'bi bi-star-half text-warning';
+            else icon.className = 'bi bi-star text-warning';
+            icon.setAttribute('aria-hidden', 'true');
+            starWrap.appendChild(icon);
+
+            starWrap.addEventListener('click', (event) => {
+                const rect = starWrap.getBoundingClientRect();
+                const clickedHalf = (event.clientX - rect.left) < (rect.width / 2);
+                const newValue = clickedHalf ? i - 0.5 : i;
+                wrap.dataset.rating = (value === newValue) ? '' : String(newValue);
+                renderStars();
+            });
+            wrap.appendChild(starWrap);
+        }
+        const label = document.createElement('span');
+        label.className = 'text-muted small ms-1';
+        label.textContent = value > 0 ? value.toFixed(1) : i18n.t('astrodex.not_rated');
+        wrap.appendChild(label);
+    };
+
+    renderStars();
+    return wrap;
+}
+
+/** Read the current value set on a widget built by _buildRatingWidget(), or null if unrated. */
+function _getRatingWidgetValue(prefix) {
+    const wrap = document.getElementById(`${prefix}-rating-widget`);
+    const raw = wrap?.dataset.rating;
+    return raw ? parseFloat(raw) : null;
 }
 
 // ============================================
@@ -1347,6 +1507,71 @@ function buildPictureAutocompleteDatalists() {
     };
 }
 
+/** Build a section header row (feature.md's Add/Edit Picture modal sections: File / Date &
+ * Location / Equipment / Photo informations). */
+function _buildPictureSectionHeaderHtml(labelText) {
+    return `
+        <div class="col-12 mt-3">
+            <h6 class="text-body-secondary mb-0">${escapeHtml(labelText)}</h6>
+            <hr class="mt-1 mb-2">
+        </div>
+    `;
+}
+
+/** Build the shared Equipment section markup (add + edit forms): one combination select
+ * (enabled combinations + "Other equipment") plus the free-text fallback fields and a checklist
+ * placeholder - see _wirePictureEquipmentSection() for the behavior wired in after mount. */
+function _buildPictureEquipmentSectionHtml(prefix, picture, deviceOptions, filterOptions) {
+    const forceIncludeId = picture?.combination_id || null;
+    const selectedComboId = picture ? (picture.combination_id || '') : '';
+    const selectedIsOther = !!picture && !picture.combination_id;
+    return `
+        ${_buildPictureSectionHeaderHtml(i18n.t('astrodex.section_equipment'))}
+        <div class="col-md-12">
+            <label for="${prefix}-combination-select" class="form-label">${i18n.t('astrodex.equipment_combinations')}</label>
+            <select class="form-select" id="${prefix}-combination-select">
+                <option value="">${i18n.t('astrodex.select_combination_placeholder')}</option>
+                ${_buildPictureCombinationOptions(forceIncludeId, selectedComboId)}
+                <option value="${_OTHER_EQUIPMENT_VALUE}" ${selectedIsOther ? 'selected' : ''}>${i18n.t('astrodex.other_equipment')}</option>
+            </select>
+        </div>
+        <div class="col-md-12" id="${prefix}-combo-checklist-wrap" style="display: none;">
+            <label class="form-label">${i18n.t('astrodex.combination_used_components_label')}</label>
+            <div id="${prefix}-combo-checklist"></div>
+        </div>
+        <div class="col-md-6" id="${prefix}-other-device-wrap" style="display: none;">
+            <label for="${prefix}-device" class="form-label">${i18n.t('astrodex.custom_equipment')}</label>
+            <input type="text" class="form-control" id="${prefix}-device" list="device-list" autocomplete="off" value="${escapeHtml(picture?.device || '')}">
+            <datalist id="device-list">${deviceOptions}</datalist>
+        </div>
+        <div class="col-md-6" id="${prefix}-other-filters-wrap" style="display: none;">
+            <label for="${prefix}-filters" class="form-label">${i18n.t('astrodex.custom_filters')}</label>
+            <input type="text" class="form-control" id="${prefix}-filters" placeholder="${i18n.t('astrodex.filters_placeholder')}" list="filters-list" autocomplete="off" value="${escapeHtml(picture?.filters || '')}">
+            <datalist id="filters-list">${filterOptions}</datalist>
+        </div>
+    `;
+}
+
+/** Collect the Equipment section's fields back into a picture payload fragment. */
+function _collectPictureEquipmentFields(prefix) {
+    const select = document.getElementById(`${prefix}-combination-select`);
+    const isOther = !select || select.value === _OTHER_EQUIPMENT_VALUE || select.value === '';
+    if (isOther) {
+        return {
+            combination_id: null,
+            combination_used_components: null,
+            device: document.getElementById(`${prefix}-device`)?.value || '',
+            filters: document.getElementById(`${prefix}-filters`)?.value || '',
+        };
+    }
+    return {
+        combination_id: select.value,
+        combination_used_components: _collectCombinationUsedComponents(prefix),
+        device: '',
+        filters: '',
+    };
+}
+
 async function showAddPictureModal(itemId) {
     closeModal(); // Close current modal to avoid stacking
 
@@ -1354,10 +1579,7 @@ async function showAddPictureModal(itemId) {
     const today = new Date().toISOString().split('T')[0];
 
     const { deviceOptions, filterOptions, isoOptions } = buildPictureAutocompleteDatalists();
-
-    // Equipment combination and filter options
-    const equipmentComboOptions = buildEquipmentCombinationOptions();
-    const equipmentFilterOptions = buildEquipmentFilterOptions();
+    const equipmentSectionHtml = _buildPictureEquipmentSectionHtml('picture', null, deviceOptions, filterOptions);
 
     // Location picker (v1.2) - defaults to the active location but the
     // uploader can change/clear it, since a photo is often uploaded well
@@ -1369,10 +1591,12 @@ async function showAddPictureModal(itemId) {
 
     createModal(`${i18n.t('astrodex.add_picture')}`, `
         <form id="add-picture-form" class="form row g-3 align-items-end">
+            ${_buildPictureSectionHeaderHtml(i18n.t('astrodex.section_file'))}
             <div class="col-md-12">
                 <label for="picture-file" class="form-label">${i18n.t('astrodex.image_file')} *</label>
                 <input type="file" class="form-control" id="picture-file" accept="image/*" required>
             </div>
+            ${_buildPictureSectionHeaderHtml(i18n.t('astrodex.section_date_location'))}
             <div class="col-md-6">
                 <label for="picture-date" class="form-label">${i18n.t('astrodex.observation_date')}</label>
                 <input type="date" class="form-control" id="picture-date" value="${escapeHtml(today)}">
@@ -1380,6 +1604,8 @@ async function showAddPictureModal(itemId) {
             ${locationSelectField}
             ${locationCustomFields}
             ${locationMapField}
+            ${equipmentSectionHtml}
+            ${_buildPictureSectionHeaderHtml(i18n.t('astrodex.section_photo_info'))}
             <div class="col-md-6">
                 <label for="picture-exposition" class="form-label">${i18n.t('astrodex.exposition_time')}</label>
                 <input type="text" class="form-control" id="picture-exposition" placeholder="${i18n.t('astrodex.exposition_time_placeholder')}">
@@ -1396,33 +1622,9 @@ async function showAddPictureModal(itemId) {
                 </datalist>
             </div>
             <div class="col-md-6"></div>
-            <div class="col-md-6">
-                <label for="picture-device" class="form-label">${i18n.t('astrodex.equipment_combinations')}</label>
-                <select class="form-select" id="picture-device-select" onchange="updateDeviceField()">
-                    <option value="">${i18n.t('astrodex.free_text')}</option>
-                    ${equipmentComboOptions}
-                </select>
-            </div>
-            <div class="col-md-6">
-                <label for="picture-device" class="form-label">${i18n.t('astrodex.custom_equipment')}</label>
-                <input type="text" class="form-control" id="picture-device" list="device-list" autocomplete="off">
-                <datalist id="device-list">
-                    ${deviceOptions}
-                </datalist>
-            </div>
-            <div class="col-md-6">
-                <label for="picture-filters" class="form-label">${i18n.t('astrodex.filters')}</label>
-                <select class="form-select" id="picture-filters-select" onchange="updateFilterField()">
-                    <option value="">${i18n.t('astrodex.free_text')}</option>
-                    ${equipmentFilterOptions}
-                </select>
-            </div>
-            <div class="col-md-6">
-                <label for="picture-filters" class="form-label">${i18n.t('astrodex.custom_filters')}</label>
-                <input type="text" class="form-control" id="picture-filters" placeholder="${i18n.t('astrodex.filters_placeholder')}" list="filters-list" autocomplete="off">
-                <datalist id="filters-list">
-                    ${filterOptions}
-                </datalist>
+            <div class="col-md-12">
+                <label class="form-label d-block">${i18n.t('astrodex.rating')}</label>
+                <div id="picture-rating-container"></div>
             </div>
             <div class="col-md-12">
                 <label for="picture-notes" class="form-label">${i18n.t('astrodex.form_notes')}</label>
@@ -1441,6 +1643,9 @@ async function showAddPictureModal(itemId) {
         keyboard: true
     });
     bs_modal.show();
+
+    document.getElementById('picture-rating-container')?.appendChild(_buildRatingWidget('picture', null));
+    _wirePictureEquipmentSection('picture', null, null);
 
     // Leaflet must measure a fully laid-out, visible container - initializing
     // while the modal is still mid fade-in transition gives it the wrong
@@ -1472,25 +1677,25 @@ async function showAddPictureModal(itemId) {
 async function uploadPicture(itemId) {
     const fileInput = document.getElementById('picture-file');
     const file = fileInput.files[0];
-    
+
     if (!file) {
         showMessage('error', i18n.t('astrodex.please_select_image'));
         return;
     }
-    
+
     // Find the submit button and disable it to prevent multiple submissions
     const submitButton = document.querySelector('#add-picture-form button[type="submit"]');
     const originalButtonText = submitButton.textContent;
-    
+
     try {
         // Disable button and show loading state
         submitButton.disabled = true;
         submitButton.textContent = i18n.t('astrodex.uploading');
-        
+
         // Upload file first
         const formData = new FormData();
         formData.append('file', file);
-        
+
         const uploadResponse = await fetchWithRetry('/api/astrodex/upload', {
             method: 'POST',
             body: formData,
@@ -1499,26 +1704,26 @@ async function uploadPicture(itemId) {
             maxAttempts: 1,
             timeoutMs: 30000
         });
-        
+
         if (!uploadResponse.ok) {
             throw new Error('Upload failed');
         }
-        
+
         const uploadResult = await uploadResponse.json();
-        
+
         // Add picture metadata
         const pictureData = {
             filename: uploadResult.filename,
             date: document.getElementById('picture-date').value,
             exposition_time: document.getElementById('picture-exposition').value,
-            device: document.getElementById('picture-device').value,
-            filters: document.getElementById('picture-filters').value,
             iso: document.getElementById('picture-iso').value,
             frames: document.getElementById('picture-frames').value,
+            rating: _getRatingWidgetValue('picture'),
             notes: document.getElementById('picture-notes').value,
+            ..._collectPictureEquipmentFields('picture'),
             ..._collectPictureLocationFields('picture')
         };
-        
+
         const response = await fetchJSON(`/api/astrodex/items/${itemId}/pictures`, {
             method: 'POST',
             headers: {
@@ -1526,7 +1731,7 @@ async function uploadPicture(itemId) {
             },
             body: JSON.stringify(pictureData)
         });
-        
+
         if (response.status === 'success') {
             // No alert on success
             await loadAstrodex();
@@ -1666,6 +1871,7 @@ async function showEditPictureModal(itemId, pictureId) {
     if (!picture) return;
 
     const { deviceOptions, filterOptions, isoOptions } = buildPictureAutocompleteDatalists();
+    const equipmentSectionHtml = _buildPictureEquipmentSectionHtml('edit-picture', picture, deviceOptions, filterOptions);
 
     // Pre-select whatever location this picture already has (preset, custom
     // free-text label, or "no location" for old pictures that predate this
@@ -1676,6 +1882,7 @@ async function showEditPictureModal(itemId, pictureId) {
 
     createModal(i18n.t('astrodex.edit_photo'), `
         <form id="edit-picture-form" class="form row g-3 align-items-end">
+            ${_buildPictureSectionHeaderHtml(i18n.t('astrodex.section_date_location'))}
             <div class="col-md-6">
                 <label for="edit-picture-date" class="form-label">${i18n.t('astrodex.observation_date')}</label>
                 <input type="date" class="form-control" id="edit-picture-date" value="${escapeHtml(picture.date || '')}">
@@ -1683,6 +1890,8 @@ async function showEditPictureModal(itemId, pictureId) {
             ${locationSelectField}
             ${locationCustomFields}
             ${locationMapField}
+            ${equipmentSectionHtml}
+            ${_buildPictureSectionHeaderHtml(i18n.t('astrodex.section_photo_info'))}
             <div class="col-md-6">
                 <label for="edit-picture-exposition" class="form-label">${i18n.t('astrodex.exposition_time')}</label>
                 <input type="text" class="form-control" id="edit-picture-exposition" placeholder="e.g., 120x30s" value="${escapeHtml(picture.exposition_time || '')}">
@@ -1699,33 +1908,9 @@ async function showEditPictureModal(itemId, pictureId) {
                 </datalist>
             </div>
             <div class="col-md-6"></div>
-            <div class="col-md-6">
-                <label for="edit-picture-device" class="form-label">${i18n.t('astrodex.equipment_combinations')}</label>
-                <select class="form-select" id="edit-picture-device-select" onchange="updateEditDeviceField()">
-                    <option value="">${i18n.t('astrodex.free_text')}</option>
-                    ${buildEquipmentCombinationOptions()}
-                </select>
-            </div>
-            <div class="col-md-6">
-                <label for="edit-picture-device" class="form-label">${i18n.t('astrodex.custom_equipment')}</label>
-                <input type="text" class="form-control" id="edit-picture-device" list="device-list" autocomplete="off" value="${escapeHtml(picture.device || '')}">
-                <datalist id="device-list">
-                    ${deviceOptions}
-                </datalist>
-            </div>
-            <div class="col-md-6">
-                <label for="edit-picture-filters" class="form-label">${i18n.t('astrodex.filters')}</label>
-                <select class="form-select" id="edit-picture-filters-select" onchange="updateEditFilterField()">
-                    <option value="">${i18n.t('astrodex.free_text')}</option>
-                    ${buildEquipmentFilterOptions()}
-                </select>
-            </div>
-            <div class="col-md-6">
-                <label for="edit-picture-filters" class="form-label">${i18n.t('astrodex.custom_filters')}</label>
-                <input type="text" class="form-control" id="edit-picture-filters" placeholder="${i18n.t('astrodex.custom_filters_placeholder')}" list="filters-list" autocomplete="off" value="${escapeHtml(picture.filters || '')}">
-                <datalist id="filters-list">
-                    ${filterOptions}
-                </datalist>
+            <div class="col-md-12">
+                <label class="form-label d-block">${i18n.t('astrodex.rating')}</label>
+                <div id="edit-picture-rating-container"></div>
             </div>
             <div class="col-md-12">
                 <label for="edit-picture-notes" class="form-label">${i18n.t('astrodex.form_notes')}</label>
@@ -1745,6 +1930,11 @@ async function showEditPictureModal(itemId, pictureId) {
     });
     bs_modal.show();
 
+    document.getElementById('edit-picture-rating-container')?.appendChild(
+        _buildRatingWidget('edit-picture', picture.rating)
+    );
+    _wirePictureEquipmentSection('edit-picture', picture.combination_id || null, picture.combination_used_components);
+
     // See showAddPictureModal - wait for the modal to finish its show
     // transition before Leaflet measures the container, or the map only
     // renders its top-left tile.
@@ -1756,7 +1946,7 @@ async function showEditPictureModal(itemId, pictureId) {
         e.preventDefault();
         await updatePicture(itemId, pictureId);
     });
-       
+
 
     // Event listener when modal is closed
     document.getElementById('modal_lg_close').addEventListener('hidden.bs.modal', () => {
@@ -1778,14 +1968,14 @@ async function updatePicture(itemId, pictureId) {
         const pictureData = {
             date: document.getElementById('edit-picture-date').value,
             exposition_time: document.getElementById('edit-picture-exposition').value,
-            device: document.getElementById('edit-picture-device').value,
-            filters: document.getElementById('edit-picture-filters').value,
             iso: document.getElementById('edit-picture-iso').value,
             frames: document.getElementById('edit-picture-frames').value,
+            rating: _getRatingWidgetValue('edit-picture'),
             notes: document.getElementById('edit-picture-notes').value,
+            ..._collectPictureEquipmentFields('edit-picture'),
             ..._collectPictureLocationFields('edit-picture')
         };
-        
+
         await fetchJSON(`/api/astrodex/items/${itemId}/pictures/${pictureId}`, {
             method: 'PUT',
             headers: {
@@ -1793,7 +1983,7 @@ async function updatePicture(itemId, pictureId) {
             },
             body: JSON.stringify(pictureData)
         });
-        
+
         // No alert on success
         await loadAstrodex();
         closeModal();
@@ -1922,6 +2112,28 @@ function _mountPictureSlideshow(slideshowPictures, opts) {
                             <div>
                                 <small class="text-muted d-block">${i18n.t('astrodex.filters')}</small>
                                 <strong>${escapeHtml(picture.filters)}</strong>
+                            </div>
+                        </div>
+                    </div>
+                ` : ''}
+                ${picture.combination_id ? `
+                    <div class="col-md-6 col-lg-4">
+                        <div class="d-flex align-items-center p-2 rounded shadow-sm astrodex-slideshow-tile">
+                            <div class="me-3 fs-4"><i class="bi bi-camera2" aria-hidden="true"></i></div>
+                            <div>
+                                <small class="text-muted d-block">${i18n.t('astrodex.equipment_combinations')}</small>
+                                <strong>${escapeHtml(_findAstrodexEquipmentName('combinations', picture.combination_id) || i18n.t('astrodex.combination_unavailable'))}</strong>
+                            </div>
+                        </div>
+                    </div>
+                ` : ''}
+                ${picture.rating != null ? `
+                    <div class="col-md-6 col-lg-4">
+                        <div class="d-flex align-items-center p-2 rounded shadow-sm astrodex-slideshow-tile">
+                            <div class="me-3 fs-4"><i class="bi bi-star-fill text-warning" aria-hidden="true"></i></div>
+                            <div>
+                                <small class="text-muted d-block">${i18n.t('astrodex.rating')}</small>
+                                <strong>${_buildStarRatingDisplayHtml(picture.rating)}</strong>
                             </div>
                         </div>
                     </div>

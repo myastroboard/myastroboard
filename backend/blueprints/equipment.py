@@ -5,8 +5,10 @@ from dataclasses import asdict
 from flask import Blueprint, request, jsonify
 
 from equipment import equipment_profiles
-from utils.auth import user_required, get_current_user
+from observation import astrodex
+from utils.auth import user_required, get_current_user, user_manager
 from utils.logging_config import get_logger
+from utils.repo_config import load_config
 
 logger = get_logger(__name__)
 
@@ -664,16 +666,30 @@ def get_combinations():
     try:
         user = get_current_user()
         user_id = user.user_id if user else None
-        if not user_id:  # pragma: no cover
+        if not user_id or not user:  # pragma: no cover
             return jsonify({'error': 'User not authenticated'}), 401
+
+        config = load_config()
+        private_mode = bool(config.get('astrodex', {}).get('private', False))
+        users = user_manager.list_users()
+        usernames_by_id = {
+            user_entry.get('user_id', ''): user_entry.get('username', 'unknown')
+            for user_entry in users
+            if user_entry.get('user_id')
+        }
+        photo_index = astrodex.build_combination_photo_index(user_id, user.username, private_mode, usernames_by_id)
 
         data = equipment_profiles.load_user_combinations(user_id)
         items_with_status = []
         for combo in data.get('items', []):
             status = equipment_profiles.compute_combination_share_status(combo, user_id)
             validity = equipment_profiles.compute_combination_validity_status(combo, user_id)
-            items_with_status.append({**combo, **status, **validity})
+            photo_stats = astrodex.summarize_combination_pictures(photo_index.get(combo['id'], []))
+            items_with_status.append({**combo, **status, **validity, **photo_stats})
         shared_with_status = equipment_profiles.load_all_shared_combinations(user_id)
+        for combo in shared_with_status:
+            photo_stats = astrodex.summarize_combination_pictures(photo_index.get(combo['id'], []))
+            combo.update(photo_stats)
         return jsonify(
             {
                 'data': items_with_status,
@@ -719,7 +735,7 @@ def get_combination(combination_id):
     try:
         user = get_current_user()
         user_id = user.user_id if user else None
-        if not user_id:  # pragma: no cover
+        if not user_id or not user:  # pragma: no cover
             return jsonify({'error': 'User not authenticated'}), 401
 
         combination = equipment_profiles.get_combination(user_id, combination_id)
@@ -727,7 +743,17 @@ def get_combination(combination_id):
         if combination:
             status = equipment_profiles.compute_combination_share_status(combination, user_id)
             validity = equipment_profiles.compute_combination_validity_status(combination, user_id)
-            return jsonify({**combination, **status, **validity})
+            config = load_config()
+            private_mode = bool(config.get('astrodex', {}).get('private', False))
+            users = user_manager.list_users()
+            usernames_by_id = {
+                user_entry.get('user_id', ''): user_entry.get('username', 'unknown')
+                for user_entry in users
+                if user_entry.get('user_id')
+            }
+            photo_index = astrodex.build_combination_photo_index(user_id, user.username, private_mode, usernames_by_id)
+            photo_stats = astrodex.summarize_combination_pictures(photo_index.get(combination_id, []))
+            return jsonify({**combination, **status, **validity, **photo_stats})
         else:
             return jsonify({'error': 'Combination not found'}), 404
     except Exception as e:
@@ -767,10 +793,12 @@ def delete_combination(combination_id):
         if not user_id:  # pragma: no cover
             return jsonify({'error': 'User not authenticated'}), 401
 
-        success = equipment_profiles.delete_combination(user_id, combination_id)
+        success, reason = equipment_profiles.delete_combination(user_id, combination_id)
 
         if success:
             return jsonify({'status': 'success'})
+        elif reason == 'in_use_by_picture':
+            return jsonify({'error': 'in_use_by_picture'}), 409
         else:
             return jsonify({'error': 'Failed to delete combination'}), 500
     except Exception as e:

@@ -169,6 +169,55 @@ class TestAstrodexPictures:
         assert picture['date'] == '2024-01-15'
         assert picture['is_main'] is True  # First picture is main
     
+    def test_add_picture_with_combination_and_rating(self, temp_data_dir):
+        """combination_id, combination_used_components and rating persist on a new picture."""
+        item = astrodex.create_astrodex_item('testuser', {'name': 'M31', 'type': 'Galaxy'})
+        picture_data = {
+            'filename': 'test_image.jpg',
+            'combination_id': 'combo-1',
+            'combination_used_components': {'telescope': True, 'camera': True, 'filter_ids': ['f1']},
+            'rating': 4.5,
+        }
+
+        picture = astrodex.add_picture_to_item('testuser', item['id'], picture_data)
+
+        assert picture['combination_id'] == 'combo-1'
+        assert picture['combination_used_components'] == {
+            'telescope': True,
+            'camera': True,
+            'filter_ids': ['f1'],
+        }
+        assert picture['rating'] == 4.5
+
+    def test_add_picture_without_combination_defaults_to_none(self, temp_data_dir):
+        """The 'Other equipment' free-text path leaves combination_id/rating unset (None)."""
+        item = astrodex.create_astrodex_item('testuser', {'name': 'M31', 'type': 'Galaxy'})
+        picture = astrodex.add_picture_to_item('testuser', item['id'], {'filename': 'pic.jpg', 'device': 'DSLR'})
+
+        assert picture['combination_id'] is None
+        assert picture['combination_used_components'] is None
+        assert picture['rating'] is None
+
+    def test_update_picture_combination_and_rating_fields(self, temp_data_dir):
+        """update_picture accepts combination_id/combination_used_components/rating."""
+        item = astrodex.create_astrodex_item('testuser', {'name': 'M31', 'type': 'Galaxy'})
+        picture = astrodex.add_picture_to_item('testuser', item['id'], {'filename': 'pic.jpg'})
+
+        updated = astrodex.update_picture(
+            'testuser',
+            item['id'],
+            picture['id'],
+            {
+                'combination_id': 'combo-2',
+                'combination_used_components': {'telescope': False, 'camera': True},
+                'rating': 3.0,
+            },
+        )
+
+        assert updated['combination_id'] == 'combo-2'
+        assert updated['combination_used_components'] == {'telescope': False, 'camera': True}
+        assert updated['rating'] == 3.0
+
     def test_add_multiple_pictures(self, temp_data_dir):
         """Test adding multiple pictures"""
         item_data = {'name': 'M42', 'type': 'Nebula'}
@@ -243,6 +292,57 @@ class TestAstrodexPictures:
         
         assert main_pic is not None
         assert main_pic['filename'] == 'pic1.jpg'
+
+
+class TestCombinationPhotoStats:
+    """Test count_pictures_for_combination, build_combination_photo_index, summarize_combination_pictures."""
+
+    def test_count_pictures_for_combination(self, temp_data_dir):
+        item = astrodex.create_astrodex_item('testuser', {'name': 'M31', 'type': 'Galaxy'})
+        astrodex.add_picture_to_item('testuser', item['id'], {'filename': 'a.jpg', 'combination_id': 'combo-1'})
+        astrodex.add_picture_to_item('testuser', item['id'], {'filename': 'b.jpg', 'combination_id': 'combo-1'})
+        astrodex.add_picture_to_item('testuser', item['id'], {'filename': 'c.jpg', 'combination_id': 'combo-2'})
+        astrodex.add_picture_to_item('testuser', item['id'], {'filename': 'd.jpg'})  # no combination
+
+        assert astrodex.count_pictures_for_combination('combo-1') == 2
+        assert astrodex.count_pictures_for_combination('combo-2') == 1
+        assert astrodex.count_pictures_for_combination('combo-missing') == 0
+        assert astrodex.count_pictures_for_combination('') == 0
+
+    def test_count_pictures_for_combination_no_directory(self, temp_data_dir):
+        """No astrodex directory at all → 0, not an error."""
+        assert astrodex.count_pictures_for_combination('combo-1') == 0
+
+    def test_build_combination_photo_index_and_summarize(self, temp_data_dir):
+        item = astrodex.create_astrodex_item('alice', {'name': 'M31', 'type': 'Galaxy'}, username='alice')
+        astrodex.add_picture_to_item(
+            'alice', item['id'], {'filename': 'a.jpg', 'combination_id': 'combo-1', 'rating': 4.0}
+        )
+        astrodex.add_picture_to_item(
+            'alice', item['id'], {'filename': 'b.jpg', 'combination_id': 'combo-1', 'rating': 5.0}
+        )
+        astrodex.add_picture_to_item('alice', item['id'], {'filename': 'c.jpg', 'combination_id': 'combo-1'})  # unrated
+        astrodex.add_picture_to_item('alice', item['id'], {'filename': 'd.jpg'})  # no combination at all
+
+        index = astrodex.build_combination_photo_index('alice', 'alice', private_mode=True)
+
+        assert set(index.keys()) == {'combo-1'}
+        assert len(index['combo-1']) == 3
+        assert all('item_id' in picture and 'item_name' in picture for picture in index['combo-1'])
+
+        stats = astrodex.summarize_combination_pictures(index['combo-1'])
+        assert stats['photo_count'] == 3
+        assert stats['average_rating'] == 4.5  # mean of 4.0 and 5.0 only - unrated excluded
+        assert len(stats['picture_refs']) == 3
+
+    def test_summarize_combination_pictures_empty(self):
+        stats = astrodex.summarize_combination_pictures([])
+        assert stats == {'photo_count': 0, 'average_rating': None, 'picture_refs': []}
+
+    def test_summarize_combination_pictures_all_unrated(self):
+        stats = astrodex.summarize_combination_pictures([{'rating': None}, {'rating': None}])
+        assert stats['photo_count'] == 2
+        assert stats['average_rating'] is None
 
 
 class TestAstrodexStats:

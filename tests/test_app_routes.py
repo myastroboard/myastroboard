@@ -3510,6 +3510,133 @@ class TestAstrodexPictureLocation:
             client_admin.delete(f"/api/locations/{location['id']}")
 
 
+class TestAstrodexPictureEquipment:
+    """Picture combination_id/combination_used_components/rating - validated/resolved
+    server-side, see _validate_and_coerce_picture_rating / _resolve_picture_combination_reference."""
+
+    def _create_item(self, client_admin):
+        import uuid as _uuid
+        resp = client_admin.post(
+            '/api/astrodex/items',
+            json={'name': f'PicEquipObj_{_uuid.uuid4().hex[:6]}', 'type': 'Galaxy', 'catalogue': 'NGC'},
+        )
+        assert resp.status_code in (200, 201), resp.get_json()
+        return resp.get_json()['item']['id']
+
+    def _add_picture(self, client_admin, item_id, **extra):
+        import uuid as _uuid
+        payload = {'filename': f'{_uuid.uuid4().hex}.jpg'}
+        payload.update(extra)
+        return client_admin.post(f'/api/astrodex/items/{item_id}/pictures', json=payload)
+
+    def _create_combination(self, client_admin):
+        scope = client_admin.post('/api/equipment/telescopes', json=_TELESCOPE_DATA).get_json()['data']
+        resp = client_admin.post(
+            '/api/equipment/combinations', json={'name': 'Picture Test Combo', 'telescope_id': scope['id']}
+        )
+        return resp.get_json()['data']
+
+    def test_add_picture_with_valid_combination_id(self, client_admin):
+        item_id = self._create_item(client_admin)
+        combo = self._create_combination(client_admin)
+        resp = self._add_picture(client_admin, item_id, combination_id=combo['id'])
+        assert resp.status_code == 200
+        picture = resp.get_json()['picture']
+        assert picture['combination_id'] == combo['id']
+
+    def test_add_picture_with_unknown_combination_id_resolves_to_none(self, client_admin):
+        """Same trust model as location_id: an inaccessible/nonexistent combination_id is
+        silently dropped rather than trusted from the client."""
+        item_id = self._create_item(client_admin)
+        resp = self._add_picture(client_admin, item_id, combination_id='not-a-real-combination-id')
+        assert resp.status_code == 200
+        assert resp.get_json()['picture']['combination_id'] is None
+
+    def test_add_picture_with_used_components_snapshot(self, client_admin):
+        item_id = self._create_item(client_admin)
+        combo = self._create_combination(client_admin)
+        used = {'telescope': True, 'filter_ids': []}
+        resp = self._add_picture(
+            client_admin, item_id, combination_id=combo['id'], combination_used_components=used
+        )
+        assert resp.status_code == 200
+        assert resp.get_json()['picture']['combination_used_components'] == used
+
+    def test_add_picture_with_non_dict_used_components_is_dropped(self, client_admin):
+        item_id = self._create_item(client_admin)
+        resp = self._add_picture(client_admin, item_id, combination_used_components='not-a-dict')
+        assert resp.status_code == 200
+        assert resp.get_json()['picture']['combination_used_components'] is None
+
+    def test_add_picture_with_valid_rating(self, client_admin):
+        item_id = self._create_item(client_admin)
+        resp = self._add_picture(client_admin, item_id, rating=4.5)
+        assert resp.status_code == 200
+        assert resp.get_json()['picture']['rating'] == 4.5
+
+    def test_add_picture_without_rating_defaults_to_none(self, client_admin):
+        item_id = self._create_item(client_admin)
+        resp = self._add_picture(client_admin, item_id)
+        assert resp.status_code == 200
+        assert resp.get_json()['picture']['rating'] is None
+
+    def test_add_picture_with_rating_out_of_range_returns_400(self, client_admin):
+        item_id = self._create_item(client_admin)
+        resp = self._add_picture(client_admin, item_id, rating=5.5)
+        assert resp.status_code == 400
+
+    def test_add_picture_with_rating_not_half_step_returns_400(self, client_admin):
+        item_id = self._create_item(client_admin)
+        resp = self._add_picture(client_admin, item_id, rating=3.25)
+        assert resp.status_code == 400
+
+    def test_add_picture_with_non_numeric_rating_returns_400(self, client_admin):
+        item_id = self._create_item(client_admin)
+        resp = self._add_picture(client_admin, item_id, rating='great')
+        assert resp.status_code == 400
+
+    def test_update_picture_can_set_rating(self, client_admin):
+        item_id = self._create_item(client_admin)
+        picture = self._add_picture(client_admin, item_id).get_json()['picture']
+        resp = client_admin.put(
+            f"/api/astrodex/items/{item_id}/pictures/{picture['id']}", json={'rating': 2.5}
+        )
+        assert resp.status_code == 200
+        assert resp.get_json()['picture']['rating'] == 2.5
+
+    def test_update_picture_with_invalid_rating_returns_400(self, client_admin):
+        item_id = self._create_item(client_admin)
+        picture = self._add_picture(client_admin, item_id).get_json()['picture']
+        resp = client_admin.put(
+            f"/api/astrodex/items/{item_id}/pictures/{picture['id']}", json={'rating': 7}
+        )
+        assert resp.status_code == 400
+
+    def test_update_picture_can_change_combination(self, client_admin):
+        item_id = self._create_item(client_admin)
+        combo_a = self._create_combination(client_admin)
+        combo_b = self._create_combination(client_admin)
+        picture = self._add_picture(client_admin, item_id, combination_id=combo_a['id']).get_json()['picture']
+
+        resp = client_admin.put(
+            f"/api/astrodex/items/{item_id}/pictures/{picture['id']}",
+            json={'combination_id': combo_b['id']},
+        )
+        assert resp.status_code == 200
+        assert resp.get_json()['picture']['combination_id'] == combo_b['id']
+
+    def test_update_picture_without_combination_key_leaves_it_untouched(self, client_admin):
+        item_id = self._create_item(client_admin)
+        combo = self._create_combination(client_admin)
+        picture = self._add_picture(client_admin, item_id, combination_id=combo['id']).get_json()['picture']
+
+        resp = client_admin.put(
+            f"/api/astrodex/items/{item_id}/pictures/{picture['id']}", json={'notes': 'unrelated edit'}
+        )
+        assert resp.status_code == 200
+        assert resp.get_json()['picture']['combination_id'] == combo['id']
+
+
 # ---------------------------------------------------------------------------
 # Push test with actual subscriptions (via monkeypatching)
 # ---------------------------------------------------------------------------
@@ -4585,6 +4712,51 @@ class TestEquipmentApiRoutes:
         assert resp.status_code == 200
         assert resp.get_json()['is_valid'] is True
 
+    def test_get_combinations_includes_photo_stats(self, client_admin):
+        """Combination payload carries photo_count/average_rating/picture_refs, and they reflect
+        pictures actually tagged with that combination via the Astrodex picture routes."""
+        scope = client_admin.post('/api/equipment/telescopes', json=_TELESCOPE_DATA).get_json()['data']
+        combo = client_admin.post(
+            '/api/equipment/combinations', json={'name': 'Photo Stats Combo', 'telescope_id': scope['id']}
+        ).get_json()['data']
+
+        item = client_admin.post(
+            '/api/astrodex/items', json={'name': 'PhotoStatsObj', 'type': 'Galaxy', 'catalogue': 'NGC'}
+        ).get_json()['item']
+        client_admin.post(
+            f"/api/astrodex/items/{item['id']}/pictures",
+            json={'filename': 'a.jpg', 'combination_id': combo['id'], 'rating': 4.0},
+        )
+        client_admin.post(
+            f"/api/astrodex/items/{item['id']}/pictures",
+            json={'filename': 'b.jpg', 'combination_id': combo['id'], 'rating': 2.0},
+        )
+
+        resp = client_admin.get('/api/equipment/combinations')
+        assert resp.status_code == 200
+        combos = resp.get_json()['data']
+        found = next(c for c in combos if c['id'] == combo['id'])
+        assert found['photo_count'] == 2
+        assert found['average_rating'] == 3.0
+        assert len(found['picture_refs']) == 2
+
+    def test_delete_combination_blocked_by_picture_returns_409(self, client_admin):
+        scope = client_admin.post('/api/equipment/telescopes', json=_TELESCOPE_DATA).get_json()['data']
+        combo = client_admin.post(
+            '/api/equipment/combinations', json={'name': 'Blocked Combo', 'telescope_id': scope['id']}
+        ).get_json()['data']
+        item = client_admin.post(
+            '/api/astrodex/items', json={'name': 'BlockedObj', 'type': 'Galaxy', 'catalogue': 'NGC'}
+        ).get_json()['item']
+        client_admin.post(
+            f"/api/astrodex/items/{item['id']}/pictures",
+            json={'filename': 'a.jpg', 'combination_id': combo['id']},
+        )
+
+        resp = client_admin.delete(f"/api/equipment/combinations/{combo['id']}")
+        assert resp.status_code == 409
+        assert resp.get_json()['error'] == 'in_use_by_picture'
+
     def test_get_combination_not_found_returns_404(self, client_admin):
         resp = client_admin.get('/api/equipment/combinations/nonexistent-combo-id')
         assert resp.status_code == 404
@@ -4608,7 +4780,7 @@ class TestEquipmentApiRoutes:
         assert resp.status_code == 404
 
     def test_delete_combination_failure_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'delete_combination', lambda *_: False)
+        monkeypatch.setattr(_app_mod.equipment_profiles, 'delete_combination', lambda *_: (False, None))
         resp = client_admin.delete('/api/equipment/combinations/any-id')
         assert resp.status_code == 500
 

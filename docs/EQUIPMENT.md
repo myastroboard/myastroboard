@@ -192,6 +192,26 @@ doesn't:
 
 A combination is flagged **Shared** only when **every component** in it is individually shared. If one component is later made private, the combination shows a ⚠ warning.
 
+### Photo badges
+
+Each combination card carries two badges sourced from Astrodex:
+
+- **Photo count** — number of Astrodex pictures linking to this combination. Click it to open the same
+  slideshow used elsewhere in Astrodex, showing every one of those pictures.
+- **Average rating** — mean of the 0-5 star ratings across those pictures (unrated pictures don't count
+  toward the average, though they do count toward the photo count).
+
+Both respect the same visibility as the rest of Astrodex: with `config['astrodex']['private']` off
+(default), they aggregate every visible user's pictures for that combination; with it on, only your own.
+
+### Deletion
+
+A combination can't be deleted while it's still referenced by any Astrodex picture (any user) - the
+delete-guard mirrors the one on individual equipment items above. This is checked in addition to the
+component-level guard: deleting the *equipment inside* a combination is blocked separately (see
+[Disabling equipment](#disabling-equipment)) while deleting the *combination itself* is blocked by its
+pictures.
+
 ---
 
 ## Field of View calculator

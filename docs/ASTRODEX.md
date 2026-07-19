@@ -56,8 +56,25 @@ Each picture attached to an item:
 | `caption` | string | Optional caption or session note |
 | `owner_user_id` | UUID | The user who uploaded this picture |
 | `created_at` | ISO 8601 | Upload timestamp |
+| `combination_id` | UUID string or `null` | Linked [equipment combination](EQUIPMENT.md#equipment-combinations), resolved and access-checked server-side. Mutually exclusive with the free-text `device`/`filters` fields ("Other equipment" path) - never both. |
+| `combination_used_components` | object or `null` | Frozen snapshot of which parts of the combination were actually used for this photo (e.g. `{"telescope": true, "camera": true, "filter_ids": [...]}`) - purely informational, set once at save time and never recomputed even if the combination is edited later. |
+| `rating` | number or `null` | User's own 0.0-5.0 rating in 0.5 steps, or `null` if not yet rated. Feeds a combination's average-rating badge in the Equipment tab (see [EQUIPMENT.md](EQUIPMENT.md#equipment-combinations)). |
 
 Images are stored in `data/astrodex/images/` and served by `GET /api/astrodex/images/<filename>`.
+
+### Equipment on a picture
+
+The Add/Edit Picture modal's Equipment section is a single select: your enabled combinations (own +
+shared) plus an **"Other equipment"** option.
+
+- Picking a combination saves `combination_id` and reveals a checklist of that combination's actual
+  components (telescope / camera / guide camera / each filter) so you can mark which ones were used for
+  this specific photo - purely optional, stored as `combination_used_components`.
+- Picking **"Other equipment"** falls back to free-text `device`/`filters` fields (with autocomplete drawn
+  from your equipment names and previously-typed values).
+- If a picture's linked combination is later disabled, it still appears in that picture's edit dropdown
+  (and stays selected) - the same "stays visible if already selected" rule the Equipment tab itself uses.
+- A combination can't be deleted while any picture (yours or another user's) still references it.
 
 ---
 
@@ -92,6 +109,10 @@ The object editor allows updating:
 - Reorder pictures; set one as the main (cover) picture.
 - Delete individual pictures.
 - Images larger than the display size are served at original resolution for download.
+- Rate your own photos 0-5 stars (half-star steps) - lets you see which equipment combination
+  produces your best results (average rating shown on the combination's card in the Equipment tab).
+- Add/edit picture modal is organized into four sections: File, Date & Location, Equipment, and
+  Photo information.
 
 ### Catalogue lookup
 
