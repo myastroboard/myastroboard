@@ -383,13 +383,6 @@ function startNotificationPoller() {
     _runNotificationChecks().then(_scheduleNextPoll);
 }
 
-function stopNotificationPoller() {
-    if (_notifPollTimer !== null) {
-        clearTimeout(_notifPollTimer);
-        _notifPollTimer = null;
-    }
-}
-
 // ======================
 // Settings UI
 // ======================

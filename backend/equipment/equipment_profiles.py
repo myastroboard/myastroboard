@@ -36,56 +36,12 @@ class TelescopeType(str, Enum):
     DOBSONIAN = "Dobsonian"
 
 
-class SensorType(str, Enum):
-    """Camera sensor types"""
-
-    CMOS_COLOR = "CMOS Color"
-    CMOS_MONO = "CMOS Mono"
-    CCD_COLOR = "CCD Color"
-    CCD_MONO = "CCD Mono"
-
-
-class MountType(str, Enum):
-    """Mount types"""
-
-    EQUATORIAL = "Equatorial"
-    ALT_AZ = "Alt-Azimuth"
-    DOBSONIAN = "Dobsonian"
-    FORK = "Fork Mount"
-
-
-class FilterType(str, Enum):
-    """Filter types"""
-
-    LRGB = "LRGB"
-    NARROWBAND = "Narrowband"
-    BROADBAND = "Broadband"
-    LUMINANCE = "Luminance"
-    RGB = "RGB"
-    HA = "H-Alpha"
-    OIII = "OIII"
-    SII = "SII"
-    UHC = "UHC"
-    LPR = "Light Pollution Reduction"
-    SOLAR = "Solar"
-    OTHER = "Other"
-
-
 class SamplingClassification(str, Enum):
     """Image sampling classification"""
 
     UNDERSAMPLED = "Undersampled"
     OPTIMAL = "Optimal"
     OVERSAMPLED = "Oversampled"
-
-
-class ImagingType(str, Enum):
-    """Imaging type classification"""
-
-    PLANETARY = "Planetary"
-    DEEP_SKY = "Deep-Sky"
-    WIDE_FIELD = "Wide-Field"
-    OTHER = "Other"
 
 
 # ============================================================

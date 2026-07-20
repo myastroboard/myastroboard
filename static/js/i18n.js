@@ -308,20 +308,6 @@ function updateElementText(element, key, params = {}) {
 }
 
 /**
- * Utility function to update element HTML with translation
- * Use carefully to avoid XSS - only use with static translation keys, never with dynamic content
- * 
- * @param {HTMLElement} element - The element to update
- * @param {string} key - The translation key
- * @param {object} params - Optional parameters for placeholders
- */
-function updateElementHTML(element, key, params = {}) {
-    if (element) {
-        element.textContent = i18n.t(key, params);
-    }
-}
-
-/**
  * Convert a string to a translation key format
  * Example: "More Info" -> "more_info"
  * 
