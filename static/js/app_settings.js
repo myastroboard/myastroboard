@@ -57,11 +57,6 @@ function showRestartBanner() {
     if (banner) banner.style.display = 'flex';
 }
 
-function hideRestartBanner() {
-    const banner = document.getElementById('restart-required-banner');
-    if (banner) banner.style.display = 'none';
-}
-
 function _showFeedback(elementId) {
     const el = document.getElementById(elementId);
     if (!el) return;

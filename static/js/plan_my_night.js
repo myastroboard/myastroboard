@@ -789,16 +789,6 @@ function computePlannedCoverage(entries, plan) {
     };
 }
 
-function getPlanEntryMinutes(entry) {
-    const explicitMinutes = Number.parseInt(String(entry?.planned_minutes ?? ''), 10);
-    if (Number.isFinite(explicitMinutes) && explicitMinutes >= 0) {
-        return explicitMinutes;
-    }
-    return parsePlanDurationToMinutes(entry?.planned_duration);
-}
-
-
-
 function getCoverageStatus(fillPercent) {
     const safePercent = Number(fillPercent) || 0;
     if (safePercent > 100) {

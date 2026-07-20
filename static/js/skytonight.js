@@ -2648,14 +2648,12 @@ async function _showSkyTonightDataSection(sectionKey, container) {
 
             // Keep window.catalogueReports in sync for badge update functions
             window.catalogueReports = window.catalogueReports || {};
-            window.catalogueReportSources = window.catalogueReportSources || {};
             if (!window.catalogueReports['SkyTonight']) {
                 window.catalogueReports['SkyTonight'] = { report: [], bodies: [], comets: [] };
             }
             if (sectionKey === 'report') window.catalogueReports['SkyTonight'].report = data.report || [];
             if (sectionKey === 'bodies') window.catalogueReports['SkyTonight'].bodies = data.bodies || [];
             if (sectionKey === 'comets') window.catalogueReports['SkyTonight'].comets = data.comets || [];
-            window.catalogueReportSources['SkyTonight'] = 'skytonight';
         }
 
         DOMUtils.clear(container);
@@ -3903,49 +3901,6 @@ function sanitizeImageSource(rawSrc) {
     }
 }
 
-// ======================
-// Modal Popups
-// ======================
-
-function showPlotPopup(title, src) {
-    const modalElement = document.getElementById('modal_full_close');
-    if (!modalElement) {
-        console.error('Modal element not found');
-        return;
-    }
-
-    const modal = new bootstrap.Modal(modalElement);
-
-    // Title
-    const titleElement = document.getElementById('modal_full_close_title');
-    if (titleElement) {
-        titleElement.textContent = title; // safe
-    }
-
-    const bodyElement = document.getElementById('modal_full_close_body');
-    if (bodyElement) {
-        // Clear existing content safely
-        DOMUtils.clear(bodyElement);
-
-        const safeSrc = sanitizeImageSource(src);
-        if (!safeSrc) {
-            console.error('Invalid image source');
-            return;
-        }
-
-        const img = document.createElement('img');
-        img.id = 'image-display';
-        img.src = safeSrc;
-        img.alt = 'Plot';
-        img.title = title;            // safe
-        img.className = 'img-fluid rounded';
-
-        bodyElement.appendChild(img);
-    }
-
-    modal.show();
-}
-
 // Altitude-time Chart.js instance - stored so it can be destroyed when the modal closes.
 let _alttimeChartInstance = null;
 
@@ -4340,32 +4295,6 @@ async function showAlttimePopup(title, targetId, locationId) {
             },
         },
     });
-}
-
-function showMorePopup(popupId) {
-    const popup = document.getElementById(popupId);
-
-    if (popup) {
-        // Use BS modal
-        //Prepare modal title
-        const titleElement = document.getElementById('modal_lg_close_title');
-        titleElement.textContent = tSkyTonightCompat('more_info');
-
-        //Prepare modal content
-        const contentElement = document.getElementById('modal_lg_close_body');
-        DOMUtils.clear(contentElement);
-        Array.from(popup.childNodes).forEach((node) => {
-            contentElement.appendChild(node.cloneNode(true));
-        });
-
-        const _modalEl2 = document.getElementById('modal_lg_close');
-        let bs_modal = bootstrap.Modal.getInstance(_modalEl2);
-        if (!bs_modal) {
-            bs_modal = new bootstrap.Modal(_modalEl2, { backdrop: true, focus: true, keyboard: true });
-        }
-        bs_modal.show();
-
-    }
 }
 
 // Close popup when clicking outside
