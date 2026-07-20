@@ -1516,14 +1516,17 @@ def update_combination(user_id: str, combination_id: str, combination_data: Dict
 def delete_combination(user_id: str, combination_id: str) -> Tuple[bool, Optional[str]]:
     """Delete an equipment combination.
 
-    Refuses deletion while any Astrodex picture (any user) still references this combination,
-    returning (False, 'in_use_by_picture'). Plan-based blocking is not yet possible here - it
-    lands once Plan My Night plans carry a combination reference too (a later milestone).
+    Refuses deletion while any Astrodex picture (any user) still references this combination
+    ('in_use_by_picture'), or any Plan My Night plan (any user) is pinned to it
+    ('in_use_by_plan').
     """
     from observation.astrodex import count_pictures_for_combination
+    from observation.plan_my_night import count_plans_for_combination
 
     if count_pictures_for_combination(combination_id) > 0:
         return False, 'in_use_by_picture'
+    if count_plans_for_combination(combination_id) > 0:
+        return False, 'in_use_by_plan'
     try:
         data = load_user_combinations(user_id)
         data['items'] = [item for item in data['items'] if item['id'] != combination_id]

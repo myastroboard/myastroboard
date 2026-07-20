@@ -60,7 +60,7 @@ def _safe_plan_path(path: str) -> str:
     return resolved
 
 
-_TELESCOPE_ID_DEFAULT = 'default'
+_COMBINATION_ID_DEFAULT = 'default'
 
 # All system-generated IDs are UUID v4 strings produced by uuid.uuid4()
 _UUID_RE = re.compile(
@@ -74,13 +74,13 @@ def _is_valid_user_id(user_id: Optional[str]) -> bool:
     return bool(user_id) and bool(_UUID_RE.match(str(user_id)))
 
 
-def _is_valid_telescope_id(telescope_id: Optional[str]) -> bool:
-    """Return True for 'default' or a UUID string used as a telescope identifier."""
-    if not telescope_id:
+def _is_valid_combination_id(combination_id: Optional[str]) -> bool:
+    """Return True for 'default' or a UUID string used as an equipment combination identifier."""
+    if not combination_id:
         return False
-    if telescope_id == _TELESCOPE_ID_DEFAULT:
+    if combination_id == _COMBINATION_ID_DEFAULT:
         return True
-    return bool(_UUID_RE.match(str(telescope_id)))
+    return bool(_UUID_RE.match(str(combination_id)))
 
 
 def _now() -> datetime:
@@ -368,16 +368,17 @@ def ensure_plan_directory() -> None:
     os.makedirs(PLAN_DIR, exist_ok=True)
 
 
-def get_user_plan_file(user_id: str, telescope_id: Optional[str] = None) -> str:
+def get_user_plan_file(user_id: str, combination_id: Optional[str] = None) -> str:
     ensure_plan_directory()
     if not _is_valid_user_id(user_id):
         raise ValueError(f'Invalid user_id format: {user_id!r}')
-    tid = telescope_id if _is_valid_telescope_id(telescope_id) else _TELESCOPE_ID_DEFAULT
-    if tid == _TELESCOPE_ID_DEFAULT:
-        # Legacy / no-telescope filename kept for backwards compat
+    cid = combination_id if _is_valid_combination_id(combination_id) else _COMBINATION_ID_DEFAULT
+    if cid == _COMBINATION_ID_DEFAULT:
+        # No-combination filename kept as-is - this predates combinations and stays the
+        # on-disk name for the "no equipment selected" plan.
         path = os.path.join(PLAN_DIR, f'{user_id}_plan_my_night.json')
     else:
-        path = os.path.join(PLAN_DIR, f'{user_id}_plan_{tid}.json')
+        path = os.path.join(PLAN_DIR, f'{user_id}_plan_{cid}.json')
     # _safe_plan_path resolves symlinks and verifies containment; returns the
     # realpath so downstream callers always operate on a canonical, safe path.
     return _safe_plan_path(path)
@@ -405,26 +406,6 @@ def get_all_plan_files(user_id: str) -> list:
     return result
 
 
-def delete_plan_for_telescope(user_id: str, telescope_id: str) -> bool:
-    """Delete the plan file for a specific telescope (called when telescope is removed)."""
-    if not _is_valid_user_id(user_id) or not _is_valid_telescope_id(telescope_id):
-        logger.warning('delete_plan_for_telescope: invalid user_id or telescope_id, aborting')
-        return False
-    try:
-        resolved = get_user_plan_file(user_id, telescope_id)
-    except ValueError:
-        logger.warning('delete_plan_for_telescope: path traversal detected, aborting')
-        return False
-    try:
-        if os.path.exists(resolved):
-            os.remove(resolved)
-            logger.info(f'Deleted plan file for user {user_id} telescope {telescope_id}')
-        return True
-    except Exception as error:
-        logger.error(f'Error deleting plan file {resolved}: {error}')
-        return False
-
-
 def _default_payload(user_id: str, username: Optional[str] = None) -> Dict:
     return {
         'user_id': user_id,
@@ -435,11 +416,11 @@ def _default_payload(user_id: str, username: Optional[str] = None) -> Dict:
     }
 
 
-def load_user_plan(user_id: str, username: Optional[str] = None, telescope_id: Optional[str] = None) -> Dict:
+def load_user_plan(user_id: str, username: Optional[str] = None, combination_id: Optional[str] = None) -> Dict:
     # get_user_plan_file already calls _safe_plan_path and returns the resolved
     # path.  Re-applying _safe_plan_path here makes the sanitization explicit at
     # the call site, which is required for CodeQL to recognise the barrier.
-    file_path = _safe_plan_path(get_user_plan_file(user_id, telescope_id))
+    file_path = _safe_plan_path(get_user_plan_file(user_id, combination_id))
     if not os.path.exists(file_path):
         return _default_payload(user_id, username)
 
@@ -509,9 +490,9 @@ def validate_plan_json(file_path: str) -> Tuple[bool, str]:
 
 
 def save_user_plan(
-    user_id: str, payload: Dict, username: Optional[str] = None, telescope_id: Optional[str] = None
+    user_id: str, payload: Dict, username: Optional[str] = None, combination_id: Optional[str] = None
 ) -> bool:
-    file_path = get_user_plan_file(user_id, telescope_id)
+    file_path = get_user_plan_file(user_id, combination_id)
     temp_path = file_path + '.tmp'
     backup_path = file_path + '.backup'
 
@@ -638,9 +619,9 @@ def is_target_in_entries(plan_entries: list, catalogue: str, name: str) -> bool:
 
 
 def is_target_in_current_plan(
-    user_id: str, username: str, catalogue: str, name: str, telescope_id: Optional[str] = None
+    user_id: str, username: str, catalogue: str, name: str, combination_id: Optional[str] = None
 ) -> bool:
-    payload = load_user_plan(user_id, username, telescope_id=telescope_id)
+    payload = load_user_plan(user_id, username, combination_id=combination_id)
     plan = payload.get('plan')
     if not plan:
         return False
@@ -737,12 +718,12 @@ def create_or_add_target(
     night_start: Any,
     night_end: Any,
     duration_hours: float = 0.0,
-    telescope_id: Optional[str] = None,
-    telescope_name: Optional[str] = None,
+    combination_id: Optional[str] = None,
+    combination_name: Optional[str] = None,
     location_id: Optional[str] = None,
     location_name: Optional[str] = None,
 ) -> Tuple[bool, str, Optional[Dict], Optional[Dict]]:
-    payload = load_user_plan(user_id, username, telescope_id=telescope_id)
+    payload = load_user_plan(user_id, username, combination_id=combination_id)
     plan = payload.get('plan')
     now_dt = _now()
 
@@ -763,8 +744,8 @@ def create_or_add_target(
             'duration_hours': float(duration_hours or 0.0),
             'created_at': _to_iso(now_dt),
             'updated_at': _to_iso(now_dt),
-            'telescope_id': telescope_id or None,
-            'telescope_name': telescope_name or None,
+            'combination_id': combination_id or None,
+            'combination_name': combination_name or None,
             # Pinned at creation (v1.2): the plan's altitude/timeline math stays
             # reproducible - it is never silently recomputed against a different
             # location. location_name is a frozen snapshot for display; the UI
@@ -786,16 +767,16 @@ def create_or_add_target(
     entries.append(target)
     plan['updated_at'] = _to_iso(now_dt)
 
-    if not save_user_plan(user_id, payload, username=username, telescope_id=telescope_id):
+    if not save_user_plan(user_id, payload, username=username, combination_id=combination_id):
         return False, 'save_failed', payload, None
 
     return True, 'added', payload, target
 
 
-def clear_plan(user_id: str, username: str, telescope_id: Optional[str] = None) -> bool:
-    payload = load_user_plan(user_id, username, telescope_id=telescope_id)
+def clear_plan(user_id: str, username: str, combination_id: Optional[str] = None) -> bool:
+    payload = load_user_plan(user_id, username, combination_id=combination_id)
     payload['plan'] = None
-    return save_user_plan(user_id, payload, username=username, telescope_id=telescope_id)
+    return save_user_plan(user_id, payload, username=username, combination_id=combination_id)
 
 
 def clear_all_plans(user_id: str) -> int:
@@ -862,8 +843,52 @@ def delete_plans_for_location(location_id: str) -> int:
     return deleted
 
 
-def remove_target(user_id: str, username: str, entry_id: str, telescope_id: Optional[str] = None) -> bool:
-    payload = load_user_plan(user_id, username, telescope_id=telescope_id)
+def _plan_references_combination(file_path: str, combination_id: str) -> bool:
+    try:
+        with open(file_path, 'r', encoding='utf-8') as file_obj:
+            payload = json.load(file_obj)
+        plan = payload.get('plan') if isinstance(payload, dict) else None
+        return bool(isinstance(plan, dict) and plan.get('combination_id') == combination_id)
+    except Exception:
+        return False
+
+
+def count_plans_for_combination(combination_id: str) -> int:
+    """Count plans (all users) pinned to an equipment combination - pre-delete check.
+
+    Unlike locations, combinations are never cascade-deleted: deletion is blocked while
+    any plan references the combination (see equipment_profiles.delete_combination).
+    """
+    if not combination_id:
+        return 0
+    return sum(1 for path in _iter_all_plan_files() if _plan_references_combination(path, combination_id))
+
+
+def purge_legacy_telescope_plans() -> int:
+    """Delete plan files still keyed by the pre-combination schema (a raw ``telescope_id`` field).
+
+    Plans are daily/ephemeral, so there is no migration path from the old telescope-keyed
+    schema - any plan file whose ``plan`` dict still contains the legacy ``telescope_id`` key
+    (an unambiguous marker: this module never writes that key again) is simply deleted.
+    Called once at app startup.
+    """
+    deleted = 0
+    for file_path in _iter_all_plan_files():
+        try:
+            with open(file_path, 'r', encoding='utf-8') as file_obj:
+                payload = json.load(file_obj)
+            plan = payload.get('plan') if isinstance(payload, dict) else None
+            if isinstance(plan, dict) and 'telescope_id' in plan:
+                os.remove(file_path)
+                deleted += 1
+                logger.info(f'Purged legacy telescope-keyed plan file: {file_path}')
+        except Exception as error:
+            logger.error(f'Error checking plan file {file_path} for legacy schema: {error}')
+    return deleted
+
+
+def remove_target(user_id: str, username: str, entry_id: str, combination_id: Optional[str] = None) -> bool:
+    payload = load_user_plan(user_id, username, combination_id=combination_id)
     plan = payload.get('plan')
     if not plan:
         return False
@@ -879,13 +904,13 @@ def remove_target(user_id: str, username: str, entry_id: str, telescope_id: Opti
         return False
 
     plan['updated_at'] = _to_iso(_now())
-    return save_user_plan(user_id, payload, username=username, telescope_id=telescope_id)
+    return save_user_plan(user_id, payload, username=username, combination_id=combination_id)
 
 
 def update_target(
-    user_id: str, username: str, entry_id: str, updates: Dict, telescope_id: Optional[str] = None
+    user_id: str, username: str, entry_id: str, updates: Dict, combination_id: Optional[str] = None
 ) -> Optional[Dict]:
-    payload = load_user_plan(user_id, username, telescope_id=telescope_id)
+    payload = load_user_plan(user_id, username, combination_id=combination_id)
     plan = payload.get('plan')
     if not plan:
         return None
@@ -919,15 +944,17 @@ def update_target(
     target_entry['updated_at'] = _to_iso(_now())
     plan['updated_at'] = _to_iso(_now())
 
-    if not save_user_plan(user_id, payload, username=username, telescope_id=telescope_id):
+    if not save_user_plan(user_id, payload, username=username, combination_id=combination_id):
         return None
 
     return target_entry
 
 
-def update_plan_meta(user_id: str, username: str, updates: Dict, telescope_id: Optional[str] = None) -> Optional[Dict]:
+def update_plan_meta(
+    user_id: str, username: str, updates: Dict, combination_id: Optional[str] = None
+) -> Optional[Dict]:
     """Update plan-level metadata fields (e.g. start_delay_minutes)."""
-    payload = load_user_plan(user_id, username, telescope_id=telescope_id)
+    payload = load_user_plan(user_id, username, combination_id=combination_id)
     plan = payload.get('plan')
     if not plan:
         return None
@@ -943,15 +970,15 @@ def update_plan_meta(user_id: str, username: str, updates: Dict, telescope_id: O
         plan['start_delay_minutes'] = delay
 
     plan['updated_at'] = _to_iso(_now())
-    if not save_user_plan(user_id, payload, username=username, telescope_id=telescope_id):
+    if not save_user_plan(user_id, payload, username=username, combination_id=combination_id):
         return None
     return plan
 
 
 def reorder_target(
-    user_id: str, username: str, entry_id: str, new_index: int, telescope_id: Optional[str] = None
+    user_id: str, username: str, entry_id: str, new_index: int, combination_id: Optional[str] = None
 ) -> bool:
-    payload = load_user_plan(user_id, username, telescope_id=telescope_id)
+    payload = load_user_plan(user_id, username, combination_id=combination_id)
     plan = payload.get('plan')
     if not plan:
         return False
@@ -972,11 +999,11 @@ def reorder_target(
     entries.insert(bounded_new_index, entry)
     plan['updated_at'] = _to_iso(_now())
 
-    return save_user_plan(user_id, payload, username=username, telescope_id=telescope_id)
+    return save_user_plan(user_id, payload, username=username, combination_id=combination_id)
 
 
-def get_plan_with_timeline(user_id: str, username: str, telescope_id: Optional[str] = None) -> Dict:
-    payload = load_user_plan(user_id, username, telescope_id=telescope_id)
+def get_plan_with_timeline(user_id: str, username: str, combination_id: Optional[str] = None) -> Dict:
+    payload = load_user_plan(user_id, username, combination_id=combination_id)
     plan = payload.get('plan')
     if not plan:
         return {
@@ -1052,7 +1079,7 @@ def get_plan_with_timeline(user_id: str, username: str, telescope_id: Optional[s
 
 
 def compute_optimized_schedule(
-    user_id: str, username: str, telescope_id: Optional[str] = None
+    user_id: str, username: str, combination_id: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
     """Propose a target order + single initial delay that maximizes each target's
     overlap with its real (altitude-based) visibility window for the night.
@@ -1061,7 +1088,7 @@ def compute_optimized_schedule(
     the first target - see ``start_delay_minutes``); the optimizer only chooses
     the order and that one delay, it never introduces mid-plan idle gaps.
     """
-    payload = load_user_plan(user_id, username, telescope_id=telescope_id)
+    payload = load_user_plan(user_id, username, combination_id=combination_id)
     plan = payload.get('plan')
     if not plan:
         return None
@@ -1178,7 +1205,7 @@ def compute_optimized_schedule(
 def apply_optimized_schedule(
     user_id: str,
     username: str,
-    telescope_id: Optional[str],
+    combination_id: Optional[str],
     order: List[str],
     start_delay_minutes: int,
 ) -> bool:
@@ -1188,7 +1215,7 @@ def apply_optimized_schedule(
     (e.g. a target was added/removed), since ``order`` would no longer be a
     valid permutation of the current entries.
     """
-    payload = load_user_plan(user_id, username, telescope_id=telescope_id)
+    payload = load_user_plan(user_id, username, combination_id=combination_id)
     plan = payload.get('plan')
     if not plan:
         return False
@@ -1204,7 +1231,7 @@ def apply_optimized_schedule(
     plan['start_delay_minutes'] = max(0, min(int(start_delay_minutes), 23 * 60 + 59))
     plan['updated_at'] = _to_iso(_now())
 
-    return save_user_plan(user_id, payload, username=username, telescope_id=telescope_id)
+    return save_user_plan(user_id, payload, username=username, combination_id=combination_id)
 
 
 def _csv_normalize_ra(val) -> str:
@@ -1334,25 +1361,28 @@ def serialize_plan_csv(plan_payload: Dict, labels: Optional[Dict[str, str]] = No
     return output.getvalue()
 
 
-def get_all_plan_states(user_id: str, username: str, telescopes: list) -> list:
-    """Return a list of plan summaries for each telescope plus the default (no-telescope) plan.
+def get_all_plan_states(user_id: str, username: str, combinations: list) -> list:
+    """Return a list of plan summaries for each combination plus the default (no-combination) plan.
 
-    Each element: {telescope_id, telescope_name, state, entries_count, night_start, night_end,
-    location_id, location_name}. ``location_id``/``location_name`` are the plan's pinned location
-    (None when the plan has no entries yet / doesn't exist) - used by the "Add to Plan" telescope
-    picker to warn against mixing locations on the same telescope's plan.
+    Each element: {combination_id, combination_name, state, entries_count, night_start, night_end,
+    location_id, location_name, is_valid, is_disabled}. ``location_id``/``location_name`` are the
+    plan's pinned location (None when the plan has no entries yet / doesn't exist) - used by the
+    "Add to Plan" combination picker to warn against mixing locations on the same combination's
+    plan. ``is_valid``/``is_disabled`` (only set on the passed-in ``combinations``, not the
+    default/orphaned entries) let that same picker offer only enabled+valid combinations for a
+    *new* plan while still showing state correctly for existing plans on a since-disabled one.
     """
     result = []
-    # Include the default plan (no telescope) only if it exists on disk
+    # Include the default plan (no combination selected) only if it exists on disk
     default_file = get_user_plan_file(user_id, None)
     if os.path.exists(default_file):
-        payload = load_user_plan(user_id, username, telescope_id=None)
+        payload = load_user_plan(user_id, username, combination_id=None)
         plan = payload.get('plan')
         state = get_plan_state(plan)
         result.append(
             {
-                'telescope_id': None,
-                'telescope_name': None,
+                'combination_id': None,
+                'combination_name': None,
                 'state': state,
                 'entries_count': len(plan.get('entries', [])) if plan else 0,
                 'night_start': plan.get('night_start') if plan else None,
@@ -1363,19 +1393,19 @@ def get_all_plan_states(user_id: str, username: str, telescopes: list) -> list:
         )
 
     known_ids: set = set()
-    for telescope in telescopes:
-        tid = telescope.get('id')
-        tname = telescope.get('name', '')
-        is_own = telescope.get('is_own', True)
-        owner_username = telescope.get('owner_username')
-        known_ids.add(tid)
-        payload = load_user_plan(user_id, username, telescope_id=tid)
+    for combination in combinations:
+        cid = combination.get('id')
+        cname = combination.get('name', '')
+        is_own = combination.get('is_own', True)
+        owner_username = combination.get('owner_username')
+        known_ids.add(cid)
+        payload = load_user_plan(user_id, username, combination_id=cid)
         plan = payload.get('plan')
         state = get_plan_state(plan)
         result.append(
             {
-                'telescope_id': tid,
-                'telescope_name': tname,
+                'combination_id': cid,
+                'combination_name': cname,
                 'state': state,
                 'entries_count': len(plan.get('entries', [])) if plan else 0,
                 'night_start': plan.get('night_start') if plan else None,
@@ -1385,28 +1415,33 @@ def get_all_plan_states(user_id: str, username: str, telescopes: list) -> list:
                 'is_own': is_own,
                 'owner_username': owner_username,
                 'is_orphaned': False,
+                # Disabled/invalid combinations stay visible here (so an existing plan on one
+                # still shows correctly instead of looking orphaned) but the frontend picker
+                # only offers enabled+valid combinations for *starting a new* plan.
+                'is_valid': bool(combination.get('is_valid', True)),
+                'is_disabled': bool(combination.get('is_disabled', False)),
             }
         )
 
-    # Detect orphaned plans: plan files exist but their telescope is no longer accessible
-    # (shared telescope was removed or unshared by its owner)
+    # Detect orphaned plans: plan files exist but their combination is no longer accessible
+    # (shared combination was removed, unshared by its owner, or deleted)
     prefix = f'{user_id}_plan_'
     suffix = '.json'
     for plan_file in get_all_plan_files(user_id):
         fname = os.path.basename(plan_file)
         if not (fname.startswith(prefix) and fname.endswith(suffix)):
             continue
-        tid = fname[len(prefix) : -len(suffix)]
-        if tid == 'my_night' or tid in known_ids:
+        cid = fname[len(prefix) : -len(suffix)]
+        if cid == 'my_night' or cid in known_ids:
             continue
-        payload = load_user_plan(user_id, username, telescope_id=tid)
+        payload = load_user_plan(user_id, username, combination_id=cid)
         plan = payload.get('plan')
-        orphaned_name = (plan.get('telescope_name') if plan else None) or tid
+        orphaned_name = (plan.get('combination_name') if plan else None) or cid
         state = get_plan_state(plan)
         result.append(
             {
-                'telescope_id': tid,
-                'telescope_name': orphaned_name,
+                'combination_id': cid,
+                'combination_name': orphaned_name,
                 'state': state,
                 'entries_count': len(plan.get('entries', [])) if plan else 0,
                 'night_start': plan.get('night_start') if plan else None,
@@ -1677,7 +1712,7 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
             date_str = _fmt_date(plan.get('night_start'))
             ns_str = _fmt_hm(plan.get('night_start'))
             ne_str = _fmt_hm(plan.get('night_end'))
-            scope = (plan.get('telescope_name') or '').strip()
+            combo_label = (plan.get('combination_name') or '').strip()
             n_tgts = len(entries)
             fill_pct = metrics.get('fill_percent', 0.0)
             planned = _fmt_min(metrics.get('planned_minutes', 0))
@@ -1695,11 +1730,11 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
                 color=C_TXT_DRK,
                 transform=ax_info.transAxes,
             )
-            if scope:
+            if combo_label:
                 ax_info.text(
                     0.50,
                     0.88,
-                    f"{t('plan_my_night.export_pdf_telescope') or 'Telescope'}:" f"  {scope}",
+                    f"{t('plan_my_night.export_pdf_combination') or 'Equipment'}:" f"  {combo_label}",
                     va='top',
                     ha='left',
                     fontsize=9.5,

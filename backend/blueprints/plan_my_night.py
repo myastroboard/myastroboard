@@ -191,7 +191,7 @@ def _resolve_requested_language() -> str:
 @plan_my_night_bp.route('/api/plan-my-night/list', methods=['GET'])
 @login_required
 def list_plan_my_night():
-    """Return per-telescope plan summaries for the telescope selector UI."""
+    """Return per-combination plan summaries for the combination selector UI."""
     try:
         user = get_current_user()
         if not user:  # pragma: no cover
@@ -199,12 +199,16 @@ def list_plan_my_night():
 
         from equipment import equipment_profiles as _ep
 
-        telescopes_data = _ep.load_user_telescopes(user.user_id)
-        own = [{**t, 'is_own': True, 'owner_username': None} for t in telescopes_data.get('items', [])]
-        shared = [{**t, 'is_own': False} for t in _ep.load_all_shared_equipment('telescopes', user.user_id)]
-        all_telescopes = own + shared
-        states = plan_my_night.get_all_plan_states(user.user_id, user.username, all_telescopes)
-        return jsonify({'status': 'success', 'plans': states, 'telescope_count': len(all_telescopes)})
+        combinations_data = _ep.load_user_combinations(user.user_id)
+        own = []
+        for combo in combinations_data.get('items', []):
+            validity = _ep.compute_combination_validity_status(combo, user.user_id)
+            own.append({**combo, **validity, 'is_own': True, 'owner_username': None})
+        # Shared combinations already carry is_valid/is_disabled from load_all_shared_combinations.
+        shared = [{**c, 'is_own': False} for c in _ep.load_all_shared_combinations(user.user_id)]
+        all_combinations = own + shared
+        states = plan_my_night.get_all_plan_states(user.user_id, user.username, all_combinations)
+        return jsonify({'status': 'success', 'plans': states, 'combination_count': len(all_combinations)})
     except Exception as error:
         logger.error(f'Error listing plans: {error}')
         return jsonify({'error': 'Internal server error'}), 500
@@ -219,8 +223,8 @@ def get_plan_my_night():
         if not user:  # pragma: no cover
             return jsonify({'error': 'User not authenticated'}), 401
 
-        telescope_id = request.args.get('telescope_id') or None
-        plan_payload = plan_my_night.get_plan_with_timeline(user.user_id, user.username, telescope_id=telescope_id)
+        combination_id = request.args.get('combination_id') or None
+        plan_payload = plan_my_night.get_plan_with_timeline(user.user_id, user.username, combination_id=combination_id)
         plan_payload = _enrich_plan_entries_with_astrodex_status(plan_payload, user.user_id)
         return jsonify(
             {
@@ -258,8 +262,8 @@ def add_target_to_plan_my_night():
         if not start_value or not end_value:
             return jsonify({'error': 'Night window unavailable'}), 409
 
-        telescope_id = data.get('telescope_id') or None
-        telescope_name = str(data.get('telescope_name') or '').strip() or None
+        combination_id = data.get('combination_id') or None
+        combination_name = str(data.get('combination_name') or '').strip() or None
 
         # New plans are pinned to the creator's CURRENT active location (v1.2)
         active_location = _resolve_active_location()
@@ -272,8 +276,8 @@ def add_target_to_plan_my_night():
             night_start=start_value,
             night_end=end_value,
             duration_hours=duration_hours,
-            telescope_id=telescope_id,
-            telescope_name=telescope_name,
+            combination_id=combination_id,
+            combination_name=combination_name,
             location_id=active_location.get('id'),
             location_name=active_location.get('name'),
         )
@@ -290,7 +294,9 @@ def add_target_to_plan_my_night():
                 'status': 'success',
                 'reason': reason,
                 'entry': entry,
-                'plan': plan_my_night.get_plan_with_timeline(user.user_id, user.username, telescope_id=telescope_id),
+                'plan': plan_my_night.get_plan_with_timeline(
+                    user.user_id, user.username, combination_id=combination_id
+                ),
             }
         )
     except Exception as error:
@@ -308,15 +314,17 @@ def patch_plan_my_night():
             return jsonify({'error': 'User not authenticated'}), 401
 
         updates = request.json or {}
-        telescope_id = updates.pop('telescope_id', None) or None
-        updated = plan_my_night.update_plan_meta(user.user_id, user.username, updates, telescope_id=telescope_id)
+        combination_id = updates.pop('combination_id', None) or None
+        updated = plan_my_night.update_plan_meta(user.user_id, user.username, updates, combination_id=combination_id)
         if updated is None:
             return jsonify({'error': 'Plan not found or locked'}), 404
 
         return jsonify(
             {
                 'status': 'success',
-                'plan': plan_my_night.get_plan_with_timeline(user.user_id, user.username, telescope_id=telescope_id),
+                'plan': plan_my_night.get_plan_with_timeline(
+                    user.user_id, user.username, combination_id=combination_id
+                ),
             }
         )
     except Exception as error:
@@ -334,8 +342,10 @@ def update_plan_my_night_target(entry_id):
             return jsonify({'error': 'User not authenticated'}), 401
 
         updates = request.json or {}
-        telescope_id = updates.pop('telescope_id', None) or None
-        updated = plan_my_night.update_target(user.user_id, user.username, entry_id, updates, telescope_id=telescope_id)
+        combination_id = updates.pop('combination_id', None) or None
+        updated = plan_my_night.update_target(
+            user.user_id, user.username, entry_id, updates, combination_id=combination_id
+        )
         if not updated:
             return jsonify({'error': 'Target not found or plan locked'}), 404
 
@@ -343,7 +353,9 @@ def update_plan_my_night_target(entry_id):
             {
                 'status': 'success',
                 'entry': updated,
-                'plan': plan_my_night.get_plan_with_timeline(user.user_id, user.username, telescope_id=telescope_id),
+                'plan': plan_my_night.get_plan_with_timeline(
+                    user.user_id, user.username, combination_id=combination_id
+                ),
             }
         )
     except Exception as error:
@@ -364,10 +376,10 @@ def reorder_plan_my_night_target(entry_id):
         new_index = data.get('new_index')
         if new_index is None:
             return jsonify({'error': 'new_index is required'}), 400
-        telescope_id = data.get('telescope_id') or None
+        combination_id = data.get('combination_id') or None
 
         success = plan_my_night.reorder_target(
-            user.user_id, user.username, entry_id, int(new_index), telescope_id=telescope_id
+            user.user_id, user.username, entry_id, int(new_index), combination_id=combination_id
         )
         if not success:
             return jsonify({'error': 'Failed to reorder target'}), 404
@@ -375,7 +387,9 @@ def reorder_plan_my_night_target(entry_id):
         return jsonify(
             {
                 'status': 'success',
-                'plan': plan_my_night.get_plan_with_timeline(user.user_id, user.username, telescope_id=telescope_id),
+                'plan': plan_my_night.get_plan_with_timeline(
+                    user.user_id, user.username, combination_id=combination_id
+                ),
             }
         )
     except Exception as error:
@@ -393,15 +407,15 @@ def optimize_plan_my_night():
         if not user:  # pragma: no cover
             return jsonify({'error': 'User not authenticated'}), 401
 
-        telescope_id = request.args.get('telescope_id') or None
-        plan_load = plan_my_night.load_user_plan(user.user_id, user.username, telescope_id=telescope_id)
+        combination_id = request.args.get('combination_id') or None
+        plan_load = plan_my_night.load_user_plan(user.user_id, user.username, combination_id=combination_id)
         plan = plan_load.get('plan')
         if not plan or not plan.get('entries'):
             return jsonify({'error': 'No plan or targets to optimize'}), 404
         if plan_my_night.get_plan_state(plan) == 'previous':
             return jsonify({'error': 'Plan belongs to previous night'}), 409
 
-        result = plan_my_night.compute_optimized_schedule(user.user_id, user.username, telescope_id=telescope_id)
+        result = plan_my_night.compute_optimized_schedule(user.user_id, user.username, combination_id=combination_id)
         if result is None:
             return jsonify({'error': 'No plan or targets to optimize'}), 404
 
@@ -421,14 +435,14 @@ def apply_plan_my_night_optimization():
             return jsonify({'error': 'User not authenticated'}), 401
 
         data = request.json or {}
-        telescope_id = data.get('telescope_id') or None
+        combination_id = data.get('combination_id') or None
         order = data.get('order')
         start_delay_minutes = data.get('start_delay_minutes')
         if not isinstance(order, list) or not order or start_delay_minutes is None:
             return jsonify({'error': 'order and start_delay_minutes are required'}), 400
 
         success = plan_my_night.apply_optimized_schedule(
-            user.user_id, user.username, telescope_id, order, int(start_delay_minutes)
+            user.user_id, user.username, combination_id, order, int(start_delay_minutes)
         )
         if not success:
             return jsonify({'error': 'Failed to apply optimized schedule (plan may have changed)'}), 409
@@ -436,7 +450,9 @@ def apply_plan_my_night_optimization():
         return jsonify(
             {
                 'status': 'success',
-                'plan': plan_my_night.get_plan_with_timeline(user.user_id, user.username, telescope_id=telescope_id),
+                'plan': plan_my_night.get_plan_with_timeline(
+                    user.user_id, user.username, combination_id=combination_id
+                ),
             }
         )
     except Exception as error:
@@ -453,15 +469,17 @@ def delete_plan_my_night_target(entry_id):
         if not user:  # pragma: no cover
             return jsonify({'error': 'User not authenticated'}), 401
 
-        telescope_id = request.args.get('telescope_id') or None
-        success = plan_my_night.remove_target(user.user_id, user.username, entry_id, telescope_id=telescope_id)
+        combination_id = request.args.get('combination_id') or None
+        success = plan_my_night.remove_target(user.user_id, user.username, entry_id, combination_id=combination_id)
         if not success:
             return jsonify({'error': 'Target not found or plan locked'}), 404
 
         return jsonify(
             {
                 'status': 'success',
-                'plan': plan_my_night.get_plan_with_timeline(user.user_id, user.username, telescope_id=telescope_id),
+                'plan': plan_my_night.get_plan_with_timeline(
+                    user.user_id, user.username, combination_id=combination_id
+                ),
             }
         )
     except Exception as error:
@@ -478,8 +496,8 @@ def clear_plan_my_night():
         if not user:  # pragma: no cover
             return jsonify({'error': 'User not authenticated'}), 401
 
-        telescope_id = request.args.get('telescope_id') or None
-        if not plan_my_night.clear_plan(user.user_id, user.username, telescope_id=telescope_id):
+        combination_id = request.args.get('combination_id') or None
+        if not plan_my_night.clear_plan(user.user_id, user.username, combination_id=combination_id):
             return jsonify({'error': 'Failed to clear plan'}), 500
 
         return jsonify({'status': 'success'})
@@ -491,7 +509,7 @@ def clear_plan_my_night():
 @plan_my_night_bp.route('/api/plan-my-night/clear-all', methods=['DELETE'])
 @user_required
 def clear_all_plans_my_night():
-    """Clear all per-telescope plans for the current user."""
+    """Clear all per-combination plans for the current user."""
     try:
         user = get_current_user()
         if not user:  # pragma: no cover
@@ -523,7 +541,7 @@ def add_plan_target_to_astrodex(entry_id):
                 fname = os.path.basename(file_path)
                 if fname != f'{user.user_id}_plan_my_night.json':
                     tid = fname.replace(f'{user.user_id}_plan_', '').replace('.json', '')
-                sub_payload = plan_my_night.load_user_plan(user.user_id, user.username, telescope_id=tid)
+                sub_payload = plan_my_night.load_user_plan(user.user_id, user.username, combination_id=tid)
                 sub_plan = sub_payload.get('plan') or {}
                 candidate = next((e for e in sub_plan.get('entries', []) if e.get('id') == entry_id), None)
                 if candidate:
@@ -565,7 +583,7 @@ def export_plan_my_night_csv():
             return jsonify({'error': 'User not authenticated'}), 401
 
         payload = plan_my_night.get_plan_with_timeline(
-            user.user_id, user.username, telescope_id=request.args.get('telescope_id') or None
+            user.user_id, user.username, combination_id=request.args.get('combination_id') or None
         )
         language = _resolve_requested_language()
         i18n = I18nManager(language)
@@ -593,7 +611,7 @@ def export_plan_my_night_csv():
 
         _plan_meta = payload.get('plan') or {}
         _csv_date = (_plan_meta.get('plan_date') or '').replace('-', '') or 'unknown'
-        _csv_scope = re.sub(r'[^\w\-]', '_', (_plan_meta.get('telescope_name') or '').strip()) or None
+        _csv_scope = re.sub(r'[^\w\-]', '_', (_plan_meta.get('combination_name') or '').strip()) or None
         _csv_name = f'plan-my-night_{_csv_date}_{_csv_scope}.csv' if _csv_scope else f'plan-my-night_{_csv_date}.csv'
 
         return send_file(buffer, as_attachment=True, mimetype='text/csv', download_name=_csv_name)
@@ -616,14 +634,14 @@ def export_plan_my_night_pdf():
         payload = plan_my_night.get_plan_with_timeline(
             user.user_id,
             user.username,
-            telescope_id=request.args.get('telescope_id') or None,
+            combination_id=request.args.get('combination_id') or None,
         )
         metrics = _compute_plan_fill_metrics(payload.get('plan') or {})
         buffer = plan_my_night.generate_plan_pdf(payload, metrics, i18n)
 
         plan = payload.get('plan')
         _pdf_date = (plan.get('plan_date') or '').replace('-', '') if plan else 'unknown'
-        _pdf_scope = re.sub(r'[^\w\-]', '_', (plan.get('telescope_name') or '').strip()) if plan else None
+        _pdf_scope = re.sub(r'[^\w\-]', '_', (plan.get('combination_name') or '').strip()) if plan else None
         _pdf_name = f'plan-my-night_{_pdf_date}_{_pdf_scope}.pdf' if _pdf_scope else f'plan-my-night_{_pdf_date}.pdf'
 
         return send_file(buffer, as_attachment=True, mimetype='application/pdf', download_name=_pdf_name)

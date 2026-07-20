@@ -644,9 +644,9 @@ def _load_cache(key: str) -> Optional[dict]:
 def _pick_active_plan(user_id: str, username: str) -> Optional[dict]:
     """Return the most relevant plan payload across all of the user's plan files.
 
-    The scheduler must check every plan file (default and telescope-specific)
-    because plans are stored per telescope and the scheduler has no way to know
-    which telescope the user had selected when they built the plan.
+    The scheduler must check every plan file (default and combination-specific)
+    because plans are stored per combination and the scheduler has no way to know
+    which combination the user had selected when they built the plan.
 
     Priority: plan where is_inside_night is True > any 'current' plan > first
     non-'none' plan found.
@@ -670,21 +670,21 @@ def _pick_active_plan(user_id: str, username: str) -> Optional[dict]:
         fname = os.path.basename(file_path)
         if not (fname.startswith(prefix) and fname.endswith(suffix)):
             continue
-        raw_tid = fname[len(prefix) : -len(suffix)]
-        telescope_id = None if raw_tid == 'my_night' else raw_tid
+        raw_cid = fname[len(prefix) : -len(suffix)]
+        combination_id = None if raw_cid == 'my_night' else raw_cid
         try:
-            payload = get_plan_with_timeline(user_id, username, telescope_id=telescope_id)
+            payload = get_plan_with_timeline(user_id, username, combination_id=combination_id)
             state = payload.get('state', 'none')
             if state == 'none':
-                logger.debug(f"Plan (telescope={telescope_id}) for {username}: state=none, skipping")
+                logger.debug(f"Plan (combination={combination_id}) for {username}: state=none, skipping")
                 continue
             logger.debug(
-                f"Plan (telescope={telescope_id}) for {username}: state={state}, "
+                f"Plan (combination={combination_id}) for {username}: state={state}, "
                 f"inside_night={payload.get('timeline', {}).get('is_inside_night')}"
             )
             candidates.append(payload)
         except Exception as e:
-            logger.debug(f"Could not load plan (telescope={telescope_id}) for {username}: {e}")
+            logger.debug(f"Could not load plan (combination={combination_id}) for {username}: {e}")
 
     if not candidates:
         logger.debug(f"No active plan found for {username}")
@@ -754,7 +754,7 @@ def _poll() -> None:
             multi_location = len(watched) > 1
 
             # Plan data is per-user - pick the most active plan across all
-            # telescope-specific plan files (not just the default one).
+            # combination-specific plan files (not just the default one).
             plan_payload = _pick_active_plan(user.user_id, user.username)
 
             # Fast-mode detection: active night OR night starting within 30 min

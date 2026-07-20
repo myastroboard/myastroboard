@@ -118,7 +118,7 @@ Plan My Night turns your SkyTonight shortlist into a structured observation sche
 
 Built for real field use: readable in low light, quick to update, and exportable for your records.
 
-Shared telescopes (see [Sharing Equipment](#sharing-equipment--perfect-for-families--astronomy-clubs)) appear in the telescope selector alongside your own, so every club member can plan their session around the shared club scope without needing to duplicate it in their own profile.
+Shared equipment combinations (see [Sharing Equipment](#sharing-equipment--perfect-for-families--astronomy-clubs)) appear in the combination selector alongside your own, so every club member can plan their session around the shared club gear without needing to duplicate it in their own profile.
 
 ![Plan My Night](img/astrodex_plan_my_night.png)
 
@@ -182,10 +182,10 @@ Every piece of equipment can be marked **"Share with all users"** in its edit fo
 | **Field of View Calculator** | Shared telescopes & cameras appear in the dropdowns, labelled *(shared by X)* |
 | **SkyTonight - Best Equipment For This Target** | Recommendations include shared equipment combinations. Own combinations are listed first. |
 | **Astrodex - Add Picture** | Shared equipment combinations and filters appear in the selection dropdowns. |
-| **Plan My Night** | Shared telescopes appear in the telescope selector (own first, then shared), so any member can plan a session around the club's scope. |
+| **Plan My Night** | Shared equipment combinations appear in the combination selector (own first, then shared), so any member can plan a session around the club's gear. |
 
-**When a shared telescope is removed or made private:**
-Any observation plan built around it is preserved intact and shown with a ⚠ *"telescope no longer available"* warning. Nothing is deleted silently - the user can review the plan and decide what to do with it.
+**When a shared combination is removed or made private:**
+Any observation plan built around it is preserved intact and shown with a ⚠ *"combination no longer available"* warning. Nothing is deleted silently - the user can review the plan and decide what to do with it.
 
 > **Typical use cases:** A family where one member owns the mount and another owns the camera; an astronomy club with shared club equipment alongside members' personal gear; a pair of astrophotographers splitting a filter set.
 

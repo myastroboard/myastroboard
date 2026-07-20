@@ -824,7 +824,6 @@ class TestGeneratePlanPdf:
 # ============================================================
 
 _TEST_UID = "aaaa1111-2222-3333-4444-555566667777"
-_TEST_SCOPE = "bbbb2222-3333-4444-5555-666677778888"
 
 
 class TestGetAllPlanFilesPathError:
@@ -845,32 +844,6 @@ class TestGetAllPlanFilesPathError:
         monkeypatch.setattr(plan_my_night, '_safe_plan_path', mock_safe)
         result = plan_my_night.get_all_plan_files(_TEST_UID)
         assert result == []
-
-
-class TestDeletePlanForTelescopeEdgeCases:
-    """Covers edge cases in delete_plan_for_telescope."""
-
-    def test_value_error_from_get_user_plan_file(self, temp_plan_dir, monkeypatch):
-        """Covers ValueError causes return False."""
-        monkeypatch.setattr(
-            plan_my_night, 'get_user_plan_file',
-            lambda *_a: (_ for _ in ()).throw(ValueError("path traversal"))
-        )
-        result = plan_my_night.delete_plan_for_telescope(_TEST_UID, _TEST_SCOPE)
-        assert result is False
-
-    def test_os_remove_exception_returns_false(self, temp_plan_dir, monkeypatch):
-        """Covers Exception on os.remove causes return False."""
-        file_path = plan_my_night.get_user_plan_file(_TEST_UID, _TEST_SCOPE)
-        with open(file_path, 'w') as f:
-            json.dump({'user_id': _TEST_UID}, f)
-
-        def raise_perm(_p):
-            raise PermissionError("file locked")
-
-        monkeypatch.setattr(plan_my_night.os, 'remove', raise_perm)
-        result = plan_my_night.delete_plan_for_telescope(_TEST_UID, _TEST_SCOPE)
-        assert result is False
 
 
 class TestLoadUserPlanExceptionPaths:
@@ -1537,7 +1510,7 @@ class TestEntryMatchesAlias:
 class TestGetAllPlanStates:
     """Covers ."""
 
-    def test_no_plans_no_telescopes_returns_empty(self, temp_plan_dir):
+    def test_no_plans_no_combinations_returns_empty(self, temp_plan_dir):
         uid = "ffff1001-0000-4000-8000-000000000000"
         result = plan_my_night.get_all_plan_states(uid, "user", [])
         assert result == []
@@ -1548,39 +1521,60 @@ class TestGetAllPlanStates:
         save_user_plan(uid, payload, username="user")
         result = plan_my_night.get_all_plan_states(uid, "user", [])
         assert len(result) == 1
-        assert result[0]['telescope_id'] is None
+        assert result[0]['combination_id'] is None
 
-    def test_telescope_plan_included(self, temp_plan_dir):
+    def test_combination_plan_included(self, temp_plan_dir):
         uid = "ffff1003-0000-4000-8000-000000000000"
-        scope_id = "scope-001"
+        combo_id = "combo-001"
         payload = {'user_id': uid, 'plan': None}
-        save_user_plan(uid, payload, username="user", telescope_id=scope_id)
-        telescopes = [{'id': scope_id, 'name': 'Test Scope', 'is_own': True,
-                       'owner_username': 'user'}]
-        result = plan_my_night.get_all_plan_states(uid, "user", telescopes)
-        assert any(r['telescope_id'] == scope_id for r in result)
+        save_user_plan(uid, payload, username="user", combination_id=combo_id)
+        combinations = [{'id': combo_id, 'name': 'Test Combo', 'is_own': True,
+                          'owner_username': 'user'}]
+        result = plan_my_night.get_all_plan_states(uid, "user", combinations)
+        assert any(r['combination_id'] == combo_id for r in result)
+
+    def test_combination_validity_flags_passed_through(self, temp_plan_dir):
+        """is_valid/is_disabled from the input combination dict surface on the result."""
+        uid = "ffff1006-0000-4000-8000-000000000000"
+        combo_id = "combo-002"
+        combinations = [{'id': combo_id, 'name': 'Disabled Combo', 'is_own': True,
+                          'owner_username': None, 'is_valid': False, 'is_disabled': True}]
+        result = plan_my_night.get_all_plan_states(uid, "user", combinations)
+        entry = next(r for r in result if r['combination_id'] == combo_id)
+        assert entry['is_valid'] is False
+        assert entry['is_disabled'] is True
+
+    def test_combination_validity_flags_default_when_absent(self, temp_plan_dir):
+        """A combination dict without is_valid/is_disabled defaults to valid+enabled."""
+        uid = "ffff1007-0000-4000-8000-000000000000"
+        combo_id = "combo-003"
+        combinations = [{'id': combo_id, 'name': 'Plain Combo', 'is_own': True, 'owner_username': None}]
+        result = plan_my_night.get_all_plan_states(uid, "user", combinations)
+        entry = next(r for r in result if r['combination_id'] == combo_id)
+        assert entry['is_valid'] is True
+        assert entry['is_disabled'] is False
 
     def test_orphaned_plan_detected(self, temp_plan_dir):
         uid = "ffff1004-0000-4000-8000-000000000000"
-        # Use a valid UUID-format telescope_id
+        # Use a valid UUID-format combination_id
         orphan_id = "0a1b2c3d-0000-4000-8000-000000000099"
-        # Save a plan for a telescope that's not in the known_ids list
+        # Save a plan for a combination that's not in the known_ids list
         now = datetime.now().astimezone()
         payload = {
             'user_id': uid,
             'plan': {
                 'night_start': (now - timedelta(hours=1)).isoformat(),
                 'night_end': (now + timedelta(hours=3)).isoformat(),
-                'telescope_name': 'Old Scope',
+                'combination_name': 'Old Combo',
                 'entries': [],
             }
         }
-        save_user_plan(uid, payload, username="user", telescope_id=orphan_id)
-        # Call with empty telescope list (orphan_id is not known)
+        save_user_plan(uid, payload, username="user", combination_id=orphan_id)
+        # Call with empty combination list (orphan_id is not known)
         result = plan_my_night.get_all_plan_states(uid, "user", [])
         orphaned = [r for r in result if r.get('is_orphaned')]
         assert len(orphaned) >= 1
-        assert orphaned[0]['telescope_id'] == orphan_id
+        assert orphaned[0]['combination_id'] == orphan_id
 
     def test_default_plan_with_entries_count(self, temp_plan_dir):
         uid = "ffff1005-0000-4000-8000-000000000000"
@@ -1651,9 +1645,9 @@ class TestCreateOrAddTargetExtra:
         assert ok is False
         assert reason == "save_failed"
 
-    def test_add_with_telescope(self, temp_plan_dir):
+    def test_add_with_combination(self, temp_plan_dir):
         uid = "a1b2c3d4-0003-4000-8000-000000000003"
-        scope_id = "a1b2c3d4-0004-4000-8000-000000000004"
+        combo_id = "a1b2c3d4-0004-4000-8000-000000000004"
         now = datetime.now().astimezone()
         ok, reason, _, target = create_or_add_target(
             user_id=uid, username="user",
@@ -1661,12 +1655,12 @@ class TestCreateOrAddTargetExtra:
             catalogue="NGC",
             night_start=(now - timedelta(hours=1)).isoformat(),
             night_end=(now + timedelta(hours=3)).isoformat(),
-            telescope_id=scope_id,
-            telescope_name="My Scope",
+            combination_id=combo_id,
+            combination_name="My Combo",
         )
         assert ok is True
-        loaded = load_user_plan(uid, "user", telescope_id=scope_id)
-        assert loaded["plan"]["telescope_id"] == scope_id
+        loaded = load_user_plan(uid, "user", combination_id=combo_id)
+        assert loaded["plan"]["combination_id"] == combo_id
 
 
 # ============================================================
@@ -1988,8 +1982,8 @@ class TestGeneratePlanPdfAdditionalBranches:
         result = generate_plan_pdf(payload, metrics, _DummyI18n())
         assert result.getvalue().startswith(b"%PDF")
 
-    def test_telescope_name_and_fill_zero_and_overflow(self, tmp_path, monkeypatch):
-        """Renders the telescope name, and exercises the fill_w<=0.01 and overflow>0 branches."""
+    def test_combination_name_and_fill_zero_and_overflow(self, tmp_path, monkeypatch):
+        """Renders the combination name, and exercises the fill_w<=0.01 and overflow>0 branches."""
         import matplotlib
         matplotlib.use("Agg", force=True)
         monkeypatch.setattr(
@@ -2000,7 +1994,7 @@ class TestGeneratePlanPdfAdditionalBranches:
             "plan": {
                 "night_start": now.isoformat(),
                 "night_end": (now + timedelta(hours=2)).isoformat(),
-                "telescope_name": "Celestron 8\"",
+                "combination_name": "Celestron 8\"",
                 "entries": [],
             }
         }

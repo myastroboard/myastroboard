@@ -29,26 +29,21 @@ function _ensurePlotlyLoaded() {
 }
 
 /**
- * Show a modal to pick a telescope for "Add to Plan My Night".
- * Returns a Promise that resolves with {telescope_id, telescope_name} or null if cancelled.
+ * Show a modal to pick an equipment combination for "Add to Plan My Night".
+ * Returns a Promise that resolves with {combination_id, combination_name} or null if cancelled.
  */
-async function showPlanTelescopePickerModal(telescopeItems, row, activeLocationId) {
-    const existingModal = document.getElementById('plan-telescope-picker-modal');
+async function showPlanCombinationPickerModal(combinationItems, row, activeLocationId) {
+    const existingModal = document.getElementById('plan-combination-picker-modal');
     if (existingModal) existingModal.remove();
 
     // Fetch ratings for the target row (non-blocking - render immediately, fill in ratings after)
     let ratingsById = {};
     if (row) {
         try {
-            // Recommendations are combination-based; several combinations can share the same
-            // telescope, so this picker (still telescope-keyed until it becomes a combination
-            // picker) shows the best rating among combinations using that telescope.
             const recoResp = await _skytFetchCombinationRecommendations(row);
             if (recoResp && Array.isArray(recoResp.recommendations)) {
                 recoResp.recommendations.forEach(item => {
-                    if (!item.telescope_id) return;
-                    const rating = parseInt(item.rating_1_to_5, 10) || 1;
-                    ratingsById[item.telescope_id] = Math.max(ratingsById[item.telescope_id] || 0, rating);
+                    if (item.combination_id) ratingsById[item.combination_id] = parseInt(item.rating_1_to_5, 10) || 1;
                 });
             }
         } catch (_) { /* ratings optional */ }
@@ -56,7 +51,7 @@ async function showPlanTelescopePickerModal(telescopeItems, row, activeLocationI
 
     return new Promise((resolve) => {
         const overlay = document.createElement('div');
-        overlay.id = 'plan-telescope-picker-modal';
+        overlay.id = 'plan-combination-picker-modal';
         overlay.className = 'modal fade show d-block';
         overlay.setAttribute('tabindex', '-1');
         overlay.style.backgroundColor = 'rgba(0,0,0,0.5)';
@@ -71,7 +66,7 @@ async function showPlanTelescopePickerModal(telescopeItems, row, activeLocationI
         header.className = 'modal-header';
         const headerTitle = document.createElement('h5');
         headerTitle.className = 'modal-title';
-        headerTitle.textContent = i18n.t('plan_my_night.select_telescope_for_plan');
+        headerTitle.textContent = i18n.t('plan_my_night.select_combination_for_plan');
         const closeBtn = document.createElement('button');
         closeBtn.type = 'button';
         closeBtn.className = 'btn-close';
@@ -90,31 +85,31 @@ async function showPlanTelescopePickerModal(telescopeItems, row, activeLocationI
 
         const hasRatings = Object.keys(ratingsById).length > 0;
 
-        // Exclude orphaned plans from the picker (telescope no longer accessible)
-        const ownItems = telescopeItems.filter(t => t.is_own !== false && !t.is_orphaned);
-        const sharedItems = telescopeItems.filter(t => t.is_own === false && !t.is_orphaned);
+        // Caller (_resolvePlanCombinationSelection) already excludes orphaned/non-pickable items.
+        const ownItems = combinationItems.filter(c => c.is_own !== false);
+        const sharedItems = combinationItems.filter(c => c.is_own === false);
 
-        const appendTelescopeBtn = (t) => {
+        const appendCombinationBtn = (c) => {
             const btn = document.createElement('button');
             btn.type = 'button';
-            btn.className = 'btn btn-telescope-pick w-100 mb-2 text-start d-flex align-items-center gap-2';
+            btn.className = 'btn btn-combination-pick w-100 mb-2 text-start d-flex align-items-center gap-2';
 
             const stateBadgeEl = document.createElement('span');
-            stateBadgeEl.className = t.state !== 'none'
-                ? `badge bg-${t.state === 'current' ? 'success' : 'warning'}`
+            stateBadgeEl.className = c.state !== 'none'
+                ? `badge bg-${c.state === 'current' ? 'success' : 'warning'}`
                 : 'badge bg-secondary';
-            stateBadgeEl.textContent = t.state !== 'none'
-                ? i18n.t(`plan_my_night.plan_status_${t.state}`, { defaultValue: t.state })
+            stateBadgeEl.textContent = c.state !== 'none'
+                ? i18n.t(`plan_my_night.plan_status_${c.state}`, { defaultValue: c.state })
                 : i18n.t('plan_my_night.plan_status_none', { defaultValue: 'no plan' });
 
             const nameSpan = document.createElement('span');
             nameSpan.className = 'flex-grow-1';
-            nameSpan.appendChild(document.createTextNode(t.telescope_name || t.telescope_id));
-            if (t.owner_username) {
+            nameSpan.appendChild(document.createTextNode(c.combination_name || c.combination_id));
+            if (c.owner_username) {
                 const _sharedEl = document.createElement('span');
                 _sharedEl.className = 'badge bg-info text-dark';
                 _sharedEl.style.fontSize = '0.75em';
-                _sharedEl.textContent = i18n.t('equipment.shared_fov_suffix', { username: t.owner_username });
+                _sharedEl.textContent = i18n.t('equipment.shared_fov_suffix', { username: c.owner_username });
                 nameSpan.append(' ');
                 nameSpan.appendChild(_sharedEl);
             }
@@ -123,22 +118,22 @@ async function showPlanTelescopePickerModal(telescopeItems, row, activeLocationI
 
             // A plan pins its location at creation (v1.2) - adding a target from a different
             // active location onto an already-current plan would silently mix locations on the
-            // same telescope's plan, so that combination is disabled here rather than allowed.
-            const hasLocationConflict = t.state === 'current' && t.location_id
-                && activeLocationId && t.location_id !== activeLocationId;
+            // same combination's plan, so that combination is disabled here rather than allowed.
+            const hasLocationConflict = c.state === 'current' && c.location_id
+                && activeLocationId && c.location_id !== activeLocationId;
             if (hasLocationConflict) {
                 const conflictEl = document.createElement('div');
                 conflictEl.className = 'small text-muted w-100 mt-1';
                 DOMUtils.append(
                     conflictEl,
                     DOMUtils.createIcon('bi bi-geo-alt icon-inline'),
-                    ` ${i18n.t('plan_my_night.telescope_location_in_use', { location: t.location_name || '?' })}`
+                    ` ${i18n.t('plan_my_night.combination_location_in_use', { location: c.location_name || '?' })}`
                 );
                 nameSpan.appendChild(conflictEl);
             }
 
-            const rating = ratingsById[t.telescope_id];
-            DOMUtils.append(btn, DOMUtils.createIcon('bi bi-telescope icon-inline flex-shrink-0'), nameSpan);
+            const rating = ratingsById[c.combination_id];
+            DOMUtils.append(btn, DOMUtils.createIcon('bi bi-collection icon-inline flex-shrink-0'), nameSpan);
             if (rating) {
                 const ratingEl = document.createElement('span');
                 ratingEl.className = 'ms-auto text-warning text-nowrap';
@@ -156,17 +151,17 @@ async function showPlanTelescopePickerModal(telescopeItems, row, activeLocationI
             if (hasLocationConflict) {
                 btn.disabled = true;
                 btn.classList.add('disabled');
-                btn.title = i18n.t('plan_my_night.telescope_location_in_use', { location: t.location_name || '?' });
+                btn.title = i18n.t('plan_my_night.combination_location_in_use', { location: c.location_name || '?' });
             } else {
                 btn.addEventListener('click', () => {
                     overlay.remove();
-                    resolve({ telescope_id: t.telescope_id, telescope_name: t.telescope_name });
+                    resolve({ combination_id: c.combination_id, combination_name: c.combination_name });
                 });
             }
             bodyContent.appendChild(btn);
         };
 
-        ownItems.forEach(appendTelescopeBtn);
+        ownItems.forEach(appendCombinationBtn);
 
         if (sharedItems.length > 0) {
             const sep = document.createElement('hr');
@@ -176,7 +171,7 @@ async function showPlanTelescopePickerModal(telescopeItems, row, activeLocationI
             sepLabel.className = 'text-muted small px-1 mb-1';
             sepLabel.textContent = i18n.t('equipment.shared_by_others_section');
             bodyContent.appendChild(sepLabel);
-            sharedItems.forEach(appendTelescopeBtn);
+            sharedItems.forEach(appendCombinationBtn);
         }
 
         const footer = document.createElement('div');
@@ -203,17 +198,22 @@ async function showPlanTelescopePickerModal(telescopeItems, row, activeLocationI
 }
 
 /**
- * Resolve which telescope's plan an "Add to Plan My Night" action should target:
- * shows a picker when the user owns/shares multiple telescopes, auto-picks the
- * only one when there's exactly one, or leaves it unset (default/no-telescope
+ * Resolve which equipment combination's plan an "Add to Plan My Night" action should
+ * target: shows a picker when the user has multiple pickable combinations, auto-picks
+ * the only one when there's exactly one, or leaves it unset (default/no-combination
  * plan) when there are none. Returns null if the user cancelled the picker.
  */
-async function _resolvePlanTelescopeSelection(itemForRatings) {
-    let telescopeId = null;
-    let telescopeName = null;
+async function _resolvePlanCombinationSelection(itemForRatings) {
+    let combinationId = null;
+    let combinationName = null;
     try {
         const listPayload = await fetchJSON('/api/plan-my-night/list');
-        const telescopeItems = (listPayload?.plans || []).filter(p => p.telescope_id !== null);
+        const allItems = (listPayload?.plans || []).filter(p => p.combination_id !== null);
+        // A combination that's since been disabled/invalidated is only offered here if it
+        // already has a plan (state !== 'none') - starting a brand new plan against inactive
+        // gear isn't allowed, but an existing plan is never hidden just because of it.
+        const pickableItems = allItems.filter(c => !c.is_orphaned
+            && (c.state !== 'none' || (c.is_valid !== false && !c.is_disabled)));
 
         let activeLocationId = null;
         if (typeof fetchMyLocations === 'function') {
@@ -223,29 +223,29 @@ async function _resolvePlanTelescopeSelection(itemForRatings) {
             } catch (_) { /* location check optional - picker just won't grey anything out */ }
         }
 
-        // A single telescope normally auto-picks silently, but if its plan is already
+        // A single combination normally auto-picks silently, but if its plan is already
         // pinned to a different location than the one active now, show the picker instead
         // so the (disabled, labelled) conflict is visible rather than silently mixing
-        // locations on that telescope's plan - see showPlanTelescopePickerModal.
-        const soleConflicts = telescopeItems.length === 1
-            && telescopeItems[0].state === 'current'
-            && telescopeItems[0].location_id
+        // locations on that combination's plan - see showPlanCombinationPickerModal.
+        const soleConflicts = pickableItems.length === 1
+            && pickableItems[0].state === 'current'
+            && pickableItems[0].location_id
             && activeLocationId
-            && telescopeItems[0].location_id !== activeLocationId;
+            && pickableItems[0].location_id !== activeLocationId;
 
-        if (telescopeItems.length >= 2 || soleConflicts) {
-            const picked = await showPlanTelescopePickerModal(telescopeItems, itemForRatings, activeLocationId);
+        if (pickableItems.length >= 2 || soleConflicts) {
+            const picked = await showPlanCombinationPickerModal(pickableItems, itemForRatings, activeLocationId);
             if (!picked) return null; // user cancelled
-            telescopeId = picked.telescope_id;
-            telescopeName = picked.telescope_name;
-        } else if (telescopeItems.length === 1) {
-            telescopeId = telescopeItems[0].telescope_id;
-            telescopeName = telescopeItems[0].telescope_name;
+            combinationId = picked.combination_id;
+            combinationName = picked.combination_name;
+        } else if (pickableItems.length === 1) {
+            combinationId = pickableItems[0].combination_id;
+            combinationName = pickableItems[0].combination_name;
         }
     } catch (_) {
-        // If list fetch fails, proceed without telescope
+        // If list fetch fails, proceed without a combination
     }
-    return { telescope_id: telescopeId, telescope_name: telescopeName };
+    return { combination_id: combinationId, combination_name: combinationName };
 }
 
 function _translatedConstellation(value) {
@@ -2241,8 +2241,8 @@ function _buildRecommendationCard(target) {
         addBtn.addEventListener('click', async () => {
             addBtn.disabled = true;
             try {
-                const telescopeSelection = await _resolvePlanTelescopeSelection(target);
-                if (!telescopeSelection) { addBtn.disabled = false; return; } // user cancelled the telescope picker
+                const combinationSelection = await _resolvePlanCombinationSelection(target);
+                if (!combinationSelection) { addBtn.disabled = false; return; } // user cancelled the combination picker
                 await fetchJSON('/api/plan-my-night/targets', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -2261,8 +2261,8 @@ function _buildRecommendationCard(target) {
                             source_type: 'recommendation',
                         },
                         catalogue: target.catalogue,
-                        telescope_id: telescopeSelection.telescope_id,
-                        telescope_name: telescopeSelection.telescope_name,
+                        combination_id: combinationSelection.combination_id,
+                        combination_name: combinationSelection.combination_name,
                     }),
                 });
                 addBtn.textContent = i18n.t('recommender.add_to_plan_done');
@@ -2584,8 +2584,8 @@ async function _beginnerCatalogAddToAstrodex(obj, buttonEl) {
 async function _beginnerCatalogAddToPlan(obj, buttonEl) {
     buttonEl.disabled = true;
     try {
-        const telescopeSelection = await _resolvePlanTelescopeSelection(obj);
-        if (!telescopeSelection) { buttonEl.disabled = false; return; } // user cancelled the telescope picker
+        const combinationSelection = await _resolvePlanCombinationSelection(obj);
+        if (!combinationSelection) { buttonEl.disabled = false; return; } // user cancelled the combination picker
         const response = await fetchJSON('/api/plan-my-night/targets', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -2601,8 +2601,8 @@ async function _beginnerCatalogAddToPlan(obj, buttonEl) {
                     alttime_file: obj.alttime_file || '',
                 },
                 catalogue: obj.catalogue_id,
-                telescope_id: telescopeSelection.telescope_id,
-                telescope_name: telescopeSelection.telescope_name,
+                combination_id: combinationSelection.combination_id,
+                combination_name: combinationSelection.combination_name,
             }),
         });
         if (response && response.status === 'success') {
@@ -3598,8 +3598,8 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
                         throw new Error('Invalid item data');
                     }
 
-                    const telescopeSelection = await _resolvePlanTelescopeSelection(itemData);
-                    if (!telescopeSelection) return; // user cancelled the telescope picker
+                    const combinationSelection = await _resolvePlanCombinationSelection(itemData);
+                    if (!combinationSelection) return; // user cancelled the combination picker
 
                     const response = await fetchJSON('/api/plan-my-night/targets', {
                         method: 'POST',
@@ -3607,8 +3607,8 @@ function generateReportTable(report, catalogue, type, displayAstrodex = true, pa
                         body: JSON.stringify({
                             item: itemData,
                             catalogue: catalogueName || itemData.catalogue || currentCatalogueTab,
-                            telescope_id: telescopeSelection.telescope_id,
-                            telescope_name: telescopeSelection.telescope_name,
+                            combination_id: combinationSelection.combination_id,
+                            combination_name: combinationSelection.combination_name,
                         })
                     });
 

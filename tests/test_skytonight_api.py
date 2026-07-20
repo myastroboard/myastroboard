@@ -1723,7 +1723,7 @@ class TestPreloadAllCurrentPlanEntries:
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_all_plan_files',
                             lambda uid: ['/fake/uid1_plan_my_night.json'])
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'load_user_plan',
-                            lambda uid, username, telescope_id=None: plan_data)
+                            lambda uid, username, combination_id=None: plan_data)
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_state',
                             lambda plan: 'current')
         result = skytonight_api_module._preload_all_current_plan_entries('uid-1', 'user1')
@@ -1735,7 +1735,7 @@ class TestPreloadAllCurrentPlanEntries:
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_all_plan_files',
                             lambda uid: ['/fake/uid1_plan_my_night.json'])
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'load_user_plan',
-                            lambda uid, username, telescope_id=None: plan_data)
+                            lambda uid, username, combination_id=None: plan_data)
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_state', lambda plan: 'none')
         result = skytonight_api_module._preload_all_current_plan_entries('uid-1', 'user1')
         assert result == []
@@ -1746,7 +1746,7 @@ class TestPreloadAllCurrentPlanEntries:
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_all_plan_files',
                             lambda uid: ['/fake/uid1_plan_my_night.json'])
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'load_user_plan',
-                            lambda uid, username, telescope_id=None: plan_data)
+                            lambda uid, username, combination_id=None: plan_data)
         result = skytonight_api_module._preload_all_current_plan_entries('uid-1', 'user1')
         assert result == []
 
@@ -1755,12 +1755,12 @@ class TestPreloadAllCurrentPlanEntries:
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_all_plan_files',
                             lambda uid: ['/fake/uid1_plan_my_night.json'])
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'load_user_plan',
-                            lambda uid, username, telescope_id=None: (_ for _ in ()).throw(RuntimeError('fail')))
+                            lambda uid, username, combination_id=None: (_ for _ in ()).throw(RuntimeError('fail')))
         result = skytonight_api_module._preload_all_current_plan_entries('uid-1', 'user1')
         assert result == []
 
-    def test_plan_files_with_telescope_id(self, monkeypatch):
-        """file with telescope-specific name → tid extracted."""
+    def test_plan_files_with_combination_id(self, monkeypatch):
+        """file with combination-specific name → cid extracted."""
         plan_data = {
             'plan': {
                 'state': 'current',
@@ -1770,7 +1770,7 @@ class TestPreloadAllCurrentPlanEntries:
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_all_plan_files',
                             lambda uid: ['/fake/uid1_plan_scope-1.json'])
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'load_user_plan',
-                            lambda uid, username, telescope_id=None: plan_data)
+                            lambda uid, username, combination_id=None: plan_data)
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_state', lambda plan: 'current')
         result = skytonight_api_module._preload_all_current_plan_entries('uid-1', 'user1')
         assert result == [{'id': 'target-2', 'name': 'M 31'}]
@@ -1847,7 +1847,7 @@ class TestPreloadPlanEntriesEdgeCases:
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_all_plan_files',
                             lambda uid: [f'/fake/{uid}_plan_my_night.json'])
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'load_user_plan',
-                            lambda uid, username, telescope_id=None: plan_data)
+                            lambda uid, username, combination_id=None: plan_data)
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_state', lambda plan: 'current')
         result = skytonight_api_module._preload_all_current_plan_entries('uid-test-123', 'user1')
         assert result == [{'id': 'target-1', 'name': 'NGC 224'}]
@@ -1863,7 +1863,7 @@ class TestPreloadPlanEntriesEdgeCases:
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_all_plan_files',
                             lambda uid: ['/fake/uid_plan_my_night.json'])
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'load_user_plan',
-                            lambda uid, username, telescope_id=None: plan_data)
+                            lambda uid, username, combination_id=None: plan_data)
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_state', lambda plan: 'current')
         result = skytonight_api_module._preload_all_current_plan_entries('uid-1', 'user1')
         assert result == []
@@ -1882,7 +1882,7 @@ class TestPreloadPlanEntriesEdgeCases:
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_all_plan_files',
                             lambda uid: ['/fake/uid_plan_my_night.json'])
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'load_user_plan',
-                            lambda uid, username, telescope_id=None: plan_data)
+                            lambda uid, username, combination_id=None: plan_data)
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_state', lambda plan: 'current')
         result = skytonight_api_module._preload_all_current_plan_entries('uid-1', 'user1')
         assert len(result) == 1

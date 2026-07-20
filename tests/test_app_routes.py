@@ -4757,6 +4757,17 @@ class TestEquipmentApiRoutes:
         assert resp.status_code == 409
         assert resp.get_json()['error'] == 'in_use_by_picture'
 
+    def test_delete_combination_blocked_by_plan_returns_409(self, client_admin, monkeypatch):
+        scope = client_admin.post('/api/equipment/telescopes', json=_TELESCOPE_DATA).get_json()['data']
+        combo = client_admin.post(
+            '/api/equipment/combinations', json={'name': 'Planned Combo', 'telescope_id': scope['id']}
+        ).get_json()['data']
+
+        monkeypatch.setattr(_plan_my_night_mod.plan_my_night, 'count_plans_for_combination', lambda _cid: 1)
+        resp = client_admin.delete(f"/api/equipment/combinations/{combo['id']}")
+        assert resp.status_code == 409
+        assert resp.get_json()['error'] == 'in_use_by_plan'
+
     def test_get_combination_not_found_returns_404(self, client_admin):
         resp = client_admin.get('/api/equipment/combinations/nonexistent-combo-id')
         assert resp.status_code == 404
@@ -6948,8 +6959,8 @@ class TestBestWindowSyncTrueButCacheStillInvalid:
 class TestAddPlanTargetDefaultAndMultiPlan:
     """Cover the default plan file case and the loop-continues-to-next-plan case."""
 
-    def test_default_plan_file_gets_tid_none(self, client_admin, monkeypatch):
-        """fname is the default plan file → tid stays None."""
+    def test_default_plan_file_gets_cid_none(self, client_admin, monkeypatch):
+        """fname is the default plan file → cid stays None."""
         from observation import plan_my_night as _pmn
         from observation import astrodex as _ad
 
@@ -6960,7 +6971,7 @@ class TestAddPlanTargetDefaultAndMultiPlan:
         monkeypatch.setattr(_pmn, 'get_all_plan_files',
                             lambda uid: [f'/fake/{uid}_plan_my_night.json'])
         monkeypatch.setattr(_pmn, 'load_user_plan',
-                            lambda uid, uname, telescope_id=None: {'plan': {'entries': [
+                            lambda uid, uname, combination_id=None: {'plan': {'entries': [
                                 {'id': entry_id, 'name': 'M31', 'catalogue': 'Messier'}
                             ]}})
         monkeypatch.setattr(_ad, 'is_item_in_astrodex', lambda *a: False)
@@ -6982,13 +6993,13 @@ class TestAddPlanTargetDefaultAndMultiPlan:
                             lambda *a, **kw: {'plan': {'entries': []}})
         monkeypatch.setattr(_pmn, 'get_all_plan_files',
                             lambda uid: [
-                                f'/fake/{uid}_plan_scope1.json',
-                                f'/fake/{uid}_plan_scope2.json',
+                                f'/fake/{uid}_plan_combo1.json',
+                                f'/fake/{uid}_plan_combo2.json',
                             ])
 
         call_count = [0]
 
-        def _load_user_plan(uid, uname, telescope_id=None):
+        def _load_user_plan(uid, uname, combination_id=None):
             call_count[0] += 1
             if call_count[0] == 1:
                 return {'plan': {'entries': []}}  # Not found in first

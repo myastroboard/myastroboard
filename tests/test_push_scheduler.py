@@ -785,12 +785,12 @@ def test_pick_active_plan_prefers_inside_night(monkeypatch):
         'observation.plan_my_night',
         types.SimpleNamespace(
             get_all_plan_files=lambda _uid: [
-                '/x/u1_plan_telescope1.json',
+                '/x/u1_plan_combo1.json',
                 '/x/u1_plan_my_night.json',
             ],
-            get_plan_with_timeline=lambda _uid, _u, telescope_id=None: (
+            get_plan_with_timeline=lambda _uid, _u, combination_id=None: (
                 {'state': 'current', 'timeline': {'is_inside_night': False}, 'plan': {}}
-                if telescope_id == 'telescope1'
+                if combination_id == 'combo1'
                 else {'state': 'current', 'timeline': {'is_inside_night': True}, 'plan': {}}
             ),
         ),
@@ -1482,9 +1482,9 @@ def test_pick_active_plan_fallback_returns_current_state(monkeypatch):
         types.SimpleNamespace(
             get_all_plan_files=lambda _uid: [
                 '/x/u1_plan_my_night.json',
-                '/x/u1_plan_scope2.json',
+                '/x/u1_plan_combo2.json',
             ],
-            get_plan_with_timeline=lambda uid, uname, telescope_id=None: {
+            get_plan_with_timeline=lambda uid, uname, combination_id=None: {
                 'state': 'current',
                 'timeline': {'is_inside_night': False},
             },
@@ -1503,7 +1503,7 @@ def test_pick_active_plan_fallback_returns_first_candidate(monkeypatch):
         'observation.plan_my_night',
         types.SimpleNamespace(
             get_all_plan_files=lambda _uid: ['/x/u1_plan_my_night.json'],
-            get_plan_with_timeline=lambda uid, uname, telescope_id=None: {
+            get_plan_with_timeline=lambda uid, uname, combination_id=None: {
                 'state': 'future',
                 'timeline': {'is_inside_night': False},
             },

@@ -558,22 +558,22 @@ class TestPlanMyNightCoveragePaths:
         )
         assert resp.status_code in (200, 400, 409, 500)
 
-    def test_plan_search_across_telescopes(self, client_admin, monkeypatch):
-        """Covers entry not in default plan, found in telescope plan."""
+    def test_plan_search_across_combinations(self, client_admin, monkeypatch):
+        """Covers entry not in default plan, found in combination plan."""
         from observation import plan_my_night as _pmn
         from observation import astrodex as _adx
         import os as _os
 
         entry_id = 'test-entry-scope-123'
-        telescope_plan = {'entries': [{'id': entry_id, 'name': 'M42', 'catalogue': 'Messier'}]}
+        combination_plan = {'entries': [{'id': entry_id, 'name': 'M42', 'catalogue': 'Messier'}]}
 
         monkeypatch.setattr(
             _pmn, 'get_all_plan_files',
-            lambda uid: [f'data/plans/{uid}_plan_scope1.json'],
+            lambda uid: [f'data/plans/{uid}_plan_combo1.json'],
         )
         monkeypatch.setattr(
             _pmn, 'load_user_plan',
-            lambda uid, uname, telescope_id=None: {'plan': telescope_plan},
+            lambda uid, uname, combination_id=None: {'plan': combination_plan},
         )
         monkeypatch.setattr(_adx, 'is_item_in_astrodex', lambda *_: False)
         monkeypatch.setattr(_adx, 'create_astrodex_item', lambda *_: {'id': 'new-item'})

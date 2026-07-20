@@ -275,8 +275,8 @@
     white-space: nowrap;
 }
 
-/* Telescope selector badge buttons */
-.plan-telescope-badge {
+/* Combination selector badge buttons */
+.plan-combination-badge {
     font-size: 0.78rem;
     padding: 0.2rem 0.55rem;
     border-radius: 1rem;
@@ -284,15 +284,15 @@
     white-space: nowrap;
 }
 
-.plan-telescope-shared-icon,
-.plan-telescope-orphan-icon {
+.plan-combination-shared-icon,
+.plan-combination-orphan-icon {
     font-size: 0.6em;
     vertical-align: middle;
     opacity: 0.85;
 }
 
-/* Telescope picker modal buttons - card surface style for contrast on gradient modal */
-.btn-telescope-pick {
+/* Combination picker modal buttons - card surface style for contrast on gradient modal */
+.btn-combination-pick {
     background-color: var(--surface-card);
     color: var(--text-color);
     border: 1px solid var(--surface-border-strong);
@@ -300,8 +300,8 @@
     transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.btn-telescope-pick:hover,
-.btn-telescope-pick:focus {
+.btn-combination-pick:hover,
+.btn-combination-pick:focus {
     background-color: #e8e9ff;
     border-color: var(--accent-1);
     color: var(--text-color);

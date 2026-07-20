@@ -179,7 +179,7 @@ A **combination** is a named configuration that groups a telescope, camera, moun
 - The **FOV Calculator** (computes field of view for that telescope + camera pair)
 - **SkyTonight** ("Best Equipment For This Target" rates all your enabled and valid combinations)
 - **Astrodex** picture metadata (which setup was used for an image session)
-- **Plan My Night** telescope selector
+- **Plan My Night** combination selector (see [PLAN_MY_NIGHT.md](PLAN_MY_NIGHT.md))
 
 At least one of **telescope** or **camera** is required; both are single-value fields (max one telescope,
 max one imaging camera per combination). Two additional fields cover setups the base telescope+camera model
@@ -206,11 +206,11 @@ Both respect the same visibility as the rest of Astrodex: with `config['astrodex
 
 ### Deletion
 
-A combination can't be deleted while it's still referenced by any Astrodex picture (any user) - the
-delete-guard mirrors the one on individual equipment items above. This is checked in addition to the
-component-level guard: deleting the *equipment inside* a combination is blocked separately (see
-[Disabling equipment](#disabling-equipment)) while deleting the *combination itself* is blocked by its
-pictures.
+A combination can't be deleted while it's still referenced by any Astrodex picture (any user) or pinned to
+any Plan My Night plan (any user) - the delete-guard mirrors the one on individual equipment items above.
+This is checked in addition to the component-level guard: deleting the *equipment inside* a combination is
+blocked separately (see [Disabling equipment](#disabling-equipment)) while deleting the *combination
+itself* is blocked by its pictures or plans.
 
 ---
 
@@ -270,7 +270,7 @@ Shared equipment flows through the whole app:
 | FOV Calculator | Shared telescopes & cameras appear in dropdowns |
 | SkyTonight — Combination recommendations | Recommendations include shared combinations (own listed first) |
 | Astrodex — Add Picture | Shared combinations and filters available in selectors |
-| Plan My Night | Shared telescopes appear in the telescope selector |
+| Plan My Night | Shared combinations appear in the combination selector |
 | Exposure Calculator | Shared cameras appear in the camera selector |
 
 ---
