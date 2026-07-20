@@ -38,3 +38,4 @@ A note about privacy. As Astrodex, World Photo Map can be private or public. Tha
 - Add notification for meteor shower
 - Precipitation is now used for astroscore calculation
 - Add combination-aware SkyTonight equipment recommendations (renamed `/api/skytonight/telescope-recommendations` -> `/api/skytonight/combination-recommendations`): camera-only rigs (lens on a tracker) can now be scored too, and recommendations blend real sensor field-of-view against the target's apparent size instead of relying only on a focal-length heuristic
+- Plan My Night plans are now keyed by equipment combination instead of telescope alone: a combination can't be deleted while a plan is pinned to it, and plan files still using the old telescope-keyed schema are purged automatically on startup (plans are daily/ephemeral, so there's nothing to migrate)

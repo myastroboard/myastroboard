@@ -182,6 +182,46 @@ def test_add_target_uses_skytonight_group_dedup(client_admin, monkeypatch):
     assert second_response.get_json()['reason'] == 'already_in_plan'
 
 
+def test_add_target_with_combination_id(client_admin):
+    telescope = client_admin.post('/api/equipment/telescopes', json={
+        'name': 'T1', 'telescope_type': 'Refractor', 'aperture_mm': 100, 'focal_length_mm': 1000,
+    }).get_json()['data']
+    combo = client_admin.post('/api/equipment/combinations', json={
+        'name': 'My Combo', 'telescope_id': telescope['id'],
+    }).get_json()['data']
+
+    target = _sample_target()
+    target['combination_id'] = combo['id']
+    target['combination_name'] = combo['name']
+    response = client_admin.post('/api/plan-my-night/targets', json=target)
+    assert response.status_code == 200
+
+    get_response = client_admin.get(f"/api/plan-my-night?combination_id={combo['id']}")
+    assert get_response.status_code == 200
+    plan_payload = get_response.get_json()
+    assert plan_payload['plan']['combination_id'] == combo['id']
+    assert plan_payload['plan']['combination_name'] == combo['name']
+
+
+def test_list_plan_my_night_returns_combination_count(client_admin):
+    # equipment_profiles.EQUIPMENT_DIR isn't isolated per-test by this fixture (only
+    # PLAN_DIR/ASTRODEX_DIR are), so the admin user's combinations accumulate across
+    # tests in this module - assert this combo is present rather than an absolute count.
+    telescope = client_admin.post('/api/equipment/telescopes', json={
+        'name': 'T2', 'telescope_type': 'Refractor', 'aperture_mm': 80, 'focal_length_mm': 600,
+    }).get_json()['data']
+    client_admin.post('/api/equipment/combinations', json={
+        'name': 'Combo A', 'telescope_id': telescope['id'],
+    })
+
+    response = client_admin.get('/api/plan-my-night/list')
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['status'] == 'success'
+    assert payload['combination_count'] >= 1
+    assert any(p['combination_name'] == 'Combo A' for p in payload['plans'])
+
+
 def test_optimize_returns_404_without_plan(client_admin):
     response = client_admin.get('/api/plan-my-night/optimize')
     assert response.status_code == 404

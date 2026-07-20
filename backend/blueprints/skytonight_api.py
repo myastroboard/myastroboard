@@ -140,16 +140,16 @@ def _get_catalogue_alias_payload(catalogue: str, item_name: str) -> tuple:
 
 
 def _preload_all_current_plan_entries(user_id: str, username: str) -> list:
-    """Aggregate entries from all current (non-previous) plans for a user across all telescopes."""
+    """Aggregate entries from all current (non-previous) plans for a user across all combinations."""
     all_entries: list = []
     seen_ids: set = set()
     for file_path in plan_my_night.get_all_plan_files(user_id):
         fname = os.path.basename(file_path)
-        tid: Optional[str] = None
+        cid: Optional[str] = None
         if fname != f'{user_id}_plan_my_night.json':
-            tid = fname.replace(f'{user_id}_plan_', '').replace('.json', '')
+            cid = fname.replace(f'{user_id}_plan_', '').replace('.json', '')
         try:
-            payload = plan_my_night.load_user_plan(user_id, username, telescope_id=tid)
+            payload = plan_my_night.load_user_plan(user_id, username, combination_id=cid)
             plan_obj = payload.get('plan')
             if not isinstance(plan_obj, dict):
                 continue
@@ -161,7 +161,7 @@ def _preload_all_current_plan_entries(user_id: str, username: str) -> list:
                     all_entries.append(entry)
                     seen_ids.add(eid)
         except Exception:
-            pass  # malformed plan file for this user/telescope — skip it
+            pass  # malformed plan file for this user/combination — skip it
     return all_entries
 
 

@@ -506,16 +506,16 @@ class TestPreloadAllCurrentPlanEntries:
         result = _preload_all_current_plan_entries(user_id, 'alice')
         assert result == []  # exception silenced, returns empty list
 
-    def test_deduplicates_entries_across_telescopes(self, monkeypatch, tmp_path):
+    def test_deduplicates_entries_across_combinations(self, monkeypatch, tmp_path):
         from observation import plan_my_night as pmn
         import uuid
         from datetime import datetime, timezone, timedelta
         monkeypatch.setattr(pmn, 'PLAN_DIR', str(tmp_path))
         user_id = str(uuid.uuid4())
-        tel_id = str(uuid.uuid4())
+        combo_id = str(uuid.uuid4())
         future = (datetime.now(timezone.utc) + timedelta(hours=5)).isoformat()
         entry = {'id': 'shared-entry', 'name': 'M42'}
-        for suffix in ['_plan_my_night.json', f'_plan_{tel_id}.json']:
+        for suffix in ['_plan_my_night.json', f'_plan_{combo_id}.json']:
             (tmp_path / f'{user_id}{suffix}').write_text(_json.dumps({
                 'user_id': user_id,
                 'plan': {'night_end': future, 'entries': [entry]},

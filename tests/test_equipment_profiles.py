@@ -563,6 +563,36 @@ class TestEquipmentDeleteGuard:
         assert success is True
         assert reason is None
 
+    def test_delete_combination_blocked_by_plan(self, temp_data_dir, test_user_id, monkeypatch):
+        """A combination pinned to any Plan My Night plan can't be deleted (M5 rule).
+
+        Patches observation.plan_my_night.count_plans_for_combination directly (the module
+        delete_combination lazily imports from) rather than creating real plan files, since
+        this test's temp_data_dir fixture only isolates EQUIPMENT_DIR - same approach as
+        test_delete_combination_blocked_by_picture above.
+        """
+        import observation.astrodex as astrodex_module
+        import observation.plan_my_night as plan_my_night_module
+
+        monkeypatch.setattr(astrodex_module, 'count_pictures_for_combination', lambda combination_id: 0)
+
+        telescope = equipment_profiles.create_telescope(test_user_id, {
+            'name': 'T', 'telescope_type': 'Refractor', 'aperture_mm': 100, 'focal_length_mm': 1000,
+        })
+        combo = equipment_profiles.create_combination(test_user_id, {
+            'name': 'Combo', 'telescope_id': telescope['id'],
+        })
+
+        monkeypatch.setattr(plan_my_night_module, 'count_plans_for_combination', lambda combination_id: 1)
+        success, reason = equipment_profiles.delete_combination(test_user_id, combo['id'])
+        assert success is False
+        assert reason == 'in_use_by_plan'
+
+        monkeypatch.setattr(plan_my_night_module, 'count_plans_for_combination', lambda combination_id: 0)
+        success, reason = equipment_profiles.delete_combination(test_user_id, combo['id'])
+        assert success is True
+        assert reason is None
+
     def test_delete_camera_blocked_as_imaging_camera(self, temp_data_dir, test_user_id):
         camera = equipment_profiles.create_camera(test_user_id, {
             'name': 'C', 'manufacturer': 'M', 'sensor_width_mm': 10, 'sensor_height_mm': 8,

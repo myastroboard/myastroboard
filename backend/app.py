@@ -66,7 +66,7 @@ from space import css_passes  # noqa: F401
 from equipment import equipment_profiles  # noqa: F401
 from space import iss_passes  # noqa: F401
 from astroweather import moon_planner  # noqa: F401
-from observation import plan_my_night  # noqa: F401
+from observation import plan_my_night
 
 # Declares the re-exports above as intentional (not dead code) for static analysis -
 # their only consumers are tests doing monkeypatch.setattr(app.<name>, ...).
@@ -301,6 +301,13 @@ def get_or_create_cache_scheduler():
 # ============================================================
 # Application Startup Initialization
 # ============================================================
+
+try:
+    _purged_plan_count = plan_my_night.purge_legacy_telescope_plans()
+    if _purged_plan_count:
+        logger.info(f'Purged {_purged_plan_count} legacy telescope-keyed plan file(s) on startup')
+except Exception as e:  # pragma: no cover
+    logger.error(f'Failed to purge legacy plan files on startup: {e}', exc_info=True)
 
 # Initialize cache scheduler FIRST so its cache_ready_event can be passed to
 # the SkyTonight scheduler, ensuring DSO calculations run on warm caches.
