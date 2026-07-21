@@ -292,3 +292,30 @@ class TestGetNextEclipse:
         assert info.total_duration_minutes == 0
         assert info.astrophotography_score == 0.0
         assert info.score_classification == "not_visible"
+
+
+class TestLunarEclipseDistantEpochMuting:
+    """The eclipse lookup must run inside the precision-warning mute."""
+
+    def test_get_next_eclipse_wraps_computation_in_mute(self):
+        """The lunar search is unbounded too, so it gets the same treatment."""
+        from unittest.mock import patch
+        from astroweather.moon_eclipse import LunarEclipseService
+
+        svc = LunarEclipseService(19.82, -155.47, "Pacific/Honolulu")
+        order = []
+
+        class _Probe:
+            def __enter__(self):
+                order.append("enter")
+                return self
+
+            def __exit__(self, *exc):
+                order.append("exit")
+                return False
+
+        with patch("astroweather.moon_eclipse.distant_epoch_precision_warnings_muted", _Probe):
+            with patch.object(svc, "_compute_next_eclipse", side_effect=lambda: order.append("compute")):
+                svc.get_next_eclipse()
+
+        assert order == ["enter", "compute", "exit"]

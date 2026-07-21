@@ -54,6 +54,8 @@ from astropy.time import Time as AstroTime
 from astropy.coordinates import EarthLocation, AltAz, get_body
 import astropy.units as u
 
+from utils import distant_epoch_precision_warnings_muted
+
 # =============================
 # Data structures
 # =============================
@@ -108,7 +110,19 @@ class LunarEclipseService:
     # =============================
 
     def get_next_eclipse(self) -> Optional[LunarEclipseInfo]:
-        """Get next lunar eclipse from now"""
+        """Get next lunar eclipse from now.
+
+        Lunar eclipses are visible from a whole hemisphere, so the next one is
+        usually near-term - but the search is not bounded, so it can still land
+        past the horizon of the leap-second and IERS tables. The altitude/azimuth
+        work below is run with those precision warnings muted for the same reason
+        as the solar case; see the helper's docstring.
+        """
+        with distant_epoch_precision_warnings_muted():
+            return self._compute_next_eclipse()
+
+    def _compute_next_eclipse(self) -> Optional[LunarEclipseInfo]:
+        """Find the next lunar eclipse and describe it."""
 
         # astronomy.Time expects UTC time
         now_utc = datetime.datetime.now(datetime.timezone.utc)
