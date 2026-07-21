@@ -864,8 +864,25 @@ def summarize_combination_pictures(pictures: List[Dict]) -> Dict:
 
     average_rating is the mean of only the *rated* pictures (unrated ones count toward
     photo_count but are excluded from the average, not treated as a zero).
+
+    A rating that isn't a number counts as unrated as well. Ratings are validated on write,
+    so a non-numeric one means hand-edited or legacy data on disk - and a single such entry
+    must not raise and take down every endpoint that reports combination stats. It is logged
+    rather than dropped silently, since nothing else would reveal the bad record.
     """
-    ratings = [float(picture['rating']) for picture in pictures if picture.get('rating') is not None]
+    ratings = []
+    for picture in pictures:
+        value = picture.get('rating')
+        if value is None:
+            continue
+        try:
+            ratings.append(float(value))
+        except (TypeError, ValueError):
+            logger.warning(
+                "Ignoring non-numeric rating %r on picture %s - counting it as unrated",
+                value,
+                picture.get('id'),
+            )
     return {
         'photo_count': len(pictures),
         'average_rating': round(sum(ratings) / len(ratings), 2) if ratings else None,
