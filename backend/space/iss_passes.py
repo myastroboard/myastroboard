@@ -16,6 +16,7 @@ import threading
 import time
 
 import json
+import numpy as np
 import requests
 import astropy.units as u
 from astropy.time import Time as AstroTime
@@ -75,14 +76,20 @@ MIN_EVENT_ALTITUDE_DEG = 10.0
 MAX_VISIBLE_SKY_SUN_ALTITUDE_DEG = -4.0
 VISIBILITY_SAMPLE_SECONDS = 5
 GEOMETRIC_PASS_MIN_ALTITUDE_DEG = 0.0
-SOLAR_TRANSIT_SAMPLE_SECONDS = 1.0
-SOLAR_TRANSIT_REFINE_WINDOW_SECONDS = 1.0
+# Transit detection samples the ISS/Sun (or ISS/Moon) geometry over each geometric
+# pass. To avoid propagating every pass at 1 s (the ISS moves ~1°/s, so most passes
+# never bring it anywhere near the disk), each pass is first scanned coarsely and
+# vectorised; a pass whose closest approach stays beyond MAX_APPROACH_DEG is
+# skipped, and only a promising pass is refined at fine resolution. The coarse step
+# must stay well under the fine window so the true minimum is always bracketed.
+SOLAR_TRANSIT_COARSE_SECONDS = 10.0
+SOLAR_TRANSIT_MAX_APPROACH_DEG = 6.0
 SOLAR_TRANSIT_REFINE_SAMPLE_SECONDS = 0.1
 SOLAR_TRANSIT_MIN_SUN_ALTITUDE_DEG = 0.0
 SOLAR_ANGULAR_RADIUS_FALLBACK_DEG = 0.2666
 SOLAR_RADIUS_KM = 695700.0
-LUNAR_TRANSIT_SAMPLE_SECONDS = 1.0
-LUNAR_TRANSIT_REFINE_WINDOW_SECONDS = 1.0
+LUNAR_TRANSIT_COARSE_SECONDS = 10.0
+LUNAR_TRANSIT_MAX_APPROACH_DEG = 6.0
 LUNAR_TRANSIT_REFINE_SAMPLE_SECONDS = 0.1
 LUNAR_TRANSIT_MIN_MOON_ALTITUDE_DEG = 5.0
 LUNAR_ANGULAR_RADIUS_FALLBACK_DEG = 0.2615
@@ -322,9 +329,18 @@ class ISSPassService:
         all_passes = self._build_passes(event_times, event_types, satellite, observer, ts, eph)
         passes = [entry for entry in all_passes if entry.get("is_visible")]
         next_visible = passes[0] if passes else None
-        solar_transits = self._find_solar_transits(now_utc, end_utc, satellite, observer, ts, eph)
+
+        # Geometric passes (altitude >= 0) are computed once and shared by the solar
+        # and lunar transit scans, which both need the full above-horizon window.
+        geo_times, geo_types = satellite.find_events(
+            observer,
+            ts.from_datetime(now_utc),
+            ts.from_datetime(end_utc),
+            altitude_degrees=GEOMETRIC_PASS_MIN_ALTITUDE_DEG,
+        )
+        solar_transits = self._find_solar_transits(now_utc, end_utc, satellite, observer, ts, eph, geo_times, geo_types)
         next_solar_transit = solar_transits[0] if solar_transits else None
-        lunar_transits = self._find_lunar_transits(now_utc, end_utc, satellite, observer, ts, eph)
+        lunar_transits = self._find_lunar_transits(now_utc, end_utc, satellite, observer, ts, eph, geo_times, geo_types)
         next_lunar_transit = lunar_transits[0] if lunar_transits else None
 
         return {
@@ -638,6 +654,111 @@ class ISSPassService:
             "is_visible": True,
         }
 
+    # -----------------------------------------------------------------------
+    # Vectorised geometry helpers (transit detection). Skyfield propagates an
+    # array of times in one call, so a whole pass is evaluated at once instead of
+    # one Python-loop propagation per sampled instant.
+    # -----------------------------------------------------------------------
+
+    @staticmethod
+    def _iter_geometric_passes(event_times, event_types):
+        """Yield (start_utc, end_utc) for each rise->set geometric pass from Skyfield events."""
+        current_start: Optional[datetime] = None
+        for event_time, event_type in zip(event_times, event_types):
+            dt_utc = event_time.utc_datetime().replace(tzinfo=timezone.utc)
+            if event_type == 0:
+                current_start = dt_utc
+            elif event_type == 2 and current_start is not None:
+                yield current_start, dt_utc
+                current_start = None
+
+    @staticmethod
+    def _time_grid(start_utc: datetime, end_utc: datetime, step_seconds: float) -> List[datetime]:
+        """Inclusive list of UTC datetimes spanning [start, end] at a fixed step.
+
+        Steps never overshoot ``end_utc`` (windows shorter than one step collapse to
+        the two endpoints), so the grid is always monotonic within [start, end].
+        """
+        if end_utc <= start_utc:
+            return [start_utc]
+        total_seconds = (end_utc - start_utc).total_seconds()
+        step_count = max(1, int(total_seconds / step_seconds))
+        times = [start_utc + timedelta(seconds=min(idx * step_seconds, total_seconds)) for idx in range(step_count + 1)]
+        if times[-1] != end_utc:
+            times.append(end_utc)
+        return times
+
+    @staticmethod
+    def _angular_separation_array(alt1, az1, alt2, az2) -> np.ndarray:
+        """Vectorised angular separation (degrees) between two alt/az arrays."""
+        a1 = np.radians(alt1)
+        a2 = np.radians(alt2)
+        delta_az = np.radians((az1 - az2) % 360.0)
+        cos_sep = np.sin(a1) * np.sin(a2) + np.cos(a1) * np.cos(a2) * np.cos(delta_az)
+        return np.degrees(np.arccos(np.clip(cos_sep, -1.0, 1.0)))
+
+    def _iss_altaz_arrays(self, times_utc, satellite, observer, ts):
+        """Vectorised ISS topocentric altitude/azimuth (degrees) over the given UTC datetimes."""
+        t = ts.from_datetimes(times_utc)
+        altitude, azimuth, _ = (satellite - observer).at(t).altaz()
+        return (
+            np.atleast_1d(np.asarray(altitude.degrees, dtype=float)),
+            np.atleast_1d(np.asarray(azimuth.degrees, dtype=float)),
+        )
+
+    def _sun_altaz_radius_arrays(self, times_utc, observer, ts, eph):
+        """Vectorised Sun alt/az (deg) and apparent angular radius (deg) over the given times."""
+        if eph is not None:
+            t = ts.from_datetimes(times_utc)
+            sun_apparent = (eph["earth"] + observer).at(t).observe(eph["sun"]).apparent()
+            altitude, azimuth, _ = sun_apparent.altaz()
+            distance_km = np.atleast_1d(np.asarray(sun_apparent.distance().km, dtype=float))
+            radius = np.degrees(np.arcsin(np.clip(SOLAR_RADIUS_KM / distance_km, -1.0, 1.0)))
+            return (
+                np.atleast_1d(np.asarray(altitude.degrees, dtype=float)),
+                np.atleast_1d(np.asarray(azimuth.degrees, dtype=float)),
+                radius,
+            )
+        sun_alt, sun_az = self._sun_altaz_arrays_astropy(times_utc)
+        return sun_alt, sun_az, np.full(len(times_utc), SOLAR_ANGULAR_RADIUS_FALLBACK_DEG)
+
+    def _sun_altaz_arrays_astropy(self, times_utc):
+        """Vectorised Sun alt/az (deg) via Astropy - fallback when the ephemeris is unavailable."""
+        astro_time = AstroTime([when.astimezone(timezone.utc) for when in times_utc])
+        frame = AltAz(obstime=astro_time, location=self.location)
+        altaz = get_sun(astro_time).transform_to(frame)
+        return (
+            np.atleast_1d(np.asarray(cast(Any, altaz.alt).to_value(u.deg), dtype=float)),
+            np.atleast_1d(np.asarray(cast(Any, altaz.az).to_value(u.deg), dtype=float)),
+        )
+
+    def _moon_altaz_radius_illum_arrays(self, times_utc, observer, ts, eph):
+        """Vectorised Moon alt/az (deg), apparent radius (deg) and illumination (%) over the times."""
+        t = ts.from_datetimes(times_utc)
+        observed = (eph["earth"] + observer).at(t)
+        moon_astrometric = observed.observe(eph["moon"])
+        moon_apparent = moon_astrometric.apparent()
+        altitude, azimuth, _ = moon_apparent.altaz()
+        distance_km = np.atleast_1d(np.asarray(moon_apparent.distance().km, dtype=float))
+        radius = np.degrees(np.arcsin(np.clip(LUNAR_RADIUS_KM / distance_km, -1.0, 1.0)))
+
+        moon_ra, moon_dec, _ = moon_apparent.radec()
+        sun_apparent = observed.observe(eph["sun"]).apparent()
+        sun_ra, sun_dec, _ = sun_apparent.radec()
+        elongation = self._angular_separation_array(
+            np.atleast_1d(np.asarray(moon_dec.degrees, dtype=float)),
+            np.atleast_1d(np.asarray(moon_ra.hours, dtype=float)) * 15.0,
+            np.atleast_1d(np.asarray(sun_dec.degrees, dtype=float)),
+            np.atleast_1d(np.asarray(sun_ra.hours, dtype=float)) * 15.0,
+        )
+        illumination = np.clip(50.0 * (1.0 - np.cos(np.radians(elongation))), 0.0, 100.0)
+        return (
+            np.atleast_1d(np.asarray(altitude.degrees, dtype=float)),
+            np.atleast_1d(np.asarray(azimuth.degrees, dtype=float)),
+            radius,
+            illumination,
+        )
+
     def _find_solar_transits(
         self,
         start_utc: datetime,
@@ -646,48 +767,35 @@ class ISSPassService:
         observer,
         ts,
         eph,
+        event_times=None,
+        event_types=None,
     ) -> List[Dict[str, Any]]:
-        """Find ISS solar transits for the observer using per-pass refinement."""
-        event_times, event_types = satellite.find_events(
-            observer,
-            ts.from_datetime(start_utc),
-            ts.from_datetime(end_utc),
-            altitude_degrees=GEOMETRIC_PASS_MIN_ALTITUDE_DEG,
-        )
+        """Find ISS solar transits for the observer using per-pass refinement.
+
+        ``event_times``/``event_types`` may be a pre-computed geometric pass event
+        list (shared with lunar-transit detection to avoid a second find_events call);
+        when omitted they are computed here.
+        """
+        if event_times is None or event_types is None:
+            event_times, event_types = satellite.find_events(
+                observer,
+                ts.from_datetime(start_utc),
+                ts.from_datetime(end_utc),
+                altitude_degrees=GEOMETRIC_PASS_MIN_ALTITUDE_DEG,
+            )
 
         transits: List[Dict[str, Any]] = []
-        current: Dict[str, Any] = {}
-
-        for event_time, event_type in zip(event_times, event_types):
-            dt_utc = event_time.utc_datetime().replace(tzinfo=timezone.utc)
-
-            if event_type == 0:
-                current = {"start": dt_utc}
-                continue
-
-            if event_type == 1:
-                if current:
-                    current["peak"] = dt_utc
-                continue
-
-            if event_type == 2:
-                if not current or "start" not in current:
-                    current = {}
-                    continue
-
-                current["end"] = dt_utc
-                transit = self._extract_solar_transit_segment(
-                    start_utc=current["start"],
-                    end_utc=current["end"],
-                    satellite=satellite,
-                    observer=observer,
-                    ts=ts,
-                    eph=eph,
-                )
-                if transit is not None:
-                    transits.append(transit)
-
-                current = {}
+        for pass_start, pass_end in self._iter_geometric_passes(event_times, event_types):
+            transit = self._extract_solar_transit_segment(
+                start_utc=pass_start,
+                end_utc=pass_end,
+                satellite=satellite,
+                observer=observer,
+                ts=ts,
+                eph=eph,
+            )
+            if transit is not None:
+                transits.append(transit)
 
         transits.sort(key=lambda event: event.get("peak_time", ""))
         return transits
@@ -701,69 +809,60 @@ class ISSPassService:
         ts,
         eph,
     ) -> Optional[Dict[str, Any]]:
-        """Find a refined ISS solar transit within a daylight geometric pass."""
+        """Find a refined ISS solar transit within a daylight geometric pass (vectorised)."""
         if end_utc <= start_utc:
             return None
 
-        samples = self._sample_time_range(
-            start_utc=start_utc,
-            end_utc=end_utc,
-            step_seconds=SOLAR_TRANSIT_SAMPLE_SECONDS,
-            sampler=lambda when: self._sample_solar_transit_observation(when, satellite, observer, ts, eph),
-        )
+        # Coarse vectorised scan of the whole pass; reject early when the Sun is
+        # below the horizon throughout or the ISS never comes near the disk.
+        coarse_times = self._time_grid(start_utc, end_utc, SOLAR_TRANSIT_COARSE_SECONDS)
+        iss_alt, iss_az = self._iss_altaz_arrays(coarse_times, satellite, observer, ts)
+        sun_alt, sun_az, _ = self._sun_altaz_radius_arrays(coarse_times, observer, ts, eph)
+        separation = self._angular_separation_array(iss_alt, iss_az, sun_alt, sun_az)
 
-        candidate_indices = [
-            idx
-            for idx, sample in enumerate(samples)
-            if sample["sun_altitude_deg"] >= SOLAR_TRANSIT_MIN_SUN_ALTITUDE_DEG
-            and sample["iss_altitude_deg"] >= GEOMETRIC_PASS_MIN_ALTITUDE_DEG
-            and sample["separation_deg"] <= sample["solar_radius_deg"]
-        ]
-        if not candidate_indices:
+        valid = (sun_alt >= SOLAR_TRANSIT_MIN_SUN_ALTITUDE_DEG) & (iss_alt >= GEOMETRIC_PASS_MIN_ALTITUDE_DEG)
+        if not bool(valid.any()):
+            return None
+        masked_sep = np.where(valid, separation, np.inf)
+        coarse_idx = int(np.argmin(masked_sep))
+        if masked_sep[coarse_idx] > SOLAR_TRANSIT_MAX_APPROACH_DEG:
             return None
 
-        segments = self._group_consecutive_indices(candidate_indices)
-        best_segment = min(
-            segments,
-            key=lambda segment: min(samples[idx]["separation_deg"] for idx in segment),
+        # Fine vectorised scan around the coarse minimum (the window brackets the true minimum).
+        peak_time = coarse_times[coarse_idx]
+        window = timedelta(seconds=SOLAR_TRANSIT_COARSE_SECONDS)
+        fine_start = max(start_utc, peak_time - window)
+        fine_end = min(end_utc, peak_time + window)
+        fine_times = self._time_grid(fine_start, fine_end, SOLAR_TRANSIT_REFINE_SAMPLE_SECONDS)
+        f_iss_alt, f_iss_az = self._iss_altaz_arrays(fine_times, satellite, observer, ts)
+        f_sun_alt, f_sun_az, f_radius = self._sun_altaz_radius_arrays(fine_times, observer, ts, eph)
+        f_sep = self._angular_separation_array(f_iss_alt, f_iss_az, f_sun_alt, f_sun_az)
+
+        on_disk = (
+            (f_sun_alt >= SOLAR_TRANSIT_MIN_SUN_ALTITUDE_DEG)
+            & (f_iss_alt >= GEOMETRIC_PASS_MIN_ALTITUDE_DEG)
+            & (f_sep <= f_radius)
         )
-        coarse_peak = min((samples[idx] for idx in best_segment), key=lambda sample: sample["separation_deg"])
+        if not bool(on_disk.any()):
+            return None
 
-        refined_start = max(start_utc, coarse_peak["time_utc"] - timedelta(seconds=SOLAR_TRANSIT_REFINE_WINDOW_SECONDS))
-        refined_end = min(end_utc, coarse_peak["time_utc"] + timedelta(seconds=SOLAR_TRANSIT_REFINE_WINDOW_SECONDS))
-        refined_samples = self._sample_time_range(
-            start_utc=refined_start,
-            end_utc=refined_end,
-            step_seconds=SOLAR_TRANSIT_REFINE_SAMPLE_SECONDS,
-            sampler=lambda when: self._sample_solar_transit_observation(when, satellite, observer, ts, eph),
-        )
-
-        refined_candidates = [
-            sample
-            for sample in refined_samples
-            if sample["sun_altitude_deg"] >= SOLAR_TRANSIT_MIN_SUN_ALTITUDE_DEG
-            and sample["iss_altitude_deg"] >= GEOMETRIC_PASS_MIN_ALTITUDE_DEG
-            and sample["separation_deg"] <= sample["solar_radius_deg"]
-        ]
-        if not refined_candidates:
-            refined_candidates = [coarse_peak]
-
-        start_sample = refined_candidates[0]
-        end_sample = refined_candidates[-1]
-        peak_sample = min(refined_candidates, key=lambda sample: sample["separation_deg"])
-        duration_seconds = max(0.0, (end_sample["time_utc"] - start_sample["time_utc"]).total_seconds())
+        indices = np.nonzero(on_disk)[0]
+        start_i = int(indices[0])
+        end_i = int(indices[-1])
+        peak_i = int(indices[int(np.argmin(f_sep[indices]))])
+        duration_seconds = max(0.0, (fine_times[end_i] - fine_times[start_i]).total_seconds())
 
         return {
-            "start_time": start_sample["time_utc"].astimezone(self.timezone).isoformat(),
-            "peak_time": peak_sample["time_utc"].astimezone(self.timezone).isoformat(),
-            "end_time": end_sample["time_utc"].astimezone(self.timezone).isoformat(),
+            "start_time": fine_times[start_i].astimezone(self.timezone).isoformat(),
+            "peak_time": fine_times[peak_i].astimezone(self.timezone).isoformat(),
+            "end_time": fine_times[end_i].astimezone(self.timezone).isoformat(),
             "duration_seconds": round(duration_seconds, 1),
-            "minimum_separation_arcmin": round(float(peak_sample["separation_deg"]) * 60.0, 2),
-            "solar_radius_arcmin": round(float(peak_sample["solar_radius_deg"]) * 60.0, 2),
-            "sun_altitude_deg": round(float(peak_sample["sun_altitude_deg"]), 1),
-            "sun_azimuth_deg": round(float(peak_sample["sun_azimuth_deg"]), 1),
-            "iss_altitude_deg": round(float(peak_sample["iss_altitude_deg"]), 1),
-            "iss_azimuth_deg": round(float(peak_sample["iss_azimuth_deg"]), 1),
+            "minimum_separation_arcmin": round(float(f_sep[peak_i]) * 60.0, 2),
+            "solar_radius_arcmin": round(float(f_radius[peak_i]) * 60.0, 2),
+            "sun_altitude_deg": round(float(f_sun_alt[peak_i]), 1),
+            "sun_azimuth_deg": round(float(f_sun_az[peak_i]), 1),
+            "iss_altitude_deg": round(float(f_iss_alt[peak_i]), 1),
+            "iss_azimuth_deg": round(float(f_iss_az[peak_i]), 1),
             "pass_type": "solar_transit",
             "is_visible": True,
         }
@@ -781,45 +880,6 @@ class ISSPassService:
         if samples[-1]["time_utc"] != end_utc:
             samples.append(sampler(end_utc))
         return samples
-
-    def _sample_solar_transit_observation(
-        self, when_utc: datetime, satellite: EarthSatellite, observer, ts, eph
-    ) -> Dict[str, Any]:
-        """Sample ISS/Sun geometry for solar-transit detection at one instant."""
-        event_time = ts.from_datetime(when_utc)
-        topocentric = (satellite - observer).at(event_time)
-        iss_altitude, iss_azimuth, _ = topocentric.altaz()
-        iss_altitude_deg = float(iss_altitude.degrees)
-        iss_azimuth_deg = float(iss_azimuth.degrees)
-
-        if eph is not None:
-            earth = eph["earth"]
-            sun = eph["sun"]
-            sun_apparent = (earth + observer).at(event_time).observe(sun).apparent()
-            sun_altitude, sun_azimuth, _ = sun_apparent.altaz()
-            sun_altitude_deg = float(sun_altitude.degrees)
-            sun_azimuth_deg = float(sun_azimuth.degrees)
-            solar_radius_deg = self._solar_angular_radius_deg(sun_apparent)
-        else:
-            sun_altitude_deg, sun_azimuth_deg = self._sun_alt_az_deg(when_utc)
-            solar_radius_deg = SOLAR_ANGULAR_RADIUS_FALLBACK_DEG
-
-        separation_deg = self._angular_separation_deg(
-            iss_altitude_deg,
-            iss_azimuth_deg,
-            sun_altitude_deg,
-            sun_azimuth_deg,
-        )
-
-        return {
-            "time_utc": when_utc,
-            "iss_altitude_deg": iss_altitude_deg,
-            "iss_azimuth_deg": iss_azimuth_deg,
-            "sun_altitude_deg": sun_altitude_deg,
-            "sun_azimuth_deg": sun_azimuth_deg,
-            "solar_radius_deg": solar_radius_deg,
-            "separation_deg": separation_deg,
-        }
 
     def _solar_angular_radius_deg(self, sun_apparent) -> float:
         """Estimate solar apparent angular radius from observer distance."""
@@ -839,52 +899,38 @@ class ISSPassService:
         observer,
         ts,
         eph,
+        event_times=None,
+        event_types=None,
     ) -> List[Dict[str, Any]]:
-        """Find ISS lunar transits for the observer using per-pass refinement."""
+        """Find ISS lunar transits for the observer using per-pass refinement.
+
+        ``event_times``/``event_types`` may be a pre-computed geometric pass event
+        list (shared with solar-transit detection); when omitted they are computed here.
+        """
         if eph is None:
             logger.warning("Ephemeris not loaded; lunar transit detection skipped")
             return []
 
-        event_times, event_types = satellite.find_events(
-            observer,
-            ts.from_datetime(start_utc),
-            ts.from_datetime(end_utc),
-            altitude_degrees=GEOMETRIC_PASS_MIN_ALTITUDE_DEG,
-        )
+        if event_times is None or event_types is None:
+            event_times, event_types = satellite.find_events(
+                observer,
+                ts.from_datetime(start_utc),
+                ts.from_datetime(end_utc),
+                altitude_degrees=GEOMETRIC_PASS_MIN_ALTITUDE_DEG,
+            )
 
         transits: List[Dict[str, Any]] = []
-        current: Dict[str, Any] = {}
-
-        for event_time, event_type in zip(event_times, event_types):
-            dt_utc = event_time.utc_datetime().replace(tzinfo=timezone.utc)
-
-            if event_type == 0:
-                current = {"start": dt_utc}
-                continue
-
-            if event_type == 1:
-                if current:
-                    current["peak"] = dt_utc
-                continue
-
-            if event_type == 2:
-                if not current or "start" not in current:
-                    current = {}
-                    continue
-
-                current["end"] = dt_utc
-                transit = self._extract_lunar_transit_segment(
-                    start_utc=current["start"],
-                    end_utc=current["end"],
-                    satellite=satellite,
-                    observer=observer,
-                    ts=ts,
-                    eph=eph,
-                )
-                if transit is not None:
-                    transits.append(transit)
-
-                current = {}
+        for pass_start, pass_end in self._iter_geometric_passes(event_times, event_types):
+            transit = self._extract_lunar_transit_segment(
+                start_utc=pass_start,
+                end_utc=pass_end,
+                satellite=satellite,
+                observer=observer,
+                ts=ts,
+                eph=eph,
+            )
+            if transit is not None:
+                transits.append(transit)
 
         transits.sort(key=lambda event: event.get("peak_time", ""))
         return transits
@@ -898,126 +944,60 @@ class ISSPassService:
         ts,
         eph,
     ) -> Optional[Dict[str, Any]]:
-        """Find a refined ISS lunar transit within a geometric pass where the Moon is visible."""
+        """Find a refined ISS lunar transit within a geometric pass where the Moon is up (vectorised)."""
         if end_utc <= start_utc:
             return None
 
-        samples = self._sample_time_range(
-            start_utc=start_utc,
-            end_utc=end_utc,
-            step_seconds=LUNAR_TRANSIT_SAMPLE_SECONDS,
-            sampler=lambda when: self._sample_lunar_transit_observation(when, satellite, observer, ts, eph),
-        )
+        coarse_times = self._time_grid(start_utc, end_utc, LUNAR_TRANSIT_COARSE_SECONDS)
+        iss_alt, iss_az = self._iss_altaz_arrays(coarse_times, satellite, observer, ts)
+        moon_alt, moon_az, _, _ = self._moon_altaz_radius_illum_arrays(coarse_times, observer, ts, eph)
+        separation = self._angular_separation_array(iss_alt, iss_az, moon_alt, moon_az)
 
-        candidate_indices = [
-            idx
-            for idx, sample in enumerate(samples)
-            if sample["moon_altitude_deg"] >= LUNAR_TRANSIT_MIN_MOON_ALTITUDE_DEG
-            and sample["iss_altitude_deg"] >= GEOMETRIC_PASS_MIN_ALTITUDE_DEG
-            and sample["separation_deg"] <= sample["lunar_radius_deg"]
-        ]
-        if not candidate_indices:
+        valid = (moon_alt >= LUNAR_TRANSIT_MIN_MOON_ALTITUDE_DEG) & (iss_alt >= GEOMETRIC_PASS_MIN_ALTITUDE_DEG)
+        if not bool(valid.any()):
+            return None
+        masked_sep = np.where(valid, separation, np.inf)
+        coarse_idx = int(np.argmin(masked_sep))
+        if masked_sep[coarse_idx] > LUNAR_TRANSIT_MAX_APPROACH_DEG:
             return None
 
-        segments = self._group_consecutive_indices(candidate_indices)
-        best_segment = min(
-            segments,
-            key=lambda segment: min(samples[idx]["separation_deg"] for idx in segment),
+        peak_time = coarse_times[coarse_idx]
+        window = timedelta(seconds=LUNAR_TRANSIT_COARSE_SECONDS)
+        fine_start = max(start_utc, peak_time - window)
+        fine_end = min(end_utc, peak_time + window)
+        fine_times = self._time_grid(fine_start, fine_end, LUNAR_TRANSIT_REFINE_SAMPLE_SECONDS)
+        f_iss_alt, f_iss_az = self._iss_altaz_arrays(fine_times, satellite, observer, ts)
+        f_moon_alt, f_moon_az, f_radius, f_illum = self._moon_altaz_radius_illum_arrays(fine_times, observer, ts, eph)
+        f_sep = self._angular_separation_array(f_iss_alt, f_iss_az, f_moon_alt, f_moon_az)
+
+        on_disk = (
+            (f_moon_alt >= LUNAR_TRANSIT_MIN_MOON_ALTITUDE_DEG)
+            & (f_iss_alt >= GEOMETRIC_PASS_MIN_ALTITUDE_DEG)
+            & (f_sep <= f_radius)
         )
-        coarse_peak = min((samples[idx] for idx in best_segment), key=lambda sample: sample["separation_deg"])
+        if not bool(on_disk.any()):
+            return None
 
-        refined_start = max(start_utc, coarse_peak["time_utc"] - timedelta(seconds=LUNAR_TRANSIT_REFINE_WINDOW_SECONDS))
-        refined_end = min(end_utc, coarse_peak["time_utc"] + timedelta(seconds=LUNAR_TRANSIT_REFINE_WINDOW_SECONDS))
-        refined_samples = self._sample_time_range(
-            start_utc=refined_start,
-            end_utc=refined_end,
-            step_seconds=LUNAR_TRANSIT_REFINE_SAMPLE_SECONDS,
-            sampler=lambda when: self._sample_lunar_transit_observation(when, satellite, observer, ts, eph),
-        )
-
-        refined_candidates = [
-            sample
-            for sample in refined_samples
-            if sample["moon_altitude_deg"] >= LUNAR_TRANSIT_MIN_MOON_ALTITUDE_DEG
-            and sample["iss_altitude_deg"] >= GEOMETRIC_PASS_MIN_ALTITUDE_DEG
-            and sample["separation_deg"] <= sample["lunar_radius_deg"]
-        ]
-        if not refined_candidates:
-            refined_candidates = [coarse_peak]
-
-        start_sample = refined_candidates[0]
-        end_sample = refined_candidates[-1]
-        peak_sample = min(refined_candidates, key=lambda sample: sample["separation_deg"])
-        duration_seconds = max(0.0, (end_sample["time_utc"] - start_sample["time_utc"]).total_seconds())
+        indices = np.nonzero(on_disk)[0]
+        start_i = int(indices[0])
+        end_i = int(indices[-1])
+        peak_i = int(indices[int(np.argmin(f_sep[indices]))])
+        duration_seconds = max(0.0, (fine_times[end_i] - fine_times[start_i]).total_seconds())
 
         return {
-            "start_time": start_sample["time_utc"].astimezone(self.timezone).isoformat(),
-            "peak_time": peak_sample["time_utc"].astimezone(self.timezone).isoformat(),
-            "end_time": end_sample["time_utc"].astimezone(self.timezone).isoformat(),
+            "start_time": fine_times[start_i].astimezone(self.timezone).isoformat(),
+            "peak_time": fine_times[peak_i].astimezone(self.timezone).isoformat(),
+            "end_time": fine_times[end_i].astimezone(self.timezone).isoformat(),
             "duration_seconds": round(duration_seconds, 1),
-            "minimum_separation_arcmin": round(float(peak_sample["separation_deg"]) * 60.0, 2),
-            "lunar_radius_arcmin": round(float(peak_sample["lunar_radius_deg"]) * 60.0, 2),
-            "moon_altitude_deg": round(float(peak_sample["moon_altitude_deg"]), 1),
-            "moon_azimuth_deg": round(float(peak_sample["moon_azimuth_deg"]), 1),
-            "moon_illumination_pct": round(float(peak_sample.get("moon_illumination_pct", 0.0)), 1),
-            "iss_altitude_deg": round(float(peak_sample["iss_altitude_deg"]), 1),
-            "iss_azimuth_deg": round(float(peak_sample["iss_azimuth_deg"]), 1),
+            "minimum_separation_arcmin": round(float(f_sep[peak_i]) * 60.0, 2),
+            "lunar_radius_arcmin": round(float(f_radius[peak_i]) * 60.0, 2),
+            "moon_altitude_deg": round(float(f_moon_alt[peak_i]), 1),
+            "moon_azimuth_deg": round(float(f_moon_az[peak_i]), 1),
+            "moon_illumination_pct": round(float(f_illum[peak_i]), 1),
+            "iss_altitude_deg": round(float(f_iss_alt[peak_i]), 1),
+            "iss_azimuth_deg": round(float(f_iss_az[peak_i]), 1),
             "pass_type": "lunar_transit",
             "is_visible": True,
-        }
-
-    def _sample_lunar_transit_observation(
-        self, when_utc: datetime, satellite: EarthSatellite, observer, ts, eph
-    ) -> Dict[str, Any]:
-        """Sample ISS/Moon geometry for lunar-transit detection at one instant."""
-        event_time = ts.from_datetime(when_utc)
-        topocentric = (satellite - observer).at(event_time)
-        iss_altitude, iss_azimuth, _ = topocentric.altaz()
-        iss_altitude_deg = float(iss_altitude.degrees)
-        iss_azimuth_deg = float(iss_azimuth.degrees)
-
-        earth = eph["earth"]
-        moon = eph["moon"]
-        moon_apparent = (earth + observer).at(event_time).observe(moon).apparent()
-        moon_altitude, moon_azimuth, _ = moon_apparent.altaz()
-        moon_altitude_deg = float(moon_altitude.degrees)
-        moon_azimuth_deg = float(moon_azimuth.degrees)
-        lunar_radius_deg = self._lunar_angular_radius_deg(moon_apparent)
-
-        # Estimate Moon illumination fraction using Sun-Moon-Earth geometry.
-        try:
-            sun = eph["sun"]
-            moon_astrometric = (earth + observer).at(event_time).observe(moon)
-            sun_astrometric = (earth + observer).at(event_time).observe(sun)
-            moon_ra, moon_dec, _ = moon_astrometric.apparent().radec()
-            sun_ra, sun_dec, _ = sun_astrometric.apparent().radec()
-            elongation_deg = self._angular_separation_deg(
-                float(moon_dec.degrees),
-                float(moon_ra.hours) * 15.0,
-                float(sun_dec.degrees),
-                float(sun_ra.hours) * 15.0,
-            )
-            moon_illumination_pct = 50.0 * (1.0 - cos(radians(elongation_deg))) * 100.0 / 100.0
-            moon_illumination_pct = max(0.0, min(100.0, moon_illumination_pct))
-        except Exception:
-            moon_illumination_pct = 0.0
-
-        separation_deg = self._angular_separation_deg(
-            iss_altitude_deg,
-            iss_azimuth_deg,
-            moon_altitude_deg,
-            moon_azimuth_deg,
-        )
-
-        return {
-            "time_utc": when_utc,
-            "iss_altitude_deg": iss_altitude_deg,
-            "iss_azimuth_deg": iss_azimuth_deg,
-            "moon_altitude_deg": moon_altitude_deg,
-            "moon_azimuth_deg": moon_azimuth_deg,
-            "lunar_radius_deg": lunar_radius_deg,
-            "moon_illumination_pct": moon_illumination_pct,
-            "separation_deg": separation_deg,
         }
 
     def _lunar_angular_radius_deg(self, moon_apparent) -> float:

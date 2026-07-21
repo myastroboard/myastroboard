@@ -11,7 +11,6 @@ get_css_passes_report = css_module.get_css_passes_report
 LUNAR_ANGULAR_RADIUS_FALLBACK_DEG = css_module.LUNAR_ANGULAR_RADIUS_FALLBACK_DEG
 from utils.events_aggregator import EventsAggregator
 
-
 # ─── Minimal valid CSS TLE (NORAD 48274) ────────────────────────────────────
 _CSS_TLE_L1 = "1 48274U 21035A   26100.00000000  .00010000  00000+0  18000-3 0  9991"
 _CSS_TLE_L2 = "2 48274  41.4700 120.0000 0005000 200.0000 160.0000 15.34000000000000"
@@ -25,9 +24,9 @@ class TestCSSPassServiceScoring:
 
         assert service._classify_day_night(-20) == "Astronomical Night"
         assert service._classify_day_night(-15) == "Nautical Twilight"
-        assert service._classify_day_night(-8)  == "Civil Twilight"
-        assert service._classify_day_night(-1)  == "Twilight"
-        assert service._classify_day_night(10)  == "Daylight"
+        assert service._classify_day_night(-8) == "Civil Twilight"
+        assert service._classify_day_night(-1) == "Twilight"
+        assert service._classify_day_night(10) == "Daylight"
 
     def test_visibility_score_range(self):
         service = CSSPassService(45.5, -73.5, 30, "America/Montreal")
@@ -50,8 +49,8 @@ class TestCSSPassServiceScoring:
     def test_azimuth_to_cardinal(self):
         service = CSSPassService(45.5, -73.5, 30, "America/Montreal")
 
-        assert service._azimuth_to_cardinal(0)   == "N"
-        assert service._azimuth_to_cardinal(90)  == "E"
+        assert service._azimuth_to_cardinal(0) == "N"
+        assert service._azimuth_to_cardinal(90) == "E"
         assert service._azimuth_to_cardinal(180) == "S"
         assert service._azimuth_to_cardinal(270) == "W"
         assert service._azimuth_to_cardinal(225) == "SW"
@@ -80,91 +79,56 @@ class TestCSSPassServiceWrapper:
 class TestCSSPassServiceSolarTransit:
     """Test CSS solar transit detection helpers."""
 
+    @staticmethod
+    def _patch_solar(monkeypatch, service, center, css_alt=30.0, sun_alt=30.0, az_rate=0.5):
+        import numpy as np
+
+        def fake_css(times, *args, **kwargs):
+            secs = np.array([(t - center).total_seconds() for t in times])
+            return np.full(len(times), css_alt), 180.0 + secs * az_rate
+
+        def fake_sun(times, *args, **kwargs):
+            n = len(times)
+            return np.full(n, sun_alt), np.full(n, 180.0), np.full(n, 0.27)
+
+        monkeypatch.setattr(service, "_iss_altaz_arrays", fake_css)
+        monkeypatch.setattr(service, "_sun_altaz_radius_arrays", fake_sun)
+
     def test_extract_solar_transit_segment_returns_refined_window(self, monkeypatch):
         service = CSSPassService(45.5, -73.5, 30, "America/Montreal")
         start_utc = datetime(2026, 5, 8, 12, 0, 0, tzinfo=timezone.utc)
-        end_utc = start_utc + timedelta(seconds=4)
+        end_utc = start_utc + timedelta(seconds=30)
+        center = start_utc + timedelta(seconds=15)
+        self._patch_solar(monkeypatch, service, center)
 
-        coarse_samples = [
-            {
-                "time_utc":        start_utc + timedelta(seconds=offset),
-                "css_altitude_deg": 25.0,
-                "css_azimuth_deg":  180.0,
-                "sun_altitude_deg": 30.0,
-                "sun_azimuth_deg":  180.0,
-                "solar_radius_deg": 0.27,
-                "separation_deg":   separation,
-            }
-            for offset, separation in [
-                (0, 0.40), (1, 0.26), (2, 0.05), (3, 0.24), (4, 0.38),
-            ]
-        ]
-        refined_samples = [
-            {
-                "time_utc":        start_utc + timedelta(seconds=offset),
-                "css_altitude_deg": 25.0,
-                "css_azimuth_deg":  180.0,
-                "sun_altitude_deg": 30.0,
-                "sun_azimuth_deg":  180.0,
-                "solar_radius_deg": 0.27,
-                "separation_deg":   separation,
-            }
-            for offset, separation in [
-                (1.8, 0.28), (1.9, 0.20), (2.0, 0.03), (2.1, 0.21), (2.2, 0.29),
-            ]
-        ]
-
-        def _mock_sample_time_range(start_utc, end_utc, step_seconds, sampler):
-            return coarse_samples if step_seconds == 1.0 else refined_samples
-
-        monkeypatch.setattr(service, "_sample_time_range", _mock_sample_time_range)
-
-        transit = service._extract_solar_transit_segment(
-            start_utc=start_utc,
-            end_utc=end_utc,
-            satellite=None,
-            observer=None,
-            ts=None,
-            eph=None,
-        )
+        transit = service._extract_solar_transit_segment(start_utc, end_utc, None, None, None, None)
 
         assert transit is not None
-        assert transit["peak_time"] == (start_utc + timedelta(seconds=2)).astimezone(service.timezone).isoformat()
-        assert transit["duration_seconds"] == 0.2
-        assert transit["minimum_separation_arcmin"] == 1.8
         assert transit["is_visible"] is True
+        assert transit["pass_type"] == "solar_transit"
+        assert transit["css_altitude_deg"] == 30.0
+        assert transit["minimum_separation_arcmin"] < 1.0
+        peak = datetime.fromisoformat(transit["peak_time"]).astimezone(timezone.utc)
+        assert abs((peak - center).total_seconds()) < 1.0
 
     def test_extract_solar_transit_segment_returns_none_when_no_transit(self, monkeypatch):
+        import numpy as np
+
         service = CSSPassService(45.5, -73.5, 30, "America/Montreal")
         start_utc = datetime(2026, 5, 8, 12, 0, 0, tzinfo=timezone.utc)
-        end_utc = start_utc + timedelta(seconds=4)
+        end_utc = start_utc + timedelta(seconds=30)
 
-        # All separations exceed solar radius → no transit
-        samples = [
-            {
-                "time_utc": start_utc + timedelta(seconds=i),
-                "css_altitude_deg": 25.0,
-                "css_azimuth_deg": 180.0,
-                "sun_altitude_deg": 30.0,
-                "sun_azimuth_deg": 180.0,
-                "solar_radius_deg": 0.27,
-                "separation_deg": 1.0,
-            }
-            for i in range(5)
-        ]
-
-        monkeypatch.setattr(service, "_sample_time_range", lambda *args, **kwargs: samples)
-
-        transit = service._extract_solar_transit_segment(
-            start_utc=start_utc,
-            end_utc=end_utc,
-            satellite=None,
-            observer=None,
-            ts=None,
-            eph=None,
+        # CSS stays ~40° from the Sun for the whole pass -> rejected at the coarse stage.
+        monkeypatch.setattr(
+            service, "_iss_altaz_arrays", lambda times, *a, **k: (np.full(len(times), 70.0), np.full(len(times), 180.0))
+        )
+        monkeypatch.setattr(
+            service,
+            "_sun_altaz_radius_arrays",
+            lambda times, *a, **k: (np.full(len(times), 30.0), np.full(len(times), 180.0), np.full(len(times), 0.27)),
         )
 
-        assert transit is None
+        assert service._extract_solar_transit_segment(start_utc, end_utc, None, None, None, None) is None
 
 
 class TestCSSPassServiceTleFallback:
@@ -197,11 +161,7 @@ class TestCSSPassServiceTleFallback:
             calls["count"] += 1
             if calls["count"] == 1:
                 return _Response("", HTTPError("403 Client Error: Forbidden"))
-            return _Response(
-                "CSS (TIANHE)\n"
-                + _CSS_TLE_L1 + "\n"
-                + _CSS_TLE_L2 + "\n"
-            )
+            return _Response("CSS (TIANHE)\n" + _CSS_TLE_L1 + "\n" + _CSS_TLE_L2 + "\n")
 
         monkeypatch.setattr("space.css_passes.requests.get", _mock_get)
 
@@ -233,9 +193,14 @@ class TestCSSPassServiceTleFallback:
     def test_fetch_css_tle_uses_cache_in_cooldown(self, monkeypatch):
         service = CSSPassService(45.5, -73.5, 30, "America/Montreal")
 
-        monkeypatch.setattr("space.css_passes._get_cached_css_tle", lambda max_age_seconds=None: (
-            _CSS_TLE_L1, _CSS_TLE_L2, 0,
-        ))
+        monkeypatch.setattr(
+            "space.css_passes._get_cached_css_tle",
+            lambda max_age_seconds=None: (
+                _CSS_TLE_L1,
+                _CSS_TLE_L2,
+                0,
+            ),
+        )
         monkeypatch.setattr("space.css_passes._in_css_tle_failure_cooldown", lambda: True)
 
         called = {"count": 0}
@@ -276,16 +241,19 @@ class TestCSSPassServiceTleFallback:
     def test_parse_css_tle_from_json_response(self):
         """Parser handles JSON bodies returned by tle.ivanstanojevic.me."""
         import json as _json
+
         service = CSSPassService(45.5, -73.5, 30, "America/Montreal")
 
         # tle.ivanstanojevic.me-style payload
-        payload_ivan = _json.dumps({
-            "@type": "TleModel",
-            "name": "CSS (TIANHE)",
-            "date": "2026-04-10T00:00:00+00:00",
-            "line1": _CSS_TLE_L1,
-            "line2": _CSS_TLE_L2,
-        })
+        payload_ivan = _json.dumps(
+            {
+                "@type": "TleModel",
+                "name": "CSS (TIANHE)",
+                "date": "2026-04-10T00:00:00+00:00",
+                "line1": _CSS_TLE_L1,
+                "line2": _CSS_TLE_L2,
+            }
+        )
         l1, l2 = service._parse_css_tle_from_response(payload_ivan)
         assert l1 == _CSS_TLE_L1
         assert l2 == _CSS_TLE_L2
@@ -302,6 +270,7 @@ class TestCSSPassServiceTleFallback:
     def test_fetch_css_tle_uses_alternative_source_when_celestrak_times_out(self, monkeypatch):
         """Alternative JSON sources are tried after Celestrak timeout."""
         import json as _json
+
         service = CSSPassService(45.5, -73.5, 30, "America/Montreal")
 
         monkeypatch.setattr("space.css_passes._get_cached_css_tle", lambda max_age_seconds=None: None)
@@ -318,10 +287,14 @@ class TestCSSPassServiceTleFallback:
             calls.append(url)
             if css_module._is_celestrak_url(url):
                 raise _TimeoutError("Connection timed out")
-            return type("R", (), {
-                "text": _json.dumps({"line1": _CSS_TLE_L1, "line2": _CSS_TLE_L2}),
-                "raise_for_status": lambda self: None,
-            })()
+            return type(
+                "R",
+                (),
+                {
+                    "text": _json.dumps({"line1": _CSS_TLE_L1, "line2": _CSS_TLE_L2}),
+                    "raise_for_status": lambda self: None,
+                },
+            )()
 
         monkeypatch.setattr("space.css_passes.requests.get", _mock_get)
 
@@ -334,6 +307,7 @@ class TestCSSPassServiceTleFallback:
 
     def test_fetch_css_tle_skips_celestrak_when_block_flag_is_set(self, monkeypatch):
         import json as _json
+
         service = CSSPassService(45.5, -73.5, 30, "America/Montreal")
 
         monkeypatch.setattr("space.css_passes._get_cached_css_tle", lambda max_age_seconds=None: None)
@@ -348,11 +322,15 @@ class TestCSSPassServiceTleFallback:
             calls.append(url)
             if css_module._is_celestrak_url(url):
                 raise AssertionError("Celestrak URL should be skipped when block flag is set")
-            return type("R", (), {
-                "text": _json.dumps({"line1": _CSS_TLE_L1, "line2": _CSS_TLE_L2}),
-                "status_code": 200,
-                "raise_for_status": lambda self: None,
-            })()
+            return type(
+                "R",
+                (),
+                {
+                    "text": _json.dumps({"line1": _CSS_TLE_L1, "line2": _CSS_TLE_L2}),
+                    "status_code": 200,
+                    "raise_for_status": lambda self: None,
+                },
+            )()
 
         monkeypatch.setattr("space.css_passes.requests.get", _mock_get)
 
@@ -383,11 +361,13 @@ class TestCSSPassServiceTleFallback:
         block_calls = []
 
         def _mock_set_css_celestrak_block(status_code, reason, source_url):
-            block_calls.append({
-                "status_code": status_code,
-                "reason": reason,
-                "source_url": source_url,
-            })
+            block_calls.append(
+                {
+                    "status_code": status_code,
+                    "reason": reason,
+                    "source_url": source_url,
+                }
+            )
 
         monkeypatch.setattr("space.css_passes._set_css_celestrak_block", _mock_set_css_celestrak_block)
 
@@ -449,9 +429,9 @@ class TestCSSCalendarAggregation:
         aggregator = EventsAggregator(45.5, -73.5, "America/Montreal")
 
         base_day = aggregator.local_now.replace(hour=20, minute=0, second=0, microsecond=0)
-        pass_1_peak = (base_day + timedelta(days=1, minutes=4))
-        pass_2_peak = (base_day + timedelta(days=3, minutes=6))
-        pass_3_peak_outside = (base_day + timedelta(days=9, minutes=8))
+        pass_1_peak = base_day + timedelta(days=1, minutes=4)
+        pass_2_peak = base_day + timedelta(days=3, minutes=6)
+        pass_3_peak_outside = base_day + timedelta(days=9, minutes=8)
 
         css_payload = {
             "passes": [
@@ -736,127 +716,84 @@ class TestCSSCalendarAggregation:
 class TestCSSPassServiceLunarTransit:
     """Test CSS lunar transit detection helpers."""
 
+    @staticmethod
+    def _patch_moon(monkeypatch, service, center, css_alt=40.0, moon_alt=40.0, illum=75.0):
+        import numpy as np
+
+        def fake_css(times, *args, **kwargs):
+            secs = np.array([(t - center).total_seconds() for t in times])
+            return np.full(len(times), css_alt), 195.0 + secs * 0.5
+
+        def fake_moon(times, *args, **kwargs):
+            n = len(times)
+            return np.full(n, moon_alt), np.full(n, 195.0), np.full(n, 0.27), np.full(n, illum)
+
+        monkeypatch.setattr(service, "_iss_altaz_arrays", fake_css)
+        monkeypatch.setattr(service, "_moon_altaz_radius_illum_arrays", fake_moon)
+
     def test_extract_lunar_transit_segment_returns_refined_window(self, monkeypatch):
         service = CSSPassService(45.5, -73.5, 30, "America/Montreal")
         start_utc = datetime(2026, 5, 8, 21, 0, 0, tzinfo=timezone.utc)
-        end_utc = start_utc + timedelta(seconds=4)
+        end_utc = start_utc + timedelta(seconds=30)
+        center = start_utc + timedelta(seconds=15)
+        self._patch_moon(monkeypatch, service, center)
 
-        coarse_samples = [
-            {
-                "time_utc":        start_utc + timedelta(seconds=offset),
-                "css_altitude_deg": 40.0,
-                "css_azimuth_deg":  195.0,
-                "moon_altitude_deg": 40.0,
-                "moon_azimuth_deg":  195.0,
-                "lunar_radius_deg":  0.27,
-                "moon_illumination_pct": 75.0,
-                "separation_deg":   separation,
-            }
-            for offset, separation in [
-                (0, 0.40), (1, 0.26), (2, 0.05), (3, 0.24), (4, 0.38),
-            ]
-        ]
-        refined_samples = [
-            {
-                "time_utc":        start_utc + timedelta(seconds=offset),
-                "css_altitude_deg": 40.0,
-                "css_azimuth_deg":  195.0,
-                "moon_altitude_deg": 40.0,
-                "moon_azimuth_deg":  195.0,
-                "lunar_radius_deg":  0.27,
-                "moon_illumination_pct": 75.0,
-                "separation_deg":   separation,
-            }
-            for offset, separation in [
-                (1.8, 0.28), (1.9, 0.20), (2.0, 0.03), (2.1, 0.21), (2.2, 0.29),
-            ]
-        ]
-
-        def _mock_sample_time_range(start_utc, end_utc, step_seconds, sampler):
-            return coarse_samples if step_seconds == 1.0 else refined_samples
-
-        monkeypatch.setattr(service, "_sample_time_range", _mock_sample_time_range)
-
-        transit = service._extract_lunar_transit_segment(
-            start_utc=start_utc,
-            end_utc=end_utc,
-            satellite=None,
-            observer=None,
-            ts=None,
-            eph=None,
-        )
+        transit = service._extract_lunar_transit_segment(start_utc, end_utc, None, None, None, None)
 
         assert transit is not None
         assert transit["pass_type"] == "lunar_transit"
-        assert transit["peak_time"] == (start_utc + timedelta(seconds=2)).astimezone(service.timezone).isoformat()
-        assert transit["duration_seconds"] == 0.2
-        assert transit["minimum_separation_arcmin"] == pytest.approx(0.03 * 60, abs=0.01)
+        assert transit["moon_altitude_deg"] == 40.0
         assert transit["moon_illumination_pct"] == 75.0
+        assert transit["minimum_separation_arcmin"] < 1.0
         assert transit["is_visible"] is True
+        peak = datetime.fromisoformat(transit["peak_time"]).astimezone(timezone.utc)
+        assert abs((peak - center).total_seconds()) < 1.0
 
     def test_extract_lunar_transit_segment_returns_none_when_no_candidates(self, monkeypatch):
+        import numpy as np
+
         service = CSSPassService(45.5, -73.5, 30, "America/Montreal")
         start_utc = datetime(2026, 5, 8, 21, 0, 0, tzinfo=timezone.utc)
-        end_utc = start_utc + timedelta(seconds=4)
+        end_utc = start_utc + timedelta(seconds=30)
 
-        samples = [
-            {
-                "time_utc": start_utc + timedelta(seconds=i),
-                "css_altitude_deg": 40.0,
-                "css_azimuth_deg": 195.0,
-                "moon_altitude_deg": 40.0,
-                "moon_azimuth_deg": 195.0,
-                "lunar_radius_deg": 0.27,
-                "moon_illumination_pct": 50.0,
-                "separation_deg": 1.5,
-            }
-            for i in range(5)
-        ]
-
-        monkeypatch.setattr(service, "_sample_time_range", lambda *args, **kwargs: samples)
-
-        transit = service._extract_lunar_transit_segment(
-            start_utc=start_utc,
-            end_utc=end_utc,
-            satellite=None,
-            observer=None,
-            ts=None,
-            eph=None,
+        monkeypatch.setattr(
+            service, "_iss_altaz_arrays", lambda times, *a, **k: (np.full(len(times), 70.0), np.full(len(times), 195.0))
+        )
+        monkeypatch.setattr(
+            service,
+            "_moon_altaz_radius_illum_arrays",
+            lambda times, *a, **k: (
+                np.full(len(times), 40.0),
+                np.full(len(times), 195.0),
+                np.full(len(times), 0.27),
+                np.full(len(times), 50.0),
+            ),
         )
 
-        assert transit is None
+        assert service._extract_lunar_transit_segment(start_utc, end_utc, None, None, None, None) is None
 
     def test_extract_lunar_transit_segment_returns_none_when_moon_too_low(self, monkeypatch):
+        import numpy as np
+
         service = CSSPassService(45.5, -73.5, 30, "America/Montreal")
         start_utc = datetime(2026, 5, 8, 21, 0, 0, tzinfo=timezone.utc)
-        end_utc = start_utc + timedelta(seconds=4)
+        end_utc = start_utc + timedelta(seconds=30)
 
-        samples = [
-            {
-                "time_utc": start_utc + timedelta(seconds=i),
-                "css_altitude_deg": 40.0,
-                "css_azimuth_deg": 195.0,
-                "moon_altitude_deg": 2.0,
-                "moon_azimuth_deg": 195.0,
-                "lunar_radius_deg": 0.27,
-                "moon_illumination_pct": 50.0,
-                "separation_deg": 0.05,
-            }
-            for i in range(5)
-        ]
-
-        monkeypatch.setattr(service, "_sample_time_range", lambda *args, **kwargs: samples)
-
-        transit = service._extract_lunar_transit_segment(
-            start_utc=start_utc,
-            end_utc=end_utc,
-            satellite=None,
-            observer=None,
-            ts=None,
-            eph=None,
+        monkeypatch.setattr(
+            service, "_iss_altaz_arrays", lambda times, *a, **k: (np.full(len(times), 2.0), np.full(len(times), 195.0))
+        )
+        monkeypatch.setattr(
+            service,
+            "_moon_altaz_radius_illum_arrays",
+            lambda times, *a, **k: (
+                np.full(len(times), 2.0),
+                np.full(len(times), 195.0),
+                np.full(len(times), 0.27),
+                np.full(len(times), 50.0),
+            ),
         )
 
-        assert transit is None
+        assert service._extract_lunar_transit_segment(start_utc, end_utc, None, None, None, None) is None
 
     def test_find_lunar_transits_skipped_without_ephemeris(self):
         """_find_lunar_transits returns [] gracefully when eph is None."""
@@ -897,28 +834,46 @@ class TestCSSPassServiceLunarTransit:
 
         import os
         from utils.constants import DATA_DIR_CACHE
+
         SKYFIELD_CACHE_DIR = os.path.join(DATA_DIR_CACHE, "skyfield")
         os.makedirs(SKYFIELD_CACHE_DIR, exist_ok=True)
 
         class _FakeTS:
             def from_datetime(self, dt):
                 return dt
+
             def timescale(self):
                 return self
 
         fake_ts = _FakeTS()
-        monkeypatch.setattr(css_module, "SKYFIELD_LOADER", type("L", (), {
-            "timescale": lambda self: fake_ts,
-        })())
+        monkeypatch.setattr(
+            css_module,
+            "SKYFIELD_LOADER",
+            type(
+                "L",
+                (),
+                {
+                    "timescale": lambda self: fake_ts,
+                },
+            )(),
+        )
 
         class _FakeSatellite:
             def find_events(self, *args, **kwargs):
                 return [], []
 
         monkeypatch.setattr(css_module, "EarthSatellite", lambda *args, **kwargs: _FakeSatellite())
-        monkeypatch.setattr(css_module, "wgs84", type("W", (), {
-            "latlon": lambda *args, **kwargs: None,
-        })())
+        monkeypatch.setattr(
+            css_module,
+            "wgs84",
+            type(
+                "W",
+                (),
+                {
+                    "latlon": lambda *args, **kwargs: None,
+                },
+            )(),
+        )
 
         report = service.get_report(days=1)
 
