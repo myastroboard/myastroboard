@@ -428,7 +428,9 @@ def _translate_solar_system_events(data: Dict[str, Any], language: str) -> Dict[
                 if comet_name and magnitude and visibility:
                     title = i18n.t('events_api.solar_system.comet_title', comet_name=comet_name)
                     description = i18n.t(
-                        'events_api.solar_system.comet_description', magnitude=magnitude, visibility=visibility
+                        'events_api.solar_system.comet_description',
+                        magnitude=magnitude,
+                        visibility=i18n.t(f'events_api.solar_system.visibility_{visibility}'),
                     )
                     translated_event["title"] = title
                     translated_event["description"] = description

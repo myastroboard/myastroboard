@@ -817,3 +817,120 @@ class TestSpecialPhenomenaNullAndArrayBranches:
                 Time("2026-03-03T00:00:00", format="isot", scale="utc"),
             )
         assert result == []
+
+
+class TestSeasonalInstantAccuracy:
+    """Equinox and solstice instants must match published times.
+
+    These guard a real defect: the instants used to be derived from the Sun's
+    declination as reported by ``get_sun``, which is GCRS and therefore still
+    referred to the J2000 equator. Equinoxes and solstices are defined against
+    the true equinox of date, so precession since J2000 shifted every result by
+    roughly nine hours. Anything measuring the seasons in a J2000-referred frame
+    fails these assertions.
+    """
+
+    # Published instants (UTC). Tolerance covers the one-minute search grid.
+    PUBLISHED = [
+        ("spring", 2026, "2026-03-20T14:46:00"),
+        ("autumn", 2026, "2026-09-23T00:05:00"),
+        ("summer", 2026, "2026-06-21T08:24:00"),
+        ("winter", 2026, "2026-12-21T20:50:00"),
+        ("spring", 2027, "2027-03-20T20:24:00"),
+    ]
+
+    TOLERANCE_MINUTES = 3.0
+
+    def setup_method(self):
+        self.svc = SpecialPhenomenaService(48.85, 2.35, 35, "Europe/Paris", "en")
+
+    @pytest.mark.parametrize("season,year,published", PUBLISHED)
+    def test_seasonal_instant_matches_published_time(self, season, year, published):
+        """Each refined instant lands within a few minutes of the published one."""
+        from astropy.time import Time
+        from astropy import units as u
+
+        if season in ("spring", "autumn"):
+            computed = self.svc._refine_equinox_time(self.svc._approximate_equinox(year, season), season)
+        else:
+            computed = self.svc._refine_solstice_time(self.svc._approximate_solstice(year, season), season)
+
+        delta_minutes = abs((computed - Time(published, format="isot", scale="utc")).to(u.min).value)
+        assert (
+            delta_minutes <= self.TOLERANCE_MINUTES
+        ), f"{season} {year} off by {delta_minutes:.1f} min (got {computed.utc.iso}, expected {published})"
+
+    def test_equinox_is_not_the_j2000_declination_zero(self):
+        """The March equinox must not be placed where GCRS declination crosses zero.
+
+        The two differ by about nine hours, which is what the old implementation
+        returned. This pins the regression directly rather than relying only on
+        the published-value comparison above.
+        """
+        import numpy as np
+        from astropy.coordinates import get_sun
+        from astropy import units as u
+
+        approx = self.svc._approximate_equinox(2026, "spring")
+        computed = self.svc._refine_equinox_time(approx, "spring")
+
+        grid = approx + (np.arange(-120, 121) * u.hour)
+        j2000_dec_zero = grid[int(np.argmin(np.abs(np.asarray(get_sun(grid).dec.degree, dtype=float))))]
+
+        assert abs((computed - j2000_dec_zero).to(u.hour).value) > 4.0
+
+
+class TestSolarLongitudeHelpers:
+    """Fallback behaviour of the vectorised solar-longitude search."""
+
+    def setup_method(self):
+        self.svc = SpecialPhenomenaService(48.85, 2.35, 35, "Europe/Paris", "en")
+
+    def test_returns_fallback_when_ephemeris_yields_nothing(self):
+        """get_sun returning None leaves the approximate time untouched."""
+        from astropy.time import Time
+
+        fallback = Time("2026-03-20T12:00:00", format="isot", scale="utc")
+        with patch("observation.special_phenomena.get_sun", return_value=None):
+            result = self.svc._best_solar_longitude_time(fallback, 0.0, fallback)
+        assert result is fallback
+
+    def test_returns_fallback_on_ephemeris_error(self):
+        """An astropy failure falls back instead of propagating."""
+        from astropy.time import Time
+
+        fallback = Time("2026-03-20T12:00:00", format="isot", scale="utc")
+        with patch("observation.special_phenomena.get_sun", side_effect=Exception("ephemeris down")):
+            result = self.svc._best_solar_longitude_time(fallback, 0.0, fallback)
+        assert result is fallback
+
+    def test_longitude_target_wraps_around_zero(self):
+        """A target of 0 deg matches longitudes just below 360, not just above 0."""
+        import numpy as np
+        from astropy.time import Time
+        from astropy import units as u
+
+        # Grid straddling the March equinox: longitude runs 359.x -> 0.x
+        grid = Time("2026-03-20T12:00:00", format="isot", scale="utc") + (np.arange(-6, 7) * u.hour)
+        result = self.svc._best_solar_longitude_time(grid, 0.0, grid[0])
+
+        # The nearest sample to longitude 0 is the last one before the crossing,
+        # never the far end of the grid.
+        assert abs((result - Time("2026-03-20T14:46:00", format="isot", scale="utc")).to(u.hour).value) < 2.0
+
+
+class TestEclipticAltitudeWarningFree:
+    """The zodiacal-light elongation test must not warn on every call."""
+
+    def test_no_non_rotation_transformation_warning(self):
+        """Comparing across mismatched frames warned once per scanned day."""
+        import warnings
+        from astropy.time import Time
+
+        svc = SpecialPhenomenaService(48.85, 2.35, 35, "Europe/Paris", "en")
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            svc._get_ecliptic_altitude(Time("2026-08-15T22:30:00", format="isot", scale="utc"))
+
+        offenders = [w for w in caught if "NonRotationTransformation" in w.category.__name__]
+        assert offenders == [], f"unexpected frame-mismatch warnings: {[str(w.message) for w in offenders]}"

@@ -1755,6 +1755,9 @@
       "meteor_shower_description": "Pic de pluie de météores. Jusqu'à {zenith_hourly_rate} météores/heure. Corps parent : {parent_body}",
       "comet_title": "{comet_name} Près du Périhélie",
       "comet_description": "Comète périodique près du périhélie. Magnitude ~{magnitude} ({visibility}). Consultez les cartes pour la localisation exacte.",
+      "visibility_naked_eye_possible": "œil nu possible",
+      "visibility_binoculars": "jumelles",
+      "visibility_telescope": "télescope",
       "asteroid_occultation_title": "Occultation d'Astéroïde - Consultez l'IOTA pour les Détails",
       "asteroid_occultation_description": "Astéroïde passant devant une étoile. Prédictions précises disponibles sur IOTA/IOD. Nécessite un chronométrage précis."
     },

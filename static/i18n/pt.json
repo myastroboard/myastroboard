@@ -1755,6 +1755,9 @@
       "meteor_shower_description": "Pico da chuva de meteoros. Até {zenith_hourly_rate} meteoros/hora. Corpo pai: {parent_body}",
       "comet_title": "{comet_name} Perto do periélio",
       "comet_description": "Cometa periódico próximo ao periélio. Magnitude ~{magnitude} ({visibility}). Verifique os gráficos para localização exata.",
+      "visibility_naked_eye_possible": "olho nu possível",
+      "visibility_binoculars": "binóculos",
+      "visibility_telescope": "telescópio",
       "asteroid_occultation_title": "Ocultação de Asteroides - Veja IOTA para detalhes",
       "asteroid_occultation_description": "Asteróide passando na frente de uma estrela. Previsões precisas disponíveis em IOTA/IOD. Requer tempo preciso."
     },
