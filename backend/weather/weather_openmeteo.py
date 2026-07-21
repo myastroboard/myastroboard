@@ -3,14 +3,13 @@ Manage weather from Open-Meteo API
 https://open-meteo.com/en/docs
 """
 
-import json
-import os
 import threading
 import time
 from typing import cast, Optional
 import requests
 import numpy as np
 import pandas as pd
+from utils import save_json_file
 from utils.repo_config import load_config, get_install_default_location
 from utils.constants import URL_OPENMETEO, CONDITIONS_FILE, SKYTONIGHT_LIVE_CONDITIONS_DEBOUNCE_SECONDS
 from utils.logging_config import get_logger
@@ -562,10 +561,9 @@ def get_skytonight_conditions(location=None):
             "pressure": round(pressure, 3),
         }
 
-        # Save JSON
-        os.makedirs(os.path.dirname(CONDITIONS_FILE), exist_ok=True)
-        with open(CONDITIONS_FILE, "w") as f:
-            json.dump(conditions, f, indent=2)
+        # Persist atomically (temp file + os.replace) so a concurrent reader never
+        # sees a half-written file.
+        save_json_file(CONDITIONS_FILE, conditions)
 
         with _SKYTONIGHT_CONDITIONS_DEBOUNCE_LOCK:
             _SKYTONIGHT_CONDITIONS_DEBOUNCE[debounce_key] = {"ts": time.time(), "data": conditions}

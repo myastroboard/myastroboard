@@ -4,6 +4,7 @@ Predicts aurora visibility based on geomagnetic activity (Kp index) and observer
 Uses NOAA Space Weather Prediction Center data.
 """
 
+import threading
 import time
 import requests
 from datetime import datetime, timezone
@@ -28,6 +29,10 @@ REQUEST_TIMEOUT = 10
 # per-location-math split already used for ISS/CSS passes.
 _kp_index_cache: Dict[str, Any] = {'value': None, 'timestamp': 0.0}
 _kp_forecast_cache: Dict[str, Any] = {'value': None, 'timestamp': 0.0}
+
+# Serialises the NOAA fetches so several locations refreshing in parallel share a
+# single upstream call per TTL window instead of each issuing its own.
+_KP_FETCH_LOCK = threading.Lock()
 
 # Aurora best window hours (local time)
 AURORA_BEST_WINDOW_START = 22
@@ -61,38 +66,44 @@ class AuroraService:
         now = time.monotonic()
         if _kp_index_cache['value'] is not None and (now - _kp_index_cache['timestamp']) < CACHE_TTL_AURORA:
             return _kp_index_cache['value']
-        try:
-            response = requests.get(NOAA_KP_API, timeout=REQUEST_TIMEOUT)
-            response.raise_for_status()
-            data = response.json()
+        with _KP_FETCH_LOCK:
+            # Re-check inside the lock: another location's parallel job may have just
+            # populated the shared cache while we waited, avoiding a duplicate fetch.
+            now = time.monotonic()
+            if _kp_index_cache['value'] is not None and (now - _kp_index_cache['timestamp']) < CACHE_TTL_AURORA:
+                return _kp_index_cache['value']
+            try:
+                response = requests.get(NOAA_KP_API, timeout=REQUEST_TIMEOUT)
+                response.raise_for_status()
+                data = response.json()
 
-            if isinstance(data, list) and len(data) > 0:
-                latest = data[-1]
-                # New format: list of dicts with key 'Kp'
-                if isinstance(latest, dict):
-                    raw = latest.get('Kp')
-                # Legacy format: list of lists, Kp at index 1
-                elif isinstance(latest, list) and len(latest) > 1:
-                    raw = latest[1]
-                else:
-                    raw = None
+                if isinstance(data, list) and len(data) > 0:
+                    latest = data[-1]
+                    # New format: list of dicts with key 'Kp'
+                    if isinstance(latest, dict):
+                        raw = latest.get('Kp')
+                    # Legacy format: list of lists, Kp at index 1
+                    elif isinstance(latest, list) and len(latest) > 1:
+                        raw = latest[1]
+                    else:
+                        raw = None
 
-                if raw is not None:
-                    try:
-                        kp_value = float(raw)
-                        logger.debug(f"Fetched current Kp index: {kp_value}")
-                        _kp_index_cache['value'] = kp_value
-                        _kp_index_cache['timestamp'] = now
-                        return kp_value
-                    except (ValueError, TypeError):
-                        logger.warning(f"Could not parse Kp value from {latest}")
-            return None
-        except requests.RequestException as e:
-            logger.debug(f"Failed to fetch current Kp index from NOAA: {e}")
-            return None
-        except Exception as e:
-            logger.error(f"Error fetching Kp index: {e}")
-            return None
+                    if raw is not None:
+                        try:
+                            kp_value = float(raw)
+                            logger.debug(f"Fetched current Kp index: {kp_value}")
+                            _kp_index_cache['value'] = kp_value
+                            _kp_index_cache['timestamp'] = now
+                            return kp_value
+                        except (ValueError, TypeError):
+                            logger.warning(f"Could not parse Kp value from {latest}")
+                return None
+            except requests.RequestException as e:
+                logger.debug(f"Failed to fetch current Kp index from NOAA: {e}")
+                return None
+            except Exception as e:
+                logger.error(f"Error fetching Kp index: {e}")
+                return None
 
     def fetch_kp_forecast(self) -> Optional[List[Dict[str, Any]]]:
         """
@@ -104,54 +115,60 @@ class AuroraService:
         now = time.monotonic()
         if _kp_forecast_cache['value'] is not None and (now - _kp_forecast_cache['timestamp']) < CACHE_TTL_AURORA:
             return _kp_forecast_cache['value']
-        try:
-            response = requests.get(NOAA_3DAY_FORECAST, timeout=REQUEST_TIMEOUT)
-            response.raise_for_status()
-            data = response.json()
+        with _KP_FETCH_LOCK:
+            # Re-check inside the lock: another location's parallel job may have just
+            # populated the shared cache while we waited, avoiding a duplicate fetch.
+            now = time.monotonic()
+            if _kp_forecast_cache['value'] is not None and (now - _kp_forecast_cache['timestamp']) < CACHE_TTL_AURORA:
+                return _kp_forecast_cache['value']
+            try:
+                response = requests.get(NOAA_3DAY_FORECAST, timeout=REQUEST_TIMEOUT)
+                response.raise_for_status()
+                data = response.json()
 
-            forecast_data = []
+                forecast_data = []
 
-            # New format: list of dicts (key 'kp' lowercase)
-            if isinstance(data, list) and len(data) > 0 and isinstance(data[0], dict):
-                for row in data:
-                    raw_kp = row.get('kp')
-                    if raw_kp is None:
-                        continue
-                    try:
-                        forecast_data.append({'timestamp': row.get('time_tag', ''), 'kp': float(raw_kp)})
-                    except (TypeError, ValueError):
-                        continue
-            # Legacy format: list of lists with header row
-            elif isinstance(data, list) and len(data) > 1 and isinstance(data[0], list):
-                header = data[0]
-                time_idx = header.index('time_tag') if 'time_tag' in header else None
-                kp_idx = next((i for i, h in enumerate(header) if str(h).lower() == 'kp'), None)
-
-                if kp_idx is not None:
-                    for row in data[1:]:
-                        if not isinstance(row, list) or len(row) <= kp_idx:
+                # New format: list of dicts (key 'kp' lowercase)
+                if isinstance(data, list) and len(data) > 0 and isinstance(data[0], dict):
+                    for row in data:
+                        raw_kp = row.get('kp')
+                        if raw_kp is None:
                             continue
                         try:
-                            kp_value = float(row[kp_idx])
+                            forecast_data.append({'timestamp': row.get('time_tag', ''), 'kp': float(raw_kp)})
                         except (TypeError, ValueError):
                             continue
-                        timestamp = ''
-                        if time_idx is not None and len(row) > time_idx:
-                            timestamp = row[time_idx]
-                        forecast_data.append({'timestamp': timestamp, 'kp': kp_value})
+                # Legacy format: list of lists with header row
+                elif isinstance(data, list) and len(data) > 1 and isinstance(data[0], list):
+                    header = data[0]
+                    time_idx = header.index('time_tag') if 'time_tag' in header else None
+                    kp_idx = next((i for i, h in enumerate(header) if str(h).lower() == 'kp'), None)
 
-            logger.debug(f"Fetched Kp forecast: {len(forecast_data)} entries")
-            if forecast_data:
-                _kp_forecast_cache['value'] = forecast_data
-                _kp_forecast_cache['timestamp'] = now
-                return forecast_data
-            return None
-        except requests.RequestException as e:
-            logger.debug(f"Failed to fetch Kp forecast from NOAA: {e}")
-            return None
-        except Exception as e:
-            logger.error(f"Error fetching Kp forecast: {e}")
-            return None
+                    if kp_idx is not None:
+                        for row in data[1:]:
+                            if not isinstance(row, list) or len(row) <= kp_idx:
+                                continue
+                            try:
+                                kp_value = float(row[kp_idx])
+                            except (TypeError, ValueError):
+                                continue
+                            timestamp = ''
+                            if time_idx is not None and len(row) > time_idx:
+                                timestamp = row[time_idx]
+                            forecast_data.append({'timestamp': timestamp, 'kp': kp_value})
+
+                logger.debug(f"Fetched Kp forecast: {len(forecast_data)} entries")
+                if forecast_data:
+                    _kp_forecast_cache['value'] = forecast_data
+                    _kp_forecast_cache['timestamp'] = now
+                    return forecast_data
+                return None
+            except requests.RequestException as e:
+                logger.debug(f"Failed to fetch Kp forecast from NOAA: {e}")
+                return None
+            except Exception as e:
+                logger.error(f"Error fetching Kp forecast: {e}")
+                return None
 
     def calculate_aurora_probability(self, kp_index: float) -> float:
         """

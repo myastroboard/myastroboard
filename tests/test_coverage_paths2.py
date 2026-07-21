@@ -1,4 +1,3 @@
-
 # ---------------------------------------------------------------------------
 # Coverage boost — second batch: cache fallback arcs, config, backup, etc.
 # ---------------------------------------------------------------------------
@@ -86,6 +85,7 @@ class TestSyncTruePostSyncFalseBranches:
         self._setup(monkeypatch)
         _set_location_slot('iss_passes', None)
         from space import iss_passes as _iss
+
         monkeypatch.setattr(_iss, 'get_celestrak_status', lambda: 'ok')
         monkeypatch.setattr(_iss, 'get_iss_tle_source_info', lambda: {})
         resp = client_admin.get('/api/iss/passes')
@@ -116,8 +116,13 @@ class TestSyncTruePostSyncFalseBranches:
         """All aggregated per-location slots empty in get_upcoming_events_api."""
         self._setup(monkeypatch)
         for name in (
-            'solar_eclipse', 'lunar_eclipse', 'aurora', 'iss_passes',
-            'moon_planner', 'planetary_events', 'special_phenomena',
+            'solar_eclipse',
+            'lunar_eclipse',
+            'aurora',
+            'iss_passes',
+            'moon_planner',
+            'planetary_events',
+            'special_phenomena',
             'solar_system_events',
         ):
             _set_location_slot(name, None)
@@ -150,6 +155,7 @@ class TestSyncTruePostSyncFalseBranches:
         self._setup(monkeypatch)
         _set_location_slot('sidereal_time', None)
         from observation import sidereal_time as _st
+
         monkeypatch.setattr(
             _st.SiderealTimeService,
             'get_current_sidereal_info',
@@ -241,11 +247,14 @@ class TestBackupRestoreAstrodexSubpath:
     def test_restore_config_and_astrodex_together(self, client_admin):
         """Covers the json_blobs path and non-json path together."""
         import json as _json
+
         config_content = _json.dumps({'location': {'latitude': 48.0}}).encode()
-        buf = self._make_zip([
-            ('config.json', config_content),
-            ('astrodex/user123/obs.json', b'{"name": "Observation"}'),
-        ])
+        buf = self._make_zip(
+            [
+                ('config.json', config_content),
+                ('astrodex/user123/obs.json', b'{"name": "Observation"}'),
+            ]
+        )
         data = {'file': (buf, 'backup.zip')}
         resp = client_admin.post('/api/backup/restore', data=data, content_type='multipart/form-data')
         assert resp.status_code in (200, 400, 500)
@@ -253,8 +262,10 @@ class TestBackupRestoreAstrodexSubpath:
     def test_restore_app_settings_reloads(self, client_admin, monkeypatch):
         """Covers app_settings reload after restore."""
         import json as _json
+
         settings_content = _json.dumps({'session_cookie_secure': False}).encode()
         from utils import app_settings as _as
+
         monkeypatch.setattr(_as, 'reload_app_settings', lambda: None)
         monkeypatch.setattr(_as, 'get_app_settings', lambda: {'session_cookie_secure': False})
         buf = self._make_zip([('app_settings.json', settings_content)])
@@ -358,13 +369,17 @@ class TestPlanResolveNightFallback:
             raise RuntimeError('sun fail')
 
         monkeypatch.setattr(_SS, 'get_today_report', sun_raise)
-        monkeypatch.setattr(_plan_my_night_mod, 'load_calculation_results',
-                            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('calc fail')))
+        monkeypatch.setattr(
+            _plan_my_night_mod,
+            'load_calculation_results',
+            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('calc fail')),
+        )
 
         from observation import plan_my_night as _pmn
 
         monkeypatch.setattr(
-            _pmn, 'create_or_add_target',
+            _pmn,
+            'create_or_add_target',
             lambda **_kw: (True, 'created', {}, {'id': 'e-1'}),
         )
         monkeypatch.setattr(_pmn, 'get_plan_with_timeline', lambda *a, **kw: {'state': 'ok'})
@@ -383,13 +398,17 @@ class TestPlanResolveNightFallback:
             raise RuntimeError('sun fail')
 
         monkeypatch.setattr(_SS, 'get_today_report', sun_raise)
-        monkeypatch.setattr(_plan_my_night_mod, 'load_calculation_results',
-                            lambda *_a, **_k: {'metadata': {'night_start': None, 'night_end': None}})
+        monkeypatch.setattr(
+            _plan_my_night_mod,
+            'load_calculation_results',
+            lambda *_a, **_k: {'metadata': {'night_start': None, 'night_end': None}},
+        )
 
         from observation import plan_my_night as _pmn
 
         monkeypatch.setattr(
-            _pmn, 'create_or_add_target',
+            _pmn,
+            'create_or_add_target',
             lambda **_kw: (True, 'created', {}, {'id': 'e-2'}),
         )
 
@@ -417,8 +436,7 @@ class TestEquipmentPaths:
         """Covers when updating another user's shared telescope."""
         from equipment import equipment_profiles as _ep
 
-        monkeypatch.setattr(_ep, 'load_all_shared_equipment',
-                            lambda kind, uid: [{'id': 'scope-1', 'name': 'Shared'}])
+        monkeypatch.setattr(_ep, 'load_all_shared_equipment', lambda kind, uid: [{'id': 'scope-1', 'name': 'Shared'}])
         resp = client_admin.put('/api/equipment/telescopes/scope-1', json={'name': 'Renamed'})
         assert resp.status_code == 403
 
@@ -436,8 +454,7 @@ class TestEquipmentPaths:
         """Covers when updating another user's shared camera."""
         from equipment import equipment_profiles as _ep
 
-        monkeypatch.setattr(_ep, 'load_all_shared_equipment',
-                            lambda kind, uid: [{'id': 'cam-1', 'name': 'Shared'}])
+        monkeypatch.setattr(_ep, 'load_all_shared_equipment', lambda kind, uid: [{'id': 'cam-1', 'name': 'Shared'}])
         resp = client_admin.put('/api/equipment/cameras/cam-1', json={'name': 'Renamed'})
         assert resp.status_code == 403
 
@@ -455,8 +472,7 @@ class TestEquipmentPaths:
         """Covers when updating another user's shared mount."""
         from equipment import equipment_profiles as _ep
 
-        monkeypatch.setattr(_ep, 'load_all_shared_equipment',
-                            lambda kind, uid: [{'id': 'mnt-1', 'name': 'Shared'}])
+        monkeypatch.setattr(_ep, 'load_all_shared_equipment', lambda kind, uid: [{'id': 'mnt-1', 'name': 'Shared'}])
         resp = client_admin.put('/api/equipment/mounts/mnt-1', json={'name': 'Renamed'})
         assert resp.status_code == 403
 
@@ -474,8 +490,7 @@ class TestEquipmentPaths:
         """Covers when updating another user's shared filter."""
         from equipment import equipment_profiles as _ep
 
-        monkeypatch.setattr(_ep, 'load_all_shared_equipment',
-                            lambda kind, uid: [{'id': 'filter-1', 'name': 'Shared'}])
+        monkeypatch.setattr(_ep, 'load_all_shared_equipment', lambda kind, uid: [{'id': 'filter-1', 'name': 'Shared'}])
         resp = client_admin.put('/api/equipment/filters/filter-1', json={'name': 'Renamed'})
         assert resp.status_code == 403
 
@@ -493,8 +508,7 @@ class TestEquipmentPaths:
         """Covers when updating another user's shared accessory."""
         from equipment import equipment_profiles as _ep
 
-        monkeypatch.setattr(_ep, 'load_all_shared_equipment',
-                            lambda kind, uid: [{'id': 'acc-1', 'name': 'Shared'}])
+        monkeypatch.setattr(_ep, 'load_all_shared_equipment', lambda kind, uid: [{'id': 'acc-1', 'name': 'Shared'}])
         resp = client_admin.put('/api/equipment/accessories/acc-1', json={'name': 'Renamed'})
         assert resp.status_code == 403
 
@@ -620,8 +634,9 @@ class TestMiscRemainingPaths:
 
         fake = {'id': 'combo-1', 'name': 'My Setup', 'telescope_id': 't1', 'camera_id': 'c1'}
         monkeypatch.setattr(_ep, 'get_combination', lambda uid, cid: fake)
-        monkeypatch.setattr(_ep, 'compute_combination_share_status',
-                            lambda combo, uid: {'is_owner': True, 'is_shared': False})
+        monkeypatch.setattr(
+            _ep, 'compute_combination_share_status', lambda combo, uid: {'is_owner': True, 'is_shared': False}
+        )
         resp = client_admin.get('/api/equipment/combinations/combo-1')
         assert resp.status_code == 200
 
@@ -638,6 +653,7 @@ class TestMiscRemainingPaths:
         entry['timestamp'] = _time.time() + 60  # valid TTL, wrong window
         monkeypatch.setattr(_cache_store, 'load_shared_cache_entry', lambda *_: None)
         from space import iss_passes as _iss
+
         monkeypatch.setattr(_iss, 'get_celestrak_status', lambda: 'ok')
         monkeypatch.setattr(_iss, 'get_iss_tle_source_info', lambda: {})
         resp = client_admin.get('/api/iss/passes?days=7')
@@ -660,29 +676,39 @@ class TestMiscRemainingPaths:
     def test_translation_asteroid_occultation_missing_body(self, client_admin, monkeypatch):
         """Asteroid occultation with empty body/star translated from stale slot data."""
         _force_invalid_isolated(monkeypatch)
-        _set_location_slot('solar_system_events', {
-            'events': [{
-                'event_type': 'Asteroid Occultation',
-                'title': 'Test',
-                'description': 'Test desc',
-                'raw_data': {'asteroid_name': 'Test', 'star_magnitude': 8.5},
-            }],
-            'language': 'en',
-        })
+        _set_location_slot(
+            'solar_system_events',
+            {
+                'events': [
+                    {
+                        'event_type': 'Asteroid Occultation',
+                        'title': 'Test',
+                        'description': 'Test desc',
+                        'raw_data': {'asteroid_name': 'Test', 'star_magnitude': 8.5},
+                    }
+                ],
+                'language': 'en',
+            },
+        )
         resp = client_admin.get('/api/events/solarsystem?lang=fr')
         assert resp.status_code == 200
 
     def test_special_phenomena_translation_with_format_key(self, client_admin, monkeypatch):
         """Phenomena translation fallback.format(**kwargs) from stale slot data."""
         _force_invalid_isolated(monkeypatch)
-        _set_location_slot('special_phenomena', {
-            'events': [{
-                'event_type': 'Astronomical Event',
-                'title': 'Spring Equinox',
-                'raw_data': {'event': 'spring_equinox', 'hemisphere': 'northern'},
-            }],
-            'language': 'en',
-        })
+        _set_location_slot(
+            'special_phenomena',
+            {
+                'events': [
+                    {
+                        'event_type': 'Astronomical Event',
+                        'title': 'Spring Equinox',
+                        'raw_data': {'event': 'spring_equinox', 'hemisphere': 'northern'},
+                    }
+                ],
+                'language': 'en',
+            },
+        )
         resp = client_admin.get('/api/events/phenomena?lang=de')
         assert resp.status_code == 200
 
@@ -699,7 +725,8 @@ class TestMiscRemainingPaths:
         from observation import plan_my_night as _pmn
 
         monkeypatch.setattr(
-            _pmn, 'create_or_add_target',
+            _pmn,
+            'create_or_add_target',
             lambda **_kw: (True, 'created', {}, {'id': 'e-x'}),
         )
         resp = client_admin.post(
@@ -728,7 +755,8 @@ class TestMiscRemainingPaths:
         monkeypatch.setattr(_adx, 'can_user_view_image', lambda uid, filename: True)
         monkeypatch.setattr(_adx, 'ASTRODEX_IMAGES_DIR', _os.path.dirname(__file__))
         monkeypatch.setattr(
-            _flask, 'send_from_directory',
+            _flask,
+            'send_from_directory',
             lambda d, f, **kw: _flask.jsonify({'file': f}),
         )
         resp = client_admin.get('/api/astrodex/images/conftest.py')
@@ -736,10 +764,11 @@ class TestMiscRemainingPaths:
 
     def test_sidereal_time_sync_post_invalid_location(self, client_admin, monkeypatch):
         """Sidereal slot invalid-for-today → live computation arc."""
-        monkeypatch.setattr(_cache_store, 'is_cache_valid_for_today', lambda *_: False)
+        monkeypatch.setattr(_cache_store, 'is_cache_valid_for_today', lambda *_, **__: False)
         monkeypatch.setattr(_cache_store, 'load_shared_cache_entry', lambda *_: None)
         _set_location_slot('sidereal_time', None)
         from observation import sidereal_time as _st
+
         monkeypatch.setattr(
             _st.SiderealTimeService,
             'get_current_sidereal_info',

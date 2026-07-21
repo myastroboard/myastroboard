@@ -11,6 +11,7 @@ import sys
 import unicodedata
 import uuid
 import yaml
+from datetime import datetime, timezone
 from typing import Dict, Tuple, Optional
 from utils.constants import CONFIG_FILE, DATA_DIR
 from utils.logging_config import get_logger
@@ -287,3 +288,22 @@ _ASTROPY_CONSTELLATION_FIXES: Dict[str, str] = {
 def fix_astropy_constellation_name(name: str) -> str:
     """Correct known misspellings in astropy's get_constellation() output."""
     return _ASTROPY_CONSTELLATION_FIXES.get(name, name)
+
+
+def parse_iso_to_utc(value: Optional[str]) -> datetime:
+    """Parse an ISO 8601 string (with or without offset) into an aware UTC datetime.
+
+    Event services store times as local ISO strings carrying the observer's UTC
+    offset. Sorting those strings lexicographically misorders events across a
+    daylight-saving offset change (e.g. ``+02:00`` in summer vs ``+01:00`` in
+    winter). Parsing back to an absolute instant fixes that. Empty or invalid
+    input maps to ``datetime.max`` (UTC) so the value can be used directly as a
+    sort key that pushes unparseable entries to the end.
+    """
+    try:
+        parsed = datetime.fromisoformat(str(value))
+    except (ValueError, TypeError):
+        return datetime.max.replace(tzinfo=timezone.utc)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)

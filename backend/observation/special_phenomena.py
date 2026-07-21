@@ -13,6 +13,7 @@ All calculations account for observer location and timezone.
 from datetime import datetime, timedelta, date as date_type
 from typing import List, Dict, Any
 from zoneinfo import ZoneInfo
+from utils import parse_iso_to_utc
 from utils.logging_config import get_logger
 from utils.i18n_utils import I18nManager
 
@@ -23,6 +24,7 @@ from astropy.coordinates import (
     get_sun,
     SkyCoord,
     ICRS,
+    GeocentricTrueEcliptic,
 )
 from astropy.time import Time
 from astropy import units as u
@@ -104,8 +106,9 @@ class SpecialPhenomenaService:
             logger.error(f"Error calculating special phenomena: {e}")
             return []
 
-        # Sort by time
-        events.sort(key=lambda x: x.get('peak_time', x.get('start_time')))
+        # Sort by absolute instant (parsed from the local ISO strings) so events
+        # stay correctly ordered across a daylight-saving offset change.
+        events.sort(key=lambda x: parse_iso_to_utc(x.get('peak_time') or x.get('start_time')))
 
         return events
 
@@ -251,6 +254,39 @@ class SpecialPhenomenaService:
             return Time(f"{year}-12-21T12:00:00", format='isot', scale='utc', location=self.location)
         return Time(f"{year}-06-21T12:00:00", format='isot', scale='utc', location=self.location)
 
+    @staticmethod
+    def _sun_declination_deg(sun: Any) -> float:
+        """Return the Sun's declination in degrees, handling scalar/array returns."""
+        dec_val = sun.dec.degree  # type: ignore
+        if isinstance(dec_val, (np.ndarray, complex)):
+            return float(np.real(np.atleast_1d(dec_val).flat[0]))
+        return float(dec_val)  # type: ignore
+
+    def _refine_declination_time(self, best_time: Time, best_cost: float, cost_fn: Any) -> Time:
+        """Refine to 1-minute resolution around ``best_time``, minimising ``cost_fn``.
+
+        ``cost_fn`` maps the Sun's declination to a value that is lowest at the
+        target instant (``abs`` for an equinox, ``-dec`` for the summer solstice,
+        ``dec`` for the winter solstice). This second pass adds sub-minute
+        precision on top of the coarse 1-hour scan (which alone was only accurate
+        to about an hour).
+        """
+        current = best_time - (1.0 * u.hour)
+        end_time = best_time + (1.0 * u.hour)
+        step = 1.0 * u.min
+        while current < end_time:
+            try:
+                sun = get_sun(current)
+                if sun is not None:
+                    cost = cost_fn(self._sun_declination_deg(sun))
+                    if cost < best_cost:
+                        best_cost = cost
+                        best_time = current
+            except Exception:
+                pass  # astropy ephemeris error for this timestep — skip it
+            current = current + step
+        return best_time
+
     def _refine_equinox_time(self, approx_time: Time, season: str) -> Time:
         """Refine equinox time by finding when Sun's declination is closest to 0."""
         # Check around approximate time
@@ -263,11 +299,7 @@ class SpecialPhenomenaService:
             sun_current = get_sun(current)
             if sun_current is None:
                 return best_time
-            dec_val = sun_current.dec.degree  # type: ignore
-            if isinstance(dec_val, (np.ndarray, complex)):
-                min_declination = abs(float(np.real(np.atleast_1d(dec_val).flat[0])))
-            else:
-                min_declination = abs(float(dec_val))  # type: ignore
+            min_declination = abs(self._sun_declination_deg(sun_current))
         except Exception:
             min_declination = 180.0
 
@@ -278,11 +310,7 @@ class SpecialPhenomenaService:
                     current = current + step_hours
                     continue
 
-                dec_val = sun.dec.degree  # type: ignore
-                if isinstance(dec_val, (np.ndarray, complex)):
-                    declination = abs(float(np.real(np.atleast_1d(dec_val).flat[0])))
-                else:
-                    declination = abs(float(dec_val))  # type: ignore
+                declination = abs(self._sun_declination_deg(sun))
 
                 if declination < min_declination:
                     min_declination = declination
@@ -292,7 +320,7 @@ class SpecialPhenomenaService:
 
             current = current + step_hours  # Step by 1 hour
 
-        return best_time
+        return self._refine_declination_time(best_time, min_declination, abs)
 
     def _refine_solstice_time(self, approx_time: Time, season: str) -> Time:
         """Refine solstice time by finding when Sun's declination is at extremum."""
@@ -306,11 +334,7 @@ class SpecialPhenomenaService:
             sun_current = get_sun(current)
             if sun_current is None:
                 return best_time
-            dec_val = sun_current.dec.degree  # type: ignore
-            if isinstance(dec_val, (np.ndarray, complex)):
-                max_declination = float(np.real(np.atleast_1d(dec_val).flat[0]))
-            else:
-                max_declination = float(dec_val)  # type: ignore
+            max_declination = self._sun_declination_deg(sun_current)
         except Exception:
             max_declination = 0.0
 
@@ -323,11 +347,7 @@ class SpecialPhenomenaService:
                     current = current + step_hours
                     continue
 
-                dec_val = sun.dec.degree  # type: ignore
-                if isinstance(dec_val, (np.ndarray, complex)):
-                    declination = float(np.real(np.atleast_1d(dec_val).flat[0]))
-                else:
-                    declination = float(dec_val)  # type: ignore
+                declination = self._sun_declination_deg(sun)
 
                 if target_max and declination > max_declination:
                     max_declination = declination
@@ -340,7 +360,10 @@ class SpecialPhenomenaService:
 
             current = current + step_hours  # Step by 1 hour
 
-        return best_time
+        # Summer solstice maximises declination (cost -dec); winter minimises it (cost dec).
+        if target_max:
+            return self._refine_declination_time(best_time, -max_declination, lambda d: -d)
+        return self._refine_declination_time(best_time, max_declination, lambda d: d)
 
     def _find_zodiacal_light_windows(self, start_date: Time, end_date: Time) -> List[Dict[str, Any]]:
         """
@@ -603,22 +626,38 @@ class SpecialPhenomenaService:
         return events
 
     def _get_ecliptic_altitude(self, time: Time) -> float:
-        """Get altitude of ecliptic above horizon at given time."""
+        """Return the top altitude of the zodiacal band above the horizon.
+
+        The zodiacal light follows the ecliptic and stands highest when the
+        ecliptic meets the horizon steeply. We sample the ecliptic plane
+        (latitude 0), keep the sampled points that are above the horizon and
+        within 90 degrees of the Sun (where the band is bright), and return the
+        greatest altitude among them. Returns 0.0 when the band is entirely
+        below the horizon or on any error.
+
+        This previously returned the Sun's own altitude. Because the caller
+        already requires the Sun to be below the horizon, that made the
+        downstream ``ecliptic_alt > 20`` gate impossible to satisfy, so no
+        zodiacal light window was ever emitted.
+        """
         try:
-            # Ecliptic is the Sun's apparent path
             sun = get_sun(time)
             if sun is None:
                 return 0.0
 
-            ecliptic_altaz = sun.transform_to(AltAz(obstime=time, location=self.location))
-            if ecliptic_altaz is None:
-                return 0.0
+            ecliptic_longitudes = np.arange(0.0, 360.0, 15.0)
+            ecliptic_points = SkyCoord(
+                lon=ecliptic_longitudes * u.deg,
+                lat=np.zeros_like(ecliptic_longitudes) * u.deg,
+                frame=GeocentricTrueEcliptic(obstime=time, equinox=time),
+            )
 
-            alt_val = ecliptic_altaz.alt.degree  # type: ignore
-            if isinstance(alt_val, (np.ndarray, complex)):
-                return float(np.real(np.atleast_1d(alt_val).flat[0]))
-            else:
-                return float(alt_val)  # type: ignore
+            altaz = ecliptic_points.transform_to(AltAz(obstime=time, location=self.location))
+            altitudes = np.atleast_1d(np.asarray(altaz.alt.degree, dtype=float))  # type: ignore[union-attr]
+            separations = np.atleast_1d(np.asarray(ecliptic_points.separation(sun).degree, dtype=float))
+
+            band = altitudes[(altitudes > 0.0) & (separations <= 90.0)]
+            return float(band.max()) if band.size else 0.0
         except Exception:
             return 0.0
 

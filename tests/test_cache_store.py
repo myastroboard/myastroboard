@@ -3,6 +3,7 @@ Unit tests for cache store (cache_store.py)
 Tests the server-side cache management system with TTL-based expiration
 and the per-location cache slots introduced by v1.2 multi-location profiles.
 """
+
 import pytest
 import time
 import os
@@ -114,12 +115,7 @@ class TestLocationChangeDetection:
 
     def test_get_current_location_signature(self):
         """Test location signature creation"""
-        location = {
-            "latitude": 45.5,
-            "longitude": -73.5,
-            "elevation": 100,
-            "timezone": "America/Montreal"
-        }
+        location = {"latitude": 45.5, "longitude": -73.5, "elevation": 100, "timezone": "America/Montreal"}
         signature = get_current_location_signature(location)
         assert signature["latitude"] == 45.5
         assert signature["longitude"] == -73.5
@@ -133,12 +129,7 @@ class TestLocationChangeDetection:
 
     def test_has_location_changed_first_time(self):
         """Test has_location_changed returns True on first tracking"""
-        location = {
-            "latitude": 45.5,
-            "longitude": -73.5,
-            "elevation": 100,
-            "timezone": "America/Montreal"
-        }
+        location = {"latitude": 45.5, "longitude": -73.5, "elevation": 100, "timezone": "America/Montreal"}
         assert has_location_changed(location) is True
 
     @pytest.mark.parametrize(
@@ -152,12 +143,7 @@ class TestLocationChangeDetection:
     )
     def test_has_location_changed_per_field(self, field, new_value):
         """Each tracked field triggers change detection independently"""
-        location1 = {
-            "latitude": 45.5,
-            "longitude": -73.5,
-            "elevation": 100,
-            "timezone": "America/Montreal"
-        }
+        location1 = {"latitude": 45.5, "longitude": -73.5, "elevation": 100, "timezone": "America/Montreal"}
         update_location_config(location1)
 
         location2 = dict(location1)
@@ -166,12 +152,7 @@ class TestLocationChangeDetection:
 
     def test_has_location_changed_no_change(self):
         """Test location change detection when nothing changed"""
-        location = {
-            "latitude": 45.5,
-            "longitude": -73.5,
-            "elevation": 100,
-            "timezone": "America/Montreal"
-        }
+        location = {"latitude": 45.5, "longitude": -73.5, "elevation": 100, "timezone": "America/Montreal"}
         update_location_config(location)
 
         # Same location
@@ -179,12 +160,7 @@ class TestLocationChangeDetection:
 
     def test_update_location_config(self):
         """Test updating tracked location config (legacy flat slot)"""
-        location = {
-            "latitude": 40.7,
-            "longitude": -74.0,
-            "elevation": 50,
-            "timezone": "America/New_York"
-        }
+        location = {"latitude": 40.7, "longitude": -74.0, "elevation": 50, "timezone": "America/New_York"}
         update_location_config(location)
 
         stored = cache_store._last_known_location_signatures[cache_store._LEGACY_SIGNATURE_KEY]
@@ -354,6 +330,7 @@ class TestLoadLocationSignaturesFile:
 
     def test_legacy_flat_file_maps_to_legacy_slot(self, tmp_path, monkeypatch):
         import json
+
         location_data = {"latitude": 51.5, "longitude": -0.12, "elevation": 10, "timezone": "Europe/London"}
         loc_file = tmp_path / 'location_cache.json'
         loc_file.write_text(json.dumps(location_data))
@@ -365,6 +342,7 @@ class TestLoadLocationSignaturesFile:
 
     def test_per_id_file_shape_loads_directly(self, tmp_path, monkeypatch):
         import json
+
         data = {"loc-1": {"latitude": 1.0, "longitude": 2.0, "elevation": 3, "timezone": "UTC"}}
         loc_file = tmp_path / 'location_cache.json'
         loc_file.write_text(json.dumps(data))
@@ -383,6 +361,7 @@ class TestLoadLocationSignaturesFile:
         neither branch - the loader must leave the in-memory state untouched
         rather than raising or storing a non-dict value."""
         import json
+
         loc_file = tmp_path / 'location_cache.json'
         loc_file.write_text(json.dumps(["not", "a", "dict"]))
         monkeypatch.setattr(cache_store, '_LOCATION_CACHE_FILE', str(loc_file))
@@ -396,6 +375,7 @@ class TestSaveLocationSignaturesException:
 
     def test_save_exception_is_silently_ignored(self, monkeypatch):
         import builtins
+
         original_open = builtins.open
 
         def raising_open(path, mode='r', **kwargs):
@@ -436,6 +416,15 @@ class TestIsCacheValidForToday:
 
         cache_entry = {"timestamp": time.time() - 7200, "data": {"some": "data"}}
         assert is_cache_valid_for_today(cache_entry, 3600) is False
+
+    def test_fresh_cache_valid_with_explicit_timezone(self):
+        cache_entry = {"timestamp": time.time(), "data": {"some": "data"}}
+        assert is_cache_valid_for_today(cache_entry, 3600, tz_name="Europe/Paris") is True
+
+    def test_unknown_timezone_falls_back_to_server_local(self):
+        cache_entry = {"timestamp": time.time(), "data": {"some": "data"}}
+        # An unresolvable timezone must not raise; it degrades to the server day boundary.
+        assert is_cache_valid_for_today(cache_entry, 3600, tz_name="Not/AZone") is True
 
     def test_stale_day_cache_is_invalid(self, monkeypatch):
 
@@ -643,11 +632,13 @@ class TestIsExecutionMetricsValid:
 
     def test_returns_false_when_success_but_expired(self, tmp_path, monkeypatch):
         from datetime import datetime, timezone, timedelta
+
         monkeypatch.setattr(cs, '_SHARED_CACHE_FILE', str(tmp_path / "ev4.json"))
         monkeypatch.setattr(cs, '_SHARED_CACHE_LOCK', str(tmp_path / "ev4.lock"))
         cache_store.record_cache_execution("allsky_sensor", 0.1, True)
         # Manually backdate the last_run_at to simulate expiry
         import json
+
         with open(str(tmp_path / "ev4.json")) as f:
             data = json.load(f)
         old_ts = (datetime.now(timezone.utc) - timedelta(seconds=400)).isoformat()
@@ -661,6 +652,7 @@ class TestIsExecutionMetricsValid:
         monkeypatch.setattr(cs, '_SHARED_CACHE_LOCK', str(tmp_path / "ev5.lock"))
         cache_store.record_cache_execution("allsky_sensor", 0.1, True)
         import json
+
         with open(str(tmp_path / "ev5.json")) as f:
             data = json.load(f)
         del data["_cache_metrics"]["allsky_sensor"]["last_run_at"]
@@ -673,6 +665,7 @@ class TestIsExecutionMetricsValid:
         monkeypatch.setattr(cs, '_SHARED_CACHE_LOCK', str(tmp_path / "ev6.lock"))
         cache_store.record_cache_execution("allsky_sensor", 0.1, True)
         import json
+
         with open(str(tmp_path / "ev6.json")) as f:
             data = json.load(f)
         data["_cache_metrics"]["allsky_sensor"]["last_run_at"] = "not-a-valid-timestamp"

@@ -42,9 +42,16 @@ class TestMeteorShowerConstants:
         assert "Geminids" in SolarSystemEventsService.METEOR_SHOWERS
 
     def test_each_shower_has_required_keys(self):
-        required = {"peak_month", "peak_day_start", "peak_day_end",
-                    "radiant_ra", "radiant_dec", "zenith_hourly_rate",
-                    "parent_body", "hemisphere"}
+        required = {
+            "peak_month",
+            "peak_day_start",
+            "peak_day_end",
+            "radiant_ra",
+            "radiant_dec",
+            "zenith_hourly_rate",
+            "parent_body",
+            "hemisphere",
+        }
         for name, data in SolarSystemEventsService.METEOR_SHOWERS.items():
             for key in required:
                 assert key in data, f"Shower {name} missing key {key}"
@@ -110,6 +117,7 @@ class TestFindMeteorShowerPeaks:
     def test_southern_observer_skips_northern_only_showers(self):
         svc = SolarSystemEventsService(-33.9, 151.2, timezone="Australia/Sydney")
         from datetime import date, timedelta
+
         start_date = date(2026, 1, 1)
         events = svc._find_meteor_shower_peaks(start_date, 365)
         # Events for Southern-only showers should be filtered; Perseids (Northern) excluded
@@ -119,6 +127,7 @@ class TestFindMeteorShowerPeaks:
     def test_both_hemisphere_showers_visible_from_north(self):
         svc = SolarSystemEventsService(45.0, -73.5, timezone="America/Montreal")
         from datetime import date
+
         start_date = date(2026, 1, 1)
         events = svc._find_meteor_shower_peaks(start_date, 365)
         event_names = {e["raw_data"]["shower"] for e in events}
@@ -128,6 +137,7 @@ class TestFindMeteorShowerPeaks:
     def test_event_has_required_keys(self):
         svc = SolarSystemEventsService(45.0, -73.5, timezone="America/Montreal")
         from datetime import date
+
         start_date = date(2026, 1, 1)
         events = svc._find_meteor_shower_peaks(start_date, 365)
         if events:
@@ -138,6 +148,7 @@ class TestFindMeteorShowerPeaks:
     def test_score_within_0_to_10(self):
         svc = SolarSystemEventsService(45.0, -73.5, timezone="America/Montreal")
         from datetime import date
+
         events = svc._find_meteor_shower_peaks(date(2026, 1, 1), 365)
         for e in events:
             assert 0.0 <= e["score"] <= 10.0
@@ -149,12 +160,14 @@ class TestFindCometVisibilityWindows:
     def test_returns_list(self):
         svc = SolarSystemEventsService(45.0, -73.5)
         from datetime import date
+
         events = svc._find_comet_visibility_windows(date(2026, 1, 1), 365)
         assert isinstance(events, list)
 
     def test_comet_events_have_required_keys(self):
         svc = SolarSystemEventsService(45.0, -73.5)
         from datetime import date
+
         events = svc._find_comet_visibility_windows(date(2026, 1, 1), 365)
         for e in events:
             assert "event_type" in e
@@ -165,6 +178,7 @@ class TestFindCometVisibilityWindows:
         """When date range is before any comet perihelion, no events should be returned."""
         svc = SolarSystemEventsService(45.0, -73.5)
         from datetime import date
+
         # Use a date range long before any known comets
         events = svc._find_comet_visibility_windows(date(2000, 1, 1), 10)
         assert isinstance(events, list)
@@ -176,12 +190,15 @@ class TestGetSolarSystemEvents:
     """Tests for the main get_solar_system_events method."""
 
     def test_returns_sorted_list(self):
+        from utils import parse_iso_to_utc
+
         svc = SolarSystemEventsService(45.0, -73.5, timezone="America/Montreal")
         events = svc.get_solar_system_events(days_ahead=365)
         assert isinstance(events, list)
-        # Should be sorted by peak_time or start_time
-        times = [e.get("peak_time", e.get("start_time")) for e in events]
-        assert times == sorted(times)
+        # Sorted by absolute instant (correct across a daylight-saving offset change),
+        # which need not match the lexicographic order of the local ISO strings.
+        instants = [parse_iso_to_utc(e.get("peak_time") or e.get("start_time")) for e in events]
+        assert instants == sorted(instants)
 
     def test_returns_empty_on_exception(self):
         """When an exception occurs internally, returns empty list."""
@@ -204,12 +221,14 @@ class TestFindAsteroidOccultations:
     def test_returns_empty_list(self):
         svc = SolarSystemEventsService(45.0, -73.5)
         from datetime import date
+
         events = svc._find_asteroid_occultations(date(2026, 1, 1), 365)
         assert events == []
 
     def test_returns_list_type(self):
         svc = SolarSystemEventsService(45.0, -73.5)
         from datetime import date
+
         events = svc._find_asteroid_occultations(date(2026, 6, 1), 30)
         assert isinstance(events, list)
 
@@ -221,6 +240,7 @@ class TestFindMeteorShowerPeaksEdgeCases:
         """A very narrow date range excluding all peaks returns empty list."""
         svc = SolarSystemEventsService(45.0, -73.5, timezone="America/Montreal")
         from datetime import date
+
         # February has no meteor shower peaks in the METEOR_SHOWERS data
         events = svc._find_meteor_shower_peaks(date(2026, 2, 1), 5)
         assert isinstance(events, list)
@@ -243,6 +263,7 @@ class TestFindMeteorShowerPeaksEdgeCases:
             }
         }
         from datetime import date
+
         try:
             events = svc._find_meteor_shower_peaks(date(2026, 1, 1), 365)
             assert len(events) == 0
@@ -255,6 +276,7 @@ class TestIsRadiantVisible:
 
     def test_returns_bool(self):
         from astropy.time import Time
+
         svc = SolarSystemEventsService(45.0, -73.5)
         t = Time("2026-08-12T02:00:00", format="isot", scale="utc")
         result = svc._is_radiant_visible(48, 58, t)
@@ -262,6 +284,7 @@ class TestIsRadiantVisible:
 
     def test_returns_false_on_exception(self):
         from astropy.time import Time
+
         svc = SolarSystemEventsService(45.0, -73.5)
         t = Time("2026-08-12T02:00:00", format="isot", scale="utc")
         with patch("observation.solar_system_events.SkyCoord", side_effect=Exception("bad")):
@@ -294,7 +317,7 @@ class TestIsRadiantVisible:
         def patched_transform(self_coord, frame):
             mock_altaz = MagicMock()
             mock_alt = MagicMock()
-            mock_alt.degree = np.array([45.0])  # ndarray → triggers 
+            mock_alt.degree = np.array([45.0])  # ndarray → triggers
             mock_altaz.alt = mock_alt
             return mock_altaz
 
@@ -336,16 +359,105 @@ class TestCometExceptionHandler:
 
         svc = SolarSystemEventsService(45.0, -73.5)
 
-        # Patch timedelta to raise on first call (inside the comet loop)
-        original_timedelta = module.timedelta
-        call_count = [0]
-
-        def raising_timedelta(*args, **kwargs):
-            call_count[0] += 1
-            if call_count[0] == 2:
-                raise ValueError("simulated timedelta error")
-            return original_timedelta(*args, **kwargs)
-
-        with patch.object(module, 'timedelta', raising_timedelta):
+        # Force the dataset path to be skipped so the curated fallback runs.
+        with patch.object(svc, "_dataset_comet_candidates", return_value=[]), patch.object(
+            svc, "_build_comet_event", side_effect=ValueError("simulated build error")
+        ):
             events = svc._find_comet_visibility_windows(date(2026, 1, 1), 365)
-        assert isinstance(events, list)
+        assert events == []
+
+
+class TestMeteorShowerYearBoundary:
+    """A search window crossing a calendar boundary must surface next-year showers."""
+
+    def test_mid_year_window_includes_next_year_early_shower(self):
+        from datetime import date
+
+        svc = SolarSystemEventsService(45.0, 0.0, timezone="UTC")
+        # Window 2026-07-01 .. 2027-07-01 crosses into 2027.
+        events = svc._find_meteor_shower_peaks(date(2026, 7, 1), 365)
+        # Quadrantids peak in early January, so only the 2027 occurrence is in range.
+        quadrantids = [e for e in events if e["raw_data"]["shower"] == "Quadrantids"]
+        assert quadrantids, "next-year Quadrantids should appear in a mid-year 365-day window"
+        assert any("2027" in e["peak_time"] for e in quadrantids)
+
+
+class TestMeteorShowerActivityWindow:
+    """Meteor showers span their full IMO activity window, not just peak ± 2 days."""
+
+    def test_perseids_window_spans_weeks(self):
+        from datetime import date, datetime
+
+        svc = SolarSystemEventsService(45.0, 0.0, timezone="UTC")
+        events = svc._find_meteor_shower_peaks(date(2026, 1, 1), 365)
+        perseids = next(e for e in events if e["raw_data"]["shower"] == "Perseids")
+        start = datetime.fromisoformat(perseids["start_time"])
+        end = datetime.fromisoformat(perseids["end_time"])
+        peak = datetime.fromisoformat(perseids["peak_time"])
+        assert (end - start).days >= 30  # ~38-day real window, not the old 4-day span
+        assert start <= peak <= end
+
+    def test_quadrantids_window_wraps_year_boundary(self):
+        from datetime import date, datetime
+
+        svc = SolarSystemEventsService(45.0, 0.0, timezone="UTC")
+        # Quadrantids peak early January 2027 within a mid-2026 + 365-day window.
+        events = svc._find_meteor_shower_peaks(date(2026, 7, 1), 365)
+        quad = next(e for e in events if e["raw_data"]["shower"] == "Quadrantids")
+        start = datetime.fromisoformat(quad["start_time"])
+        end = datetime.fromisoformat(quad["end_time"])
+        assert start.month == 12  # activity opens the previous December
+        assert end.month == 1  # and closes in January
+        assert start < end
+
+
+class TestCometDatasetSource:
+    """Comet events come from the live MPC-fed dataset, not a hardcoded year list."""
+
+    def test_uses_dataset_comets_when_available(self, monkeypatch):
+        import skytonight.skytonight_targets as targets_mod
+        from datetime import date
+
+        fake_dataset = {
+            "targets": [
+                {
+                    "category": "comets",
+                    "preferred_name": "C/2026 X1 (Test)",
+                    "magnitude": 5.0,
+                    "metadata": {"perihelion_date": "2026-08-15"},
+                },
+                {
+                    "category": "comets",
+                    "preferred_name": "Faint Comet",
+                    "magnitude": 18.0,  # fainter than the notable cutoff -> excluded
+                    "metadata": {"perihelion_date": "2026-08-15"},
+                },
+                {
+                    "category": "deep_sky",
+                    "preferred_name": "M31",
+                    "magnitude": 3.4,
+                    "metadata": {},
+                },
+            ]
+        }
+        monkeypatch.setattr(targets_mod, "load_targets_dataset", lambda *a, **k: fake_dataset)
+
+        svc = SolarSystemEventsService(45.0, 0.0, timezone="UTC")
+        events = svc._find_comet_visibility_windows(date(2026, 8, 1), 60)
+
+        names = [e["raw_data"]["comet"] for e in events]
+        assert "C/2026 X1 (Test)" in names
+        assert "Faint Comet" not in names
+        assert "M31" not in names
+        assert all(e["event_type"] == "Comet Appearance" for e in events)
+        assert all(e["raw_data"]["source"] == "dataset" for e in events)
+
+    def test_falls_back_to_curated_when_dataset_empty(self, monkeypatch):
+        import skytonight.skytonight_targets as targets_mod
+        from datetime import date
+
+        monkeypatch.setattr(targets_mod, "load_targets_dataset", lambda *a, **k: {"targets": []})
+        svc = SolarSystemEventsService(45.0, 0.0, timezone="UTC")
+        events = svc._find_comet_visibility_windows(date(2026, 1, 1), 365)
+        assert events  # curated 2026 comets overlap the full-year window
+        assert all(e["raw_data"]["source"] == "curated" for e in events)

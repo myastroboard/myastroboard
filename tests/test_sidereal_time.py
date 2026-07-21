@@ -49,12 +49,30 @@ class TestDecimalHoursToHms:
 
 
 class TestIsCircumpolar:
-    """Tests for _is_circumpolar (always returns False by design)."""
+    """Tests for _is_circumpolar (declination + observer latitude based)."""
 
-    def test_always_false(self):
+    def test_high_northern_latitude(self):
+        # From latitude 70N, objects never set once dec >= 90 - 70 = 20.
         svc = SiderealTimeService(70.0, 0.0)
-        assert svc._is_circumpolar(0.0) is False
-        assert svc._is_circumpolar(180.0) is False
+        assert svc._is_circumpolar(25.0) is True
+        assert svc._is_circumpolar(20.0) is True
+        assert svc._is_circumpolar(10.0) is False
+        assert svc._is_circumpolar(-30.0) is False
+
+    def test_southern_latitude(self):
+        # From latitude 30S, objects never set once dec <= -(90 - 30) = -60.
+        svc = SiderealTimeService(-30.0, 0.0)
+        assert svc._is_circumpolar(-65.0) is True
+        assert svc._is_circumpolar(-60.0) is True
+        assert svc._is_circumpolar(-50.0) is False
+        assert svc._is_circumpolar(20.0) is False
+
+    def test_equator_only_pole_is_circumpolar(self):
+        # From the equator nothing meaningfully circles the pole above the horizon.
+        svc = SiderealTimeService(0.0, 0.0)
+        assert svc._is_circumpolar(45.0) is False
+        assert svc._is_circumpolar(89.0) is False
+        assert svc._is_circumpolar(90.0) is True
 
 
 class TestGetCurrentSiderealInfo:
@@ -133,6 +151,20 @@ class TestGetObjectLstForTransit:
             expected_ra_hours = (120.0 / 360.0) * 24.0
             assert result["local_sidereal_time_at_transit_hours"] == pytest.approx(expected_ra_hours)
 
+    def test_is_circumpolar_none_without_declination(self):
+        """Circumpolarity is unknown from RA alone, so it is None when dec is omitted."""
+        svc = SiderealTimeService(70.0, 0.0)
+        result = svc.get_object_lst_for_transit(180.0, date(2026, 6, 15))
+        if result:
+            assert result["is_circumpolar"] is None
+
+    def test_is_circumpolar_true_with_high_declination(self):
+        """A high-declination object is circumpolar from a high latitude when dec is given."""
+        svc = SiderealTimeService(70.0, 0.0)
+        result = svc.get_object_lst_for_transit(180.0, date(2026, 6, 15), dec_degrees=80.0)
+        if result:
+            assert result["is_circumpolar"] is True
+
 
 class TestGetHourlySiderealTimes:
     """Tests for get_hourly_sidereal_times."""
@@ -193,7 +225,7 @@ class TestGetBestObservationTimes:
         def patched_transform_to(self_coord, frame):
             real_altaz_call_count[0] += 1
             if real_altaz_call_count[0] == 1:
-                return None  # First call returns None → exercises 
+                return None  # First call returns None → exercises
             return original_transform_to(self_coord, frame)
 
         with patch.object(SkyCoord, 'transform_to', patched_transform_to):
@@ -213,7 +245,7 @@ class TestGetBestObservationTimes:
         def patched_transform_to(self_coord, frame):
             mock_altaz = MagicMock()
             mock_alt = MagicMock()
-            mock_alt.degree = np.array([42.0])  # ndarray → triggers 
+            mock_alt.degree = np.array([42.0])  # ndarray → triggers
             mock_altaz.alt = mock_alt
             return mock_altaz
 
@@ -235,7 +267,7 @@ class TestCalculateSiderealInfoNdarrayBranch:
 
         mock_time = MagicMock()
         mock_gst = MagicMock()
-        mock_gst.hour = np.array([12.5])  # ndarray → triggers 
+        mock_gst.hour = np.array([12.5])  # ndarray → triggers
 
         mock_time.sidereal_time.return_value = mock_gst
         mock_time.jd = 2460676.0
@@ -309,6 +341,7 @@ class TestExceptionHandlerBranches:
     def test_get_current_sidereal_info_exception_returns_empty(self, monkeypatch):
         """exception in Time.now() → empty dict."""
         from astropy.time import Time
+
         monkeypatch.setattr(Time, 'now', staticmethod(lambda: (_ for _ in ()).throw(RuntimeError("time error"))))
         svc = SiderealTimeService(45.0, -73.5)
         result = svc.get_current_sidereal_info()
@@ -323,21 +356,27 @@ class TestExceptionHandlerBranches:
     def test_get_hourly_sidereal_times_exception_returns_empty_list(self, monkeypatch):
         """exception in loop → empty list returned."""
         from astropy.time import Time
+
         svc = SiderealTimeService(45.0, -73.5)
-        monkeypatch.setattr(svc, '_calculate_sidereal_info', lambda t: (_ for _ in ()).throw(RuntimeError("calc error")))
+        monkeypatch.setattr(
+            svc, '_calculate_sidereal_info', lambda t: (_ for _ in ()).throw(RuntimeError("calc error"))
+        )
         result = svc.get_hourly_sidereal_times(date(2026, 6, 1), num_hours=1)
         assert result == []
 
     def test_get_object_lst_for_transit_exception_returns_empty(self, monkeypatch):
         """exception in calculation → empty dict."""
         svc = SiderealTimeService(45.0, -73.5)
-        monkeypatch.setattr(svc, '_calculate_sidereal_info', lambda t: (_ for _ in ()).throw(RuntimeError("calc error")))
+        monkeypatch.setattr(
+            svc, '_calculate_sidereal_info', lambda t: (_ for _ in ()).throw(RuntimeError("calc error"))
+        )
         result = svc.get_object_lst_for_transit(180.0, date(2026, 6, 15))
         assert result == {}
 
     def test_calculate_sidereal_info_exception_returns_empty(self, monkeypatch):
         """exception in _calculate_sidereal_info → empty dict."""
         from astropy.time import Time
+
         svc = SiderealTimeService(45.0, -73.5)
         t = Time(datetime(2026, 6, 1, 0, 0, 0, tzinfo=ZoneInfo("UTC")))
         monkeypatch.setattr(t, 'sidereal_time', lambda *a, **kw: (_ for _ in ()).throw(ValueError("bad")))
@@ -347,7 +386,9 @@ class TestExceptionHandlerBranches:
     def test_get_best_observation_times_exception_returns_empty(self, monkeypatch):
         """exception in SkyCoord → empty dict."""
         svc = SiderealTimeService(45.0, -73.5)
-        monkeypatch.setattr(svc, '_calculate_sidereal_info', lambda t: (_ for _ in ()).throw(RuntimeError("calc error")))
+        monkeypatch.setattr(
+            svc, '_calculate_sidereal_info', lambda t: (_ for _ in ()).throw(RuntimeError("calc error"))
+        )
         # Pass an invalid date type to trigger exception
         result = svc.get_best_observation_times(6.0, 45.0, "not-a-date")  # type: ignore
         assert result == {}

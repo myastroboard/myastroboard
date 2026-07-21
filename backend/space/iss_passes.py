@@ -33,6 +33,29 @@ os.makedirs(SKYFIELD_CACHE_DIR, exist_ok=True)
 SKYFIELD_LOADER = Loader(SKYFIELD_CACHE_DIR)
 logger.debug(f"Skyfield cache directory: {SKYFIELD_CACHE_DIR}")
 
+# Process-wide memoised JPL ephemeris. The live-position endpoint is polled far
+# more often than the (cached) pass report, so re-opening the ~16 MB de421.bsp on
+# every request wastes CPU/IO and file handles; load it once and reuse it.
+_EPHEMERIS = None
+_EPHEMERIS_ATTEMPTED = False
+_EPHEMERIS_LOCK = threading.Lock()
+
+
+def _get_ephemeris():
+    """Return the shared de421 ephemeris, loading it once (None if unavailable)."""
+    global _EPHEMERIS, _EPHEMERIS_ATTEMPTED
+    if _EPHEMERIS is None and not _EPHEMERIS_ATTEMPTED:
+        with _EPHEMERIS_LOCK:
+            if _EPHEMERIS is None and not _EPHEMERIS_ATTEMPTED:
+                _EPHEMERIS_ATTEMPTED = True
+                try:
+                    _EPHEMERIS = SKYFIELD_LOADER('de421.bsp')
+                except Exception as exc:
+                    logger.warning(f"Could not load ephemeris file de421.bsp: {exc}")
+                    _EPHEMERIS = None
+    return _EPHEMERIS
+
+
 # TLE sources in priority order.  Celestrak is authoritative but sources 2-3 are
 # independent aggregators that remain reachable when a Celestrak IP-block occurs.
 # They are placed early so a Celestrak timeout does not cost 30 extra seconds.
@@ -91,6 +114,21 @@ def _write_tle_cache(payload: Dict[str, Any]) -> None:
     save_json_file(ISS_TLE_CACHE_FILE, payload)
 
 
+# Serialises the read-modify-write TLE cache updates below. In a multi-location
+# install the ISS pass job runs once per location in parallel threads, so without
+# this lock two writers could interleave and lose each other's updates (e.g. clobber
+# a freshly-set celestrak_blocked flag). Network fetches stay outside the lock.
+_TLE_CACHE_LOCK = threading.Lock()
+
+
+def _update_tle_cache(mutator) -> None:
+    """Apply ``mutator(payload)`` to the on-disk TLE cache atomically."""
+    with _TLE_CACHE_LOCK:
+        payload = _read_tle_cache()
+        mutator(payload)
+        _write_tle_cache(payload)
+
+
 def _get_cached_tle(max_age_seconds: Optional[int] = None) -> Optional[Tuple[str, str, int]]:
     cache = _read_tle_cache()
     line1 = str(cache.get('line1') or '').strip()
@@ -107,12 +145,13 @@ def _get_cached_tle(max_age_seconds: Optional[int] = None) -> Optional[Tuple[str
 
 
 def _set_cached_tle(line1: str, line2: str) -> None:
-    payload = _read_tle_cache()
-    payload['line1'] = line1
-    payload['line2'] = line2
-    payload['fetched_at'] = _utc_timestamp()
-    payload['last_error_at'] = None
-    _write_tle_cache(payload)
+    def _mutate(payload: Dict[str, Any]) -> None:
+        payload['line1'] = line1
+        payload['line2'] = line2
+        payload['fetched_at'] = _utc_timestamp()
+        payload['last_error_at'] = None
+
+    _update_tle_cache(_mutate)
 
 
 def _source_name_from_url(source_url: str) -> str:
@@ -132,14 +171,15 @@ def _is_celestrak_url(candidate_url: str) -> bool:
 
 
 def _set_cached_tle_with_source(line1: str, line2: str, source_url: str) -> None:
-    payload = _read_tle_cache()
-    payload['line1'] = line1
-    payload['line2'] = line2
-    payload['fetched_at'] = _utc_timestamp()
-    payload['last_error_at'] = None
-    payload['last_source_url'] = source_url
-    payload['last_source_name'] = _source_name_from_url(source_url)
-    _write_tle_cache(payload)
+    def _mutate(payload: Dict[str, Any]) -> None:
+        payload['line1'] = line1
+        payload['line2'] = line2
+        payload['fetched_at'] = _utc_timestamp()
+        payload['last_error_at'] = None
+        payload['last_source_url'] = source_url
+        payload['last_source_name'] = _source_name_from_url(source_url)
+
+    _update_tle_cache(_mutate)
 
 
 def get_iss_tle_source_info() -> Dict[str, Any]:
@@ -152,9 +192,7 @@ def get_iss_tle_source_info() -> Dict[str, Any]:
 
 
 def _set_tle_error_timestamp() -> None:
-    payload = _read_tle_cache()
-    payload['last_error_at'] = _utc_timestamp()
-    _write_tle_cache(payload)
+    _update_tle_cache(lambda payload: payload.update({'last_error_at': _utc_timestamp()}))
 
 
 def _in_tle_failure_cooldown() -> bool:
@@ -166,33 +204,39 @@ def _in_tle_failure_cooldown() -> bool:
 
 
 def _set_celestrak_block(status_code: int, reason: str, source_url: str) -> None:
-    payload = _read_tle_cache()
-    payload['celestrak_blocked'] = True
-    payload['celestrak_blocked_at'] = _utc_timestamp()
-    payload['celestrak_blocked_status_code'] = int(status_code)
-    payload['celestrak_blocked_reason'] = reason
-    payload['celestrak_blocked_source_url'] = source_url
-    _write_tle_cache(payload)
+    def _mutate(payload: Dict[str, Any]) -> None:
+        payload['celestrak_blocked'] = True
+        payload['celestrak_blocked_at'] = _utc_timestamp()
+        payload['celestrak_blocked_status_code'] = int(status_code)
+        payload['celestrak_blocked_reason'] = reason
+        payload['celestrak_blocked_source_url'] = source_url
+
+    _update_tle_cache(_mutate)
 
 
 def _reset_celestrak_timeout_streak() -> None:
-    payload = _read_tle_cache()
-    payload['celestrak_timeout_streak'] = 0
-    payload['celestrak_last_timeout_at'] = None
-    payload['celestrak_last_timeout_reason'] = None
-    payload['celestrak_last_timeout_source_url'] = None
-    _write_tle_cache(payload)
+    def _mutate(payload: Dict[str, Any]) -> None:
+        payload['celestrak_timeout_streak'] = 0
+        payload['celestrak_last_timeout_at'] = None
+        payload['celestrak_last_timeout_reason'] = None
+        payload['celestrak_last_timeout_source_url'] = None
+
+    _update_tle_cache(_mutate)
 
 
 def _increment_celestrak_timeout_streak(reason: str, source_url: str) -> int:
-    payload = _read_tle_cache()
-    streak = int(payload.get('celestrak_timeout_streak') or 0) + 1
-    payload['celestrak_timeout_streak'] = streak
-    payload['celestrak_last_timeout_at'] = _utc_timestamp()
-    payload['celestrak_last_timeout_reason'] = reason
-    payload['celestrak_last_timeout_source_url'] = source_url
-    _write_tle_cache(payload)
-    return streak
+    captured: Dict[str, int] = {}
+
+    def _mutate(payload: Dict[str, Any]) -> None:
+        streak = int(payload.get('celestrak_timeout_streak') or 0) + 1
+        payload['celestrak_timeout_streak'] = streak
+        payload['celestrak_last_timeout_at'] = _utc_timestamp()
+        payload['celestrak_last_timeout_reason'] = reason
+        payload['celestrak_last_timeout_source_url'] = source_url
+        captured['streak'] = streak
+
+    _update_tle_cache(_mutate)
+    return captured.get('streak', 0)
 
 
 def _is_celestrak_timeout_error(exc: Exception) -> bool:
@@ -203,19 +247,20 @@ def _is_celestrak_timeout_error(exc: Exception) -> bool:
 
 
 def _clear_celestrak_block(reset_failure_cooldown: bool = True) -> None:
-    payload = _read_tle_cache()
-    payload['celestrak_blocked'] = False
-    payload['celestrak_blocked_at'] = None
-    payload['celestrak_blocked_status_code'] = None
-    payload['celestrak_blocked_reason'] = None
-    payload['celestrak_blocked_source_url'] = None
-    payload['celestrak_timeout_streak'] = 0
-    payload['celestrak_last_timeout_at'] = None
-    payload['celestrak_last_timeout_reason'] = None
-    payload['celestrak_last_timeout_source_url'] = None
-    if reset_failure_cooldown:
-        payload['last_error_at'] = None
-    _write_tle_cache(payload)
+    def _mutate(payload: Dict[str, Any]) -> None:
+        payload['celestrak_blocked'] = False
+        payload['celestrak_blocked_at'] = None
+        payload['celestrak_blocked_status_code'] = None
+        payload['celestrak_blocked_reason'] = None
+        payload['celestrak_blocked_source_url'] = None
+        payload['celestrak_timeout_streak'] = 0
+        payload['celestrak_last_timeout_at'] = None
+        payload['celestrak_last_timeout_reason'] = None
+        payload['celestrak_last_timeout_source_url'] = None
+        if reset_failure_cooldown:
+            payload['last_error_at'] = None
+
+    _update_tle_cache(_mutate)
 
 
 def get_celestrak_status() -> Dict[str, Any]:
@@ -1233,11 +1278,7 @@ def get_current_position(
         obs_altitude_deg = float(_obs_alt.degrees)  # type: ignore[arg-type]
         obs_azimuth_deg = float(_obs_az.degrees)  # type: ignore[arg-type]
 
-        eph = None
-        try:
-            eph = SKYFIELD_LOADER('de421.bsp')
-        except Exception:
-            pass  # ephemeris file unavailable — solar/lunar checks are skipped below
+        eph = _get_ephemeris()
 
         if eph is not None:
             earth = eph["earth"]

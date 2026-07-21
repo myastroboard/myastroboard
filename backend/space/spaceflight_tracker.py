@@ -26,6 +26,12 @@ _REQUEST_TIMEOUT = 15
 _SPACEFLIGHT_IMAGES_DIR = os.path.join(DATA_DIR_CACHE, 'spaceflight_images')
 _SPACEFLIGHT_BACKOFF_FILE = os.path.join(DATA_DIR_CACHE, 'spaceflight_backoff.json')
 
+# Grace window for prune_image_cache: never delete an image written within this many
+# seconds. The three spaceflight caches refresh as parallel jobs, so a just-downloaded
+# image may not yet be referenced in the shared cache when the events job runs its
+# prune - without the grace it would be deleted as an orphan and immediately re-fetched.
+_PRUNE_GRACE_SECONDS = 600
+
 _STATION_ABBREV_MAP: Dict[str, str] = {
     "international space station": "ISS",
     "tiangong space station": "CSS",
@@ -441,18 +447,25 @@ def prune_image_cache(active_data: list) -> None:
         if path and isinstance(path, str) and path.startswith("/api/spaceflight/img/"):
             in_use.add(os.path.basename(path))
 
+    now_ts = time.time()
     removed = 0
     freed = 0
     for fname in os.listdir(_SPACEFLIGHT_IMAGES_DIR):
-        if fname not in in_use:
-            fpath = os.path.join(_SPACEFLIGHT_IMAGES_DIR, fname)
-            try:
-                size = os.path.getsize(fpath)
-                os.remove(fpath)
-                removed += 1
-                freed += size
-            except OSError as exc:
-                logger.warning("Could not remove stale spaceflight image %s: %s", fpath, exc)
+        # Keep in-use images and the ".url" recovery sidecar of any in-use image.
+        base_name = fname[:-4] if fname.endswith('.url') else fname
+        if base_name in in_use:
+            continue
+        fpath = os.path.join(_SPACEFLIGHT_IMAGES_DIR, fname)
+        try:
+            # Grace period: never delete a file a concurrent refresh just wrote.
+            if now_ts - os.path.getmtime(fpath) < _PRUNE_GRACE_SECONDS:
+                continue
+            size = os.path.getsize(fpath)
+            os.remove(fpath)
+            removed += 1
+            freed += size
+        except OSError as exc:
+            logger.warning("Could not remove stale spaceflight image %s: %s", fpath, exc)
 
     if removed:
         logger.info(

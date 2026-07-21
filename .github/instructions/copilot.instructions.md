@@ -85,7 +85,7 @@ myastroboard/
 │   │   ├── plan_my_night.py             # Plan My Night storage and business logic
 │   │   ├── planetary_events.py          # Planetary events cache service
 │   │   ├── sidereal_time.py             # Sidereal time service
-│   │   ├── solar_system_events.py       # Solar system events cache service
+│   │   ├── solar_system_events.py       # Solar system events (meteor showers are a curated annual set; comets are read from the live MPC-fed SkyTonight dataset - never hardcode dated comets)
 │   │   └── special_phenomena.py         # Special phenomena cache service
 │   ├── cache/                       # Shared JSON cache store and background scheduler/updater
 │   │   ├── cache_scheduler.py           # Periodic cache scheduler

@@ -1,10 +1,19 @@
 """Tests for spaceflight_tracker.py — pure normaliser functions and helpers."""
+
+import os
 import time
 from contextlib import contextmanager
 from unittest.mock import patch, MagicMock
 import requests
 
 from space import spaceflight_tracker
+
+
+def _age_file(path, seconds_old=3600):
+    """Backdate a file's mtime so it falls outside the prune grace window."""
+    past = time.time() - seconds_old
+    os.utime(str(path), (past, past))
+
 
 _cache_image = spaceflight_tracker._cache_image
 _get = spaceflight_tracker._get
@@ -304,12 +313,38 @@ class TestPruneImageCache:
         img_dir.mkdir()
         (img_dir / "old.jpg").write_bytes(b"data")
         (img_dir / "keep.jpg").write_bytes(b"data")
+        _age_file(img_dir / "old.jpg")  # past the grace window so it is eligible for pruning
 
         with patch("space.spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(img_dir)):
             prune_image_cache(["/api/spaceflight/img/keep.jpg"])
 
         assert not (img_dir / "old.jpg").exists()
         assert (img_dir / "keep.jpg").exists()
+
+    def test_grace_window_keeps_freshly_written_files(self, tmp_path):
+        """A just-written orphan is kept: a parallel refresh may not yet reference it."""
+        img_dir = tmp_path / "images"
+        img_dir.mkdir()
+        (img_dir / "fresh.jpg").write_bytes(b"data")  # mtime = now, inside the grace window
+
+        with patch("space.spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(img_dir)):
+            prune_image_cache([])
+
+        assert (img_dir / "fresh.jpg").exists()
+
+    def test_keeps_url_sidecar_of_in_use_image(self, tmp_path):
+        """The .url recovery sidecar of an in-use image must not be pruned."""
+        img_dir = tmp_path / "images"
+        img_dir.mkdir()
+        (img_dir / "keep.jpg").write_bytes(b"data")
+        (img_dir / "keep.jpg.url").write_text("https://example/keep.jpg")
+        _age_file(img_dir / "keep.jpg.url")
+
+        with patch("space.spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(img_dir)):
+            prune_image_cache(["/api/spaceflight/img/keep.jpg"])
+
+        assert (img_dir / "keep.jpg").exists()
+        assert (img_dir / "keep.jpg.url").exists()
 
     def test_keeps_all_referenced_files(self, tmp_path):
         img_dir = tmp_path / "images"
@@ -327,6 +362,7 @@ class TestPruneImageCache:
         img_dir = tmp_path / "images"
         img_dir.mkdir()
         (img_dir / "orphan.jpg").write_bytes(b"x")
+        _age_file(img_dir / "orphan.jpg")  # past the grace window
 
         with patch("space.spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(img_dir)):
             prune_image_cache([])
@@ -410,6 +446,7 @@ class TestCacheImage:
         """If file already exists, no request is made."""
         url = "https://example.com/cached.jpg"
         import hashlib
+
         url_hash = hashlib.md5(url.encode()).hexdigest()
         cached_file = tmp_path / f"{url_hash}.jpg"
         cached_file.write_bytes(b"existing")
@@ -611,10 +648,26 @@ class TestGetPastLaunches:
         raw = {
             "count": 2,
             "results": [
-                {"id": "x", "name": "Past 1", "status": {}, "rocket": {"configuration": {}},
-                 "mission": {}, "pad": {"location": {}}, "launch_service_provider": {}, "image": None},
-                {"id": "y", "name": "Past 2", "status": {}, "rocket": {"configuration": {}},
-                 "mission": {}, "pad": {"location": {}}, "launch_service_provider": {}, "image": None},
+                {
+                    "id": "x",
+                    "name": "Past 1",
+                    "status": {},
+                    "rocket": {"configuration": {}},
+                    "mission": {},
+                    "pad": {"location": {}},
+                    "launch_service_provider": {},
+                    "image": None,
+                },
+                {
+                    "id": "y",
+                    "name": "Past 2",
+                    "status": {},
+                    "rocket": {"configuration": {}},
+                    "mission": {},
+                    "pad": {"location": {}},
+                    "launch_service_provider": {},
+                    "image": None,
+                },
             ],
         }
         with _no_cache():
@@ -648,7 +701,7 @@ class TestGetIssCrew:
                     "start": "2024-03-04T00:00:00Z",
                     "end": None,
                     "spacestation": {"name": "International Space Station"},
-                    "crew": [],   # list endpoint omits crew
+                    "crew": [],  # list endpoint omits crew
                     "mission_patch": None,
                     "wiki": None,
                 },
@@ -675,18 +728,34 @@ class TestGetIssCrew:
             ]
         }
         detail_71 = {
-            "id": 71, "name": "Expedition 71", "start": "2024-03-04T00:00:00Z",
-            "end": None, "spacestation": {"name": "International Space Station"},
-            "crew": [{"astronaut": {"name": "Test Astronaut", "nationality": "American",
-                                    "agency": {"name": "NASA", "abbrev": "NASA"},
-                                    "profile_image": None},
-                      "role": {"role": "Commander"}}],
-            "mission_patch": None, "wiki": None,
+            "id": 71,
+            "name": "Expedition 71",
+            "start": "2024-03-04T00:00:00Z",
+            "end": None,
+            "spacestation": {"name": "International Space Station"},
+            "crew": [
+                {
+                    "astronaut": {
+                        "name": "Test Astronaut",
+                        "nationality": "American",
+                        "agency": {"name": "NASA", "abbrev": "NASA"},
+                        "profile_image": None,
+                    },
+                    "role": {"role": "Commander"},
+                }
+            ],
+            "mission_patch": None,
+            "wiki": None,
         }
         detail_12 = {
-            "id": 12, "name": "Shenzhou 19", "start": "2024-10-30T00:00:00Z",
-            "end": None, "spacestation": {"name": "Tiangong space station"},
-            "crew": [], "mission_patch": None, "wiki": None,
+            "id": 12,
+            "name": "Shenzhou 19",
+            "start": "2024-10-30T00:00:00Z",
+            "end": None,
+            "spacestation": {"name": "Tiangong space station"},
+            "crew": [],
+            "mission_patch": None,
+            "wiki": None,
         }
 
         def _mock_get(path, params=None):
@@ -718,10 +787,17 @@ class TestGetIssCrew:
                     "start": "2024-03-04T00:00:00Z",
                     "end": None,
                     "spacestation": {"name": "International Space Station"},
-                    "crew": [{"astronaut": {"name": "Test Astronaut", "nationality": "American",
-                                            "agency": {"name": "NASA", "abbrev": "NASA"},
-                                            "profile_image": None},
-                              "role": {"role": "Commander"}}],
+                    "crew": [
+                        {
+                            "astronaut": {
+                                "name": "Test Astronaut",
+                                "nationality": "American",
+                                "agency": {"name": "NASA", "abbrev": "NASA"},
+                                "profile_image": None,
+                            },
+                            "role": {"role": "Commander"},
+                        }
+                    ],
                     "mission_patch": None,
                     "wiki": None,
                 },
@@ -859,10 +935,22 @@ class TestGetLaunchVidurls:
     def test_returns_sorted_results_youtube_first(self):
         raw = {
             "vidURLs": [
-                {"url": "https://vimeo.com/video", "title": "Vimeo", "source": "vimeo",
-                 "publisher": "Pub", "type": {"name": "Live"}, "priority": 10},
-                {"url": "https://www.youtube.com/watch?v=abc", "title": "YT",
-                 "source": "youtube", "publisher": "SpX", "type": {"name": "Live"}, "priority": 5},
+                {
+                    "url": "https://vimeo.com/video",
+                    "title": "Vimeo",
+                    "source": "vimeo",
+                    "publisher": "Pub",
+                    "type": {"name": "Live"},
+                    "priority": 10,
+                },
+                {
+                    "url": "https://www.youtube.com/watch?v=abc",
+                    "title": "YT",
+                    "source": "youtube",
+                    "publisher": "SpX",
+                    "type": {"name": "Live"},
+                    "priority": 5,
+                },
             ]
         }
         with patch("space.spaceflight_tracker._get", return_value=raw):
@@ -884,8 +972,18 @@ class TestGetLaunchVidurls:
             "data": [{"url": "https://old.com"}],
             "ts": time.time() - 9999,
         }
-        raw = {"vidURLs": [{"url": "https://new.com", "title": "New", "source": "x",
-                             "publisher": "y", "type": {"name": "Live"}, "priority": 1}]}
+        raw = {
+            "vidURLs": [
+                {
+                    "url": "https://new.com",
+                    "title": "New",
+                    "source": "x",
+                    "publisher": "y",
+                    "type": {"name": "Live"},
+                    "priority": 1,
+                }
+            ]
+        }
         with patch("space.spaceflight_tracker._get", return_value=raw):
             result = get_launch_vidurls("old-id")
         assert result[0]["url"] == "https://new.com"
@@ -894,8 +992,14 @@ class TestGetLaunchVidurls:
         raw = {
             "vidURLs": [
                 {"url": None, "title": "No URL"},
-                {"url": "https://example.com/v", "title": "Valid", "source": "x",
-                 "publisher": "y", "type": {"name": "Live"}, "priority": 0},
+                {
+                    "url": "https://example.com/v",
+                    "title": "Valid",
+                    "source": "x",
+                    "publisher": "y",
+                    "type": {"name": "Live"},
+                    "priority": 0,
+                },
             ]
         }
         with patch("space.spaceflight_tracker._get", return_value=raw):
@@ -918,10 +1022,22 @@ class TestGetLaunchVidurls:
     def test_youtube_com_without_www_also_sorted_first(self):
         raw = {
             "vidURLs": [
-                {"url": "https://vimeo.com/v", "title": "V", "source": "vimeo",
-                 "publisher": "x", "type": {"name": "Live"}, "priority": 100},
-                {"url": "https://youtube.com/watch?v=xyz", "title": "YT bare",
-                 "source": "youtube", "publisher": "y", "type": None, "priority": 1},
+                {
+                    "url": "https://vimeo.com/v",
+                    "title": "V",
+                    "source": "vimeo",
+                    "publisher": "x",
+                    "type": {"name": "Live"},
+                    "priority": 100,
+                },
+                {
+                    "url": "https://youtube.com/watch?v=xyz",
+                    "title": "YT bare",
+                    "source": "youtube",
+                    "publisher": "y",
+                    "type": None,
+                    "priority": 1,
+                },
             ]
         }
         with patch("space.spaceflight_tracker._get", return_value=raw):
@@ -951,13 +1067,16 @@ class TestPruneImageCacheOsError:
         img_dir = tmp_path / "images"
         img_dir.mkdir()
         (img_dir / "active.jpg").write_bytes(b"x")
+        _age_file(img_dir / "active.jpg")  # past the grace window
 
         with patch("space.spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(img_dir)):
-            prune_image_cache([
-                None,
-                42,
-                "/other/path/active.jpg",
-            ])
+            prune_image_cache(
+                [
+                    None,
+                    42,
+                    "/other/path/active.jpg",
+                ]
+            )
         assert (img_dir / "active.jpg").exists() is False
 
 
@@ -997,6 +1116,7 @@ class TestLoadBackoffState:
 
     def test_loads_valid_future_entries(self, tmp_path, monkeypatch):
         import json, time as _time
+
         future = _time.time() + 3600
         f = tmp_path / "backoff.json"
         f.write_text(json.dumps({"/launch/": future}))
@@ -1007,6 +1127,7 @@ class TestLoadBackoffState:
 
     def test_skips_expired_entries(self, tmp_path, monkeypatch):
         import json, time as _time
+
         past = _time.time() - 100
         f = tmp_path / "backoff.json"
         f.write_text(json.dumps({"/old/": past}))
@@ -1016,6 +1137,7 @@ class TestLoadBackoffState:
 
     def test_skips_invalid_exp_value(self, tmp_path, monkeypatch):
         import json
+
         f = tmp_path / "backoff.json"
         f.write_text(json.dumps({"/bad/": "not-a-number"}))
         monkeypatch.setattr(spaceflight_tracker, "_SPACEFLIGHT_BACKOFF_FILE", str(f))
@@ -1034,6 +1156,7 @@ class TestSaveBackoffState:
 
     def test_writes_active_entries(self, tmp_path, monkeypatch):
         import json, time as _time
+
         f = tmp_path / "backoff.json"
         monkeypatch.setattr(spaceflight_tracker, "_SPACEFLIGHT_BACKOFF_FILE", str(f))
         monkeypatch.setattr(spaceflight_tracker, "DATA_DIR_CACHE", str(tmp_path))
@@ -1048,6 +1171,7 @@ class TestSaveBackoffState:
 
     def test_omits_expired_entries(self, tmp_path, monkeypatch):
         import json, time as _time
+
         f = tmp_path / "backoff.json"
         monkeypatch.setattr(spaceflight_tracker, "_SPACEFLIGHT_BACKOFF_FILE", str(f))
         monkeypatch.setattr(spaceflight_tracker, "DATA_DIR_CACHE", str(tmp_path))

@@ -614,9 +614,12 @@ def get_sidereal_time_api():
         # current - always fresh, no cache needed
         current_info = svc.get_current_sidereal_info()
 
-        # hourly_forecast - from scheduler cache (day-sensitive, refreshed at day change)
+        # hourly_forecast - from scheduler cache (day-sensitive, refreshed at day change
+        # evaluated in the observer's timezone, not the server's)
         hourly_forecast = None
-        if cache_store.is_cache_valid_for_today(cached, CACHE_TTL_SIDEREAL_TIME) and cached.get("data"):
+        if cache_store.is_cache_valid_for_today(
+            cached, CACHE_TTL_SIDEREAL_TIME, tz_name=location.get("timezone")
+        ) and cached.get("data"):
             hourly_forecast = cached["data"].get("hourly_forecast")
 
         return jsonify(

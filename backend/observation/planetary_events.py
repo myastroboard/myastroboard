@@ -12,8 +12,9 @@ All calculations account for observer location and timezone.
 """
 
 from datetime import datetime, timedelta
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 from zoneinfo import ZoneInfo
+from utils import parse_iso_to_utc
 from utils.logging_config import get_logger
 
 from astropy.coordinates import (
@@ -90,7 +91,9 @@ class PlanetaryEventsService:
             logger.error(f"Error calculating planetary events: {e}")
             return []
 
-        events.sort(key=lambda x: x.get('peak_time', x.get('start_time')))
+        # Sort by absolute instant (parsed from the local ISO strings) so events
+        # stay correctly ordered across a daylight-saving offset change.
+        events.sort(key=lambda x: parse_iso_to_utc(x.get('peak_time') or x.get('start_time')))
         return events
 
     def _prefetch_coords(self, start_date: Time, days_ahead: int, step_days: float = 1.0) -> None:
@@ -100,9 +103,35 @@ class PlanetaryEventsService:
         n = int(days_ahead / step_days) + 1
         t_arr = start_date + np.arange(n) * step_days * u.day
         self._t_arr = t_arr
+        self._step_days = step_days
         self._coords: Dict[str, Any] = {}
         for body in list(PLANETS.keys()) + ['sun']:
             self._coords[body] = get_body(body, t_arr, self.location)
+
+    @staticmethod
+    def _parabolic_min(values: np.ndarray, idx: int, t_arr: Any, step_days: float) -> Tuple[Any, float]:
+        """Refine a sampled minimum with a parabolic fit on its two neighbours.
+
+        Returns ``(refined_time, refined_value)``. Because the closest approach
+        rarely coincides with a sample, fitting a parabola to the minimum and its
+        neighbours recovers a sub-sample estimate of both the time and the
+        separation without any extra ephemeris calls. Falls back to the sampled
+        point on an array edge or a non-convex (degenerate) fit.
+        """
+        n = len(values)
+        if idx <= 0 or idx >= n - 1:
+            return t_arr[idx], float(values[idx])
+        y0 = float(values[idx - 1])
+        y1 = float(values[idx])
+        y2 = float(values[idx + 1])
+        denom = y0 - 2.0 * y1 + y2
+        if denom <= 0.0:
+            return t_arr[idx], y1
+        delta = 0.5 * (y0 - y2) / denom
+        delta = max(-1.0, min(1.0, delta))
+        refined_value = y1 + 0.5 * (y2 - y0) * delta + 0.5 * denom * (delta**2)
+        refined_time = t_arr[idx] + delta * step_days * u.day
+        return refined_time, float(refined_value)
 
     @staticmethod
     def _find_runs(boolean_arr: np.ndarray):
@@ -129,9 +158,8 @@ class PlanetaryEventsService:
                 try:
                     seps = np.asarray(coords[planet1].separation(coords[planet2]).degree)
                     for s, e in self._find_runs(seps < 5.0):
-                        min_idx = s + int(np.argmin(seps[s:e]))
-                        min_sep = float(seps[min_idx])
-                        peak_time = t_arr[min_idx]
+                        min_idx = int(s) + int(np.argmin(seps[s:e]))
+                        peak_time, min_sep = self._parabolic_min(seps, min_idx, t_arr, self._step_days)
                         visible = self._is_event_visible(planet1, planet2, peak_time)
                         events.append(
                             {
@@ -157,8 +185,13 @@ class PlanetaryEventsService:
         return events
 
     def _find_moon_conjunctions(self, start_date: Time, days_ahead: int) -> List[Dict[str, Any]]:
-        """Find Moon-planet conjunctions using 6-hour sampling (Moon moves ~13°/day)."""
-        step_days = 0.25  # 6-hour steps — coarser steps miss the minimum at ~3° threshold
+        """Find Moon-planet conjunctions using 2-hour sampling (Moon moves ~13°/day).
+
+        The Moon covers ~1.1° per 2-hour step, well under the 3° appulse threshold,
+        so a close approach is no longer skipped between samples; a parabolic fit
+        then refines the sampled minimum to a sub-step estimate.
+        """
+        step_days = 1.0 / 12.0  # 2-hour steps
         n = int(days_ahead / step_days) + 1
         t_arr = start_date + np.arange(n) * step_days * u.day
 
@@ -176,9 +209,8 @@ class PlanetaryEventsService:
                 planet_coords = get_body(planet, t_arr, self.location)
                 seps = np.asarray(moon_coords.separation(planet_coords).degree)
                 for s, e in self._find_runs(seps < threshold_deg):
-                    min_idx = s + int(np.argmin(seps[s:e]))
-                    min_sep = float(seps[min_idx])
-                    peak_time = t_arr[min_idx]
+                    min_idx = int(s) + int(np.argmin(seps[s:e]))
+                    peak_time, min_sep = self._parabolic_min(seps, min_idx, t_arr, step_days)
                     visible = self._is_event_visible('moon', planet, peak_time)  # type: ignore[arg-type]
                     events.append(
                         {
