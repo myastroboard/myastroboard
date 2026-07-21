@@ -11,6 +11,7 @@ import sys
 import unicodedata
 import uuid
 import yaml
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Dict, Tuple, Optional
 from utils.constants import CONFIG_FILE, DATA_DIR
@@ -307,3 +308,38 @@ def parse_iso_to_utc(value: Optional[str]) -> datetime:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     return parsed.astimezone(timezone.utc)
+
+
+@contextmanager
+def distant_epoch_precision_warnings_muted():
+    """Mute astropy/ERFA precision warnings for deliberately far-future instants.
+
+    A locally visible eclipse can be many years out - Mauna Kea's next solar
+    eclipse is in 2031. Leap-second and Earth-orientation (IERS) tables are only
+    published about a year ahead, so astropy warns that it is assuming
+    UT1-UTC = 0 and falling back to the 50-year mean polar motion, and ERFA flags
+    the date as a "dubious year". No newer table exists, and none will until the
+    date draws closer, so neither warning is actionable.
+
+    The accuracy actually given up is negligible here: the eclipse instant itself
+    comes from astronomy-engine, and astropy is used only to derive altitude and
+    azimuth from it. Omitting UT1-UTC moves those by well under 0.01 degrees,
+    far below the precision shown to the user.
+
+    Deliberately scoped to the calls that are known to look decades ahead, so
+    degraded-accuracy warnings from any other calculation still reach the log.
+    Note that warning filters are process-wide, so a thread running concurrently
+    could miss a warning line for the short duration of this block.
+    """
+    import warnings
+
+    from erfa import ErfaWarning
+    from astropy.utils import iers
+    from astropy.utils.exceptions import AstropyWarning
+
+    with warnings.catch_warnings():
+        warnings.filterwarnings('ignore', message='.*dubious year.*', category=ErfaWarning)
+        warnings.filterwarnings('ignore', message='.*polar motion.*', category=AstropyWarning)
+        # Astropy's own message suggests "silent"; the accepted option is "ignore".
+        with iers.conf.set_temp('iers_degraded_accuracy', 'ignore'):
+            yield

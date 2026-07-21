@@ -52,6 +52,8 @@ from astropy.time import Time as AstroTime
 from astropy.coordinates import EarthLocation, AltAz, get_sun
 import astropy.units as u
 
+from utils import distant_epoch_precision_warnings_muted
+
 # =============================
 # Data structures
 # =============================
@@ -104,7 +106,19 @@ class SolarEclipseService:
     # =============================
 
     def get_next_eclipse(self) -> Optional[SolarEclipseInfo]:
-        """Get next solar eclipse from now"""
+        """Get next solar eclipse from now.
+
+        The next eclipse *visible from this location* can be many years out (for
+        Mauna Kea it is in 2031), which is past the horizon of the leap-second
+        and IERS tables. The altitude/azimuth work below is therefore run with
+        those precision warnings muted - see the helper's docstring for why that
+        loses nothing meaningful here.
+        """
+        with distant_epoch_precision_warnings_muted():
+            return self._compute_next_eclipse()
+
+    def _compute_next_eclipse(self) -> Optional[SolarEclipseInfo]:
+        """Find the next locally visible solar eclipse and describe it."""
 
         # astronomy.Time expects UTC time
         now_utc = datetime.datetime.now(datetime.timezone.utc)

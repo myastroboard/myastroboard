@@ -399,3 +399,74 @@ class TestNumpySafeEncoder:
         data = {'a': {'b': np.int64(5)}}
         result = _sanitize_for_json(data)
         assert result == {'a': {'b': 5}}
+
+
+class TestDistantEpochPrecisionWarningsMuted:
+    """Scoped muting of astropy/ERFA precision warnings for far-future instants.
+
+    A locally visible solar eclipse can be years out, past the horizon of the
+    leap-second and IERS tables. Astropy then warns about assuming UT1-UTC = 0
+    and falling back to mean polar motion, which floods the server log on every
+    cache cycle even though nothing is wrong and no newer table exists.
+    """
+
+    def test_mutes_dubious_year_erfa_warning(self):
+        """The ERFA 'dubious year' warning is swallowed inside the block."""
+        import warnings
+        from erfa import ErfaWarning
+        from utils import distant_epoch_precision_warnings_muted
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            with distant_epoch_precision_warnings_muted():
+                warnings.warn('ERFA function "dtf2d" yielded 1 of "dubious year"', ErfaWarning)
+
+        assert caught == []
+
+    def test_mutes_polar_motion_warning(self):
+        """The astropy polar-motion range warning is swallowed inside the block."""
+        import warnings
+        from astropy.utils.exceptions import AstropyWarning
+        from utils import distant_epoch_precision_warnings_muted
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            with distant_epoch_precision_warnings_muted():
+                warnings.warn("Tried to get polar motions for times after IERS data is valid.", AstropyWarning)
+
+        assert caught == []
+
+    def test_does_not_mute_unrelated_warnings(self):
+        """Muting is targeted - other warnings still surface."""
+        import warnings
+        from utils import distant_epoch_precision_warnings_muted
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            with distant_epoch_precision_warnings_muted():
+                warnings.warn("something else entirely", UserWarning)
+
+        assert len(caught) == 1
+        assert "something else entirely" in str(caught[0].message)
+
+    def test_restores_iers_config_afterwards(self):
+        """The IERS accuracy setting is process-wide, so it must be restored."""
+        from astropy.utils import iers
+        from utils import distant_epoch_precision_warnings_muted
+
+        before = iers.conf.iers_degraded_accuracy
+        with distant_epoch_precision_warnings_muted():
+            assert iers.conf.iers_degraded_accuracy == "ignore"
+        assert iers.conf.iers_degraded_accuracy == before
+
+    def test_restores_iers_config_when_body_raises(self):
+        """An exception inside the block must not leak the relaxed setting."""
+        import pytest as _pytest
+        from astropy.utils import iers
+        from utils import distant_epoch_precision_warnings_muted
+
+        before = iers.conf.iers_degraded_accuracy
+        with _pytest.raises(ValueError):
+            with distant_epoch_precision_warnings_muted():
+                raise ValueError("boom")
+        assert iers.conf.iers_degraded_accuracy == before

@@ -29,9 +29,7 @@ class TestCalculateAstrophotographyScore:
         self.svc = SolarEclipseService(45.0, -73.5, "America/Montreal")
 
     def test_not_visible_returns_zero(self):
-        score, classification = self.svc._calculate_astrophotography_score(
-            "Total", False, 80.0, 30.0, 120
-        )
+        score, classification = self.svc._calculate_astrophotography_score("Total", False, 80.0, 30.0, 120)
         assert score == 0.0
         assert classification == "not_visible"
 
@@ -119,8 +117,7 @@ class TestFmt:
 
     def test_formats_datetime_as_iso(self):
         svc = SolarEclipseService(45.0, -73.5, "UTC")
-        dt = datetime.datetime(2026, 8, 12, 14, 32, 15,
-                               tzinfo=datetime.timezone.utc)
+        dt = datetime.datetime(2026, 8, 12, 14, 32, 15, tzinfo=datetime.timezone.utc)
         result = svc._fmt(dt)
         assert "2026-08-12" in result
         assert "14:32:15" in result
@@ -356,3 +353,34 @@ class TestEclipseDataclasses:
         )
         assert info.visible is True
         assert info.type == "Partial"
+
+
+class TestSolarEclipseDistantEpochMuting:
+    """The eclipse lookup must run inside the precision-warning mute."""
+
+    def test_get_next_eclipse_wraps_computation_in_mute(self):
+        """Muting is applied around the whole lookup, not just one call.
+
+        The altitude-vs-time sampling hits astropy as often as the azimuth does,
+        so the mute belongs at the entry point rather than at a single helper.
+        """
+        from unittest.mock import patch
+        from astroweather.sun_eclipse import SolarEclipseService
+
+        svc = SolarEclipseService(19.82, -155.47, "Pacific/Honolulu")
+        order = []
+
+        class _Probe:
+            def __enter__(self):
+                order.append("enter")
+                return self
+
+            def __exit__(self, *exc):
+                order.append("exit")
+                return False
+
+        with patch("astroweather.sun_eclipse.distant_epoch_precision_warnings_muted", _Probe):
+            with patch.object(svc, "_compute_next_eclipse", side_effect=lambda: order.append("compute")):
+                svc.get_next_eclipse()
+
+        assert order == ["enter", "compute", "exit"]
