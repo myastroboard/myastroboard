@@ -38,7 +38,7 @@ def test_get_combinations_merges_share_status(client_admin, monkeypatch):
     monkeypatch.setattr(
         _app_mod.equipment_profiles,
         "compute_combination_share_status",
-        lambda combo, _uid: {"is_shared": combo.get("id") == "c1", "shared_scope": "private"},
+        lambda combo, _uid, _index=None: {"is_shared": combo.get("id") == "c1", "shared_scope": "private"},
     )
     monkeypatch.setattr(_app_mod.equipment_profiles, "load_all_shared_combinations", lambda _uid: [])
 

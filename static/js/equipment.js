@@ -1609,7 +1609,9 @@ async function saveFilter(id) {
             modal.hide();
         }
         await loadEquipmentType('filters');
+        await loadEquipmentType('combinations');
         renderFiltersTab();
+        renderCombinationsTab();
         showMessage('success', id ? i18n.t('equipment.filter_updated') : i18n.t('equipment.filter_created'));
     } catch (error) {
         console.error('Error saving filter:', error);
@@ -1940,10 +1942,10 @@ async function deleteEquipment(type, id) {
         await loadEquipmentType(type);
         
         // Reload combinations if deleting equipment that affects payload or names
-        if (['telescopes', 'cameras', 'mounts', 'accessories'].includes(type)) {
+        if (['telescopes', 'cameras', 'mounts', 'filters', 'accessories'].includes(type)) {
             await loadEquipmentType('combinations');
         }
-        
+
         if (type === 'telescopes') {
             renderTelescopesTab();
             renderFOVCalculatorTab();
@@ -1957,6 +1959,7 @@ async function deleteEquipment(type, id) {
             renderCombinationsTab();
         } else if (type === 'filters') {
             renderFiltersTab();
+            renderCombinationsTab();
         } else if (type === 'accessories') {
             renderAccessoriesTab();
             renderCombinationsTab();

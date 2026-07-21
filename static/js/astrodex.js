@@ -221,14 +221,20 @@ function _wirePictureEquipmentSection(prefix, existingCombinationId, existingUse
     applySelection(select.value && select.value === existingCombinationId ? existingUsedComponents : null);
 }
 
+/** Bootstrap icon class for star `i` (1-5) of a 0-5, 0.5-step rating `value` - shared by the
+ * read-only display and the interactive widget so a rounding/threshold fix only needs one edit. */
+function _starIconClass(value, i) {
+    if (value >= i) return 'bi bi-star-fill text-warning';
+    if (value >= i - 0.5) return 'bi bi-star-half text-warning';
+    return 'bi bi-star text-warning';
+}
+
 /** Build a read-only star-rating display (used in the slideshow/detail view). */
 function _buildStarRatingDisplayHtml(rating) {
     const value = Number(rating) || 0;
     let icons = '';
     for (let i = 1; i <= 5; i++) {
-        if (value >= i) icons += '<i class="bi bi-star-fill text-warning" aria-hidden="true"></i>';
-        else if (value >= i - 0.5) icons += '<i class="bi bi-star-half text-warning" aria-hidden="true"></i>';
-        else icons += '<i class="bi bi-star text-warning" aria-hidden="true"></i>';
+        icons += `<i class="${_starIconClass(value, i)}" aria-hidden="true"></i>`;
     }
     return `${icons} <span class="ms-1">${value.toFixed(1)}</span>`;
 }
@@ -259,9 +265,7 @@ function _buildRatingWidget(prefix, currentRating) {
             starWrap.title = i18n.t('astrodex.rating');
 
             const icon = document.createElement('i');
-            if (value >= i) icon.className = 'bi bi-star-fill text-warning';
-            else if (value >= i - 0.5) icon.className = 'bi bi-star-half text-warning';
-            else icon.className = 'bi bi-star text-warning';
+            icon.className = _starIconClass(value, i);
             icon.setAttribute('aria-hidden', 'true');
             starWrap.appendChild(icon);
 
@@ -1552,11 +1556,24 @@ function _buildPictureEquipmentSectionHtml(prefix, picture, deviceOptions, filte
     `;
 }
 
-/** Collect the Equipment section's fields back into a picture payload fragment. */
-function _collectPictureEquipmentFields(prefix) {
+/** Collect the Equipment section's fields back into a picture payload fragment.
+ * `existingCombinationId` (edits only) lets a save preserve a combination link the select
+ * couldn't render as an option - e.g. a shared combination whose sharing broke after this
+ * picture was tagged with it. Omitting the equipment keys entirely in that case mirrors the
+ * backend's "only touched if explicitly included" contract for combination_id (see
+ * update_picture_api), instead of the empty/placeholder select value silently clearing the link
+ * on an edit that never touched the Equipment section. */
+function _collectPictureEquipmentFields(prefix, existingCombinationId) {
     const select = document.getElementById(`${prefix}-combination-select`);
     const isOther = !select || select.value === _OTHER_EQUIPMENT_VALUE || select.value === '';
     if (isOther) {
+        if (select && select.value === '' && existingCombinationId
+            && !Array.from(select.options).some(o => o.value === existingCombinationId)) {
+            return {
+                device: document.getElementById(`${prefix}-device`)?.value || '',
+                filters: document.getElementById(`${prefix}-filters`)?.value || '',
+            };
+        }
         return {
             combination_id: null,
             combination_used_components: null,
@@ -1965,6 +1982,9 @@ async function showEditPictureModal(itemId, pictureId) {
 
 async function updatePicture(itemId, pictureId) {
     try {
+        const item = astrodexData.items.find(i => i.id === itemId);
+        const existingPicture = item?.pictures.find(p => p.id === pictureId);
+
         const pictureData = {
             date: document.getElementById('edit-picture-date').value,
             exposition_time: document.getElementById('edit-picture-exposition').value,
@@ -1972,7 +1992,7 @@ async function updatePicture(itemId, pictureId) {
             frames: document.getElementById('edit-picture-frames').value,
             rating: _getRatingWidgetValue('edit-picture'),
             notes: document.getElementById('edit-picture-notes').value,
-            ..._collectPictureEquipmentFields('edit-picture'),
+            ..._collectPictureEquipmentFields('edit-picture', existingPicture?.combination_id),
             ..._collectPictureLocationFields('edit-picture')
         };
 
