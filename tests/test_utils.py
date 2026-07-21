@@ -460,15 +460,23 @@ class TestDistantEpochPrecisionWarningsMuted:
         assert iers.conf.iers_degraded_accuracy == before
 
     def test_restores_iers_config_when_body_raises(self):
-        """An exception inside the block must not leak the relaxed setting."""
-        import pytest as _pytest
+        """An exception inside the block must not leak the relaxed setting.
+
+        The raise is caught with try/except rather than pytest.raises so that static
+        analysis can see the assertion below is reached; pytest.raises swallowing the
+        exception is invisible to it, which makes the tail of the test look dead.
+        """
         from astropy.utils import iers
         from utils import distant_epoch_precision_warnings_muted
 
         before = iers.conf.iers_degraded_accuracy
-        with _pytest.raises(ValueError):
+        raised = False
+        try:
             with distant_epoch_precision_warnings_muted():
                 raise ValueError("boom")
+        except ValueError:
+            raised = True
+        assert raised
         assert iers.conf.iers_degraded_accuracy == before
 
 
