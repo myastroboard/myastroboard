@@ -67,7 +67,7 @@ if sys.platform == "win32":
         deadlock, so we retry a few times before giving up.
         """
         attempts = 6
-        for attempt in range(attempts):
+        for attempt in range(attempts):  # pragma: no branch - attempts is a fixed positive literal, always ≥1 iteration
             try:
                 msvcrt.locking(fileno, msvcrt.LK_LOCK, 1)
                 return

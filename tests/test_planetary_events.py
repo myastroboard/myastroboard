@@ -68,6 +68,45 @@ class TestFindRuns:
         assert len(runs) == 1
 
 
+class TestParabolicMin:
+    """Tests for the static _parabolic_min helper."""
+
+    def _t_arr(self, n):
+        from astropy.time import Time
+        from astropy import units as u
+
+        return Time("2026-01-01") + np.arange(n) * 1.0 * u.day
+
+    def test_idx_at_left_edge_returns_sampled_point(self):
+        values = np.array([5.0, 3.0, 4.0])
+        t_arr = self._t_arr(3)
+        refined_time, refined_value = PlanetaryEventsService._parabolic_min(values, 0, t_arr, 1.0)
+        assert refined_time == t_arr[0]
+        assert refined_value == 5.0
+
+    def test_idx_at_right_edge_returns_sampled_point(self):
+        values = np.array([5.0, 3.0, 4.0])
+        t_arr = self._t_arr(3)
+        refined_time, refined_value = PlanetaryEventsService._parabolic_min(values, 2, t_arr, 1.0)
+        assert refined_time == t_arr[2]
+        assert refined_value == 4.0
+
+    def test_degenerate_fit_returns_sampled_point(self):
+        """A non-convex (denom <= 0) fit falls back to the sampled minimum, not a bogus refinement."""
+        values = np.array([1.0, 5.0, 1.0])  # local maximum shape → denom = 1 - 10 + 1 = -8 <= 0
+        t_arr = self._t_arr(3)
+        refined_time, refined_value = PlanetaryEventsService._parabolic_min(values, 1, t_arr, 1.0)
+        assert refined_time == t_arr[1]
+        assert refined_value == 5.0
+
+    def test_convex_fit_refines_between_samples(self):
+        values = np.array([5.0, 1.0, 4.0])
+        t_arr = self._t_arr(3)
+        refined_time, refined_value = PlanetaryEventsService._parabolic_min(values, 1, t_arr, 1.0)
+        assert refined_value < 1.0
+        assert refined_time != t_arr[1]
+
+
 class TestRateImportance:
     """Tests for _rate_importance."""
 

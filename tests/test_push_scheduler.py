@@ -929,6 +929,27 @@ def test_release_lock_handles_unlock_errors(monkeypatch, tmp_path):
     assert push_scheduler._lock_file is None
 
 
+def test_release_lock_handles_close_error_after_unlock_error(monkeypatch):
+    """Both the unlock call and the subsequent close() fail - the close-time error
+    must be swallowed too, not left to propagate out of _release_lock()."""
+    from utils import push_scheduler
+
+    class _BrokenLockFile:
+        def seek(self, _pos):
+            pass
+
+        def close(self):
+            raise OSError("close also broken")
+
+    push_scheduler._lock_file = _BrokenLockFile()
+
+    monkeypatch.setattr(push_scheduler.sys, 'platform', 'win32')
+    monkeypatch.setattr(push_scheduler.msvcrt, 'locking', lambda *a, **k: (_ for _ in ()).throw(PermissionError('x')))
+
+    push_scheduler._release_lock()  # must not raise
+    assert push_scheduler._lock_file is None
+
+
 def test_acquire_lock_success_and_failure(monkeypatch, tmp_path):
     from utils import push_scheduler
 

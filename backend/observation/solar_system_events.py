@@ -13,7 +13,7 @@ Provides detailed visibility information for each event.
 from datetime import datetime, timedelta, date
 from typing import List, Dict, Any, Optional
 from zoneinfo import ZoneInfo
-from utils import parse_iso_to_utc
+from utils import parse_iso_to_utc, distant_epoch_precision_warnings_muted
 from utils.logging_config import get_logger
 from utils.i18n_utils import I18nManager
 
@@ -555,10 +555,18 @@ class SolarSystemEventsService:
         return events
 
     def _is_radiant_visible(self, radiant_ra: float, radiant_dec: float, time: Time) -> bool:
-        """Check if a meteor shower radiant is visible from the observer location."""
+        """Check if a meteor shower radiant is visible from the observer location.
+
+        Peaks are checked up to a year ahead (see ``_find_meteor_shower_peaks``),
+        which can land past the ~1-year IERS Earth-orientation table coverage.
+        The resulting precision warnings are muted the same way as the eclipse
+        services - see ``distant_epoch_precision_warnings_muted`` for why that's
+        safe here too.
+        """
         try:
             radiant = SkyCoord(ra=radiant_ra * u.deg, dec=radiant_dec * u.deg, frame=ICRS)
-            altaz = radiant.transform_to(AltAz(obstime=time, location=self.location))
+            with distant_epoch_precision_warnings_muted():
+                altaz = radiant.transform_to(AltAz(obstime=time, location=self.location))
 
             if altaz is None:
                 return False

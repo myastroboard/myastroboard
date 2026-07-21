@@ -1056,11 +1056,13 @@ class TestPruneImageCacheOsError:
         img_dir = tmp_path / "images"
         img_dir.mkdir()
         (img_dir / "orphan.jpg").write_bytes(b"x")
+        _age_file(img_dir / "orphan.jpg")  # past the grace window so it is eligible for removal
 
         with patch("space.spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(img_dir)):
             with patch("os.remove", side_effect=OSError("locked")):
                 # Should not raise
                 prune_image_cache([])
+        assert (img_dir / "orphan.jpg").exists()  # removal failed, file is still there
 
     def test_non_matching_paths_skipped_in_in_use_build(self, tmp_path):
         """active_data paths not starting with /api/spaceflight/img/ → skipped."""

@@ -5,6 +5,7 @@ and the per-location cache slots introduced by v1.2 multi-location profiles.
 """
 
 import pytest
+import sys
 import time
 import os
 import uuid
@@ -672,3 +673,36 @@ class TestIsExecutionMetricsValid:
         with open(str(tmp_path / "ev6.json"), "w") as f:
             json.dump(data, f)
         assert cache_store._is_execution_metrics_valid("allsky_sensor", 300) is False
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="_msvcrt_lock is only defined on Windows")
+class TestMsvcrtLock:
+    """_msvcrt_lock retries transient OSError from msvcrt.locking a few times before giving up."""
+
+    def test_succeeds_on_first_try(self, monkeypatch):
+        calls = []
+        monkeypatch.setattr(cs.msvcrt, "locking", lambda *a: calls.append(a))
+        cs._msvcrt_lock(fileno=7)
+        assert len(calls) == 1
+
+    def test_retries_then_succeeds(self, monkeypatch):
+        attempts = {"n": 0}
+
+        def _flaky_locking(fileno, mode, nbytes):
+            attempts["n"] += 1
+            if attempts["n"] < 3:
+                raise OSError("pretend deadlock timeout")
+
+        monkeypatch.setattr(cs.msvcrt, "locking", _flaky_locking)
+        monkeypatch.setattr(cs.time, "sleep", lambda *_: None)
+        cs._msvcrt_lock(fileno=7)
+        assert attempts["n"] == 3
+
+    def test_raises_after_exhausting_all_attempts(self, monkeypatch):
+        def _always_fails(fileno, mode, nbytes):
+            raise OSError("pretend deadlock timeout")
+
+        monkeypatch.setattr(cs.msvcrt, "locking", _always_fails)
+        monkeypatch.setattr(cs.time, "sleep", lambda *_: None)
+        with pytest.raises(OSError):
+            cs._msvcrt_lock(fileno=7)

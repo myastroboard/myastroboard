@@ -43,6 +43,32 @@ def test_setup_logger_without_console_adds_only_file_handler(monkeypatch):
     assert isinstance(logger.handlers[0], DummyRotatingHandler)
 
 
+class _BrokenCloseHandler(logging.Handler):
+    """A handler whose close() raises, simulating an already-broken file handle."""
+
+    def close(self):
+        raise OSError("close failed")
+
+
+def test_setup_logger_closes_stale_handlers_ignoring_close_errors(monkeypatch):
+    """A module reload can re-enter setup_logger for an already-configured stdlib
+    logger name (Python caches loggers globally by name); if one of its old
+    handlers raises on close, that must not prevent the rest of the
+    reconfiguration from completing."""
+    monkeypatch.setattr(module, "RotatingFileHandler", DummyRotatingHandler)
+    monkeypatch.setattr(module.os, "makedirs", lambda *_args, **_kwargs: None)
+
+    logger = module.setup_logger("test.close_exc", include_console=False)
+    logger.addHandler(_BrokenCloseHandler())
+    module._loggers.clear()  # simulate losing our own cache without losing the stdlib logger
+
+    reconfigured = module.setup_logger("test.close_exc", include_console=False)
+
+    assert reconfigured is logger
+    assert len(reconfigured.handlers) == 1
+    assert isinstance(reconfigured.handlers[0], DummyRotatingHandler)
+
+
 def test_setup_logger_with_console_level_override(monkeypatch):
     monkeypatch.setattr(module, "RotatingFileHandler", DummyRotatingHandler)
     monkeypatch.setattr(module.os, "makedirs", lambda *_args, **_kwargs: None)

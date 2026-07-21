@@ -853,12 +853,19 @@ def _release_lock() -> None:
             msvcrt.locking(lf.fileno(), msvcrt.LK_UNLCK, 1)
         else:  # pragma: no cover
             fcntl.flock(lf.fileno(), fcntl.LOCK_UN)
-        lf.close()
     except Exception as e:
         try:
             logger.error(f"Error releasing push scheduler lock: {e}")
         except (ValueError, OSError):
             pass  # Log stream already closed during process shutdown
+    finally:
+        # Close even when unlocking failed above - otherwise the OS lock (and the
+        # file descriptor itself) outlives this call, leaking a handle every time
+        # unlock raises instead of just on the happy path.
+        try:
+            lf.close()
+        except Exception:
+            pass
 
 
 def start() -> None:

@@ -1078,6 +1078,37 @@ class TestRecommendCombinationsForTarget:
         assert result[0]['camera_name'] == 'Cam2'
         assert result[0]['fov_diagonal_deg'] is not None
 
+    def test_combo_with_camera_but_unknown_target_size_skips_fov_score(self):
+        """_fov_match_score returns None when the target has no known size, even though
+        the FOV itself was computed fine - the rating falls back to the no-FOV weighting."""
+        telescope = self._make_telescope('t8')
+        camera = {'id': 'cam-3', 'name': 'Cam3', 'sensor_width_mm': 23.5,
+                  'sensor_height_mm': 15.6, 'pixel_size_um': 3.76}
+        combo = self._make_combo('c8', 't8')
+        combo['camera_id'] = 'cam-3'
+        result = _recommend_combinations_for_target(
+            {'size': None, 'mag': 8.0, 'type': 'Galaxy'}, [combo], {'t8': telescope}, {'cam-3': camera}
+        )
+        assert len(result) == 1
+        assert result[0]['camera_name'] == 'Cam3'
+        assert result[0]['fov_diagonal_deg'] is not None
+        assert result[0]['target_size_arcmin'] is None
+
+    def test_combo_with_non_numeric_sensor_field_falls_back_no_fov(self):
+        """A corrupted camera profile (non-numeric sensor value) raises ValueError while
+        computing the FOV, which is caught so the recommendation still comes back rated
+        with the no-FOV weighting instead of the whole combo being skipped."""
+        telescope = self._make_telescope('t9')
+        camera = {'id': 'cam-4', 'name': 'Cam4', 'sensor_width_mm': 'not-a-number',
+                  'sensor_height_mm': 15.6, 'pixel_size_um': 3.76}
+        combo = self._make_combo('c9', 't9')
+        combo['camera_id'] = 'cam-4'
+        result = _recommend_combinations_for_target(
+            {'size': 30.0, 'mag': 8.0, 'type': 'Galaxy'}, [combo], {'t9': telescope}, {'cam-4': camera}
+        )
+        assert len(result) == 1
+        assert result[0]['fov_diagonal_deg'] is None
+
 
 # ---------------------------------------------------------------------------
 # _alttime_json_path helper
