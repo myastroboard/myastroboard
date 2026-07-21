@@ -702,12 +702,16 @@ class TestFindCombinationsReferencing:
         })
         assert equipment_profiles._find_combinations_referencing('telescopes', 'no-such-id') == []
 
-    def test_inner_exception_on_invalid_combinations_file_continues(self, temp_data_dir, test_user_id):
+    def test_inner_exception_on_invalid_combinations_file_blocks_delete(self, temp_data_dir, test_user_id):
+        """An unreadable combinations file fails the guard closed (blocks delete) rather than
+        being silently skipped - it might still reference the equipment being deleted."""
         equipment_profiles.ensure_equipment_directories()
         bad_file = os.path.join(equipment_profiles.EQUIPMENT_DIR, 'someone_combinations.json')
         with open(bad_file, 'w') as f:
             f.write('{invalid')
-        assert equipment_profiles._find_combinations_referencing('telescopes', 'any-id') == []
+        matches = equipment_profiles._find_combinations_referencing('telescopes', 'any-id')
+        assert len(matches) == 1
+        assert matches[0]['owner_id'] == 'someone'
 
     def test_outer_exception_returns_empty_list(self, temp_data_dir, monkeypatch):
         def raise_oops(_path):

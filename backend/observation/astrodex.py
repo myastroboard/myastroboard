@@ -837,6 +837,28 @@ def build_combination_photo_index(
     return index
 
 
+def get_pictures_for_combination(
+    combination_id: str,
+    current_user_id: str,
+    current_username: Optional[str] = None,
+    private_mode: bool = False,
+    usernames_by_id: Optional[Dict[str, str]] = None,
+) -> List[Dict]:
+    """Like build_combination_photo_index() but for a single combination_id - use this for the
+    single-combination endpoint instead of indexing every other combination's pictures too."""
+    visible = get_visible_astrodex(current_user_id, current_username, private_mode, usernames_by_id)
+    pictures: List[Dict] = []
+    for item in visible.get('items', []):
+        for picture in item.get('pictures', []):
+            if picture.get('combination_id') != combination_id:
+                continue
+            annotated = dict(picture)
+            annotated['item_id'] = item.get('id')
+            annotated['item_name'] = item.get('name')
+            pictures.append(annotated)
+    return pictures
+
+
 def summarize_combination_pictures(pictures: List[Dict]) -> Dict:
     """Compute {photo_count, average_rating, picture_refs} for one combination's pictures.
 

@@ -609,36 +609,50 @@ const _WIZARD_CAMERA_SENSOR_TYPE_MAP = {
 };
 
 async function _wizardLoadEquipmentData() {
-    try {
-        const resp = await fetch('/static/data/equipment_presets.json', { credentials: 'same-origin' });
-        _wizard.presets = resp.ok ? await resp.json() : { telescopes: [], cameras: [] };
-    } catch (_) {
-        _wizard.presets = { telescopes: [], cameras: [] };
-    }
-    try {
-        const telResp = await fetchJSON('/api/equipment/telescopes');
-        _wizard.existingTelescopes = [...(telResp.data || []), ...(telResp.shared_from_others || [])];
-    } catch (_) {
-        _wizard.existingTelescopes = [];
-    }
-    try {
-        const camResp = await fetchJSON('/api/equipment/cameras');
-        _wizard.existingCameras = [...(camResp.data || []), ...(camResp.shared_from_others || [])];
-    } catch (_) {
-        _wizard.existingCameras = [];
-    }
-    try {
-        const mountResp = await fetchJSON('/api/equipment/mounts');
-        _wizard.existingMounts = [...(mountResp.data || []), ...(mountResp.shared_from_others || [])];
-    } catch (_) {
-        _wizard.existingMounts = [];
-    }
-    try {
-        const comboResp = await fetchJSON('/api/equipment/combinations');
-        _wizard.existingCombinations = [...(comboResp.data || []), ...(comboResp.shared_from_others || [])];
-    } catch (_) {
-        _wizard.existingCombinations = [];
-    }
+    // Independent requests - fired together instead of sequentially, but each keeps its own
+    // try/catch so one endpoint failing doesn't blank out data already fetched from the others.
+    await Promise.all([
+        (async () => {
+            try {
+                const resp = await fetch('/static/data/equipment_presets.json', { credentials: 'same-origin' });
+                _wizard.presets = resp.ok ? await resp.json() : { telescopes: [], cameras: [] };
+            } catch (_) {
+                _wizard.presets = { telescopes: [], cameras: [] };
+            }
+        })(),
+        (async () => {
+            try {
+                const telResp = await fetchJSON('/api/equipment/telescopes');
+                _wizard.existingTelescopes = [...(telResp.data || []), ...(telResp.shared_from_others || [])];
+            } catch (_) {
+                _wizard.existingTelescopes = [];
+            }
+        })(),
+        (async () => {
+            try {
+                const camResp = await fetchJSON('/api/equipment/cameras');
+                _wizard.existingCameras = [...(camResp.data || []), ...(camResp.shared_from_others || [])];
+            } catch (_) {
+                _wizard.existingCameras = [];
+            }
+        })(),
+        (async () => {
+            try {
+                const mountResp = await fetchJSON('/api/equipment/mounts');
+                _wizard.existingMounts = [...(mountResp.data || []), ...(mountResp.shared_from_others || [])];
+            } catch (_) {
+                _wizard.existingMounts = [];
+            }
+        })(),
+        (async () => {
+            try {
+                const comboResp = await fetchJSON('/api/equipment/combinations');
+                _wizard.existingCombinations = [...(comboResp.data || []), ...(comboResp.shared_from_others || [])];
+            } catch (_) {
+                _wizard.existingCombinations = [];
+            }
+        })(),
+    ]);
 }
 
 /** Find an equipment item's display name by id in one of the wizard's already-loaded lists. */
@@ -722,7 +736,7 @@ function _buildEquipmentStep(container) {
     const telescopeSelect = document.getElementById('wizard-telescope-preset');
     const _updateCameraBlockVisibility = () => {
         const preset = (_wizard.presets?.telescopes || []).find((p) => p.id === telescopeSelect?.value);
-        const isBundling = !!(preset?.bundle && preset.bundle.length > 0);
+        const isBundling = preset?.auto_combination !== false && !!(preset?.bundle && preset.bundle.length > 0);
         cameraBlock.style.display = isBundling ? 'none' : '';
         bundledNote.style.display = isBundling ? '' : 'none';
     };
@@ -1059,7 +1073,7 @@ async function _saveEquipmentStep() {
     const expSelect = document.getElementById('wizard-experience-level');
     const telescopeSelect = document.getElementById('wizard-telescope-preset');
     const telescopePreset = (_wizard.presets?.telescopes || []).find((p) => p.id === telescopeSelect?.value);
-    const isBundling = !!(telescopePreset?.bundle && telescopePreset.bundle.length > 0);
+    const isBundling = telescopePreset?.auto_combination !== false && !!(telescopePreset?.bundle && telescopePreset.bundle.length > 0);
 
     try {
         const telescopeId = await _saveEquipmentOfKind('telescope');
@@ -1078,7 +1092,10 @@ async function _saveEquipmentStep() {
 
         // Goal (feature.md): every time the wizard creates equipment, a combination links it.
         if (telescopeId || cameraId) {
+            const cameraSelect = document.getElementById('wizard-camera-preset');
+            const cameraPreset = (_wizard.presets?.cameras || []).find((p) => p.id === cameraSelect?.value);
             const comboName = telescopePreset?.label
+                || cameraPreset?.label
                 || document.getElementById('wizard-telescope-manual-name')?.value.trim()
                 || document.getElementById('wizard-camera-manual-name')?.value.trim()
                 || i18n.t('wizard.equipment_default_combination_name');

@@ -20,6 +20,17 @@ logger = get_logger(__name__)
 EQUIPMENT_DIR = os.path.join(DATA_DIR, 'equipments')
 
 
+def _get_float_or_none(value, default=None):
+    """Convert an optional numeric form field to a float, treating '' and None as unset.
+
+    Checks explicitly for None/'' rather than falsiness so a legitimate 0 (e.g. a lens focal
+    ratio) is stored as 0.0 instead of being silently discarded as "not provided".
+    """
+    if value is None or value == '':
+        return default
+    return float(value)
+
+
 class TelescopeType(str, Enum):
     """Telescope types"""
 
@@ -404,8 +415,14 @@ _COMBINATION_LIST_REFERENCE_FIELDS: Dict[str, str] = {
 }
 
 
-def _index_owned_and_shared_equipment(user_id: str) -> Tuple[Dict[str, Dict], Dict[str, Dict]]:
-    """Build (own_by_id, shared_by_id) indexes across all 5 basic equipment types."""
+def index_owned_and_shared_equipment(user_id: str) -> Tuple[Dict[str, Dict], Dict[str, Dict]]:
+    """Build (own_by_id, shared_by_id) indexes across all 5 basic equipment types.
+
+    Exposed (not module-private) so a caller that needs the same index for several combinations
+    in one request (e.g. the combinations list endpoint) can build it once and pass it into
+    compute_combination_share_status/compute_combination_validity_status via their
+    `equipment_index` param, instead of each call re-scanning the equipment directory.
+    """
     loaders = {
         'telescopes': load_user_telescopes,
         'cameras': load_user_cameras,
@@ -463,6 +480,11 @@ def _find_combinations_referencing(equipment_type: str, equipment_id: str) -> Li
     Used as a delete-guard: equipment referenced by a combination cannot be removed while the
     reference exists. Scans every user's combinations file (not just the owner's) because a
     *shared* item can be referenced by another user's combination.
+
+    A combinations file that fails to read/parse (mid-write, corruption, permission hiccup) is
+    treated as "unknown, might still reference this equipment" rather than silently skipped - the
+    guard fails closed (blocks the delete) instead of failing open, since ignoring an unreadable
+    file could let a still-referenced item be deleted out from under that user's combination.
     """
     ensure_equipment_directories()
     scalar_fields = _COMBINATION_SCALAR_REFERENCE_FIELDS.get(equipment_type, ())
@@ -478,7 +500,12 @@ def _find_combinations_referencing(equipment_type: str, equipment_id: str) -> Li
             try:
                 with open(fpath, 'r') as f:
                     data = json.load(f)
-            except Exception:
+            except Exception as e:
+                logger.error(
+                    f"Could not read {fpath} while checking references for "
+                    f"{equipment_type}/{equipment_id}; blocking delete to be safe: {e}"
+                )
+                matches.append({'name': '(unreadable combination - please retry)', 'owner_id': owner_id})
                 continue
             for combo in data.get('items', []):
                 referenced = any(combo.get(field) == equipment_id for field in scalar_fields)
@@ -492,15 +519,21 @@ def _find_combinations_referencing(equipment_type: str, equipment_id: str) -> Li
     return matches
 
 
-def compute_combination_validity_status(combination: Dict, user_id: str) -> Dict:
+def compute_combination_validity_status(
+    combination: Dict, user_id: str, equipment_index: Optional[Tuple[Dict[str, Dict], Dict[str, Dict]]] = None
+) -> Dict:
     """Compute is_valid/invalid_reasons for a combination (feature.md's 'autocheck' requirement).
 
     Distinct from is_disabled (the combination's own explicit toggle): is_valid is computed
     automatically and turns False as soon as any referenced equipment item is disabled - or,
     defensively, no longer resolvable at all (covers combinations created before delete-guards
     existed, where a referenced item may already be gone).
+
+    `equipment_index` lets a caller that's computing this for several combinations in one request
+    (e.g. the combinations list endpoint) pass in a single `index_owned_and_shared_equipment`
+    result instead of every combination re-scanning the equipment directory from scratch.
     """
-    own_by_id, shared_by_id = _index_owned_and_shared_equipment(user_id)
+    own_by_id, shared_by_id = equipment_index or index_owned_and_shared_equipment(user_id)
 
     invalid_reasons: List[str] = []
     disabled_component_ids: List[str] = []
@@ -521,15 +554,19 @@ def compute_combination_validity_status(combination: Dict, user_id: str) -> Dict
     }
 
 
-def compute_combination_share_status(combination: Dict, user_id: str) -> Dict:
+def compute_combination_share_status(
+    combination: Dict, user_id: str, equipment_index: Optional[Tuple[Dict[str, Dict], Dict[str, Dict]]] = None
+) -> Dict:
     """Compute is_shared, has_broken_share, and broken_items for a combination.
 
     A combination is 'shared' iff ALL constituent equipment items are accessible
     (own or from others) and have is_shared=True.
     'has_broken_share' is True when a referenced item can no longer be found in
     any user's shared pool (it was previously accessible but is now gone/unshared).
+
+    `equipment_index` - see compute_combination_validity_status.
     """
-    own_by_id, shared_by_id = _index_owned_and_shared_equipment(user_id)
+    own_by_id, shared_by_id = equipment_index or index_owned_and_shared_equipment(user_id)
     ref_ids = _combination_reference_ids(combination)
 
     is_shared = True
@@ -645,12 +682,6 @@ def save_user_telescopes(user_id: str, data: Dict) -> bool:
 def create_telescope(user_id: str, telescope_data: Dict) -> Optional[Dict]:
     """Create a new telescope profile"""
     try:
-        # Helper to convert empty strings to None for optional float fields
-        def get_float_or_none(value, default=None):
-            if not value or value == '':
-                return default
-            return float(value)
-
         # Create telescope object with auto-calculated fields
         telescope = Telescope(
             id=str(uuid.uuid4()),
@@ -659,8 +690,8 @@ def create_telescope(user_id: str, telescope_data: Dict) -> Optional[Dict]:
             telescope_type=telescope_data['telescope_type'],
             aperture_mm=float(telescope_data['aperture_mm']),
             focal_length_mm=float(telescope_data['focal_length_mm']),
-            weight_kg=get_float_or_none(telescope_data.get('weight_kg'), 0.0),
-            reducer_barlow_factor=get_float_or_none(telescope_data.get('reducer_barlow_factor'), 1.0),
+            weight_kg=_get_float_or_none(telescope_data.get('weight_kg'), 0.0),
+            reducer_barlow_factor=_get_float_or_none(telescope_data.get('reducer_barlow_factor'), 1.0),
             native_focal_ratio=0.0,  # Will be calculated
             effective_focal_length=0.0,  # Will be calculated
             effective_focal_ratio=0.0,  # Will be calculated
@@ -699,12 +730,6 @@ def get_telescope(user_id: str, telescope_id: str) -> Optional[Dict]:
 def update_telescope(user_id: str, telescope_id: str, telescope_data: Dict) -> Optional[Dict]:
     """Update a telescope profile"""
     try:
-        # Helper to convert empty strings to None for optional float fields
-        def get_float_or_none(value, default=None):
-            if not value or value == '':
-                return default
-            return float(value)
-
         data = load_user_telescopes(user_id)
 
         for i, item in enumerate(data['items']):
@@ -717,8 +742,8 @@ def update_telescope(user_id: str, telescope_id: str, telescope_data: Dict) -> O
                     telescope_type=telescope_data['telescope_type'],
                     aperture_mm=float(telescope_data['aperture_mm']),
                     focal_length_mm=float(telescope_data['focal_length_mm']),
-                    weight_kg=get_float_or_none(telescope_data.get('weight_kg'), item.get('weight_kg', 0.0)),
-                    reducer_barlow_factor=get_float_or_none(telescope_data.get('reducer_barlow_factor'), 1.0),
+                    weight_kg=_get_float_or_none(telescope_data.get('weight_kg'), item.get('weight_kg', 0.0)),
+                    reducer_barlow_factor=_get_float_or_none(telescope_data.get('reducer_barlow_factor'), 1.0),
                     native_focal_ratio=0.0,
                     effective_focal_length=0.0,
                     effective_focal_ratio=0.0,
@@ -792,12 +817,6 @@ def save_user_cameras(user_id: str, data: Dict) -> bool:
 def create_camera(user_id: str, camera_data: Dict) -> Optional[Dict]:
     """Create a new camera profile"""
     try:
-        # Helper to convert empty strings to None for optional float fields
-        def get_float_or_none(value, default=None):
-            if not value or value == '':
-                return default
-            return float(value)
-
         camera = Camera(
             id=str(uuid.uuid4()),
             name=camera_data['name'],
@@ -808,12 +827,12 @@ def create_camera(user_id: str, camera_data: Dict) -> Optional[Dict]:
             resolution_height_px=int(camera_data['resolution_height_px']),
             pixel_size_um=float(camera_data['pixel_size_um']),
             sensor_type=camera_data['sensor_type'],
-            weight_kg=get_float_or_none(camera_data.get('weight_kg'), 0.0),
+            weight_kg=_get_float_or_none(camera_data.get('weight_kg'), 0.0),
             sensor_diagonal_mm=0.0,  # Will be calculated
             cooling_supported=camera_data.get('cooling_supported', False),
-            min_temperature_c=get_float_or_none(camera_data.get('min_temperature_c')),
-            read_noise_e=get_float_or_none(camera_data.get('read_noise_e')),
-            quantum_efficiency=get_float_or_none(camera_data.get('quantum_efficiency')),
+            min_temperature_c=_get_float_or_none(camera_data.get('min_temperature_c')),
+            read_noise_e=_get_float_or_none(camera_data.get('read_noise_e')),
+            quantum_efficiency=_get_float_or_none(camera_data.get('quantum_efficiency')),
             notes=camera_data.get('notes', ''),
             created_at=datetime.now(timezone.utc).isoformat(),
             updated_at=datetime.now(timezone.utc).isoformat(),
@@ -845,12 +864,6 @@ def get_camera(user_id: str, camera_id: str) -> Optional[Dict]:
 def update_camera(user_id: str, camera_id: str, camera_data: Dict) -> Optional[Dict]:
     """Update a camera profile"""
     try:
-        # Helper to convert empty strings to None for optional float fields
-        def get_float_or_none(value, default=None):
-            if not value or value == '':
-                return default
-            return float(value)
-
         data = load_user_cameras(user_id)
 
         for i, item in enumerate(data['items']):
@@ -865,12 +878,12 @@ def update_camera(user_id: str, camera_id: str, camera_data: Dict) -> Optional[D
                     resolution_height_px=int(camera_data['resolution_height_px']),
                     pixel_size_um=float(camera_data['pixel_size_um']),
                     sensor_type=camera_data['sensor_type'],
-                    weight_kg=get_float_or_none(camera_data.get('weight_kg'), item.get('weight_kg', 0.0)),
+                    weight_kg=_get_float_or_none(camera_data.get('weight_kg'), item.get('weight_kg', 0.0)),
                     sensor_diagonal_mm=0.0,
                     cooling_supported=camera_data.get('cooling_supported', False),
-                    min_temperature_c=get_float_or_none(camera_data.get('min_temperature_c')),
-                    read_noise_e=get_float_or_none(camera_data.get('read_noise_e')),
-                    quantum_efficiency=get_float_or_none(camera_data.get('quantum_efficiency')),
+                    min_temperature_c=_get_float_or_none(camera_data.get('min_temperature_c')),
+                    read_noise_e=_get_float_or_none(camera_data.get('read_noise_e')),
+                    quantum_efficiency=_get_float_or_none(camera_data.get('quantum_efficiency')),
                     notes=camera_data.get('notes', ''),
                     created_at=item.get('created_at', datetime.now(timezone.utc).isoformat()),
                     updated_at=datetime.now(timezone.utc).isoformat(),
@@ -1190,18 +1203,12 @@ def save_user_accessories(user_id: str, data: Dict) -> bool:
 def create_accessory(user_id: str, accessory_data: Dict) -> Optional[Dict]:
     """Create a new accessory profile"""
     try:
-        # Helper to convert empty strings to None for optional float fields
-        def get_float_or_none(value, default=None):
-            if not value or value == '':
-                return default
-            return float(value)
-
         accessory = Accessory(
             id=str(uuid.uuid4()),
             name=accessory_data['name'],
             manufacturer=accessory_data.get('manufacturer', ''),
             accessory_type=accessory_data.get('accessory_type', ''),
-            weight_kg=get_float_or_none(accessory_data.get('weight_kg'), 0.0),
+            weight_kg=_get_float_or_none(accessory_data.get('weight_kg'), 0.0),
             notes=accessory_data.get('notes', ''),
             created_at=datetime.now(timezone.utc).isoformat(),
             updated_at=datetime.now(timezone.utc).isoformat(),
@@ -1232,12 +1239,6 @@ def get_accessory(user_id: str, accessory_id: str) -> Optional[Dict]:
 def update_accessory(user_id: str, accessory_id: str, accessory_data: Dict) -> Optional[Dict]:
     """Update an accessory profile"""
     try:
-        # Helper to convert empty strings to None for optional float fields
-        def get_float_or_none(value, default=None):
-            if not value or value == '':
-                return default
-            return float(value)
-
         data = load_user_accessories(user_id)
 
         for i, item in enumerate(data['items']):
@@ -1247,7 +1248,7 @@ def update_accessory(user_id: str, accessory_id: str, accessory_data: Dict) -> O
                     name=accessory_data['name'],
                     manufacturer=accessory_data.get('manufacturer', item.get('manufacturer', '')),
                     accessory_type=accessory_data.get('accessory_type', item.get('accessory_type', '')),
-                    weight_kg=get_float_or_none(accessory_data.get('weight_kg'), item.get('weight_kg', 0.0)),
+                    weight_kg=_get_float_or_none(accessory_data.get('weight_kg'), item.get('weight_kg', 0.0)),
                     notes=accessory_data.get('notes', ''),
                     created_at=item.get('created_at', datetime.now(timezone.utc).isoformat()),
                     updated_at=datetime.now(timezone.utc).isoformat(),
@@ -1377,12 +1378,10 @@ def create_combination(user_id: str, combination_data: Dict) -> Optional[Dict]:
             logger.error("At minimum a telescope or camera must be selected")
             return None
 
-        # Helper to convert empty strings to None for optional float fields
-        def get_float_or_none(value, default=None):
-            if not value or value == '':
-                return default
-            return float(value)
-
+        # lens_focal_length_mm/lens_focal_ratio only make sense for a camera-only combination
+        # (a lens mounted directly on the camera) - cleared whenever a telescope is selected so
+        # a combination can't end up with both a telescope and stale lens optics on record.
+        has_telescope = bool(combination_data.get('telescope_id'))
         combination = EquipmentCombination(
             id=str(uuid.uuid4()),
             name=combination_data['name'],
@@ -1396,8 +1395,8 @@ def create_combination(user_id: str, combination_data: Dict) -> Optional[Dict]:
             updated_at=datetime.now(timezone.utc).isoformat(),
             is_disabled=bool(combination_data.get('is_disabled', False)),
             guide_camera_id=combination_data.get('guide_camera_id') or None,
-            lens_focal_length_mm=get_float_or_none(combination_data.get('lens_focal_length_mm')),
-            lens_focal_ratio=get_float_or_none(combination_data.get('lens_focal_ratio')),
+            lens_focal_length_mm=None if has_telescope else _get_float_or_none(combination_data.get('lens_focal_length_mm')),
+            lens_focal_ratio=None if has_telescope else _get_float_or_none(combination_data.get('lens_focal_ratio')),
         )
 
         data = load_user_combinations(user_id)
@@ -1426,12 +1425,6 @@ def update_combination(user_id: str, combination_id: str, combination_data: Dict
     try:
         data = load_user_combinations(user_id)
 
-        # Helper to convert empty strings to None for optional float fields
-        def get_float_or_none(value, default=None):
-            if not value or value == '':
-                return default
-            return float(value)
-
         for i, item in enumerate(data['items']):
             if item['id'] == combination_id:
                 # Validate: at minimum telescope or camera must be selected
@@ -1439,6 +1432,10 @@ def update_combination(user_id: str, combination_id: str, combination_data: Dict
                     logger.error("At minimum a telescope or camera must be selected")
                     return None
 
+                # See create_combination: lens fields are camera-only optics and are cleared
+                # whenever a telescope is selected, even if the submitted payload still carries
+                # stale values from before a telescope was added.
+                has_telescope = bool(combination_data.get('telescope_id'))
                 combination = EquipmentCombination(
                     id=combination_id,
                     name=combination_data['name'],
@@ -1452,8 +1449,8 @@ def update_combination(user_id: str, combination_id: str, combination_data: Dict
                     updated_at=datetime.now(timezone.utc).isoformat(),
                     is_disabled=bool(combination_data.get('is_disabled', item.get('is_disabled', False))),
                     guide_camera_id=combination_data.get('guide_camera_id') or None,
-                    lens_focal_length_mm=get_float_or_none(combination_data.get('lens_focal_length_mm')),
-                    lens_focal_ratio=get_float_or_none(combination_data.get('lens_focal_ratio')),
+                    lens_focal_length_mm=None if has_telescope else _get_float_or_none(combination_data.get('lens_focal_length_mm')),
+                    lens_focal_ratio=None if has_telescope else _get_float_or_none(combination_data.get('lens_focal_ratio')),
                 )
 
                 data['items'][i] = asdict(combination)

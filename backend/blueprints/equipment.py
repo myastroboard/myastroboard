@@ -15,6 +15,27 @@ logger = get_logger(__name__)
 equipment_bp = Blueprint('equipment', __name__)
 
 
+def _resolve_astrodex_visibility_context():
+    """Return (private_mode, usernames_by_id) - shared by every route that needs to resolve
+    Astrodex picture visibility/ownership, so a future change to either only needs updating here.
+    """
+    config = load_config()
+    private_mode = bool(config.get('astrodex', {}).get('private', False))
+    users = user_manager.list_users()
+    usernames_by_id = {
+        user_entry.get('user_id', ''): user_entry.get('username', 'unknown')
+        for user_entry in users
+        if user_entry.get('user_id')
+    }
+    return private_mode, usernames_by_id
+
+
+def _build_combination_photo_index_for_current_user(user, user_id):
+    """Build the per-combination Astrodex photo index for the requesting user."""
+    private_mode, usernames_by_id = _resolve_astrodex_visibility_context()
+    return astrodex.build_combination_photo_index(user_id, user.username, private_mode, usernames_by_id)
+
+
 def _validate_telescope_data(data):
     """Return an error message string if telescope numeric fields are out of range, else None."""
     if 'aperture_mm' in data:
@@ -669,21 +690,16 @@ def get_combinations():
         if not user_id or not user:  # pragma: no cover
             return jsonify({'error': 'User not authenticated'}), 401
 
-        config = load_config()
-        private_mode = bool(config.get('astrodex', {}).get('private', False))
-        users = user_manager.list_users()
-        usernames_by_id = {
-            user_entry.get('user_id', ''): user_entry.get('username', 'unknown')
-            for user_entry in users
-            if user_entry.get('user_id')
-        }
-        photo_index = astrodex.build_combination_photo_index(user_id, user.username, private_mode, usernames_by_id)
+        photo_index = _build_combination_photo_index_for_current_user(user, user_id)
 
         data = equipment_profiles.load_user_combinations(user_id)
+        # Built once and reused for every combination below instead of each status/validity call
+        # re-scanning all 5 equipment types (own + shared) from disk per combination.
+        equipment_index = equipment_profiles.index_owned_and_shared_equipment(user_id)
         items_with_status = []
         for combo in data.get('items', []):
-            status = equipment_profiles.compute_combination_share_status(combo, user_id)
-            validity = equipment_profiles.compute_combination_validity_status(combo, user_id)
+            status = equipment_profiles.compute_combination_share_status(combo, user_id, equipment_index)
+            validity = equipment_profiles.compute_combination_validity_status(combo, user_id, equipment_index)
             photo_stats = astrodex.summarize_combination_pictures(photo_index.get(combo['id'], []))
             items_with_status.append({**combo, **status, **validity, **photo_stats})
         shared_with_status = equipment_profiles.load_all_shared_combinations(user_id)
@@ -739,20 +755,28 @@ def get_combination(combination_id):
             return jsonify({'error': 'User not authenticated'}), 401
 
         combination = equipment_profiles.get_combination(user_id, combination_id)
-
+        status = {}
+        validity = {}
         if combination:
             status = equipment_profiles.compute_combination_share_status(combination, user_id)
             validity = equipment_profiles.compute_combination_validity_status(combination, user_id)
-            config = load_config()
-            private_mode = bool(config.get('astrodex', {}).get('private', False))
-            users = user_manager.list_users()
-            usernames_by_id = {
-                user_entry.get('user_id', ''): user_entry.get('username', 'unknown')
-                for user_entry in users
-                if user_entry.get('user_id')
-            }
-            photo_index = astrodex.build_combination_photo_index(user_id, user.username, private_mode, usernames_by_id)
-            photo_stats = astrodex.summarize_combination_pictures(photo_index.get(combination_id, []))
+        else:
+            # Not owned by this user - fall back to combinations shared with them, same as the
+            # list endpoint. load_all_shared_combinations already merges share/validity status
+            # and owner info into the combo dict (computed from the owner's perspective), so
+            # status/validity stay empty here and {**combination, **status, **validity} below
+            # still yields the fully-annotated shape either way.
+            combination = next(
+                (c for c in equipment_profiles.load_all_shared_combinations(user_id) if c['id'] == combination_id),
+                None,
+            )
+
+        if combination:
+            private_mode, usernames_by_id = _resolve_astrodex_visibility_context()
+            pictures = astrodex.get_pictures_for_combination(
+                combination_id, user_id, user.username, private_mode, usernames_by_id
+            )
+            photo_stats = astrodex.summarize_combination_pictures(pictures)
             return jsonify({**combination, **status, **validity, **photo_stats})
         else:
             return jsonify({'error': 'Combination not found'}), 404
