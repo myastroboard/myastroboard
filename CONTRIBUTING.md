@@ -23,7 +23,7 @@ This project and everyone participating in it is governed by our [Code of Conduc
 
 Before you begin, make sure you have:
 - Docker and Docker Compose installed
-- Python 3.12 or higher (for local development)
+- Python 3.13 or higher (for local development)
 - Git for version control
 - A GitHub account
 
@@ -45,7 +45,7 @@ Before you begin, make sure you have:
    ```bash
    # Option 1: Using Docker (recommended)
    docker-compose -f docker-compose-dev.yml up --build
-   
+
    # Option 2: Local Python environment
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
@@ -123,7 +123,25 @@ Unsure where to begin? Look for issues labeled:
 2. **Write Code** - Follow our style guidelines
 3. **Add Tests** - Include tests for new functionality
 4. **Update Documentation** - Update relevant documentation
-5. **Submit PR** - Use our Pull Request template
+5. **Resume modification** - Optional, if necessary using `CHANGELOG_NEXT.md`
+6. **Submit PR** - Use our Pull Request template
+
+### CHANGELOG_NEXT.md
+
+This file is used at each new release to announce notable change. Use it to brievly explain new feature, notable change, ...
+
+Use `#### title` to organize in sections. In release note the file will be displayed:
+
+```
+## 🚀 What's Changed"
+
+### 📝 Changelog
+[CHANGELOG_NEXT.md]
+
+### 📋 Commits since $PREVIOUS_TAG:
+...
+
+```
 
 ## Style Guidelines
 
@@ -163,25 +181,25 @@ def calculate_observation_score(
 ) -> Dict[str, float]:
     """
     Calculate observation quality score for a celestial object.
-    
+
     Args:
         altitude: Object altitude in degrees
         magnitude: Object visual magnitude
         moon_separation: Angular separation from moon in degrees
         weather_quality: Optional weather quality factor (0-1)
-    
+
     Returns:
         Dictionary containing score components and total score
     """
     logger.debug(f"Calculating score for altitude={altitude}, mag={magnitude}")
-    
+
     # Implementation here
     score = {
         'altitude_score': altitude / 90.0,
         'magnitude_score': max(0, 1 - magnitude / 10),
         'moon_score': moon_separation / 180.0
     }
-    
+
     return score
 ```
 
@@ -285,6 +303,12 @@ djlint templates/ static/offline.html --profile jinja --lint --ignore H021,H023,
 - Form `method` attribute must be **lowercase**: `method="post"`, not `method="POST"`
 - Avoid consecutive blank lines inside markup (djlint H014)
 - New templates should include a `<meta name="description">` unless they are internal/fallback pages
+- **NEVER** use `innerHTML` in `static/js/**` (writes or reads for rendering).
+- **NEVER** introduce new `DOMUtils.setTrustedHTML(...)` callsites.
+- Build UI with explicit DOM APIs: `document.createElement`, `textContent`, `appendChild`, `setAttribute`.
+- For text and API/user content, always use `textContent` (never HTML string interpolation).
+- Before re-rendering containers, use `DOMUtils.clear(container)`.
+- Preserve existing IDs/classes/data-attributes required by listeners and Bootstrap behavior.
 
 ### Git Commit Messages
 
