@@ -305,7 +305,9 @@ def get_or_create_cache_scheduler():
 try:
     _purged_plan_count = plan_my_night.purge_legacy_telescope_plans()
     if _purged_plan_count:
-        logger.info(f'Purged {_purged_plan_count} legacy telescope-keyed plan file(s) on startup')
+        logger.info(  # pragma: no cover - depends on real legacy files existing before this module's first import
+            f'Purged {_purged_plan_count} legacy telescope-keyed plan file(s) on startup'
+        )
 except Exception as e:  # pragma: no cover
     logger.error(f'Failed to purge legacy plan files on startup: {e}', exc_info=True)
 

@@ -3,6 +3,8 @@ Tests for aurora_predictions.py
 Covers AuroraService pure-logic methods and mocked HTTP calls.
 """
 
+import time
+
 import pytest
 from unittest.mock import patch, MagicMock
 from astroweather import aurora_predictions
@@ -240,6 +242,54 @@ class TestFetchKpForecast:
         result = self.svc.fetch_kp_forecast()
         assert isinstance(result, list)
         assert result[0]["kp"] == pytest.approx(2.67)
+
+
+class _RaceLock:
+    """Lock stand-in that simulates another location's parallel job populating
+    the shared cache between the outer check and this call acquiring the lock."""
+
+    def __init__(self, cache, value):
+        self._cache = cache
+        self._value = value
+
+    def __enter__(self):
+        self._cache['value'] = self._value
+        self._cache['timestamp'] = time.monotonic()
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+class TestFetchCurrentKpIndexLockRecheck:
+    """Covers the re-check inside the lock in fetch_current_kp_index."""
+
+    def setup_method(self):
+        self.svc = AuroraService(60.0, 25.0, "UTC")
+
+    @patch("astroweather.aurora_predictions.requests.get")
+    def test_returns_value_populated_while_waiting_for_lock(self, mock_get):
+        race_lock = _RaceLock(aurora_predictions._kp_index_cache, 4.5)
+        with patch.object(aurora_predictions, "_KP_FETCH_LOCK", race_lock):
+            result = self.svc.fetch_current_kp_index()
+        assert result == 4.5
+        mock_get.assert_not_called()
+
+
+class TestFetchKpForecastLockRecheck:
+    """Covers the re-check inside the lock in fetch_kp_forecast."""
+
+    def setup_method(self):
+        self.svc = AuroraService(60.0, 25.0, "UTC")
+
+    @patch("astroweather.aurora_predictions.requests.get")
+    def test_returns_value_populated_while_waiting_for_lock(self, mock_get):
+        cached = [{"time_tag": "2026-01-01T00:00:00", "kp": 3.0}]
+        race_lock = _RaceLock(aurora_predictions._kp_forecast_cache, cached)
+        with patch.object(aurora_predictions, "_KP_FETCH_LOCK", race_lock):
+            result = self.svc.fetch_kp_forecast()
+        assert result == cached
+        mock_get.assert_not_called()
 
 
 class TestKpDataSharedAcrossLocations:

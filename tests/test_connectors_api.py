@@ -393,6 +393,7 @@ class TestAllSkyProxy:
                     resp = client_user.get('/api/connectors/allsky/proxy?module=live_image')
         assert resp.status_code == 200
         assert b"fake-image-data" in resp.data
+        resp.close()
 
     def test_504_on_timeout(self, client_user):
         mock_connector = MagicMock()
@@ -448,3 +449,4 @@ class TestAllSkyProxy:
                     )
         assert resp.status_code == 206
         assert captured['headers'].get('Range') == 'bytes=0-1023'
+        resp.close()

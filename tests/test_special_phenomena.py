@@ -918,6 +918,21 @@ class TestSolarLongitudeHelpers:
         # never the far end of the grid.
         assert abs((result - Time("2026-03-20T14:46:00", format="isot", scale="utc")).to(u.hour).value) < 2.0
 
+    def test_returns_fallback_when_best_index_exceeds_times_size(self):
+        """A longitudes array longer than the times grid (an ephemeris/broadcast
+        oddity) can pick an index past the grid's end - fall back rather than
+        indexing out of range."""
+        import numpy as np
+        from astropy.time import Time
+        from astropy import units as u
+
+        grid = Time("2026-03-20T12:00:00", format="isot", scale="utc") + (np.arange(0, 3) * u.hour)
+        fallback = grid[0]
+        oversized_longitudes = np.array([100.0, 100.0, 100.0, 0.0])  # best match at index 3, out of grid bounds
+        with patch.object(self.svc, "_sun_ecliptic_longitudes_deg", return_value=oversized_longitudes):
+            result = self.svc._best_solar_longitude_time(grid, 0.0, fallback)
+        assert result is fallback
+
 
 class TestEclipticAltitudeWarningFree:
     """The zodiacal-light elongation test must not warn on every call."""

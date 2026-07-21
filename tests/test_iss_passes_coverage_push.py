@@ -18,10 +18,20 @@ class _Dist:
 
 @pytest.fixture(autouse=True)
 def _reset_ephemeris_memo():
-    """Reset the process-wide de421 memo so each test's SKYFIELD_LOADER patch applies."""
+    """Reset the process-wide de421 memo so each test's SKYFIELD_LOADER patch applies.
+
+    Closes a real ephemeris object before discarding the reference - otherwise the
+    underlying open file is only reclaimed by the garbage collector later, which
+    surfaces as a ResourceWarning attributed to whatever unrelated test happens to
+    be running when GC finalizes it.
+    """
+    if mod._EPHEMERIS is not None and hasattr(mod._EPHEMERIS, "close"):
+        mod._EPHEMERIS.close()
     mod._EPHEMERIS = None
     mod._EPHEMERIS_ATTEMPTED = False
     yield
+    if mod._EPHEMERIS is not None and hasattr(mod._EPHEMERIS, "close"):
+        mod._EPHEMERIS.close()
     mod._EPHEMERIS = None
     mod._EPHEMERIS_ATTEMPTED = False
 
@@ -447,6 +457,10 @@ def test_vectorised_geometry_helpers():
     assert all(grid[i] <= grid[i + 1] for i in range(len(grid) - 1))
     short = svc._time_grid(start, start + timedelta(seconds=3), 10.0)
     assert short == [start, start + timedelta(seconds=3)]
+    collapsed = svc._time_grid(start, start, 5.0)
+    assert collapsed == [start]
+    inverted = svc._time_grid(start, start - timedelta(seconds=5), 5.0)
+    assert inverted == [start]
 
     # _angular_separation_array: identical directions -> 0, opposite azimuths at 0° alt -> 180.
     sep = svc._angular_separation_array(
@@ -1132,3 +1146,58 @@ def test_observer_visibility_false_when_not_sunlit(monkeypatch):
 
     out = mod.get_current_position(latitude=10.0, longitude=20.0, elevation_m=0.0)
     assert out["observer"]["is_visible"] is False
+
+
+# ---------------------------------------------------------------------------
+# _get_ephemeris — inner double-checked-lock re-check
+# ---------------------------------------------------------------------------
+
+
+class _RaceLock:
+    """Lock stand-in simulating another thread finishing the load while we waited."""
+
+    def __enter__(self):
+        mod._EPHEMERIS_ATTEMPTED = True
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+def test_get_ephemeris_inner_recheck_skips_when_already_attempted(monkeypatch):
+    """Inner re-check inside the lock: another thread already flipped _EPHEMERIS_ATTEMPTED
+    while we waited for the lock, so this call must not retry the load."""
+    monkeypatch.setattr(mod, "_EPHEMERIS_LOCK", _RaceLock())
+    calls = []
+    monkeypatch.setattr(mod, "SKYFIELD_LOADER", lambda *a, **k: calls.append(a))
+    result = mod._get_ephemeris()
+    assert result is None
+    assert calls == []
+
+
+# ---------------------------------------------------------------------------
+# _sun_altaz_radius_arrays / _sun_altaz_arrays_astropy — Astropy fallback path
+# ---------------------------------------------------------------------------
+
+
+def test_sun_altaz_radius_arrays_falls_back_to_astropy_without_ephemeris():
+    """eph=None → uses the Astropy fallback (no Skyfield ephemeris available)."""
+    svc = mod.ISSPassService(45.5, -73.5, 10, "UTC")
+    times_utc = [
+        datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
+        datetime(2026, 1, 1, 13, 0, 0, tzinfo=timezone.utc),
+    ]
+    alt, az, radius = svc._sun_altaz_radius_arrays(times_utc, observer=None, ts=None, eph=None)
+    assert len(alt) == len(times_utc)
+    assert len(az) == len(times_utc)
+    assert (radius == mod.SOLAR_ANGULAR_RADIUS_FALLBACK_DEG).all()
+
+
+def test_sun_altaz_arrays_astropy_direct():
+    svc = mod.ISSPassService(45.5, -73.5, 10, "UTC")
+    times_utc = [datetime(2026, 6, 21, 12, 0, 0, tzinfo=timezone.utc)]
+    alt, az = svc._sun_altaz_arrays_astropy(times_utc)
+    assert len(alt) == 1
+    assert len(az) == 1
+    assert -90.0 <= alt[0] <= 90.0
+    assert 0.0 <= az[0] < 360.0

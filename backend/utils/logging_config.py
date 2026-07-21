@@ -83,7 +83,14 @@ def setup_logger(name: str, include_console: bool = True, console_level: Optiona
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)  # Set to DEBUG to capture all levels
 
-    # Clear any existing handlers
+    # Clear any existing handlers, closing them first: Python caches loggers
+    # globally by name, so a module reload can reach this point for a logger
+    # that still carries file handlers from its previous configuration.
+    for old_handler in logger.handlers[:]:
+        try:
+            old_handler.close()
+        except Exception:
+            pass
     logger.handlers.clear()
 
     # Ensure log directory exists

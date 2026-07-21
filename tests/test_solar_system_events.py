@@ -461,3 +461,106 @@ class TestCometDatasetSource:
         events = svc._find_comet_visibility_windows(date(2026, 1, 1), 365)
         assert events  # curated 2026 comets overlap the full-year window
         assert all(e["raw_data"]["source"] == "curated" for e in events)
+
+
+class TestDatasetCometCandidates:
+    """Tests for _dataset_comet_candidates directly."""
+
+    def test_returns_empty_when_dataset_unavailable(self, monkeypatch):
+        import skytonight.skytonight_targets as targets_mod
+
+        def _raise(*a, **k):
+            raise RuntimeError("dataset not built yet")
+
+        monkeypatch.setattr(targets_mod, "load_targets_dataset", _raise)
+        svc = SolarSystemEventsService(45.0, 0.0, timezone="UTC")
+        assert svc._dataset_comet_candidates() == []
+
+    def test_skips_candidate_with_unparseable_perihelion(self, monkeypatch):
+        import skytonight.skytonight_targets as targets_mod
+
+        fake_dataset = {
+            "targets": [
+                {
+                    "category": "comets",
+                    "preferred_name": "Bad Date Comet",
+                    "magnitude": 5.0,
+                    "metadata": {"perihelion_date": "not-a-date"},
+                },
+            ]
+        }
+        monkeypatch.setattr(targets_mod, "load_targets_dataset", lambda *a, **k: fake_dataset)
+        svc = SolarSystemEventsService(45.0, 0.0, timezone="UTC")
+        assert svc._dataset_comet_candidates() == []
+
+
+class TestCuratedCometCandidates:
+    """Tests for _curated_comet_candidates directly."""
+
+    def test_skips_entry_with_invalid_date_fields(self, monkeypatch):
+        svc = SolarSystemEventsService(45.0, 0.0, timezone="UTC")
+        monkeypatch.setattr(
+            svc,
+            "NOTABLE_COMETS",
+            {
+                "Bad Comet": {
+                    "perihelion_month": 13,  # invalid month -> ValueError
+                    "perihelion_day": 1,
+                    "perihelion_year": 2026,
+                    "magnitude": 8.0,
+                    "visibility": "binoculars",
+                },
+                "Good Comet": {
+                    "perihelion_month": 6,
+                    "perihelion_day": 1,
+                    "perihelion_year": 2026,
+                    "magnitude": 8.0,
+                    "visibility": "binoculars",
+                },
+            },
+        )
+        candidates = svc._curated_comet_candidates()
+        assert [c["name"] for c in candidates] == ["Good Comet"]
+
+    def test_skips_entry_missing_required_key(self, monkeypatch):
+        svc = SolarSystemEventsService(45.0, 0.0, timezone="UTC")
+        monkeypatch.setattr(
+            svc,
+            "NOTABLE_COMETS",
+            {"Incomplete Comet": {"perihelion_month": 6, "perihelion_year": 2026}},  # missing perihelion_day
+        )
+        assert svc._curated_comet_candidates() == []
+
+
+class TestParsePerihelion:
+    """Tests for the static _parse_perihelion helper."""
+
+    def test_none_value_returns_none(self):
+        assert SolarSystemEventsService._parse_perihelion(None) is None
+
+    def test_empty_string_returns_none(self):
+        assert SolarSystemEventsService._parse_perihelion("") is None
+
+    def test_unparseable_string_returns_none(self):
+        assert SolarSystemEventsService._parse_perihelion("not-a-date") is None
+
+    def test_valid_date_string_parses(self):
+        result = SolarSystemEventsService._parse_perihelion("2026-08-15")
+        assert result is not None
+        assert result.year == 2026 and result.month == 8 and result.day == 15
+
+
+class TestEquipmentLabel:
+    """Tests for the static _equipment_label helper."""
+
+    def test_none_magnitude_defaults_to_telescope(self):
+        assert SolarSystemEventsService._equipment_label(None) == "telescope"
+
+    def test_bright_magnitude_is_naked_eye(self):
+        assert SolarSystemEventsService._equipment_label(3.0) == "naked_eye_possible"
+
+    def test_moderate_magnitude_is_binoculars(self):
+        assert SolarSystemEventsService._equipment_label(8.0) == "binoculars"
+
+    def test_faint_magnitude_is_telescope(self):
+        assert SolarSystemEventsService._equipment_label(15.0) == "telescope"

@@ -2159,3 +2159,50 @@ class TestSharedEquipmentAdditionalBranches:
                             lambda _: (_ for _ in ()).throw(Exception("listdir fail")))
         result = equipment_profiles.load_all_shared_combinations(exclude_user_id='other')
         assert result == []
+
+
+class TestIndexTelescopesAndCameras:
+    """index_telescopes_and_cameras merges each user's own + shared telescopes/cameras."""
+
+    def test_merges_own_and_shared_telescopes_and_cameras(self, temp_data_dir, monkeypatch):
+        owner_id = 'scope-owner'
+        viewer_id = 'viewer'
+        fake_auth = types.SimpleNamespace(
+            user_manager=types.SimpleNamespace(
+                list_users=lambda: [
+                    {'user_id': owner_id, 'username': 'alice'},
+                    {'user_id': viewer_id, 'username': 'bob'},
+                ]
+            )
+        )
+        monkeypatch.setitem(sys.modules, 'utils.auth', fake_auth)
+        equipment_profiles.ensure_equipment_directories()
+
+        # Another user's shared telescope and camera
+        tel_file = equipment_profiles.get_user_equipment_file(owner_id, 'telescopes')
+        with open(tel_file, 'w', encoding='utf-8') as f:
+            json.dump({'items': [{'id': 'shared-scope', 'name': 'Shared Scope', 'is_shared': True}]}, f)
+        cam_file = equipment_profiles.get_user_equipment_file(owner_id, 'cameras')
+        with open(cam_file, 'w', encoding='utf-8') as f:
+            json.dump({'items': [{'id': 'shared-cam', 'name': 'Shared Cam', 'is_shared': True}]}, f)
+
+        # Viewer's own telescope and camera
+        own_scope = equipment_profiles.create_telescope(
+            viewer_id,
+            {'name': 'Own Scope', 'telescope_type': 'Refractor', 'aperture_mm': 100, 'focal_length_mm': 800},
+        )
+        own_camera = equipment_profiles.create_camera(
+            viewer_id,
+            {
+                'name': 'Own Cam', 'manufacturer': 'ZWO', 'sensor_type': 'CMOS',
+                'sensor_width_mm': 19.1, 'sensor_height_mm': 13.0,
+                'resolution_width_px': 4144, 'resolution_height_px': 2822, 'pixel_size_um': 4.63,
+            },
+        )
+
+        telescopes_by_id, cameras_by_id = equipment_profiles.index_telescopes_and_cameras(viewer_id)
+
+        assert own_scope['id'] in telescopes_by_id
+        assert 'shared-scope' in telescopes_by_id
+        assert own_camera['id'] in cameras_by_id
+        assert 'shared-cam' in cameras_by_id

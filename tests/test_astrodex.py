@@ -313,6 +313,35 @@ class TestCombinationPhotoStats:
         """No astrodex directory at all → 0, not an error."""
         assert astrodex.count_pictures_for_combination('combo-1') == 0
 
+    def test_count_pictures_for_combination_skips_non_dict_item(self, temp_data_dir):
+        """A malformed item (not a dict) in the items list is skipped, not raised."""
+        astrodex.ensure_astrodex_directories()
+        fpath = astrodex.get_user_astrodex_file('weiruser')
+        with open(fpath, 'w', encoding='utf-8') as f:
+            json.dump(
+                {
+                    'items': [
+                        'not-a-dict',
+                        {'id': 'item1', 'pictures': [{'combination_id': 'combo-1'}]},
+                    ]
+                },
+                f,
+            )
+        assert astrodex.count_pictures_for_combination('combo-1') == 1
+
+    def test_count_pictures_for_combination_skips_unreadable_file(self, temp_data_dir):
+        """A corrupt/unreadable astrodex file is skipped (best-effort count), not raised."""
+        astrodex.ensure_astrodex_directories()
+        good_item = astrodex.create_astrodex_item('gooduser', {'name': 'M31', 'type': 'Galaxy'})
+        astrodex.add_picture_to_item(
+            'gooduser', good_item['id'], {'filename': 'a.jpg', 'combination_id': 'combo-1'}
+        )
+        bad_fpath = astrodex.get_user_astrodex_file('baduser')
+        with open(bad_fpath, 'w', encoding='utf-8') as f:
+            f.write('{not valid json')
+
+        assert astrodex.count_pictures_for_combination('combo-1') == 1
+
     def test_build_combination_photo_index_and_summarize(self, temp_data_dir):
         item = astrodex.create_astrodex_item('alice', {'name': 'M31', 'type': 'Galaxy'}, username='alice')
         astrodex.add_picture_to_item(
@@ -343,6 +372,29 @@ class TestCombinationPhotoStats:
         stats = astrodex.summarize_combination_pictures([{'rating': None}, {'rating': None}])
         assert stats['photo_count'] == 2
         assert stats['average_rating'] is None
+
+    def test_summarize_combination_pictures_non_numeric_rating_counts_as_unrated(self):
+        """A non-numeric rating (hand-edited/legacy data) is logged and treated as unrated,
+        not raised - it must not take down the whole combination-stats endpoint."""
+        stats = astrodex.summarize_combination_pictures(
+            [{'id': 'p1', 'rating': 'excellent'}, {'id': 'p2', 'rating': 4.0}]
+        )
+        assert stats['photo_count'] == 2
+        assert stats['average_rating'] == 4.0
+
+    def test_get_pictures_for_combination(self, temp_data_dir):
+        item = astrodex.create_astrodex_item('alice', {'name': 'M31', 'type': 'Galaxy'}, username='alice')
+        astrodex.add_picture_to_item(
+            'alice', item['id'], {'filename': 'a.jpg', 'combination_id': 'combo-1', 'rating': 4.0}
+        )
+        astrodex.add_picture_to_item('alice', item['id'], {'filename': 'b.jpg', 'combination_id': 'combo-2'})
+
+        pictures = astrodex.get_pictures_for_combination('combo-1', 'alice', 'alice', private_mode=True)
+
+        assert len(pictures) == 1
+        assert pictures[0]['filename'] == 'a.jpg'
+        assert pictures[0]['item_id'] == item['id']
+        assert pictures[0]['item_name'] == item['name']
 
 
 class TestAstrodexStats:

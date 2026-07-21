@@ -937,6 +937,42 @@ class TestCombinationRecommendationsRoute:
         data = response.get_json()
         assert data['has_combinations'] is True
 
+    def test_disabled_shared_combination_excluded(self, client_admin, monkeypatch):
+        """shared combination with is_disabled=True → excluded, same as an own disabled combo."""
+        shared_combo = {
+            'id': 'combo-3', 'name': 'Disabled Shared Combo', 'telescope_id': 'scope-3',
+            'is_disabled': True, 'is_valid': True, 'owner_username': 'alice',
+        }
+        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_user_combinations',
+                            lambda uid: {'items': []})
+        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_all_shared_combinations',
+                            lambda *a, **k: [shared_combo])
+        response = client_admin.post(
+            '/api/skytonight/combination-recommendations',
+            json={'id': 'NGC 224', 'type': 'Galaxy', 'mag': 3.4, 'size': 189.0},
+        )
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['has_combinations'] is False
+
+    def test_invalid_shared_combination_excluded(self, client_admin, monkeypatch):
+        """shared combination with is_valid=False → excluded, same as an own invalid combo."""
+        shared_combo = {
+            'id': 'combo-4', 'name': 'Invalid Shared Combo', 'telescope_id': 'scope-4',
+            'is_disabled': False, 'is_valid': False, 'owner_username': 'alice',
+        }
+        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_user_combinations',
+                            lambda uid: {'items': []})
+        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_all_shared_combinations',
+                            lambda *a, **k: [shared_combo])
+        response = client_admin.post(
+            '/api/skytonight/combination-recommendations',
+            json={'id': 'NGC 224', 'type': 'Galaxy', 'mag': 3.4, 'size': 189.0},
+        )
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['has_combinations'] is False
+
 
 class TestSkymapRoute:
     """Cover /api/skytonight/skymap."""

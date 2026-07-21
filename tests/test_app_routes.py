@@ -206,26 +206,32 @@ class TestStaticFileRoutes:
     def test_manifest_webmanifest_returns_200(self, client):
         resp = client.get('/manifest.webmanifest')
         assert resp.status_code == 200
+        resp.close()
 
     def test_manifest_localized_returns_200_or_404(self, client):
         resp = client.get('/manifest.en.webmanifest')
         assert resp.status_code in (200, 404)
+        resp.close()
 
     def test_manifest_localized_fr_returns_200_or_404(self, client):
         resp = client.get('/manifest.fr.webmanifest')
         assert resp.status_code in (200, 404)
+        resp.close()
 
     def test_service_worker_returns_200(self, client):
         resp = client.get('/sw.js')
         assert resp.status_code == 200
+        resp.close()
 
     def test_offline_page_returns_200(self, client):
         resp = client.get('/offline.html')
         assert resp.status_code == 200
+        resp.close()
 
     def test_robots_txt_returns_200(self, client):
         resp = client.get('/robots.txt')
         assert resp.status_code == 200
+        resp.close()
 
 
 # ---------------------------------------------------------------------------
@@ -818,6 +824,7 @@ class TestConfigExport:
     def test_export_returns_200_or_404(self, client_admin):
         resp = client_admin.get('/api/config/export')
         assert resp.status_code in (200, 404)
+        resp.close()
 
     def test_unauthenticated_returns_401(self, client):
         resp = client.get('/api/config/export')
@@ -1540,6 +1547,14 @@ class TestEquipmentCameras:
         resp = client_admin.delete('/api/equipment/cameras/nonexistent-id')
         assert resp.status_code in (200, 404, 500)
 
+    def test_delete_camera_blocked_by_combination_returns_409(self, client_admin, monkeypatch):
+        monkeypatch.setattr(_app_mod.equipment_profiles, 'delete_camera', lambda *_: (False, ['Combo A']))
+        resp = client_admin.delete('/api/equipment/cameras/some-id')
+        assert resp.status_code == 409
+        body = resp.get_json()
+        assert body['error'] == 'in_use_by_combination'
+        assert body['combinations'] == ['Combo A']
+
 
 # ---------------------------------------------------------------------------
 # Equipment Profiles — Numeric Validation (PR #121)
@@ -1716,6 +1731,14 @@ class TestEquipmentMounts:
         resp = client_admin.delete('/api/equipment/mounts/nonexistent-id')
         assert resp.status_code in (200, 404, 500)
 
+    def test_delete_mount_blocked_by_combination_returns_409(self, client_admin, monkeypatch):
+        monkeypatch.setattr(_app_mod.equipment_profiles, 'delete_mount', lambda *_: (False, ['Combo A']))
+        resp = client_admin.delete('/api/equipment/mounts/some-id')
+        assert resp.status_code == 409
+        body = resp.get_json()
+        assert body['error'] == 'in_use_by_combination'
+        assert body['combinations'] == ['Combo A']
+
 
 # ---------------------------------------------------------------------------
 # Equipment Profiles — Filters CRUD
@@ -1753,6 +1776,14 @@ class TestEquipmentFilters:
         resp = client_admin.delete('/api/equipment/filters/nonexistent-id')
         assert resp.status_code in (200, 404, 500)
 
+    def test_delete_filter_blocked_by_combination_returns_409(self, client_admin, monkeypatch):
+        monkeypatch.setattr(_app_mod.equipment_profiles, 'delete_filter', lambda *_: (False, ['Combo A']))
+        resp = client_admin.delete('/api/equipment/filters/some-id')
+        assert resp.status_code == 409
+        body = resp.get_json()
+        assert body['error'] == 'in_use_by_combination'
+        assert body['combinations'] == ['Combo A']
+
 
 # ---------------------------------------------------------------------------
 # Equipment Profiles — Accessories CRUD
@@ -1789,6 +1820,14 @@ class TestEquipmentAccessories:
     def test_delete_accessory_nonexistent_returns_error(self, client_admin):
         resp = client_admin.delete('/api/equipment/accessories/nonexistent-id')
         assert resp.status_code in (200, 404, 500)
+
+    def test_delete_accessory_blocked_by_combination_returns_409(self, client_admin, monkeypatch):
+        monkeypatch.setattr(_app_mod.equipment_profiles, 'delete_accessory', lambda *_: (False, ['Combo A']))
+        resp = client_admin.delete('/api/equipment/accessories/some-id')
+        assert resp.status_code == 409
+        body = resp.get_json()
+        assert body['error'] == 'in_use_by_combination'
+        assert body['combinations'] == ['Combo A']
 
 
 # ---------------------------------------------------------------------------
@@ -3624,6 +3663,21 @@ class TestAstrodexPictureEquipment:
         assert resp.status_code == 200
         assert resp.get_json()['picture']['combination_id'] is None
 
+    def test_add_picture_with_shared_combination_id(self, client_admin):
+        """A combination this user doesn't own, but that another user shared (via its
+        constituent equipment), resolves through the shared-combinations lookup rather
+        than the direct-ownership one."""
+        owner_id = 'shared-combo-owner'
+        scope = _equipment_mod.equipment_profiles.create_telescope(owner_id, {**_TELESCOPE_DATA, 'is_shared': True})
+        combo = _equipment_mod.equipment_profiles.create_combination(
+            owner_id, {'name': 'Shared Combo', 'telescope_id': scope['id']}
+        )
+
+        item_id = self._create_item(client_admin)
+        resp = self._add_picture(client_admin, item_id, combination_id=combo['id'])
+        assert resp.status_code == 200
+        assert resp.get_json()['picture']['combination_id'] == combo['id']
+
     def test_add_picture_with_used_components_snapshot(self, client_admin):
         item_id = self._create_item(client_admin)
         combo = self._create_combination(client_admin)
@@ -3690,6 +3744,31 @@ class TestAstrodexPictureEquipment:
         )
         assert resp.status_code == 200
         assert resp.get_json()['picture']['combination_id'] == combo_b['id']
+
+    def test_update_picture_can_change_used_components(self, client_admin):
+        item_id = self._create_item(client_admin)
+        combo = self._create_combination(client_admin)
+        picture = self._add_picture(client_admin, item_id, combination_id=combo['id']).get_json()['picture']
+
+        used = {'telescope': True, 'filter_ids': ['f1']}
+        resp = client_admin.put(
+            f"/api/astrodex/items/{item_id}/pictures/{picture['id']}",
+            json={'combination_used_components': used},
+        )
+        assert resp.status_code == 200
+        assert resp.get_json()['picture']['combination_used_components'] == used
+
+    def test_update_picture_with_non_dict_used_components_is_dropped(self, client_admin):
+        item_id = self._create_item(client_admin)
+        combo = self._create_combination(client_admin)
+        picture = self._add_picture(client_admin, item_id, combination_id=combo['id']).get_json()['picture']
+
+        resp = client_admin.put(
+            f"/api/astrodex/items/{item_id}/pictures/{picture['id']}",
+            json={'combination_used_components': 'not-a-dict'},
+        )
+        assert resp.status_code == 200
+        assert resp.get_json()['picture']['combination_used_components'] is None
 
     def test_update_picture_without_combination_key_leaves_it_untouched(self, client_admin):
         item_id = self._create_item(client_admin)
@@ -4870,6 +4949,30 @@ class TestEquipmentApiRoutes:
         assert found['average_rating'] == 3.0
         assert len(found['picture_refs']) == 2
 
+    def test_get_combinations_includes_shared_from_others_with_photo_stats(self, client_admin):
+        """A combination shared by another user appears in shared_from_others, and gets the
+        same photo-stats treatment (computed from this user's own tagged pictures) as an
+        owned combination."""
+        owner_id = 'shared-combo-owner-2'
+        scope = _equipment_mod.equipment_profiles.create_telescope(owner_id, {**_TELESCOPE_DATA, 'is_shared': True})
+        combo = _equipment_mod.equipment_profiles.create_combination(
+            owner_id, {'name': 'Shared Combo', 'telescope_id': scope['id']}
+        )
+
+        item = client_admin.post(
+            '/api/astrodex/items', json={'name': 'SharedComboObj', 'type': 'Galaxy', 'catalogue': 'NGC'}
+        ).get_json()['item']
+        client_admin.post(
+            f"/api/astrodex/items/{item['id']}/pictures",
+            json={'filename': 'a.jpg', 'combination_id': combo['id'], 'rating': 4.0},
+        )
+
+        resp = client_admin.get('/api/equipment/combinations')
+        assert resp.status_code == 200
+        shared = resp.get_json()['shared_from_others']
+        found = next(c for c in shared if c['id'] == combo['id'])
+        assert found['photo_count'] == 1
+
     def test_delete_combination_blocked_by_picture_returns_409(self, client_admin):
         scope = client_admin.post('/api/equipment/telescopes', json=_TELESCOPE_DATA).get_json()['data']
         combo = client_admin.post(
@@ -5377,6 +5480,7 @@ class TestObjectImageApi:
         assert resp.mimetype == 'image/jpeg'
         assert resp.data == b'\xff\xd8\xff\xe0fakejpeg'
         assert 'max-age' in resp.headers.get('Cache-Control', '')
+        resp.close()
 
     def test_upstream_failure_returns_502(self, client_admin, monkeypatch):
         from observation import object_info as _oi
@@ -6666,6 +6770,7 @@ class TestSpaceflightImageSidecar:
         monkeypatch.setattr(_tracking_mod, 'DATA_DIR_CACHE', str(tmp_path))
         resp = client_admin.get(f'/api/spaceflight/img/{self.VALID_HEX}')
         assert resp.status_code in (200, 404)  # 200 if Flask test client serves it, 404 fallback
+        resp.close()
 
     def test_sidecar_download_exception_returns_404(self, client_admin, monkeypatch, tmp_path):
         """sidecar exists but download fails → 404 Image unavailable."""
@@ -6707,6 +6812,7 @@ class TestSpaceflightImageSidecar:
         monkeypatch.setattr(_reqs, 'get', lambda *a, **kw: mock_response)
         resp = client_admin.get(f'/api/spaceflight/img/{self.VALID_HEX}')
         assert resp.status_code in (200, 404)  # 200 if downloaded file is served
+        resp.close()
 
     def test_safe_cache_path_rejects_traversal(self, tmp_path):
         """_safe_cache_path's own sanitizer contract: an escaping filename raises ValueError.
@@ -7596,6 +7702,7 @@ class TestAllSkyProxyApi:
                 resp = client_admin.get('/api/connectors/allsky/proxy?module=live_image')
         assert resp.status_code == 200
         assert resp.content_type == "image/jpeg"
+        resp.close()
 
     def test_proxy_timeout_returns_504(self, client_admin, monkeypatch):
         import requests as _req
@@ -7638,6 +7745,7 @@ class TestAllSkyProxyApi:
         assert resp.status_code == 206
         call_kwargs = mock_get.call_args[1]
         assert call_kwargs.get('headers', {}).get('Range') == 'bytes=0-999'
+        resp.close()
 
     def test_proxy_dns_failure_uses_original_url(self, client_admin, monkeypatch):
         from unittest.mock import patch, MagicMock
@@ -7651,6 +7759,7 @@ class TestAllSkyProxyApi:
             with patch('requests.get', return_value=mock_resp):
                 resp = client_admin.get('/api/connectors/allsky/proxy?module=live_image')
         assert resp.status_code == 200
+        resp.close()
 
     def test_proxy_empty_dns_result_uses_original_url(self, client_admin, monkeypatch):
         from unittest.mock import patch, MagicMock
@@ -7664,6 +7773,7 @@ class TestAllSkyProxyApi:
             with patch('requests.get', return_value=mock_resp):
                 resp = client_admin.get('/api/connectors/allsky/proxy?module=live_image')
         assert resp.status_code == 200
+        resp.close()
 
     def test_proxy_non200_upstream_still_returned(self, client_admin, monkeypatch):
         from unittest.mock import patch, MagicMock
@@ -7677,6 +7787,7 @@ class TestAllSkyProxyApi:
             with patch('requests.get', return_value=mock_resp):
                 resp = client_admin.get('/api/connectors/allsky/proxy?module=live_image')
         assert resp.status_code == 404
+        resp.close()
 
 
 # ---------------------------------------------------------------------------
