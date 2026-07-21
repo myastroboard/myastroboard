@@ -3,6 +3,7 @@
 Covers static-file routes, auth endpoints, config, cache/report endpoints,
 admin endpoints, and various API utility routes.
 """
+
 import os
 import sys
 import tempfile
@@ -127,9 +128,10 @@ def _isolate_location_cache_hydration(monkeypatch):
     file: in-route reads must only see what each test plants via _LEGACY."""
     monkeypatch.setattr(_cache_store, 'load_shared_cache_entry', lambda *_a, **_k: None)
     yield
+
+
 from app import app
 from utils.auth import user_manager
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -443,8 +445,14 @@ class TestConfigEndpoints:
         old_cfg = {
             'locations': [
                 {
-                    'id': 'preset-1', 'name': 'Test Site', 'latitude': 1, 'longitude': 2,
-                    'elevation': 0, 'timezone': 'UTC', 'is_install_default': True, 'horizon_profile': [],
+                    'id': 'preset-1',
+                    'name': 'Test Site',
+                    'latitude': 1,
+                    'longitude': 2,
+                    'elevation': 0,
+                    'timezone': 'UTC',
+                    'is_install_default': True,
+                    'horizon_profile': [],
                 }
             ],
             'skytonight': {'constraints': {}},
@@ -469,8 +477,14 @@ class TestConfigEndpoints:
         old_cfg = {
             'locations': [
                 {
-                    'id': 'preset-1', 'name': 'Test Site', 'latitude': 1, 'longitude': 2,
-                    'elevation': 0, 'timezone': 'UTC', 'is_install_default': True, 'horizon_profile': [],
+                    'id': 'preset-1',
+                    'name': 'Test Site',
+                    'latitude': 1,
+                    'longitude': 2,
+                    'elevation': 0,
+                    'timezone': 'UTC',
+                    'is_install_default': True,
+                    'horizon_profile': [],
                 }
             ],
             'skytonight': {'constraints': {}},
@@ -924,6 +938,7 @@ class TestObjectInfoEndpoint:
 
     def test_valid_object_returns_response(self, client_admin, monkeypatch):
         from observation import object_info as _oi
+
         monkeypatch.setattr(_oi, 'get_object_info', lambda identifier, language='en': {'name': identifier})
         resp = client_admin.get('/api/object/M42')
         assert resp.status_code in (200, 404, 500)
@@ -1063,7 +1078,11 @@ class TestRoutesWithPopulatedCache:
     def test_planetary_events_from_cache(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
         monkeypatch.setitem(_LEGACY['planetary_events'], 'data', {'events': []})
-        monkeypatch.setitem(_LEGACY['special_phenomena'], 'data', {'events': [], 'equinoxes_solstices': [], 'zodiacal_light': [], 'milky_way': []})
+        monkeypatch.setitem(
+            _LEGACY['special_phenomena'],
+            'data',
+            {'events': [], 'equinoxes_solstices': [], 'zodiacal_light': [], 'milky_way': []},
+        )
         resp = client_admin.get('/api/events/planetary')
         assert resp.status_code == 200
 
@@ -1192,6 +1211,7 @@ class TestSuccessfulLogin:
     def temp_user_credentials(self):
         """Create a fresh test user for login tests then delete it."""
         import uuid
+
         username = f'test_login_{uuid.uuid4().hex[:8]}'
         password = 'TestLogin99!'
         user_manager.create_user(username, password, 'user')
@@ -1237,17 +1257,17 @@ class TestEventsEndpoints:
 
     def test_events_upcoming_with_cache_returns_200(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
-        monkeypatch.setitem(
-            _LEGACY['solar_eclipse'], 'data', {'eclipse': None, 'status': 'none'}
-        )
-        monkeypatch.setitem(
-            _LEGACY['lunar_eclipse'], 'data', {'eclipse': None, 'status': 'none'}
-        )
+        monkeypatch.setitem(_LEGACY['solar_eclipse'], 'data', {'eclipse': None, 'status': 'none'})
+        monkeypatch.setitem(_LEGACY['lunar_eclipse'], 'data', {'eclipse': None, 'status': 'none'})
         monkeypatch.setitem(_LEGACY['aurora'], 'data', {'kp_index': 0, 'probability': 0})
         monkeypatch.setitem(_LEGACY['iss_passes'], 'data', {'passes': [], 'window_days': 20})
         monkeypatch.setitem(_LEGACY['moon_planner'], 'data', {'nights': []})
         monkeypatch.setitem(_LEGACY['planetary_events'], 'data', {'events': []})
-        monkeypatch.setitem(_LEGACY['special_phenomena'], 'data', {'events': [], 'equinoxes_solstices': [], 'zodiacal_light': [], 'milky_way': []})
+        monkeypatch.setitem(
+            _LEGACY['special_phenomena'],
+            'data',
+            {'events': [], 'equinoxes_solstices': [], 'zodiacal_light': [], 'milky_way': []},
+        )
         resp = client_admin.get('/api/events/upcoming')
         assert resp.status_code in (200, 202, 400)
 
@@ -1374,11 +1394,17 @@ class TestEventsUpcomingFullCache:
         monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda name, cache: True)
         monkeypatch.setitem(_LEGACY['solar_eclipse'], 'data', {'eclipse': None, 'status': 'none', 'events': []})
         monkeypatch.setitem(_LEGACY['lunar_eclipse'], 'data', {'eclipse': None, 'status': 'none', 'events': []})
-        monkeypatch.setitem(_LEGACY['aurora'], 'data', {'kp_index': 1.0, 'probability': 5.0, 'visibility_level': 'None', 'reports': []})
+        monkeypatch.setitem(
+            _LEGACY['aurora'], 'data', {'kp_index': 1.0, 'probability': 5.0, 'visibility_level': 'None', 'reports': []}
+        )
         monkeypatch.setitem(_LEGACY['iss_passes'], 'data', {'passes': [], 'window_days': 20, 'status': 'ok'})
         monkeypatch.setitem(_LEGACY['moon_planner'], 'data', {'nights': [], 'dark_window': None})
         monkeypatch.setitem(_LEGACY['planetary_events'], 'data', {'events': []})
-        monkeypatch.setitem(_LEGACY['special_phenomena'], 'data', {'events': [], 'equinoxes_solstices': [], 'zodiacal_light': [], 'milky_way': []})
+        monkeypatch.setitem(
+            _LEGACY['special_phenomena'],
+            'data',
+            {'events': [], 'equinoxes_solstices': [], 'zodiacal_light': [], 'milky_way': []},
+        )
 
     def test_events_upcoming_full_returns_200(self, client_admin, monkeypatch):
         self._patch_all_caches(monkeypatch)
@@ -1397,9 +1423,7 @@ class TestEventsUpcomingFullCache:
 
     def test_best_window_from_cache(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
-        monkeypatch.setitem(
-            _LEGACY['best_window_strict'], 'data', {'window': 'data', 'mode': 'strict'}
-        )
+        monkeypatch.setitem(_LEGACY['best_window_strict'], 'data', {'window': 'data', 'mode': 'strict'})
         resp = client_admin.get('/api/tonight/best-window')
         assert resp.status_code == 200
 
@@ -1642,15 +1666,17 @@ class TestEquipmentNumericValidation:
     def test_update_telescope_invalid_aperture_returns_400(self, client_admin):
         r = client_admin.post('/api/equipment/telescopes', json=self.VALID_TELESCOPE)
         tid = r.get_json()['data']['id']
-        resp = client_admin.put(f'/api/equipment/telescopes/{tid}',
-                                json={**self.VALID_TELESCOPE, 'aperture_mm': 9999})  # above max 5000
+        resp = client_admin.put(
+            f'/api/equipment/telescopes/{tid}', json={**self.VALID_TELESCOPE, 'aperture_mm': 9999}
+        )  # above max 5000
         assert resp.status_code == 400
 
     def test_update_camera_invalid_sensor_returns_400(self, client_admin):
         r = client_admin.post('/api/equipment/cameras', json=self.VALID_CAMERA)
         cid = r.get_json()['data']['id']
-        resp = client_admin.put(f'/api/equipment/cameras/{cid}',
-                                json={**self.VALID_CAMERA, 'sensor_width_mm': 200})  # above max 100
+        resp = client_admin.put(
+            f'/api/equipment/cameras/{cid}', json={**self.VALID_CAMERA, 'sensor_width_mm': 200}
+        )  # above max 100
         assert resp.status_code == 400
 
 
@@ -1855,7 +1881,8 @@ class TestDifficultyLookupCache:
 
     def test_skips_entries_missing_difficulty_or_bad_catalogue_names(self, monkeypatch):
         monkeypatch.setattr(
-            _astrodex_mod, 'load_json_file',
+            _astrodex_mod,
+            'load_json_file',
             lambda *a, **k: {
                 'deep_sky': [
                     {'catalogue_names': {'Messier': 'M 42'}},  # no difficulty -> skipped
@@ -1886,6 +1913,7 @@ class TestAstrodexCrud:
     def _create_item(self, client_admin):
         """Helper to create an astrodex item and return its id."""
         import uuid as _uuid
+
         resp = client_admin.post(
             '/api/astrodex/items',
             json={
@@ -1903,6 +1931,7 @@ class TestAstrodexCrud:
 
     def test_add_item_returns_200(self, client_admin):
         import uuid as _uuid
+
         resp = client_admin.post(
             '/api/astrodex/items',
             json={'name': f'TestObj_{_uuid.uuid4().hex[:6]}', 'type': 'Galaxy', 'catalogue': 'NGC'},
@@ -1945,6 +1974,7 @@ class TestAstrodexCrud:
 
     def test_catalogue_lookup_known_object(self, client_admin, monkeypatch):
         from skytonight import skytonight_targets as _skt
+
         monkeypatch.setattr(
             _skt,
             'get_lookup_entry',
@@ -2031,6 +2061,7 @@ class TestBackupEndpoints:
 
     def test_backup_restore_invalid_zip_returns_400(self, client_admin):
         import io as _io
+
         data = {'file': (_io.BytesIO(b'not a zip file'), 'backup.zip')}
         resp = client_admin.post(
             '/api/backup/restore',
@@ -2041,6 +2072,7 @@ class TestBackupEndpoints:
 
     def test_backup_restore_wrong_extension_returns_400(self, client_admin):
         import io as _io
+
         data = {'file': (_io.BytesIO(b'some data'), 'backup.txt')}
         resp = client_admin.post(
             '/api/backup/restore',
@@ -2052,6 +2084,7 @@ class TestBackupEndpoints:
     def test_backup_restore_valid_zip_no_recognised_entries_returns_400(self, client_admin):
         import io as _io
         import zipfile as _zf
+
         buf = _io.BytesIO()
         with _zf.ZipFile(buf, mode='w') as z:
             z.writestr('unknown_file.txt', 'some content')
@@ -2274,6 +2307,7 @@ class TestUserCrudErrors:
 
     def test_create_user_invalid_role_returns_400(self, client_admin):
         import uuid as _uuid
+
         resp = client_admin.post(
             '/api/users',
             json={'username': f'u_{_uuid.uuid4().hex[:6]}', 'password': 'TestPass99!', 'role': 'superadmin'},
@@ -2282,6 +2316,7 @@ class TestUserCrudErrors:
 
     def test_update_user_empty_body_returns_400(self, client_admin):
         import uuid as _uuid
+
         fake_id = str(_uuid.uuid4())
         resp = client_admin.put(f'/api/users/{fake_id}', json={})
         assert resp.status_code == 400
@@ -2369,6 +2404,7 @@ class TestBackupRestoreValid:
         import io as _io
         import zipfile as _zf
         import json as _json
+
         buf = _io.BytesIO()
         with _zf.ZipFile(buf, mode='w') as z:
             z.writestr('config.json', _json.dumps({'location': {}, 'skytonight': {}}))
@@ -2384,6 +2420,7 @@ class TestBackupRestoreValid:
     def test_backup_restore_invalid_json_returns_400(self, client_admin):
         import io as _io
         import zipfile as _zf
+
         buf = _io.BytesIO()
         with _zf.ZipFile(buf, mode='w') as z:
             z.writestr('config.json', 'not valid json {{{')
@@ -2514,8 +2551,7 @@ class TestConfigPostHorizonProfile:
     def test_post_config_with_clear_horizon_flag(self, client_admin, monkeypatch):
         # v1.2: the clear flag empties the install-default PRESET's profile;
         # skytonight.constraints never carries horizon_profile again.
-        old_cfg = _v12_config({'horizon_profile': [{'az': 10, 'alt': 20}]},
-                              skytonight={'constraints': {}})
+        old_cfg = _v12_config({'horizon_profile': [{'az': 10, 'alt': 20}]}, skytonight={'constraints': {}})
         captured = {}
         monkeypatch.setattr(_locations_mod, 'load_config', lambda: old_cfg)
         monkeypatch.setattr(_locations_mod, 'save_config', lambda cfg: captured.setdefault('cfg', cfg))
@@ -2927,6 +2963,7 @@ class TestSpaceflightLaunchVidurls:
     def test_vidurls_valid_uuid_returns_200(self, client_admin, monkeypatch):
         import uuid as _uuid
         from space import spaceflight_tracker as _st
+
         fake_uuid = str(_uuid.uuid4())
         monkeypatch.setattr(_st, 'get_launch_vidurls', lambda lid: ['https://youtube.com/watch?v=test'])
         resp = client_admin.get(f'/api/spaceflight/launch/{fake_uuid}/vidurls')
@@ -2934,6 +2971,7 @@ class TestSpaceflightLaunchVidurls:
 
     def test_vidurls_unauthenticated_returns_401(self, client):
         import uuid as _uuid
+
         fake_uuid = str(_uuid.uuid4())
         resp = client.get(f'/api/spaceflight/launch/{fake_uuid}/vidurls')
         assert resp.status_code == 401
@@ -2949,6 +2987,7 @@ class TestEquipmentLifecycle:
 
     def test_telescope_full_lifecycle(self, client_admin):
         import uuid as _uuid
+
         name = f'Scope_{_uuid.uuid4().hex[:6]}'
         # Create
         create_resp = client_admin.post(
@@ -2976,6 +3015,7 @@ class TestEquipmentLifecycle:
 
     def test_camera_full_lifecycle(self, client_admin):
         import uuid as _uuid
+
         name = f'Cam_{_uuid.uuid4().hex[:6]}'
         create_resp = client_admin.post(
             '/api/equipment/cameras',
@@ -2996,6 +3036,7 @@ class TestEquipmentLifecycle:
 
     def test_mount_full_lifecycle(self, client_admin):
         import uuid as _uuid
+
         name = f'Mount_{_uuid.uuid4().hex[:6]}'
         create_resp = client_admin.post('/api/equipment/mounts', json={'name': name, 'type': 'EQ'})
         assert create_resp.status_code in (200, 201, 500)
@@ -3013,6 +3054,7 @@ class TestEquipmentLifecycle:
 
     def test_filter_full_lifecycle(self, client_admin):
         import uuid as _uuid
+
         name = f'Filter_{_uuid.uuid4().hex[:6]}'
         create_resp = client_admin.post('/api/equipment/filters', json={'name': name, 'type': 'Ha'})
         assert create_resp.status_code in (200, 201, 500)
@@ -3030,6 +3072,7 @@ class TestEquipmentLifecycle:
 
     def test_accessory_full_lifecycle(self, client_admin):
         import uuid as _uuid
+
         name = f'Acc_{_uuid.uuid4().hex[:6]}'
         create_resp = client_admin.post('/api/equipment/accessories', json={'name': name, 'type': 'barlow'})
         assert create_resp.status_code in (200, 201, 500)
@@ -3055,6 +3098,7 @@ class TestAstrodexUploadValidation:
 
     def test_upload_invalid_extension_returns_400(self, client_admin):
         import io as _io
+
         data = {'file': (_io.BytesIO(b'some image data'), 'photo.bmp')}
         resp = client_admin.post(
             '/api/astrodex/upload',
@@ -3065,6 +3109,7 @@ class TestAstrodexUploadValidation:
 
     def test_upload_no_extension_returns_400(self, client_admin):
         import io as _io
+
         data = {'file': (_io.BytesIO(b'data'), 'photonoext')}
         resp = client_admin.post(
             '/api/astrodex/upload',
@@ -3076,6 +3121,7 @@ class TestAstrodexUploadValidation:
     def test_upload_valid_jpg_returns_200(self, client_admin, monkeypatch):
         import io as _io
         from observation import astrodex as _ad
+
         monkeypatch.setattr(_ad, 'ensure_astrodex_directories', lambda: None)
 
         import werkzeug.datastructures as _wd
@@ -3114,14 +3160,16 @@ class TestSpecialPhenomenaTranslationBranches:
         monkeypatch.setitem(
             _LEGACY['special_phenomena'],
             'data',
-            self._make_cache_with_events([
-                {
-                    'event_type': 'Solstice',
-                    'raw_data': {'event': 'summer_solstice'},
-                    'title': 'Summer Solstice',
-                    'description': 'Longest day.',
-                }
-            ]),
+            self._make_cache_with_events(
+                [
+                    {
+                        'event_type': 'Solstice',
+                        'raw_data': {'event': 'summer_solstice'},
+                        'title': 'Summer Solstice',
+                        'description': 'Longest day.',
+                    }
+                ]
+            ),
         )
         resp = client_admin.get('/api/events/phenomena', headers={'Accept-Language': 'fr'})
         assert resp.status_code == 200
@@ -3131,14 +3179,16 @@ class TestSpecialPhenomenaTranslationBranches:
         monkeypatch.setitem(
             _LEGACY['special_phenomena'],
             'data',
-            self._make_cache_with_events([
-                {
-                    'event_type': 'Equinox',
-                    'raw_data': {'event': 'autumn_equinox'},
-                    'title': 'Autumnal Equinox',
-                    'description': 'Equal day and night.',
-                }
-            ]),
+            self._make_cache_with_events(
+                [
+                    {
+                        'event_type': 'Equinox',
+                        'raw_data': {'event': 'autumn_equinox'},
+                        'title': 'Autumnal Equinox',
+                        'description': 'Equal day and night.',
+                    }
+                ]
+            ),
         )
         resp = client_admin.get('/api/events/phenomena', headers={'Accept-Language': 'fr'})
         assert resp.status_code == 200
@@ -3148,14 +3198,16 @@ class TestSpecialPhenomenaTranslationBranches:
         monkeypatch.setitem(
             _LEGACY['special_phenomena'],
             'data',
-            self._make_cache_with_events([
-                {
-                    'event_type': 'Solstice',
-                    'raw_data': {'event': 'winter_solstice'},
-                    'title': 'Winter Solstice',
-                    'description': 'Shortest day.',
-                }
-            ]),
+            self._make_cache_with_events(
+                [
+                    {
+                        'event_type': 'Solstice',
+                        'raw_data': {'event': 'winter_solstice'},
+                        'title': 'Winter Solstice',
+                        'description': 'Shortest day.',
+                    }
+                ]
+            ),
         )
         resp = client_admin.get('/api/events/phenomena', headers={'Accept-Language': 'fr'})
         assert resp.status_code == 200
@@ -3165,15 +3217,17 @@ class TestSpecialPhenomenaTranslationBranches:
         monkeypatch.setitem(
             _LEGACY['special_phenomena'],
             'data',
-            self._make_cache_with_events([
-                {
-                    'event_type': 'Zodiacal Light',
-                    'raw_data': {'event': 'zodiacal_light'},
-                    'viewing_type': 'morning',
-                    'title': 'Zodiacal Light (Morning)',
-                    'description': 'Faint cone of light.',
-                }
-            ]),
+            self._make_cache_with_events(
+                [
+                    {
+                        'event_type': 'Zodiacal Light',
+                        'raw_data': {'event': 'zodiacal_light'},
+                        'viewing_type': 'morning',
+                        'title': 'Zodiacal Light (Morning)',
+                        'description': 'Faint cone of light.',
+                    }
+                ]
+            ),
         )
         resp = client_admin.get('/api/events/phenomena', headers={'Accept-Language': 'fr'})
         assert resp.status_code == 200
@@ -3183,15 +3237,17 @@ class TestSpecialPhenomenaTranslationBranches:
         monkeypatch.setitem(
             _LEGACY['special_phenomena'],
             'data',
-            self._make_cache_with_events([
-                {
-                    'event_type': 'Zodiacal Light',
-                    'raw_data': {'event': 'zodiacal_light'},
-                    'viewing_type': 'evening',
-                    'title': 'Zodiacal Light (Evening)',
-                    'description': 'Faint cone of light.',
-                }
-            ]),
+            self._make_cache_with_events(
+                [
+                    {
+                        'event_type': 'Zodiacal Light',
+                        'raw_data': {'event': 'zodiacal_light'},
+                        'viewing_type': 'evening',
+                        'title': 'Zodiacal Light (Evening)',
+                        'description': 'Faint cone of light.',
+                    }
+                ]
+            ),
         )
         resp = client_admin.get('/api/events/phenomena', headers={'Accept-Language': 'fr'})
         assert resp.status_code == 200
@@ -3201,15 +3257,17 @@ class TestSpecialPhenomenaTranslationBranches:
         monkeypatch.setitem(
             _LEGACY['special_phenomena'],
             'data',
-            self._make_cache_with_events([
-                {
-                    'event_type': 'Milky Way Core Visibility',
-                    'raw_data': {'event': 'milky_way', 'galactic_center_altitude': 35.0},
-                    'galactic_center_altitude': 35.0,
-                    'title': 'Milky Way Core Visible',
-                    'description': 'Galactic center visible.',
-                }
-            ]),
+            self._make_cache_with_events(
+                [
+                    {
+                        'event_type': 'Milky Way Core Visibility',
+                        'raw_data': {'event': 'milky_way', 'galactic_center_altitude': 35.0},
+                        'galactic_center_altitude': 35.0,
+                        'title': 'Milky Way Core Visible',
+                        'description': 'Galactic center visible.',
+                    }
+                ]
+            ),
         )
         resp = client_admin.get('/api/events/phenomena', headers={'Accept-Language': 'fr'})
         assert resp.status_code == 200
@@ -3302,6 +3360,7 @@ class TestAstrodexItemLifecycle:
 
     def test_create_update_delete_item(self, client_admin):
         import uuid as _uuid
+
         name = f'TestGalaxy_{_uuid.uuid4().hex[:6]}'
         # Create
         create_resp = client_admin.post(
@@ -3333,6 +3392,7 @@ class TestAstrodexItemLifecycle:
 
     def test_duplicate_item_returns_409(self, client_admin):
         import uuid as _uuid
+
         name = f'DupObj_{_uuid.uuid4().hex[:6]}'
         client_admin.post('/api/astrodex/items', json={'name': name, 'type': 'Star', 'catalogue': 'HIP'})
         resp2 = client_admin.post('/api/astrodex/items', json={'name': name, 'type': 'Star', 'catalogue': 'HIP'})
@@ -3346,6 +3406,7 @@ class TestAstrodexPictureLocation:
 
     def _create_item(self, client_admin):
         import uuid as _uuid
+
         resp = client_admin.post(
             '/api/astrodex/items',
             json={'name': f'PicLocObj_{_uuid.uuid4().hex[:6]}', 'type': 'Galaxy', 'catalogue': 'NGC'},
@@ -3363,6 +3424,7 @@ class TestAstrodexPictureLocation:
 
     def _add_picture(self, client_admin, item_id, **extra):
         import uuid as _uuid
+
         payload = {'filename': f'{_uuid.uuid4().hex}.jpg'}
         payload.update(extra)
         resp = client_admin.post(f'/api/astrodex/items/{item_id}/pictures', json=payload)
@@ -3463,8 +3525,12 @@ class TestAstrodexPictureLocation:
     def test_add_picture_with_custom_location_and_coordinates(self, client_admin):
         item_id = self._create_item(client_admin)
         picture = self._add_picture(
-            client_admin, item_id,
-            location_id=None, location_name='Atacama Desert', latitude=-23.5, longitude=-70.4,
+            client_admin,
+            item_id,
+            location_id=None,
+            location_name='Atacama Desert',
+            latitude=-23.5,
+            longitude=-70.4,
         )
         assert picture['location_name'] == 'Atacama Desert'
         assert picture['latitude'] == -23.5
@@ -3476,8 +3542,12 @@ class TestAstrodexPictureLocation:
         the label itself is still kept."""
         item_id = self._create_item(client_admin)
         picture = self._add_picture(
-            client_admin, item_id,
-            location_id=None, location_name='Somewhere', latitude='not-a-number', longitude=999,
+            client_admin,
+            item_id,
+            location_id=None,
+            location_name='Somewhere',
+            latitude='not-a-number',
+            longitude=999,
         )
         assert picture['location_name'] == 'Somewhere'
         assert picture['latitude'] is None
@@ -3516,6 +3586,7 @@ class TestAstrodexPictureEquipment:
 
     def _create_item(self, client_admin):
         import uuid as _uuid
+
         resp = client_admin.post(
             '/api/astrodex/items',
             json={'name': f'PicEquipObj_{_uuid.uuid4().hex[:6]}', 'type': 'Galaxy', 'catalogue': 'NGC'},
@@ -3525,6 +3596,7 @@ class TestAstrodexPictureEquipment:
 
     def _add_picture(self, client_admin, item_id, **extra):
         import uuid as _uuid
+
         payload = {'filename': f'{_uuid.uuid4().hex}.jpg'}
         payload.update(extra)
         return client_admin.post(f'/api/astrodex/items/{item_id}/pictures', json=payload)
@@ -3556,9 +3628,7 @@ class TestAstrodexPictureEquipment:
         item_id = self._create_item(client_admin)
         combo = self._create_combination(client_admin)
         used = {'telescope': True, 'filter_ids': []}
-        resp = self._add_picture(
-            client_admin, item_id, combination_id=combo['id'], combination_used_components=used
-        )
+        resp = self._add_picture(client_admin, item_id, combination_id=combo['id'], combination_used_components=used)
         assert resp.status_code == 200
         assert resp.get_json()['picture']['combination_used_components'] == used
 
@@ -3598,18 +3668,14 @@ class TestAstrodexPictureEquipment:
     def test_update_picture_can_set_rating(self, client_admin):
         item_id = self._create_item(client_admin)
         picture = self._add_picture(client_admin, item_id).get_json()['picture']
-        resp = client_admin.put(
-            f"/api/astrodex/items/{item_id}/pictures/{picture['id']}", json={'rating': 2.5}
-        )
+        resp = client_admin.put(f"/api/astrodex/items/{item_id}/pictures/{picture['id']}", json={'rating': 2.5})
         assert resp.status_code == 200
         assert resp.get_json()['picture']['rating'] == 2.5
 
     def test_update_picture_with_invalid_rating_returns_400(self, client_admin):
         item_id = self._create_item(client_admin)
         picture = self._add_picture(client_admin, item_id).get_json()['picture']
-        resp = client_admin.put(
-            f"/api/astrodex/items/{item_id}/pictures/{picture['id']}", json={'rating': 7}
-        )
+        resp = client_admin.put(f"/api/astrodex/items/{item_id}/pictures/{picture['id']}", json={'rating': 7})
         assert resp.status_code == 400
 
     def test_update_picture_can_change_combination(self, client_admin):
@@ -3657,6 +3723,7 @@ class TestPushTestWithSubscriptions:
         ]
 
         from utils import push_manager as _pm
+
         monkeypatch.setattr(_pm, 'send_push', lambda sub, payload, ttl=60, urgency='high': True)
 
         try:
@@ -3679,6 +3746,7 @@ class TestPushTestWithSubscriptions:
         ]
 
         from utils import push_manager as _pm
+
         monkeypatch.setattr(_pm, 'send_push', lambda sub, payload, ttl=300, urgency='normal': True)
 
         try:
@@ -3701,6 +3769,7 @@ class TestPushTestWithSubscriptions:
         ]
 
         from utils import push_manager as _pm
+
         monkeypatch.setattr(_pm, 'send_push', lambda sub, payload, ttl=300, urgency='normal': False)
 
         try:
@@ -3766,6 +3835,7 @@ class TestObjectInfoDeep:
 
     def test_object_m31_returns_response(self, client_admin, monkeypatch):
         from observation import object_info as _oi
+
         monkeypatch.setattr(
             _oi,
             'get_object_info',
@@ -3776,6 +3846,7 @@ class TestObjectInfoDeep:
 
     def test_object_info_none_returns_404(self, client_admin, monkeypatch):
         from observation import object_info as _oi
+
         monkeypatch.setattr(_oi, 'get_object_info', lambda identifier, language='en': None)
         resp = client_admin.get('/api/object/XYZ999')
         assert resp.status_code in (404, 500)
@@ -3794,9 +3865,7 @@ class TestPushSubscribeIdempotent:
         original_subs = list(admin_user.push_subscriptions)
 
         # Pre-add subscription
-        admin_user.push_subscriptions = [
-            {'endpoint': endpoint, 'keys': {}, 'created_at': '2026-01-01T00:00:00'}
-        ]
+        admin_user.push_subscriptions = [{'endpoint': endpoint, 'keys': {}, 'created_at': '2026-01-01T00:00:00'}]
 
         try:
             resp = client_admin.post(
@@ -3921,24 +3990,31 @@ class TestPlanMyNightRouteHandlers:
 
     def test_plan_add_target_with_data_returns_response(self, client_admin, monkeypatch, tmp_path):
         from observation import plan_my_night as _pmn
+
         monkeypatch.setattr(_pmn, 'PLAN_DIR', str(tmp_path))
         from datetime import datetime, timezone, timedelta
+
         future = (datetime.now(timezone.utc) + timedelta(hours=6)).isoformat()
-        resp = client_admin.post('/api/plan-my-night/targets', json={
-            'name': 'M42',
-            'catalogue': 'Messier',
-            'night_start': (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat(),
-            'night_end': future,
-        })
+        resp = client_admin.post(
+            '/api/plan-my-night/targets',
+            json={
+                'name': 'M42',
+                'catalogue': 'Messier',
+                'night_start': (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat(),
+                'night_end': future,
+            },
+        )
         assert resp.status_code in (200, 201, 400, 422, 500)
 
     def test_plan_remove_nonexistent_target_returns_response(self, client_admin):
         import uuid
+
         resp = client_admin.delete(f'/api/plan-my-night/targets/{uuid.uuid4()}')
         assert resp.status_code in (200, 404, 400)
 
     def test_plan_reorder_nonexistent_target_returns_response(self, client_admin):
         import uuid
+
         resp = client_admin.post(
             f'/api/plan-my-night/targets/{uuid.uuid4()}/reorder',
             json={'position': 0},
@@ -3947,6 +4023,7 @@ class TestPlanMyNightRouteHandlers:
 
     def test_plan_update_target_returns_response(self, client_admin):
         import uuid
+
         resp = client_admin.put(
             f'/api/plan-my-night/targets/{uuid.uuid4()}',
             json={'done': True},
@@ -4036,12 +4113,15 @@ class TestPushSubscribeAndList:
     def client_with_subscription(self, client_admin):
         """Subscribe the admin user then yield, cleaning up after."""
         fake_endpoint = 'https://fcm.googleapis.com/fake/endpoint/test123'
-        resp = client_admin.post('/api/push/subscribe', json={
-            'subscription': {
-                'endpoint': fake_endpoint,
-                'keys': {'p256dh': 'fake_key', 'auth': 'fake_auth'},
-            }
-        })
+        resp = client_admin.post(
+            '/api/push/subscribe',
+            json={
+                'subscription': {
+                    'endpoint': fake_endpoint,
+                    'keys': {'p256dh': 'fake_key', 'auth': 'fake_auth'},
+                }
+            },
+        )
         yield client_admin, resp
         # Clean up: remove subscription
         client_admin.delete('/api/push/unsubscribe', json={'endpoint': fake_endpoint})
@@ -4065,12 +4145,15 @@ class TestPushSubscribeAndList:
     def test_duplicate_subscribe_is_idempotent(self, client_with_subscription):
         client, _ = client_with_subscription
         # Subscribe again with same endpoint — should still return 'subscribed'
-        resp = client.post('/api/push/subscribe', json={
-            'subscription': {
-                'endpoint': 'https://fcm.googleapis.com/fake/endpoint/test123',
-                'keys': {},
-            }
-        })
+        resp = client.post(
+            '/api/push/subscribe',
+            json={
+                'subscription': {
+                    'endpoint': 'https://fcm.googleapis.com/fake/endpoint/test123',
+                    'keys': {},
+                }
+            },
+        )
         assert resp.status_code == 200
 
     def test_list_subscriptions_unauthenticated_returns_401(self, client):
@@ -4245,27 +4328,26 @@ class TestAuthErrorHandlers:
 
     def test_change_password_generic_value_error_uses_default_key(self, client_admin, monkeypatch):
         """ValueError with unrecognised message → default error_key."""
-        monkeypatch.setattr(user_manager, 'change_own_password',
-                            lambda *_a, **_k: (_ for _ in ()).throw(ValueError("Something else")))
-        resp = client_admin.post('/api/auth/change-password', json={
-            'current_password': 'x', 'new_password': 'y'
-        })
+        monkeypatch.setattr(
+            user_manager, 'change_own_password', lambda *_a, **_k: (_ for _ in ()).throw(ValueError("Something else"))
+        )
+        resp = client_admin.post('/api/auth/change-password', json={'current_password': 'x', 'new_password': 'y'})
         assert resp.status_code == 400
         assert resp.get_json().get('error_key') == 'users.error_update_password'
 
     def test_change_password_unexpected_exception_returns_500(self, client_admin, monkeypatch):
         """unexpected exception in change_own_password → 500."""
-        monkeypatch.setattr(user_manager, 'change_own_password',
-                            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("db down")))
-        resp = client_admin.post('/api/auth/change-password', json={
-            'current_password': 'x', 'new_password': 'y'
-        })
+        monkeypatch.setattr(
+            user_manager, 'change_own_password', lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("db down"))
+        )
+        resp = client_admin.post('/api/auth/change-password', json={'current_password': 'x', 'new_password': 'y'})
         assert resp.status_code == 500
 
     def test_preferences_get_unexpected_exception_returns_500(self, client_admin, monkeypatch):
         """exception in get_user_preferences → 500."""
-        monkeypatch.setattr(user_manager, 'get_user_preferences',
-                            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("db error")))
+        monkeypatch.setattr(
+            user_manager, 'get_user_preferences', lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("db error"))
+        )
         resp = client_admin.get('/api/auth/preferences')
         assert resp.status_code == 500
 
@@ -4276,56 +4358,75 @@ class TestAuthErrorHandlers:
 
     def test_preferences_put_invalid_subtab_returns_400(self, client_admin, monkeypatch):
         """Invalid startup_subtab → 400 with specific error_key."""
-        monkeypatch.setattr(user_manager, 'update_user_preferences',
-                            lambda *_a, **_k: (_ for _ in ()).throw(ValueError("Invalid startup_subtab: x")))
+        monkeypatch.setattr(
+            user_manager,
+            'update_user_preferences',
+            lambda *_a, **_k: (_ for _ in ()).throw(ValueError("Invalid startup_subtab: x")),
+        )
         resp = client_admin.put('/api/auth/preferences', json={'preferences': {}})
         assert resp.status_code == 400
         assert resp.get_json().get('error_key') == 'settings.pref_invalid_startup_subtab'
 
     def test_preferences_put_invalid_time_format_returns_400(self, client_admin, monkeypatch):
         """Invalid time_format → 400 with specific error_key."""
-        monkeypatch.setattr(user_manager, 'update_user_preferences',
-                            lambda *_a, **_k: (_ for _ in ()).throw(ValueError("Invalid time_format: x")))
+        monkeypatch.setattr(
+            user_manager,
+            'update_user_preferences',
+            lambda *_a, **_k: (_ for _ in ()).throw(ValueError("Invalid time_format: x")),
+        )
         resp = client_admin.put('/api/auth/preferences', json={'preferences': {}})
         assert resp.status_code == 400
         assert resp.get_json().get('error_key') == 'settings.pref_invalid_time_format'
 
     def test_preferences_put_invalid_density_returns_400(self, client_admin, monkeypatch):
         """Invalid density → 400 with specific error_key."""
-        monkeypatch.setattr(user_manager, 'update_user_preferences',
-                            lambda *_a, **_k: (_ for _ in ()).throw(ValueError("Invalid density: x")))
+        monkeypatch.setattr(
+            user_manager,
+            'update_user_preferences',
+            lambda *_a, **_k: (_ for _ in ()).throw(ValueError("Invalid density: x")),
+        )
         resp = client_admin.put('/api/auth/preferences', json={'preferences': {}})
         assert resp.status_code == 400
         assert resp.get_json().get('error_key') == 'settings.pref_invalid_density'
 
     def test_preferences_put_invalid_experience_level_returns_400(self, client_admin, monkeypatch):
         """Invalid experience_level → 400 with specific error_key."""
-        monkeypatch.setattr(user_manager, 'update_user_preferences',
-                            lambda *_a, **_k: (_ for _ in ()).throw(ValueError("Invalid experience_level: x")))
+        monkeypatch.setattr(
+            user_manager,
+            'update_user_preferences',
+            lambda *_a, **_k: (_ for _ in ()).throw(ValueError("Invalid experience_level: x")),
+        )
         resp = client_admin.put('/api/auth/preferences', json={'preferences': {}})
         assert resp.status_code == 400
         assert resp.get_json().get('error_key') == 'settings.pref_invalid_experience_level'
 
     def test_preferences_put_invalid_wizard_returns_400(self, client_admin, monkeypatch):
         """Invalid wizard → 400 with specific error_key."""
-        monkeypatch.setattr(user_manager, 'update_user_preferences',
-                            lambda *_a, **_k: (_ for _ in ()).throw(ValueError("Invalid wizard: must be a dictionary")))
+        monkeypatch.setattr(
+            user_manager,
+            'update_user_preferences',
+            lambda *_a, **_k: (_ for _ in ()).throw(ValueError("Invalid wizard: must be a dictionary")),
+        )
         resp = client_admin.put('/api/auth/preferences', json={'preferences': {}})
         assert resp.status_code == 400
         assert resp.get_json().get('error_key') == 'settings.pref_invalid_wizard'
 
     def test_preferences_put_generic_value_error_returns_400(self, client_admin, monkeypatch):
         """ValueError with unrecognised text → default error_key."""
-        monkeypatch.setattr(user_manager, 'update_user_preferences',
-                            lambda *_a, **_k: (_ for _ in ()).throw(ValueError("Some unknown error")))
+        monkeypatch.setattr(
+            user_manager,
+            'update_user_preferences',
+            lambda *_a, **_k: (_ for _ in ()).throw(ValueError("Some unknown error")),
+        )
         resp = client_admin.put('/api/auth/preferences', json={'preferences': {}})
         assert resp.status_code == 400
         assert resp.get_json().get('error_key') == 'settings.pref_save_error'
 
     def test_preferences_put_unexpected_exception_returns_500(self, client_admin, monkeypatch):
         """unexpected exception in update_user_preferences → 500."""
-        monkeypatch.setattr(user_manager, 'update_user_preferences',
-                            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("crash")))
+        monkeypatch.setattr(
+            user_manager, 'update_user_preferences', lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("crash"))
+        )
         resp = client_admin.put('/api/auth/preferences', json={'preferences': {}})
         assert resp.status_code == 500
 
@@ -4341,6 +4442,7 @@ class TestPushApiErrors:
     def test_vapid_public_key_exception_returns_503(self, client_admin, monkeypatch):
         """exception in get_vapid_public_key → 503."""
         import sys, types
+
         fake_pm = types.ModuleType('push_manager')
         fake_pm.get_vapid_public_key = lambda: (_ for _ in ()).throw(RuntimeError("no vapid"))
         monkeypatch.setitem(sys.modules, 'utils.push_manager', fake_pm)
@@ -4350,6 +4452,7 @@ class TestPushApiErrors:
     def test_vapid_config_status_exception_returns_500(self, client_admin, monkeypatch):
         """exception in get_vapid_contact_status → 500."""
         import sys, types
+
         fake_pm = types.ModuleType('push_manager')
         fake_pm.get_vapid_contact_status = lambda: (_ for _ in ()).throw(RuntimeError("error"))
         monkeypatch.setitem(sys.modules, 'utils.push_manager', fake_pm)
@@ -4362,14 +4465,20 @@ class TestPushApiErrors:
 # ---------------------------------------------------------------------------
 
 _TELESCOPE_DATA = {
-    'name': 'Test Refractor', 'telescope_type': 'Refractor',
-    'aperture_mm': 100, 'focal_length_mm': 800,
+    'name': 'Test Refractor',
+    'telescope_type': 'Refractor',
+    'aperture_mm': 100,
+    'focal_length_mm': 800,
 }
 _CAMERA_DATA = {
-    'name': 'ASI294', 'manufacturer': 'ZWO',
-    'sensor_width_mm': 19.1, 'sensor_height_mm': 13.0,
-    'resolution_width_px': 4144, 'resolution_height_px': 2822,
-    'pixel_size_um': 4.63, 'sensor_type': 'CMOS',
+    'name': 'ASI294',
+    'manufacturer': 'ZWO',
+    'sensor_width_mm': 19.1,
+    'sensor_height_mm': 13.0,
+    'resolution_width_px': 4144,
+    'resolution_height_px': 2822,
+    'pixel_size_um': 4.63,
+    'sensor_type': 'CMOS',
 }
 _MOUNT_DATA = {'name': 'EQ6-R', 'mount_type': 'Equatorial', 'payload_capacity_kg': 20}
 _FILTER_DATA = {'name': 'OIII', 'filter_type': 'Narrowband'}
@@ -4393,9 +4502,7 @@ class TestEquipmentApiRoutes:
     def test_update_telescope_success_returns_200(self, client_admin):
         r = client_admin.post('/api/equipment/telescopes', json=_TELESCOPE_DATA)
         tid = r.get_json()['data']['id']
-        resp = client_admin.put(f'/api/equipment/telescopes/{tid}', json={
-            **_TELESCOPE_DATA, 'name': 'Updated Scope'
-        })
+        resp = client_admin.put(f'/api/equipment/telescopes/{tid}', json={**_TELESCOPE_DATA, 'name': 'Updated Scope'})
         assert resp.status_code == 200
 
     def test_update_telescope_not_found_returns_404(self, client_admin):
@@ -4422,32 +4529,37 @@ class TestEquipmentApiRoutes:
         assert body['combinations'] == ['Combo A']
 
     def test_get_telescopes_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'load_user_telescopes',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("disk")))
+        monkeypatch.setattr(
+            _app_mod.equipment_profiles, 'load_user_telescopes', lambda *_: (_ for _ in ()).throw(RuntimeError("disk"))
+        )
         resp = client_admin.get('/api/equipment/telescopes')
         assert resp.status_code == 500
 
     def test_create_telescope_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'create_telescope',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(
+            _app_mod.equipment_profiles, 'create_telescope', lambda *_: (_ for _ in ()).throw(RuntimeError("fail"))
+        )
         resp = client_admin.post('/api/equipment/telescopes', json=_TELESCOPE_DATA)
         assert resp.status_code == 500
 
     def test_get_telescope_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'get_telescope',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(
+            _app_mod.equipment_profiles, 'get_telescope', lambda *_: (_ for _ in ()).throw(RuntimeError("fail"))
+        )
         resp = client_admin.get('/api/equipment/telescopes/any-id')
         assert resp.status_code == 500
 
     def test_update_telescope_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'update_telescope',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(
+            _app_mod.equipment_profiles, 'update_telescope', lambda *_: (_ for _ in ()).throw(RuntimeError("fail"))
+        )
         resp = client_admin.put('/api/equipment/telescopes/any-id', json=_TELESCOPE_DATA)
         assert resp.status_code == 500
 
     def test_delete_telescope_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'delete_telescope',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(
+            _app_mod.equipment_profiles, 'delete_telescope', lambda *_: (_ for _ in ()).throw(RuntimeError("fail"))
+        )
         resp = client_admin.delete('/api/equipment/telescopes/any-id')
         assert resp.status_code == 500
 
@@ -4483,32 +4595,37 @@ class TestEquipmentApiRoutes:
         assert resp.status_code == 500
 
     def test_get_cameras_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'load_user_cameras',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("disk")))
+        monkeypatch.setattr(
+            _app_mod.equipment_profiles, 'load_user_cameras', lambda *_: (_ for _ in ()).throw(RuntimeError("disk"))
+        )
         resp = client_admin.get('/api/equipment/cameras')
         assert resp.status_code == 500
 
     def test_create_camera_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'create_camera',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(
+            _app_mod.equipment_profiles, 'create_camera', lambda *_: (_ for _ in ()).throw(RuntimeError("fail"))
+        )
         resp = client_admin.post('/api/equipment/cameras', json=_CAMERA_DATA)
         assert resp.status_code == 500
 
     def test_get_camera_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'get_camera',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(
+            _app_mod.equipment_profiles, 'get_camera', lambda *_: (_ for _ in ()).throw(RuntimeError("fail"))
+        )
         resp = client_admin.get('/api/equipment/cameras/any-id')
         assert resp.status_code == 500
 
     def test_update_camera_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'update_camera',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(
+            _app_mod.equipment_profiles, 'update_camera', lambda *_: (_ for _ in ()).throw(RuntimeError("fail"))
+        )
         resp = client_admin.put('/api/equipment/cameras/any-id', json=_CAMERA_DATA)
         assert resp.status_code == 500
 
     def test_delete_camera_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'delete_camera',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(
+            _app_mod.equipment_profiles, 'delete_camera', lambda *_: (_ for _ in ()).throw(RuntimeError("fail"))
+        )
         resp = client_admin.delete('/api/equipment/cameras/any-id')
         assert resp.status_code == 500
 
@@ -4538,32 +4655,37 @@ class TestEquipmentApiRoutes:
         assert resp.status_code == 500
 
     def test_get_mounts_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'load_user_mounts',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("disk")))
+        monkeypatch.setattr(
+            _app_mod.equipment_profiles, 'load_user_mounts', lambda *_: (_ for _ in ()).throw(RuntimeError("disk"))
+        )
         resp = client_admin.get('/api/equipment/mounts')
         assert resp.status_code == 500
 
     def test_create_mount_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'create_mount',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(
+            _app_mod.equipment_profiles, 'create_mount', lambda *_: (_ for _ in ()).throw(RuntimeError("fail"))
+        )
         resp = client_admin.post('/api/equipment/mounts', json=_MOUNT_DATA)
         assert resp.status_code == 500
 
     def test_get_mount_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'get_mount',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(
+            _app_mod.equipment_profiles, 'get_mount', lambda *_: (_ for _ in ()).throw(RuntimeError("fail"))
+        )
         resp = client_admin.get('/api/equipment/mounts/any-id')
         assert resp.status_code == 500
 
     def test_update_mount_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'update_mount',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(
+            _app_mod.equipment_profiles, 'update_mount', lambda *_: (_ for _ in ()).throw(RuntimeError("fail"))
+        )
         resp = client_admin.put('/api/equipment/mounts/any-id', json=_MOUNT_DATA)
         assert resp.status_code == 500
 
     def test_delete_mount_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'delete_mount',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(
+            _app_mod.equipment_profiles, 'delete_mount', lambda *_: (_ for _ in ()).throw(RuntimeError("fail"))
+        )
         resp = client_admin.delete('/api/equipment/mounts/any-id')
         assert resp.status_code == 500
 
@@ -4580,9 +4702,7 @@ class TestEquipmentApiRoutes:
     def test_update_filter_success_returns_200(self, client_admin):
         r = client_admin.post('/api/equipment/filters', json=_FILTER_DATA)
         fid = r.get_json()['data']['id']
-        resp = client_admin.put(f'/api/equipment/filters/{fid}', json={
-            **_FILTER_DATA, 'name': 'H-Alpha'
-        })
+        resp = client_admin.put(f'/api/equipment/filters/{fid}', json={**_FILTER_DATA, 'name': 'H-Alpha'})
         assert resp.status_code == 200
 
     def test_update_filter_not_found_returns_404(self, client_admin):
@@ -4595,32 +4715,37 @@ class TestEquipmentApiRoutes:
         assert resp.status_code == 500
 
     def test_get_filters_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'load_user_filters',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("disk")))
+        monkeypatch.setattr(
+            _app_mod.equipment_profiles, 'load_user_filters', lambda *_: (_ for _ in ()).throw(RuntimeError("disk"))
+        )
         resp = client_admin.get('/api/equipment/filters')
         assert resp.status_code == 500
 
     def test_create_filter_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'create_filter',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(
+            _app_mod.equipment_profiles, 'create_filter', lambda *_: (_ for _ in ()).throw(RuntimeError("fail"))
+        )
         resp = client_admin.post('/api/equipment/filters', json=_FILTER_DATA)
         assert resp.status_code == 500
 
     def test_get_filter_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'get_filter',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(
+            _app_mod.equipment_profiles, 'get_filter', lambda *_: (_ for _ in ()).throw(RuntimeError("fail"))
+        )
         resp = client_admin.get('/api/equipment/filters/any-id')
         assert resp.status_code == 500
 
     def test_update_filter_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'update_filter',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(
+            _app_mod.equipment_profiles, 'update_filter', lambda *_: (_ for _ in ()).throw(RuntimeError("fail"))
+        )
         resp = client_admin.put('/api/equipment/filters/any-id', json=_FILTER_DATA)
         assert resp.status_code == 500
 
     def test_delete_filter_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'delete_filter',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(
+            _app_mod.equipment_profiles, 'delete_filter', lambda *_: (_ for _ in ()).throw(RuntimeError("fail"))
+        )
         resp = client_admin.delete('/api/equipment/filters/any-id')
         assert resp.status_code == 500
 
@@ -4650,32 +4775,37 @@ class TestEquipmentApiRoutes:
         assert resp.status_code == 500
 
     def test_get_accessories_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'load_user_accessories',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("disk")))
+        monkeypatch.setattr(
+            _app_mod.equipment_profiles, 'load_user_accessories', lambda *_: (_ for _ in ()).throw(RuntimeError("disk"))
+        )
         resp = client_admin.get('/api/equipment/accessories')
         assert resp.status_code == 500
 
     def test_create_accessory_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'create_accessory',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(
+            _app_mod.equipment_profiles, 'create_accessory', lambda *_: (_ for _ in ()).throw(RuntimeError("fail"))
+        )
         resp = client_admin.post('/api/equipment/accessories', json=_ACCESSORY_DATA)
         assert resp.status_code == 500
 
     def test_get_accessory_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'get_accessory',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(
+            _app_mod.equipment_profiles, 'get_accessory', lambda *_: (_ for _ in ()).throw(RuntimeError("fail"))
+        )
         resp = client_admin.get('/api/equipment/accessories/any-id')
         assert resp.status_code == 500
 
     def test_update_accessory_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'update_accessory',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(
+            _app_mod.equipment_profiles, 'update_accessory', lambda *_: (_ for _ in ()).throw(RuntimeError("fail"))
+        )
         resp = client_admin.put('/api/equipment/accessories/any-id', json=_ACCESSORY_DATA)
         assert resp.status_code == 500
 
     def test_delete_accessory_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'delete_accessory',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(
+            _app_mod.equipment_profiles, 'delete_accessory', lambda *_: (_ for _ in ()).throw(RuntimeError("fail"))
+        )
         resp = client_admin.delete('/api/equipment/accessories/any-id')
         assert resp.status_code == 500
 
@@ -4683,9 +4813,9 @@ class TestEquipmentApiRoutes:
 
     def test_create_combination_returns_201(self, client_admin):
         scope = client_admin.post('/api/equipment/telescopes', json=_TELESCOPE_DATA).get_json()['data']
-        resp = client_admin.post('/api/equipment/combinations', json={
-            'name': 'Main Combo', 'telescope_id': scope['id']
-        })
+        resp = client_admin.post(
+            '/api/equipment/combinations', json={'name': 'Main Combo', 'telescope_id': scope['id']}
+        )
         assert resp.status_code == 201
 
     def test_get_combinations_includes_validity_status(self, client_admin):
@@ -4774,20 +4904,18 @@ class TestEquipmentApiRoutes:
 
     def test_update_combination_success_returns_200(self, client_admin):
         scope = client_admin.post('/api/equipment/telescopes', json=_TELESCOPE_DATA).get_json()['data']
-        r = client_admin.post('/api/equipment/combinations', json={
-            'name': 'C1', 'telescope_id': scope['id']
-        })
+        r = client_admin.post('/api/equipment/combinations', json={'name': 'C1', 'telescope_id': scope['id']})
         cid = r.get_json()['data']['id']
-        resp = client_admin.put(f'/api/equipment/combinations/{cid}', json={
-            'name': 'C1 Updated', 'telescope_id': scope['id']
-        })
+        resp = client_admin.put(
+            f'/api/equipment/combinations/{cid}', json={'name': 'C1 Updated', 'telescope_id': scope['id']}
+        )
         assert resp.status_code == 200
 
     def test_update_combination_not_found_returns_404(self, client_admin):
         scope = client_admin.post('/api/equipment/telescopes', json=_TELESCOPE_DATA).get_json()['data']
-        resp = client_admin.put('/api/equipment/combinations/nonexistent-id', json={
-            'name': 'X', 'telescope_id': scope['id']
-        })
+        resp = client_admin.put(
+            '/api/equipment/combinations/nonexistent-id', json={'name': 'X', 'telescope_id': scope['id']}
+        )
         assert resp.status_code == 404
 
     def test_delete_combination_failure_returns_500(self, client_admin, monkeypatch):
@@ -4796,46 +4924,54 @@ class TestEquipmentApiRoutes:
         assert resp.status_code == 500
 
     def test_get_combinations_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'load_user_combinations',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("disk")))
+        monkeypatch.setattr(
+            _app_mod.equipment_profiles,
+            'load_user_combinations',
+            lambda *_: (_ for _ in ()).throw(RuntimeError("disk")),
+        )
         resp = client_admin.get('/api/equipment/combinations')
         assert resp.status_code == 500
 
     def test_create_combination_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'create_combination',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
-        resp = client_admin.post('/api/equipment/combinations', json={
-            'name': 'X', 'telescope_id': 'any'
-        })
+        monkeypatch.setattr(
+            _app_mod.equipment_profiles, 'create_combination', lambda *_: (_ for _ in ()).throw(RuntimeError("fail"))
+        )
+        resp = client_admin.post('/api/equipment/combinations', json={'name': 'X', 'telescope_id': 'any'})
         assert resp.status_code == 500
 
     def test_get_combination_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'get_combination',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(
+            _app_mod.equipment_profiles, 'get_combination', lambda *_: (_ for _ in ()).throw(RuntimeError("fail"))
+        )
         resp = client_admin.get('/api/equipment/combinations/any-id')
         assert resp.status_code == 500
 
     def test_update_combination_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'update_combination',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(
+            _app_mod.equipment_profiles, 'update_combination', lambda *_: (_ for _ in ()).throw(RuntimeError("fail"))
+        )
         resp = client_admin.put('/api/equipment/combinations/any-id', json={'name': 'X'})
         assert resp.status_code == 500
 
     def test_delete_combination_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'delete_combination',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(
+            _app_mod.equipment_profiles, 'delete_combination', lambda *_: (_ for _ in ()).throw(RuntimeError("fail"))
+        )
         resp = client_admin.delete('/api/equipment/combinations/any-id')
         assert resp.status_code == 500
 
     # ---- FOV Calculator and Equipment Summary ----
 
     def test_fov_calculator_returns_200(self, client_admin):
-        resp = client_admin.post('/api/equipment/fov-calculator', json={
-            'telescope_focal_length_mm': 800,
-            'camera_sensor_width_mm': 10.0,
-            'camera_sensor_height_mm': 7.0,
-            'camera_pixel_size_um': 3.75,
-        })
+        resp = client_admin.post(
+            '/api/equipment/fov-calculator',
+            json={
+                'telescope_focal_length_mm': 800,
+                'camera_sensor_width_mm': 10.0,
+                'camera_sensor_height_mm': 7.0,
+                'camera_pixel_size_um': 3.75,
+            },
+        )
         assert resp.status_code == 200
         data = resp.get_json()
         assert 'horizontal_fov_deg' in data
@@ -4849,8 +4985,11 @@ class TestEquipmentApiRoutes:
         assert resp.status_code == 200
 
     def test_equipment_summary_exception_returns_500_duplicate(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'get_all_equipment_summary',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(
+            _app_mod.equipment_profiles,
+            'get_all_equipment_summary',
+            lambda *_: (_ for _ in ()).throw(RuntimeError("fail")),
+        )
         resp = client_admin.get('/api/equipment/summary')
         assert resp.status_code == 500
 
@@ -4861,8 +5000,11 @@ class TestEquipmentApiRoutes:
         assert resp.status_code == 404
 
     def test_equipment_summary_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.equipment_profiles, 'get_all_equipment_summary',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(
+            _app_mod.equipment_profiles,
+            'get_all_equipment_summary',
+            lambda *_: (_ for _ in ()).throw(RuntimeError("fail")),
+        )
         resp = client_admin.get('/api/equipment/summary')
         assert resp.status_code == 500
 
@@ -4915,22 +5057,19 @@ class TestEnrichPlanEntriesWithAstrodexStatus:
 class TestSkyQualityInvalidValues:
 
     def test_both_sqm_and_bortle_invalid_returns_not_configured(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_route_helpers_mod, 'load_config',
-                            lambda: _v12_config({'sqm': 'bad', 'bortle': 'worse'}))
+        monkeypatch.setattr(_route_helpers_mod, 'load_config', lambda: _v12_config({'sqm': 'bad', 'bortle': 'worse'}))
         resp = client_admin.get('/api/skyquality')
         assert resp.status_code == 200
         assert resp.get_json()['sqm_source'] == 'not_configured'
 
     def test_sqm_only_invalid_returns_null_sqm(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_route_helpers_mod, 'load_config',
-                            lambda: _v12_config({'sqm': 'invalid'}))
+        monkeypatch.setattr(_route_helpers_mod, 'load_config', lambda: _v12_config({'sqm': 'invalid'}))
         resp = client_admin.get('/api/skyquality')
         assert resp.status_code == 200
         assert resp.get_json()['sqm'] is None
 
     def test_bortle_only_invalid_returns_null_bortle(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_route_helpers_mod, 'load_config',
-                            lambda: _v12_config({'bortle': 'invalid'}))
+        monkeypatch.setattr(_route_helpers_mod, 'load_config', lambda: _v12_config({'bortle': 'invalid'}))
         resp = client_admin.get('/api/skyquality')
         assert resp.status_code == 200
         assert resp.get_json()['bortle'] is None
@@ -4956,8 +5095,7 @@ class TestGetCurrentUserNullPaths:
         monkeypatch.setattr(_equipment_mod, 'get_current_user', lambda: None)
 
     def test_change_password_returns_401(self, client_admin):
-        resp = client_admin.post('/api/auth/change-password',
-                                 json={'current_password': 'x', 'new_password': 'y'})
+        resp = client_admin.post('/api/auth/change-password', json={'current_password': 'x', 'new_password': 'y'})
         assert resp.status_code == 401
 
     def test_get_preferences_returns_401(self, client_admin):
@@ -4969,8 +5107,7 @@ class TestGetCurrentUserNullPaths:
         assert resp.status_code == 401
 
     def test_push_subscribe_returns_401(self, client_admin):
-        resp = client_admin.post('/api/push/subscribe',
-                                 json={'subscription': {'endpoint': 'https://x', 'keys': {}}})
+        resp = client_admin.post('/api/push/subscribe', json={'subscription': {'endpoint': 'https://x', 'keys': {}}})
         assert resp.status_code == 401
 
     def test_push_list_subscriptions_returns_401(self, client_admin):
@@ -4986,8 +5123,7 @@ class TestGetCurrentUserNullPaths:
         assert resp.status_code == 401
 
     def test_push_unsubscribe_returns_401(self, client_admin):
-        resp = client_admin.delete('/api/push/unsubscribe',
-                                   json={'endpoint': 'https://x'})
+        resp = client_admin.delete('/api/push/unsubscribe', json={'endpoint': 'https://x'})
         assert resp.status_code == 401
 
     def test_plan_list_returns_401(self, client_admin):
@@ -4999,8 +5135,7 @@ class TestGetCurrentUserNullPaths:
         assert resp.status_code == 401
 
     def test_plan_targets_post_returns_401(self, client_admin):
-        resp = client_admin.post('/api/plan-my-night/targets',
-                                 json={'item': {}, 'catalogue': 'Messier'})
+        resp = client_admin.post('/api/plan-my-night/targets', json={'item': {}, 'catalogue': 'Messier'})
         assert resp.status_code == 401
 
     def test_plan_pdf_export_returns_401(self, client_admin):
@@ -5113,44 +5248,51 @@ class TestCacheRouteExceptionHandlers:
     def test_moon_calendar_exception_returns_500(self, client_admin, monkeypatch):
         # v1.2: _moon_calendar_cache is keyed by location id - clear it whole
         monkeypatch.setattr(_weather_mod, '_moon_calendar_cache', {})
-        monkeypatch.setattr(_route_helpers_mod, 'load_config',
-                            lambda: (_ for _ in ()).throw(RuntimeError("cfg fail")))
+        monkeypatch.setattr(_route_helpers_mod, 'load_config', lambda: (_ for _ in ()).throw(RuntimeError("cfg fail")))
         resp = client_admin.get('/api/moon/month-calendar')
         assert resp.status_code == 500
 
     def test_iss_location_runtime_error_returns_503(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.iss_passes, 'get_current_position',
-                            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(
+            _app_mod.iss_passes, 'get_current_position', lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("fail"))
+        )
         resp = client_admin.get('/api/iss/location')
         assert resp.status_code == 503
 
     def test_iss_location_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.iss_passes, 'get_current_position',
-                            lambda *_a, **_k: (_ for _ in ()).throw(IOError("fail")))
+        monkeypatch.setattr(
+            _app_mod.iss_passes, 'get_current_position', lambda *_a, **_k: (_ for _ in ()).throw(IOError("fail"))
+        )
         resp = client_admin.get('/api/iss/location')
         assert resp.status_code == 500
 
     def test_astrodex_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.astrodex, 'get_visible_astrodex',
-                            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(
+            _app_mod.astrodex, 'get_visible_astrodex', lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("fail"))
+        )
         resp = client_admin.get('/api/astrodex')
         assert resp.status_code == 500
 
     def test_astrodex_check_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.astrodex, 'is_item_in_astrodex',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(
+            _app_mod.astrodex, 'is_item_in_astrodex', lambda *_: (_ for _ in ()).throw(RuntimeError("fail"))
+        )
         resp = client_admin.get('/api/astrodex/check/M31')
         assert resp.status_code == 500
 
     def test_plan_list_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.plan_my_night, 'get_all_plan_states',
-                            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(
+            _app_mod.plan_my_night, 'get_all_plan_states', lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("fail"))
+        )
         resp = client_admin.get('/api/plan-my-night/list')
         assert resp.status_code == 500
 
     def test_plan_get_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.plan_my_night, 'get_plan_with_timeline',
-                            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(
+            _app_mod.plan_my_night,
+            'get_plan_with_timeline',
+            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("fail")),
+        )
         resp = client_admin.get('/api/plan-my-night')
         assert resp.status_code == 500
 
@@ -5170,8 +5312,9 @@ class TestMoonCalendarNoLocation:
         assert resp.status_code == 400
 
     def test_no_longitude_returns_400(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_route_helpers_mod, 'load_config',
-                            lambda: _v12_config({'latitude': 48.5, 'longitude': None}))
+        monkeypatch.setattr(
+            _route_helpers_mod, 'load_config', lambda: _v12_config({'latitude': 48.5, 'longitude': None})
+        )
         resp = client_admin.get('/api/moon/month-calendar')
         assert resp.status_code == 400
 
@@ -5189,8 +5332,10 @@ class TestObjectInfoEdgeCases:
 
     def test_valid_identifier_returns_data(self, client_admin, monkeypatch):
         from observation import object_info as _oi
-        monkeypatch.setattr(_oi, 'get_object_info',
-                            lambda identifier, lang='en': {'name': identifier, 'type': 'Galaxy'})
+
+        monkeypatch.setattr(
+            _oi, 'get_object_info', lambda identifier, lang='en': {'name': identifier, 'type': 'Galaxy'}
+        )
         resp = client_admin.get('/api/object/M31')
         assert resp.status_code == 200
         assert resp.get_json()['name'] == 'M31'
@@ -5221,6 +5366,7 @@ class TestObjectImageApi:
 
     def test_valid_filename_returns_image(self, client_admin, monkeypatch, tmp_path):
         from observation import object_info as _oi
+
         monkeypatch.setattr(_oi, 'OBJECT_IMAGE_CACHE_DIR', str(tmp_path))
         cached_file = tmp_path / '10.684000_41.269000.jpg'
         cached_file.write_bytes(b'\xff\xd8\xff\xe0fakejpeg')
@@ -5234,6 +5380,7 @@ class TestObjectImageApi:
 
     def test_upstream_failure_returns_502(self, client_admin, monkeypatch):
         from observation import object_info as _oi
+
         monkeypatch.setattr(_oi, 'ensure_cached_object_image', lambda ra, dec: None)
         resp = client_admin.get('/api/object-image/10.684000_41.269000.jpg')
         assert resp.status_code == 502
@@ -5277,8 +5424,7 @@ class TestLogsApiEdgeCases:
         assert resp.status_code == 200
 
     def test_clear_logs_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.os.path, 'exists',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("fs error")))
+        monkeypatch.setattr(_app_mod.os.path, 'exists', lambda *_: (_ for _ in ()).throw(RuntimeError("fs error")))
         resp = client_admin.post('/api/logs/clear')
         assert resp.status_code == 500
 
@@ -5296,8 +5442,7 @@ class TestExportConfigEdgeCases:
         assert resp.status_code == 404
 
     def test_config_export_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.os.path, 'isfile',
-                            lambda _: (_ for _ in ()).throw(RuntimeError("disk error")))
+        monkeypatch.setattr(_app_mod.os.path, 'isfile', lambda _: (_ for _ in ()).throw(RuntimeError("disk error")))
         resp = client_admin.get('/api/config/export')
         assert resp.status_code == 500
 
@@ -5311,17 +5456,20 @@ class TestPreferencesEdgeCases:
 
     def test_get_preferences_value_error_returns_400(self, client_admin, monkeypatch):
         import app as _a
-        monkeypatch.setattr(_a.user_manager, 'get_user_preferences',
-                            lambda *_: (_ for _ in ()).throw(ValueError("bad pref")))
+
+        monkeypatch.setattr(
+            _a.user_manager, 'get_user_preferences', lambda *_: (_ for _ in ()).throw(ValueError("bad pref"))
+        )
         resp = client_admin.get('/api/auth/preferences')
         assert resp.status_code == 400
 
     def test_update_preferences_value_error_returns_400(self, client_admin, monkeypatch):
         import app as _a
-        monkeypatch.setattr(_a.user_manager, 'update_user_preferences',
-                            lambda *_: (_ for _ in ()).throw(ValueError("bad pref")))
-        resp = client_admin.put('/api/auth/preferences',
-                                json={'preferences': {'language': 'xx'}})
+
+        monkeypatch.setattr(
+            _a.user_manager, 'update_user_preferences', lambda *_: (_ for _ in ()).throw(ValueError("bad pref"))
+        )
+        resp = client_admin.put('/api/auth/preferences', json={'preferences': {'language': 'xx'}})
         assert resp.status_code == 400
 
 
@@ -5334,18 +5482,18 @@ class TestUserManagementEdgeCases:
 
     def test_create_user_other_value_error_returns_400(self, client_admin, monkeypatch):
         import app as _a
-        monkeypatch.setattr(_a.user_manager, 'create_user',
-                            lambda *_: (_ for _ in ()).throw(ValueError("Some other error")))
-        resp = client_admin.post('/api/users',
-                                 json={'username': 'u', 'password': 'p', 'role': 'user'})
+
+        monkeypatch.setattr(
+            _a.user_manager, 'create_user', lambda *_: (_ for _ in ()).throw(ValueError("Some other error"))
+        )
+        resp = client_admin.post('/api/users', json={'username': 'u', 'password': 'p', 'role': 'user'})
         assert resp.status_code == 400
 
     def test_create_user_exception_returns_500(self, client_admin, monkeypatch):
         import app as _a
-        monkeypatch.setattr(_a.user_manager, 'create_user',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("db fail")))
-        resp = client_admin.post('/api/users',
-                                 json={'username': 'u', 'password': 'p', 'role': 'user'})
+
+        monkeypatch.setattr(_a.user_manager, 'create_user', lambda *_: (_ for _ in ()).throw(RuntimeError("db fail")))
+        resp = client_admin.post('/api/users', json={'username': 'u', 'password': 'p', 'role': 'user'})
         assert resp.status_code == 500
 
     def test_update_user_success_returns_200(self, client_admin, monkeypatch):
@@ -5362,22 +5510,24 @@ class TestUserManagementEdgeCases:
 
     def test_update_user_username_taken_returns_400(self, client_admin, monkeypatch):
         import app as _a
-        monkeypatch.setattr(_a.user_manager, 'update_user',
-                            lambda *_: (_ for _ in ()).throw(ValueError("Username x already taken")))
+
+        monkeypatch.setattr(
+            _a.user_manager, 'update_user', lambda *_: (_ for _ in ()).throw(ValueError("Username x already taken"))
+        )
         resp = client_admin.put('/api/users/u1', json={'username': 'x'})
         assert resp.status_code == 400
 
     def test_update_user_exception_returns_500(self, client_admin, monkeypatch):
         import app as _a
-        monkeypatch.setattr(_a.user_manager, 'update_user',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("db fail")))
+
+        monkeypatch.setattr(_a.user_manager, 'update_user', lambda *_: (_ for _ in ()).throw(RuntimeError("db fail")))
         resp = client_admin.put('/api/users/u1', json={'username': 'x'})
         assert resp.status_code == 500
 
     def test_delete_user_exception_returns_500(self, client_admin, monkeypatch):
         import app as _a
-        monkeypatch.setattr(_a.user_manager, 'delete_user',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("db fail")))
+
+        monkeypatch.setattr(_a.user_manager, 'delete_user', lambda *_: (_ for _ in ()).throw(RuntimeError("db fail")))
         resp = client_admin.delete('/api/users/some-id')
         assert resp.status_code == 500
 
@@ -5390,26 +5540,30 @@ class TestUserManagementEdgeCases:
 class TestIssSpaceflightExceptions:
 
     def test_iss_celestrak_restart_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.iss_passes, 'clear_celestrak_block_flag',
-                            lambda: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(
+            _app_mod.iss_passes, 'clear_celestrak_block_flag', lambda: (_ for _ in ()).throw(RuntimeError("fail"))
+        )
         resp = client_admin.post('/api/iss/celestrak/restart')
         assert resp.status_code == 500
 
     def test_spaceflight_launches_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.cache_store, 'is_cache_valid',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(
+            _app_mod.cache_store, 'is_cache_valid', lambda *_: (_ for _ in ()).throw(RuntimeError("fail"))
+        )
         resp = client_admin.get('/api/spaceflight/launches')
         assert resp.status_code == 500
 
     def test_spaceflight_astronauts_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.cache_store, 'is_cache_valid',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(
+            _app_mod.cache_store, 'is_cache_valid', lambda *_: (_ for _ in ()).throw(RuntimeError("fail"))
+        )
         resp = client_admin.get('/api/spaceflight/astronauts')
         assert resp.status_code == 500
 
     def test_spaceflight_events_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.cache_store, 'is_cache_valid',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(
+            _app_mod.cache_store, 'is_cache_valid', lambda *_: (_ for _ in ()).throw(RuntimeError("fail"))
+        )
         resp = client_admin.get('/api/spaceflight/events')
         assert resp.status_code == 500
 
@@ -5434,10 +5588,10 @@ class TestIssSpaceflightExceptions:
 class TestOnDemandTranslateException:
 
     def test_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_tracking_mod, 'translate_text_on_demand',
-                            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("fail")))
-        resp = client_admin.post('/api/translate/on-demand',
-                                 json={'text': 'hello', 'target_lang': 'fr'})
+        monkeypatch.setattr(
+            _tracking_mod, 'translate_text_on_demand', lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("fail"))
+        )
+        resp = client_admin.post('/api/translate/on-demand', json={'text': 'hello', 'target_lang': 'fr'})
         assert resp.status_code == 500
 
 
@@ -5458,8 +5612,11 @@ class TestTranslateSolarSystemEvents:
         assert result['events'][0]['event_type'] == 'Meteor Shower'
 
     def test_comet_appearance_missing_fields_returns_unchanged(self):
-        data = {'events': [{'event_type': 'Comet Appearance', 'magnitude': '',
-                             'equipment_needed': '', 'raw_data': {'comet': ''}}]}
+        data = {
+            'events': [
+                {'event_type': 'Comet Appearance', 'magnitude': '', 'equipment_needed': '', 'raw_data': {'comet': ''}}
+            ]
+        }
         result = self._fn(data, 'fr')
         assert result['events'][0]['event_type'] == 'Comet Appearance'
 
@@ -5470,10 +5627,17 @@ class TestTranslateSolarSystemEvents:
 
     def test_exception_in_translation_is_swallowed(self, monkeypatch):
         """exception during translation is caught and swallowed."""
-        monkeypatch.setattr(_astronomy_mod, 'I18nManager',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("i18n fail")))
-        data = {'events': [{'event_type': 'Meteor Shower', 'raw_data': {
-            'shower': 'Perseids'}, 'zenith_hourly_rate': '100', 'parent_body': 'Comet'}]}
+        monkeypatch.setattr(_astronomy_mod, 'I18nManager', lambda *_: (_ for _ in ()).throw(RuntimeError("i18n fail")))
+        data = {
+            'events': [
+                {
+                    'event_type': 'Meteor Shower',
+                    'raw_data': {'shower': 'Perseids'},
+                    'zenith_hourly_rate': '100',
+                    'parent_body': 'Comet',
+                }
+            ]
+        }
         try:
             self._fn(data, 'de')
         except RuntimeError:
@@ -5487,6 +5651,7 @@ class TestTranslateSolarSystemEvents:
 
     def test_i18n_exception_caught_by_inner_handler(self, monkeypatch):
         """i18n.t raises inside try → except logged, event appended."""
+
         class _BrokenI18n:
             def t(self, *a, **kw):
                 raise RuntimeError('i18n broken')
@@ -5512,30 +5677,26 @@ class TestTranslateSpecialPhenomenaEvents:
 
     def test_milky_way_with_null_gc_altitude_skips_translation(self):
         """Milky Way event with no gc_altitude → no title/description update."""
-        data = {'events': [{'event_type': 'Milky Way Core Visibility',
-                             'raw_data': {}}]}
+        data = {'events': [{'event_type': 'Milky Way Core Visibility', 'raw_data': {}}]}
         result = self._fn(data, 'fr')
         assert result['events'][0]['event_type'] == 'Milky Way Core Visibility'
         assert 'title' not in result['events'][0]
 
     def test_milky_way_with_gc_altitude_in_raw_data(self):
         """gc_altitude fallback to raw_data.galactic_center_altitude."""
-        data = {'events': [{'event_type': 'Milky Way Core Visibility',
-                             'raw_data': {'galactic_center_altitude': 30.0}}]}
+        data = {'events': [{'event_type': 'Milky Way Core Visibility', 'raw_data': {'galactic_center_altitude': 30.0}}]}
         result = self._fn(data, 'en')
         assert result['events'][0]['event_type'] == 'Milky Way Core Visibility'
 
     def test_milky_way_with_gc_altitude_second_fallback(self):
         """gc_altitude second fallback (raw_data.gc_altitude)."""
-        data = {'events': [{'event_type': 'Milky Way Core Visibility',
-                             'raw_data': {'gc_altitude': 25.0}}]}
+        data = {'events': [{'event_type': 'Milky Way Core Visibility', 'raw_data': {'gc_altitude': 25.0}}]}
         result = self._fn(data, 'en')
         assert result['events'][0]['event_type'] == 'Milky Way Core Visibility'
 
     def test_exception_in_translation_swallowed(self, monkeypatch):
         """exception in event translation is caught."""
-        monkeypatch.setattr(_astronomy_mod, 'I18nManager',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(_astronomy_mod, 'I18nManager', lambda *_: (_ for _ in ()).throw(RuntimeError("fail")))
         data = {'events': [{'event_type': 'Spring Equinox', 'raw_data': {'event': 'spring_equinox'}}]}
         try:
             self._fn(data, 'de')
@@ -5588,15 +5749,17 @@ class TestPlanMyNightRoutes:
 
     def test_add_target_invalid_night_window_returns_409(self, client_admin, monkeypatch):
         monkeypatch.setattr(_plan_my_night_mod, '_resolve_observing_night_for_plan', self._fake_night)
-        monkeypatch.setattr(_app_mod.plan_my_night, 'create_or_add_target',
-                            lambda **_kw: (False, 'invalid_night_window', {}, None))
+        monkeypatch.setattr(
+            _app_mod.plan_my_night, 'create_or_add_target', lambda **_kw: (False, 'invalid_night_window', {}, None)
+        )
         resp = client_admin.post('/api/plan-my-night/targets', json={'catalogue': 'Messier', 'item': {'name': 'M42'}})
         assert resp.status_code == 409
         assert 'Invalid night window' in resp.get_json()['error']
 
     def test_add_target_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_plan_my_night_mod, '_resolve_observing_night_for_plan',
-                            lambda: (_ for _ in ()).throw(RuntimeError('fail')))
+        monkeypatch.setattr(
+            _plan_my_night_mod, '_resolve_observing_night_for_plan', lambda: (_ for _ in ()).throw(RuntimeError('fail'))
+        )
         resp = client_admin.post('/api/plan-my-night/targets', json={'catalogue': 'Messier', 'item': {'name': 'M42'}})
         assert resp.status_code == 500
 
@@ -5613,8 +5776,9 @@ class TestPlanMyNightRoutes:
         assert resp.get_json()['status'] == 'success'
 
     def test_patch_plan_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.plan_my_night, 'update_plan_meta',
-                            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
+        monkeypatch.setattr(
+            _app_mod.plan_my_night, 'update_plan_meta', lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail'))
+        )
         resp = client_admin.patch('/api/plan-my-night', json={})
         assert resp.status_code == 500
 
@@ -5631,8 +5795,9 @@ class TestPlanMyNightRoutes:
         assert resp.get_json()['status'] == 'success'
 
     def test_update_target_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.plan_my_night, 'update_target',
-                            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
+        monkeypatch.setattr(
+            _app_mod.plan_my_night, 'update_target', lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail'))
+        )
         resp = client_admin.put('/api/plan-my-night/targets/abc123', json={})
         assert resp.status_code == 500
 
@@ -5653,8 +5818,9 @@ class TestPlanMyNightRoutes:
         assert resp.get_json()['status'] == 'success'
 
     def test_reorder_target_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.plan_my_night, 'reorder_target',
-                            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
+        monkeypatch.setattr(
+            _app_mod.plan_my_night, 'reorder_target', lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail'))
+        )
         resp = client_admin.post('/api/plan-my-night/targets/abc123/reorder', json={'new_index': 0})
         assert resp.status_code == 500
 
@@ -5671,8 +5837,9 @@ class TestPlanMyNightRoutes:
         assert resp.get_json()['status'] == 'success'
 
     def test_delete_target_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.plan_my_night, 'remove_target',
-                            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
+        monkeypatch.setattr(
+            _app_mod.plan_my_night, 'remove_target', lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail'))
+        )
         resp = client_admin.delete('/api/plan-my-night/targets/abc123')
         assert resp.status_code == 500
 
@@ -5688,8 +5855,9 @@ class TestPlanMyNightRoutes:
         assert resp.get_json()['status'] == 'success'
 
     def test_clear_plan_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.plan_my_night, 'clear_plan',
-                            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
+        monkeypatch.setattr(
+            _app_mod.plan_my_night, 'clear_plan', lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail'))
+        )
         resp = client_admin.delete('/api/plan-my-night/clear')
         assert resp.status_code == 500
 
@@ -5700,31 +5868,42 @@ class TestPlanMyNightRoutes:
         assert resp.get_json()['deleted'] == 2
 
     def test_clear_all_plans_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.plan_my_night, 'clear_all_plans',
-                            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
+        monkeypatch.setattr(
+            _app_mod.plan_my_night, 'clear_all_plans', lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail'))
+        )
         resp = client_admin.delete('/api/plan-my-night/clear-all')
         assert resp.status_code == 500
 
     def test_add_to_astrodex_entry_not_found_returns_404(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.plan_my_night, 'get_plan_with_timeline',
-                            lambda *_a, **_k: {'plan': {'entries': []}})
+        monkeypatch.setattr(
+            _app_mod.plan_my_night, 'get_plan_with_timeline', lambda *_a, **_k: {'plan': {'entries': []}}
+        )
         monkeypatch.setattr(_app_mod.plan_my_night, 'get_all_plan_files', lambda *_a, **_k: [])
         resp = client_admin.post('/api/plan-my-night/targets/nonexistent/add-to-astrodex')
         assert resp.status_code == 404
 
     def test_add_to_astrodex_already_there_returns_success(self, client_admin, monkeypatch):
         fake_entry = {'id': 'e1', 'name': 'M42', 'catalogue': 'Messier'}
-        monkeypatch.setattr(_app_mod.plan_my_night, 'get_plan_with_timeline',
-                            lambda *_a, **_k: {'plan': {'entries': [fake_entry]}})
+        monkeypatch.setattr(
+            _app_mod.plan_my_night, 'get_plan_with_timeline', lambda *_a, **_k: {'plan': {'entries': [fake_entry]}}
+        )
         monkeypatch.setattr(_app_mod.astrodex, 'is_item_in_astrodex', lambda *_a, **_k: True)
         resp = client_admin.post('/api/plan-my-night/targets/e1/add-to-astrodex')
         assert resp.status_code == 200
         assert resp.get_json()['reason'] == 'already_in_astrodex'
 
     def test_add_to_astrodex_create_success(self, client_admin, monkeypatch):
-        fake_entry = {'id': 'e1', 'name': 'M42', 'catalogue': 'Messier', 'type': 'Galaxy', 'constellation': 'Ori', 'notes': ''}
-        monkeypatch.setattr(_app_mod.plan_my_night, 'get_plan_with_timeline',
-                            lambda *_a, **_k: {'plan': {'entries': [fake_entry]}})
+        fake_entry = {
+            'id': 'e1',
+            'name': 'M42',
+            'catalogue': 'Messier',
+            'type': 'Galaxy',
+            'constellation': 'Ori',
+            'notes': '',
+        }
+        monkeypatch.setattr(
+            _app_mod.plan_my_night, 'get_plan_with_timeline', lambda *_a, **_k: {'plan': {'entries': [fake_entry]}}
+        )
         monkeypatch.setattr(_app_mod.astrodex, 'is_item_in_astrodex', lambda *_a, **_k: False)
         monkeypatch.setattr(_app_mod.astrodex, 'create_astrodex_item', lambda *_a, **_k: {'id': 'new1'})
         resp = client_admin.post('/api/plan-my-night/targets/e1/add-to-astrodex')
@@ -5733,16 +5912,20 @@ class TestPlanMyNightRoutes:
 
     def test_add_to_astrodex_create_fails_returns_500(self, client_admin, monkeypatch):
         fake_entry = {'id': 'e1', 'name': 'M42', 'catalogue': 'Messier'}
-        monkeypatch.setattr(_app_mod.plan_my_night, 'get_plan_with_timeline',
-                            lambda *_a, **_k: {'plan': {'entries': [fake_entry]}})
+        monkeypatch.setattr(
+            _app_mod.plan_my_night, 'get_plan_with_timeline', lambda *_a, **_k: {'plan': {'entries': [fake_entry]}}
+        )
         monkeypatch.setattr(_app_mod.astrodex, 'is_item_in_astrodex', lambda *_a, **_k: False)
         monkeypatch.setattr(_app_mod.astrodex, 'create_astrodex_item', lambda *_a, **_k: None)
         resp = client_admin.post('/api/plan-my-night/targets/e1/add-to-astrodex')
         assert resp.status_code == 500
 
     def test_csv_export_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.plan_my_night, 'get_plan_with_timeline',
-                            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
+        monkeypatch.setattr(
+            _app_mod.plan_my_night,
+            'get_plan_with_timeline',
+            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')),
+        )
         resp = client_admin.get('/api/plan-my-night/export.csv')
         assert resp.status_code == 500
 
@@ -5779,8 +5962,9 @@ class TestAstrodexCrudRoutes:
 
     def test_add_item_exception_returns_500(self, client_admin, monkeypatch):
         monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
-        monkeypatch.setattr(_app_mod.astrodex, 'is_item_in_astrodex',
-                            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
+        monkeypatch.setattr(
+            _app_mod.astrodex, 'is_item_in_astrodex', lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail'))
+        )
         resp = client_admin.post('/api/astrodex/items', json={'name': 'M42'})
         assert resp.status_code == 500
 
@@ -5797,8 +5981,9 @@ class TestAstrodexCrudRoutes:
 
     def test_switch_catalogue_name_value_error_returns_400(self, client_admin, monkeypatch):
         monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
-        monkeypatch.setattr(_app_mod.astrodex, 'switch_item_catalogue_name',
-                            lambda *_a, **_k: (_ for _ in ()).throw(ValueError('bad')))
+        monkeypatch.setattr(
+            _app_mod.astrodex, 'switch_item_catalogue_name', lambda *_a, **_k: (_ for _ in ()).throw(ValueError('bad'))
+        )
         resp = client_admin.post('/api/astrodex/items/item1/catalogue-name', json={'catalogue': 'NGC'})
         assert resp.status_code == 400
 
@@ -5817,14 +6002,17 @@ class TestAstrodexCrudRoutes:
 
     def test_get_item_exception_returns_500(self, client_admin, monkeypatch):
         monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
-        monkeypatch.setattr(_app_mod.astrodex, 'get_astrodex_item',
-                            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
+        monkeypatch.setattr(
+            _app_mod.astrodex, 'get_astrodex_item', lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail'))
+        )
         resp = client_admin.get('/api/astrodex/items/item1')
         assert resp.status_code == 500
 
     def test_update_item_success_returns_200(self, client_admin, monkeypatch):
         monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
-        monkeypatch.setattr(_app_mod.astrodex, 'update_astrodex_item', lambda *_a, **_k: {'id': 'item1', 'notes': 'test'})
+        monkeypatch.setattr(
+            _app_mod.astrodex, 'update_astrodex_item', lambda *_a, **_k: {'id': 'item1', 'notes': 'test'}
+        )
         resp = client_admin.put('/api/astrodex/items/item1', json={'notes': 'test'})
         assert resp.status_code == 200
         assert resp.get_json()['status'] == 'success'
@@ -5837,8 +6025,9 @@ class TestAstrodexCrudRoutes:
 
     def test_update_item_exception_returns_500(self, client_admin, monkeypatch):
         monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
-        monkeypatch.setattr(_app_mod.astrodex, 'update_astrodex_item',
-                            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
+        monkeypatch.setattr(
+            _app_mod.astrodex, 'update_astrodex_item', lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail'))
+        )
         resp = client_admin.put('/api/astrodex/items/item1', json={'notes': 'test'})
         assert resp.status_code == 500
 
@@ -5857,8 +6046,9 @@ class TestAstrodexCrudRoutes:
 
     def test_delete_item_exception_returns_500(self, client_admin, monkeypatch):
         monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
-        monkeypatch.setattr(_app_mod.astrodex, 'delete_astrodex_item',
-                            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
+        monkeypatch.setattr(
+            _app_mod.astrodex, 'delete_astrodex_item', lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail'))
+        )
         resp = client_admin.delete('/api/astrodex/items/item1')
         assert resp.status_code == 500
 
@@ -5877,8 +6067,9 @@ class TestAstrodexCrudRoutes:
 
     def test_add_picture_exception_returns_500(self, client_admin, monkeypatch):
         monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
-        monkeypatch.setattr(_app_mod.astrodex, 'add_picture_to_item',
-                            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
+        monkeypatch.setattr(
+            _app_mod.astrodex, 'add_picture_to_item', lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail'))
+        )
         resp = client_admin.post('/api/astrodex/items/item1/pictures', json={})
         assert resp.status_code == 500
 
@@ -5897,8 +6088,9 @@ class TestAstrodexCrudRoutes:
 
     def test_update_picture_exception_returns_500(self, client_admin, monkeypatch):
         monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
-        monkeypatch.setattr(_app_mod.astrodex, 'update_picture',
-                            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
+        monkeypatch.setattr(
+            _app_mod.astrodex, 'update_picture', lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail'))
+        )
         resp = client_admin.put('/api/astrodex/items/item1/pictures/pic1', json={})
         assert resp.status_code == 500
 
@@ -5916,8 +6108,9 @@ class TestAstrodexCrudRoutes:
 
     def test_delete_picture_exception_returns_500(self, client_admin, monkeypatch):
         monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
-        monkeypatch.setattr(_app_mod.astrodex, 'delete_picture',
-                            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
+        monkeypatch.setattr(
+            _app_mod.astrodex, 'delete_picture', lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail'))
+        )
         resp = client_admin.delete('/api/astrodex/items/item1/pictures/pic1')
         assert resp.status_code == 500
 
@@ -5935,21 +6128,22 @@ class TestAstrodexCrudRoutes:
 
     def test_set_main_picture_exception_returns_500(self, client_admin, monkeypatch):
         monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
-        monkeypatch.setattr(_app_mod.astrodex, 'set_main_picture',
-                            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
+        monkeypatch.setattr(
+            _app_mod.astrodex, 'set_main_picture', lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail'))
+        )
         resp = client_admin.post('/api/astrodex/items/item1/pictures/pic1/main')
         assert resp.status_code == 500
 
     def test_constellations_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.astrodex, 'get_constellations_list',
-                            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
+        monkeypatch.setattr(
+            _app_mod.astrodex, 'get_constellations_list', lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail'))
+        )
         resp = client_admin.get('/api/astrodex/constellations')
         assert resp.status_code == 500
 
     def test_astrodex_image_exception_returns_404(self, client_admin, monkeypatch):
         monkeypatch.setattr(_astrodex_mod, 'get_current_user', type('U', (), {'user_id': 'u1', 'username': 'admin'}))
-        monkeypatch.setattr(_astrodex_mod, 'load_config',
-                            lambda: (_ for _ in ()).throw(RuntimeError('fail')))
+        monkeypatch.setattr(_astrodex_mod, 'load_config', lambda: (_ for _ in ()).throw(RuntimeError('fail')))
         resp = client_admin.get('/api/astrodex/images/somefile.jpg')
         assert resp.status_code == 404
 
@@ -5964,34 +6158,34 @@ class TestUserManagementMoreBranches:
         assert resp.get_json()['status'] == 'success'
 
     def test_delete_user_cannot_delete_own_account(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.user_manager, 'delete_user',
-                            lambda *_a, **_k: (_ for _ in ()).throw(ValueError('Cannot delete your own account')))
+        monkeypatch.setattr(
+            _app_mod.user_manager,
+            'delete_user',
+            lambda *_a, **_k: (_ for _ in ()).throw(ValueError('Cannot delete your own account')),
+        )
         resp = client_admin.delete('/api/users/some-user-id')
         assert resp.status_code == 400
         assert resp.get_json()['error_key'] == 'users.cannot_delete_own_account'
 
     def test_update_user_invalid_role_returns_400(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.user_manager, 'update_user',
-                            lambda *_a, **_k: (_ for _ in ()).throw(ValueError('Invalid role: superuser')))
+        monkeypatch.setattr(
+            _app_mod.user_manager,
+            'update_user',
+            lambda *_a, **_k: (_ for _ in ()).throw(ValueError('Invalid role: superuser')),
+        )
         resp = client_admin.put('/api/users/some-user-id', json={'role': 'superuser'})
         assert resp.status_code == 400
         assert resp.get_json()['error_key'] == 'users.invalid_role'
 
     def test_config_update_bortle_invalid_returns_400(self, client_admin, monkeypatch):
         monkeypatch.setattr(_locations_mod, 'load_config', lambda: _v12_config({}, skytonight={}))
-        resp = client_admin.post('/api/config', json={
-            'location': {'bortle': 99},
-            'skytonight': {}
-        })
+        resp = client_admin.post('/api/config', json={'location': {'bortle': 99}, 'skytonight': {}})
         assert resp.status_code == 400
         assert 'bortle' in resp.get_json()['error']
 
     def test_config_update_sqm_invalid_returns_400(self, client_admin, monkeypatch):
         monkeypatch.setattr(_locations_mod, 'load_config', lambda: _v12_config({}, skytonight={}))
-        resp = client_admin.post('/api/config', json={
-            'location': {'sqm': -5.0},
-            'skytonight': {}
-        })
+        resp = client_admin.post('/api/config', json={'location': {'sqm': -5.0}, 'skytonight': {}})
         assert resp.status_code == 400
         assert 'sqm' in resp.get_json()['error']
 
@@ -6000,24 +6194,27 @@ class TestSpaceflightMoreRoutes:
     """Tests for spaceflight/ISS routes covering missed branches."""
 
     def test_iss_passes_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.cache_store, 'is_cache_valid',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError('fail')))
+        monkeypatch.setattr(
+            _app_mod.cache_store, 'is_cache_valid', lambda *_: (_ for _ in ()).throw(RuntimeError('fail'))
+        )
         resp = client_admin.get('/api/iss/passes')
         assert resp.status_code == 500
 
     def test_spaceflight_launch_vidurls_exception_returns_200(self, client_admin, monkeypatch):
         from space import spaceflight_tracker as _st
-        monkeypatch.setattr(_st, 'get_launch_vidurls',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError('fail')))
+
+        monkeypatch.setattr(_st, 'get_launch_vidurls', lambda *_: (_ for _ in ()).throw(RuntimeError('fail')))
         resp = client_admin.get('/api/spaceflight/launch/12345678-1234-1234-1234-123456789abc/vidurls')
         assert resp.status_code == 200
         assert resp.get_json()['vidURLs'] == []
 
     def test_spaceflight_launches_cache_sync_returns_data(self, client_admin, monkeypatch):
         call_count = [0]
+
         def fake_is_valid(*_):
             call_count[0] += 1
             return call_count[0] > 1
+
         _app_mod.cache_store._spaceflight_launches_cache['data'] = {'launches': []}
         monkeypatch.setattr(_app_mod.cache_store, 'is_cache_valid', fake_is_valid)
         monkeypatch.setattr(_app_mod.cache_store, 'sync_cache_from_shared', lambda *_: True)
@@ -6026,19 +6223,25 @@ class TestSpaceflightMoreRoutes:
 
     def test_object_info_invalid_identifier_returns_400(self, client_admin, monkeypatch):
         from observation import object_info as _oi
+
         monkeypatch.setattr(_oi, 'get_object_info', lambda *_a, **_k: {'error': 'invalid_identifier'})
         resp = client_admin.get('/api/object/!!!bad!!!')
         assert resp.status_code == 400
 
     def test_catalogue_lookup_found_in_local_returns_200(self, client_admin, monkeypatch):
         from skytonight import skytonight_targets as _st
-        monkeypatch.setattr(_st, 'get_lookup_entry', lambda cat, name: {
-            'preferred_name': 'M31',
-            'object_type': 'Galaxy',
-            'constellation': 'And',
-            'aliases': {'Messier': 'M31'},
-            'group_id': 'g1',
-        })
+
+        monkeypatch.setattr(
+            _st,
+            'get_lookup_entry',
+            lambda cat, name: {
+                'preferred_name': 'M31',
+                'object_type': 'Galaxy',
+                'constellation': 'And',
+                'aliases': {'Messier': 'M31'},
+                'group_id': 'g1',
+            },
+        )
         resp = client_admin.get('/api/astrodex/catalogue-lookup?name=M31')
         assert resp.status_code == 200
         assert resp.get_json()['found'] is True
@@ -6050,8 +6253,8 @@ class TestSpaceflightMoreRoutes:
 
     def test_catalogue_lookup_exception_returns_500(self, client_admin, monkeypatch):
         from skytonight import skytonight_targets as _st
-        monkeypatch.setattr(_st, 'get_lookup_entry',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError('fail')))
+
+        monkeypatch.setattr(_st, 'get_lookup_entry', lambda *_: (_ for _ in ()).throw(RuntimeError('fail')))
         resp = client_admin.get('/api/astrodex/catalogue-lookup?name=M31')
         assert resp.status_code == 500
 
@@ -6061,9 +6264,11 @@ class TestStaleCachePathRoutes:
 
     def _make_is_valid_counter(self, first_result=False, later_result=True):
         count = [0]
+
         def f(*_):
             count[0] += 1
             return later_result if count[0] > 1 else first_result
+
         return f
 
     def test_sun_report_sync_cache_returns_data(self, client_admin, monkeypatch):
@@ -6141,8 +6346,7 @@ class TestAstroAndBestWindowRoutes:
         assert resp.status_code == 400
 
     def test_sidereal_time_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_route_helpers_mod, 'load_config',
-                            lambda: (_ for _ in ()).throw(RuntimeError('fail')))
+        monkeypatch.setattr(_route_helpers_mod, 'load_config', lambda: (_ for _ in ()).throw(RuntimeError('fail')))
         resp = client_admin.get('/api/astro/sidereal-time')
         assert resp.status_code == 500
 
@@ -6154,8 +6358,9 @@ class TestAstroAndBestWindowRoutes:
         assert resp.status_code == 200
 
     def test_horizon_graph_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.cache_store, 'is_cache_valid',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError('fail')))
+        monkeypatch.setattr(
+            _app_mod.cache_store, 'is_cache_valid', lambda *_: (_ for _ in ()).throw(RuntimeError('fail'))
+        )
         resp = client_admin.get('/api/astro/horizon-graph')
         assert resp.status_code == 500
 
@@ -6171,8 +6376,9 @@ class TestAstroAndBestWindowRoutes:
         assert resp.status_code == 200
 
     def test_best_window_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.cache_store, 'is_cache_valid',
-                            lambda *_: (_ for _ in ()).throw(RuntimeError('fail')))
+        monkeypatch.setattr(
+            _app_mod.cache_store, 'is_cache_valid', lambda *_: (_ for _ in ()).throw(RuntimeError('fail'))
+        )
         resp = client_admin.get('/api/tonight/best-window?mode=strict')
         assert resp.status_code == 500
 
@@ -6201,39 +6407,47 @@ class TestWeatherRoutes:
     def test_hourly_forecast_exception_returns_500(self, client_admin, monkeypatch):
         monkeypatch.setattr(_app_mod.cache_store, 'is_cache_valid', lambda *_: False)
         monkeypatch.setattr(_app_mod.cache_store, 'sync_cache_from_shared', lambda *_: False)
-        monkeypatch.setattr(_weather_mod, 'get_hourly_forecast',
-                            lambda **_kw: (_ for _ in ()).throw(RuntimeError('fail')))
+        monkeypatch.setattr(
+            _weather_mod, 'get_hourly_forecast', lambda **_kw: (_ for _ in ()).throw(RuntimeError('fail'))
+        )
         resp = client_admin.get('/api/weather/forecast')
         assert resp.status_code == 500
 
     def test_astro_weather_analysis_none_returns_202(self, client_admin, monkeypatch):
         from weather import weather_astro as _wa
+
         monkeypatch.setattr(_wa, 'get_astro_weather_analysis', lambda *_a, **_k: None)
         resp = client_admin.get('/api/weather/astro-analysis')
         assert resp.status_code == 202
 
     def test_astro_weather_analysis_exception_returns_500(self, client_admin, monkeypatch):
         from weather import weather_astro as _wa
-        monkeypatch.setattr(_wa, 'get_astro_weather_analysis',
-                            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
+
+        monkeypatch.setattr(
+            _wa, 'get_astro_weather_analysis', lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail'))
+        )
         resp = client_admin.get('/api/weather/astro-analysis')
         assert resp.status_code == 500
 
     def test_current_astro_conditions_none_returns_500(self, client_admin, monkeypatch):
         from weather import weather_astro as _wa
+
         monkeypatch.setattr(_wa, 'get_current_astro_conditions', lambda *_a, **_k: None)
         resp = client_admin.get('/api/weather/astro-current')
         assert resp.status_code == 500
 
     def test_current_astro_conditions_exception_returns_500(self, client_admin, monkeypatch):
         from weather import weather_astro as _wa
-        monkeypatch.setattr(_wa, 'get_current_astro_conditions',
-                            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
+
+        monkeypatch.setattr(
+            _wa, 'get_current_astro_conditions', lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail'))
+        )
         resp = client_admin.get('/api/weather/astro-current')
         assert resp.status_code == 500
 
     def test_weather_alerts_none_returns_200_pending(self, client_admin, monkeypatch):
         from weather import weather_astro as _wa
+
         monkeypatch.setattr(_wa, 'get_astro_weather_analysis', lambda *_a, **_k: None)
         resp = client_admin.get('/api/weather/alerts')
         assert resp.status_code == 200
@@ -6241,8 +6455,10 @@ class TestWeatherRoutes:
 
     def test_weather_alerts_exception_returns_500(self, client_admin, monkeypatch):
         from weather import weather_astro as _wa
-        monkeypatch.setattr(_wa, 'get_astro_weather_analysis',
-                            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail')))
+
+        monkeypatch.setattr(
+            _wa, 'get_astro_weather_analysis', lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('fail'))
+        )
         resp = client_admin.get('/api/weather/alerts')
         assert resp.status_code == 500
 
@@ -6257,9 +6473,11 @@ class TestPushSubscriptionsAppleProvider:
 
     def test_apple_endpoint_classified_as_apple(self, client_admin, monkeypatch):
         admin = user_manager.get_user_by_username('admin')
-        monkeypatch.setattr(admin, 'push_subscriptions', [
-            {'endpoint': 'https://web.push.apple.com/some/path', 'created_at': '2026-01-01T00:00:00Z'}
-        ])
+        monkeypatch.setattr(
+            admin,
+            'push_subscriptions',
+            [{'endpoint': 'https://web.push.apple.com/some/path', 'created_at': '2026-01-01T00:00:00Z'}],
+        )
         resp = client_admin.get('/api/push/subscriptions')
         assert resp.status_code == 200
         subs = resp.get_json()['subscriptions']
@@ -6278,10 +6496,9 @@ class TestPushExceptionHandlers:
     def test_push_test_trigger_exception_returns_500(self, client_admin, monkeypatch):
         """exception inside push_test_trigger try block → 500."""
         from utils import i18n_utils as _i18n
+
         admin = user_manager.get_user_by_username('admin')
-        monkeypatch.setattr(admin, 'push_subscriptions', [
-            {'endpoint': 'https://example.com/push', 'keys': {}}
-        ])
+        monkeypatch.setattr(admin, 'push_subscriptions', [{'endpoint': 'https://example.com/push', 'keys': {}}])
 
         def _raise(*a, **kw):
             raise RuntimeError('translation fail')
@@ -6293,10 +6510,9 @@ class TestPushExceptionHandlers:
     def test_push_test_exception_returns_500(self, client_admin, monkeypatch):
         """exception inside push_test try block → 500."""
         from utils import push_manager as _pm
+
         admin = user_manager.get_user_by_username('admin')
-        monkeypatch.setattr(admin, 'push_subscriptions', [
-            {'endpoint': 'https://example.com/push', 'keys': {}}
-        ])
+        monkeypatch.setattr(admin, 'push_subscriptions', [{'endpoint': 'https://example.com/push', 'keys': {}}])
 
         def _raise(*a, **kw):
             raise RuntimeError('send fail')
@@ -6344,22 +6560,30 @@ class TestConfigPostAdditionalBranches:
         """'astrodex' IS in submitted config → if-body skipped."""
         monkeypatch.setattr(_locations_mod, 'save_config', lambda *a, **kw: None)
         monkeypatch.setattr(_app_mod.cache_store, 'reset_all_caches', lambda: None)
-        resp = client_admin.post('/api/config', json={
-            'location': {'latitude': 48.8, 'longitude': 2.3, 'timezone': 'Europe/Paris', 'elevation': 30},
-            'astrodex': {'private': True},  # already present → if body skipped
-        })
+        resp = client_admin.post(
+            '/api/config',
+            json={
+                'location': {'latitude': 48.8, 'longitude': 2.3, 'timezone': 'Europe/Paris', 'elevation': 30},
+                'astrodex': {'private': True},  # already present → if body skipped
+            },
+        )
         assert resp.status_code == 200
 
     def test_config_with_non_dict_old_skytonight(self, client_admin, monkeypatch):
         """old_skytonight is not a dict → assigned {}."""
-        old_cfg = {'location': {'latitude': 48.8, 'longitude': 2.3, 'timezone': 'UTC', 'elevation': 0},
-                   'skytonight': 'not-a-dict'}  # non-dict skytonight
+        old_cfg = {
+            'location': {'latitude': 48.8, 'longitude': 2.3, 'timezone': 'UTC', 'elevation': 0},
+            'skytonight': 'not-a-dict',
+        }  # non-dict skytonight
         monkeypatch.setattr(_locations_mod, 'load_config', lambda: old_cfg)
         monkeypatch.setattr(_locations_mod, 'save_config', lambda *a, **kw: None)
         monkeypatch.setattr(_app_mod.cache_store, 'reset_all_caches', lambda: None)
-        resp = client_admin.post('/api/config', json={
-            'location': {'latitude': 48.8, 'longitude': 2.3, 'timezone': 'UTC', 'elevation': 0},
-        })
+        resp = client_admin.post(
+            '/api/config',
+            json={
+                'location': {'latitude': 48.8, 'longitude': 2.3, 'timezone': 'UTC', 'elevation': 0},
+            },
+        )
         assert resp.status_code == 200
 
     def test_config_with_legacy_top_level_constraints(self, client_admin, monkeypatch):
@@ -6369,11 +6593,14 @@ class TestConfigPostAdditionalBranches:
         saved = {}
         monkeypatch.setattr(_locations_mod, 'save_config', lambda cfg: saved.update({'cfg': cfg}))
         monkeypatch.setattr(_app_mod.cache_store, 'reset_all_caches', lambda: None)
-        resp = client_admin.post('/api/config', json={
-            'location': {'latitude': 48.8, 'longitude': 2.3, 'timezone': 'UTC', 'elevation': 0},
-            'constraints': {'altitude_constraint_min': 30},  # legacy top-level
-            'skytonight': {},  # no 'constraints' key
-        })
+        resp = client_admin.post(
+            '/api/config',
+            json={
+                'location': {'latitude': 48.8, 'longitude': 2.3, 'timezone': 'UTC', 'elevation': 0},
+                'constraints': {'altitude_constraint_min': 30},  # legacy top-level
+                'skytonight': {},  # no 'constraints' key
+            },
+        )
         assert resp.status_code == 200
         # legacy constraints should have been migrated
         assert saved.get('cfg', {}).get('skytonight', {}).get('constraints') == {'altitude_constraint_min': 30}
@@ -6406,6 +6633,7 @@ class TestBackupRestorePathSanitization:
     def test_empty_path_component_rejected(self, client_admin):
         import io as _io
         import zipfile as _zf
+
         buf = _io.BytesIO()
         with _zf.ZipFile(buf, 'w') as zfile:
             # 'astrodex/...' → rel='...', secure_filename('...')='' → rejected
@@ -6442,6 +6670,7 @@ class TestSpaceflightImageSidecar:
     def test_sidecar_download_exception_returns_404(self, client_admin, monkeypatch, tmp_path):
         """sidecar exists but download fails → 404 Image unavailable."""
         import requests as _reqs
+
         img_dir = tmp_path / 'spaceflight_images'
         img_dir.mkdir()
         sidecar = img_dir / (self.VALID_HEX + '.url')
@@ -6463,13 +6692,18 @@ class TestSpaceflightImageSidecar:
         sidecar = img_dir / (self.VALID_HEX + '.url')
         sidecar.write_text('https://example.com/image.jpg', encoding='utf-8')
 
-        mock_response = type('R', (), {
-            'raise_for_status': lambda self: None,
-            'iter_content': lambda self, chunk_size=8192: [b'\xff\xd8\xff\xe0fake_jpeg'],
-        })()
+        mock_response = type(
+            'R',
+            (),
+            {
+                'raise_for_status': lambda self: None,
+                'iter_content': lambda self, chunk_size=8192: [b'\xff\xd8\xff\xe0fake_jpeg'],
+            },
+        )()
 
         monkeypatch.setattr(_tracking_mod, 'DATA_DIR_CACHE', str(tmp_path))
         import requests as _reqs
+
         monkeypatch.setattr(_reqs, 'get', lambda *a, **kw: mock_response)
         resp = client_admin.get(f'/api/spaceflight/img/{self.VALID_HEX}')
         assert resp.status_code in (200, 404)  # 200 if downloaded file is served
@@ -6503,6 +6737,7 @@ class TestTranslateSpecialPhenomenaT:
 
     def _i18n_returns_key(self):
         """Returns mock I18nManager whose t() echoes back the key unchanged."""
+
         class _KeyI18n:
             def t(self, key, **kwargs):
                 return key  # translation = key → not a real translation
@@ -6512,22 +6747,30 @@ class TestTranslateSpecialPhenomenaT:
     def test_t_with_kwargs_format_success(self, monkeypatch):
         """kwargs truthy, fallback.format(**kwargs) succeeds."""
         monkeypatch.setattr(_astronomy_mod, 'I18nManager', self._i18n_returns_key())
-        data = {'events': [{
-            'event_type': 'Milky Way Core Visibility',
-            'galactic_center_altitude': 45.0,
-            'description': 'Galactic center visible at {gc_altitude}° altitude.',
-        }]}
+        data = {
+            'events': [
+                {
+                    'event_type': 'Milky Way Core Visibility',
+                    'galactic_center_altitude': 45.0,
+                    'description': 'Galactic center visible at {gc_altitude}° altitude.',
+                }
+            ]
+        }
         result = _astronomy_mod._translate_special_phenomena_events(data, 'fr')
         assert '45' in result['events'][0]['description']
 
     def test_t_with_kwargs_format_fail_returns_fallback(self, monkeypatch):
         """kwargs truthy, format raises → return fallback."""
         monkeypatch.setattr(_astronomy_mod, 'I18nManager', self._i18n_returns_key())
-        data = {'events': [{
-            'event_type': 'Milky Way Core Visibility',
-            'galactic_center_altitude': 45.0,
-            'description': '{nonexistent_key_xyz} broken format',  # key not in kwargs → KeyError
-        }]}
+        data = {
+            'events': [
+                {
+                    'event_type': 'Milky Way Core Visibility',
+                    'galactic_center_altitude': 45.0,
+                    'description': '{nonexistent_key_xyz} broken format',  # key not in kwargs → KeyError
+                }
+            ]
+        }
         result = _astronomy_mod._translate_special_phenomena_events(data, 'fr')
         # fallback returned as-is on format error
         assert '{nonexistent_key_xyz}' in result['events'][0]['description']
@@ -6535,11 +6778,15 @@ class TestTranslateSpecialPhenomenaT:
     def test_t_without_kwargs_returns_fallback(self, monkeypatch):
         """kwargs falsy → return fallback directly."""
         monkeypatch.setattr(_astronomy_mod, 'I18nManager', self._i18n_returns_key())
-        data = {'events': [{
-            'event_type': 'Seasonal',
-            'raw_data': {'event': 'spring_equinox'},
-            'title': 'Vernal Equinox Spring',
-        }]}
+        data = {
+            'events': [
+                {
+                    'event_type': 'Seasonal',
+                    'raw_data': {'event': 'spring_equinox'},
+                    'title': 'Vernal Equinox Spring',
+                }
+            ]
+        }
         result = _astronomy_mod._translate_special_phenomena_events(data, 'fr')
         # fallback (original title) returned when no kwargs
         assert result['events'][0]['title'] == 'Vernal Equinox Spring'
@@ -6556,14 +6803,17 @@ class TestSiderealTimeCacheSkipSync:
     def test_valid_today_cache_skips_sync(self, client_admin, monkeypatch):
         from unittest.mock import MagicMock
         from observation import sidereal_time as _st
+
         mock_svc = MagicMock()
         mock_svc.get_current_sidereal_info.return_value = {'sidereal_time': 12.0}
         monkeypatch.setattr(_st, 'SiderealTimeService', lambda **kw: mock_svc)
-        monkeypatch.setattr(_route_helpers_mod, 'load_config', lambda: {
-            'location': {'latitude': 48.0, 'longitude': 2.0, 'elevation': 100, 'timezone': 'UTC'}
-        })
-        # Make is_cache_valid_for_today return True → False branch of `if not ...` → skip 
-        monkeypatch.setattr(_app_mod.cache_store, 'is_cache_valid_for_today', lambda *_: True)
+        monkeypatch.setattr(
+            _route_helpers_mod,
+            'load_config',
+            lambda: {'location': {'latitude': 48.0, 'longitude': 2.0, 'elevation': 100, 'timezone': 'UTC'}},
+        )
+        # Make is_cache_valid_for_today return True → False branch of `if not ...` → skip
+        monkeypatch.setattr(_app_mod.cache_store, 'is_cache_valid_for_today', lambda *_, **__: True)
         _LEGACY['sidereal_time']['data'] = {'hourly_forecast': []}
         resp = client_admin.get('/api/astro/sidereal-time')
         assert resp.status_code == 200
@@ -6607,6 +6857,7 @@ class TestResolveObservingNightBranches:
 
     def _make_report(self, dusk, dawn):
         from types import SimpleNamespace as SN
+
         return SN(nautical_dusk=dusk, nautical_dawn=dawn)
 
     def test_no_location_falls_to_skytonight_fallback(self, monkeypatch):
@@ -6614,9 +6865,13 @@ class TestResolveObservingNightBranches:
         monkeypatch.setattr(
             _route_helpers_mod, 'load_config', lambda: _v12_config({'latitude': None, 'longitude': None})
         )
-        monkeypatch.setattr(_plan_my_night_mod, 'load_calculation_results', lambda *_a, **_k: {
-            'metadata': {'night_start': '2026-06-09T21:00:00+02:00', 'night_end': '2026-06-10T04:00:00+02:00'}
-        })
+        monkeypatch.setattr(
+            _plan_my_night_mod,
+            'load_calculation_results',
+            lambda *_a, **_k: {
+                'metadata': {'night_start': '2026-06-09T21:00:00+02:00', 'night_end': '2026-06-10T04:00:00+02:00'}
+            },
+        )
         result = _plan_my_night_mod._resolve_observing_night_for_plan()
         assert result is not None
         assert 'start' in result
@@ -6624,6 +6879,7 @@ class TestResolveObservingNightBranches:
     def test_empty_dusk_dawn_returns_none_parse(self, monkeypatch):
         """_parse('') → return None; triggers tomorrow fetch."""
         from unittest.mock import MagicMock
+
         mock_svc = MagicMock()
         mock_svc.get_today_report.return_value = self._make_report('', 'Not found')
         # Tomorrow also returns empty → no valid window
@@ -6637,6 +6893,7 @@ class TestResolveObservingNightBranches:
     def test_invalid_date_parse_returns_none(self, monkeypatch):
         """strptime fails → return None; triggers tomorrow fetch."""
         from unittest.mock import MagicMock
+
         mock_svc = MagicMock()
         mock_svc.get_today_report.return_value = self._make_report('NOT-A-DATE', 'ALSO-BAD')
         mock_svc.get_tomorrow_report.return_value = self._make_report('NOT-A-DATE', 'ALSO-BAD')
@@ -6649,13 +6906,12 @@ class TestResolveObservingNightBranches:
     def test_today_dusk_none_fetches_tomorrow(self, monkeypatch):
         """today dusk is None → fetch tomorrow report."""
         from unittest.mock import MagicMock
+
         mock_svc = MagicMock()
         # Today: dusk=None → triggers tomorrow fetch
         mock_svc.get_today_report.return_value = self._make_report('', '')
         # Tomorrow: valid dusk < dawn
-        mock_svc.get_tomorrow_report.return_value = self._make_report(
-            '2026-06-10 21:30', '2026-06-11 04:00'
-        )
+        mock_svc.get_tomorrow_report.return_value = self._make_report('2026-06-10 21:30', '2026-06-11 04:00')
         monkeypatch.setattr(_route_helpers_mod, 'load_config', _v12_config)
         monkeypatch.setattr(_plan_my_night_mod, 'SunService', lambda **kw: mock_svc)
         result = _plan_my_night_mod._resolve_observing_night_for_plan()
@@ -6665,14 +6921,19 @@ class TestResolveObservingNightBranches:
     def test_tomorrow_also_invalid_falls_to_skytonight(self, monkeypatch):
         """tomorrow's dusk/dawn also invalid → None → SkyTonight fallback."""
         from unittest.mock import MagicMock
+
         mock_svc = MagicMock()
         mock_svc.get_today_report.return_value = self._make_report('', '')
         mock_svc.get_tomorrow_report.return_value = self._make_report('', '')
         monkeypatch.setattr(_route_helpers_mod, 'load_config', _v12_config)
         monkeypatch.setattr(_plan_my_night_mod, 'SunService', lambda **kw: mock_svc)
-        monkeypatch.setattr(_plan_my_night_mod, 'load_calculation_results', lambda *_a, **_k: {
-            'metadata': {'night_start': '2026-06-09T21:00:00+00:00', 'night_end': '2026-06-10T04:00:00+00:00'}
-        })
+        monkeypatch.setattr(
+            _plan_my_night_mod,
+            'load_calculation_results',
+            lambda *_a, **_k: {
+                'metadata': {'night_start': '2026-06-09T21:00:00+00:00', 'night_end': '2026-06-10T04:00:00+00:00'}
+            },
+        )
         result = _plan_my_night_mod._resolve_observing_night_for_plan()
         assert result is not None  # SkyTonight fallback succeeds
 
@@ -6693,17 +6954,15 @@ class TestAddPlanTargetToAstrodexBranches:
 
         entry_id = 'test-search-loop-entry'
 
-        monkeypatch.setattr(_pmn, 'get_plan_with_timeline',
-                            lambda *a, **kw: {'plan': {'entries': []}})
-        monkeypatch.setattr(_pmn, 'get_all_plan_files',
-                            lambda uid: [f'/fake/{uid}_plan_scope1.json'])
-        monkeypatch.setattr(_pmn, 'load_user_plan',
-                            lambda *a, **kw: {'plan': {'entries': [
-                                {'id': entry_id, 'name': 'M42', 'catalogue': 'Messier'}
-                            ]}})
+        monkeypatch.setattr(_pmn, 'get_plan_with_timeline', lambda *a, **kw: {'plan': {'entries': []}})
+        monkeypatch.setattr(_pmn, 'get_all_plan_files', lambda uid: [f'/fake/{uid}_plan_scope1.json'])
+        monkeypatch.setattr(
+            _pmn,
+            'load_user_plan',
+            lambda *a, **kw: {'plan': {'entries': [{'id': entry_id, 'name': 'M42', 'catalogue': 'Messier'}]}},
+        )
         monkeypatch.setattr(_ad, 'is_item_in_astrodex', lambda *a: False)
-        monkeypatch.setattr(_ad, 'create_astrodex_item',
-                            lambda *a, **kw: {'id': 'new-item', 'name': 'M42'})
+        monkeypatch.setattr(_ad, 'create_astrodex_item', lambda *a, **kw: {'id': 'new-item', 'name': 'M42'})
 
         resp = client_admin.post(f'/api/plan-my-night/targets/{entry_id}/add-to-astrodex')
         assert resp.status_code in (200, 201)
@@ -6732,6 +6991,7 @@ class TestCreateAccessoryNone:
 
     def test_create_accessory_none_returns_500(self, client_admin, monkeypatch):
         from equipment import equipment_profiles as _ep
+
         monkeypatch.setattr(_ep, 'create_accessory', lambda *a, **kw: None)
         resp = client_admin.post('/api/equipment/accessories', json={'name': 'TestBarlow'})
         assert resp.status_code == 500
@@ -6747,10 +7007,14 @@ class TestPushSubscriptionsMozillaOtherProvider:
 
     def test_mozilla_and_other_endpoints_classified(self, client_admin, monkeypatch):
         admin = user_manager.get_user_by_username('admin')
-        monkeypatch.setattr(admin, 'push_subscriptions', [
-            {'endpoint': 'https://push.services.mozilla.com/notify/abc', 'keys': {}},
-            {'endpoint': 'https://unknown-push.example.com/token', 'keys': {}},
-        ])
+        monkeypatch.setattr(
+            admin,
+            'push_subscriptions',
+            [
+                {'endpoint': 'https://push.services.mozilla.com/notify/abc', 'keys': {}},
+                {'endpoint': 'https://unknown-push.example.com/token', 'keys': {}},
+            ],
+        )
         resp = client_admin.get('/api/push/subscriptions')
         assert resp.status_code == 200
         subs = resp.get_json()['subscriptions']
@@ -6874,8 +7138,7 @@ class TestTimezoneFilterBranch:
     """Cover a tz matching posix/right/localtime skips body (False branch)."""
 
     def test_localtime_tz_skipped_by_filter(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_misc_mod, 'available_timezones',
-                            lambda: {'UTC', 'Europe/Paris', 'localtime'})
+        monkeypatch.setattr(_misc_mod, 'available_timezones', lambda: {'UTC', 'Europe/Paris', 'localtime'})
         resp = client_admin.get('/api/timezones')
         assert resp.status_code == 200
         data = resp.get_json()
@@ -6896,16 +7159,21 @@ class TestTranslateSolarSystemMissingFields:
     def test_meteor_shower_missing_fields_skips_translation(self, monkeypatch):
         """shower_name/zenith_hourly_rate/parent_body falsy → skip title/desc."""
         from unittest.mock import MagicMock
+
         mock_i18n = MagicMock()
         monkeypatch.setattr(_astronomy_mod, 'I18nManager', lambda lang: mock_i18n)
-        data = {'events': [{
-            'event_type': 'Meteor Shower',
-            'raw_data': {'shower': ''},  # empty → condition False
-            'zenith_hourly_rate': '',
-            'parent_body': '',
-            'title': 'Meteor Shower',
-            'description': 'Some shower',
-        }]}
+        data = {
+            'events': [
+                {
+                    'event_type': 'Meteor Shower',
+                    'raw_data': {'shower': ''},  # empty → condition False
+                    'zenith_hourly_rate': '',
+                    'parent_body': '',
+                    'title': 'Meteor Shower',
+                    'description': 'Some shower',
+                }
+            ]
+        }
         result = _astronomy_mod._translate_solar_system_events(data, 'fr')
         assert result['events'][0]['title'] == 'Meteor Shower'
         mock_i18n.t.assert_not_called()
@@ -6913,16 +7181,21 @@ class TestTranslateSolarSystemMissingFields:
     def test_comet_appearance_missing_fields_skips_translation(self, monkeypatch):
         """comet_name/magnitude/visibility falsy → skip title/desc."""
         from unittest.mock import MagicMock
+
         mock_i18n = MagicMock()
         monkeypatch.setattr(_astronomy_mod, 'I18nManager', lambda lang: mock_i18n)
-        data = {'events': [{
-            'event_type': 'Comet Appearance',
-            'raw_data': {'comet': ''},  # empty → condition False
-            'magnitude': '',
-            'equipment_needed': '',
-            'title': 'Comet Appearance',
-            'description': 'Some comet',
-        }]}
+        data = {
+            'events': [
+                {
+                    'event_type': 'Comet Appearance',
+                    'raw_data': {'comet': ''},  # empty → condition False
+                    'magnitude': '',
+                    'equipment_needed': '',
+                    'title': 'Comet Appearance',
+                    'description': 'Some comet',
+                }
+            ]
+        }
         result = _astronomy_mod._translate_solar_system_events(data, 'fr')
         assert result['events'][0]['title'] == 'Comet Appearance'
         mock_i18n.t.assert_not_called()
@@ -6966,17 +7239,17 @@ class TestAddPlanTargetDefaultAndMultiPlan:
 
         entry_id = 'test-default-plan-entry'
 
-        monkeypatch.setattr(_pmn, 'get_plan_with_timeline',
-                            lambda *a, **kw: {'plan': {'entries': []}})
-        monkeypatch.setattr(_pmn, 'get_all_plan_files',
-                            lambda uid: [f'/fake/{uid}_plan_my_night.json'])
-        monkeypatch.setattr(_pmn, 'load_user_plan',
-                            lambda uid, uname, combination_id=None: {'plan': {'entries': [
-                                {'id': entry_id, 'name': 'M31', 'catalogue': 'Messier'}
-                            ]}})
+        monkeypatch.setattr(_pmn, 'get_plan_with_timeline', lambda *a, **kw: {'plan': {'entries': []}})
+        monkeypatch.setattr(_pmn, 'get_all_plan_files', lambda uid: [f'/fake/{uid}_plan_my_night.json'])
+        monkeypatch.setattr(
+            _pmn,
+            'load_user_plan',
+            lambda uid, uname, combination_id=None: {
+                'plan': {'entries': [{'id': entry_id, 'name': 'M31', 'catalogue': 'Messier'}]}
+            },
+        )
         monkeypatch.setattr(_ad, 'is_item_in_astrodex', lambda *a: False)
-        monkeypatch.setattr(_ad, 'create_astrodex_item',
-                            lambda *a, **kw: {'id': 'new-item', 'name': 'M31'})
+        monkeypatch.setattr(_ad, 'create_astrodex_item', lambda *a, **kw: {'id': 'new-item', 'name': 'M31'})
 
         resp = client_admin.post(f'/api/plan-my-night/targets/{entry_id}/add-to-astrodex')
         assert resp.status_code in (200, 201)
@@ -6989,13 +7262,15 @@ class TestAddPlanTargetDefaultAndMultiPlan:
 
         entry_id = 'test-second-plan-entry'
 
-        monkeypatch.setattr(_pmn, 'get_plan_with_timeline',
-                            lambda *a, **kw: {'plan': {'entries': []}})
-        monkeypatch.setattr(_pmn, 'get_all_plan_files',
-                            lambda uid: [
-                                f'/fake/{uid}_plan_combo1.json',
-                                f'/fake/{uid}_plan_combo2.json',
-                            ])
+        monkeypatch.setattr(_pmn, 'get_plan_with_timeline', lambda *a, **kw: {'plan': {'entries': []}})
+        monkeypatch.setattr(
+            _pmn,
+            'get_all_plan_files',
+            lambda uid: [
+                f'/fake/{uid}_plan_combo1.json',
+                f'/fake/{uid}_plan_combo2.json',
+            ],
+        )
 
         call_count = [0]
 
@@ -7003,14 +7278,11 @@ class TestAddPlanTargetDefaultAndMultiPlan:
             call_count[0] += 1
             if call_count[0] == 1:
                 return {'plan': {'entries': []}}  # Not found in first
-            return {'plan': {'entries': [
-                {'id': entry_id, 'name': 'NGC 224', 'catalogue': 'NGC'}
-            ]}}
+            return {'plan': {'entries': [{'id': entry_id, 'name': 'NGC 224', 'catalogue': 'NGC'}]}}
 
         monkeypatch.setattr(_pmn, 'load_user_plan', _load_user_plan)
         monkeypatch.setattr(_ad, 'is_item_in_astrodex', lambda *a: False)
-        monkeypatch.setattr(_ad, 'create_astrodex_item',
-                            lambda *a, **kw: {'id': 'new-item', 'name': 'NGC 224'})
+        monkeypatch.setattr(_ad, 'create_astrodex_item', lambda *a, **kw: {'id': 'new-item', 'name': 'NGC 224'})
 
         resp = client_admin.post(f'/api/plan-my-night/targets/{entry_id}/add-to-astrodex')
         assert resp.status_code in (200, 201)
@@ -7118,11 +7390,13 @@ class TestAllSkyStatusApi:
 
     def test_returns_cached_data(self, client_admin, monkeypatch):
         cfg = {
-            "url": "http://allsky.local", "enabled": True,
+            "url": "http://allsky.local",
+            "enabled": True,
             "modules": {"sensor_data": {"enabled": True}},
         }
         monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
         from cache import cache_store as cs
+
         original = dict(cs._allsky_sensor_cache)
         cs._allsky_sensor_cache["data"] = {"AS_TEMPERATURE_C": 15.0}
         try:
@@ -7135,14 +7409,19 @@ class TestAllSkyStatusApi:
 
     def test_fetches_live_when_cache_empty(self, client_admin, monkeypatch):
         from unittest.mock import patch, MagicMock
+
         cfg = {
-            "url": "http://allsky.local", "enabled": True,
+            "url": "http://allsky.local",
+            "enabled": True,
             "modules": {"sensor_data": {"enabled": True}},
         }
         monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
         from cache import cache_store as cs
+
         cs._allsky_sensor_cache["data"] = None
-        with patch('connectors.allsky_connector.AllSkyConnector.fetch_sensor_data', return_value={"AS_TEMPERATURE_C": 20.0}):
+        with patch(
+            'connectors.allsky_connector.AllSkyConnector.fetch_sensor_data', return_value={"AS_TEMPERATURE_C": 20.0}
+        ):
             resp = client_admin.get('/api/connectors/allsky/status')
         assert resp.status_code == 200
         cs._allsky_sensor_cache["data"] = None
@@ -7161,6 +7440,7 @@ class TestAllSkyHealthApi:
         monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
         from cache import cache_store as cs
         import time
+
         cs._allsky_health_cache["data"] = {"reachable": True, "modules": {}}
         cs._allsky_health_cache["timestamp"] = time.time()
         try:
@@ -7173,10 +7453,12 @@ class TestAllSkyHealthApi:
 
     def test_get_fresh_bypasses_cache(self, client_admin, monkeypatch):
         from unittest.mock import patch
+
         cfg = {"url": "http://allsky.local", "enabled": True, "modules": {}}
         monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
         from cache import cache_store as cs
         import time
+
         cs._allsky_health_cache["data"] = {"reachable": True, "modules": {}}
         cs._allsky_health_cache["timestamp"] = time.time()
         fresh_result = {"reachable": False, "modules": {}}
@@ -7191,13 +7473,16 @@ class TestAllSkyHealthApi:
 
     def test_get_live_health_check(self, client_admin, monkeypatch):
         from unittest.mock import patch
+
         cfg = {"url": "http://allsky.local", "enabled": True, "modules": {}}
         monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
         from cache import cache_store as cs
+
         cs._allsky_health_cache["data"] = None
         cs._allsky_health_cache["timestamp"] = 0
-        with patch('connectors.allsky_connector.AllSkyConnector.health_check',
-                   return_value={"reachable": True, "modules": {}}):
+        with patch(
+            'connectors.allsky_connector.AllSkyConnector.health_check', return_value={"reachable": True, "modules": {}}
+        ):
             resp = client_admin.get('/api/connectors/allsky/health')
         assert resp.status_code == 200
         assert resp.get_json()['reachable'] is True
@@ -7205,50 +7490,55 @@ class TestAllSkyHealthApi:
         cs._allsky_health_cache["timestamp"] = 0
 
     def test_post_missing_url_returns_400(self, client_admin, monkeypatch):
-        resp = client_admin.post('/api/connectors/allsky/health',
-                                 json={}, content_type='application/json')
+        resp = client_admin.post('/api/connectors/allsky/health', json={}, content_type='application/json')
         assert resp.status_code == 400
         assert resp.get_json()['reachable'] is False
 
     def test_post_reachable_url(self, client_admin, monkeypatch):
         from unittest.mock import patch, MagicMock
+
         mock_resp = MagicMock(status_code=200)
         with patch('requests.head', return_value=mock_resp):
-            resp = client_admin.post('/api/connectors/allsky/health',
-                                     json={"url": "http://allsky.local"},
-                                     content_type='application/json')
+            resp = client_admin.post(
+                '/api/connectors/allsky/health', json={"url": "http://allsky.local"}, content_type='application/json'
+            )
         assert resp.status_code == 200
         assert resp.get_json()['reachable'] is True
 
     def test_post_405_falls_back_to_get(self, client_admin, monkeypatch):
         from unittest.mock import patch, MagicMock
+
         head_resp = MagicMock(status_code=405)
         get_resp = MagicMock(status_code=200)
         with patch('requests.head', return_value=head_resp):
             with patch('requests.get', return_value=get_resp):
-                resp = client_admin.post('/api/connectors/allsky/health',
-                                         json={"url": "http://allsky.local"},
-                                         content_type='application/json')
+                resp = client_admin.post(
+                    '/api/connectors/allsky/health',
+                    json={"url": "http://allsky.local"},
+                    content_type='application/json',
+                )
         assert resp.status_code == 200
         assert resp.get_json()['reachable'] is True
 
     def test_post_connection_error_returns_not_reachable(self, client_admin, monkeypatch):
         import requests as _req
         from unittest.mock import patch
+
         with patch('requests.head', side_effect=_req.exceptions.ConnectionError):
-            resp = client_admin.post('/api/connectors/allsky/health',
-                                     json={"url": "http://allsky.local"},
-                                     content_type='application/json')
+            resp = client_admin.post(
+                '/api/connectors/allsky/health', json={"url": "http://allsky.local"}, content_type='application/json'
+            )
         assert resp.status_code == 200
         assert resp.get_json()['reachable'] is False
 
     def test_post_500_not_reachable(self, client_admin, monkeypatch):
         from unittest.mock import patch, MagicMock
+
         mock_resp = MagicMock(status_code=500)
         with patch('requests.head', return_value=mock_resp):
-            resp = client_admin.post('/api/connectors/allsky/health',
-                                     json={"url": "http://allsky.local"},
-                                     content_type='application/json')
+            resp = client_admin.post(
+                '/api/connectors/allsky/health', json={"url": "http://allsky.local"}, content_type='application/json'
+            )
         assert resp.status_code == 200
         assert resp.get_json()['reachable'] is False
 
@@ -7295,6 +7585,7 @@ class TestAllSkyProxyApi:
 
     def test_proxy_streams_content(self, client_admin, monkeypatch):
         from unittest.mock import patch, MagicMock
+
         monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         mock_resp = MagicMock()
         mock_resp.status_code = 200
@@ -7309,6 +7600,7 @@ class TestAllSkyProxyApi:
     def test_proxy_timeout_returns_504(self, client_admin, monkeypatch):
         import requests as _req
         from unittest.mock import patch
+
         monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         with patch('socket.getaddrinfo', return_value=[(None, None, None, None, ("1.2.3.4", 80))]):
             with patch('requests.get', side_effect=_req.exceptions.Timeout):
@@ -7318,6 +7610,7 @@ class TestAllSkyProxyApi:
     def test_proxy_connection_error_returns_502(self, client_admin, monkeypatch):
         import requests as _req
         from unittest.mock import patch
+
         monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         with patch('socket.getaddrinfo', return_value=[(None, None, None, None, ("1.2.3.4", 80))]):
             with patch('requests.get', side_effect=_req.exceptions.ConnectionError):
@@ -7326,6 +7619,7 @@ class TestAllSkyProxyApi:
 
     def test_proxy_range_header_forwarded(self, client_admin, monkeypatch):
         from unittest.mock import patch, MagicMock
+
         monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         mock_resp = MagicMock()
         mock_resp.status_code = 206
@@ -7347,6 +7641,7 @@ class TestAllSkyProxyApi:
 
     def test_proxy_dns_failure_uses_original_url(self, client_admin, monkeypatch):
         from unittest.mock import patch, MagicMock
+
         monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         mock_resp = MagicMock()
         mock_resp.status_code = 200
@@ -7359,6 +7654,7 @@ class TestAllSkyProxyApi:
 
     def test_proxy_empty_dns_result_uses_original_url(self, client_admin, monkeypatch):
         from unittest.mock import patch, MagicMock
+
         monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         mock_resp = MagicMock()
         mock_resp.status_code = 200
@@ -7371,6 +7667,7 @@ class TestAllSkyProxyApi:
 
     def test_proxy_non200_upstream_still_returned(self, client_admin, monkeypatch):
         from unittest.mock import patch, MagicMock
+
         monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         mock_resp = MagicMock()
         mock_resp.status_code = 404
@@ -7412,6 +7709,7 @@ class TestCSSPasses:
     def test_css_passes_exception_returns_500(self, client_admin, monkeypatch):
         def _boom(c, t):
             raise RuntimeError('storage failure')
+
         monkeypatch.setattr(_cache_store, 'is_cache_valid', _boom)
         resp = client_admin.get('/api/css/passes')
         assert resp.status_code == 500
@@ -7468,6 +7766,7 @@ class TestCSSLocation:
     def test_css_location_runtime_error_returns_503(self, client_admin, monkeypatch):
         def _raise(**_):
             raise RuntimeError('TLE unavailable')
+
         monkeypatch.setattr(_app_mod.css_passes, 'get_css_current_position', _raise)
         resp = client_admin.get('/api/css/location')
         assert resp.status_code == 503
@@ -7475,6 +7774,7 @@ class TestCSSLocation:
     def test_css_location_generic_exception_returns_500(self, client_admin, monkeypatch):
         def _raise(**_):
             raise ValueError('bad value')
+
         monkeypatch.setattr(_app_mod.css_passes, 'get_css_current_position', _raise)
         resp = client_admin.get('/api/css/location')
         assert resp.status_code == 500
@@ -7502,6 +7802,7 @@ class TestCSSCelestrakRestart:
     def test_css_celestrak_restart_exception_returns_500(self, client_admin, monkeypatch):
         def _raise():
             raise RuntimeError('disk error')
+
         monkeypatch.setattr(_app_mod.css_passes, 'clear_css_celestrak_block_flag', _raise)
         resp = client_admin.post('/api/css/celestrak/restart')
         assert resp.status_code == 500

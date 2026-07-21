@@ -12,7 +12,7 @@ used to determine the positions of celestial objects.
 """
 
 from datetime import datetime, timedelta, date
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from zoneinfo import ZoneInfo
 from utils.logging_config import get_logger
 
@@ -22,6 +22,11 @@ from astropy import units as u
 import numpy as np
 
 logger = get_logger(__name__)
+
+# Ratio of the mean solar day to the mean sidereal day: local sidereal time
+# advances this many sidereal hours per solar hour (1 solar hour = 1.00273790935
+# sidereal hours). Used to convert a sidereal-hour offset into elapsed civil time.
+SIDEREAL_TO_SOLAR_RATIO = 1.00273790935
 
 
 class SiderealTimeService:
@@ -111,7 +116,9 @@ class SiderealTimeService:
 
         return results
 
-    def get_object_lst_for_transit(self, ra_degrees: float, target_date: date) -> Dict[str, Any]:
+    def get_object_lst_for_transit(
+        self, ra_degrees: float, target_date: date, dec_degrees: Optional[float] = None
+    ) -> Dict[str, Any]:
         """
         Get the Local Sidereal Time when an object at a given RA will transit (cross meridian).
         Useful for planning observations of specific objects.
@@ -119,6 +126,9 @@ class SiderealTimeService:
         Args:
             ra_degrees: Right Ascension of target object in degrees
             target_date: Date for which to calculate (local date)
+            dec_degrees: Declination of target in degrees. Required to determine
+                whether the object is circumpolar; when omitted the
+                ``is_circumpolar`` field is reported as ``None`` (unknown).
 
         Returns:
             Dictionary with transit time and LST information
@@ -150,10 +160,13 @@ class SiderealTimeService:
             daily_sidereal_info = self._calculate_sidereal_info(time_obj)
             lst_at_midnight = float(daily_sidereal_info['local_sidereal_time_hours'])
 
-            # Calculate hours since midnight when transit occurs
-            hours_offset = lst_at_transit - lst_at_midnight
-            if hours_offset < 0:
-                hours_offset += 24
+            # Calculate hours since midnight when transit occurs. The offset is in
+            # sidereal hours; convert to elapsed civil (solar) time by dividing by the
+            # sidereal-to-solar rate, otherwise the transit drifts up to ~4 min late.
+            sidereal_offset = lst_at_transit - lst_at_midnight
+            if sidereal_offset < 0:
+                sidereal_offset += 24
+            hours_offset = sidereal_offset / SIDEREAL_TO_SOLAR_RATIO
 
             transit_time = start_of_day + timedelta(hours=hours_offset)
             transit_time_obj = Time(transit_time)
@@ -164,7 +177,7 @@ class SiderealTimeService:
                 'local_sidereal_time_at_transit_hours': lst_at_transit,
                 'transit_time_utc': transit_time_obj.iso,
                 'transit_time_local': transit_time.isoformat(),
-                'is_circumpolar': self._is_circumpolar(ra_degrees),
+                'is_circumpolar': (self._is_circumpolar(dec_degrees) if dec_degrees is not None else None),
                 'accuracy_note': 'Transit time is approximate; use more precise ephemeris for exact pointing',
             }
 
@@ -175,8 +188,10 @@ class SiderealTimeService:
     def _calculate_sidereal_info(self, time_obj: Time) -> Dict[str, Any]:
         """Calculate comprehensive sidereal time information."""
         try:
-            # Greenwich Sidereal Time
-            gst = time_obj.sidereal_time('mean', longitude=0 * u.deg)
+            # Greenwich Apparent Sidereal Time (includes nutation / the equation of
+            # the equinoxes, up to ~1.1 s more accurate than mean sidereal time and
+            # consistent with the apparent LST used elsewhere in the app).
+            gst = time_obj.sidereal_time('apparent', longitude=0 * u.deg)
             gst_hour_val = gst.hour
             if isinstance(gst_hour_val, (np.ndarray, complex)):
                 gst_hours = float(np.real(np.atleast_1d(gst_hour_val).flat[0]))
@@ -328,12 +343,17 @@ class SiderealTimeService:
         s = ((hours - h) * 60 - m) * 60
         return f"{h:02d}h {m:02d}m {s:05.2f}s"
 
-    def _is_circumpolar(self, ra_degrees: float) -> bool:
+    def _is_circumpolar(self, dec_degrees: float) -> bool:
         """
-        Check if an object at given RA is circumpolar (never sets).
-        Note: This is a simplified check; actual visibility depends on declination too.
+        Check if an object at a given declination is circumpolar (never sets).
+
+        An object never sets when its declination lies within the observer's
+        latitude of the visible celestial pole: ``dec >= 90 - lat`` in the
+        northern hemisphere, ``dec <= -(90 + lat)`` in the southern. Right
+        ascension has no bearing on circumpolarity - only declination and the
+        observer's latitude do.
         """
-        # A rough approximation: objects are circumpolar if they're always above horizon
-        # This depends on both RA and the observer's latitude
-        # For simplicity, we note that circumpolar objects depend on declination primarily
-        return False  # RA alone doesn't determine this; declination is the key factor
+        lat = self.latitude
+        if lat >= 0:
+            return dec_degrees >= (90.0 - lat)
+        return dec_degrees <= -(90.0 + lat)

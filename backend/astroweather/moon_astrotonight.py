@@ -84,14 +84,20 @@ class AstroTonightService:
         Returns a dict keyed by mode: {'strict': BestWindow, 'practical': BestWindow, 'illumination': BestWindow}
         """
         now = datetime.datetime.now(self.timezone)
-        today = now.date()
+        # Before dawn we are still inside the night that began the previous evening,
+        # so anchor the window there (otherwise a pre-dawn call would skip the
+        # in-progress night and jump to the next evening); after 06:00 local, use
+        # tonight's upcoming night.
+        base_date = now.date() - datetime.timedelta(days=1) if now.hour < 6 else now.date()
 
         step_minutes = 5
         step = datetime.timedelta(minutes=step_minutes)
 
         # Night interval: 18:00 → 06:00 local
-        start = datetime.datetime.combine(today, datetime.time(18, 0), tzinfo=self.timezone)
-        end = datetime.datetime.combine(today + datetime.timedelta(days=1), datetime.time(6, 0), tzinfo=self.timezone)
+        start = datetime.datetime.combine(base_date, datetime.time(18, 0), tzinfo=self.timezone)
+        end = datetime.datetime.combine(
+            base_date + datetime.timedelta(days=1), datetime.time(6, 0), tzinfo=self.timezone
+        )
 
         # Illumination computed once per night (used by 'illumination' mode)
         illumination = self._moon_illumination(start)

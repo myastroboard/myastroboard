@@ -15,6 +15,16 @@ class _Dist:
         self.km = km
 
 
+@pytest.fixture(autouse=True)
+def _reset_ephemeris_memo():
+    """Reset the process-wide de421 memo so each test's SKYFIELD_LOADER patch applies."""
+    mod._EPHEMERIS = None
+    mod._EPHEMERIS_ATTEMPTED = False
+    yield
+    mod._EPHEMERIS = None
+    mod._EPHEMERIS_ATTEMPTED = False
+
+
 def test_cache_helper_roundtrip_branches(monkeypatch):
     store = {}
 
@@ -120,7 +130,9 @@ def test_cooldown_and_block_state_mutators(monkeypatch):
 
 def test_clear_celestrak_block_flag_calls_clear(monkeypatch):
     called = {"clear": 0}
-    monkeypatch.setattr(mod, "_clear_celestrak_block", lambda reset_failure_cooldown=True: called.update({"clear": called["clear"] + 1}))
+    monkeypatch.setattr(
+        mod, "_clear_celestrak_block", lambda reset_failure_cooldown=True: called.update({"clear": called["clear"] + 1})
+    )
     monkeypatch.setattr(mod, "get_celestrak_status", lambda: {"blocked": False})
     result = mod.clear_celestrak_block_flag()
     assert called["clear"] == 1
@@ -177,7 +189,9 @@ def test_load_ephemeris_failure_returns_none(monkeypatch):
 def test_fetch_tle_recent_cache_fast_path(monkeypatch):
     svc = mod.ISSPassService(45.5, -73.5, 10, "UTC")
     monkeypatch.setattr(mod, "_get_cached_tle", lambda max_age_seconds=None: ("1 A", "2 B", 1))
-    monkeypatch.setattr(mod.requests, "get", lambda *a, **k: (_ for _ in ()).throw(AssertionError("network should not be called")))
+    monkeypatch.setattr(
+        mod.requests, "get", lambda *a, **k: (_ for _ in ()).throw(AssertionError("network should not be called"))
+    )
     assert svc._fetch_iss_tle() == ("1 A", "2 B")
 
 
@@ -219,7 +233,9 @@ def test_fetch_tle_success_from_celestrak_resets_flags(monkeypatch):
 
     called = {"reset": 0, "clear": 0}
     monkeypatch.setattr(mod, "_reset_celestrak_timeout_streak", lambda: called.update({"reset": called["reset"] + 1}))
-    monkeypatch.setattr(mod, "_clear_celestrak_block", lambda reset_failure_cooldown=True: called.update({"clear": called["clear"] + 1}))
+    monkeypatch.setattr(
+        mod, "_clear_celestrak_block", lambda reset_failure_cooldown=True: called.update({"clear": called["clear"] + 1})
+    )
     monkeypatch.setattr(mod, "_set_cached_tle_with_source", lambda *a, **k: None)
 
     class _Resp:
@@ -294,13 +310,17 @@ def test_build_passes_and_extract_visible_segment_paths(monkeypatch):
 
     monkeypatch.setattr(svc, "_extract_visible_segment", original_extract)
 
-    monkeypatch.setattr(svc, "_sample_observation", lambda *_a, **_k: {
-        "time_utc": start,
-        "altitude_deg": 5.0,
-        "azimuth_deg": 10.0,
-        "sun_altitude_deg": 0.0,
-        "is_visible": False,
-    })
+    monkeypatch.setattr(
+        svc,
+        "_sample_observation",
+        lambda *_a, **_k: {
+            "time_utc": start,
+            "altitude_deg": 5.0,
+            "azimuth_deg": 10.0,
+            "sun_altitude_deg": 0.0,
+            "is_visible": False,
+        },
+    )
     assert svc._extract_visible_segment(start, start + timedelta(seconds=10), None, None, None, None) is None
 
 
@@ -337,13 +357,53 @@ def test_find_solar_transits_and_extract_segment(monkeypatch):
     monkeypatch.setattr(svc, "_extract_solar_transit_segment", original)
 
     coarse = [
-        {"time_utc": start, "iss_altitude_deg": 20.0, "sun_altitude_deg": 10.0, "separation_deg": 0.5, "solar_radius_deg": 0.3, "sun_azimuth_deg": 180.0, "iss_azimuth_deg": 180.0},
-        {"time_utc": start + timedelta(seconds=1), "iss_altitude_deg": 20.0, "sun_altitude_deg": 10.0, "separation_deg": 0.2, "solar_radius_deg": 0.3, "sun_azimuth_deg": 180.0, "iss_azimuth_deg": 180.0},
-        {"time_utc": start + timedelta(seconds=2), "iss_altitude_deg": 20.0, "sun_altitude_deg": 10.0, "separation_deg": 0.4, "solar_radius_deg": 0.3, "sun_azimuth_deg": 180.0, "iss_azimuth_deg": 180.0},
+        {
+            "time_utc": start,
+            "iss_altitude_deg": 20.0,
+            "sun_altitude_deg": 10.0,
+            "separation_deg": 0.5,
+            "solar_radius_deg": 0.3,
+            "sun_azimuth_deg": 180.0,
+            "iss_azimuth_deg": 180.0,
+        },
+        {
+            "time_utc": start + timedelta(seconds=1),
+            "iss_altitude_deg": 20.0,
+            "sun_altitude_deg": 10.0,
+            "separation_deg": 0.2,
+            "solar_radius_deg": 0.3,
+            "sun_azimuth_deg": 180.0,
+            "iss_azimuth_deg": 180.0,
+        },
+        {
+            "time_utc": start + timedelta(seconds=2),
+            "iss_altitude_deg": 20.0,
+            "sun_altitude_deg": 10.0,
+            "separation_deg": 0.4,
+            "solar_radius_deg": 0.3,
+            "sun_azimuth_deg": 180.0,
+            "iss_azimuth_deg": 180.0,
+        },
     ]
     refined = [
-        {"time_utc": start + timedelta(seconds=1), "iss_altitude_deg": 20.0, "sun_altitude_deg": 10.0, "separation_deg": 0.2, "solar_radius_deg": 0.3, "sun_azimuth_deg": 180.0, "iss_azimuth_deg": 180.0},
-        {"time_utc": start + timedelta(seconds=1, milliseconds=100), "iss_altitude_deg": 20.0, "sun_altitude_deg": 10.0, "separation_deg": 0.05, "solar_radius_deg": 0.3, "sun_azimuth_deg": 180.0, "iss_azimuth_deg": 180.0},
+        {
+            "time_utc": start + timedelta(seconds=1),
+            "iss_altitude_deg": 20.0,
+            "sun_altitude_deg": 10.0,
+            "separation_deg": 0.2,
+            "solar_radius_deg": 0.3,
+            "sun_azimuth_deg": 180.0,
+            "iss_azimuth_deg": 180.0,
+        },
+        {
+            "time_utc": start + timedelta(seconds=1, milliseconds=100),
+            "iss_altitude_deg": 20.0,
+            "sun_altitude_deg": 10.0,
+            "separation_deg": 0.05,
+            "solar_radius_deg": 0.3,
+            "sun_azimuth_deg": 180.0,
+            "iss_azimuth_deg": 180.0,
+        },
     ]
 
     def _sample_time_range(start_utc, end_utc, step_seconds, sampler):
@@ -355,15 +415,21 @@ def test_find_solar_transits_and_extract_segment(monkeypatch):
     assert seg["is_visible"] is True
 
     # No candidate path.
-    monkeypatch.setattr(svc, "_sample_time_range", lambda *a, **k: [{
-        "time_utc": start,
-        "iss_altitude_deg": -1.0,
-        "sun_altitude_deg": -1.0,
-        "separation_deg": 10.0,
-        "solar_radius_deg": 0.1,
-        "sun_azimuth_deg": 0.0,
-        "iss_azimuth_deg": 0.0,
-    }])
+    monkeypatch.setattr(
+        svc,
+        "_sample_time_range",
+        lambda *a, **k: [
+            {
+                "time_utc": start,
+                "iss_altitude_deg": -1.0,
+                "sun_altitude_deg": -1.0,
+                "separation_deg": 10.0,
+                "solar_radius_deg": 0.1,
+                "sun_azimuth_deg": 0.0,
+                "iss_azimuth_deg": 0.0,
+            }
+        ],
+    )
     assert svc._extract_solar_transit_segment(start, end, None, None, None, None) is None
 
     # Refined-candidates-empty fallback to coarse peak.
@@ -483,12 +549,48 @@ def test_find_lunar_transits_and_extract_segment(monkeypatch):
     monkeypatch.setattr(svc, "_extract_lunar_transit_segment", original)
 
     coarse = [
-        {"time_utc": start, "iss_altitude_deg": 20.0, "moon_altitude_deg": 40.0, "separation_deg": 0.5, "lunar_radius_deg": 0.3, "moon_azimuth_deg": 180.0, "iss_azimuth_deg": 180.0, "moon_illumination_pct": 10.0},
-        {"time_utc": start + timedelta(seconds=1), "iss_altitude_deg": 20.0, "moon_altitude_deg": 40.0, "separation_deg": 0.2, "lunar_radius_deg": 0.3, "moon_azimuth_deg": 180.0, "iss_azimuth_deg": 180.0, "moon_illumination_pct": 10.0},
+        {
+            "time_utc": start,
+            "iss_altitude_deg": 20.0,
+            "moon_altitude_deg": 40.0,
+            "separation_deg": 0.5,
+            "lunar_radius_deg": 0.3,
+            "moon_azimuth_deg": 180.0,
+            "iss_azimuth_deg": 180.0,
+            "moon_illumination_pct": 10.0,
+        },
+        {
+            "time_utc": start + timedelta(seconds=1),
+            "iss_altitude_deg": 20.0,
+            "moon_altitude_deg": 40.0,
+            "separation_deg": 0.2,
+            "lunar_radius_deg": 0.3,
+            "moon_azimuth_deg": 180.0,
+            "iss_azimuth_deg": 180.0,
+            "moon_illumination_pct": 10.0,
+        },
     ]
     refined = [
-        {"time_utc": start + timedelta(seconds=1), "iss_altitude_deg": 20.0, "moon_altitude_deg": 40.0, "separation_deg": 0.2, "lunar_radius_deg": 0.3, "moon_azimuth_deg": 180.0, "iss_azimuth_deg": 180.0, "moon_illumination_pct": 10.0},
-        {"time_utc": start + timedelta(seconds=1, milliseconds=100), "iss_altitude_deg": 20.0, "moon_altitude_deg": 40.0, "separation_deg": 0.05, "lunar_radius_deg": 0.3, "moon_azimuth_deg": 180.0, "iss_azimuth_deg": 180.0, "moon_illumination_pct": 10.0},
+        {
+            "time_utc": start + timedelta(seconds=1),
+            "iss_altitude_deg": 20.0,
+            "moon_altitude_deg": 40.0,
+            "separation_deg": 0.2,
+            "lunar_radius_deg": 0.3,
+            "moon_azimuth_deg": 180.0,
+            "iss_azimuth_deg": 180.0,
+            "moon_illumination_pct": 10.0,
+        },
+        {
+            "time_utc": start + timedelta(seconds=1, milliseconds=100),
+            "iss_altitude_deg": 20.0,
+            "moon_altitude_deg": 40.0,
+            "separation_deg": 0.05,
+            "lunar_radius_deg": 0.3,
+            "moon_azimuth_deg": 180.0,
+            "iss_azimuth_deg": 180.0,
+            "moon_illumination_pct": 10.0,
+        },
     ]
 
     def _sample_time_range(start_utc, end_utc, step_seconds, sampler):
@@ -499,16 +601,22 @@ def test_find_lunar_transits_and_extract_segment(monkeypatch):
     assert seg is not None
     assert seg["pass_type"] == "lunar_transit"
 
-    monkeypatch.setattr(svc, "_sample_time_range", lambda *a, **k: [{
-        "time_utc": start,
-        "iss_altitude_deg": -1.0,
-        "moon_altitude_deg": -1.0,
-        "separation_deg": 10.0,
-        "lunar_radius_deg": 0.1,
-        "moon_azimuth_deg": 0.0,
-        "iss_azimuth_deg": 0.0,
-        "moon_illumination_pct": 0.0,
-    }])
+    monkeypatch.setattr(
+        svc,
+        "_sample_time_range",
+        lambda *a, **k: [
+            {
+                "time_utc": start,
+                "iss_altitude_deg": -1.0,
+                "moon_altitude_deg": -1.0,
+                "separation_deg": 10.0,
+                "lunar_radius_deg": 0.1,
+                "moon_azimuth_deg": 0.0,
+                "iss_azimuth_deg": 0.0,
+                "moon_illumination_pct": 0.0,
+            }
+        ],
+    )
     assert svc._extract_lunar_transit_segment(start, end, None, None, None, object()) is None
 
     monkeypatch.setattr(svc, "_sample_time_range", lambda *a, **k: coarse)
@@ -630,7 +738,11 @@ def test_sample_observation_and_sun_alt_helpers(monkeypatch):
     o2 = svc._sample_observation(now, _Sat(), object(), _TS(), {"earth": object(), "sun": object()})
     assert o2["is_visible"] is False
 
-    monkeypatch.setattr(svc, "_sun_altitude_deg_skyfield", mod.ISSPassService._sun_altitude_deg_skyfield.__get__(svc, mod.ISSPassService))
+    monkeypatch.setattr(
+        svc,
+        "_sun_altitude_deg_skyfield",
+        mod.ISSPassService._sun_altitude_deg_skyfield.__get__(svc, mod.ISSPassService),
+    )
 
     class _A:
         def apparent(self):
@@ -876,7 +988,9 @@ def test_fetch_tle_cooldown_with_stale_cache(monkeypatch):
 
 def test_fetch_tle_celestrak_403_message_uses_cached_fallback(monkeypatch):
     svc = mod.ISSPassService(45.5, -73.5, 10, "UTC")
-    monkeypatch.setattr(mod, "_get_cached_tle", lambda max_age_seconds=None: ("1 A", "2 B", 1) if max_age_seconds is None else None)
+    monkeypatch.setattr(
+        mod, "_get_cached_tle", lambda max_age_seconds=None: ("1 A", "2 B", 1) if max_age_seconds is None else None
+    )
     monkeypatch.setattr(mod, "_in_tle_failure_cooldown", lambda: False)
     monkeypatch.setattr(mod, "get_celestrak_status", lambda: {"blocked": False})
     monkeypatch.setattr(mod, "_set_tle_error_timestamp", lambda: None)
@@ -888,14 +1002,7 @@ def test_fetch_tle_celestrak_403_message_uses_cached_fallback(monkeypatch):
 
 def test_parse_tle_prefers_named_iss_pair():
     svc = mod.ISSPassService(45.5, -73.5, 10, "UTC")
-    payload = (
-        "OTHER\n"
-        "1 00000 X\n"
-        "2 00000 Y\n"
-        "ISS (ZARYA)\n"
-        "1 25544 A\n"
-        "2 25544 B\n"
-    )
+    payload = "OTHER\n" "1 00000 X\n" "2 00000 Y\n" "ISS (ZARYA)\n" "1 25544 A\n" "2 25544 B\n"
     line1, line2 = svc._parse_iss_tle_from_response(payload)
     assert line1 == "1 25544 A"
     assert line2 == "2 25544 B"
@@ -935,14 +1042,17 @@ def test_build_passes_event_edge_branches(monkeypatch):
     assert svc._build_passes([_Evt(now), _Evt(now + timedelta(seconds=5))], [0, 2], None, None, None, None) == []
 
     # event_type=2 with full segment but no pass_entry
-    assert svc._build_passes(
-        [_Evt(now), _Evt(now + timedelta(seconds=2)), _Evt(now + timedelta(seconds=4))],
-        [0, 1, 2],
-        None,
-        None,
-        None,
-        None,
-    ) == []
+    assert (
+        svc._build_passes(
+            [_Evt(now), _Evt(now + timedelta(seconds=2)), _Evt(now + timedelta(seconds=4))],
+            [0, 1, 2],
+            None,
+            None,
+            None,
+            None,
+        )
+        == []
+    )
 
     # unknown event type should be ignored and loop should continue.
     assert svc._build_passes([_Evt(now), _Evt(now + timedelta(seconds=1))], [9, 9], None, None, None, None) == []
@@ -954,8 +1064,20 @@ def test_extract_visible_segment_positive_path(monkeypatch):
 
     samples = [
         {"time_utc": start, "altitude_deg": 5.0, "azimuth_deg": 90.0, "sun_altitude_deg": -2.0, "is_visible": False},
-        {"time_utc": start + timedelta(seconds=5), "altitude_deg": 30.0, "azimuth_deg": 100.0, "sun_altitude_deg": -8.0, "is_visible": True},
-        {"time_utc": start + timedelta(seconds=10), "altitude_deg": 40.0, "azimuth_deg": 110.0, "sun_altitude_deg": -10.0, "is_visible": True},
+        {
+            "time_utc": start + timedelta(seconds=5),
+            "altitude_deg": 30.0,
+            "azimuth_deg": 100.0,
+            "sun_altitude_deg": -8.0,
+            "is_visible": True,
+        },
+        {
+            "time_utc": start + timedelta(seconds=10),
+            "altitude_deg": 40.0,
+            "azimuth_deg": 110.0,
+            "sun_altitude_deg": -10.0,
+            "is_visible": True,
+        },
     ]
     idx = {"i": 0}
 
@@ -1015,10 +1137,26 @@ def test_extract_solar_invalid_window_and_refined_fallback(monkeypatch):
     assert svc._extract_solar_transit_segment(start, start, None, None, None, None) is None
 
     coarse = [
-        {"time_utc": start, "iss_altitude_deg": 20.0, "sun_altitude_deg": 10.0, "separation_deg": 0.2, "solar_radius_deg": 0.3, "sun_azimuth_deg": 100.0, "iss_azimuth_deg": 100.0},
+        {
+            "time_utc": start,
+            "iss_altitude_deg": 20.0,
+            "sun_altitude_deg": 10.0,
+            "separation_deg": 0.2,
+            "solar_radius_deg": 0.3,
+            "sun_azimuth_deg": 100.0,
+            "iss_azimuth_deg": 100.0,
+        },
     ]
     refined_bad = [
-        {"time_utc": start + timedelta(seconds=1), "iss_altitude_deg": -1.0, "sun_altitude_deg": -1.0, "separation_deg": 9.0, "solar_radius_deg": 0.1, "sun_azimuth_deg": 0.0, "iss_azimuth_deg": 0.0},
+        {
+            "time_utc": start + timedelta(seconds=1),
+            "iss_altitude_deg": -1.0,
+            "sun_altitude_deg": -1.0,
+            "separation_deg": 9.0,
+            "solar_radius_deg": 0.1,
+            "sun_azimuth_deg": 0.0,
+            "iss_azimuth_deg": 0.0,
+        },
     ]
 
     def _sample_time_range(start_utc, end_utc, step_seconds, sampler):
@@ -1073,10 +1211,28 @@ def test_extract_lunar_refined_fallback_branch(monkeypatch):
     end = start + timedelta(seconds=4)
 
     coarse = [
-        {"time_utc": start, "iss_altitude_deg": 20.0, "moon_altitude_deg": 40.0, "separation_deg": 0.2, "lunar_radius_deg": 0.3, "moon_azimuth_deg": 100.0, "iss_azimuth_deg": 100.0, "moon_illumination_pct": 15.0},
+        {
+            "time_utc": start,
+            "iss_altitude_deg": 20.0,
+            "moon_altitude_deg": 40.0,
+            "separation_deg": 0.2,
+            "lunar_radius_deg": 0.3,
+            "moon_azimuth_deg": 100.0,
+            "iss_azimuth_deg": 100.0,
+            "moon_illumination_pct": 15.0,
+        },
     ]
     refined_bad = [
-        {"time_utc": start + timedelta(seconds=1), "iss_altitude_deg": -1.0, "moon_altitude_deg": -1.0, "separation_deg": 10.0, "lunar_radius_deg": 0.1, "moon_azimuth_deg": 0.0, "iss_azimuth_deg": 0.0, "moon_illumination_pct": 0.0},
+        {
+            "time_utc": start + timedelta(seconds=1),
+            "iss_altitude_deg": -1.0,
+            "moon_altitude_deg": -1.0,
+            "separation_deg": 10.0,
+            "lunar_radius_deg": 0.1,
+            "moon_azimuth_deg": 0.0,
+            "iss_azimuth_deg": 0.0,
+            "moon_illumination_pct": 0.0,
+        },
     ]
 
     def _sample_time_range(start_utc, end_utc, step_seconds, sampler):

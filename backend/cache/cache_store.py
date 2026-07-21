@@ -25,6 +25,7 @@ import time
 import json
 import os
 import sys
+import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from utils.constants import (
@@ -57,6 +58,24 @@ from utils.constants import (
 # Windows-compatible file locking
 if sys.platform == "win32":
     import msvcrt
+
+    def _msvcrt_lock(fileno):
+        """Acquire a 1-byte msvcrt lock, retrying past the default ~10s deadlock timeout.
+
+        msvcrt.locking(LK_LOCK) raises OSError after ~10 blocked seconds; under brief
+        contention between gunicorn workers that is a false failure rather than a real
+        deadlock, so we retry a few times before giving up.
+        """
+        attempts = 6
+        for attempt in range(attempts):
+            try:
+                msvcrt.locking(fileno, msvcrt.LK_LOCK, 1)
+                return
+            except OSError:
+                if attempt == attempts - 1:
+                    raise
+                time.sleep(0.2)
+
 else:  # pragma: no cover
     import fcntl
 
@@ -143,7 +162,7 @@ def _cache_file_read_lock():
     try:
         if sys.platform == "win32":
             # msvcrt has no native shared lock; fall back to exclusive on Windows.
-            msvcrt.locking(lock_file.fileno(), msvcrt.LK_LOCK, 1)
+            _msvcrt_lock(lock_file.fileno())
         else:  # pragma: no cover
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_SH)
         yield
@@ -164,7 +183,7 @@ def _cache_file_write_lock():
     lock_file = open(_SHARED_CACHE_LOCK, "a+")
     try:
         if sys.platform == "win32":
-            msvcrt.locking(lock_file.fileno(), msvcrt.LK_LOCK, 1)
+            _msvcrt_lock(lock_file.fileno())
         else:  # pragma: no cover
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
         yield
@@ -196,10 +215,17 @@ def _read_shared_cache():
 
 
 def _write_shared_cache(shared_cache):
-    """Write shared cache file safely"""
+    """Write the shared cache file atomically (temp file + os.replace).
+
+    Writers hold the exclusive lock, but an unlocked reader (e.g. get_cache_metrics)
+    must never observe a half-written file, so the finished file is swapped in
+    atomically instead of being truncated and rewritten in place.
+    """
     _ensure_data_dir()
-    with open(_SHARED_CACHE_FILE, "w", encoding="utf-8") as f:
+    tmp_path = f"{_SHARED_CACHE_FILE}.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
         json.dump(shared_cache, f, indent=2, ensure_ascii=False)
+    os.replace(tmp_path, _SHARED_CACHE_FILE)
 
 
 def update_shared_cache_entry(key, data, timestamp):
@@ -486,17 +512,30 @@ def is_cache_valid(cache_entry, ttl_seconds):
     return elapsed < ttl_seconds
 
 
-def is_cache_valid_for_today(cache_entry, ttl_seconds):
-    """Like is_cache_valid, but also invalidates when the local calendar day has changed.
+def is_cache_valid_for_today(cache_entry, ttl_seconds, tz_name=None):
+    """Like is_cache_valid, but also invalidates when the calendar day has changed.
 
     Use this for caches that are computed for 'today' (sun report, horizon graph,
     moon report, etc.) - a 6h TTL would otherwise serve stale day-N data well into
     day N+1 if the cache was last populated late in the evening.
+
+    ``tz_name`` selects the calendar the day boundary is evaluated in. Pass the
+    observer location's IANA timezone so the boundary matches the day the data was
+    actually computed for; when omitted it falls back to the server's local time
+    (legacy behaviour), which can flip a day early/late for far-away observers.
     """
     if not is_cache_valid(cache_entry, ttl_seconds):
         return False
-    cache_date = datetime.fromtimestamp(cache_entry["timestamp"]).date()
-    return cache_date == datetime.today().date()
+    tz = None
+    if tz_name:
+        try:
+            from zoneinfo import ZoneInfo
+
+            tz = ZoneInfo(tz_name)
+        except Exception:
+            tz = None  # unknown timezone — fall back to server-local day boundary
+    cache_date = datetime.fromtimestamp(cache_entry["timestamp"], tz).date()
+    return cache_date == datetime.now(tz).date()
 
 
 def _default_status_location_ids():
@@ -727,5 +766,6 @@ def record_cache_execution(job_name, duration_seconds, success, location_id=None
 
 def get_cache_metrics():
     """Return per-job execution metrics from shared cache."""
-    shared = _read_shared_cache()
+    with _cache_file_read_lock():
+        shared = _read_shared_cache()
     return shared.get("_cache_metrics", {})

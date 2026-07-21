@@ -2,6 +2,7 @@
 Comprehensive coverage tests for css_passes.py.
 Mirrors test_iss_passes_coverage_push.py to push coverage to 100%.
 """
+
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -17,6 +18,16 @@ class _Deg:
 class _Dist:
     def __init__(self, km):
         self.km = km
+
+
+@pytest.fixture(autouse=True)
+def _reset_ephemeris_memo():
+    """Reset the process-wide de421 memo so each test's SKYFIELD_LOADER patch applies."""
+    mod._EPHEMERIS = None
+    mod._EPHEMERIS_ATTEMPTED = False
+    yield
+    mod._EPHEMERIS = None
+    mod._EPHEMERIS_ATTEMPTED = False
 
 
 def test_cache_helper_roundtrip_branches(monkeypatch):
@@ -124,7 +135,11 @@ def test_cooldown_and_block_state_mutators(monkeypatch):
 
 def test_clear_css_celestrak_block_flag_calls_clear(monkeypatch):
     called = {"clear": 0}
-    monkeypatch.setattr(mod, "_clear_css_celestrak_block", lambda reset_failure_cooldown=True: called.update({"clear": called["clear"] + 1}))
+    monkeypatch.setattr(
+        mod,
+        "_clear_css_celestrak_block",
+        lambda reset_failure_cooldown=True: called.update({"clear": called["clear"] + 1}),
+    )
     monkeypatch.setattr(mod, "get_css_celestrak_status", lambda: {"blocked": False})
     result = mod.clear_css_celestrak_block_flag()
     assert called["clear"] == 1
@@ -193,7 +208,9 @@ def test_load_ephemeris_failure_returns_none(monkeypatch):
 def test_fetch_css_tle_recent_cache_fast_path(monkeypatch):
     svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
     monkeypatch.setattr(mod, "_get_cached_css_tle", lambda max_age_seconds=None: ("1 A", "2 B", 1))
-    monkeypatch.setattr(mod.requests, "get", lambda *a, **k: (_ for _ in ()).throw(AssertionError("network should not be called")))
+    monkeypatch.setattr(
+        mod.requests, "get", lambda *a, **k: (_ for _ in ()).throw(AssertionError("network should not be called"))
+    )
     assert svc._fetch_css_tle() == ("1 A", "2 B")
 
 
@@ -234,8 +251,14 @@ def test_fetch_css_tle_success_from_celestrak_resets_flags(monkeypatch):
     monkeypatch.setattr(mod, "get_css_celestrak_status", lambda: {"blocked": False})
 
     called = {"reset": 0, "clear": 0}
-    monkeypatch.setattr(mod, "_reset_css_celestrak_timeout_streak", lambda: called.update({"reset": called["reset"] + 1}))
-    monkeypatch.setattr(mod, "_clear_css_celestrak_block", lambda reset_failure_cooldown=True: called.update({"clear": called["clear"] + 1}))
+    monkeypatch.setattr(
+        mod, "_reset_css_celestrak_timeout_streak", lambda: called.update({"reset": called["reset"] + 1})
+    )
+    monkeypatch.setattr(
+        mod,
+        "_clear_css_celestrak_block",
+        lambda reset_failure_cooldown=True: called.update({"clear": called["clear"] + 1}),
+    )
     monkeypatch.setattr(mod, "_set_cached_css_tle_with_source", lambda *a, **k: None)
 
     class _Resp:
@@ -310,13 +333,17 @@ def test_build_passes_and_extract_visible_segment_paths(monkeypatch):
 
     monkeypatch.setattr(svc, "_extract_visible_segment", original_extract)
 
-    monkeypatch.setattr(svc, "_sample_observation", lambda *_a, **_k: {
-        "time_utc": start,
-        "altitude_deg": 5.0,
-        "azimuth_deg": 10.0,
-        "sun_altitude_deg": 0.0,
-        "is_visible": False,
-    })
+    monkeypatch.setattr(
+        svc,
+        "_sample_observation",
+        lambda *_a, **_k: {
+            "time_utc": start,
+            "altitude_deg": 5.0,
+            "azimuth_deg": 10.0,
+            "sun_altitude_deg": 0.0,
+            "is_visible": False,
+        },
+    )
     assert svc._extract_visible_segment(start, start + timedelta(seconds=10), None, None, None, None) is None
 
 
@@ -353,13 +380,53 @@ def test_find_solar_transits_and_extract_segment(monkeypatch):
     monkeypatch.setattr(svc, "_extract_solar_transit_segment", original)
 
     coarse = [
-        {"time_utc": start, "css_altitude_deg": 20.0, "sun_altitude_deg": 10.0, "separation_deg": 0.5, "solar_radius_deg": 0.3, "sun_azimuth_deg": 180.0, "css_azimuth_deg": 180.0},
-        {"time_utc": start + timedelta(seconds=1), "css_altitude_deg": 20.0, "sun_altitude_deg": 10.0, "separation_deg": 0.2, "solar_radius_deg": 0.3, "sun_azimuth_deg": 180.0, "css_azimuth_deg": 180.0},
-        {"time_utc": start + timedelta(seconds=2), "css_altitude_deg": 20.0, "sun_altitude_deg": 10.0, "separation_deg": 0.4, "solar_radius_deg": 0.3, "sun_azimuth_deg": 180.0, "css_azimuth_deg": 180.0},
+        {
+            "time_utc": start,
+            "css_altitude_deg": 20.0,
+            "sun_altitude_deg": 10.0,
+            "separation_deg": 0.5,
+            "solar_radius_deg": 0.3,
+            "sun_azimuth_deg": 180.0,
+            "css_azimuth_deg": 180.0,
+        },
+        {
+            "time_utc": start + timedelta(seconds=1),
+            "css_altitude_deg": 20.0,
+            "sun_altitude_deg": 10.0,
+            "separation_deg": 0.2,
+            "solar_radius_deg": 0.3,
+            "sun_azimuth_deg": 180.0,
+            "css_azimuth_deg": 180.0,
+        },
+        {
+            "time_utc": start + timedelta(seconds=2),
+            "css_altitude_deg": 20.0,
+            "sun_altitude_deg": 10.0,
+            "separation_deg": 0.4,
+            "solar_radius_deg": 0.3,
+            "sun_azimuth_deg": 180.0,
+            "css_azimuth_deg": 180.0,
+        },
     ]
     refined = [
-        {"time_utc": start + timedelta(seconds=1), "css_altitude_deg": 20.0, "sun_altitude_deg": 10.0, "separation_deg": 0.2, "solar_radius_deg": 0.3, "sun_azimuth_deg": 180.0, "css_azimuth_deg": 180.0},
-        {"time_utc": start + timedelta(seconds=1, milliseconds=100), "css_altitude_deg": 20.0, "sun_altitude_deg": 10.0, "separation_deg": 0.05, "solar_radius_deg": 0.3, "sun_azimuth_deg": 180.0, "css_azimuth_deg": 180.0},
+        {
+            "time_utc": start + timedelta(seconds=1),
+            "css_altitude_deg": 20.0,
+            "sun_altitude_deg": 10.0,
+            "separation_deg": 0.2,
+            "solar_radius_deg": 0.3,
+            "sun_azimuth_deg": 180.0,
+            "css_azimuth_deg": 180.0,
+        },
+        {
+            "time_utc": start + timedelta(seconds=1, milliseconds=100),
+            "css_altitude_deg": 20.0,
+            "sun_altitude_deg": 10.0,
+            "separation_deg": 0.05,
+            "solar_radius_deg": 0.3,
+            "sun_azimuth_deg": 180.0,
+            "css_azimuth_deg": 180.0,
+        },
     ]
 
     def _sample_time_range(start_utc, end_utc, step_seconds, sampler):
@@ -371,15 +438,21 @@ def test_find_solar_transits_and_extract_segment(monkeypatch):
     assert seg["is_visible"] is True
 
     # No candidate path.
-    monkeypatch.setattr(svc, "_sample_time_range", lambda *a, **k: [{
-        "time_utc": start,
-        "css_altitude_deg": -1.0,
-        "sun_altitude_deg": -1.0,
-        "separation_deg": 10.0,
-        "solar_radius_deg": 0.1,
-        "sun_azimuth_deg": 0.0,
-        "css_azimuth_deg": 0.0,
-    }])
+    monkeypatch.setattr(
+        svc,
+        "_sample_time_range",
+        lambda *a, **k: [
+            {
+                "time_utc": start,
+                "css_altitude_deg": -1.0,
+                "sun_altitude_deg": -1.0,
+                "separation_deg": 10.0,
+                "solar_radius_deg": 0.1,
+                "sun_azimuth_deg": 0.0,
+                "css_azimuth_deg": 0.0,
+            }
+        ],
+    )
     assert svc._extract_solar_transit_segment(start, end, None, None, None, None) is None
 
     # Refined-candidates-empty fallback to coarse peak.
@@ -499,12 +572,48 @@ def test_find_lunar_transits_and_extract_segment(monkeypatch):
     monkeypatch.setattr(svc, "_extract_lunar_transit_segment", original)
 
     coarse = [
-        {"time_utc": start, "css_altitude_deg": 20.0, "moon_altitude_deg": 40.0, "separation_deg": 0.5, "lunar_radius_deg": 0.3, "moon_azimuth_deg": 180.0, "css_azimuth_deg": 180.0, "moon_illumination_pct": 10.0},
-        {"time_utc": start + timedelta(seconds=1), "css_altitude_deg": 20.0, "moon_altitude_deg": 40.0, "separation_deg": 0.2, "lunar_radius_deg": 0.3, "moon_azimuth_deg": 180.0, "css_azimuth_deg": 180.0, "moon_illumination_pct": 10.0},
+        {
+            "time_utc": start,
+            "css_altitude_deg": 20.0,
+            "moon_altitude_deg": 40.0,
+            "separation_deg": 0.5,
+            "lunar_radius_deg": 0.3,
+            "moon_azimuth_deg": 180.0,
+            "css_azimuth_deg": 180.0,
+            "moon_illumination_pct": 10.0,
+        },
+        {
+            "time_utc": start + timedelta(seconds=1),
+            "css_altitude_deg": 20.0,
+            "moon_altitude_deg": 40.0,
+            "separation_deg": 0.2,
+            "lunar_radius_deg": 0.3,
+            "moon_azimuth_deg": 180.0,
+            "css_azimuth_deg": 180.0,
+            "moon_illumination_pct": 10.0,
+        },
     ]
     refined = [
-        {"time_utc": start + timedelta(seconds=1), "css_altitude_deg": 20.0, "moon_altitude_deg": 40.0, "separation_deg": 0.2, "lunar_radius_deg": 0.3, "moon_azimuth_deg": 180.0, "css_azimuth_deg": 180.0, "moon_illumination_pct": 10.0},
-        {"time_utc": start + timedelta(seconds=1, milliseconds=100), "css_altitude_deg": 20.0, "moon_altitude_deg": 40.0, "separation_deg": 0.05, "lunar_radius_deg": 0.3, "moon_azimuth_deg": 180.0, "css_azimuth_deg": 180.0, "moon_illumination_pct": 10.0},
+        {
+            "time_utc": start + timedelta(seconds=1),
+            "css_altitude_deg": 20.0,
+            "moon_altitude_deg": 40.0,
+            "separation_deg": 0.2,
+            "lunar_radius_deg": 0.3,
+            "moon_azimuth_deg": 180.0,
+            "css_azimuth_deg": 180.0,
+            "moon_illumination_pct": 10.0,
+        },
+        {
+            "time_utc": start + timedelta(seconds=1, milliseconds=100),
+            "css_altitude_deg": 20.0,
+            "moon_altitude_deg": 40.0,
+            "separation_deg": 0.05,
+            "lunar_radius_deg": 0.3,
+            "moon_azimuth_deg": 180.0,
+            "css_azimuth_deg": 180.0,
+            "moon_illumination_pct": 10.0,
+        },
     ]
 
     def _sample_time_range(start_utc, end_utc, step_seconds, sampler):
@@ -515,16 +624,22 @@ def test_find_lunar_transits_and_extract_segment(monkeypatch):
     assert seg is not None
     assert seg["pass_type"] == "lunar_transit"
 
-    monkeypatch.setattr(svc, "_sample_time_range", lambda *a, **k: [{
-        "time_utc": start,
-        "css_altitude_deg": -1.0,
-        "moon_altitude_deg": -1.0,
-        "separation_deg": 10.0,
-        "lunar_radius_deg": 0.1,
-        "moon_azimuth_deg": 0.0,
-        "css_azimuth_deg": 0.0,
-        "moon_illumination_pct": 0.0,
-    }])
+    monkeypatch.setattr(
+        svc,
+        "_sample_time_range",
+        lambda *a, **k: [
+            {
+                "time_utc": start,
+                "css_altitude_deg": -1.0,
+                "moon_altitude_deg": -1.0,
+                "separation_deg": 10.0,
+                "lunar_radius_deg": 0.1,
+                "moon_azimuth_deg": 0.0,
+                "css_azimuth_deg": 0.0,
+                "moon_illumination_pct": 0.0,
+            }
+        ],
+    )
     assert svc._extract_lunar_transit_segment(start, end, None, None, None, object()) is None
 
     monkeypatch.setattr(svc, "_sample_time_range", lambda *a, **k: coarse)
@@ -646,7 +761,11 @@ def test_sample_observation_and_sun_alt_helpers(monkeypatch):
     o2 = svc._sample_observation(now, _Sat(), object(), _TS(), {"earth": object(), "sun": object()})
     assert o2["is_visible"] is False
 
-    monkeypatch.setattr(svc, "_sun_altitude_deg_skyfield", mod.CSSPassService._sun_altitude_deg_skyfield.__get__(svc, mod.CSSPassService))
+    monkeypatch.setattr(
+        svc,
+        "_sun_altitude_deg_skyfield",
+        mod.CSSPassService._sun_altitude_deg_skyfield.__get__(svc, mod.CSSPassService),
+    )
 
     class _A:
         def apparent(self):
@@ -893,7 +1012,9 @@ def test_fetch_css_tle_cooldown_with_stale_cache(monkeypatch):
 
 def test_fetch_css_tle_celestrak_403_message_uses_cached_fallback(monkeypatch):
     svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
-    monkeypatch.setattr(mod, "_get_cached_css_tle", lambda max_age_seconds=None: ("1 A", "2 B", 1) if max_age_seconds is None else None)
+    monkeypatch.setattr(
+        mod, "_get_cached_css_tle", lambda max_age_seconds=None: ("1 A", "2 B", 1) if max_age_seconds is None else None
+    )
     monkeypatch.setattr(mod, "_in_css_tle_failure_cooldown", lambda: False)
     monkeypatch.setattr(mod, "get_css_celestrak_status", lambda: {"blocked": False})
     monkeypatch.setattr(mod, "_set_css_tle_error_timestamp", lambda: None)
@@ -905,14 +1026,7 @@ def test_fetch_css_tle_celestrak_403_message_uses_cached_fallback(monkeypatch):
 
 def test_parse_css_tle_prefers_named_css_pair():
     svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
-    payload = (
-        "OTHER\n"
-        "1 00000 X\n"
-        "2 00000 Y\n"
-        "CSS (TIANHE)\n"
-        "1 48274 A\n"
-        "2 48274 B\n"
-    )
+    payload = "OTHER\n" "1 00000 X\n" "2 00000 Y\n" "CSS (TIANHE)\n" "1 48274 A\n" "2 48274 B\n"
     line1, line2 = svc._parse_css_tle_from_response(payload)
     assert line1 == "1 48274 A"
     assert line2 == "2 48274 B"
@@ -952,14 +1066,17 @@ def test_build_passes_event_edge_branches(monkeypatch):
     assert svc._build_passes([_Evt(now), _Evt(now + timedelta(seconds=5))], [0, 2], None, None, None, None) == []
 
     # event_type=2 with full segment but no pass_entry
-    assert svc._build_passes(
-        [_Evt(now), _Evt(now + timedelta(seconds=2)), _Evt(now + timedelta(seconds=4))],
-        [0, 1, 2],
-        None,
-        None,
-        None,
-        None,
-    ) == []
+    assert (
+        svc._build_passes(
+            [_Evt(now), _Evt(now + timedelta(seconds=2)), _Evt(now + timedelta(seconds=4))],
+            [0, 1, 2],
+            None,
+            None,
+            None,
+            None,
+        )
+        == []
+    )
 
     # unknown event type should be ignored and loop should continue
     assert svc._build_passes([_Evt(now), _Evt(now + timedelta(seconds=1))], [9, 9], None, None, None, None) == []
@@ -971,8 +1088,20 @@ def test_extract_visible_segment_positive_path(monkeypatch):
 
     samples = [
         {"time_utc": start, "altitude_deg": 5.0, "azimuth_deg": 90.0, "sun_altitude_deg": -2.0, "is_visible": False},
-        {"time_utc": start + timedelta(seconds=5), "altitude_deg": 30.0, "azimuth_deg": 100.0, "sun_altitude_deg": -8.0, "is_visible": True},
-        {"time_utc": start + timedelta(seconds=10), "altitude_deg": 40.0, "azimuth_deg": 110.0, "sun_altitude_deg": -10.0, "is_visible": True},
+        {
+            "time_utc": start + timedelta(seconds=5),
+            "altitude_deg": 30.0,
+            "azimuth_deg": 100.0,
+            "sun_altitude_deg": -8.0,
+            "is_visible": True,
+        },
+        {
+            "time_utc": start + timedelta(seconds=10),
+            "altitude_deg": 40.0,
+            "azimuth_deg": 110.0,
+            "sun_altitude_deg": -10.0,
+            "is_visible": True,
+        },
     ]
     idx = {"i": 0}
 
@@ -1032,10 +1161,26 @@ def test_extract_solar_invalid_window_and_refined_fallback(monkeypatch):
     assert svc._extract_solar_transit_segment(start, start, None, None, None, None) is None
 
     coarse = [
-        {"time_utc": start, "css_altitude_deg": 20.0, "sun_altitude_deg": 10.0, "separation_deg": 0.2, "solar_radius_deg": 0.3, "sun_azimuth_deg": 100.0, "css_azimuth_deg": 100.0},
+        {
+            "time_utc": start,
+            "css_altitude_deg": 20.0,
+            "sun_altitude_deg": 10.0,
+            "separation_deg": 0.2,
+            "solar_radius_deg": 0.3,
+            "sun_azimuth_deg": 100.0,
+            "css_azimuth_deg": 100.0,
+        },
     ]
     refined_bad = [
-        {"time_utc": start + timedelta(seconds=1), "css_altitude_deg": -1.0, "sun_altitude_deg": -1.0, "separation_deg": 9.0, "solar_radius_deg": 0.1, "sun_azimuth_deg": 0.0, "css_azimuth_deg": 0.0},
+        {
+            "time_utc": start + timedelta(seconds=1),
+            "css_altitude_deg": -1.0,
+            "sun_altitude_deg": -1.0,
+            "separation_deg": 9.0,
+            "solar_radius_deg": 0.1,
+            "sun_azimuth_deg": 0.0,
+            "css_azimuth_deg": 0.0,
+        },
     ]
 
     def _sample_time_range(start_utc, end_utc, step_seconds, sampler):
@@ -1090,10 +1235,28 @@ def test_extract_lunar_refined_fallback_branch(monkeypatch):
     end = start + timedelta(seconds=4)
 
     coarse = [
-        {"time_utc": start, "css_altitude_deg": 20.0, "moon_altitude_deg": 40.0, "separation_deg": 0.2, "lunar_radius_deg": 0.3, "moon_azimuth_deg": 100.0, "css_azimuth_deg": 100.0, "moon_illumination_pct": 15.0},
+        {
+            "time_utc": start,
+            "css_altitude_deg": 20.0,
+            "moon_altitude_deg": 40.0,
+            "separation_deg": 0.2,
+            "lunar_radius_deg": 0.3,
+            "moon_azimuth_deg": 100.0,
+            "css_azimuth_deg": 100.0,
+            "moon_illumination_pct": 15.0,
+        },
     ]
     refined_bad = [
-        {"time_utc": start + timedelta(seconds=1), "css_altitude_deg": -1.0, "moon_altitude_deg": -1.0, "separation_deg": 10.0, "lunar_radius_deg": 0.1, "moon_azimuth_deg": 0.0, "css_azimuth_deg": 0.0, "moon_illumination_pct": 0.0},
+        {
+            "time_utc": start + timedelta(seconds=1),
+            "css_altitude_deg": -1.0,
+            "moon_altitude_deg": -1.0,
+            "separation_deg": 10.0,
+            "lunar_radius_deg": 0.1,
+            "moon_azimuth_deg": 0.0,
+            "css_azimuth_deg": 0.0,
+            "moon_illumination_pct": 0.0,
+        },
     ]
 
     def _sample_time_range(start_utc, end_utc, step_seconds, sampler):
@@ -1197,6 +1360,7 @@ def test_group_consecutive_indices_empty_and_single():
 
 def test_is_celestrak_timeout_error():
     import requests as _req
+
     assert mod._is_celestrak_timeout_error(_req.exceptions.Timeout("timed out")) is True
     assert mod._is_celestrak_timeout_error(Exception("connect timeout")) is True
     assert mod._is_celestrak_timeout_error(Exception("timed out")) is True
@@ -1222,6 +1386,7 @@ def test_is_celestrak_url():
 # _classify_day_night — cover all return branches
 # ---------------------------------------------------------------------------
 
+
 def test_classify_day_night_all_branches():
     svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
     assert svc._classify_day_night(-20.0) == "Astronomical Night"
@@ -1235,8 +1400,10 @@ def test_classify_day_night_all_branches():
 # _parse_css_tle_from_response — JSON success path
 # ---------------------------------------------------------------------------
 
+
 def test_parse_css_tle_from_json_response():
     import json as _json
+
     svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
     line1_str = "1 48274U 21035A   26100.00000000  .00010000  00000+0  18000-3 0  9991"
     line2_str = "2 48274  41.4700 120.0000 0005000 200.0000 160.0000 15.60000000000000"
@@ -1250,6 +1417,7 @@ def test_parse_css_tle_from_json_response():
 # _fetch_css_tle — timeout streak reaches block threshold
 # ---------------------------------------------------------------------------
 
+
 def test_fetch_css_tle_marks_celestrak_blocked_after_timeout_threshold(monkeypatch):
     svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
     monkeypatch.setattr(mod, "_get_cached_css_tle", lambda **_: None)
@@ -1261,13 +1429,17 @@ def test_fetch_css_tle_marks_celestrak_blocked_after_timeout_threshold(monkeypat
     monkeypatch.setattr(mod, "_write_css_tle_cache", lambda p: (cache_payload.clear(), cache_payload.update(p)))
 
     block_calls = []
-    monkeypatch.setattr(mod, "_set_css_celestrak_block", lambda status_code, reason, source_url: block_calls.append(reason))
+    monkeypatch.setattr(
+        mod, "_set_css_celestrak_block", lambda status_code, reason, source_url: block_calls.append(reason)
+    )
     monkeypatch.setattr(mod, "_set_css_tle_error_timestamp", lambda: None)
 
     class _Response:
         status_code = 200
         text = ""
-        def raise_for_status(self): return None
+
+        def raise_for_status(self):
+            return None
 
     def _mock_get(url, **_):
         if mod._is_celestrak_url(url):
@@ -1288,6 +1460,7 @@ def test_fetch_css_tle_marks_celestrak_blocked_after_timeout_threshold(monkeypat
 # ---------------------------------------------------------------------------
 # _fetch_css_tle — stale cache fallback when all sources fail
 # ---------------------------------------------------------------------------
+
 
 def test_fetch_css_tle_all_sources_fail_returns_stale_cache(monkeypatch):
     svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
@@ -1315,6 +1488,7 @@ def test_fetch_css_tle_all_sources_fail_returns_stale_cache(monkeypatch):
 # ---------------------------------------------------------------------------
 # get_css_passes_report — top-level wrapper
 # ---------------------------------------------------------------------------
+
 
 def test_get_css_passes_report_handles_exception(monkeypatch):
     monkeypatch.setattr(mod.CSSPassService, "get_report", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))

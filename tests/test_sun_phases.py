@@ -68,3 +68,34 @@ class TestSunServiceBranches:
         altitude = svc._sun_altitude(dt)
 
         assert altitude == 12.34
+
+
+class TestSunsetAltitudeConvention:
+    """Sunset/sunrise use the standard -0.833° centre altitude with interpolation."""
+
+    def test_standard_altitude_constant(self):
+        from astroweather.sun_phases import SUN_STANDARD_ALTITUDE
+
+        assert SUN_STANDARD_ALTITUDE == -0.833
+
+    @patch("astroweather.sun_phases.get_sun")
+    def test_sunset_crosses_standard_altitude_with_interpolation(self, mock_get_sun):
+        from astroweather.sun_phases import SUN_STANDARD_ALTITUDE
+
+        svc = SunService(45.0, 0.0, "UTC")  # UTC so local == UTC for easy comparison
+        n = 289  # noon -> next noon at 5-min steps (inclusive)
+        alts = np.linspace(5.0, -5.0, n)  # Sun descends monotonically across the window
+        mock_get_sun.return_value = _FakeSunArray(alts)
+
+        report = svc._compute_day(datetime.date(2026, 6, 5))
+
+        # Analytic crossing of the standard altitude, interpolated between samples.
+        deg_per_sample = 10.0 / (n - 1)
+        idx = (5.0 - SUN_STANDARD_ALTITUDE) / deg_per_sample
+        start_utc = datetime.datetime(2026, 6, 5, 12, 0, tzinfo=datetime.timezone.utc)
+        expected = start_utc + datetime.timedelta(minutes=idx * 5)
+        got = datetime.datetime.strptime(report.sunset, "%Y-%m-%d %H:%M").replace(tzinfo=datetime.timezone.utc)
+
+        # Interpolation should land within a minute of the analytic crossing (the old
+        # snap-to-next-sample behaviour would have been up to 5 minutes late).
+        assert abs((got - expected).total_seconds()) < 120

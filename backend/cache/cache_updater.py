@@ -1160,7 +1160,7 @@ def fully_initialize_caches():
                     continue
                 entry = cache_store.load_location_cache(shared_name, location_id)
                 valid = (
-                    cache_store.is_cache_valid_for_today(entry, ttl)
+                    cache_store.is_cache_valid_for_today(entry, ttl, tz_name=location.get("timezone"))
                     if day_sensitive
                     else cache_store.is_cache_valid(entry, ttl)
                 )
