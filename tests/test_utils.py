@@ -470,3 +470,40 @@ class TestDistantEpochPrecisionWarningsMuted:
             with distant_epoch_precision_warnings_muted():
                 raise ValueError("boom")
         assert iers.conf.iers_degraded_accuracy == before
+
+
+class TestParseIsoToUtcLogsFallback:
+    """The unparseable-timestamp fallback must announce itself.
+
+    An event with an unreadable time still reaches the UI, parked at the end of
+    the list where it looks like the most distant future event rather than a
+    broken one. The log line is the only thing distinguishing the two.
+    """
+
+    def test_logs_warning_for_unparseable_value(self):
+        from unittest.mock import patch
+        import utils as utils_module
+
+        with patch.object(utils_module, "logger") as mock_logger:
+            utils_module.parse_iso_to_utc("not-a-date")
+
+        assert mock_logger.warning.called
+        assert "not-a-date" in str(mock_logger.warning.call_args)
+
+    def test_logs_warning_for_none(self):
+        from unittest.mock import patch
+        import utils as utils_module
+
+        with patch.object(utils_module, "logger") as mock_logger:
+            utils_module.parse_iso_to_utc(None)
+
+        assert mock_logger.warning.called
+
+    def test_does_not_log_for_valid_value(self):
+        from unittest.mock import patch
+        import utils as utils_module
+
+        with patch.object(utils_module, "logger") as mock_logger:
+            utils_module.parse_iso_to_utc("2026-01-01T12:00:00+02:00")
+
+        assert not mock_logger.warning.called
