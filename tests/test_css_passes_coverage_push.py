@@ -5,6 +5,7 @@ Mirrors test_iss_passes_coverage_push.py to push coverage to 100%.
 
 from datetime import datetime, timedelta, timezone
 
+import numpy as np
 import pytest
 
 from space import css_passes as mod
@@ -28,6 +29,36 @@ def _reset_ephemeris_memo():
     yield
     mod._EPHEMERIS = None
     mod._EPHEMERIS_ATTEMPTED = False
+
+
+def _patch_solar_arrays(monkeypatch, svc, center, css_alt=30.0, sun_alt=30.0, az_rate=0.5):
+    """Feed the vectorised solar helpers so the CSS/Sun separation dips at ``center``."""
+
+    def fake_css(times, *args, **kwargs):
+        secs = np.array([(t - center).total_seconds() for t in times])
+        return np.full(len(times), css_alt), 180.0 + secs * az_rate
+
+    def fake_sun(times, *args, **kwargs):
+        n = len(times)
+        return np.full(n, sun_alt), np.full(n, 180.0), np.full(n, 0.27)
+
+    monkeypatch.setattr(svc, "_iss_altaz_arrays", fake_css)
+    monkeypatch.setattr(svc, "_sun_altaz_radius_arrays", fake_sun)
+
+
+def _patch_moon_arrays(monkeypatch, svc, center, css_alt=40.0, moon_alt=40.0, illum=10.0):
+    """Feed the vectorised lunar helpers so the CSS/Moon separation dips at ``center``."""
+
+    def fake_css(times, *args, **kwargs):
+        secs = np.array([(t - center).total_seconds() for t in times])
+        return np.full(len(times), css_alt), 180.0 + secs * 0.5
+
+    def fake_moon(times, *args, **kwargs):
+        n = len(times)
+        return np.full(n, moon_alt), np.full(n, 180.0), np.full(n, 0.27), np.full(n, illum)
+
+    monkeypatch.setattr(svc, "_iss_altaz_arrays", fake_css)
+    monkeypatch.setattr(svc, "_moon_altaz_radius_illum_arrays", fake_moon)
 
 
 def test_cache_helper_roundtrip_branches(monkeypatch):
@@ -379,86 +410,21 @@ def test_find_solar_transits_and_extract_segment(monkeypatch):
     assert out == [{"peak_time": "b"}]
     monkeypatch.setattr(svc, "_extract_solar_transit_segment", original)
 
-    coarse = [
-        {
-            "time_utc": start,
-            "css_altitude_deg": 20.0,
-            "sun_altitude_deg": 10.0,
-            "separation_deg": 0.5,
-            "solar_radius_deg": 0.3,
-            "sun_azimuth_deg": 180.0,
-            "css_azimuth_deg": 180.0,
-        },
-        {
-            "time_utc": start + timedelta(seconds=1),
-            "css_altitude_deg": 20.0,
-            "sun_altitude_deg": 10.0,
-            "separation_deg": 0.2,
-            "solar_radius_deg": 0.3,
-            "sun_azimuth_deg": 180.0,
-            "css_azimuth_deg": 180.0,
-        },
-        {
-            "time_utc": start + timedelta(seconds=2),
-            "css_altitude_deg": 20.0,
-            "sun_altitude_deg": 10.0,
-            "separation_deg": 0.4,
-            "solar_radius_deg": 0.3,
-            "sun_azimuth_deg": 180.0,
-            "css_azimuth_deg": 180.0,
-        },
-    ]
-    refined = [
-        {
-            "time_utc": start + timedelta(seconds=1),
-            "css_altitude_deg": 20.0,
-            "sun_altitude_deg": 10.0,
-            "separation_deg": 0.2,
-            "solar_radius_deg": 0.3,
-            "sun_azimuth_deg": 180.0,
-            "css_azimuth_deg": 180.0,
-        },
-        {
-            "time_utc": start + timedelta(seconds=1, milliseconds=100),
-            "css_altitude_deg": 20.0,
-            "sun_altitude_deg": 10.0,
-            "separation_deg": 0.05,
-            "solar_radius_deg": 0.3,
-            "sun_azimuth_deg": 180.0,
-            "css_azimuth_deg": 180.0,
-        },
-    ]
-
-    def _sample_time_range(start_utc, end_utc, step_seconds, sampler):
-        return coarse if step_seconds == mod.SOLAR_TRANSIT_SAMPLE_SECONDS else refined
-
-    monkeypatch.setattr(svc, "_sample_time_range", _sample_time_range)
-    seg = svc._extract_solar_transit_segment(start, end, None, None, None, None)
+    # Positive path: CSS sweeps through the Sun -> a transit is found and refined.
+    window_end = start + timedelta(seconds=30)
+    center = start + timedelta(seconds=15)
+    _patch_solar_arrays(monkeypatch, svc, center)
+    seg = svc._extract_solar_transit_segment(start, window_end, None, None, None, None)
     assert seg is not None
     assert seg["is_visible"] is True
 
-    # No candidate path.
+    # No candidate: Sun below the horizon for the whole pass -> None.
     monkeypatch.setattr(
         svc,
-        "_sample_time_range",
-        lambda *a, **k: [
-            {
-                "time_utc": start,
-                "css_altitude_deg": -1.0,
-                "sun_altitude_deg": -1.0,
-                "separation_deg": 10.0,
-                "solar_radius_deg": 0.1,
-                "sun_azimuth_deg": 0.0,
-                "css_azimuth_deg": 0.0,
-            }
-        ],
+        "_sun_altaz_radius_arrays",
+        lambda times, *a, **k: (np.full(len(times), -5.0), np.full(len(times), 180.0), np.full(len(times), 0.3)),
     )
-    assert svc._extract_solar_transit_segment(start, end, None, None, None, None) is None
-
-    # Refined-candidates-empty fallback to coarse peak.
-    monkeypatch.setattr(svc, "_sample_time_range", lambda *a, **k: coarse)
-    seg2 = svc._extract_solar_transit_segment(start, end, None, None, None, None)
-    assert seg2 is not None
+    assert svc._extract_solar_transit_segment(start, window_end, None, None, None, None) is None
 
 
 def test_sample_time_range_and_angular_radius_helpers():
@@ -494,53 +460,35 @@ def test_sample_time_range_and_angular_radius_helpers():
     assert svc._solar_angular_radius_deg(_TooClose()) == mod.SOLAR_ANGULAR_RADIUS_FALLBACK_DEG
 
 
-def test_sample_solar_transit_observation_both_paths(monkeypatch):
+def test_vectorised_geometry_helpers():
     svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
-    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
-    class _Topo:
-        def altaz(self):
-            return _Deg(30.0), _Deg(120.0), None
+    grid = svc._time_grid(start, start + timedelta(seconds=20), 5.0)
+    assert grid[0] == start and grid[-1] == start + timedelta(seconds=20)
+    assert all(grid[i] <= grid[i + 1] for i in range(len(grid) - 1))
+    short = svc._time_grid(start, start + timedelta(seconds=3), 10.0)
+    assert short == [start, start + timedelta(seconds=3)]
 
-    class _Sat:
-        def __sub__(self, _observer):
-            return self
+    sep = svc._angular_separation_array(
+        np.array([10.0, 0.0]), np.array([180.0, 0.0]), np.array([10.0, 0.0]), np.array([180.0, 180.0])
+    )
+    assert sep[0] == pytest.approx(0.0, abs=1e-6)
+    assert sep[1] == pytest.approx(180.0, abs=1e-6)
 
-        def at(self, _event_time):
-            return _Topo()
+    class _Evt:
+        def __init__(self, dt):
+            self._dt = dt
 
-    class _TS:
-        def from_datetime(self, dt):
-            return dt
+        def utc_datetime(self):
+            return self._dt.replace(tzinfo=None)
 
-    class _ObsChain:
-        def apparent(self):
-            return self
-
-        def altaz(self):
-            return _Deg(40.0), _Deg(150.0), None
-
-        def distance(self):
-            return _Dist(mod.SOLAR_RADIUS_KM + 1000)
-
-    class _Earth:
-        def __add__(self, _observer):
-            return self
-
-        def at(self, _event_time):
-            return self
-
-        def observe(self, _obj):
-            return _ObsChain()
-
-    eph = {"earth": _Earth(), "sun": object()}
-    out = svc._sample_solar_transit_observation(now, _Sat(), object(), _TS(), eph)
-    assert out["css_altitude_deg"] == 30.0
-    assert out["sun_altitude_deg"] == 40.0
-
-    monkeypatch.setattr(svc, "_sun_alt_az_deg", lambda _w: (5.0, 100.0))
-    out2 = svc._sample_solar_transit_observation(now, _Sat(), object(), _TS(), None)
-    assert out2["solar_radius_deg"] == mod.SOLAR_ANGULAR_RADIUS_FALLBACK_DEG
+    passes = list(
+        svc._iter_geometric_passes(
+            [_Evt(start), _Evt(start + timedelta(seconds=2)), _Evt(start + timedelta(seconds=4))], [0, 1, 2]
+        )
+    )
+    assert passes == [(start, start + timedelta(seconds=4))]
 
 
 def test_find_lunar_transits_and_extract_segment(monkeypatch):
@@ -571,80 +519,26 @@ def test_find_lunar_transits_and_extract_segment(monkeypatch):
     assert out == [{"peak_time": "a"}]
     monkeypatch.setattr(svc, "_extract_lunar_transit_segment", original)
 
-    coarse = [
-        {
-            "time_utc": start,
-            "css_altitude_deg": 20.0,
-            "moon_altitude_deg": 40.0,
-            "separation_deg": 0.5,
-            "lunar_radius_deg": 0.3,
-            "moon_azimuth_deg": 180.0,
-            "css_azimuth_deg": 180.0,
-            "moon_illumination_pct": 10.0,
-        },
-        {
-            "time_utc": start + timedelta(seconds=1),
-            "css_altitude_deg": 20.0,
-            "moon_altitude_deg": 40.0,
-            "separation_deg": 0.2,
-            "lunar_radius_deg": 0.3,
-            "moon_azimuth_deg": 180.0,
-            "css_azimuth_deg": 180.0,
-            "moon_illumination_pct": 10.0,
-        },
-    ]
-    refined = [
-        {
-            "time_utc": start + timedelta(seconds=1),
-            "css_altitude_deg": 20.0,
-            "moon_altitude_deg": 40.0,
-            "separation_deg": 0.2,
-            "lunar_radius_deg": 0.3,
-            "moon_azimuth_deg": 180.0,
-            "css_azimuth_deg": 180.0,
-            "moon_illumination_pct": 10.0,
-        },
-        {
-            "time_utc": start + timedelta(seconds=1, milliseconds=100),
-            "css_altitude_deg": 20.0,
-            "moon_altitude_deg": 40.0,
-            "separation_deg": 0.05,
-            "lunar_radius_deg": 0.3,
-            "moon_azimuth_deg": 180.0,
-            "css_azimuth_deg": 180.0,
-            "moon_illumination_pct": 10.0,
-        },
-    ]
-
-    def _sample_time_range(start_utc, end_utc, step_seconds, sampler):
-        return coarse if step_seconds == mod.LUNAR_TRANSIT_SAMPLE_SECONDS else refined
-
-    monkeypatch.setattr(svc, "_sample_time_range", _sample_time_range)
-    seg = svc._extract_lunar_transit_segment(start, end, None, None, None, object())
+    # Positive path: CSS sweeps through the Moon -> a transit is found and refined.
+    window_end = start + timedelta(seconds=30)
+    center = start + timedelta(seconds=15)
+    _patch_moon_arrays(monkeypatch, svc, center)
+    seg = svc._extract_lunar_transit_segment(start, window_end, None, None, None, object())
     assert seg is not None
     assert seg["pass_type"] == "lunar_transit"
 
+    # No candidate: Moon below its minimum altitude for the whole pass -> None.
     monkeypatch.setattr(
         svc,
-        "_sample_time_range",
-        lambda *a, **k: [
-            {
-                "time_utc": start,
-                "css_altitude_deg": -1.0,
-                "moon_altitude_deg": -1.0,
-                "separation_deg": 10.0,
-                "lunar_radius_deg": 0.1,
-                "moon_azimuth_deg": 0.0,
-                "css_azimuth_deg": 0.0,
-                "moon_illumination_pct": 0.0,
-            }
-        ],
+        "_moon_altaz_radius_illum_arrays",
+        lambda times, *a, **k: (
+            np.full(len(times), -1.0),
+            np.full(len(times), 180.0),
+            np.full(len(times), 0.3),
+            np.full(len(times), 0.0),
+        ),
     )
-    assert svc._extract_lunar_transit_segment(start, end, None, None, None, object()) is None
-
-    monkeypatch.setattr(svc, "_sample_time_range", lambda *a, **k: coarse)
-    seg2 = svc._extract_lunar_transit_segment(start, end, None, None, None, object())
-    assert seg2 is not None
+    assert svc._extract_lunar_transit_segment(start, window_end, None, None, None, object()) is None
 
 
 def test_extract_lunar_transit_segment_invalid_window_returns_none():
@@ -653,70 +547,14 @@ def test_extract_lunar_transit_segment_invalid_window_returns_none():
     assert svc._extract_lunar_transit_segment(now, now, None, None, None, object()) is None
 
 
-def test_sample_lunar_transit_observation_and_radius(monkeypatch):
+def test_lunar_angular_radius_helper():
     svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
-    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
-    class _Topo:
-        def altaz(self):
-            return _Deg(25.0), _Deg(200.0), None
-
-    class _Sat:
-        def __sub__(self, _observer):
-            return self
-
-        def at(self, _event_time):
-            return _Topo()
-
-    class _TS:
-        def from_datetime(self, dt):
-            return dt
-
-    class _RADec:
-        def __init__(self, deg, hours):
-            self.degrees = deg
-            self.hours = hours
-
-    class _Ast:
-        def __init__(self, alt=30.0, az=120.0, dist=400000.0, radec=(10.0, 5.0)):
-            self._alt = alt
-            self._az = az
-            self._dist = dist
-            self._radec = radec
-
-        def apparent(self):
-            return self
-
-        def altaz(self):
-            return _Deg(self._alt), _Deg(self._az), None
-
+    class _Far:
         def distance(self):
-            return _Dist(self._dist)
+            return _Dist(mod.LUNAR_RADIUS_KM + 100000)
 
-        def radec(self):
-            return _RADec(self._radec[0], self._radec[1]), _RADec(self._radec[0], self._radec[1]), None
-
-    class _Earth:
-        def __add__(self, _observer):
-            return self
-
-        def at(self, _event_time):
-            return self
-
-        def observe(self, body):
-            if body == "moon":
-                return _Ast(alt=40.0, az=150.0, dist=384000.0, radec=(12.0, 3.0))
-            return _Ast(alt=20.0, az=110.0, dist=149600000.0, radec=(5.0, 2.0))
-
-    eph = {"earth": _Earth(), "moon": "moon", "sun": "sun"}
-    out = svc._sample_lunar_transit_observation(now, _Sat(), object(), _TS(), eph)
-    assert out["css_altitude_deg"] == 25.0
-    assert out["moon_altitude_deg"] == 40.0
-    assert 0.0 <= out["moon_illumination_pct"] <= 100.0
-
-    eph_no_sun = {"earth": _Earth(), "moon": "moon"}
-    out2 = svc._sample_lunar_transit_observation(now, _Sat(), object(), _TS(), eph_no_sun)
-    assert out2["moon_illumination_pct"] == 0.0
+    assert svc._lunar_angular_radius_deg(_Far()) > 0.0
 
     class _Bad:
         def distance(self):
@@ -1153,44 +991,24 @@ def test_find_solar_transits_event_edge_branches(monkeypatch):
     assert svc._find_solar_transits(start, end, _SatUnknown(), object(), _TS(), object()) == []
 
 
-def test_extract_solar_invalid_window_and_refined_fallback(monkeypatch):
+def test_extract_solar_invalid_window_and_no_fine_candidate(monkeypatch):
     svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
     start = datetime(2026, 1, 1, tzinfo=timezone.utc)
-    end = start + timedelta(seconds=4)
 
+    # Zero-length window -> None.
     assert svc._extract_solar_transit_segment(start, start, None, None, None, None) is None
 
-    coarse = [
-        {
-            "time_utc": start,
-            "css_altitude_deg": 20.0,
-            "sun_altitude_deg": 10.0,
-            "separation_deg": 0.2,
-            "solar_radius_deg": 0.3,
-            "sun_azimuth_deg": 100.0,
-            "css_azimuth_deg": 100.0,
-        },
-    ]
-    refined_bad = [
-        {
-            "time_utc": start + timedelta(seconds=1),
-            "css_altitude_deg": -1.0,
-            "sun_altitude_deg": -1.0,
-            "separation_deg": 9.0,
-            "solar_radius_deg": 0.1,
-            "sun_azimuth_deg": 0.0,
-            "css_azimuth_deg": 0.0,
-        },
-    ]
-
-    def _sample_time_range(start_utc, end_utc, step_seconds, sampler):
-        if step_seconds == mod.SOLAR_TRANSIT_SAMPLE_SECONDS:
-            return coarse
-        return refined_bad
-
-    monkeypatch.setattr(svc, "_sample_time_range", _sample_time_range)
-    out = svc._extract_solar_transit_segment(start, end, None, None, None, None)
-    assert out is not None
+    # Coarse approach within the margin but never on the disk at fine resolution -> None.
+    end = start + timedelta(seconds=30)
+    monkeypatch.setattr(
+        svc, "_iss_altaz_arrays", lambda times, *a, **k: (np.full(len(times), 30.0), np.full(len(times), 185.0))
+    )
+    monkeypatch.setattr(
+        svc,
+        "_sun_altaz_radius_arrays",
+        lambda times, *a, **k: (np.full(len(times), 30.0), np.full(len(times), 180.0), np.full(len(times), 0.27)),
+    )
+    assert svc._extract_solar_transit_segment(start, end, None, None, None, None) is None
 
 
 def test_find_lunar_transits_event_edge_branches(monkeypatch):
@@ -1229,44 +1047,29 @@ def test_find_lunar_transits_event_edge_branches(monkeypatch):
     assert svc._find_lunar_transits(start, end, _SatUnknown(), object(), _TS(), object()) == []
 
 
-def test_extract_lunar_refined_fallback_branch(monkeypatch):
+def test_extract_lunar_invalid_window_and_no_fine_candidate(monkeypatch):
     svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
     start = datetime(2026, 1, 1, tzinfo=timezone.utc)
-    end = start + timedelta(seconds=4)
 
-    coarse = [
-        {
-            "time_utc": start,
-            "css_altitude_deg": 20.0,
-            "moon_altitude_deg": 40.0,
-            "separation_deg": 0.2,
-            "lunar_radius_deg": 0.3,
-            "moon_azimuth_deg": 100.0,
-            "css_azimuth_deg": 100.0,
-            "moon_illumination_pct": 15.0,
-        },
-    ]
-    refined_bad = [
-        {
-            "time_utc": start + timedelta(seconds=1),
-            "css_altitude_deg": -1.0,
-            "moon_altitude_deg": -1.0,
-            "separation_deg": 10.0,
-            "lunar_radius_deg": 0.1,
-            "moon_azimuth_deg": 0.0,
-            "css_azimuth_deg": 0.0,
-            "moon_illumination_pct": 0.0,
-        },
-    ]
+    # Zero-length window -> None.
+    assert svc._extract_lunar_transit_segment(start, start, None, None, None, object()) is None
 
-    def _sample_time_range(start_utc, end_utc, step_seconds, sampler):
-        if step_seconds == mod.LUNAR_TRANSIT_SAMPLE_SECONDS:
-            return coarse
-        return refined_bad
-
-    monkeypatch.setattr(svc, "_sample_time_range", _sample_time_range)
-    out = svc._extract_lunar_transit_segment(start, end, None, None, None, object())
-    assert out is not None
+    # Coarse approach within the margin but never on the disk at fine resolution -> None.
+    end = start + timedelta(seconds=30)
+    monkeypatch.setattr(
+        svc, "_iss_altaz_arrays", lambda times, *a, **k: (np.full(len(times), 40.0), np.full(len(times), 185.0))
+    )
+    monkeypatch.setattr(
+        svc,
+        "_moon_altaz_radius_illum_arrays",
+        lambda times, *a, **k: (
+            np.full(len(times), 40.0),
+            np.full(len(times), 180.0),
+            np.full(len(times), 0.27),
+            np.full(len(times), 15.0),
+        ),
+    )
+    assert svc._extract_lunar_transit_segment(start, end, None, None, None, object()) is None
 
 
 def test_fetch_css_tle_blocked_celestrak_skips_first_url_and_raises_without_cache(monkeypatch):

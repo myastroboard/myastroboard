@@ -76,68 +76,55 @@ class TestISSPassServiceSolarTransit:
     """Test ISS solar transit detection helpers."""
 
     def test_extract_solar_transit_segment_returns_refined_window(self, monkeypatch):
+        import numpy as np
+
         service = ISSPassService(45.5, -73.5, 30, "America/Montreal")
         start_utc = datetime(2026, 5, 8, 12, 0, 0, tzinfo=timezone.utc)
-        end_utc = start_utc + timedelta(seconds=4)
+        end_utc = start_utc + timedelta(seconds=30)
+        # The ISS sweeps through the Sun's azimuth, so the ISS/Sun separation dips
+        # to zero at the window centre (a real transit) and the fine scan pins it.
+        center = start_utc + timedelta(seconds=15)
 
-        coarse_samples = [
-            {
-                "time_utc": start_utc + timedelta(seconds=offset),
-                "iss_altitude_deg": 25.0,
-                "iss_azimuth_deg": 180.0,
-                "sun_altitude_deg": 30.0,
-                "sun_azimuth_deg": 180.0,
-                "solar_radius_deg": 0.27,
-                "separation_deg": separation,
-            }
-            for offset, separation in [
-                (0, 0.40),
-                (1, 0.26),
-                (2, 0.05),
-                (3, 0.24),
-                (4, 0.38),
-            ]
-        ]
-        refined_samples = [
-            {
-                "time_utc": start_utc + timedelta(seconds=offset),
-                "iss_altitude_deg": 25.0,
-                "iss_azimuth_deg": 180.0,
-                "sun_altitude_deg": 30.0,
-                "sun_azimuth_deg": 180.0,
-                "solar_radius_deg": 0.27,
-                "separation_deg": separation,
-            }
-            for offset, separation in [
-                (1.8, 0.28),
-                (1.9, 0.20),
-                (2.0, 0.03),
-                (2.1, 0.21),
-                (2.2, 0.29),
-            ]
-        ]
+        def fake_iss(times, *args, **kwargs):
+            secs = np.array([(t - center).total_seconds() for t in times])
+            return np.full(len(times), 30.0), 180.0 + secs * 0.5  # 0.5°/s sweep past the Sun
 
-        def _mock_sample_time_range(start_utc, end_utc, step_seconds, sampler):
-            if step_seconds == 1.0:
-                return coarse_samples
-            return refined_samples
+        def fake_sun(times, *args, **kwargs):
+            n = len(times)
+            return np.full(n, 30.0), np.full(n, 180.0), np.full(n, 0.27)
 
-        monkeypatch.setattr(service, "_sample_time_range", _mock_sample_time_range)
+        monkeypatch.setattr(service, "_iss_altaz_arrays", fake_iss)
+        monkeypatch.setattr(service, "_sun_altaz_radius_arrays", fake_sun)
 
-        transit = service._extract_solar_transit_segment(
-            start_utc=start_utc,
-            end_utc=end_utc,
-            satellite=None,
-            observer=None,
-            ts=None,
-            eph=None,
-        )
+        transit = service._extract_solar_transit_segment(start_utc, end_utc, None, None, None, None)
 
         assert transit is not None
-        assert transit["peak_time"] == (start_utc + timedelta(seconds=2)).astimezone(service.timezone).isoformat()
-        assert transit["duration_seconds"] == 0.2
-        assert transit["minimum_separation_arcmin"] == 1.8
         assert transit["is_visible"] is True
+        assert transit["pass_type"] == "solar_transit"
+        assert transit["sun_altitude_deg"] == 30.0
+        assert transit["iss_altitude_deg"] == 30.0
+        assert transit["minimum_separation_arcmin"] < 1.0  # closest approach is essentially zero
+        peak = datetime.fromisoformat(transit["peak_time"]).astimezone(timezone.utc)
+        assert abs((peak - center).total_seconds()) < 1.0  # peak lands at the closest approach
+
+    def test_extract_solar_transit_segment_returns_none_when_iss_never_near_sun(self, monkeypatch):
+        import numpy as np
+
+        service = ISSPassService(45.5, -73.5, 30, "America/Montreal")
+        start_utc = datetime(2026, 5, 8, 12, 0, 0, tzinfo=timezone.utc)
+        end_utc = start_utc + timedelta(seconds=30)
+
+        # ISS stays ~40° from the Sun for the whole pass -> rejected at the coarse stage.
+        monkeypatch.setattr(
+            service, "_iss_altaz_arrays", lambda times, *a, **k: (np.full(len(times), 70.0), np.full(len(times), 180.0))
+        )
+        monkeypatch.setattr(
+            service,
+            "_sun_altaz_radius_arrays",
+            lambda times, *a, **k: (np.full(len(times), 30.0), np.full(len(times), 180.0), np.full(len(times), 0.27)),
+        )
+
+        assert service._extract_solar_transit_segment(start_utc, end_utc, None, None, None, None) is None
 
 
 class TestISSPassServiceTleFallback:
@@ -206,11 +193,14 @@ class TestISSPassServiceTleFallback:
     def test_fetch_iss_tle_uses_cache_in_cooldown(self, monkeypatch):
         service = ISSPassService(45.5, -73.5, 30, "America/Montreal")
 
-        monkeypatch.setattr("space.iss_passes._get_cached_tle", lambda max_age_seconds=None: (
-            "1 25544U 98067A   26100.00000000  .00010000  00000+0  18000-3 0  9991",
-            "2 25544  51.6400 120.0000 0005000 200.0000 160.0000 15.50000000000000",
-            0,
-        ))
+        monkeypatch.setattr(
+            "space.iss_passes._get_cached_tle",
+            lambda max_age_seconds=None: (
+                "1 25544U 98067A   26100.00000000  .00010000  00000+0  18000-3 0  9991",
+                "2 25544  51.6400 120.0000 0005000 200.0000 160.0000 15.50000000000000",
+                0,
+            ),
+        )
         monkeypatch.setattr("space.iss_passes._in_tle_failure_cooldown", lambda: True)
 
         called = {"count": 0}
@@ -255,32 +245,37 @@ class TestISSPassServiceTleFallback:
     def test_parse_iss_tle_from_json_response(self):
         """Parser handles JSON bodies returned by tle.ivanstanojevic.me and wheretheiss.at."""
         import json as _json
+
         service = ISSPassService(45.5, -73.5, 30, "America/Montreal")
 
         line1_str = "1 25544U 98067A   26100.00000000  .00010000  00000+0  18000-3 0  9991"
         line2_str = "2 25544  51.6400 120.0000 0005000 200.0000 160.0000 15.50000000000000"
 
         # tle.ivanstanojevic.me-style payload
-        payload_ivan = _json.dumps({
-            "@type": "TleModel",
-            "name": "ISS (ZARYA)",
-            "date": "2026-04-10T00:00:00+00:00",
-            "line1": line1_str,
-            "line2": line2_str,
-        })
+        payload_ivan = _json.dumps(
+            {
+                "@type": "TleModel",
+                "name": "ISS (ZARYA)",
+                "date": "2026-04-10T00:00:00+00:00",
+                "line1": line1_str,
+                "line2": line2_str,
+            }
+        )
         l1, l2 = service._parse_iss_tle_from_response(payload_ivan)
         assert l1 == line1_str
         assert l2 == line2_str
 
         # wheretheiss.at-style payload
-        payload_wheretheiss = _json.dumps({
-            "name": "ISS (ZARYA)",
-            "satelliteId": 25544,
-            "line1": line1_str,
-            "line2": line2_str,
-            "requestedAt": "2026-04-10T00:00:00.000Z",
-            "source": "celestrak",
-        })
+        payload_wheretheiss = _json.dumps(
+            {
+                "name": "ISS (ZARYA)",
+                "satelliteId": 25544,
+                "line1": line1_str,
+                "line2": line2_str,
+                "requestedAt": "2026-04-10T00:00:00.000Z",
+                "source": "celestrak",
+            }
+        )
         l1, l2 = service._parse_iss_tle_from_response(payload_wheretheiss)
         assert l1 == line1_str
         assert l2 == line2_str
@@ -288,6 +283,7 @@ class TestISSPassServiceTleFallback:
     def test_fetch_iss_tle_uses_alternative_source_when_celestrak_blocked(self, monkeypatch):
         """Alternative JSON sources are tried after Celestrak timeout/block."""
         import json as _json
+
         service = ISSPassService(45.5, -73.5, 30, "America/Montreal")
 
         line1_str = "1 25544U 98067A   26100.00000000  .00010000  00000+0  18000-3 0  9991"
@@ -308,10 +304,14 @@ class TestISSPassServiceTleFallback:
             if "celestrak" in url:
                 raise _TimeoutError("Connection timed out")
             # First non-Celestrak URL returns JSON TLE
-            return type("R", (), {
-                "text": _json.dumps({"line1": line1_str, "line2": line2_str}),
-                "raise_for_status": lambda self: None,
-            })()
+            return type(
+                "R",
+                (),
+                {
+                    "text": _json.dumps({"line1": line1_str, "line2": line2_str}),
+                    "raise_for_status": lambda self: None,
+                },
+            )()
 
         monkeypatch.setattr("space.iss_passes.requests.get", _mock_get)
 
@@ -325,6 +325,7 @@ class TestISSPassServiceTleFallback:
 
     def test_fetch_iss_tle_skips_celestrak_when_block_flag_is_set(self, monkeypatch):
         import json as _json
+
         service = ISSPassService(45.5, -73.5, 30, "America/Montreal")
 
         line1_str = "1 25544U 98067A   26100.00000000  .00010000  00000+0  18000-3 0  9991"
@@ -342,11 +343,15 @@ class TestISSPassServiceTleFallback:
             calls.append(url)
             if iss_module._is_celestrak_url(url):
                 raise AssertionError("Celestrak URL should be skipped when block flag is set")
-            return type("R", (), {
-                "text": _json.dumps({"line1": line1_str, "line2": line2_str}),
-                "status_code": 200,
-                "raise_for_status": lambda self: None,
-            })()
+            return type(
+                "R",
+                (),
+                {
+                    "text": _json.dumps({"line1": line1_str, "line2": line2_str}),
+                    "status_code": 200,
+                    "raise_for_status": lambda self: None,
+                },
+            )()
 
         monkeypatch.setattr("space.iss_passes.requests.get", _mock_get)
 
@@ -377,11 +382,13 @@ class TestISSPassServiceTleFallback:
         block_calls = []
 
         def _mock_set_celestrak_block(status_code, reason, source_url):
-            block_calls.append({
-                "status_code": status_code,
-                "reason": reason,
-                "source_url": source_url,
-            })
+            block_calls.append(
+                {
+                    "status_code": status_code,
+                    "reason": reason,
+                    "source_url": source_url,
+                }
+            )
 
         monkeypatch.setattr("space.iss_passes._set_celestrak_block", _mock_set_celestrak_block)
 
@@ -416,9 +423,9 @@ class TestISSCalendarAggregation:
         aggregator = EventsAggregator(45.5, -73.5, "America/Montreal")
 
         base_day = aggregator.local_now.replace(hour=20, minute=0, second=0, microsecond=0)
-        pass_1_peak = (base_day + timedelta(days=1, minutes=4))
-        pass_2_peak = (base_day + timedelta(days=3, minutes=6))
-        pass_3_peak_outside = (base_day + timedelta(days=9, minutes=8))
+        pass_1_peak = base_day + timedelta(days=1, minutes=4)
+        pass_2_peak = base_day + timedelta(days=3, minutes=6)
+        pass_3_peak_outside = base_day + timedelta(days=9, minutes=8)
 
         iss_payload = {
             "passes": [
@@ -621,143 +628,96 @@ class TestISSCalendarAggregation:
 class TestISSPassServiceLunarTransit:
     """Test ISS lunar transit detection helpers."""
 
+    @staticmethod
+    def _patch_moon_arrays(monkeypatch, service, center, moon_alt=40.0, illum=75.0):
+        import numpy as np
+
+        def fake_iss(times, *args, **kwargs):
+            secs = np.array([(t - center).total_seconds() for t in times])
+            return np.full(len(times), moon_alt), 195.0 + secs * 0.5
+
+        def fake_moon(times, *args, **kwargs):
+            n = len(times)
+            return (
+                np.full(n, moon_alt),
+                np.full(n, 195.0),
+                np.full(n, 0.27),
+                np.full(n, illum),
+            )
+
+        monkeypatch.setattr(service, "_iss_altaz_arrays", fake_iss)
+        monkeypatch.setattr(service, "_moon_altaz_radius_illum_arrays", fake_moon)
+
     def test_extract_lunar_transit_segment_returns_refined_window(self, monkeypatch):
         service = ISSPassService(45.5, -73.5, 30, "America/Montreal")
         start_utc = datetime(2026, 5, 8, 21, 0, 0, tzinfo=timezone.utc)
-        end_utc = start_utc + timedelta(seconds=4)
+        end_utc = start_utc + timedelta(seconds=30)
+        center = start_utc + timedelta(seconds=15)
+        self._patch_moon_arrays(monkeypatch, service, center, moon_alt=40.0, illum=75.0)
 
-        coarse_samples = [
-            {
-                "time_utc": start_utc + timedelta(seconds=offset),
-                "iss_altitude_deg": 40.0,
-                "iss_azimuth_deg": 195.0,
-                "moon_altitude_deg": 40.0,
-                "moon_azimuth_deg": 195.0,
-                "lunar_radius_deg": 0.27,
-                "moon_illumination_pct": 75.0,
-                "separation_deg": separation,
-            }
-            for offset, separation in [
-                (0, 0.40),
-                (1, 0.26),
-                (2, 0.05),
-                (3, 0.24),
-                (4, 0.38),
-            ]
-        ]
-        refined_samples = [
-            {
-                "time_utc": start_utc + timedelta(seconds=offset),
-                "iss_altitude_deg": 40.0,
-                "iss_azimuth_deg": 195.0,
-                "moon_altitude_deg": 40.0,
-                "moon_azimuth_deg": 195.0,
-                "lunar_radius_deg": 0.27,
-                "moon_illumination_pct": 75.0,
-                "separation_deg": separation,
-            }
-            for offset, separation in [
-                (1.8, 0.28),
-                (1.9, 0.20),
-                (2.0, 0.03),
-                (2.1, 0.21),
-                (2.2, 0.29),
-            ]
-        ]
-
-        def _mock_sample_time_range(start_utc, end_utc, step_seconds, sampler):
-            if step_seconds == 1.0:
-                return coarse_samples
-            return refined_samples
-
-        monkeypatch.setattr(service, "_sample_time_range", _mock_sample_time_range)
-
-        transit = service._extract_lunar_transit_segment(
-            start_utc=start_utc,
-            end_utc=end_utc,
-            satellite=None,
-            observer=None,
-            ts=None,
-            eph=None,
-        )
+        transit = service._extract_lunar_transit_segment(start_utc, end_utc, None, None, None, None)
 
         assert transit is not None
         assert transit["pass_type"] == "lunar_transit"
-        assert transit["peak_time"] == (start_utc + timedelta(seconds=2)).astimezone(service.timezone).isoformat()
-        assert transit["duration_seconds"] == 0.2
-        assert transit["minimum_separation_arcmin"] == pytest.approx(0.03 * 60, abs=0.01)
+        assert transit["moon_altitude_deg"] == 40.0
         assert transit["moon_illumination_pct"] == 75.0
+        assert transit["minimum_separation_arcmin"] < 1.0
         assert transit["is_visible"] is True
+        peak = datetime.fromisoformat(transit["peak_time"]).astimezone(timezone.utc)
+        assert abs((peak - center).total_seconds()) < 1.0
 
     def test_extract_lunar_transit_segment_returns_none_when_no_candidates(self, monkeypatch):
+        import numpy as np
+
         service = ISSPassService(45.5, -73.5, 30, "America/Montreal")
         start_utc = datetime(2026, 5, 8, 21, 0, 0, tzinfo=timezone.utc)
-        end_utc = start_utc + timedelta(seconds=4)
+        end_utc = start_utc + timedelta(seconds=30)
 
-        # All separations exceed the lunar radius → no transit
-        samples = [
-            {
-                "time_utc": start_utc + timedelta(seconds=offset),
-                "iss_altitude_deg": 40.0,
-                "iss_azimuth_deg": 195.0,
-                "moon_altitude_deg": 40.0,
-                "moon_azimuth_deg": 195.0,
-                "lunar_radius_deg": 0.27,
-                "moon_illumination_pct": 50.0,
-                "separation_deg": 1.5,
-            }
-            for offset in range(5)
-        ]
-
-        monkeypatch.setattr(service, "_sample_time_range", lambda *args, **kwargs: samples)
-
-        transit = service._extract_lunar_transit_segment(
-            start_utc=start_utc,
-            end_utc=end_utc,
-            satellite=None,
-            observer=None,
-            ts=None,
-            eph=None,
+        # ISS stays ~30° from the Moon for the whole pass -> rejected at the coarse stage.
+        monkeypatch.setattr(
+            service, "_iss_altaz_arrays", lambda times, *a, **k: (np.full(len(times), 70.0), np.full(len(times), 195.0))
+        )
+        monkeypatch.setattr(
+            service,
+            "_moon_altaz_radius_illum_arrays",
+            lambda times, *a, **k: (
+                np.full(len(times), 40.0),
+                np.full(len(times), 195.0),
+                np.full(len(times), 0.27),
+                np.full(len(times), 50.0),
+            ),
         )
 
-        assert transit is None
+        assert service._extract_lunar_transit_segment(start_utc, end_utc, None, None, None, None) is None
 
     def test_extract_lunar_transit_segment_returns_none_when_moon_too_low(self, monkeypatch):
+        import numpy as np
+
         service = ISSPassService(45.5, -73.5, 30, "America/Montreal")
         start_utc = datetime(2026, 5, 8, 21, 0, 0, tzinfo=timezone.utc)
-        end_utc = start_utc + timedelta(seconds=4)
+        end_utc = start_utc + timedelta(seconds=30)
 
-        # Moon altitude below LUNAR_TRANSIT_MIN_MOON_ALTITUDE_DEG (5°) → excluded
-        samples = [
-            {
-                "time_utc": start_utc + timedelta(seconds=offset),
-                "iss_altitude_deg": 40.0,
-                "iss_azimuth_deg": 195.0,
-                "moon_altitude_deg": 2.0,
-                "moon_azimuth_deg": 195.0,
-                "lunar_radius_deg": 0.27,
-                "moon_illumination_pct": 50.0,
-                "separation_deg": 0.05,
-            }
-            for offset in range(5)
-        ]
-
-        monkeypatch.setattr(service, "_sample_time_range", lambda *args, **kwargs: samples)
-
-        transit = service._extract_lunar_transit_segment(
-            start_utc=start_utc,
-            end_utc=end_utc,
-            satellite=None,
-            observer=None,
-            ts=None,
-            eph=None,
+        # Moon below LUNAR_TRANSIT_MIN_MOON_ALTITUDE_DEG (5°) even though the ISS crosses it.
+        monkeypatch.setattr(
+            service, "_iss_altaz_arrays", lambda times, *a, **k: (np.full(len(times), 2.0), np.full(len(times), 195.0))
+        )
+        monkeypatch.setattr(
+            service,
+            "_moon_altaz_radius_illum_arrays",
+            lambda times, *a, **k: (
+                np.full(len(times), 2.0),
+                np.full(len(times), 195.0),
+                np.full(len(times), 0.27),
+                np.full(len(times), 50.0),
+            ),
         )
 
-        assert transit is None
+        assert service._extract_lunar_transit_segment(start_utc, end_utc, None, None, None, None) is None
 
     def test_find_lunar_transits_skipped_without_ephemeris(self, monkeypatch):
         """_find_lunar_transits returns [] gracefully when eph is None."""
         from datetime import datetime, timezone
+
         service = ISSPassService(45.5, -73.5, 30, "America/Montreal")
         start_utc = datetime(2026, 5, 8, 0, 0, 0, tzinfo=timezone.utc)
         end_utc = start_utc + timedelta(days=1)
@@ -787,10 +747,14 @@ class TestISSPassServiceLunarTransit:
         """get_report() always returns lunar_transits / next_lunar_transit / total_lunar_transits."""
         service = ISSPassService(45.5, -73.5, 30, "America/Montreal")
 
-        monkeypatch.setattr(service, "_fetch_iss_tle", lambda: (
-            "1 25544U 98067A   26100.00000000  .00010000  00000+0  18000-3 0  9991",
-            "2 25544  51.6400 120.0000 0005000 200.0000 160.0000 15.50000000000000",
-        ))
+        monkeypatch.setattr(
+            service,
+            "_fetch_iss_tle",
+            lambda: (
+                "1 25544U 98067A   26100.00000000  .00010000  00000+0  18000-3 0  9991",
+                "2 25544  51.6400 120.0000 0005000 200.0000 160.0000 15.50000000000000",
+            ),
+        )
         monkeypatch.setattr(service, "_load_ephemeris", lambda: None)
         monkeypatch.setattr(service, "_build_passes", lambda *args, **kwargs: [])
         monkeypatch.setattr(service, "_find_solar_transits", lambda *args, **kwargs: [])
@@ -799,6 +763,7 @@ class TestISSPassServiceLunarTransit:
         from skyfield.api import Loader
         import os
         from utils.constants import DATA_DIR_CACHE
+
         SKYFIELD_CACHE_DIR = os.path.join(DATA_DIR_CACHE, "skyfield")
         os.makedirs(SKYFIELD_CACHE_DIR, exist_ok=True)
 
@@ -806,22 +771,39 @@ class TestISSPassServiceLunarTransit:
         class _FakeTS:
             def from_datetime(self, dt):
                 return dt
+
             def timescale(self):
                 return self
 
         fake_ts = _FakeTS()
-        monkeypatch.setattr(iss_module, "SKYFIELD_LOADER", type("L", (), {
-            "timescale": lambda self: fake_ts,
-        })())
+        monkeypatch.setattr(
+            iss_module,
+            "SKYFIELD_LOADER",
+            type(
+                "L",
+                (),
+                {
+                    "timescale": lambda self: fake_ts,
+                },
+            )(),
+        )
 
         class _FakeSatellite:
             def find_events(self, *args, **kwargs):
                 return [], []
 
         monkeypatch.setattr(iss_module, "EarthSatellite", lambda *args, **kwargs: _FakeSatellite())
-        monkeypatch.setattr(iss_module, "wgs84", type("W", (), {
-            "latlon": lambda *args, **kwargs: None,
-        })())
+        monkeypatch.setattr(
+            iss_module,
+            "wgs84",
+            type(
+                "W",
+                (),
+                {
+                    "latlon": lambda *args, **kwargs: None,
+                },
+            )(),
+        )
 
         report = service.get_report(days=1)
 
