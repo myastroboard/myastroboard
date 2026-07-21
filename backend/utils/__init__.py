@@ -300,10 +300,16 @@ def parse_iso_to_utc(value: Optional[str]) -> datetime:
     winter). Parsing back to an absolute instant fixes that. Empty or invalid
     input maps to ``datetime.max`` (UTC) so the value can be used directly as a
     sort key that pushes unparseable entries to the end.
+
+    That fallback is logged rather than applied silently: an event carrying an
+    unreadable time still appears in the list, just parked at the bottom where it
+    reads as "furthest in the future" instead of as broken. Without the log line
+    there is nothing to tell the two apart.
     """
     try:
         parsed = datetime.fromisoformat(str(value))
     except (ValueError, TypeError):
+        logger.warning("Unparseable event timestamp %r - sorting this event last", value)
         return datetime.max.replace(tzinfo=timezone.utc)
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
