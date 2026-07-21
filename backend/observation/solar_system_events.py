@@ -487,6 +487,10 @@ class SolarSystemEventsService:
             return 'binoculars'
         return 'telescope'
 
+    def _equipment_display_label(self, equipment: str) -> str:
+        """Translate an internal equipment key (e.g. 'naked_eye_possible') for display."""
+        return self.i18n.t(f'events_api.solar_system.visibility_{equipment}')
+
     def _build_comet_event(
         self, candidate: Dict[str, Any], start_date: date, end_date: date, source: str
     ) -> Optional[Dict[str, Any]]:
@@ -508,7 +512,7 @@ class SolarSystemEventsService:
         description = self.i18n.t(
             'events_api.solar_system.comet_description',
             magnitude=magnitude if magnitude is not None else '—',
-            visibility=equipment,
+            visibility=self._equipment_display_label(equipment),
         )
 
         return {

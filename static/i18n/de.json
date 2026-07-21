@@ -1755,6 +1755,9 @@
       "meteor_shower_description": "Meteorschauer Peak. Bis zu {zenith_hourly_rate} Meteore/Stunde. Mutterkoerper: {parent_body}",
       "comet_title": "{comet_name} Bei Perihelion",
       "comet_description": "Periodischer Komet bei Perihelion. Magnitude ~{magnitude} ({visibility}). Konsultieren Sie Karten für den genauen Standort.",
+      "visibility_naked_eye_possible": "bloßes Auge möglich",
+      "visibility_binoculars": "Fernglas",
+      "visibility_telescope": "Teleskop",
       "asteroid_occultation_title": "Asteroidenbedeckung - Siehe IOTA für Details",
       "asteroid_occultation_description": "Asteroid geht vor einem Stern vorbei. Genaue Vorhersagen verfügbar auf IOTA/IOD. Erfordert genaues Timing."
     },

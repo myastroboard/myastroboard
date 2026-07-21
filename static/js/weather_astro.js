@@ -355,14 +355,23 @@ function renderNightTimeline(hourlyData, timezone) {
     // Only the single closest hour is flagged "now" - a fixed distance threshold
     // can match two adjacent hourly points at once (e.g. now sits 20min from one
     // point and 40min from the next, both under a 60min window), highlighting both.
-    let nowIdx = -1, nowBestDiff = Infinity;
-    nightHours.forEach((h, i) => {
-        const diff = Math.abs(new Date(h.datetime).getTime() - nowMs);
-        if (diff < nowBestDiff) {
-            nowBestDiff = diff;
-            nowIdx = i;
-        }
-    });
+    // Nothing is flagged if "now" falls outside the displayed range altogether
+    // (e.g. it's still afternoon and the timeline only starts at dusk) - closest
+    // still isn't "now" in that case.
+    const rangeMargin = 30 * 60 * 1000;
+    const rangeStart = new Date(nightHours[0].datetime).getTime();
+    const rangeEnd = new Date(nightHours[nightHours.length - 1].datetime).getTime();
+    let nowIdx = -1;
+    if (nowMs >= rangeStart - rangeMargin && nowMs <= rangeEnd + rangeMargin) {
+        let nowBestDiff = Infinity;
+        nightHours.forEach((h, i) => {
+            const diff = Math.abs(new Date(h.datetime).getTime() - nowMs);
+            if (diff < nowBestDiff) {
+                nowBestDiff = diff;
+                nowIdx = i;
+            }
+        });
+    }
 
     nightHours.forEach((h, i) => {
         const isNow = i === nowIdx;

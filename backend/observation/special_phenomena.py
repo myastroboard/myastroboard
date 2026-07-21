@@ -255,115 +255,63 @@ class SpecialPhenomenaService:
         return Time(f"{year}-06-21T12:00:00", format='isot', scale='utc', location=self.location)
 
     @staticmethod
-    def _sun_declination_deg(sun: Any) -> float:
-        """Return the Sun's declination in degrees, handling scalar/array returns."""
-        dec_val = sun.dec.degree  # type: ignore
-        if isinstance(dec_val, (np.ndarray, complex)):
-            return float(np.real(np.atleast_1d(dec_val).flat[0]))
-        return float(dec_val)  # type: ignore
+    def _sun_ecliptic_longitudes_deg(times: Time) -> np.ndarray:
+        """Return the Sun's apparent ecliptic longitude in degrees for each instant.
 
-    def _refine_declination_time(self, best_time: Time, best_cost: float, cost_fn: Any) -> Time:
-        """Refine to 1-minute resolution around ``best_time``, minimising ``cost_fn``.
+        Longitudes are measured in the true ecliptic and equinox *of date*, which
+        is the frame the equinoxes and solstices are defined against. ``get_sun``
+        on its own reports GCRS, whose equator is still the J2000 one, so reading
+        its declination places the seasons several hours off (precession since
+        J2000 has moved the equinox by roughly a third of a degree).
 
-        ``cost_fn`` maps the Sun's declination to a value that is lowest at the
-        target instant (``abs`` for an equinox, ``-dec`` for the summer solstice,
-        ``dec`` for the winter solstice). This second pass adds sub-minute
-        precision on top of the coarse 1-hour scan (which alone was only accurate
-        to about an hour).
+        A single vectorized call covers the whole grid. Returns an empty array
+        when the ephemeris yields nothing, which callers read as "keep the best
+        guess you already have".
         """
-        current = best_time - (1.0 * u.hour)
-        end_time = best_time + (1.0 * u.hour)
-        step = 1.0 * u.min
-        while current < end_time:
-            try:
-                sun = get_sun(current)
-                if sun is not None:
-                    cost = cost_fn(self._sun_declination_deg(sun))
-                    if cost < best_cost:
-                        best_cost = cost
-                        best_time = current
-            except Exception:
-                pass  # astropy ephemeris error for this timestep — skip it
-            current = current + step
-        return best_time
+        sun = get_sun(times)
+        if sun is None:
+            return np.empty(0, dtype=float)
+        ecliptic = sun.transform_to(GeocentricTrueEcliptic(obstime=times, equinox=times))
+        return np.atleast_1d(np.asarray(np.real(ecliptic.lon.degree), dtype=float))  # type: ignore[union-attr]
+
+    def _best_solar_longitude_time(self, times: Time, target_longitude: float, fallback: Time) -> Time:
+        """Return the instant in ``times`` where the Sun is nearest ``target_longitude``."""
+        try:
+            longitudes = self._sun_ecliptic_longitudes_deg(times)
+            if longitudes.size == 0:
+                return fallback
+            # Wrap into [-180, 180) so the March equinox (0 deg) compares correctly.
+            offsets = np.abs((longitudes - target_longitude + 180.0) % 360.0 - 180.0)
+            index = int(np.argmin(offsets))
+            if index >= times.size:
+                return fallback
+            selected = times[index]
+            return selected if selected is not None else fallback
+        except Exception:
+            return fallback  # astropy ephemeris error — keep the approximate time
+
+    def _refine_to_solar_longitude(self, approx_time: Time, target_longitude: float) -> Time:
+        """Locate the target instant to 1-minute precision around ``approx_time``.
+
+        A coarse 1-hour scan over +/-5 days picks the right hour, then a 1-minute
+        scan over +/-1 hour pins down the instant. Each pass queries the
+        ephemeris once for its whole grid rather than once per timestep.
+        """
+        coarse_grid = approx_time + (np.arange(-120, 121) * u.hour)
+        best_time = self._best_solar_longitude_time(coarse_grid, target_longitude, approx_time)
+
+        fine_grid = best_time + (np.arange(-60, 61) * u.min)
+        return self._best_solar_longitude_time(fine_grid, target_longitude, best_time)
 
     def _refine_equinox_time(self, approx_time: Time, season: str) -> Time:
-        """Refine equinox time by finding when Sun's declination is closest to 0."""
-        # Check around approximate time
-        step_hours = 1.0 * u.hour
-        current = approx_time - (5 * u.day)  # Start 5 days before
-        end_time = approx_time + (5 * u.day)
-        best_time = current
-
-        try:
-            sun_current = get_sun(current)
-            if sun_current is None:
-                return best_time
-            min_declination = abs(self._sun_declination_deg(sun_current))
-        except Exception:
-            min_declination = 180.0
-
-        while current < end_time:
-            try:
-                sun = get_sun(current)
-                if sun is None:
-                    current = current + step_hours
-                    continue
-
-                declination = abs(self._sun_declination_deg(sun))
-
-                if declination < min_declination:
-                    min_declination = declination
-                    best_time = current
-            except Exception:
-                pass  # astropy ephemeris error for this timestep — skip it
-
-            current = current + step_hours  # Step by 1 hour
-
-        return self._refine_declination_time(best_time, min_declination, abs)
+        """Refine equinox time by finding when the Sun crosses the equinox point."""
+        # Spring equinox sits at solar longitude 0 deg, autumn at 180 deg.
+        return self._refine_to_solar_longitude(approx_time, 0.0 if season == 'spring' else 180.0)
 
     def _refine_solstice_time(self, approx_time: Time, season: str) -> Time:
-        """Refine solstice time by finding when Sun's declination is at extremum."""
-        # Check around approximate time
-        step_hours = 1.0 * u.hour
-        current = approx_time - (5 * u.day)  # Start 5 days before
-        end_time = approx_time + (5 * u.day)
-        best_time = current
-
-        try:
-            sun_current = get_sun(current)
-            if sun_current is None:
-                return best_time
-            max_declination = self._sun_declination_deg(sun_current)
-        except Exception:
-            max_declination = 0.0
-
-        target_max = season == 'summer'
-
-        while current < end_time:
-            try:
-                sun = get_sun(current)
-                if sun is None:
-                    current = current + step_hours
-                    continue
-
-                declination = self._sun_declination_deg(sun)
-
-                if target_max and declination > max_declination:
-                    max_declination = declination
-                    best_time = current
-                elif not target_max and declination < max_declination:
-                    max_declination = declination
-                    best_time = current
-            except Exception:
-                pass  # astropy ephemeris error for this timestep — skip it
-
-            current = current + step_hours  # Step by 1 hour
-
-        # Summer solstice maximises declination (cost -dec); winter minimises it (cost dec).
-        if target_max:
-            return self._refine_declination_time(best_time, -max_declination, lambda d: -d)
-        return self._refine_declination_time(best_time, max_declination, lambda d: d)
+        """Refine solstice time by finding when the Sun reaches its declination extremum."""
+        # Summer solstice sits at solar longitude 90 deg, winter at 270 deg.
+        return self._refine_to_solar_longitude(approx_time, 90.0 if season == 'summer' else 270.0)
 
     def _find_zodiacal_light_windows(self, start_date: Time, end_date: Time) -> List[Dict[str, Any]]:
         """
@@ -645,16 +593,22 @@ class SpecialPhenomenaService:
             if sun is None:
                 return 0.0
 
+            ecliptic_frame = GeocentricTrueEcliptic(obstime=time, equinox=time)
             ecliptic_longitudes = np.arange(0.0, 360.0, 15.0)
             ecliptic_points = SkyCoord(
                 lon=ecliptic_longitudes * u.deg,
                 lat=np.zeros_like(ecliptic_longitudes) * u.deg,
-                frame=GeocentricTrueEcliptic(obstime=time, equinox=time),
+                frame=ecliptic_frame,
             )
 
             altaz = ecliptic_points.transform_to(AltAz(obstime=time, location=self.location))
             altitudes = np.atleast_1d(np.asarray(altaz.alt.degree, dtype=float))  # type: ignore[union-attr]
-            separations = np.atleast_1d(np.asarray(ecliptic_points.separation(sun).degree, dtype=float))
+
+            # Move the Sun into the sampling frame before measuring elongation.
+            # Separating across GCRS -> GeocentricTrueEcliptic is not a pure
+            # rotation, so astropy warns once per call (and this runs per day).
+            sun_ecliptic = sun.transform_to(ecliptic_frame)
+            separations = np.atleast_1d(np.asarray(ecliptic_points.separation(sun_ecliptic).degree, dtype=float))
 
             band = altitudes[(altitudes > 0.0) & (separations <= 90.0)]
             return float(band.max()) if band.size else 0.0

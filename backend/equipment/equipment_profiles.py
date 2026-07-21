@@ -1395,7 +1395,9 @@ def create_combination(user_id: str, combination_data: Dict) -> Optional[Dict]:
             updated_at=datetime.now(timezone.utc).isoformat(),
             is_disabled=bool(combination_data.get('is_disabled', False)),
             guide_camera_id=combination_data.get('guide_camera_id') or None,
-            lens_focal_length_mm=None if has_telescope else _get_float_or_none(combination_data.get('lens_focal_length_mm')),
+            lens_focal_length_mm=(
+                None if has_telescope else _get_float_or_none(combination_data.get('lens_focal_length_mm'))
+            ),
             lens_focal_ratio=None if has_telescope else _get_float_or_none(combination_data.get('lens_focal_ratio')),
         )
 
@@ -1449,8 +1451,12 @@ def update_combination(user_id: str, combination_id: str, combination_data: Dict
                     updated_at=datetime.now(timezone.utc).isoformat(),
                     is_disabled=bool(combination_data.get('is_disabled', item.get('is_disabled', False))),
                     guide_camera_id=combination_data.get('guide_camera_id') or None,
-                    lens_focal_length_mm=None if has_telescope else _get_float_or_none(combination_data.get('lens_focal_length_mm')),
-                    lens_focal_ratio=None if has_telescope else _get_float_or_none(combination_data.get('lens_focal_ratio')),
+                    lens_focal_length_mm=(
+                        None if has_telescope else _get_float_or_none(combination_data.get('lens_focal_length_mm'))
+                    ),
+                    lens_focal_ratio=(
+                        None if has_telescope else _get_float_or_none(combination_data.get('lens_focal_ratio'))
+                    ),
                 )
 
                 data['items'][i] = asdict(combination)
