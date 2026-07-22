@@ -35,10 +35,11 @@ function getLocalizedQualityScoreLabel(score) {
 // transparency is inverted (1=worst/N=best per 7Timer's own docs).
 function getScaleColorClass(value, scaleSize, higherRawIsBetter = false) {
     const v = Number(value);
-    if (!Number.isFinite(v) || !scaleSize || scaleSize <= 1) return 'text-secondary';
+    if (!Number.isFinite(v) || !scaleSize || scaleSize <= 1 || v < 1 || v > scaleSize) return 'text-secondary';
     const quality = higherRawIsBetter ? (v - 1) / (scaleSize - 1) : (scaleSize - v) / (scaleSize - 1); // 1 = best, 0 = worst
-    if (quality >= 0.66) return 'text-success';
-    if (quality >= 0.33) return 'text-warning';
+    const clamped = Math.max(0, Math.min(1, quality));
+    if (clamped >= 0.66) return 'text-success';
+    if (clamped >= 0.33) return 'text-warning';
     return 'text-danger';
 }
 
@@ -176,6 +177,8 @@ function createSeeingMetricIcon(iconClass, colorClass, tooltip) {
     const ico = DOMUtils.createIcon(iconClass);
     ico.className += ` ${colorClass}`;
     ico.title = tooltip;
+    ico.setAttribute('aria-hidden', 'false');
+    ico.setAttribute('aria-label', tooltip);
     return ico;
 }
 
