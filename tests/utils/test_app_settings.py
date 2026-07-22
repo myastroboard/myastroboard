@@ -1,8 +1,6 @@
 """Tests for app_settings.py: secret key generation and persistent app settings."""
 
 import json
-import os
-import sys
 
 import pytest
 

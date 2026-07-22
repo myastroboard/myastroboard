@@ -6,8 +6,10 @@ import pytest
 import os
 import json
 import yaml
+from unittest.mock import patch
 
 # Import the functions to test
+import utils as utils_module
 from utils import (
     IndentDumper,
     _NumpySafeEncoder,
@@ -489,9 +491,6 @@ class TestParseIsoToUtcLogsFallback:
     """
 
     def test_logs_warning_for_unparseable_value(self):
-        from unittest.mock import patch
-        import utils as utils_module
-
         with patch.object(utils_module, "logger") as mock_logger:
             utils_module.parse_iso_to_utc("not-a-date")
 
@@ -499,18 +498,12 @@ class TestParseIsoToUtcLogsFallback:
         assert "not-a-date" in str(mock_logger.warning.call_args)
 
     def test_logs_warning_for_none(self):
-        from unittest.mock import patch
-        import utils as utils_module
-
         with patch.object(utils_module, "logger") as mock_logger:
             utils_module.parse_iso_to_utc(None)
 
         assert mock_logger.warning.called
 
     def test_does_not_log_for_valid_value(self):
-        from unittest.mock import patch
-        import utils as utils_module
-
         with patch.object(utils_module, "logger") as mock_logger:
             utils_module.parse_iso_to_utc("2026-01-01T12:00:00+02:00")
 

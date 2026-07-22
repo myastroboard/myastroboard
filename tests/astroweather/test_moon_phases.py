@@ -1,7 +1,5 @@
 """Unit tests for moon_phases.py pure-logic methods."""
 
-import sys
-import os
 import datetime
 from zoneinfo import ZoneInfo
 from unittest.mock import MagicMock

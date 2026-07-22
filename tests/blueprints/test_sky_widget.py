@@ -1,7 +1,5 @@
 """Tests for _determine_sky_period and get_sky_widget_api."""
 
-import sys
-import os
 from datetime import datetime, timezone, timedelta
 from unittest.mock import patch
 import pytest

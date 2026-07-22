@@ -4,7 +4,6 @@ Tests for Shared Equipment feature
 import pytest
 import os
 import tempfile
-import sys
 from unittest.mock import patch, MagicMock
 
 from equipment import equipment_profiles

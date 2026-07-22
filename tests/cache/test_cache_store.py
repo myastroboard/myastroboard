@@ -331,7 +331,6 @@ class TestLoadLocationSignaturesFile:
     """_load_location_signatures reads file contents or swallows exceptions."""
 
     def test_legacy_flat_file_maps_to_legacy_slot(self, tmp_path, monkeypatch):
-        import json
 
         location_data = {"latitude": 51.5, "longitude": -0.12, "elevation": 10, "timezone": "Europe/London"}
         loc_file = tmp_path / 'location_cache.json'
@@ -343,7 +342,6 @@ class TestLoadLocationSignaturesFile:
         assert legacy["timezone"] == "Europe/London"
 
     def test_per_id_file_shape_loads_directly(self, tmp_path, monkeypatch):
-        import json
 
         data = {"loc-1": {"latitude": 1.0, "longitude": 2.0, "elevation": 3, "timezone": "UTC"}}
         loc_file = tmp_path / 'location_cache.json'
@@ -362,7 +360,6 @@ class TestLoadLocationSignaturesFile:
         """A valid JSON array (neither the legacy nor per-id dict shape) matches
         neither branch - the loader must leave the in-memory state untouched
         rather than raising or storing a non-dict value."""
-        import json
 
         loc_file = tmp_path / 'location_cache.json'
         loc_file.write_text(json.dumps(["not", "a", "dict"]))
@@ -471,7 +468,6 @@ class TestUpdateAndLoadSharedCacheEntry:
         assert result is None
 
     def test_load_entry_not_dict_returns_none(self, tmp_path, monkeypatch):
-        import json
 
         cache_file = tmp_path / "cache3.json"
         cache_file.write_text(json.dumps({"test_key": "not_a_dict"}), encoding="utf-8")
@@ -481,7 +477,6 @@ class TestUpdateAndLoadSharedCacheEntry:
         assert result is None
 
     def test_load_entry_missing_timestamp_returns_none(self, tmp_path, monkeypatch):
-        import json
 
         cache_file = tmp_path / "cache4.json"
         cache_file.write_text(json.dumps({"test_key": {"data": 42}}), encoding="utf-8")
@@ -519,7 +514,6 @@ class TestSyncAllFromShared:
     """_sync_all_from_shared hydrates location slots from keyed entries."""
 
     def test_keyed_entries_hydrate_registry(self, tmp_path, monkeypatch):
-        import json
 
         loc_id = str(uuid.uuid4())
         shared = {
@@ -541,7 +535,6 @@ class TestGetCacheStatusProgressPercent:
     """progress_percent calculation when total_steps > 0."""
 
     def test_progress_percent_computed_from_shared_cache(self, tmp_path, monkeypatch):
-        import json
 
         shared = {
             "_cache_in_progress": {
@@ -576,7 +569,6 @@ class TestCacheInitStatusNoCacheInProgress:
     """get_cache_init_status with no _cache_in_progress in shared cache."""
 
     def test_no_cache_in_progress_key(self, tmp_path, monkeypatch):
-        import json
 
         shared = {"some_other_key": {"timestamp": 0, "data": None}}
         cache_file = tmp_path / "no_progress.json"
@@ -639,7 +631,6 @@ class TestIsExecutionMetricsValid:
         monkeypatch.setattr(cs, '_SHARED_CACHE_LOCK', str(tmp_path / "ev4.lock"))
         cache_store.record_cache_execution("allsky_sensor", 0.1, True)
         # Manually backdate the last_run_at to simulate expiry
-        import json
 
         with open(str(tmp_path / "ev4.json")) as f:
             data = json.load(f)
@@ -653,7 +644,6 @@ class TestIsExecutionMetricsValid:
         monkeypatch.setattr(cs, '_SHARED_CACHE_FILE', str(tmp_path / "ev5.json"))
         monkeypatch.setattr(cs, '_SHARED_CACHE_LOCK', str(tmp_path / "ev5.lock"))
         cache_store.record_cache_execution("allsky_sensor", 0.1, True)
-        import json
 
         with open(str(tmp_path / "ev5.json")) as f:
             data = json.load(f)
@@ -666,7 +656,6 @@ class TestIsExecutionMetricsValid:
         monkeypatch.setattr(cs, '_SHARED_CACHE_FILE', str(tmp_path / "ev6.json"))
         monkeypatch.setattr(cs, '_SHARED_CACHE_LOCK', str(tmp_path / "ev6.lock"))
         cache_store.record_cache_execution("allsky_sensor", 0.1, True)
-        import json
 
         with open(str(tmp_path / "ev6.json")) as f:
             data = json.load(f)

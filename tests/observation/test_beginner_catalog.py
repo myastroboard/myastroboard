@@ -1,6 +1,5 @@
 """Tests for backend/beginner_catalog.py and the /api/beginner-catalog endpoint."""
 
-import os
 import sys
 import tempfile
 import types

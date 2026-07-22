@@ -5,7 +5,6 @@ import pytest
 import os
 import json
 import tempfile
-import sys
 
 from observation import astrodex
 from observation import catalogue_aliases

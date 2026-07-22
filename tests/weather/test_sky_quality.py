@@ -5,8 +5,6 @@ All functions under test are pure (no I/O), so no fixtures are needed.
 """
 
 import math
-import sys
-import os
 
 import pytest
 

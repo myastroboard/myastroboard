@@ -1,6 +1,4 @@
 """Unit tests for AllSkyConnector and BaseConnector."""
-import sys
-import os
 
 import requests as _requests
 from unittest.mock import MagicMock, patch

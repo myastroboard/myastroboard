@@ -11,7 +11,6 @@ Covers:
 
 import json
 import os
-import sys
 import types
 import uuid
 from unittest.mock import Mock
