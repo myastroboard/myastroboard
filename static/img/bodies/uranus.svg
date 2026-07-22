@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Uranus">
+    <defs>
+        <radialGradient id="uranus-disc" cx="36%" cy="30%" r="80%">
+            <stop offset="0%" stop-color="#dcfbfb" />
+            <stop offset="55%" stop-color="#8fd6e0" />
+            <stop offset="100%" stop-color="#2c6b7c" />
+        </radialGradient>
+        <clipPath id="uranus-clip">
+            <circle cx="100" cy="100" r="60" />
+        </clipPath>
+    </defs>
+    <rect width="200" height="200" fill="#0b1020" />
+    <!-- Uranus is tipped on its side, so its thin rings run almost vertically. -->
+    <ellipse cx="100" cy="100" rx="20" ry="82" fill="none" stroke="#9fd4dd" stroke-width="3" opacity="0.45"
+        transform="rotate(8 100 100)" />
+    <circle cx="100" cy="100" r="60" fill="url(#uranus-disc)" />
+    <g clip-path="url(#uranus-clip)" fill="#cdf1f4" opacity="0.35">
+        <ellipse cx="100" cy="76" rx="62" ry="7" />
+        <ellipse cx="100" cy="122" rx="62" ry="6" />
+    </g>
+</svg>

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Mercury">
+    <defs>
+        <radialGradient id="mercury-disc" cx="35%" cy="30%" r="80%">
+            <stop offset="0%" stop-color="#c8c2ba" />
+            <stop offset="55%" stop-color="#8d867e" />
+            <stop offset="100%" stop-color="#3b3733" />
+        </radialGradient>
+        <clipPath id="mercury-clip">
+            <circle cx="100" cy="100" r="58" />
+        </clipPath>
+    </defs>
+    <rect width="200" height="200" fill="#0b1020" />
+    <circle cx="100" cy="100" r="58" fill="url(#mercury-disc)" />
+    <g clip-path="url(#mercury-clip)">
+        <g fill="#6f6862" opacity="0.75">
+            <circle cx="82" cy="78" r="13" />
+            <circle cx="118" cy="112" r="10" />
+            <circle cx="70" cy="118" r="8" />
+            <circle cx="107" cy="66" r="6" />
+            <circle cx="132" cy="86" r="5" />
+            <circle cx="94" cy="134" r="6" />
+        </g>
+        <g fill="#a9a29a" opacity="0.6">
+            <circle cx="82" cy="75" r="10" />
+            <circle cx="118" cy="109" r="7" />
+            <circle cx="70" cy="115" r="6" />
+        </g>
+    </g>
+</svg>

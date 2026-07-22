@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Jupiter">
+    <defs>
+        <radialGradient id="jupiter-disc" cx="36%" cy="30%" r="80%">
+            <stop offset="0%" stop-color="#f6e3c6" />
+            <stop offset="55%" stop-color="#d8a86f" />
+            <stop offset="100%" stop-color="#7a4a24" />
+        </radialGradient>
+        <clipPath id="jupiter-clip">
+            <circle cx="100" cy="100" r="70" />
+        </clipPath>
+    </defs>
+    <rect width="200" height="200" fill="#0b1020" />
+    <circle cx="100" cy="100" r="70" fill="url(#jupiter-disc)" />
+    <g clip-path="url(#jupiter-clip)">
+        <rect x="26" y="48" width="148" height="11" fill="#a97040" opacity="0.55" />
+        <rect x="26" y="68" width="148" height="8" fill="#f3e0c2" opacity="0.5" />
+        <rect x="26" y="84" width="148" height="14" fill="#b07640" opacity="0.6" />
+        <rect x="26" y="104" width="148" height="9" fill="#f7e8ce" opacity="0.45" />
+        <rect x="26" y="119" width="148" height="13" fill="#a0673a" opacity="0.55" />
+        <rect x="26" y="140" width="148" height="9" fill="#eed9b8" opacity="0.4" />
+        <ellipse cx="126" cy="122" rx="19" ry="11" fill="#c4442c" opacity="0.85" />
+        <ellipse cx="126" cy="122" rx="11" ry="6" fill="#e0674a" opacity="0.8" />
+    </g>
+</svg>

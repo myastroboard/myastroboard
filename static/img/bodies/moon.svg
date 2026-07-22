@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Moon">
+    <defs>
+        <radialGradient id="moon-disc" cx="36%" cy="30%" r="80%">
+            <stop offset="0%" stop-color="#f4f2ec" />
+            <stop offset="55%" stop-color="#cfcbc2" />
+            <stop offset="100%" stop-color="#7d7972" />
+        </radialGradient>
+        <clipPath id="moon-clip">
+            <circle cx="100" cy="100" r="64" />
+        </clipPath>
+    </defs>
+    <rect width="200" height="200" fill="#0b1020" />
+    <circle cx="100" cy="100" r="64" fill="url(#moon-disc)" />
+    <g clip-path="url(#moon-clip)" fill="#9c988f" opacity="0.7">
+        <ellipse cx="80" cy="76" rx="24" ry="19" />
+        <ellipse cx="112" cy="66" rx="15" ry="12" />
+        <ellipse cx="72" cy="112" rx="18" ry="14" />
+        <ellipse cx="118" cy="122" rx="21" ry="16" transform="rotate(-15 118 122)" />
+    </g>
+    <g clip-path="url(#moon-clip)" fill="#b9b5ad">
+        <circle cx="128" cy="92" r="9" />
+        <circle cx="92" cy="140" r="6" />
+        <circle cx="58" cy="88" r="5" />
+        <circle cx="140" cy="118" r="4" />
+    </g>
+</svg>

@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Saturn">
+    <defs>
+        <radialGradient id="saturn-disc" cx="36%" cy="30%" r="80%">
+            <stop offset="0%" stop-color="#f9ebc8" />
+            <stop offset="55%" stop-color="#d9b878" />
+            <stop offset="100%" stop-color="#7d5c2c" />
+        </radialGradient>
+        <clipPath id="saturn-clip">
+            <circle cx="100" cy="100" r="52" />
+        </clipPath>
+        <!-- Hides the half of the ring that passes behind the globe. -->
+        <clipPath id="saturn-ring-front">
+            <rect x="0" y="100" width="200" height="100" />
+        </clipPath>
+    </defs>
+    <rect width="200" height="200" fill="#0b1020" />
+    <g transform="rotate(-18 100 100)">
+        <ellipse cx="100" cy="100" rx="88" ry="26" fill="none" stroke="#c9ab74" stroke-width="9" opacity="0.75" />
+        <ellipse cx="100" cy="100" rx="76" ry="21" fill="none" stroke="#8f7648" stroke-width="4" opacity="0.6" />
+        <circle cx="100" cy="100" r="52" fill="url(#saturn-disc)" />
+        <g clip-path="url(#saturn-clip)">
+            <rect x="40" y="72" width="120" height="9" fill="#b8924f" opacity="0.5" />
+            <rect x="40" y="92" width="120" height="7" fill="#f6e6c0" opacity="0.45" />
+            <rect x="40" y="110" width="120" height="10" fill="#ac8748" opacity="0.5" />
+            <rect x="40" y="128" width="120" height="6" fill="#f0dfb8" opacity="0.4" />
+        </g>
+        <g clip-path="url(#saturn-ring-front)">
+            <ellipse cx="100" cy="100" rx="88" ry="26" fill="none" stroke="#e0c691" stroke-width="9" />
+            <ellipse cx="100" cy="100" rx="76" ry="21" fill="none" stroke="#a3894f" stroke-width="4" />
+        </g>
+    </g>
+</svg>

@@ -155,6 +155,8 @@ EXPECTED_ROUTES = {
     ('/api/astrodex', ('GET',)),
     ('/api/astrodex/catalogue-lookup', ('GET',)),
     ('/api/astrodex/check/<item_name>', ('GET',)),
+    ('/api/astrodex/collection', ('GET',)),
+    ('/api/astrodex/collection/catalogues', ('GET',)),
     ('/api/astrodex/constellations', ('GET',)),
     ('/api/astrodex/images/<filename>', ('GET',)),
     ('/api/astrodex/items', ('POST',)),

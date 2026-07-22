@@ -81,6 +81,7 @@ myastroboard/
 │   │   ├── astrodex.py                  # Astrodex business logic and storage
 │   │   ├── beginner_catalog.py          # Curated starter DSO list (loading, i18n, enrichment)
 │   │   ├── catalogue_aliases.py         # Catalogue alias helpers (legacy, kept for astrodex cross-reference)
+│   │   ├── catalogue_collection.py       # Astrodex Catalogue Collection: pairs a catalogue with the user's Astrodex (caught state, card images, filter/sort/paging)
 │   │   ├── object_info.py               # Single-object coordinate and catalogue lookup
 │   │   ├── plan_my_night.py             # Plan My Night storage and business logic
 │   │   ├── planetary_events.py          # Planetary events cache service
@@ -144,6 +145,7 @@ myastroboard/
 │   ├── js/                          # Frontend JavaScript modules
 │   │   ├── app.js                   # Main tab/subtab routing + startup
 │   │   ├── astrodex.js              # Astrodex UI
+│   │   ├── astrodex_collection.js   # Astrodex Catalogue Collection sub-tab UI
 │   │   ├── config.js                # Configuration UI
 │   │   ├── domUtils.js              # Safe DOM helpers (DOMUtils)
 │   │   ├── equipment.js             # Equipment profiles UI
