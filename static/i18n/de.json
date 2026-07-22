@@ -373,7 +373,7 @@
     "planetary_imaging": "Für Planetenabbildung",
     "current_seeing": "Aktuelles Seeing",
     "forecast": "Heutige Vorhersage",
-    "best_window": "Bestes Seeing-Fenster",
+    "best_window": "Bestes Gesamtfenster",
     "seeing_scale": {
       "1": "Ausgezeichnet",
       "2": "Gut",
@@ -390,7 +390,7 @@
     },
     "no_data": "Keine Seeing-Daten verfügbar",
     "data_source": "Datenquelle: 7Timer",
-    "footer_source": "Datenquelle: 7Timer-Seeing-Vorhersage + lokale Normalisierung und Best-Window-Scoring.",
+    "footer_source": "Datenquelle: 7Timer Astro-Vorhersage (Seeing, Transparenz, Bewölkung, Wind) + zusammengesetzte Qualitätsbewertung.",
     "unavailable_no_usable_values": "Die öffentliche numerische API von 7Timer liefert in diesem Zyklus undefinierte Seeing-Werte. Das Website-Diagramm kann weiterhin Symbole anzeigen, aber derzeit keine nutzbaren numerischen Seeing-Werte.",
     "unavailable_fetch_failed": "Die Seeing-Vorhersage ist vorübergehend nicht verfügbar, weil die 7Timer-Anfrage fehlgeschlagen ist. Bitte versuchen Sie es später erneut.",
     "tips": {
@@ -403,7 +403,45 @@
     "failed_to_load_forecast": "Die Seeing-Vorhersage konnte nicht geladen werden. Bitte versuchen Sie es später noch einmal.",
     "quality_table": "Qualität",
     "scale_mapping_title": "Skalenzuordnung",
-    "scale_mapping_info": "Die rohen 7Timer-Seeing-Werte (1-8) werden auf die 5-stufige Qualitäts-Skala dieser App (1-5) normalisiert, damit Bezeichnungen und Beschreibungen konsistent bleiben."
+    "scale_mapping_info": "Die 7Timer-Rohwerte für Seeing, Transparenz, Bewölkung und Wind werden in verständliche Bezeichnungen übersetzt und zu einem einzigen Qualitätswert von 0-10 kombiniert, gewichtet zugunsten von Seeing und Transparenz, da dies die eigenen astronomischen Modellwerte von 7Timer sind. Aktiver Regen oder Schnee senkt den Wert auf nahezu null.",
+    "best_seeing_window": "Bestes Seeing-Fenster",
+    "current_conditions": "Aktuelle Bedingungen",
+    "transparency_scale": {
+      "1": "Sehr schlecht",
+      "2": "Schlecht",
+      "3": "Unterdurchschnittlich",
+      "4": "Durchschnittlich",
+      "5": "Überdurchschnittlich",
+      "6": "Gut",
+      "7": "Sehr gut",
+      "8": "Ausgezeichnet"
+    },
+    "cloudcover_scale": {
+      "1": "Klar",
+      "2": "Überwiegend klar",
+      "3": "Überwiegend klar",
+      "4": "Teilweise bewölkt",
+      "5": "Teilweise bewölkt",
+      "6": "Überwiegend bewölkt",
+      "7": "Überwiegend bewölkt",
+      "8": "Bewölkt",
+      "9": "Bedeckt"
+    },
+    "wind_scale": {
+      "1": "Ruhig",
+      "2": "Leicht",
+      "3": "Mäßig",
+      "4": "Frisch",
+      "5": "Stark",
+      "6": "Sturmböig",
+      "7": "Sturm",
+      "8": "Orkan"
+    },
+    "prec_type": {
+      "none": "Keiner",
+      "rain": "Regen",
+      "snow": "Schnee"
+    }
   },
   "iss": {
     "passes": "ISS Bestanden",

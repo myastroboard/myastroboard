@@ -373,7 +373,7 @@
     "planetary_imaging": "Pour l'imagerie planétaire",
     "current_seeing": "Seeing actuel",
     "forecast": "Prévisions de ce soir",
-    "best_window": "Meilleure fenêtre de seeing",
+    "best_window": "Meilleure fenêtre globale",
     "seeing_scale": {
       "1": "Excellent",
       "2": "Bon",
@@ -390,7 +390,7 @@
     },
     "no_data": "Aucune donnée de seeing disponible",
     "data_source": "Source des données : 7Timer",
-    "footer_source": "Source des données : prévisions de seeing 7Timer + normalisation locale et score de meilleure fenêtre.",
+    "footer_source": "Source des données : prévisions astro 7Timer (seeing, transparence, couverture nuageuse, vent) + score de qualité composite.",
     "unavailable_no_usable_values": "L'API numérique publique de 7Timer a renvoyé des valeurs de seeing indéfinies pour ce cycle. Le graphique du site peut encore afficher des icônes, mais aucune valeur numérique exploitable n'est fournie actuellement.",
     "unavailable_fetch_failed": "Les prévisions de seeing sont temporairement indisponibles car la requête 7Timer a échoué. Veuillez réessayer plus tard.",
     "tips": {
@@ -403,7 +403,45 @@
     "failed_to_load_forecast": "Échec du chargement des prévisions de seeing. Veuillez réessayer plus tard.",
     "quality_table": "Qualité",
     "scale_mapping_title": "Correspondance des échelles",
-    "scale_mapping_info": "Les valeurs brutes de seeing 7Timer (1-8) sont normalisées vers l'échelle de qualité à 5 niveaux de l'application (1-5) afin de garder des libellés et descriptions cohérents."
+    "scale_mapping_info": "Les valeurs brutes de seeing, transparence, couverture nuageuse et vent de 7Timer sont décodées en libellés clairs puis combinées en un score de qualité unique sur 10, pondéré en faveur du seeing et de la transparence car ce sont les propres sorties de modèle astronomique de 7Timer. Une pluie ou une neige active ramène le score près de zéro.",
+    "best_seeing_window": "Meilleure fenêtre de seeing",
+    "current_conditions": "Conditions actuelles",
+    "transparency_scale": {
+      "1": "Très mauvaise",
+      "2": "Mauvaise",
+      "3": "Inférieure à la moyenne",
+      "4": "Moyenne",
+      "5": "Supérieure à la moyenne",
+      "6": "Bonne",
+      "7": "Très bonne",
+      "8": "Excellente"
+    },
+    "cloudcover_scale": {
+      "1": "Dégagé",
+      "2": "Plutôt dégagé",
+      "3": "Plutôt dégagé",
+      "4": "Partiellement nuageux",
+      "5": "Partiellement nuageux",
+      "6": "Plutôt nuageux",
+      "7": "Plutôt nuageux",
+      "8": "Nuageux",
+      "9": "Couvert"
+    },
+    "wind_scale": {
+      "1": "Calme",
+      "2": "Léger",
+      "3": "Modéré",
+      "4": "Assez fort",
+      "5": "Fort",
+      "6": "Coup de vent",
+      "7": "Tempête",
+      "8": "Ouragan"
+    },
+    "prec_type": {
+      "none": "Aucune",
+      "rain": "Pluie",
+      "snow": "Neige"
+    }
   },
   "iss": {
     "passes": "Passages de l'ISS",

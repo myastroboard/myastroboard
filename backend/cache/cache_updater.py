@@ -805,22 +805,29 @@ def update_seeing_forecast_cache(config=None, location=None):
         )
 
         if seeing_data is None:
-            response = {
-                "location": location,
-                "seeing_forecast": None,
-                "message": "Failed to fetch seeing forecast from 7Timer",
-                "message_key": "seeing_forecast.unavailable_fetch_failed",
-            }
-        else:
-            response = {
-                "location": location,
-                "seeing_forecast": seeing_data,
-                "units": {
-                    "seeing": "scale 1-5 (1=Excellent, 2=Good, 3=Moderate, 4=Poor, 5=Very Poor)",
-                    "times": "ISO 8601 UTC",
-                    "duration": "hours",
-                },
-            }
+            # Don't overwrite a previously-cached good forecast with a failure marker:
+            # doing so would stamp a fresh timestamp and make is_cache_valid() treat the
+            # failure as "fresh" for the full CACHE_TTL_SEEING_FORECAST window (6h),
+            # blocking retries even after 7Timer recovers. Keep the previous cache entry
+            # untouched instead, matching update_iss_passes_cache/update_aurora_cache -
+            # the next scheduler tick will retry once the existing entry's TTL elapses.
+            logger.warning("Seeing forecast unavailable (7Timer fetch failed); keeping previous cache state")
+            return
+
+        response = {
+            "location": location,
+            "seeing_forecast": seeing_data,
+            "units": {
+                "seeing": "scale 1-8 (1=Excellent, 8=Bad)",
+                "transparency": "scale 1-8 (1=Very Poor, 8=Excellent, mag per air mass)",
+                "cloudcover": "scale 1-9 (1=0-6% clear, 9=94-100% overcast)",
+                "wind_speed_class": "scale 1-8 (1=calm <0.3 m/s, 8=hurricane >32.6 m/s)",
+                "humidity_percent": "midpoint percent decoded from 7Timer's rh2m code",
+                "quality_score": "0-10 composite (seeing+transparency+cloud+wind, precipitation is a veto), 10=best",
+                "times": "ISO 8601 UTC",
+                "duration": "hours",
+            },
+        }
 
         cache_store.update_location_cache("seeing_forecast", location["id"], response)
 

@@ -122,13 +122,19 @@ This "best period" badge is displayed in the Trend sub-tab.
 
 **Source**: [7Timer ASTRO product](https://www.7timer.info/)
 
-**Cache TTL**: 6 hours (`CACHE_TTL_SEEING_FORECAST`).
+**Cache TTL**: 6 hours (`CACHE_TTL_SEEING_FORECAST`). On a fetch failure, the cache is left
+untouched (previous good forecast keeps being served) instead of being overwritten with a
+failure marker - a transient 7Timer outage no longer blanks the tab for the full TTL window,
+since the next 5-minute scheduler tick retries once the existing entry's TTL naturally elapses.
 
 **Module**: `backend/astroweather/seeing_forecast_7timer.py`
 
 **Class**: `SeeingForecastService`
 
-7Timer provides astronomical seeing and transparency data based on GFS numerical weather models. The ASTRO product gives time-series forecasts at 3-hour resolution.
+7Timer's ASTRO product returns eight fields per 3-hourly timepoint: `seeing`, `transparency`,
+`cloudcover`, `lifted_index`, `rh2m` (humidity), `wind10m` (direction + speed class), `temp2m`
+and `prec_type`. All of them are decoded and surfaced - not just seeing - and combined into a
+single composite `quality_score` (0-10) per timeslot.
 
 ### Seeing scale (7Timer)
 
@@ -145,17 +151,60 @@ This "best period" badge is displayed in the Trend sub-tab.
 
 ### Transparency scale (7Timer)
 
-| Value | Label | Limiting magnitude |
+7Timer's transparency field uses the same 1–8 shape as seeing (1 = worst, 8 = best), expressed
+as limiting magnitude per air mass:
+
+| Value | Label | Mag per air mass |
 |-------|-------|-------------------|
-| 1 | Very poor | < 4 |
-| 2 | Poor | 4 – 4.75 |
-| 3 | Average | 4.75 – 5.5 |
-| 4 | Good | 5.5 – 6 |
-| 5 | Excellent | > 6 |
+| 1 | Very Poor | < 0.3 |
+| 2 | Poor | 0.3 – 0.4 |
+| 3 | Below Average | 0.4 – 0.5 |
+| 4 | Average | 0.5 – 0.6 |
+| 5 | Above Average | 0.6 – 0.7 |
+| 6 | Good | 0.7 – 0.85 |
+| 7 | Very Good | 0.85 – 1 |
+| 8 | Excellent | > 1 |
 
-### Night summary
+### Cloud cover scale (7Timer)
 
-The service computes a **tonight summary** by extracting the forecast slots that fall between astronomical dusk and astronomical dawn for the configured location. It returns the median seeing value, the worst transparency, and a colour-coded quality badge.
+1–9 scale, 1 = clearest (0–6% cover), 9 = fully overcast (94–100% cover).
+
+### Wind speed scale (7Timer, 10m)
+
+1–8 scale from calm (< 0.3 m/s) to hurricane (> 32.6 m/s), paired with a compass direction.
+
+### Composite quality score
+
+Each forecast point's `quality_score` (0-10, higher is better) combines four of the raw 7Timer
+fields:
+
+| Component | Weight | Why |
+|-----------|--------|-----|
+| Seeing | 35% | 7Timer's own astronomy-specific model output (not a proxy) |
+| Transparency | 30% | Same - 7Timer's own model output |
+| Cloud cover | 25% | Strongest remaining go/no-go signal |
+| Wind speed | 10% | Tracking-stability proxy |
+
+Active precipitation (`prec_type` != `none`) is a hard multiplicative veto (score × 0.1) rather
+than an averaged component, the same convention used by `weather_astro.py`'s
+`precipitation_factor`: rain or snow shouldn't be masked by otherwise-clear metrics.
+`lifted_index` is decoded and exposed but not scored, since 7Timer's `seeing` value already
+folds atmospheric stability into its own model.
+
+The Seeing sub-tab renders this as an hourly timeline in the same visual style as the Trend
+sub-tab's "Tonight's Score" (`night-score-timeline`): one card per timeslot with the combined
+score, a quality badge, and an icon row for every underlying metric (seeing, transparency,
+cloud cover, wind, humidity, precipitation).
+
+### Best windows
+
+Two "best window" cards are computed from the forecast:
+
+- **Best Seeing Window** - longest consecutive run with `seeing` ≤ 3 (Good or better),
+  unchanged from the original seeing-only definition - still the relevant metric for planetary
+  imagers.
+- **Best Overall Window** - longest consecutive run with `quality_score` ≥ 6 (Good or better),
+  reflecting the full picture (seeing + transparency + clouds + wind).
 
 ---
 

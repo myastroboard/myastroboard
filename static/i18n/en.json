@@ -373,7 +373,7 @@
     "planetary_imaging": "For Planetary Imaging",
     "current_seeing": "Current Seeing",
     "forecast": "Tonight's Forecast",
-    "best_window": "Best Seeing Window",
+    "best_window": "Best Overall Window",
     "seeing_scale": {
       "1": "Excellent",
       "2": "Good",
@@ -390,7 +390,7 @@
     },
     "no_data": "No seeing data available",
     "data_source": "Data source: 7Timer",
-    "footer_source": "Data source: 7Timer seeing forecast + local normalization and best-window scoring.",
+    "footer_source": "Data source: 7Timer astro forecast (seeing, transparency, cloud cover, wind) + composite quality scoring.",
     "unavailable_no_usable_values": "7Timer's public numeric API returned undefined seeing values for this cycle. The website chart may still show icons, but no usable numeric seeing values are currently provided.",
     "unavailable_fetch_failed": "Seeing forecast is temporarily unavailable because the 7Timer request failed. Please try again later.",
     "tips": {
@@ -403,7 +403,45 @@
     "failed_to_load_forecast": "Failed to load seeing forecast. Please try again later.",
     "quality_table": "Quality",
     "scale_mapping_title": "Scale mapping",
-    "scale_mapping_info": "7Timer raw seeing values (1-8) are normalized to this app's 5-level quality scale (1-5) to keep labels and descriptions consistent."
+    "scale_mapping_info": "7Timer's raw seeing, transparency, cloud cover and wind values are decoded to plain-language labels and combined into a single 0-10 quality score, weighted toward seeing and transparency since those are 7Timer's own astronomy-specific model outputs. Active rain or snow overrides the score to near zero.",
+    "best_seeing_window": "Best Seeing Window",
+    "current_conditions": "Current Conditions",
+    "transparency_scale": {
+      "1": "Very Poor",
+      "2": "Poor",
+      "3": "Below Average",
+      "4": "Average",
+      "5": "Above Average",
+      "6": "Good",
+      "7": "Very Good",
+      "8": "Excellent"
+    },
+    "cloudcover_scale": {
+      "1": "Clear",
+      "2": "Mostly Clear",
+      "3": "Mostly Clear",
+      "4": "Partly Cloudy",
+      "5": "Partly Cloudy",
+      "6": "Mostly Cloudy",
+      "7": "Mostly Cloudy",
+      "8": "Cloudy",
+      "9": "Overcast"
+    },
+    "wind_scale": {
+      "1": "Calm",
+      "2": "Light",
+      "3": "Moderate",
+      "4": "Fresh",
+      "5": "Strong",
+      "6": "Gale",
+      "7": "Storm",
+      "8": "Hurricane"
+    },
+    "prec_type": {
+      "none": "None",
+      "rain": "Rain",
+      "snow": "Snow"
+    }
   },
   "iss": {
     "passes": "ISS Passes",

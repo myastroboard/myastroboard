@@ -2,6 +2,46 @@
 // Seeing Forecast (7Timer)
 // ======================
 
+function getQualityScoreColorClass(score) {
+    const v = Number(score);
+    if (!Number.isFinite(v)) return 'text-secondary';
+    if (v >= 6) return 'text-success';
+    if (v >= 4) return 'text-warning';
+    return 'text-danger';
+}
+
+function getQualityScoreCssClass(score) {
+    const v = Number(score);
+    if (!Number.isFinite(v)) return 'quality-bad';
+    if (v >= 8) return 'quality-excellent';
+    if (v >= 6) return 'quality-good';
+    if (v >= 4) return 'quality-fair';
+    if (v >= 2) return 'quality-poor';
+    return 'quality-bad';
+}
+
+function getLocalizedQualityScoreLabel(score) {
+    const v = Number(score);
+    if (!Number.isFinite(v)) return i18n.t('common.quality_scale.unknown');
+    if (v >= 8) return i18n.t('common.quality_scale.excellent');
+    if (v >= 6) return i18n.t('common.quality_scale.good');
+    if (v >= 4) return i18n.t('common.quality_scale.fair');
+    if (v >= 2) return i18n.t('common.quality_scale.poor');
+    return i18n.t('common.quality_scale.bad');
+}
+
+// Generic 1..N 7Timer scale -> quality color class, used for the per-metric icons.
+// Matches the backend's _quality_component: most scales are 1=best/N=worst, but
+// transparency is inverted (1=worst/N=best per 7Timer's own docs).
+function getScaleColorClass(value, scaleSize, higherRawIsBetter = false) {
+    const v = Number(value);
+    if (!Number.isFinite(v) || !scaleSize || scaleSize <= 1) return 'text-secondary';
+    const quality = higherRawIsBetter ? (v - 1) / (scaleSize - 1) : (scaleSize - v) / (scaleSize - 1); // 1 = best, 0 = worst
+    if (quality >= 0.66) return 'text-success';
+    if (quality >= 0.33) return 'text-warning';
+    return 'text-danger';
+}
+
 function getSeeingBadgeClass(seeingValue) {
     const v = Number(seeingValue);
     if (!Number.isFinite(v)) return 'text-secondary';
@@ -75,6 +115,14 @@ function getLocalizedSeeingDetails(seeingValue, fallbackDetails = '') {
     return fallbackDetails || '';
 }
 
+// Localized label for one of the new 7Timer scales (transparency/cloudcover/wind), falling
+// back to the backend-provided English label if the language pack has no entry yet.
+function getLocalizedScaleLabel(namespace, value, fallbackLabel) {
+    if (value === null || value === undefined) return i18n.t('common.quality_scale.unknown');
+    const key = `seeing_forecast.${namespace}.${value}`;
+    return i18n.t(key, fallbackLabel || i18n.t('common.quality_scale.unknown'));
+}
+
 function formatTimeThenDateInTimezone(isoString, timezone, locale = navigator.language) {
     if (!isoString) return 'N/A';
     const date = new Date(isoString);
@@ -124,75 +172,182 @@ function isLikelyNight(isoString, timezone) {
     return hour >= 19 || hour < 6;
 }
 
-function renderSeeingForecastRows(forecast, timezone) {
-    const table = document.createElement('table');
-    table.className = 'table table-striped table-hover mb-0 seeing-forecast-table';
+function createSeeingMetricIcon(iconClass, colorClass, tooltip) {
+    const ico = DOMUtils.createIcon(iconClass);
+    ico.className += ` ${colorClass}`;
+    ico.title = tooltip;
+    return ico;
+}
 
-    const thead = document.createElement('thead');
-    const trh = document.createElement('tr');
-    ['common.time_label', 'seeing_forecast.current_seeing', 'seeing_forecast.quality_table'].forEach((key) => {
-        const th = document.createElement('th');
-        th.textContent = i18n.t(key);
-        trh.appendChild(th);
-    });
-    thead.appendChild(trh);
+/**
+ * Build the icon row summarizing every raw 7Timer metric for one forecast point,
+ * so the tab surfaces seeing + transparency + clouds + wind + humidity + precipitation
+ * instead of seeing alone.
+ */
+function buildForecastPointIconRow(point) {
+    const iconRow = document.createElement('div');
+    iconRow.className = 'night-score-icons';
 
-    const tbody = document.createElement('tbody');
+    iconRow.appendChild(createSeeingMetricIcon(
+        'bi bi-eye',
+        getSeeingBadgeClass(point.seeing),
+        `${i18n.t('astro_weather.seeing')}: ${getLocalizedSeeingQuality(point.seeing, point.description)}`
+    ));
+
+    iconRow.appendChild(createSeeingMetricIcon(
+        'bi bi-stars',
+        getScaleColorClass(point.transparency, 8, true),
+        `${i18n.t('astro_weather.transparency')}: ${getLocalizedScaleLabel('transparency_scale', point.transparency, point.transparency_label)}`
+    ));
+
+    iconRow.appendChild(createSeeingMetricIcon(
+        'bi bi-clouds',
+        getScaleColorClass(point.cloudcover, 9),
+        `${i18n.t('weather.cloud_cover')}: ${getLocalizedScaleLabel('cloudcover_scale', point.cloudcover, point.cloudcover_label)}`
+    ));
+
+    const windLabel = getLocalizedScaleLabel('wind_scale', point.wind_speed_class, point.wind_label);
+    const windDirection = point.wind_direction ? ` (${point.wind_direction})` : '';
+    iconRow.appendChild(createSeeingMetricIcon(
+        'bi bi-wind',
+        getScaleColorClass(point.wind_speed_class, 8),
+        `${i18n.t('weather.wind')}: ${windLabel}${windDirection}`
+    ));
+
+    if (point.humidity_percent !== null && point.humidity_percent !== undefined) {
+        const humidityColor = point.humidity_percent <= 50 ? 'text-success' : point.humidity_percent <= 75 ? 'text-warning' : 'text-danger';
+        iconRow.appendChild(createSeeingMetricIcon(
+            'bi bi-droplet-half',
+            humidityColor,
+            `${i18n.t('weather.humidity')}: ~${Math.round(point.humidity_percent)}${i18n.t('units.percent')}`
+        ));
+    }
+
+    const precType = point.prec_type || 'none';
+    const hasPrecipitation = precType !== 'none';
+    iconRow.appendChild(createSeeingMetricIcon(
+        'bi bi-cloud-rain',
+        hasPrecipitation ? 'text-danger' : 'text-secondary',
+        `${i18n.t('weather.precipitation')}: ${i18n.t(`seeing_forecast.prec_type.${precType}`, precType)}`
+    ));
+
+    return iconRow;
+}
+
+/**
+ * Render the 7Timer forecast as an hourly quality timeline, in the same visual language as
+ * the Trend sub-tab's "Tonight's Score" (night-score-timeline): one card per timeslot with a
+ * combined quality_score, a quality badge, and an icon row for every underlying metric.
+ */
+function renderSeeingQualityTimeline(forecast, timezone) {
+    const timeline = document.createElement('div');
+    timeline.className = 'night-score-timeline';
+
     const now = Date.now();
-    (forecast || []).filter(point => new Date(point.time).getTime() >= now).forEach((point) => {
-        const tr = document.createElement('tr');
-        const night = isLikelyNight(point.time, timezone);
-        tr.classList.add(night ? 'seeing-row-night' : 'seeing-row-day');
+    const futurePoints = (forecast || []).filter(point => new Date(point.time).getTime() >= now);
 
-        const tdTime = document.createElement('td');
-        const timeCellWrap = document.createElement('div');
-        timeCellWrap.className = 'seeing-time-cell';
+    if (futurePoints.length === 0) {
+        const msg = document.createElement('p');
+        msg.className = 'text-muted fst-italic mb-0';
+        msg.textContent = i18n.t('seeing_forecast.no_data');
+        return msg;
+    }
 
-        const period = document.createElement('span');
-        const periodLabel = night
-            ? i18n.t('common.night', 'Night')
-            : i18n.t('common.day', 'Day');
-        period.className = `seeing-daynight-indicator ${night ? 'is-night' : 'is-day'}`;
-        period.setAttribute('title', periodLabel);
-        period.setAttribute('aria-label', periodLabel);
-        period.appendChild(DOMUtils.createIcon(`bi ${night ? 'bi-moon-stars-fill' : 'bi-sun-fill'}`));
-        timeCellWrap.appendChild(period);
-
-        const tlabel = document.createElement('span');
-        tlabel.className = 'seeing-time-label';
-        tlabel.textContent = formatTimeThenDateInTimezone(point.time, timezone);
-        timeCellWrap.appendChild(tlabel);
-        tdTime.appendChild(timeCellWrap);
-
-        const tdSeeing = document.createElement('td');
-        const badgeClass = getSeeingBadgeClass(point.seeing);
-        const _pill = document.createElement('span');
-        _pill.className = `seeing-score-pill fw-bold ${badgeClass}`;
-        _pill.textContent = point.seeing;
-        tdSeeing.appendChild(_pill);
-
-        const tdDesc = document.createElement('td');
-        const qualityText = document.createElement('div');
-        qualityText.textContent = getLocalizedSeeingQuality(point.seeing, point.description);
-        tdDesc.appendChild(qualityText);
-
-        const detailText = getLocalizedSeeingDetails(point.seeing, point.conditions);
-        if (detailText) {
-            const detailNode = document.createElement('small');
-            detailNode.className = 'text-muted d-block';
-            detailNode.textContent = detailText;
-            tdDesc.appendChild(detailNode);
+    // Only the single closest future point is flagged "now" (half of the 3h step margin),
+    // matching the "now" highlight convention used by night-score-timeline.
+    const rangeMargin = 90 * 60 * 1000;
+    let nowIdx = -1;
+    let nowBestDiff = Infinity;
+    futurePoints.forEach((point, i) => {
+        const diff = Math.abs(new Date(point.time).getTime() - now);
+        if (diff <= rangeMargin && diff < nowBestDiff) {
+            nowBestDiff = diff;
+            nowIdx = i;
         }
-
-        tr.appendChild(tdTime);
-        tr.appendChild(tdSeeing);
-        tr.appendChild(tdDesc);
-        tbody.appendChild(tr);
     });
 
-    table.appendChild(thead);
-    table.appendChild(tbody);
-    return table;
+    futurePoints.forEach((point, i) => {
+        const isNow = i === nowIdx;
+        const night = isLikelyNight(point.time, timezone);
+
+        const card = document.createElement('div');
+        card.className = `card h-100 night-score-card${isNow ? ' night-score-card-now' : ''}`;
+
+        const body = document.createElement('div');
+        body.className = 'card-body p-1 text-center';
+
+        const hourRow = document.createElement('div');
+        hourRow.className = 'night-score-hour-row';
+
+        const phaseIco = DOMUtils.createIcon(night ? 'bi bi-moon-stars-fill' : 'bi bi-sun-fill');
+        phaseIco.className += night ? ' text-info' : ' text-warning';
+        hourRow.appendChild(phaseIco);
+
+        const hourEl = document.createElement('span');
+        hourEl.className = 'fw-semibold night-score-hour';
+        hourEl.textContent = formatTimeThenDateInTimezone(point.time, timezone);
+        hourRow.appendChild(hourEl);
+
+        body.appendChild(hourRow);
+
+        const scoreEl = document.createElement('div');
+        scoreEl.className = `night-score-value ${getQualityScoreColorClass(point.quality_score)}`;
+        scoreEl.textContent = point.quality_score ?? '-';
+        body.appendChild(scoreEl);
+
+        const qualBadge = document.createElement('div');
+        qualBadge.className = `astro-quality-text quality-box ${getQualityScoreCssClass(point.quality_score)}`;
+        qualBadge.textContent = getLocalizedQualityScoreLabel(point.quality_score);
+        body.appendChild(qualBadge);
+
+        body.appendChild(buildForecastPointIconRow(point));
+
+        card.appendChild(body);
+        timeline.appendChild(card);
+    });
+
+    return timeline;
+}
+
+function createSeeingSummaryCard({ iconClass, titleKey, score, scoreLabel, subLines }) {
+    const col = document.createElement('div');
+    col.className = 'col';
+    const card = document.createElement('div');
+    card.className = 'card h-100';
+
+    const header = document.createElement('div');
+    header.className = 'card-header fw-bold';
+    DOMUtils.append(header, DOMUtils.createIcon(`${iconClass} icon-inline`), i18n.t(titleKey));
+    card.appendChild(header);
+
+    const body = document.createElement('div');
+    body.className = 'card-body';
+
+    if (score === null || score === undefined) {
+        body.className += ' text-muted';
+        body.textContent = i18n.t('seeing_forecast.no_data');
+    } else {
+        const scoreDiv = document.createElement('div');
+        scoreDiv.className = `fs-3 fw-bold ${getQualityScoreColorClass(score)}`;
+        scoreDiv.textContent = score;
+        body.appendChild(scoreDiv);
+
+        const qualDiv = document.createElement('div');
+        qualDiv.className = 'text-muted';
+        qualDiv.textContent = scoreLabel;
+        body.appendChild(qualDiv);
+
+        (subLines || []).forEach((line) => {
+            const small = document.createElement('small');
+            small.className = 'text-muted d-block mt-1';
+            small.textContent = line;
+            body.appendChild(small);
+        });
+    }
+
+    card.appendChild(body);
+    col.appendChild(card);
+    return col;
 }
 
 async function loadSeeingForecast() {
@@ -228,100 +383,57 @@ async function loadSeeingForecast() {
     container.appendChild(infoAlert);
 
     const topRow = document.createElement('div');
-    topRow.className = 'row row-cols-1 row-cols-lg-2 g-3 mb-3';
+    topRow.className = 'row row-cols-1 row-cols-lg-3 g-3 mb-3';
 
-    const currentCol = document.createElement('div');
-    currentCol.className = 'col';
-    const currentCard = document.createElement('div');
-    currentCard.className = 'card h-100';
-    const _curHeader = document.createElement('div');
-    _curHeader.className = 'card-header fw-bold';
-    DOMUtils.append(_curHeader, DOMUtils.createIcon('bi bi-eye icon-inline'), i18n.t('seeing_forecast.current_seeing'));
-    const _curBody = document.createElement('div');
-    _curBody.className = 'card-body';
-    const _scoreDiv = document.createElement('div');
-    _scoreDiv.className = `fs-3 fw-bold ${getSeeingBadgeClass(seeingData.now)}`;
-    _scoreDiv.textContent = seeingData.now ?? '-';
-    const _qualDiv = document.createElement('div');
-    _qualDiv.className = 'text-muted';
-    _qualDiv.textContent = getLocalizedSeeingQuality(seeingData.now, seeingData.now_description);
-    const _detailSmall = document.createElement('small');
-    _detailSmall.className = 'text-muted d-block mt-1';
-    _detailSmall.textContent = getLocalizedSeeingDetails(seeingData.now, '');
-    const _srcSmall = document.createElement('small');
-    _srcSmall.className = 'text-muted';
-    _srcSmall.textContent = i18n.t('seeing_forecast.data_source');
-    _curBody.appendChild(_scoreDiv);
-    _curBody.appendChild(_qualDiv);
-    _curBody.appendChild(_detailSmall);
-    _curBody.appendChild(_srcSmall);
-    currentCard.appendChild(_curHeader);
-    currentCard.appendChild(_curBody);
-    currentCol.appendChild(currentCard);
+    topRow.appendChild(createSeeingSummaryCard({
+        iconClass: 'bi bi-speedometer2',
+        titleKey: 'seeing_forecast.current_conditions',
+        score: seeingData.now_quality_score,
+        scoreLabel: getLocalizedQualityScoreLabel(seeingData.now_quality_score),
+        subLines: [
+            `${i18n.t('astro_weather.seeing')}: ${getLocalizedSeeingQuality(seeingData.now, seeingData.now_description)}`,
+            i18n.t('seeing_forecast.data_source')
+        ]
+    }));
 
-    const bestCol = document.createElement('div');
-    bestCol.className = 'col';
-    const bestCard = document.createElement('div');
-    bestCard.className = 'card h-100';
     const bw = seeingData.best_window;
-    const _bwHeader = document.createElement('div');
-    _bwHeader.className = 'card-header fw-bold';
-    DOMUtils.append(_bwHeader, DOMUtils.createIcon('bi bi-clock-history icon-inline'), i18n.t('seeing_forecast.best_window'));
-    bestCard.appendChild(_bwHeader);
-    if (bw) {
-        const _bwBody = document.createElement('div');
-        _bwBody.className = 'card-body';
-        const _timeDiv = document.createElement('div');
-        const _tStrong = document.createElement('strong');
-        _tStrong.textContent = `${i18n.t('common.time_label')}:`;
-        _timeDiv.appendChild(_tStrong);
-        _timeDiv.append(` ${formatTimeThenDateInTimezone(bw.start, configuredTimezone)}`);
-        const _durDiv = document.createElement('div');
-        const _dStrong = document.createElement('strong');
-        _dStrong.textContent = i18n.t('common.duration');
-        _durDiv.appendChild(_dStrong);
-        _durDiv.append(` ${bw.duration_hours}h`);
-        const _qualDiv = document.createElement('div');
-        const _qStrong = document.createElement('strong');
-        _qStrong.textContent = i18n.t('common.quality');
-        _qualDiv.appendChild(_qStrong);
-        _qualDiv.append(' ');
-        const _qualSpan = document.createElement('span');
-        _qualSpan.className = getSeeingBadgeClass(bw.seeing);
-        _qualSpan.textContent = getLocalizedSeeingQuality(bw.seeing, bw.description);
-        _qualDiv.appendChild(_qualSpan);
-        const _detDiv = document.createElement('div');
-        _detDiv.className = 'small text-muted mt-1';
-        _detDiv.textContent = getLocalizedSeeingDetails(bw.seeing, bw.conditions || '');
-        _bwBody.appendChild(_timeDiv);
-        _bwBody.appendChild(_durDiv);
-        _bwBody.appendChild(_qualDiv);
-        _bwBody.appendChild(_detDiv);
-        bestCard.appendChild(_bwBody);
-    } else {
-        const _bwBody = document.createElement('div');
-        _bwBody.className = 'card-body text-muted';
-        _bwBody.textContent = i18n.t('seeing_forecast.no_data');
-        bestCard.appendChild(_bwBody);
-    }
-    bestCol.appendChild(bestCard);
+    topRow.appendChild(createSeeingSummaryCard({
+        iconClass: 'bi bi-clock-history',
+        titleKey: 'seeing_forecast.best_window',
+        score: bw ? bw.quality_score : null,
+        scoreLabel: bw ? getLocalizedQualityScoreLabel(bw.quality_score) : null,
+        subLines: bw ? [
+            `${i18n.t('common.time_label')}: ${formatTimeThenDateInTimezone(bw.start, configuredTimezone)}`,
+            `${i18n.t('common.duration')} ${bw.duration_hours}h`
+        ] : null
+    }));
 
-    topRow.appendChild(currentCol);
-    topRow.appendChild(bestCol);
+    const bsw = seeingData.best_seeing_window;
+    topRow.appendChild(createSeeingSummaryCard({
+        iconClass: 'bi bi-eye',
+        titleKey: 'seeing_forecast.best_seeing_window',
+        score: bsw ? bsw.seeing : null,
+        scoreLabel: bsw ? getLocalizedSeeingQuality(bsw.seeing, bsw.description) : null,
+        subLines: bsw ? [
+            `${i18n.t('common.time_label')}: ${formatTimeThenDateInTimezone(bsw.start, configuredTimezone)}`,
+            `${i18n.t('common.duration')} ${bsw.duration_hours}h`
+        ] : null
+    }));
+
     container.appendChild(topRow);
 
-    const forecastCard = document.createElement('div');
-    forecastCard.className = 'card h-100';
+    const timelineCard = document.createElement('div');
+    timelineCard.className = 'card h-100';
     const header = document.createElement('div');
     header.className = 'card-header fw-bold';
     DOMUtils.append(header, DOMUtils.createIcon('bi bi-calendar-event text-danger icon-inline'), i18n.t('seeing_forecast.forecast'));
     const body = document.createElement('div');
-    body.className = 'table-responsive';
-    body.appendChild(renderSeeingForecastRows(seeingData.forecast, configuredTimezone));
+    body.className = 'night-score-timeline-scroll';
+    body.appendChild(renderSeeingQualityTimeline(seeingData.forecast, configuredTimezone));
 
-    forecastCard.appendChild(header);
-    forecastCard.appendChild(body);
-    container.appendChild(forecastCard);
+    timelineCard.appendChild(header);
+    timelineCard.appendChild(body);
+    container.appendChild(timelineCard);
 
     const normalizationInfo = document.createElement('div');
     normalizationInfo.className = 'alert alert-secondary mt-3 mb-0';
