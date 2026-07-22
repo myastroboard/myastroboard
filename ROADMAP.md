@@ -2,9 +2,47 @@
 
 This document describes features that could potentially be integrated into MyAstroBoard. There are no guarantees; consider this file a list of ideas that may evolve based on my own ideas or future discussions.
 
+**Status legend:** ✅ Implemented - shipped · 🗓️ Planned - next in line · 💡 Idea - not started, scope and priority may change.
+
 ---
 
 ## Release Plan
+
+### v0.9 - Web Push E2E Validation
+
+| | |
+|---|---|
+| **Why** | Ship the one half-done feature before declaring stability - the Web Push infrastructure (VAPID keys, `push_manager.py`, `push_scheduler.py`, SW handler) was fully built but needed real-device validation. |
+| **Effort** | Low |
+| **Status** | ✅ Implemented |
+
+End-to-end Web Push notifications validated on Android (Chrome) and iOS (Safari), including delivery while the tab is closed.
+
+---
+
+### v1.0 - First Stable Release
+
+| | |
+|---|---|
+| **Why** | A clean, self-hostable release that a new user can install and use in under 15 minutes. |
+| **Effort** | Low |
+| **Status** | ✅ Implemented |
+
+`docker compose up` install with no manual steps, all 6 i18n languages complete, stabilized API routes, and up-to-date documentation.
+
+---
+
+### v1.1 - First Light (Beginner Experience)
+
+| | |
+|---|---|
+| **Why** | Astrophotography has a steep learning curve; today MAB assumes prior knowledge. Lowering the floor grows the user base and makes every later feature more valuable. |
+| **Effort** | Medium |
+| **Status** | ✅ Implemented |
+
+Guided first-run setup wizard, a "what to shoot tonight?" recommender, a curated beginner catalog, and a contextual tips system across the app.
+
+---
 
 ### v1.2 - Multi-location Profiles
 
@@ -12,21 +50,9 @@ This document describes features that could potentially be integrated into MyAst
 |---|---|
 | **Why** | Observers travel to dark sites; location drives every calculation (Plan My Night, SkyTonight, aurora, horizon, etc.) |
 | **Effort** | Medium |
+| **Status** | ✅ Implemented |
 
-What needs to be built:
-
-- **Location presets** - app list of saved locations (name, lat/lon, elevation, timezone, horizon profile, bortle, sqm). Creation only by admin. There is always a default location, if no location attributed to users.
-- **Attribution of locations** - each location (one or more) can be attributed to a user
-- **Per-user settings** - user can select a default location, and sort locations if they have more than 2
-- **Location switcher** - quick selector in the navbar; drives all active calculations
-- **Backend extension** - extend existing location config in `auth.py` / `config_defaults.py`; no new storage module needed
-- **Horizon profile per location** - associate a custom horizon with each preset
-- **i18n** in 6 languages
-- **Prerequisites** - must absolutely check for each external API the limit rate to define a limit of authorized location max. Detail of this calculation must be documented to easily recalculate it when API change their quota. Finally, if the result is 5 or more, we should limit to 5 locations.
-- **Concerned modules** - these modules are specifically based on location: #forecast-astro (all subs), #forecast-weather (all subs), /#skytonight, #spaceflight/iss
-- **Astrodex & Plan my night** - use of this location
-- **Advanced call API** - in case of multiple locations there is a high risk that the same API will be called multiple times quickly. Must check whether some APIs allow multiple requests in the same call, or orchestrate calls following the same pattern as previous ones.
-- **Notifications** - notifications must take care of location in message. Maybe user should have possibility to disable notification for specific location, in user params.
+Admin-managed location presets (with horizon profile, bortle, SQM) that users can be attributed to, pick a default from, and switch between via a navbar selector - driving every location-aware module (Plan My Night, SkyTonight, forecasts, ISS, Astrodex, notifications).
 
 ---
 
@@ -36,6 +62,7 @@ What needs to be built:
 |---|---|
 | **Why** | Closes the loop: **Plan -> Observe -> Log -> Astrodex**. Positioned after v1.2 so that beginners are already onboarded and have sessions worth logging. |
 | **Effort** | High |
+| **Status** | 🗓️ Planned - next up |
 
 Users can record what they actually captured after a session, not just what they planned.
 
@@ -57,6 +84,7 @@ The equipment and object models (Equipment, Astrodex) are reusable as references
 |---|---|
 | **Why** | Advanced imagers need planning depth that matches dedicated tools (Telescopius). These features add no new data model - they derive from existing equipment profiles, SkyTonight data, and Plan My Night. |
 | **Effort** | High |
+| **Status** | 💡 Idea - subject to change |
 
 #### Target visibility calendar
 
@@ -107,6 +135,7 @@ Given a Plan My Night target list, re-order entries to maximize average altitude
 |---|---|
 | **Why** | Answers "how am I progressing?" for beginners and "how am I optimizing?" for advanced users. Requires v1.3 (Observation Log) as data source. |
 | **Effort** | Medium |
+| **Status** | 💡 Idea - subject to change |
 
 #### Personal stats dashboard
 
@@ -144,6 +173,7 @@ For logged sessions: overlay seeing score, moon phase, and SQM at the time of ca
 |---|---|
 | **Why** | The one missing visualization that every astronomer expects. Positioned at v2.0 because it has the highest integration surface - it becomes most useful once planning tools (v1.4), observation log (v1.3), and Astrodex are mature. |
 | **Effort** | High |
+| **Status** | 💡 Idea - subject to change |
 
 Scope: a planning-grade sky chart integrated with existing data - not a full Stellarium simulation. This distinction keeps the feature achievable.
 
@@ -184,6 +214,7 @@ Scope: a planning-grade sky chart integrated with existing data - not a full Ste
 |---|---|
 | **Why** | Single-user self-hosted installs benefit from sharing; club and family installs benefit even more. Built last in the 2.x cycle because it needs a stable feature set and a user base large enough to make sharing meaningful. v1.1 (beginner onboarding) is the prerequisite for that user base. |
 | **Effort** | Medium |
+| **Status** | 💡 Idea - subject to change |
 
 #### Public Astrodex profiles (opt-in)
 
@@ -216,6 +247,7 @@ Export Plan My Night or SkyTonight results as:
 |---|---|
 | **Why** | Bridges MAB with the capture and guiding software that advanced imagers already run. Most niche audience - placed last. |
 | **Effort** | High |
+| **Status** | 💡 Idea - subject to change |
 
 #### Plate solve (upload -> coordinates)
 
@@ -250,6 +282,7 @@ Export Plan My Night or SkyTonight results as:
 |---|---|
 | **Why** | Every planning tool up to this point (Plan My Night, SkyTonight filters, Wishlist, Session Analytics) still requires the user to decide what to shoot. This version closes the loop by suggesting it. It's a pure software/data feature with no hardware connector required, so it can ship ahead of the live-integration cluster (v2.4+). |
 | **Effort** | High |
+| **Status** | 💡 Idea - subject to change |
 
 #### Night Copilot
 
@@ -281,6 +314,7 @@ Additional features:
 |---|---|
 | **Why** | Turns MyAstroBoard into the real-time dashboard of the observatory, not just a planning tool. First of the "live" versions - it requires a persistent device-connector layer (ASCOM Alpaca / INDI) that today only exists as the v2.2 GoTo stretch goal. |
 | **Effort** | High |
+| **Status** | 💡 Idea - subject to change |
 
 What needs to be built:
 
@@ -302,6 +336,7 @@ What needs to be built:
 |---|---|
 | **Why** | Not a replacement for NINA - a live companion view for users who already run NINA as their capture software. Upgrades v2.2's file-based NINA sequence export / PHD2 log import into a live, bidirectional connection. |
 | **Effort** | High |
+| **Status** | 💡 Idea - subject to change |
 
 Features:
 
@@ -323,6 +358,7 @@ Features:
 |---|---|
 | **Why** | With live equipment status (v2.4) and NINA telemetry (v2.5) available, MAB can start acting on conditions instead of only displaying them. |
 | **Effort** | High |
+| **Status** | 💡 Idea - subject to change |
 
 Features:
 
@@ -343,6 +379,7 @@ Features:
 |---|---|
 | **Why** | Coordinates every connector built through v2.4-v2.6 into a single one-click flow - the payoff of the live-integration cluster. |
 | **Effort** | High |
+| **Status** | 💡 Idea - subject to change |
 
 Coordinates:
 
@@ -374,6 +411,7 @@ One-click night:
 |---|---|
 | **Why** | Long-term vision, not a committed release. MyAstroBoard orchestrates existing astro software (NINA, PHD2, ASCOM Alpaca, INDI, Seestar, Stellarium, Home Assistant, weather, AllSky…) rather than replacing it, and becomes the one place that remembers everything across years of sessions - the equivalent of Home Assistant for astronomy. |
 | **Effort** | Very high / open-ended |
+| **Status** | 💡 Idea - subject to change |
 
 #### Plugin ecosystem
 
@@ -401,21 +439,21 @@ Also:
 
 ## Summary
 
-| Version | Theme | Audience | Effort | Implemented |
+| Version | Theme | Audience | Effort | Status |
 |---------|-------|----------|--------|--------|
-| v0.9 | Web Push E2E validation | All | Low | X |
-| v1.0 | First stable release | All | Low | X |
-| v1.1 | First Light - beginner onboarding | Beginners | Medium | X |
-| v1.2 | Multi-location profiles | All | Medium | |
-| v1.3 | Observation Log | Intermediate+ | High | |
-| v1.4 | Planning Intelligence | Advanced | High | |
-| v1.5 | Session Analytics | All | Medium | |
-| v2.0 | Interactive Sky Chart | All | High | |
-| v2.1 | Community & Sharing | All | Medium | |
-| v2.2 | Integrations (plate solve, PHD2, NINA) | Advanced | High | |
-| v2.3 | Astro Intelligence (Night Copilot) | All | High | |
-| v2.4 | Observatory Dashboard | Advanced | High | |
-| v2.5 | NINA Companion | Advanced | High | |
-| v2.6 | Smart Automation | Advanced | High | |
-| v2.7 | Observatory Orchestrator | Advanced | High | |
-| v3.0 | Personal Observatory OS | All | Very High | |
+| v0.9 | Web Push E2E validation | All | Low | ✅ Implemented |
+| v1.0 | First stable release | All | Low | ✅ Implemented |
+| v1.1 | First Light - beginner onboarding | Beginners | Medium | ✅ Implemented |
+| v1.2 | Multi-location profiles | All | Medium | ✅ Implemented |
+| v1.3 | Observation Log | Intermediate+ | High | 🗓️ Planned |
+| v1.4 | Planning Intelligence | Advanced | High | 💡 Idea |
+| v1.5 | Session Analytics | All | Medium | 💡 Idea |
+| v2.0 | Interactive Sky Chart | All | High | 💡 Idea |
+| v2.1 | Community & Sharing | All | Medium | 💡 Idea |
+| v2.2 | Integrations (plate solve, PHD2, NINA) | Advanced | High | 💡 Idea |
+| v2.3 | Astro Intelligence (Night Copilot) | All | High | 💡 Idea |
+| v2.4 | Observatory Dashboard | Advanced | High | 💡 Idea |
+| v2.5 | NINA Companion | Advanced | High | 💡 Idea |
+| v2.6 | Smart Automation | Advanced | High | 💡 Idea |
+| v2.7 | Observatory Orchestrator | Advanced | High | 💡 Idea |
+| v3.0 | Personal Observatory OS | All | Very High | 💡 Idea |
