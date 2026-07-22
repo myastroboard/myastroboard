@@ -120,7 +120,7 @@ def _quality_component(value: Optional[int], scale_size: int, higher_raw_is_bett
     ``transparency`` is the opposite (1=worst, N=best per 7Timer's own docs) - pass
     ``higher_raw_is_better=True`` for those.
     """
-    if value is None:
+    if value is None or value < 1 or value > scale_size:
         return 0.0
     if higher_raw_is_better:
         quality = (value - 1) / (scale_size - 1) * 10
