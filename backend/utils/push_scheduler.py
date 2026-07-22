@@ -865,7 +865,7 @@ def _release_lock() -> None:
         try:
             lf.close()
         except Exception:
-            pass
+            pass  # Best-effort close; fd may already be invalid during shutdown
 
 
 def start() -> None:

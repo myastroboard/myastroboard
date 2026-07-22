@@ -90,7 +90,7 @@ def setup_logger(name: str, include_console: bool = True, console_level: Optiona
         try:
             old_handler.close()
         except Exception:
-            pass
+            pass  # Best-effort close; stream may already be closed/invalid
     logger.handlers.clear()
 
     # Ensure log directory exists

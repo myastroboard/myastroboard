@@ -40,18 +40,17 @@ SKYFIELD_LOADER = Loader(SKYFIELD_CACHE_DIR)
 # Process-wide memoised JPL ephemeris. The live-position endpoint is polled far
 # more often than the (cached) pass report, so re-opening the ~16 MB de421.bsp on
 # every request wastes CPU/IO and file handles; load it once and reuse it.
-_EPHEMERIS = None
-_EPHEMERIS_ATTEMPTED = False
+_EPHEMERIS_UNSET = object()  # sentinel: load not yet attempted
+_EPHEMERIS: Any = _EPHEMERIS_UNSET
 _EPHEMERIS_LOCK = threading.Lock()
 
 
 def _get_ephemeris():
     """Return the shared de421 ephemeris, loading it once (None if unavailable)."""
-    global _EPHEMERIS, _EPHEMERIS_ATTEMPTED
-    if _EPHEMERIS is None and not _EPHEMERIS_ATTEMPTED:
+    global _EPHEMERIS
+    if _EPHEMERIS is _EPHEMERIS_UNSET:
         with _EPHEMERIS_LOCK:
-            if _EPHEMERIS is None and not _EPHEMERIS_ATTEMPTED:
-                _EPHEMERIS_ATTEMPTED = True
+            if _EPHEMERIS is _EPHEMERIS_UNSET:
                 try:
                     _EPHEMERIS = SKYFIELD_LOADER('de421.bsp')
                 except Exception as exc:
