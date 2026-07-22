@@ -460,8 +460,10 @@ class EventsAggregator:
             except Exception as e:
                 logger.warning(f"Error extracting solar system events: {e}")
 
-        # Sort by days until event
-        events.sort(key=lambda x: x.days_until_event)
+        # Sort chronologically. days_until_event alone is day-granularity, so same-day
+        # events (e.g. a CSS transit at 19:34 and an ISS pass at 23:13) would otherwise
+        # keep whatever order they were extracted in instead of their actual time.
+        events.sort(key=lambda x: self._parse_iso_time(x.peak_time) if x.peak_time else self.local_now)
 
         # Prepare results
         result = {
@@ -1148,6 +1150,20 @@ class EventsAggregator:
         }
         return self._t(f"events_api.activities.{activity_key}", fallback_map.get(activity_key, "observing"))
 
+    def _event_window_has_ended(self, event_data: Dict[str, Any]) -> bool:
+        """True if a timed event's visibility window (end_time, if any) is already in the past.
+
+        Short nightly windows (Milky Way core, zodiacal light) carry a real end_time a few
+        hours after peak_time; without this check they linger as "happening now" all day
+        (day-granularity days_until_event stays 0/-1 long after the window actually closed).
+        Events without an end_time (equinox, solstice) are left to the day-based filtering
+        elsewhere, since they are momentary rather than window-based.
+        """
+        end_time_str = event_data.get("end_time")
+        if not end_time_str:
+            return False
+        return self._parse_iso_time(end_time_str) < self.local_now
+
     def _parse_iso_time(self, iso_string: str) -> datetime.datetime:
         """Parse ISO format time string"""
         try:
@@ -1226,6 +1242,9 @@ class EventsAggregator:
             try:
                 peak_time_str = event_data.get("peak_time")
                 if not peak_time_str:
+                    continue
+
+                if self._event_window_has_ended(event_data):
                     continue
 
                 peak_time = self._parse_iso_time(peak_time_str)
