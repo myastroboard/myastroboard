@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Sun">
+    <defs>
+        <radialGradient id="sun-disc" cx="42%" cy="38%" r="72%">
+            <stop offset="0%" stop-color="#fff6cf" />
+            <stop offset="45%" stop-color="#ffc93c" />
+            <stop offset="85%" stop-color="#f3841c" />
+            <stop offset="100%" stop-color="#d2540b" />
+        </radialGradient>
+        <radialGradient id="sun-corona" cx="50%" cy="50%" r="50%">
+            <stop offset="55%" stop-color="#ffb02e" stop-opacity="0.55" />
+            <stop offset="100%" stop-color="#ffb02e" stop-opacity="0" />
+        </radialGradient>
+        <clipPath id="sun-clip">
+            <circle cx="100" cy="100" r="62" />
+        </clipPath>
+    </defs>
+    <rect width="200" height="200" fill="#120a06" />
+    <circle cx="100" cy="100" r="96" fill="url(#sun-corona)" />
+    <circle cx="100" cy="100" r="62" fill="url(#sun-disc)" />
+    <g clip-path="url(#sun-clip)" fill="#b8480a" opacity="0.55">
+        <ellipse cx="78" cy="118" rx="13" ry="8" transform="rotate(-18 78 118)" />
+        <ellipse cx="122" cy="80" rx="9" ry="6" transform="rotate(24 122 80)" />
+        <ellipse cx="112" cy="126" rx="6" ry="4" />
+    </g>
+    <circle cx="100" cy="100" r="62" fill="none" stroke="#ffe08a" stroke-opacity="0.45" stroke-width="2" />
+</svg>

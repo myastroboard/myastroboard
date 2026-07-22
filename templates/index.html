@@ -50,6 +50,7 @@
     <link rel="stylesheet" href="/static/css/bs_skytonight.css?v={{ version }}" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="/static/css/bs_astrodex.css?v={{ version }}" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="/static/css/bs_astrodex_map.css?v={{ version }}" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="/static/css/bs_astrodex_collection.css?v={{ version }}" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="/static/css/bs_plan_my_night.css?v={{ version }}" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="/static/css/bs_equipment.css?v={{ version }}" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="/static/css/bs_metrics.css?v={{ version }}" media="print" onload="this.media='all'">
@@ -64,6 +65,7 @@
         <link rel="stylesheet" href="/static/css/bs_skytonight.css?v={{ version }}">
         <link rel="stylesheet" href="/static/css/bs_astrodex.css?v={{ version }}">
         <link rel="stylesheet" href="/static/css/bs_astrodex_map.css?v={{ version }}">
+        <link rel="stylesheet" href="/static/css/bs_astrodex_collection.css?v={{ version }}">
         <link rel="stylesheet" href="/static/css/bs_plan_my_night.css?v={{ version }}">
         <link rel="stylesheet" href="/static/css/bs_equipment.css?v={{ version }}">
         <link rel="stylesheet" href="/static/css/bs_metrics.css?v={{ version }}">
@@ -674,6 +676,11 @@
                             <i class="bi bi-geo-alt-fill text-danger icon-inline" aria-hidden="true"></i> <span data-i18n="astrodex.photo_map_tab">Photo Map</span>
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link sub-tab-btn" href="#" data-subtab="catalogue-collection">
+                            <i class="bi bi-grid-3x3-gap-fill text-success icon-inline" aria-hidden="true"></i> <span data-i18n="astrodex.collection_tab">Catalogue Collection</span>
+                        </a>
+                    </li>
                 </ul>
             </div>
 
@@ -777,6 +784,76 @@
                     <p class="text-muted" data-i18n="astrodex.map_intro">See where your Astrodex photos were taken.</p>
                     <div id="astrodex-map-without-location-line"></div>
                     <div id="astrodex-photo-map" class="astrodex-photo-map"></div>
+                </div>
+            </div>
+
+            <!-- Catalogue Collection Sub-tab -->
+            <div id="catalogue-collection-subtab" class="sub-tab-content">
+                <div class="shadow p-2 mb-3 rounded bg-sub-container">
+                    <h2>
+                        <i class="bi bi-grid-3x3-gap-fill text-success icon-inline" aria-hidden="true"></i> <span data-i18n="astrodex.collection_title">Catalogue Collection</span>
+                    </h2>
+                    <p class="text-muted" data-i18n="astrodex.collection_intro">Browse a whole catalogue and see at a glance which objects you have already captured.</p>
+
+                    <div class="row g-3 mt-2">
+                        <div class="col-md-4">
+                            <label class="form-label small mb-1" for="collection-catalogue" data-i18n="astrodex.collection_catalogue">Catalogue</label>
+                            <select id="collection-catalogue" class="form-select"></select>
+                        </div>
+                        <div class="col-md-8 d-flex align-items-end">
+                            <div id="collection-progress" class="collection-progress w-100"></div>
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mt-1 mb-3">
+                        <div class="col-6 col-lg-4 col-xl-2">
+                            <input type="text" id="collection-search" class="form-control" placeholder="Search objects..." data-i18n-placeholder="astrodex.search">
+                        </div>
+                        <div class="col-6 col-lg-4 col-xl-2">
+                            <select id="collection-caught-filter" class="form-select">
+                                <option value="all" data-i18n="astrodex.collection_filter_caught_all">All objects</option>
+                                <option value="yes" data-i18n="astrodex.collection_filter_caught_yes">Captured</option>
+                                <option value="no" data-i18n="astrodex.collection_filter_caught_no">Not captured</option>
+                            </select>
+                        </div>
+                        <div class="col-6 col-lg-4 col-xl-2">
+                            <select id="collection-difficulty-filter" class="form-select">
+                                <option value="" data-i18n="astrodex.collection_filter_difficulty_all">All difficulties</option>
+                                <option value="beginner" data-i18n="difficulty.beginner">Beginner</option>
+                                <option value="intermediate" data-i18n="difficulty.intermediate">Intermediate</option>
+                                <option value="advanced" data-i18n="difficulty.advanced">Advanced</option>
+                            </select>
+                        </div>
+                        <div class="col-6 col-lg-4 col-xl-2">
+                            <select id="collection-type-filter" class="form-select">
+                                <option value="" data-i18n="astrodex.filter_type_all">All Types</option>
+                            </select>
+                        </div>
+                        <div class="col-6 col-lg-4 col-xl-2">
+                            <select id="collection-constellation-filter" class="form-select">
+                                <option value="" data-i18n="astrodex.collection_filter_constellation_all">All constellations</option>
+                            </select>
+                        </div>
+                        <div class="col-6 col-lg-4 col-xl-2">
+                            <div class="input-group">
+                                <select id="collection-sort" class="form-select">
+                                    <option value="catalogue_id" data-i18n="astrodex.collection_sort_catalogue">Sort by Catalogue ID</option>
+                                    <option value="name" data-i18n="astrodex.sort_by_name">Sort by Name</option>
+                                    <option value="caught" data-i18n="astrodex.collection_sort_caught">Sort by Captured</option>
+                                    <option value="difficulty" data-i18n="astrodex.collection_sort_difficulty">Sort by Difficulty</option>
+                                    <option value="magnitude" data-i18n="astrodex.collection_sort_magnitude">Sort by Magnitude</option>
+                                    <option value="constellation" data-i18n="astrodex.collection_sort_constellation">Sort by Constellation</option>
+                                    <option value="type" data-i18n="astrodex.sort_by_type">Sort by Type</option>
+                                </select>
+                                <button type="button" class="btn btn-primary" id="collection-sort-order">
+                                    <i class="bi bi-sort-up-alt" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="collection-grid" class="row row-cols-3 row-cols-sm-4 row-cols-md-5 row-cols-lg-6 row-cols-xl-8 row-cols-xxl-10 g-2"></div>
+                    <div id="collection-pagination"></div>
                 </div>
             </div>
 
@@ -3169,6 +3246,7 @@
     <script src="/static/js/config.js?v={{ version }}"></script>
     <script src="/static/js/locations.js?v={{ version }}"></script>
     <script src="/static/js/astrodex_map.js?v={{ version }}"></script>
+    <script src="/static/js/astrodex_collection.js?v={{ version }}"></script>
     <script src="/static/js/app_settings.js?v={{ version }}"></script>
     <script src="/static/js/skytonight.js?v={{ version }}"></script>
     <script src="/static/js/logs.js?v={{ version }}"></script>

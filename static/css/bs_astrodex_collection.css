@@ -1,0 +1,159 @@
+/* CSS for the Astrodex Catalogue Collection sub-tab.
+
+   Cards are deliberately dense: a catalogue page shows up to 120 of them, so every
+   card is a thumbnail, a name and two lines of metadata and nothing more. All sizing
+   lives here rather than in inline style attributes set from JavaScript. */
+
+.collection-progress {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.collection-progress-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    color: var(--bs-secondary);
+}
+
+.collection-progress-count {
+    font-weight: var(--font-bold);
+    color: var(--text-primary);
+}
+
+.collection-progress .progress {
+    height: 0.6rem;
+}
+
+.collection-card {
+    height: 100%;
+    overflow: hidden;
+    transition: box-shadow var(--transition-normal), transform var(--transition-normal);
+}
+
+.collection-card:hover {
+    box-shadow: 0 0 0 2px var(--bs-primary);
+}
+
+.collection-card-image {
+    position: relative;
+    width: 100%;
+    height: 90px;
+    overflow: hidden;
+    background: var(--bs-secondary-bg-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.collection-card-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0;
+    transition: opacity var(--transition-normal);
+}
+
+/* Set by the lazy loader once the image has actually decoded, so a card never
+   flashes a broken-image glyph while its DSS2 tile is still being fetched. */
+.collection-card-image img.is-loaded {
+    opacity: 1;
+}
+
+/* Not-yet-captured objects are shown "locked": the DSS2 preview is drained of colour
+   and dimmed so a caught object's real photo stands out across a dense grid. */
+.collection-card-uncaught .collection-card-image img {
+    filter: grayscale(1) contrast(0.85) brightness(0.65);
+}
+
+.collection-card-uncaught {
+    opacity: 0.72;
+    border-style: dashed;
+}
+
+.collection-card-uncaught:hover {
+    opacity: 1;
+}
+
+.collection-card-placeholder {
+    color: var(--bs-secondary);
+    font-size: 1.6rem;
+}
+
+.collection-card-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 1px 5px;
+    border-radius: var(--border-radius);
+    background: var(--photo-badge-bg);
+    color: var(--bs-light);
+    font-size: 0.7rem;
+    line-height: 1.4;
+}
+
+.collection-card-body {
+    padding: 0.4rem 0.5rem 0.5rem;
+}
+
+.collection-card-id {
+    font-size: 0.8rem;
+    font-weight: var(--font-bold);
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.collection-card-name {
+    font-size: 0.72rem;
+    color: var(--bs-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The shared difficulty badge is sized for full-width tables; shrink it to fit a card
+   that is only about 110px wide. */
+.collection-card-difficulty {
+    margin-top: 0.2rem;
+}
+
+.collection-card-difficulty .badge {
+    font-size: 0.62rem;
+    padding: 0.15em 0.4em;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.collection-card-meta {
+    font-size: 0.68rem;
+    color: var(--bs-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.collection-pagination-bar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    .collection-card,
+    .collection-card-image img {
+        transition: none;
+    }
+}

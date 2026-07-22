@@ -10,6 +10,7 @@ from werkzeug.utils import secure_filename
 from equipment import equipment_profiles
 from observation import astrodex
 from observation import beginner_catalog
+from observation import catalogue_collection
 from utils.auth import login_required, user_required, get_current_user, user_manager
 from blueprints.plan_my_night import _resolve_requested_language
 from utils.logging_config import get_logger
@@ -696,6 +697,59 @@ def check_item_in_astrodex(item_name):
         return jsonify({'in_astrodex': is_in_astrodex})
     except Exception as e:
         logger.error(f"Error checking astrodex: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@astrodex_bp.route('/api/astrodex/collection/catalogues', methods=['GET'])
+@login_required
+def get_collection_catalogues():
+    """List the catalogues browsable in the Catalogue Collection sub-tab, with caught counts."""
+    try:
+        user = get_current_user()
+        if not user:  # pragma: no cover
+            return jsonify({'error': 'User not authenticated'}), 401
+
+        items = astrodex.load_user_astrodex(user.user_id, user.username).get('items', [])
+        return jsonify({'catalogues': catalogue_collection.list_catalogues(items)})
+    except Exception as e:
+        logger.error(f"Error listing collection catalogues: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@astrodex_bp.route('/api/astrodex/collection', methods=['GET'])
+@login_required
+def get_collection_page():
+    """Return one filtered, sorted, paginated page of a catalogue's collection cards."""
+    try:
+        user = get_current_user()
+        if not user:  # pragma: no cover
+            return jsonify({'error': 'User not authenticated'}), 401
+
+        catalogue = request.args.get('catalogue', '').strip()
+        if not catalogue:
+            return jsonify({'error': 'Missing catalogue'}), 400
+
+        items = astrodex.load_user_astrodex(user.user_id, user.username).get('items', [])
+        return jsonify(
+            catalogue_collection.get_collection_page(
+                catalogue,
+                items,
+                page=request.args.get('page', default=0, type=int) or 0,
+                page_size=(
+                    request.args.get('page_size', default=catalogue_collection.DEFAULT_PAGE_SIZE, type=int)
+                    or catalogue_collection.DEFAULT_PAGE_SIZE
+                ),
+                sort=request.args.get('sort', 'catalogue_id'),
+                order=request.args.get('order', 'asc'),
+                search=request.args.get('q', ''),
+                object_type=request.args.get('type', '').strip(),
+                constellation=request.args.get('constellation', '').strip(),
+                caught=request.args.get('caught', 'all'),
+                difficulty=request.args.get('difficulty', '').strip(),
+            )
+        )
+    except Exception as e:
+        logger.error(f"Error building collection page: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
 

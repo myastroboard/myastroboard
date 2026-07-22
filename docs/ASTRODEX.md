@@ -134,6 +134,100 @@ This does **not** perform any EXIF GPS extraction — it only visualizes coordin
 
 ---
 
+## Catalogue Collection
+
+**Astrodex tab → Catalogue Collection sub-tab**
+
+The Pokédex view. Pick a catalogue and see **every** object in it as a small card, whether
+you have imaged it or not — captured objects in full colour with your own cover photo,
+everything else greyed out with a sky-survey preview. Cards are display-only: nothing here
+adds, edits or deletes anything, it only reflects state already owned by the Astrodex and
+the SkyTonight catalogue.
+
+### What you can browse
+
+Every deep-sky catalogue of the SkyTonight dataset, plus a **Solar System** pseudo-catalogue:
+
+| Group | Contents |
+|-------|----------|
+| Solar System | The 8 planets, the Moon and the Sun. The Sun is a synthetic entry — SkyTonight tracks it as the source of twilight, never as a target — and the whole group is unrelated to the `bodies` results table. |
+| Human-scale catalogues | Messier, Caldwell, Famous objects (`CommonName`), Herschel 400, Pensack 500, Gary Imm, Arp, LBN, Sharpless, Barnard, vdB, Abell PNe |
+| Reference catalogues | Abell galaxy clusters (~2 700), NGC (~13 300), IC (~5 500) |
+
+Comets are deliberately absent: they are transient visitors, not a fixed set to complete.
+
+The picker shows a captured count per catalogue (`Messier (12/109)`), and a progress bar
+sits above the grid. An object present in several catalogues — M 31 is also NGC 224 — counts
+as captured in each of them.
+
+Each card shows its catalogue identifier, name, type, constellation, difficulty badge and
+magnitude.
+
+### Card images
+
+| Situation | Image |
+|-----------|-------|
+| Captured, has pictures | The item's main (cover) picture, full colour |
+| Captured, no pictures yet | The DSS2 preview, full colour |
+| Not captured, deep-sky object | The DSS2 preview, greyscaled and dimmed |
+| Not captured, solar-system body | Bundled artwork under `static/img/bodies/` — planets have no fixed coordinates, so no sky survey can supply their picture |
+
+DSS2 previews reuse the existing `GET /api/object-image/<filename>` proxy, which fetches
+from CDS hips2fits once and caches the JPEG on disk. Thumbnails load through an
+`IntersectionObserver` as their card nears the viewport, so browsing a 13 000-object
+catalogue never fires more cold CDS fetches than the objects actually looked at.
+
+### Captured detection
+
+An object counts as captured when one of its catalogue identifiers or aliases matches an
+Astrodex item of the **current user**. Matching runs through the same
+`_extract_name_candidates()` extractor `is_item_in_astrodex()` uses, so an item saved as
+`"M31 - Andromeda Galaxy"` is recognised, and the collection always agrees with the
+"in Astrodex" badges shown elsewhere in the app.
+
+### Filtering, sorting, paging
+
+All three happen **server-side** (`backend/observation/catalogue_collection.py`) — the NGC
+catalogue is far too large to hand to the browser at once. Pages hold 60 cards by default,
+120 at most.
+
+- **Filters**: free-text search (identifier and name), captured / not captured, difficulty, object type, constellation.
+- **Sorts**: catalogue identifier (default, ordered naturally so `M 9` precedes `M 10`), name, captured, difficulty, magnitude, constellation, type — each reversible.
+- Objects with no value for the sorted field (no published magnitude, no difficulty) stay grouped at the end in both directions, rather than jumping to the top when the order flips.
+- The type and constellation dropdowns are built over the whole catalogue, not the current page, so they do not shrink as you filter or page. They are re-sorted client-side on the *translated* label, so the list reads alphabetically in the user's own language.
+
+### Difficulty
+
+Cards carry the same beginner / intermediate / advanced badge SkyTonight and the Astrodex
+grid use, via the shared `createDifficultyBadgeNode()`.
+
+The label comes from `skytonight_calculator.compute_difficulty_score()`, called directly on
+the catalogue record. That scorer derives the label from magnitude and apparent size alone
+and is explicitly independent of location and sky quality, so it can be computed for the
+**whole** catalogue rather than only for the targets a given night's run happened to
+evaluate — unlike `GET /api/astrodex`, which cross-references `dso_results.json` and
+therefore leaves items unrated when they were not observable. Solar-system bodies have
+neither magnitude nor size on record, so they get no badge instead of the scorer's neutral
+"intermediate" default, which would be a guess.
+
+> The `difficulty`/`difficulty_score` fields stored in `targets.json` are **not** used here:
+> the offline dataset builder writes a placeholder (`0` / `intermediate`) for every object.
+
+### Naming and translation
+
+- **Constellations** are stored in the dataset as IAU abbreviations (`And`, plus PyOngc's
+  `Se1`/`Se2` for the two halves of Serpens). The endpoint expands them to full names
+  (`Andromeda`, `Serpens Caput`) so the frontend's existing `constellations.*` keys resolve;
+  all 91 names in the dataset have a translation.
+- **Object types** go through `skytonight.type_*`, as everywhere else.
+- **Object names** are catalogue proper nouns and are shown as-is — SkyTonight does not
+  translate them either. The one exception is the Solar System group, whose members have
+  real translations and so go through the shared `planets.*` dictionary (`Moon` → `Lune`).
+  `planets.sun` was added for this view; the namespace previously only covered planets,
+  since its only other consumer is the events aggregator.
+
+---
+
 ## Shared items
 
 When multiple users on the same instance image the same object, items are **merged** in the Astrodex view:
@@ -179,6 +273,8 @@ Per-user write locks (`threading.Lock` per `user_id`) prevent concurrent save ra
 | `POST` | `/api/astrodex/items/<item_id>/pictures/<picture_id>/main` | login | Set picture as main |
 | `GET` | `/api/astrodex/images/<filename>` | login | Serve a picture file |
 | `GET` | `/api/astrodex/check/<item_name>` | login | Check if name already exists |
+| `GET` | `/api/astrodex/collection/catalogues` | login | List browsable catalogues for the Catalogue Collection sub-tab, with per-catalogue object and captured counts |
+| `GET` | `/api/astrodex/collection` | login | One filtered/sorted/paginated page of a catalogue's collection cards |
 | `GET` | `/api/astrodex/constellations` | login | List constellations in collection |
 | `GET` | `/api/astrodex/catalogue-lookup` | login | Look up object in SkyTonight catalogue |
 | `POST` | `/api/astrodex/items/<item_id>/catalogue-name` | login | Set canonical catalogue name |

@@ -181,6 +181,8 @@ This page lists the HTTP routes currently declared across `backend/blueprints/*.
 - `GET /api/astrodex/check/<item_name>`
 - `GET /api/astrodex/constellations`
 - `GET /api/astrodex/catalogue-lookup`
+- `GET /api/astrodex/collection/catalogues`
+- `GET /api/astrodex/collection`
 
 ## Plan My Night
 

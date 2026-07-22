@@ -351,3 +351,127 @@ def test_resolve_picture_location_snapshot_falls_through_on_lookup_miss(monkeypa
     result = astrodex_bp_module._resolve_picture_location_snapshot('loc-1', fake_user)
 
     assert result == astrodex_bp_module._EMPTY_PICTURE_LOCATION
+
+
+def _fake_collection_dataset(*_args, **_kwargs):
+    """Two Messier objects plus one body, in the dataclass shape the real dataset uses."""
+    from skytonight.skytonight_models import SkyTonightTarget
+
+    return {
+        'targets': [
+            SkyTonightTarget.from_dict({
+                'target_id': 'dso-m31',
+                'category': 'deep_sky',
+                'object_type': 'Galaxy',
+                'preferred_name': 'Andromeda Galaxy',
+                'catalogue_names': {'Messier': 'M 31'},
+                'aliases': ['M 31', 'Andromeda Galaxy'],
+                'constellation': 'And',
+                'magnitude': 3.4,
+                'coordinates': {'ra_hours': 0.712, 'dec_degrees': 41.269},
+            }),
+            SkyTonightTarget.from_dict({
+                'target_id': 'dso-m42',
+                'category': 'deep_sky',
+                'object_type': 'Nebula',
+                'preferred_name': 'Orion Nebula',
+                'catalogue_names': {'Messier': 'M 42'},
+                'aliases': ['M 42', 'Orion Nebula'],
+                'constellation': 'Ori',
+                'magnitude': 4.0,
+                'coordinates': {'ra_hours': 5.588, 'dec_degrees': -5.391},
+            }),
+            SkyTonightTarget.from_dict({
+                'target_id': 'body-mars',
+                'category': 'bodies',
+                'object_type': 'Planet',
+                'preferred_name': 'Mars',
+                'catalogue_names': {'Bodies': 'Mars'},
+                'coordinates': None,
+            }),
+        ]
+    }
+
+
+def test_collection_catalogues_api(client, monkeypatch):
+    """The catalogue picker lists browsable catalogues with their captured counts."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        monkeypatch.setenv('DATA_DIR', tmpdir)
+        astrodex.ASTRODEX_DIR = os.path.join(tmpdir, 'astrodex')
+        astrodex.ASTRODEX_IMAGES_DIR = os.path.join(astrodex.ASTRODEX_DIR, 'images')
+        monkeypatch.setattr(skytonight_targets, 'load_targets_dataset', _fake_collection_dataset)
+
+        user = user_manager.get_user_by_username('admin')
+        astrodex.create_astrodex_item(
+            user.user_id,
+            {'name': 'M 31', 'type': 'Galaxy', 'catalogue': 'Messier'},
+            username=user.username
+        )
+
+        response = client.get('/api/astrodex/collection/catalogues')
+        assert response.status_code == 200
+
+        catalogues = {entry['id']: entry for entry in response.get_json()['catalogues']}
+        assert catalogues['Messier'] == {'id': 'Messier', 'total': 2, 'caught': 1}
+        # One dataset body (Mars) plus the synthetic Sun entry.
+        assert catalogues['Bodies']['total'] == 2
+
+
+def test_collection_page_api(client, monkeypatch):
+    """A collection page returns cards annotated with their captured state."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        monkeypatch.setenv('DATA_DIR', tmpdir)
+        astrodex.ASTRODEX_DIR = os.path.join(tmpdir, 'astrodex')
+        astrodex.ASTRODEX_IMAGES_DIR = os.path.join(astrodex.ASTRODEX_DIR, 'images')
+        monkeypatch.setattr(skytonight_targets, 'load_targets_dataset', _fake_collection_dataset)
+
+        user = user_manager.get_user_by_username('admin')
+        item = astrodex.create_astrodex_item(
+            user.user_id,
+            {'name': 'M31 - Andromeda Galaxy', 'type': 'Galaxy', 'catalogue': 'Messier'},
+            username=user.username
+        )
+        astrodex.add_picture_to_item(user.user_id, item['id'], {'filename': 'andromeda.jpg', 'is_main': True})
+
+        response = client.get('/api/astrodex/collection?catalogue=Messier&sort=catalogue_id')
+        assert response.status_code == 200
+
+        payload = response.get_json()
+        assert payload['total'] == 2
+        assert payload['caught'] == 1
+
+        cards = {card['catalogue_id']: card for card in payload['items']}
+        assert cards['M 31']['caught'] is True
+        assert cards['M 31']['image_url'] == '/api/astrodex/images/andromeda.jpg'
+        assert cards['M 42']['caught'] is False
+        assert cards['M 42']['image_source'] == 'dss2'
+
+        # Constellations are expanded from the dataset's IAU abbreviations so the
+        # frontend's `constellations.*` translations resolve.
+        assert cards['M 31']['constellation'] == 'Andromeda'
+        assert cards['M 42']['constellation'] == 'Orion'
+        assert cards['M 31']['difficulty'] in ('beginner', 'intermediate', 'advanced')
+
+
+def test_collection_page_api_filters_by_difficulty(client, monkeypatch):
+    """The difficulty filter narrows the page and is reflected in filtered_total."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        monkeypatch.setenv('DATA_DIR', tmpdir)
+        astrodex.ASTRODEX_DIR = os.path.join(tmpdir, 'astrodex')
+        astrodex.ASTRODEX_IMAGES_DIR = os.path.join(astrodex.ASTRODEX_DIR, 'images')
+        monkeypatch.setattr(skytonight_targets, 'load_targets_dataset', _fake_collection_dataset)
+
+        response = client.get('/api/astrodex/collection?catalogue=Messier&difficulty=beginner')
+        assert response.status_code == 200
+
+        payload = response.get_json()
+        assert payload['total'] == 2
+        assert payload['items'], 'expected at least one beginner target'
+        assert all(card['difficulty'] == 'beginner' for card in payload['items'])
+        assert payload['filtered_total'] == len(payload['items'])
+
+
+def test_collection_page_api_requires_a_catalogue(client):
+    """Without a catalogue there is nothing to page through - reject rather than guess."""
+    response = client.get('/api/astrodex/collection')
+    assert response.status_code == 400

@@ -21,6 +21,8 @@ Why ? Because now (and more later, see roadmap), all these data will be allow yo
 
 As location can be added to your picture, a World Photo Map is now available to see your different spot. On photo, you are not limited by recorded location, you can also indicate GPS coordinate if you take pictures in holidays!
 
+And the Codex idea goes one step further with a new **Catalogue Collection** sub-tab. Pick a catalogue - Messier, Caldwell, Herschel 400, Sharpless, the full NGC, or the Solar System with the planets, the Moon and the Sun - and you get the whole thing as a wall of small cards. The ones you have already captured show your own photo in full colour; the rest are greyed out behind a DSS2 sky-survey preview, waiting to be caught. A progress bar tells you how far along a catalogue you are, and you can search, filter by difficulty, type, constellation or captured state, and sort by catalogue number, name, difficulty, magnitude or capture. Each card carries the same beginner/intermediate/advanced badge you already know from SkyTonight - and here it is computed for every object in the catalogue, not just the ones that happened to be observable on the last calculation run. Cards are purely a mirror of what is already in your Astrodex - there is nothing to click, it is there to be looked at.
+
 A note about privacy. As Astrodex, World Photo Map can be private or public. That's mean, if map is set as public, all users of your server can see the position on the map. This point is documented in UI. As this is a local tool, this shouldn't be an issue, specially because you can turn it in private. In all of case the location is provided to "logged" users only for the map, never to others.
 
 #### Astronomy and reliability audit

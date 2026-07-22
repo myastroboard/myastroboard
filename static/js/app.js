@@ -506,6 +506,9 @@ function switchSubTab(parentTab, subtabName, options = {}) {
         case 'photo-map':
             if (typeof loadAstrodexPhotoMap === 'function') loadAstrodexPhotoMap();
             break; // Astrodex tab
+        case 'catalogue-collection':
+            if (typeof loadCatalogueCollection === 'function') loadCatalogueCollection();
+            break; // Astrodex tab
         case 'notifications':
             if (typeof initNotificationSettingsUI === 'function') initNotificationSettingsUI();
             break; // My Settings tab

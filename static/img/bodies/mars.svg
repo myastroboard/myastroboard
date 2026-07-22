@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Mars">
+    <defs>
+        <radialGradient id="mars-disc" cx="36%" cy="30%" r="80%">
+            <stop offset="0%" stop-color="#ff9c66" />
+            <stop offset="55%" stop-color="#c8501c" />
+            <stop offset="100%" stop-color="#5d1e06" />
+        </radialGradient>
+        <clipPath id="mars-clip">
+            <circle cx="100" cy="100" r="58" />
+        </clipPath>
+    </defs>
+    <rect width="200" height="200" fill="#0b1020" />
+    <circle cx="100" cy="100" r="58" fill="url(#mars-disc)" />
+    <g clip-path="url(#mars-clip)" fill="#8c3512" opacity="0.65">
+        <ellipse cx="86" cy="104" rx="30" ry="14" transform="rotate(-14 86 104)" />
+        <ellipse cx="128" cy="82" rx="16" ry="9" transform="rotate(20 128 82)" />
+        <ellipse cx="112" cy="128" rx="18" ry="8" />
+    </g>
+    <g clip-path="url(#mars-clip)" fill="#fdf6ef" opacity="0.9">
+        <ellipse cx="100" cy="46" rx="24" ry="11" />
+        <ellipse cx="100" cy="154" rx="17" ry="8" />
+    </g>
+</svg>

@@ -864,15 +864,13 @@ def _reset_ephemeris_memo():
     surfaces as a ResourceWarning attributed to whatever unrelated test happens to
     be running when GC finalizes it.
     """
-    if mod._EPHEMERIS is not None and hasattr(mod._EPHEMERIS, "close"):
+    if mod._EPHEMERIS is not None and mod._EPHEMERIS is not mod._EPHEMERIS_UNSET and hasattr(mod._EPHEMERIS, "close"):
         mod._EPHEMERIS.close()
-    mod._EPHEMERIS = None
-    mod._EPHEMERIS_ATTEMPTED = False
+    mod._EPHEMERIS = mod._EPHEMERIS_UNSET
     yield
-    if mod._EPHEMERIS is not None and hasattr(mod._EPHEMERIS, "close"):
+    if mod._EPHEMERIS is not None and mod._EPHEMERIS is not mod._EPHEMERIS_UNSET and hasattr(mod._EPHEMERIS, "close"):
         mod._EPHEMERIS.close()
-    mod._EPHEMERIS = None
-    mod._EPHEMERIS_ATTEMPTED = False
+    mod._EPHEMERIS = mod._EPHEMERIS_UNSET
 
 
 def _patch_solar_arrays(monkeypatch, svc, center, iss_alt=30.0, sun_alt=30.0, az_rate=0.5):
@@ -1996,7 +1994,7 @@ class _RaceLock:
     """Lock stand-in simulating another thread finishing the load while we waited."""
 
     def __enter__(self):
-        mod._EPHEMERIS_ATTEMPTED = True
+        mod._EPHEMERIS = None
         return self
 
     def __exit__(self, *exc):
@@ -2004,8 +2002,9 @@ class _RaceLock:
 
 
 def test_get_ephemeris_inner_recheck_skips_when_already_attempted(monkeypatch):
-    """Inner re-check inside the lock: another thread already flipped _EPHEMERIS_ATTEMPTED
-    while we waited for the lock, so this call must not retry the load."""
+    """Inner re-check inside the lock: another thread already finished the load attempt
+    (leaving the memo no longer unset) while we waited for the lock, so this call must
+    not retry the load."""
     monkeypatch.setattr(mod, "_EPHEMERIS_LOCK", _RaceLock())
     calls = []
     monkeypatch.setattr(mod, "SKYFIELD_LOADER", lambda *a, **k: calls.append(a))

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Venus">
+    <defs>
+        <radialGradient id="venus-disc" cx="36%" cy="30%" r="80%">
+            <stop offset="0%" stop-color="#fff1c9" />
+            <stop offset="55%" stop-color="#e6b96a" />
+            <stop offset="100%" stop-color="#8a5a23" />
+        </radialGradient>
+        <clipPath id="venus-clip">
+            <circle cx="100" cy="100" r="62" />
+        </clipPath>
+    </defs>
+    <rect width="200" height="200" fill="#0b1020" />
+    <circle cx="100" cy="100" r="62" fill="url(#venus-disc)" />
+    <g clip-path="url(#venus-clip)" fill="none" stroke="#f6dda4" stroke-opacity="0.5" stroke-width="7" stroke-linecap="round">
+        <path d="M32 76 Q100 62 172 82" />
+        <path d="M30 100 Q104 90 174 104" />
+        <path d="M34 124 Q98 116 170 128" />
+    </g>
+    <g clip-path="url(#venus-clip)" fill="#b5813a" opacity="0.35">
+        <ellipse cx="120" cy="132" rx="34" ry="12" transform="rotate(-12 120 132)" />
+    </g>
+</svg>
