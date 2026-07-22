@@ -373,7 +373,7 @@
     "planetary_imaging": "Para imagens planetárias",
     "current_seeing": "Seeing Atual",
     "forecast": "Previsão desta noite",
-    "best_window": "Melhor janela de seeing",
+    "best_window": "Melhor janela geral",
     "seeing_scale": {
       "1": "Excelente",
       "2": "Bom",
@@ -390,7 +390,7 @@
     },
     "no_data": "Não há dados de seeing disponíveis",
     "data_source": "Fonte de dados: 7Timer",
-    "footer_source": "Fonte de dados: previsão de seeing 7Timer + normalização local e pontuação da melhor janela.",
+    "footer_source": "Fonte dos dados: previsão astro do 7Timer (seeing, transparência, cobertura de nuvens, vento) + pontuação de qualidade composta.",
     "unavailable_no_usable_values": "O numérico público API do 7Timer retornou valores de visualização indefinidos para este ciclo. O gráfico do site ainda pode mostrar ícones, mas nenhum valor numérico utilizável é fornecido atualmente.",
     "unavailable_fetch_failed": "A visualização da previsão está temporariamente indisponível porque a solicitação do 7Timer falhou. Por favor, tente novamente mais tarde.",
     "tips": {
@@ -403,7 +403,45 @@
     "failed_to_load_forecast": "Falha ao carregar a visualização da previsão. Por favor, tente novamente mais tarde.",
     "quality_table": "Qualidade",
     "scale_mapping_title": "Mapeamento de escala",
-    "scale_mapping_info": "Os valores brutos de seeing do 7Timer (1-8) são normalizados para a escala de qualidade de 5 níveis deste aplicativo (1-5) para manter os rótulos e as descrições consistentes."
+    "scale_mapping_info": "Os valores brutos de seeing, transparência, cobertura de nuvens e vento do 7Timer são decodificados em rótulos simples e combinados numa única pontuação de qualidade de 0 a 10, ponderada a favor do seeing e da transparência, pois são saídas próprias do modelo astronômico do 7Timer. Chuva ou neve ativa reduz a pontuação para quase zero.",
+    "best_seeing_window": "Melhor janela de seeing",
+    "current_conditions": "Condições atuais",
+    "transparency_scale": {
+      "1": "Muito fraca",
+      "2": "Fraca",
+      "3": "Abaixo da média",
+      "4": "Média",
+      "5": "Acima da média",
+      "6": "Boa",
+      "7": "Muito boa",
+      "8": "Excelente"
+    },
+    "cloudcover_scale": {
+      "1": "Limpo",
+      "2": "Maioritariamente limpo",
+      "3": "Maioritariamente limpo",
+      "4": "Parcialmente nublado",
+      "5": "Parcialmente nublado",
+      "6": "Maioritariamente nublado",
+      "7": "Maioritariamente nublado",
+      "8": "Nublado",
+      "9": "Encoberto"
+    },
+    "wind_scale": {
+      "1": "Calmo",
+      "2": "Fraco",
+      "3": "Moderado",
+      "4": "Fresco",
+      "5": "Forte",
+      "6": "Tempestuoso",
+      "7": "Tempestade",
+      "8": "Furacão"
+    },
+    "prec_type": {
+      "none": "Nenhuma",
+      "rain": "Chuva",
+      "snow": "Neve"
+    }
   },
   "iss": {
     "passes": "ISS Passes",

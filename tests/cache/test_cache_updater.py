@@ -1274,8 +1274,13 @@ class TestUpdateSeeingForecastCache:
 
     @patch("cache.cache_updater.cache_store")
     @patch("cache.cache_updater.load_config")
-    def test_seeing_forecast_with_none_data(self, mock_load_config, mock_cache_store, mock_config):
-        """When seeing_data is None, response has null field with message."""
+    def test_seeing_forecast_with_none_data_keeps_previous_cache(self, mock_load_config, mock_cache_store, mock_config):
+        """A None fetch result (e.g. 7Timer connect timeout) leaves the cache untouched.
+
+        Regression test: overwriting the cache with a failure marker would stamp a fresh
+        timestamp and make is_cache_valid() treat the failure as "fresh" for the full
+        CACHE_TTL_SEEING_FORECAST window (6h), blocking retries even after 7Timer recovers.
+        """
         from cache.cache_updater import update_seeing_forecast_cache
 
         mock_load_config.return_value = mock_config
@@ -1284,9 +1289,7 @@ class TestUpdateSeeingForecastCache:
         with patch.dict(sys.modules, {"astroweather.seeing_forecast_7timer": fake_module}):
             update_seeing_forecast_cache()
 
-        stored = _loc_payload(mock_cache_store, "seeing_forecast")
-        assert stored["seeing_forecast"] is None
-        assert "message" in stored
+        mock_cache_store.update_location_cache.assert_not_called()
 
     @patch("cache.cache_updater.cache_store")
     @patch("cache.cache_updater.load_config")
