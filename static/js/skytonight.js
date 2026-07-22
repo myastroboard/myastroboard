@@ -21,7 +21,7 @@ const _plotlyLoadState = { promise: null };
 function _ensurePlotlyLoaded() {
     return ensureVendorScriptLoaded(
         () => typeof Plotly !== 'undefined',
-        '/static/vendor/plotly/plotly-3.5.1.min.js?v=3.5.1',
+        '/static/vendor/plotly/plotly-3.7.0.min.js?v=3.7.0',
         null,
         _plotlyLoadState,
         'Plotly'
