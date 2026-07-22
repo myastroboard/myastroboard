@@ -20,6 +20,7 @@ function resolveEventIconClass(event) {
 
 function resolveEventBannerModifier(event) {
     const map = {
+        'text-must-see':  'mustsee',
         'text-danger':    'critical',
         'text-warning':   'high',
         'text-info':      'medium',
@@ -192,9 +193,9 @@ function displayEvents(eventsData) {
     // Show the events banner
     container.style.display = 'block';
 
-    // Display up to first 3 events in continuous rotary banner
+    // Display up to first 5 events in continuous rotary banner
     if (visibleEvents && visibleEvents.length > 0) {
-        const rotaryEvents = visibleEvents.slice(0, 3);
+        const rotaryEvents = visibleEvents.slice(0, 5);
         startEventsRotary(container, rotaryEvents);
     }
 }
@@ -219,12 +220,16 @@ function startEventsRotary(container, events) {
         return;
     }
 
-    // Build dots navigation
+    // Build dots navigation. Each dot is a button with a generous padded hit area
+    // (the visible dot itself stays small) so it's actually tappable on mobile.
     const dotsNav = document.createElement('div');
     dotsNav.className = 'event-banner-dots';
-    events.forEach((_, i) => {
-        const dot = document.createElement('span');
-        dot.className = 'event-banner-dot' + (i === 0 ? ' active' : '');
+    events.forEach((event, i) => {
+        const dot = document.createElement('button');
+        dot.type = 'button';
+        dot.className = 'event-banner-dot-hit';
+        dot.setAttribute('aria-label', event?.title || `${i + 1}`);
+        dot.appendChild(document.createElement('span')).className = 'event-banner-dot' + (i === 0 ? ' active' : '');
         dot.addEventListener('click', () => {
             currentIndex = i;
             if (eventsRotaryIntervalId) {
@@ -273,10 +278,23 @@ function createEventAlertCard(event) {
     const content = document.createElement('div');
     content.className = 'event-banner__content';
 
+    const titleRow = document.createElement('div');
+    titleRow.className = 'event-banner__title-row';
+
     const titleEl = document.createElement('div');
     titleEl.className = 'event-banner__title';
     titleEl.textContent = event.title || '';
-    content.appendChild(titleEl);
+    titleRow.appendChild(titleEl);
+
+    if (event.importance === 'critical') {
+        const mustSeeBadge = document.createElement('span');
+        mustSeeBadge.className = 'event-banner__badge';
+        mustSeeBadge.appendChild(DOMUtils.createIcon('bi bi-star-fill', 'icon-inline me-1'));
+        mustSeeBadge.appendChild(document.createTextNode(i18n.t('calendar.importance.critical')));
+        titleRow.appendChild(mustSeeBadge);
+    }
+
+    content.appendChild(titleRow);
 
     if (event.description) {
         const descEl = document.createElement('div');

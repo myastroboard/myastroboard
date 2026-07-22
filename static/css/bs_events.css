@@ -36,6 +36,7 @@
     left: 0; top: 0; bottom: 0;
     width: 3px;
 }
+.event-banner--mustsee::before  { background: #e8a000; width: 4px; }
 .event-banner--critical::before { background: var(--error-500); }
 .event-banner--high::before     { background: var(--warning-500); }
 .event-banner--medium::before   { background: var(--accent-1); }
@@ -53,6 +54,7 @@
     font-size: 1rem;
     margin-left: 0.125rem;
 }
+.event-banner--mustsee   .event-banner__icon { background: rgba(232, 160, 0,   0.14); color: #e8a000;            }
 .event-banner--critical .event-banner__icon { background: rgba(239, 68,  68,  0.12); color: var(--error-500);   }
 .event-banner--high     .event-banner__icon { background: rgba(245, 158, 11,  0.12); color: var(--warning-500); }
 .event-banner--medium   .event-banner__icon { background: var(--accent-soft);        color: var(--accent-1);    }
@@ -64,6 +66,15 @@
     min-width: 0;
 }
 
+.event-banner__title-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    row-gap: 0.25rem;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
 .event-banner__title {
     font-weight: var(--font-semibold);
     font-size: 1.1rem;
@@ -72,6 +83,25 @@
     overflow: hidden;
     text-overflow: ellipsis;
     line-height: 1.3;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* "Must-see" badge, called out on the banner itself instead of relying on the
+   thin left-border accent alone. */
+.event-banner__badge {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.65rem;
+    font-weight: var(--font-semibold);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    padding: 0.15rem 0.5rem;
+    border-radius: var(--border-radius-pill);
+    background: #e8a000;
+    color: #fff;
+    white-space: nowrap;
 }
 
 .event-banner__desc {
@@ -121,20 +151,36 @@
     color: var(--accent-1);
 }
 
-/* Rotary dots */
+/* Rotary dots. The visible dot stays small, but each one sits inside a
+   button with a generously padded hit area so it's actually tappable on
+   mobile (WCAG recommends ~44px touch targets, tiny 6px dots are not). */
 .event-banner-dots {
     display: flex;
     justify-content: center;
-    gap: 0.4rem;
-    margin-top: 0.5rem;
+    align-items: center;
+    gap: 0.125rem;
+    margin-top: 0.25rem;
+}
+.event-banner-dot-hit {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
 }
 .event-banner-dot {
+    display: block;
     width: 6px;
     height: 6px;
     border-radius: 50%;
     background: var(--surface-border-strong);
     transition: background var(--transition-normal), transform var(--transition-normal);
-    cursor: pointer;
+    pointer-events: none;
 }
 .event-banner-dot.active {
     background: var(--accent-1);
@@ -161,6 +207,10 @@
     }
     .event-banner__btn-label {
         display: none;
+    }
+    .event-banner__badge {
+        font-size: 0.6rem;
+        padding: 0.1rem 0.4rem;
     }
 }
 
