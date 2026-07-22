@@ -4,33 +4,20 @@ This directory contains comprehensive unit tests for the MyAstroBoard applicatio
 
 ## Test Coverage
 
-The test suite includes **317 tests** covering:
+The test suite mirrors `backend/`'s package layout, one subdirectory per package:
 
-- **Astronomical Calculations** (`test_astronomical.py`): Moon and sun phase calculations, twilight times, dark sky windows
-- **Astrodex** (`test_astrodex.py`, `test_astrodex_api.py`): Collection management and API endpoints
-- **Authentication** (`test_auth.py`): Login, logout, password change, session handling
-- **Cache Management** (`test_cache_store.py`, `test_cache_scheduler.py`): Cache data structures, TTL, and scheduler
-- **Catalogue Aliases** (`test_catalogue_aliases.py`): Cross-catalogue name resolution
-- **Configuration** (`test_config.py`): Configuration loading, saving, and validation
-- **Constants** (`test_constants.py`): Application constants and environment variables
-- **Equipment Profiles** (`test_equipment_profiles.py`): Telescope, camera, mount, filter, accessory, combination management
-- **Events** (`test_new_event_services.py`): Planetary events, phenomena, solar system events
-- **Horizon Graph** (`test_horizon_graph.py`): Custom horizon profile and graph data
-- **i18n** (`test_i18n_utils.py`): Translation loading and key resolution
-- **ISS Passes** (`test_iss_passes.py`): ISS pass prediction
-- **Logging** (`test_logging_config.py`): Logger configuration
-- **Moon Eclipse** (`test_moon_eclipse.py`): Lunar eclipse calculations
-- **Plan My Night** (`test_plan_my_night_api.py`): Observation plan CRUD and timeline
-- **SkyTonight API** (`test_skytonight_api.py`): SkyTonight HTTP endpoints
-- **SkyTonight Bodies** (`test_skytonight_bodies.py`): Solar-system body target building
-- **SkyTonight Catalogue Builder** (`test_skytonight_catalogue_builder.py`): Dataset assembly from PyOngc rows
-- **SkyTonight Comets** (`test_skytonight_comets.py`): Comet target loading
-- **SkyTonight Scheduler** (`test_skytonight_scheduler.py`): Schedule resolution and missed-run recovery
-- **SkyTonight Targets** (`test_skytonight_targets.py`): Target dataset loading and storage
-- **Text Configuration** (`test_txtconf_loader.py`): Catalogue and version file loading
-- **Utilities** (`test_utils.py`): File operations, coordinate conversion, JSON handling
-- **Version Checker** (`test_version_checker.py`): Update check logic and caching
-- **Weather** (`test_weather_utils.py`): Weather API client creation
+- **`blueprints/`**: Flask route/API-level tests (`test_app_routes.py` is the main route-coverage file; per-domain files for astrodex, connectors, plan-my-night, push, skytonight, sky-widget, and the `test_route_inventory.py` API-contract guard)
+- **`utils/`**: Cross-cutting support modules — config (`test_config.py`, `test_locations.py`), auth (`test_auth.py`), i18n (`test_i18n_utils.py`), logging (`test_logging_config.py`), push (`test_push_manager.py`, `test_push_scheduler.py`), metrics, version checking, txtconf loading, and shared utilities (`test_utils.py`)
+- **`cache/`**: Shared JSON cache store and background scheduler/updater (`test_cache_store.py`, `test_cache_scheduler.py`, `test_cache_updater.py`)
+- **`skytonight/`**: SkyTonight calculation pipeline — bodies, calculator, catalogue builder, comets, models, scheduler, storage, targets
+- **`astroweather/`**: Astronomical/atmospheric forecast services — moon/sun phases, eclipses, aurora, horizon graph, seeing forecast
+- **`weather/`**: Weather forecast clients and astrophotography weather analysis (sky quality/Bortle, Open-Meteo, weather_astro)
+- **`observation/`**: Observation logbook, planning, and events business logic — astrodex, beginner catalog, object info, plan-my-night, planetary/solar-system events, sidereal time
+- **`space/`**: ISS/CSS pass prediction and spaceflight tracking
+- **`equipment/`**: Equipment profiles and the exposure-calculator formula
+- **`connectors/`**: AllSky connector
+
+Test files follow `backend/<package>/<module>.py` → `tests/<package>/test_<module>.py`.
 
 ## Running Tests
 
@@ -44,13 +31,16 @@ python -m pytest tests/ -v
 python -m pytest tests/ -q
 
 # Run specific test file
-python -m pytest tests/test_utils.py -v
+python -m pytest tests/utils/test_utils.py -v
 
 # Run specific test class
-python -m pytest tests/test_utils.py::TestCoordinateConversion -v
+python -m pytest tests/utils/test_utils.py::TestCoordinateConversion -v
 
 # Run specific test
-python -m pytest tests/test_utils.py::TestCoordinateConversion::test_dms_to_decimal_positive -v
+python -m pytest tests/utils/test_utils.py::TestCoordinateConversion::test_dms_to_decimal_positive -v
+
+# Run every test for one backend package
+python -m pytest tests/skytonight/ -v
 ```
 
 ### With Coverage
@@ -89,10 +79,12 @@ python -m pytest tests/ -l
 
 ### Test Organization
 
-Tests are organized by module:
-- Each backend module has a corresponding test file (e.g., `utils.py` → `test_utils.py`)
+Tests mirror the `backend/` package structure:
+- Each backend package has a matching `tests/` subdirectory (e.g., `backend/skytonight/` → `tests/skytonight/`)
+- Each backend module has a corresponding test file (e.g., `utils/logging_config.py` → `tests/utils/test_logging_config.py`)
 - Tests are grouped into classes by functionality
 - Each test class focuses on a specific aspect or function
+- Don't add new top-level "coverage boost" grab-bag files spanning several unrelated modules - extend the test file for the module actually under test instead, even if that means several small additions across files
 
 ### Fixtures
 
