@@ -310,6 +310,16 @@ djlint templates/ static/offline.html --profile jinja --lint --ignore H021,H023,
 - Before re-rendering containers, use `DOMUtils.clear(container)`.
 - Preserve existing IDs/classes/data-attributes required by listeners and Bootstrap behavior.
 
+#### Inline `style` attribute
+
+**NEVER** add a `style="..."` attribute (in templates, or via `element.style.x = ...` / `setAttribute('style', ...)` in JS) to express *static* presentation — colors, sizes, spacing, font-size, etc. Put it in a CSS class in the relevant `static/css/bs_*.css` file instead, even if it means adding a small one-off utility class. A `<div>` that already carries a `class` and *also* carries a hardcoded `style` is the smell to avoid — the static declaration belongs in CSS, not duplicated inline.
+
+Two narrow exceptions, both allowed:
+- **JS-driven show/hide**: `style="display: none;"` in markup, or `el.style.display = 'none'` in JS, to toggle visibility at runtime. This is intentional (see djlint H021 above) — don't rewrite these to `classList.toggle('d-none')` unless you're already touching that code for another reason.
+- **Genuinely per-instance dynamic values that can't be a static class**: e.g. Bootstrap's own documented progress-bar pattern (`<div class="progress-bar" style="width: 25%">`), or a computed pixel offset/color/width set at runtime from data. These are fine as direct `.style.x` writes; don't invent a CSS class per possible value.
+
+If you're unsure whether a given `style` is "static" or "dynamic", check whether the value ever changes after initial render without a full class swap — if it doesn't, it's static and belongs in CSS.
+
 ### Git Commit Messages
 
 Follow these conventions:

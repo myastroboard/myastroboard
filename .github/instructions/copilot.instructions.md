@@ -319,6 +319,12 @@ except Exception as e:
 - Major modules (`auth`, `app`, `astrodex`, `weather`, `weather_astro`, `equipment`, `moon`, `sun`, `iss`, `horizon_graph`, `aurora`, `solar_eclipse`, `lunar_eclipse`, `skytonight`, `skytonightScheduler`, `plan_my_night`) now follow node-based DOM updates.
 - Any change reintroducing HTML sinks should be treated as a regression and rewritten.
 
+#### Inline `style` Attribute (MANDATORY)
+Full rationale and examples: [CONTRIBUTING.md#inline-style-attribute](../../CONTRIBUTING.md#inline-style-attribute).
+- **NEVER** add `style="..."` in templates, or `element.style.x = ...` in JS, for *static* presentation (colors, sizes, spacing, font-size). Put it in a `static/css/bs_*.css` class instead, even a small new one-off class.
+- Allowed exceptions: JS-driven show/hide (`style.display`), and genuinely per-instance dynamic values that can't be a static class (Bootstrap's documented `progress-bar` width pattern, a computed color/offset from data).
+- A `<div>` carrying both a `class` and a hardcoded static `style` is the smell — move the static part into the class.
+
 ### File Organization
 - One class per file when possible
 - Keep related functionality together
@@ -669,6 +675,7 @@ Update `EXPECTED_ROUTES` in that file to match, and document the change in `CHAN
 - [ ] All code/comments/UI text in English (see Language Requirement above)
 - [ ] No `print()` or direct `logging` import in backend code (use `logging_config.get_logger`)
 - [ ] No `innerHTML` / new `DOMUtils.setTrustedHTML` in `static/js/**`
+- [ ] No new static inline `style="..."` / `.style.x =` (use a CSS class; JS show/hide and genuinely dynamic values are the only exceptions)
 
 ## Security Considerations
 

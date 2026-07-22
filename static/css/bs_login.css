@@ -1,5 +1,11 @@
 /* Login page specific styles for MyAstroBoard */
 
+.login-logo-icon {
+    height: 3em;
+    width: auto;
+    vertical-align: middle;
+}
+
 /* Login page body */
 .login-page {
     min-height: 100vh;

@@ -761,3 +761,57 @@ html[data-theme="red"] .text-bg-primary {
     color: #ffffff !important;
 }
 
+/* ── Generic presentation utilities (replace static inline style="...") ── */
+.icon-xs {
+    font-size: .65em;
+}
+
+.spinner-lg {
+    width: 3rem;
+    height: 3rem;
+}
+
+.progress-lg {
+    height: 30px;
+}
+
+.progress-thin {
+    height: 6px;
+}
+
+.min-w-11rem {
+    min-width: 11rem;
+}
+
+.max-w-420 {
+    max-width: 420px;
+}
+
+.chart-card-bg {
+    background: var(--surface-2);
+}
+
+.guide-canvas {
+    width: 100%;
+    height: 160px;
+    display: block;
+}
+
+.guide-canvas.tall {
+    height: 175px;
+}
+
+.btn-emphasis-text {
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.restart-overlay {
+    z-index: 9999;
+    background: rgba(0, 0, 0, 0.8);
+}
+
+#horizon-profile-table thead th:last-child {
+    width: 40px;
+}
+
