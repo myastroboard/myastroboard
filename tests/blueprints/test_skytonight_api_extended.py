@@ -1,6 +1,5 @@
 """Extended Flask test client tests for skytonight_api blueprint routes."""
 import json as _json
-import os
 import sys
 import tempfile
 import types

@@ -7,7 +7,6 @@ Covers every branch of all five connector routes:
   GET /api/connectors/allsky/urls
   GET /api/connectors/allsky/proxy
 """
-import os
 import sys
 import time
 import types

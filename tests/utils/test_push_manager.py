@@ -1,7 +1,6 @@
 """Tests for push_manager.py: VAPID key management and Web Push delivery."""
 
 import json
-import os
 import sys
 import types
 

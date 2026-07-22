@@ -1,8 +1,5 @@
 """Tests for compute_difficulty_score() in skytonight_calculator.py."""
 
-import os
-import sys
-
 from skytonight.skytonight_calculator import compute_difficulty_score  # noqa: E402
 from skytonight.skytonight_models import SkyTonightTarget  # noqa: E402
 

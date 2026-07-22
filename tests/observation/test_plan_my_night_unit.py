@@ -4,7 +4,6 @@ Tests date parsing, validation, matching logic, and file I/O.
 """
 
 import os
-import sys
 import tempfile
 import json
 from datetime import datetime, timedelta, timezone

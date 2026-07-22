@@ -4,7 +4,6 @@ Fails if any route is added, removed, renamed, or changes its HTTP method.
 To update intentionally: modify EXPECTED_ROUTES below and document the
 breaking change in CHANGELOG_NEXT.md.
 """
-import os
 import sys
 import types
 

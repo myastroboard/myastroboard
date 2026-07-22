@@ -1,6 +1,5 @@
 """API tests for SkyTonight report endpoints."""
 
-import os
 import sys
 import tempfile
 import types

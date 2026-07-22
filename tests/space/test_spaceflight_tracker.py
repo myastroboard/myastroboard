@@ -1118,7 +1118,7 @@ class TestLoadBackoffState:
         assert result == {}
 
     def test_loads_valid_future_entries(self, tmp_path, monkeypatch):
-        import json, time as _time
+        import time as _time
 
         future = _time.time() + 3600
         f = tmp_path / "backoff.json"
@@ -1129,7 +1129,7 @@ class TestLoadBackoffState:
         assert result["/launch/"] == future
 
     def test_skips_expired_entries(self, tmp_path, monkeypatch):
-        import json, time as _time
+        import time as _time
 
         past = _time.time() - 100
         f = tmp_path / "backoff.json"
@@ -1139,7 +1139,6 @@ class TestLoadBackoffState:
         assert "/old/" not in result
 
     def test_skips_invalid_exp_value(self, tmp_path, monkeypatch):
-        import json
 
         f = tmp_path / "backoff.json"
         f.write_text(json.dumps({"/bad/": "not-a-number"}))
@@ -1158,7 +1157,7 @@ class TestLoadBackoffState:
 class TestSaveBackoffState:
 
     def test_writes_active_entries(self, tmp_path, monkeypatch):
-        import json, time as _time
+        import time as _time
 
         f = tmp_path / "backoff.json"
         monkeypatch.setattr(spaceflight_tracker, "_SPACEFLIGHT_BACKOFF_FILE", str(f))
@@ -1173,7 +1172,7 @@ class TestSaveBackoffState:
             spaceflight_tracker._backoff_until.pop("/save-test/", None)
 
     def test_omits_expired_entries(self, tmp_path, monkeypatch):
-        import json, time as _time
+        import time as _time
 
         f = tmp_path / "backoff.json"
         monkeypatch.setattr(spaceflight_tracker, "_SPACEFLIGHT_BACKOFF_FILE", str(f))
