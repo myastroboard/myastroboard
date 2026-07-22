@@ -365,7 +365,7 @@ Fixes #456
 pytest
 
 # Run specific test file
-pytest tests/test_utils.py
+pytest tests/utils/test_utils.py
 
 # Run with coverage
 pytest --cov=backend --cov-report=html
@@ -376,12 +376,13 @@ docker-compose -f docker-compose-dev.yml run myastroboard pytest
 
 ### Writing Tests
 
-- Place tests in the `tests/` directory
+- Place tests in the `tests/` directory, mirroring the `backend/` package layout (e.g. `backend/skytonight/foo.py` → `tests/skytonight/test_foo.py`)
 - Name test files `test_*.py`
 - Name test functions `test_*`
 - Use descriptive test names
 - Include docstrings explaining what is tested
-- Use fixtures from `conftest.py`
+- Use fixtures from `conftest.py` (shared at the `tests/` root - applies to every subdirectory)
+- Don't create top-level "coverage boost" files spanning several unrelated modules - add the test to the file for the module actually under test, even if that means several small edits across files
 
 #### Example:
 ```python
@@ -402,13 +403,13 @@ def test_parse_coordinates_invalid_format():
 
 ### API Route Changes
 
-`tests/test_route_inventory.py` maintains the v1.0 API contract: it fails if any route is added, removed, renamed, or changes its HTTP method.
+`tests/blueprints/test_route_inventory.py` maintains the v1.0 API contract: it fails if any route is added, removed, renamed, or changes its HTTP method.
 
 **If you add or rename an API route**, update `EXPECTED_ROUTES` in that file to match, and document the change in `CHANGELOG_NEXT.md`.
 
 ```bash
 # Quick check after touching app.py or skytonight_api.py
-pytest tests/test_route_inventory.py
+pytest tests/blueprints/test_route_inventory.py
 ```
 
 The failure output lists exactly which routes are unexpected or missing, so you know precisely what to update.

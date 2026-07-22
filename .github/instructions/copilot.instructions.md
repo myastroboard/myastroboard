@@ -169,39 +169,21 @@ myastroboard/
 ├── templates/
 │   ├── index.html                   # Main dashboard page
 │   └── login.html                   # Login page
-├── tests/
+├── tests/                            # Mirrors backend/'s package layout (backend/skytonight/foo.py -> tests/skytonight/test_foo.py)
 │   ├── __pycache__/                 # Python bytecode cache for tests
 │   ├── __init__.py                  # Tests package marker
-│   ├── conftest.py                  # Shared pytest fixtures
+│   ├── conftest.py                  # Shared pytest fixtures (applies to every subdirectory below)
 │   ├── README.md                    # Testing notes
-│   ├── test_astrodex.py             # Astrodex unit tests
-│   ├── test_astrodex_api.py         # Astrodex API tests
-│   ├── test_astronomical.py         # Astronomical services tests
-│   ├── test_auth.py                 # Authentication and users tests
-│   ├── test_cache_scheduler.py      # Cache scheduler tests
-│   ├── test_cache_store.py          # Cache storage tests
-│   ├── test_catalogue_aliases.py    # Catalogue aliases tests
-│   ├── test_config.py               # Configuration management tests
-│   ├── test_constants.py            # Constants module tests
-│   ├── test_equipment_profiles.py   # Equipment profiles tests
-│   ├── test_horizon_graph.py        # Horizon graph tests
-│   ├── test_i18n_utils.py           # i18n utility tests
-│   ├── test_iss_passes.py           # ISS passes tests
-│   ├── test_css_passes.py           # CSS passes tests
-│   ├── test_logging_config.py       # Logging configuration tests
-│   ├── test_moon_eclipse.py         # Moon eclipse tests
-│   ├── test_new_event_services.py   # New event services tests
-│   ├── test_plan_my_night_api.py    # Plan My Night API tests
-│   ├── test_skytonight_api.py       # SkyTonight API tests
-│   ├── test_skytonight_bodies.py    # SkyTonight bodies builder tests
-│   ├── test_skytonight_catalogue_builder.py # Dataset builder tests
-│   ├── test_skytonight_comets.py    # Comet ingestion tests
-│   ├── test_skytonight_scheduler.py # SkyTonight scheduler tests
-│   ├── test_skytonight_targets.py   # Target dataset access tests
-│   ├── test_txtconf_loader.py       # txtconf loader tests
-│   ├── test_utils.py                # Shared utility tests
-│   ├── test_version_checker.py      # Version checker tests
-│   └── test_weather_utils.py        # Weather utility tests
+│   ├── blueprints/                  # Flask route/API-level tests (test_app_routes.py is the main route-coverage file)
+│   ├── utils/                       # Tests for backend/utils/* (config, auth, i18n, logging, push, metrics, version checker...)
+│   ├── cache/                       # Tests for backend/cache/* (cache_store, cache_scheduler, cache_updater)
+│   ├── skytonight/                  # Tests for backend/skytonight/* (calculator, catalogue builder, scheduler, targets...)
+│   ├── astroweather/                # Tests for backend/astroweather/* (moon/sun phases, eclipses, aurora, horizon graph...)
+│   ├── weather/                     # Tests for backend/weather/* (sky_quality, weather_astro, weather_openmeteo...)
+│   ├── observation/                 # Tests for backend/observation/* (astrodex, plan_my_night, events, object_info...)
+│   ├── space/                       # Tests for backend/space/* (iss_passes, css_passes, spaceflight_tracker)
+│   ├── equipment/                   # Tests for backend/equipment/* + exposure calculator
+│   └── connectors/                  # Tests for backend/connectors/* (allsky_connector)
 ├── CODEOWNERS                       # Repository ownership rules
 ├── CODE_OF_CONDUCT.md               # Community code of conduct
 ├── CONTRIBUTING.md                  # Contribution guidelines
@@ -671,7 +653,7 @@ djlint templates/ static/offline.html --profile jinja --lint --ignore H021,H023,
 ### Route Inventory Check
 If a change touches `app.py` or any `backend/blueprints/*.py` file (route added, removed, renamed, or its HTTP method changed):
 ```bash
-pytest tests/test_route_inventory.py
+pytest tests/blueprints/test_route_inventory.py
 ```
 Update `EXPECTED_ROUTES` in that file to match, and document the change in `CHANGELOG_NEXT.md`. The failure output lists exactly which routes are unexpected or missing.
 
@@ -681,7 +663,7 @@ Update `EXPECTED_ROUTES` in that file to match, and document the change in `CHAN
 - [ ] `flake8 backend/` reports no issues
 - [ ] `pyright backend/` reports no errors
 - [ ] `djlint` passes for any touched template
-- [ ] `pytest tests/test_route_inventory.py` passes if routes changed
+- [ ] `pytest tests/blueprints/test_route_inventory.py` passes if routes changed
 - [ ] All code/comments/UI text in English (see Language Requirement above)
 - [ ] No `print()` or direct `logging` import in backend code (use `logging_config.get_logger`)
 - [ ] No `innerHTML` / new `DOMUtils.setTrustedHTML` in `static/js/**`
