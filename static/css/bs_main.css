@@ -715,6 +715,14 @@ body.density-compact .alert {
     padding: 0.85rem 0 0.45rem;
     text-shadow: 0 8px 30px rgba(0, 0, 0, 0.28);
     animation: rise-in 420ms var(--transition-smooth);
+    /* Own stacking context above .mainContainer (z-index: 1). The rise-in
+       animation already makes .hero a stacking context while it runs, which
+       would otherwise trap the sky-widget panel (its own z-index: 200) below
+       the frosted, semi-transparent navbar/main content - the panel then
+       renders see-through for the first ~420ms after every load. Pinning the
+       hero above main content keeps the panel opaque regardless. */
+    position: relative;
+    z-index: 10;
 }
 
 .hero h1 {
