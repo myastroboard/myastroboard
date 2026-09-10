@@ -130,10 +130,16 @@ function _checkSunN6(data) {
     if (notificationManager.wasRecentlyNotified('N6', 8 * 60 * 60 * 1000)) return; // once per day
 
     const minutes = Math.round(msUntil / 60000);
+    // Local dusk clock time in the observing site's timezone - mirrors the
+    // server-side push body (utils/push_scheduler.py _check_n6_darkness) so the
+    // in-app fallback and the background push read identically.
+    const time = (typeof formatTimeOnlyInTimezone === 'function')
+        ? formatTimeOnlyInTimezone(duskIso, data?.location?.timezone)
+        : '';
     notificationManager.notify(
         'N6',
         i18n.t('notifications.n6_title'),
-        i18n.t('notifications.n6_body', { minutes }),
+        i18n.t('notifications.n6_body', { minutes, time }),
         { url: '#forecast-astro/astro-weather' }
     );
 }

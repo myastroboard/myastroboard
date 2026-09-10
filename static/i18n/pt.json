@@ -2434,7 +2434,7 @@
     "n4_title": "Eclipse lunar",
     "n5_body": "Maximo em {minutes} min",
     "n5_title": "Eclipse solar",
-    "n6_body": "A noite comeca em {minutes} min - prepare-se",
+    "n6_body": "A noite começa às {time} (em {minutes} min) - prepare-se",
     "n6_title": "Escuridao astronomica",
     "n7_body": "Kp {kp} detectado - {visibility}",
     "n7_title": "Alerta aurora",
