@@ -983,11 +983,16 @@ async function _renderSkyMap(reports, container) {
     slider.step = '5';
     slider.value = '65';
     sliderValueSpan.textContent = '65%';
-    slider.addEventListener('input', () => {
+    const _syncScoreSlider = (runFilters) => {
         minScore = parseInt(slider.value, 10) / 100;
         sliderValueSpan.textContent = `${slider.value}%`;
-        applyFilters();
-    });
+        if (runFilters) applyFilters();
+    };
+    // 'input' keeps the % label live while dragging; the map re-render (Plotly.restyle)
+    // waits for 'change' - the handle being released - so a full-range drag no longer
+    // fires a restyle on every 5 % step.
+    slider.addEventListener('input', () => _syncScoreSlider(false));
+    slider.addEventListener('change', () => _syncScoreSlider(true));
     sliderWrap.appendChild(slider);
 
     // ── AstroScore tier legend ────────────────────────────────────────────────

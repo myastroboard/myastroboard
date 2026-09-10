@@ -17,3 +17,8 @@
 - Fixed a false "already in your Astrodex" match between two different objects that a catalogue
   gives the same common name (e.g. NGC 6992 and NGC 6995, both "Eastern Veil"). Objects that
   resolve to distinct SkyTonight targets are no longer collapsed by a shared alias.
+
+#### SkyTonight
+
+- Sky map: dragging the minimum-AstroScore slider now updates the map only when the handle is
+  released, instead of re-rendering on every step of the drag.
