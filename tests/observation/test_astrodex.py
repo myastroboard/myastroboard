@@ -642,6 +642,41 @@ class TestAstrodexAliases:
 
         assert astrodex.is_item_in_astrodex('testuser', 'NGC 3031', 'openngc') is True
 
+    @staticmethod
+    def _fake_veil_entry(catalogue: str, object_name: str) -> dict:
+        """NGC 6992 and NGC 6995 - distinct SkyTonight targets that OpenNGC both
+        labels with the "Eastern Veil" common name."""
+        entries = {
+            ('OpenNGC', 'NGC 6992'): {
+                'group_id': 'dso-openngc-ngc6992',
+                'aliases': {'OpenNGC': 'NGC 6992', 'CommonName': 'Eastern Veil', 'Caldwell': 'C 33'},
+            },
+            ('OpenNGC', 'NGC 6995'): {
+                'group_id': 'dso-openngc-ngc6995',
+                'aliases': {'OpenNGC': 'NGC 6995', 'CommonName': 'Eastern Veil'},
+            },
+        }
+        return entries.get((catalogue, object_name), {})
+
+    def test_shared_common_name_does_not_merge_distinct_targets(self, temp_data_dir, monkeypatch):
+        """A common name shared by two different targets must not trigger a false duplicate."""
+        monkeypatch.setattr(skytonight_targets, 'get_lookup_entry', self._fake_veil_entry)
+
+        item = astrodex.create_astrodex_item(
+            'testuser', {'name': 'NGC 6995', 'type': 'Nebula', 'catalogue': 'OpenNGC'}
+        )
+        assert item is not None
+
+        assert astrodex.is_item_in_astrodex('testuser', 'NGC 6992', 'OpenNGC') is False
+        assert astrodex.find_item_in_astrodex('testuser', 'NGC 6992', 'OpenNGC') is None
+
+        preloaded = astrodex.load_user_astrodex('testuser')
+        assert astrodex.is_item_in_preloaded_astrodex(preloaded, 'NGC 6992', 'OpenNGC') is False
+
+        # The genuine duplicate is still detected.
+        assert astrodex.is_item_in_astrodex('testuser', 'NGC 6995', 'OpenNGC') is True
+        assert astrodex.find_item_in_astrodex('testuser', 'NGC 6995', 'OpenNGC') is not None
+
     def test_alias_metadata_enrichment(self, temp_data_dir, monkeypatch):
         """Test alias metadata is attached to items when available"""
         monkeypatch.setattr(skytonight_targets, 'get_lookup_entry', self._fake_alias_entry)

@@ -7,3 +7,13 @@
   with no push (plain browser tab, push unsupported, endpoint purged server-side).
 - The "astronomical night" (N6) in-app message now matches the push wording exactly, including
   the dusk clock time, and fixes missing accents in the FR/ES/PT strings.
+
+#### Astrodex
+
+- Add/Edit Photo: the equipment combination dropdown is now sorted alphabetically instead of
+  creation order.
+- Adding a new object now opens that object's detail view straight away, so a photo can be
+  attached without hunting for the freshly added card first.
+- Fixed a false "already in your Astrodex" match between two different objects that a catalogue
+  gives the same common name (e.g. NGC 6992 and NGC 6995, both "Eastern Veil"). Objects that
+  resolve to distinct SkyTonight targets are no longer collapsed by a shared alias.

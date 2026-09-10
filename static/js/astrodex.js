@@ -266,10 +266,13 @@ const _OTHER_EQUIPMENT_VALUE = '__other__';
 /** Build <option> markup for the picture Equipment combination select: enabled combinations
  * (own + shared) only, unless `forceIncludeId` (the picture's own already-saved combination) is
  * disabled - it stays visible then so an existing selection never silently disappears (same rule
- * as the Equipment tab's combination-editor pickers). */
+ * as the Equipment tab's combination-editor pickers). Sorted alphabetically by name so the list
+ * stays predictable as combinations are added. */
 function _buildPictureCombinationOptions(forceIncludeId, selectedId) {
     const all = [...astrodexEquipmentCache.combinations, ...astrodexEquipmentCache.sharedCombinations];
-    const visible = all.filter(combo => !combo.is_disabled || combo.id === forceIncludeId);
+    const visible = all
+        .filter(combo => !combo.is_disabled || combo.id === forceIncludeId)
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     return visible.map(combo => {
         const label = combo.owner_username
             ? `${escapeHtml(combo.name)} ${i18n.t('equipment.shared_fov_suffix', { username: escapeHtml(combo.owner_username) })}`
@@ -978,6 +981,8 @@ function updateAstrodexFilter(filterName, value, isAllowedAstrodex) {
 // Add Item to Astrodex
 // ============================================
 
+/** Create an Astrodex item. Returns the created item object on success (falls back to `true`
+ * if the server response omits it), or `false` on failure / duplicate. */
 async function addToAstrodex(itemData) {
     try {
         const resp = await fetch('/api/astrodex/items', {
@@ -1004,7 +1009,7 @@ async function addToAstrodex(itemData) {
             if (typeof updateCatalogueCapturedBadge === 'function') {
                 updateCatalogueCapturedBadge(data.item || itemData, true);
             }
-            return true;
+            return data.item || true;
         } else {
             showMessage('error', data.error || i18n.t('astrodex.failed_to_add_item'));
             return false;
@@ -1250,9 +1255,20 @@ async function showAddAstrodexItemModal() {
             } catch (_) { /* stale/invalid stash - just omit it */ }
         }
 
-        const success = await addToAstrodex(itemData);
-        if (success) {
-            closeModal('#modal_lg_close');
+        const created = await addToAstrodex(itemData);
+        if (created) {
+            // Resolve the new item against the freshly reloaded list so we only hand
+            // showAstrodexItemDetail() an id it can actually render (otherwise it would
+            // bail early and leave this add-item modal stuck open).
+            const newId = created.id || astrodexData.items.find(item => item.name === itemData.name)?.id;
+            const newItem = newId && astrodexData.items.find(item => item.id === newId);
+            if (newItem) {
+                // Jump straight into the new object's detail modal so a photo can be
+                // added right away - openModal() closes this add-item modal first.
+                await showAstrodexItemDetail(newItem.id);
+            } else {
+                closeModal('#modal_lg_close');
+            }
         }
     };
     document.getElementById('add-astrodex-form').addEventListener('submit', submitHandler);

@@ -1238,62 +1238,23 @@ def get_main_picture(item: Dict) -> Optional[Dict]:
     return item['pictures'][0] if item['pictures'] else None
 
 
-def is_item_in_astrodex_with_catalogue(user_id: str, item_name: str, catalogue: str = '') -> bool:
-    """Check if an item exists by exact name or cross-catalogue aliases group."""
-    astrodex = load_user_astrodex(user_id)
+def _find_matching_astrodex_item(items: List[Dict], item_name: str, catalogue: str = '') -> Optional[Dict]:
+    """Return the first item in *items* that represents the same object as ``item_name``.
 
+    Shared matching core behind ``is_item_in_astrodex*`` / ``find_item_in_astrodex``.
+    Checks, most reliable first:
+
+    1. Exact (normalized) name equality.
+    2. Same SkyTonight alias-group id - the authoritative "same target" signal.
+    3. Cross-catalogue alias-name overlap, but only when the two objects don't already
+       resolve to two *different* SkyTonight targets. Some catalogues hand distinct
+       objects the same common name (NGC 6992 and NGC 6995 both carry the "Eastern Veil"
+       CommonName); a shared alias must not collapse those into a false duplicate.
+    """
     requested_candidates = _extract_name_candidates(item_name)
     requested_normalized_names = {
         _normalize_name(candidate) for candidate in requested_candidates if _normalize_name(candidate)
     }
-
-    requested_group_ids = set()
-    requested_alias_names = set()
-    for candidate in requested_candidates or [item_name]:
-        group_id, aliases = _get_alias_metadata(catalogue, candidate)
-        if group_id:
-            requested_group_ids.add(group_id)
-        if aliases:
-            requested_alias_names.update(_normalize_name(value) for value in aliases.values() if value)
-
-    requested_alias_names.discard('')
-
-    for item in astrodex['items']:
-        existing_name_normalized = _normalize_name(item.get('name', ''))
-        if existing_name_normalized and existing_name_normalized in requested_normalized_names:
-            return True
-
-        existing_group_id, existing_aliases = _get_item_alias_metadata(item)
-
-        if existing_group_id and existing_group_id in requested_group_ids:
-            return True
-
-        if requested_alias_names:
-            existing_alias_names = {_normalize_name(value) for value in existing_aliases.values() if value}
-            if existing_alias_names and (requested_alias_names & existing_alias_names):
-                return True
-            if existing_name_normalized in requested_alias_names:
-                return True
-
-        if catalogue and existing_aliases:
-            alias_name = _get_alias_for_catalogue(existing_aliases, catalogue)
-            if alias_name and _normalize_name(alias_name) in requested_normalized_names:
-                return True
-
-    return False
-
-
-def is_item_in_astrodex(user_id: str, item_name: str, catalogue: str = '') -> bool:
-    """Compatibility wrapper to support optional catalogue context."""
-    return is_item_in_astrodex_with_catalogue(user_id, item_name, catalogue)
-
-
-def find_item_in_astrodex(user_id: str, item_name: str, catalogue: str = '') -> dict | None:
-    """Return the matching astrodex item (or None) — same matching rules as is_item_in_astrodex."""
-    astrodex = load_user_astrodex(user_id)
-
-    requested_candidates = _extract_name_candidates(item_name)
-    requested_normalized_names = {_normalize_name(c) for c in requested_candidates if _normalize_name(c)}
 
     requested_group_ids: set = set()
     requested_alias_names: set = set()
@@ -1302,10 +1263,10 @@ def find_item_in_astrodex(user_id: str, item_name: str, catalogue: str = '') -> 
         if group_id:
             requested_group_ids.add(group_id)
         if aliases:
-            requested_alias_names.update(_normalize_name(v) for v in aliases.values() if v)
+            requested_alias_names.update(_normalize_name(value) for value in aliases.values() if value)
     requested_alias_names.discard('')
 
-    for item in astrodex['items']:
+    for item in items:
         existing_name_normalized = _normalize_name(item.get('name', ''))
         if existing_name_normalized and existing_name_normalized in requested_normalized_names:
             return item
@@ -1315,8 +1276,13 @@ def find_item_in_astrodex(user_id: str, item_name: str, catalogue: str = '') -> 
         if existing_group_id and existing_group_id in requested_group_ids:
             return item
 
+        # Both sides resolve to a SkyTonight target, but to different ones: genuinely
+        # different objects, so skip the looser alias-name matching below.
+        if requested_group_ids and existing_group_id and existing_group_id not in requested_group_ids:
+            continue
+
         if requested_alias_names:
-            existing_alias_names = {_normalize_name(v) for v in existing_aliases.values() if v}
+            existing_alias_names = {_normalize_name(value) for value in existing_aliases.values() if value}
             if existing_alias_names and (requested_alias_names & existing_alias_names):
                 return item
             if existing_name_normalized in requested_alias_names:
@@ -1330,6 +1296,23 @@ def find_item_in_astrodex(user_id: str, item_name: str, catalogue: str = '') -> 
     return None
 
 
+def is_item_in_astrodex_with_catalogue(user_id: str, item_name: str, catalogue: str = '') -> bool:
+    """Check if an item exists by exact name or cross-catalogue aliases group."""
+    astrodex = load_user_astrodex(user_id)
+    return _find_matching_astrodex_item(astrodex['items'], item_name, catalogue) is not None
+
+
+def is_item_in_astrodex(user_id: str, item_name: str, catalogue: str = '') -> bool:
+    """Compatibility wrapper to support optional catalogue context."""
+    return is_item_in_astrodex_with_catalogue(user_id, item_name, catalogue)
+
+
+def find_item_in_astrodex(user_id: str, item_name: str, catalogue: str = '') -> dict | None:
+    """Return the matching astrodex item (or None) — same matching rules as is_item_in_astrodex."""
+    astrodex = load_user_astrodex(user_id)
+    return _find_matching_astrodex_item(astrodex['items'], item_name, catalogue)
+
+
 def is_item_in_preloaded_astrodex(astrodex_data: dict, item_name: str, catalogue: str = '') -> bool:
     """Same logic as is_item_in_astrodex_with_catalogue but uses pre-loaded data.
 
@@ -1337,46 +1320,7 @@ def is_item_in_preloaded_astrodex(astrodex_data: dict, item_name: str, catalogue
     astrodex (e.g. annotating 1 000 DSO rows in a single API call).
     """
     items = astrodex_data.get('items', []) if isinstance(astrodex_data, dict) else []
-
-    requested_candidates = _extract_name_candidates(item_name)
-    requested_normalized_names = {
-        _normalize_name(candidate) for candidate in requested_candidates if _normalize_name(candidate)
-    }
-
-    requested_group_ids: set = set()
-    requested_alias_names: set = set()
-    for candidate in requested_candidates or [item_name]:
-        group_id, aliases = _get_alias_metadata(catalogue, candidate)
-        if group_id:
-            requested_group_ids.add(group_id)
-        if aliases:
-            requested_alias_names.update(_normalize_name(value) for value in aliases.values() if value)
-
-    requested_alias_names.discard('')
-
-    for item in items:
-        existing_name_normalized = _normalize_name(item.get('name', ''))
-        if existing_name_normalized and existing_name_normalized in requested_normalized_names:
-            return True
-
-        existing_group_id, existing_aliases = _get_item_alias_metadata(item)
-
-        if existing_group_id and existing_group_id in requested_group_ids:
-            return True
-
-        if requested_alias_names:
-            existing_alias_names = {_normalize_name(value) for value in existing_aliases.values() if value}
-            if existing_alias_names and (requested_alias_names & existing_alias_names):
-                return True
-            if existing_name_normalized in requested_alias_names:
-                return True
-
-        if catalogue and existing_aliases:
-            alias_name = _get_alias_for_catalogue(existing_aliases, catalogue)
-            if alias_name and _normalize_name(alias_name) in requested_normalized_names:
-                return True
-
-    return False
+    return _find_matching_astrodex_item(items, item_name, catalogue) is not None
 
 
 def enrich_item_with_catalogue_aliases(item: Dict) -> Dict:
