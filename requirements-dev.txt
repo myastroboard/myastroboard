@@ -14,8 +14,8 @@ pytest-playwright===0.9.0
 # Development tools (optional)
 black===26.5.1
 flake8===7.3.0
-djlint===1.45.0
-pyright===1.1.411
+djlint===1.46.1
+pyright===1.1.413
 
 # Used by scripts/translate_i18n_values.py
 translators===6.0.4
