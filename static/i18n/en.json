@@ -2434,7 +2434,7 @@
     "n4_title": "Lunar Eclipse",
     "n5_body": "Maximum in {minutes} min",
     "n5_title": "Solar Eclipse",
-    "n6_body": "Night begins in {minutes} min - time to get ready",
+    "n6_body": "Night begins at {time} (in {minutes} min) - time to get ready",
     "n6_title": "Astronomical darkness",
     "n7_body": "Kp {kp} detected - {visibility}",
     "n7_title": "Aurora Alert",

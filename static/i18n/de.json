@@ -2434,7 +2434,7 @@
     "n4_title": "Mondfinsternis",
     "n5_body": "Maximum in {minutes} Min",
     "n5_title": "Sonnenfinsternis",
-    "n6_body": "Nacht beginnt in {minutes} Min - machen Sie sich bereit",
+    "n6_body": "Nacht beginnt um {time} (in {minutes} Min.) - Vorbereitung!",
     "n6_title": "Astronomische Nacht",
     "n7_body": "Kp {kp} erkannt - {visibility}",
     "n7_title": "Aurora-Alarm",

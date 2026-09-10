@@ -2434,7 +2434,7 @@
     "n4_title": "Eclissi lunare",
     "n5_body": "Massimo tra {minutes} min",
     "n5_title": "Eclissi solare",
-    "n6_body": "La notte inizia tra {minutes} min - preparati",
+    "n6_body": "La notte inizia alle {time} (tra {minutes} min) - preparati",
     "n6_title": "Oscurita astronomica",
     "n7_body": "Kp {kp} rilevato - {visibility}",
     "n7_title": "Allerta aurora",

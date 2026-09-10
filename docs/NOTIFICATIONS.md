@@ -15,6 +15,12 @@ Phase C - Web Push / background (tab may be closed)  ✅ Done
 ### Phase A - Browser Notification API
 - `notifications.js` - `NotificationManager` singleton + `startNotificationPoller()` (5 min interval)
 - Notifications fire when the tab is open; poller runs regardless of which tab is active
+- **Fallback only when push is active**: if this device has a live Web Push subscription, the
+  server-side scheduler (Phase C) already delivers every trigger, so the in-app poller and
+  `notificationManager.notify()` both bail out (`hasActivePushSubscription()`). Without that
+  gate each alert fired twice - once locally, once from the service-worker `push` handler.
+  Phase A stays active for devices with no working push (plain browser tab, push unsupported,
+  endpoint purged server-side).
 
 ### Phase B - Settings UI
 - My Settings → Notifications sub-tab (N1–N9 toggles, lead times, Kp threshold, test button)
@@ -129,6 +135,10 @@ await notificationManager.notify(
     { url: '#forecast-astro/aurora' }
 );
 ```
+
+`notify()` resolves to `false` without showing anything when this device has an active Web Push
+subscription - the server-side scheduler owns delivery in that case (see Phase A note above).
+`_check*` functions can still call it unconditionally; the gate lives in one place.
 
 ---
 

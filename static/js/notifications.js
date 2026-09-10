@@ -40,6 +40,7 @@ class NotificationManager {
     constructor() {
         this._prefs        = null; // lazy-loaded from localStorage
         this._lastNotified = {};   // triggerId → ms timestamp, in-memory dedup
+        this._pushActive   = null; // { value: bool, at: ms } - cached push-subscription state
     }
 
     // ── Support & permission ─────────────────────────────────────────────
@@ -144,6 +145,48 @@ class NotificationManager {
         return last != null && (Date.now() - last) < cooldownMs;
     }
 
+    // ── Web Push coordination ────────────────────────────────────────────
+
+    /**
+     * True when this device has an active Web Push subscription.
+     *
+     * With push active, the server-side scheduler (utils/push_scheduler.py)
+     * delivers every N1–N9 alert on its own. Firing a local Notification from
+     * the in-app poller as well double-notifies - once here, once from the
+     * service-worker `push` handler, each with its own wording. `notify()` and
+     * the poller therefore bail out when this is true; the in-app path stays as
+     * the fallback for devices with no working push subscription (plain Safari
+     * tab, push unsupported, endpoint purged server-side).
+     *
+     * The lookup reads the service-worker registration, so the result is cached
+     * briefly to keep a burst of _check* calls in one poll cycle cheap.
+     */
+    async hasActivePushSubscription() {
+        const CACHE_MS = 30 * 1000;
+        if (this._pushActive && (Date.now() - this._pushActive.at) < CACHE_MS) {
+            return this._pushActive.value;
+        }
+        let active = false;
+        try {
+            if ('serviceWorker' in navigator && 'PushManager' in window) {
+                // navigator.serviceWorker.ready never resolves if registration failed;
+                // cap the wait so a broken SW can't stall the notification poller.
+                const timeout = new Promise((resolve) => setTimeout(() => resolve(null), 3000));
+                const reg = await Promise.race([navigator.serviceWorker.ready, timeout]);
+                active = reg ? (await reg.pushManager.getSubscription()) != null : false;
+            }
+        } catch (_) {
+            active = false;
+        }
+        this._pushActive = { value: active, at: Date.now() };
+        return active;
+    }
+
+    /** Drop the cached push-subscription state after a subscribe/unsubscribe. */
+    invalidatePushSubscriptionCache() {
+        this._pushActive = null;
+    }
+
     // ── Fire notification ─────────────────────────────────────────────────
 
     /**
@@ -160,6 +203,10 @@ class NotificationManager {
     async notify(triggerId, title, body, { url = '/', tag = null } = {}) {
         if (!this.canNotify())              return false;
         if (!this.isTriggerEnabled(triggerId)) return false;
+
+        // Background Web Push active: the server-side scheduler already delivers
+        // this trigger, so a local Notification here would be a duplicate.
+        if (await this.hasActivePushSubscription()) return false;
 
         // Request permission lazily on first call if not yet asked
         if (this.permission !== 'granted') {
@@ -236,6 +283,7 @@ async function _subscribeToPush() {
                     headers:     { 'Content-Type': 'application/json' },
                     body:        JSON.stringify({ subscription: existing.toJSON() }),
                 });
+                notificationManager.invalidatePushSubscriptionCache();
                 return;
             }
 
@@ -261,6 +309,7 @@ async function _subscribeToPush() {
             headers:     { 'Content-Type': 'application/json' },
             body:        JSON.stringify({ subscription: sub.toJSON() }),
         });
+        notificationManager.invalidatePushSubscriptionCache();
     } catch (e) {
         console.warn('Push subscription failed:', e);
     }
@@ -279,6 +328,7 @@ async function _unsubscribeFromPush() {
             body:        JSON.stringify({ endpoint: sub.endpoint }),
         });
         await sub.unsubscribe();
+        notificationManager.invalidatePushSubscriptionCache();
     } catch (e) {
         console.warn('Push unsubscription failed:', e);
     }
@@ -297,6 +347,12 @@ let   _notifFastMode   = false;             // true when inside night or ≤30 m
 
 async function _runNotificationChecks() {
     if (!notificationManager.canNotify()) return;
+
+    // Background Web Push active: the server-side scheduler owns delivery. Skip
+    // the in-app poll entirely - it only exists as the no-push fallback, and
+    // running it here would double every alert (once from this poller, once
+    // from the service-worker push handler).
+    if (await notificationManager.hasActivePushSubscription()) return;
 
     const enabled = notificationManager.getPrefs().triggers;
 
