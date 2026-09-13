@@ -9,19 +9,21 @@
 /* Login page body */
 .login-page {
     min-height: 100vh;
+    min-height: 100dvh;
     display: flex;
     align-items: center;
     justify-content: center;
     background: var(--bg-gradient);
     padding: 1rem;
     position: relative;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
 }
 
 .login-page::before,
 .login-page::after {
     content: "";
-    position: absolute;
+    position: fixed;
     pointer-events: none;
 }
 
