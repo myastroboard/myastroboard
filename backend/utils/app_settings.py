@@ -24,6 +24,7 @@ _DEFAULTS: dict = {
     "vapid_contact_email": "",
     "trust_proxy_headers": False,
     "session_cookie_secure": False,
+    "search_engine_indexing": False,
 }
 
 _cache: dict | None = None

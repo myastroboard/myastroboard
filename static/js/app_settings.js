@@ -6,9 +6,11 @@ async function loadAppSettings() {
         const emailEl = document.getElementById('app-setting-vapid-email');
         const trustEl = document.getElementById('app-setting-trust-proxy');
         const secureEl = document.getElementById('app-setting-session-secure');
+        const indexingEl = document.getElementById('app-setting-search-indexing');
         if (emailEl) emailEl.value = settings.vapid_contact_email || '';
         if (trustEl) trustEl.checked = !!settings.trust_proxy_headers;
         if (secureEl) secureEl.checked = !!settings.session_cookie_secure;
+        if (indexingEl) indexingEl.checked = !!settings.search_engine_indexing;
     } catch (err) {
         console.error('Failed to load app settings:', err);
     }
@@ -17,6 +19,11 @@ async function loadAppSettings() {
 async function saveAppSettingsNotifications() {
     const email = (document.getElementById('app-setting-vapid-email')?.value || '').trim();
     await _saveAppSettings({ vapid_contact_email: email }, 'notifications');
+}
+
+async function saveAppSettingsPrivacy() {
+    const indexing = document.getElementById('app-setting-search-indexing')?.checked ?? false;
+    await _saveAppSettings({ search_engine_indexing: indexing }, 'privacy');
 }
 
 async function saveAppSettingsProxy() {
@@ -35,10 +42,12 @@ async function _saveAppSettings(partial, section) {
             body: JSON.stringify(payload),
         });
 
-        const feedbackId = section === 'notifications'
-            ? 'app-settings-notifications-feedback'
-            : 'app-settings-proxy-feedback';
-        _showFeedback(feedbackId);
+        const feedbackIds = {
+            notifications: 'app-settings-notifications-feedback',
+            privacy: 'app-settings-privacy-feedback',
+            proxy: 'app-settings-proxy-feedback',
+        };
+        _showFeedback(feedbackIds[section]);
 
         if (section === 'notifications' && typeof _refreshVapidWarning === 'function') {
             _refreshVapidWarning();
@@ -92,6 +101,9 @@ async function restartApp() {
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('save-app-settings-notifications')
         ?.addEventListener('click', saveAppSettingsNotifications);
+
+    document.getElementById('save-app-settings-privacy')
+        ?.addEventListener('click', saveAppSettingsPrivacy);
 
     document.getElementById('save-app-settings-proxy')
         ?.addEventListener('click', saveAppSettingsProxy);

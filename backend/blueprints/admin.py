@@ -34,6 +34,7 @@ def get_app_settings_api():
             'vapid_contact_email': settings.get('vapid_contact_email', ''),
             'trust_proxy_headers': settings.get('trust_proxy_headers', False),
             'session_cookie_secure': settings.get('session_cookie_secure', False),
+            'search_engine_indexing': settings.get('search_engine_indexing', False),
         }
     )
 
@@ -53,6 +54,9 @@ def update_app_settings_api():
         'session_cookie_secure': bool(
             data.get('session_cookie_secure', old_settings.get('session_cookie_secure', False))
         ),
+        'search_engine_indexing': bool(
+            data.get('search_engine_indexing', old_settings.get('search_engine_indexing', False))
+        ),
     }
 
     _app_settings.save_app_settings(new_settings)
@@ -67,7 +71,8 @@ def update_app_settings_api():
         f"App settings updated by {session.get('username', '?')}: "
         f"vapid_email={'set' if new_settings['vapid_contact_email'] else 'empty'}, "
         f"trust_proxy={new_settings['trust_proxy_headers']}, "
-        f"session_secure={new_settings['session_cookie_secure']}"
+        f"session_secure={new_settings['session_cookie_secure']}, "
+        f"search_engine_indexing={new_settings['search_engine_indexing']}"
     )
     return jsonify({'status': 'success', 'requires_restart': requires_restart})
 

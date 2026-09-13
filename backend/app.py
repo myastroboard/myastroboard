@@ -13,6 +13,7 @@ from flask import (
     redirect,
     url_for,
     g,
+    Response,
 )
 from flask_compress import Compress
 from flask_cors import CORS
@@ -232,7 +233,9 @@ def login_page():
     # Get version for cache busting
     version = get_repo_version()
 
-    return render_template('login.html', version=version)
+    seo_indexable = bool(_app_settings.get_app_settings().get('search_engine_indexing', False))
+
+    return render_template('login.html', version=version, seo_indexable=seo_indexable)
 
 
 @app.route('/manifest.webmanifest')
@@ -268,11 +271,34 @@ def offline_page():
     return send_from_directory(STATIC_DIR, 'offline.html')
 
 
+_ROBOTS_TXT_INDEXABLE = (
+    "User-agent: *\n"
+    "Allow: /login\n"
+    "Allow: /static/\n"
+    "Disallow: /api/\n"
+    "Disallow: /data/\n"
+    "Disallow: /offline.html\n"
+    "Disallow: /sw.js\n"
+    "Disallow: /manifest.webmanifest\n"
+    "Disallow: /manifest.fr.webmanifest\n"
+    "Disallow: /manifest.es.webmanifest\n"
+    "Disallow: /manifest.de.webmanifest\n"
+    "Disallow: /manifest.it.webmanifest\n"
+    "Disallow: /manifest.pt.webmanifest\n"
+)
+_ROBOTS_TXT_PRIVATE = "User-agent: *\nDisallow: /\n"
+
+
 @app.route('/robots.txt')
 def robots_txt():
-    """Serve robots.txt from root path"""
-    response = send_from_directory(STATIC_DIR, 'robots.txt', mimetype='text/plain')
-    response.headers['Cache-Control'] = 'public, max-age=86400'
+    """Serve robots.txt - only allows crawling /login when an admin has
+    opted in via Parameters -> Advanced -> Privacy (search_engine_indexing).
+    Private (Disallow: /) by default so self-hosted instances are not
+    crawlable out of the box."""
+    indexable = bool(_app_settings.get_app_settings().get('search_engine_indexing', False))
+    content = _ROBOTS_TXT_INDEXABLE if indexable else _ROBOTS_TXT_PRIVATE
+    response = Response(content, mimetype='text/plain')
+    response.headers['Cache-Control'] = 'public, max-age=3600, must-revalidate'
     return response
 
 

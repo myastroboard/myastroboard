@@ -133,6 +133,7 @@ Stored separately in `data/app_settings.json` (see [AUTHENTICATION.md](AUTHENTIC
 | `vapid_contact_email` | `""` | Contact email for Web Push VAPID tokens (required for iOS push) |
 | `trust_proxy_headers` | `false` | Enable `X-Forwarded-For` / `X-Forwarded-Proto` forwarding (reverse proxy deployments) |
 | `session_cookie_secure` | `false` | Require HTTPS for session cookie |
+| `search_engine_indexing` | `false` | Allow search engines to crawl and index the login page. Off by default for privacy: `/robots.txt` returns `Disallow: /` and the login page is served with `noindex, nofollow`. When enabled, `/robots.txt` allows `/login` and the login page adds Open Graph/JSON-LD metadata pointing to myastroboard.org |
 
 ---
 

@@ -11,7 +11,40 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="MyAstroBoard">
     <meta name="app-version" content="{{ version }}">
-    <meta name="description" content="Login to MyAstroBoard - Astronomy observation planning dashboard.">
+    <meta name="description" content="Login to MyAstroBoard, the open-source self-hosted astronomy dashboard for observation and astrophotography planning. Learn more at myastroboard.org.">
+    {% if seo_indexable %}
+    <meta name="robots" content="index, follow">
+    <meta name="generator" content="MyAstroBoard {{ version }}">
+    <link rel="canonical" href="{{ request.url_root }}login">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="MyAstroBoard">
+    <meta property="og:title" content="MyAstroBoard - Astronomy Observation Planning Dashboard">
+    <meta property="og:description" content="Self-hosted astronomy dashboard combining weather and astronomical conditions, automated SkyTonight execution, and planning tools for observation and astrophotography sessions.">
+    <meta property="og:url" content="{{ request.url_root }}login">
+    <meta property="og:image" content="{{ request.url_root }}static/img/pwa-screenshot-wide.png">
+    <meta property="og:image:width" content="1556">
+    <meta property="og:image:height" content="760">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="MyAstroBoard - Astronomy Observation Planning Dashboard">
+    <meta name="twitter:description" content="Self-hosted astronomy dashboard combining weather and astronomical conditions, automated SkyTonight execution, and planning tools for observation and astrophotography sessions.">
+    <meta name="twitter:image" content="{{ request.url_root }}static/img/pwa-screenshot-wide.png">
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "MyAstroBoard",
+        "applicationCategory": "UtilitiesApplication",
+        "operatingSystem": "Docker, Linux, Windows, macOS",
+        "url": "https://myastroboard.org",
+        "description": "Self-hosted astronomy dashboard combining weather and astronomical conditions, automated SkyTonight execution, and planning tools for observation and astrophotography sessions.",
+        "isAccessibleForFree": true,
+        "license": "https://www.gnu.org/licenses/agpl-3.0.html",
+        "sameAs": ["https://github.com/myastroboard/myastroboard"]
+    }
+    </script>
+    {% else %}
+    <meta name="robots" content="noindex, nofollow">
+    {% endif %}
     <script src="/static/js/theme.js?v={{ version }}"></script>
     <title data-i18n="auth.login_page_title">Login - MyAstroBoard</title>
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
@@ -63,6 +96,13 @@
             <button type="button" class="btn btn-outline-light btn-sm pwa-install-btn" data-pwa-install hidden>
                 <span data-i18n="pwa.install_app"></span>
             </button>
+        </div>
+
+        <div class="mt-3 text-center">
+            <a class="footer-link footer-link-subtle login-powered-by" href="https://myastroboard.org" target="_blank" rel="noopener noreferrer">
+                <i class="bi bi-globe2 icon-inline" aria-hidden="true"></i>
+                <span data-i18n="auth.powered_by_myastroboard">Powered by MyAstroBoard</span>
+            </a>
         </div>
     </div>
 

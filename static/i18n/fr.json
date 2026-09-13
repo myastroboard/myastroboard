@@ -861,6 +861,9 @@
     "app_settings_notifications_desc": "Configurez l'adresse e-mail de contact utilisée pour la livraison des notifications push VAPID. Cet e-mail est transmis aux services push et n'est pas affiché aux utilisateurs.",
     "app_settings_vapid_email_label": "E-mail de contact VAPID",
     "app_settings_vapid_email_placeholder": "admin@votre-domaine.com",
+    "app_settings_privacy_title": "Confidentialité et moteurs de recherche",
+    "app_settings_privacy_desc": "Par défaut, cette instance est privée : il est demandé aux moteurs de recherche de ne pas l'explorer ni l'indexer, y compris la page de connexion. N'activez ceci que si vous voulez que votre page de connexion soit trouvable sur Google et les autres moteurs de recherche.",
+    "app_settings_indexing_label": "Autoriser les moteurs de recherche à indexer la page de connexion",
     "app_settings_proxy_title": "Proxy inverse",
     "app_settings_proxy_desc": "Activez ces paramètres uniquement si MyAstroBoard fonctionne derrière un proxy inverse (NGINX, Traefik, etc.) avec HTTPS. Un redémarrage du conteneur est nécessaire pour appliquer les modifications.",
     "app_settings_trust_proxy_label": "Faire confiance aux en-têtes proxy (X-Forwarded-*)",
@@ -2167,7 +2170,8 @@
     "login_failed_generic": "Échec de la connexion",
     "network_error_retry": "Erreur réseau. Vérifiez votre connexion et réessayez.",
     "internal_server_error": "Erreur interne du serveur",
-    "authentication_required": "Authentification requise"
+    "authentication_required": "Authentification requise",
+    "powered_by_myastroboard": "Propulsé par MyAstroBoard"
   },
   "cache": {
     "updating_data": "Mise à jour des données astronomiques, veuillez patienter...",

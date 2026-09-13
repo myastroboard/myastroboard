@@ -139,6 +139,7 @@ Stored in `data/app_settings.json` via `backend/utils/app_settings.py`:
 | `vapid_contact_email` | `""` | Contact email embedded in Web Push VAPID tokens (required for iOS push; see [NOTIFICATIONS.md](NOTIFICATIONS.md)) |
 | `trust_proxy_headers` | `false` | Set `true` when behind a reverse proxy sending `X-Forwarded-For` / `X-Forwarded-Proto` headers (see [6.REVERSE_PROXY.md](6.REVERSE_PROXY.md)) |
 | `session_cookie_secure` | `false` | Set `true` to restrict the session cookie to HTTPS connections only (recommended when using HTTPS) |
+| `search_engine_indexing` | `false` | Set `true` to let search engines crawl and index the login page. Instances are private by default (`/robots.txt` disallows everything, login page is `noindex, nofollow`) |
 
 These are managed in **Parameters → Advanced → Application** in the admin UI, or via `GET/POST /api/admin/app-settings`.
 

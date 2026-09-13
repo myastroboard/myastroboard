@@ -12,6 +12,7 @@
     <meta name="apple-mobile-web-app-title" content="MyAstroBoard">
     <meta name="app-version" content="{{ version }}">
     <meta name="description" content="MyAstroBoard - Astronomy observation planning dashboard with weather forecasts, SkyTonight targets, lunar and solar events, ISS passes, and equipment management.">
+    <meta name="robots" content="noindex, nofollow">
     <script src="/static/js/theme.js?v={{ version }}"></script>
     <title data-i18n="common.title_html">MyAstroBoard - Astronomy Observation Planning Dashboard</title>
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
@@ -1897,6 +1898,32 @@
                             <span data-i18n="settings.app_settings_save_btn">Save</span>
                         </button>
                         <span id="app-settings-notifications-feedback" class="ms-3 text-success" style="display:none;" data-i18n="settings.app_settings_saved">Settings saved.</span>
+                    </div>
+                </div>
+
+                <!-- Privacy / Search Engine Indexing -->
+                <div class="shadow p-2 mb-3 rounded bg-sub-container">
+                    <h2>
+                        <i class="bi bi-incognito text-secondary icon-inline" aria-hidden="true"></i>
+                        <span data-i18n="settings.app_settings_privacy_title">Privacy &amp; search engines</span>
+                    </h2>
+                    <div class="alert alert-info" role="alert">
+                        <span data-i18n="settings.app_settings_privacy_desc">By default this instance is private: search engines are asked not to crawl or index it, including the login page. Enable this only if you want your login page discoverable on Google and other search engines.</span>
+                    </div>
+                    <div class="row g-3 mt-1 mb-2">
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="app-setting-search-indexing" role="switch">
+                                <label class="form-check-label" for="app-setting-search-indexing" data-i18n="settings.app_settings_indexing_label">Allow search engines to index the login page</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="button-group mt-2">
+                        <button type="button" id="save-app-settings-privacy" class="btn btn-primary">
+                            <i class="bi bi-save icon-inline" aria-hidden="true"></i>
+                            <span data-i18n="settings.app_settings_save_btn">Save</span>
+                        </button>
+                        <span id="app-settings-privacy-feedback" class="ms-3 text-success" style="display:none;" data-i18n="settings.app_settings_saved">Settings saved.</span>
                     </div>
                 </div>
 
