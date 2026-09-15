@@ -4159,10 +4159,24 @@ class TestPushTestWithSubscriptions:
 
 class TestCacheSchedulerManagement:
 
-    def test_get_or_create_cache_scheduler_returns_something(self):
-        result = _app_mod.get_or_create_cache_scheduler()
-        # May be None if creation fails in test env, but the function should not raise
-        assert result is None or result is not None
+    def test_get_or_create_cache_scheduler_returns_something(self, monkeypatch):
+        # Unmocked, start() runs update_all_caches() synchronously on its first pass
+        # (the thread's immediate run, joined by stop() before it can return) - writing
+        # live data into the shared astro_weather cache for every test in the rest of
+        # the session. Stub start() like TestCacheSchedulerStartTrue does below.
+        from cache.cache_scheduler import CacheScheduler as CS
+
+        monkeypatch.setattr(CS, 'start', lambda self: True)
+        saved = _app_mod.app.config.pop('cache_scheduler', None)
+        try:
+            result = _app_mod.get_or_create_cache_scheduler()
+            # May be None if creation fails in test env, but the function should not raise
+            assert result is None or result is not None
+        finally:
+            if saved is not None:
+                _app_mod.app.config['cache_scheduler'] = saved
+            elif 'cache_scheduler' in _app_mod.app.config:
+                _app_mod.app.config.pop('cache_scheduler')
 
 
 # ---------------------------------------------------------------------------
