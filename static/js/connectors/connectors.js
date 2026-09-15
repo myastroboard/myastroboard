@@ -41,6 +41,56 @@ async function loadConnectorsStore() {
     if (masCard) _bindMyAstroShineEvents();
 }
 
+// A connector does not necessarily feed the Observatory: AllSky does, MyAstroShine feeds
+// the AstroDex, and a connector can feed nothing at all (self-contained). `target_modules`
+// carries the app areas each connector surfaces in; these are navbar tabs, so their labels
+// are reused from the navbar namespace rather than duplicated per connector.
+const _TARGET_MODULE_I18N_KEYS = {
+    observatory:      'navbar.observatory',
+    astrodex:         'navbar.astrodex',
+    astrophotography: 'navbar.astrophotography',
+    weather:          'navbar.weather',
+    skytonight:       'navbar.skytonight',
+    equipment:        'navbar.equipment',
+    plan_my_night:    'navbar.plan_my_night',
+    observation_log:  'navbar.observation_log',
+    calendar:         'navbar.calendar',
+};
+
+/**
+ * "Appears in: [Observatory]" row for a connector card.
+ * An empty/missing target_modules list renders a single "Standalone" badge — that is a
+ * deliberate state (a self-contained connector), not missing data.
+ */
+function _targetModulesRow(targetModules) {
+    const row = document.createElement('p');
+    row.className = 'small mb-2 d-flex flex-wrap align-items-center gap-1';
+
+    const label = document.createElement('span');
+    label.className = 'text-muted';
+    label.textContent = i18n.t('connectors.target_modules_title');
+    row.appendChild(label);
+
+    const slugs = Array.isArray(targetModules) ? targetModules : [];
+    if (slugs.length === 0) {
+        const badge = document.createElement('span');
+        badge.className = 'badge bg-light text-dark border';
+        badge.title = i18n.t('connectors.target_modules_standalone_hint');
+        badge.textContent = i18n.t('connectors.target_modules_standalone');
+        row.appendChild(badge);
+        return row;
+    }
+
+    slugs.forEach(slug => {
+        const badge = document.createElement('span');
+        badge.className = 'badge bg-primary-subtle text-primary-emphasis border border-primary-subtle';
+        const key = _TARGET_MODULE_I18N_KEYS[slug];
+        badge.textContent = key ? i18n.t(key) : slug;
+        row.appendChild(badge);
+    });
+    return row;
+}
+
 function _connectorCard(c) {
     const col = document.createElement('div');
     col.className = 'col-12 col-md-6 col-xl-4';
@@ -89,6 +139,8 @@ function _connectorCard(c) {
     desc.className = 'text-muted small mb-2';
     desc.textContent = i18n.t(`connectors.${c.name}_desc`);
     body.appendChild(desc);
+
+    body.appendChild(_targetModulesRow(c.target_modules));
 
     if (c.min_version) {
         const ver = document.createElement('p');
@@ -383,6 +435,8 @@ async function _myAstroShineCard() {
     desc.className = 'text-muted small mb-2';
     desc.textContent = i18n.t('connectors.myastroshine_desc');
     body.appendChild(desc);
+
+    body.appendChild(_targetModulesRow(cfg.target_modules));
 
     const configBtn = document.createElement('button');
     configBtn.className = 'btn btn-sm btn-outline-primary w-100';

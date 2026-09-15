@@ -119,6 +119,9 @@ def get_integration_config_api():
                 'has_token': bool(cfg.get('token')),
                 'has_signing_secret': bool(cfg.get('signing_secret')),
                 'effective_enabled': integration.integration_enabled(cfg),
+                # MyAstroShine is not a BaseConnector, but its card renders the same
+                # "appears in" badges — it surfaces inside the AstroDex tab, not Observatory.
+                'target_modules': ['astrodex'],
             }
         )
     except Exception as exc:

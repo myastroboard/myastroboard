@@ -18,6 +18,12 @@ class BaseConnector(ABC):
     # Ordered list of module definitions: {slug, label, description, default_enabled}
     MODULES: list[dict] = []
 
+    # App areas (navbar tabs) where this connector's data surfaces, e.g. ["observatory"].
+    # Purely declarative — it drives the badges on the connector card so users know where to
+    # look once the connector is enabled. An empty list means the connector is self-contained
+    # and adds nothing to an existing tab.
+    target_modules: list[str] = []
+
     def __init__(self, config: dict):
         """
         Args:

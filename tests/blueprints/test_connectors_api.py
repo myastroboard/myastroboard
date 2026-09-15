@@ -114,6 +114,39 @@ class TestListConnectors:
         assert 'homepage' in data[0]
         assert 'github.com/AllskyTeam' in data[0]['homepage']
 
+    def test_response_includes_target_modules(self, client_user):
+        with patch('blueprints.connectors.load_config', return_value=_config()):
+            resp = client_user.get('/api/connectors')
+        data = resp.get_json()
+        assert data[0]['target_modules'] == ['observatory']
+
+    def test_target_modules_defaults_to_empty_list(self, client_user):
+        """A connector that declares no target module is valid - it feeds no app tab."""
+        from connectors.base_connector import BaseConnector
+
+        class _StandaloneConnector(BaseConnector):
+            name = 'standalone'
+            label = 'Standalone'
+            description = ''
+            MODULES = []
+
+            def health_check(self):
+                return {}
+
+            def get_module_urls(self, date_str=None):
+                return {}
+
+            def fetch_sensor_data(self):
+                return {}
+
+        registry = {'standalone': _StandaloneConnector}
+        with patch.dict('connectors.REGISTRY', registry, clear=True), patch(
+            'blueprints.connectors.load_config', return_value=_config()
+        ):
+            resp = client_user.get('/api/connectors')
+        data = resp.get_json()
+        assert data[0]['target_modules'] == []
+
 
 # ---------------------------------------------------------------------------
 # GET /api/connectors/allsky/status

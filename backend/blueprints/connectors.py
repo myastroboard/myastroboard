@@ -41,6 +41,7 @@ def list_connectors_api():
                 "min_version": cls.min_version,
                 "homepage": cls.homepage,
                 "modules": cls.MODULES,
+                "target_modules": list(cls.target_modules),
                 "installed": bool(cfg.get("url")),
                 "enabled": bool(cfg.get("enabled")) and bool(cfg.get("url")),
                 "config": cfg,

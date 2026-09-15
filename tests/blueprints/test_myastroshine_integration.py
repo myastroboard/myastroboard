@@ -165,6 +165,12 @@ def test_config_get_masks_secrets(client_admin, env):
     assert _SECRET not in json.dumps(data)
 
 
+def test_config_get_reports_astrodex_target_module(client_admin, env):
+    """The card badge must say AstroDex - MyAstroShine does not feed the Observatory."""
+    data = client_admin.get("/api/astrodex/integration/config").get_json()
+    assert data["target_modules"] == ["astrodex"]
+
+
 def test_config_post_requires_admin(client, env):
     assert client.post("/api/astrodex/integration/config", json={"url": "x"}).status_code == 401
 

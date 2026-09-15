@@ -33,6 +33,7 @@ class AllSkyConnector(BaseConnector):
     description = "All-sky camera — live image, keogram, startrails, sensor data, timelapse"
     min_version = "v2024.12"
     homepage = "https://github.com/AllskyTeam/allsky"
+    target_modules = ["observatory"]
 
     MODULES = [
         {
