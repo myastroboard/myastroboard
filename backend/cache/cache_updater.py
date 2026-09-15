@@ -30,6 +30,7 @@ from weather.weather_openmeteo import get_hourly_forecast
 from weather.weather_astro import get_astro_weather_analysis
 from utils import slugify_location_name, _sanitize_for_json
 from cache import cache_store
+
 # The two AllSky cache TTLs are the connector's own, declared on its class.
 # connectors/ imports nothing from cache/, so this edge closes no cycle.
 from connectors.allsky_connector import AllSkyConnector
