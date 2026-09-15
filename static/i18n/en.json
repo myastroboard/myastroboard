@@ -2482,6 +2482,8 @@
     "not_installed": "Not installed",
     "requires": "Requires",
     "configure": "Configure",
+    "saved": "Connector settings saved",
+    "save_error": "Could not save the connector settings",
     "label_field": "Display label",
     "url_field": "AllSky base URL",
     "advanced_settings": "Advanced settings",
@@ -2527,9 +2529,7 @@
     "myastroshine_callback_override_field": "Callback URL override",
     "myastroshine_callback_override_hint": "Only needed if the MyAstroShine container cannot reach this dashboard's public URL on its own.",
     "myastroshine_copy_rating_field": "Copy the source photo's rating to the enhanced copy",
-    "myastroshine_test_offline_hint": "Unreachable - this is expected if you are not on the same network as MyAstroShine.",
-    "myastroshine_saved": "MyAstroShine settings saved",
-    "myastroshine_save_error": "Could not save MyAstroShine settings"
+    "myastroshine_test_offline_hint": "Unreachable - this is expected if you are not on the same network as MyAstroShine."
   },
   "sky_widget": {
     "loading": "Loading...",

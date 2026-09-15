@@ -97,17 +97,16 @@ v1.6 turns `BaseConnector` into a documented, versioned public SDK with a separa
 `myastroboard/mab-plugins` repository and a curated (reviewed-PR) distribution model. Until then,
 new connectors land directly in `backend/connectors/` by PR.
 
-> **Not every "connector" is a `BaseConnector`.** The MyAstroShine integration
-> ([MYASTROSHINE.md](MYASTROSHINE.md)) is bidirectional, owns UI in the Astrodex tab, and has its
-> own routes - it is a core feature, not an extension point. It is stored under
-> `config["connectors"]["myastroshine"]` only so it rides along in the backup ZIP, and is
-> deliberately absent from the `REGISTRY`, `GET /api/connectors`, and the Observatory tab. Its
-> *identity* still lives with the others, as a plain metadata class in
-> `backend/connectors/myastroshine_connector.py` (same attribute block, no `BaseConnector`
-> base), so there is one place to read a connector's label, homepage, minimum version and
-> target modules from. A new read-only bridge to an external tool is a `BaseConnector`; anything
-> that writes back into MyAstroBoard data or owns its own screen is a core change - open a
-> discussion first.
+> **A connector is a connector.** MyAstroShine
+> ([MYASTROSHINE.md](MYASTROSHINE.md)) is bidirectional and owns UI in the Astrodex tab, but it
+> is still an optional bridge to an external service that the user switches on or off - so it is
+> a `BaseConnector` in the `REGISTRY`, listed by `GET /api/connectors`, and rendered by the same
+> card as AllSky. What differs is carried declaratively: `SECRET_FIELDS` for its credentials,
+> `CONFIG_FIELDS` for its extra settings, `target_modules = ["astrodex"]` for where its data
+> lands, and an empty `MODULES` because the round-trip has no independently-toggleable parts.
+>
+> Anything that writes back into MyAstroBoard data or owns its own screen still needs a core
+> change alongside the connector - open a discussion first.
 
 ---
 

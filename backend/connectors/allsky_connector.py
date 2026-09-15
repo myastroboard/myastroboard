@@ -35,6 +35,12 @@ class AllSkyConnector(BaseConnector):
     homepage = "https://github.com/AllskyTeam/allsky"
     target_modules = ["observatory"]
 
+    CONFIG_FIELDS = {
+        "image_path": "current/tmp",
+        "image_filename": "image.jpg",
+        "export_json_path": "allskydata.json",
+    }
+
     MODULES = [
         {
             "slug": "live_image",

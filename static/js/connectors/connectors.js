@@ -29,16 +29,122 @@ async function loadConnectorsStore() {
 
     DOMUtils.clear(container);
     connectors.forEach(c => container.appendChild(_connectorCard(c)));
-
-    // MyAstroShine is not a BaseConnector (bidirectional, lives in the AstroDex
-    // tab) so it is not in /api/connectors - render its card here, next to the
-    // BaseConnector cards, backed by its own /api/astrodex/integration/* routes.
-    const masCard = await _myAstroShineCard();
-    if (masCard) container.appendChild(masCard);
-
     container.appendChild(_suggestCard());
     connectors.forEach(c => _bindConnectorEvents(c));
-    if (masCard) _bindMyAstroShineEvents();
+}
+
+// Per-connector presentation. Everything else about a connector comes from
+// GET /api/connectors; this covers only what the card cannot infer: which icon to use,
+// which i18n key labels its URL field, and the config inputs beyond the common
+// label / URL / enabled / modules. Each field's `key` is the config key the backend
+// accepts in POST /api/connectors/<name>/config (its CONFIG_FIELDS), so adding a field
+// is one entry here and one entry there.
+const _CONNECTOR_UI = {
+    allsky: {
+        icon: 'bi bi-camera-video me-2 text-info',
+        urlLabelKey: 'url_field',
+        advanced: [
+            { key: 'image_path',       labelKey: 'allsky_image_path',       placeholder: 'current/tmp' },
+            { key: 'image_filename',   labelKey: 'allsky_image_filename',   placeholder: 'image.jpg' },
+            { key: 'export_json_path', labelKey: 'allsky_export_json_path', placeholder: 'allskydata.json' },
+        ],
+    },
+    myastroshine: {
+        icon: 'bi bi-stars me-2 text-info',
+        urlLabelKey: 'myastroshine_url_field',
+        urlPlaceholder: 'http://192.168.x.x:8002',
+        unreachableHintKey: 'myastroshine_test_offline_hint',
+        fields: [
+            { key: 'token',          labelKey: 'myastroshine_token_field',  type: 'password', secret: true },
+            { key: 'signing_secret', labelKey: 'myastroshine_secret_field', type: 'password', secret: true },
+        ],
+        fieldsHelpKey: 'myastroshine_token_help',
+        checkboxes: [
+            { key: 'copy_rating', labelKey: 'myastroshine_copy_rating_field' },
+        ],
+        advanced: [
+            { key: 'callback_url_override', labelKey: 'myastroshine_callback_override_field',
+              type: 'url', helpKey: 'myastroshine_callback_override_hint' },
+        ],
+    },
+};
+
+function _connectorUI(name) {
+    return _CONNECTOR_UI[name] || {};
+}
+
+/**
+ * Every declared input for a connector, main and advanced, so the save path can collect
+ * them without knowing which connector it is looking at.
+ */
+function _connectorFieldSpecs(name) {
+    const ui = _connectorUI(name);
+    return [...(ui.fields || []), ...(ui.checkboxes || []), ...(ui.advanced || [])];
+}
+
+function _fieldInputId(name, key) {
+    return `connector-field-${name}-${key}`;
+}
+
+/** Render one labelled text/password/url input from a field spec. */
+function _connectorFieldInput(c, spec) {
+    const cfg = c.config || {};
+    const frag = document.createDocumentFragment();
+    const id = _fieldInputId(c.name, spec.key);
+
+    const lbl = document.createElement('label');
+    lbl.className = 'form-label fw-semibold small';
+    lbl.setAttribute('for', id);
+    lbl.textContent = i18n.t(`connectors.${spec.labelKey}`);
+    frag.appendChild(lbl);
+
+    const input = document.createElement('input');
+    input.type = spec.type || 'text';
+    input.className = 'form-control form-control-sm mb-2 connector-field-input';
+    input.id = id;
+    input.dataset.connector = c.name;
+    input.dataset.field = spec.key;
+    if (spec.secret) {
+        // The value is never sent to the browser: show the masked form as a placeholder,
+        // and leave the input blank so submitting it unchanged keeps the stored secret.
+        input.value = '';
+        input.placeholder = cfg[spec.key] || i18n.t('connectors.myastroshine_secret_unchanged');
+        input.dataset.secret = 'true';
+    } else {
+        input.value = cfg[spec.key] ?? spec.placeholder ?? '';
+        input.placeholder = spec.placeholder || '';
+    }
+    frag.appendChild(input);
+
+    if (spec.helpKey) {
+        const help = document.createElement('div');
+        help.className = 'form-text small mb-2';
+        help.textContent = i18n.t(`connectors.${spec.helpKey}`);
+        frag.appendChild(help);
+    }
+    return frag;
+}
+
+/** Render one labelled checkbox from a field spec. */
+function _connectorFieldCheckbox(c, spec) {
+    const cfg = c.config || {};
+    const wrap = document.createElement('div');
+    wrap.className = 'form-check form-switch mb-3';
+    const chk = document.createElement('input');
+    chk.type = 'checkbox';
+    chk.className = 'form-check-input connector-field-input';
+    chk.id = _fieldInputId(c.name, spec.key);
+    chk.dataset.connector = c.name;
+    chk.dataset.field = spec.key;
+    chk.dataset.checkbox = 'true';
+    chk.checked = Boolean(cfg[spec.key]);
+    const lbl = document.createElement('label');
+    lbl.className = 'form-check-label small';
+    lbl.setAttribute('for', chk.id);
+    lbl.textContent = i18n.t(`connectors.${spec.labelKey}`);
+    wrap.appendChild(chk);
+    wrap.appendChild(lbl);
+    return wrap;
 }
 
 // A connector does not necessarily feed the Observatory: AllSky does, MyAstroShine feeds
@@ -116,7 +222,10 @@ function _connectorCard(c) {
     header.className = 'card-header d-flex justify-content-between align-items-center';
 
     const headerLeft = document.createElement('span');
-    headerLeft.appendChild(DOMUtils.createIcon('bi bi-camera-video me-2 text-info'));
+    headerLeft.appendChild(DOMUtils.createIcon(_connectorUI(c.name).icon || 'bi bi-plug me-2 text-info'));
+    // The connector's own name, not config.label: that one is the user's display name for
+    // the Observatory panel, and it ships with a default ("My AllSky Camera") that would
+    // otherwise replace the connector's name on every install.
     headerLeft.appendChild(document.createTextNode(i18n.t(`connectors.${c.name}_label`)));
     if (c.homepage) {
         const link = document.createElement('a');
@@ -207,7 +316,7 @@ function _connectorConfigForm(c) {
     const urlLbl = document.createElement('label');
     urlLbl.className = 'form-label fw-semibold small';
     urlLbl.setAttribute('for', `connector-url-${c.name}`);
-    urlLbl.textContent = i18n.t('connectors.url_field');
+    urlLbl.textContent = i18n.t(`connectors.${_connectorUI(c.name).urlLabelKey || 'url_field'}`);
     urlDiv.appendChild(urlLbl);
 
     const inputGroup = document.createElement('div');
@@ -218,7 +327,7 @@ function _connectorConfigForm(c) {
     urlInput.id = `connector-url-${c.name}`;
     urlInput.dataset.connector = c.name;
     urlInput.value = cfg.url || '';
-    urlInput.placeholder = 'http://192.168.x.x';
+    urlInput.placeholder = _connectorUI(c.name).urlPlaceholder || 'http://192.168.x.x';
     const testBtn = document.createElement('button');
     testBtn.className = 'btn btn-outline-secondary connector-test-btn';
     testBtn.dataset.connector = c.name;
@@ -246,11 +355,22 @@ function _connectorConfigForm(c) {
     urlDiv.appendChild(testResult);
     frag.appendChild(urlDiv);
 
+    // Connector-specific fields (credentials, options)
+    const ui = _connectorUI(c.name);
+    (ui.fields || []).forEach(spec => frag.appendChild(_connectorFieldInput(c, spec)));
+    if (ui.fieldsHelpKey) {
+        const help = document.createElement('div');
+        help.className = 'form-text small mb-3';
+        help.textContent = i18n.t(`connectors.${ui.fieldsHelpKey}`);
+        frag.appendChild(help);
+    }
+    (ui.checkboxes || []).forEach(spec => frag.appendChild(_connectorFieldCheckbox(c, spec)));
+
     // Advanced (collapse)
     const advDiv = document.createElement('div');
     advDiv.className = 'mb-3 collapse';
     advDiv.id = `connector-advanced-${c.name}`;
-    if (c.name === 'allsky') advDiv.appendChild(_allskyAdvancedFields(cfg));
+    (ui.advanced || []).forEach(spec => advDiv.appendChild(_connectorFieldInput(c, spec)));
     frag.appendChild(advDiv);
 
     const advLink = document.createElement('a');
@@ -261,13 +381,15 @@ function _connectorConfigForm(c) {
     advLink.appendChild(document.createTextNode(i18n.t('connectors.advanced_settings')));
     frag.appendChild(advLink);
 
-    // Modules
+    // Modules — omitted entirely by a connector that exposes none.
     const modsDiv = document.createElement('div');
     modsDiv.className = 'mb-3';
-    const modsTitle = document.createElement('p');
-    modsTitle.className = 'fw-semibold small mb-2';
-    modsTitle.textContent = i18n.t('connectors.modules_title');
-    modsDiv.appendChild(modsTitle);
+    if ((c.modules || []).length) {
+        const modsTitle = document.createElement('p');
+        modsTitle.className = 'fw-semibold small mb-2';
+        modsTitle.textContent = i18n.t('connectors.modules_title');
+        modsDiv.appendChild(modsTitle);
+    }
 
     (c.modules || []).forEach(m => {
         const enabled = modules[m.slug]?.enabled ?? m.default_enabled;
@@ -348,328 +470,6 @@ function _connectorConfigForm(c) {
     return frag;
 }
 
-function _allskyAdvancedFields(cfg) {
-    const frag = document.createDocumentFragment();
-    const fields = [
-        { id: 'connector-allsky-image-path',      key: 'allsky_image_path',       value: cfg.image_path       || 'current/tmp',     placeholder: 'current/tmp' },
-        { id: 'connector-allsky-image-filename',   key: 'allsky_image_filename',    value: cfg.image_filename   || 'image.jpg',       placeholder: 'image.jpg' },
-        { id: 'connector-allsky-export-json-path', key: 'allsky_export_json_path',  value: cfg.export_json_path || 'allskydata.json', placeholder: 'allskydata.json' },
-    ];
-    fields.forEach(({ id, key, value, placeholder }) => {
-        const lbl = document.createElement('label');
-        lbl.className = 'form-label fw-semibold small';
-        lbl.setAttribute('for', id);
-        lbl.textContent = i18n.t(`connectors.${key}`);
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.className = 'form-control form-control-sm mb-2';
-        input.id = id;
-        input.value = value;
-        input.placeholder = placeholder;
-        frag.appendChild(lbl);
-        frag.appendChild(input);
-    });
-    return frag;
-}
-
-// ── MyAstroShine integration card ─────────────────────────────────────────────
-
-function _masField(labelText, inputId, type, value, placeholder) {
-    const wrap = document.createElement('div');
-    wrap.className = 'mb-3';
-    const lbl = document.createElement('label');
-    lbl.className = 'form-label fw-semibold small';
-    lbl.setAttribute('for', inputId);
-    lbl.textContent = labelText;
-    const input = document.createElement('input');
-    input.type = type;
-    input.className = 'form-control form-control-sm';
-    input.id = inputId;
-    if (value) input.value = value;
-    if (placeholder) input.placeholder = placeholder;
-    if (type === 'password') input.autocomplete = 'new-password';
-    wrap.appendChild(lbl);
-    wrap.appendChild(input);
-    return wrap;
-}
-
-async function _myAstroShineCard() {
-    const cfg = await fetchJSONOnce('/api/astrodex/integration/config').catch(() => null);
-    if (!cfg) return null;
-
-    const col = document.createElement('div');
-    col.className = 'col-12 col-md-6 col-xl-4';
-
-    const card = document.createElement('div');
-    card.className = 'card h-100';
-    card.id = 'connector-card-myastroshine';
-
-    // Header
-    const header = document.createElement('div');
-    header.className = 'card-header d-flex justify-content-between align-items-center';
-    const headerLeft = document.createElement('span');
-    headerLeft.appendChild(DOMUtils.createIcon('bi bi-stars me-2 text-info'));
-    headerLeft.appendChild(document.createTextNode(cfg.label || i18n.t('connectors.myastroshine_label')));
-    if (cfg.homepage) {
-        const repoLink = document.createElement('a');
-        repoLink.href = cfg.homepage;
-        repoLink.target = '_blank';
-        repoLink.rel = 'noopener';
-        repoLink.className = 'ms-2 text-muted';
-        repoLink.title = cfg.homepage;
-        repoLink.appendChild(DOMUtils.createIcon('bi bi-github'));
-        headerLeft.appendChild(repoLink);
-    }
-
-    const badge = document.createElement('span');
-    if (cfg.effective_enabled) {
-        badge.className = 'badge bg-success';
-        badge.textContent = i18n.t('connectors.enabled');
-    } else if (cfg.url) {
-        badge.className = 'badge bg-secondary';
-        badge.textContent = i18n.t('connectors.installed');
-    } else {
-        badge.className = 'badge bg-light text-dark border';
-        badge.textContent = i18n.t('connectors.not_installed');
-    }
-    header.appendChild(headerLeft);
-    header.appendChild(badge);
-
-    // Body
-    const body = document.createElement('div');
-    body.className = 'card-body';
-    const desc = document.createElement('p');
-    desc.className = 'text-muted small mb-2';
-    desc.textContent = i18n.t('connectors.myastroshine_desc');
-    body.appendChild(desc);
-
-    body.appendChild(_targetModulesRow(cfg.target_modules));
-
-    const masVerRow = _minVersionRow(cfg.min_version);
-    if (masVerRow) body.appendChild(masVerRow);
-
-    const configBtn = document.createElement('button');
-    configBtn.className = 'btn btn-sm btn-outline-primary w-100';
-    configBtn.id = 'connector-configure-myastroshine';
-    configBtn.appendChild(DOMUtils.createIcon('bi bi-gear me-1'));
-    configBtn.appendChild(document.createTextNode(i18n.t('connectors.configure')));
-    body.appendChild(configBtn);
-
-    // Config panel
-    const panel = document.createElement('div');
-    panel.className = 'connector-config-panel card-body border-top pt-3';
-    panel.id = 'connector-panel-myastroshine';
-    panel.style.display = 'none';
-    panel.appendChild(_myAstroShineConfigForm(cfg));
-
-    card.appendChild(header);
-    card.appendChild(body);
-    card.appendChild(panel);
-    col.appendChild(card);
-    return col;
-}
-
-function _myAstroShineConfigForm(cfg) {
-    const frag = document.createDocumentFragment();
-    const unchanged = i18n.t('connectors.myastroshine_secret_unchanged');
-
-    frag.appendChild(_masField(
-        i18n.t('connectors.label_field'), 'mas-label', 'text', cfg.label || '', i18n.t('connectors.myastroshine_label')));
-
-    // URL + server-side reachability test button
-    const urlDiv = document.createElement('div');
-    urlDiv.className = 'mb-3';
-    const urlLbl = document.createElement('label');
-    urlLbl.className = 'form-label fw-semibold small';
-    urlLbl.setAttribute('for', 'mas-url');
-    urlLbl.textContent = i18n.t('connectors.myastroshine_url_field');
-    urlDiv.appendChild(urlLbl);
-    const inputGroup = document.createElement('div');
-    inputGroup.className = 'input-group input-group-sm';
-    const urlInput = document.createElement('input');
-    urlInput.type = 'url';
-    urlInput.className = 'form-control';
-    urlInput.id = 'mas-url';
-    urlInput.value = cfg.url || '';
-    urlInput.placeholder = 'http://192.168.1.42:8002';
-    const testBtn = document.createElement('button');
-    testBtn.className = 'btn btn-outline-secondary';
-    testBtn.type = 'button';
-    testBtn.id = 'mas-test-btn';
-    testBtn.appendChild(DOMUtils.createIcon('bi bi-wifi'));
-    inputGroup.appendChild(urlInput);
-    inputGroup.appendChild(testBtn);
-    urlDiv.appendChild(inputGroup);
-    const testResult = document.createElement('div');
-    testResult.className = 'form-text connector-test-result';
-    testResult.id = 'mas-test-result';
-    urlDiv.appendChild(testResult);
-    frag.appendChild(urlDiv);
-
-    // Token + signing secret (secrets: blank means "keep current")
-    frag.appendChild(_masField(
-        i18n.t('connectors.myastroshine_token_field'), 'mas-token', 'password', '',
-        cfg.has_token ? unchanged : 'mas_...'));
-    frag.appendChild(_masField(
-        i18n.t('connectors.myastroshine_secret_field'), 'mas-signing-secret', 'password', '',
-        cfg.has_signing_secret ? unchanged : ''));
-    const tokenHelp = document.createElement('p');
-    tokenHelp.className = 'form-text text-muted small mt-0 mb-3';
-    tokenHelp.textContent = i18n.t('connectors.myastroshine_token_help');
-    frag.appendChild(tokenHelp);
-
-    // Advanced (collapse) - callback URL override
-    const advDiv = document.createElement('div');
-    advDiv.className = 'mb-3 collapse';
-    advDiv.id = 'connector-advanced-myastroshine';
-    advDiv.appendChild(_masField(
-        i18n.t('connectors.myastroshine_callback_override_field'), 'mas-callback-override', 'url',
-        cfg.callback_url_override || '', 'http://192.168.1.42:5000'));
-    const cbHint = document.createElement('p');
-    cbHint.className = 'form-text text-muted small mt-0';
-    cbHint.textContent = i18n.t('connectors.myastroshine_callback_override_hint');
-    advDiv.appendChild(cbHint);
-    frag.appendChild(advDiv);
-
-    const advLink = document.createElement('a');
-    advLink.className = 'small text-muted d-block mb-3';
-    advLink.dataset.bsToggle = 'collapse';
-    advLink.href = '#connector-advanced-myastroshine';
-    advLink.appendChild(DOMUtils.createIcon('bi bi-chevron-down me-1'));
-    advLink.appendChild(document.createTextNode(i18n.t('connectors.advanced_settings')));
-    frag.appendChild(advLink);
-
-    // copy_rating switch
-    const copyRatingWrap = document.createElement('div');
-    copyRatingWrap.className = 'form-check form-switch mb-3';
-    const copyRatingChk = document.createElement('input');
-    copyRatingChk.type = 'checkbox';
-    copyRatingChk.className = 'form-check-input';
-    copyRatingChk.id = 'mas-copy-rating';
-    copyRatingChk.checked = !!cfg.copy_rating;
-    const copyRatingLbl = document.createElement('label');
-    copyRatingLbl.className = 'form-check-label small';
-    copyRatingLbl.setAttribute('for', 'mas-copy-rating');
-    copyRatingLbl.textContent = i18n.t('connectors.myastroshine_copy_rating_field');
-    copyRatingWrap.appendChild(copyRatingChk);
-    copyRatingWrap.appendChild(copyRatingLbl);
-    frag.appendChild(copyRatingWrap);
-
-    // Actions: enable switch + save
-    const actions = document.createElement('div');
-    actions.className = 'd-flex gap-2';
-    const switchRow = document.createElement('div');
-    switchRow.className = 'form-check form-switch me-auto align-self-center';
-    const enabledChk = document.createElement('input');
-    enabledChk.type = 'checkbox';
-    enabledChk.className = 'form-check-input';
-    enabledChk.id = 'mas-enabled';
-    enabledChk.checked = !!cfg.enabled;
-    const enabledLbl = document.createElement('label');
-    enabledLbl.className = 'form-check-label small';
-    enabledLbl.setAttribute('for', 'mas-enabled');
-    enabledLbl.textContent = i18n.t('connectors.enabled_label');
-    switchRow.appendChild(enabledChk);
-    switchRow.appendChild(enabledLbl);
-
-    const saveBtn = document.createElement('button');
-    saveBtn.className = 'btn btn-sm btn-primary';
-    saveBtn.type = 'button';
-    saveBtn.id = 'mas-save-btn';
-    saveBtn.appendChild(DOMUtils.createIcon('bi bi-floppy me-1'));
-    saveBtn.appendChild(document.createTextNode(i18n.t('common.save')));
-
-    actions.appendChild(switchRow);
-    actions.appendChild(saveBtn);
-    frag.appendChild(actions);
-
-    return frag;
-}
-
-function _bindMyAstroShineEvents() {
-    const configureBtn = document.getElementById('connector-configure-myastroshine');
-    const panel = document.getElementById('connector-panel-myastroshine');
-    if (configureBtn && panel) {
-        configureBtn.addEventListener('click', () => {
-            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-        });
-    }
-    const testBtn = document.getElementById('mas-test-btn');
-    if (testBtn) testBtn.addEventListener('click', _testMyAstroShine);
-    const saveBtn = document.getElementById('mas-save-btn');
-    if (saveBtn) saveBtn.addEventListener('click', _saveMyAstroShine);
-}
-
-async function _testMyAstroShine() {
-    const urlInput = document.getElementById('mas-url');
-    const resultDiv = document.getElementById('mas-test-result');
-    if (!urlInput || !resultDiv) return;
-
-    const url = urlInput.value.trim().replace(/\/+$/, '');
-    if (!url) {
-        _setResultMessage(resultDiv, i18n.t('connectors.url_required'), 'text-danger');
-        return;
-    }
-    _setResultSpinner(resultDiv, i18n.t('connectors.testing'));
-
-    const result = await fetchJSONOnce('/api/astrodex/integration/test', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
-    }).catch(() => null);
-
-    if (result && result.reachable) {
-        _setResultMessage(resultDiv, i18n.t('connectors.reachable'), 'text-success', 'bi bi-check-circle');
-    } else {
-        _setResultMessage(
-            resultDiv, i18n.t('connectors.myastroshine_test_offline_hint'), 'text-warning', 'bi bi-exclamation-triangle');
-    }
-}
-
-async function _saveMyAstroShine() {
-    const saveBtn = document.getElementById('mas-save-btn');
-    const payload = {
-        label: (document.getElementById('mas-label')?.value || '').trim(),
-        url: (document.getElementById('mas-url')?.value || '').trim().replace(/\/+$/, ''),
-        callback_url_override: (document.getElementById('mas-callback-override')?.value || '').trim().replace(/\/+$/, ''),
-        copy_rating: !!document.getElementById('mas-copy-rating')?.checked,
-        enabled: !!document.getElementById('mas-enabled')?.checked,
-    };
-    // Only send secrets when the user actually typed something (blank = keep current).
-    const token = (document.getElementById('mas-token')?.value || '').trim();
-    const secret = (document.getElementById('mas-signing-secret')?.value || '').trim();
-    if (token) payload.token = token;
-    if (secret) payload.signing_secret = secret;
-
-    if (saveBtn) {
-        saveBtn.disabled = true;
-        DOMUtils.clear(saveBtn);
-        const spinner = document.createElement('div');
-        spinner.className = 'spinner-border spinner-border-sm';
-        saveBtn.appendChild(spinner);
-    }
-
-    const result = await fetchJSONOnce('/api/astrodex/integration/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-    }).catch(() => null);
-
-    if (saveBtn) {
-        saveBtn.disabled = false;
-        DOMUtils.clear(saveBtn);
-        saveBtn.appendChild(DOMUtils.createIcon('bi bi-floppy me-1'));
-        saveBtn.appendChild(document.createTextNode(i18n.t('common.save')));
-    }
-
-    if (result?.status === 'success') {
-        showMessage('success', i18n.t('connectors.myastroshine_saved'));
-        loadConnectorsStore();
-    } else {
-        showMessage('error', i18n.t('connectors.myastroshine_save_error'));
-    }
-}
-
 function _suggestCard() {
     const url = 'https://github.com/myastroboard/myastroboard/discussions/new?category=ideas&labels=enhancement,connector';
 
@@ -741,6 +541,18 @@ function _setResultMessage(resultDiv, text, cssClass, iconClass) {
     resultDiv.appendChild(span);
 }
 
+/**
+ * "Unreachable", or the connector's own explanation of what that means for it.
+ */
+function _setUnreachable(name, resultDiv) {
+    const hintKey = _connectorUI(name).unreachableHintKey;
+    if (hintKey) {
+        _setResultMessage(resultDiv, i18n.t(`connectors.${hintKey}`), 'text-warning', 'bi bi-exclamation-triangle');
+    } else {
+        _setResultMessage(resultDiv, i18n.t('connectors.unreachable'), 'text-danger', 'bi bi-x-circle');
+    }
+}
+
 function _setResultSpinner(resultDiv, text) {
     DOMUtils.clear(resultDiv);
     const span = document.createElement('span');
@@ -776,7 +588,7 @@ async function _testConnector(name) {
     } else if (result.reachable) {
         _setResultMessage(resultDiv, i18n.t('connectors.reachable'), 'text-success', 'bi bi-check-circle');
     } else {
-        _setResultMessage(resultDiv, i18n.t('connectors.unreachable'), 'text-danger', 'bi bi-x-circle');
+        _setUnreachable(name, resultDiv);
     }
 }
 
@@ -791,7 +603,7 @@ async function _runHealthCheck(name) {
     }
 
     if (!health.reachable) {
-        if (resultDiv) _setResultMessage(resultDiv, i18n.t('connectors.unreachable'), 'text-danger', 'bi bi-x-circle');
+        if (resultDiv) _setUnreachable(name, resultDiv);
     } else {
         if (resultDiv) _setResultMessage(resultDiv, i18n.t('connectors.reachable'), 'text-success', 'bi bi-check-circle');
     }
@@ -815,48 +627,36 @@ async function _saveConnector(name) {
 
     if (!urlInput) return;
 
-    const config = await fetchJSONOnce('/api/config').catch(() => null);
-    if (!config) return;
-
-    const connectorsCfg = config.connectors || {};
-    const existing      = connectorsCfg[name] || {};
-
     const modules = {};
     document.querySelectorAll(`.connector-module-toggle[data-connector="${name}"]`).forEach(chk => {
         modules[chk.dataset.module] = { enabled: chk.checked };
     });
 
-    const updated = {
-        ...existing,
+    const payload = {
         url:     urlInput.value.trim().replace(/\/+$/, ''),
-        label:   labelInput ? labelInput.value.trim() : existing.label,
-        enabled: enabledChk ? enabledChk.checked : existing.enabled,
-        modules: { ...(existing.modules || {}), ...modules },
+        enabled: enabledChk ? enabledChk.checked : undefined,
+        modules,
     };
+    if (labelInput) payload.label = labelInput.value.trim();
 
-    if (name === 'allsky') {
-        const imgPath  = document.getElementById('connector-allsky-image-path');
-        const imgFile  = document.getElementById('connector-allsky-image-filename');
-        const jsonPath = document.getElementById('connector-allsky-export-json-path');
-        if (imgPath)  updated.image_path       = imgPath.value.trim()  || 'current/tmp';
-        if (imgFile)  updated.image_filename   = imgFile.value.trim()  || 'image.jpg';
-        if (jsonPath) updated.export_json_path = jsonPath.value.trim() || 'allskydata.json';
-    }
-
-    config.connectors = { ...connectorsCfg, [name]: updated };
+    // Only fields the connector declared, collected by their config key. A blank secret is
+    // sent as an empty string and the backend reads that as "keep the stored value".
+    document.querySelectorAll(`.connector-field-input[data-connector="${name}"]`).forEach(input => {
+        payload[input.dataset.field] = input.dataset.checkbox ? input.checked : input.value.trim();
+    });
 
     if (saveBtn) {
         saveBtn.disabled = true;
         DOMUtils.clear(saveBtn);
-        const spinner = document.createElement('div');
+        const spinner = document.createElement('span');
         spinner.className = 'spinner-border spinner-border-sm';
         saveBtn.appendChild(spinner);
     }
 
-    const result = await fetchJSONOnce('/api/config', {
+    const result = await fetchJSONOnce(`/api/connectors/${name}/config`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config),
+        body: JSON.stringify(payload),
     }).catch(() => null);
 
     if (saveBtn) {
@@ -866,11 +666,33 @@ async function _saveConnector(name) {
         saveBtn.appendChild(document.createTextNode(i18n.t('common.save')));
     }
 
-    if (result?.status === 'success') {
-        updateObservatoryNavVisibility();
-        _runHealthCheck(name);
+    if (!result) {
+        showMessage('error', i18n.t('connectors.save_error'));
+        return;
+    }
+
+    showMessage('success', i18n.t('connectors.saved'));
+    _updateStatusBadge(name, result);
+    if (typeof updateObservatoryNavVisibility === 'function') updateObservatoryNavVisibility();
+    _runHealthCheck(name);
+}
+
+/** Repaint a card's Enabled / Installed / Not installed badge after a save. */
+function _updateStatusBadge(name, state) {
+    const badge = document.querySelector(`#connector-card-${name} .card-header .badge`);
+    if (!badge) return;
+    if (state.enabled) {
+        badge.className = 'badge bg-success';
+        badge.textContent = i18n.t('connectors.enabled');
+    } else if (state.installed) {
+        badge.className = 'badge bg-secondary';
+        badge.textContent = i18n.t('connectors.installed');
+    } else {
+        badge.className = 'badge bg-light text-dark border';
+        badge.textContent = i18n.t('connectors.not_installed');
     }
 }
+
 
 // ── Observatory dispatcher ────────────────────────────────────────────────────
 

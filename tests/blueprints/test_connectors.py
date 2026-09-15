@@ -54,8 +54,15 @@ class TestListConnectors:
         assert resp.status_code == 200
         data = resp.get_json()
         assert isinstance(data, list)
-        assert len(data) == 1
-        assert data[0]['name'] == 'allsky'
+        assert [c['name'] for c in data] == ['allsky', 'myastroshine']
+
+    def test_every_registered_connector_is_listed(self, client_user):
+        """The listing is the registry - a connector is not special-cased out of it."""
+        from connectors import REGISTRY
+
+        with patch('blueprints.connectors.load_config', return_value=_config()):
+            data = client_user.get('/api/connectors').get_json()
+        assert {c['name'] for c in data} == set(REGISTRY)
 
     def test_connector_not_installed_when_no_url(self, client_user):
         with patch('blueprints.connectors.load_config', return_value=_config()):

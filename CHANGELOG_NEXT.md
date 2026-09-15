@@ -26,3 +26,27 @@
   existed was documented in three files, the stated AllSky minimum version (v2023.1) and
   upstream repo link were both out of date, and the Observatory layout tables did not match
   what the tab actually renders. All corrected, plus a file-layout table in CONNECTORS.md.
+
+#### Connectors — MyAstroShine is now a first-class connector
+
+- MyAstroShine was half a connector: stored under `config.connectors`, switched on and off from
+  the same screen, but absent from the registry and rendered by a card of its own. It is now a
+  `BaseConnector` like AllSky — in `REGISTRY`, listed by `GET /api/connectors`, and drawn by the
+  same card, which also means it gains the health-check button.
+- What is specific to it is declared rather than special-cased: `SECRET_FIELDS` (token, signing
+  secret), `CONFIG_FIELDS`, `URL_FIELDS`, an empty `MODULES`, and an `is_configured()` that
+  requires the credentials, not just a URL — so the card now says *Not installed* until all
+  three are set, instead of *Installed* with a URL alone.
+- Connector settings are saved through a new `POST /api/connectors/<name>/config` (admin),
+  merged server-side. It replaces the previous client-side round-trip through `GET/POST
+  /api/config`, which sent the board's whole configuration to the browser and back on every
+  connector save, and it only accepts the keys a connector declares.
+- `GET /api/connectors` masks every connector's `SECRET_FIELDS` (`****` + last 4, plus a
+  `has_<field>` flag). The endpoint is readable by any signed-in user, so MyAstroShine's token
+  and signing secret never reach the browser.
+- **Route changes**: `GET|POST /api/astrodex/integration/config` and
+  `POST /api/astrodex/integration/test` are removed, replaced by the shared connector config
+  route and `GET|POST /api/connectors/myastroshine/health`. Both were browser-only; the routes
+  the MyAstroShine container calls (`/handoff`, `/source`, `/source/image`, `/enhanced`) and the
+  `/status` route used by the AstroDex tab are untouched, so no MyAstroShine instance needs
+  updating.

@@ -39,12 +39,13 @@ round-trip described above. The connector card shows this requirement as a *Requ
 line; it is informational, not enforced, since MyAstroShine only reports its own version once a
 handoff completes (stored per picture as `enhanced_source_version`).
 
-That version, and the rest of the connector's identity (label, description, homepage,
-`target_modules`), are declared on `MyAstroShineConnector`
-(`backend/connectors/myastroshine_connector.py`) and served from there by
-`GET /api/astrodex/integration/config` - same attribute block as a `BaseConnector`, so there is
-one place to edit. The class is intentionally not a `BaseConnector` and not in `REGISTRY`; the
-docstring explains why, and [CONNECTORS.md](CONNECTORS.md) covers the split.
+That version, and everything else the card shows, is declared on `MyAstroShineConnector`
+(`backend/connectors/myastroshine_connector.py`) - a `BaseConnector` in the `REGISTRY`, listed by
+`GET /api/connectors` and saved through `POST /api/connectors/myastroshine/config` like any other
+connector. See [CONNECTORS.md](CONNECTORS.md#myastroshine-connector).
+
+The token and signing secret are declared as `SECRET_FIELDS`, so the listing masks them and a
+blank submission keeps the stored value: they are never sent to the browser.
 
 ### 1. Create a token in MyAstroShine
 
@@ -169,10 +170,15 @@ These are **not** editable - they are absent from `update_picture()`'s allowed f
 
 ---
 
-## Not a connector
+## A connector, with two particularities
 
-Despite living under `config.connectors.myastroshine`, this is **not** a `BaseConnector`: it is
-bidirectional, owns UI in the Astrodex tab, and has its own routes
-(`backend/blueprints/connectors_myastroshine.py`, `backend/observation/myastroshine_integration.py`).
-It is stored there only so it rides along in the backup ZIP and stays next to the other connector
-config. It is deliberately absent from `GET /api/connectors` and the Observatory tab.
+This is a `BaseConnector` like AllSky — in the `REGISTRY`, listed by `GET /api/connectors`,
+stored under `config.connectors.myastroshine`, and rendered by the same card. Two things set it
+apart, both declared rather than special-cased:
+
+- **It is bidirectional.** The browser hands a photo to MyAstroShine and the MyAstroShine
+  container posts the enhanced result back, so it authenticates — hence `SECRET_FIELDS` and the
+  cookieless callback routes in `backend/blueprints/connectors_myastroshine.py` (logic in
+  `backend/observation/myastroshine_integration.py`).
+- **It surfaces in the AstroDex, not the Observatory** — `target_modules = ["astrodex"]`, and it
+  has no Observatory panel.

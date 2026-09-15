@@ -2482,6 +2482,8 @@
     "not_installed": "Nicht installiert",
     "requires": "Benötigt",
     "configure": "Konfigurieren",
+    "saved": "Konnektor-Einstellungen gespeichert",
+    "save_error": "Konnektor-Einstellungen konnten nicht gespeichert werden",
     "label_field": "Anzeigename",
     "url_field": "AllSky-Basis-URL",
     "advanced_settings": "Erweiterte Einstellungen",
@@ -2527,9 +2529,7 @@
     "myastroshine_callback_override_field": "Callback-URL (überschreiben)",
     "myastroshine_callback_override_hint": "Nur nötig, wenn der MyAstroShine-Container die öffentliche URL dieses Dashboards nicht selbst erreichen kann.",
     "myastroshine_copy_rating_field": "Bewertung des Originalfotos auf die bearbeitete Kopie übernehmen",
-    "myastroshine_test_offline_hint": "Nicht erreichbar - normal, wenn du nicht im selben Netzwerk wie MyAstroShine bist.",
-    "myastroshine_saved": "MyAstroShine-Einstellungen gespeichert",
-    "myastroshine_save_error": "MyAstroShine-Einstellungen konnten nicht gespeichert werden"
+    "myastroshine_test_offline_hint": "Nicht erreichbar - normal, wenn du nicht im selben Netzwerk wie MyAstroShine bist."
   },
   "sky_widget": {
     "loading": "Laden...",

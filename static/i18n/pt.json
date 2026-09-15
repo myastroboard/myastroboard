@@ -2482,6 +2482,8 @@
     "not_installed": "Não instalado",
     "requires": "Requer",
     "configure": "Configurar",
+    "saved": "Configurações do conector salvas",
+    "save_error": "Não foi possível salvar as configurações do conector",
     "label_field": "Rótulo",
     "url_field": "URL base AllSky",
     "advanced_settings": "Configurações avançadas",
@@ -2527,9 +2529,7 @@
     "myastroshine_callback_override_field": "URL de retorno (override)",
     "myastroshine_callback_override_hint": "Só é necessário se o contentor do MyAstroShine não conseguir alcançar sozinho o URL público deste painel.",
     "myastroshine_copy_rating_field": "Copiar a classificação da foto original para a cópia melhorada",
-    "myastroshine_test_offline_hint": "Inacessível - normal se não estiver na mesma rede que o MyAstroShine.",
-    "myastroshine_saved": "Definições do MyAstroShine guardadas",
-    "myastroshine_save_error": "Não foi possível guardar as definições do MyAstroShine"
+    "myastroshine_test_offline_hint": "Inacessível - normal se não estiver na mesma rede que o MyAstroShine."
   },
   "sky_widget": {
     "loading": "Carregando...",

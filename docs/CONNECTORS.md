@@ -14,14 +14,43 @@ The registry is discovered at runtime and served via `GET /api/connectors`.
 
 One module per connector on each side, named after it:
 
-| | Registry | AllSky | MyAstroShine |
+| | Shared | AllSky | MyAstroShine |
 |---|---|---|---|
 | Connector | `connectors/base_connector.py` | `connectors/allsky_connector.py` | `connectors/myastroshine_connector.py` |
 | Blueprint | `blueprints/connectors.py` | `blueprints/connectors_allsky.py` | `blueprints/connectors_myastroshine.py` |
 | Tests | `tests/blueprints/test_connectors.py` | `tests/blueprints/test_connectors_allsky.py` | `tests/blueprints/test_connectors_myastroshine.py` |
 
-`blueprints/connectors.py` serves only the registry listing; a connector's own routes go in its
-own blueprint module, registered in `backend/app.py`.
+`blueprints/connectors.py` serves the two routes every connector shares — the listing and the
+config save; a connector's own routes go in its own blueprint module, registered in
+`backend/app.py`.
+
+### Declaring a connector
+
+Beyond `name` / `label` / `description` / `min_version` / `homepage`, a connector says what it
+needs through class attributes, so the shared listing, save route and card can handle it without
+special-casing:
+
+| Attribute | Purpose |
+|---|---|
+| `MODULES` | Independently-toggleable features. Empty is valid — the card then shows no Modules section |
+| `target_modules` | App tabs the data lands in (see above). Empty = standalone |
+| `CONFIG_FIELDS` | Settable config keys beyond `label` / `url` / `enabled` / `modules`, as `{key: default}`. `POST /api/connectors/<name>/config` accepts these and nothing else |
+| `SECRET_FIELDS` | Keys holding credentials. Masked by `GET /api/connectors`; a blank or still-masked submission means "keep the stored value" |
+| `URL_FIELDS` | Keys among `CONFIG_FIELDS` holding a URL, so the save strips their trailing slash |
+
+`is_configured()` says what "installed" means (a base URL by default; MyAstroShine also requires
+its credentials). Only `health_check()` must be implemented — `get_module_urls()` and
+`fetch_sensor_data()` default to empty, for a connector that serves no browser-fetched resource
+and no live readings.
+
+### Secrets
+
+Credentials never reach the browser. `GET /api/connectors` is readable by any signed-in user, so
+it replaces every `SECRET_FIELDS` value with `****` + the last 4 characters and adds a
+`has_<field>` boolean; the card shows the masked form as an input placeholder and submits the
+field blank unless the admin types a new value. The merge happens server-side in
+`POST /api/connectors/<name>/config` (admin only), so a value the browser was never given cannot
+be echoed back and overwrite the real one.
 
 ### Target modules
 
@@ -53,7 +82,8 @@ Each connector card shows its current status badge (Enabled / Installed / Not in
 
 Under the description each card shows an **Appears in** row: one badge per app tab the connector feeds, or a *Standalone* badge when it feeds none.
 
-Configuration is stored in `config.json → connectors.<name>`.
+Configuration is stored in `config.json → connectors.<name>`, written by
+`POST /api/connectors/<name>/config`.
 
 ### Base URL — use a static IP address
 
@@ -151,34 +181,44 @@ All resource URLs are served through the MyAstroBoard backend at `/api/connector
 
 ## MyAstroShine integration
 
-MyAstroShine *is* a connector, and its identity is declared like every other one, in
-`backend/connectors/myastroshine_connector.py`:
+MyAstroShine is a `BaseConnector` like AllSky — in the `REGISTRY`, listed by
+`GET /api/connectors`, saved through `POST /api/connectors/myastroshine/config`, and rendered by
+the same card. What is specific to it is declared, not special-cased:
 
 ```python
-class MyAstroShineConnector:
-    name = "myastroshine"
-    label = "MyAstroShine"
+class MyAstroShineConnector(BaseConnector):
     min_version = "v0.4.0"
-    homepage = "https://github.com/myastroboard/myastroshine"
     target_modules = ["astrodex"]
+    MODULES = []                                     # the round-trip is the whole connector
+    SECRET_FIELDS = ("token", "signing_secret")
+    URL_FIELDS = ("callback_url_override",)
+    CONFIG_FIELDS = {"token": "", "signing_secret": "", "callback_url_override": "", "copy_rating": False}
 ```
 
-What it is *not* is a `BaseConnector`, so it is absent from `REGISTRY` and from
-`GET /api/connectors`. The exchange is bidirectional (send a photo out for re-processing, get an
-enhanced duplicate back), it exposes no independently-toggleable modules, and its card needs
-token / signing-secret / callback-override fields the generic card does not render - so the card
-and its config are driven by `/api/astrodex/integration/*` instead. That route serves the
-identity block above, which is why the card still shows the same repo link, **AstroDex** badge
-and *Requires v0.4.0* line as a BaseConnector card.
+**Appears in**: AstroDex — not the Observatory, so it has no Observatory panel.
 
+`is_configured()` requires the two credentials on top of the URL: a URL alone signs no handoff,
+so the card reports *Not installed* until all three are set. `health_check()` probes
+`<url>/api/health`; MyAstroShine is LAN-only, so an unreachable result is expected and normal
+when the board runs on another network, and the card says so rather than showing a plain error.
+
+Its own routes — the handoff and the two cookieless endpoints the MyAstroShine container calls
+back on — stay in `blueprints/connectors_myastroshine.py` under `/api/astrodex/integration/*`.
 Full documentation: [MYASTROSHINE.md](MYASTROSHINE.md).
 
 ## Adding a new connector
 
-1. Create a class in `backend/connectors/` that extends `BaseConnector`
-2. Implement the three abstract methods: `health_check()`, `get_module_urls()`, `fetch_sensor_data()`
-3. Set `target_modules` to the app tabs the connector feeds (leave it empty if it feeds none)
+1. Create a class in `backend/connectors/<name>_connector.py` that extends `BaseConnector`
+2. Implement `health_check()`; override `get_module_urls()` / `fetch_sensor_data()` only if the
+   connector actually serves browser-fetched resources or live readings
+3. Declare `target_modules`, and `MODULES` / `CONFIG_FIELDS` / `SECRET_FIELDS` / `URL_FIELDS` as
+   needed (see [Declaring a connector](#declaring-a-connector))
 4. Register it in `backend/connectors/__init__.py`
+5. Add its routes, if any, in `backend/blueprints/connectors_<name>.py` and register the
+   blueprint in `backend/app.py`
+6. Add `connectors.<name>_label` / `connectors.<name>_desc` to all six `static/i18n/*.json`, and
+   an entry in `_CONNECTOR_UI` (`static/js/connectors/connectors.js`) for its icon and any
+   config inputs beyond the common ones
 
 The connector appears automatically in the Parameters → Connectors UI.
 

@@ -13,34 +13,27 @@ The AstroDex <-> MyAstroShine image round-trip (see docs/MYASTROSHINE.md):
   handoff signature is checked first, in constant time, before any disk access.
 """
 
-import ipaddress
 import json
-import socket
 import time
 from collections import deque
 from threading import Lock
-from urllib.parse import urlparse
 
-import requests
 from flask import Blueprint, jsonify, request, send_file
 
+from connectors.myastroshine_connector import MyAstroShineConnector
 from observation import astrodex
 from observation import myastroshine_integration as integration
-from utils.auth import admin_required, get_current_user, login_required, user_required
-from connectors.myastroshine_connector import MyAstroShineConnector
+from utils.auth import get_current_user, login_required, user_required
 from utils.constants import (
     MYASTROSHINE_ENHANCED_RATE_LIMIT,
     MYASTROSHINE_ENHANCED_RATE_WINDOW_SECONDS,
     MYASTROSHINE_MAX_IMAGE_BYTES,
 )
 from utils.logging_config import get_logger
-from utils.repo_config import load_config, save_config
 
 logger = get_logger(__name__)
 
 connectors_myastroshine_bp = Blueprint('connectors_myastroshine', __name__)
-
-_SECRET_FIELDS = ('token', 'signing_secret')
 
 # In-process sliding-window rate limit for the three cookieless endpoints.
 _rate_lock = Lock()
@@ -63,15 +56,6 @@ def _rate_limited(client_key: str) -> bool:
             for key in [k for k, v in _rate_hits.items() if not v]:
                 _rate_hits.pop(key, None)
         return False
-
-
-def _mask_secret(value: str) -> str:
-    """Render a secret as '****' + its last 4 chars, or '' when unset."""
-    if not value:
-        return ''
-    if len(value) <= 4:
-        return '****'
-    return f"****{value[-4:]}"
 
 
 def _client_key() -> str:
@@ -102,127 +86,33 @@ def integration_status():
         return jsonify({'error': 'Internal server error'}), 500
 
 
-@connectors_myastroshine_bp.route('/api/astrodex/integration/config', methods=['GET'])
+@connectors_myastroshine_bp.route('/api/connectors/myastroshine/health', methods=['GET', 'POST'])
 @login_required
-def get_integration_config_api():
-    """Return the connector-card config with secrets masked (never the raw values)."""
-    try:
-        cfg = integration.get_integration_config()
-        return jsonify(
-            {
-                'enabled': bool(cfg.get('enabled')),
-                'label': cfg.get('label') or '',
-                'url': cfg.get('url') or '',
-                'callback_url_override': cfg.get('callback_url_override') or '',
-                'copy_rating': bool(cfg.get('copy_rating')),
-                'token': _mask_secret(cfg.get('token') or ''),
-                'signing_secret': _mask_secret(cfg.get('signing_secret') or ''),
-                'has_token': bool(cfg.get('token')),
-                'has_signing_secret': bool(cfg.get('signing_secret')),
-                'effective_enabled': integration.integration_enabled(cfg),
-                # Identity block, mirroring what GET /api/connectors serves for a
-                # BaseConnector so the card renders the same header link, "appears in"
-                # badges and "Requires <version>" line. See MyAstroShineConnector.
-                'name': MyAstroShineConnector.name,
-                'description': MyAstroShineConnector.description,
-                'min_version': MyAstroShineConnector.min_version,
-                'homepage': MyAstroShineConnector.homepage,
-                'target_modules': list(MyAstroShineConnector.target_modules),
-            }
-        )
-    except Exception as exc:
-        logger.error(f"Error reading MyAstroShine integration config: {exc}")
-        return jsonify({'error': 'Internal server error'}), 500
+def myastroshine_health_api():
+    """Reachability probe against ``<url>/api/health``, in the shape every connector uses.
 
+    POST {"url": "..."} - probe an arbitrary URL, for the test button before saving.
+    GET - probe the saved URL.
 
-@connectors_myastroshine_bp.route('/api/astrodex/integration/config', methods=['POST'])
-@admin_required
-def save_integration_config_api():
-    """Persist the connector-card config. An empty secret field means "keep current"."""
-    try:
-        payload = request.get_json(silent=True) or {}
-        config = load_config()
-        connectors = config.setdefault('connectors', {})
-        current = dict(connectors.get('myastroshine', {}) or {})
-
-        if 'label' in payload:
-            current['label'] = str(payload.get('label') or '').strip()
-        if 'url' in payload:
-            current['url'] = str(payload.get('url') or '').strip().rstrip('/')
-        if 'callback_url_override' in payload:
-            current['callback_url_override'] = str(payload.get('callback_url_override') or '').strip().rstrip('/')
-        if 'copy_rating' in payload:
-            current['copy_rating'] = bool(payload.get('copy_rating'))
-        if 'enabled' in payload:
-            current['enabled'] = bool(payload.get('enabled'))
-
-        for field in _SECRET_FIELDS:
-            if field in payload:
-                incoming = str(payload.get(field) or '').strip()
-                # Blank (or the masked placeholder echoed back) == keep the stored value.
-                if incoming and not incoming.startswith('****'):
-                    current[field] = incoming
-
-        connectors['myastroshine'] = current
-        if not save_config(config):
-            return jsonify({'error': 'Failed to save configuration'}), 500
-
-        return jsonify({'status': 'success', 'effective_enabled': integration.integration_enabled(current)})
-    except Exception as exc:
-        logger.error(f"Error saving MyAstroShine integration config: {exc}")
-        return jsonify({'error': 'Internal server error'}), 500
-
-
-@connectors_myastroshine_bp.route('/api/astrodex/integration/test', methods=['POST'])
-@admin_required
-def test_integration_api():
-    """Best-effort server-side reachability probe against ``<url>/api/health``.
-
-    MyAstroShine is LAN-only: an "unreachable" result is expected and normal
-    when the board runs on a different network. The probe resolves the host and
-    refuses loopback / link-local / unspecified / multicast targets, then hits
-    the resolved IP directly (not the original hostname) to break the
-    user-controlled data flow (SSRF / DNS-rebinding hardening) - same pattern as
-    the AllSky connector test.
+    MyAstroShine is LAN-only, so "unreachable" is expected and normal when the board runs on
+    a different network. The probe itself (host resolution, SSRF guards) lives on the
+    connector class.
     """
     try:
-        data = request.get_json(silent=True) or {}
-        raw_url = (data.get('url') or '').strip().rstrip('/')
-        if not raw_url:
-            cfg = integration.get_integration_config()
-            raw_url = (cfg.get('url') or '').strip().rstrip('/')
-        if not raw_url:
-            return jsonify({'reachable': False, 'error': 'url required'}), 400
+        if request.method == 'POST':
+            data = request.get_json(silent=True) or {}
+            url = str(data.get('url') or '').strip().rstrip('/')
+        else:
+            url = str(integration.get_integration_config().get('url') or '').strip().rstrip('/')
 
-        parsed = urlparse(raw_url)
-        if parsed.scheme not in ('http', 'https') or not parsed.hostname:
-            return jsonify({'reachable': False, 'error': 'url must be a valid http(s) URL'}), 400
+        if not url:
+            return jsonify({'reachable': False, 'modules': {}, 'error': 'url required'}), 400
 
-        try:
-            port = parsed.port or (443 if parsed.scheme == 'https' else 80)
-            addrinfo = socket.getaddrinfo(parsed.hostname, port, type=socket.SOCK_STREAM)
-            resolved_ip = str(addrinfo[0][4][0])
-            ip_obj = ipaddress.ip_address(resolved_ip)
-            if ip_obj.is_loopback or ip_obj.is_link_local or ip_obj.is_unspecified or ip_obj.is_multicast:
-                return jsonify({'reachable': False, 'error': 'url host is not allowed'}), 400
-        except (socket.gaierror, ValueError):
-            return jsonify({'reachable': False, 'error': 'unable to resolve host'}), 400
-
-        safe_scheme = 'https' if parsed.scheme == 'https' else 'http'
-        netloc = f"[{resolved_ip}]" if ':' in resolved_ip else resolved_ip
-        if parsed.port:
-            netloc = f"{netloc}:{parsed.port}"
-        probe_url = f"{safe_scheme}://{netloc}/api/health"
-        headers = {'Host': parsed.netloc} if parsed.netloc else {}
-
-        try:
-            resp = requests.get(probe_url, timeout=5, headers=headers, allow_redirects=False)
-            reachable = resp.status_code < 500
-        except requests.exceptions.RequestException:
-            reachable = False
-        return jsonify({'reachable': reachable})
+        result = MyAstroShineConnector({'url': url}).health_check()
+        status = 400 if result.get('error') else 200
+        return jsonify(result), status
     except Exception as exc:
-        logger.error(f"Error testing MyAstroShine reachability: {exc}")
+        logger.error(f"Error probing MyAstroShine reachability: {exc}")
         return jsonify({'error': 'Internal server error'}), 500
 
 

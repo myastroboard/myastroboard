@@ -157,9 +157,6 @@ EXPECTED_ROUTES = {
     ('/api/astrodex/upload', ('POST',)),
     # --- myastroshine integration (AstroDex <-> MyAstroShine) ---
     ('/api/astrodex/integration/status', ('GET',)),
-    ('/api/astrodex/integration/config', ('GET',)),
-    ('/api/astrodex/integration/config', ('POST',)),
-    ('/api/astrodex/integration/test', ('POST',)),
     ('/api/astrodex/integration/handoff', ('POST',)),
     ('/api/astrodex/integration/source', ('GET',)),
     ('/api/astrodex/integration/source/image', ('GET',)),
@@ -219,10 +216,12 @@ EXPECTED_ROUTES = {
     ('/api/equipment/telescopes/<telescope_id>', ('PUT',)),
     # --- connectors ---
     ('/api/connectors', ('GET',)),
+    ('/api/connectors/<name>/config', ('POST',)),
     ('/api/connectors/allsky/health', ('GET', 'POST')),
     ('/api/connectors/allsky/proxy', ('GET',)),
     ('/api/connectors/allsky/status', ('GET',)),
     ('/api/connectors/allsky/urls', ('GET',)),
+    ('/api/connectors/myastroshine/health', ('GET', 'POST')),
     # --- skytonight (blueprint) ---
     ('/api/catalogues', ('GET',)),
     ('/api/scheduler/status', ('GET',)),
