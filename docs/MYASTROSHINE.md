@@ -37,8 +37,14 @@ CORS to open on MyAstroShine.
 **Minimum version**: MyAstroShine **v0.4.0** - older releases do not implement the pull + webhook
 round-trip described above. The connector card shows this requirement as a *Requires v0.4.0*
 line; it is informational, not enforced, since MyAstroShine only reports its own version once a
-handoff completes (stored per picture as `enhanced_source_version`). The value lives in
-`MYASTROSHINE_MIN_VERSION` (`backend/utils/constants.py`).
+handoff completes (stored per picture as `enhanced_source_version`).
+
+That version, and the rest of the connector's identity (label, description, homepage,
+`target_modules`), are declared on `MyAstroShineConnector`
+(`backend/connectors/myastroshine_connector.py`) and served from there by
+`GET /api/astrodex/integration/config` - same attribute block as a `BaseConnector`, so there is
+one place to edit. The class is intentionally not a `BaseConnector` and not in `REGISTRY`; the
+docstring explains why, and [CONNECTORS.md](CONNECTORS.md) covers the split.
 
 ### 1. Create a token in MyAstroShine
 
@@ -167,6 +173,6 @@ These are **not** editable - they are absent from `update_picture()`'s allowed f
 
 Despite living under `config.connectors.myastroshine`, this is **not** a `BaseConnector`: it is
 bidirectional, owns UI in the Astrodex tab, and has its own routes
-(`backend/blueprints/myastroshine_integration.py`, `backend/observation/myastroshine_integration.py`).
+(`backend/blueprints/connectors_myastroshine.py`, `backend/observation/myastroshine_integration.py`).
 It is stored there only so it rides along in the backup ZIP and stays next to the other connector
 config. It is deliberately absent from `GET /api/connectors` and the Observatory tab.

@@ -79,7 +79,7 @@ def client():
 @pytest.fixture
 def env(monkeypatch):
     """Temp DATA_DIR, clean consumed store, integration config forced to _cfg()."""
-    from blueprints import myastroshine_integration as _bp
+    from blueprints import connectors_myastroshine as _bp
 
     with tempfile.TemporaryDirectory() as tmpdir:
         monkeypatch.setenv("DATA_DIR", tmpdir)
@@ -177,6 +177,18 @@ def test_config_get_reports_min_version(client_admin, env):
     assert data["min_version"] == "v0.4.0"
 
 
+def test_config_get_identity_comes_from_the_connector_class(client_admin, env):
+    """The card's identity has one source: MyAstroShineConnector, not the route."""
+    from connectors.myastroshine_connector import MyAstroShineConnector
+
+    data = client_admin.get("/api/astrodex/integration/config").get_json()
+    assert data["name"] == MyAstroShineConnector.name
+    assert data["description"] == MyAstroShineConnector.description
+    assert data["min_version"] == MyAstroShineConnector.min_version
+    assert data["homepage"] == MyAstroShineConnector.homepage
+    assert data["target_modules"] == MyAstroShineConnector.target_modules
+
+
 def test_config_post_requires_admin(client, env):
     assert client.post("/api/astrodex/integration/config", json={"url": "x"}).status_code == 401
 
@@ -184,9 +196,9 @@ def test_config_post_requires_admin(client, env):
 def test_config_post_blank_secret_keeps_current(client_admin, env, monkeypatch):
     saved = {}
     monkeypatch.setattr(
-        "blueprints.myastroshine_integration.load_config", lambda: {"connectors": {"myastroshine": _cfg()}}
+        "blueprints.connectors_myastroshine.load_config", lambda: {"connectors": {"myastroshine": _cfg()}}
     )
-    monkeypatch.setattr("blueprints.myastroshine_integration.save_config", lambda cfg: saved.update(cfg) or True)
+    monkeypatch.setattr("blueprints.connectors_myastroshine.save_config", lambda cfg: saved.update(cfg) or True)
 
     resp = client_admin.post(
         "/api/astrodex/integration/config",
@@ -208,9 +220,9 @@ def test_config_post_blank_secret_keeps_current(client_admin, env, monkeypatch):
 def test_config_post_updates_secret_when_provided(client_admin, env, monkeypatch):
     saved = {}
     monkeypatch.setattr(
-        "blueprints.myastroshine_integration.load_config", lambda: {"connectors": {"myastroshine": _cfg()}}
+        "blueprints.connectors_myastroshine.load_config", lambda: {"connectors": {"myastroshine": _cfg()}}
     )
-    monkeypatch.setattr("blueprints.myastroshine_integration.save_config", lambda cfg: saved.update(cfg) or True)
+    monkeypatch.setattr("blueprints.connectors_myastroshine.save_config", lambda cfg: saved.update(cfg) or True)
 
     client_admin.post("/api/astrodex/integration/config", json={"token": "mas_newtoken000000"})
     assert saved["connectors"]["myastroshine"]["token"] == "mas_newtoken000000"
@@ -232,10 +244,10 @@ def test_test_probe_reports_reachable(client_admin, env, monkeypatch):
         status_code = 200
 
     monkeypatch.setattr(
-        "blueprints.myastroshine_integration.socket.getaddrinfo",
+        "blueprints.connectors_myastroshine.socket.getaddrinfo",
         lambda *a, **k: [(2, 1, 6, "", ("93.184.216.34", 443))],
     )
-    monkeypatch.setattr("blueprints.myastroshine_integration.requests.get", lambda *a, **k: _Resp())
+    monkeypatch.setattr("blueprints.connectors_myastroshine.requests.get", lambda *a, **k: _Resp())
     resp = client_admin.post("/api/astrodex/integration/test", json={"url": "https://myshine.example.com"})
     assert resp.get_json() == {"reachable": True}
 
@@ -395,7 +407,7 @@ def _raise(*args, **kwargs):
 
 
 def test_mask_secret_variants():
-    from blueprints.myastroshine_integration import _mask_secret
+    from blueprints.connectors_myastroshine import _mask_secret
 
     assert _mask_secret("") == ""
     assert _mask_secret("abcd") == "****"  # <= 4 chars -> no tail revealed
@@ -403,7 +415,7 @@ def test_mask_secret_variants():
 
 
 def test_rate_limited_trips_after_budget_then_window_evicts(monkeypatch):
-    import blueprints.myastroshine_integration as bp
+    import blueprints.connectors_myastroshine as bp
     from utils.constants import MYASTROSHINE_ENHANCED_RATE_LIMIT
 
     bp._rate_hits.clear()
@@ -421,7 +433,7 @@ def test_rate_limited_trips_after_budget_then_window_evicts(monkeypatch):
 
 
 def test_rate_limited_prunes_idle_buckets():
-    import blueprints.myastroshine_integration as bp
+    import blueprints.connectors_myastroshine as bp
 
     bp._rate_hits.clear()
     for i in range(520):
@@ -457,8 +469,8 @@ def test_config_get_masks_short_and_empty_secrets(client_admin, env, monkeypatch
 
 def test_config_post_updates_label_callback_and_enabled(client_admin, env, monkeypatch):
     saved = {}
-    monkeypatch.setattr("blueprints.myastroshine_integration.load_config", lambda: {"connectors": {}})
-    monkeypatch.setattr("blueprints.myastroshine_integration.save_config", lambda cfg: saved.update(cfg) or True)
+    monkeypatch.setattr("blueprints.connectors_myastroshine.load_config", lambda: {"connectors": {}})
+    monkeypatch.setattr("blueprints.connectors_myastroshine.save_config", lambda cfg: saved.update(cfg) or True)
     resp = client_admin.post(
         "/api/astrodex/integration/config",
         json={
@@ -476,14 +488,14 @@ def test_config_post_updates_label_callback_and_enabled(client_admin, env, monke
 
 
 def test_config_post_save_failure_is_500(client_admin, env, monkeypatch):
-    monkeypatch.setattr("blueprints.myastroshine_integration.load_config", lambda: {"connectors": {}})
-    monkeypatch.setattr("blueprints.myastroshine_integration.save_config", lambda cfg: False)
+    monkeypatch.setattr("blueprints.connectors_myastroshine.load_config", lambda: {"connectors": {}})
+    monkeypatch.setattr("blueprints.connectors_myastroshine.save_config", lambda cfg: False)
     resp = client_admin.post("/api/astrodex/integration/config", json={"url": "http://x:1"})
     assert resp.status_code == 500
 
 
 def test_config_post_internal_error(client_admin, env, monkeypatch):
-    monkeypatch.setattr("blueprints.myastroshine_integration.load_config", _raise)
+    monkeypatch.setattr("blueprints.connectors_myastroshine.load_config", _raise)
     assert client_admin.post("/api/astrodex/integration/config", json={"url": "x"}).status_code == 500
 
 
@@ -501,7 +513,7 @@ def test_test_probe_requires_a_url(client_admin, env, monkeypatch):
 
 def test_test_probe_falls_back_to_configured_url(client_admin, env, monkeypatch):
     monkeypatch.setattr(
-        "blueprints.myastroshine_integration.socket.getaddrinfo",
+        "blueprints.connectors_myastroshine.socket.getaddrinfo",
         lambda *a, **k: [(2, 1, 6, "", ("127.0.0.1", 8002))],
     )
     resp = client_admin.post("/api/astrodex/integration/test", json={})  # uses cfg['url']
@@ -520,7 +532,7 @@ def test_test_probe_unresolvable_host(client_admin, env, monkeypatch):
     def _gaierror(*a, **k):
         raise _socket.gaierror("no such host")
 
-    monkeypatch.setattr("blueprints.myastroshine_integration.socket.getaddrinfo", _gaierror)
+    monkeypatch.setattr("blueprints.connectors_myastroshine.socket.getaddrinfo", _gaierror)
     resp = client_admin.post("/api/astrodex/integration/test", json={"url": "http://nope.invalid"})
     assert resp.status_code == 400
     assert resp.get_json()["error"] == "unable to resolve host"
@@ -530,20 +542,20 @@ def test_test_probe_explicit_port_and_connection_error(client_admin, env, monkey
     import requests
 
     monkeypatch.setattr(
-        "blueprints.myastroshine_integration.socket.getaddrinfo",
+        "blueprints.connectors_myastroshine.socket.getaddrinfo",
         lambda *a, **k: [(2, 1, 6, "", ("93.184.216.34", 8002))],
     )
 
     def _conn_err(*a, **k):
         raise requests.exceptions.ConnectionError("refused")
 
-    monkeypatch.setattr("blueprints.myastroshine_integration.requests.get", _conn_err)
+    monkeypatch.setattr("blueprints.connectors_myastroshine.requests.get", _conn_err)
     resp = client_admin.post("/api/astrodex/integration/test", json={"url": "http://myshine.example.com:8002"})
     assert resp.get_json() == {"reachable": False}
 
 
 def test_test_probe_internal_error(client_admin, env, monkeypatch):
-    monkeypatch.setattr("blueprints.myastroshine_integration.urlparse", _raise)
+    monkeypatch.setattr("blueprints.connectors_myastroshine.urlparse", _raise)
     assert client_admin.post("/api/astrodex/integration/test", json={"url": "http://x:1"}).status_code == 500
 
 
@@ -579,7 +591,7 @@ def test_handoff_internal_error(client_admin, env, admin_id, monkeypatch):
 
 
 def test_source_rate_limited(client, env, monkeypatch):
-    monkeypatch.setattr("blueprints.myastroshine_integration._rate_limited", lambda key: True)
+    monkeypatch.setattr("blueprints.connectors_myastroshine._rate_limited", lambda key: True)
     assert client.get("/api/astrodex/integration/source?handoff=x").status_code == 429
 
 
@@ -605,7 +617,7 @@ def test_source_internal_error(client, env, admin_id, monkeypatch):
 
 
 def test_source_image_rate_limited(client, env, monkeypatch):
-    monkeypatch.setattr("blueprints.myastroshine_integration._rate_limited", lambda key: True)
+    monkeypatch.setattr("blueprints.connectors_myastroshine._rate_limited", lambda key: True)
     assert client.get("/api/astrodex/integration/source/image?handoff=x").status_code == 429
 
 
@@ -635,7 +647,7 @@ def test_source_image_internal_error(client, env, admin_id, monkeypatch):
 
 
 def test_enhanced_rate_limited(client, env, monkeypatch):
-    monkeypatch.setattr("blueprints.myastroshine_integration._rate_limited", lambda key: True)
+    monkeypatch.setattr("blueprints.connectors_myastroshine._rate_limited", lambda key: True)
     assert client.post("/api/astrodex/integration/enhanced").status_code == 429
 
 
@@ -649,7 +661,7 @@ def test_enhanced_rejects_bad_handoff(client, env):
 def test_enhanced_rejects_oversized_content_length(client, env, admin_id, monkeypatch):
     item, picture = _seed(admin_id)
     handoff = _handoff_for(item, picture, admin_id)
-    monkeypatch.setattr("blueprints.myastroshine_integration.MYASTROSHINE_MAX_IMAGE_BYTES", 64)
+    monkeypatch.setattr("blueprints.connectors_myastroshine.MYASTROSHINE_MAX_IMAGE_BYTES", 64)
     payload = {"parameters": {}}
     oversized = b"\xff\xd8\xff" + b"0" * (2 * 1024 * 1024)  # > 64 + 1 MiB slack
     resp = client.post(
@@ -688,7 +700,7 @@ def test_enhanced_rejects_empty_image(client, env, admin_id):
 def test_enhanced_rejects_image_over_max_bytes(client, env, admin_id, monkeypatch):
     item, picture = _seed(admin_id)
     handoff = _handoff_for(item, picture, admin_id)
-    monkeypatch.setattr("blueprints.myastroshine_integration.MYASTROSHINE_MAX_IMAGE_BYTES", 4)
+    monkeypatch.setattr("blueprints.connectors_myastroshine.MYASTROSHINE_MAX_IMAGE_BYTES", 4)
     resp = client.post(
         "/api/astrodex/integration/enhanced",
         data={"handoff": handoff, "payload": "{}", "image": (io.BytesIO(b"\xff\xd8\xff\xff\xff\xff"), "e.jpg")},

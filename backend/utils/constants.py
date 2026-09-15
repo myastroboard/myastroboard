@@ -106,10 +106,6 @@ MYASTROSHINE_HANDOFF_TTL_SECONDS = 12 * 60 * 60
 MYASTROSHINE_MAX_IMAGE_BYTES = 50 * 1024 * 1024  # 50 MB - cap on the enhanced JPEG upload
 MYASTROSHINE_ENHANCED_RATE_LIMIT = 30  # max cookieless integration calls per client per window
 MYASTROSHINE_ENHANCED_RATE_WINDOW_SECONDS = 60  # sliding window for the rate limit above
-# Oldest MyAstroShine release that speaks the round-trip protocol above. Shown on the
-# connector card ("Requires v0.4.0"), mirroring BaseConnector.min_version - informational,
-# the same way AllSky's is: MyAstroShine reports its version only after a handoff completes.
-MYASTROSHINE_MIN_VERSION = "v0.4.0"
 
 # Logging configuration
 LOG_MAX_BYTES = 10 * 1024 * 1024  # 10MB

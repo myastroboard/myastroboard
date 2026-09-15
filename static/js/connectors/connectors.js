@@ -374,8 +374,6 @@ function _allskyAdvancedFields(cfg) {
 
 // ── MyAstroShine integration card ─────────────────────────────────────────────
 
-const _MYASTROSHINE_REPO_URL = 'https://github.com/myastroboard/myastroshine';
-
 function _masField(labelText, inputId, type, value, placeholder) {
     const wrap = document.createElement('div');
     wrap.className = 'mb-3';
@@ -412,14 +410,16 @@ async function _myAstroShineCard() {
     const headerLeft = document.createElement('span');
     headerLeft.appendChild(DOMUtils.createIcon('bi bi-stars me-2 text-info'));
     headerLeft.appendChild(document.createTextNode(cfg.label || i18n.t('connectors.myastroshine_label')));
-    const repoLink = document.createElement('a');
-    repoLink.href = _MYASTROSHINE_REPO_URL;
-    repoLink.target = '_blank';
-    repoLink.rel = 'noopener';
-    repoLink.className = 'ms-2 text-muted';
-    repoLink.title = _MYASTROSHINE_REPO_URL;
-    repoLink.appendChild(DOMUtils.createIcon('bi bi-github'));
-    headerLeft.appendChild(repoLink);
+    if (cfg.homepage) {
+        const repoLink = document.createElement('a');
+        repoLink.href = cfg.homepage;
+        repoLink.target = '_blank';
+        repoLink.rel = 'noopener';
+        repoLink.className = 'ms-2 text-muted';
+        repoLink.title = cfg.homepage;
+        repoLink.appendChild(DOMUtils.createIcon('bi bi-github'));
+        headerLeft.appendChild(repoLink);
+    }
 
     const badge = document.createElement('span');
     if (cfg.effective_enabled) {

@@ -97,7 +97,7 @@ DEFAULT_ALLSKY_CONNECTOR = {
 
 # MyAstroShine integration (AstroDex <-> MyAstroShine image round-trip).
 # NOT a BaseConnector: it is bidirectional, lives in the AstroDex tab, and has
-# its own routes (blueprints/myastroshine_integration.py) - it is only stored
+# its own routes (blueprints/connectors_myastroshine.py) - it is only stored
 # under config["connectors"] so it rides along in the backup ZIP and stays
 # consistent with the rest of the connector config. See docs/MYASTROSHINE.md.
 DEFAULT_MYASTROSHINE_INTEGRATION = {

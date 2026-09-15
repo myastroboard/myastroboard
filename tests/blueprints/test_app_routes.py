@@ -27,6 +27,7 @@ from blueprints import astrodex as _astrodex_mod
 from blueprints import astronomy as _astronomy_mod
 from blueprints import auth as _auth_mod
 from blueprints import connectors as _connectors_mod
+from blueprints import connectors_allsky as _connectors_allsky_mod
 from blueprints import equipment as _equipment_mod
 from blueprints import locations as _locations_mod
 from blueprints import misc as _misc_mod
@@ -7830,13 +7831,13 @@ class TestListConnectorsApi:
 class TestAllSkyStatusApi:
 
     def test_returns_404_when_not_configured(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {}})
+        monkeypatch.setattr(_connectors_allsky_mod, 'load_config', lambda: {"connectors": {}})
         resp = client_admin.get('/api/connectors/allsky/status')
         assert resp.status_code == 404
 
     def test_returns_404_when_sensor_data_not_enabled(self, client_admin, monkeypatch):
         cfg = {"url": "http://allsky.local", "enabled": True, "modules": {}}
-        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
+        monkeypatch.setattr(_connectors_allsky_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
         resp = client_admin.get('/api/connectors/allsky/status')
         assert resp.status_code == 404
 
@@ -7846,7 +7847,7 @@ class TestAllSkyStatusApi:
             "enabled": True,
             "modules": {"sensor_data": {"enabled": True}},
         }
-        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
+        monkeypatch.setattr(_connectors_allsky_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
         from cache import cache_store as cs
 
         original = dict(cs._allsky_sensor_cache)
@@ -7867,7 +7868,7 @@ class TestAllSkyStatusApi:
             "enabled": True,
             "modules": {"sensor_data": {"enabled": True}},
         }
-        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
+        monkeypatch.setattr(_connectors_allsky_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
         from cache import cache_store as cs
 
         cs._allsky_sensor_cache["data"] = None
@@ -7882,14 +7883,14 @@ class TestAllSkyStatusApi:
 class TestAllSkyHealthApi:
 
     def test_get_no_url_returns_200_not_reachable(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {}})
+        monkeypatch.setattr(_connectors_allsky_mod, 'load_config', lambda: {"connectors": {}})
         resp = client_admin.get('/api/connectors/allsky/health')
         assert resp.status_code == 200
         assert resp.get_json()['reachable'] is False
 
     def test_get_returns_cached_health(self, client_admin, monkeypatch):
         cfg = {"url": "http://allsky.local", "enabled": True, "modules": {}}
-        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
+        monkeypatch.setattr(_connectors_allsky_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
         from cache import cache_store as cs
         import time
 
@@ -7907,7 +7908,7 @@ class TestAllSkyHealthApi:
         from unittest.mock import patch
 
         cfg = {"url": "http://allsky.local", "enabled": True, "modules": {}}
-        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
+        monkeypatch.setattr(_connectors_allsky_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
         from cache import cache_store as cs
         import time
 
@@ -7927,7 +7928,7 @@ class TestAllSkyHealthApi:
         from unittest.mock import patch
 
         cfg = {"url": "http://allsky.local", "enabled": True, "modules": {}}
-        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
+        monkeypatch.setattr(_connectors_allsky_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
         from cache import cache_store as cs
 
         cs._allsky_health_cache["data"] = None
@@ -7998,12 +7999,12 @@ class TestAllSkyHealthApi:
 class TestAllSkyUrlsApi:
 
     def test_returns_404_when_not_configured(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {}})
+        monkeypatch.setattr(_connectors_allsky_mod, 'load_config', lambda: {"connectors": {}})
         resp = client_admin.get('/api/connectors/allsky/urls')
         assert resp.status_code == 404
 
     def test_returns_proxy_urls_for_enabled_modules(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
+        monkeypatch.setattr(_connectors_allsky_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         resp = client_admin.get('/api/connectors/allsky/urls')
         assert resp.status_code == 200
         data = resp.get_json()
@@ -8011,7 +8012,7 @@ class TestAllSkyUrlsApi:
         assert data["live_image"].startswith("/api/connectors/allsky/proxy?module=live_image")
 
     def test_date_suffix_appended_when_provided(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
+        monkeypatch.setattr(_connectors_allsky_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         resp = client_admin.get('/api/connectors/allsky/urls?date=20260101')
         assert resp.status_code == 200
         data = resp.get_json()
@@ -8026,19 +8027,19 @@ class TestAllSkyProxyApi:
         assert resp.status_code == 400
 
     def test_not_configured_returns_503(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {}})
+        monkeypatch.setattr(_connectors_allsky_mod, 'load_config', lambda: {"connectors": {}})
         resp = client_admin.get('/api/connectors/allsky/proxy?module=live_image')
         assert resp.status_code == 503
 
     def test_unknown_module_returns_404(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
+        monkeypatch.setattr(_connectors_allsky_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         resp = client_admin.get('/api/connectors/allsky/proxy?module=nonexistent')
         assert resp.status_code == 404
 
     def test_proxy_streams_content(self, client_admin, monkeypatch):
         from unittest.mock import patch, MagicMock
 
-        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
+        monkeypatch.setattr(_connectors_allsky_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.headers = {"Content-Type": "image/jpeg", "Content-Length": "1234"}
@@ -8054,7 +8055,7 @@ class TestAllSkyProxyApi:
         import requests as _req
         from unittest.mock import patch
 
-        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
+        monkeypatch.setattr(_connectors_allsky_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         with patch('socket.getaddrinfo', return_value=[(None, None, None, None, ("1.2.3.4", 80))]):
             with patch('requests.get', side_effect=_req.exceptions.Timeout):
                 resp = client_admin.get('/api/connectors/allsky/proxy?module=live_image')
@@ -8064,7 +8065,7 @@ class TestAllSkyProxyApi:
         import requests as _req
         from unittest.mock import patch
 
-        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
+        monkeypatch.setattr(_connectors_allsky_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         with patch('socket.getaddrinfo', return_value=[(None, None, None, None, ("1.2.3.4", 80))]):
             with patch('requests.get', side_effect=_req.exceptions.ConnectionError):
                 resp = client_admin.get('/api/connectors/allsky/proxy?module=live_image')
@@ -8073,7 +8074,7 @@ class TestAllSkyProxyApi:
     def test_proxy_range_header_forwarded(self, client_admin, monkeypatch):
         from unittest.mock import patch, MagicMock
 
-        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
+        monkeypatch.setattr(_connectors_allsky_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         mock_resp = MagicMock()
         mock_resp.status_code = 206
         mock_resp.headers = {
@@ -8096,7 +8097,7 @@ class TestAllSkyProxyApi:
     def test_proxy_dns_failure_uses_original_url(self, client_admin, monkeypatch):
         from unittest.mock import patch, MagicMock
 
-        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
+        monkeypatch.setattr(_connectors_allsky_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.headers = {"Content-Type": "image/jpeg"}
@@ -8110,7 +8111,7 @@ class TestAllSkyProxyApi:
     def test_proxy_empty_dns_result_uses_original_url(self, client_admin, monkeypatch):
         from unittest.mock import patch, MagicMock
 
-        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
+        monkeypatch.setattr(_connectors_allsky_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.headers = {"Content-Type": "image/jpeg"}
@@ -8124,7 +8125,7 @@ class TestAllSkyProxyApi:
     def test_proxy_non200_upstream_still_returned(self, client_admin, monkeypatch):
         from unittest.mock import patch, MagicMock
 
-        monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
+        monkeypatch.setattr(_connectors_allsky_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         mock_resp = MagicMock()
         mock_resp.status_code = 404
         mock_resp.headers = {"Content-Type": "text/html"}

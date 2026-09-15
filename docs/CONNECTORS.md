@@ -10,6 +10,19 @@ Connectors are Python classes that extend `BaseConnector` (`backend/connectors/b
 
 The registry is discovered at runtime and served via `GET /api/connectors`.
 
+### File layout
+
+One module per connector on each side, named after it:
+
+| | Registry | AllSky | MyAstroShine |
+|---|---|---|---|
+| Connector | `connectors/base_connector.py` | `connectors/allsky_connector.py` | `connectors/myastroshine_connector.py` |
+| Blueprint | `blueprints/connectors.py` | `blueprints/connectors_allsky.py` | `blueprints/connectors_myastroshine.py` |
+| Tests | `tests/blueprints/test_connectors.py` | `tests/blueprints/test_connectors_allsky.py` | `tests/blueprints/test_connectors_myastroshine.py` |
+
+`blueprints/connectors.py` serves only the registry listing; a connector's own routes go in its
+own blueprint module, registered in `backend/app.py`.
+
 ### Target modules
 
 A connector also declares `target_modules` — the list of app tabs where its data shows up:
@@ -60,9 +73,9 @@ The **health-check button** (heart icon, after saving) runs a full per-module pr
 
 ## AllSky connector
 
-[AllSky](https://github.com/thomasjacquin/allsky) is an open-source all-sky camera system. It serves data entirely through file serving (no REST API).
+[AllSky](https://github.com/AllskyTeam/allsky) is an open-source all-sky camera system. It serves data entirely through file serving (no REST API).
 
-**Minimum version**: v2023.1
+**Minimum version**: v2024.12
 
 **Appears in**: Observatory
 
@@ -75,7 +88,6 @@ The **health-check button** (heart icon, after saving) runs a full per-module pr
 | `keogram` | Keogram | Enabled | Daily keogram timeline strip (generated end-of-night) |
 | `startrails` | Startrails | Disabled | Stacked startrails image (generated end-of-night) |
 | `daily_timelapse` | Daily timelapse | Disabled | Full-night timelapse video (generated end-of-night) |
-| `mini_timelapse` | Mini-timelapse | Disabled | Frequent short clip — requires AllSky mini-timelapse enabled (Number Of Images > 0) |
 
 ### Advanced settings
 
@@ -111,8 +123,8 @@ When modules are enabled the Observatory tab renders the following layout:
 | Row | Left | Right |
 |-----|------|-------|
 | 1 | Live image (auto-refreshes every 30 s) | Sensor data (polls every 60 s) — if enabled |
-| 2 | Startrails | Keogram |
-| 3 | Mini-timelapse | Daily timelapse |
+| 2 | Startrails | Daily timelapse |
+| 3 | Keogram (full width) | |
 
 Rows 2 and 3 only appear for their respective enabled modules. End-of-night images (keogram, startrails, daily timelapse) show a *Not yet generated* placeholder until AllSky produces them at the end of the night.
 
@@ -139,12 +151,26 @@ All resource URLs are served through the MyAstroBoard backend at `/api/connector
 
 ## MyAstroShine integration
 
-The **MyAstroShine** card in Parameters -> Connectors is *not* a `BaseConnector` - it is a
-bidirectional AstroDex feature (send a photo out for re-processing, get an enhanced duplicate
-back) that happens to store its config alongside the connectors. It has no Observatory panel and
-does not appear in `GET /api/connectors`. Its card shows an **AstroDex** target-module badge and
-a *Requires v0.4.0* line, both served as fixed values by
-`GET /api/astrodex/integration/config` (`target_modules` and `min_version`).
+MyAstroShine *is* a connector, and its identity is declared like every other one, in
+`backend/connectors/myastroshine_connector.py`:
+
+```python
+class MyAstroShineConnector:
+    name = "myastroshine"
+    label = "MyAstroShine"
+    min_version = "v0.4.0"
+    homepage = "https://github.com/myastroboard/myastroshine"
+    target_modules = ["astrodex"]
+```
+
+What it is *not* is a `BaseConnector`, so it is absent from `REGISTRY` and from
+`GET /api/connectors`. The exchange is bidirectional (send a photo out for re-processing, get an
+enhanced duplicate back), it exposes no independently-toggleable modules, and its card needs
+token / signing-secret / callback-override fields the generic card does not render - so the card
+and its config are driven by `/api/astrodex/integration/*` instead. That route serves the
+identity block above, which is why the card still shows the same repo link, **AstroDex** badge
+and *Requires v0.4.0* line as a BaseConnector card.
+
 Full documentation: [MYASTROSHINE.md](MYASTROSHINE.md).
 
 ## Adding a new connector

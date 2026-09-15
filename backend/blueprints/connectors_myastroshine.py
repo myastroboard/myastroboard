@@ -27,18 +27,18 @@ from flask import Blueprint, jsonify, request, send_file
 from observation import astrodex
 from observation import myastroshine_integration as integration
 from utils.auth import admin_required, get_current_user, login_required, user_required
+from connectors.myastroshine_connector import MyAstroShineConnector
 from utils.constants import (
     MYASTROSHINE_ENHANCED_RATE_LIMIT,
     MYASTROSHINE_ENHANCED_RATE_WINDOW_SECONDS,
     MYASTROSHINE_MAX_IMAGE_BYTES,
-    MYASTROSHINE_MIN_VERSION,
 )
 from utils.logging_config import get_logger
 from utils.repo_config import load_config, save_config
 
 logger = get_logger(__name__)
 
-myastroshine_bp = Blueprint('myastroshine_integration', __name__)
+connectors_myastroshine_bp = Blueprint('connectors_myastroshine', __name__)
 
 _SECRET_FIELDS = ('token', 'signing_secret')
 
@@ -91,7 +91,7 @@ def _verify_handoff_or_none(token: str):
 # ---------------------------------------------------------------------------
 
 
-@myastroshine_bp.route('/api/astrodex/integration/status', methods=['GET'])
+@connectors_myastroshine_bp.route('/api/astrodex/integration/status', methods=['GET'])
 @login_required
 def integration_status():
     """Whether the AstroDex "Send to MyAstroShine" button should be shown."""
@@ -102,7 +102,7 @@ def integration_status():
         return jsonify({'error': 'Internal server error'}), 500
 
 
-@myastroshine_bp.route('/api/astrodex/integration/config', methods=['GET'])
+@connectors_myastroshine_bp.route('/api/astrodex/integration/config', methods=['GET'])
 @login_required
 def get_integration_config_api():
     """Return the connector-card config with secrets masked (never the raw values)."""
@@ -120,11 +120,14 @@ def get_integration_config_api():
                 'has_token': bool(cfg.get('token')),
                 'has_signing_secret': bool(cfg.get('signing_secret')),
                 'effective_enabled': integration.integration_enabled(cfg),
-                # MyAstroShine is not a BaseConnector, but its card renders the same
-                # "appears in" badges — it surfaces inside the AstroDex tab, not Observatory —
-                # and the same "Requires <version>" line as a BaseConnector's min_version.
-                'target_modules': ['astrodex'],
-                'min_version': MYASTROSHINE_MIN_VERSION,
+                # Identity block, mirroring what GET /api/connectors serves for a
+                # BaseConnector so the card renders the same header link, "appears in"
+                # badges and "Requires <version>" line. See MyAstroShineConnector.
+                'name': MyAstroShineConnector.name,
+                'description': MyAstroShineConnector.description,
+                'min_version': MyAstroShineConnector.min_version,
+                'homepage': MyAstroShineConnector.homepage,
+                'target_modules': list(MyAstroShineConnector.target_modules),
             }
         )
     except Exception as exc:
@@ -132,7 +135,7 @@ def get_integration_config_api():
         return jsonify({'error': 'Internal server error'}), 500
 
 
-@myastroshine_bp.route('/api/astrodex/integration/config', methods=['POST'])
+@connectors_myastroshine_bp.route('/api/astrodex/integration/config', methods=['POST'])
 @admin_required
 def save_integration_config_api():
     """Persist the connector-card config. An empty secret field means "keep current"."""
@@ -170,7 +173,7 @@ def save_integration_config_api():
         return jsonify({'error': 'Internal server error'}), 500
 
 
-@myastroshine_bp.route('/api/astrodex/integration/test', methods=['POST'])
+@connectors_myastroshine_bp.route('/api/astrodex/integration/test', methods=['POST'])
 @admin_required
 def test_integration_api():
     """Best-effort server-side reachability probe against ``<url>/api/health``.
@@ -223,7 +226,7 @@ def test_integration_api():
         return jsonify({'error': 'Internal server error'}), 500
 
 
-@myastroshine_bp.route('/api/astrodex/integration/handoff', methods=['POST'])
+@connectors_myastroshine_bp.route('/api/astrodex/integration/handoff', methods=['POST'])
 @user_required
 def mint_handoff_api():
     """Forge a signed single-use handoff token for one of the caller's own pictures."""
@@ -270,7 +273,7 @@ def mint_handoff_api():
 # ---------------------------------------------------------------------------
 
 
-@myastroshine_bp.route('/api/astrodex/integration/source', methods=['GET'])
+@connectors_myastroshine_bp.route('/api/astrodex/integration/source', methods=['GET'])
 def integration_source_api():
     """Return the source picture's metadata for a valid handoff token."""
     if _rate_limited(_client_key()):
@@ -289,7 +292,7 @@ def integration_source_api():
         return jsonify({'error': 'Internal server error'}), 500
 
 
-@myastroshine_bp.route('/api/astrodex/integration/source/image', methods=['GET'])
+@connectors_myastroshine_bp.route('/api/astrodex/integration/source/image', methods=['GET'])
 def integration_source_image_api():
     """Stream the source picture's image bytes for a valid handoff token."""
     if _rate_limited(_client_key()):
@@ -307,7 +310,7 @@ def integration_source_image_api():
         return jsonify({'error': 'Internal server error'}), 500
 
 
-@myastroshine_bp.route('/api/astrodex/integration/enhanced', methods=['POST'])
+@connectors_myastroshine_bp.route('/api/astrodex/integration/enhanced', methods=['POST'])
 def integration_enhanced_api():
     """Create the enhanced duplicate picture from a MyAstroShine multipart callback."""
     if _rate_limited(_client_key()):

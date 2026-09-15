@@ -130,6 +130,8 @@ from blueprints.auth import auth_bp
 from blueprints.push import push_bp
 from blueprints.locations import locations_bp
 from blueprints.connectors import connectors_bp
+from blueprints.connectors_allsky import connectors_allsky_bp
+from blueprints.connectors_myastroshine import connectors_myastroshine_bp
 from blueprints.admin import admin_bp
 from blueprints.misc import misc_bp
 from blueprints.weather import weather_bp
@@ -137,7 +139,6 @@ from blueprints.tracking import tracking_bp
 from blueprints.astronomy import astronomy_bp
 from blueprints.plan_my_night import plan_my_night_bp
 from blueprints.astrodex import astrodex_bp
-from blueprints.myastroshine_integration import myastroshine_bp
 from blueprints.equipment import equipment_bp
 from blueprints.observation_sessions import observation_sessions_bp
 
@@ -146,6 +147,8 @@ app.register_blueprint(auth_bp)
 app.register_blueprint(push_bp)
 app.register_blueprint(locations_bp)
 app.register_blueprint(connectors_bp)
+app.register_blueprint(connectors_allsky_bp)
+app.register_blueprint(connectors_myastroshine_bp)
 app.register_blueprint(admin_bp)
 app.register_blueprint(misc_bp)
 app.register_blueprint(weather_bp)
@@ -153,7 +156,6 @@ app.register_blueprint(tracking_bp)
 app.register_blueprint(astronomy_bp)
 app.register_blueprint(plan_my_night_bp)
 app.register_blueprint(astrodex_bp)
-app.register_blueprint(myastroshine_bp)
 app.register_blueprint(equipment_bp)
 app.register_blueprint(observation_sessions_bp)
 
