@@ -142,8 +142,9 @@ All resource URLs are served through the MyAstroBoard backend at `/api/connector
 The **MyAstroShine** card in Parameters -> Connectors is *not* a `BaseConnector` - it is a
 bidirectional AstroDex feature (send a photo out for re-processing, get an enhanced duplicate
 back) that happens to store its config alongside the connectors. It has no Observatory panel and
-does not appear in `GET /api/connectors`. Its card shows an **AstroDex** target-module badge,
-served as a fixed `target_modules` value by `GET /api/astrodex/integration/config`.
+does not appear in `GET /api/connectors`. Its card shows an **AstroDex** target-module badge and
+a *Requires v0.4.0* line, both served as fixed values by
+`GET /api/astrodex/integration/config` (`target_modules` and `min_version`).
 Full documentation: [MYASTROSHINE.md](MYASTROSHINE.md).
 
 ## Adding a new connector

@@ -91,6 +91,18 @@ function _targetModulesRow(targetModules) {
     return row;
 }
 
+/**
+ * "Requires <version>" line, or null when the connector declares no minimum version.
+ */
+function _minVersionRow(minVersion) {
+    if (!minVersion) return null;
+    const ver = document.createElement('p');
+    ver.className = 'text-muted small mb-2';
+    ver.appendChild(DOMUtils.createIcon('bi bi-tag me-1'));
+    ver.appendChild(document.createTextNode(`${i18n.t('connectors.requires')} ${minVersion}`));
+    return ver;
+}
+
 function _connectorCard(c) {
     const col = document.createElement('div');
     col.className = 'col-12 col-md-6 col-xl-4';
@@ -142,13 +154,8 @@ function _connectorCard(c) {
 
     body.appendChild(_targetModulesRow(c.target_modules));
 
-    if (c.min_version) {
-        const ver = document.createElement('p');
-        ver.className = 'text-muted small mb-2';
-        ver.appendChild(DOMUtils.createIcon('bi bi-tag me-1'));
-        ver.appendChild(document.createTextNode(`${i18n.t('connectors.requires')} ${c.min_version}`));
-        body.appendChild(ver);
-    }
+    const verRow = _minVersionRow(c.min_version);
+    if (verRow) body.appendChild(verRow);
 
     const configBtn = document.createElement('button');
     configBtn.className = 'btn btn-sm btn-outline-primary w-100 connector-configure-btn';
@@ -437,6 +444,9 @@ async function _myAstroShineCard() {
     body.appendChild(desc);
 
     body.appendChild(_targetModulesRow(cfg.target_modules));
+
+    const masVerRow = _minVersionRow(cfg.min_version);
+    if (masVerRow) body.appendChild(masVerRow);
 
     const configBtn = document.createElement('button');
     configBtn.className = 'btn btn-sm btn-outline-primary w-100';

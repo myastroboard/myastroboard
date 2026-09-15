@@ -34,6 +34,12 @@ CORS to open on MyAstroShine.
 
 ## Setup
 
+**Minimum version**: MyAstroShine **v0.4.0** - older releases do not implement the pull + webhook
+round-trip described above. The connector card shows this requirement as a *Requires v0.4.0*
+line; it is informational, not enforced, since MyAstroShine only reports its own version once a
+handoff completes (stored per picture as `enhanced_source_version`). The value lives in
+`MYASTROSHINE_MIN_VERSION` (`backend/utils/constants.py`).
+
 ### 1. Create a token in MyAstroShine
 
 MyAstroShine -> Settings -> Tokens -> New. You get a **token** (`mas_...`) and a **signing

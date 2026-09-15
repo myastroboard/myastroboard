@@ -171,6 +171,12 @@ def test_config_get_reports_astrodex_target_module(client_admin, env):
     assert data["target_modules"] == ["astrodex"]
 
 
+def test_config_get_reports_min_version(client_admin, env):
+    """The card shows a "Requires ..." line, like a BaseConnector's min_version."""
+    data = client_admin.get("/api/astrodex/integration/config").get_json()
+    assert data["min_version"] == "v0.4.0"
+
+
 def test_config_post_requires_admin(client, env):
     assert client.post("/api/astrodex/integration/config", json={"url": "x"}).status_code == 401
 

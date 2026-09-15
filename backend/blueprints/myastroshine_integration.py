@@ -31,6 +31,7 @@ from utils.constants import (
     MYASTROSHINE_ENHANCED_RATE_LIMIT,
     MYASTROSHINE_ENHANCED_RATE_WINDOW_SECONDS,
     MYASTROSHINE_MAX_IMAGE_BYTES,
+    MYASTROSHINE_MIN_VERSION,
 )
 from utils.logging_config import get_logger
 from utils.repo_config import load_config, save_config
@@ -120,8 +121,10 @@ def get_integration_config_api():
                 'has_signing_secret': bool(cfg.get('signing_secret')),
                 'effective_enabled': integration.integration_enabled(cfg),
                 # MyAstroShine is not a BaseConnector, but its card renders the same
-                # "appears in" badges — it surfaces inside the AstroDex tab, not Observatory.
+                # "appears in" badges — it surfaces inside the AstroDex tab, not Observatory —
+                # and the same "Requires <version>" line as a BaseConnector's min_version.
                 'target_modules': ['astrodex'],
+                'min_version': MYASTROSHINE_MIN_VERSION,
             }
         )
     except Exception as exc:
