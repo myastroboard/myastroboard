@@ -10,14 +10,18 @@ import time
 from flask import Blueprint, request, jsonify, abort, Response, stream_with_context
 
 from cache import cache_store
+from connectors.allsky_connector import AllSkyConnector
 from utils.auth import login_required
-from utils.constants import CACHE_TTL_ALLSKY_HEALTH
 from utils.logging_config import get_logger
 from utils.repo_config import load_config
 
 logger = get_logger(__name__)
 
 connectors_allsky_bp = Blueprint('connectors_allsky', __name__)
+
+# Bound once, so the route's caching does not depend on the AllSkyConnector object itself
+# (which tests replace to stub out the network). The value's home stays the connector class.
+_HEALTH_CACHE_TTL = AllSkyConnector.HEALTH_CACHE_TTL
 
 # AllSky image/video files are named after the session date (YYYYMMDD). date_str is
 # interpolated directly into the upstream URL path (see AllSkyConnector._keogram_url and
@@ -39,11 +43,8 @@ def allsky_status_api():
 
     data = cache_store._allsky_sensor_cache.get("data")
     if data is None:
-        from connectors.allsky_connector import AllSkyConnector
-
         data = AllSkyConnector(allsky_cfg).fetch_sensor_data()
         cache_store._allsky_sensor_cache["data"] = data
-
         cache_store._allsky_sensor_cache["timestamp"] = time.time()
     return jsonify(data)
 
@@ -104,10 +105,9 @@ def allsky_health_api():
 
     cached = cache_store._allsky_health_cache
     fresh = request.args.get("fresh") == "1"
-    if not fresh and cached.get("data") and (time.time() - cached.get("timestamp", 0)) < CACHE_TTL_ALLSKY_HEALTH:
+    age = time.time() - cached.get("timestamp", 0)
+    if not fresh and cached.get("data") and age < _HEALTH_CACHE_TTL:
         return jsonify(cached["data"])
-
-    from connectors.allsky_connector import AllSkyConnector
 
     result = AllSkyConnector(allsky_cfg).health_check()
     cache_store._allsky_health_cache["data"] = result
@@ -131,8 +131,6 @@ def allsky_urls_api():
     date_str = request.args.get("date")
     if date_str and not _ALLSKY_DATE_PATTERN.match(date_str):
         return jsonify({"error": "date must be in YYYYMMDD format"}), 400
-    from connectors.allsky_connector import AllSkyConnector
-
     direct_urls = AllSkyConnector(allsky_cfg).get_module_urls(date_str=date_str)
 
     date_suffix = f"&date={date_str}" if date_str else ""
@@ -162,7 +160,6 @@ def allsky_proxy_api():
     date_str = request.args.get("date")
     if date_str and not _ALLSKY_DATE_PATTERN.match(date_str):
         return jsonify({"error": "date must be in YYYYMMDD format"}), 400
-    from connectors.allsky_connector import AllSkyConnector
     import requests as _req
 
     direct_urls = AllSkyConnector(allsky_cfg).get_module_urls(date_str=date_str)

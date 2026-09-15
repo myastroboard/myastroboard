@@ -38,6 +38,9 @@ special-casing:
 | `SECRET_FIELDS` | Keys holding credentials. Masked by `GET /api/connectors`; a blank or still-masked submission means "keep the stored value" |
 | `URL_FIELDS` | Keys among `CONFIG_FIELDS` holding a URL, so the save strips their trailing slash |
 
+A connector's own tuning knobs (cache TTLs, size caps, rate limits) are class attributes too,
+not entries in `utils/constants.py` — adding a connector should not mean editing a shared file.
+
 `is_configured()` says what "installed" means (a base URL by default; MyAstroShine also requires
 its credentials). Only `health_check()` must be implemented — `get_module_urls()` and
 `fetch_sensor_data()` default to empty, for a connector that serves no browser-fetched resource

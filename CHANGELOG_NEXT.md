@@ -50,3 +50,8 @@
   the MyAstroShine container calls (`/handoff`, `/source`, `/source/image`, `/enhanced`) and the
   `/status` route used by the AstroDex tab are untouched, so no MyAstroShine instance needs
   updating.
+- Connector-specific constants moved out of the project-wide `utils/constants.py` onto the
+  connector that owns them: MyAstroShine's handoff TTL, max upload size, rate limit and window,
+  and AllSky's two cache TTLs (`CACHE_TTL_ALLSKY_SENSOR` / `_HEALTH` become
+  `AllSkyConnector.SENSOR_CACHE_TTL` / `.HEALTH_CACHE_TTL`). Adding a connector no longer means
+  editing a shared constants file.

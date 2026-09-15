@@ -2068,23 +2068,24 @@ def test_update_allsky_sensor_cache_paths(monkeypatch):
     from cache import cache_updater
     from cache import cache_store
 
-    fake_connector = types.SimpleNamespace(
-        AllSkyConnector=lambda _cfg: types.SimpleNamespace(fetch_sensor_data=lambda: {"temp": 1})
+    monkeypatch.setattr(
+        cache_updater,
+        "AllSkyConnector",
+        lambda _cfg: types.SimpleNamespace(fetch_sensor_data=lambda: {"temp": 1}),
     )
-    with patch.dict("sys.modules", {"connectors.allsky_connector": fake_connector}):
-        cache_store._allsky_sensor_cache = {"data": None, "timestamp": 0}
-        cache_updater.update_allsky_sensor_cache(
-            {
-                "connectors": {
-                    "allsky": {
-                        "enabled": True,
-                        "url": "http://x",
-                        "modules": {"sensor_data": {"enabled": True}},
-                    }
+    cache_store._allsky_sensor_cache = {"data": None, "timestamp": 0}
+    cache_updater.update_allsky_sensor_cache(
+        {
+            "connectors": {
+                "allsky": {
+                    "enabled": True,
+                    "url": "http://x",
+                    "modules": {"sensor_data": {"enabled": True}},
                 }
             }
-        )
-        assert cache_store._allsky_sensor_cache["data"] == {"temp": 1}
+        }
+    )
+    assert cache_store._allsky_sensor_cache["data"] == {"temp": 1}
 
 
 def test_update_allsky_sensor_cache_none_config_and_early_returns(monkeypatch):
@@ -2100,15 +2101,16 @@ def test_update_allsky_health_cache_paths(monkeypatch):
     from cache import cache_updater
     from cache import cache_store
 
-    fake_connector = types.SimpleNamespace(
-        AllSkyConnector=lambda _cfg: types.SimpleNamespace(health_check=lambda: {"ok": True})
+    monkeypatch.setattr(
+        cache_updater,
+        "AllSkyConnector",
+        lambda _cfg: types.SimpleNamespace(health_check=lambda: {"ok": True}),
     )
-    with patch.dict("sys.modules", {"connectors.allsky_connector": fake_connector}):
-        cache_store._allsky_health_cache = {"data": None, "timestamp": 0}
-        cache_updater.update_allsky_health_cache(
-            {"connectors": {"allsky": {"enabled": True, "url": "http://x", "modules": {}}}}
-        )
-        assert cache_store._allsky_health_cache["data"] == {"ok": True}
+    cache_store._allsky_health_cache = {"data": None, "timestamp": 0}
+    cache_updater.update_allsky_health_cache(
+        {"connectors": {"allsky": {"enabled": True, "url": "http://x", "modules": {}}}}
+    )
+    assert cache_store._allsky_health_cache["data"] == {"ok": True}
 
 
 def test_update_allsky_health_cache_none_config_and_early_return(monkeypatch):

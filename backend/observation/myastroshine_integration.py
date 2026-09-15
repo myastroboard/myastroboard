@@ -32,7 +32,7 @@ from typing import Any, Dict, Optional, Tuple
 
 from observation import astrodex
 from utils import load_json_file, save_json_file
-from utils.constants import MYASTROSHINE_HANDOFF_TTL_SECONDS
+from connectors.myastroshine_connector import MyAstroShineConnector
 from utils.logging_config import get_logger
 from utils.repo_config import load_config
 
@@ -191,7 +191,7 @@ def mint_handoff(cfg: Dict, *, user_id: str, item_id: str, picture_id: str, call
         'picture_id': picture_id,
         'user_id': user_id,
         'iat': now,
-        'exp': now + MYASTROSHINE_HANDOFF_TTL_SECONDS,
+        'exp': now + MyAstroShineConnector.HANDOFF_TTL_SECONDS,
         'jti': str(uuid.uuid4()),
     }
     body = _b64url_encode(canonical_json(payload).encode('utf-8'))
@@ -296,7 +296,7 @@ def is_handoff_consumed(jti: str) -> bool:
 def mark_handoff_consumed(jti: str, expiry_epoch: Optional[float] = None) -> None:
     """Record a handoff's jti as spent so a later replay is rejected with 409."""
     if expiry_epoch is None:
-        expiry_epoch = time.time() + MYASTROSHINE_HANDOFF_TTL_SECONDS
+        expiry_epoch = time.time() + MyAstroShineConnector.HANDOFF_TTL_SECONDS
     with _consumed_lock:
         _consumed[jti] = float(expiry_epoch)
         _prune_and_persist_locked()

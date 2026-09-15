@@ -99,7 +99,7 @@ Shine    --POST /enhanced  (multipart + signature)-->  Board        new duplicat
 - Payload: `{ kid, callback_base, item_id, picture_id, user_id, iat, exp, jti }`.
   `kid` = the first 12 chars of the token. `callback_base` is set by the board only (never user
   input) - it is still re-checked against MyAstroShine's allowlist before any callback.
-- **TTL 12 h** (`MYASTROSHINE_HANDOFF_TTL_SECONDS`) - long enough for a full evening editing
+- **TTL 12 h** (`MyAstroShineConnector.HANDOFF_TTL_SECONDS`) - long enough for a full evening editing
   session. **Single use**: the `jti` is marked spent when `/enhanced` succeeds, so a replay is
   rejected with `409`. The spent-jti set is kept in memory and mirrored to
   `data/astrodex/myastroshine_consumed_handoffs.json` so a worker restart still blocks a replay.
@@ -156,7 +156,7 @@ These are **not** editable - they are absent from `update_picture()`'s allowed f
 ## Security summary
 
 - `source` / `source/image` / `enhanced`: no session cookie; handoff signature checked first, in
-  constant time; rate-limited; upload size capped at `MYASTROSHINE_MAX_IMAGE_BYTES` (50 MB).
+  constant time; rate-limited; upload size capped at `MyAstroShineConnector.MAX_IMAGE_BYTES` (50 MB).
 - `callback_base` is board-set and re-verified against MyAstroShine's allowlist.
 - The handoff pins `user_id` + `item_id` + `picture_id`, so a return can only ever write into that
   user's Astrodex, on that item. All three are re-checked to a strict uuid shape at every entry

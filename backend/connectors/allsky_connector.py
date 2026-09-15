@@ -35,6 +35,11 @@ class AllSkyConnector(BaseConnector):
     homepage = "https://github.com/AllskyTeam/allsky"
     target_modules = ["observatory"]
 
+    # Cache TTLs for the two AllSky reads the board makes on the user's behalf. Both are
+    # 5 min: sensor values drift slowly, and reachability does not need tighter polling.
+    SENSOR_CACHE_TTL = 300
+    HEALTH_CACHE_TTL = 300
+
     CONFIG_FIELDS = {
         "image_path": "current/tmp",
         "image_filename": "image.jpg",

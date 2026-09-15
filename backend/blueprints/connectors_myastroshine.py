@@ -24,11 +24,6 @@ from connectors.myastroshine_connector import MyAstroShineConnector
 from observation import astrodex
 from observation import myastroshine_integration as integration
 from utils.auth import get_current_user, login_required, user_required
-from utils.constants import (
-    MYASTROSHINE_ENHANCED_RATE_LIMIT,
-    MYASTROSHINE_ENHANCED_RATE_WINDOW_SECONDS,
-    MYASTROSHINE_MAX_IMAGE_BYTES,
-)
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -43,12 +38,12 @@ _rate_hits: dict[str, deque] = {}
 def _rate_limited(client_key: str) -> bool:
     """True when *client_key* has exceeded the cookieless-endpoint call budget."""
     now = time.time()
-    window = MYASTROSHINE_ENHANCED_RATE_WINDOW_SECONDS
+    window = MyAstroShineConnector.ENHANCED_RATE_WINDOW_SECONDS
     with _rate_lock:
         hits = _rate_hits.setdefault(client_key, deque())
         while hits and hits[0] <= now - window:
             hits.popleft()
-        if len(hits) >= MYASTROSHINE_ENHANCED_RATE_LIMIT:
+        if len(hits) >= MyAstroShineConnector.ENHANCED_RATE_LIMIT:
             return True
         hits.append(now)
         # Opportunistically drop idle buckets so the map can't grow unbounded.
@@ -211,7 +206,7 @@ def integration_enhanced_api():
         return jsonify({'error': 'Invalid or expired handoff'}), 401
 
     content_length = request.content_length or 0
-    if content_length and content_length > MYASTROSHINE_MAX_IMAGE_BYTES + 1024 * 1024:
+    if content_length and content_length > MyAstroShineConnector.MAX_IMAGE_BYTES + 1024 * 1024:
         return jsonify({'error': 'Payload too large'}), 413
 
     upload = request.files.get('image')
@@ -220,7 +215,7 @@ def integration_enhanced_api():
     image_bytes = upload.read()
     if not image_bytes:
         return jsonify({'error': 'image part is empty'}), 400
-    if len(image_bytes) > MYASTROSHINE_MAX_IMAGE_BYTES:
+    if len(image_bytes) > MyAstroShineConnector.MAX_IMAGE_BYTES:
         return jsonify({'error': 'Image too large'}), 413
 
     try:

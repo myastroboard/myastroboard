@@ -107,7 +107,7 @@ class TestAllSkyStatus:
         mock_connector.fetch_sensor_data.return_value = fresh_data
 
         with patch('blueprints.connectors_allsky.load_config', return_value=_config(_CFG_ALLSKY_ENABLED)):
-            with patch('connectors.allsky_connector.AllSkyConnector', return_value=mock_connector):
+            with patch('blueprints.connectors_allsky.AllSkyConnector', return_value=mock_connector):
                 resp = client_user.get('/api/connectors/allsky/status')
         assert resp.status_code == 200
         assert resp.get_json() == fresh_data
@@ -151,7 +151,7 @@ class TestAllSkyHealth:
         cache_store._allsky_health_cache["timestamp"] = 0  # stale
 
         with patch('blueprints.connectors_allsky.load_config', return_value=_config(_CFG_ALLSKY_ENABLED)):
-            with patch('connectors.allsky_connector.AllSkyConnector', return_value=mock_connector):
+            with patch('blueprints.connectors_allsky.AllSkyConnector', return_value=mock_connector):
                 resp = client_user.get('/api/connectors/allsky/health')
         assert resp.status_code == 200
         assert resp.get_json() == fresh_health
@@ -167,7 +167,7 @@ class TestAllSkyHealth:
         cache_store._allsky_health_cache["timestamp"] = time.time() - 400  # 400s old → stale
 
         with patch('blueprints.connectors_allsky.load_config', return_value=_config(_CFG_ALLSKY_ENABLED)):
-            with patch('connectors.allsky_connector.AllSkyConnector', return_value=mock_connector):
+            with patch('blueprints.connectors_allsky.AllSkyConnector', return_value=mock_connector):
                 resp = client_user.get('/api/connectors/allsky/health')
         assert resp.get_json() == fresh_health
 
@@ -261,7 +261,7 @@ class TestAllSkyUrls:
         mock_connector.get_module_urls.return_value = direct
 
         with patch('blueprints.connectors_allsky.load_config', return_value=_config(_CFG_ALLSKY_ENABLED)):
-            with patch('connectors.allsky_connector.AllSkyConnector', return_value=mock_connector):
+            with patch('blueprints.connectors_allsky.AllSkyConnector', return_value=mock_connector):
                 resp = client_user.get('/api/connectors/allsky/urls')
         assert resp.status_code == 200
         data = resp.get_json()
@@ -273,7 +273,7 @@ class TestAllSkyUrls:
         mock_connector.get_module_urls.return_value = {}
 
         with patch('blueprints.connectors_allsky.load_config', return_value=_config(_CFG_ALLSKY_ENABLED)):
-            with patch('connectors.allsky_connector.AllSkyConnector', return_value=mock_connector):
+            with patch('blueprints.connectors_allsky.AllSkyConnector', return_value=mock_connector):
                 resp = client_user.get('/api/connectors/allsky/urls?date=20260101')
         assert resp.status_code == 200
         mock_connector.get_module_urls.assert_called_once_with(date_str='20260101')
@@ -290,7 +290,7 @@ class TestAllSkyUrls:
         mock_connector.get_module_urls.return_value = direct
 
         with patch('blueprints.connectors_allsky.load_config', return_value=_config(_CFG_ALLSKY_ENABLED)):
-            with patch('connectors.allsky_connector.AllSkyConnector', return_value=mock_connector):
+            with patch('blueprints.connectors_allsky.AllSkyConnector', return_value=mock_connector):
                 resp = client_user.get('/api/connectors/allsky/urls?date=20260101')
         data = resp.get_json()
         assert data['keogram'] == '/api/connectors/allsky/proxy?module=keogram&date=20260101'
@@ -331,7 +331,7 @@ class TestAllSkyProxy:
         mock_connector.get_module_urls.return_value = {}  # module absent
 
         with patch('blueprints.connectors_allsky.load_config', return_value=_config(_CFG_ALLSKY_ENABLED)):
-            with patch('connectors.allsky_connector.AllSkyConnector', return_value=mock_connector):
+            with patch('blueprints.connectors_allsky.AllSkyConnector', return_value=mock_connector):
                 resp = client_user.get('/api/connectors/allsky/proxy?module=keogram')
         assert resp.status_code == 404
 
@@ -347,7 +347,7 @@ class TestAllSkyProxy:
         mock_upstream.iter_content.return_value = iter([b"fake-image-data"])
 
         with patch('blueprints.connectors_allsky.load_config', return_value=_config(_CFG_ALLSKY_ENABLED)):
-            with patch('connectors.allsky_connector.AllSkyConnector', return_value=mock_connector):
+            with patch('blueprints.connectors_allsky.AllSkyConnector', return_value=mock_connector):
                 with patch('requests.get', return_value=mock_upstream):
                     resp = client_user.get('/api/connectors/allsky/proxy?module=live_image')
         assert resp.status_code == 200
@@ -361,7 +361,7 @@ class TestAllSkyProxy:
         }
 
         with patch('blueprints.connectors_allsky.load_config', return_value=_config(_CFG_ALLSKY_ENABLED)):
-            with patch('connectors.allsky_connector.AllSkyConnector', return_value=mock_connector):
+            with patch('blueprints.connectors_allsky.AllSkyConnector', return_value=mock_connector):
                 with patch('requests.get', side_effect=_requests.exceptions.Timeout):
                     resp = client_user.get('/api/connectors/allsky/proxy?module=live_image')
         assert resp.status_code == 504
@@ -373,7 +373,7 @@ class TestAllSkyProxy:
         }
 
         with patch('blueprints.connectors_allsky.load_config', return_value=_config(_CFG_ALLSKY_ENABLED)):
-            with patch('connectors.allsky_connector.AllSkyConnector', return_value=mock_connector):
+            with patch('blueprints.connectors_allsky.AllSkyConnector', return_value=mock_connector):
                 with patch('requests.get', side_effect=_requests.exceptions.ConnectionError("refused")):
                     resp = client_user.get('/api/connectors/allsky/proxy?module=live_image')
         assert resp.status_code == 502
@@ -400,7 +400,7 @@ class TestAllSkyProxy:
             return mock_upstream
 
         with patch('blueprints.connectors_allsky.load_config', return_value=_config(_CFG_ALLSKY_ENABLED)):
-            with patch('connectors.allsky_connector.AllSkyConnector', return_value=mock_connector):
+            with patch('blueprints.connectors_allsky.AllSkyConnector', return_value=mock_connector):
                 with patch('requests.get', side_effect=_fake_get):
                     resp = client_user.get(
                         '/api/connectors/allsky/proxy?module=live_image',

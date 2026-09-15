@@ -28,6 +28,7 @@ if "psutil" not in sys.modules:
     sys.modules["psutil"] = types.ModuleType("psutil")
 
 from observation import astrodex
+from connectors.myastroshine_connector import MyAstroShineConnector
 from observation import myastroshine_integration as integration
 from utils.auth import user_manager
 
@@ -195,8 +196,6 @@ def test_listing_reports_astrodex_target_module(client_admin, env, monkeypatch):
 
 def test_listing_identity_comes_from_the_connector_class(client_admin, env, monkeypatch):
     """The card's identity has one source: MyAstroShineConnector, not the route."""
-    from connectors.myastroshine_connector import MyAstroShineConnector
-
     entry = _listed(client_admin, monkeypatch)
     assert entry["label"] == MyAstroShineConnector.label
     assert entry["description"] == MyAstroShineConnector.description
@@ -539,18 +538,18 @@ def test_mask_secret_variants():
 
 def test_rate_limited_trips_after_budget_then_window_evicts(monkeypatch):
     import blueprints.connectors_myastroshine as bp
-    from utils.constants import MYASTROSHINE_ENHANCED_RATE_LIMIT
+    from connectors.myastroshine_connector import MyAstroShineConnector
 
     bp._rate_hits.clear()
     now = [1000.0]
     monkeypatch.setattr(bp.time, "time", lambda: now[0])
     key = "10.0.0.1"
 
-    for _ in range(MYASTROSHINE_ENHANCED_RATE_LIMIT):
+    for _ in range(MyAstroShineConnector.ENHANCED_RATE_LIMIT):
         assert bp._rate_limited(key) is False
     assert bp._rate_limited(key) is True  # budget exhausted
 
-    now[0] += bp.MYASTROSHINE_ENHANCED_RATE_WINDOW_SECONDS + 1  # stale hits fall out of window
+    now[0] += MyAstroShineConnector.ENHANCED_RATE_WINDOW_SECONDS + 1  # stale hits fall out of window
     assert bp._rate_limited(key) is False
     bp._rate_hits.clear()
 
@@ -678,7 +677,7 @@ def test_enhanced_rejects_bad_handoff(client, env):
 def test_enhanced_rejects_oversized_content_length(client, env, admin_id, monkeypatch):
     item, picture = _seed(admin_id)
     handoff = _handoff_for(item, picture, admin_id)
-    monkeypatch.setattr("blueprints.connectors_myastroshine.MYASTROSHINE_MAX_IMAGE_BYTES", 64)
+    monkeypatch.setattr(MyAstroShineConnector, "MAX_IMAGE_BYTES", 64)
     payload = {"parameters": {}}
     oversized = b"\xff\xd8\xff" + b"0" * (2 * 1024 * 1024)  # > 64 + 1 MiB slack
     resp = client.post(
@@ -717,7 +716,7 @@ def test_enhanced_rejects_empty_image(client, env, admin_id):
 def test_enhanced_rejects_image_over_max_bytes(client, env, admin_id, monkeypatch):
     item, picture = _seed(admin_id)
     handoff = _handoff_for(item, picture, admin_id)
-    monkeypatch.setattr("blueprints.connectors_myastroshine.MYASTROSHINE_MAX_IMAGE_BYTES", 4)
+    monkeypatch.setattr(MyAstroShineConnector, "MAX_IMAGE_BYTES", 4)
     resp = client.post(
         "/api/astrodex/integration/enhanced",
         data={"handoff": handoff, "payload": "{}", "image": (io.BytesIO(b"\xff\xd8\xff\xff\xff\xff"), "e.jpg")},

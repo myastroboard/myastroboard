@@ -47,6 +47,15 @@ class MyAstroShineConnector(BaseConnector):
 
     URL_FIELDS = ("callback_url_override",)
 
+    # How long a signed handoff stays valid. The single-use ``jti`` is the real anti-replay
+    # guard; this TTL just bounds how long a leaked handoff URL could pull the source image.
+    HANDOFF_TTL_SECONDS = 12 * 60 * 60
+    # Cap on the enhanced JPEG MyAstroShine uploads back.
+    MAX_IMAGE_BYTES = 50 * 1024 * 1024  # 50 MB
+    # Sliding-window rate limit for the cookieless endpoints the container calls.
+    ENHANCED_RATE_LIMIT = 30  # max calls per client per window
+    ENHANCED_RATE_WINDOW_SECONDS = 60
+
     CONFIG_FIELDS = {
         "token": "",
         "signing_secret": "",
