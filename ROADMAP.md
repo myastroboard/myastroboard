@@ -12,9 +12,33 @@ MyAstroBoard is an **opinionated core, not a plugin platform.** Extensibility is
 
 - **Catalogues** - JSON cross-ref / standalone files (already the mechanism for Pensack 500, LBN, GaryImm, Arp, Sharpless, Barnard, vdB, Abell). Adding one is a JSON file plus a short registration block.
 - **Export formatters** - a small registry shipped with v2.1 (Stellarium, SkySafari, NINA, CSV).
-- **Connectors** - the `BaseConnector` contract, promoted to a documented public SDK in v1.6.
+- **Connectors** - the `BaseConnector` contract (talk to an external system, return data), hardened in-tree one connector at a time - see [below](#on-the-former-connector-sdk-and-mab-plugins-was-v16).
 
-The recipe per extension type lives in [docs/EXTENDING.md](docs/EXTENDING.md); the connector and export-formatter sections are filled in as v1.6 and v2.1 land.
+The recipe per extension type lives in [docs/EXTENDING.md](docs/EXTENDING.md); the connector recipe is already filled in, the export-formatter section is filled in as v2.1 lands.
+
+### On the former "Connector SDK and mab-plugins" (was v1.6)
+
+A public, versioned `BaseConnector` SDK plus a separate `myastroboard/mab-plugins` repository for
+community connectors - i.e. a connector catalogue - was previously slotted at v1.6. It is
+dropped:
+
+- A connector already gets its narrow, reviewable contract from `BaseConnector` itself - no
+  version-range negotiation or install-from-catalogue machinery has turned out to be needed to
+  get that. The 2026-09-15 connector refactor (MyAstroShine promoted to a first-class
+  `BaseConnector`, one module per connector on both sides, each connector owning its own
+  constants and declaring its `target_modules`) delivered the actual benefit the SDK was chasing -
+  a uniform, reviewable shape - without a public API surface or an external repository to
+  maintain compatibility against.
+- A separate curated repository is a distribution and moderation commitment (compatibility
+  matrix, reviewed PRs from strangers, an in-app installer) with no requester behind it yet. New
+  connectors keep landing directly in `backend/connectors/` by PR, same as AllSky and
+  MyAstroShine.
+- Reconsidered only if an external contributor actually shows up wanting to maintain a connector
+  MAB would rather not carry in-tree - the same bar the old v1.6 entry already set, just without
+  building the catalogue machinery in advance of that demand.
+
+The freed v1.6 slot goes to the MQTT Publisher connector below - a concrete, scoped connector,
+not the general-purpose SDK.
 
 ### On the former "Feature Registry" (was v1.5)
 
@@ -182,33 +206,30 @@ It adds a whole new surface (tab, sub-tabs, i18n namespace, aggregations). If bu
 
 ---
 
-### v1.6 - Connector SDK and mab-plugins
+### v1.6 - MQTT Publisher & Home Assistant Integration
 
 | | |
 |---|---|
-| **Why** | The one place the plugin idea genuinely pays off. A connector has a narrow, uniform contract - talk to an external system, return data - so a stranger can write one safely and it can be reviewed as a single unit; this is the real contributor on-ramp. A full vertical feature that owns its own UI, storage and i18n never can, which is why the extensibility story stops here rather than at feature-level plugins. `BaseConnector` already covers roughly half of it; this turns it into a documented, versioned public API with its own repository. |
+| **Why** | The connector pattern hardened through AllSky and MyAstroShine (one module per connector, `target_modules`, declared config/secret fields) is solid enough to point outward instead of only pulling data in. A lot of self-hosted astro setups already run Home Assistant for the rest of the observatory (power, roof, weather sensors); publishing MAB's own state as MQTT lets it show up on an existing HA dashboard instead of requiring a second one. Scoped as a publish-only connector - no inbound control, no device layer - so it does not need to wait for the v2.4+ live-equipment cluster. Replaces the dropped "Connector SDK and mab-plugins" idea in this slot - see [Architecture direction](#on-the-former-connector-sdk-and-mab-plugins-was-v16). |
 | **Effort** | Medium |
-| **Status** | 💡 Idea - subject to change. Trigger-based: pursue when the first external connector is requested that the core team would rather not carry in-tree. If a wow-feature is the better use of the slot, v2.0 (Interactive Sky Chart) can be pulled ahead of it. |
+| **Status** | 💡 Idea - scope still being studied |
 
-#### Connector SDK v2
+#### MQTT Publisher connector
 
-- Public, documented, versioned `BaseConnector` contract with a stability guarantee
-- Self-contained connector manifest (version, author, core version range, declared capabilities, health check) - defined here, not derived from a core-wide feature manifest
-- Declarative settings schema, so the Parameters -> Connectors form is generated instead of hand-written per connector
-- Per-connector i18n namespace
-- Health check and self-test as part of the contract, not per-connector improvisation
+- New `BaseConnector` in `backend/connectors/` - same shape as AllSky/MyAstroShine, but it pushes to a broker on an interval/on-event instead of being polled or polling an external API
+- Candidate topics (to be scoped - not locked in):
+  - Astrodex counters: photo count, distinct objects/constellations captured
+  - Plan My Night state: whether a plan is currently active, and for which target
+  - Equipment currently assigned to the active session
+- MQTT Discovery so entities appear in Home Assistant automatically, no manual YAML
 
-#### mab-plugins repository
+#### Companion Home Assistant cards repository
 
-- Separate repository (`myastroboard/mab-plugins`) holding community connectors
-- **Curated distribution**: connectors land through reviewed pull requests, not install-from-arbitrary-URL. A connector runs in-process with access to user data, so the trust boundary has to be a human review rather than a checkbox
-- Per-connector version and compatibility matrix against core versions
-- In-app browse and install from the curated index
-
-#### Migration
-
-- The existing AllSky connector becomes the first SDK v2 connector and the reference implementation
-- `docs/EXTENDING.md` gains the connector recipe (settings schema, i18n namespace, health check, test harness) with the AllSky connector as the worked example
+- Separate repository holding ready-made Home Assistant Lovelace cards/dashboard YAML that
+  consume the topics above - not a connector catalogue: this repo ships HA-side dashboard
+  definitions, not code that runs inside MAB, so it carries none of the trust-boundary and
+  compatibility-matrix concerns the dropped mab-plugins idea had
+- Gives a Home Assistant user a working MAB dashboard without hand-building cards from the topic list
 
 **i18n in 6 languages.**
 
@@ -277,7 +298,7 @@ Multi-panel planning for targets that exceed the sensor FOV - the multi-panel ex
 
 - User can set their Astrodex to public -> accessible at `/u/<username>` without login
 - Shareable link; optionally password-protected
-- Profile shows: captured objects, equipment used, observation stats (from v1.6)
+- Profile shows: captured objects, equipment used, observation stats (from v1.5)
 
 #### Export to external tools
 
@@ -306,7 +327,7 @@ Export Plan My Night or SkyTonight results as:
 | **Effort** | High |
 | **Status** | 💡 Idea - subject to change |
 
-Everything here that talks to an external system is built as an SDK v2 connector (v1.6) and lives in `mab-plugins`, not as bespoke in-core code. This release is the first real test of whether that contract is expressive enough for connectors that write back into MAB data rather than only reading.
+Everything here that talks to an external system is built as a `BaseConnector` in `backend/connectors/`, same as AllSky, MyAstroShine and the v1.6 MQTT publisher, not as bespoke in-core code. This release is the first real test of whether that contract is expressive enough for connectors that write back into MAB data rather than only reading.
 
 #### Plate solve (upload -> coordinates)
 
@@ -319,7 +340,7 @@ Everything here that talks to an external system is built as an SDK v2 connector
 
 - Upload a PHD2 `PHD2_GuideLog` file -> MAB parses: total guide time, RMS error, drift trend
 - Result attached to an Observation Log session (v1.3)
-- Session Analytics dashboard (v1.6) shows guiding quality trend per equipment combination over time
+- Session Analytics dashboard (v1.5) shows guiding quality trend per equipment combination over time
 
 #### NINA sequence export
 
@@ -351,7 +372,7 @@ Suggests the best target for tonight using signals already collected elsewhere i
 - Moon phase and position
 - Seeing & transparency (existing #forecast-astro)
 - User observation history (v1.3 Observation Log)
-- Wishlist (v1.6)
+- Wishlist (v1.5)
 - Available time window (Plan My Night)
 
 Additional features:
@@ -361,7 +382,7 @@ Additional features:
 - **Equipment recommendations** - suggest the best telescope/camera combo from the user's equipment list for a given target
 - **Exposure recommendations** - suggest sub-exposure length and total integration time based on target surface brightness, moon phase, and historical results for similar targets
 
-**Prerequisites** - meaningful recommendations need v1.3 (Observation Log) and v1.6 (Session Analytics/Wishlist) as data sources, and benefit from v2.0 (Sky Chart) for target context.
+**Prerequisites** - meaningful recommendations need v1.3 (Observation Log) and v1.5 (Session Analytics/Wishlist) as data sources, and benefit from v2.0 (Sky Chart) for target context.
 
 **i18n in 6 languages.**
 
@@ -445,7 +466,7 @@ Coordinates:
 - NINA
 - PHD2
 - ASCOM Alpaca
-- Home Assistant *(net-new connector, built on the v1.6 SDK like the others)*
+- Home Assistant *(extends the v1.6 MQTT Publisher connector with inbound control, rather than a net-new connector)*
 - Weather
 - Notifications
 
@@ -458,7 +479,7 @@ One-click night:
 5. Park mount
 6. Generate report
 
-**Prerequisites** - v2.4, v2.5, v2.6; adds a new Home Assistant connector for power/roof/dome control.
+**Prerequisites** - v2.4, v2.5, v2.6; upgrades the v1.6 Home Assistant connector from publish-only to power/roof/dome control.
 
 **i18n in 6 languages.**
 
@@ -474,16 +495,16 @@ One-click night:
 
 #### Feature-level modularity (probably never)
 
-The public connector API and curated repository ship in v1.6. What this section once committed to - promoting **core features** (SkyTonight, Astrodex, Plan My Night, Equipment...) from internal modules to separately installable units - is now an explicit "probably never":
+A public connector API and curated community repository was once the plan for this slot (see [Architecture direction](#on-the-former-connector-sdk-and-mab-plugins-was-v16)); that idea is dropped, connectors stay in-tree. What this section once committed to - promoting **core features** (SkyTonight, Astrodex, Plan My Night, Equipment...) from internal modules to separately installable units - is now an explicit "probably never":
 
 - Nobody self-hosting a planning app wants "SkyTonight without Astrodex". The install base that benefits from feature-level modularity is tiny, and the features are deeply interdependent (Plan My Night without SkyTonight is meaningless, Astrodex without Equipment loses picture metadata)
 - It needs a dependency solver plus graceful degradation for every meaningful subset. The state space grows as 2^N and the features are not independent, so this is a deliberate and permanent maintenance cost, not a free consequence of modularity
 - Reconsidered only if MyAstroBoard reaches genuine multi-maintainer scale **and** the incremental boundary work (no cycles, per-feature i18n, core vs feature routes) has actually landed by then - neither is assumed
-- The community integration surface (NINA, PHD2, ASCOM Alpaca, INDI, Seestar, Stellarium, Home Assistant, weather providers, AllSky) already grows through the v1.6 connector SDK without one person maintaining every connector - that is the modularity that matters, and it does not require this step
+- The community integration surface (NINA, PHD2, ASCOM Alpaca, INDI, Seestar, Stellarium, Home Assistant, weather providers, AllSky) already grows through the same in-tree `BaseConnector` contract, PR by PR, without one person maintaining every connector - that is the modularity that matters, and it does not require a public SDK or an external repository
 
 #### Intelligent journal (observatory memory)
 
-Natural-language queries over the history accumulated in Observation Log (v1.3) and Session Analytics (v1.6), e.g.:
+Natural-language queries over the history accumulated in Observation Log (v1.3) and Session Analytics (v1.5), e.g.:
 
 - "What's my best image of M31?"
 - "Which setup works best for galaxies?"
@@ -511,7 +532,7 @@ Also:
 | v1.3 | Observation Log | Intermediate+ | High | ✅ Implemented |
 | v1.4 | Planning Intelligence (visibility calendar, meridian flip, advanced filters) | Advanced | High | ✅ Implemented |
 | v1.5 | Session Analytics | All | Medium | 💡 Idea |
-| v1.6 | Connector SDK and mab-plugins | All | Medium | 💡 Idea |
+| v1.6 | MQTT Publisher & Home Assistant Integration | All | Medium | 💡 Idea |
 | v2.0 | Interactive Sky Chart + mosaic planner | All | High | 💡 Idea |
 | v2.1 | Community & Sharing | All | Medium | 💡 Idea |
 | v2.2 | Integrations (plate solve, PHD2, NINA) | Advanced | High | 💡 Idea |

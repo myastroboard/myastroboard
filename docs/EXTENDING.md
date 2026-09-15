@@ -13,7 +13,7 @@ i18n namespace, its own cache jobs - that is a core change, not an extension. Op
 |---|---|---|---|
 | Translation | A new UI language, or fixes to an existing one | Available | [7.TRANSLATIONS.md](7.TRANSLATIONS.md) |
 | Target catalogue | Cross-references or standalone deep-sky objects in SkyTonight | Available | [below](#target-catalogue) |
-| Connector | A read-only bridge to an external astronomy tool, surfaced in the app tabs it declares | Available; formal public SDK planned for v1.6 | [CONNECTORS.md - Adding a new connector](CONNECTORS.md#adding-a-new-connector) |
+| Connector | A bridge to an external astronomy tool, surfaced in the app tabs it declares | Available | [CONNECTORS.md - Adding a new connector](CONNECTORS.md#adding-a-new-connector) |
 | Export formatter | A new "export Plan My Night / SkyTonight as X" format (Stellarium, SkySafari, NINA...) | Planned for v2.1 - no stable contract yet | - |
 
 Every extension follows the project-wide rules in
@@ -93,9 +93,9 @@ A connector is the safest kind of third-party contribution because its contract 
 to an external system, return data. It does **not** own UI, user storage, or an i18n namespace
 of its own beyond its settings labels.
 
-v1.6 turns `BaseConnector` into a documented, versioned public SDK with a separate
-`myastroboard/mab-plugins` repository and a curated (reviewed-PR) distribution model. Until then,
-new connectors land directly in `backend/connectors/` by PR.
+There is no public SDK or external plugin repository planned - that idea was dropped (see
+[ROADMAP.md - Architecture direction](../ROADMAP.md#on-the-former-connector-sdk-and-mab-plugins-was-v16)).
+New connectors land directly in `backend/connectors/` by PR, same as AllSky and MyAstroShine.
 
 > **A connector is a connector.** MyAstroShine
 > ([MYASTROSHINE.md](MYASTROSHINE.md)) is bidirectional and owns UI in the Astrodex tab, but it
