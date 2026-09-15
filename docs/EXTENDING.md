@@ -13,7 +13,7 @@ i18n namespace, its own cache jobs - that is a core change, not an extension. Op
 |---|---|---|---|
 | Translation | A new UI language, or fixes to an existing one | Available | [7.TRANSLATIONS.md](7.TRANSLATIONS.md) |
 | Target catalogue | Cross-references or standalone deep-sky objects in SkyTonight | Available | [below](#target-catalogue) |
-| Connector | A read-only bridge to an external astronomy tool, surfaced in the Observatory tab | Available; formal public SDK planned for v1.6 | [CONNECTORS.md - Adding a new connector](CONNECTORS.md#adding-a-new-connector) |
+| Connector | A bridge to an external astronomy tool, surfaced in the app tabs it declares | Available | [CONNECTORS.md - Adding a new connector](CONNECTORS.md#adding-a-new-connector) |
 | Export formatter | A new "export Plan My Night / SkyTonight as X" format (Stellarium, SkySafari, NINA...) | Planned for v2.1 - no stable contract yet | - |
 
 Every extension follows the project-wide rules in
@@ -84,24 +84,29 @@ note and in the PR description.
 
 A connector is a Python class extending `BaseConnector`
 (`backend/connectors/base_connector.py`), registered in `backend/connectors/__init__.py`,
-exposing one or more independently-toggleable modules. Its data appears in the **Observatory**
-tab. Full recipe: [CONNECTORS.md - Adding a new connector](CONNECTORS.md#adding-a-new-connector).
+exposing one or more independently-toggleable modules. Its data appears in the app tabs it
+names in `target_modules` — `["observatory"]` for AllSky, and legitimately `[]` for a
+self-contained connector that feeds no existing tab.
+Full recipe: [CONNECTORS.md - Adding a new connector](CONNECTORS.md#adding-a-new-connector).
 
 A connector is the safest kind of third-party contribution because its contract is narrow: talk
 to an external system, return data. It does **not** own UI, user storage, or an i18n namespace
 of its own beyond its settings labels.
 
-v1.6 turns `BaseConnector` into a documented, versioned public SDK with a separate
-`myastroboard/mab-plugins` repository and a curated (reviewed-PR) distribution model. Until then,
-new connectors land directly in `backend/connectors/` by PR.
+There is no public SDK or external plugin repository planned - that idea was dropped (see
+[ROADMAP.md - Architecture direction](../ROADMAP.md#on-the-former-connector-sdk-and-mab-plugins-was-v16)).
+New connectors land directly in `backend/connectors/` by PR, same as AllSky and MyAstroShine.
 
-> **Not every "connector" is a `BaseConnector`.** The MyAstroShine integration
-> ([MYASTROSHINE.md](MYASTROSHINE.md)) is bidirectional, owns UI in the Astrodex tab, and has its
-> own routes - it is a core feature, not an extension point. It is stored under
-> `config["connectors"]["myastroshine"]` only so it rides along in the backup ZIP, and is
-> deliberately absent from the `REGISTRY`, `GET /api/connectors`, and the Observatory tab. A new
-> read-only bridge to an external tool is a `BaseConnector`; anything that writes back into
-> MyAstroBoard data or owns its own screen is a core change - open a discussion first.
+> **A connector is a connector.** MyAstroShine
+> ([MYASTROSHINE.md](MYASTROSHINE.md)) is bidirectional and owns UI in the Astrodex tab, but it
+> is still an optional bridge to an external service that the user switches on or off - so it is
+> a `BaseConnector` in the `REGISTRY`, listed by `GET /api/connectors`, and rendered by the same
+> card as AllSky. What differs is carried declaratively: `SECRET_FIELDS` for its credentials,
+> `CONFIG_FIELDS` for its extra settings, `target_modules = ["astrodex"]` for where its data
+> lands, and an empty `MODULES` because the round-trip has no independently-toggleable parts.
+>
+> Anything that writes back into MyAstroBoard data or owns its own screen still needs a core
+> change alongside the connector - open a discussion first.
 
 ---
 

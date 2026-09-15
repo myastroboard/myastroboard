@@ -157,8 +157,7 @@ Connector configuration is stored in `config.json → connectors.<name>`. See [C
       "sensor_data":     { "enabled": false },
       "keogram":         { "enabled": true },
       "startrails":      { "enabled": false },
-      "daily_timelapse": { "enabled": false },
-      "mini_timelapse":  { "enabled": false }
+      "daily_timelapse": { "enabled": false }
     }
   }
 }

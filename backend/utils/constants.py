@@ -93,20 +93,6 @@ MOON_ALTITUDE_PRACTICAL = 5  # Degrees - minimum moon altitude for visibility
 WIND_TRACKING_THRESHOLD = 15.0  # km/h - wind speed that affects mount tracking
 ASTRO_BEST_PERIOD_MIN_DURATION_HOURS = 2.0  # Hide short windows that are not practical for setup/imaging
 
-# Connector cache TTLs
-CACHE_TTL_ALLSKY_SENSOR = 300  # 5 min  - live sensor data (temp, gain, etc.)
-CACHE_TTL_ALLSKY_HEALTH = 300  # 5 min  - per-module reachability checks
-
-# MyAstroShine integration (AstroDex <-> MyAstroShine image round-trip)
-# 12 h covers a full evening editing session (open MyAstroShine, process, come
-# back later, send the result home). The single-use ``jti`` is the real
-# anti-replay guard; this TTL just bounds how long a leaked handoff URL could
-# pull the source image.
-MYASTROSHINE_HANDOFF_TTL_SECONDS = 12 * 60 * 60
-MYASTROSHINE_MAX_IMAGE_BYTES = 50 * 1024 * 1024  # 50 MB - cap on the enhanced JPEG upload
-MYASTROSHINE_ENHANCED_RATE_LIMIT = 30  # max cookieless integration calls per client per window
-MYASTROSHINE_ENHANCED_RATE_WINDOW_SECONDS = 60  # sliding window for the rate limit above
-
 # Logging configuration
 LOG_MAX_BYTES = 10 * 1024 * 1024  # 10MB
 LOG_BACKUP_COUNT = 5

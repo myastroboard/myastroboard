@@ -34,6 +34,19 @@ CORS to open on MyAstroShine.
 
 ## Setup
 
+**Minimum version**: MyAstroShine **v0.4.0** - older releases do not implement the pull + webhook
+round-trip described above. The connector card shows this requirement as a *Requires v0.4.0*
+line; it is informational, not enforced, since MyAstroShine only reports its own version once a
+handoff completes (stored per picture as `enhanced_source_version`).
+
+That version, and everything else the card shows, is declared on `MyAstroShineConnector`
+(`backend/connectors/myastroshine_connector.py`) - a `BaseConnector` in the `REGISTRY`, listed by
+`GET /api/connectors` and saved through `POST /api/connectors/myastroshine/config` like any other
+connector. See [CONNECTORS.md](CONNECTORS.md#myastroshine-connector).
+
+The token and signing secret are declared as `SECRET_FIELDS`, so the listing masks them and a
+blank submission keeps the stored value: they are never sent to the browser.
+
 ### 1. Create a token in MyAstroShine
 
 MyAstroShine -> Settings -> Tokens -> New. You get a **token** (`mas_...`) and a **signing
@@ -86,7 +99,7 @@ Shine    --POST /enhanced  (multipart + signature)-->  Board        new duplicat
 - Payload: `{ kid, callback_base, item_id, picture_id, user_id, iat, exp, jti }`.
   `kid` = the first 12 chars of the token. `callback_base` is set by the board only (never user
   input) - it is still re-checked against MyAstroShine's allowlist before any callback.
-- **TTL 12 h** (`MYASTROSHINE_HANDOFF_TTL_SECONDS`) - long enough for a full evening editing
+- **TTL 12 h** (`MyAstroShineConnector.HANDOFF_TTL_SECONDS`) - long enough for a full evening editing
   session. **Single use**: the `jti` is marked spent when `/enhanced` succeeds, so a replay is
   rejected with `409`. The spent-jti set is kept in memory and mirrored to
   `data/astrodex/myastroshine_consumed_handoffs.json` so a worker restart still blocks a replay.
@@ -143,7 +156,7 @@ These are **not** editable - they are absent from `update_picture()`'s allowed f
 ## Security summary
 
 - `source` / `source/image` / `enhanced`: no session cookie; handoff signature checked first, in
-  constant time; rate-limited; upload size capped at `MYASTROSHINE_MAX_IMAGE_BYTES` (50 MB).
+  constant time; rate-limited; upload size capped at `MyAstroShineConnector.MAX_IMAGE_BYTES` (50 MB).
 - `callback_base` is board-set and re-verified against MyAstroShine's allowlist.
 - The handoff pins `user_id` + `item_id` + `picture_id`, so a return can only ever write into that
   user's Astrodex, on that item. All three are re-checked to a strict uuid shape at every entry
@@ -157,10 +170,15 @@ These are **not** editable - they are absent from `update_picture()`'s allowed f
 
 ---
 
-## Not a connector
+## A connector, with two particularities
 
-Despite living under `config.connectors.myastroshine`, this is **not** a `BaseConnector`: it is
-bidirectional, owns UI in the Astrodex tab, and has its own routes
-(`backend/blueprints/myastroshine_integration.py`, `backend/observation/myastroshine_integration.py`).
-It is stored there only so it rides along in the backup ZIP and stays next to the other connector
-config. It is deliberately absent from `GET /api/connectors` and the Observatory tab.
+This is a `BaseConnector` like AllSky — in the `REGISTRY`, listed by `GET /api/connectors`,
+stored under `config.connectors.myastroshine`, and rendered by the same card. Two things set it
+apart, both declared rather than special-cased:
+
+- **It is bidirectional.** The browser hands a photo to MyAstroShine and the MyAstroShine
+  container posts the enhanced result back, so it authenticates — hence `SECRET_FIELDS` and the
+  cookieless callback routes in `backend/blueprints/connectors_myastroshine.py` (logic in
+  `backend/observation/myastroshine_integration.py`).
+- **It surfaces in the AstroDex, not the Observatory** — `target_modules = ["astrodex"]`, and it
+  has no Observatory panel.

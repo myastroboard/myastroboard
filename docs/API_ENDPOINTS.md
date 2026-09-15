@@ -150,7 +150,8 @@ This page lists the HTTP routes currently declared across `backend/blueprints/*.
 
 ## Connectors
 
-- `GET /api/connectors` — List all available connectors with installed/enabled state and module config
+- `GET /api/connectors` — List all registered connectors with installed/enabled state, module config, `target_modules` (app tabs the connector surfaces in), and a config block whose `SECRET_FIELDS` are masked (`****` + last 4, plus a `has_<field>` boolean)
+- `POST /api/connectors/<name>/config` (admin) — Save one connector's config; merged server-side, and a blank or still-masked secret means "keep current"
 - `GET /api/connectors/allsky/status` — Return cached AllSky sensor data (`allskydata.json`); requires `sensor_data` module enabled
 - `GET /api/connectors/allsky/health` — Run a per-module health check against the AllSky instance; accepts `?fresh=1` to bypass cache
 - `GET /api/connectors/allsky/urls` — Return proxy URLs for all enabled AllSky modules; accepts `?date=YYYYMMDD`
@@ -190,9 +191,7 @@ This page lists the HTTP routes currently declared across `backend/blueprints/*.
 AstroDex <-> MyAstroShine image round-trip. Not a `BaseConnector` - config lives under `config.connectors.myastroshine` but the routes and UI are AstroDex-side.
 
 - `GET /api/astrodex/integration/status` - `{ enabled: bool }` - drives the per-photo "Send to MyAstroShine" button
-- `GET /api/astrodex/integration/config` - Connector-card config; `token`/`signing_secret` are masked (`****` + last 4)
-- `POST /api/astrodex/integration/config` (admin) - Save the card; a blank or masked secret field means "keep current"
-- `POST /api/astrodex/integration/test` (admin) - Best-effort server-side reachability probe of `<url>/api/health` (loopback / link-local / unspecified / multicast refused)
+- `GET|POST /api/connectors/myastroshine/health` - Best-effort reachability probe of `<url>/api/health` (loopback / link-local / unspecified / multicast refused). GET probes the saved URL, POST the one in the body. The card's config is served by the shared connector routes above
 - `POST /api/astrodex/integration/handoff` - Mint a signed, single-use handoff token for one of the caller's own pictures; returns `{ handoff, myastroshine_url, open_url }`
 - `GET /api/astrodex/integration/source?handoff=<token>` - **No session cookie** (MyAstroShine container calls it). Source picture metadata for a valid handoff
 - `GET /api/astrodex/integration/source/image?handoff=<token>` - **No session cookie.** Source image bytes

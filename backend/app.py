@@ -130,6 +130,8 @@ from blueprints.auth import auth_bp
 from blueprints.push import push_bp
 from blueprints.locations import locations_bp
 from blueprints.connectors import connectors_bp
+from blueprints.connectors_allsky import connectors_allsky_bp
+from blueprints.connectors_myastroshine import connectors_myastroshine_bp
 from blueprints.admin import admin_bp
 from blueprints.misc import misc_bp
 from blueprints.weather import weather_bp
@@ -137,7 +139,6 @@ from blueprints.tracking import tracking_bp
 from blueprints.astronomy import astronomy_bp
 from blueprints.plan_my_night import plan_my_night_bp
 from blueprints.astrodex import astrodex_bp
-from blueprints.myastroshine_integration import myastroshine_bp
 from blueprints.equipment import equipment_bp
 from blueprints.observation_sessions import observation_sessions_bp
 
@@ -146,6 +147,8 @@ app.register_blueprint(auth_bp)
 app.register_blueprint(push_bp)
 app.register_blueprint(locations_bp)
 app.register_blueprint(connectors_bp)
+app.register_blueprint(connectors_allsky_bp)
+app.register_blueprint(connectors_myastroshine_bp)
 app.register_blueprint(admin_bp)
 app.register_blueprint(misc_bp)
 app.register_blueprint(weather_bp)
@@ -153,7 +156,6 @@ app.register_blueprint(tracking_bp)
 app.register_blueprint(astronomy_bp)
 app.register_blueprint(plan_my_night_bp)
 app.register_blueprint(astrodex_bp)
-app.register_blueprint(myastroshine_bp)
 app.register_blueprint(equipment_bp)
 app.register_blueprint(observation_sessions_bp)
 
@@ -341,34 +343,51 @@ try:
 except Exception as e:  # pragma: no cover
     logger.error(f'Failed to purge legacy plan files on startup: {e}', exc_info=True)
 
-# Initialize cache scheduler FIRST so its cache_ready_event can be passed to
-# the SkyTonight scheduler, ensuring DSO calculations run on warm caches.
-try:
-    logger.info("Initializing cache scheduler on application startup...")
-    get_or_create_cache_scheduler()
-except Exception as e:  # pragma: no cover
-    logger.error(f"Failed to initialize cache scheduler on startup: {e}", exc_info=True)
+# The three schedulers below spawn real, persistent background threads that keep
+# running - and keep overwriting shared in-memory caches - for the life of the
+# process. Test modules import this file at pytest collection time (before any
+# fixture can intervene), so left unguarded these threads race live against
+# whatever a test just monkeypatched, causing order-dependent failures far from
+# the scheduler code itself. Tests that exercise these functions directly (e.g.
+# TestCacheSchedulerManagement) call get_or_create_cache_scheduler() /
+# get_or_create_skytonight_scheduler() / push_scheduler.start() themselves and
+# are unaffected by skipping the auto-start below.
+_AUTOSTART_SCHEDULERS = 'pytest' not in sys.modules
+
+if _AUTOSTART_SCHEDULERS:
+    # Initialize cache scheduler FIRST so its cache_ready_event can be passed to
+    # the SkyTonight scheduler, ensuring DSO calculations run on warm caches.
+    try:
+        logger.info("Initializing cache scheduler on application startup...")
+        get_or_create_cache_scheduler()
+    except Exception as e:  # pragma: no cover
+        logger.error(f"Failed to initialize cache scheduler on startup: {e}", exc_info=True)
+
+    try:
+        logger.info('Initializing SkyTonight scheduler on application startup...')
+        _cache_sched = app.config.get('cache_scheduler')
+        get_or_create_skytonight_scheduler(
+            app, cache_ready_event=_cache_sched.cache_ready_event if _cache_sched is not None else None
+        )
+    except Exception as e:  # pragma: no cover
+        logger.error(f'Failed to initialize SkyTonight scheduler on startup: {e}', exc_info=True)
+
+    try:
+        logger.info('Initializing push notification scheduler on application startup...')
+        from utils import push_scheduler as _push_scheduler
+
+        _push_scheduler.start()
+    except Exception as e:  # pragma: no cover
+        logger.error(f'Failed to initialize push scheduler on startup: {e}', exc_info=True)
 
 try:
-    logger.info('Initializing SkyTonight scheduler on application startup...')
-    _cache_sched = app.config.get('cache_scheduler')
-    get_or_create_skytonight_scheduler(
-        app, cache_ready_event=_cache_sched.cache_ready_event if _cache_sched is not None else None
-    )
-except Exception as e:  # pragma: no cover
-    logger.error(f'Failed to initialize SkyTonight scheduler on startup: {e}', exc_info=True)
-
-try:
-    logger.info('Initializing push notification scheduler on application startup...')
-    from utils import push_scheduler as _push_scheduler
-
-    _push_scheduler.start()
-    # Generate VAPID keys early so the first /api/push/vapid-public-key request is instant
+    # Generate VAPID keys early so the first /api/push/vapid-public-key request is instant.
+    # A one-shot file write, not a recurring thread, so this stays unconditional.
     from utils.push_manager import load_or_generate_vapid_keys as _init_vapid
 
     _init_vapid()
 except Exception as e:  # pragma: no cover
-    logger.error(f'Failed to initialize push scheduler on startup: {e}', exc_info=True)
+    logger.error(f'Failed to generate VAPID keys on startup: {e}', exc_info=True)
 
 try:
     # Warm the system-metrics disk-usage cache in the background so the first

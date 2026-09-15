@@ -28,6 +28,10 @@ import sys
 import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
+
+# The two AllSky cache TTLs are the connector's own, declared on its class.
+# connectors/ imports nothing from cache/, so this edge closes no cycle.
+from connectors.allsky_connector import AllSkyConnector
 from utils.constants import (
     WEATHER_CACHE_TTL,
     DATA_DIR_CACHE,
@@ -52,8 +56,6 @@ from utils.constants import (
     CACHE_TTL_SPACEFLIGHT_ASTRONAUTS,
     CACHE_TTL_SPACEFLIGHT_EVENTS,
     CACHE_TTL_IERS,
-    CACHE_TTL_ALLSKY_SENSOR,
-    CACHE_TTL_ALLSKY_HEALTH,
 )
 
 # Windows-compatible file locking
@@ -692,9 +694,9 @@ def get_cache_init_status(location_ids=None):
         }
     )
     if allsky_sensor_available:
-        status["allsky_sensor"] = _is_execution_metrics_valid("allsky_sensor", CACHE_TTL_ALLSKY_SENSOR)
+        status["allsky_sensor"] = _is_execution_metrics_valid("allsky_sensor", AllSkyConnector.SENSOR_CACHE_TTL)
     if allsky_health_available:
-        status["allsky_health"] = _is_execution_metrics_valid("allsky_health", CACHE_TTL_ALLSKY_HEALTH)
+        status["allsky_health"] = _is_execution_metrics_valid("allsky_health", AllSkyConnector.HEALTH_CACHE_TTL)
 
     per_location = {
         location_id: {name: _loc_valid(name, location_id) for name in LOCATION_SCOPED_CACHE_TTLS}
@@ -723,8 +725,8 @@ def get_cache_init_status(location_ids=None):
                 "iers": CACHE_TTL_IERS,
                 # Jobs that can never run (connector/module not configured)
                 # must not appear in the metrics table as permanently "stale".
-                **({"allsky_sensor": CACHE_TTL_ALLSKY_SENSOR} if allsky_sensor_available else {}),
-                **({"allsky_health": CACHE_TTL_ALLSKY_HEALTH} if allsky_health_available else {}),
+                **({"allsky_sensor": AllSkyConnector.SENSOR_CACHE_TTL} if allsky_sensor_available else {}),
+                **({"allsky_health": AllSkyConnector.HEALTH_CACHE_TTL} if allsky_health_available else {}),
             },
             "execution_metrics": get_cache_metrics(),
         }

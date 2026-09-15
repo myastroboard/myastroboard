@@ -131,7 +131,7 @@ def test_mint_and_verify_handoff_roundtrip():
     assert claims["user_id"] == _UID
     assert claims["callback_base"] == "https://astro.example.com"
     assert claims["kid"] == _TOKEN[:12]
-    assert claims["exp"] - claims["iat"] == integration.MYASTROSHINE_HANDOFF_TTL_SECONDS
+    assert claims["exp"] - claims["iat"] == integration.MyAstroShineConnector.HANDOFF_TTL_SECONDS
 
 
 def test_verify_handoff_rejects_tampered_signature():
@@ -156,7 +156,7 @@ def test_verify_handoff_rejects_malformed_identifiers():
 def test_verify_handoff_rejects_expired(monkeypatch):
     token = _mint()
     real_time = time.time
-    far_future = real_time() + integration.MYASTROSHINE_HANDOFF_TTL_SECONDS + 10
+    far_future = real_time() + integration.MyAstroShineConnector.HANDOFF_TTL_SECONDS + 10
     monkeypatch.setattr(integration.time, "time", lambda: far_future)
     assert integration.verify_handoff(_cfg(), token) is None
 

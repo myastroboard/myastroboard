@@ -30,6 +30,10 @@ from weather.weather_openmeteo import get_hourly_forecast
 from weather.weather_astro import get_astro_weather_analysis
 from utils import slugify_location_name, _sanitize_for_json
 from cache import cache_store
+
+# The two AllSky cache TTLs are the connector's own, declared on its class.
+# connectors/ imports nothing from cache/, so this edge closes no cycle.
+from connectors.allsky_connector import AllSkyConnector
 from utils.constants import (
     WEATHER_CACHE_TTL,
     CACHE_TTL_MOON_REPORT,
@@ -52,8 +56,6 @@ from utils.constants import (
     CACHE_TTL_SPACEFLIGHT_ASTRONAUTS,
     CACHE_TTL_SPACEFLIGHT_EVENTS,
     CACHE_TTL_IERS,
-    CACHE_TTL_ALLSKY_SENSOR,
-    CACHE_TTL_ALLSKY_HEALTH,
 )
 
 # Initialize logger for this module
@@ -1085,8 +1087,6 @@ def update_allsky_sensor_cache(config=None):
     if not allsky_cfg.get("modules", {}).get("sensor_data", {}).get("enabled"):
         return
 
-    from connectors.allsky_connector import AllSkyConnector
-
     connector = AllSkyConnector(allsky_cfg)
     data = connector.fetch_sensor_data()
     now_ts = time.time()
@@ -1103,8 +1103,6 @@ def update_allsky_health_cache(config=None):
     allsky_cfg = config.get("connectors", {}).get("allsky", {})
     if not allsky_cfg.get("enabled") or not allsky_cfg.get("url"):
         return
-
-    from connectors.allsky_connector import AllSkyConnector
 
     result = AllSkyConnector(allsky_cfg).health_check()
     cache_store._allsky_health_cache["data"] = result
@@ -1313,7 +1311,7 @@ def fully_initialize_caches():
                         "allsky_sensor",
                         None,
                         partial(update_allsky_sensor_cache, config=config),
-                        CACHE_TTL_ALLSKY_SENSOR,
+                        AllSkyConnector.SENSOR_CACHE_TTL,
                         cache_store._allsky_sensor_cache,
                     )
                 )
@@ -1322,7 +1320,7 @@ def fully_initialize_caches():
                     "allsky_health",
                     None,
                     partial(update_allsky_health_cache, config=config),
-                    CACHE_TTL_ALLSKY_HEALTH,
+                    AllSkyConnector.HEALTH_CACHE_TTL,
                     cache_store._allsky_health_cache,
                 )
             )

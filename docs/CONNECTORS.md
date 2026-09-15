@@ -1,6 +1,6 @@
 # Connectors
 
-Connectors integrate external astronomy tools into MyAstroBoard. Once configured and enabled, a connector's data appears in the **Observatory** tab.
+Connectors integrate external astronomy tools into MyAstroBoard. Once configured and enabled, a connector's data appears in the app tabs it declares — AllSky feeds the **Observatory** tab, MyAstroShine feeds the **AstroDex**, and a connector may feed no tab at all.
 
 ---
 
@@ -9,6 +9,64 @@ Connectors integrate external astronomy tools into MyAstroBoard. Once configured
 Connectors are Python classes that extend `BaseConnector` (`backend/connectors/base_connector.py`) and are registered in `backend/connectors/__init__.py`. Each connector exposes one or more **modules** — discrete features that can be independently enabled or disabled.
 
 The registry is discovered at runtime and served via `GET /api/connectors`.
+
+### File layout
+
+One module per connector on each side, named after it:
+
+| | Shared | AllSky | MyAstroShine |
+|---|---|---|---|
+| Connector | `connectors/base_connector.py` | `connectors/allsky_connector.py` | `connectors/myastroshine_connector.py` |
+| Blueprint | `blueprints/connectors.py` | `blueprints/connectors_allsky.py` | `blueprints/connectors_myastroshine.py` |
+| Tests | `tests/blueprints/test_connectors.py` | `tests/blueprints/test_connectors_allsky.py` | `tests/blueprints/test_connectors_myastroshine.py` |
+
+`blueprints/connectors.py` serves the two routes every connector shares — the listing and the
+config save; a connector's own routes go in its own blueprint module, registered in
+`backend/app.py`.
+
+### Declaring a connector
+
+Beyond `name` / `label` / `description` / `min_version` / `homepage`, a connector says what it
+needs through class attributes, so the shared listing, save route and card can handle it without
+special-casing:
+
+| Attribute | Purpose |
+|---|---|
+| `MODULES` | Independently-toggleable features. Empty is valid — the card then shows no Modules section |
+| `target_modules` | App tabs the data lands in (see above). Empty = standalone |
+| `CONFIG_FIELDS` | Settable config keys beyond `label` / `url` / `enabled` / `modules`, as `{key: default}`. `POST /api/connectors/<name>/config` accepts these and nothing else |
+| `SECRET_FIELDS` | Keys holding credentials. Masked by `GET /api/connectors`; a blank or still-masked submission means "keep the stored value" |
+| `URL_FIELDS` | Keys among `CONFIG_FIELDS` holding a URL, so the save strips their trailing slash |
+
+A connector's own tuning knobs (cache TTLs, size caps, rate limits) are class attributes too,
+not entries in `utils/constants.py` — adding a connector should not mean editing a shared file.
+
+`is_configured()` says what "installed" means (a base URL by default; MyAstroShine also requires
+its credentials). Only `health_check()` must be implemented — `get_module_urls()` and
+`fetch_sensor_data()` default to empty, for a connector that serves no browser-fetched resource
+and no live readings.
+
+### Secrets
+
+Credentials never reach the browser. `GET /api/connectors` is readable by any signed-in user, so
+it replaces every `SECRET_FIELDS` value with `****` + the last 4 characters and adds a
+`has_<field>` boolean; the card shows the masked form as an input placeholder and submits the
+field blank unless the admin types a new value. The merge happens server-side in
+`POST /api/connectors/<name>/config` (admin only), so a value the browser was never given cannot
+be echoed back and overwrite the real one.
+
+### Target modules
+
+A connector also declares `target_modules` — the list of app tabs where its data shows up:
+
+```python
+class AllSkyConnector(BaseConnector):
+    target_modules = ["observatory"]
+```
+
+Slugs match the navbar tab keys (`observatory`, `astrodex`, `weather`, `skytonight`, …) so the UI can reuse the existing translations; `static/js/connectors/connectors.js` maps them in `_TARGET_MODULE_I18N_KEYS`. The connector card renders one translated badge per slug under the description.
+
+The list is purely declarative — nothing is routed or wired from it. An **empty list is a valid, meaningful value**: it means the connector is self-contained and adds nothing to an existing tab (a future MQTT bridge, for example), and the card then shows a single *Standalone* badge.
 
 ---
 
@@ -22,10 +80,13 @@ Each connector card shows its current status badge (Enabled / Installed / Not in
 |-------|-------------|
 | **Display label** | Custom name shown in the Observatory tab header |
 | **Base URL** | Root URL of the external service (e.g. `http://192.168.1.42`) |
-| **Enable connector** | Toggle to activate this connector and expose it in Observatory |
+| **Enable connector** | Toggle to activate this connector and expose it in its target tabs |
 | **Modules** | Per-feature toggles — each module can be independently enabled |
 
-Configuration is stored in `config.json → connectors.<name>`.
+Under the description each card shows an **Appears in** row: one badge per app tab the connector feeds, or a *Standalone* badge when it feeds none.
+
+Configuration is stored in `config.json → connectors.<name>`, written by
+`POST /api/connectors/<name>/config`.
 
 ### Base URL — use a static IP address
 
@@ -45,9 +106,11 @@ The **health-check button** (heart icon, after saving) runs a full per-module pr
 
 ## AllSky connector
 
-[AllSky](https://github.com/thomasjacquin/allsky) is an open-source all-sky camera system. It serves data entirely through file serving (no REST API).
+[AllSky](https://github.com/AllskyTeam/allsky) is an open-source all-sky camera system. It serves data entirely through file serving (no REST API).
 
-**Minimum version**: v2023.1
+**Minimum version**: v2024.12
+
+**Appears in**: Observatory
 
 ### Modules
 
@@ -58,7 +121,6 @@ The **health-check button** (heart icon, after saving) runs a full per-module pr
 | `keogram` | Keogram | Enabled | Daily keogram timeline strip (generated end-of-night) |
 | `startrails` | Startrails | Disabled | Stacked startrails image (generated end-of-night) |
 | `daily_timelapse` | Daily timelapse | Disabled | Full-night timelapse video (generated end-of-night) |
-| `mini_timelapse` | Mini-timelapse | Disabled | Frequent short clip — requires AllSky mini-timelapse enabled (Number Of Images > 0) |
 
 ### Advanced settings
 
@@ -94,8 +156,8 @@ When modules are enabled the Observatory tab renders the following layout:
 | Row | Left | Right |
 |-----|------|-------|
 | 1 | Live image (auto-refreshes every 30 s) | Sensor data (polls every 60 s) — if enabled |
-| 2 | Startrails | Keogram |
-| 3 | Mini-timelapse | Daily timelapse |
+| 2 | Startrails | Daily timelapse |
+| 3 | Keogram (full width) | |
 
 Rows 2 and 3 only appear for their respective enabled modules. End-of-night images (keogram, startrails, daily timelapse) show a *Not yet generated* placeholder until AllSky produces them at the end of the night.
 
@@ -122,16 +184,44 @@ All resource URLs are served through the MyAstroBoard backend at `/api/connector
 
 ## MyAstroShine integration
 
-The **MyAstroShine** card in Parameters -> Connectors is *not* a `BaseConnector` - it is a
-bidirectional AstroDex feature (send a photo out for re-processing, get an enhanced duplicate
-back) that happens to store its config alongside the connectors. It has no Observatory panel and
-does not appear in `GET /api/connectors`. Full documentation: [MYASTROSHINE.md](MYASTROSHINE.md).
+MyAstroShine is a `BaseConnector` like AllSky — in the `REGISTRY`, listed by
+`GET /api/connectors`, saved through `POST /api/connectors/myastroshine/config`, and rendered by
+the same card. What is specific to it is declared, not special-cased:
+
+```python
+class MyAstroShineConnector(BaseConnector):
+    min_version = "v0.4.0"
+    target_modules = ["astrodex"]
+    MODULES = []                                     # the round-trip is the whole connector
+    SECRET_FIELDS = ("token", "signing_secret")
+    URL_FIELDS = ("callback_url_override",)
+    CONFIG_FIELDS = {"token": "", "signing_secret": "", "callback_url_override": "", "copy_rating": False}
+```
+
+**Appears in**: AstroDex — not the Observatory, so it has no Observatory panel.
+
+`is_configured()` requires the two credentials on top of the URL: a URL alone signs no handoff,
+so the card reports *Not installed* until all three are set. `health_check()` probes
+`<url>/api/health`; MyAstroShine is LAN-only, so an unreachable result is expected and normal
+when the board runs on another network, and the card says so rather than showing a plain error.
+
+Its own routes — the handoff and the two cookieless endpoints the MyAstroShine container calls
+back on — stay in `blueprints/connectors_myastroshine.py` under `/api/astrodex/integration/*`.
+Full documentation: [MYASTROSHINE.md](MYASTROSHINE.md).
 
 ## Adding a new connector
 
-1. Create a class in `backend/connectors/` that extends `BaseConnector`
-2. Implement the three abstract methods: `health_check()`, `get_module_urls()`, `fetch_sensor_data()`
-3. Register it in `backend/connectors/__init__.py`
+1. Create a class in `backend/connectors/<name>_connector.py` that extends `BaseConnector`
+2. Implement `health_check()`; override `get_module_urls()` / `fetch_sensor_data()` only if the
+   connector actually serves browser-fetched resources or live readings
+3. Declare `target_modules`, and `MODULES` / `CONFIG_FIELDS` / `SECRET_FIELDS` / `URL_FIELDS` as
+   needed (see [Declaring a connector](#declaring-a-connector))
+4. Register it in `backend/connectors/__init__.py`
+5. Add its routes, if any, in `backend/blueprints/connectors_<name>.py` and register the
+   blueprint in `backend/app.py`
+6. Add `connectors.<name>_label` / `connectors.<name>_desc` to all six `static/i18n/*.json`, and
+   an entry in `_CONNECTOR_UI` (`static/js/connectors/connectors.js`) for its icon and any
+   config inputs beyond the common ones
 
 The connector appears automatically in the Parameters → Connectors UI.
 
