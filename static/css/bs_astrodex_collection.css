@@ -38,12 +38,19 @@
     box-shadow: 0 0 0 2px var(--bs-primary);
 }
 
-/* Caught objects get a green border so a matched card stands out at a glance across a
-   dense grid. Uses --bs-success rather than the "subtle" token: the subtle variant's
-   dark-theme value is nearly invisible against the dark card background. !important is
-   required to beat bs_main.css's ".card { border: ... !important }" base rule. */
-.collection-card-caught {
+/* Caught objects get a green border plus a soft glow so a matched card stands out at a
+   glance across a dense grid, even for inherently gray/low-color targets (globular
+   clusters, DSS2 tiles) where the colour-vs-grayscale image treatment alone isn't
+   enough of a cue. Uses --bs-success rather than the "subtle" token: the subtle
+   variant's dark-theme value is nearly invisible against the dark card background.
+   !important plus the "#astrodex-tab" prefix are both required: bs_astrodex.css's
+   "#astrodex-tab .card" rule tints every card's border with --domain-astrodex and sets
+   its own box-shadow, also !important, and an ID selector always outranks a plain
+   class - a bare ".collection-card-caught" loses to it regardless of !important.
+   Matching that specificity here (and loading after it) is what lets ours win. */
+#astrodex-tab .collection-card-caught {
     border: 2px solid var(--bs-success) !important;
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--bs-success) 55%, transparent) !important;
 }
 
 .collection-card-image {
@@ -91,6 +98,9 @@
     font-size: 1.6rem;
 }
 
+/* Solid success green (rather than the translucent black used for other photo-count
+   badges) so a captured card reads as "captured" at a glance, matching the green
+   "Captured" badge used on the SkyTonight beginner-catalog and recommendation cards. */
 .collection-card-badge {
     position: absolute;
     top: 4px;
@@ -100,10 +110,11 @@
     gap: 0.2rem;
     padding: 1px 5px;
     border-radius: var(--border-radius);
-    background: var(--photo-badge-bg);
+    background: var(--bs-success);
     color: var(--bs-light);
     font-size: 0.7rem;
     line-height: 1.4;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
 }
 
 .collection-card-body {

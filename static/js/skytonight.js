@@ -2435,7 +2435,7 @@ function _buildBeginnerCatalogCard(obj) {
     _loadCardThumbnail(img, obj.thumbnail_url, obj.catalogue_id || obj.preferred_name);
 
     const body = document.createElement('div');
-    body.className = 'card-body';
+    body.className = 'card-body d-flex flex-column';
 
     const name = document.createElement('h6');
     name.className = 'card-title mb-1';
@@ -2496,7 +2496,7 @@ function _buildBeginnerCatalogCard(obj) {
     body.appendChild(integration);
 
     const ctaRow = document.createElement('div');
-    ctaRow.className = 'd-flex gap-2';
+    ctaRow.className = 'd-flex gap-2 mt-auto pt-2';
 
     const captureBtn = document.createElement('button');
     captureBtn.type = 'button';
