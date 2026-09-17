@@ -21,6 +21,21 @@
   optional, so picture metadata covers an unknown subset of what was captured. Your Astrodex
   collection size is reported as its own separate figure.
 
+#### Headline figures
+
+- The Astrodex, Observation Log and Analytics tabs no longer open on a grid of identical stat
+  cards. They share one **headline figures plate**: the number you came for at full size, the
+  rest as a compact row of figures with their own icons and context lines. On the Astrodex the
+  personal counts ("of which yours: 40") get their own line instead of being tacked onto the
+  end of a label.
+- **Fixed**: a zero duration displayed as a bare "0" with no unit. On an account with nothing
+  logged yet that was the largest thing on the page, and it did not say zero of what.
+- The Analytics sub-tab is now called **Your Sky** rather than *Analytics*, which is what it
+  shows. The `#astrodex/analytics` address is unchanged, so existing links still work.
+- Charts on that tab follow the **red night-vision theme**: under it the categorical palette
+  becomes a single-hue red ramp separated by lightness, instead of blue, green and violet on a
+  dark red page.
+
 #### Wishlist (v1.5)
 
 - New **Wishlist** sub-tab: objects you want to capture, with priority, notes, and a progress bar.

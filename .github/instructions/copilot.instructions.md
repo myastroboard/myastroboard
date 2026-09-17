@@ -867,6 +867,35 @@ set_global_log_level('DEBUG')
 - **Cache Updates**: Look for module `cache_updater` and `cache_scheduler` in logs
 - **Weather API**: Look for module `weather_openmeteo` in logs
 
+## UI/UX Headline Figures Standard
+
+A tab that opens on a set of headline numbers renders them through
+`DOMUtils.buildStatPlate()`, which builds the shared `.stat-plate` component (defined in
+`static/css/bs_main.css`). Do not hand-roll another grid of stat cards.
+
+```javascript
+DOMUtils.buildStatPlate('my-stats-container', {
+    hero: { value: '55h55', label: i18n.t('x.integration'), hint: i18n.t('x.integration_hint') },
+    figures: [
+        { icon: 'bi-stars', value: '15', label: i18n.t('x.objects'), hint: i18n.t('x.objects_hint') },
+    ],
+});
+```
+
+- `hero` is the one figure a person opens the tab for; `figures` are context. A uniform
+  grid gives every number the same weight, which is exactly what they do not have.
+- `value` takes a string **or** a `Node`, so a page with a richer value (a star rating,
+  say) passes the element it already builds.
+- `hint` is optional and renders as a third, quieter line.
+- `icon` is a Bootstrap Icons class without the `bi ` prefix (`'bi-stars'`).
+- The container needs no grid classes in the template - the component supplies its own
+  responsive grid, which reflows from seven figures down to two columns on a phone.
+- The plate is **not** a Bootstrap `.card`, and must not become one: `bs_main.css` forces
+  a light surface onto `.card` with `!important`, so a dark panel has to carry its own
+  classes. Same reason as `.moon-info-card`.
+
+Used by the Astrodex, Observation Log and Analytics tabs.
+
 ## UI/UX Graphing Standard
 
 All interactive charts in the UI should follow a consistent, clean presentation format. Use the `horizon-graph.js` implementation as reference for the standard layout.

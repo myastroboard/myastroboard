@@ -336,7 +336,9 @@ function renderObservationLogStats() {
     const stats = observationLogData.stats || {};
     DOMUtils.buildStatPlate(container, {
         hero: {
-            value: _obsFormatIntegration(stats.total_integration_minutes) || '0',
+            // An empty log still reads as a duration - see _saHours() for the same call.
+            value: _obsFormatIntegration(stats.total_integration_minutes)
+                || i18n.t('observation_log.minutes_short', { minutes: 0 }),
             label: i18n.t('observation_log.stat_integration'),
         },
         figures: [

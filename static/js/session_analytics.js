@@ -113,7 +113,11 @@ function _saT(key, fallback, params) {
  */
 function _saHours(minutes) {
     const value = Number(minutes);
-    if (!Number.isFinite(value) || value <= 0) return '0';
+    // Zero still carries its unit: as a headline figure, a bare "0" next to "Light
+    // collected" does not say zero of what.
+    if (!Number.isFinite(value) || value <= 0) {
+        return _saT('session_analytics.minutes_short', '0 min', { minutes: 0 });
+    }
     const hours = Math.floor(value / 60);
     const rest = Math.round(value % 60);
     if (hours <= 0) return _saT('session_analytics.minutes_short', `${rest} min`, { minutes: rest });

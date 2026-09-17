@@ -95,6 +95,22 @@ Integration over time (a dense monthly series - a month with no activity renders
 bar rather than closing up the axis), object types, constellation spread, and equipment
 usage.
 
+### 1b. How the headline figures are rendered
+
+Through the shared `.stat-plate` component (`DOMUtils.buildStatPlate()`), not a grid of
+cards - see the Headline Figures Standard in `.github/instructions/copilot.instructions.md`.
+The Astrodex and Observation Log tabs render theirs the same way.
+
+A zero duration still carries its unit: at the hero's size, a bare "0" under "Light
+collected" is the first thing a new user reads, and it does not say zero of what.
+
+### 2b. Colours under the red night-vision theme
+
+Both palettes go through `_saPalette()` / `_saQualityPalette()`, which return a single-hue
+red ramp when `html[data-theme="red"]` is in force - the categories are then separated by
+lightness rather than by hue. A blue or green dot is exactly the light that theme exists to
+keep out of a dark-adapted eye, and this page puts a large chart in front of one.
+
 ### 3. Sky coverage
 
 Every captured object placed on an RA/Dec grid: right ascension on the x axis, **reversed**
