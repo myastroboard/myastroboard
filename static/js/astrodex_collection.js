@@ -445,6 +445,19 @@ function buildCollectionCard(item) {
         body.appendChild(magnitude);
     }
 
+    if (typeof buildWishlistButton === 'function' && !item.caught) {
+        const actions = document.createElement('div');
+        actions.className = 'collection-card-actions';
+        actions.appendChild(buildWishlistButton({
+            name: item.catalogue_id,
+            catalogue: collectionState.catalogue,
+            type: item.object_type,
+            constellation: item.constellation,
+            source: 'catalogue_collection',
+        }, Boolean(item.in_wishlist)));
+        body.appendChild(actions);
+    }
+
     card.appendChild(body);
     col.appendChild(card);
     return col;

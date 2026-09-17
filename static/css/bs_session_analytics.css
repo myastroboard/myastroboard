@@ -1,0 +1,172 @@
+/* Session Analytics (v1.5) - Analytics and Wishlist sub-tabs of the Astrodex main tab.
+   Every static presentation rule for those two surfaces lives here: no inline style
+   attributes, per the project style guide. The only runtime .style writes in
+   session_analytics.js / wishlist.js are genuinely per-instance computed values
+   (a progress bar width, a scatter point colour). */
+
+.session-analytics-section-title {
+    font-size: 1.15rem;
+    margin-bottom: 0.35rem;
+}
+
+/* --- Headline stat tiles ------------------------------------------------- */
+
+.session-analytics-stat-value {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+.session-analytics-stat-label {
+    display: block;
+    font-size: 0.8rem;
+    opacity: 0.75;
+}
+
+.session-analytics-stat-hint {
+    display: block;
+    font-size: 0.72rem;
+    opacity: 0.6;
+    margin-top: 0.15rem;
+}
+
+/* --- Chart cards --------------------------------------------------------- */
+
+/* Chart.js sizes a responsive canvas to its parent's content box, so every canvas gets
+   its own fixed-height, position:relative container. Without it, a card that holds
+   anything besides the canvas feeds the canvas height back into the parent and the chart
+   grows without bound. */
+.session-analytics-chart-wrap {
+    position: relative;
+    width: 100%;
+    height: 320px;
+}
+
+.session-analytics-chart-wrap-tall {
+    position: relative;
+    width: 100%;
+    height: 420px;
+}
+
+.session-analytics-legend-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.75rem;
+}
+
+.session-analytics-legend-swatch {
+    display: inline-block;
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 0.2rem;
+}
+
+/* --- Empty states -------------------------------------------------------- */
+
+.session-analytics-empty {
+    text-align: center;
+    padding: 2rem 1rem;
+    opacity: 0.8;
+}
+
+.session-analytics-empty-icon {
+    font-size: 2rem;
+    display: block;
+    margin-bottom: 0.5rem;
+    opacity: 0.5;
+}
+
+/* --- Conditions ---------------------------------------------------------- */
+
+.session-analytics-bucket-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.2rem 0;
+    font-size: 0.82rem;
+}
+
+.session-analytics-bucket-samples {
+    opacity: 0.65;
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+.session-analytics-bucket-thin {
+    opacity: 0.55;
+    font-style: italic;
+}
+
+.session-analytics-direction-note {
+    font-size: 0.75rem;
+    opacity: 0.7;
+    margin-bottom: 0.4rem;
+}
+
+/* --- Sky coverage -------------------------------------------------------- */
+
+.session-analytics-coverage-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.session-analytics-unplaced {
+    font-size: 0.78rem;
+    opacity: 0.75;
+}
+
+/* --- Wishlist ------------------------------------------------------------ */
+
+.wishlist-progress-wrapper {
+    max-width: 32rem;
+}
+
+.wishlist-item-row {
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.5rem;
+    padding: 0.6rem 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.wishlist-item-captured {
+    opacity: 0.65;
+}
+
+.wishlist-item-name {
+    font-weight: 600;
+}
+
+.wishlist-item-meta {
+    font-size: 0.78rem;
+    opacity: 0.75;
+}
+
+.wishlist-priority-high {
+    color: var(--bs-warning);
+}
+
+.wishlist-priority-low {
+    opacity: 0.6;
+}
+
+.wishlist-visibility-cell {
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
+@media (max-width: 575.98px) {
+    .session-analytics-chart-wrap,
+    .session-analytics-chart-wrap-tall {
+        height: 260px;
+    }
+
+    .session-analytics-stat-value {
+        font-size: 1.2rem;
+    }
+}

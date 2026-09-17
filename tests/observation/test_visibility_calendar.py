@@ -317,3 +317,174 @@ def test_result_is_cached_and_lru_evicts(monkeypatch):
     visibility_calendar.get_visibility_calendar('NGC 224', _PARIS, _YEAR + 1)
     visibility_calendar.get_visibility_calendar('NGC 224', _PARIS, _YEAR + 2)
     assert ('ngc 224', 'loc-paris', _YEAR) not in visibility_calendar._calendar_cache
+
+
+class TestNightContextSplit:
+    """The shared-context refactor must not change what the v1.4 calendar computes."""
+
+    def _location(self):
+        return {'id': 'loc-test', 'latitude': 48.0, 'longitude': 2.0, 'timezone': 'Europe/Paris'}
+
+    def test_context_fold_matches_the_single_night_sample(self):
+        """One shared grid must give the same answer as the per-target path."""
+        from datetime import date as _date
+
+        night = _date(2026, 9, 15)
+        direct = visibility_calendar._sample_night(10.68, 41.27, 48.0, 2.0, 'Europe/Paris', night, 30.0, 80.0, [])
+
+        context = visibility_calendar.build_night_context(48.0, 2.0, 'Europe/Paris', night)
+        folded = visibility_calendar.sample_target_in_context(context, 10.68, 41.27, 30.0, 80.0, [])
+
+        assert folded == direct
+
+    def test_one_context_serves_several_targets(self):
+        from datetime import date as _date
+
+        context = visibility_calendar.build_night_context(48.0, 2.0, 'Europe/Paris', _date(2026, 9, 15))
+        andromeda = visibility_calendar.sample_target_in_context(context, 10.68, 41.27, 30.0, 80.0, [])
+        orion = visibility_calendar.sample_target_in_context(context, 83.82, -5.39, 30.0, 80.0, [])
+
+        assert andromeda['date'] == orion['date']
+        assert andromeda['dark_hours'] == orion['dark_hours']
+        # Different declinations from 48 N cannot produce the same peak altitude.
+        assert andromeda['max_altitude'] != orion['max_altitude']
+
+    def test_context_dark_hours_is_target_independent(self):
+        from datetime import date as _date
+
+        context = visibility_calendar.build_night_context(48.0, 2.0, 'Europe/Paris', _date(2026, 12, 21))
+        dark_hours, moonless_dark_hours = visibility_calendar.context_dark_hours(context)
+        assert dark_hours > 0
+        assert 0 <= moonless_dark_hours <= dark_hours
+
+
+class TestDarkHoursByMonth:
+
+    def _location(self):
+        return {'id': 'loc-dark', 'latitude': 48.0, 'longitude': 2.0, 'timezone': 'Europe/Paris'}
+
+    def test_returns_twelve_months(self):
+        visibility_calendar.clear_batch_caches()
+        rows = visibility_calendar.dark_hours_by_month(self._location(), 2026)
+        assert [row['month'] for row in rows] == list(range(1, 13))
+
+    def test_winter_has_more_darkness_than_summer_in_the_north(self):
+        """A sanity check that the figures are real rather than placeholders."""
+        visibility_calendar.clear_batch_caches()
+        rows = visibility_calendar.dark_hours_by_month(self._location(), 2026)
+        december = next(row for row in rows if row['month'] == 12)
+        june = next(row for row in rows if row['month'] == 6)
+        assert december['dark_hours'] > june['dark_hours']
+
+    def test_moonless_darkness_never_exceeds_total_darkness(self):
+        visibility_calendar.clear_batch_caches()
+        for row in visibility_calendar.dark_hours_by_month(self._location(), 2026):
+            assert row['moonless_dark_hours'] <= row['dark_hours'] + 1e-9
+
+    def test_result_is_cached_per_location_and_year(self):
+        visibility_calendar.clear_batch_caches()
+        first = visibility_calendar.dark_hours_by_month(self._location(), 2026)
+        second = visibility_calendar.dark_hours_by_month(self._location(), 2026)
+        assert first is second
+
+    def test_clearing_the_cache_recomputes(self):
+        first = visibility_calendar.dark_hours_by_month(self._location(), 2026)
+        visibility_calendar.clear_batch_caches()
+        assert visibility_calendar.dark_hours_by_month(self._location(), 2026) is not first
+
+
+class TestNextVisibilityBatch:
+
+    def _location(self):
+        return {'id': 'loc-batch', 'latitude': 48.0, 'longitude': 2.0, 'timezone': 'Europe/Paris'}
+
+    def test_returns_one_row_per_target_in_order(self):
+        from datetime import date as _date
+
+        visibility_calendar.clear_batch_caches()
+        targets = [
+            {'ra_deg': 10.68, 'dec_deg': 41.27},
+            {'ra_deg': 83.82, 'dec_deg': -5.39},
+        ]
+        rows = visibility_calendar.next_visibility_batch(targets, self._location(), _date(2026, 9, 15))
+        assert len(rows) == 2
+        assert all('observable_hours_next' in row for row in rows)
+
+    def test_targets_without_coordinates_get_null_figures_not_dropped(self):
+        """An unresolved wish still needs a row so the UI can say why."""
+        from datetime import date as _date
+
+        visibility_calendar.clear_batch_caches()
+        targets = [{'ra_deg': None, 'dec_deg': None}, {'ra_deg': 10.68, 'dec_deg': 41.27}]
+        rows = visibility_calendar.next_visibility_batch(targets, self._location(), _date(2026, 9, 15))
+        assert len(rows) == 2
+        assert rows[0]['observable_hours_next'] is None
+        assert rows[1]['observable_hours_next'] is not None
+
+    def test_no_placed_target_short_circuits(self):
+        from datetime import date as _date
+
+        rows = visibility_calendar.next_visibility_batch(
+            [{'ra_deg': None, 'dec_deg': None}], self._location(), _date(2026, 9, 15)
+        )
+        assert rows[0]['best_month'] is None
+
+    def test_empty_input(self):
+        assert visibility_calendar.next_visibility_batch([], self._location()) == []
+
+    def test_first_sample_is_the_reference_date(self):
+        from datetime import date as _date
+
+        visibility_calendar.clear_batch_caches()
+        rows = visibility_calendar.next_visibility_batch(
+            [{'ra_deg': 10.68, 'dec_deg': 41.27}], self._location(), _date(2026, 9, 15)
+        )
+        assert rows[0]['sampled_dates'][0] == '2026-09-15'
+
+    def test_month_rollover_is_handled(self):
+        """November plus three months has to land in the next year, not month 14."""
+        from datetime import date as _date
+
+        visibility_calendar.clear_batch_caches()
+        rows = visibility_calendar.next_visibility_batch(
+            [{'ra_deg': 10.68, 'dec_deg': 41.27}], self._location(), _date(2026, 11, 20), months_ahead=3
+        )
+        assert rows[0]['sampled_dates'] == ['2026-11-20', '2026-12-15', '2027-01-15']
+
+    def test_batch_matches_the_single_target_computation(self):
+        """The shared grid must not change the numbers it produces."""
+        from datetime import date as _date
+
+        visibility_calendar.clear_batch_caches()
+        night = _date(2026, 9, 15)
+        rows = visibility_calendar.next_visibility_batch(
+            [{'ra_deg': 10.68, 'dec_deg': 41.27}], self._location(), night, months_ahead=1
+        )
+        alt_min, alt_max = visibility_calendar._resolve_constraints()
+        direct = visibility_calendar._sample_night(
+            10.68, 41.27, 48.0, 2.0, 'Europe/Paris', night, alt_min, alt_max, []
+        )
+        assert rows[0]['observable_hours_next'] == direct['observable_hours']
+        assert rows[0]['max_altitude_next'] == direct['max_altitude']
+
+    def test_contexts_are_reused_across_calls(self):
+        """Repeated wishlist loads on the same day must do no fresh ephemeris work."""
+        from datetime import date as _date
+
+        visibility_calendar.clear_batch_caches()
+        calls = []
+        original = visibility_calendar.build_night_context
+
+        def counting_context(*args, **kwargs):
+            calls.append(args[3])
+            return original(*args, **kwargs)
+
+        visibility_calendar.build_night_context = counting_context
+        try:
+            targets = [{'ra_deg': 10.68, 'dec_deg': 41.27}]
+            visibility_calendar.next_visibility_batch(targets, self._location(), _date(2026, 9, 15))
+            first_pass = len(calls)
+            visibility_calendar.next_visibility_batch(targets, self._location(), _date(2026, 9, 15))
+            assert len(calls) == first_pass
+        finally:
+            visibility_calendar.build_night_context = original

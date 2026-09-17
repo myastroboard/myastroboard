@@ -522,6 +522,12 @@ function switchSubTab(parentTab, subtabName, options = {}) {
         case 'observation-log':
             if (typeof loadObservationSessions === 'function') loadObservationSessions();
             break; // Astrodex tab
+        case 'analytics':
+            if (typeof loadSessionAnalytics === 'function') loadSessionAnalytics();
+            break; // Astrodex tab (v1.5)
+        case 'wishlist':
+            if (typeof loadWishlist === 'function') loadWishlist();
+            break; // Astrodex tab (v1.5)
         case 'photo-map':
             if (typeof loadAstrodexPhotoMap === 'function') loadAstrodexPhotoMap();
             break; // Astrodex tab
@@ -584,6 +590,9 @@ function cleanupTransientCharts() {
     }
     if (typeof destroyAstrodexPhotoMap === 'function') {
         destroyAstrodexPhotoMap();
+    }
+    if (typeof destroySessionAnalyticsCharts === 'function') {
+        destroySessionAnalyticsCharts();
     }
 }
 

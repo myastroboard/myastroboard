@@ -55,6 +55,7 @@
     <link rel="stylesheet" href="/static/css/bs_astrodex_collection.css?v={{ version }}" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="/static/css/bs_plan_my_night.css?v={{ version }}" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="/static/css/bs_observation_log.css?v={{ version }}" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="/static/css/bs_session_analytics.css?v={{ version }}" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="/static/css/bs_equipment.css?v={{ version }}" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="/static/css/bs_metrics.css?v={{ version }}" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="/static/css/bs_events.css?v={{ version }}" media="print" onload="this.media='all'">
@@ -72,6 +73,7 @@
         <link rel="stylesheet" href="/static/css/bs_astrodex_collection.css?v={{ version }}">
         <link rel="stylesheet" href="/static/css/bs_plan_my_night.css?v={{ version }}">
         <link rel="stylesheet" href="/static/css/bs_observation_log.css?v={{ version }}">
+        <link rel="stylesheet" href="/static/css/bs_session_analytics.css?v={{ version }}">
         <link rel="stylesheet" href="/static/css/bs_equipment.css?v={{ version }}">
         <link rel="stylesheet" href="/static/css/bs_metrics.css?v={{ version }}">
         <link rel="stylesheet" href="/static/css/bs_events.css?v={{ version }}">
@@ -702,6 +704,16 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link sub-tab-btn" href="#" data-subtab="analytics">
+                            <i class="bi bi-graph-up-arrow text-info icon-inline" aria-hidden="true"></i> <span data-i18n="navbar.session_analytics">Analytics</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link sub-tab-btn" href="#" data-subtab="wishlist">
+                            <i class="bi bi-bookmark-star-fill text-warning icon-inline" aria-hidden="true"></i> <span data-i18n="navbar.wishlist">Wishlist</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link sub-tab-btn" href="#" data-subtab="photo-map">
                             <i class="bi bi-geo-alt-fill text-danger icon-inline" aria-hidden="true"></i> <span data-i18n="astrodex.photo_map_tab">Photo Map</span>
                         </a>
@@ -854,6 +866,59 @@
 
                 <div class="shadow p-2 mb-3 rounded bg-sub-container">
                     <div id="observation-log-display"></div>
+                </div>
+            </div>
+
+            <!-- Session Analytics Sub-tab (v1.5) -->
+            <div id="analytics-subtab" class="sub-tab-content">
+                <div class="shadow p-2 mb-3 rounded bg-sub-container">
+                    <h2>
+                        <i class="bi bi-graph-up-arrow text-info icon-inline" aria-hidden="true"></i> <span data-i18n="session_analytics.title">Session Analytics</span>
+                    </h2>
+                    <p class="text-muted small mb-2" data-i18n="session_analytics.intro">How your observing is going, computed from everything you have logged.</p>
+                    <div id="session-analytics-stats" class="row row-cols-2 row-cols-md-4 g-3"></div>
+                </div>
+
+                <div class="shadow p-2 mb-3 rounded bg-sub-container">
+                    <h3 class="session-analytics-section-title">
+                        <i class="bi bi-bar-chart-line-fill text-primary icon-inline" aria-hidden="true"></i> <span data-i18n="session_analytics.breakdown_title">Where your time goes</span>
+                    </h3>
+                    <div id="session-analytics-charts" class="row row-cols-1 row-cols-xl-2 g-3"></div>
+                </div>
+
+                <div class="shadow p-2 mb-3 rounded bg-sub-container">
+                    <h3 class="session-analytics-section-title">
+                        <i class="bi bi-compass-fill text-warning icon-inline" aria-hidden="true"></i> <span data-i18n="session_analytics.coverage_title">Sky coverage</span>
+                    </h3>
+                    <p class="text-muted small mb-2" data-i18n="session_analytics.coverage_intro">Every object you have captured, placed on the sky.</p>
+                    <div id="session-analytics-coverage"></div>
+                </div>
+
+                <div class="shadow p-2 mb-3 rounded bg-sub-container">
+                    <h3 class="session-analytics-section-title">
+                        <i class="bi bi-calendar3 text-info icon-inline" aria-hidden="true"></i> <span data-i18n="session_analytics.best_months_title">Best months</span>
+                    </h3>
+                    <p class="text-muted small mb-2" data-i18n="session_analytics.best_months_intro">How much observable darkness your site offers each month, next to the hours you actually logged. This is astronomy and your own history - it says nothing about the weather.</p>
+                    <div id="session-analytics-best-months"></div>
+                </div>
+
+                <div class="shadow p-2 mb-3 rounded bg-sub-container">
+                    <h3 class="session-analytics-section-title">
+                        <i class="bi bi-clipboard-data-fill text-success icon-inline" aria-hidden="true"></i> <span data-i18n="session_analytics.conditions_title">Conditions and results</span>
+                    </h3>
+                    <p class="text-muted small mb-2" data-i18n="session_analytics.conditions_intro">How you rated your own results under the conditions you recorded. Descriptive only - it reports what your log contains, it does not predict anything.</p>
+                    <div id="session-analytics-conditions"></div>
+                </div>
+            </div>
+
+            <!-- Wishlist Sub-tab (v1.5) -->
+            <div id="wishlist-subtab" class="sub-tab-content">
+                <div class="shadow p-2 mb-3 rounded bg-sub-container">
+                    <h2>
+                        <i class="bi bi-bookmark-star-fill text-warning icon-inline" aria-hidden="true"></i> <span data-i18n="wishlist.title">Wishlist</span>
+                    </h2>
+                    <p class="text-muted small mb-2" data-i18n="wishlist.intro">Objects you want to capture. Add them from SkyTonight, the catalogue collection or the beginner catalog; they are marked captured automatically once they show up in your log or your Astrodex.</p>
+                    <div id="wishlist-display"></div>
                 </div>
             </div>
 
@@ -3382,6 +3447,8 @@
     <script src="/static/js/plan_my_night.js?v={{ version }}"></script>
     <script src="/static/js/equipment.js?v={{ version }}"></script>
     <script src="/static/js/observation_sessions.js?v={{ version }}"></script>
+    <script src="/static/js/session_analytics.js?v={{ version }}"></script>
+    <script src="/static/js/wishlist.js?v={{ version }}"></script>
     <script src="/static/js/config.js?v={{ version }}"></script>
     <script src="/static/js/locations.js?v={{ version }}"></script>
     <script src="/static/js/astrodex_map.js?v={{ version }}"></script>

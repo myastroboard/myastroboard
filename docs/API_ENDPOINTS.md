@@ -234,6 +234,20 @@ AstroDex <-> MyAstroShine image round-trip. Not a `BaseConnector` - config lives
 - `GET /api/observation-sessions/<session_id>/export.pdf` - One session as a PDF (common info + every logged target, with its attached photo when there is one)
 - `GET /api/observation-sessions/export.pdf` - Every own session as one PDF (cover + summary + per-session pages); optional `from_date`/`to_date`/`order` (`asc`/`desc`, default `asc`)
 
+## Session Analytics and Wishlist (v1.5 - see docs/SESSION_ANALYTICS.md)
+
+All self-scoped: a user only ever sees aggregates of their own Observation Log and Astrodex.
+
+- `GET /api/session-analytics/summary` - Integration hours (lifetime/year/month), monthly series, distinct objects, object-type and constellation breakdowns, equipment usage, top targets, plus the separately-labelled Astrodex collection size; optional `year`
+- `GET /api/session-analytics/sky-coverage` - Captured objects placed on an RA/Dec grid, the count and names of those that could not be placed, and the never-visible declination bound for the active location
+- `GET /api/session-analytics/conditions` - Rated entries joined to their night's seeing/transparency/SQM/Moon, plus bucketed averages carrying their own sample counts
+- `GET /api/session-analytics/best-months` - Dark and moonless-dark hours available per month at the active location, next to the hours the user actually logged; **not** a weather statistic; optional `year`
+- `GET /api/wishlist` - Wishlist items with derived captured state, progress counters and next-visibility figures; optional `sort` (`visibility`/`priority`/`name`) and `visibility=0` to skip the ephemeris pass
+- `POST /api/wishlist` (user) - Add targets; body is always `{"targets": [...]}`; returns the added items plus duplicate/invalid/full skip counts
+- `PATCH /api/wishlist/<item_id>` (user) - Update `priority` or `notes`
+- `DELETE /api/wishlist/<item_id>` (user) - Remove one item
+- `POST /api/wishlist/archive-captured` (user) - Remove every item currently derived as captured
+
 ## Equipment
 
 - `GET /api/equipment/telescopes`

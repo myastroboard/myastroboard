@@ -11,7 +11,9 @@ from equipment import equipment_profiles
 from observation import astrodex
 from observation import beginner_catalog
 from observation import catalogue_collection
+from observation import wishlist
 from utils.auth import login_required, user_required, get_current_user, user_manager
+from utils.constellation_names import full_constellation_name
 from blueprints.plan_my_night import _resolve_requested_language
 from utils.logging_config import get_logger
 from utils.repo_config import load_config, get_locations_for_user, get_location_by_id
@@ -344,8 +346,16 @@ def get_beginner_catalog():
         # between the two panels instead of only reflecting the default no-telescope plan.
         user_plan_entries = _preload_all_current_plan_entries(user.user_id, user.username)
 
+        wishlist_index = wishlist.build_wishlist_index(
+            wishlist.load_user_wishlist(user.user_id, user.username).get('items', [])
+        )
         catalog = beginner_catalog.enrich_with_skytonight(
-            catalog, dso_results, user_astrodex_items, user_plan_entries, location_id=active_location_id
+            catalog,
+            dso_results,
+            user_astrodex_items,
+            user_plan_entries,
+            location_id=active_location_id,
+            wishlist_index=wishlist_index,
         )
 
         # Only apply the visible_only filter when results actually exist - per spec, an
@@ -828,6 +838,9 @@ def get_collection_page():
             return jsonify({'error': 'Missing catalogue'}), 400
 
         items = astrodex.load_user_astrodex(user.user_id, user.username).get('items', [])
+        wishlist_index = wishlist.build_wishlist_index(
+            wishlist.load_user_wishlist(user.user_id, user.username).get('items', [])
+        )
         return jsonify(
             catalogue_collection.get_collection_page(
                 catalogue,
@@ -844,6 +857,7 @@ def get_collection_page():
                 constellation=request.args.get('constellation', '').strip(),
                 caught=request.args.get('caught', 'all'),
                 difficulty=request.args.get('difficulty', '').strip(),
+                wishlist_index=wishlist_index,
             )
         )
     except Exception as e:
@@ -872,18 +886,6 @@ def astrodex_catalogue_lookup():
     Astrodex manual-add form can be pre-filled when the entered name is known.
     """
     try:
-        from constellation import Constellation
-        import re as _re
-
-        # Build a one-time abbr→full-name mapping (e.g. 'Cnc' -> 'Cancer',
-        # 'UMa' -> 'Ursa Major').  c.name is the Python enum member name
-        # (e.g. 'UrsaMajor') so we apply the same humanize() logic used in
-        # astrodex.get_constellations_list() to insert spaces before capitals.
-        def _humanize(name: str) -> str:
-            return _re.sub(r'(?<!^)(?=[A-Z])', ' ', name)
-
-        _abbr_to_name = {c.abbr: _humanize(c.name) for c in Constellation}
-
         name = request.args.get('name', '').strip()
         if not name:
             return jsonify({'found': False})
@@ -893,8 +895,9 @@ def astrodex_catalogue_lookup():
         # lookup table registers every target under alias::<normalised_name>.
         entry = skytonight_targets.get_lookup_entry('alias', name)
         if entry:
-            raw_constellation = entry.get('constellation') or ''
-            full_constellation = (_abbr_to_name.get(raw_constellation, raw_constellation) or '').lower()
+            # The dataset stores IAU abbreviations ('Cnc'); the frontend keys its
+            # constellation translations on the lowercased full name.
+            full_constellation = full_constellation_name(entry.get('constellation')).lower()
             return jsonify(
                 {
                     'found': True,

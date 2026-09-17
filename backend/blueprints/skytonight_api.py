@@ -18,14 +18,15 @@ from equipment import equipment_profiles
 from observation import object_info
 from observation import plan_my_night
 from observation import visibility_calendar
+from observation import wishlist
 from equipment import exposure_math
 from skytonight import skytonight_targets
 from utils.auth import admin_required, get_current_user, login_required, user_manager
+from utils.constellation_names import full_constellation_name
 from utils.constants import (
     OUTPUT_DIR,
     SKYTONIGHT_CALCULATION_LOG_FILE,
 )
-from constellation import Constellation as _Constellation
 from utils.logging_config import get_logger
 from utils.repo_config import load_config, get_active_location, get_locations_for_user
 from skytonight.skytonight_scheduler_manager import (
@@ -56,23 +57,6 @@ from utils import load_json_file, normalize_catalogue_key as _normalize_catalogu
 logger = get_logger(__name__)
 
 skytonight_bp = Blueprint('skytonight', __name__)
-
-# ---------------------------------------------------------------------------
-# Constellation abbreviation → full name map
-# ---------------------------------------------------------------------------
-
-
-def _humanize_const_name(name: str) -> str:
-    return re.sub(r'(?<!^)(?=[A-Z])', ' ', name)
-
-
-_CONSTELLATION_ABBR_MAP: Dict[str, str] = {
-    str(c.abbr): _humanize_const_name(c.name) for c in _Constellation if c.abbr is not None
-}
-# PyOngc uses Se1/Se2 for the two halves of Serpens (not in the IAU enum).
-_CONSTELLATION_ABBR_MAP['Se1'] = 'Serpens Caput'
-_CONSTELLATION_ABBR_MAP['Se2'] = 'Serpens Cauda'
-
 
 # ---------------------------------------------------------------------------
 # Shared helpers
@@ -147,6 +131,12 @@ def _get_catalogue_alias_payload(catalogue: str, item_name: str) -> tuple:
     return group_id, aliases
 
 
+def _preload_wishlist_index(user_id: str, username: str) -> set:
+    """Every identifier the user's wishlist covers, as one set for batch annotation."""
+    data = wishlist.load_user_wishlist(user_id, username)
+    return wishlist.build_wishlist_index(data.get('items', []))
+
+
 def _preload_all_current_plan_entries(user_id: str, username: str) -> list:
     """Aggregate entries from all current (non-previous) plans for a user across all combinations."""
     all_entries: list = []
@@ -195,13 +185,14 @@ def _annotate_skytonight_item(
     plan_state: str,
     _preloaded_astrodex: Optional[Dict[str, Any]] = None,
     _preloaded_plan_entries: Optional[list] = None,
+    _preloaded_wishlist: Optional[set] = None,
 ) -> None:
-    """Annotate a single item with astrodex / plan-my-night presence flags.
+    """Annotate a single item with astrodex / plan-my-night / wishlist presence flags.
 
-    When *_preloaded_astrodex* and *_preloaded_plan_entries* are supplied the
-    function uses those already-loaded structures instead of reading the user
-    files from disk again, which is critical for batch annotation (e.g. 1 000
-    DSO rows in one API call).
+    When *_preloaded_astrodex*, *_preloaded_plan_entries* and *_preloaded_wishlist* are
+    supplied the function uses those already-loaded structures instead of reading the
+    user files from disk again, which is critical for batch annotation (e.g. 1 000 DSO
+    rows in one API call). Every batch call site preloads all three.
     """
     item_name = str(item.get('target name') or item.get('name') or item.get('id') or '').strip()
     if item_name:
@@ -224,9 +215,12 @@ def _annotate_skytonight_item(
         group_id, aliases = _get_catalogue_alias_payload(source_catalogue, item_name)
         item['catalogue_group_id'] = group_id
         item['catalogue_aliases'] = aliases
+        index = _preloaded_wishlist if _preloaded_wishlist is not None else _preload_wishlist_index(user_id, username)
+        item['in_wishlist'] = wishlist.is_target_in_index(index, item_name, group_id, aliases)
     else:
         item['in_astrodex'] = False
         item['in_plan_my_night'] = False
+        item['in_wishlist'] = False
         item['catalogue_group_id'] = ''
         item['catalogue_aliases'] = {}
     item['plan_state'] = plan_state
@@ -267,6 +261,7 @@ def _build_skytonight_reports_payload(catalogue: Optional[str], user_id: str, us
     plan_payload = plan_my_night.get_plan_with_timeline(user_id, username)
     plan_state = plan_payload.get('state', 'none')
     location_id = _skytonight_request_location().get('id')
+    wishlist_index = _preload_wishlist_index(user_id, username)
 
     base_result: Dict[str, Any] = {
         'report': [],
@@ -308,7 +303,7 @@ def _build_skytonight_reports_payload(catalogue: Optional[str], user_id: str, us
 
             observation = calc_item.get('observation', {})
             const_abbr = calc_item.get('constellation', '')
-            const_full = _CONSTELLATION_ABBR_MAP.get(const_abbr, const_abbr)
+            const_full = full_constellation_name(const_abbr)
             ra_hms = observation.get('ra_hms', '')
             dec_dms = observation.get('dec_dms', '')
             row: Dict[str, Any] = {
@@ -339,7 +334,9 @@ def _build_skytonight_reports_payload(catalogue: Optional[str], user_id: str, us
                 'source_type': 'calculated',
                 'plan_state': plan_state,
             }
-            _annotate_skytonight_item(row, user_id, username, source_catalogue, plan_state)
+            _annotate_skytonight_item(
+                row, user_id, username, source_catalogue, plan_state, _preloaded_wishlist=wishlist_index
+            )
             base_result['report'].append(row)
             deep_sky_rows += 1
 
@@ -371,7 +368,7 @@ def _build_skytonight_reports_payload(catalogue: Optional[str], user_id: str, us
                 'source_type': 'calculated',
                 'plan_state': plan_state,
             }
-            _annotate_skytonight_item(row, user_id, username, 'Bodies', plan_state)
+            _annotate_skytonight_item(row, user_id, username, 'Bodies', plan_state, _preloaded_wishlist=wishlist_index)
             base_result['bodies'].append(row)
 
         for calc_item in calc.get('comets', []):
@@ -408,7 +405,7 @@ def _build_skytonight_reports_payload(catalogue: Optional[str], user_id: str, us
                 'source_type': 'calculated',
                 'plan_state': plan_state,
             }
-            _annotate_skytonight_item(row, user_id, username, 'Comets', plan_state)
+            _annotate_skytonight_item(row, user_id, username, 'Comets', plan_state, _preloaded_wishlist=wishlist_index)
             base_result['comets'].append(row)
 
         base_result['report_truncated'] = len(base_result['report']) >= max_deep_sky_rows
@@ -449,7 +446,7 @@ def _build_skytonight_reports_payload(catalogue: Optional[str], user_id: str, us
                 display_name = preferred_name
                 source_catalogue = _resolve_source_catalogue(catalogue_names, display_name)
 
-            const_full = _CONSTELLATION_ABBR_MAP.get(constellation, constellation)
+            const_full = full_constellation_name(constellation)
             row = {
                 'id': display_name,
                 'target name': display_name,
@@ -468,7 +465,9 @@ def _build_skytonight_reports_payload(catalogue: Optional[str], user_id: str, us
                 row['catalogue_aliases'] = {}
                 row['plan_state'] = plan_state
             else:
-                _annotate_skytonight_item(row, user_id, username, source_catalogue, plan_state)
+                _annotate_skytonight_item(
+                    row, user_id, username, source_catalogue, plan_state, _preloaded_wishlist=wishlist_index
+                )
             base_result['report'].append(row)
             deep_sky_rows += 1
             continue
@@ -482,7 +481,7 @@ def _build_skytonight_reports_payload(catalogue: Optional[str], user_id: str, us
                 'alttime_file': '',
                 'source_type': 'dataset',
             }
-            _annotate_skytonight_item(row, user_id, username, 'Bodies', plan_state)
+            _annotate_skytonight_item(row, user_id, username, 'Bodies', plan_state, _preloaded_wishlist=wishlist_index)
             base_result['bodies'].append(row)
             continue
 
@@ -495,7 +494,7 @@ def _build_skytonight_reports_payload(catalogue: Optional[str], user_id: str, us
                 'alttime_file': '',
                 'source_type': 'dataset',
             }
-            _annotate_skytonight_item(row, user_id, username, 'Comets', plan_state)
+            _annotate_skytonight_item(row, user_id, username, 'Comets', plan_state, _preloaded_wishlist=wishlist_index)
             base_result['comets'].append(row)
 
     base_result['report_truncated'] = len(base_result['report']) >= max_deep_sky_rows
@@ -512,6 +511,7 @@ def _build_bodies_section_payload(user_id: str, username: str) -> Dict[str, Any]
     # Pre-load user data once to avoid N×file-reads inside the per-item annotation loop.
     _preloaded_astrodex = astrodex.load_user_astrodex(user_id)
     _preloaded_plan_entries: list = _preload_all_current_plan_entries(user_id, username)
+    _preloaded_wishlist: set = _preload_wishlist_index(user_id, username)
 
     if has_bodies_results(location_id):
         data = load_json_file(get_bodies_results_file(location_id), default={})
@@ -552,6 +552,7 @@ def _build_bodies_section_payload(user_id: str, username: str) -> Dict[str, Any]
                 plan_state,
                 _preloaded_astrodex=_preloaded_astrodex,
                 _preloaded_plan_entries=_preloaded_plan_entries,
+                _preloaded_wishlist=_preloaded_wishlist,
             )
             rows.append(row)
         return {
@@ -585,6 +586,7 @@ def _build_bodies_section_payload(user_id: str, username: str) -> Dict[str, Any]
             plan_state,
             _preloaded_astrodex=_preloaded_astrodex,
             _preloaded_plan_entries=_preloaded_plan_entries,
+            _preloaded_wishlist=_preloaded_wishlist,
         )
         rows.append(row)
     return {
@@ -605,6 +607,7 @@ def _build_comets_section_payload(user_id: str, username: str) -> Dict[str, Any]
     # Pre-load user data once to avoid N×file-reads inside the per-item annotation loop.
     _preloaded_astrodex = astrodex.load_user_astrodex(user_id)
     _preloaded_plan_entries: list = _preload_all_current_plan_entries(user_id, username)
+    _preloaded_wishlist: set = _preload_wishlist_index(user_id, username)
 
     if has_comets_results(location_id):
         data = load_json_file(get_comets_results_file(location_id), default={})
@@ -652,6 +655,7 @@ def _build_comets_section_payload(user_id: str, username: str) -> Dict[str, Any]
                 plan_state,
                 _preloaded_astrodex=_preloaded_astrodex,
                 _preloaded_plan_entries=_preloaded_plan_entries,
+                _preloaded_wishlist=_preloaded_wishlist,
             )
             rows.append(row)
         return {
@@ -689,6 +693,7 @@ def _build_comets_section_payload(user_id: str, username: str) -> Dict[str, Any]
             plan_state,
             _preloaded_astrodex=_preloaded_astrodex,
             _preloaded_plan_entries=_preloaded_plan_entries,
+            _preloaded_wishlist=_preloaded_wishlist,
         )
         rows.append(row)
     return {
@@ -940,6 +945,7 @@ def _build_dso_section_payload(
     # Pre-load user data once to avoid N×file-reads inside the per-item annotation loop.
     _preloaded_astrodex = astrodex.load_user_astrodex(user_id)
     _preloaded_plan_entries: list = _preload_all_current_plan_entries(user_id, username)
+    _preloaded_wishlist: set = _preload_wishlist_index(user_id, username)
 
     if has_dso_results(location_id):
         data = load_json_file(get_dso_results_file(location_id), default={})
@@ -966,7 +972,7 @@ def _build_dso_section_payload(
             )
             observation = calc_item.get('observation', {})
             const_abbr = calc_item.get('constellation', '')
-            const_full = _CONSTELLATION_ABBR_MAP.get(const_abbr, const_abbr)
+            const_full = full_constellation_name(const_abbr)
             ra_hms = observation.get('ra_hms', '')
             dec_dms = observation.get('dec_dms', '')
             row: Dict[str, Any] = {
@@ -1008,6 +1014,7 @@ def _build_dso_section_payload(
                 plan_state,
                 _preloaded_astrodex=_preloaded_astrodex,
                 _preloaded_plan_entries=_preloaded_plan_entries,
+                _preloaded_wishlist=_preloaded_wishlist,
             )
             rows.append(row)
             rows_added += 1
@@ -1056,7 +1063,7 @@ def _build_dso_section_payload(
         if filters.get('size_max') is not None and target_size is not None and target_size > filters['size_max']:
             continue
         const = str(_target_attr(target, 'constellation', '') or '')
-        const_full = _CONSTELLATION_ABBR_MAP.get(const, const)
+        const_full = full_constellation_name(const)
         row = {
             'id': display_name,
             'target name': display_name,
@@ -1082,6 +1089,7 @@ def _build_dso_section_payload(
                 plan_state,
                 _preloaded_astrodex=_preloaded_astrodex,
                 _preloaded_plan_entries=_preloaded_plan_entries,
+                _preloaded_wishlist=_preloaded_wishlist,
             )
         rows.append(row)
         rows_added += 1
@@ -1690,7 +1698,7 @@ def get_skytonight_skymap_api():
         for tgt in targets:
             abbr = tgt.get('constellation', '')
             if abbr:
-                tgt['constellation'] = _CONSTELLATION_ABBR_MAP.get(abbr, abbr)
+                tgt['constellation'] = full_constellation_name(abbr)
 
         # Backfill the messier flag for skymap files written before this field was added.
         # Cross-reference against dso_results.json (already loaded; O(n) pass).

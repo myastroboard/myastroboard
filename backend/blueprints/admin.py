@@ -148,6 +148,7 @@ def backup_download_api():
       - data/astrodex/  (full directory)
       - data/equipments/ (full directory)
       - data/observation_sessions/ (full directory)
+      - data/wishlist/ (full directory)
     The archive is built in memory so no temporary file is left on disk.
     """
     # Evolutive list: each entry is (source_path, archive_name, is_dir)
@@ -158,6 +159,7 @@ def backup_download_api():
         (os.path.join(DATA_DIR, 'astrodex'), 'astrodex', True),
         (os.path.join(DATA_DIR, 'equipments'), 'equipments', True),
         (os.path.join(DATA_DIR, 'observation_sessions'), 'observation_sessions', True),
+        (os.path.join(DATA_DIR, 'wishlist'), 'wishlist', True),
     ]
     try:
         buf = io.BytesIO()
@@ -221,9 +223,10 @@ def backup_restore_api():
         'astrodex': os.path.join(DATA_DIR, 'astrodex'),
         'equipments': os.path.join(DATA_DIR, 'equipments'),
         'observation_sessions': os.path.join(DATA_DIR, 'observation_sessions'),
+        'wishlist': os.path.join(DATA_DIR, 'wishlist'),
     }
     # Directories that must be cleared before restoring their contents
-    RESTORE_CLEAR_DIRS = {'astrodex', 'equipments', 'observation_sessions'}
+    RESTORE_CLEAR_DIRS = {'astrodex', 'equipments', 'observation_sessions', 'wishlist'}
     # JSON files whose content must be valid JSON
     RESTORE_VALIDATE_JSON = {'config.json', 'users.json', 'app_settings.json'}
 

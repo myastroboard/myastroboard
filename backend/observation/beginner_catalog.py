@@ -8,10 +8,10 @@ with the current user's SkyTonight/Astrodex/Plan My Night state.
 import json
 import os
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from observation import object_info
-from constellation import Constellation as _Constellation
+from utils.constellation_names import full_constellation_name
 from utils.i18n_utils import I18nManager
 from utils.logging_config import get_logger
 from skytonight.skytonight_storage import get_alttime_dir
@@ -36,20 +36,6 @@ def _alttime_file_for_target(target_id: str, location_id: Any) -> str:
     safe_id = _ALTTIME_ID_SAFE.sub('_', target_id.lower())
     path = os.path.join(get_alttime_dir(location_id), f'{safe_id}_alttime.json')
     return target_id if os.path.isfile(path) else ''
-
-
-def _humanize_const_name(name: str) -> str:
-    return re.sub(r'(?<!^)(?=[A-Z])', ' ', name)
-
-
-# Same abbreviation -> full name conversion used by the DSO endpoints (skytonight_api.py),
-# duplicated here rather than imported to avoid a circular import (skytonight_api imports
-# this module already).
-_CONSTELLATION_ABBR_MAP: Dict[str, str] = {
-    str(c.abbr): _humanize_const_name(c.name) for c in _Constellation if c.abbr is not None
-}
-_CONSTELLATION_ABBR_MAP['Se1'] = 'Serpens Caput'
-_CONSTELLATION_ABBR_MAP['Se2'] = 'Serpens Cauda'
 
 
 _catalog_cache: Dict[str, Any] = {'data': None, 'key': None}
@@ -104,9 +90,7 @@ def translate_catalog_entries(catalog: List[Dict[str, Any]], lang: str) -> List[
         new_entry['why_beginner'] = manager.t(f'beginner_catalog.objects.{i18n_key}.why')
         new_entry['suggested_framing'] = manager.t(f'beginner_catalog.objects.{i18n_key}.framing')
         const_abbr = entry.get('constellation')
-        new_entry['constellation'] = (
-            _CONSTELLATION_ABBR_MAP.get(const_abbr, const_abbr) if isinstance(const_abbr, str) else const_abbr
-        )
+        new_entry['constellation'] = full_constellation_name(const_abbr) if isinstance(const_abbr, str) else const_abbr
         translated.append(new_entry)
     return translated
 
@@ -144,8 +128,10 @@ def enrich_with_skytonight(
     user_astrodex_items: List[Dict[str, Any]],
     user_plan_entries: List[Dict[str, Any]],
     location_id: Any = None,
+    wishlist_index: Optional[set] = None,
 ) -> List[Dict[str, Any]]:
-    """Add ``visible_tonight``, ``astro_score``, ``in_astrodex`` and ``in_plan`` to each catalog entry.
+    """Add ``visible_tonight``, ``astro_score``, ``in_astrodex``, ``in_plan`` and
+    ``in_wishlist`` to each catalog entry.
 
     Args:
         catalog: Translated catalog entries (output of :func:`translate_catalog_entries`).
@@ -154,6 +140,8 @@ def enrich_with_skytonight(
         user_plan_entries: The current user's Plan My Night entries.
         location_id: Active location id, used to resolve the per-location altitude-time
             JSON directory for the ``alttime_file`` field.
+        wishlist_index: Normalized identifiers the user's wishlist covers, built by the
+            blueprint layer so this module needs no dependency on the wishlist.
     """
     dso_lookup = _build_dso_lookup(dso_results)
     astrodex_keys = _build_name_key_set(user_astrodex_items, ['name', 'catalogue'])
@@ -194,6 +182,7 @@ def enrich_with_skytonight(
 
         new_entry['in_astrodex'] = bool(match_keys & astrodex_keys)
         new_entry['in_plan'] = bool(match_keys & plan_keys)
+        new_entry['in_wishlist'] = bool(wishlist_index and (match_keys & wishlist_index))
 
         enriched.append(new_entry)
 

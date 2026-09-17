@@ -172,7 +172,7 @@ Applied server-side, before the result-set truncation: the DSO payload is capped
 |---|---|
 | **Why** | Answers "how am I progressing?" for beginners and "how am I optimizing?" for advanced users. Requires v1.3 (Observation Log) as data source. Kept as the release right after v1.4 - a user-visible feature that also tests whether any shared feature structure is actually needed, rather than a refactoring-only release that speculates about it. |
 | **Effort** | Medium |
-| **Status** | 💡 Idea - subject to change |
+| **Status** | ✅ Implemented |
 
 #### Personal stats dashboard
 
@@ -181,7 +181,7 @@ New section (or tab within an existing one):
 - Total integration hours: lifetime / this year / this month
 - Objects captured: count, constellation spread, object-type distribution
 - Equipment usage: hours per telescope/camera combination
-- Best imaging months at user location (derived from historical weather cache)
+- Best imaging months at user location: dark and moonless-dark hours per month computed live from the ephemeris, next to the hours actually logged. **Not** derived from a historical weather cache - no such cache exists (every weather cache is a short-TTL forecast snapshot), so the chart never claims to say when the sky is clear. A weather climatology behind its own scheduler cache job was specified and deliberately deferred.
 
 #### Wishlist tracker
 
@@ -203,6 +203,15 @@ For logged sessions: overlay seeing score, moon phase, and SQM at the time of ca
 **i18n in 6 languages.**
 
 It adds a whole new surface (tab, sub-tabs, i18n namespace, aggregations). If building it makes a shared registry feel *necessary* rather than merely tidy, that is the signal to scope one; if the existing per-domain conventions absorb it fine, that is the signal not to.
+
+**Verdict after shipping: no registry needed.** The release added one blueprint, two i18n
+namespaces, two sub-tab entries in `switchSubTab()`, one CSS file and two script tags - every one
+a single-line insertion into an existing list. What it *did* surface was duplication (four copies
+of the constellation abbreviation table) and a real data-shape inconsistency (the stored `ra`/`dec`
+on a frozen target is a float on one code path and a formatted string on another). Both were fixed
+with a shared helper in `utils/` and a single resolver module, which is the mechanism
+[Architecture direction](#architecture-direction) already prescribes. Per-domain conventions
+absorbed the feature, so no registry is scoped.
 
 ---
 
@@ -531,7 +540,7 @@ Also:
 | v1.2 | Multi-location profiles | All | Medium | ✅ Implemented |
 | v1.3 | Observation Log | Intermediate+ | High | ✅ Implemented |
 | v1.4 | Planning Intelligence (visibility calendar, meridian flip, advanced filters) | Advanced | High | ✅ Implemented |
-| v1.5 | Session Analytics | All | Medium | 💡 Idea |
+| v1.5 | Session Analytics | All | Medium | ✅ Implemented |
 | v1.6 | MQTT Publisher & Home Assistant Integration | All | Medium | 💡 Idea |
 | v2.0 | Interactive Sky Chart + mosaic planner | All | High | 💡 Idea |
 | v2.1 | Community & Sharing | All | Medium | 💡 Idea |

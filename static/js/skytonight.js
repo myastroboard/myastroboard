@@ -2522,6 +2522,16 @@ function _buildBeginnerCatalogCard(obj) {
     }
     ctaRow.appendChild(planBtn);
 
+    if (typeof buildWishlistButton === 'function') {
+        ctaRow.appendChild(buildWishlistButton({
+            name: obj.preferred_name,
+            catalogue: obj.catalogue_id,
+            type: obj.object_type,
+            constellation: (obj.constellation || '').toLowerCase(),
+            source: 'beginner_catalog',
+        }, Boolean(obj.in_wishlist), 'flex-fill'));
+    }
+
     body.appendChild(ctaRow);
     card.appendChild(body);
     col.appendChild(card);
@@ -2790,6 +2800,26 @@ async function showMorePopupFromRowData(moreData) {
     const contentEl = document.getElementById('modal_lg_close_body');
     if (!contentEl) return;
     DOMUtils.clear(contentEl);
+
+    // Wishlist entry point for every table row (DSO, body or comet): the tables
+    // themselves are built as HTML strings, which the style guide says not to extend.
+    if (typeof buildWishlistButton === 'function') {
+        const targetName = String(row['target name'] || row['name'] || row['id'] || '').trim();
+        if (targetName) {
+            const actions = document.createElement('div');
+            actions.className = 'd-flex justify-content-end mb-2';
+            actions.appendChild(buildWishlistButton({
+                name: targetName,
+                catalogue: row['catalogue'] || '',
+                type: row['type'] || '',
+                constellation: row['constellation'] || '',
+                catalogue_group_id: row['catalogue_group_id'] || '',
+                catalogue_aliases: row['catalogue_aliases'] || {},
+                source: 'skytonight',
+            }, Boolean(row['in_wishlist'])));
+            contentEl.appendChild(actions);
+        }
+    }
 
     const tableDiv = document.createElement('div');
     tableDiv.className = 'table-responsive';
