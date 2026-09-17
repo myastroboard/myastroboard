@@ -89,8 +89,15 @@ def one_session():
             [night],
             [
                 make_entry('M 31', night_id='night-1', integration_minutes=120.0, frame_count=40, rating=4.5),
-                make_entry('M 33', night_id='night-1', integration_minutes=60.0, frame_count=20, rating=3.0,
-                           type='Galaxy', constellation='Tri'),
+                make_entry(
+                    'M 33',
+                    night_id='night-1',
+                    integration_minutes=60.0,
+                    frame_count=20,
+                    rating=3.0,
+                    type='Galaxy',
+                    constellation='Tri',
+                ),
             ],
         )
     ]
@@ -250,10 +257,16 @@ class TestBuildSummaryTotals:
                 's1',
                 [make_night('n1', '2026-09-10'), make_night('n2', '2026-09-11')],
                 [
-                    make_entry('M 31', night_id='n1', integration_minutes=60.0,
-                               catalogue_group_id='dso-openngc-ngc0224'),
-                    make_entry('NGC 224', night_id='n2', integration_minutes=60.0, catalogue='OpenNGC',
-                               catalogue_group_id='dso-openngc-ngc0224'),
+                    make_entry(
+                        'M 31', night_id='n1', integration_minutes=60.0, catalogue_group_id='dso-openngc-ngc0224'
+                    ),
+                    make_entry(
+                        'NGC 224',
+                        night_id='n2',
+                        integration_minutes=60.0,
+                        catalogue='OpenNGC',
+                        catalogue_group_id='dso-openngc-ngc0224',
+                    ),
                 ],
             )
         ]
@@ -394,8 +407,9 @@ class TestBuildSummaryBreakdowns:
                 [make_night('n1', '2026-09-10')],
                 [
                     make_entry('M 31', integration_minutes=60.0),
-                    make_entry('M 42', integration_minutes=120.0, combination_id='combo-2',
-                               combination_name='RC8 + ASI2600'),
+                    make_entry(
+                        'M 42', integration_minutes=120.0, combination_id='combo-2', combination_name='RC8 + ASI2600'
+                    ),
                 ],
             )
         ]
@@ -424,9 +438,11 @@ class TestBuildSummaryBreakdowns:
 
     def test_equipment_session_count_is_distinct_sessions(self):
         sessions = [
-            make_session('s1', [make_night('n1', '2026-09-10')],
-                         [make_entry('M 31', integration_minutes=60.0),
-                          make_entry('M 33', integration_minutes=60.0)]),
+            make_session(
+                's1',
+                [make_night('n1', '2026-09-10')],
+                [make_entry('M 31', integration_minutes=60.0), make_entry('M 33', integration_minutes=60.0)],
+            ),
             make_session('s2', [make_night('n2', '2026-09-12')], [make_entry('M 51', integration_minutes=60.0)]),
         ]
         equipment = build_summary(sessions, TODAY)['equipment']
@@ -439,10 +455,12 @@ class TestBuildSummaryBreakdowns:
                 's1',
                 [make_night('n1', '2026-09-10'), make_night('n2', '2026-09-14')],
                 [
-                    make_entry('M 31', night_id='n1', integration_minutes=60.0,
-                               catalogue_group_id='dso-openngc-ngc0224'),
-                    make_entry('M 31', night_id='n2', integration_minutes=90.0,
-                               catalogue_group_id='dso-openngc-ngc0224'),
+                    make_entry(
+                        'M 31', night_id='n1', integration_minutes=60.0, catalogue_group_id='dso-openngc-ngc0224'
+                    ),
+                    make_entry(
+                        'M 31', night_id='n2', integration_minutes=90.0, catalogue_group_id='dso-openngc-ngc0224'
+                    ),
                 ],
             )
         ]
@@ -451,6 +469,37 @@ class TestBuildSummaryBreakdowns:
         assert targets[0]['integration_minutes'] == pytest.approx(150.0)
         assert targets[0]['entries'] == 2
         assert targets[0]['last_date'] == '2026-09-14'
+
+    def test_captured_entry_with_no_identifiable_target_is_counted_but_not_tracked(self):
+        """An entry with neither a name nor a constellation still counts toward the
+        captured-entries total; it just cannot contribute a target or constellation row."""
+        sessions = [
+            make_session(
+                's1', [make_night('n1', '2026-09-10')], [make_entry('', integration_minutes=60.0, constellation='')]
+            )
+        ]
+        summary = build_summary(sessions, TODAY)
+        assert summary['totals']['captured_entries'] == 1
+        assert summary['totals']['objects_captured'] == 0
+        assert summary['constellations'] == []
+        assert summary['top_targets'] == []
+
+    def test_a_later_entry_supplies_the_combination_name_a_bare_id_did_not_carry(self):
+        sessions = [
+            make_session(
+                's1',
+                [make_night('n1', '2026-09-10')],
+                [
+                    make_entry('M 31', integration_minutes=60.0, combination_id='combo-2', combination_name=None),
+                    make_entry(
+                        'M 42', integration_minutes=30.0, combination_id='combo-2', combination_name='RC8 + ASI2600'
+                    ),
+                ],
+            )
+        ]
+        equipment = build_summary(sessions, TODAY)['equipment']
+        by_id = {row['combination_id']: row for row in equipment}
+        assert by_id['combo-2']['combination_name'] == 'RC8 + ASI2600'
 
     def test_breakdowns_are_capped_with_a_reported_total(self):
         entries = [
@@ -495,6 +544,14 @@ class TestBuildSummaryRobustness:
         summary = build_summary(sessions, TODAY)
         assert summary['monthly'] == []
         assert summary['totals']['integration_minutes_lifetime'] == pytest.approx(60.0)
+
+    def test_a_non_numeric_date_does_not_crash_the_monthly_series(self):
+        """A corrupted date field must degrade to an empty series, not raise."""
+        sessions = [
+            make_session('s1', [make_night('n1', 'abcd-01-15')], [make_entry('M 31', integration_minutes=60.0)])
+        ]
+        summary = build_summary(sessions, TODAY)
+        assert summary['monthly'] == []
 
 
 class TestBuildConditions:
@@ -575,10 +632,16 @@ class TestBuildConditions:
 
     def test_averages_separate_good_from_bad_nights(self):
         sessions = [
-            make_session('s1', [make_night('n1', '2026-09-10', seeing=2)],
-                         [make_entry('M 31', integration_minutes=60.0, rating=5.0)]),
-            make_session('s2', [make_night('n2', '2026-09-11', seeing=7)],
-                         [make_entry('M 33', integration_minutes=60.0, rating=1.0)]),
+            make_session(
+                's1',
+                [make_night('n1', '2026-09-10', seeing=2)],
+                [make_entry('M 31', integration_minutes=60.0, rating=5.0)],
+            ),
+            make_session(
+                's2',
+                [make_night('n2', '2026-09-11', seeing=7)],
+                [make_entry('M 33', integration_minutes=60.0, rating=1.0)],
+            ),
         ]
         buckets = build_conditions(sessions)['metrics']['seeing']['buckets']
         assert buckets[0]['average_rating'] == pytest.approx(5.0)
@@ -587,10 +650,16 @@ class TestBuildConditions:
 
     def test_measured_samples_counts_nights_that_recorded_the_metric(self):
         sessions = [
-            make_session('s1', [make_night('n1', '2026-09-10', seeing=2)],
-                         [make_entry('M 31', integration_minutes=60.0, rating=5.0)]),
-            make_session('s2', [make_night('n2', '2026-09-11', sqm=21.0)],
-                         [make_entry('M 33', integration_minutes=60.0, rating=1.0)]),
+            make_session(
+                's1',
+                [make_night('n1', '2026-09-10', seeing=2)],
+                [make_entry('M 31', integration_minutes=60.0, rating=5.0)],
+            ),
+            make_session(
+                's2',
+                [make_night('n2', '2026-09-11', sqm=21.0)],
+                [make_entry('M 33', integration_minutes=60.0, rating=1.0)],
+            ),
         ]
         metrics = build_conditions(sessions)['metrics']
         assert metrics['seeing']['measured_samples'] == 1
@@ -602,6 +671,14 @@ class TestBuildConditions:
         assert result['total_rated_entries'] == 0
         assert all(metric['measured_samples'] == 0 for metric in result['metrics'].values())
 
+    def test_a_value_outside_every_band_is_measured_but_not_bucketed(self):
+        """A corrupted sqm reading (e.g. a sensor glitch) still counts toward
+        measured_samples, but there is no quality band to credit its rating to."""
+        result = build_conditions(self._rated(sqm=999.0))
+        sqm = result['metrics']['sqm']
+        assert sqm['measured_samples'] == 1
+        assert sum(bucket['samples'] for bucket in sqm['buckets']) == 0
+
 
 class TestBuildLoggedMonths:
 
@@ -611,7 +688,7 @@ class TestBuildLoggedMonths:
         assert all(row['integration_hours'] == 0.0 for row in rows)
 
     def test_folds_every_year_into_the_same_calendar_month(self):
-        """"Which months do I actually get out" is a question about seasons, not years."""
+        """ "Which months do I actually get out" is a question about seasons, not years."""
         sessions = [
             make_session('s1', [make_night('n1', '2024-08-10')], [make_entry('M 31', integration_minutes=60.0)]),
             make_session('s2', [make_night('n2', '2026-08-12')], [make_entry('M 33', integration_minutes=120.0)]),
@@ -652,6 +729,19 @@ class TestBuildLoggedMonths:
 
     def test_undated_entries_are_skipped(self):
         sessions = [make_session('s1', [make_night('n1', '')], [make_entry('M 31', integration_minutes=60.0)])]
+        assert all(row['integration_hours'] == 0.0 for row in build_logged_months(sessions))
+
+    def test_a_non_numeric_month_field_is_skipped(self):
+        sessions = [
+            make_session('s1', [make_night('n1', '2026-ab-10')], [make_entry('M 31', integration_minutes=60.0)])
+        ]
+        assert all(row['integration_hours'] == 0.0 for row in build_logged_months(sessions))
+
+    def test_an_out_of_range_month_field_is_skipped(self):
+        """A corrupted date ('month 13') must not raise looking up a bucket that isn't there."""
+        sessions = [
+            make_session('s1', [make_night('n1', '2026-13-10')], [make_entry('M 31', integration_minutes=60.0)])
+        ]
         assert all(row['integration_hours'] == 0.0 for row in build_logged_months(sessions))
 
 
@@ -857,9 +947,43 @@ class TestBuildSkyCoverage:
         assert session_analytics.build_sky_coverage(sessions)['points'][0]['type'] == 'Unknown'
 
     def test_unnamed_records_are_skipped(self, stub_resolver):
-        sessions = [
-            make_session('s1', [make_night('n1', '2026-09-10')], [make_entry('', integration_minutes=60.0)])
-        ]
+        sessions = [make_session('s1', [make_night('n1', '2026-09-10')], [make_entry('', integration_minutes=60.0)])]
         coverage = session_analytics.build_sky_coverage(sessions, [{'id': 'x', 'name': ''}])
         assert coverage['points'] == []
         assert coverage['unplaced_count'] == 0
+
+    def test_a_punctuation_only_log_name_has_no_stable_key_and_is_dropped(self, stub_resolver):
+        """Passes the blank-name check (it is non-empty text) but normalizes to nothing,
+        so there is no key to track it - or even count it as unplaced - by."""
+        sessions = [make_session('s1', [make_night('n1', '2026-09-10')], [make_entry('***', integration_minutes=60.0)])]
+        coverage = session_analytics.build_sky_coverage(sessions)
+        assert coverage['points'] == []
+        assert coverage['unplaced_count'] == 0
+
+    def test_astrodex_item_id_is_not_overwritten_by_a_later_entry(self, stub_resolver):
+        sessions = [
+            make_session(
+                's1',
+                [make_night('n1', '2026-09-10'), make_night('n2', '2026-09-14')],
+                [
+                    make_entry('M 31', night_id='n1', integration_minutes=60.0, astrodex_item_id='item-1'),
+                    make_entry('M 31', night_id='n2', integration_minutes=30.0, astrodex_item_id='item-2'),
+                ],
+            )
+        ]
+        point = session_analytics.build_sky_coverage(sessions)['points'][0]
+        assert point['astrodex_item_id'] == 'item-1'
+
+    def test_a_punctuation_only_astrodex_name_has_no_stable_key_and_is_dropped(self, stub_resolver):
+        items = [{'id': 'item-1', 'name': '###', 'pictures': []}]
+        coverage = session_analytics.build_sky_coverage([], items)
+        assert coverage['points'] == []
+        assert coverage['unplaced_count'] == 0
+
+    def test_astrodex_item_outside_the_dataset_is_counted_as_unplaced(self, stub_resolver):
+        """Unlike a log entry, an astrodex item carries no ra/dec snapshot to fall back on."""
+        items = [{'id': 'item-1', 'name': 'Some Unknown Nebula', 'pictures': []}]
+        coverage = session_analytics.build_sky_coverage([], items)
+        assert coverage['points'] == []
+        assert coverage['unplaced_count'] == 1
+        assert 'Some Unknown Nebula' in coverage['unplaced_names']

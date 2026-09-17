@@ -209,6 +209,12 @@ class TestResolveFromDataset:
         assert resolve_from_dataset('') is None
         assert resolve_from_dataset(None) is None
 
+    def test_lookup_entry_that_is_not_a_dict_is_treated_as_unresolved(self, monkeypatch):
+        """get_lookup_entry's contract is dict-or-{}, but the boundary check must not
+        assume every future caller honours it."""
+        monkeypatch.setattr(target_coordinates.skytonight_targets, 'get_lookup_entry', lambda *_: None)
+        assert resolve_from_dataset('M 31', 'Messier') is None
+
 
 class TestResolveCoordinates:
     """The full resolution order used by the sky coverage map and the wishlist."""
@@ -286,8 +292,16 @@ class TestResolveTarget:
         """Consumers index into this dict unconditionally."""
         monkeypatch.setattr(target_coordinates.skytonight_targets, 'get_lookup_entry', lambda *_: {})
         expected = {
-            'group_id', 'target_id', 'preferred_name', 'object_type', 'constellation',
-            'category', 'ra_deg', 'dec_deg', 'resolved', 'placed',
+            'group_id',
+            'target_id',
+            'preferred_name',
+            'object_type',
+            'constellation',
+            'category',
+            'ra_deg',
+            'dec_deg',
+            'resolved',
+            'placed',
         }
         assert set(target_coordinates.resolve_target('Anything')) == expected
 
@@ -295,9 +309,7 @@ class TestResolveTarget:
 class TestLookupDatasetEntry:
 
     def test_returns_the_entry_for_a_known_object(self, monkeypatch):
-        monkeypatch.setattr(
-            target_coordinates.skytonight_targets, 'get_lookup_entry', lambda *_: {'group_id': 'g1'}
-        )
+        monkeypatch.setattr(target_coordinates.skytonight_targets, 'get_lookup_entry', lambda *_: {'group_id': 'g1'})
         assert target_coordinates.lookup_dataset_entry('M 31', 'Messier') == {'group_id': 'g1'}
 
     def test_returns_empty_for_an_unknown_object(self, monkeypatch):

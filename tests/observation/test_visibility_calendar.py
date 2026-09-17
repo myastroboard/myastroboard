@@ -11,7 +11,6 @@ if 'psutil' not in sys.modules:
 from observation import visibility_calendar  # type: ignore[import-not-found]
 from skytonight.skytonight_models import SkyTonightTarget, SkyTonightCoordinates  # type: ignore[import-not-found]
 
-
 _YEAR = 2026
 _PARIS = {
     'id': 'loc-paris',
@@ -119,7 +118,9 @@ def test_horizon_profile_reduces_observable_hours(monkeypatch):
 
 
 def test_solar_system_body_is_unsupported(monkeypatch):
-    _patch_dataset(monkeypatch, [_target('body-jupiter', 5.0, 20.0, category='bodies', object_type='Planet', name='Jupiter')])
+    _patch_dataset(
+        monkeypatch, [_target('body-jupiter', 5.0, 20.0, category='bodies', object_type='Planet', name='Jupiter')]
+    )
     result = visibility_calendar.get_visibility_calendar('Jupiter', _PARIS, _YEAR)
 
     assert result['supported'] is False
@@ -392,6 +393,30 @@ class TestDarkHoursByMonth:
         visibility_calendar.clear_batch_caches()
         assert visibility_calendar.dark_hours_by_month(self._location(), 2026) is not first
 
+    def test_a_failed_sample_falls_back_to_a_null_month(self, monkeypatch):
+        """A transient ephemeris failure must not crash the whole month grid - it just
+        leaves the affected month(s) with no usable samples."""
+
+        def _raise(*args, **kwargs):
+            raise RuntimeError('ephemeris boom')
+
+        monkeypatch.setattr(visibility_calendar, 'build_night_context', _raise)
+        visibility_calendar.clear_batch_caches()
+        rows = visibility_calendar.dark_hours_by_month(self._location(), 2026)
+        assert all(row['dark_hours'] == 0.0 for row in rows)
+        assert all(row['moon_illumination_pct'] is None for row in rows)
+
+    def test_dark_hours_cache_evicts_the_oldest_entry(self, monkeypatch):
+        monkeypatch.setattr(visibility_calendar, '_MAX_CACHE_ENTRIES', 1)
+        visibility_calendar.clear_batch_caches()
+        visibility_calendar.dark_hours_by_month(
+            {'id': 'loc-a', 'latitude': 48.0, 'longitude': 2.0, 'timezone': 'Europe/Paris'}, 2026
+        )
+        visibility_calendar.dark_hours_by_month(
+            {'id': 'loc-b', 'latitude': 48.0, 'longitude': 2.0, 'timezone': 'Europe/Paris'}, 2026
+        )
+        assert ('loc-a', 2026) not in visibility_calendar._dark_hours_cache
+
 
 class TestNextVisibilityBatch:
 
@@ -461,9 +486,7 @@ class TestNextVisibilityBatch:
             [{'ra_deg': 10.68, 'dec_deg': 41.27}], self._location(), night, months_ahead=1
         )
         alt_min, alt_max = visibility_calendar._resolve_constraints()
-        direct = visibility_calendar._sample_night(
-            10.68, 41.27, 48.0, 2.0, 'Europe/Paris', night, alt_min, alt_max, []
-        )
+        direct = visibility_calendar._sample_night(10.68, 41.27, 48.0, 2.0, 'Europe/Paris', night, alt_min, alt_max, [])
         assert rows[0]['observable_hours_next'] == direct['observable_hours']
         assert rows[0]['max_altitude_next'] == direct['max_altitude']
 
@@ -488,3 +511,29 @@ class TestNextVisibilityBatch:
             assert len(calls) == first_pass
         finally:
             visibility_calendar.build_night_context = original
+
+    def test_a_failed_context_sample_is_skipped_not_raised(self, monkeypatch):
+        """A transient ephemeris failure for one sampled night must not crash the batch -
+        the row just keeps its null defaults for that sample."""
+        from datetime import date as _date
+
+        def _raise(*args, **kwargs):
+            raise RuntimeError('ephemeris boom')
+
+        monkeypatch.setattr(visibility_calendar, '_cached_night_context', _raise)
+        visibility_calendar.clear_batch_caches()
+        rows = visibility_calendar.next_visibility_batch(
+            [{'ra_deg': 10.68, 'dec_deg': 41.27}], self._location(), _date(2026, 9, 15)
+        )
+        assert rows[0]['observable_hours_next'] is None
+        assert rows[0]['best_month'] is None
+
+    def test_context_cache_evicts_the_oldest_entry(self, monkeypatch):
+        from datetime import date as _date
+
+        monkeypatch.setattr(visibility_calendar, '_MAX_CONTEXT_ENTRIES', 1)
+        visibility_calendar.clear_batch_caches()
+        location_id = self._location()['id']
+        visibility_calendar._cached_night_context(location_id, 48.0, 2.0, 'Europe/Paris', _date(2026, 1, 1))
+        visibility_calendar._cached_night_context(location_id, 48.0, 2.0, 'Europe/Paris', _date(2026, 2, 1))
+        assert (location_id, '2026-01-01') not in visibility_calendar._context_cache

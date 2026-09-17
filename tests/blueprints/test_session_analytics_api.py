@@ -301,6 +301,7 @@ def stub_visibility(monkeypatch):
     next_visibility_batch() is exercised for real in tests/observation; here it would add
     a few Astropy night grids to every single request for no extra coverage of the route.
     """
+
     def fake_batch(targets, location, reference_date=None, months_ahead=3):
         return [
             {
@@ -316,9 +317,7 @@ def stub_visibility(monkeypatch):
         ]
 
     monkeypatch.setattr(session_analytics_bp_module.visibility_calendar, 'next_visibility_batch', fake_batch)
-    monkeypatch.setattr(
-        session_analytics_bp_module.visibility_calendar, 'dark_hours_by_month', lambda *_a, **_k: []
-    )
+    monkeypatch.setattr(session_analytics_bp_module.visibility_calendar, 'dark_hours_by_month', lambda *_a, **_k: [])
 
 
 @pytest.fixture
@@ -387,6 +386,13 @@ class TestWishlistList:
         wishlist.add_targets('someone-else', 'someone-else', [{'name': 'M 42'}])
         assert wishlist_client.get('/api/wishlist').get_json()['items'] == []
 
+    def test_unexpected_error_returns_500(self, wishlist_client, monkeypatch):
+        def boom(*_args, **_kwargs):
+            raise RuntimeError('boom')
+
+        monkeypatch.setattr(session_analytics_bp_module.wishlist, 'load_user_wishlist', boom)
+        assert wishlist_client.get('/api/wishlist').status_code == 500
+
 
 class TestWishlistCapturedState:
     """Captured is recomputed on every read, so an edit is reflected immediately."""
@@ -418,6 +424,40 @@ class TestWishlistCapturedState:
         stored = wishlist.load_user_wishlist(admin_user_id)['items'][0]
         assert 'captured' not in stored
 
+    def test_captured_index_tolerates_entries_with_no_alias_dict(self, wishlist_client, admin_user_id, monkeypatch):
+        """Older/malformed entries may lack the catalogue_aliases field entirely - unlike
+        a freshly-stored entry, which observation_sessions always normalizes to {}."""
+        monkeypatch.setattr(
+            session_analytics_bp_module.observation_sessions,
+            'load_user_sessions',
+            lambda *_a, **_k: {
+                'sessions': [
+                    {
+                        'id': 's1',
+                        'nights': [{'id': 'n1', 'date': '2026-07-14'}],
+                        'entries': [{'id': 'e1', 'night_id': 'n1', 'name': 'M 31', 'frame_count': 10}],
+                    }
+                ]
+            },
+        )
+        _post_target(wishlist_client)
+        assert wishlist_client.get('/api/wishlist').get_json()['progress']['captured'] == 1
+
+    def test_captured_index_skips_non_dict_astrodex_items(self, wishlist_client, monkeypatch):
+        monkeypatch.setattr(
+            session_analytics_bp_module.astrodex,
+            'load_user_astrodex',
+            lambda *_a, **_k: {'items': ['junk', {'id': 'i1', 'name': 'M 31', 'catalogue': 'Messier'}]},
+        )
+        _post_target(wishlist_client)
+        assert wishlist_client.get('/api/wishlist').get_json()['progress']['captured'] == 1
+
+    def test_captured_index_tolerates_an_unresolvable_astrodex_item(self, wishlist_client, admin_user_id):
+        """An astrodex item outside the dataset resolves to an empty group id - it must
+        still be processed without error, contributing no group-id key."""
+        astrodex.create_astrodex_item(admin_user_id, {'name': 'Totally Unknown Nebula'}, username='admin')
+        assert wishlist_client.get('/api/wishlist').status_code == 200
+
 
 class TestWishlistAdd:
 
@@ -441,9 +481,7 @@ class TestWishlistAdd:
         assert wishlist_client.post('/api/wishlist', json={'targets': targets}).status_code == 400
 
     def test_several_targets_in_one_call(self, wishlist_client):
-        response = wishlist_client.post(
-            '/api/wishlist', json={'targets': [{'name': 'M 31'}, {'name': 'M 42'}]}
-        )
+        response = wishlist_client.post('/api/wishlist', json={'targets': [{'name': 'M 31'}, {'name': 'M 42'}]})
         assert response.status_code == 201
         assert len(response.get_json()['data']['added']) == 2
 
@@ -459,6 +497,13 @@ class TestWishlistAdd:
                 'saved': False,
             },
         )
+        assert _post_target(wishlist_client).status_code == 500
+
+    def test_unexpected_error_returns_500(self, wishlist_client, monkeypatch):
+        def boom(*_args, **_kwargs):
+            raise RuntimeError('boom')
+
+        monkeypatch.setattr(session_analytics_bp_module.wishlist, 'add_targets', boom)
         assert _post_target(wishlist_client).status_code == 500
 
 
@@ -489,6 +534,24 @@ class TestWishlistUpdateDelete:
     def test_delete_unknown_item(self, wishlist_client):
         assert wishlist_client.delete('/api/wishlist/nope').status_code == 404
 
+    def test_update_unexpected_error_returns_500(self, wishlist_client, monkeypatch):
+        item_id = _post_target(wishlist_client).get_json()['data']['added'][0]['id']
+
+        def boom(*_args, **_kwargs):
+            raise RuntimeError('boom')
+
+        monkeypatch.setattr(session_analytics_bp_module.wishlist, 'update_item', boom)
+        assert wishlist_client.patch(f'/api/wishlist/{item_id}', json={'notes': 'x'}).status_code == 500
+
+    def test_delete_unexpected_error_returns_500(self, wishlist_client, monkeypatch):
+        item_id = _post_target(wishlist_client).get_json()['data']['added'][0]['id']
+
+        def boom(*_args, **_kwargs):
+            raise RuntimeError('boom')
+
+        monkeypatch.setattr(session_analytics_bp_module.wishlist, 'delete_item', boom)
+        assert wishlist_client.delete(f'/api/wishlist/{item_id}').status_code == 500
+
 
 class TestWishlistArchiveCaptured:
 
@@ -507,6 +570,13 @@ class TestWishlistArchiveCaptured:
         response = wishlist_client.post('/api/wishlist/archive-captured', json={})
         assert response.get_json()['removed'] == 0
         assert len(wishlist_client.get('/api/wishlist').get_json()['items']) == 1
+
+    def test_unexpected_error_returns_500(self, wishlist_client, monkeypatch):
+        def boom(*_args, **_kwargs):
+            raise RuntimeError('boom')
+
+        monkeypatch.setattr(session_analytics_bp_module.wishlist, 'load_user_wishlist', boom)
+        assert wishlist_client.post('/api/wishlist/archive-captured', json={}).status_code == 500
 
 
 class TestBestMonths:
@@ -535,6 +605,7 @@ class TestBestMonths:
 
     def test_ephemeris_failure_still_returns_the_personal_half(self, client, monkeypatch):
         """One broken half must not take the whole dashboard section down."""
+
         def boom(*_args, **_kwargs):
             raise RuntimeError('no ephemeris')
 
@@ -553,6 +624,16 @@ class TestBestMonths:
         app.config['TESTING'] = True
         with app.test_client() as anonymous:
             assert anonymous.get('/api/session-analytics/best-months').status_code == 401
+
+    def test_unexpected_error_outside_the_ephemeris_guard_returns_500(self, client, stub_visibility, monkeypatch):
+        """Unlike the ephemeris half, a failure building the logged-months series is not
+        individually guarded and must fall through to the route's own 500."""
+
+        def boom(*_args, **_kwargs):
+            raise RuntimeError('boom')
+
+        monkeypatch.setattr(session_analytics_bp_module.session_analytics, 'build_logged_months', boom)
+        assert client.get('/api/session-analytics/best-months').status_code == 500
 
 
 class TestWishlistVisibility:

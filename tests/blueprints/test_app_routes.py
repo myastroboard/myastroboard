@@ -908,8 +908,10 @@ class TestMoonExtendedEndpoints:
     def test_phase_calendar_cache_is_bounded(self, client_admin, monkeypatch):
         monkeypatch.setattr(_route_helpers_mod, 'load_config', _v12_config)
         monkeypatch.setattr(_weather_mod, '_MOON_PHASE_CALENDAR_CACHE_MAX', 3)
-        stale = {f'Old/Zone{i}:2000-0{i + 1}': {'timestamp': float(i), 'data': {'days': [], 'principal_phases': []}}
-                 for i in range(10)}
+        stale = {
+            f'Old/Zone{i}:2000-0{i + 1}': {'timestamp': float(i), 'data': {'days': [], 'principal_phases': []}}
+            for i in range(10)
+        }
         monkeypatch.setattr(_weather_mod, '_moon_phase_calendar_cache', dict(stale))
         resp = client_admin.get('/api/moon/phase-calendar')
         assert resp.status_code == 200
@@ -1086,9 +1088,7 @@ class TestWeatherAstroAnalysis:
         assert resp.status_code in (200, 202, 400, 500)
 
     def test_astro_analysis_served_from_warm_cache(self, client_admin, monkeypatch):
-        monkeypatch.setattr(
-            _weather_mod, '_cached_astro_analysis_if_default', lambda *a, **k: {'served': 'from-cache'}
-        )
+        monkeypatch.setattr(_weather_mod, '_cached_astro_analysis_if_default', lambda *a, **k: {'served': 'from-cache'})
         resp = client_admin.get('/api/weather/astro-analysis')
         assert resp.status_code == 200
         assert resp.get_json() == {'served': 'from-cache'}
@@ -1824,9 +1824,7 @@ class TestEquipmentNumericValidation:
         assert resp.status_code == 400
 
     def test_update_mount_invalid_tracking_accuracy_returns_400(self, client_admin):
-        resp = client_admin.put(
-            '/api/equipment/mounts/some-id', json={'tracking_accuracy_arcsec': 50}
-        )  # above max 10
+        resp = client_admin.put('/api/equipment/mounts/some-id', json={'tracking_accuracy_arcsec': 50})  # above max 10
         assert resp.status_code == 400
 
     # --- Filter: invalid numeric fields must be rejected on create and update ---
@@ -1838,37 +1836,27 @@ class TestEquipmentNumericValidation:
         assert resp.status_code == 400
 
     def test_update_filter_invalid_bandwidth_returns_400(self, client_admin):
-        resp = client_admin.put(
-            '/api/equipment/filters/some-id', json={'bandwidth_nm': 5000}
-        )  # above max 1000
+        resp = client_admin.put('/api/equipment/filters/some-id', json={'bandwidth_nm': 5000})  # above max 1000
         assert resp.status_code == 400
 
     # --- Accessory: invalid numeric fields must be rejected on create and update ---
 
     def test_create_accessory_invalid_weight_returns_400(self, client_admin):
-        resp = client_admin.post(
-            '/api/equipment/accessories', json={'name': 'A', 'weight_kg': 500}
-        )  # above max 50
+        resp = client_admin.post('/api/equipment/accessories', json={'name': 'A', 'weight_kg': 500})  # above max 50
         assert resp.status_code == 400
 
     def test_update_accessory_invalid_weight_returns_400(self, client_admin):
-        resp = client_admin.put(
-            '/api/equipment/accessories/some-id', json={'weight_kg': -5}
-        )  # below min 0
+        resp = client_admin.put('/api/equipment/accessories/some-id', json={'weight_kg': -5})  # below min 0
         assert resp.status_code == 400
 
     # --- Combination: invalid numeric fields must be rejected on create and update ---
 
     def test_create_combination_invalid_focal_length_returns_400(self, client_admin):
-        resp = client_admin.post(
-            '/api/equipment/combinations', json={'lens_focal_length_mm': 5000}
-        )  # above max 2000
+        resp = client_admin.post('/api/equipment/combinations', json={'lens_focal_length_mm': 5000})  # above max 2000
         assert resp.status_code == 400
 
     def test_update_combination_invalid_focal_ratio_returns_400(self, client_admin):
-        resp = client_admin.put(
-            '/api/equipment/combinations/some-id', json={'lens_focal_ratio': 100}
-        )  # above max 32
+        resp = client_admin.put('/api/equipment/combinations/some-id', json={'lens_focal_ratio': 100})  # above max 32
         assert resp.status_code == 400
 
 
@@ -4068,9 +4056,7 @@ class TestAstrodexPictureEquipment:
         """Explicitly sending null/empty-string capture fields (as opposed to omitting them
         entirely) still resolves to None, same as omitting them."""
         item_id = self._create_item(client_admin)
-        resp = self._add_picture(
-            client_admin, item_id, exposition_time=None, frames='', integration_minutes=None
-        )
+        resp = self._add_picture(client_admin, item_id, exposition_time=None, frames='', integration_minutes=None)
         assert resp.status_code == 200
         picture = resp.get_json()['picture']
         assert picture['exposition_time'] is None
@@ -4099,9 +4085,7 @@ class TestAstrodexPictureEquipment:
 
     def test_update_picture_without_capture_keys_leaves_them_untouched(self, client_admin):
         item_id = self._create_item(client_admin)
-        picture = self._add_picture(
-            client_admin, item_id, exposition_time=180, frames=20
-        ).get_json()['picture']
+        picture = self._add_picture(client_admin, item_id, exposition_time=180, frames=20).get_json()['picture']
 
         resp = client_admin.put(
             f"/api/astrodex/items/{item_id}/pictures/{picture['id']}", json={'notes': 'unrelated edit'}
@@ -7833,6 +7817,23 @@ class TestCacheSchedulerStartTrue:
             elif 'cache_scheduler' in _app_mod.app.config:
                 _app_mod.app.config.pop('cache_scheduler')
 
+    def test_second_call_returns_the_cached_instance(self, client_admin, monkeypatch):
+        """Cover the branch where an existing scheduler is reused rather than recreated."""
+        from cache.cache_scheduler import CacheScheduler as CS
+
+        monkeypatch.setattr(CS, 'start', lambda self: True)
+
+        saved = _app_mod.app.config.pop('cache_scheduler', None)
+        try:
+            first = _app_mod.get_or_create_cache_scheduler()
+            second = _app_mod.get_or_create_cache_scheduler()
+            assert second is first
+        finally:
+            if saved is not None:
+                _app_mod.app.config['cache_scheduler'] = saved
+            elif 'cache_scheduler' in _app_mod.app.config:
+                _app_mod.app.config.pop('cache_scheduler')
+
 
 # ---------------------------------------------------------------------------
 # Connector routes
@@ -8321,6 +8322,7 @@ class TestCSSCelestrakRestart:
 # Merged from former test_coverage_paths.py
 # ---------------------------------------------------------------------------
 
+
 def _plant_slot(name, data, fresh=True):
     """Plant `data` in the active location's slot; fresh=True makes the TTL valid."""
     entry = _cache_store.get_location_cache_entry(name, _install_default_location_id())
@@ -8382,6 +8384,7 @@ class TestCacheSyncPaths:
     def test_iss_passes_sync_path(self, client_admin, monkeypatch):
         self._fresh(monkeypatch, 'iss_passes', {'window_days': 20, 'passes': []})
         from space import iss_passes as _iss
+
         monkeypatch.setattr(_iss, 'get_celestrak_status', lambda: 'ok')
         monkeypatch.setattr(_iss, 'get_iss_tle_source_info', lambda: {})
         resp = client_admin.get('/api/iss/passes')
@@ -8410,6 +8413,7 @@ class TestCacheSyncPaths:
         _isolate_shared_file(monkeypatch)
         _plant_slot('sidereal_time', {'hourly_forecast': []}, fresh=True)
         from observation import sidereal_time as _st
+
         monkeypatch.setattr(
             _st.SiderealTimeService,
             'get_current_sidereal_info',
@@ -8434,11 +8438,13 @@ class TestWeatherForecastLiveData:
         """Covers ."""
         pd = pytest.importorskip('pandas')
 
-        df = pd.DataFrame({
-            'date': pd.to_datetime(['2026-06-07T22:00:00+00:00']),
-            'temperature_2m': [15.0],
-            'bytes_col': [b'raw bytes'],
-        })
+        df = pd.DataFrame(
+            {
+                'date': pd.to_datetime(['2026-06-07T22:00:00+00:00']),
+                'temperature_2m': [15.0],
+                'bytes_col': [b'raw bytes'],
+            }
+        )
         mock_forecast = {
             'hourly': df,
             'location': {'name': 'TestCity', 'lat': '48.85'},
@@ -8466,11 +8472,13 @@ class TestCatalogueLookupSimbad:
         monkeypatch.setattr(_skt, 'get_lookup_entry', lambda *a, **kw: None)
         monkeypatch.setattr(_oi, 'is_safe_identifier', lambda name: True)
         monkeypatch.setattr(
-            _oi, 'resolve_identifier_for_catalogue_lookup',
+            _oi,
+            'resolve_identifier_for_catalogue_lookup',
             lambda name: {'aliases': ['HIP 12345'], 'object_type': 'Star', 'constellation': 'Ori'},
         )
         monkeypatch.setattr(
-            _oi, 'build_catalogue_names_from_aliases',
+            _oi,
+            'build_catalogue_names_from_aliases',
             lambda name, aliases: {'Hipparcos': 'HIP 12345'},
         )
 
@@ -8490,7 +8498,8 @@ class TestCatalogueLookupSimbad:
         monkeypatch.setattr(_skt, 'get_lookup_entry', lambda *a, **kw: None)
         monkeypatch.setattr(_oi, 'is_safe_identifier', lambda name: True)
         monkeypatch.setattr(
-            _oi, 'resolve_identifier_for_catalogue_lookup',
+            _oi,
+            'resolve_identifier_for_catalogue_lookup',
             lambda name: {
                 'aliases': ['NAME Vega', '* alf Lyr', '* 3 Lyr', 'HIP 91262'],
                 'object_type': 'Star',
@@ -8514,11 +8523,13 @@ class TestCatalogueLookupSimbad:
         monkeypatch.setattr(_skt, 'get_lookup_entry', lambda *a, **kw: None)
         monkeypatch.setattr(_oi, 'is_safe_identifier', lambda name: True)
         monkeypatch.setattr(
-            _oi, 'resolve_identifier_for_catalogue_lookup',
+            _oi,
+            'resolve_identifier_for_catalogue_lookup',
             lambda name: {'aliases': ['NGC 1234'], 'object_type': 'Galaxy', 'constellation': 'Peg'},
         )
         monkeypatch.setattr(
-            _oi, 'build_catalogue_names_from_aliases',
+            _oi,
+            'build_catalogue_names_from_aliases',
             lambda name, aliases: {'OpenNGC': 'NGC 1234'},
         )
 
@@ -8536,11 +8547,13 @@ class TestCatalogueLookupSimbad:
         monkeypatch.setattr(_skt, 'get_lookup_entry', lambda *a, **kw: None)
         monkeypatch.setattr(_oi, 'is_safe_identifier', lambda name: True)
         monkeypatch.setattr(
-            _oi, 'resolve_identifier_for_catalogue_lookup',
+            _oi,
+            'resolve_identifier_for_catalogue_lookup',
             lambda name: {'aliases': [], 'object_type': 'Unknown', 'constellation': '?'},
         )
         monkeypatch.setattr(
-            _oi, 'build_catalogue_names_from_aliases',
+            _oi,
+            'build_catalogue_names_from_aliases',
             lambda name, aliases: {},
         )
 
@@ -8620,6 +8633,7 @@ class TestPasswordChangeSuccess:
 
     def test_password_change_success(self, client_admin, monkeypatch):
         from utils.auth import user_manager as _um
+
         monkeypatch.setattr(_um, 'change_own_password', lambda *_: None)
         resp = client_admin.post(
             '/api/auth/change-password',
@@ -8680,6 +8694,7 @@ class TestPushExceptionPaths:
         class _BrokenList:
             def __iter__(self):
                 raise RuntimeError('broken subscriptions')
+
             def __len__(self):
                 return 1
 
@@ -8811,10 +8826,14 @@ class TestTranslationBranches:
 
     def test_solar_system_asteroid_occultation_event(self, client_admin, monkeypatch):
         """Asteroid Occultation event translation branch."""
-        self._stale(monkeypatch, 'solar_system_events', {
-            'events': [{'event_type': 'Asteroid Occultation', 'title': 'Ast', 'description': 'Desc'}],
-            'language': 'en',
-        })
+        self._stale(
+            monkeypatch,
+            'solar_system_events',
+            {
+                'events': [{'event_type': 'Asteroid Occultation', 'title': 'Ast', 'description': 'Desc'}],
+                'language': 'en',
+            },
+        )
         resp = client_admin.get('/api/events/solarsystem?lang=fr')
         assert resp.status_code == 200
 
@@ -8839,11 +8858,13 @@ class TestPlanMyNightCoveragePaths:
         from observation import plan_my_night as _pmn
 
         monkeypatch.setattr(
-            _pmn, 'create_or_add_target',
+            _pmn,
+            'create_or_add_target',
             lambda **_kw: (False, 'previous_plan_locked', None, None),
         )
         monkeypatch.setattr(
-            _plan_my_night_mod, '_resolve_observing_night_for_plan',
+            _plan_my_night_mod,
+            '_resolve_observing_night_for_plan',
             lambda: {
                 'start': '2026-06-07T22:00:00',
                 'end': '2026-06-08T04:00:00',
@@ -8865,7 +8886,8 @@ class TestPlanMyNightCoveragePaths:
 
         monkeypatch.setattr(_SS, 'get_today_report', sun_raise)
         monkeypatch.setattr(
-            _plan_my_night_mod, 'load_calculation_results',
+            _plan_my_night_mod,
+            'load_calculation_results',
             lambda *_a, **_k: {
                 'metadata': {
                     'night_start': '2026-06-07T22:00:00',
@@ -8876,7 +8898,8 @@ class TestPlanMyNightCoveragePaths:
         from observation import plan_my_night as _pmn
 
         monkeypatch.setattr(
-            _pmn, 'create_or_add_target',
+            _pmn,
+            'create_or_add_target',
             lambda **_kw: (True, 'created', {}, {'id': 'entry-1'}),
         )
         monkeypatch.setattr(_pmn, 'get_plan_with_timeline', lambda *a, **kw: {'state': 'ok'})
@@ -8896,11 +8919,13 @@ class TestPlanMyNightCoveragePaths:
         combination_plan = {'entries': [{'id': entry_id, 'name': 'M42', 'catalogue': 'Messier'}]}
 
         monkeypatch.setattr(
-            _pmn, 'get_all_plan_files',
+            _pmn,
+            'get_all_plan_files',
             lambda uid: [f'data/plans/{uid}_plan_combo1.json'],
         )
         monkeypatch.setattr(
-            _pmn, 'load_user_plan',
+            _pmn,
+            'load_user_plan',
             lambda uid, uname, combination_id=None: {'plan': combination_plan},
         )
         monkeypatch.setattr(_adx, 'is_item_in_astrodex', lambda *_: False)
@@ -8939,7 +8964,8 @@ class TestAstrodexUploadPaths:
         from observation import astrodex as _adx
 
         monkeypatch.setattr(
-            _adx, 'switch_item_catalogue_name',
+            _adx,
+            'switch_item_catalogue_name',
             lambda uid, item_id, catalogue: {'id': item_id, 'name': 'NGC 224'},
         )
         resp = client_admin.post(
@@ -8954,7 +8980,8 @@ class TestAstrodexUploadPaths:
         from observation import astrodex as _adx
 
         monkeypatch.setattr(
-            _adx, 'switch_item_catalogue_name',
+            _adx,
+            'switch_item_catalogue_name',
             lambda uid, item_id, catalogue: None,
         )
         resp = client_admin.post(
@@ -9030,8 +9057,7 @@ class TestObjectInfoPaths:
         from observation import object_info as _oi
 
         monkeypatch.setattr(_oi, 'is_safe_identifier', lambda name: True)
-        monkeypatch.setattr(_oi, 'get_object_info',
-                            lambda name, lang='en': {'error': 'invalid_identifier'})
+        monkeypatch.setattr(_oi, 'get_object_info', lambda name, lang='en': {'error': 'invalid_identifier'})
         resp = client_admin.get('/api/object/INVALID_IDENT')
         assert resp.status_code in (400, 500)
 
@@ -9063,6 +9089,7 @@ class TestTimezonesAndCoordinates:
 # ---------------------------------------------------------------------------
 # Merged from former test_coverage_paths2.py
 # ---------------------------------------------------------------------------
+
 
 def _force_invalid_isolated(monkeypatch):
     """v1.2 arc setup: the TTL check always fails and shared-file lookups are
@@ -9839,6 +9866,7 @@ class TestMiscRemainingPaths:
 # Merged from former test_coverage_edge_cases.py
 # ---------------------------------------------------------------------------
 
+
 def test_validate_location_payload_accepts_none_bortle():
     payload = {
         "name": "Site",
@@ -9876,6 +9904,7 @@ def test_get_combinations_merges_share_status(client_admin, monkeypatch):
 # Merged from former test_locations_coverage.py
 # ---------------------------------------------------------------------------
 
+
 class TestLocationsApiErrorArcs:
     def _raise(self, *_a, **_k):
         raise RuntimeError('boom')
@@ -9901,17 +9930,21 @@ class TestLocationsApiErrorArcs:
 
     def test_validate_payload_edges(self):
         validate = _locations_mod._validate_location_payload
-        assert validate('junk')[1] is not None                      # non-dict payload
-        assert validate({'name': 'X', 'latitude': None, 'longitude': 2,
-                         'elevation': 0, 'timezone': 'UTC'})[1] is not None  # lat not a number
-        assert validate({'name': 'X', 'latitude': 1, 'longitude': 2,
-                         'elevation': 'high', 'timezone': 'UTC'})[1] is not None  # bad elevation
-        assert validate({'name': 'X', 'latitude': 1, 'longitude': 2,
-                         'elevation': None, 'timezone': 'UTC'})[1] is not None  # elevation explicitly None
+        assert validate('junk')[1] is not None  # non-dict payload
+        assert (
+            validate({'name': 'X', 'latitude': None, 'longitude': 2, 'elevation': 0, 'timezone': 'UTC'})[1] is not None
+        )  # lat not a number
+        assert (
+            validate({'name': 'X', 'latitude': 1, 'longitude': 2, 'elevation': 'high', 'timezone': 'UTC'})[1]
+            is not None
+        )  # bad elevation
+        assert (
+            validate({'name': 'X', 'latitude': 1, 'longitude': 2, 'elevation': None, 'timezone': 'UTC'})[1] is not None
+        )  # elevation explicitly None
         cleaned, err = validate({'bortle': None, 'sqm': None}, partial=True)
         assert err is None and cleaned == {'bortle': None, 'sqm': None}  # explicit nulls kept
         cleaned, err = validate({'horizon_profile': None}, partial=True)
-        assert err is None and cleaned['horizon_profile'] == []     # None horizon -> []
+        assert err is None and cleaned['horizon_profile'] == []  # None horizon -> []
         assert validate({'horizon_profile': 'flat'}, partial=True)[1] is not None  # non-list horizon
 
     def test_put_unknown_location_returns_404(self, client_admin):
@@ -9932,9 +9965,16 @@ class TestLocationsApiErrorArcs:
         assert resp.status_code == 404
 
     def test_delete_invalid_plans_mode_returns_400(self, client_admin):
-        resp = client_admin.post('/api/locations', json={
-            'name': 'Del Mode', 'latitude': 1, 'longitude': 2, 'elevation': 0, 'timezone': 'UTC',
-        })
+        resp = client_admin.post(
+            '/api/locations',
+            json={
+                'name': 'Del Mode',
+                'latitude': 1,
+                'longitude': 2,
+                'elevation': 0,
+                'timezone': 'UTC',
+            },
+        )
         loc_id = resp.get_json()['location']['id']
         try:
             bad = client_admin.delete(f'/api/locations/{loc_id}?plans=maybe')
@@ -9994,7 +10034,8 @@ class TestCachedLocationScore:
 
     def test_returns_none_when_score_missing(self, monkeypatch):
         monkeypatch.setattr(
-            _cache_store, 'load_location_cache',
+            _cache_store,
+            'load_location_cache',
             lambda name, loc_id: {'data': {'current_conditions': {'seeing_pickering': 7.0}}},
         )
         assert _locations_mod._cached_location_score('loc-nocond') is None
@@ -10035,16 +10076,20 @@ class TestForecastObservationScoreMerge:
 
     def test_condition_set_from_matching_hour(self, monkeypatch):
         monkeypatch.setattr(
-            _weather_mod.cache_store, 'load_location_cache',
+            _weather_mod.cache_store,
+            'load_location_cache',
             lambda name, loc: self._astro(
                 {'datetime': '2026-09-03T21:00:00+02:00', 'observation_score': 6.3},
                 {'datetime': '2026-09-03T22:00:00+02:00', 'observation_score': 5.9},
             ),
         )
-        payload = {'location': {'name': 'X'}, 'hourly': [
-            {'date': '2026-09-03T21:00:00+02:00', 'temperature_2m': 12.0},
-            {'date': '2026-09-03T22:00:00+02:00', 'temperature_2m': 11.0},
-        ]}
+        payload = {
+            'location': {'name': 'X'},
+            'hourly': [
+                {'date': '2026-09-03T21:00:00+02:00', 'temperature_2m': 12.0},
+                {'date': '2026-09-03T22:00:00+02:00', 'temperature_2m': 11.0},
+            ],
+        }
         out = _weather_mod._forecast_with_observation_score(payload, 'loc-1')
         assert out['hourly'][0]['condition'] == pytest.approx(63.0)
         assert out['hourly'][1]['condition'] == pytest.approx(59.0)
@@ -10052,7 +10097,8 @@ class TestForecastObservationScoreMerge:
 
     def test_astro_score_wins_over_local_components(self, monkeypatch):
         monkeypatch.setattr(
-            _weather_mod.cache_store, 'load_location_cache',
+            _weather_mod.cache_store,
+            'load_location_cache',
             lambda name, loc: self._astro({'datetime': '2026-09-03T21:00:00+02:00', 'observation_score': 6.3}),
         )
         record = {'date': '2026-09-03T21:00:00+02:00', **self._components()}
@@ -10061,7 +10107,8 @@ class TestForecastObservationScoreMerge:
 
     def test_unmatched_hour_without_components_has_no_condition(self, monkeypatch):
         monkeypatch.setattr(
-            _weather_mod.cache_store, 'load_location_cache',
+            _weather_mod.cache_store,
+            'load_location_cache',
             lambda name, loc: self._astro({'datetime': '2026-09-03T21:00:00+02:00', 'observation_score': 6.3}),
         )
         out = _weather_mod._forecast_with_observation_score({'hourly': [{'date': '2026-09-03T23:00:00+02:00'}]}, 'l')
@@ -10069,7 +10116,8 @@ class TestForecastObservationScoreMerge:
 
     def test_unmatched_hour_falls_back_to_local_component_score(self, monkeypatch):
         monkeypatch.setattr(
-            _weather_mod.cache_store, 'load_location_cache',
+            _weather_mod.cache_store,
+            'load_location_cache',
             lambda name, loc: self._astro({'datetime': '2026-09-03T21:00:00+02:00', 'observation_score': 6.3}),
         )
         record = {'date': '2026-09-03T23:00:00+02:00', **self._components()}
@@ -10078,7 +10126,8 @@ class TestForecastObservationScoreMerge:
 
     def test_stale_condition_is_replaced(self, monkeypatch):
         monkeypatch.setattr(
-            _weather_mod.cache_store, 'load_location_cache',
+            _weather_mod.cache_store,
+            'load_location_cache',
             lambda name, loc: self._astro({'datetime': '2026-09-03T21:00:00+02:00', 'observation_score': 6.3}),
         )
         out = _weather_mod._forecast_with_observation_score(
@@ -10116,7 +10165,8 @@ class TestForecastObservationScoreMerge:
 
     def test_non_numeric_astro_score_falls_back_to_local_blend(self, monkeypatch):
         monkeypatch.setattr(
-            _weather_mod.cache_store, 'load_location_cache',
+            _weather_mod.cache_store,
+            'load_location_cache',
             lambda name, loc: self._astro(
                 {'datetime': '2026-09-03T21:00:00+02:00', 'observation_score': 'not-a-number'}
             ),

@@ -356,7 +356,7 @@ except Exception as e:  # pragma: no cover
 # are unaffected by skipping the auto-start below.
 _AUTOSTART_SCHEDULERS = 'pytest' not in sys.modules
 
-if _AUTOSTART_SCHEDULERS:
+if _AUTOSTART_SCHEDULERS:  # pragma: no cover - never true while imported under pytest
     # Initialize cache scheduler FIRST so its cache_ready_event can be passed to
     # the SkyTonight scheduler, ensuring DSO calculations run on warm caches.
     try:
