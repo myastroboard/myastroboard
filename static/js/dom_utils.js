@@ -12,8 +12,78 @@ const DOMUtils = {
     clearContainer,
     setLoading,
     createIcon,
-    createSpinnerWrapper
+    createSpinnerWrapper,
+    buildStatPlate
 };
+
+/**
+ * Render a page's headline figures as one plate: the figure that matters at full size,
+ * the rest as a compact row beside it.
+ *
+ * A value may be a string or a Node, so a page that shows something richer than a number
+ * (a star rating, for instance) can pass the element it already builds.
+ *
+ * See the ".stat-plate" component in bs_main.css for why this is not a Bootstrap card.
+ *
+ * @param {HTMLElement|string} containerOrId - emptied first; takes the .stat-plate class
+ * @param {Object} plate
+ * @param {{value: string|Node, label: string, hint?: string}} plate.hero
+ * @param {Array<{value: string|Node, label: string, hint?: string, icon?: string}>} [plate.figures]
+ */
+function buildStatPlate(containerOrId, plate) {
+    const container = getElement(containerOrId);
+    if (!container || !plate || !plate.hero) return;
+    clear(container);
+    container.classList.add('stat-plate');
+
+    const row = document.createElement('div');
+    row.className = 'stat-plate-row';
+
+    const hero = document.createElement('div');
+    hero.className = 'stat-plate-hero';
+    hero.appendChild(_statPlatePart('stat-plate-hero-value', plate.hero.value));
+    hero.appendChild(_statPlatePart('stat-plate-hero-label', plate.hero.label));
+    if (plate.hero.hint) {
+        hero.appendChild(_statPlatePart('stat-plate-hero-hint', plate.hero.hint));
+    }
+    row.appendChild(hero);
+
+    const figures = Array.isArray(plate.figures) ? plate.figures : [];
+    if (figures.length) {
+        const grid = document.createElement('div');
+        grid.className = 'stat-plate-figures';
+        figures.forEach(figure => {
+            const cell = document.createElement('div');
+            cell.className = 'stat-plate-figure';
+            if (figure.icon) {
+                cell.appendChild(createIcon(`bi ${figure.icon}`, 'stat-plate-icon'));
+            }
+            const text = document.createElement('div');
+            text.appendChild(_statPlatePart('stat-plate-value', figure.value));
+            text.appendChild(_statPlatePart('stat-plate-label', figure.label));
+            if (figure.hint) {
+                text.appendChild(_statPlatePart('stat-plate-hint', figure.hint));
+            }
+            cell.appendChild(text);
+            grid.appendChild(cell);
+        });
+        row.appendChild(grid);
+    }
+
+    container.appendChild(row);
+}
+
+/** One line of a plate. Accepts a Node so a caller can pass a richer value than text. */
+function _statPlatePart(className, value) {
+    const element = document.createElement('span');
+    element.className = className;
+    if (value instanceof Node) {
+        element.appendChild(value);
+    } else {
+        element.textContent = String(value ?? '');
+    }
+    return element;
+}
 
 /**
  * Create a Bootstrap Icons <i> element.

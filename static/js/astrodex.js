@@ -661,33 +661,38 @@ function renderAstrodexStats() {
         ? ''
         : ` (${i18n.t('astrodex.personal')}${personalStats.constellationsCount})`;
 
-    DOMUtils.clear(statsContainer);
-    const statItems = [
-        { value: totalItems.toFixed(0), label: `${i18n.t('astrodex.total_objects')}${personalSuffix}` },
-        { value: itemsWithPictures.toFixed(0), label: `${i18n.t('astrodex.with_photos')}${personalPicturesSuffix}` },
-        { value: totalPictures.toFixed(0), label: `${i18n.t('astrodex.total_photos')}${personalTotalPhotosSuffix}` },
-        { value: objectTypesCount.toFixed(0), label: `${i18n.t('astrodex.object_types')}${personalObjectTypesSuffix}` },
-        { value: constellationCount.toFixed(0), label: `${i18n.t('astrodex.constellations')}${personalConstellationsSuffix}` }
-    ];
-
-    statItems.forEach((statItem) => {
-        const col = document.createElement('div');
-        col.className = 'col';
-        const card = document.createElement('div');
-        card.className = 'card h-100';
-        const body = document.createElement('div');
-        body.className = 'card-body text-center';
-        const value = document.createElement('div');
-        value.className = 'astrodex-insight-value text-primary';
-        value.textContent = statItem.value;
-        const label = document.createElement('div');
-        label.className = 'fw-light fst-italic';
-        label.textContent = statItem.label;
-        body.appendChild(value);
-        body.appendChild(label);
-        card.appendChild(body);
-        col.appendChild(card);
-        statsContainer.appendChild(col);
+    DOMUtils.buildStatPlate(statsContainer, {
+        hero: {
+            value: totalItems.toFixed(0),
+            label: i18n.t('astrodex.total_objects'),
+            hint: personalSuffix.trim(),
+        },
+        figures: [
+            {
+                icon: 'bi-image',
+                value: itemsWithPictures.toFixed(0),
+                label: i18n.t('astrodex.with_photos'),
+                hint: personalPicturesSuffix.trim(),
+            },
+            {
+                icon: 'bi-images',
+                value: totalPictures.toFixed(0),
+                label: i18n.t('astrodex.total_photos'),
+                hint: personalTotalPhotosSuffix.trim(),
+            },
+            {
+                icon: 'bi-tags',
+                value: objectTypesCount.toFixed(0),
+                label: i18n.t('astrodex.object_types'),
+                hint: personalObjectTypesSuffix.trim(),
+            },
+            {
+                icon: 'bi-diagram-2',
+                value: constellationCount.toFixed(0),
+                label: i18n.t('astrodex.constellations'),
+                hint: personalConstellationsSuffix.trim(),
+            },
+        ],
     });
 }
 

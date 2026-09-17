@@ -427,7 +427,7 @@ def _make_calc_result():
                 'astro_score': 0.9,
                 'observation': {
                     'ra_hms': '00h 42m 44s',
-                    'dec_dms': '+41° 16′ 09″',
+                    'dec_dms': "+41° 16' 09.00\"",
                     'max_altitude': 55.0,
                     'observable_fraction': 0.8,
                     'observable_hours': 4.0,
@@ -445,7 +445,7 @@ def _make_calc_result():
                 'magnitude': -2.0,
                 'astro_score': 0.8,
                 'observation': {
-                    'ra_hms': '03h 00m', 'dec_dms': '+16° 00′',
+                    'ra_hms': '03h 00m', 'dec_dms': "+16° 00'",
                     'max_altitude': 40.0, 'azimuth': 170.0,
                     'max_altitude_time': '23:00', 'meridian_transit': '23:00',
                     'antimeridian_transit': '11:00', 'observable_hours': 5.0,
@@ -463,7 +463,7 @@ def _make_calc_result():
                 'metadata': {'perihelion_date': '2026-10-20', 'absolute_magnitude': 5.0,
                              'distance_earth_au': 1.2, 'distance_sun_au': 1.5},
                 'observation': {
-                    'ra_hms': '05h 00m', 'dec_dms': '+20° 00′',
+                    'ra_hms': '05h 00m', 'dec_dms': "+20° 00'",
                     'max_altitude': 35.0, 'azimuth': 160.0,
                     'rise_time': '21:00', 'set_time': '03:00',
                     'meridian_transit': '00:00', 'antimeridian_transit': '12:00',

@@ -678,7 +678,7 @@
             <div id="observatory-content">
                 <div class="text-muted text-center py-4">
                     <div class="spinner-border spinner-border-sm me-2"></div>
-                    <span data-i18n="observatory.loading">Loading observatory data…</span>
+                    <span data-i18n="observatory.loading">Loading observatory data...</span>
                 </div>
             </div>
         </div>
@@ -705,7 +705,7 @@
                     </li>
                     <li class="nav-item">
                         <a class="nav-link sub-tab-btn" href="#" data-subtab="analytics">
-                            <i class="bi bi-graph-up-arrow text-info icon-inline" aria-hidden="true"></i> <span data-i18n="navbar.session_analytics">Analytics</span>
+                            <i class="bi bi-compass-fill text-info icon-inline" aria-hidden="true"></i> <span data-i18n="navbar.session_analytics">Your Sky</span>
                         </a>
                     </li>
                     <li class="nav-item">
@@ -735,7 +735,7 @@
                     <p id="astrodex-collection-subtitle" data-i18n="astrodex.your_collection">Your personal collection of captured celestial objects</p>
 
                     <!-- Stats Cards -->
-                    <div id="astrodex-stats" class="row row-cols-2 row-cols-md-5 g-4">
+                    <div id="astrodex-stats">
                         <!-- Stats will be rendered by JavaScript -->
                     </div>
 
@@ -830,7 +830,7 @@
                         <i class="bi bi-question-circle me-1" aria-hidden="true"></i>
                         <span data-i18n="observation_log.help_toggle">Learn more</span>
                     </button>
-                    <div id="observation-log-stats" class="row row-cols-2 row-cols-md-4 g-3"></div>
+                    <div id="observation-log-stats"></div>
                 </div>
 
                 <div class="collapse mb-3" id="observation-log-help">
@@ -873,30 +873,30 @@
             <div id="analytics-subtab" class="sub-tab-content">
                 <div class="shadow p-2 mb-3 rounded bg-sub-container">
                     <h2>
-                        <i class="bi bi-graph-up-arrow text-info icon-inline" aria-hidden="true"></i> <span data-i18n="session_analytics.title">Session Analytics</span>
+                        <i class="bi bi-graph-up-arrow text-info icon-inline" aria-hidden="true"></i> <span data-i18n="session_analytics.title">Your observing record</span>
                     </h2>
-                    <p class="text-muted small mb-2" data-i18n="session_analytics.intro">How your observing is going, computed from everything you have logged.</p>
-                    <div id="session-analytics-stats" class="row row-cols-2 row-cols-md-4 g-3"></div>
+                    <p class="text-muted small mb-2" data-i18n="session_analytics.intro">What your logbook says about the nights you have spent under the sky.</p>
+                    <div id="session-analytics-stats"></div>
                 </div>
 
                 <div class="shadow p-2 mb-3 rounded bg-sub-container">
                     <h3 class="session-analytics-section-title">
-                        <i class="bi bi-bar-chart-line-fill text-primary icon-inline" aria-hidden="true"></i> <span data-i18n="session_analytics.breakdown_title">Where your time goes</span>
+                        <i class="bi bi-bar-chart-line-fill text-primary icon-inline" aria-hidden="true"></i> <span data-i18n="session_analytics.breakdown_title">Where your nights go</span>
                     </h3>
                     <div id="session-analytics-charts" class="row row-cols-1 row-cols-xl-2 g-3"></div>
                 </div>
 
                 <div class="shadow p-2 mb-3 rounded bg-sub-container">
                     <h3 class="session-analytics-section-title">
-                        <i class="bi bi-compass-fill text-warning icon-inline" aria-hidden="true"></i> <span data-i18n="session_analytics.coverage_title">Sky coverage</span>
+                        <i class="bi bi-compass-fill text-warning icon-inline" aria-hidden="true"></i> <span data-i18n="session_analytics.coverage_title">Your sky so far</span>
                     </h3>
-                    <p class="text-muted small mb-2" data-i18n="session_analytics.coverage_intro">Every object you have captured, placed on the sky.</p>
+                    <p class="text-muted small mb-2" data-i18n="session_analytics.coverage_intro">Every object you have captured, put back where it belongs on the sky.</p>
                     <div id="session-analytics-coverage"></div>
                 </div>
 
                 <div class="shadow p-2 mb-3 rounded bg-sub-container">
                     <h3 class="session-analytics-section-title">
-                        <i class="bi bi-calendar3 text-info icon-inline" aria-hidden="true"></i> <span data-i18n="session_analytics.best_months_title">Best months</span>
+                        <i class="bi bi-calendar3 text-info icon-inline" aria-hidden="true"></i> <span data-i18n="session_analytics.best_months_title">When the sky is open</span>
                     </h3>
                     <p class="text-muted small mb-2" data-i18n="session_analytics.best_months_intro">How much observable darkness your site offers each month, next to the hours you actually logged. This is astronomy and your own history - it says nothing about the weather.</p>
                     <div id="session-analytics-best-months"></div>
@@ -904,7 +904,7 @@
 
                 <div class="shadow p-2 mb-3 rounded bg-sub-container">
                     <h3 class="session-analytics-section-title">
-                        <i class="bi bi-clipboard-data-fill text-success icon-inline" aria-hidden="true"></i> <span data-i18n="session_analytics.conditions_title">Conditions and results</span>
+                        <i class="bi bi-clipboard-data-fill text-success icon-inline" aria-hidden="true"></i> <span data-i18n="session_analytics.conditions_title">How the sky treated you</span>
                     </h3>
                     <p class="text-muted small mb-2" data-i18n="session_analytics.conditions_intro">How you rated your own results under the conditions you recorded. Descriptive only - it reports what your log contains, it does not predict anything.</p>
                     <div id="session-analytics-conditions"></div>
@@ -2055,7 +2055,7 @@
             <!-- Restarting overlay (fixed, full-screen) -->
             <div id="restarting-overlay" class="position-fixed top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center restart-overlay" style="display:none!important;">
                 <div class="spinner-border text-light mb-3 spinner-lg" role="status" aria-hidden="true"></div>
-                <p class="text-light fs-5" data-i18n="settings.restarting_wait">Restarting… please wait</p>
+                <p class="text-light fs-5" data-i18n="settings.restarting_wait">Restarting... please wait</p>
             </div>
 
             <!-- Logs Sub-tab -->
@@ -2093,7 +2093,7 @@
                     <div class="mt-2 d-flex gap-2 align-items-center">
                         <input type="text" id="log-filter" class="form-control form-control-sm font-monospace"
                                data-i18n-placeholder="settings.log_filter_placeholder"
-                               placeholder="Filter logs…" autocomplete="off" spellcheck="false">
+                               placeholder="Filter logs..." autocomplete="off" spellcheck="false">
                         <select id="log-module-filter" class="form-select form-select-sm flex-shrink-0 w-auto min-w-11rem">
                             <option value="" data-i18n="settings.log_module_all">All modules</option>
                         </select>
@@ -2531,7 +2531,7 @@
                             </thead>
                             <tbody id="cache-jobs-table-body">
                                 <tr>
-                                    <td colspan="5" class="text-muted" data-i18n="metrics.cache_jobs_loading">Loading cache metrics…</td>
+                                    <td colspan="5" class="text-muted" data-i18n="metrics.cache_jobs_loading">Loading cache metrics...</td>
                                 </tr>
                             </tbody>
                         </table>

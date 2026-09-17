@@ -28,14 +28,6 @@
     font-size: 1.25rem;
 }
 
-.observation-log-stat-value {
-    font-size: 2rem;
-    font-weight: bold;
-    color: var(--bs-primary);
-    line-height: 1;
-    margin-bottom: 0.5rem;
-}
-
 /* Read-only star rating (icons + numeric value): always one line, never wraps
    mid-icon on narrow columns. */
 .observation-log-star-rating {
@@ -44,11 +36,10 @@
     white-space: nowrap;
 }
 
-/* Inside the big stat-header value, shrink the stars back down from the 2rem
-   heading size - at full size, 5 icons + the rating number don't fit the
-   half-width mobile column and wrap onto a second line. */
-.observation-log-stat-value .observation-log-star-rating {
-    font-size: 1.15rem;
+/* Inside a headline figure, shrink the stars back down - at the figure's own size, 5
+   icons plus the rating number overflow the narrow grid column and wrap. */
+.stat-plate-value .observation-log-star-rating {
+    font-size: 0.95rem;
     gap: 0.1rem;
 }
 

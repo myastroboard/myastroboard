@@ -7,6 +7,10 @@
 - **Sky coverage map**: every object you have captured placed on an RA/Dec grid, coloured by type
   or by capture year, with the band of sky that never rises at your location shaded in. Objects
   whose coordinates cannot be resolved are counted and named rather than silently dropped.
+  It is drawn as a sky chart, not a scatter plot: the Milky Way is filled behind the data, the
+  ecliptic and the celestial equator are marked, each object's dot grows with the integration
+  time behind it, and the top axis reads the same right ascension as the month the object is at
+  its best. The plot area follows the theme, red night-vision mode included.
 - **Conditions and results**: your ratings plotted against the seeing, transparency, SQM and Moon
   illumination you recorded for each night. Strictly descriptive - every bucket shows its own
   sample count, and a bucket with fewer than five samples says so instead of being plotted.
@@ -94,15 +98,15 @@
   upstream repo link were both out of date, and the Observatory layout tables did not match
   what the tab actually renders. All corrected, plus a file-layout table in CONNECTORS.md.
 
-#### Connectors — MyAstroShine is now a first-class connector
+#### Connectors - MyAstroShine is now a first-class connector
 
 - MyAstroShine was half a connector: stored under `config.connectors`, switched on and off from
   the same screen, but absent from the registry and rendered by a card of its own. It is now a
-  `BaseConnector` like AllSky — in `REGISTRY`, listed by `GET /api/connectors`, and drawn by the
+  `BaseConnector` like AllSky - in `REGISTRY`, listed by `GET /api/connectors`, and drawn by the
   same card, which also means it gains the health-check button.
 - What is specific to it is declared rather than special-cased: `SECRET_FIELDS` (token, signing
   secret), `CONFIG_FIELDS`, `URL_FIELDS`, an empty `MODULES`, and an `is_configured()` that
-  requires the credentials, not just a URL — so the card now says *Not installed* until all
+  requires the credentials, not just a URL - so the card now says *Not installed* until all
   three are set, instead of *Installed* with a URL alone.
 - Connector settings are saved through a new `POST /api/connectors/<name>/config` (admin),
   merged server-side. It replaces the previous client-side round-trip through `GET/POST

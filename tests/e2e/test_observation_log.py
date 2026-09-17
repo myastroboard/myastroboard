@@ -50,7 +50,8 @@ def test_observation_log_subtab_renders_without_console_errors(logged_in_page):
 
     _open_observation_log(page)
 
-    assert page.locator('#observation-log-stats .observation-log-stat-value').count() == 4
+    assert page.locator('#observation-log-stats .stat-plate-hero-value').count() == 1
+    assert page.locator('#observation-log-stats .stat-plate-figure').count() == 3
     assert not errors, f"Console/page errors on the Observation Log sub-tab: {errors}"
 
 

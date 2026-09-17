@@ -100,12 +100,34 @@ usage.
 Every captured object placed on an RA/Dec grid: right ascension on the x axis, **reversed**
 as on any sky chart, declination on the y axis. Colour by object type or by capture year.
 
+It is drawn as a sky chart rather than as a scatter plot, so the dots have something to sit
+against:
+
+- the **Milky Way** is filled behind the data, from the galactic equator transformed into
+  equatorial coordinates (J2000 pole at RA 192.85948 deg, Dec 27.12825 deg). Several faint
+  layers at widening galactic latitudes are filled over one another, so the glow falls off
+  instead of stepping;
+- the **ecliptic** is drawn dashed - the path the Sun, Moon and planets follow;
+- the **celestial equator** is marked at Dec 0;
+- a **dot grows with the integration time** behind its object, on a square root so one very
+  long project does not flatten everything else;
+- the top axis reads the same right ascension **as a month**: an object culminates near
+  local midnight when the Sun sits half a sky away from it. The reading is anchored on the
+  equinoxes and solstices rather than on one straight line through the year, which would
+  name the wrong month for an object near a boundary.
+
 A shaded band marks the declinations that never rise at the active location
 (`dec < -(90 - lat)` in the northern hemisphere, mirrored in the southern), so "where have
 I been" is read against where the observer can actually go.
 
 Objects whose coordinates cannot be resolved at all are **counted and named**, not silently
 dropped - the same honest accounting the Photo Map does with its ungeotagged pictures.
+
+Everything painted on the canvas takes its colour from custom properties declared in
+`static/css/bs_session_analytics.css` (`--sky-chart-*`), read back with `getComputedStyle`
+at draw time: a canvas cannot carry a class, and the red night-vision theme redefines all
+of them. The plot area stays dark under the light theme on purpose - a sky chart reads as a
+window onto the sky, and inverting it would only make the objects harder to place.
 
 ### 4. Conditions and results
 
@@ -297,8 +319,11 @@ ephemeris-backed one never holds up the three that are instant.
 - **Cross-user or club leaderboards.** Sessions are private; analytics stay self-scoped.
   Public profiles are a v2.1 concern.
 - **A true all-sky projection** for the coverage map. v1.5 ships the rectangular RA/Dec
-  grid; the projected, imagery-backed view arrives with the v2.0 sky chart rather than
-  being built twice.
+  grid with the Milky Way and the ecliptic drawn on it; the projected, imagery-backed view
+  arrives with the v2.0 sky chart rather than being built twice.
+- **Named stars and constellation figures** on the coverage map. The landmarks it carries
+  are computed, not catalogued - drawing real stars means shipping a star catalogue to the
+  browser, which belongs with the v2.0 sky chart.
 - **Guiding-quality trends** per equipment combination - that needs the v2.2 PHD2 import.
 - **PDF export** of the dashboard.
 

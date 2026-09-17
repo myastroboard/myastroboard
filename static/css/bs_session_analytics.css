@@ -9,28 +9,6 @@
     margin-bottom: 0.35rem;
 }
 
-/* --- Headline stat tiles ------------------------------------------------- */
-
-.session-analytics-stat-value {
-    display: block;
-    font-size: 1.5rem;
-    font-weight: 600;
-    line-height: 1.2;
-}
-
-.session-analytics-stat-label {
-    display: block;
-    font-size: 0.8rem;
-    opacity: 0.75;
-}
-
-.session-analytics-stat-hint {
-    display: block;
-    font-size: 0.72rem;
-    opacity: 0.6;
-    margin-top: 0.15rem;
-}
-
 /* --- Chart cards --------------------------------------------------------- */
 
 /* Chart.js sizes a responsive canvas to its parent's content box, so every canvas gets
@@ -43,10 +21,19 @@
     height: 320px;
 }
 
+/* The sky coverage chart, and only it. Chart.js needs a definite height here, so this
+   is a fixed value that steps up on a wide screen rather than an aspect ratio - the
+   canvas must never be able to feed its own height back into its parent. */
 .session-analytics-chart-wrap-tall {
     position: relative;
     width: 100%;
-    height: 420px;
+    height: 460px;
+}
+
+@media (min-width: 1400px) {
+    .session-analytics-chart-wrap-tall {
+        height: 560px;
+    }
 }
 
 .session-analytics-legend-badge {
@@ -108,6 +95,46 @@
 
 /* --- Sky coverage -------------------------------------------------------- */
 
+/* The coverage chart paints a sky rather than a plot area, and a canvas cannot carry a
+   class - session_analytics.js reads these back with getComputedStyle at draw time.
+   They stay dark under the light theme on purpose: a sky chart reads as a window onto
+   the sky, and inverting it would only make the objects harder to place. The red theme
+   redefines every one of them so night vision survives. */
+:root {
+    --sky-chart-bg-top: #12263f;
+    --sky-chart-bg-bottom: #050c17;
+    --sky-chart-grid: rgba(148, 197, 255, 0.14);
+    --sky-chart-milky-way: rgba(198, 222, 255, 0.042);
+    --sky-chart-milky-way-key: #8fa8cc;
+    --sky-chart-ecliptic: rgba(255, 214, 128, 0.5);
+    --sky-chart-ecliptic-key: #d99b2b;
+    --sky-chart-equator: rgba(148, 197, 255, 0.4);
+    --sky-chart-equator-key: #5f87b8;
+    --sky-chart-never: rgba(2, 6, 12, 0.55);
+    --sky-chart-never-line: rgba(160, 180, 210, 0.5);
+    --sky-chart-glow: rgba(150, 195, 255, 0.9);
+}
+
+html[data-theme="dark"] {
+    --sky-chart-bg-top: #0c1c30;
+    --sky-chart-bg-bottom: #03070d;
+}
+
+html[data-theme="red"] {
+    --sky-chart-bg-top: #2a0606;
+    --sky-chart-bg-bottom: #0f0000;
+    --sky-chart-grid: rgba(255, 130, 130, 0.16);
+    --sky-chart-milky-way: rgba(255, 170, 170, 0.045);
+    --sky-chart-milky-way-key: #b96a6a;
+    --sky-chart-ecliptic: rgba(255, 170, 120, 0.5);
+    --sky-chart-ecliptic-key: #c4713a;
+    --sky-chart-equator: rgba(255, 130, 130, 0.4);
+    --sky-chart-equator-key: #a35555;
+    --sky-chart-never: rgba(12, 0, 0, 0.6);
+    --sky-chart-never-line: rgba(220, 150, 150, 0.5);
+    --sky-chart-glow: rgba(255, 140, 140, 0.9);
+}
+
 .session-analytics-coverage-toolbar {
     display: flex;
     flex-wrap: wrap;
@@ -164,9 +191,5 @@
     .session-analytics-chart-wrap,
     .session-analytics-chart-wrap-tall {
         height: 260px;
-    }
-
-    .session-analytics-stat-value {
-        font-size: 1.2rem;
     }
 }

@@ -332,44 +332,30 @@ async function _obsLoadPlans() {
 function renderObservationLogStats() {
     const container = document.getElementById('observation-log-stats');
     if (!container) return;
-    DOMUtils.clear(container);
 
     const stats = observationLogData.stats || {};
-    const cards = [
-        { value: stats.total_sessions ?? 0, label: i18n.t('observation_log.stat_sessions') },
-        { value: stats.total_entries ?? 0, label: i18n.t('observation_log.stat_targets') },
-        {
+    DOMUtils.buildStatPlate(container, {
+        hero: {
             value: _obsFormatIntegration(stats.total_integration_minutes) || '0',
             label: i18n.t('observation_log.stat_integration'),
         },
-        {
-            value: stats.average_rating != null ? _obsBuildStarRatingDisplay(stats.average_rating) : '—',
-            label: i18n.t('observation_log.stat_rating'),
-        },
-    ];
-
-    cards.forEach(({ value, label }) => {
-        const col = document.createElement('div');
-        col.className = 'col';
-        const card = document.createElement('div');
-        card.className = 'card h-100 text-center';
-        const body = document.createElement('div');
-        body.className = 'card-body';
-        const valueEl = document.createElement('div');
-        valueEl.className = 'observation-log-stat-value';
-        if (value instanceof Node) {
-            valueEl.appendChild(value);
-        } else {
-            valueEl.textContent = String(value);
-        }
-        const labelEl = document.createElement('div');
-        labelEl.className = 'text-muted small';
-        labelEl.textContent = label;
-        body.appendChild(valueEl);
-        body.appendChild(labelEl);
-        card.appendChild(body);
-        col.appendChild(card);
-        container.appendChild(col);
+        figures: [
+            {
+                icon: 'bi-moon-stars',
+                value: String(stats.total_sessions ?? 0),
+                label: i18n.t('observation_log.stat_sessions'),
+            },
+            {
+                icon: 'bi-stars',
+                value: String(stats.total_entries ?? 0),
+                label: i18n.t('observation_log.stat_targets'),
+            },
+            {
+                icon: 'bi-star-fill',
+                value: stats.average_rating != null ? _obsBuildStarRatingDisplay(stats.average_rating) : '-',
+                label: i18n.t('observation_log.stat_rating'),
+            },
+        ],
     });
 }
 
