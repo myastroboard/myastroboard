@@ -13,7 +13,7 @@ import uuid
 import yaml
 from contextlib import contextmanager
 from datetime import datetime, timezone
-from typing import Dict, Tuple, Optional
+from typing import Dict, Optional
 from utils.constants import CONFIG_FILE, DATA_DIR
 from utils.logging_config import get_logger
 
@@ -166,56 +166,6 @@ def save_json_file(file_path: str, data: dict) -> bool:
     except Exception as exc:
         logger.error(f'save_json_file failed for {file_path}: {type(exc).__name__}: {exc}')
         return False
-
-
-# Coordinate conversion utilities
-DMS_PATTERN = re.compile(r"([+-]?\d+)[d°]\s*(\d+)[m']\s*([\d.]+)[s\"]?")
-
-
-def dms_to_decimal(dms_string: str) -> Optional[float]:
-    """
-    Convert DMS (Degrees Minutes Seconds) string to decimal degrees
-
-    Args:
-        dms_string: DMS string like "48d38m36.16s" or "48°38'36.16\""
-
-    Returns:
-        Decimal degrees or None if conversion fails
-    """
-    try:
-        match = DMS_PATTERN.match(dms_string.strip())
-        if not match:
-            return None
-
-        degrees = float(match.group(1))
-        minutes = float(match.group(2))
-        seconds = float(match.group(3))
-
-        # Handle negative degrees
-        if degrees < 0:
-            return degrees - (minutes / 60.0) - (seconds / 3600.0)
-        else:
-            return degrees + (minutes / 60.0) + (seconds / 3600.0)
-    except (ValueError, AttributeError, TypeError):
-        return None
-
-
-def decimal_to_dms(decimal_degrees: float) -> Tuple[int, int, float]:
-    """
-    Convert decimal degrees to DMS components
-
-    Args:
-        decimal_degrees: Decimal degrees value
-
-    Returns:
-        Tuple of (degrees, minutes, seconds)
-    """
-    degrees = int(decimal_degrees)
-    minutes_float = (abs(decimal_degrees) - abs(degrees)) * 60
-    minutes = int(minutes_float)
-    seconds = (minutes_float - minutes) * 60
-
-    return degrees, minutes, seconds
 
 
 def validate_coordinates(lat: float, lon: float) -> bool:

@@ -34,6 +34,18 @@
   position, since a fixed RA/Dec would be wrong within weeks.
 - Wishlists are private per user and are included in the admin backup archive.
 
+#### Coordinate conversion
+
+- **Fixed**: the DMS to decimal converter mis-signed any coordinate whose degrees field is a
+  negative zero. `-0d30m00s` - half an arcminute west of Greenwich, an ordinary longitude -
+  came back as `+0.5` instead of `-0.5`, because the sign was read back from the parsed number
+  rather than from the string. The sign is now captured by the pattern itself.
+- The route's tests only asserted that a request returned 200 or 400, never what it converted
+  to, which is how this survived. They now check the values.
+- Removed `utils.dms_to_decimal`, `utils.decimal_to_dms` and `utils.DMS_PATTERN`: dead code
+  with no production caller (only their own tests), duplicating - and carrying the same sign
+  bug as - the converter the coordinate-entry route actually uses.
+
 #### Internal
 
 - New `backend/utils/constellation_names.py` replaces four separate copies of the IAU

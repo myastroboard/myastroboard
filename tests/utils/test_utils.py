@@ -18,8 +18,6 @@ from utils import (
     safe_file_exists,
     load_json_file,
     save_json_file,
-    dms_to_decimal,
-    decimal_to_dms,
     validate_coordinates,
     format_file_size,
     get_environment_info,
@@ -179,60 +177,6 @@ class TestYamlHelpers:
 
 class TestCoordinateConversion:
     """Test coordinate conversion utilities"""
-
-    def test_dms_to_decimal_positive(self):
-        """Test converting positive DMS to decimal"""
-        result = dms_to_decimal("48d38m36.16s")
-        assert result is not None
-        assert abs(result - 48.6434) < 0.001
-
-    def test_dms_to_decimal_negative(self):
-        """Test converting negative DMS to decimal"""
-        result = dms_to_decimal("-45d30m0s")
-        assert result is not None
-        assert abs(result - (-45.5)) < 0.001
-
-    def test_dms_to_decimal_with_symbols(self):
-        """Test DMS with degree/minute/second symbols"""
-        result = dms_to_decimal("2°20'14.025\"")
-        assert result is not None
-        assert abs(result - 2.3372) < 0.001
-
-    def test_dms_to_decimal_zero(self):
-        """Test converting zero degrees"""
-        result = dms_to_decimal("0d0m0s")
-        assert result == 0.0
-
-    def test_dms_to_decimal_invalid_format(self):
-        """Test invalid DMS format returns None"""
-        assert dms_to_decimal("invalid") is None
-        assert dms_to_decimal("") is None
-        assert dms_to_decimal("123") is None
-
-    def test_dms_to_decimal_none_input(self):
-        """Test None input returns None"""
-        assert dms_to_decimal(None) is None
-
-    def test_decimal_to_dms_positive(self):
-        """Test converting positive decimal to DMS"""
-        degrees, minutes, seconds = decimal_to_dms(48.6434)
-        assert degrees == 48
-        assert minutes == 38
-        assert abs(seconds - 36.24) < 0.1
-
-    def test_decimal_to_dms_negative(self):
-        """Test converting negative decimal to DMS"""
-        degrees, minutes, seconds = decimal_to_dms(-45.5)
-        assert degrees == -45
-        assert minutes == 30
-        assert abs(seconds - 0.0) < 0.01
-
-    def test_decimal_to_dms_zero(self):
-        """Test converting zero"""
-        degrees, minutes, seconds = decimal_to_dms(0.0)
-        assert degrees == 0
-        assert minutes == 0
-        assert seconds == 0.0
 
     def test_validate_coordinates_valid(self):
         """Test validating valid coordinates"""

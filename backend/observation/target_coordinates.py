@@ -21,11 +21,12 @@ everywhere:
 2. parsing whatever the record itself stored, in either observed shape;
 3. give up - the caller counts the miss and reports it rather than dropping it silently.
 
-The sexagesimal parsing here deliberately does not reuse ``utils.dms_to_decimal``: that
-helper accepts neither the ``h m s`` nor the colon-separated form, and it mis-signs a
-value whose degrees field is a negative zero (``"-00d30m00s"`` returns ``+0.5``, because
-``float("-00") < 0`` is False). It currently has no production callers, so it is left
-alone rather than changed from an unrelated branch.
+The sexagesimal parsing lives here rather than in ``utils/`` because this is its only
+consumer: it has to accept the ``h m s`` and colon-separated forms that a right ascension
+arrives in, which the coordinate-entry route's own stricter degrees-only pattern does not.
+Both take the sign from the string rather than from the parsed degrees - reading it back
+loses it whenever the degrees field is a negative zero, and ``"-00d30m00s"`` is an
+ordinary longitude half an arcminute west of Greenwich.
 """
 
 import math

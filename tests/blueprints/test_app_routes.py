@@ -2362,6 +2362,43 @@ class TestDmsConversion:
         resp = client.post('/api/convert-coordinates', json={'dms': '48d38m36s'})
         assert resp.status_code == 401
 
+    def test_positive_dms_converts_to_the_right_decimal(self, client_admin):
+        resp = client_admin.post('/api/convert-coordinates', json={'dms': '48d38m36.16s'})
+        assert resp.status_code == 200
+        assert resp.get_json()['decimal'] == pytest.approx(48.643378, abs=1e-6)
+
+    def test_negative_dms_converts_to_the_right_decimal(self, client_admin):
+        resp = client_admin.post('/api/convert-coordinates', json={'dms': '-45d30m0s'})
+        assert resp.status_code == 200
+        assert resp.get_json()['decimal'] == pytest.approx(-45.5)
+
+    def test_negative_zero_degrees_keeps_its_sign(self, client_admin):
+        """Half an arcminute west of Greenwich is an ordinary longitude, and the sign
+        lives only in the string - int('-0') is 0."""
+        for dms in ('-0d30m00s', '-00d30m00s'):
+            resp = client_admin.post('/api/convert-coordinates', json={'dms': dms})
+            assert resp.status_code == 200, dms
+            assert resp.get_json()['decimal'] == pytest.approx(-0.5), dms
+
+    def test_explicit_positive_sign_is_accepted(self, client_admin):
+        resp = client_admin.post('/api/convert-coordinates', json={'dms': '+2d20m14.025s'})
+        assert resp.status_code == 200
+        assert resp.get_json()['decimal'] == pytest.approx(2.337229, abs=1e-6)
+
+    def test_degree_and_quote_symbols_are_accepted(self, client_admin):
+        resp = client_admin.post('/api/convert-coordinates', json={'dms': '2\u00b020\'14.025"'})
+        assert resp.status_code == 200
+        assert resp.get_json()['decimal'] == pytest.approx(2.337229, abs=1e-6)
+
+    def test_zero_converts_to_zero(self, client_admin):
+        resp = client_admin.post('/api/convert-coordinates', json={'dms': '0d0m0s'})
+        assert resp.status_code == 200
+        assert resp.get_json()['decimal'] == pytest.approx(0.0)
+
+    def test_out_of_range_value_is_rejected(self, client_admin):
+        resp = client_admin.post('/api/convert-coordinates', json={'dms': '200d0m0s'})
+        assert resp.status_code == 400
+
 
 # ---------------------------------------------------------------------------
 # Best window with mode=all
