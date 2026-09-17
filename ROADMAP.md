@@ -221,7 +221,7 @@ absorbed the feature, so no registry is scoped.
 |---|---|
 | **Why** | The connector pattern hardened through AllSky and MyAstroShine (one module per connector, `target_modules`, declared config/secret fields) is solid enough to point outward instead of only pulling data in. A lot of self-hosted astro setups already run Home Assistant for the rest of the observatory (power, roof, weather sensors); publishing MAB's own state as MQTT lets it show up on an existing HA dashboard instead of requiring a second one. Scoped as a publish-only connector - no inbound control, no device layer - so it does not need to wait for the v2.4+ live-equipment cluster. Replaces the dropped "Connector SDK and mab-plugins" idea in this slot - see [Architecture direction](#on-the-former-connector-sdk-and-mab-plugins-was-v16). |
 | **Effort** | Medium |
-| **Status** | 💡 Idea - scope still being studied |
+| **Status** | 💡 In near future release |
 
 #### MQTT Publisher connector
 
@@ -230,7 +230,8 @@ absorbed the feature, so no registry is scoped.
   - Astrodex counters: photo count, distinct objects/constellations captured
   - Plan My Night state: whether a plan is currently active, and for which target
   - Equipment currently assigned to the active session
-- MQTT Discovery so entities appear in Home Assistant automatically, no manual YAML
+- MQTT Discovery so entities appear in Home Assistant automatically, no manual YAML (checkbox ?)
+- Parameters: server + port + user + pass (pass excluded from backup and safely saved)
 
 #### Companion Home Assistant cards repository
 
@@ -239,6 +240,18 @@ absorbed the feature, so no registry is scoped.
   definitions, not code that runs inside MAB, so it carries none of the trust-boundary and
   compatibility-matrix concerns the dropped mab-plugins idea had
 - Gives a Home Assistant user a working MAB dashboard without hand-building cards from the topic list
+- Respect HACS documentation for publishing/release
+- Respect Home Assistant 2026.9 standards
+- Github repo with standardized name in orgonization myastroboard
+
+#### Topics published
+
+Complete and deeper analysis to do:
+
+- What is interesting to propose?
+- Multi-user case & Multi-location case in MyAstroBoard must be taken in consideration
+- Is it exist a way to display Astrodex as camera entity for example ? Separate connector ?
+- Publish weather ? Publish night score ?
 
 **i18n in 6 languages.**
 
