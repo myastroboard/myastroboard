@@ -81,7 +81,7 @@ class TestParseDecToDegrees:
         assert parse_dec_to_degrees(48.43816666666666) == pytest.approx(48.43817, abs=1e-5)
 
     def test_dms_string_from_the_results_table(self):
-        assert parse_dec_to_degrees('48° 26\' 17.40"') == pytest.approx(48.43817, abs=1e-4)
+        assert parse_dec_to_degrees('48\u00b0 26\' 17.40"') == pytest.approx(48.43817, abs=1e-4)
 
     def test_dms_string_with_letter_separators(self):
         assert parse_dec_to_degrees('48d26m17.40s') == pytest.approx(48.43817, abs=1e-4)
@@ -91,10 +91,10 @@ class TestParseDecToDegrees:
 
     def test_negative_zero_degrees_keeps_its_sign(self):
         """A target just south of the equator has a '-00' degrees field."""
-        assert parse_dec_to_degrees('-00° 30\' 00"') == pytest.approx(-0.5)
+        assert parse_dec_to_degrees('-00\u00b0 30\' 00"') == pytest.approx(-0.5)
 
     def test_explicit_positive_sign(self):
-        assert parse_dec_to_degrees('+48° 26\' 17.40"') == pytest.approx(48.43817, abs=1e-4)
+        assert parse_dec_to_degrees('+48\u00b0 26\' 17.40"') == pytest.approx(48.43817, abs=1e-4)
 
     def test_poles_are_in_range(self):
         assert parse_dec_to_degrees(90.0) == pytest.approx(90.0)
@@ -111,6 +111,41 @@ class TestParseDecToDegrees:
         assert parse_dec_to_degrees(None) is None
         assert parse_dec_to_degrees('') is None
         assert parse_dec_to_degrees('somewhere up there') is None
+
+
+class TestSexagesimalParsingIsLinear:
+    """The parser sits behind a route any user can post to, so its cost must not depend
+    on how the input is shaped - only on how long it is.
+
+    The pattern this parser replaced let a run of whitespace be shared between adjacent
+    optional pieces, and a few tens of kilobytes of tabs held a worker for seconds.
+    """
+
+    @pytest.mark.parametrize('filler', ['\t', '\n ', ' '])
+    def test_a_long_run_of_whitespace_is_rejected_quickly(self, filler):
+        import time
+
+        hostile = '12 ' + filler * 50_000 + 'x'
+        started = time.perf_counter()
+        assert parse_ra_to_degrees(hostile) is None
+        assert parse_dec_to_degrees(hostile) is None
+        assert time.perf_counter() - started < 0.5
+
+    def test_every_documented_shape_still_parses(self):
+        """Replacing the parser must not lose any of the forms a record can carry."""
+        assert parse_ra_to_degrees('21h 31m 48.32s') == pytest.approx(322.9513, abs=1e-3)
+        assert parse_ra_to_degrees('21:31:48.32') == pytest.approx(322.9513, abs=1e-3)
+        assert parse_ra_to_degrees('21h31m48.32s') == pytest.approx(322.9513, abs=1e-3)
+        assert parse_ra_to_degrees('  21 31 48.32  ') == pytest.approx(322.9513, abs=1e-3)
+        assert parse_dec_to_degrees('48d 26m 17.4s') == pytest.approx(48.4382, abs=1e-3)
+        assert parse_dec_to_degrees('+41\u00b0 16\u2032 09\u2033') == pytest.approx(41.2692, abs=1e-3)
+        assert parse_dec_to_degrees("-05\u00b0 12' 33\"") == pytest.approx(-5.2092, abs=1e-3)
+        assert parse_dec_to_degrees('-00 30 00') == pytest.approx(-0.5)
+
+    def test_a_fourth_field_or_a_bare_number_is_not_sexagesimal(self):
+        assert parse_dec_to_degrees('1:2:3:4') is None
+        # One field is not a sexagesimal value; it falls through to the decimal reading.
+        assert parse_dec_to_degrees('12.5') == pytest.approx(12.5)
 
 
 class TestResolveFromDataset:
@@ -189,7 +224,7 @@ class TestResolveCoordinates:
     def test_falls_back_to_the_stored_snapshot(self, monkeypatch):
         """An object outside the dataset still places if the record carries coordinates."""
         monkeypatch.setattr(target_coordinates.skytonight_targets, 'get_lookup_entry', lambda *_: {})
-        resolved = resolve_coordinates('Some Star', 'SIMBAD', ra='21h 31m 48.32s', dec='48° 26\' 17.40"')
+        resolved = resolve_coordinates('Some Star', 'SIMBAD', ra='21h 31m 48.32s', dec='48\u00b0 26\' 17.40"')
         assert resolved is not None
         assert resolved[0] == pytest.approx(322.9513, abs=1e-3)
         assert resolved[1] == pytest.approx(48.43817, abs=1e-4)

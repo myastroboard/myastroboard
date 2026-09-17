@@ -39,18 +39,17 @@ from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-# "21h 31m 48.32s", "21:31:48.32", "48d 26m 17.4s", "48 26 17.4", "-00 30 00".
-# The sign is captured separately from the leading field so a "-0" degrees value keeps
-# its sign (see the module docstring).
-_SEXAGESIMAL = re.compile(
-    r"""^\s*
-    (?P<sign>[+-])?\s*
-    (?P<first>\d+(?:\.\d+)?)\s*[hd°:\s]\s*
-    (?P<second>\d+(?:\.\d+)?)\s*[m'′:\s]?\s*
-    (?:(?P<third>\d+(?:\.\d+)?)\s*["s″]?)?
-    \s*$""",
-    re.VERBOSE,
-)
+# Every character that may separate sexagesimal fields: the unit letters, the degree
+# sign, the minute and second marks (ASCII and typographic), and the colon. A value is
+# parsed by turning each of them into a space and splitting - "21h 31m 48.32s",
+# "21:31:48.32", "48d 26m 17.4s", "48 26 17.4", "-00 30 00" all reduce to two or three
+# numeric fields. This runs in linear time whatever the input; the single anchored
+# pattern it replaces let a run of whitespace be shared between adjacent \s* pieces and
+# could be made to backtrack polynomially by a long enough string.
+_SEPARATORS = re.compile(r"""[hdms°:'′"″]""")
+
+# One field: digits, with an optional decimal part. Anchored by fullmatch, no nesting.
+_FIELD = re.compile(r"\d+(?:\.\d+)?")
 
 # A numeric right ascension coming from the frontend is in decimal *hours*
 # (``coordinates.ra_hours``). A value above this can only be degrees, so it is read as
@@ -59,20 +58,28 @@ _MAX_RA_HOURS = 24.0
 
 
 def _sexagesimal_to_float(value: str) -> Optional[float]:
-    """Parse a sexagesimal string into a signed decimal value in its leading unit."""
-    match = _SEXAGESIMAL.match(value)
-    if not match:
+    """Parse a sexagesimal string into a signed decimal value in its leading unit.
+
+    The sign is read off the string before the fields are, so a "-0" degrees value keeps
+    it (see the module docstring) - ``int("-0")`` is 0.
+    """
+    text = value.strip()
+    negative = False
+    if text and text[0] in '+-':
+        negative = text[0] == '-'
+        text = text[1:]
+
+    fields = _SEPARATORS.sub(' ', text).split()
+    if len(fields) not in (2, 3) or not all(_FIELD.fullmatch(field) for field in fields):
         return None
-    try:
-        first = float(match.group('first'))
-        second = float(match.group('second'))
-        third = float(match.group('third') or 0.0)
-    except (TypeError, ValueError):
-        return None
+
+    first = float(fields[0])
+    second = float(fields[1])
+    third = float(fields[2]) if len(fields) == 3 else 0.0
     if second >= 60.0 or third >= 60.0:
         return None
     magnitude = first + second / 60.0 + third / 3600.0
-    return -magnitude if match.group('sign') == '-' else magnitude
+    return -magnitude if negative else magnitude
 
 
 def _as_finite_float(value: Any) -> Optional[float]:
