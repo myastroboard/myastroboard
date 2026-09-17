@@ -23,6 +23,7 @@ If you want see more, maybe look at the [visual tour](docs/VISUAL_TOUR.md).
 - Weather and observing-condition analysis (Open-Meteo)
 - Moon, sun, eclipses, aurora, ISS passes, and astronomy event endpoints
 - Astrodex: personal astrophotography catalog and image management
+- Observation Log, Your Sky and Wishlist: a private observing logbook, what it adds up to, and what is still on your list ([details](docs/OBSERVATION_LOG.md))
 - Plan My Night timeline builder with CSV/PDF export
 - Equipment profiles and field-of-view calculator
 - Observatory: live dashboard fed by external connectors
@@ -30,6 +31,42 @@ If you want see more, maybe look at the [visual tour](docs/VISUAL_TOUR.md).
 - Multi-user auth system with admin/user roles
 - Multi-location profiles: up to 5 admin-managed observing sites with per-user attribution, one-tap switching, and per-location caches ([details](docs/LOCATIONS.md))
 - i18n support (English/French plus community translations)
+
+### A real observing logbook
+
+Plenty of tools tell you what to shoot tonight. MyAstroBoard keeps the other half - what you
+actually did, and what it adds up to over the years.
+
+| Question | Answered by |
+|---|---|
+| "What do I want to shoot tonight?" | **Plan My Night** |
+| "What did I actually do on the night of 12 August?" | **Observation Log** |
+| "Everything I have ever captured, as a gallery" | **Astrodex** |
+| "How is my observing actually going?" | **Your Sky** |
+| "What do I still want to capture?" | **Wishlist** |
+
+A **session** is a trip, not a row in a table. It has a location, an equipment combination, and one
+or more **nights** - each with its own start and end times and its own measured conditions: SQM,
+seeing, transparency, Moon illumination. Under it, one entry per target records the real numbers:
+frame count, sub-exposure length, integration minutes, a 0-5 rating and your own notes. A
+multi-night dark-sky trip stays a single session. A target you switched telescopes for halfway
+through the night carries its own equipment combination.
+
+**Your Sky** reads the whole log back: hours collected month by month, the object types and
+constellations you gravitate towards, which gear actually did the work, and how your own ratings
+line up against the conditions you recorded - reported honestly, with sample counts, and never
+dressed up as a prediction. It also draws every object you have captured onto a sky chart, against
+the Milky Way and the ecliptic, each dot sized by the integration time behind it and each reading
+back as the month that object is at its best.
+
+Your log is **permanently private**. There is no shared mode and no admin-wide view, even on an
+instance where the Astrodex gallery is shared between users. Each session exports to a
+print-friendly PDF, and the log, the gallery and the wishlist all travel in the admin backup
+archive.
+
+See it in the [visual tour](docs/VISUAL_TOUR.md#your-sky), or read the details in
+[docs/OBSERVATION_LOG.md](docs/OBSERVATION_LOG.md) and
+[docs/SESSION_ANALYTICS.md](docs/SESSION_ANALYTICS.md).
 
 ### Also for space enthusiasts
 

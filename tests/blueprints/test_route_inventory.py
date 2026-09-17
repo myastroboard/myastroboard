@@ -181,6 +181,17 @@ EXPECTED_ROUTES = {
     ('/api/observation-sessions/<session_id>/nights/<night_id>', ('DELETE',)),
     ('/api/observation-sessions/<session_id>/nights/<night_id>', ('PUT',)),
     ('/api/observation-sessions/export.pdf', ('GET',)),
+    # --- session analytics (v1.5) ---
+    ('/api/session-analytics/summary', ('GET',)),
+    ('/api/session-analytics/sky-coverage', ('GET',)),
+    ('/api/session-analytics/conditions', ('GET',)),
+    ('/api/session-analytics/best-months', ('GET',)),
+    # --- wishlist (v1.5) ---
+    ('/api/wishlist', ('GET',)),
+    ('/api/wishlist', ('POST',)),
+    ('/api/wishlist/<item_id>', ('DELETE',)),
+    ('/api/wishlist/<item_id>', ('PATCH',)),
+    ('/api/wishlist/archive-captured', ('POST',)),
     # --- equipment ---
     ('/api/equipment/accessories', ('GET',)),
     ('/api/equipment/accessories', ('POST',)),

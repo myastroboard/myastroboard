@@ -374,6 +374,13 @@ def test_probe_internal_error(client_admin, env, monkeypatch):
     assert client_admin.post(_PROBE, json={"url": "http://x:1"}).status_code == 500
 
 
+def test_connector_health_check_requires_a_url():
+    """The blueprint route rejects a blank url before ever building a connector, but
+    the connector's own health_check must not assume that guard always ran first."""
+    connector = MyAstroShineConnector({"url": ""})
+    assert connector.health_check() == {"reachable": False, "modules": {}, "error": "url required"}
+
+
 # ---------------------------------------------------------------------------
 # /handoff
 # ---------------------------------------------------------------------------

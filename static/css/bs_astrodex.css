@@ -1,13 +1,5 @@
 /* CSS for astrodex */
 
-.astrodex-insight-value {
-    font-size: 2rem;
-    font-weight: bold;
-    color: var(--bs-primary);
-    line-height: 1;
-    margin-bottom: 0.5rem;
-}
-
 #astrodex-tab .card {
     box-shadow: var(--shadow-card-unified);
     border-color: color-mix(in srgb, var(--domain-astrodex) 24%, var(--surface-border)) !important;

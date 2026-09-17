@@ -5,6 +5,7 @@
 Each connector's own routes are tested in the sibling module named after it -
 test_connectors_allsky.py, test_connectors_myastroshine.py.
 """
+
 import sys
 import types
 
@@ -22,7 +23,7 @@ _CFG_ALLSKY_ENABLED = {
     "url": "http://allsky.local",
     "enabled": True,
     "modules": {
-        "live_image":  {"enabled": True},
+        "live_image": {"enabled": True},
         "sensor_data": {"enabled": True},
     },
 }
@@ -41,6 +42,7 @@ def _config(allsky_cfg=None):
 # ---------------------------------------------------------------------------
 # GET /api/connectors
 # ---------------------------------------------------------------------------
+
 
 class TestListConnectors:
 
@@ -124,3 +126,49 @@ class TestListConnectors:
             resp = client_user.get('/api/connectors')
         data = resp.get_json()
         assert data[0]['target_modules'] == []
+
+
+# ---------------------------------------------------------------------------
+# POST /api/connectors/<name>/config - the shared save path
+#
+# Most of this endpoint is exercised through MyAstroShine in
+# test_connectors_myastroshine.py, but that connector declares no MODULES and no
+# plain-string CONFIG_FIELDS, so the module-merge and generic-string-field branches
+# need a connector that actually has them - AllSky does.
+# ---------------------------------------------------------------------------
+
+
+class TestSaveConnectorConfig:
+
+    def test_known_module_is_merged_and_unknown_or_malformed_entries_are_ignored(self, client_admin, monkeypatch):
+        saved = {}
+        monkeypatch.setattr('blueprints.connectors.load_config', lambda: {'connectors': {}})
+        monkeypatch.setattr('blueprints.connectors.save_config', lambda cfg: saved.update(cfg) or True)
+
+        resp = client_admin.post(
+            '/api/connectors/allsky/config',
+            json={
+                'url': 'http://allsky.local',
+                'modules': {
+                    'live_image': {'enabled': True},
+                    'not_a_real_module': {'enabled': True},
+                    'sensor_data': 'not-a-dict',
+                },
+            },
+        )
+        assert resp.status_code == 200
+        assert saved['connectors']['allsky']['modules'] == {'live_image': {'enabled': True}}
+
+    def test_plain_string_config_field_is_trimmed_or_falls_back_to_default(self, client_admin, monkeypatch):
+        saved = {}
+        monkeypatch.setattr('blueprints.connectors.load_config', lambda: {'connectors': {}})
+        monkeypatch.setattr('blueprints.connectors.save_config', lambda cfg: saved.update(cfg) or True)
+
+        resp = client_admin.post(
+            '/api/connectors/allsky/config',
+            json={'url': 'http://allsky.local', 'image_path': '  custom/path  ', 'image_filename': ''},
+        )
+        assert resp.status_code == 200
+        stored = saved['connectors']['allsky']
+        assert stored['image_path'] == 'custom/path'
+        assert stored['image_filename'] == 'image.jpg'  # blank falls back to the field's default

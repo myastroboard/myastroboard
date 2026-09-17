@@ -12,7 +12,6 @@ if 'psutil' not in sys.modules:
 from blueprints import skytonight_api as _skytonight_api_mod
 _annotate_skytonight_item = _skytonight_api_mod._annotate_skytonight_item
 _get_catalogue_alias_payload = _skytonight_api_mod._get_catalogue_alias_payload
-_humanize_const_name = _skytonight_api_mod._humanize_const_name
 _preload_all_current_plan_entries = _skytonight_api_mod._preload_all_current_plan_entries
 _resolve_source_catalogue = _skytonight_api_mod._resolve_source_catalogue
 _target_attr = _skytonight_api_mod._target_attr
@@ -589,20 +588,6 @@ class TestAnnotateSkytonightItem:
         _annotate_skytonight_item(item, 'u1', 'alice', 'OpenNGC', 'current')
         assert item['in_astrodex'] is False
         assert item['plan_state'] == 'current'
-
-
-class TestHumanizeConstName:
-
-    def test_camel_case_split(self):
-        assert _humanize_const_name('CanisMajor') == 'Canis Major'
-
-    def test_single_word(self):
-        assert _humanize_const_name('Orion') == 'Orion'
-
-    def test_multiple_caps(self):
-        # Inserts a space before every uppercase letter after the first
-        result = _humanize_const_name('UrsaMajor')
-        assert 'Ursa' in result and 'Major' in result
 
 
 class TestTargetAttr:

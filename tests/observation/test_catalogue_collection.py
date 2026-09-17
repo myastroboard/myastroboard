@@ -184,15 +184,6 @@ class TestConstellationNames:
         constellations = {card['constellation'] for card in page['items']}
         assert constellations == {'Andromeda', 'Aquarius', 'Ophiuchus', 'Taurus'}
 
-    def test_pyongc_serpens_halves_are_expanded(self):
-        """Se1/Se2 are PyOngc-only codes absent from the IAU enum."""
-        assert catalogue_collection._full_constellation_name('Se1') == 'Serpens Caput'
-        assert catalogue_collection._full_constellation_name('Se2') == 'Serpens Cauda'
-
-    def test_unknown_values_pass_through(self):
-        assert catalogue_collection._full_constellation_name('Nonsense') == 'Nonsense'
-        assert catalogue_collection._full_constellation_name(None) == ''
-
     def test_filter_uses_the_expanded_name(self):
         page = catalogue_collection.get_collection_page('Messier', [], constellation='Taurus')
         assert [card['catalogue_id'] for card in page['items']] == ['M 45']

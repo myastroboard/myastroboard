@@ -176,3 +176,8 @@
         transition: none;
     }
 }
+
+/* Wishlist action on a collection card (v1.5). */
+.collection-card-actions {
+    margin-top: 0.4rem;
+}

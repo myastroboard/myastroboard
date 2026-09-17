@@ -894,7 +894,7 @@ class EventsAggregator:
                 description=self._t(
                     "events_api.iss_solar_transit_description",
                     "ISS crosses the solar disk from your location."
-                    " Minimum separation {minimum_separation_arcmin}′, estimated transit window {duration_seconds}s"
+                    " Minimum separation {minimum_separation_arcmin}', estimated transit window {duration_seconds}s"
                     " near {sun_altitude_deg}° solar altitude. Certified solar filter required.",
                     minimum_separation_arcmin=f"{min_sep_arcmin:.2f}",
                     duration_seconds=f"{duration_seconds:.1f}",
@@ -948,7 +948,7 @@ class EventsAggregator:
                 description=self._t(
                     "events_api.iss_lunar_transit_description",
                     "ISS crosses the lunar disk from your location."
-                    " Minimum separation {minimum_separation_arcmin}′, estimated transit window {duration_seconds}s"
+                    " Minimum separation {minimum_separation_arcmin}', estimated transit window {duration_seconds}s"
                     " near {moon_altitude_deg}° lunar altitude. Moon illumination {moon_illumination_pct}%.",
                     minimum_separation_arcmin=f"{min_sep_arcmin:.2f}",
                     duration_seconds=f"{duration_seconds:.1f}",
@@ -1080,7 +1080,7 @@ class EventsAggregator:
                 description=self._t(
                     "events_api.css_solar_transit_description",
                     "CSS crosses the solar disk from your location."
-                    " Minimum separation {minimum_separation_arcmin}′, estimated transit window {duration_seconds}s"
+                    " Minimum separation {minimum_separation_arcmin}', estimated transit window {duration_seconds}s"
                     " near {sun_altitude_deg}° solar altitude. Certified solar filter required.",
                     minimum_separation_arcmin=f"{min_sep_arcmin:.2f}",
                     duration_seconds=f"{duration_seconds:.1f}",
@@ -1131,7 +1131,7 @@ class EventsAggregator:
                 description=self._t(
                     "events_api.css_lunar_transit_description",
                     "CSS crosses the lunar disk from your location."
-                    " Minimum separation {minimum_separation_arcmin}′, estimated transit window {duration_seconds}s"
+                    " Minimum separation {minimum_separation_arcmin}', estimated transit window {duration_seconds}s"
                     " near {moon_altitude_deg}° lunar altitude. Moon illumination {moon_illumination_pct}%.",
                     minimum_separation_arcmin=f"{min_sep_arcmin:.2f}",
                     duration_seconds=f"{duration_seconds:.1f}",

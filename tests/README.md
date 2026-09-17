@@ -38,7 +38,7 @@ python -m pytest tests/utils/test_utils.py -v
 python -m pytest tests/utils/test_utils.py::TestCoordinateConversion -v
 
 # Run specific test
-python -m pytest tests/utils/test_utils.py::TestCoordinateConversion::test_dms_to_decimal_positive -v
+python -m pytest tests/utils/test_utils.py::TestCoordinateConversion::test_validate_coordinates_valid -v
 
 # Run every test for one backend package
 python -m pytest tests/skytonight/ -v

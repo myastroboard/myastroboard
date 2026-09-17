@@ -15,15 +15,11 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from observation import object_info
 from observation.astrodex import _extract_name_candidates
-
-# The abbreviation -> full name map (including PyOngc's Se1/Se2 Serpens halves) already
-# exists next door; imported rather than copied a third time, since neither module
-# imports the other.
-from observation.beginner_catalog import _CONSTELLATION_ABBR_MAP
 from skytonight import skytonight_targets
 from skytonight.skytonight_calculator import compute_difficulty_score
 from skytonight.skytonight_models import SkyTonightTarget
 from utils import normalize_catalogue_key as _normalize_key
+from utils.constellation_names import full_constellation_name
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -170,15 +166,6 @@ def _main_picture_filename(item: Dict[str, Any]) -> Optional[str]:
     return filename or None
 
 
-def _full_constellation_name(abbreviation: Any) -> str:
-    """Expand an IAU constellation abbreviation ("And") to its full name ("Andromeda").
-
-    Unknown values are passed through unchanged, so an already-expanded name survives.
-    """
-    value = str(abbreviation or '').strip()
-    return _CONSTELLATION_ABBR_MAP.get(value, value)
-
-
 def _difficulty_for(magnitude: Optional[float], size_arcmin: Optional[float]) -> Optional[str]:
     """Return the beginner/intermediate/advanced label for an object, or None if not rateable.
 
@@ -233,7 +220,7 @@ def _normalize_target(target: Any, catalogue: str) -> Optional[Dict[str, Any]]:
         'object_type': str(field('object_type', '') or ''),
         # The dataset stores IAU abbreviations ("And"); the frontend's constellation
         # translations are keyed on the full name, so expand it here.
-        'constellation': _full_constellation_name(field('constellation', '')),
+        'constellation': full_constellation_name(field('constellation', '')),
         'magnitude': magnitude,
         'size_arcmin': size_arcmin,
         'difficulty': _difficulty_for(magnitude, size_arcmin),
@@ -265,10 +252,15 @@ def _catalogue_entries(catalogue: str) -> List[Dict[str, Any]]:
     return entries
 
 
-def _annotate(entry: Dict[str, Any], astrodex_index: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
-    """Attach caught state and the card image to a normalized catalogue entry."""
+def _annotate(
+    entry: Dict[str, Any],
+    astrodex_index: Dict[str, Dict[str, Any]],
+    wishlist_index: Optional[set] = None,
+) -> Dict[str, Any]:
+    """Attach caught state, wishlist state and the card image to a normalized entry."""
+    candidates = _target_key_candidates(entry)
     matched: Optional[Dict[str, Any]] = None
-    for key in _target_key_candidates(entry):
+    for key in candidates:
         matched = astrodex_index.get(key)
         if matched is not None:
             break
@@ -304,6 +296,7 @@ def _annotate(entry: Dict[str, Any], astrodex_index: Dict[str, Dict[str, Any]]) 
         'size_arcmin': entry['size_arcmin'],
         'difficulty': entry['difficulty'],
         'caught': caught,
+        'in_wishlist': bool(wishlist_index and (candidates & wishlist_index)),
         'picture_count': picture_count,
         'image_url': image_url,
         'image_source': image_source,
@@ -421,6 +414,7 @@ def get_collection_page(
     constellation: str = '',
     caught: str = 'all',
     difficulty: str = '',
+    wishlist_index: Optional[set] = None,
 ) -> Dict[str, Any]:
     """Return one page of a catalogue's cards plus the counters and filter options around it.
 
@@ -435,7 +429,7 @@ def get_collection_page(
     search = str(search or '').strip().casefold()
 
     astrodex_index = build_astrodex_index(astrodex_items)
-    cards = [_annotate(entry, astrodex_index) for entry in _catalogue_entries(catalogue)]
+    cards = [_annotate(entry, astrodex_index, wishlist_index) for entry in _catalogue_entries(catalogue)]
 
     total = len(cards)
     caught_total = sum(1 for card in cards if card['caught'])

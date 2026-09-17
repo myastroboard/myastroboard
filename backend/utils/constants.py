@@ -39,6 +39,13 @@ URL_OPENMETEO = "https://api.open-meteo.com/v1/forecast"
 # not a per-install tuning knob. Full rate-limit derivation: docs/LOCATIONS.md.
 MAX_LOCATIONS = 5
 
+# Session Analytics wishlist (v1.5)
+# Hard cap on wishlist entries per user. The wishlist's "next visibility window" sort
+# folds every item through one shared per-night ephemeris grid, so the cost is linear in
+# this number; 500 keeps that pass and the JSON file bounded without being a limit a real
+# observing wishlist runs into.
+MAX_WISHLIST_ITEMS = 500
+
 # Server-side debounce for the SkyTonight live-conditions fetch (use_cache=False
 # Open-Meteo call). Bounds the worst-case per-location call rate — see
 # docs/LOCATIONS.md "Rate-limit analysis".

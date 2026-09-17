@@ -459,12 +459,14 @@ combination is *effective* for that entry (its own override, or the session's) w
 - **Session sharing / multi-user visibility.** Sessions are always private; there is no
   `private_mode` toggle and no merged view.
 - **Full analytics** (integration hours over time, equipment usage breakdowns, sky-coverage maps) -
-  that's v1.5 Session Analytics.
+  shipped in v1.5 Session Analytics, built on this module; see
+  [SESSION_ANALYTICS.md](SESSION_ANALYTICS.md).
 
 ---
 
 ## Related documentation
 
+- [SESSION_ANALYTICS.md](SESSION_ANALYTICS.md) - the v1.5 aggregations built on this log
 - [PLAN_MY_NIGHT.md](PLAN_MY_NIGHT.md) - the plan this log imports from
 - [EQUIPMENT.md](EQUIPMENT.md) - combination deletion guards
 - [LOCATIONS.md](LOCATIONS.md) - preset deletion workflow

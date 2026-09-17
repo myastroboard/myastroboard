@@ -1,0 +1,195 @@
+/* Session Analytics (v1.5) - Analytics and Wishlist sub-tabs of the Astrodex main tab.
+   Every static presentation rule for those two surfaces lives here: no inline style
+   attributes, per the project style guide. The only runtime .style writes in
+   session_analytics.js / wishlist.js are genuinely per-instance computed values
+   (a progress bar width, a scatter point colour). */
+
+.session-analytics-section-title {
+    font-size: 1.15rem;
+    margin-bottom: 0.35rem;
+}
+
+/* --- Chart cards --------------------------------------------------------- */
+
+/* Chart.js sizes a responsive canvas to its parent's content box, so every canvas gets
+   its own fixed-height, position:relative container. Without it, a card that holds
+   anything besides the canvas feeds the canvas height back into the parent and the chart
+   grows without bound. */
+.session-analytics-chart-wrap {
+    position: relative;
+    width: 100%;
+    height: 320px;
+}
+
+/* The sky coverage chart, and only it. Chart.js needs a definite height here, so this
+   is a fixed value that steps up on a wide screen rather than an aspect ratio - the
+   canvas must never be able to feed its own height back into its parent. */
+.session-analytics-chart-wrap-tall {
+    position: relative;
+    width: 100%;
+    height: 460px;
+}
+
+@media (min-width: 1400px) {
+    .session-analytics-chart-wrap-tall {
+        height: 560px;
+    }
+}
+
+.session-analytics-legend-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.75rem;
+}
+
+.session-analytics-legend-swatch {
+    display: inline-block;
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 0.2rem;
+}
+
+/* --- Empty states -------------------------------------------------------- */
+
+.session-analytics-empty {
+    text-align: center;
+    padding: 2rem 1rem;
+    opacity: 0.8;
+}
+
+.session-analytics-empty-icon {
+    font-size: 2rem;
+    display: block;
+    margin-bottom: 0.5rem;
+    opacity: 0.5;
+}
+
+/* --- Conditions ---------------------------------------------------------- */
+
+.session-analytics-bucket-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.2rem 0;
+    font-size: 0.82rem;
+}
+
+.session-analytics-bucket-samples {
+    opacity: 0.65;
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+.session-analytics-bucket-thin {
+    opacity: 0.55;
+    font-style: italic;
+}
+
+.session-analytics-direction-note {
+    font-size: 0.75rem;
+    opacity: 0.7;
+    margin-bottom: 0.4rem;
+}
+
+/* --- Sky coverage -------------------------------------------------------- */
+
+/* The coverage chart paints a sky rather than a plot area, and a canvas cannot carry a
+   class - session_analytics.js reads these back with getComputedStyle at draw time.
+   They stay dark under the light theme on purpose: a sky chart reads as a window onto
+   the sky, and inverting it would only make the objects harder to place. The red theme
+   redefines every one of them so night vision survives. */
+:root {
+    --sky-chart-bg-top: #12263f;
+    --sky-chart-bg-bottom: #050c17;
+    --sky-chart-grid: rgba(148, 197, 255, 0.14);
+    --sky-chart-milky-way: rgba(198, 222, 255, 0.042);
+    --sky-chart-milky-way-key: #8fa8cc;
+    --sky-chart-ecliptic: rgba(255, 214, 128, 0.5);
+    --sky-chart-ecliptic-key: #d99b2b;
+    --sky-chart-equator: rgba(148, 197, 255, 0.4);
+    --sky-chart-equator-key: #5f87b8;
+    --sky-chart-never: rgba(2, 6, 12, 0.55);
+    --sky-chart-never-line: rgba(160, 180, 210, 0.5);
+    --sky-chart-glow: rgba(150, 195, 255, 0.9);
+}
+
+html[data-theme="dark"] {
+    --sky-chart-bg-top: #0c1c30;
+    --sky-chart-bg-bottom: #03070d;
+}
+
+html[data-theme="red"] {
+    --sky-chart-bg-top: #2a0606;
+    --sky-chart-bg-bottom: #0f0000;
+    --sky-chart-grid: rgba(255, 130, 130, 0.16);
+    --sky-chart-milky-way: rgba(255, 170, 170, 0.045);
+    --sky-chart-milky-way-key: #b96a6a;
+    --sky-chart-ecliptic: rgba(255, 170, 120, 0.5);
+    --sky-chart-ecliptic-key: #c4713a;
+    --sky-chart-equator: rgba(255, 130, 130, 0.4);
+    --sky-chart-equator-key: #a35555;
+    --sky-chart-never: rgba(12, 0, 0, 0.6);
+    --sky-chart-never-line: rgba(220, 150, 150, 0.5);
+    --sky-chart-glow: rgba(255, 140, 140, 0.9);
+}
+
+.session-analytics-coverage-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.session-analytics-unplaced {
+    font-size: 0.78rem;
+    opacity: 0.75;
+}
+
+/* --- Wishlist ------------------------------------------------------------ */
+
+.wishlist-progress-wrapper {
+    max-width: 32rem;
+}
+
+.wishlist-item-row {
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.5rem;
+    padding: 0.6rem 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.wishlist-item-captured {
+    opacity: 0.65;
+}
+
+.wishlist-item-name {
+    font-weight: 600;
+}
+
+.wishlist-item-meta {
+    font-size: 0.78rem;
+    opacity: 0.75;
+}
+
+.wishlist-priority-high {
+    color: var(--bs-warning);
+}
+
+.wishlist-priority-low {
+    opacity: 0.6;
+}
+
+.wishlist-visibility-cell {
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
+@media (max-width: 575.98px) {
+    .session-analytics-chart-wrap,
+    .session-analytics-chart-wrap-tall {
+        height: 260px;
+    }
+}

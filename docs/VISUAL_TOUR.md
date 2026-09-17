@@ -9,6 +9,7 @@ A visual walkthrough of MyAstroBoard's interface and capabilities - from your fi
 4. [SkyTonight](#skytonight)
 5. [Plan My Night](#plan-my-night)
 6. [Astrodex Collections](#astrodex-collections)
+   - [Your Sky](#your-sky)
 7. [Spaceflight](#spaceflight)
 8. [Equipment Profiles](#equipment-profiles)
 9. [Administration](#administration)
@@ -142,6 +143,27 @@ Observation Log integration helps you review captures night-by-night and keep co
 Photo Map view lets you explore where your captures were taken across your observing locations.
 
 ![Astrodex Photo Map](img/astrodex_photomap.png)
+
+### Your Sky
+
+Everything the Observation Log knows, read back to you. Total light collected over your whole
+logbook, this year and this month; the object types and constellations you gravitate towards;
+which equipment actually did the work; and how the ratings you gave yourself line up against the
+seeing, transparency, SQM and Moon illumination you recorded.
+
+It stays honest about what it knows: every comparison shows its own sample count, and a group with
+too few nights behind it says so instead of being plotted as if it meant something.
+
+![Your Sky](img/astrodex_analytics_1.png)
+
+The sky coverage chart is a sky chart rather than a scatter plot. The Milky Way is drawn behind
+your captures from the galactic equator, the ecliptic is marked - the path the Sun, Moon and
+planets follow - and the band that never rises from your location is shaded out, so "where have I
+been" is read against where you can actually go. Each dot grows with the integration time behind
+it, and the top axis reads the same right ascension as the month that part of the sky is at its
+best.
+
+![The sky you have covered](img/astrodex_analytics_2.png)
 
 ### Object Editor
 Log every detail of a capture session:

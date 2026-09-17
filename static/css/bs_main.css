@@ -1590,3 +1590,135 @@ html[data-theme="red"] .text-bg-primary {
     width: 40px;
 }
 
+
+/* ============================================================
+   Headline figures plate
+
+   One panel carrying a page's headline numbers: the figure that matters at full size,
+   the rest as a compact row beside it. Replaces the grids of identical stat cards, which
+   gave every number the same weight - the one thing a lifetime integration total and a
+   constellation count do not have.
+
+   Built from standalone elements on purpose. The rules above force a light surface onto
+   .card/.card-header with !important, so a "premium" dark panel cannot be a Bootstrap
+   card; it has to carry its own classes. Same approach as .moon-info-card.
+
+   Built by DOMUtils.buildStatPlate().
+   ============================================================ */
+
+.stat-plate {
+    background: var(--bg-gradient);
+    color: var(--text-light);
+    border: 1px solid var(--info-card-border);
+    border-radius: var(--border-radius-xl);
+    box-shadow: var(--shadow-info-card);
+    padding: 1.25rem 1.5rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-plate::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--info-card-sheen), transparent);
+}
+
+.stat-plate-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1.25rem 2.25rem;
+}
+
+.stat-plate-hero {
+    min-width: 11rem;
+}
+
+.stat-plate-hero-value {
+    display: block;
+    font-size: 3.25rem;
+    font-weight: 300;
+    line-height: 1;
+    letter-spacing: -0.02em;
+}
+
+.stat-plate-hero-label {
+    display: block;
+    font-size: 0.95rem;
+    opacity: 0.9;
+    margin-top: 0.35rem;
+}
+
+.stat-plate-hero-hint {
+    display: block;
+    font-size: 0.78rem;
+    opacity: 0.55;
+}
+
+/* auto-fit rather than a fixed column count: the plate is used with anything from three
+   figures to seven, and each page should not have to pick a grid. */
+.stat-plate-figures {
+    flex: 1 1 24rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: 1rem 1.25rem;
+}
+
+.stat-plate-figure {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.stat-plate-icon {
+    opacity: 0.5;
+    font-size: 0.95rem;
+    flex-shrink: 0;
+}
+
+.stat-plate-value {
+    display: block;
+    font-size: 1.3rem;
+    font-weight: var(--font-semibold);
+    line-height: 1.15;
+}
+
+.stat-plate-label {
+    display: block;
+    font-size: 0.74rem;
+    opacity: 0.7;
+}
+
+.stat-plate-hint {
+    display: block;
+    font-size: 0.68rem;
+    opacity: 0.45;
+}
+
+@media (max-width: 575.98px) {
+    .stat-plate {
+        padding: 1rem;
+    }
+
+    .stat-plate-row {
+        gap: 1rem;
+    }
+
+    .stat-plate-hero-value {
+        font-size: 2.5rem;
+    }
+
+    /* The plate gets about 300px of content width on a phone. 8rem tracks keep two
+       figures per row there, which halves the height of the block a reader has to scroll
+       past before the first chart - one column of seven is a long way down. */
+    .stat-plate-figures {
+        flex-basis: 100%;
+        grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+        gap: 0.75rem 1rem;
+    }
+}

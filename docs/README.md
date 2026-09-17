@@ -32,6 +32,7 @@ Welcome to the comprehensive documentation for MyAstroBoard, the integrated astr
 
 #### Collection & Equipment
 - [Astrodex](ASTRODEX.md) - Personal astrophotography logbook: data model, image management, catalogue integration
+- [Session Analytics and Wishlist](SESSION_ANALYTICS.md) - Progress dashboard, sky coverage map, conditions comparison, best months, and the wishlist derived from your log
 - [Equipment Profiles](EQUIPMENT.md) - Telescopes, cameras, mounts, filters, FOV calculator formulas, equipment sharing
 
 #### Spaceflight

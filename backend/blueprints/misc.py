@@ -25,8 +25,13 @@ misc_bp = Blueprint('misc', __name__)
 
 # Coordinate conversion regex pattern (module-level constant)
 # Matches DMS format: 48d38m36.16s or 48°38'36.16"
-# Pattern: optional sign, degrees, minutes, seconds
-DMS_PATTERN = re.compile(r"^([+-]?\d{1,3})[d°]\s*(\d{1,2})[m']\s*(\d{1,2}(?:\.\d{1,6})?)[s\"]?$")
+# The sign is captured separately from the degrees: reading it back from the parsed number
+# loses it whenever the degrees field is a negative zero, and "-0d30m00s" (half an arcminute
+# west of Greenwich) is a perfectly ordinary longitude.
+DMS_PATTERN = re.compile(
+    r"^(?P<sign>[+-])?(?P<degrees>\d{1,3})[d°]\s*(?P<minutes>\d{1,2})[m']\s*"
+    r"(?P<seconds>\d{1,2}(?:\.\d{1,6})?)[s\"]?$"
+)
 
 
 @misc_bp.route('/api/skyquality', methods=['GET'])
@@ -116,13 +121,14 @@ def convert_coordinates_api():
         match = DMS_PATTERN.match(dms_str.strip())
 
         if match:
-            degrees = int(match.group(1))
-            minutes = int(match.group(2))
-            seconds = float(match.group(3))
+            degrees = int(match.group('degrees'))
+            minutes = int(match.group('minutes'))
+            seconds = float(match.group('seconds'))
 
-            # Convert to decimal
-            decimal = abs(degrees) + minutes / 60 + seconds / 3600
-            if degrees < 0:
+            # Convert to decimal, taking the sign from the string rather than from the
+            # parsed degrees - see DMS_PATTERN above.
+            decimal = degrees + minutes / 60 + seconds / 3600
+            if match.group('sign') == '-':
                 decimal = -decimal
 
             # Validate reasonable ranges (lat: -90 to 90, lon: -180 to 180)

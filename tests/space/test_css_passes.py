@@ -1358,6 +1358,32 @@ def test_find_solar_transits_and_extract_segment(monkeypatch):
     assert svc._extract_solar_transit_segment(start, window_end, None, None, None, None) is None
 
 
+def test_find_solar_transits_reuses_precomputed_events(monkeypatch):
+    """get_report shares one find_events() call between the geometric pass scan and the
+    solar transit search - a satellite whose find_events() would blow up proves it."""
+    svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
+    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    end = start + timedelta(seconds=4)
+
+    class _Evt:
+        def __init__(self, dt):
+            self._dt = dt
+
+        def utc_datetime(self):
+            return self._dt.replace(tzinfo=None)
+
+    class _ExplodingSat:
+        def find_events(self, *args, **kwargs):
+            raise AssertionError("find_events must not be called when events are already provided")
+
+    event_times = [_Evt(start), _Evt(start + timedelta(seconds=2)), _Evt(end)]
+    event_types = [0, 1, 2]
+
+    monkeypatch.setattr(svc, "_extract_solar_transit_segment", lambda **kwargs: {"peak_time": "reused"})
+    out = svc._find_solar_transits(start, end, _ExplodingSat(), object(), object(), object(), event_times, event_types)
+    assert out == [{"peak_time": "reused"}]
+
+
 def test_sample_time_range_and_angular_radius_helpers():
     svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
     start = datetime(2026, 1, 1, tzinfo=timezone.utc)
@@ -1404,6 +1430,10 @@ def test_vectorised_geometry_helpers():
     assert collapsed == [start]
     inverted = svc._time_grid(start, start - timedelta(seconds=5), 5.0)
     assert inverted == [start]
+    # 7s window at a 5s step: the natural grid stops short at +5s, so the exact end
+    # must be appended as an extra point rather than silently dropped.
+    remainder = svc._time_grid(start, start + timedelta(seconds=7), 5.0)
+    assert remainder == [start, start + timedelta(seconds=5), start + timedelta(seconds=7)]
 
     sep = svc._angular_separation_array(
         np.array([10.0, 0.0]), np.array([180.0, 0.0]), np.array([10.0, 0.0]), np.array([180.0, 180.0])
@@ -1474,6 +1504,31 @@ def test_find_lunar_transits_and_extract_segment(monkeypatch):
         ),
     )
     assert svc._extract_lunar_transit_segment(start, window_end, None, None, None, object()) is None
+
+
+def test_find_lunar_transits_reuses_precomputed_events(monkeypatch):
+    """Same shared-events optimisation as the solar transit search."""
+    svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
+    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    end = start + timedelta(seconds=4)
+
+    class _Evt:
+        def __init__(self, dt):
+            self._dt = dt
+
+        def utc_datetime(self):
+            return self._dt.replace(tzinfo=None)
+
+    class _ExplodingSat:
+        def find_events(self, *args, **kwargs):
+            raise AssertionError("find_events must not be called when events are already provided")
+
+    event_times = [_Evt(start), _Evt(start + timedelta(seconds=2)), _Evt(end)]
+    event_types = [0, 1, 2]
+
+    monkeypatch.setattr(svc, "_extract_lunar_transit_segment", lambda **kwargs: {"peak_time": "reused"})
+    out = svc._find_lunar_transits(start, end, _ExplodingSat(), object(), object(), object(), event_times, event_types)
+    assert out == [{"peak_time": "reused"}]
 
 
 def test_extract_lunar_transit_segment_invalid_window_returns_none():
@@ -2246,6 +2301,68 @@ def test_sun_altaz_arrays_astropy_direct():
     assert len(az) == 1
     assert -90.0 <= alt[0] <= 90.0
     assert 0.0 <= az[0] < 360.0
+
+
+# ---------------------------------------------------------------------------
+# _iss_altaz_arrays / _sun_altaz_radius_arrays (eph branch) /
+# _moon_altaz_radius_illum_arrays — real Skyfield vectorised paths.
+#
+# Every other test fakes these three out (they are the expensive, network-shaped
+# calls), so the real bodies need one direct exercise against genuine Skyfield
+# objects. de421.bsp is already cached locally by the app's own ephemeris loader,
+# so this needs no network access and stays fast.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def real_skyfield_objects():
+    from skyfield.api import EarthSatellite, wgs84
+
+    ts = mod.SKYFIELD_LOADER.timescale()
+    satellite = EarthSatellite(_CSS_TLE_L1, _CSS_TLE_L2, "CSS (TIANHE)", ts)
+    observer = wgs84.latlon(45.5, -73.5, elevation_m=10.0)
+    eph = mod.SKYFIELD_LOADER("de421.bsp")
+    return satellite, observer, ts, eph
+
+
+def test_iss_altaz_arrays_real_skyfield_computation(real_skyfield_objects):
+    satellite, observer, ts, _eph = real_skyfield_objects
+    svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    times = [now, now + timedelta(minutes=1)]
+
+    altitude, azimuth = svc._iss_altaz_arrays(times, satellite, observer, ts)
+    assert len(altitude) == len(times)
+    assert len(azimuth) == len(times)
+    assert all(-90.0 <= value <= 90.0 for value in altitude)
+    assert all(0.0 <= value < 360.0 for value in azimuth)
+
+
+def test_sun_altaz_radius_arrays_uses_the_real_ephemeris_when_available(real_skyfield_objects):
+    _satellite, observer, ts, eph = real_skyfield_objects
+    svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    times = [now, now + timedelta(minutes=1)]
+
+    altitude, azimuth, radius = svc._sun_altaz_radius_arrays(times, observer, ts, eph)
+    assert len(altitude) == len(times)
+    assert all(-90.0 <= value <= 90.0 for value in altitude)
+    assert all(0.0 <= value < 360.0 for value in azimuth)
+    assert all(radius > 0.0)
+
+
+def test_moon_altaz_radius_illum_arrays_real_skyfield_computation(real_skyfield_objects):
+    _satellite, observer, ts, eph = real_skyfield_objects
+    svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    times = [now, now + timedelta(minutes=1)]
+
+    altitude, azimuth, radius, illumination = svc._moon_altaz_radius_illum_arrays(times, observer, ts, eph)
+    assert len(altitude) == len(times)
+    assert all(-90.0 <= value <= 90.0 for value in altitude)
+    assert all(0.0 <= value < 360.0 for value in azimuth)
+    assert all(radius > 0.0)
+    assert all(0.0 <= value <= 100.0 for value in illumination)
 
 
 class TestAngularSeparationDegScalar:

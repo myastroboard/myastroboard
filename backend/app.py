@@ -141,6 +141,7 @@ from blueprints.plan_my_night import plan_my_night_bp
 from blueprints.astrodex import astrodex_bp
 from blueprints.equipment import equipment_bp
 from blueprints.observation_sessions import observation_sessions_bp
+from blueprints.session_analytics import session_analytics_bp
 
 app.register_blueprint(skytonight_bp)
 app.register_blueprint(auth_bp)
@@ -158,6 +159,7 @@ app.register_blueprint(plan_my_night_bp)
 app.register_blueprint(astrodex_bp)
 app.register_blueprint(equipment_bp)
 app.register_blueprint(observation_sessions_bp)
+app.register_blueprint(session_analytics_bp)
 
 
 # ============================================================
@@ -354,7 +356,7 @@ except Exception as e:  # pragma: no cover
 # are unaffected by skipping the auto-start below.
 _AUTOSTART_SCHEDULERS = 'pytest' not in sys.modules
 
-if _AUTOSTART_SCHEDULERS:
+if _AUTOSTART_SCHEDULERS:  # pragma: no cover - never true while imported under pytest
     # Initialize cache scheduler FIRST so its cache_ready_event can be passed to
     # the SkyTonight scheduler, ensuring DSO calculations run on warm caches.
     try:
