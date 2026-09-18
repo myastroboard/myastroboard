@@ -897,6 +897,11 @@ const _CONNECTOR_ICONS = {
     allsky: 'bi-camera-video',
 };
 
+/** Enabled connectors whose data lands in the Observatory tab (declared via target_modules). */
+function _feedsObservatory(c) {
+    return Boolean(c && c.enabled && Array.isArray(c.target_modules) && c.target_modules.includes('observatory'));
+}
+
 function _ensureScript(src) {
     const version = document.querySelector('meta[name="app-version"]')?.content || '';
     const fullSrc = `${src}?v=${version}`;
@@ -958,7 +963,9 @@ async function loadObservatory() {
     if (!container) return;
 
     const connectors = await fetchJSONOnce('/api/connectors').catch(() => []);
-    const enabled = (connectors || []).filter(c => c.enabled);
+    // Only connectors that declare the Observatory as a target have a panel here: an enabled
+    // MyAstroShine (AstroDex) or MQTT (standalone) connector must not get an empty sub-tab.
+    const enabled = (connectors || []).filter(_feedsObservatory);
 
     if (enabled.length === 0) {
         DOMUtils.clear(container);
@@ -1021,7 +1028,7 @@ async function loadObservatory() {
 
 function updateObservatoryNavVisibility() {
     fetchJSONOnce('/api/connectors').then(connectors => {
-        const hasEnabled = (connectors || []).some(c => c.enabled);
+        const hasEnabled = (connectors || []).some(_feedsObservatory);
         const navItem = document.getElementById('observatory-nav-item');
         if (navItem) navItem.style.display = hasEnabled ? '' : 'none';
     }).catch(() => {});

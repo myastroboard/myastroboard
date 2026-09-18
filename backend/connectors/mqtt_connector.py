@@ -304,8 +304,11 @@ class MqttConnector(BaseConnector):
                 client.loop(timeout=0.5)
         except (OSError, ValueError) as exc:
             # ConnectionRefusedError / socket.timeout are OSError; a TLS handshake failure is
-            # ssl.SSLError (also OSError); ValueError covers paho argument validation.
-            logger.debug("MQTT probe to %s:%s failed: %s", host, port, exc)
+            # ssl.SSLError (also OSError); ValueError covers paho argument validation. Only the
+            # exception type is logged, never its message: this try block also hands the broker
+            # credentials to paho, and some libraries embed a failing argument's value in their
+            # exception text - the type name is enough to diagnose a probe failure.
+            logger.debug("MQTT probe to %s:%s failed: %s", host, port, type(exc).__name__)
             return {"reachable": False, "error": _describe_probe_error(exc)}
         finally:
             try:
@@ -344,7 +347,12 @@ class MqttConnector(BaseConnector):
 
 
 def _describe_probe_error(exc: BaseException) -> str:
-    """A short, credential-free description of a failed CONNECT."""
+    """A short, credential-free description of a failed CONNECT.
+
+    Only the exception's type name is ever returned, never ``str(exc)``: this describes the
+    outcome of a connection attempt made with the caller's credentials, and some libraries echo
+    a failing argument's value back in their exception message.
+    """
     if isinstance(exc, ConnectionRefusedError):
         return "connection refused"
     if isinstance(exc, (TimeoutError, socket.timeout)):
@@ -352,4 +360,4 @@ def _describe_probe_error(exc: BaseException) -> str:
     name = type(exc).__name__
     if "SSL" in name or "ssl" in name.lower():
         return "TLS handshake failed - check the certificate or enable the insecure option"
-    return f"{name}: {exc}" if str(exc) else name
+    return name

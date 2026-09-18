@@ -33,7 +33,7 @@ from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional
 
 from connectors.mqtt_connector import MqttConnector
-from utils.connector_secrets import merge_secrets
+from utils.connector_secrets import load_secrets
 from utils.constants import CONFIG_FILE, DATA_DIR_CACHE
 from utils.logging_config import get_logger
 
@@ -164,6 +164,11 @@ class MqttPublisher:
         self._connected = False
         self._force_full = False
         self._connector: Optional[MqttConnector] = None
+        # Kept off the connector object on purpose (see _refresh_connector): the connector's
+        # own config is used for non-secret reads (host, client id, topics) throughout this
+        # class, and mixing the password into that same dict makes every one of those reads
+        # indistinguishable from a credential to a static data-flow analysis.
+        self._password: str = ""
         self._config: Dict[str, Any] = {}
         self._source_signature: Any = None
         self._next_due: float = 0.0
@@ -335,16 +340,17 @@ class MqttPublisher:
             logger.error(f"MQTT publisher: could not load config: {exc}")
             return False
         block = (config.get("connectors") or {}).get("mqtt") or {}
-        merged = merge_secrets(MqttConnector.name, block, MqttConnector.SECRET_FIELDS)
-        connector = MqttConnector(merged)
-        previous = self._connector
+        connector = MqttConnector(block)
+        password = load_secrets(MqttConnector.name).get("password", "")
+        previous, previous_password = self._connector, self._password
         self._config = config
         self._connector = connector
+        self._password = password
         if previous is None:
             return True
         # Only a change that matters to the connection or the payloads counts as a change;
         # an unrelated config save must not bounce the broker connection.
-        return _relevant_config(previous) != _relevant_config(connector)
+        return _relevant_config(previous, previous_password) != _relevant_config(connector, password)
 
     # ------------------------------------------------------------------
     # Connection
@@ -374,7 +380,7 @@ class MqttPublisher:
             client.on_message = self._on_message
             username = str(connector.config.get("username") or "")
             if username:
-                client.username_pw_set(username, str(connector.config.get("password") or "") or None)
+                client.username_pw_set(username, self._password or None)
             if tls:
                 client.tls_set()
                 if connector.tls_insecure():
@@ -385,8 +391,11 @@ class MqttPublisher:
             client.connect_async(host, port, keepalive=60)
             client.loop_start()
         except Exception as exc:
-            logger.warning(f"MQTT publisher: connection to {host}:{port} failed to start: {exc}")
-            self._note_error(f"connect: {exc}")
+            # Only the exception type, never its message: this try block also hands the broker
+            # credentials to paho via username_pw_set, and some libraries echo a failing
+            # argument's value back in their exception text.
+            logger.warning("MQTT publisher: connection to %s:%s failed to start: %s", host, port, type(exc).__name__)
+            self._note_error(f"connect: {type(exc).__name__}")
             return
         self._client = client
         self._connected = False
@@ -631,14 +640,14 @@ class MqttPublisher:
         _write_json(STATUS_FILE, status)
 
 
-def _relevant_config(connector: MqttConnector) -> str:
+def _relevant_config(connector: MqttConnector, password: str) -> str:
     """The part of the connector config whose change warrants a reconnect / full republish."""
     cfg = connector.config
     relevant = {
         "url": connector.base_url,
         "enabled": connector.is_enabled(),
         "username": cfg.get("username"),
-        "password": cfg.get("password"),
+        "password": password,
         "base_topic": connector.base_topic(),
         "discovery_enabled": connector.discovery_enabled(),
         "discovery_prefix": connector.discovery_prefix(),
