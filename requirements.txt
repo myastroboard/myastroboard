@@ -36,3 +36,6 @@ packaging===26.3
 
 # Web Push notifications
 pywebpush===2.5.0
+
+# MQTT publisher (Home Assistant connector)
+paho-mqtt===2.1.0

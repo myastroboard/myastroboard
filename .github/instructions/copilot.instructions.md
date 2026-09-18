@@ -38,6 +38,7 @@ myastroboard/
 │   │   ├── __init__.py                  # Common backend utility functions (includes slugify_location_name) - former utils.py
 │   │   ├── route_helpers.py             # Shared cross-domain route helpers (_resolve_active_location, _active_location_cache)
 │   │   ├── app_settings.py              # Persistent app settings (VAPID email, proxy headers)
+│   │   ├── connector_secrets.py         # Connector credentials sidecar (data/connectors_secrets.json, outside backups)
 │   │   ├── auth.py                      # Authentication and user management
 │   │   ├── config_defaults.py           # Default config values
 │   │   ├── constants.py                 # Shared constants (paths, URLs, timeouts)
@@ -55,7 +56,10 @@ myastroboard/
 │   │   ├── auth.py                  # /api/auth/*, /api/users/*
 │   │   ├── push.py                  # /api/push/*
 │   │   ├── locations.py             # /api/config, /api/locations/*
-│   │   ├── connectors.py            # /api/connectors/* (AllSky)
+│   │   ├── connectors.py            # /api/connectors (registry listing + shared config save)
+│   │   ├── connectors_allsky.py     # /api/connectors/allsky/*
+│   │   ├── connectors_myastroshine.py # /api/connectors/myastroshine/health, /api/astrodex/integration/*
+│   │   ├── connectors_mqtt.py       # /api/connectors/mqtt/* (health, status, publish, remove)
 │   │   ├── admin.py                 # /api/admin/*, /api/metrics, /api/backup/*, /api/logs/*, /api/config/export
 │   │   ├── misc.py                  # /api/skyquality, /api/convert-coordinates, /api/timezones, /api/health, /api/cache, /api/version
 │   │   ├── weather.py               # /api/weather/*, /api/moon/*, /api/aurora/predictions, /api/seeing-forecast
@@ -101,6 +105,13 @@ myastroboard/
 │   │   ├── css_passes.py                # CSS (China Space Station, NORAD 48274) passes – full parallel mirror of iss_passes.py
 │   │   ├── iss_passes.py                # ISS passes, solar transit, and lunar transit integration
 │   │   └── spaceflight_tracker.py       # Launch Library 2 client (launches, astronauts, events)
+│   ├── connectors/                  # BaseConnector registry - bridges to external tools (see docs/CONNECTORS.md)
+│   │   ├── base_connector.py            # Abstract contract (MODULES, CONFIG_FIELDS, SECRET_FIELDS, target_modules)
+│   │   ├── allsky_connector.py          # AllSky all-sky camera (Observatory tab)
+│   │   ├── myastroshine_connector.py    # MyAstroShine photo round-trip (AstroDex)
+│   │   ├── mqtt_connector.py            # MQTT / Home Assistant publisher - declaration + broker probe (no feature imports!)
+│   │   ├── mqtt_publisher.py            # Background publisher thread (lock file, paho client, cycles, cleanup manifest)
+│   │   └── mqtt_payloads.py             # HA discovery + state builders (lazy feature imports) - see docs/HOME_ASSISTANT.md
 │   ├── equipment/                   # Equipment profiles business logic
 │   │   └── equipment_profiles.py        # Equipment profiles API helpers
 │   ├── skytonight/                  # SkyTonight calculation pipeline (routes live in blueprints/skytonight_api.py)
@@ -117,6 +128,7 @@ myastroboard/
 │   ├── astrodex/                    # Astrodex JSON + images
 │   ├── cache/                       # Runtime cache payloads
 │   ├── config.json                  # Main app config
+│   ├── connectors_secrets.json      # Connector credentials (MQTT password, MyAstroShine token) - never in backups
 │   ├── equipments/                  # Equipment profile JSON files
 │   ├── myastroboard.log             # Application log file
 │   ├── observation_sessions/        # Observation Log JSON (one <user_id>_sessions.json per user)
@@ -192,7 +204,7 @@ myastroboard/
 │   ├── observation/                 # Tests for backend/observation/* (astrodex, plan_my_night, events, object_info...)
 │   ├── space/                       # Tests for backend/space/* (iss_passes, css_passes, spaceflight_tracker)
 │   ├── equipment/                   # Tests for backend/equipment/* + exposure calculator
-│   └── connectors/                  # Tests for backend/connectors/* (allsky_connector)
+│   └── connectors/                  # Tests for backend/connectors/* (allsky, base, mqtt_connector / mqtt_payloads / mqtt_publisher)
 ├── CODEOWNERS                       # Repository ownership rules
 ├── CODE_OF_CONDUCT.md               # Community code of conduct
 ├── CONTRIBUTING.md                  # Contribution guidelines
@@ -434,6 +446,7 @@ night, events <-> skytonight, skytonight <-> weather) and are being unwound one 
   - `time_format`: `auto` | `12h` | `24h`
   - `density`: `comfortable` | `compact`
   - `theme_mode`: `auto` | `light` | `dark` | `red`
+  - `mqtt_publish_enabled`: `true` | `false` (v1.6) - the user's own consent to publish their Astrodex / plan / log activity through the MQTT connector; user-scoped, default off
 - **Backend Rules**:
   - Validate allowed keys and values before saving
   - Merge with defaults for missing keys
@@ -479,7 +492,7 @@ night, events <-> skytonight, skytonight <-> weather) and are being unwound one 
 
 - **Pattern**: RESTful JSON API with role-based access control
 - **Endpoint Coverage**:
-  - Routes are defined as Flask Blueprints in `backend/blueprints/*.py` (registered in `backend/app.py`), one module per domain: `auth.py` (auth+users), `push.py`, `locations.py` (config+locations), `connectors.py`, `admin.py` (app-settings/restart/metrics/backup/logs), `misc.py` (skyquality/convert-coordinates/timezones/health/cache/version), `weather.py` (weather+moon+aurora+seeing), `tracking.py` (object/iss/css/spaceflight/translate), `astronomy.py` (sky-widget/sun/events/astro/tonight), `plan_my_night.py`, `astrodex.py` (astrodex+beginner-catalog), `equipment.py`, `skytonight_api.py` (SkyTonight routes; the SkyTonight _calculation pipeline_ it calls into still lives in `backend/skytonight/`). `app.py` itself only holds the Flask app factory, extension setup, static/PWA routes, and startup/scheduler init. Cross-domain route helpers (`_resolve_active_location`, `_active_location_cache`) live in `backend/utils/route_helpers.py`.
+  - Routes are defined as Flask Blueprints in `backend/blueprints/*.py` (registered in `backend/app.py`), one module per domain: `auth.py` (auth+users), `push.py`, `locations.py` (config+locations), `connectors.py` (+ `connectors_allsky.py`, `connectors_myastroshine.py`, `connectors_mqtt.py`), `admin.py` (app-settings/restart/metrics/backup/logs), `misc.py` (skyquality/convert-coordinates/timezones/health/cache/version), `weather.py` (weather+moon+aurora+seeing), `tracking.py` (object/iss/css/spaceflight/translate), `astronomy.py` (sky-widget/sun/events/astro/tonight), `plan_my_night.py`, `astrodex.py` (astrodex+beginner-catalog), `equipment.py`, `skytonight_api.py` (SkyTonight routes; the SkyTonight _calculation pipeline_ it calls into still lives in `backend/skytonight/`). `app.py` itself only holds the Flask app factory, extension setup, static/PWA routes, and startup/scheduler init. Cross-domain route helpers (`_resolve_active_location`, `_active_location_cache`) live in `backend/utils/route_helpers.py`.
   - The current endpoint inventory is maintained in `docs/API_ENDPOINTS.md` and should be updated whenever a route is added, removed, or renamed.
   - Key security constraints:
     - Most `/api/*` routes require login (`@login_required`).
@@ -513,6 +526,7 @@ night, events <-> skytonight, skytonight <-> weather) and are being unwound one 
   - Observation Log (v1.3, self-scoped; see `docs/OBSERVATION_LOG.md`): `GET/POST /api/observation-sessions`, `GET/PUT/DELETE /api/observation-sessions/<session_id>`, `POST /api/observation-sessions/from-plan`, `POST /api/observation-sessions/<session_id>/entries`, `PUT/DELETE /api/observation-sessions/<session_id>/entries/<entry_id>`, `POST /api/observation-sessions/<session_id>/entries/<entry_id>/astrodex-picture`. Adding/updating an entry with `frame_count > 0` auto-registers its target in Astrodex (never auto-reversed); attaching the picture stays a manual step reusing `POST /api/astrodex/upload`.
   - SkyTonight debug helper: `GET /api/skytonight/target-debug`
   - Localized manifest route: `GET /manifest.<lang>.webmanifest` (public)
+  - MQTT / Home Assistant connector (admin unless noted; see `docs/HOME_ASSISTANT.md`): `GET|POST /api/connectors/mqtt/health`, `GET /api/connectors/mqtt/status` (login), `POST /api/connectors/mqtt/publish`, `POST /api/connectors/mqtt/remove`. The publisher itself is a background thread (`connectors/mqtt_publisher.py`) started from `app.py` next to the push scheduler.
 - **Error Handling**: Return appropriate HTTP status codes with JSON error objects
   - 401 Unauthorized - Not authenticated
   - 403 Forbidden - Insufficient permissions (not admin)

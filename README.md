@@ -28,6 +28,7 @@ If you want see more, maybe look at the [visual tour](docs/VISUAL_TOUR.md).
 - Equipment profiles and field-of-view calculator
 - Observatory: live dashboard fed by external connectors
 - Connectors: AllSky all-sky camera integration (live image, keogram, startrails, timelapse, sensor data)
+- Home Assistant: publish sky conditions, weather, tonight's targets and your activity to an MQTT broker with automatic discovery ([details](docs/HOME_ASSISTANT.md))
 - Multi-user auth system with admin/user roles
 - Multi-location profiles: up to 5 admin-managed observing sites with per-user attribution, one-tap switching, and per-location caches ([details](docs/LOCATIONS.md))
 - i18n support (English/French plus community translations)
@@ -82,6 +83,7 @@ See it in the [visual tour](docs/VISUAL_TOUR.md#your-sky), or read the details i
 - Update Guide: [docs/3.UPDATE.md](docs/3.UPDATE.md)
 - Reverse Proxy: [docs/6.REVERSE_PROXY.md](docs/6.REVERSE_PROXY.md)
 - Connectors: [docs/CONNECTORS.md](docs/CONNECTORS.md)
+- Home Assistant / MQTT: [docs/HOME_ASSISTANT.md](docs/HOME_ASSISTANT.md)
 - API Endpoints: [docs/API_ENDPOINTS.md](docs/API_ENDPOINTS.md)
 - Visual Tour: [docs/VISUAL_TOUR.md](docs/VISUAL_TOUR.md)
 

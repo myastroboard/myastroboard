@@ -177,3 +177,78 @@ class SunService:
             return "Not found"
 
         return dt.strftime("%Y-%m-%d %H:%M")
+
+
+# -----------------------------
+# Sky period from a cached report
+# -----------------------------
+
+SKY_PERIODS = (
+    "day",
+    "civil_twilight",
+    "nautical_twilight",
+    "astronomical_twilight",
+    "astronomical_night",
+    "unknown",
+)
+
+
+def determine_sky_period(sun_data, timezone_str: str) -> tuple:
+    """
+    Determine the current sky period from a ``sun_report`` cache payload.
+
+    Returns ``(period, next_period, seconds_until_next)``. *period* is one of SKY_PERIODS;
+    the report's naive local time strings ("YYYY-MM-DD HH:MM", or "Not found") are read in
+    *timezone_str*. Shared by the sky widget route and the MQTT publisher.
+    """
+    if not sun_data or "sun" not in sun_data:
+        return "unknown", "unknown", None
+
+    sun = sun_data["sun"]
+    try:
+        tz = ZoneInfo(timezone_str)
+    except Exception:
+        tz = datetime.timezone.utc
+    now = datetime.datetime.now(tz=tz)
+
+    def parse_dt(s):
+        if not s or s == "Not found":
+            return None
+        try:
+            return datetime.datetime.strptime(s, "%Y-%m-%d %H:%M").replace(tzinfo=tz)
+        except ValueError:
+            return None
+
+    def secs(dt_end):
+        return max(0, int((dt_end - now).total_seconds()))
+
+    sunset = parse_dt(sun.get("sunset"))
+    sunrise = parse_dt(sun.get("sunrise"))
+    civil_dusk = parse_dt(sun.get("civil_dusk"))
+    civil_dawn = parse_dt(sun.get("civil_dawn"))
+    nautical_dusk = parse_dt(sun.get("nautical_dusk"))
+    nautical_dawn = parse_dt(sun.get("nautical_dawn"))
+    astro_dusk = parse_dt(sun.get("astronomical_dusk"))
+    astro_dawn = parse_dt(sun.get("astronomical_dawn"))
+
+    # Check from darkest to lightest
+    if astro_dusk and astro_dawn and astro_dusk <= now <= astro_dawn:
+        return "astronomical_night", "astronomical_dawn", secs(astro_dawn)
+    if nautical_dusk and astro_dusk and nautical_dusk <= now < astro_dusk:
+        return "astronomical_twilight", "astronomical_night", secs(astro_dusk)
+    if astro_dawn and nautical_dawn and astro_dawn < now <= nautical_dawn:
+        return "astronomical_twilight", "nautical_twilight", secs(nautical_dawn)
+    if civil_dusk and nautical_dusk and civil_dusk <= now < nautical_dusk:
+        return "nautical_twilight", "astronomical_twilight", secs(nautical_dusk)
+    if nautical_dawn and civil_dawn and nautical_dawn < now <= civil_dawn:
+        return "nautical_twilight", "civil_twilight", secs(civil_dawn)
+    if sunset and civil_dusk and sunset <= now < civil_dusk:
+        return "civil_twilight", "nautical_twilight", secs(civil_dusk)
+    if civil_dawn and sunrise and civil_dawn < now <= sunrise:
+        return "civil_twilight", "day", secs(sunrise)
+    # Day: next is civil_dusk (via sunset)
+    if sunset and now < sunset:
+        return "day", "civil_twilight", secs(sunset)
+    if civil_dusk and now < civil_dusk:
+        return "day", "civil_twilight", secs(civil_dusk)
+    return "day", "civil_twilight", None

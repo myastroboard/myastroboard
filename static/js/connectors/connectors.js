@@ -67,7 +67,92 @@ const _CONNECTOR_UI = {
               type: 'url', helpKey: 'myastroshine_callback_override_hint' },
         ],
     },
+    mqtt: {
+        icon: 'bi bi-broadcast me-2 text-info',
+        urlLabelKey: 'mqtt_url_field',
+        urlPlaceholder: 'mqtt://192.168.x.x:1883',
+        urlHelpKey: 'mqtt_url_help',
+        unreachableHintKey: 'mqtt_test_offline_hint',
+        fields: [
+            { key: 'username', labelKey: 'mqtt_username_field' },
+            { key: 'password', labelKey: 'mqtt_password_field', type: 'password', secret: true },
+        ],
+        fieldsHelpKey: 'mqtt_credentials_help',
+        checkboxes: [
+            { key: 'discovery_enabled', labelKey: 'mqtt_discovery_field' },
+        ],
+        advanced: [
+            { key: 'base_topic',               labelKey: 'mqtt_base_topic_field',       placeholder: 'myastroboard' },
+            { key: 'discovery_prefix',         labelKey: 'mqtt_discovery_prefix_field', placeholder: 'homeassistant' },
+            { key: 'publish_interval_seconds', labelKey: 'mqtt_interval_field',         type: 'number', min: 15, step: 5, placeholder: '60' },
+            { key: 'client_id',                labelKey: 'mqtt_client_id_field',        helpKey: 'mqtt_client_id_hint' },
+            { key: 'tls_insecure',             labelKey: 'mqtt_tls_insecure_field',     checkbox: true },
+        ],
+        statusEndpoint: '/api/connectors/mqtt/status',
+        statusRenderer: _mqttStatusLine,
+        actions: [
+            { key: 'publish', labelKey: 'mqtt_publish_now',    icon: 'bi bi-send',  endpoint: '/api/connectors/mqtt/publish',
+              successKey: 'mqtt_publish_requested' },
+            { key: 'remove',  labelKey: 'mqtt_remove_from_ha', icon: 'bi bi-trash', endpoint: '/api/connectors/mqtt/remove',
+              confirmKey: 'mqtt_remove_confirm', successKey: 'mqtt_remove_requested', danger: true },
+        ],
+    },
 };
+
+/**
+ * Status line of the MQTT card, from GET /api/connectors/mqtt/status (written by the
+ * publisher thread): connection, last publish, published devices, last error.
+ */
+function _mqttStatusLine(status) {
+    const frag = document.createDocumentFragment();
+    const badge = document.createElement('span');
+    if (!status.enabled) {
+        badge.className = 'badge bg-light text-dark border me-2';
+        badge.textContent = i18n.t('connectors.mqtt_status_disabled');
+    } else if (status.connected) {
+        badge.className = 'badge bg-success me-2';
+        badge.textContent = i18n.t('connectors.mqtt_status_connected');
+    } else {
+        badge.className = 'badge bg-warning text-dark me-2';
+        badge.textContent = i18n.t('connectors.mqtt_status_disconnected');
+    }
+    frag.appendChild(badge);
+
+    const parts = [];
+    if (status.last_publish_at) {
+        parts.push(`${i18n.t('connectors.mqtt_status_last_publish')} ${formatDateTime(status.last_publish_at)}`);
+    } else if (status.enabled) {
+        parts.push(i18n.t('connectors.mqtt_status_never_published'));
+    }
+    if (Array.isArray(status.devices) && status.devices.length) {
+        const entities = status.devices.reduce((sum, d) => sum + (d.entities || 0), 0);
+        parts.push(i18n.t('connectors.mqtt_status_devices', { devices: status.devices.length, entities }));
+    }
+    const text = document.createElement('span');
+    text.className = 'text-muted';
+    text.textContent = parts.join(' - ');
+    frag.appendChild(text);
+
+    if (status.last_error) {
+        const err = document.createElement('div');
+        err.className = 'text-danger small mt-1';
+        err.appendChild(DOMUtils.createIcon('bi bi-exclamation-circle me-1'));
+        err.appendChild(document.createTextNode(status.last_error));
+        frag.appendChild(err);
+    }
+
+    // User devices only exist for users who opted in themselves (Customize): say so rather
+    // than leaving an admin wondering why the user modules publish nothing.
+    const hasUserDevice = Array.isArray(status.devices) && status.devices.some(d => d.kind === 'user');
+    if (status.enabled && status.user_modules_enabled && !hasUserDevice) {
+        const hint = document.createElement('div');
+        hint.className = 'text-muted small mt-1';
+        hint.appendChild(DOMUtils.createIcon('bi bi-info-circle me-1'));
+        hint.appendChild(document.createTextNode(i18n.t('connectors.mqtt_status_no_user_opted_in')));
+        frag.appendChild(hint);
+    }
+    return frag;
+}
 
 function _connectorUI(name) {
     return _CONNECTOR_UI[name] || {};
@@ -104,11 +189,16 @@ function _connectorFieldInput(c, spec) {
     input.id = id;
     input.dataset.connector = c.name;
     input.dataset.field = spec.key;
+    if (spec.type === 'number') {
+        if (spec.min !== undefined) input.min = String(spec.min);
+        if (spec.max !== undefined) input.max = String(spec.max);
+        if (spec.step !== undefined) input.step = String(spec.step);
+    }
     if (spec.secret) {
         // The value is never sent to the browser: show the masked form as a placeholder,
         // and leave the input blank so submitting it unchanged keeps the stored secret.
         input.value = '';
-        input.placeholder = cfg[spec.key] || i18n.t('connectors.myastroshine_secret_unchanged');
+        input.placeholder = cfg[spec.key] || i18n.t('connectors.secret_unchanged');
         input.dataset.secret = 'true';
     } else {
         input.value = cfg[spec.key] ?? spec.placeholder ?? '';
@@ -349,6 +439,13 @@ function _connectorConfigForm(c) {
     urlInput.addEventListener('input', _updateLocalWarn);
     _updateLocalWarn();
 
+    if (_connectorUI(c.name).urlHelpKey) {
+        const urlHelp = document.createElement('div');
+        urlHelp.className = 'form-text small';
+        urlHelp.textContent = i18n.t(`connectors.${_connectorUI(c.name).urlHelpKey}`);
+        urlDiv.appendChild(urlHelp);
+    }
+
     const testResult = document.createElement('div');
     testResult.className = 'form-text connector-test-result';
     testResult.id = `test-result-${c.name}`;
@@ -370,7 +467,9 @@ function _connectorConfigForm(c) {
     const advDiv = document.createElement('div');
     advDiv.className = 'mb-3 collapse';
     advDiv.id = `connector-advanced-${c.name}`;
-    (ui.advanced || []).forEach(spec => advDiv.appendChild(_connectorFieldInput(c, spec)));
+    (ui.advanced || []).forEach(spec => {
+        advDiv.appendChild(spec.checkbox ? _connectorFieldCheckbox(c, spec) : _connectorFieldInput(c, spec));
+    });
     frag.appendChild(advDiv);
 
     const advLink = document.createElement('a');
@@ -467,7 +566,71 @@ function _connectorConfigForm(c) {
     actions.appendChild(healthBtn);
     frag.appendChild(actions);
 
+    // Live status + connector-specific actions (a connector that runs something in the
+    // background, like the MQTT publisher, reports what it is doing here).
+    if (ui.statusEndpoint) {
+        const statusDiv = document.createElement('div');
+        statusDiv.className = 'connector-status-line small mt-3';
+        statusDiv.id = `connector-status-${c.name}`;
+        frag.appendChild(statusDiv);
+    }
+    if ((ui.actions || []).length) {
+        const actionRow = document.createElement('div');
+        actionRow.className = 'd-flex flex-wrap gap-2 mt-2';
+        ui.actions.forEach(spec => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = `btn btn-sm ${spec.danger ? 'btn-outline-danger' : 'btn-outline-primary'} connector-action-btn`;
+            btn.dataset.connector = c.name;
+            btn.dataset.action = spec.key;
+            btn.appendChild(DOMUtils.createIcon(`${spec.icon} me-1`));
+            btn.appendChild(document.createTextNode(i18n.t(`connectors.${spec.labelKey}`)));
+            actionRow.appendChild(btn);
+        });
+        frag.appendChild(actionRow);
+    }
+
     return frag;
+}
+
+/** Re-fetch and repaint a connector's status line, if it declares one. */
+async function _refreshConnectorStatus(name) {
+    const ui = _connectorUI(name);
+    const statusDiv = document.getElementById(`connector-status-${name}`);
+    if (!ui.statusEndpoint || !statusDiv) return;
+    const status = await fetchJSONOnce(ui.statusEndpoint).catch(() => null);
+    DOMUtils.clear(statusDiv);
+    if (!status) {
+        _setResultMessage(statusDiv, i18n.t('connectors.status_error'), 'text-danger', 'bi bi-x-circle');
+        return;
+    }
+    if (typeof ui.statusRenderer === 'function') statusDiv.appendChild(ui.statusRenderer(status));
+}
+
+/** Run one of a connector's declared actions (POST), with an optional confirmation first. */
+async function _runConnectorAction(name, actionKey) {
+    const spec = (_connectorUI(name).actions || []).find(a => a.key === actionKey);
+    if (!spec) return;
+    if (spec.confirmKey && !window.confirm(i18n.t(`connectors.${spec.confirmKey}`))) return;
+
+    const btn = document.querySelector(`.connector-action-btn[data-connector="${name}"][data-action="${actionKey}"]`);
+    if (btn) btn.disabled = true;
+    const result = await fetchJSONOnce(spec.endpoint, { method: spec.method || 'POST' }).catch(() => null);
+    if (btn) btn.disabled = false;
+
+    if (!result) {
+        showMessage('error', i18n.t('connectors.action_error'));
+        return;
+    }
+    showMessage('success', i18n.t(`connectors.${spec.successKey || 'action_done'}`));
+    if (result.enabled === false) {
+        const enabledChk = document.getElementById(`connector-enabled-${name}`);
+        if (enabledChk) enabledChk.checked = false;
+        _updateStatusBadge(name, { enabled: false, installed: true });
+    }
+    // The publisher reacts on its next tick - repaint now and again once it has had time to.
+    _refreshConnectorStatus(name);
+    setTimeout(() => _refreshConnectorStatus(name), 6000);
 }
 
 function _suggestCard() {
@@ -530,6 +693,11 @@ function _bindConnectorEvents(c) {
 
     const saveBtn = document.querySelector(`.connector-save-btn[data-connector="${c.name}"]`);
     if (saveBtn) saveBtn.addEventListener('click', () => _saveConnector(c.name));
+
+    document.querySelectorAll(`.connector-action-btn[data-connector="${c.name}"]`).forEach(btn => {
+        btn.addEventListener('click', () => _runConnectorAction(c.name, btn.dataset.action));
+    });
+    _refreshConnectorStatus(c.name);
 }
 
 function _setResultMessage(resultDiv, text, cssClass, iconClass) {
@@ -544,12 +712,19 @@ function _setResultMessage(resultDiv, text, cssClass, iconClass) {
 /**
  * "Unreachable", or the connector's own explanation of what that means for it.
  */
-function _setUnreachable(name, resultDiv) {
+function _setUnreachable(name, resultDiv, detail) {
     const hintKey = _connectorUI(name).unreachableHintKey;
     if (hintKey) {
         _setResultMessage(resultDiv, i18n.t(`connectors.${hintKey}`), 'text-warning', 'bi bi-exclamation-triangle');
     } else {
         _setResultMessage(resultDiv, i18n.t('connectors.unreachable'), 'text-danger', 'bi bi-x-circle');
+    }
+    if (detail) {
+        // The backend's own one-line reason (refused, timeout, TLS...), never a credential.
+        const span = document.createElement('span');
+        span.className = 'text-muted ms-1';
+        span.textContent = `(${detail})`;
+        resultDiv.appendChild(span);
     }
 }
 
@@ -577,10 +752,18 @@ async function _testConnector(name) {
 
     _setResultSpinner(resultDiv, i18n.t('connectors.testing'));
 
+    // The URL plus the connector's fields as typed, so a probe can use the credentials in the
+    // form. A blank secret means "use the stored one" - the backend only does so for the
+    // saved URL.
+    const payload = { url };
+    document.querySelectorAll(`.connector-field-input[data-connector="${name}"]`).forEach(input => {
+        payload[input.dataset.field] = input.dataset.checkbox ? input.checked : input.value.trim();
+    });
+
     const result = await fetchJSONOnce(`/api/connectors/${name}/health`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify(payload),
     }).catch(() => null);
 
     if (!result) {
@@ -588,7 +771,7 @@ async function _testConnector(name) {
     } else if (result.reachable) {
         _setResultMessage(resultDiv, i18n.t('connectors.reachable'), 'text-success', 'bi bi-check-circle');
     } else {
-        _setUnreachable(name, resultDiv);
+        _setUnreachable(name, resultDiv, result.error);
     }
 }
 
@@ -603,10 +786,11 @@ async function _runHealthCheck(name) {
     }
 
     if (!health.reachable) {
-        if (resultDiv) _setUnreachable(name, resultDiv);
+        if (resultDiv) _setUnreachable(name, resultDiv, health.error);
     } else {
         if (resultDiv) _setResultMessage(resultDiv, i18n.t('connectors.reachable'), 'text-success', 'bi bi-check-circle');
     }
+    _refreshConnectorStatus(name);
 
     for (const [slug, result] of Object.entries(health.modules || {})) {
         const badge = document.getElementById(`health-${name}-${slug}`);
@@ -674,6 +858,7 @@ async function _saveConnector(name) {
     showMessage('success', i18n.t('connectors.saved'));
     _updateStatusBadge(name, result);
     if (typeof updateObservatoryNavVisibility === 'function') updateObservatoryNavVisibility();
+    if (typeof updateMqttPublishOptionVisibility === 'function') updateMqttPublishOptionVisibility();
     _runHealthCheck(name);
 }
 

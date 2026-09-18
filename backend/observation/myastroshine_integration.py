@@ -33,6 +33,7 @@ from typing import Any, Dict, Optional, Tuple
 from observation import astrodex
 from utils import load_json_file, save_json_file
 from connectors.myastroshine_connector import MyAstroShineConnector
+from utils.connector_secrets import merge_secrets
 from utils.logging_config import get_logger
 from utils.repo_config import load_config
 
@@ -94,10 +95,16 @@ def _consumed_file_path() -> str:
 
 
 def get_integration_config(config: Optional[Dict] = None) -> Dict[str, Any]:
-    """Return the ``connectors.myastroshine`` config block (merged with defaults)."""
+    """Return the ``connectors.myastroshine`` config block, credentials included.
+
+    The token and signing secret live in the connector-secrets sidecar (utils/connector_secrets.py),
+    not in config.json; ``merge_secrets`` overlays them (and still honours a legacy value left in
+    the config block on an install that has not been migrated yet).
+    """
     if config is None:
         config = load_config()
-    return dict(config.get('connectors', {}).get('myastroshine', {}) or {})
+    block = config.get('connectors', {}).get('myastroshine', {}) or {}
+    return merge_secrets(MyAstroShineConnector.name, block, MyAstroShineConnector.SECRET_FIELDS)
 
 
 def integration_enabled(cfg: Optional[Dict] = None) -> bool:

@@ -1333,6 +1333,13 @@
                                 </div>
                                 <div class="form-text" data-i18n="settings.pref_recommendations_enabled_info">Shows a "Tonight for you" panel of recommended targets at the top of the SkyTonight Deep Sky Objects tab.</div>
                             </div>
+                            <div class="col-md-4 d-none" id="pref-mqtt-publish-wrapper">
+                                <div class="form-check form-switch mt-4">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="pref-mqtt-publish-enabled">
+                                    <label class="form-check-label" for="pref-mqtt-publish-enabled" data-i18n="settings.pref_mqtt_publish_enabled">Publish my activity to Home Assistant (MQTT)</label>
+                                </div>
+                                <div class="form-text" data-i18n="settings.pref_mqtt_publish_enabled_info">Creates a device for you in Home Assistant with your Astrodex counters, tonight's plan and its equipment, your observation log totals and (if the administrator enabled it) your latest picture. Only your own data, only while this is on.</div>
+                            </div>
                         </div>
 
                         <div class="mt-3 d-flex gap-2">

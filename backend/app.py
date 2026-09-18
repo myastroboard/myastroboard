@@ -132,6 +132,7 @@ from blueprints.locations import locations_bp
 from blueprints.connectors import connectors_bp
 from blueprints.connectors_allsky import connectors_allsky_bp
 from blueprints.connectors_myastroshine import connectors_myastroshine_bp
+from blueprints.connectors_mqtt import connectors_mqtt_bp
 from blueprints.admin import admin_bp
 from blueprints.misc import misc_bp
 from blueprints.weather import weather_bp
@@ -150,6 +151,7 @@ app.register_blueprint(locations_bp)
 app.register_blueprint(connectors_bp)
 app.register_blueprint(connectors_allsky_bp)
 app.register_blueprint(connectors_myastroshine_bp)
+app.register_blueprint(connectors_mqtt_bp)
 app.register_blueprint(admin_bp)
 app.register_blueprint(misc_bp)
 app.register_blueprint(weather_bp)
@@ -357,6 +359,21 @@ except Exception as e:  # pragma: no cover
 _AUTOSTART_SCHEDULERS = 'pytest' not in sys.modules
 
 if _AUTOSTART_SCHEDULERS:  # pragma: no cover - never true while imported under pytest
+    # Connector credentials moved out of config.json (v1.6): move any that a previous
+    # version stored there into the sidecar before the next backup can ship them.
+    # A one-shot config rewrite; guarded like the schedulers so the test suite's shared
+    # config file is never rewritten at import time.
+    try:
+        from utils.connector_secrets import migrate_all_legacy_secrets as _migrate_secrets
+        from utils.repo_config import load_config as _load_config_for_secrets, save_config as _save_config_for_secrets
+
+        _startup_config = _load_config_for_secrets()
+        if _migrate_secrets(_startup_config):
+            _save_config_for_secrets(_startup_config)
+            logger.info('Connector credentials migrated from config.json to the secrets sidecar')
+    except Exception as e:
+        logger.error(f'Failed to migrate connector credentials on startup: {e}', exc_info=True)
+
     # Initialize cache scheduler FIRST so its cache_ready_event can be passed to
     # the SkyTonight scheduler, ensuring DSO calculations run on warm caches.
     try:
@@ -381,6 +398,16 @@ if _AUTOSTART_SCHEDULERS:  # pragma: no cover - never true while imported under 
         _push_scheduler.start()
     except Exception as e:  # pragma: no cover
         logger.error(f'Failed to initialize push scheduler on startup: {e}', exc_info=True)
+
+    try:
+        # Idle until the MQTT connector is enabled in Parameters -> Connectors; then it keeps
+        # the broker connection and publishes on its own interval (see connectors/mqtt_publisher.py).
+        logger.info('Initializing MQTT publisher on application startup...')
+        from connectors import mqtt_publisher as _mqtt_publisher
+
+        _mqtt_publisher.start()
+    except Exception as e:  # pragma: no cover
+        logger.error(f'Failed to initialize MQTT publisher on startup: {e}', exc_info=True)
 
 try:
     # Generate VAPID keys early so the first /api/push/vapid-public-key request is instant.
@@ -423,6 +450,12 @@ def _stop_schedulers_on_exit():  # pragma: no cover
         _ps.stop()
     except Exception as e:  # pragma: no cover
         logger.warning(f"Error stopping push scheduler on exit: {e}")
+    try:
+        from connectors import mqtt_publisher as _mp
+
+        _mp.stop()
+    except Exception as e:
+        logger.warning(f"Error stopping MQTT publisher on exit: {e}")
 
 
 atexit.register(_stop_schedulers_on_exit)

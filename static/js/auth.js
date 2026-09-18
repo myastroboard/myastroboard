@@ -19,6 +19,7 @@ const DEFAULT_USER_PREFERENCES = {
     experience_level: 'advanced',
     beginner_catalog_enabled: true,
     recommendations_enabled: true,
+    mqtt_publish_enabled: false,
     wizard: { completed: false, skipped: false },
     notifications: null,
 };
@@ -383,6 +384,25 @@ function populateCustomizeFormFromPreferences() {
     if (recommendationsEnabled) {
         recommendationsEnabled.checked = prefs.recommendations_enabled !== false;
     }
+    const mqttPublishEnabled = document.getElementById('pref-mqtt-publish-enabled');
+    if (mqttPublishEnabled) {
+        mqttPublishEnabled.checked = prefs.mqtt_publish_enabled === true;
+    }
+    updateMqttPublishOptionVisibility();
+}
+
+/**
+ * The "publish my activity to Home Assistant" switch only makes sense once an admin has
+ * enabled the MQTT connector - hidden otherwise so the Customize form is not noise on
+ * installs without a broker. The preference itself is user-scoped and always saved.
+ */
+function updateMqttPublishOptionVisibility() {
+    const wrapper = document.getElementById('pref-mqtt-publish-wrapper');
+    if (!wrapper) return;
+    fetchJSONOnce('/api/connectors').then(connectors => {
+        const mqtt = (connectors || []).find(c => c.name === 'mqtt');
+        wrapper.classList.toggle('d-none', !(mqtt && mqtt.enabled));
+    }).catch(() => wrapper.classList.add('d-none'));
 }
 
 async function saveUserPreferences(preferences) {
@@ -443,7 +463,8 @@ function setupCustomizeForm() {
             first_day_of_week: document.getElementById('pref-first-day-of-week')?.value || DEFAULT_USER_PREFERENCES.first_day_of_week,
             experience_level: document.getElementById('pref-experience-level')?.value || DEFAULT_USER_PREFERENCES.experience_level,
             beginner_catalog_enabled: document.getElementById('pref-beginner-catalog-enabled')?.checked ?? DEFAULT_USER_PREFERENCES.beginner_catalog_enabled,
-            recommendations_enabled: document.getElementById('pref-recommendations-enabled')?.checked ?? DEFAULT_USER_PREFERENCES.recommendations_enabled
+            recommendations_enabled: document.getElementById('pref-recommendations-enabled')?.checked ?? DEFAULT_USER_PREFERENCES.recommendations_enabled,
+            mqtt_publish_enabled: document.getElementById('pref-mqtt-publish-enabled')?.checked ?? DEFAULT_USER_PREFERENCES.mqtt_publish_enabled
         };
 
         try {

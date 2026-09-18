@@ -151,11 +151,15 @@ This page lists the HTTP routes currently declared across `backend/blueprints/*.
 ## Connectors
 
 - `GET /api/connectors` — List all registered connectors with installed/enabled state, module config, `target_modules` (app tabs the connector surfaces in), and a config block whose `SECRET_FIELDS` are masked (`****` + last 4, plus a `has_<field>` boolean)
-- `POST /api/connectors/<name>/config` (admin) — Save one connector's config; merged server-side, and a blank or still-masked secret means "keep current"
+- `POST /api/connectors/<name>/config` (admin) — Save one connector's config; merged server-side, `int` / `bool` fields coerced to their declared type, and a blank or still-masked secret means "keep current". Secrets are written to `data/connectors_secrets.json`, never to `config.json`
 - `GET /api/connectors/allsky/status` — Return cached AllSky sensor data (`allskydata.json`); requires `sensor_data` module enabled
 - `GET /api/connectors/allsky/health` — Run a per-module health check against the AllSky instance; accepts `?fresh=1` to bypass cache
 - `GET /api/connectors/allsky/urls` — Return proxy URLs for all enabled AllSky modules; accepts `?date=YYYYMMDD`
 - `GET /api/connectors/allsky/proxy` — Proxy an AllSky resource through the backend; params: `module=<slug>` and optional `date=YYYYMMDD`
+- `GET|POST /api/connectors/mqtt/health` (admin) - One real MQTT connect against the broker. POST `{url, username?, password?, tls_insecure?}` probes as typed (a blank password is replaced by the stored one only for the saved URL); GET probes the saved config and reports module toggles. A failed probe is a 200 with `reachable: false` and an `error` string
+- `GET /api/connectors/mqtt/status` - What the publisher thread is doing: `enabled`, `connected`, `broker`, `last_publish_at`, `last_error`, `devices[]`, `messages_total` (read from the status file the thread writes, so any worker can answer)
+- `POST /api/connectors/mqtt/publish` (admin) - Ask the publisher for a full republish (discovery + every state) on its next tick
+- `POST /api/connectors/mqtt/remove` (admin) - Switch the connector off and purge every retained MyAstroBoard topic from the broker (Home Assistant drops the devices)
 
 ## Object Lookup
 

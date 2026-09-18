@@ -233,6 +233,10 @@ EXPECTED_ROUTES = {
     ('/api/connectors/allsky/status', ('GET',)),
     ('/api/connectors/allsky/urls', ('GET',)),
     ('/api/connectors/myastroshine/health', ('GET', 'POST')),
+    ('/api/connectors/mqtt/health', ('GET', 'POST')),
+    ('/api/connectors/mqtt/publish', ('POST',)),
+    ('/api/connectors/mqtt/remove', ('POST',)),
+    ('/api/connectors/mqtt/status', ('GET',)),
     # --- skytonight (blueprint) ---
     ('/api/catalogues', ('GET',)),
     ('/api/scheduler/status', ('GET',)),

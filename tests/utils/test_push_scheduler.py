@@ -914,27 +914,33 @@ def test_load_cache_returns_none_on_exception(monkeypatch):
 
 
 def test_pick_active_plan_prefers_inside_night(monkeypatch):
-    from utils import push_scheduler
+    from observation import plan_my_night
 
-    monkeypatch.setitem(
-        sys.modules,
-        'observation.plan_my_night',
-        types.SimpleNamespace(
-            get_all_plan_files=lambda _uid: [
-                '/x/u1_plan_combo1.json',
-                '/x/u1_plan_my_night.json',
-            ],
-            get_plan_with_timeline=lambda _uid, _u, combination_id=None: (
-                {'state': 'current', 'timeline': {'is_inside_night': False}, 'plan': {}}
-                if combination_id == 'combo1'
-                else {'state': 'current', 'timeline': {'is_inside_night': True}, 'plan': {}}
-            ),
+    monkeypatch.setattr(plan_my_night, 'get_all_plan_files', lambda _uid: [
+        '/x/u1_plan_combo1.json',
+        '/x/u1_plan_my_night.json',
+    ])
+    monkeypatch.setattr(
+        plan_my_night,
+        'get_plan_with_timeline',
+        lambda _uid, _u, combination_id=None: (
+            {'state': 'current', 'timeline': {'is_inside_night': False}, 'plan': {}}
+            if combination_id == 'combo1'
+            else {'state': 'current', 'timeline': {'is_inside_night': True}, 'plan': {}}
         ),
     )
 
-    payload = push_scheduler._pick_active_plan('u1', 'alice')
+    payload = plan_my_night.pick_active_plan('u1', 'alice')
     assert payload is not None
     assert payload.get('timeline', {}).get('is_inside_night') is True
+
+
+def test_push_scheduler_pick_active_plan_delegates_to_plan_my_night(monkeypatch):
+    from observation import plan_my_night
+    from utils import push_scheduler
+
+    monkeypatch.setattr(plan_my_night, 'pick_active_plan', lambda uid, uname: {'state': 'current', 'who': (uid, uname)})
+    assert push_scheduler._pick_active_plan('u1', 'alice') == {'state': 'current', 'who': ('u1', 'alice')}
 
 
 def test_pick_active_plan_returns_none_when_import_fails(monkeypatch):
@@ -1351,64 +1357,40 @@ def test_load_cache_returns_none_when_entry_is_none(monkeypatch):
 
 
 def test_pick_active_plan_no_plan_files(monkeypatch):
-    from utils import push_scheduler
-    monkeypatch.setitem(
-        sys.modules,
-        'observation.plan_my_night',
-        types.SimpleNamespace(
-            get_all_plan_files=lambda _uid: [],
-            get_plan_with_timeline=lambda *a, **k: {},
-        ),
-    )
-    result = push_scheduler._pick_active_plan('u1', 'alice')
-    assert result is None
+    from observation import plan_my_night
+    monkeypatch.setattr(plan_my_night, 'get_all_plan_files', lambda _uid: [])
+    monkeypatch.setattr(plan_my_night, 'get_plan_with_timeline', lambda *a, **k: {})
+    assert plan_my_night.pick_active_plan('u1', 'alice') is None
 
 
 def test_pick_active_plan_file_wrong_prefix_skipped(monkeypatch):
     """Files not matching user prefix are skipped."""
-    from utils import push_scheduler
-    monkeypatch.setitem(
-        sys.modules,
-        'observation.plan_my_night',
-        types.SimpleNamespace(
-            get_all_plan_files=lambda _uid: ['/x/u2_plan_my_night.json'],
-            get_plan_with_timeline=lambda *a, **k: {'state': 'current',
-                                                     'timeline': {'is_inside_night': False}},
-        ),
-    )
-    result = push_scheduler._pick_active_plan('u1', 'alice')
-    assert result is None  # Wrong user prefix
+    from observation import plan_my_night
+    monkeypatch.setattr(plan_my_night, 'get_all_plan_files', lambda _uid: ['/x/u2_plan_my_night.json'])
+    monkeypatch.setattr(plan_my_night, 'get_plan_with_timeline',
+                        lambda *a, **k: {'state': 'current', 'timeline': {'is_inside_night': False}})
+    assert plan_my_night.pick_active_plan('u1', 'alice') is None  # Wrong user prefix
 
 
 def test_pick_active_plan_state_none_excluded(monkeypatch):
     """Plans with state='none' are excluded from candidates."""
-    from utils import push_scheduler
-    monkeypatch.setitem(
-        sys.modules,
-        'observation.plan_my_night',
-        types.SimpleNamespace(
-            get_all_plan_files=lambda _uid: ['/x/u1_plan_my_night.json'],
-            get_plan_with_timeline=lambda *a, **k: {'state': 'none',
-                                                     'timeline': {'is_inside_night': False}},
-        ),
-    )
-    result = push_scheduler._pick_active_plan('u1', 'alice')
-    assert result is None
+    from observation import plan_my_night
+    monkeypatch.setattr(plan_my_night, 'get_all_plan_files', lambda _uid: ['/x/u1_plan_my_night.json'])
+    monkeypatch.setattr(plan_my_night, 'get_plan_with_timeline',
+                        lambda *a, **k: {'state': 'none', 'timeline': {'is_inside_night': False}})
+    assert plan_my_night.pick_active_plan('u1', 'alice') is None
 
 
 def test_pick_active_plan_exception_loading_plan(monkeypatch):
     """Exception when loading a plan is swallowed."""
-    from utils import push_scheduler
-    monkeypatch.setitem(
-        sys.modules,
-        'observation.plan_my_night',
-        types.SimpleNamespace(
-            get_all_plan_files=lambda _uid: ['/x/u1_plan_my_night.json'],
-            get_plan_with_timeline=lambda *a, **k: (_ for _ in ()).throw(RuntimeError('boom')),
-        ),
-    )
-    result = push_scheduler._pick_active_plan('u1', 'alice')
-    assert result is None
+    from observation import plan_my_night
+    monkeypatch.setattr(plan_my_night, 'get_all_plan_files', lambda _uid: ['/x/u1_plan_my_night.json'])
+
+    def _boom(*a, **k):
+        raise RuntimeError('boom')
+
+    monkeypatch.setattr(plan_my_night, 'get_plan_with_timeline', _boom)
+    assert plan_my_night.pick_active_plan('u1', 'alice') is None
 
 
 def test_start_skips_when_thread_already_alive(monkeypatch):
@@ -1632,41 +1614,29 @@ def test_n4_naive_peak_datetime_gets_utc(monkeypatch):
 
 def test_pick_active_plan_fallback_returns_current_state(monkeypatch):
     """when no candidate is_inside_night, return first with state='current'."""
-    from utils import push_scheduler
-    monkeypatch.setitem(
-        sys.modules,
-        'observation.plan_my_night',
-        types.SimpleNamespace(
-            get_all_plan_files=lambda _uid: [
-                '/x/u1_plan_my_night.json',
-                '/x/u1_plan_combo2.json',
-            ],
-            get_plan_with_timeline=lambda uid, uname, combination_id=None: {
-                'state': 'current',
-                'timeline': {'is_inside_night': False},
-            },
-        ),
-    )
-    result = push_scheduler._pick_active_plan('u1', 'alice')
+    from observation import plan_my_night
+    monkeypatch.setattr(plan_my_night, 'get_all_plan_files', lambda _uid: [
+        '/x/u1_plan_my_night.json',
+        '/x/u1_plan_combo2.json',
+    ])
+    monkeypatch.setattr(plan_my_night, 'get_plan_with_timeline', lambda uid, uname, combination_id=None: {
+        'state': 'current',
+        'timeline': {'is_inside_night': False},
+    })
+    result = plan_my_night.pick_active_plan('u1', 'alice')
     assert result is not None
     assert result['state'] == 'current'
 
 
 def test_pick_active_plan_fallback_returns_first_candidate(monkeypatch):
     """when no candidate is state='current', return candidates[0]."""
-    from utils import push_scheduler
-    monkeypatch.setitem(
-        sys.modules,
-        'observation.plan_my_night',
-        types.SimpleNamespace(
-            get_all_plan_files=lambda _uid: ['/x/u1_plan_my_night.json'],
-            get_plan_with_timeline=lambda uid, uname, combination_id=None: {
-                'state': 'future',
-                'timeline': {'is_inside_night': False},
-            },
-        ),
-    )
-    result = push_scheduler._pick_active_plan('u1', 'alice')
+    from observation import plan_my_night
+    monkeypatch.setattr(plan_my_night, 'get_all_plan_files', lambda _uid: ['/x/u1_plan_my_night.json'])
+    monkeypatch.setattr(plan_my_night, 'get_plan_with_timeline', lambda uid, uname, combination_id=None: {
+        'state': 'future',
+        'timeline': {'is_inside_night': False},
+    })
+    result = plan_my_night.pick_active_plan('u1', 'alice')
     assert result is not None
     assert result['state'] == 'future'
 

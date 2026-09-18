@@ -824,6 +824,18 @@ class TestValidateUserPreferences:
         is_valid, msg = auth.UserManager.validate_user_preferences({'recommendations_enabled': True})
         assert is_valid
 
+    def test_mqtt_publish_enabled_not_bool_fails(self):
+        is_valid, msg = auth.UserManager.validate_user_preferences({'mqtt_publish_enabled': 'yes'})
+        assert is_valid is False
+        assert 'mqtt_publish_enabled' in msg
+
+    def test_mqtt_publish_enabled_bool_passes_and_defaults_off(self):
+        is_valid, _msg = auth.UserManager.validate_user_preferences({'mqtt_publish_enabled': True})
+        assert is_valid is True
+        assert auth.DEFAULT_USER_PREFERENCES['mqtt_publish_enabled'] is False
+        assert auth.UserManager.sanitize_user_preferences({})['mqtt_publish_enabled'] is False
+        assert auth.UserManager.sanitize_user_preferences({'mqtt_publish_enabled': True})['mqtt_publish_enabled'] is True
+
     def test_wizard_not_dict_fails(self):
         is_valid, msg = auth.UserManager.validate_user_preferences({'wizard': 'yes'})
         assert not is_valid

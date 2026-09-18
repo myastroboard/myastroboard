@@ -109,6 +109,23 @@ def setup_test_environment():
 
 
 @pytest.fixture(autouse=True)
+def isolate_connector_secrets(tmp_path, monkeypatch):
+    """Point the connector-credentials sidecar at a per-test file.
+
+    The module binds its path to DATA_DIR at import time (the shared temp root - see
+    _clean_stale_test_state), so without this a credential saved by one test would be
+    listed, masked, by the next.
+    """
+    try:
+        from utils import connector_secrets
+    except ImportError:
+        yield
+        return
+    monkeypatch.setattr(connector_secrets, '_SECRETS_FILE', str(tmp_path / 'connectors_secrets.json'))
+    yield
+
+
+@pytest.fixture(autouse=True)
 def reset_app_settings_module_cache():
     """Reset the app_settings module-level cache between tests."""
     try:

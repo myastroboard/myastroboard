@@ -107,6 +107,12 @@ New connectors land directly in `backend/connectors/` by PR, same as AllSky and 
 >
 > Anything that writes back into MyAstroBoard data or owns its own screen still needs a core
 > change alongside the connector - open a discussion first.
+>
+> A connector may also *push* rather than be polled: the MQTT / Home Assistant connector
+> ([HOME_ASSISTANT.md](HOME_ASSISTANT.md)) owns a background publisher thread
+> (`connectors/mqtt_publisher.py`, started from `app.py` like the other schedulers) and reaches
+> feature packages only through lazy imports, because `cache/` and `observation/` already import
+> `connectors/` at module level.
 
 ---
 
