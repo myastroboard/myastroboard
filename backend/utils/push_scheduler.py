@@ -697,61 +697,13 @@ def _load_cache(key: str) -> Optional[dict]:
 
 
 def _pick_active_plan(user_id: str, username: str) -> Optional[dict]:
-    """Return the most relevant plan payload across all of the user's plan files.
-
-    The scheduler must check every plan file (default and combination-specific)
-    because plans are stored per combination and the scheduler has no way to know
-    which combination the user had selected when they built the plan.
-
-    Priority: plan where is_inside_night is True > any 'current' plan > first
-    non-'none' plan found.
-    """
+    """The user's live plan, if any - see observation.plan_my_night.pick_active_plan."""
     try:
-        from observation.plan_my_night import get_all_plan_files, get_plan_with_timeline
+        from observation.plan_my_night import pick_active_plan
     except Exception as e:
         logger.debug(f"Could not import plan_my_night for {username}: {e}")
         return None
-
-    plan_files = get_all_plan_files(user_id)
-    if not plan_files:
-        logger.debug(f"No plan files found for {username}")
-        return None
-
-    prefix = f'{user_id}_plan_'
-    suffix = '.json'
-
-    candidates = []
-    for file_path in plan_files:
-        fname = os.path.basename(file_path)
-        if not (fname.startswith(prefix) and fname.endswith(suffix)):
-            continue
-        raw_cid = fname[len(prefix) : -len(suffix)]
-        combination_id = None if raw_cid == 'my_night' else raw_cid
-        try:
-            payload = get_plan_with_timeline(user_id, username, combination_id=combination_id)
-            state = payload.get('state', 'none')
-            if state == 'none':
-                logger.debug(f"Plan (combination={combination_id}) for {username}: state=none, skipping")
-                continue
-            logger.debug(
-                f"Plan (combination={combination_id}) for {username}: state={state}, "
-                f"inside_night={payload.get('timeline', {}).get('is_inside_night')}"
-            )
-            candidates.append(payload)
-        except Exception as e:
-            logger.debug(f"Could not load plan (combination={combination_id}) for {username}: {e}")
-
-    if not candidates:
-        logger.debug(f"No active plan found for {username}")
-        return None
-
-    for p in candidates:
-        if p.get('timeline', {}).get('is_inside_night'):
-            return p
-    for p in candidates:
-        if p.get('state') == 'current':
-            return p
-    return candidates[0]
+    return pick_active_plan(user_id, username)
 
 
 def _poll() -> None:

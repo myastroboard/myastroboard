@@ -42,6 +42,7 @@ Welcome to the comprehensive documentation for MyAstroBoard, the integrated astr
 - [Observatory](OBSERVATORY.md) - Live dashboard fed by external connectors (AllSky panels, sensor data, keogram, timelapse)
 - [Connectors](CONNECTORS.md) - Connector architecture, AllSky setup, module reference, and how to add a new connector
 - [MyAstroShine integration](MYASTROSHINE.md) - AstroDex <-> MyAstroShine image round-trip: send a photo out for re-processing, get an enhanced duplicate back
+- [Home Assistant integration](HOME_ASSISTANT.md) - MQTT publisher with Home Assistant discovery: sky conditions, weather, tonight's targets, events and per-user activity as Home Assistant devices
 
 ### Administration
 - [Authentication & Users](AUTHENTICATION.md) - Roles, user management, preferences, session security
@@ -97,6 +98,7 @@ Welcome to the comprehensive documentation for MyAstroBoard, the integrated astr
 | AllSky live image & data | Observatory | [OBSERVATORY.md](OBSERVATORY.md) |
 | External connectors setup | Parameters → Connectors | [CONNECTORS.md](CONNECTORS.md) |
 | Send a photo to MyAstroShine | Astrodex → object → photo actions | [MYASTROSHINE.md](MYASTROSHINE.md) |
+| Show MyAstroBoard in Home Assistant | Parameters → Connectors → MQTT / Home Assistant | [HOME_ASSISTANT.md](HOME_ASSISTANT.md) |
 | Push notifications | My Settings → Notifications | [NOTIFICATIONS.md](NOTIFICATIONS.md) |
 | User roles | Parameters → Users | [AUTHENTICATION.md](AUTHENTICATION.md) |
 | Location presets & switcher | Parameters → Locations / sky widget | [LOCATIONS.md](LOCATIONS.md) |

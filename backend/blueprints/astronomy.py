@@ -8,6 +8,7 @@ from typing import Any, Dict
 
 from flask import Blueprint, request, jsonify
 
+from astroweather.sun_phases import determine_sky_period
 from cache import cache_store
 from utils.auth import login_required
 from utils.constants import (
@@ -33,67 +34,10 @@ logger = get_logger(__name__)
 astronomy_bp = Blueprint('astronomy', __name__)
 
 
-def _determine_sky_period(sun_data: "dict | None", timezone_str: str) -> tuple:
-    """
-    Determine current sky period from sun report cache data.
-    Returns (period, next_period, seconds_until_next).
-    period values: 'day', 'civil_twilight', 'nautical_twilight',
-                   'astronomical_twilight', 'astronomical_night'
-    """
-    import datetime as _dt
-    from zoneinfo import ZoneInfo
-
-    if not sun_data or "sun" not in sun_data:
-        return "unknown", "unknown", None
-
-    sun = sun_data["sun"]
-    try:
-        tz = ZoneInfo(timezone_str)
-    except Exception:
-        tz = _dt.timezone.utc
-    now = _dt.datetime.now(tz=tz)
-
-    def parse_dt(s):
-        if not s or s == "Not found":
-            return None
-        try:
-            return _dt.datetime.strptime(s, "%Y-%m-%d %H:%M").replace(tzinfo=tz)
-        except ValueError:
-            return None
-
-    def secs(dt_end):
-        return max(0, int((dt_end - now).total_seconds()))
-
-    sunset = parse_dt(sun.get("sunset"))
-    sunrise = parse_dt(sun.get("sunrise"))
-    civil_dusk = parse_dt(sun.get("civil_dusk"))
-    civil_dawn = parse_dt(sun.get("civil_dawn"))
-    nautical_dusk = parse_dt(sun.get("nautical_dusk"))
-    nautical_dawn = parse_dt(sun.get("nautical_dawn"))
-    astro_dusk = parse_dt(sun.get("astronomical_dusk"))
-    astro_dawn = parse_dt(sun.get("astronomical_dawn"))
-
-    # Check from darkest to lightest
-    if astro_dusk and astro_dawn and astro_dusk <= now <= astro_dawn:
-        return "astronomical_night", "astronomical_dawn", secs(astro_dawn)
-    if nautical_dusk and astro_dusk and nautical_dusk <= now < astro_dusk:
-        return "astronomical_twilight", "astronomical_night", secs(astro_dusk)
-    if astro_dawn and nautical_dawn and astro_dawn < now <= nautical_dawn:
-        return "astronomical_twilight", "nautical_twilight", secs(nautical_dawn)
-    if civil_dusk and nautical_dusk and civil_dusk <= now < nautical_dusk:
-        return "nautical_twilight", "astronomical_twilight", secs(nautical_dusk)
-    if nautical_dawn and civil_dawn and nautical_dawn < now <= civil_dawn:
-        return "nautical_twilight", "civil_twilight", secs(civil_dawn)
-    if sunset and civil_dusk and sunset <= now < civil_dusk:
-        return "civil_twilight", "nautical_twilight", secs(civil_dusk)
-    if civil_dawn and sunrise and civil_dawn < now <= sunrise:
-        return "civil_twilight", "day", secs(sunrise)
-    # Day: next is civil_dusk (via sunset)
-    if sunset and now < sunset:
-        return "day", "civil_twilight", secs(sunset)
-    if civil_dusk and now < civil_dusk:
-        return "day", "civil_twilight", secs(civil_dusk)
-    return "day", "civil_twilight", None
+# The sky-period helper moved to astroweather/sun_phases.py (the MQTT publisher needs it
+# too, and feature code may not import a blueprint). Kept under its old name here as a
+# test-patching seam.
+_determine_sky_period = determine_sky_period
 
 
 @astronomy_bp.route("/api/sky-widget", methods=["GET"])

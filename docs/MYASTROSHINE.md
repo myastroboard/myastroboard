@@ -58,7 +58,7 @@ secret** (64 hex chars), shown once.
 |---|---|
 | **Display label** | Optional, defaults to "MyAstroShine" |
 | **MyAstroShine base URL** | What the **browser** opens, e.g. `http://192.168.1.42:8002`. Use a static LAN IP, not a `.local` name. If you open the board from outside your LAN the MyAstroShine tab will not load - that is expected, MyAstroShine is LAN-only. |
-| **Token** / **Signing secret** | Paste both from step 1. Stored in `config.json`, masked in every API response, "blank = keep current" on save. |
+| **Token** / **Signing secret** | Paste both from step 1. Stored in `data/connectors_secrets.json` (never in `config.json` or a backup), masked in every API response, "blank = keep current" on save. |
 | **Callback URL override** (advanced) | Only if the MyAstroShine container cannot reach this dashboard's public URL on its own (no NAT hair-pinning). e.g. `http://192.168.1.42:5000`, or the board's service name on a shared Docker network. When set, it wins over the URL derived from the reverse-proxy headers. |
 | **Copy the source photo's rating** | Off by default - a re-processed image is a new artifact to re-judge. |
 | **Enable connector** | The button and endpoints activate only when enabled **and** URL + token + signing secret are all set. |
@@ -164,8 +164,9 @@ These are **not** editable - they are absent from `update_picture()`'s allowed f
   resulting path to `data/astrodex/` with a realpath barrier.
 - Enhanced image is confined to `data/astrodex/images/` with the same realpath barrier as the
   normal upload path.
-- `token` / `signing_secret` live in `config.json` (backup ZIP), are masked in API responses, and
-  "blank = keep".
+- `token` / `signing_secret` live in `data/connectors_secrets.json` (outside `config.json` and
+  outside the backup ZIP - re-enter them after restoring a backup on another machine), are
+  masked in API responses, and "blank = keep".
 - No new CSP `connect-src` entry and no CORS: the browser never makes a cross-origin request.
 
 ---

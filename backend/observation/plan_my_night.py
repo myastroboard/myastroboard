@@ -1227,6 +1227,58 @@ def reorder_target(
     return save_user_plan(user_id, payload, username=username, combination_id=combination_id)
 
 
+def pick_active_plan(user_id: str, username: str) -> Optional[Dict]:
+    """Return the most relevant plan payload across all of the user's plan files.
+
+    Plans are stored per combination, so every plan file (default and combination-specific)
+    is checked - a caller has no way to know which combination the user built tonight's plan
+    for. Priority: a plan whose timeline is inside the night > any 'current' plan > the first
+    non-'none' plan found. None when the user has no usable plan.
+
+    Shared by the push scheduler (N1/N2 triggers) and the MQTT publisher (user device).
+    """
+    plan_files = get_all_plan_files(user_id)
+    if not plan_files:
+        logger.debug(f"No plan files found for {username}")
+        return None
+
+    prefix = f'{user_id}_plan_'
+    suffix = '.json'
+
+    candidates = []
+    for file_path in plan_files:
+        fname = os.path.basename(file_path)
+        if not (fname.startswith(prefix) and fname.endswith(suffix)):
+            continue
+        raw_cid = fname[len(prefix) : -len(suffix)]
+        combination_id = None if raw_cid == 'my_night' else raw_cid
+        try:
+            payload = get_plan_with_timeline(user_id, username, combination_id=combination_id)
+            state = payload.get('state', 'none')
+            if state == 'none':
+                logger.debug(f"Plan (combination={combination_id}) for {username}: state=none, skipping")
+                continue
+            logger.debug(
+                f"Plan (combination={combination_id}) for {username}: state={state}, "
+                f"inside_night={payload.get('timeline', {}).get('is_inside_night')}"
+            )
+            candidates.append(payload)
+        except Exception as e:
+            logger.debug(f"Could not load plan (combination={combination_id}) for {username}: {e}")
+
+    if not candidates:
+        logger.debug(f"No active plan found for {username}")
+        return None
+
+    for p in candidates:
+        if p.get('timeline', {}).get('is_inside_night'):
+            return p
+    for p in candidates:
+        if p.get('state') == 'current':
+            return p
+    return candidates[0]
+
+
 def get_plan_with_timeline(user_id: str, username: str, combination_id: Optional[str] = None) -> Dict:
     payload = load_user_plan(user_id, username, combination_id=combination_id)
     plan = payload.get('plan')

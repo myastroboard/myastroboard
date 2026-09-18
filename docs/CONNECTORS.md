@@ -1,6 +1,6 @@
 # Connectors
 
-Connectors integrate external astronomy tools into MyAstroBoard. Once configured and enabled, a connector's data appears in the app tabs it declares — AllSky feeds the **Observatory** tab, MyAstroShine feeds the **AstroDex**, and a connector may feed no tab at all.
+Connectors integrate external astronomy tools into MyAstroBoard. Once configured and enabled, a connector's data appears in the app tabs it declares — AllSky feeds the **Observatory** tab, MyAstroShine feeds the **AstroDex**, and a connector may feed no tab at all: the MQTT / Home Assistant connector publishes MyAstroBoard's own state *outward* and is standalone.
 
 ---
 
@@ -14,11 +14,14 @@ The registry is discovered at runtime and served via `GET /api/connectors`.
 
 One module per connector on each side, named after it:
 
-| | Shared | AllSky | MyAstroShine |
-|---|---|---|---|
-| Connector | `connectors/base_connector.py` | `connectors/allsky_connector.py` | `connectors/myastroshine_connector.py` |
-| Blueprint | `blueprints/connectors.py` | `blueprints/connectors_allsky.py` | `blueprints/connectors_myastroshine.py` |
-| Tests | `tests/blueprints/test_connectors.py` | `tests/blueprints/test_connectors_allsky.py` | `tests/blueprints/test_connectors_myastroshine.py` |
+| | Shared | AllSky | MyAstroShine | MQTT / Home Assistant |
+|---|---|---|---|---|
+| Connector | `connectors/base_connector.py` | `connectors/allsky_connector.py` | `connectors/myastroshine_connector.py` | `connectors/mqtt_connector.py` (+ `mqtt_publisher.py`, `mqtt_payloads.py`) |
+| Blueprint | `blueprints/connectors.py` | `blueprints/connectors_allsky.py` | `blueprints/connectors_myastroshine.py` | `blueprints/connectors_mqtt.py` |
+| Tests | `tests/blueprints/test_connectors.py` | `tests/blueprints/test_connectors_allsky.py` | `tests/blueprints/test_connectors_myastroshine.py` | `tests/blueprints/test_connectors_mqtt.py`, `tests/connectors/test_mqtt_*.py` |
+
+Credentials of every connector (`SECRET_FIELDS`) live in `utils/connector_secrets.py`'s sidecar,
+not in `config.json` - see [Secrets](#secrets).
 
 `blueprints/connectors.py` serves the two routes every connector shares — the listing and the
 config save; a connector's own routes go in its own blueprint module, registered in
@@ -34,8 +37,8 @@ special-casing:
 |---|---|
 | `MODULES` | Independently-toggleable features. Empty is valid — the card then shows no Modules section |
 | `target_modules` | App tabs the data lands in (see above). Empty = standalone |
-| `CONFIG_FIELDS` | Settable config keys beyond `label` / `url` / `enabled` / `modules`, as `{key: default}`. `POST /api/connectors/<name>/config` accepts these and nothing else |
-| `SECRET_FIELDS` | Keys holding credentials. Masked by `GET /api/connectors`; a blank or still-masked submission means "keep the stored value" |
+| `CONFIG_FIELDS` | Settable config keys beyond `label` / `url` / `enabled` / `modules`, as `{key: default}`. `POST /api/connectors/<name>/config` accepts these and nothing else, coercing each value to the type of its default (`str`, `bool` or `int`) |
+| `SECRET_FIELDS` | Keys holding credentials. Stored in the secrets sidecar, masked by `GET /api/connectors`; a blank or still-masked submission means "keep the stored value" |
 | `URL_FIELDS` | Keys among `CONFIG_FIELDS` holding a URL, so the save strips their trailing slash |
 
 A connector's own tuning knobs (cache TTLs, size caps, rate limits) are class attributes too,
@@ -55,6 +58,18 @@ field blank unless the admin types a new value. The merge happens server-side in
 `POST /api/connectors/<name>/config` (admin only), so a value the browser was never given cannot
 be echoed back and overwrite the real one.
 
+Credentials never sit in `config.json` either (v1.6). They live in
+`data/connectors_secrets.json`, written by `utils/connector_secrets.py` (atomic, owner-only
+permissions) and deliberately absent from the backup ZIP and the config export - the same rule
+`secret_key.txt` and `vapid.json` already follow. Consequences:
+
+- a backup restored on a fresh host needs each connector's credentials re-entered once;
+- a connector is always constructed from `merge_secrets(name, config_block, cls.SECRET_FIELDS)`,
+  the config block overlaid with the sidecar (`blueprints/connectors.py`,
+  `observation/myastroshine_integration.get_integration_config`, `connectors/mqtt_publisher.py`);
+- an install upgraded from an earlier version is migrated at startup and on the first save:
+  values still found in `config.json` move to the sidecar and are stripped from the config.
+
 ### Target modules
 
 A connector also declares `target_modules` — the list of app tabs where its data shows up:
@@ -66,7 +81,7 @@ class AllSkyConnector(BaseConnector):
 
 Slugs match the navbar tab keys (`observatory`, `astrodex`, `weather`, `skytonight`, …) so the UI can reuse the existing translations; `static/js/connectors/connectors.js` maps them in `_TARGET_MODULE_I18N_KEYS`. The connector card renders one translated badge per slug under the description.
 
-The list is purely declarative — nothing is routed or wired from it. An **empty list is a valid, meaningful value**: it means the connector is self-contained and adds nothing to an existing tab (a future MQTT bridge, for example), and the card then shows a single *Standalone* badge.
+The list is purely declarative — nothing is routed or wired from it. An **empty list is a valid, meaningful value**: it means the connector is self-contained and adds nothing to an existing tab (the MQTT / Home Assistant publisher), and the card then shows a single *Standalone* badge.
 
 ---
 
@@ -101,6 +116,12 @@ Your router's DHCP settings or your device's documentation will show its current
 The **test button** (wifi icon, next to the URL field) immediately probes the URL you have typed — no save required — and shows Reachable / Unreachable. Use it to verify the IP address and port before saving.
 
 The **health-check button** (heart icon, after saving) runs a full per-module probe and reports status badges (✓ / ✗) with a detail message (200 OK, 404 + hint, timeout, etc.) for each enabled module.
+
+The test button also sends the connector's other fields as typed, so a connector that needs
+credentials to answer (MQTT) can probe with them before anything is saved. A connector that
+runs something in the background can declare a `statusEndpoint` and `actions` in
+`_CONNECTOR_UI` (`static/js/connectors/connectors.js`): the card then shows a live status line
+and action buttons under the save row.
 
 ---
 
@@ -209,6 +230,72 @@ Its own routes — the handoff and the two cookieless endpoints the MyAstroShine
 back on — stay in `blueprints/connectors_myastroshine.py` under `/api/astrodex/integration/*`.
 Full documentation: [MYASTROSHINE.md](MYASTROSHINE.md).
 
+## MQTT / Home Assistant connector
+
+Publishes MyAstroBoard's state to an MQTT broker with Home Assistant MQTT Discovery: one
+Home Assistant device for the board, one per location preset (sky conditions, weather, events)
+and one per **opted-in** user (Astrodex counters, tonight's plan and equipment, observation log
+totals, latest picture). Publish-only. Full documentation, entity tables and topic reference:
+[HOME_ASSISTANT.md](HOME_ASSISTANT.md).
+
+**Minimum version**: Home Assistant 2024.11 (device-based discovery)
+
+**Appears in**: nowhere in MyAstroBoard - *Standalone* (its output is Home Assistant)
+
+```python
+class MqttConnector(BaseConnector):
+    target_modules = []
+    SECRET_FIELDS = ("password",)
+    CONFIG_FIELDS = {"username": "", "password": "", "base_topic": "myastroboard", "discovery_enabled": True,
+                     "discovery_prefix": "homeassistant", "publish_interval_seconds": 60, "client_id": "",
+                     "tls_insecure": False}
+```
+
+The shared `url` field carries the broker as `mqtt://host:1883` or `mqtts://host:8883`;
+`is_configured()` only needs that URL (anonymous brokers exist). `health_check()` is one real
+MQTT connect.
+
+### Modules
+
+| Slug | Label | Default | Description |
+|------|-------|---------|-------------|
+| `sky_conditions` | Sky conditions | Enabled | Sky period, night score, sun and moon times, dark window, best window, top target |
+| `weather_now` | Weather now | Enabled | Current weather for astrophotography: clouds, wind, dew risk, seeing, transparency |
+| `upcoming_events` | Upcoming events | Disabled | Next event, next ISS / CSS pass, aurora activity, next eclipses |
+| `user_activity` | User activity | Disabled | Astrodex counters, tonight's plan and its equipment, observation log totals - per opted-in user |
+| `astrodex_image` | Latest Astrodex picture | Disabled | The newest Astrodex picture as an image entity - per opted-in user |
+| `board_diagnostics` | Board diagnostics | Enabled | Version, update available, cache and SkyTonight scheduler state, last publish |
+
+### Advanced settings
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `base_topic` | `myastroboard` | Root of every published topic |
+| `discovery_prefix` | `homeassistant` | Home Assistant's discovery prefix |
+| `publish_interval_seconds` | `60` | Publish cycle (minimum 15 s); states go out only when changed |
+| `client_id` | generated | MQTT client id, generated once when blank |
+| `tls_insecure` | `false` | Accept a self-signed broker certificate (`mqtts://` only) |
+
+### How it runs
+
+`connectors/mqtt_publisher.py` is a background thread started from `app.py` like the push
+scheduler (lock file under `data/cache/`, one worker owns it). It idles until the connector is
+enabled, then keeps a paho-mqtt client connected (last will = `offline` on `<base>/status`) and
+runs a publish cycle every interval: `connectors/mqtt_payloads.py` builds the devices, discovery
+and state messages are published only when they changed, and topics that are no longer wanted
+(module off, user opted out, location deleted) receive an empty retained payload so Home
+Assistant drops them. A trigger file carries the card's *Publish now* / *Remove from Home
+Assistant* actions to the owning worker; a status file carries the publisher's state back to
+`GET /api/connectors/mqtt/status`.
+
+The three MQTT modules reach feature packages only through lazy imports: `connectors/` is
+imported at module level by `cache/` and `observation/`, so a module-level import back would be
+a circular import (a test guards this).
+
+### Troubleshooting
+
+See [HOME_ASSISTANT.md - Troubleshooting](HOME_ASSISTANT.md#troubleshooting).
+
 ## Adding a new connector
 
 1. Create a class in `backend/connectors/<name>_connector.py` that extends `BaseConnector`
@@ -221,7 +308,8 @@ Full documentation: [MYASTROSHINE.md](MYASTROSHINE.md).
    blueprint in `backend/app.py`
 6. Add `connectors.<name>_label` / `connectors.<name>_desc` to all six `static/i18n/*.json`, and
    an entry in `_CONNECTOR_UI` (`static/js/connectors/connectors.js`) for its icon and any
-   config inputs beyond the common ones
+   config inputs beyond the common ones (text, password, url or number inputs, checkboxes,
+   an optional status line and action buttons)
 
 The connector appears automatically in the Parameters → Connectors UI.
 

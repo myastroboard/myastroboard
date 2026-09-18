@@ -221,37 +221,42 @@ absorbed the feature, so no registry is scoped.
 |---|---|
 | **Why** | The connector pattern hardened through AllSky and MyAstroShine (one module per connector, `target_modules`, declared config/secret fields) is solid enough to point outward instead of only pulling data in. A lot of self-hosted astro setups already run Home Assistant for the rest of the observatory (power, roof, weather sensors); publishing MAB's own state as MQTT lets it show up on an existing HA dashboard instead of requiring a second one. Scoped as a publish-only connector - no inbound control, no device layer - so it does not need to wait for the v2.4+ live-equipment cluster. Replaces the dropped "Connector SDK and mab-plugins" idea in this slot - see [Architecture direction](#on-the-former-connector-sdk-and-mab-plugins-was-v16). |
 | **Effort** | Medium |
-| **Status** | 💡 In near future release |
+| **Status** | ✅ Implemented (connector) - companion cards repository in progress |
 
 #### MQTT Publisher connector
 
-- New `BaseConnector` in `backend/connectors/` - same shape as AllSky/MyAstroShine, but it pushes to a broker on an interval/on-event instead of being polled or polling an external API
-- Candidate topics (to be scoped - not locked in):
-  - Astrodex counters: photo count, distinct objects/constellations captured
-  - Plan My Night state: whether a plan is currently active, and for which target
-  - Equipment currently assigned to the active session
-- MQTT Discovery so entities appear in Home Assistant automatically, no manual YAML (checkbox ?)
-- Parameters: server + port + user + pass (pass excluded from backup and safely saved)
+- `MqttConnector` in `backend/connectors/` - same shape as AllSky/MyAstroShine, plus a
+  background publisher thread (`mqtt_publisher.py`, started like the push scheduler) that
+  pushes to the broker on an interval and on Home Assistant's birth message
+- Home Assistant MQTT Discovery (device-based, HA 2024.11+): one device for the board, one per
+  location preset, one per opted-in user - no YAML on the HA side
+- Six modules: sky conditions (period, night score, sun/moon, dark and best windows, top
+  target), weather now, upcoming events, user activity (Astrodex counters, plan, equipment,
+  log totals), latest Astrodex picture (HA `image` entity), board diagnostics
+- Parameters: broker URL (`mqtt://` / `mqtts://`), user + password, discovery toggle, base
+  topic, interval, client id, self-signed TLS. The password lives in the new connector
+  credentials sidecar, outside `config.json` and outside backups (applies to MyAstroShine's
+  credentials too, migrated automatically)
 
 #### Companion Home Assistant cards repository
 
-- Separate repository holding ready-made Home Assistant Lovelace cards/dashboard YAML that
-  consume the topics above - not a connector catalogue: this repo ships HA-side dashboard
-  definitions, not code that runs inside MAB, so it carries none of the trust-boundary and
-  compatibility-matrix concerns the dropped mab-plugins idea had
-- Gives a Home Assistant user a working MAB dashboard without hand-building cards from the topic list
-- Respect HACS documentation for publishing/release
-- Respect Home Assistant 2026.9 standards
-- Github repo with standardized name in orgonization myastroboard
+- Separate repository [lovelace-myastroboard-card](https://github.com/myastroboard/lovelace-myastroboard-card):
+  ready-made Lovelace cards and dashboard YAML that consume the topics above - HA-side
+  definitions only, no code inside MAB, so none of the trust-boundary concerns of the dropped
+  mab-plugins idea
+- HACS *Dashboard* category (one `.js` named after the repository, `hacs.json`, GitHub releases)
+- Status: repository created, content in progress
 
 #### Topics published
 
-Complete and deeper analysis to do:
+Answered during implementation - the full entity and topic reference is in
+[docs/HOME_ASSISTANT.md](docs/HOME_ASSISTANT.md):
 
-- What is interesting to propose?
-- Multi-user case & Multi-location case in MyAstroBoard must be taken in consideration
-- Is it exist a way to display Astrodex as camera entity for example ? Separate connector ?
-- Publish weather ? Publish night score ?
+- Multi-location: one HA device per preset, keyed by its uuid. Multi-user: one device per user
+  who opted in themselves (Parameters -> Customize), gated by admin module toggles
+- Astrodex as a camera entity: same connector, `astrodex_image` module, HA `image` platform fed
+  with the newest picture (resized, no coordinates)
+- Weather and night score: both published (`observation_score` 0-10 is the sky widget's score)
 
 **i18n in 6 languages.**
 
@@ -554,7 +559,7 @@ Also:
 | v1.3 | Observation Log | Intermediate+ | High | ✅ Implemented |
 | v1.4 | Planning Intelligence (visibility calendar, meridian flip, advanced filters) | Advanced | High | ✅ Implemented |
 | v1.5 | Session Analytics | All | Medium | ✅ Implemented |
-| v1.6 | MQTT Publisher & Home Assistant Integration | All | Medium | 💡 Idea |
+| v1.6 | MQTT Publisher & Home Assistant Integration | All | Medium | ✅ Implemented |
 | v2.0 | Interactive Sky Chart + mosaic planner | All | High | 💡 Idea |
 | v2.1 | Community & Sharing | All | Medium | 💡 Idea |
 | v2.2 | Integrations (plate solve, PHD2, NINA) | Advanced | High | 💡 Idea |

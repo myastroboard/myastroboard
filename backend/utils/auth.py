@@ -87,6 +87,9 @@ DEFAULT_USER_PREFERENCES = {
     'experience_level': 'advanced',
     'beginner_catalog_enabled': True,
     'recommendations_enabled': True,
+    # v1.6: publish this user's own Astrodex / plan activity through the MQTT connector.
+    # Off by default and user-scoped: an admin enables the connector, never another user's data.
+    'mqtt_publish_enabled': False,
     'wizard': {
         'completed': False,
         'skipped': False,
@@ -417,6 +420,10 @@ class UserManager:
         recommendations_enabled = preferences.get('recommendations_enabled')
         if recommendations_enabled is not None and not isinstance(recommendations_enabled, bool):
             return False, "Invalid recommendations_enabled: must be a boolean"
+
+        mqtt_publish_enabled = preferences.get('mqtt_publish_enabled')
+        if mqtt_publish_enabled is not None and not isinstance(mqtt_publish_enabled, bool):
+            return False, "Invalid mqtt_publish_enabled: must be a boolean"
 
         wizard = preferences.get('wizard')
         if wizard is not None:

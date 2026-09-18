@@ -243,9 +243,14 @@ def test_config_post_blank_secret_keeps_current(client_admin, env, monkeypatch):
     assert resp.status_code == 200
     stored = saved["connectors"]["myastroshine"]
     assert stored["url"] == "http://10.0.0.5:8002"
-    assert stored["token"] == _TOKEN  # blank means unchanged
-    assert stored["signing_secret"] == _SECRET  # masked echo ignored
     assert stored["copy_rating"] is True
+    # Credentials never land in config.json: the legacy values planted in the config block
+    # were migrated to the sidecar on save, and "blank" / "masked echo" kept them there.
+    assert "token" not in stored
+    assert "signing_secret" not in stored
+    from utils.connector_secrets import load_secrets
+
+    assert load_secrets("myastroshine") == {"token": _TOKEN, "signing_secret": _SECRET}
 
 
 def test_config_post_updates_secret_when_provided(client_admin, env, monkeypatch):
@@ -254,7 +259,11 @@ def test_config_post_updates_secret_when_provided(client_admin, env, monkeypatch
     monkeypatch.setattr("blueprints.connectors.save_config", lambda cfg: saved.update(cfg) or True)
 
     client_admin.post("/api/connectors/myastroshine/config", json={"token": "mas_newtoken000000"})
-    assert saved["connectors"]["myastroshine"]["token"] == "mas_newtoken000000"
+    assert "token" not in saved["connectors"]["myastroshine"]
+    from utils.connector_secrets import load_secrets
+
+    assert load_secrets("myastroshine")["token"] == "mas_newtoken000000"
+    assert load_secrets("myastroshine")["signing_secret"] == _SECRET  # untouched, migrated from the config block
 
 
 def test_config_post_updates_label_callback_and_enabled(client_admin, env, monkeypatch):
