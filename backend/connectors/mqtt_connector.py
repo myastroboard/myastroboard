@@ -323,15 +323,20 @@ class MqttConnector(BaseConnector):
             return {"reachable": False, "error": f"broker refused the connection: {reason}"}
         return {"reachable": True, "error": None}
 
-    def health_check(self) -> dict:
+    def health_check(self, password: Optional[str] = None) -> dict:
         """Connection probe against the saved broker plus one line per module.
+
+        *password* lets a caller supply the credential explicitly rather than through
+        ``self.config`` - see ``connectors_mqtt.py``'s ``_saved_connector()``, which builds
+        this connector from a secret-free config block precisely so a plain informational
+        read of ``base_url``/``client_id`` elsewhere is never mistaken for a credential.
 
         Module lines only reflect the toggles here; the publisher's own status route says
         what is actually being published.
         """
         if not self.base_url:
             return {"reachable": False, "modules": {}, "error": "url required"}
-        result = self.probe()
+        result = self.probe(password=password)
         modules = {}
         for module in self.MODULES:
             slug = module["slug"]

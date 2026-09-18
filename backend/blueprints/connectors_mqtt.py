@@ -12,7 +12,7 @@ from flask import Blueprint, jsonify, request
 
 from connectors.mqtt_connector import MqttConnector
 from utils.auth import admin_required, login_required
-from utils.connector_secrets import merge_secrets
+from utils.connector_secrets import load_secrets
 from utils.logging_config import get_logger
 from utils.repo_config import load_config, save_config
 
@@ -22,10 +22,22 @@ connectors_mqtt_bp = Blueprint('connectors_mqtt', __name__)
 
 
 def _saved_connector() -> MqttConnector:
-    """The connector built from the saved config block plus its sidecar credentials."""
+    """The connector built from the saved config block - deliberately secret-free.
+
+    The password never goes into this connector's ``config``: mixing it into the same dict
+    that ``base_url``/``client_id``/etc. are read from makes every one of those routine reads
+    indistinguishable from a credential to a static analysis, and CodeQL flags it as such (a
+    real finding once seen, even though this dict is never logged directly). Callers that need
+    the password fetch it separately with ``_saved_password()`` and pass it explicitly.
+    """
     config = load_config()
     block = config.get('connectors', {}).get('mqtt', {}) or {}
-    return MqttConnector(merge_secrets(MqttConnector.name, block, MqttConnector.SECRET_FIELDS))
+    return MqttConnector(block)
+
+
+def _saved_password() -> str:
+    """The stored MQTT password, read straight from the secrets sidecar."""
+    return load_secrets(MqttConnector.name).get('password', '')
 
 
 def _is_masked_or_blank(value: str) -> bool:
@@ -50,7 +62,7 @@ def mqtt_health_api():
     try:
         connector = _saved_connector()
         if request.method == 'GET':
-            return jsonify(connector.health_check())
+            return jsonify(connector.health_check(password=_saved_password()))
 
         data = request.get_json(silent=True) or {}
         url = str(data.get('url') or '').strip().rstrip('/')
@@ -60,7 +72,7 @@ def mqtt_health_api():
         username = str(data.get('username') or '').strip()
         password = str(data.get('password') or '').strip()
         if _is_masked_or_blank(password):
-            password = str(connector.config.get('password') or '') if url == connector.base_url else ''
+            password = _saved_password() if url == connector.base_url else ''
         tls_insecure = data.get('tls_insecure')
         if tls_insecure is None:
             tls_insecure = connector.tls_insecure()
