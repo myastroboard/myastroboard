@@ -269,7 +269,7 @@ class TestProbe:
             ('refused', 'connection refused'),
             ('socket-timeout', 'timeout - no answer from the broker'),
             ('ssl', 'TLS handshake failed - check the certificate or enable the insecure option'),
-            ('valueerror', 'ValueError: bad argument'),
+            ('valueerror', 'ValueError'),  # never the exception message - it could echo a credential
             ('silent', 'timeout - no answer from the broker'),
             ('auth', 'broker refused the connection: Not authorized'),
             ('int-rc', 'broker refused the connection: 5'),

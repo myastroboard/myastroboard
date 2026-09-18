@@ -301,7 +301,10 @@ class TestLifecycle:
 
         env["publisher"]._client_factory = boom
         env["publisher"]._tick()
-        assert "no paho" in pub.read_status()["last_error"]
+        # The exception type is reported, never its message - this try block also hands the
+        # broker credentials to paho, so the raw text must never reach the log or the status file.
+        assert "RuntimeError" in pub.read_status()["last_error"]
+        assert "no paho" not in pub.read_status()["last_error"]
 
     def test_config_loader_failure_keeps_going(self, env):
         def boom():
