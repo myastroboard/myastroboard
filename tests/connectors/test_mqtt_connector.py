@@ -5,6 +5,7 @@ no network. Host resolution is patched so the tests do not depend on DNS either.
 """
 
 import socket
+import ssl
 
 import pytest
 
@@ -80,8 +81,8 @@ class FakeClient:
             raise RuntimeError('already gone')
 
 
-class _SSLError(OSError):
-    pass
+class _SSLError(ssl.SSLError):
+    pass  # the real base class - a bare OSError is not enough to exercise isinstance(exc, ssl.SSLError)
 
 
 def _factory(behaviour, created):
@@ -105,11 +106,13 @@ def _resolve_ok(monkeypatch):
 
 
 class TestParseBrokerUrl:
+    """parse_broker_url() returns an (host, port, tls, error) tuple - never raises - so a bad
+    URL never needs an exception object that could later reach an HTTP response (CWE-209)."""
 
     def test_plain_and_tls_defaults(self):
-        assert mc.parse_broker_url('mqtt://broker.lan') == ('broker.lan', 1883, False)
-        assert mc.parse_broker_url('mqtts://broker.lan') == ('broker.lan', 8883, True)
-        assert mc.parse_broker_url('MQTT://192.168.1.10:1884/') == ('192.168.1.10', 1884, False)
+        assert mc.parse_broker_url('mqtt://broker.lan') == ('broker.lan', 1883, False, None)
+        assert mc.parse_broker_url('mqtts://broker.lan') == ('broker.lan', 8883, True, None)
+        assert mc.parse_broker_url('MQTT://192.168.1.10:1884/') == ('192.168.1.10', 1884, False, None)
 
     @pytest.mark.parametrize(
         'bad',
@@ -117,8 +120,8 @@ class TestParseBrokerUrl:
          'mqtt://broker.lan:notaport'],
     )
     def test_rejects_anything_that_is_not_a_bare_mqtt_url(self, bad):
-        with pytest.raises(ValueError):
-            mc.parse_broker_url(bad)
+        host, port, tls, error = mc.parse_broker_url(bad)
+        assert host is None and port is None and error
 
 
 class TestResolveBrokerHost:
@@ -269,7 +272,7 @@ class TestProbe:
             ('refused', 'connection refused'),
             ('socket-timeout', 'timeout - no answer from the broker'),
             ('ssl', 'TLS handshake failed - check the certificate or enable the insecure option'),
-            ('valueerror', 'ValueError'),  # never the exception message - it could echo a credential
+            ('valueerror', 'connection failed'),  # generic fallback - never derived from the exception at all
             ('silent', 'timeout - no answer from the broker'),
             ('auth', 'broker refused the connection: Not authorized'),
             ('int-rc', 'broker refused the connection: 5'),
@@ -291,6 +294,28 @@ class TestProbe:
 
         client = MqttConnector._default_client_factory('probe-x')
         assert isinstance(client, mqtt.Client)
+
+
+class TestDescribeProbeError:
+    """_describe_probe_error() must never leak anything read off the exception object itself
+    (not even its class name) into its return value - that return value flows into an HTTP
+    response, and CodeQL's exception-exposure check (CWE-209) treats any exception-derived
+    data reaching one as a finding, regardless of how harmless the content looks."""
+
+    @pytest.mark.parametrize(
+        'exc',
+        [
+            ConnectionRefusedError('some detail that must never surface'),
+            socket.timeout('some detail that must never surface'),
+            ssl.SSLError('some detail that must never surface'),
+            ValueError('some detail that must never surface'),
+            RuntimeError('some detail that must never surface'),
+        ],
+    )
+    def test_return_value_never_contains_the_exception_message_or_type(self, exc):
+        description = mc._describe_probe_error(exc)
+        assert 'some detail' not in description
+        assert type(exc).__name__ not in description
 
 
 class TestHealthCheck:

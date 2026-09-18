@@ -19,6 +19,7 @@ import ipaddress
 import re
 import secrets
 import socket
+import ssl
 import time
 from typing import Any, Callable, Optional
 from urllib.parse import urlparse
@@ -38,27 +39,29 @@ DEFAULT_PORT = 1883
 DEFAULT_TLS_PORT = 8883
 
 
-def parse_broker_url(url: str) -> tuple[str, int, bool]:
-    """``mqtt://host[:port]`` / ``mqtts://host[:port]`` -> ``(host, port, tls)``.
+def parse_broker_url(url: str) -> tuple[Optional[str], Optional[int], bool, Optional[str]]:
+    """``mqtt://host[:port]`` / ``mqtts://host[:port]`` -> ``(host, port, tls, error)``.
 
-    Raises ValueError for anything else, with a message the card can show as-is.
+    Exactly one of ``(host, port)`` or ``error`` is set, like ``resolve_broker_host()`` below -
+    a plain string return rather than a raised exception, so a bad URL never needs to be
+    described through an exception object that could later reach an HTTP response.
     """
     parsed = urlparse(str(url or '').strip())
     scheme = (parsed.scheme or '').lower()
     if scheme not in ('mqtt', 'mqtts'):
-        raise ValueError('url must start with mqtt:// or mqtts://')
+        return None, None, False, 'url must start with mqtt:// or mqtts://'
     if not parsed.hostname:
-        raise ValueError('url must include a broker host')
+        return None, None, False, 'url must include a broker host'
     if parsed.path not in ('', '/') or parsed.query or parsed.fragment:
-        raise ValueError('url must be host and port only, e.g. mqtt://192.168.1.10:1883')
+        return None, None, False, 'url must be host and port only, e.g. mqtt://192.168.1.10:1883'
     tls = scheme == 'mqtts'
     try:
         port = parsed.port
-    except ValueError as exc:
-        raise ValueError('url port is not a valid number') from exc
+    except ValueError:
+        return None, None, False, 'url port is not a valid number'
     if port is None:
         port = DEFAULT_TLS_PORT if tls else DEFAULT_PORT
-    return parsed.hostname, int(port), tls
+    return parsed.hostname, int(port), tls, None
 
 
 def resolve_broker_host(host: str, port: int) -> tuple[Optional[str], Optional[str]]:
@@ -172,7 +175,10 @@ class MqttConnector(BaseConnector):
 
     def broker(self) -> tuple[str, int, bool]:
         """``(host, port, tls)`` from the configured URL; raises ValueError when unusable."""
-        return parse_broker_url(self.base_url)
+        host, port, tls, error = parse_broker_url(self.base_url)
+        if error or host is None or port is None:
+            raise ValueError(error or "invalid broker url")
+        return host, port, tls
 
     def is_configured(self) -> bool:
         """A parseable mqtt(s):// URL is the only requirement - anonymous brokers exist."""
@@ -267,10 +273,9 @@ class MqttConnector(BaseConnector):
         stored password may be paired with the host it is probing.
         """
         target = str(url if url is not None else self.base_url or "").strip().rstrip("/")
-        try:
-            host, port, tls = parse_broker_url(target)
-        except ValueError as exc:
-            return {"reachable": False, "error": str(exc)}
+        host, port, tls, url_error = parse_broker_url(target)
+        if url_error or host is None or port is None:
+            return {"reachable": False, "error": url_error or "invalid broker url"}
 
         resolved_ip, error = resolve_broker_host(host, port)
         if error or resolved_ip is None:
@@ -352,17 +357,20 @@ class MqttConnector(BaseConnector):
 
 
 def _describe_probe_error(exc: BaseException) -> str:
-    """A short, credential-free description of a failed CONNECT.
+    """A short, generic description of a failed CONNECT, for the browser.
 
-    Only the exception's type name is ever returned, never ``str(exc)``: this describes the
-    outcome of a connection attempt made with the caller's credentials, and some libraries echo
-    a failing argument's value back in their exception message.
+    Deliberately never derived from *exc* - not even its type name via ``type(exc).__name__``:
+    this return value flows into an HTTP response, and CodeQL's information-exposure check
+    (CWE-209) flags any value read off an exception object that reaches one, regardless of how
+    little it actually reveals. ``isinstance`` only tests *which* branch runs; every branch
+    below returns a fixed literal, so nothing about the exception's own content ever leaves this
+    function. The exception itself is still available to ``logger.debug`` at the call site,
+    which only ever writes to the server's own log file.
     """
     if isinstance(exc, ConnectionRefusedError):
         return "connection refused"
     if isinstance(exc, (TimeoutError, socket.timeout)):
         return "timeout - no answer from the broker"
-    name = type(exc).__name__
-    if "SSL" in name or "ssl" in name.lower():
+    if isinstance(exc, ssl.SSLError):
         return "TLS handshake failed - check the certificate or enable the insecure option"
-    return name
+    return "connection failed"
