@@ -87,8 +87,9 @@ class TestHealth:
         assert body['reachable'] is True
         assert body['modules']['sky_conditions'] == {'ok': True, 'detail': 'enabled'}
         assert body['modules']['weather_now'] == {'ok': False, 'detail': 'disabled'}
-        # health_check() calls probe() without arguments: the connector's own config applies
-        assert probe['calls'] == [{'url': None, 'username': None, 'password': None, 'tls_insecure': None}]
+        # health_check() forwards the saved password explicitly - the connector's own config
+        # is deliberately secret-free (see _saved_connector()'s docstring)
+        assert probe['calls'] == [{'url': None, 'username': None, 'password': 'saved-pw', 'tls_insecure': None}]
 
     def test_get_without_url_reports_url_required(self, client_admin, saved, probe):
         saved['config'] = {'connectors': {}}
@@ -121,6 +122,17 @@ class TestHealth:
         resp = client_admin.post('/api/connectors/mqtt/health', json={'url': 'mqtt://broker.lan:1883'})
         assert resp.status_code == 200
         assert resp.get_json() == {'reachable': False, 'modules': {}, 'error': 'connection refused'}
+
+    def test_saved_connector_config_never_carries_the_password(self, saved):
+        """Regression guard for the CodeQL finding: mixing the password into the same dict
+        that url/client_id/etc. are read from taints every one of those reads as a credential
+        to static analysis. The connector built for routing must stay secret-free; the caller
+        fetches the password separately (_saved_password())."""
+        from blueprints.connectors_mqtt import _saved_connector, _saved_password
+
+        connector = _saved_connector()
+        assert 'password' not in connector.config
+        assert _saved_password() == 'saved-pw'
 
     def test_unexpected_failure_is_a_500(self, client_admin, saved, monkeypatch):
         def boom(*a, **k):
