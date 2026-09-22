@@ -92,6 +92,24 @@
             </button>
         </form>
 
+        <!-- Second login step, shown only when the account has two-factor authentication active -->
+        <div id="otp-step" class="login-form" hidden>
+            <p class="otp-prompt" data-i18n="auth.otp_prompt">Enter the 6-digit code from your authenticator app.</p>
+
+            <div class="form-floating mb-3">
+                <input type="text" class="form-control text-center otp-code-input" id="otp-code" name="otp-code" placeholder="000000" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code">
+                <label for="otp-code" data-i18n="auth.otp_code">Verification code</label>
+            </div>
+
+            <button type="button" class="btn btn-login" id="otp-verify-btn">
+                <span class="btn-text" data-i18n="auth.otp_verify"><i class="bi bi-shield-check icon-inline" aria-hidden="true"></i>Verify</span>
+            </button>
+
+            <div class="mt-3 text-center">
+                <button type="button" class="btn btn-outline-light btn-sm" id="otp-back-btn" data-i18n="auth.otp_back">Back to sign in</button>
+            </div>
+        </div>
+
         <div class="mt-3 text-center">
             <button type="button" class="btn btn-outline-light btn-sm pwa-install-btn" data-pwa-install hidden>
                 <span data-i18n="pwa.install_app"></span>

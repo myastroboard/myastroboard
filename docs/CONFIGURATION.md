@@ -182,6 +182,12 @@ Connector configuration is stored in `config.json → connectors.<name>`. See [C
 
 The archive is named `myastroboard_backup_<timestamp>.zip`.
 
+**Not included**: `data/security_settings.json` (trusted networks, instance-wide 2FA switch) is
+deliberately excluded from both the backup ZIP and `/api/config/export`, for the same reason as
+`trust_proxy_headers`: a LAN CIDR block from one install is meaningless - or actively wrong - on a
+restored host. Re-configure trusted networks by hand after a restore on a different machine. See
+also [docs/AUTHENTICATION.md](AUTHENTICATION.md).
+
 ### Restore backup
 
 `POST /api/backup/restore` (multipart form, field `file`) accepts a backup ZIP and restores its contents. The existing files are overwritten.

@@ -1722,3 +1722,31 @@ html[data-theme="red"] .text-bg-primary {
         gap: 0.75rem 1rem;
     }
 }
+
+
+/* ============================================================
+   Two-factor authentication enrolment
+
+   The QR code is drawn into a <canvas> by auth.js (renderTwoFactorQrCode) from the
+   vendored generator, so it only needs sizing here - its colours are painted in the
+   canvas itself and stay black on white in every theme, which is what scanners expect.
+   ============================================================ */
+
+.totp-qr-canvas {
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--border-radius);
+    padding: 0.5rem;
+    background: #ffffff;
+}
+
+/* The shared secret is read out character by character when the QR code cannot be
+   scanned (authenticator app on the same phone), so it needs room to breathe. */
+.totp-secret {
+    letter-spacing: 0.1rem;
+}
+
+/* Spacing for the button row of a modal form built in JS. */
+.modal-actions-gap {
+    gap: 1rem;
+}

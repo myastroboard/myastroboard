@@ -5920,6 +5920,7 @@ class TestUserManagementEdgeCases:
             user_id = 'u1'
             username = 'newname'
             role = 'user'
+            account_scope = 'global'
 
         monkeypatch.setattr(_a.user_manager, 'update_user', lambda *_a, **_k: _FakeUser())
         resp = client_admin.put('/api/users/u1', json={'username': 'newname'})

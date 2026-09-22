@@ -26,11 +26,17 @@ EXPECTED_ROUTES = {
     ('/static/<path:filename>', ('GET',)),
     ('/sw.js', ('GET',)),
     # --- auth ---
+    ('/api/auth/2fa/confirm', ('POST',)),
+    ('/api/auth/2fa/disable', ('POST',)),
+    ('/api/auth/2fa/setup', ('POST',)),
     ('/api/auth/change-password', ('POST',)),
     ('/api/auth/login', ('POST',)),
+    ('/api/auth/login/verify-2fa', ('POST',)),
     ('/api/auth/logout', ('POST',)),
     ('/api/auth/preferences', ('GET',)),
     ('/api/auth/preferences', ('PUT',)),
+    ('/api/auth/security-settings', ('GET',)),
+    ('/api/auth/security-settings', ('POST',)),
     ('/api/auth/status', ('GET',)),
     # --- push notifications ---
     ('/api/push/subscribe', ('POST',)),
@@ -46,6 +52,7 @@ EXPECTED_ROUTES = {
     ('/api/users', ('POST',)),
     ('/api/users/<user_id>', ('DELETE',)),
     ('/api/users/<user_id>', ('PUT',)),
+    ('/api/users/<user_id>/2fa', ('DELETE',)),
     # --- config ---
     ('/api/config', ('GET',)),
     ('/api/config', ('POST',)),
@@ -154,6 +161,9 @@ EXPECTED_ROUTES = {
     ('/api/astrodex/items/<item_id>/pictures/<picture_id>', ('PUT',)),
     ('/api/astrodex/items/<item_id>/pictures/<picture_id>/main', ('POST',)),
     ('/api/astrodex/map', ('GET',)),
+    ('/api/astrodex/stream/<user_id>/<token>/current.jpg', ('GET',)),
+    ('/api/astrodex/stream/shared/<token>/current.jpg', ('GET',)),
+    ('/api/astrodex/stream/urls', ('GET',)),
     ('/api/astrodex/upload', ('POST',)),
     # --- myastroshine integration (AstroDex <-> MyAstroShine) ---
     ('/api/astrodex/integration/status', ('GET',)),
@@ -232,6 +242,7 @@ EXPECTED_ROUTES = {
     ('/api/connectors/allsky/proxy', ('GET',)),
     ('/api/connectors/allsky/status', ('GET',)),
     ('/api/connectors/allsky/urls', ('GET',)),
+    ('/api/connectors/astrodex_stream/rotate', ('POST',)),
     ('/api/connectors/myastroshine/health', ('GET', 'POST')),
     ('/api/connectors/mqtt/health', ('GET', 'POST')),
     ('/api/connectors/mqtt/publish', ('POST',)),
