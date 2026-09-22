@@ -3,8 +3,8 @@ AstroDex Stream connector - a personal, auto-refreshing photo slideshow of a use
 AstroDex pictures, rendered as a single "current frame" JPEG that any still-image camera
 viewer (Home Assistant's Generic Camera integration, a browser <img> tag, ...) can poll.
 
-Not a real video stream - see feature-astrodex-stream.md §1 for the feasibility study that
-rejected RTSP and a pushed MJPEG stream in favour of this. The server renders whichever photo
+Not a real video stream - see docs/ASTRODEX_STREAM.md#why-not-a-real-video-stream for the
+feasibility study that rejected RTSP and a pushed MJPEG stream in favour of this. The server renders whichever photo
 is "current" as a pure function of wall-clock time, so there is no background thread to
 start/stop and nothing needs a new Docker port - it rides the app's existing HTTP port like
 every other connector. Deliberately no crossfade: a client polling mid-transition would just

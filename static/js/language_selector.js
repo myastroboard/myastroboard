@@ -156,7 +156,7 @@ class LanguageSelector {
         // Schedule the update for the next animation frame to avoid blocking
         requestAnimationFrame(() => {
             try {
-                const elements = document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-title]');
+                const elements = document.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-title], [data-i18n-aria-label]');
                 const totalElements = elements.length;
                 const batchSize = 50; // Process 50 elements at a time
                 
@@ -171,6 +171,7 @@ class LanguageSelector {
                         const textKey = element.getAttribute('data-i18n');
                         const placeholderKey = element.getAttribute('data-i18n-placeholder');
                         const titleKey = element.getAttribute('data-i18n-title');
+                        const ariaLabelKey = element.getAttribute('data-i18n-aria-label');
 
                         if (textKey) {
                             try {
@@ -202,6 +203,17 @@ class LanguageSelector {
                                 }
                             } catch (error) {
                                 console.warn(`[LanguageSelector] Error translating title key: ${titleKey}`, error);
+                            }
+                        }
+
+                        if (ariaLabelKey) {
+                            try {
+                                const translatedAriaLabel = i18n.t(ariaLabelKey);
+                                if (element.getAttribute('aria-label') !== translatedAriaLabel) {
+                                    element.setAttribute('aria-label', translatedAriaLabel);
+                                }
+                            } catch (error) {
+                                console.warn(`[LanguageSelector] Error translating aria-label key: ${ariaLabelKey}`, error);
                             }
                         }
                     }

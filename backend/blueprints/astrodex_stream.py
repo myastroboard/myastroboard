@@ -2,7 +2,7 @@
 
 Serves the "current frame" of a user's (or the shared) AstroDex slideshow as a single JPEG -
 see backend/observation/astrodex_stream.py for the rendering engine and
-feature-astrodex-stream.md for the design rationale (this is deliberately not a real video
+docs/ASTRODEX_STREAM.md for the design rationale (this is deliberately not a real video
 stream).
 
 - ``/urls`` is browser-facing (session cookie): drives the AstroDex page's stream modal.
@@ -128,7 +128,7 @@ def shared_stream(token):
 
 @astrodex_stream_bp.route('/api/connectors/astrodex_stream/rotate', methods=['POST'])
 @admin_required
-def rotate_signing_secret():
+def rotate_stream_keys():
     try:
         astrodex_stream.rotate_signing_secret()
     except RuntimeError as exc:

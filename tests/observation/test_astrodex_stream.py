@@ -211,7 +211,7 @@ class TestRendering:
 class TestSharedFeed:
 
     def test_shared_feed_strips_gps_and_merges_across_users(self, temp_data_dir):
-        item_a, pic_a = _seed_picture('user-a', filename='a.jpg', item_name='M31')
+        item_a = astrodex.create_astrodex_item('user-a', {'name': 'M31', 'type': 'Galaxy'})
         astrodex.add_picture_to_item(
             'user-a',
             item_a['id'],
