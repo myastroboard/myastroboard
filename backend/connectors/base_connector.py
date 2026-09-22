@@ -40,6 +40,13 @@ class BaseConnector(ABC):
     # slash, as it does for the main `url`, so callers can concatenate paths onto them.
     URL_FIELDS: tuple[str, ...] = ()
 
+    # Keys among CONFIG_FIELDS restricted to a closed set of string values, as
+    # {key: (allowed, ...)}. The shared save keeps a submission only when it is one of
+    # these; anything else (including a blank/missing value) falls back to the field's
+    # CONFIG_FIELDS default. GET /api/connectors exposes this so the frontend can build a
+    # <select> from it instead of hardcoding the choices a second time.
+    ENUM_FIELDS: dict[str, tuple[str, ...]] = {}
+
     def __init__(self, config: dict):
         """
         Args:

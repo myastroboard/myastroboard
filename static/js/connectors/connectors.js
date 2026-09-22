@@ -27,10 +27,17 @@ async function loadConnectorsStore() {
         return;
     }
 
+    // Alphabetical by the label actually shown on the card (not registration order in
+    // connectors/__init__.py's REGISTRY, which is arbitrary) - localeCompare so accented
+    // labels sort correctly in every language, not just byte order.
+    const sorted = [...connectors].sort((a, b) =>
+        i18n.t(`connectors.${a.name}_label`).localeCompare(i18n.t(`connectors.${b.name}_label`))
+    );
+
     DOMUtils.clear(container);
-    connectors.forEach(c => container.appendChild(_connectorCard(c)));
+    sorted.forEach(c => container.appendChild(_connectorCard(c)));
     container.appendChild(_suggestCard());
-    connectors.forEach(c => _bindConnectorEvents(c));
+    sorted.forEach(c => _bindConnectorEvents(c));
 }
 
 // Per-connector presentation. Everything else about a connector comes from
@@ -95,6 +102,24 @@ const _CONNECTOR_UI = {
               successKey: 'mqtt_publish_requested' },
             { key: 'remove',  labelKey: 'mqtt_remove_from_ha', icon: 'bi bi-trash', endpoint: '/api/connectors/mqtt/remove',
               confirmKey: 'mqtt_remove_confirm', successKey: 'mqtt_remove_requested', danger: true },
+        ],
+    },
+    astrodex_stream: {
+        icon: 'bi bi-collection-play me-2 text-info',
+        hideUrl: true,
+        fields: [
+            { key: 'display_seconds', labelKey: 'astrodex_stream_display_seconds_field', type: 'number', min: 5, max: 600, step: 5 },
+            { key: 'aspect_ratio', labelKey: 'astrodex_stream_aspect_ratio_field', type: 'select', optionLabels: {
+                '16:9': 'astrodex_stream_aspect_16_9', '9:16': 'astrodex_stream_aspect_9_16',
+                '4:3': 'astrodex_stream_aspect_4_3', '3:4': 'astrodex_stream_aspect_3_4',
+                '1:1': 'astrodex_stream_aspect_1_1',
+            } },
+        ],
+        fieldsHelpKey: 'astrodex_stream_fields_help',
+        actions: [
+            { key: 'rotate', labelKey: 'astrodex_stream_rotate_keys', icon: 'bi bi-key',
+              endpoint: '/api/connectors/astrodex_stream/rotate',
+              confirmKey: 'astrodex_stream_rotate_confirm', successKey: 'astrodex_stream_rotate_done', danger: true },
         ],
     },
 };
@@ -171,8 +196,9 @@ function _fieldInputId(name, key) {
     return `connector-field-${name}-${key}`;
 }
 
-/** Render one labelled text/password/url input from a field spec. */
+/** Render one labelled text/password/url/select input from a field spec. */
 function _connectorFieldInput(c, spec) {
+    if (spec.type === 'select') return _connectorFieldSelect(c, spec);
     const cfg = c.config || {};
     const frag = document.createDocumentFragment();
     const id = _fieldInputId(c.name, spec.key);
@@ -205,6 +231,51 @@ function _connectorFieldInput(c, spec) {
         input.placeholder = spec.placeholder || '';
     }
     frag.appendChild(input);
+
+    if (spec.helpKey) {
+        const help = document.createElement('div');
+        help.className = 'form-text small mb-2';
+        help.textContent = i18n.t(`connectors.${spec.helpKey}`);
+        frag.appendChild(help);
+    }
+    return frag;
+}
+
+/**
+ * Render one labelled <select> from a field spec whose allowed values come from the
+ * backend's ENUM_FIELDS (GET /api/connectors' `enum_fields`), not hardcoded here - the
+ * connector's Python class stays the single source of truth for what is a valid value.
+ * `spec.optionLabels` maps each value to its own i18n key (an enum value like "16:9" isn't
+ * a valid key fragment on its own).
+ */
+function _connectorFieldSelect(c, spec) {
+    const cfg = c.config || {};
+    const frag = document.createDocumentFragment();
+    const id = _fieldInputId(c.name, spec.key);
+
+    const lbl = document.createElement('label');
+    lbl.className = 'form-label fw-semibold small';
+    lbl.setAttribute('for', id);
+    lbl.textContent = i18n.t(`connectors.${spec.labelKey}`);
+    frag.appendChild(lbl);
+
+    const select = document.createElement('select');
+    select.className = 'form-select form-select-sm mb-2 connector-field-input';
+    select.id = id;
+    select.dataset.connector = c.name;
+    select.dataset.field = spec.key;
+
+    const options = (c.enum_fields && c.enum_fields[spec.key]) || [];
+    const current = cfg[spec.key];
+    options.forEach(value => {
+        const opt = document.createElement('option');
+        opt.value = value;
+        const labelKey = spec.optionLabels && spec.optionLabels[value];
+        opt.textContent = labelKey ? i18n.t(`connectors.${labelKey}`) : value;
+        if (value === current) opt.selected = true;
+        select.appendChild(opt);
+    });
+    frag.appendChild(select);
 
     if (spec.helpKey) {
         const help = document.createElement('div');
@@ -400,57 +471,61 @@ function _connectorConfigForm(c) {
     labelDiv.appendChild(labelInput);
     frag.appendChild(labelDiv);
 
-    // URL
-    const urlDiv = document.createElement('div');
-    urlDiv.className = 'mb-3';
-    const urlLbl = document.createElement('label');
-    urlLbl.className = 'form-label fw-semibold small';
-    urlLbl.setAttribute('for', `connector-url-${c.name}`);
-    urlLbl.textContent = i18n.t(`connectors.${_connectorUI(c.name).urlLabelKey || 'url_field'}`);
-    urlDiv.appendChild(urlLbl);
+    // URL - omitted entirely by a connector with nothing external to point at (e.g.
+    // astrodex_stream, which is self-contained like MyAstroShine's SECRET_FIELDS but without
+    // even a remote host to configure).
+    if (!_connectorUI(c.name).hideUrl) {
+        const urlDiv = document.createElement('div');
+        urlDiv.className = 'mb-3';
+        const urlLbl = document.createElement('label');
+        urlLbl.className = 'form-label fw-semibold small';
+        urlLbl.setAttribute('for', `connector-url-${c.name}`);
+        urlLbl.textContent = i18n.t(`connectors.${_connectorUI(c.name).urlLabelKey || 'url_field'}`);
+        urlDiv.appendChild(urlLbl);
 
-    const inputGroup = document.createElement('div');
-    inputGroup.className = 'input-group input-group-sm';
-    const urlInput = document.createElement('input');
-    urlInput.type = 'url';
-    urlInput.className = 'form-control connector-url-input';
-    urlInput.id = `connector-url-${c.name}`;
-    urlInput.dataset.connector = c.name;
-    urlInput.value = cfg.url || '';
-    urlInput.placeholder = _connectorUI(c.name).urlPlaceholder || 'http://192.168.x.x';
-    const testBtn = document.createElement('button');
-    testBtn.className = 'btn btn-outline-secondary connector-test-btn';
-    testBtn.dataset.connector = c.name;
-    testBtn.appendChild(DOMUtils.createIcon('bi bi-wifi'));
-    inputGroup.appendChild(urlInput);
-    inputGroup.appendChild(testBtn);
-    urlDiv.appendChild(inputGroup);
+        const inputGroup = document.createElement('div');
+        inputGroup.className = 'input-group input-group-sm';
+        const urlInput = document.createElement('input');
+        urlInput.type = 'url';
+        urlInput.className = 'form-control connector-url-input';
+        urlInput.id = `connector-url-${c.name}`;
+        urlInput.dataset.connector = c.name;
+        urlInput.value = cfg.url || '';
+        urlInput.placeholder = _connectorUI(c.name).urlPlaceholder || 'http://192.168.x.x';
+        const testBtn = document.createElement('button');
+        testBtn.className = 'btn btn-outline-secondary connector-test-btn';
+        testBtn.dataset.connector = c.name;
+        testBtn.appendChild(DOMUtils.createIcon('bi bi-wifi'));
+        inputGroup.appendChild(urlInput);
+        inputGroup.appendChild(testBtn);
+        urlDiv.appendChild(inputGroup);
 
-    const localWarn = document.createElement('div');
-    localWarn.className = 'form-text text-warning connector-local-warn d-none';
-    localWarn.appendChild(DOMUtils.createIcon('bi bi-exclamation-triangle me-1'));
-    localWarn.appendChild(document.createTextNode(i18n.t('connectors.local_hostname_warning')));
-    urlDiv.appendChild(localWarn);
+        const localWarn = document.createElement('div');
+        localWarn.className = 'form-text text-warning connector-local-warn d-none';
+        localWarn.appendChild(DOMUtils.createIcon('bi bi-exclamation-triangle me-1'));
+        localWarn.appendChild(document.createTextNode(i18n.t('connectors.local_hostname_warning')));
+        urlDiv.appendChild(localWarn);
 
-    const _updateLocalWarn = () => {
-        const v = urlInput.value.trim();
-        localWarn.classList.toggle('d-none', !/\.local(\/|$)/i.test(v));
-    };
-    urlInput.addEventListener('input', _updateLocalWarn);
-    _updateLocalWarn();
+        const _updateLocalWarn = () => {
+            const v = urlInput.value.trim();
+            localWarn.classList.toggle('d-none', !/\.local(\/|$)/i.test(v));
+        };
+        urlInput.addEventListener('input', _updateLocalWarn);
+        _updateLocalWarn();
 
-    if (_connectorUI(c.name).urlHelpKey) {
-        const urlHelp = document.createElement('div');
-        urlHelp.className = 'form-text small';
-        urlHelp.textContent = i18n.t(`connectors.${_connectorUI(c.name).urlHelpKey}`);
-        urlDiv.appendChild(urlHelp);
+        if (_connectorUI(c.name).urlHelpKey) {
+            const urlHelp = document.createElement('div');
+            urlHelp.className = 'form-text small';
+            urlHelp.textContent = i18n.t(`connectors.${_connectorUI(c.name).urlHelpKey}`);
+            urlDiv.appendChild(urlHelp);
+        }
+
+        const testResult = document.createElement('div');
+        testResult.className = 'form-text connector-test-result';
+        testResult.id = `test-result-${c.name}`;
+        urlDiv.appendChild(testResult);
+        frag.appendChild(urlDiv);
     }
-
-    const testResult = document.createElement('div');
-    testResult.className = 'form-text connector-test-result';
-    testResult.id = `test-result-${c.name}`;
-    urlDiv.appendChild(testResult);
-    frag.appendChild(urlDiv);
 
     // Connector-specific fields (credentials, options)
     const ui = _connectorUI(c.name);
@@ -463,22 +538,25 @@ function _connectorConfigForm(c) {
     }
     (ui.checkboxes || []).forEach(spec => frag.appendChild(_connectorFieldCheckbox(c, spec)));
 
-    // Advanced (collapse)
-    const advDiv = document.createElement('div');
-    advDiv.className = 'mb-3 collapse';
-    advDiv.id = `connector-advanced-${c.name}`;
-    (ui.advanced || []).forEach(spec => {
-        advDiv.appendChild(spec.checkbox ? _connectorFieldCheckbox(c, spec) : _connectorFieldInput(c, spec));
-    });
-    frag.appendChild(advDiv);
+    // Advanced (collapse) - omitted entirely by a connector that declares no advanced field,
+    // same reasoning as the Modules section below (an empty toggle that opens onto nothing).
+    if ((ui.advanced || []).length) {
+        const advDiv = document.createElement('div');
+        advDiv.className = 'mb-3 collapse';
+        advDiv.id = `connector-advanced-${c.name}`;
+        ui.advanced.forEach(spec => {
+            advDiv.appendChild(spec.checkbox ? _connectorFieldCheckbox(c, spec) : _connectorFieldInput(c, spec));
+        });
+        frag.appendChild(advDiv);
 
-    const advLink = document.createElement('a');
-    advLink.className = 'small text-muted d-block mb-3';
-    advLink.dataset.bsToggle = 'collapse';
-    advLink.href = `#connector-advanced-${c.name}`;
-    advLink.appendChild(DOMUtils.createIcon('bi bi-chevron-down me-1'));
-    advLink.appendChild(document.createTextNode(i18n.t('connectors.advanced_settings')));
-    frag.appendChild(advLink);
+        const advLink = document.createElement('a');
+        advLink.className = 'small text-muted d-block mb-3';
+        advLink.dataset.bsToggle = 'collapse';
+        advLink.href = `#connector-advanced-${c.name}`;
+        advLink.appendChild(DOMUtils.createIcon('bi bi-chevron-down me-1'));
+        advLink.appendChild(document.createTextNode(i18n.t('connectors.advanced_settings')));
+        frag.appendChild(advLink);
+    }
 
     // Modules — omitted entirely by a connector that exposes none.
     const modsDiv = document.createElement('div');
@@ -556,14 +634,17 @@ function _connectorConfigForm(c) {
     saveBtn.appendChild(DOMUtils.createIcon('bi bi-floppy me-1'));
     saveBtn.appendChild(document.createTextNode(i18n.t('common.save')));
 
-    const healthBtn = document.createElement('button');
-    healthBtn.className = 'btn btn-sm btn-outline-secondary connector-health-btn';
-    healthBtn.dataset.connector = c.name;
-    healthBtn.appendChild(DOMUtils.createIcon('bi bi-heart-pulse'));
-
     actions.appendChild(switchRow);
     actions.appendChild(saveBtn);
-    actions.appendChild(healthBtn);
+    // Health check is meaningless for a connector with nothing external to reach
+    // (hideUrl) - GET /api/connectors/<name>/health only exists for connectors that define it.
+    if (!ui.hideUrl) {
+        const healthBtn = document.createElement('button');
+        healthBtn.className = 'btn btn-sm btn-outline-secondary connector-health-btn';
+        healthBtn.dataset.connector = c.name;
+        healthBtn.appendChild(DOMUtils.createIcon('bi bi-heart-pulse'));
+        actions.appendChild(healthBtn);
+    }
     frag.appendChild(actions);
 
     // Live status + connector-specific actions (a connector that runs something in the
@@ -809,18 +890,19 @@ async function _saveConnector(name) {
     const enabledChk = document.getElementById(`connector-enabled-${name}`);
     const saveBtn    = document.querySelector(`.connector-save-btn[data-connector="${name}"]`);
 
-    if (!urlInput) return;
-
     const modules = {};
     document.querySelectorAll(`.connector-module-toggle[data-connector="${name}"]`).forEach(chk => {
         modules[chk.dataset.module] = { enabled: chk.checked };
     });
 
     const payload = {
-        url:     urlInput.value.trim().replace(/\/+$/, ''),
         enabled: enabledChk ? enabledChk.checked : undefined,
         modules,
     };
+    // A connector with hideUrl (no urlInput) simply omits `url` - the backend only touches
+    // that field when the key is present in the payload, so its stored value (always '') is
+    // left alone.
+    if (urlInput) payload.url = urlInput.value.trim().replace(/\/+$/, '');
     if (labelInput) payload.label = labelInput.value.trim();
 
     // Only fields the connector declared, collected by their config key. A blank secret is
@@ -859,7 +941,7 @@ async function _saveConnector(name) {
     _updateStatusBadge(name, result);
     if (typeof updateObservatoryNavVisibility === 'function') updateObservatoryNavVisibility();
     if (typeof updateMqttPublishOptionVisibility === 'function') updateMqttPublishOptionVisibility();
-    _runHealthCheck(name);
+    if (!_connectorUI(name).hideUrl) _runHealthCheck(name);
 }
 
 /** Repaint a card's Enabled / Installed / Not installed badge after a save. */

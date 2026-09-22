@@ -23,6 +23,22 @@
   re-enter the connector credentials once - the same rule the push notification keys already
   follow.
 
+#### AstroDex Stream connector
+
+- New **AstroDex Stream** connector under Parameters -> Connectors: a personal, auto-refreshing
+  photo slideshow of your AstroDex pictures - paste the URL into Home Assistant's **Generic
+  Camera** integration (or any still-image viewer) and it shows up as a live camera, cropped to
+  the format you choose (16:9, 9:16, 4:3, 3:4, 1:1), with a discreet object-name-and-date banner.
+  Configurable display duration; photos shuffle rather than repeating in a fixed order, and never
+  the same one twice in a row.
+- Every user gets their own signed URL - nobody can read another user's stream, even on a shared
+  install (e.g. an astronomy club). A shared URL (every user's photos merged) is also available,
+  but only when Astrodex is not set to private. An admin can rotate the signing key at any time
+  to invalidate every URL handed out so far.
+- Not a real video stream by design: no new Docker port and no extra native dependency beyond
+  Pillow for the crop/banner rendering - see [docs/ASTRODEX_STREAM.md](docs/ASTRODEX_STREAM.md)
+  for the full setup guide and the reasoning behind that choice.
+
 #### Connector cards
 
 - Connector settings can now be numbers and advanced checkboxes, the test button sends the

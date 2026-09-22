@@ -260,6 +260,31 @@ Answered during implementation - the full entity and topic reference is in
 
 **i18n in 6 languages.**
 
+#### AstroDex Stream connector
+
+A second, unrelated connector landed in the same v1.6 slot: a personal, auto-refreshing photo
+slideshow of a user's AstroDex pictures, servable to Home Assistant's **Generic Camera**
+integration (or any still-image viewer) without a real video stream.
+
+- `AstroDexStreamConnector` in `backend/connectors/` - same shape as the others, no `MODULES`
+  (the slideshow is the whole connector), no `SECRET_FIELDS` (the per-user signing key is
+  auto-generated, never admin-entered)
+- RTSP and a continuously pushed MJPEG stream were both considered and rejected: the first needs
+  a new Docker port (incompatible with this project's zero-manual-config promise), the second
+  would starve the app's synchronous `gunicorn` workers with long-lived connections. The server
+  instead renders whichever photo is "current" as a pure function of wall-clock time, and a
+  client just polls a plain JPEG URL - full reasoning in
+  [docs/ASTRODEX_STREAM.md](docs/ASTRODEX_STREAM.md#why-not-a-real-video-stream)
+- One signed URL per user (HMAC-SHA256, nothing stored per user) so a club install can't let one
+  member read another's stream; a shared URL (every user's photos merged) is available only when
+  Astrodex is not set to private; an admin **Rotate keys** action invalidates every URL at once
+- Photos shuffle rather than repeating in a fixed alphabetical order, never the same one
+  back-to-back; no crossfade transition between photos - a client polling mid-transition would
+  latch onto a half-blended frame until its own next poll, so every served frame is always one
+  full, clean photo
+
+**i18n in 6 languages.**
+
 ---
 
 ### v2.0 - Interactive Sky Chart
@@ -559,7 +584,7 @@ Also:
 | v1.3 | Observation Log | Intermediate+ | High | ✅ Implemented |
 | v1.4 | Planning Intelligence (visibility calendar, meridian flip, advanced filters) | Advanced | High | ✅ Implemented |
 | v1.5 | Session Analytics | All | Medium | ✅ Implemented |
-| v1.6 | MQTT Publisher & Home Assistant Integration | All | Medium | ✅ Implemented |
+| v1.6 | MQTT Publisher & Home Assistant Integration + AstroDex Stream | All | Medium | ✅ Implemented |
 | v2.0 | Interactive Sky Chart + mosaic planner | All | High | 💡 Idea |
 | v2.1 | Community & Sharing | All | Medium | 💡 Idea |
 | v2.2 | Integrations (plate solve, PHD2, NINA) | Advanced | High | 💡 Idea |

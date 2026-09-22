@@ -481,6 +481,8 @@ async function loadAstrodex() {
         // Re-check the MyAstroShine integration state on each tab entry so enabling
         // it in Parameters shows the "Send to MyAstroShine" button without a reload.
         _myAstroShineStatusChecked = false;
+        _astrodexStreamStatusChecked = false;
+        _ensureAstrodexStreamStatus();
 
         // Get role user
         const roleUser = await getUserRole();
@@ -1449,6 +1451,87 @@ async function _ensureMyAstroShineStatus() {
     _myAstroShineEnabled = !!(status && status.enabled);
     _myAstroShineStatusChecked = true;
     return _myAstroShineEnabled;
+}
+
+// AstroDex Stream connector: the personal (+ shared, when the board isn't private) photo
+// feed URL. Same fetch-once-per-tab-entry shape as _ensureMyAstroShineStatus above - the
+// icon button in the header is toggled from the result rather than left to poll.
+let _astrodexStreamUrls = null;
+let _astrodexStreamStatusChecked = false;
+
+async function _ensureAstrodexStreamStatus() {
+    if (_astrodexStreamStatusChecked) return _astrodexStreamUrls;
+    const data = await fetchJSONOnce('/api/astrodex/stream/urls').catch(() => null);
+    _astrodexStreamUrls = (data && data.enabled) ? data : null;
+    _astrodexStreamStatusChecked = true;
+    const iconBtn = document.getElementById('astrodex-stream-icon-btn');
+    if (iconBtn) iconBtn.classList.toggle('d-none', !_astrodexStreamUrls);
+    return _astrodexStreamUrls;
+}
+
+async function showAstrodexStreamModal() {
+    const urls = _astrodexStreamUrls || await _ensureAstrodexStreamStatus();
+    if (!urls) return;
+
+    const sharedSection = urls.shared_url ? `
+        <div class="mb-3">
+            <label class="form-label fw-semibold">${i18n.t('astrodex.stream_shared_url_label')}</label>
+            <div class="input-group">
+                <input type="text" class="form-control" readonly value="${escapeHtml(urls.shared_url)}" id="astrodex-stream-shared-url-input">
+                <button type="button" class="btn btn-outline-secondary" data-action="copy-stream-url" data-target="astrodex-stream-shared-url-input" title="${i18n.t('astrodex.stream_copy_url')}"><i class="bi bi-clipboard" aria-hidden="true"></i></button>
+            </div>
+            <div class="form-text small">${i18n.t('astrodex.stream_shared_url_hint')}</div>
+        </div>
+    ` : `
+        <div class="alert alert-light border small mb-3">${i18n.t('astrodex.stream_shared_url_private')}</div>
+    `;
+
+    createModal(i18n.t('astrodex.stream_modal_title'), `
+        <p class="text-muted">${i18n.t('astrodex.stream_modal_intro')}</p>
+        <div class="mb-3">
+            <label class="form-label fw-semibold">${i18n.t('astrodex.stream_personal_url_label')}</label>
+            <div class="input-group">
+                <input type="text" class="form-control" readonly value="${escapeHtml(urls.personal_url)}" id="astrodex-stream-personal-url-input">
+                <button type="button" class="btn btn-outline-secondary" data-action="copy-stream-url" data-target="astrodex-stream-personal-url-input" title="${i18n.t('astrodex.stream_copy_url')}"><i class="bi bi-clipboard" aria-hidden="true"></i></button>
+            </div>
+            <div class="form-text small">${i18n.t('astrodex.stream_personal_url_hint')}</div>
+        </div>
+        ${sharedSection}
+        <div class="alert alert-light border small mb-0">
+            <i class="bi bi-info-circle icon-inline" aria-hidden="true"></i>${i18n.t('astrodex.stream_ha_setup_hint')}
+        </div>
+    `, 'lg');
+
+    openModal('#modal_lg_close');
+}
+
+async function _copyStreamUrl(inputId) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+
+    // navigator.clipboard only exists in a secure context (HTTPS, or exactly "localhost") -
+    // on a plain http:// LAN address, which is the normal way this self-hosted app is reached,
+    // the object is undefined outright, not just permission-denied. Fall back to the legacy
+    // execCommand('copy'), which is the only copy mechanism that still works there.
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        try {
+            await navigator.clipboard.writeText(input.value);
+            showMessage('success', i18n.t('astrodex.stream_url_copied'));
+            return;
+        } catch (error) {
+            console.warn('navigator.clipboard write failed, falling back to execCommand:', error);
+        }
+    }
+
+    input.select();
+    input.setSelectionRange(0, input.value.length);
+    let copied = false;
+    try {
+        copied = document.execCommand('copy');
+    } catch (error) {
+        console.warn('execCommand("copy") failed:', error);
+    }
+    showMessage(copied ? 'success' : 'error', i18n.t(copied ? 'astrodex.stream_url_copied' : 'astrodex.stream_copy_failed'));
 }
 
 // After "Send to MyAstroShine", MyAstroShine calls the board back server-to-server
@@ -2824,6 +2907,14 @@ async function initializeAstrodexEventListeners() {
                     if (isAllowedAstrodex) {
                         sendPictureToMyAstroShine(itemId, pictureId);
                     }
+                    break;
+                case 'open-astrodex-stream':
+                    e.preventDefault();
+                    showAstrodexStreamModal();
+                    break;
+                case 'copy-stream-url':
+                    e.preventDefault();
+                    _copyStreamUrl(button.getAttribute('data-target'));
                     break;
                 case 'switch-catalogue-name':
                     e.preventDefault();

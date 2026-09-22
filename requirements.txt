@@ -17,7 +17,7 @@ PyOngc===1.2.2
 # Data processing
 numpy===2.5.3
 matplotlib===3.11.2
-pandas===3.0.5
+pandas===3.0.6
 
 # HTTP and API
 requests===2.34.2
@@ -39,3 +39,6 @@ pywebpush===2.5.0
 
 # MQTT publisher (Home Assistant connector)
 paho-mqtt===2.1.0
+
+# Image processing (AstroDex Stream connector: crop + banner rendering)
+Pillow===12.3.0

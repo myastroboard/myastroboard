@@ -296,6 +296,48 @@ a circular import (a test guards this).
 
 See [HOME_ASSISTANT.md - Troubleshooting](HOME_ASSISTANT.md#troubleshooting).
 
+## AstroDex Stream connector
+
+A personal, auto-refreshing photo slideshow of a user's AstroDex pictures, rendered as a single
+"current frame" JPEG that any still-image camera viewer (Home Assistant's **Generic Camera**
+integration, a plain `<img>` tag, ...) can poll. Deliberately **not** a real video stream (no
+RTSP, no pushed MJPEG) - see [ASTRODEX_STREAM.md](ASTRODEX_STREAM.md#why-not-a-real-video-stream)
+for the feasibility reasoning. The frame is a pure function of wall-clock time, so there is no
+background thread and nothing to start or stop when the connector is enabled or disabled. No
+crossfade between photos: a client polling mid-transition would receive - and keep statically
+displaying, until its own next poll - one half-blended frame, which would look broken rather
+than smooth. Which photo is "current" instead shuffles pseudo-randomly (seeded by the feed and
+the time slot, so every viewer polling at the same moment agrees without any shared state) and
+never repeats the same photo twice in a row.
+
+**Appears in**: AstroDex - not the Observatory, so it has no Observatory panel.
+
+```python
+class AstroDexStreamConnector(BaseConnector):
+    target_modules = ["astrodex"]
+    MODULES = []                                      # the slideshow is the whole connector
+    SECRET_FIELDS = ()                                 # nothing admin-entered - see below
+    CONFIG_FIELDS = {"display_seconds": 20, "aspect_ratio": "16:9"}
+    ENUM_FIELDS = {"aspect_ratio": ("16:9", "9:16", "4:3", "3:4", "1:1")}
+```
+
+`ENUM_FIELDS` is a `BaseConnector` attribute (added for this connector, reusable by any future
+one): the shared `POST /api/connectors/<name>/config` handler keeps a submitted value only when
+it is one of the declared choices, falling back to the field's `CONFIG_FIELDS` default otherwise;
+`GET /api/connectors` exposes the allowed values as `enum_fields` so the card can build a
+`<select>` from them instead of hardcoding the choices a second time. `is_configured()` always
+returns `True` - there is no external URL or credential, nothing to "install".
+
+**Per-user signing key**: rather than storing a secret per user, a stream URL embeds an
+HMAC-SHA256 token of the user id, keyed by a signing secret generated once on first use
+(`connectors_secrets.json`, never entered by an admin - same idea as the auto-generated VAPID
+keys). Verifying a request just recomputes the token. Rotating the secret (the card's **Rotate
+keys** action, `POST /api/connectors/astrodex_stream/rotate`) invalidates every URL at once - the
+only revocation mechanism.
+
+Its own routes live in `blueprints/astrodex_stream.py` under `/api/astrodex/stream/*`. Full
+documentation: [ASTRODEX_STREAM.md](ASTRODEX_STREAM.md).
+
 ## Adding a new connector
 
 1. Create a class in `backend/connectors/<name>_connector.py` that extends `BaseConnector`
