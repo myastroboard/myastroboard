@@ -1708,6 +1708,58 @@
                         </div>
                     </form>
                 </div>
+
+                <!-- Two-factor authentication (self-service) -->
+                <div class="shadow p-2 mb-3 rounded bg-sub-container">
+                    <h2>
+                        <i class="bi bi-shield-lock-fill text-warning icon-inline" aria-hidden="true"></i> <span data-i18n="settings.security_2fa_title">Two-factor authentication</span>
+                    </h2>
+
+                    <!-- Shown when the administrator has not enabled 2FA for this instance -->
+                    <div id="security-2fa-unavailable" class="alert alert-info" role="alert" data-i18n="settings.2fa_not_available_admin" style="display:none;">
+                        Two-factor authentication has not been enabled by your administrator.
+                    </div>
+
+                    <div id="security-2fa-panel" style="display:none;">
+                        <div class="alert alert-info" role="alert" data-i18n="settings.security_2fa_desc">
+                            Add a second step to your sign-in: a 6-digit code from an authenticator app on your phone. You are not asked for it when you sign in from a trusted network.
+                        </div>
+
+                        <div id="security-2fa-message" class="alert" role="alert" style="display:none;"></div>
+
+                        <!-- 2FA not yet active for this account -->
+                        <div id="security-2fa-inactive" style="display:none;">
+                            <button type="button" id="security-2fa-enable-btn" class="btn btn-primary">
+                                <i class="bi bi-shield-plus icon-inline" aria-hidden="true"></i>
+                                <span data-i18n="settings.security_2fa_enable_btn">Enable two-factor authentication</span>
+                            </button>
+                        </div>
+
+                        <!-- 2FA active for this account -->
+                        <div id="security-2fa-active" style="display:none;">
+                            <div class="alert alert-success" role="alert">
+                                <i class="bi bi-shield-check icon-inline" aria-hidden="true"></i>
+                                <span data-i18n="settings.2fa_active">Two-factor authentication is active on your account.</span>
+                                <span id="security-2fa-confirmed-at" class="ms-1 small"></span>
+                            </div>
+
+                            <form id="security-2fa-disable-form" autocomplete="off" novalidate>
+                                <div class="row g-3 align-items-end">
+                                    <div class="col-md-4">
+                                        <label for="security-2fa-password" class="form-label" data-i18n="settings.2fa_disable_confirm_password">Confirm with your current password</label>
+                                        <input type="password" id="security-2fa-password" name="current-password" class="form-control" required minlength="6" autocomplete="current-password" data-i18n-placeholder="users.current_password_placeholder" placeholder="Enter your current password">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <button type="submit" class="btn btn-danger">
+                                            <i class="bi bi-shield-slash icon-inline" aria-hidden="true"></i>
+                                            <span data-i18n="settings.security_2fa_disable_btn">Disable two-factor authentication</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
             </div>
 
         </div>
@@ -2151,6 +2203,14 @@
                             </div>
 
                             <div class="col-12">
+                                <label class="visually-hidden" for="new-account-scope" data-i18n="users.account_scope">Scope</label>
+                                <select class="form-select" id="new-account-scope">
+                                    <option value="global" data-i18n="users.account_scope_global">Global (can sign in from anywhere)</option>
+                                    <option value="local" data-i18n="users.account_scope_local">Local (trusted networks only)</option>
+                                </select>
+                            </div>
+
+                            <div class="col-12">
                                 <button type="submit" class="btn btn-primary" data-i18n="users.create_user">Create User</button>
                             </div>
                         </div>
@@ -2162,7 +2222,55 @@
                     <h2>
                         <i class="bi bi-people-fill text-success icon-inline" aria-hidden="true"></i> <span data-i18n="users.existing_users">Existing Users</span>
                     </h2>
+                    <div id="security-local-scope-warning" class="alert alert-warning" role="alert" style="display:none;"></div>
                     <div id="users-list"></div>
+                </div>
+
+                <!-- Instance security: trusted networks + two-factor switch (admin only) -->
+                <div class="shadow p-2 mb-3 rounded bg-sub-container">
+                    <h2>
+                        <i class="bi bi-shield-lock text-danger icon-inline" aria-hidden="true"></i> <span data-i18n="settings.trusted_networks_title">Trusted networks and two-factor authentication</span>
+                    </h2>
+                    <div class="alert alert-info" role="alert" data-i18n="settings.trusted_networks_desc">
+                        A trusted network is where you consider sign-ins safe, typically your home LAN. Accounts limited to trusted networks can only sign in from here, and two-factor authentication is skipped from here.
+                    </div>
+
+                    <div id="security-settings-message" class="alert" role="alert" style="display:none;"></div>
+
+                    <div class="row g-2 align-items-center mb-2">
+                        <div class="col-md-5">
+                            <label class="visually-hidden" for="trusted-network-input" data-i18n="settings.trusted_networks_input_label">Trusted network</label>
+                            <input type="text" class="form-control" id="trusted-network-input" autocomplete="off" placeholder="192.168.1.0/24" data-i18n-placeholder="settings.trusted_networks_placeholder">
+                        </div>
+                        <div class="col-md-3">
+                            <button type="button" id="trusted-network-add" class="btn btn-secondary">
+                                <i class="bi bi-plus-lg icon-inline" aria-hidden="true"></i>
+                                <span data-i18n="settings.trusted_networks_add">Add</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-text mb-2" data-i18n="settings.trusted_networks_localhost_hint">127.0.0.1 and ::1 are always trusted and never need to be added.</div>
+                    <div id="trusted-networks-list" class="mb-3"></div>
+
+                    <div class="row g-3 mt-1 mb-2">
+                        <div class="col-md-8">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="security-2fa-enabled" role="switch">
+                                <label class="form-check-label" for="security-2fa-enabled" data-i18n="settings.security_2fa_enable_label">Enable two-factor authentication for this instance</label>
+                            </div>
+                            <div id="security-2fa-requires-network" class="alert alert-warning small mt-2 mb-0" role="alert" data-i18n="settings.security_2fa_requires_network" style="display:none;">
+                                Add at least one trusted network before enabling two-factor authentication.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="button-group mt-2">
+                        <button type="button" id="save-security-settings" class="btn btn-primary">
+                            <i class="bi bi-save icon-inline" aria-hidden="true"></i>
+                            <span data-i18n="settings.app_settings_save_btn">Save</span>
+                        </button>
+                        <span id="security-settings-feedback" class="ms-3 text-success" style="display:none;" data-i18n="settings.app_settings_saved">Settings saved.</span>
+                    </div>
                 </div>
             </div>
 
@@ -3436,6 +3544,8 @@
 
     <script src="/static/vendor/chartjs/chart.umd.min.js?v={{ version }}" defer></script>
     <!-- Plotly (~4.8MB) is lazy-loaded on demand by skytonight.js only when the sky map is rendered -->
+    <!-- QR code generator (~20KB): draws the 2FA enrolment code client-side, see auth.js renderTwoFactorQrCode() -->
+    <script src="/static/vendor/qrcode/qrcode.min.js?v={{ version }}" defer></script>
     <script src="/static/vendor/bootstrap/js/bootstrap.bundle.min.js?v={{ version }}"></script>
     <script src="/static/js/dom_utils.js?v={{ version }}"></script>
     <script src="/static/js/i18n.js?v={{ version }}"></script>

@@ -175,6 +175,18 @@
     transform: translateY(0);
 }
 
+/* Two-factor step (second login step) */
+.otp-prompt {
+    color: var(--text-secondary);
+    margin-bottom: 1.25rem;
+}
+
+.otp-code-input {
+    letter-spacing: 0.5rem;
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-semibold);
+}
+
 /* Responsive design */
 @media (max-width: 480px) {
     .login-container {

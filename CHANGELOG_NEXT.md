@@ -1,3 +1,21 @@
+#### Two-factor authentication & local/global accounts
+
+- Optional **two-factor authentication (TOTP)** for any account, compatible with standard
+  authenticator apps. Off by default: an admin enables it instance-wide under Parameters ->
+  Users (requires at least one trusted network), then each user opts in individually from My
+  Settings -> Security. Setup shows a QR code (rendered client-side, no server-side image
+  dependency) plus the raw secret as a guaranteed fallback for the "authenticator app on the
+  same phone" case. An admin can force-disable a user's 2FA if they lose their device.
+- New **trusted networks** list (Parameters -> Users): CIDR blocks or IPs you consider safe.
+  Signing in from a trusted network skips the 2FA prompt entirely. 127.0.0.1 and ::1 are always
+  trusted and never need to be added, so clearing the list can't lock out local access.
+- New **local vs. global account scope**: an account can be restricted to sign in only from a
+  trusted network. Defaults to global (sign in from anywhere) for every existing and new
+  account. With no trusted network configured, the restriction is inactive (a warning banner
+  says so) rather than silently locking everyone out.
+- `data/security_settings.json` (trusted networks + the 2FA switch) is host-specific and
+  excluded from backups and config export, like `trust_proxy_headers`.
+
 #### MQTT publisher & Home Assistant integration (v1.6)
 
 - New **MQTT / Home Assistant** connector under Parameters -> Connectors. Point it at the MQTT

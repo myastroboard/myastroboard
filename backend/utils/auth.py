@@ -10,6 +10,7 @@ import re
 import shutil
 from datetime import datetime, timezone
 from functools import wraps
+import pyotp
 from flask import session, jsonify, request
 from werkzeug.security import generate_password_hash, check_password_hash
 from utils.logging_config import get_logger
@@ -21,6 +22,19 @@ logger = get_logger(__name__)
 ROLE_ADMIN = 'admin'
 ROLE_USER = 'user'
 ROLE_READ_ONLY = 'read-only'
+
+# Account scope: a 'local' account may only sign in from a trusted network
+# (see utils/security_settings.py). Every account is 'global' unless told otherwise.
+ACCOUNT_SCOPE_GLOBAL = 'global'
+ACCOUNT_SCOPE_LOCAL = 'local'
+ALLOWED_ACCOUNT_SCOPES = {ACCOUNT_SCOPE_GLOBAL, ACCOUNT_SCOPE_LOCAL}
+
+# Issuer shown by the authenticator app next to the account name
+TOTP_ISSUER = 'MyAstroBoard'
+
+# pyotp verifies the current 30s step plus one step either side, tolerating a
+# +/-30s clock drift between the server and the authenticator device.
+TOTP_VALID_WINDOW = 1
 
 # Default admin credentials
 DEFAULT_ADMIN_USERNAME = 'admin'
@@ -126,6 +140,22 @@ DEFAULT_USER_PREFERENCES = {
 USERS_FILE = os.path.join(os.environ.get('DATA_DIR', '/app/data'), 'users.json')
 
 
+def normalize_account_scope(value):
+    """Coerce a stored account_scope to a known value.
+
+    Unlike `role`, an unrecognised scope does not invalidate the whole users file:
+    an admin hand-editing users.json (the documented lost-authenticator recovery
+    path) must not be able to lock everyone out with a typo. It falls back to
+    'global', which is also the default for entries that predate the field.
+    """
+    if value is None:
+        return ACCOUNT_SCOPE_GLOBAL
+    if value in ALLOWED_ACCOUNT_SCOPES:
+        return value
+    logger.warning(f"Unknown account_scope {value!r}, falling back to '{ACCOUNT_SCOPE_GLOBAL}'")
+    return ACCOUNT_SCOPE_GLOBAL
+
+
 class User:
     """User model"""
 
@@ -139,6 +169,10 @@ class User:
         last_login=None,
         preferences=None,
         push_subscriptions=None,
+        account_scope=None,
+        totp_secret=None,
+        totp_enabled=False,
+        totp_confirmed_at=None,
     ):
         self.user_id = user_id or str(uuid.uuid4())
         self.username = username
@@ -148,6 +182,14 @@ class User:
         self.last_login = last_login
         self.preferences = preferences.copy() if isinstance(preferences, dict) else DEFAULT_USER_PREFERENCES.copy()
         self.push_subscriptions = push_subscriptions if isinstance(push_subscriptions, list) else []
+        self.account_scope = normalize_account_scope(account_scope)
+        # Base32 TOTP shared secret. It is persisted as soon as setup starts (with
+        # totp_enabled still False) rather than being kept in memory or in the Flask
+        # session: the container runs gunicorn with several workers, so a pending
+        # secret held in one worker would be missing from the one handling /confirm.
+        self.totp_secret = totp_secret if isinstance(totp_secret, str) and totp_secret else None
+        self.totp_enabled = bool(totp_enabled) and bool(self.totp_secret)
+        self.totp_confirmed_at = totp_confirmed_at
 
     def to_dict(self):
         """Convert user to dictionary"""
@@ -160,11 +202,19 @@ class User:
             'last_login': self.last_login,
             'preferences': self.preferences,
             'push_subscriptions': self.push_subscriptions,
+            'account_scope': self.account_scope,
+            'totp_secret': self.totp_secret,
+            'totp_enabled': self.totp_enabled,
+            'totp_confirmed_at': self.totp_confirmed_at,
         }
 
     @staticmethod
     def from_dict(data):
-        """Create user from dictionary"""
+        """Create user from dictionary.
+
+        The 2FA and account-scope keys default to falsy/'global' so entries written by
+        an older version load unchanged - no migration script is needed.
+        """
         return User(
             user_id=data.get('user_id'),
             username=data['username'],
@@ -174,11 +224,35 @@ class User:
             last_login=data.get('last_login'),
             preferences=data.get('preferences'),
             push_subscriptions=data.get('push_subscriptions'),
+            account_scope=data.get('account_scope'),
+            totp_secret=data.get('totp_secret'),
+            totp_enabled=data.get('totp_enabled', False),
+            totp_confirmed_at=data.get('totp_confirmed_at'),
         )
 
     def check_password(self, password):
         """Check if password matches"""
         return check_password_hash(self.password_hash, password)
+
+    def get_totp_uri(self, issuer=TOTP_ISSUER):
+        """Return the otpauth:// provisioning URI for this user's current secret."""
+        if not self.totp_secret:
+            raise ValueError("No TOTP secret set for this user")
+        return pyotp.TOTP(self.totp_secret).provisioning_uri(name=self.username, issuer_name=issuer)
+
+    def verify_totp(self, code):
+        """Check a 6-digit TOTP code against this user's secret (clock-drift tolerant)."""
+        if not self.totp_secret or not code:
+            return False
+        try:
+            return pyotp.TOTP(self.totp_secret).verify(str(code).strip(), valid_window=TOTP_VALID_WINDOW)
+        except Exception as e:
+            logger.warning(f"TOTP verification error for user {self.username}: {e}")
+            return False
+
+    def is_local_account(self):
+        """Check if this account may only sign in from a trusted network"""
+        return self.account_scope == ACCOUNT_SCOPE_LOCAL
 
     def is_admin(self):
         """Check if user is admin"""
@@ -489,7 +563,7 @@ class UserManager:
         except Exception:
             return []
 
-    def create_user(self, username, password, role):
+    def create_user(self, username, password, role, account_scope=None):
         """Create a new user"""
         self._reload_users_if_changed()
 
@@ -499,7 +573,15 @@ class UserManager:
         if role not in [ROLE_ADMIN, ROLE_USER, ROLE_READ_ONLY]:
             raise ValueError(f"Invalid role: {role}")
 
-        user = User(username=username, password_hash=generate_password_hash(password), role=role)
+        if account_scope is not None and account_scope not in ALLOWED_ACCOUNT_SCOPES:
+            raise ValueError(f"Invalid account scope: {account_scope}")
+
+        user = User(
+            username=username,
+            password_hash=generate_password_hash(password),
+            role=role,
+            account_scope=account_scope,
+        )
 
         # New users are attributed to every existing location by default - an
         # admin can manually exclude specific ones afterward. Saves having to
@@ -533,8 +615,8 @@ class UserManager:
         """Get user by username (for backwards compatibility)"""
         return self.get_user_by_username(username)
 
-    def update_user(self, user_id, username=None, password=None, role=None):
-        """Update user username, password and/or role"""
+    def update_user(self, user_id, username=None, password=None, role=None, account_scope=None):
+        """Update user username, password, role and/or account scope"""
         self._reload_users_if_changed()
         user = self.get_user_by_id(user_id)
         if not user:
@@ -556,8 +638,76 @@ class UserManager:
                 raise ValueError(f"Invalid role: {role}")
             user.role = role
 
+        if account_scope:
+            if account_scope not in ALLOWED_ACCOUNT_SCOPES:
+                raise ValueError(f"Invalid account scope: {account_scope}")
+            user.account_scope = account_scope
+
         self.save_users()
         logger.info(f"Updated user {user.username} (ID: {user_id})")
+        return user
+
+    # ------------------------------------------------------------------
+    # Two-factor authentication (TOTP) - per-user secret lifecycle
+    # ------------------------------------------------------------------
+
+    def start_totp_setup(self, user_id):
+        """Generate and persist a fresh, unconfirmed TOTP secret for a user.
+
+        Restarting setup always regenerates the secret, so an abandoned enrollment
+        never leaves a usable secret behind. The user stays without 2FA until
+        confirm_totp_setup() succeeds.
+        """
+        self._reload_users_if_changed()
+        user = self.get_user_by_id(user_id)
+        if not user:
+            raise ValueError("User not found")
+
+        user.totp_secret = pyotp.random_base32()
+        user.totp_enabled = False
+        user.totp_confirmed_at = None
+        self.save_users()
+        logger.info(f"Started 2FA setup for user {user.username} (ID: {user_id})")
+        return user
+
+    def confirm_totp_setup(self, user_id, code):
+        """Activate 2FA for a user once they prove they can generate a valid code."""
+        self._reload_users_if_changed()
+        user = self.get_user_by_id(user_id)
+        if not user:
+            raise ValueError("User not found")
+
+        if not user.totp_secret:
+            raise ValueError("Two-factor setup has not been started")
+
+        if not user.verify_totp(code):
+            raise ValueError("Invalid two-factor code")
+
+        user.totp_enabled = True
+        user.totp_confirmed_at = datetime.now(timezone.utc).isoformat()
+        self.save_users()
+        logger.info(f"2FA confirmed and enabled for user {user.username} (ID: {user_id})")
+        return user
+
+    def disable_totp(self, user_id, password=None):
+        """Clear a user's 2FA state.
+
+        *password* re-authenticates the self-service path. Admin-driven removal
+        (a lost authenticator) passes None: admin authority is the check there.
+        """
+        self._reload_users_if_changed()
+        user = self.get_user_by_id(user_id)
+        if not user:
+            raise ValueError("User not found")
+
+        if password is not None and not user.check_password(password):
+            raise ValueError("Current password is incorrect")
+
+        user.totp_secret = None
+        user.totp_enabled = False
+        user.totp_confirmed_at = None
+        self.save_users()
+        logger.info(f"2FA disabled for user {user.username} (ID: {user_id})")
         return user
 
     def change_own_password(self, user_id, current_password, new_password):
@@ -842,6 +992,8 @@ class UserManager:
                 'role': user.role,
                 'created_at': user.created_at,
                 'last_login': user.last_login,
+                'account_scope': user.account_scope,
+                'totp_enabled': user.totp_enabled,
             }
             for user in self.users.values()
         ]

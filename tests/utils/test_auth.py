@@ -5,6 +5,7 @@ import os
 import uuid
 from unittest.mock import patch
 
+import pyotp
 import pytest
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -1797,3 +1798,292 @@ class TestAuthLocationEdgeArcs:
         manager.set_location_attribution('loc-1', [user.user_id])
         prefs = get_user_location_prefs(manager.get_user_by_id(user.user_id))
         assert prefs['attributed_location_ids'].count('loc-1') == 1
+
+
+class TestAccountScope:
+    """Local/global account scope on the User model and through UserManager."""
+
+    def test_defaults_to_global(self, isolated_user_manager):
+        user = isolated_user_manager.create_user("scoped", "secret", auth.ROLE_USER)
+
+        assert user.account_scope == auth.ACCOUNT_SCOPE_GLOBAL
+        assert user.is_local_account() is False
+
+    def test_create_user_accepts_local_scope(self, isolated_user_manager):
+        user = isolated_user_manager.create_user(
+            "localuser", "secret", auth.ROLE_USER, account_scope=auth.ACCOUNT_SCOPE_LOCAL
+        )
+
+        assert user.account_scope == auth.ACCOUNT_SCOPE_LOCAL
+        assert user.is_local_account() is True
+
+    def test_create_user_rejects_invalid_scope(self, isolated_user_manager):
+        with pytest.raises(ValueError, match="Invalid account scope"):
+            isolated_user_manager.create_user("bad", "secret", auth.ROLE_USER, account_scope="planetary")
+
+    def test_update_user_changes_scope(self, isolated_user_manager):
+        user = isolated_user_manager.create_user("mover", "secret", auth.ROLE_USER)
+
+        updated = isolated_user_manager.update_user(user.user_id, account_scope=auth.ACCOUNT_SCOPE_LOCAL)
+
+        assert updated.account_scope == auth.ACCOUNT_SCOPE_LOCAL
+
+    def test_update_user_rejects_invalid_scope(self, isolated_user_manager):
+        user = isolated_user_manager.create_user("mover2", "secret", auth.ROLE_USER)
+
+        with pytest.raises(ValueError, match="Invalid account scope"):
+            isolated_user_manager.update_user(user.user_id, account_scope="orbital")
+
+    def test_scope_survives_a_save_load_round_trip(self, isolated_user_manager):
+        isolated_user_manager.create_user(
+            "persisted", "secret", auth.ROLE_USER, account_scope=auth.ACCOUNT_SCOPE_LOCAL
+        )
+
+        reloaded = auth.UserManager()
+
+        assert reloaded.get_user_by_username("persisted").account_scope == auth.ACCOUNT_SCOPE_LOCAL
+
+    def test_legacy_entry_without_the_key_loads_as_global(self):
+        """Entries written before this field existed need no migration."""
+        user = auth.User.from_dict(
+            {
+                'user_id': 'legacy-1',
+                'username': 'legacy',
+                'password_hash': 'hash',
+                'role': auth.ROLE_USER,
+            }
+        )
+
+        assert user.account_scope == auth.ACCOUNT_SCOPE_GLOBAL
+
+    def test_unknown_stored_scope_falls_back_to_global(self):
+        """A typo in a hand-edited users.json must not invalidate the whole file."""
+        user = auth.User.from_dict(
+            {
+                'user_id': 'legacy-2',
+                'username': 'typo',
+                'password_hash': 'hash',
+                'role': auth.ROLE_USER,
+                'account_scope': 'lokal',
+            }
+        )
+
+        assert user.account_scope == auth.ACCOUNT_SCOPE_GLOBAL
+
+    def test_list_users_exposes_scope(self, isolated_user_manager):
+        isolated_user_manager.create_user(
+            "listed", "secret", auth.ROLE_USER, account_scope=auth.ACCOUNT_SCOPE_LOCAL
+        )
+
+        entry = next(u for u in isolated_user_manager.list_users() if u['username'] == 'listed')
+
+        assert entry['account_scope'] == auth.ACCOUNT_SCOPE_LOCAL
+
+
+class TestTotpUserModel:
+    """TOTP fields on the User model."""
+
+    def test_defaults_are_falsy(self):
+        user = auth.User(username="u", password_hash="h", role=auth.ROLE_USER)
+
+        assert user.totp_secret is None
+        assert user.totp_enabled is False
+        assert user.totp_confirmed_at is None
+
+    def test_legacy_entry_without_totp_keys_loads(self):
+        user = auth.User.from_dict(
+            {
+                'user_id': 'legacy-3',
+                'username': 'legacy',
+                'password_hash': 'hash',
+                'role': auth.ROLE_USER,
+            }
+        )
+
+        assert (user.totp_secret, user.totp_enabled, user.totp_confirmed_at) == (None, False, None)
+
+    def test_enabled_without_a_secret_is_coerced_off(self):
+        """A secretless "enabled" entry would otherwise lock the account out entirely."""
+        user = auth.User.from_dict(
+            {
+                'user_id': 'broken',
+                'username': 'broken',
+                'password_hash': 'hash',
+                'role': auth.ROLE_USER,
+                'totp_enabled': True,
+            }
+        )
+
+        assert user.totp_enabled is False
+
+    def test_to_dict_from_dict_round_trip(self):
+        secret = pyotp.random_base32()
+        original = auth.User(
+            username="rt",
+            password_hash="h",
+            role=auth.ROLE_USER,
+            account_scope=auth.ACCOUNT_SCOPE_LOCAL,
+            totp_secret=secret,
+            totp_enabled=True,
+            totp_confirmed_at="2026-09-22T12:00:00+00:00",
+        )
+
+        restored = auth.User.from_dict(original.to_dict())
+
+        assert restored.totp_secret == secret
+        assert restored.totp_enabled is True
+        assert restored.totp_confirmed_at == "2026-09-22T12:00:00+00:00"
+        assert restored.account_scope == auth.ACCOUNT_SCOPE_LOCAL
+
+    def test_verify_totp_accepts_a_current_code(self):
+        secret = pyotp.random_base32()
+        user = auth.User(username="v", password_hash="h", role=auth.ROLE_USER, totp_secret=secret)
+
+        assert user.verify_totp(pyotp.TOTP(secret).now()) is True
+
+    def test_verify_totp_rejects_a_wrong_code(self):
+        secret = pyotp.random_base32()
+        user = auth.User(username="v", password_hash="h", role=auth.ROLE_USER, totp_secret=secret)
+
+        assert user.verify_totp("000000") is False
+
+    def test_verify_totp_without_a_secret_is_false(self):
+        user = auth.User(username="v", password_hash="h", role=auth.ROLE_USER)
+
+        assert user.verify_totp("123456") is False
+
+    def test_verify_totp_with_empty_code_is_false(self):
+        secret = pyotp.random_base32()
+        user = auth.User(username="v", password_hash="h", role=auth.ROLE_USER, totp_secret=secret)
+
+        assert user.verify_totp("") is False
+
+    def test_provisioning_uri_carries_issuer_and_username(self):
+        secret = pyotp.random_base32()
+        user = auth.User(username="astro", password_hash="h", role=auth.ROLE_USER, totp_secret=secret)
+
+        uri = user.get_totp_uri()
+
+        assert uri.startswith("otpauth://totp/")
+        assert "astro" in uri
+        assert f"secret={secret}" in uri
+        assert "issuer=MyAstroBoard" in uri
+
+    def test_provisioning_uri_requires_a_secret(self):
+        user = auth.User(username="astro", password_hash="h", role=auth.ROLE_USER)
+
+        with pytest.raises(ValueError, match="No TOTP secret"):
+            user.get_totp_uri()
+
+
+class TestUserManagerTotpLifecycle:
+    """start / confirm / disable, and the admin forced-disable path."""
+
+    def test_setup_persists_an_unconfirmed_secret(self, isolated_user_manager):
+        user = isolated_user_manager.create_user("enroller", "secret", auth.ROLE_USER)
+
+        updated = isolated_user_manager.start_totp_setup(user.user_id)
+
+        assert updated.totp_secret
+        assert updated.totp_enabled is False
+        assert updated.totp_confirmed_at is None
+
+    def test_setup_is_written_to_disk_immediately(self, isolated_user_manager):
+        """gunicorn runs several workers: a pending secret held in memory would be
+        missing from whichever worker handles the confirm request."""
+        user = isolated_user_manager.create_user("enroller2", "secret", auth.ROLE_USER)
+        isolated_user_manager.start_totp_setup(user.user_id)
+
+        reloaded = auth.UserManager()
+
+        assert reloaded.get_user_by_id(user.user_id).totp_secret is not None
+
+    def test_restarting_setup_regenerates_the_secret(self, isolated_user_manager):
+        user = isolated_user_manager.create_user("enroller3", "secret", auth.ROLE_USER)
+
+        first = isolated_user_manager.start_totp_setup(user.user_id).totp_secret
+        second = isolated_user_manager.start_totp_setup(user.user_id).totp_secret
+
+        assert first != second
+
+    def test_confirm_with_a_valid_code_enables_2fa(self, isolated_user_manager):
+        user = isolated_user_manager.create_user("confirmer", "secret", auth.ROLE_USER)
+        secret = isolated_user_manager.start_totp_setup(user.user_id).totp_secret
+
+        updated = isolated_user_manager.confirm_totp_setup(user.user_id, pyotp.TOTP(secret).now())
+
+        assert updated.totp_enabled is True
+        assert updated.totp_confirmed_at is not None
+
+    def test_confirm_with_a_wrong_code_is_rejected(self, isolated_user_manager):
+        user = isolated_user_manager.create_user("confirmer2", "secret", auth.ROLE_USER)
+        isolated_user_manager.start_totp_setup(user.user_id)
+
+        with pytest.raises(ValueError, match="Invalid two-factor code"):
+            isolated_user_manager.confirm_totp_setup(user.user_id, "000000")
+
+        assert isolated_user_manager.get_user_by_id(user.user_id).totp_enabled is False
+
+    def test_confirm_before_setup_is_rejected(self, isolated_user_manager):
+        user = isolated_user_manager.create_user("confirmer3", "secret", auth.ROLE_USER)
+
+        with pytest.raises(ValueError, match="has not been started"):
+            isolated_user_manager.confirm_totp_setup(user.user_id, "123456")
+
+    def test_disable_with_the_right_password_clears_everything(self, isolated_user_manager):
+        user = isolated_user_manager.create_user("disabler", "secret", auth.ROLE_USER)
+        secret = isolated_user_manager.start_totp_setup(user.user_id).totp_secret
+        isolated_user_manager.confirm_totp_setup(user.user_id, pyotp.TOTP(secret).now())
+
+        updated = isolated_user_manager.disable_totp(user.user_id, "secret")
+
+        assert updated.totp_secret is None
+        assert updated.totp_enabled is False
+        assert updated.totp_confirmed_at is None
+
+    def test_disable_with_a_wrong_password_is_rejected(self, isolated_user_manager):
+        user = isolated_user_manager.create_user("disabler2", "secret", auth.ROLE_USER)
+        secret = isolated_user_manager.start_totp_setup(user.user_id).totp_secret
+        isolated_user_manager.confirm_totp_setup(user.user_id, pyotp.TOTP(secret).now())
+
+        with pytest.raises(ValueError, match="Current password is incorrect"):
+            isolated_user_manager.disable_totp(user.user_id, "wrong-password")
+
+        assert isolated_user_manager.get_user_by_id(user.user_id).totp_enabled is True
+
+    def test_admin_disable_skips_the_password_check(self, isolated_user_manager):
+        """The lost-authenticator recovery path: admin authority is the check."""
+        user = isolated_user_manager.create_user("lostphone", "secret", auth.ROLE_USER)
+        secret = isolated_user_manager.start_totp_setup(user.user_id).totp_secret
+        isolated_user_manager.confirm_totp_setup(user.user_id, pyotp.TOTP(secret).now())
+
+        updated = isolated_user_manager.disable_totp(user.user_id)
+
+        assert updated.totp_enabled is False
+        assert updated.totp_secret is None
+
+    def test_lifecycle_methods_reject_an_unknown_user(self, isolated_user_manager):
+        for call in (
+            lambda: isolated_user_manager.start_totp_setup("nope"),
+            lambda: isolated_user_manager.confirm_totp_setup("nope", "123456"),
+            lambda: isolated_user_manager.disable_totp("nope"),
+        ):
+            with pytest.raises(ValueError, match="User not found"):
+                call()
+
+    def test_list_users_exposes_totp_enabled(self, isolated_user_manager):
+        user = isolated_user_manager.create_user("listed2fa", "secret", auth.ROLE_USER)
+        secret = isolated_user_manager.start_totp_setup(user.user_id).totp_secret
+        isolated_user_manager.confirm_totp_setup(user.user_id, pyotp.TOTP(secret).now())
+
+        entry = next(u for u in isolated_user_manager.list_users() if u['username'] == 'listed2fa')
+
+        assert entry['totp_enabled'] is True
+
+    def test_list_users_never_exposes_the_secret(self, isolated_user_manager):
+        user = isolated_user_manager.create_user("secretive", "secret", auth.ROLE_USER)
+        isolated_user_manager.start_totp_setup(user.user_id)
+
+        entry = next(u for u in isolated_user_manager.list_users() if u['username'] == 'secretive')
+
+        assert 'totp_secret' not in entry

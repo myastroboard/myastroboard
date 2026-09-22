@@ -15,11 +15,17 @@ This page lists the HTTP routes currently declared across `backend/blueprints/*.
 ## Authentication
 
 - `POST /api/auth/login`
+- `POST /api/auth/login/verify-2fa`
 - `POST /api/auth/logout`
 - `GET /api/auth/status`
 - `POST /api/auth/change-password`
 - `GET /api/auth/preferences`
 - `PUT /api/auth/preferences`
+- `POST /api/auth/2fa/setup`
+- `POST /api/auth/2fa/confirm`
+- `POST /api/auth/2fa/disable`
+- `GET /api/auth/security-settings` (admin)
+- `POST /api/auth/security-settings` (admin)
 
 ## Push Notifications
 
@@ -38,6 +44,7 @@ This page lists the HTTP routes currently declared across `backend/blueprints/*.
 - `POST /api/users`
 - `PUT /api/users/<user_id>`
 - `DELETE /api/users/<user_id>`
+- `DELETE /api/users/<user_id>/2fa`
 
 ## Administration (admin)
 

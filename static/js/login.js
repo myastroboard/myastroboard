@@ -3,6 +3,11 @@ const errorMessage = document.getElementById('error-message');
 const successMessage = document.getElementById('success-message');
 const loginBtn = document.getElementById('login-btn');
 const btnText = loginBtn.querySelector('.btn-text');
+const otpStep = document.getElementById('otp-step');
+const otpCodeInput = document.getElementById('otp-code');
+const otpVerifyBtn = document.getElementById('otp-verify-btn');
+const otpBackBtn = document.getElementById('otp-back-btn');
+const otpBtnText = otpVerifyBtn ? otpVerifyBtn.querySelector('.btn-text') : null;
 
 function setIconLabel(element, iconClass, text) {
     if (!element) {
@@ -44,6 +49,10 @@ function applyLoginTranslations() {
 
     if (!loginBtn.classList.contains('loading')) {
         setIconLabel(btnText, 'bi bi-rocket-takeoff', i18n.t('auth.sign_in'));
+    }
+
+    if (otpVerifyBtn && !otpVerifyBtn.classList.contains('loading')) {
+        setIconLabel(otpBtnText, 'bi bi-shield-check', i18n.t('auth.otp_verify'));
     }
 }
 
@@ -101,6 +110,86 @@ function setLoading(isLoading) {
     } else {
         loginBtn.classList.remove('loading');
         setIconLabel(btnText, 'bi bi-rocket-takeoff', i18n.t('auth.sign_in'));
+    }
+}
+
+function setOtpLoading(isLoading) {
+    if (!otpVerifyBtn) {
+        return;
+    }
+
+    otpVerifyBtn.disabled = isLoading;
+    if (isLoading) {
+        otpVerifyBtn.classList.add('loading');
+        otpBtnText.textContent = i18n.t('auth.signing_in');
+    } else {
+        otpVerifyBtn.classList.remove('loading');
+        setIconLabel(otpBtnText, 'bi bi-shield-check', i18n.t('auth.otp_verify'));
+    }
+}
+
+// Switch between the password step and the 6-digit code step. No server call is
+// needed to go back: a fresh /api/auth/login POST overwrites any stale pending state.
+function showOtpStep(visible) {
+    if (!otpStep) {
+        return;
+    }
+
+    loginForm.hidden = visible;
+    otpStep.hidden = !visible;
+
+    if (visible) {
+        otpCodeInput.value = '';
+        otpCodeInput.focus();
+    }
+}
+
+async function submitOtpCode() {
+    const code = (otpCodeInput?.value || '').trim();
+
+    if (code.length !== 6) {
+        showMessage(errorMessage, i18n.t('auth.invalid_otp_code'));
+        return;
+    }
+
+    hideMessages();
+    setOtpLoading(true);
+
+    try {
+        const response = await fetch('/api/auth/login/verify-2fa', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({ code })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showMessage(successMessage, i18n.t('auth.login_success_redirecting'), 2000);
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 1000);
+            return;
+        }
+
+        setOtpLoading(false);
+        showMessage(errorMessage, translateLoginErrorMessage(data?.error, response.status, data?.error_key));
+
+        // An expired or abandoned pending state can only be recovered by signing in again.
+        if (data?.error_key === 'auth.otp_session_expired' || data?.error_key === 'auth.otp_too_many_attempts') {
+            showOtpStep(false);
+            document.getElementById('password').value = '';
+            return;
+        }
+
+        otpCodeInput.select();
+    } catch (error) {
+        setOtpLoading(false);
+        showMessage(errorMessage, i18n.t('auth.network_error_retry'));
+        console.error('OTP verification error:', error);
     }
 }
 
@@ -165,6 +254,14 @@ loginForm.addEventListener('submit', async (e) => {
         const data = await response.json();
         
         if (response.ok) {
+            setLoading(false);
+
+            // The account has 2FA active and this client is not on a trusted network.
+            if (data?.status === '2fa_required') {
+                showOtpStep(true);
+                return;
+            }
+
             showMessage(successMessage, i18n.t('auth.login_success_redirecting'), 2000);
             setTimeout(() => {
                 window.location.href = '/';
@@ -186,6 +283,26 @@ loginForm.addEventListener('submit', async (e) => {
 // Auto-hide error messages after 5 seconds
 document.addEventListener('DOMContentLoaded', () => {
     initializeLoginI18n();
+
+    otpVerifyBtn?.addEventListener('click', submitOtpCode);
+
+    otpBackBtn?.addEventListener('click', () => {
+        hideMessages();
+        showOtpStep(false);
+        document.getElementById('username').focus();
+    });
+
+    otpCodeInput?.addEventListener('input', () => {
+        // Authenticator codes are digits only; strip anything pasted in around them.
+        otpCodeInput.value = otpCodeInput.value.replace(/\D/g, '').slice(0, 6);
+    });
+
+    otpCodeInput?.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            submitOtpCode();
+        }
+    });
 
     window.addEventListener('i18nLanguageChanged', () => {
         applyLoginTranslations();

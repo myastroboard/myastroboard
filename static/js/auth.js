@@ -3,6 +3,12 @@
 let currentUser = null;
 let currentUserPreferences = null;
 let offlineRedirectInProgress = false;
+// Trusted networks: working copy edited locally in the admin panel, persisted on Save.
+let trustedNetworksDraft = [];
+// Last security settings read from the server, used by the local-scope warning banner.
+let securitySettingsState = { trusted_networks: [], two_factor_enabled: false };
+// Last users list rendered, so the same banner can re-render when settings arrive.
+let lastLoadedUsers = [];
 
 function localizeApiError(data, fallbackKey) {
     const localized = data?.error_key ? i18n.t(data.error_key) : null;
@@ -182,6 +188,7 @@ function updateUserInterface() {
     }*/
 
     populateSecurityUsername();
+    renderTwoFactorState();
     updateCustomizeMainTabOptions();
 }
 
@@ -680,6 +687,7 @@ async function loadUsers() {
 
         const users = await response.json();
         displayUsers(users);
+        loadSecuritySettings();
     } catch (error) {
         console.error('Error loading users:', error);
         showMessage('error', i18n.t('users.failed_to_load_users'));
@@ -689,6 +697,11 @@ async function loadUsers() {
 function displayUsers(users) {
     const usersList = document.getElementById('users-list');
     if (!usersList) return;
+
+    // Kept so the local-scope warning banner can be re-rendered when the security
+    // settings arrive, whichever of the two requests lands first.
+    lastLoadedUsers = users;
+    renderLocalScopeWarning();
     
     if (users.length === 0) {
         DOMUtils.clear(usersList);
@@ -709,6 +722,8 @@ function displayUsers(users) {
     const headers = [
         { text: i18n.t('users.username') },
         { text: i18n.t('users.role') },
+        { text: i18n.t('users.account_scope') },
+        { text: i18n.t('users.two_factor_status'), className: 'd-none d-md-table-cell' },
         { text: i18n.t('users.created'), className: 'd-none d-md-table-cell' },
         { text: i18n.t('users.last_login'), className: 'd-none d-md-table-cell' },
         { text: i18n.t('users.actions'), className: 'text-center' }
@@ -742,6 +757,21 @@ function displayUsers(users) {
 
         const roleCell = document.createElement('td');
         roleCell.textContent = user.role;
+
+        // Entries written before this field existed load as 'global'.
+        const accountScope = user.account_scope === 'local' ? 'local' : 'global';
+        const scopeCell = document.createElement('td');
+        scopeCell.textContent = i18n.t(
+            accountScope === 'local' ? 'users.account_scope_local_short' : 'users.account_scope_global_short'
+        );
+
+        // Plain text, matching the Role/Scope cells beside it - not a badge, so the
+        // row's status columns stay one consistent style instead of two.
+        const twoFactorCell = document.createElement('td');
+        twoFactorCell.className = 'd-none d-md-table-cell';
+        twoFactorCell.textContent = i18n.t(
+            user.totp_enabled ? 'users.two_factor_enabled_yes' : 'users.two_factor_enabled_no'
+        );
 
         const createdCell = document.createElement('td');
         createdCell.className = 'd-none d-md-table-cell';
@@ -783,6 +813,16 @@ function displayUsers(users) {
                 iconClass: 'bi bi-key icon-inline',
                 label: i18n.t('users.role')
             }));
+
+            const scopeButton = createActionButton({
+                className: 'btn btn-info btn-small user-edit-scope mb-2 me-2',
+                userId: user.user_id,
+                username: user.username,
+                iconClass: 'bi bi-geo icon-inline',
+                label: i18n.t('users.account_scope')
+            });
+            scopeButton.setAttribute('data-account-scope', accountScope);
+            actionsCell.appendChild(scopeButton);
         }
 
         actionsCell.appendChild(createActionButton({
@@ -792,6 +832,17 @@ function displayUsers(users) {
             iconClass: 'bi bi-lock icon-inline',
             label: i18n.t('users.password')
         }));
+
+        // An admin manages their own 2FA from My Settings, not from this table.
+        if (!isCurrentUser && user.totp_enabled) {
+            actionsCell.appendChild(createActionButton({
+                className: 'btn btn-warning btn-small user-disable-2fa mb-2 me-2',
+                userId: user.user_id,
+                username: user.username,
+                iconClass: 'bi bi-shield-slash icon-inline',
+                label: i18n.t('users.disable_2fa_for_user')
+            }));
+        }
 
         if (!isCurrentUser) {
             actionsCell.appendChild(createActionButton({
@@ -805,6 +856,8 @@ function displayUsers(users) {
 
         row.appendChild(usernameCell);
         row.appendChild(roleCell);
+        row.appendChild(scopeCell);
+        row.appendChild(twoFactorCell);
         row.appendChild(createdCell);
         row.appendChild(lastLoginCell);
         row.appendChild(actionsCell);
@@ -833,6 +886,27 @@ function displayUsers(users) {
         });
     });
     
+    usersList.querySelectorAll('.user-edit-scope').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const button = e.target.closest('.user-edit-scope');
+            editAccountScope(
+                button.getAttribute('data-user-id'),
+                button.getAttribute('data-username'),
+                button.getAttribute('data-account-scope')
+            );
+        });
+    });
+
+    usersList.querySelectorAll('.user-disable-2fa').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const button = e.target.closest('.user-disable-2fa');
+            adminDisableUserTwoFactor(
+                button.getAttribute('data-user-id'),
+                button.getAttribute('data-username')
+            );
+        });
+    });
+
     usersList.querySelectorAll('.user-change-password').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const userId = e.target.getAttribute('data-user-id');
@@ -861,6 +935,7 @@ function setupCreateUserForm() {
         const username = document.getElementById('new-username').value;
         const password = document.getElementById('new-password').value;
         const role = document.getElementById('new-role').value;
+        const accountScope = document.getElementById('new-account-scope')?.value || 'global';
         
         try {
             const response = await fetchWithRetry('/api/users', {
@@ -869,7 +944,7 @@ function setupCreateUserForm() {
                     'Content-Type': 'application/json'
                 },
                 credentials: 'include',
-                body: JSON.stringify({ username, password, role })
+                body: JSON.stringify({ username, password, role, account_scope: accountScope })
             }, {
                 maxAttempts: 1,
                 timeoutMs: 15000
@@ -1346,6 +1421,753 @@ async function deleteUser(userId, username) {
     }
 }
 
+// ============================================================
+// Two-factor authentication - self-service (My Settings -> Security)
+// ============================================================
+
+function setSecurityTwoFactorMessage(type, message) {
+    const messageDiv = document.getElementById('security-2fa-message');
+    if (!messageDiv) return;
+
+    messageDiv.className = 'alert';
+    if (type === 'success') {
+        messageDiv.classList.add('alert-success');
+    } else if (type === 'error') {
+        messageDiv.classList.add('alert-danger');
+    } else {
+        messageDiv.style.display = 'none';
+        messageDiv.textContent = '';
+        return;
+    }
+
+    messageDiv.textContent = message;
+    messageDiv.style.display = 'block';
+}
+
+// Render the panel from the current /api/auth/status snapshot: the admin switch
+// decides whether 2FA is offered at all, the per-user flag whether it is active.
+function renderTwoFactorState() {
+    const unavailable = document.getElementById('security-2fa-unavailable');
+    const panel = document.getElementById('security-2fa-panel');
+    if (!unavailable || !panel) return;
+
+    const available = !!currentUser?.two_factor_available;
+    unavailable.style.display = available ? 'none' : 'block';
+    panel.style.display = available ? 'block' : 'none';
+    if (!available) return;
+
+    const enabled = !!currentUser?.totp_enabled;
+    const inactiveBlock = document.getElementById('security-2fa-inactive');
+    const activeBlock = document.getElementById('security-2fa-active');
+    if (inactiveBlock) inactiveBlock.style.display = enabled ? 'none' : 'block';
+    if (activeBlock) activeBlock.style.display = enabled ? 'block' : 'none';
+
+    const confirmedAt = document.getElementById('security-2fa-confirmed-at');
+    if (confirmedAt) {
+        confirmedAt.textContent = (enabled && currentUser?.totp_confirmed_at)
+            ? i18n.t('settings.2fa_confirmed_at', { date: formatDateTime(new Date(currentUser.totp_confirmed_at)) })
+            : '';
+    }
+}
+
+// Draw the otpauth:// URI into a canvas with the vendored generator. Always black
+// on white: a themed QR code is not reliably scannable.
+function renderTwoFactorQrCode(container, otpauthUri) {
+    if (typeof qrcode !== 'function') {
+        console.warn('QR code library unavailable, falling back to the manual key only');
+        return false;
+    }
+
+    try {
+        const qr = qrcode(0, 'M');
+        qr.addData(otpauthUri);
+        qr.make();
+
+        const moduleCount = qr.getModuleCount();
+        const cellSize = 6;
+        const quietZone = 4 * cellSize;
+        const size = moduleCount * cellSize + quietZone * 2;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        canvas.className = 'totp-qr-canvas';
+        canvas.setAttribute('role', 'img');
+        canvas.setAttribute('aria-label', i18n.t('settings.2fa_setup_scan_qr'));
+
+        const context = canvas.getContext('2d');
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, size, size);
+        context.fillStyle = '#000000';
+        for (let row = 0; row < moduleCount; row++) {
+            for (let col = 0; col < moduleCount; col++) {
+                if (qr.isDark(row, col)) {
+                    context.fillRect(quietZone + col * cellSize, quietZone + row * cellSize, cellSize, cellSize);
+                }
+            }
+        }
+
+        container.appendChild(canvas);
+        return true;
+    } catch (error) {
+        console.error('Failed to render 2FA QR code:', error);
+        return false;
+    }
+}
+
+function buildTwoFactorSetupModal(secret, otpauthUri) {
+    const titleElement = document.getElementById('modal_lg_close_title');
+    DOMUtils.clear(titleElement);
+    DOMUtils.append(titleElement, DOMUtils.createIcon('bi bi-shield-lock icon-inline'), i18n.t('settings.2fa_setup_title'));
+
+    const contentElement = document.getElementById('modal_lg_close_body');
+    DOMUtils.clear(contentElement);
+
+    // 1. QR code - scanned from a second device.
+    const qrWrapper = document.createElement('div');
+    qrWrapper.className = 'text-center mb-3';
+    const qrCaption = document.createElement('p');
+    qrCaption.textContent = i18n.t('settings.2fa_setup_scan_qr');
+    qrWrapper.appendChild(qrCaption);
+    if (!renderTwoFactorQrCode(qrWrapper, otpauthUri)) {
+        const qrFallback = document.createElement('div');
+        qrFallback.className = 'alert alert-warning';
+        qrFallback.textContent = i18n.t('settings.2fa_qr_unavailable');
+        qrWrapper.appendChild(qrFallback);
+    }
+
+    // 2. Manual key - the one path that works identically on desktop and mobile,
+    //    including when the authenticator app runs on the same phone.
+    const manualWrapper = document.createElement('div');
+    manualWrapper.className = 'mb-3';
+    const manualLabel = document.createElement('label');
+    manualLabel.className = 'form-label';
+    manualLabel.setAttribute('for', 'totp-manual-secret');
+    manualLabel.textContent = i18n.t('settings.2fa_setup_manual_key');
+    const manualInput = document.createElement('input');
+    manualInput.type = 'text';
+    manualInput.id = 'totp-manual-secret';
+    manualInput.className = 'form-control font-monospace totp-secret';
+    manualInput.value = secret;
+    manualInput.readOnly = true;
+    manualInput.addEventListener('focus', () => manualInput.select());
+    manualWrapper.appendChild(manualLabel);
+    manualWrapper.appendChild(manualInput);
+
+    // 3. Best-effort deep link: not every authenticator registers the otpauth:// scheme.
+    const openLink = document.createElement('a');
+    openLink.className = 'btn btn-outline-secondary btn-sm mb-3';
+    openLink.href = otpauthUri;
+    openLink.rel = 'noopener noreferrer';
+    DOMUtils.append(openLink, DOMUtils.createIcon('bi bi-box-arrow-up-right icon-inline'), i18n.t('settings.2fa_setup_open_in_app'));
+
+    const errorAlert = document.createElement('div');
+    errorAlert.id = 'totp-setup-error';
+    errorAlert.className = 'alert alert-danger';
+    errorAlert.style.display = 'none';
+
+    // 4. Confirmation: the code proves the secret really reached the authenticator.
+    const form = document.createElement('form');
+    form.id = 'totp-confirm-form';
+    form.className = 'row g-3 align-items-end';
+
+    const codeCol = document.createElement('div');
+    codeCol.className = 'col-md-6';
+    const codeLabel = document.createElement('label');
+    codeLabel.className = 'form-label';
+    codeLabel.setAttribute('for', 'totp-confirm-code');
+    codeLabel.textContent = i18n.t('settings.2fa_setup_confirm_code');
+    const codeInput = document.createElement('input');
+    codeInput.type = 'text';
+    codeInput.id = 'totp-confirm-code';
+    codeInput.className = 'form-control';
+    codeInput.setAttribute('inputmode', 'numeric');
+    codeInput.setAttribute('pattern', '[0-9]*');
+    codeInput.setAttribute('maxlength', '6');
+    codeInput.setAttribute('autocomplete', 'one-time-code');
+    codeInput.required = true;
+    codeInput.addEventListener('input', () => {
+        codeInput.value = codeInput.value.replace(/[^0-9]/g, '').slice(0, 6);
+    });
+    codeCol.appendChild(codeLabel);
+    codeCol.appendChild(codeInput);
+
+    const actionsCol = document.createElement('div');
+    actionsCol.className = 'col-md-6';
+    const submitBtn = document.createElement('button');
+    submitBtn.type = 'submit';
+    submitBtn.className = 'btn btn-primary';
+    DOMUtils.append(submitBtn, DOMUtils.createIcon('bi bi-check2-circle icon-inline'), i18n.t('settings.2fa_setup_confirm_btn'));
+    actionsCol.appendChild(submitBtn);
+
+    form.appendChild(codeCol);
+    form.appendChild(actionsCol);
+
+    contentElement.appendChild(qrWrapper);
+    contentElement.appendChild(manualWrapper);
+    contentElement.appendChild(openLink);
+    contentElement.appendChild(errorAlert);
+    contentElement.appendChild(form);
+
+    return form;
+}
+
+async function startTwoFactorSetup() {
+    setSecurityTwoFactorMessage(null);
+
+    try {
+        const response = await fetchWithRetry('/api/auth/2fa/setup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include'
+        }, {
+            maxAttempts: 1,
+            timeoutMs: 15000
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            setSecurityTwoFactorMessage('error', localizeApiError(data, 'settings.2fa_setup_error'));
+            return;
+        }
+
+        const form = buildTwoFactorSetupModal(data.secret, data.otpauth_uri);
+        openModal('#modal_lg_close', {
+            backdrop: 'static',
+            onShown: () => document.getElementById('totp-confirm-code')?.focus()
+        });
+
+        form.onsubmit = (event) => {
+            event.preventDefault();
+            confirmTwoFactorSetup(document.getElementById('totp-confirm-code')?.value || '');
+        };
+    } catch (error) {
+        console.error('Error starting 2FA setup:', error);
+        setSecurityTwoFactorMessage('error', i18n.t('settings.2fa_setup_error'));
+    }
+}
+
+async function confirmTwoFactorSetup(code) {
+    const errorDiv = document.getElementById('totp-setup-error');
+    const showModalError = (message) => {
+        if (!errorDiv) return;
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+    };
+
+    if (code.trim().length !== 6) {
+        showModalError(i18n.t('auth.invalid_otp_code'));
+        return;
+    }
+
+    try {
+        const response = await fetchWithRetry('/api/auth/2fa/confirm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ code: code.trim() })
+        }, {
+            maxAttempts: 1,
+            timeoutMs: 15000
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            showModalError(localizeApiError(data, 'settings.2fa_setup_error'));
+            return;
+        }
+
+        if (currentUser) {
+            currentUser.totp_enabled = true;
+            currentUser.totp_confirmed_at = new Date().toISOString();
+        }
+        closeModal('#modal_lg_close');
+        renderTwoFactorState();
+        setSecurityTwoFactorMessage('success', i18n.t('settings.2fa_activated'));
+    } catch (error) {
+        console.error('Error confirming 2FA setup:', error);
+        showModalError(i18n.t('settings.2fa_setup_error'));
+    }
+}
+
+async function disableTwoFactor(password) {
+    setSecurityTwoFactorMessage(null);
+
+    try {
+        const response = await fetchWithRetry('/api/auth/2fa/disable', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ password })
+        }, {
+            maxAttempts: 1,
+            timeoutMs: 15000
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            setSecurityTwoFactorMessage('error', localizeApiError(data, 'settings.2fa_setup_error'));
+            return;
+        }
+
+        if (currentUser) {
+            currentUser.totp_enabled = false;
+            currentUser.totp_confirmed_at = null;
+        }
+        renderTwoFactorState();
+        setSecurityTwoFactorMessage('success', i18n.t('settings.2fa_deactivated'));
+    } catch (error) {
+        console.error('Error disabling 2FA:', error);
+        setSecurityTwoFactorMessage('error', i18n.t('settings.2fa_setup_error'));
+    }
+}
+
+function setupTwoFactorPanel() {
+    document.getElementById('security-2fa-enable-btn')?.addEventListener('click', startTwoFactorSetup);
+
+    const disableForm = document.getElementById('security-2fa-disable-form');
+    disableForm?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const passwordInput = document.getElementById('security-2fa-password');
+        const password = passwordInput?.value || '';
+        if (!password) {
+            setSecurityTwoFactorMessage('error', i18n.t('users.current_password_incorrect'));
+            return;
+        }
+        await disableTwoFactor(password);
+        disableForm.reset();
+    });
+}
+
+// ============================================================
+// Instance security settings - trusted networks (Parameters -> Users, admin only)
+// ============================================================
+
+function setSecuritySettingsMessage(type, message) {
+    const messageDiv = document.getElementById('security-settings-message');
+    if (!messageDiv) return;
+
+    messageDiv.className = 'alert';
+    if (type === 'success') {
+        messageDiv.classList.add('alert-success');
+    } else if (type === 'error') {
+        messageDiv.classList.add('alert-danger');
+    } else {
+        messageDiv.style.display = 'none';
+        messageDiv.textContent = '';
+        return;
+    }
+
+    messageDiv.textContent = message;
+    messageDiv.style.display = 'block';
+}
+
+// Same table markup/classes as the Users table (displayUsers) above it, so the two
+// lists in this sub-tab read as one consistent style rather than a table next to a
+// plain list-group.
+function renderTrustedNetworksList() {
+    const list = document.getElementById('trusted-networks-list');
+    if (!list) return;
+
+    DOMUtils.clear(list);
+
+    if (trustedNetworksDraft.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'text-muted small';
+        empty.textContent = i18n.t('settings.trusted_networks_empty');
+        list.appendChild(empty);
+    } else {
+        const tableWrapper = document.createElement('div');
+        tableWrapper.className = 'table-responsive';
+
+        const table = document.createElement('table');
+        table.className = 'table table-sm table-hover';
+
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        [
+            { text: i18n.t('settings.trusted_networks_input_label') },
+            { text: i18n.t('users.actions'), className: 'text-center' }
+        ].forEach((header) => {
+            const th = document.createElement('th');
+            th.textContent = header.text;
+            if (header.className) th.className = header.className;
+            headerRow.appendChild(th);
+        });
+        thead.appendChild(headerRow);
+
+        const tbody = document.createElement('tbody');
+        trustedNetworksDraft.forEach((network) => {
+            const row = document.createElement('tr');
+
+            const networkCell = document.createElement('th');
+            networkCell.className = 'font-monospace';
+            networkCell.textContent = network;
+
+            const actionsCell = document.createElement('td');
+            actionsCell.className = 'text-center';
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'btn btn-danger btn-small';
+            removeBtn.setAttribute('data-network', network);
+            removeBtn.setAttribute('title', i18n.t('settings.trusted_networks_remove'));
+            DOMUtils.append(removeBtn, DOMUtils.createIcon('bi bi-trash icon-inline'), i18n.t('users.delete'));
+            removeBtn.addEventListener('click', () => removeTrustedNetwork(network));
+            actionsCell.appendChild(removeBtn);
+
+            row.appendChild(networkCell);
+            row.appendChild(actionsCell);
+            tbody.appendChild(row);
+        });
+
+        table.appendChild(thead);
+        table.appendChild(tbody);
+        tableWrapper.appendChild(table);
+        list.appendChild(tableWrapper);
+    }
+
+    // 2FA cannot be switched on without a trusted network to exempt.
+    const toggle = document.getElementById('security-2fa-enabled');
+    const hint = document.getElementById('security-2fa-requires-network');
+    const hasNetwork = trustedNetworksDraft.length > 0;
+    if (toggle) {
+        toggle.disabled = !hasNetwork;
+        if (!hasNetwork) {
+            toggle.checked = false;
+        }
+    }
+    if (hint) {
+        hint.style.display = hasNetwork ? 'none' : 'block';
+    }
+}
+
+// A permissive but format-correct check: catches obvious typos (wrong octet count,
+// out-of-range values, a bad prefix) immediately on Add, before a round trip to the
+// server. The server's ipaddress.ip_network() stays the actual authority - this only
+// improves the failure mode from "silently accepted, rejected later on Save" to
+// "rejected right here, with the input still in the box to fix".
+function isValidIPv4Address(value) {
+    const octets = value.split('.');
+    if (octets.length !== 4) return false;
+    return octets.every((octet) => /^\d{1,3}$/.test(octet) && Number(octet) >= 0 && Number(octet) <= 255);
+}
+
+// Standard IPv6 forms, including "::" compression and a trailing embedded IPv4
+// (e.g. "::ffff:192.168.1.1"). Deliberately permissive - a false positive here just
+// falls through to the server's stricter check on Save.
+const IPV6_PATTERN = new RegExp(
+    '^(' +
+    '([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|' +
+    '([0-9a-fA-F]{1,4}:){1,7}:|' +
+    '([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|' +
+    '([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|' +
+    '([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|' +
+    '([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|' +
+    '([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|' +
+    '[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|' +
+    ':((:[0-9a-fA-F]{1,4}){1,7}|:)|' +
+    '::(ffff(:0{1,4})?:)?((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\\.){3}(25[0-5]|(2[0-4]|1?[0-9])?[0-9])|' +
+    '([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\\.){3}(25[0-5]|(2[0-4]|1?[0-9])?[0-9])' +
+    ')$'
+);
+
+function isValidNetworkInput(value) {
+    const slashIndex = value.lastIndexOf('/');
+    const address = slashIndex === -1 ? value : value.slice(0, slashIndex);
+    const prefixText = slashIndex === -1 ? null : value.slice(slashIndex + 1);
+
+    const isIPv4 = isValidIPv4Address(address);
+    const isIPv6 = !isIPv4 && IPV6_PATTERN.test(address);
+    if (!isIPv4 && !isIPv6) {
+        return false;
+    }
+
+    if (prefixText !== null) {
+        if (!/^\d{1,3}$/.test(prefixText)) return false;
+        const prefix = Number(prefixText);
+        const maxPrefix = isIPv4 ? 32 : 128;
+        if (prefix < 0 || prefix > maxPrefix) return false;
+    }
+
+    return true;
+}
+
+function addTrustedNetwork() {
+    const input = document.getElementById('trusted-network-input');
+    if (!input) return;
+
+    const value = input.value.trim();
+    if (!value) return;
+
+    if (!isValidNetworkInput(value)) {
+        setSecuritySettingsMessage('error', `${i18n.t('settings.invalid_trusted_network')} (${value})`);
+        return;
+    }
+
+    if (trustedNetworksDraft.includes(value)) {
+        setSecuritySettingsMessage('error', i18n.t('settings.trusted_networks_duplicate'));
+        return;
+    }
+
+    setSecuritySettingsMessage(null);
+    trustedNetworksDraft.push(value);
+    input.value = '';
+    renderTrustedNetworksList();
+}
+
+function removeTrustedNetwork(network) {
+    const toggle = document.getElementById('security-2fa-enabled');
+    const isLastEntry = trustedNetworksDraft.length === 1;
+
+    // Losing the last trusted network also turns 2FA off instance-wide - say so first.
+    if (isLastEntry && toggle?.checked && !confirm(i18n.t('settings.trusted_networks_remove_last_confirm'))) {
+        return;
+    }
+
+    setSecuritySettingsMessage(null);
+    trustedNetworksDraft = trustedNetworksDraft.filter((entry) => entry !== network);
+    renderTrustedNetworksList();
+}
+
+// Shown only when the fallback is actually active AND somebody relies on it:
+// no configured network, but at least one account is restricted to "local".
+function renderLocalScopeWarning() {
+    const banner = document.getElementById('security-local-scope-warning');
+    if (!banner) return;
+
+    const localAccounts = lastLoadedUsers.filter((user) => user.account_scope === 'local').length;
+    const show = securitySettingsState.trusted_networks.length === 0 && localAccounts > 0;
+
+    banner.textContent = show ? i18n.t('settings.local_scope_warning_banner', { count: localAccounts }) : '';
+    banner.style.display = show ? 'block' : 'none';
+}
+
+async function loadSecuritySettings() {
+    if (currentUser?.role !== 'admin') return;
+
+    try {
+        const settings = await fetchJSON('/api/auth/security-settings');
+        securitySettingsState = {
+            trusted_networks: settings.trusted_networks || [],
+            two_factor_enabled: !!settings.two_factor_enabled
+        };
+        trustedNetworksDraft = [...securitySettingsState.trusted_networks];
+
+        const toggle = document.getElementById('security-2fa-enabled');
+        if (toggle) {
+            toggle.checked = securitySettingsState.two_factor_enabled;
+        }
+        renderTrustedNetworksList();
+        renderLocalScopeWarning();
+    } catch (error) {
+        console.error('Failed to load security settings:', error);
+        setSecuritySettingsMessage('error', i18n.t('settings.security_settings_load_error'));
+    }
+}
+
+async function saveSecuritySettings() {
+    const toggle = document.getElementById('security-2fa-enabled');
+    setSecuritySettingsMessage(null);
+
+    try {
+        const response = await fetchWithRetry('/api/auth/security-settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+                trusted_networks: trustedNetworksDraft,
+                two_factor_enabled: toggle ? toggle.checked : false
+            })
+        }, {
+            maxAttempts: 1,
+            timeoutMs: 15000
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            const message = data?.error_key === 'settings.invalid_trusted_network' && data?.invalid_entry
+                ? `${i18n.t('settings.invalid_trusted_network')} (${data.invalid_entry})`
+                : localizeApiError(data, 'settings.security_settings_save_error');
+            setSecuritySettingsMessage('error', message);
+            return;
+        }
+
+        // Adopt the server's normalized list (192.168.1.5/24 comes back as 192.168.1.0/24).
+        securitySettingsState = {
+            trusted_networks: data.trusted_networks || [],
+            two_factor_enabled: !!data.two_factor_enabled
+        };
+        trustedNetworksDraft = [...securitySettingsState.trusted_networks];
+        if (toggle) {
+            toggle.checked = securitySettingsState.two_factor_enabled;
+        }
+        renderTrustedNetworksList();
+        renderLocalScopeWarning();
+
+        const feedback = document.getElementById('security-settings-feedback');
+        if (feedback) {
+            feedback.style.display = 'inline';
+            setTimeout(() => { feedback.style.display = 'none'; }, 3000);
+        }
+    } catch (error) {
+        console.error('Failed to save security settings:', error);
+        setSecuritySettingsMessage('error', i18n.t('settings.security_settings_save_error'));
+    }
+}
+
+function setupSecuritySettingsForm() {
+    document.getElementById('trusted-network-add')?.addEventListener('click', addTrustedNetwork);
+    document.getElementById('save-security-settings')?.addEventListener('click', saveSecuritySettings);
+
+    document.getElementById('trusted-network-input')?.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+            // The input is not inside a form, but Enter would still submit the
+            // create-user form above it in some browsers - handle it explicitly.
+            event.preventDefault();
+            addTrustedNetwork();
+        }
+    });
+}
+
+// ============================================================
+// Account scope + admin 2FA removal (Parameters -> Users, admin only)
+// ============================================================
+
+function editAccountScope(userId, username, currentScope) {
+    const titleElement = document.getElementById('modal_lg_close_title');
+    DOMUtils.clear(titleElement);
+    DOMUtils.append(titleElement, DOMUtils.createIcon('bi bi-geo icon-inline'), i18n.t('users.edit_account_scope'));
+
+    const contentElement = document.getElementById('modal_lg_close_body');
+    DOMUtils.clear(contentElement);
+
+    const infoAlert = document.createElement('div');
+    infoAlert.className = 'alert alert-info';
+    infoAlert.append(i18n.t('users.edit_account_scope_for'));
+    const strong = document.createElement('strong');
+    strong.textContent = username;
+    infoAlert.appendChild(strong);
+
+    const errorAlert = document.createElement('div');
+    errorAlert.id = 'account-scope-modal-error';
+    errorAlert.className = 'alert alert-danger';
+    errorAlert.style.display = 'none';
+
+    const form = document.createElement('form');
+    form.id = 'account-scope-edit-form';
+    form.className = 'row g-3';
+
+    const selectCol = document.createElement('div');
+    selectCol.className = 'col-md-12';
+    const label = document.createElement('label');
+    label.className = 'form-label';
+    label.setAttribute('for', 'new-account-scope-select');
+    label.textContent = i18n.t('users.new_account_scope');
+    const select = document.createElement('select');
+    select.id = 'new-account-scope-select';
+    select.className = 'form-select';
+    select.required = true;
+
+    [
+        { value: 'global', textKey: 'users.account_scope_global' },
+        { value: 'local', textKey: 'users.account_scope_local' }
+    ].forEach((optionData) => {
+        const option = document.createElement('option');
+        option.value = optionData.value;
+        option.textContent = i18n.t(optionData.textKey);
+        option.selected = optionData.value === currentScope;
+        select.appendChild(option);
+    });
+
+    selectCol.appendChild(label);
+    selectCol.appendChild(select);
+
+    const actionsCol = document.createElement('div');
+    actionsCol.className = 'col-md-12 d-flex justify-content-end modal-actions-gap';
+    const submitBtn = document.createElement('button');
+    submitBtn.type = 'submit';
+    submitBtn.className = 'btn btn-primary';
+    submitBtn.textContent = i18n.t('users.save_account_scope');
+    actionsCol.appendChild(submitBtn);
+
+    form.appendChild(selectCol);
+    form.appendChild(actionsCol);
+
+    contentElement.appendChild(infoAlert);
+    contentElement.appendChild(errorAlert);
+    contentElement.appendChild(form);
+
+    openModal('#modal_lg_close', { backdrop: 'static' });
+
+    form.onsubmit = async function (e) {
+        e.preventDefault();
+
+        const newScope = select.value;
+        if (newScope === currentScope) {
+            errorAlert.textContent = i18n.t('users.account_scope_unchanged');
+            errorAlert.style.display = 'block';
+            return;
+        }
+
+        try {
+            const response = await fetchWithRetry(`/api/users/${userId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ account_scope: newScope })
+            }, {
+                maxAttempts: 1,
+                timeoutMs: 15000
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                showMessage('success', i18n.t('users.account_scope_updated'));
+                loadUsers();
+                closeModal('#modal_lg_close');
+            } else {
+                errorAlert.textContent = localizeApiError(data, 'users.error_update_account_scope');
+                errorAlert.style.display = 'block';
+            }
+        } catch (error) {
+            console.error('Error updating account scope:', error);
+            errorAlert.textContent = i18n.t('users.error_update_account_scope');
+            errorAlert.style.display = 'block';
+        }
+    };
+}
+
+// Recovery path when a user loses their authenticator: no password check here,
+// admin authority is the check.
+async function adminDisableUserTwoFactor(userId, username) {
+    if (!confirm(i18n.t('users.confirm_disable_2fa_for_user', { username }))) {
+        return;
+    }
+
+    try {
+        const response = await fetchWithRetry(`/api/users/${userId}/2fa`, {
+            method: 'DELETE',
+            credentials: 'include'
+        }, {
+            maxAttempts: 1,
+            timeoutMs: 15000
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (response.ok) {
+            showMessage('success', i18n.t('users.2fa_disabled_for_user'));
+            loadUsers();
+        } else {
+            showMessage('error', localizeApiError(data, 'users.error_disable_2fa_for_user'));
+        }
+    } catch (error) {
+        console.error('Error disabling 2FA for user:', error);
+        showMessage('error', i18n.t('users.error_disable_2fa_for_user'));
+    }
+}
+
 // Error handler - only redirect on authentication failures (401), not authorization (403)
 function setupGlobalErrorHandler() {
     const originalFetch = window.fetch;
@@ -1403,6 +2225,8 @@ if (document.readyState === 'loading') {
         setupCustomizeForm();
         setupThemePickerSync();
         setupSecurityPasswordForm();
+        setupTwoFactorPanel();
+        setupSecuritySettingsForm();
         setupGlobalErrorHandler();
     });
 } else {
@@ -1412,5 +2236,7 @@ if (document.readyState === 'loading') {
     setupCustomizeForm();
     setupThemePickerSync();
     setupSecurityPasswordForm();
+    setupTwoFactorPanel();
+    setupSecuritySettingsForm();
     setupGlobalErrorHandler();
 }
