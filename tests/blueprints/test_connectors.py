@@ -56,7 +56,7 @@ class TestListConnectors:
         assert resp.status_code == 200
         data = resp.get_json()
         assert isinstance(data, list)
-        assert [c['name'] for c in data] == ['allsky', 'myastroshine', 'mqtt']
+        assert [c['name'] for c in data] == ['allsky', 'myastroshine', 'mqtt', 'astrodex_stream']
 
     def test_every_registered_connector_is_listed(self, client_user):
         """The listing is the registry - a connector is not special-cased out of it."""
@@ -189,7 +189,8 @@ def _stub_registry():
         description = ''
         MODULES = []
         SECRET_FIELDS = ('password',)
-        CONFIG_FIELDS = {'password': '', 'interval': 60, 'flag': False, 'note': 'n/a'}
+        CONFIG_FIELDS = {'password': '', 'interval': 60, 'flag': False, 'note': 'n/a', 'choice': 'a'}
+        ENUM_FIELDS = {'choice': ('a', 'b', 'c')}
 
         def is_configured(self):
             return bool(self.base_url and self.config.get('password'))
@@ -257,6 +258,25 @@ class TestTypedFieldsAndSecrets:
         assert resp.status_code == 200
         assert 'password' not in saved['connectors']['stub']
         assert load_secrets('stub') == {'password': 'legacy'}
+
+    def test_enum_field_accepts_an_allowed_value_and_rejects_anything_else(self, client_admin, monkeypatch):
+        _, saved = self._save(client_admin, monkeypatch, {'url': 'http://x', 'choice': 'b'})
+        assert saved['connectors']['stub']['choice'] == 'b'
+
+        for not_allowed in ('z', '', 'A'):
+            _, saved = self._save(client_admin, monkeypatch, {'url': 'http://x', 'choice': not_allowed})
+            assert saved['connectors']['stub']['choice'] == 'a'  # falls back to the field's default
+
+        # Surrounding whitespace is trimmed before the allowed-values check, same as every
+        # other plain string field in this endpoint - ' b ' is accepted as 'b', not rejected.
+        _, saved = self._save(client_admin, monkeypatch, {'url': 'http://x', 'choice': ' b '})
+        assert saved['connectors']['stub']['choice'] == 'b'
+
+    def test_listing_exposes_enum_fields_for_the_frontend_select(self, client_user, monkeypatch):
+        monkeypatch.setattr('blueprints.connectors.load_config', lambda: {'connectors': {'stub': {'url': 'http://x'}}})
+        with patch.dict('connectors.REGISTRY', _stub_registry(), clear=True):
+            entry = client_user.get('/api/connectors').get_json()[0]
+        assert entry['enum_fields'] == {'choice': ['a', 'b', 'c']}
 
     def test_listing_masks_a_sidecar_secret_and_reports_installed(self, client_user, monkeypatch):
         from utils.connector_secrets import save_secrets

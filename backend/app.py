@@ -133,6 +133,7 @@ from blueprints.connectors import connectors_bp
 from blueprints.connectors_allsky import connectors_allsky_bp
 from blueprints.connectors_myastroshine import connectors_myastroshine_bp
 from blueprints.connectors_mqtt import connectors_mqtt_bp
+from blueprints.astrodex_stream import astrodex_stream_bp
 from blueprints.admin import admin_bp
 from blueprints.misc import misc_bp
 from blueprints.weather import weather_bp
@@ -152,6 +153,7 @@ app.register_blueprint(connectors_bp)
 app.register_blueprint(connectors_allsky_bp)
 app.register_blueprint(connectors_myastroshine_bp)
 app.register_blueprint(connectors_mqtt_bp)
+app.register_blueprint(astrodex_stream_bp)
 app.register_blueprint(admin_bp)
 app.register_blueprint(misc_bp)
 app.register_blueprint(weather_bp)

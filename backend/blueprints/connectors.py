@@ -67,6 +67,7 @@ def list_connectors_api():
                 "modules": cls.MODULES,
                 "target_modules": list(cls.target_modules),
                 "secret_fields": list(cls.SECRET_FIELDS),
+                "enum_fields": {k: list(v) for k, v in cls.ENUM_FIELDS.items()},
                 "installed": connector.is_configured(),
                 "enabled": connector.is_enabled(),
                 "config": _public_config(cls, cfg),
@@ -133,6 +134,9 @@ def save_connector_config_api(name):
             current[field] = _coerce_int(raw, default)
         elif field in cls.URL_FIELDS:
             current[field] = str(raw or "").strip().rstrip("/") or default
+        elif field in cls.ENUM_FIELDS:
+            text = str(raw or "").strip()
+            current[field] = text if text in cls.ENUM_FIELDS[field] else default
         else:
             current[field] = str(raw or "").strip() or default
 

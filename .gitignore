@@ -45,7 +45,7 @@ Thumbs.db
 tmp/
 temp/
 *.tmp
-feature.md
+feature*.md
 
 # Others
 .claude/

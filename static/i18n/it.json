@@ -1100,7 +1100,19 @@
     "send_to_myastroshine_error": "Impossibile aprire MyAstroShine",
     "enhanced_with_myastroshine": "Rielaborata con MyAstroShine il {date}",
     "enhanced_view_settings": "mostra impostazioni",
-    "enhanced_photo_received": "Foto rielaborata ricevuta da MyAstroShine"
+    "enhanced_photo_received": "Foto rielaborata ricevuta da MyAstroShine",
+    "stream_icon_title": "Flusso foto",
+    "stream_modal_title": "Flusso foto AstroDex",
+    "stream_modal_intro": "Una presentazione delle tue foto AstroDex, aggiornata automaticamente - incolla l'URL qui sotto in un visualizzatore di telecamera a immagine fissa come Home Assistant.",
+    "stream_personal_url_label": "Il tuo URL di flusso personale",
+    "stream_personal_url_hint": "Mostra solo le tue foto. Mantieni privato questo URL - chiunque lo possieda può vedere il tuo flusso.",
+    "stream_shared_url_label": "URL di flusso condiviso",
+    "stream_shared_url_hint": "Mostra le foto di tutti gli utenti (disponibile perché AstroDex non è impostato come privato).",
+    "stream_shared_url_private": "Il flusso condiviso non è disponibile perché AstroDex è impostato come privato (Parametri -> Configurazione).",
+    "stream_copy_url": "Copia URL",
+    "stream_ha_setup_hint": "In Home Assistant: Impostazioni -> Dispositivi e servizi -> Aggiungi integrazione -> Generic Camera, quindi incolla l'URL sopra in \"Still Image URL\". Non servono nome utente o password.",
+    "stream_url_copied": "URL copiato negli appunti",
+    "stream_copy_failed": "Impossibile copiare l'URL - selezionala e copiala manualmente"
   },
   "skytonight": {
     "info_1": "SkyTonight calcola i migliori obiettivi di osservazione per la notte in base alla tua posizione, alle previsioni del tempo e ai set di dati interni.",
@@ -2691,7 +2703,20 @@
     "module_astrodex_image_label": "Ultima foto Astrodex",
     "module_astrodex_image_desc": "La foto Astrodex più recente come entità immagine di Home Assistant - solo per gli utenti che lo hanno attivato",
     "module_board_diagnostics_label": "Diagnostica della board",
-    "module_board_diagnostics_desc": "Versione, aggiornamento disponibile, stato della cache e dello scheduler SkyTonight, ultima pubblicazione"
+    "module_board_diagnostics_desc": "Versione, aggiornamento disponibile, stato della cache e dello scheduler SkyTonight, ultima pubblicazione",
+    "astrodex_stream_label": "AstroDex Stream",
+    "astrodex_stream_desc": "Presentazione personale delle tue foto AstroDex, aggiornata automaticamente - per l'integrazione Generic Camera di Home Assistant o qualsiasi visualizzatore di immagini fisse",
+    "astrodex_stream_display_seconds_field": "Durata di visualizzazione per foto (secondi)",
+    "astrodex_stream_aspect_ratio_field": "Formato",
+    "astrodex_stream_aspect_16_9": "16:9 (orizzontale)",
+    "astrodex_stream_aspect_9_16": "9:16 (verticale)",
+    "astrodex_stream_aspect_4_3": "4:3 (orizzontale)",
+    "astrodex_stream_aspect_3_4": "3:4 (verticale)",
+    "astrodex_stream_aspect_1_1": "1:1 (quadrato)",
+    "astrodex_stream_fields_help": "Si applica a ogni foto mostrata. Scegli una durata di visualizzazione generosa - Home Assistant aggiorna l'immagine secondo il proprio ritmo, non questo.",
+    "astrodex_stream_rotate_keys": "Rigenera le chiavi",
+    "astrodex_stream_rotate_confirm": "Questo invalida immediatamente tutti gli URL di flusso già distribuiti (personale e condiviso) - chiunque usi un URL precedente, inclusa una telecamera Home Assistant già configurata, dovrà usare quello nuovo. Continuare?",
+    "astrodex_stream_rotate_done": "Chiavi rigenerate - gli URL di flusso esistenti non funzionano più"
   },
   "sky_widget": {
     "loading": "Caricamento...",
