@@ -2,7 +2,7 @@
 AstroDex Stream engine - renders the "current frame" of a user's (or the shared) AstroDex
 slideshow as a single JPEG, and mints/verifies the per-user signing token that gates it.
 
-See feature-astrodex-stream.md for the full design rationale. In short: this deliberately is
+See docs/ASTRODEX_STREAM.md for the full design rationale. In short: this deliberately is
 NOT a video stream. The frame is a pure function of wall-clock time (which "slot" the clock
 puts us in, and which picture that slot maps to), so there is no per-viewer session and no
 background thread - a client (Home Assistant's Generic Camera integration, a browser tab, ...)
@@ -400,9 +400,15 @@ def _render_cached(feed_key: str, pictures: List[Dict[str, Any]], config: Dict[s
         return cached
     data = render_current_frame(pictures, config, seed=feed_key)
     _FRAME_CACHE[cache_key] = data
+    # Evict stale buckets first (the common case - entries age out as the clock advances), then
+    # fall back to insertion-order eviction if the cap is still exceeded: enough distinct
+    # (feed_key, config) combinations landing within the very same bucket would otherwise let
+    # the cache grow past the cap without ever hitting the "older bucket" condition below.
     if len(_FRAME_CACHE) > _FRAME_CACHE_MAX_ENTRIES:
         for key in [k for k in _FRAME_CACHE if k[2] < bucket]:
             _FRAME_CACHE.pop(key, None)
+    while len(_FRAME_CACHE) > _FRAME_CACHE_MAX_ENTRIES:
+        _FRAME_CACHE.pop(next(iter(_FRAME_CACHE)), None)
     return data
 
 
