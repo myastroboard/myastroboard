@@ -191,6 +191,20 @@ trust it to **allow** a step - but they are otherwise unrelated checks.
   access.
 - The client IP is `request.remote_addr`, which already resolves the real client IP behind a
   reverse proxy when `trust_proxy_headers` is enabled (see [Advanced settings](#advanced-settings-admin) above) - no separate configuration is needed for trusted networks to work correctly behind a proxy.
+- **Docker Desktop / plain `docker-compose` without a reverse proxy**: when the browser reaches
+  the container through Docker's own port mapping (`ports: - "5000:5000"`) rather than through a
+  reverse proxy, `request.remote_addr` is the Docker bridge gateway (typically `172.17.0.1` or
+  `172.18.0.1`, one fixed address for every host and every LAN client alike), not the browser's
+  real address - Docker rewrites the packet's source before it reaches the container, and there
+  is no `X-Forwarded-For` header at that point for `trust_proxy_headers` to read. Trusted
+  networks, the 2FA bypass and local-scope logins will not recognize `127.0.0.1` or a LAN CIDR in
+  this setup. Confirm the address your instance actually sees for a given login attempt in
+  `data/myastroboard.log` (`"Password accepted for user ... from <ip>, awaiting 2FA code"`), or
+  `docker network inspect <compose_project>_default` for the bridge subnet. Adding that one
+  address as a trusted network unblocks testing, but note it then trusts **every** connection
+  reaching the mapped port, not just localhost - the real fix for a LAN or public deployment is a
+  reverse proxy in front (nginx/Traefik) with `trust_proxy_headers = true`, per
+  [6.REVERSE_PROXY.md](6.REVERSE_PROXY.md).
 - **Not included in backups**: `security_settings.json` is excluded from both
   `/api/backup/download` and `/api/config/export`, for the same reason as `trust_proxy_headers` -
   see [docs/CONFIGURATION.md](CONFIGURATION.md#backup-and-restore).
