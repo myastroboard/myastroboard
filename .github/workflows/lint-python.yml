@@ -60,8 +60,8 @@ jobs:
           CHANGED=$(git diff --name-only --diff-filter=ACMR "$BASE_SHA" HEAD -- ':(glob)backend/**/*.py' ':(glob)scripts/**/*.py' ':(glob)tests/**/*.py')
           # pyright stays backend/scripts-only: test code's heavy use of monkeypatch/MagicMock
           # would drown real findings in false positives (see CONTRIBUTING.md).
-          BACKEND_FILES=$(echo "$CHANGED" | grep -E '^(backend|scripts)/' | tr '\n' ' ')
-          ALL_FILES=$(echo "$CHANGED" | tr '\n' ' ')
+          BACKEND_FILES=$(printf '%s' "$CHANGED" | grep -E '^(backend|scripts)/' | tr '\n' ' ')
+          ALL_FILES=$(printf '%s' "$CHANGED" | tr '\n' ' ')
           echo "backend_files=$BACKEND_FILES" >> "$GITHUB_OUTPUT"
           echo "all_files=$ALL_FILES" >> "$GITHUB_OUTPUT"
           echo "Changed backend/scripts files (pyright): $BACKEND_FILES"
