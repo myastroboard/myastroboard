@@ -217,6 +217,36 @@ def binary_sensor(
     return key, spec
 
 
+# Home Assistant's native `update` entity (see update.mqtt in the HA docs): richer than a
+# binary_sensor(device_class="update") - it carries the installed and latest version, can link
+# to release notes, and lists in HA's own Updates page / sidebar badge instead of sitting as a
+# diagnostic sensor. No command_topic: MyAstroBoard has no remote self-update (it is a Docker
+# image the user bumps themselves), so the entity is informational only - HA simply omits the
+# Install button when none is configured, same as any integration that only reports availability.
+def update(
+    key: str,
+    name: str,
+    *,
+    installed_version_key: str,
+    latest_version_key: str,
+    release_url: Optional[str] = None,
+    icon: Optional[str] = None,
+    diagnostic: bool = False,
+) -> Tuple[str, Dict[str, Any]]:
+    tpl = "{{ {'installed_version': value_json.%s, 'latest_version': value_json.%s} | tojson }}" % (
+        installed_version_key,
+        latest_version_key,
+    )
+    spec: Dict[str, Any] = {"p": "update", "name": name, "val_tpl": tpl}
+    if release_url:
+        spec["rel_u"] = release_url
+    if icon:
+        spec["ic"] = icon
+    if diagnostic:
+        spec["ent_cat"] = "diagnostic"
+    return key, spec
+
+
 def _assemble(
     connector: MqttConnector,
     *,
@@ -324,8 +354,15 @@ def _app_version() -> str:
 
 BOARD_COMPONENTS = [
     sensor("version", "Version", icon="mdi:tag", diagnostic=True),
-    binary_sensor("update_available", "Update available", device_class="update", diagnostic=True),
-    sensor("latest_version", "Latest version", icon="mdi:tag-arrow-up", diagnostic=True),
+    update(
+        "update",
+        "Update",
+        installed_version_key="version",
+        latest_version_key="latest_version",
+        release_url=f"{HOMEPAGE}/blob/main/CHANGELOG.md",
+        icon="mdi:tag-arrow-up",
+        diagnostic=True,
+    ),
     binary_sensor("caches_ready", "Caches ready", icon="mdi:database-check", diagnostic=True),
     binary_sensor("skytonight_running", "SkyTonight calculating", device_class="running", diagnostic=True),
     sensor("skytonight_last_run", "SkyTonight last run", device_class="timestamp", diagnostic=True),
@@ -341,7 +378,6 @@ def build_board_device(connector: MqttConnector, publisher_info: Dict[str, Any])
     version = _app_version()
     state: Dict[str, Any] = {
         "version": version,
-        "update_available": None,
         "latest_version": None,
         "caches_ready": None,
         "skytonight_running": None,
@@ -351,10 +387,9 @@ def build_board_device(connector: MqttConnector, publisher_info: Dict[str, Any])
         "locations_published": int(publisher_info.get("locations", 0) or 0),
         "users_published": int(publisher_info.get("users", 0) or 0),
     }
-    update = _shared_cache("version_update")
-    if update:
-        state["update_available"] = bool(update.get("update_available"))
-        state["latest_version"] = text(update.get("latest_version"))
+    version_update = _shared_cache("version_update")
+    if version_update:
+        state["latest_version"] = text(version_update.get("latest_version"))
     try:
         from cache import cache_store  # lazy: cache/ imports connectors/ at module level
 

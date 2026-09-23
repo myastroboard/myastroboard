@@ -160,6 +160,23 @@ class TestAssembly:
         key, spec = mp.binary_sensor("night", "Night", device_class="running")
         assert spec["p"] == "binary_sensor" and "'None' if value_json.night is none" in spec["val_tpl"]
 
+    def test_update_spec(self):
+        key, spec = mp.update(
+            "update",
+            "Update",
+            installed_version_key="version",
+            latest_version_key="latest_version",
+            release_url="https://example.com/changelog",
+            icon="mdi:tag-arrow-up",
+            diagnostic=True,
+        )
+        assert key == "update"
+        assert spec["p"] == "update" and spec["ic"] == "mdi:tag-arrow-up" and spec["ent_cat"] == "diagnostic"
+        assert spec["rel_u"] == "https://example.com/changelog"
+        assert "'installed_version': value_json.version" in spec["val_tpl"]
+        assert "'latest_version': value_json.latest_version" in spec["val_tpl"]
+        assert spec["val_tpl"].strip().endswith("| tojson }}")
+
     def test_assemble_builds_a_complete_device_discovery(self):
         connector = _connector()
         device = mp._assemble(
@@ -225,7 +242,6 @@ class TestBoardDevice:
         device = mp.build_board_device(_connector(), {"last_publish": NOW, "locations": 2, "users": 1})
         assert device.state == {
             "version": "1.6.0",
-            "update_available": True,
             "latest_version": "1.7.0",
             "caches_ready": True,
             "skytonight_running": False,
@@ -235,8 +251,16 @@ class TestBoardDevice:
             "locations_published": 2,
             "users_published": 1,
         }
-        assert set(device.discovery["cmps"]) == set(device.state)
-        assert all(c.get("ent_cat") == "diagnostic" for c in device.discovery["cmps"].values())
+        # "update" is the one component whose template reads two state keys (version,
+        # latest_version) instead of matching its own key one-to-one, so it is not itself a
+        # state key - every OTHER component still maps 1:1 to a state key in both directions.
+        cmps = device.discovery["cmps"]
+        assert set(cmps) - {"update"} == set(device.state) - {"latest_version"}
+        assert cmps["update"]["p"] == "update"
+        assert "value_json.version" in cmps["update"]["val_tpl"]
+        assert "value_json.latest_version" in cmps["update"]["val_tpl"]
+        assert cmps["update"]["rel_u"] == f"{mp.HOMEPAGE}/blob/main/CHANGELOG.md"
+        assert all(c.get("ent_cat") == "diagnostic" for c in cmps.values())
 
     def test_missing_sources_publish_nulls(self, caches, monkeypatch):
         from cache import cache_store
@@ -248,7 +272,7 @@ class TestBoardDevice:
         monkeypatch.setattr(cache_store, "is_astronomical_cache_ready", boom)
         monkeypatch.setattr(skytonight_storage, "load_scheduler_status", boom)
         device = mp.build_board_device(_connector(), {})
-        assert device.state["update_available"] is None
+        assert device.state["latest_version"] is None
         assert device.state["caches_ready"] is None
         assert device.state["skytonight_last_run"] is None
         assert device.state["last_publish"] is None
