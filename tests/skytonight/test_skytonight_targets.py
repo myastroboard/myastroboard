@@ -32,11 +32,13 @@ def _sample_targets():
 
 
 def test_choose_preferred_catalogue_name_uses_priority_order():
-    name = skytonight_targets.choose_preferred_catalogue_name({
-        'Messier': 'M 31',
-        'OpenNGC': 'NGC 224',
-        'Caldwell': 'C 23',
-    })
+    name = skytonight_targets.choose_preferred_catalogue_name(
+        {
+            'Messier': 'M 31',
+            'OpenNGC': 'NGC 224',
+            'Caldwell': 'C 23',
+        }
+    )
     # Messier takes priority over OpenNGC in SKYTONIGHT_PREFERRED_NAME_ORDER
     assert name == 'M 31'
 
@@ -66,11 +68,24 @@ def test_save_and_load_targets_dataset_round_trip(tmp_path):
     assert dataset['lookup']['openngc::ngc224']['group_id'] == 'DSO-0001'
 
 
+def test_load_targets_dataset_missing_file_has_no_mtime(tmp_path):
+    """A dataset file that doesn't exist yet (fresh install) must not raise from the
+    os.stat() mtime check - it's treated as having no mtime, not as an error."""
+    missing = tmp_path / 'does_not_exist.json'
+
+    dataset = skytonight_targets.load_targets_dataset(force_reload=True, dataset_file=str(missing))
+
+    assert dataset['targets'] == []
+    assert dataset['file_mtime_ns'] is None
+
+
 def test_get_lookup_entry_falls_back_to_alias_match(tmp_path):
     dataset_file = tmp_path / 'targets.json'
     skytonight_targets.save_targets_dataset(_sample_targets(), dataset_file=str(dataset_file))
 
-    entry = skytonight_targets.get_lookup_entry('Messier', 'Andromeda Galaxy', force_reload=True, dataset_file=str(dataset_file))
+    entry = skytonight_targets.get_lookup_entry(
+        'Messier', 'Andromeda Galaxy', force_reload=True, dataset_file=str(dataset_file)
+    )
     assert entry['group_id'] == 'DSO-0001'
 
 
@@ -129,20 +144,24 @@ def test_coerce_targets_skips_invalid_target_dict():
 
 def test_coerce_targets_skips_target_without_id():
     """A target dict with empty target_id should be excluded."""
-    result = skytonight_targets._coerce_targets([{
-        "target_id": "",
-        "category": "deep_sky",
-        "object_type": "Galaxy",
-        "preferred_name": "Test",
-        "catalogue_names": {},
-        "aliases": [],
-        "constellation": "",
-        "magnitude": None,
-        "size_arcmin": None,
-        "coordinates": None,
-        "source_catalogues": [],
-        "translation_key": "",
-    }])
+    result = skytonight_targets._coerce_targets(
+        [
+            {
+                "target_id": "",
+                "category": "deep_sky",
+                "object_type": "Galaxy",
+                "preferred_name": "Test",
+                "catalogue_names": {},
+                "aliases": [],
+                "constellation": "",
+                "magnitude": None,
+                "size_arcmin": None,
+                "coordinates": None,
+                "source_catalogues": [],
+                "translation_key": "",
+            }
+        ]
+    )
     assert result == []
 
 
@@ -201,6 +220,7 @@ def test_merge_item_empty_aliases(monkeypatch):
 def test_build_lookup_no_preferred_name():
     """Target with no preferred_name uses choose_preferred_catalogue_name as fallback."""
     from skytonight.skytonight_models import SkyTonightCoordinates, SkyTonightTarget
+
     target = SkyTonightTarget(
         target_id='DSO-TEST',
         category='deep_sky',
@@ -221,7 +241,8 @@ def test_build_lookup_no_preferred_name():
 
 def test_build_lookup_no_preferred_name_and_no_catalogues():
     """preferred_name='' and catalogue_names={} → if preferred_name: False."""
-    from skytonight.skytonight_models import SkyTonightCoordinates, SkyTonightTarget
+    from skytonight.skytonight_models import SkyTonightTarget
+
     target = SkyTonightTarget(
         target_id='DSO-EMPTY',
         category='deep_sky',

@@ -153,6 +153,7 @@ class TestBestWindowsAllModesReal:
     def test_moon_illumination_returns_float(self):
         import datetime
         from zoneinfo import ZoneInfo
+
         svc = AstroTonightService(45.5, -73.5, "America/Montreal")
         dt = datetime.datetime(2026, 6, 4, 22, 0, 0, tzinfo=ZoneInfo("America/Montreal"))
         result = svc._moon_illumination(dt)
@@ -181,8 +182,8 @@ class TestBestWindowsAllModesBranchCoverage:
         # Determine number of time steps: 18:00 → next 06:00 at 5-min intervals
         # = 12h × 12 steps/h + 1 = 145 steps
         n = 145
-        sun_alts = np.full(n, 5.0)   # not dark by default
-        moon_alts = np.full(n, -5.0) # moon always below horizon
+        sun_alts = np.full(n, 5.0)  # not dark by default
+        moon_alts = np.full(n, -5.0)  # moon always below horizon
 
         # Window 1: slots 0-19 dark (100 min)
         sun_alts[:20] = -20.0
@@ -202,11 +203,13 @@ class TestBestWindowsAllModesBranchCoverage:
             coord.transform_to.return_value = transformed
             return coord
 
-        with patch('astroweather.moon_astrotonight.get_sun', return_value=_make_alt_mock(sun_alts)), \
-             patch('astroweather.moon_astrotonight.get_body', return_value=_make_alt_mock(moon_alts)), \
-             patch('astroweather.moon_astrotonight.Time', return_value=MagicMock()), \
-             patch('astroweather.moon_astrotonight.AltAz', return_value=MagicMock()), \
-             patch.object(svc, '_moon_illumination', return_value=50.0):
+        with patch('astroweather.moon_astrotonight.get_sun', return_value=_make_alt_mock(sun_alts)), patch(
+            'astroweather.moon_astrotonight.get_body', return_value=_make_alt_mock(moon_alts)
+        ), patch('astroweather.moon_astrotonight.Time', return_value=MagicMock()), patch(
+            'astroweather.moon_astrotonight.AltAz', return_value=MagicMock()
+        ), patch.object(
+            svc, '_moon_illumination', return_value=50.0
+        ):
             result = svc.best_windows_all_modes()
 
         assert isinstance(result, dict)
@@ -238,11 +241,13 @@ class TestBestWindowsAllModesBranchCoverage:
             coord.transform_to.return_value = transformed
             return coord
 
-        with patch('astroweather.moon_astrotonight.get_sun', return_value=_make_alt_mock(sun_alts)), \
-             patch('astroweather.moon_astrotonight.get_body', return_value=_make_alt_mock(moon_alts)), \
-             patch('astroweather.moon_astrotonight.Time', return_value=MagicMock()), \
-             patch('astroweather.moon_astrotonight.AltAz', return_value=MagicMock()), \
-             patch.object(svc, '_moon_illumination', return_value=50.0):
+        with patch('astroweather.moon_astrotonight.get_sun', return_value=_make_alt_mock(sun_alts)), patch(
+            'astroweather.moon_astrotonight.get_body', return_value=_make_alt_mock(moon_alts)
+        ), patch('astroweather.moon_astrotonight.Time', return_value=MagicMock()), patch(
+            'astroweather.moon_astrotonight.AltAz', return_value=MagicMock()
+        ), patch.object(
+            svc, '_moon_illumination', return_value=50.0
+        ):
             result = svc.best_windows_all_modes()
 
         # Best window should be window 1 (200 min ≈ 3.33 h), not window 2 (195 min)

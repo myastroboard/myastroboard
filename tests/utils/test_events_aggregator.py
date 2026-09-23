@@ -19,23 +19,13 @@ from utils.events_aggregator import (
 @pytest.fixture
 def aggregator():
     """Create an EventsAggregator instance for testing."""
-    return EventsAggregator(
-        latitude=45.0,
-        longitude=-75.0,
-        timezone="America/Toronto",
-        language="en"
-    )
+    return EventsAggregator(latitude=45.0, longitude=-75.0, timezone="America/Toronto", language="en")
 
 
 @pytest.fixture
 def aggregator_french():
     """Create a French EventsAggregator instance for testing."""
-    return EventsAggregator(
-        latitude=45.0,
-        longitude=-75.0,
-        timezone="America/Toronto",
-        language="fr"
-    )
+    return EventsAggregator(latitude=45.0, longitude=-75.0, timezone="America/Toronto", language="fr")
 
 
 class TestEventTypeEnum:
@@ -98,9 +88,9 @@ class TestAstronomicalEvent:
             importance="high",
             score=8.5,
             raw_data={},
-            structure_key="solar"
+            structure_key="solar",
         )
-        
+
         assert event.id == "solar_eclipse_20260812"
         assert event.event_type == "Solar Eclipse"
         assert event.importance == "high"
@@ -123,9 +113,9 @@ class TestAstronomicalEvent:
             importance="low",
             score=None,
             raw_data={},
-            structure_key="test"
+            structure_key="test",
         )
-        
+
         assert event.start_time is None
         assert event.score is None
 
@@ -141,12 +131,7 @@ class TestEventsAggregatorInitialization:
 
     def test_init_with_utc_timezone(self):
         """Test initialization with UTC timezone."""
-        agg = EventsAggregator(
-            latitude=0.0,
-            longitude=0.0,
-            timezone="UTC",
-            language="en"
-        )
+        agg = EventsAggregator(latitude=0.0, longitude=0.0, timezone="UTC", language="en")
         assert agg.timezone == ZoneInfo("UTC")
 
     def test_init_sets_i18n_language(self, aggregator):
@@ -292,14 +277,11 @@ class TestPlanetaryEventLocalization:
             "event_type": "Planetary Conjunction",
             "title": "Venus-Jupiter Conjunction",
             "description": "Two planets come together",
-            "raw_data": {
-                "planet1": "Venus",
-                "planet2": "Jupiter"
-            }
+            "raw_data": {"planet1": "Venus", "planet2": "Jupiter"},
         }
-        
+
         title, desc = aggregator._localize_planetary_text(event_data)
-        
+
         assert title is not None
         assert desc is not None
 
@@ -309,13 +291,11 @@ class TestPlanetaryEventLocalization:
             "event_type": "Planetary Opposition",
             "title": "Mars Opposition",
             "description": "Mars at opposition",
-            "raw_data": {
-                "planet": "Mars"
-            }
+            "raw_data": {"planet": "Mars"},
         }
-        
+
         title, desc = aggregator._localize_planetary_text(event_data)
-        
+
         assert title is not None
         assert desc is not None
 
@@ -325,15 +305,12 @@ class TestPlanetaryEventLocalization:
             "event_type": "Planetary Elongation",
             "title": "Mercury Elongation",
             "description": "Mercury at maximum elongation",
-            "raw_data": {
-                "planet": "Mercury",
-                "elongation": "28.1"
-            },
-            "elongation_degrees": 28.1
+            "raw_data": {"planet": "Mercury", "elongation": "28.1"},
+            "elongation_degrees": 28.1,
         }
-        
+
         title, desc = aggregator._localize_planetary_text(event_data)
-        
+
         assert title is not None
         assert desc is not None
 
@@ -343,15 +320,12 @@ class TestPlanetaryEventLocalization:
             "event_type": "Planetary Retrograde",
             "title": "Mercury Retrograde",
             "description": "Mercury retrograde period",
-            "raw_data": {
-                "planet": "Mercury",
-                "duration_days": 21
-            },
-            "duration_days": 21
+            "raw_data": {"planet": "Mercury", "duration_days": 21},
+            "duration_days": 21,
         }
-        
+
         title, desc = aggregator._localize_planetary_text(event_data)
-        
+
         assert title is not None
         assert desc is not None
 
@@ -396,11 +370,11 @@ class TestPlanetaryEventLocalization:
             "event_type": "Unknown Planetary Event",
             "title": "Unknown",
             "description": "Unknown description",
-            "raw_data": {}
+            "raw_data": {},
         }
-        
+
         title, desc = aggregator._localize_planetary_text(event_data)
-        
+
         assert title == "Unknown" or title is not None
         assert desc == "Unknown description" or desc is not None
 
@@ -411,129 +385,80 @@ class TestAggregateAllEvents:
     def test_aggregate_with_no_data(self, aggregator):
         """Test aggregation with no event data."""
         result = aggregator.aggregate_all_events()
-        
+
         assert result is not None
         assert isinstance(result, dict)
         assert "upcoming_events" in result or result == {}
 
     def test_aggregate_with_solar_eclipse_data(self, aggregator):
         """Test aggregation with solar eclipse data."""
-        eclipse_data = {
-            "solar_eclipse": {
-                "date": "2026-08-12",
-                "magnitude": 0.95,
-                "type": "Partial"
-            }
-        }
-        
+        eclipse_data = {"solar_eclipse": {"date": "2026-08-12", "magnitude": 0.95, "type": "Partial"}}
+
         result = aggregator.aggregate_all_events(solar_eclipse_data=eclipse_data)
-        
+
         assert result is not None
 
     def test_aggregate_with_lunar_eclipse_data(self, aggregator):
         """Test aggregation with lunar eclipse data."""
-        eclipse_data = {
-            "lunar_eclipse": {
-                "date": "2026-09-07",
-                "magnitude": 1.2,
-                "type": "Total"
-            }
-        }
-        
+        eclipse_data = {"lunar_eclipse": {"date": "2026-09-07", "magnitude": 1.2, "type": "Total"}}
+
         result = aggregator.aggregate_all_events(lunar_eclipse_data=eclipse_data)
-        
+
         assert result is not None
 
     def test_aggregate_with_aurora_data(self, aggregator):
         """Test aggregation with aurora data."""
-        aurora_data = {
-            "forecast": [
-                {
-                    "date": "2026-04-17",
-                    "probability": 0.7
-                }
-            ]
-        }
-        
+        aurora_data = {"forecast": [{"date": "2026-04-17", "probability": 0.7}]}
+
         result = aggregator.aggregate_all_events(aurora_data=aurora_data)
-        
+
         assert result is not None
 
     def test_aggregate_with_iss_passes_data(self, aggregator):
         """Test aggregation with ISS passes data."""
-        iss_data = {
-            "passes": [
-                {
-                    "date": "2026-04-17",
-                    "max_altitude": 85,
-                    "magnitude": 2.5
-                }
-            ]
-        }
-        
+        iss_data = {"passes": [{"date": "2026-04-17", "max_altitude": 85, "magnitude": 2.5}]}
+
         result = aggregator.aggregate_all_events(iss_passes_data=iss_data)
-        
+
         assert result is not None
 
     def test_aggregate_with_moon_phases_data(self, aggregator):
         """Test aggregation with moon phases data."""
-        moon_data = {
-            "phases": [
-                {
-                    "date": "2026-04-18",
-                    "phase": "Full Moon"
-                }
-            ]
-        }
-        
+        moon_data = {"phases": [{"date": "2026-04-18", "phase": "Full Moon"}]}
+
         result = aggregator.aggregate_all_events(moon_phases_data=moon_data)
-        
+
         assert result is not None
 
     def test_aggregate_with_planetary_events_data(self, aggregator):
         """Test aggregation with planetary events data."""
         planetary_data = {
-            "events": [
-                {
-                    "date": "2026-04-25",
-                    "event_type": "conjunction",
-                    "planet1": "Venus",
-                    "planet2": "Jupiter"
-                }
-            ]
+            "events": [{"date": "2026-04-25", "event_type": "conjunction", "planet1": "Venus", "planet2": "Jupiter"}]
         }
-        
+
         result = aggregator.aggregate_all_events(planetary_events_data=planetary_data)
-        
+
         assert result is not None
 
     def test_aggregate_with_special_phenomena_data(self, aggregator):
         """Test aggregation with special phenomena data."""
         phenomena_data = {
-            "equinoxes": [
-                {
-                    "date": "2026-03-20",
-                    "type": "Spring Equinox"
-                }
-            ],
+            "equinoxes": [{"date": "2026-03-20", "type": "Spring Equinox"}],
             "solstices": [],
-            "zodiacal_light": []
+            "zodiacal_light": [],
         }
-        
+
         result = aggregator.aggregate_all_events(special_phenomena_data=phenomena_data)
-        
+
         assert result is not None
 
     def test_aggregate_with_multiple_event_types(self, aggregator):
         """Test aggregation with multiple event types."""
         eclipse_data = {"solar_eclipse": {"date": "2026-08-12"}}
         aurora_data = {"forecast": [{"date": "2026-04-17"}]}
-        
-        result = aggregator.aggregate_all_events(
-            solar_eclipse_data=eclipse_data,
-            aurora_data=aurora_data
-        )
-        
+
+        result = aggregator.aggregate_all_events(solar_eclipse_data=eclipse_data, aurora_data=aurora_data)
+
         assert result is not None
 
 
@@ -549,6 +474,7 @@ class TestGetLocalNow:
 # ---------------------------------------------------------------------------
 # Additional tests to increase branch/statement coverage
 # ---------------------------------------------------------------------------
+
 
 class TestExtractSolarEclipseEvents:
     """Tests for _extract_solar_eclipse_events."""
@@ -906,22 +832,14 @@ class TestExtractAuroraEvents:
     def test_aurora_low_visibility_skipped(self, aggregator):
         """Entries with < 70% visibility are skipped."""
         ts = (aggregator.local_now + timedelta(days=1)).isoformat()
-        data = {
-            "forecast": [
-                {"visibility_likelihood": 30, "timestamp": ts, "kp_index": 2}
-            ]
-        }
+        data = {"forecast": [{"visibility_likelihood": 30, "timestamp": ts, "kp_index": 2}]}
         result = aggregator._extract_aurora_events(data)
         assert result == []
 
     def test_aurora_high_visibility_returned(self, aggregator):
         """First entry with >= 70% visibility is returned."""
         ts = (aggregator.local_now + timedelta(days=1)).isoformat()
-        data = {
-            "forecast": [
-                {"visibility_likelihood": 80, "timestamp": ts, "kp_index": 5}
-            ]
-        }
+        data = {"forecast": [{"visibility_likelihood": 80, "timestamp": ts, "kp_index": 5}]}
         result = aggregator._extract_aurora_events(data)
         assert len(result) == 1
         assert result[0].event_type == "Aurora"
@@ -930,11 +848,7 @@ class TestExtractAuroraEvents:
     def test_aurora_uses_probability_fallback(self, aggregator):
         """Falls back to probability field when visibility_likelihood is absent."""
         ts = (aggregator.local_now + timedelta(days=1)).isoformat()
-        data = {
-            "forecast": [
-                {"probability": 75, "timestamp": ts, "kp_index": 4}
-            ]
-        }
+        data = {"forecast": [{"probability": 75, "timestamp": ts, "kp_index": 4}]}
         result = aggregator._extract_aurora_events(data)
         assert len(result) == 1
 
@@ -950,11 +864,7 @@ class TestExtractAuroraEvents:
 
     def test_aurora_missing_timestamp_skipped(self, aggregator):
         """Entry without a timestamp is skipped."""
-        data = {
-            "forecast": [
-                {"visibility_likelihood": 80, "kp_index": 5}
-            ]
-        }
+        data = {"forecast": [{"visibility_likelihood": 80, "kp_index": 5}]}
         result = aggregator._extract_aurora_events(data)
         assert result == []
 
@@ -998,11 +908,7 @@ class TestExtractMoonPhaseEvents:
     def test_next_7_nights_full_moon(self, aggregator):
         """Detects Full Moon from next_7_nights illumination >= 98%."""
         date_str = (aggregator.local_now + timedelta(days=2)).isoformat()
-        data = {
-            "next_7_nights": [
-                {"date": date_str, "moon": {"illumination_percent": 99}}
-            ]
-        }
+        data = {"next_7_nights": [{"date": date_str, "moon": {"illumination_percent": 99}}]}
         events = aggregator._extract_moon_phase_events(data)
         assert len(events) == 1
         assert "full_moon" in events[0].id
@@ -1010,11 +916,7 @@ class TestExtractMoonPhaseEvents:
     def test_next_7_nights_new_moon(self, aggregator):
         """Detects New Moon from next_7_nights illumination <= 2%."""
         date_str = (aggregator.local_now + timedelta(days=4)).isoformat()
-        data = {
-            "next_7_nights": [
-                {"date": date_str, "moon": {"illumination_percent": 1}}
-            ]
-        }
+        data = {"next_7_nights": [{"date": date_str, "moon": {"illumination_percent": 1}}]}
         events = aggregator._extract_moon_phase_events(data)
         assert len(events) == 1
         assert "new_moon" in events[0].id
@@ -1022,32 +924,20 @@ class TestExtractMoonPhaseEvents:
     def test_next_7_nights_mid_illumination_skipped(self, aggregator):
         """Mid-range illumination (not full/new) is ignored."""
         date_str = (aggregator.local_now + timedelta(days=4)).isoformat()
-        data = {
-            "next_7_nights": [
-                {"date": date_str, "moon": {"illumination_percent": 50}}
-            ]
-        }
+        data = {"next_7_nights": [{"date": date_str, "moon": {"illumination_percent": 50}}]}
         events = aggregator._extract_moon_phase_events(data)
         assert events == []
 
     def test_next_7_nights_missing_date_skipped(self, aggregator):
         """Entries without date are skipped."""
-        data = {
-            "next_7_nights": [
-                {"moon": {"illumination_percent": 99}}
-            ]
-        }
+        data = {"next_7_nights": [{"moon": {"illumination_percent": 99}}]}
         events = aggregator._extract_moon_phase_events(data)
         assert events == []
 
     def test_next_7_nights_missing_illumination_skipped(self, aggregator):
         """Entries without illumination_percent are skipped."""
         date_str = (aggregator.local_now + timedelta(days=2)).isoformat()
-        data = {
-            "next_7_nights": [
-                {"date": date_str, "moon": {}}
-            ]
-        }
+        data = {"next_7_nights": [{"date": date_str, "moon": {}}]}
         events = aggregator._extract_moon_phase_events(data)
         assert events == []
 
@@ -1093,7 +983,13 @@ class TestExtractIssPassEvents:
     def test_passes_in_the_past_skipped(self, aggregator):
         """ISS passes in the past (days_until < 0) are skipped."""
         peak = (aggregator.local_now - timedelta(days=1)).isoformat()
-        iss_pass = {"peak_time": peak, "visibility_score": 80, "visibility_day_night": "Night", "is_visible": True, "peak_altitude_deg": 45.0}
+        iss_pass = {
+            "peak_time": peak,
+            "visibility_score": 80,
+            "visibility_day_night": "Night",
+            "is_visible": True,
+            "peak_altitude_deg": 45.0,
+        }
         events = aggregator._extract_iss_pass_events({"passes": [iss_pass]})
         assert events == []
 
@@ -2019,18 +1915,14 @@ class TestAggregateAllEventsWithValidData:
     def test_aggregate_events_count_and_next_7_days(self, aggregator):
         """Events within 7 days appear in events_next_7_days."""
         peak = (aggregator.local_now + timedelta(days=3)).isoformat()
-        data = {
-            "phases": [{"phase": "Full Moon", "date": peak}]
-        }
+        data = {"phases": [{"phase": "Full Moon", "date": peak}]}
         result = aggregator.aggregate_all_events(moon_phases_data=data)
         assert len(result["events_next_7_days"]) >= 1
 
     def test_aggregate_next_30_days_includes_further_events(self, aggregator):
         """Events within 30 days appear in events_next_30_days."""
         peak = (aggregator.local_now + timedelta(days=25)).isoformat()
-        data = {
-            "phases": [{"phase": "New Moon", "date": peak}]
-        }
+        data = {"phases": [{"phase": "New Moon", "date": peak}]}
         result = aggregator.aggregate_all_events(moon_phases_data=data)
         assert len(result["events_next_30_days"]) >= 1
 
@@ -2041,14 +1933,57 @@ class TestAggregateAllEventsWithValidData:
         iss_peak = (aggregator.local_now + timedelta(days=2)).isoformat()
 
         result = aggregator.aggregate_all_events(
-            solar_eclipse_data={"solar_eclipse": {"visible": True, "peak_time": peak, "type": "Total", "astrophotography_score": 9, "obscuration_percent": 100.0, "peak_altitude_deg": 45.0}},
-            lunar_eclipse_data={"lunar_eclipse": {"visible": True, "peak_time": peak, "type": "Total", "obscuration_percent": 100.0}},
+            solar_eclipse_data={
+                "solar_eclipse": {
+                    "visible": True,
+                    "peak_time": peak,
+                    "type": "Total",
+                    "astrophotography_score": 9,
+                    "obscuration_percent": 100.0,
+                    "peak_altitude_deg": 45.0,
+                }
+            },
+            lunar_eclipse_data={
+                "lunar_eclipse": {"visible": True, "peak_time": peak, "type": "Total", "obscuration_percent": 100.0}
+            },
             aurora_data={"forecast": [{"visibility_likelihood": 85, "timestamp": aurora_ts, "kp_index": 6}]},
             moon_phases_data={"phases": [{"phase": "Full Moon", "date": peak}]},
-            iss_passes_data={"passes": [{"peak_time": iss_peak, "visibility_score": 80, "visibility_day_night": "Astronomical Night", "is_visible": True, "peak_altitude_deg": 45.0}]},
-            planetary_events_data={"events": [{"peak_time": peak, "event_type": "Planetary Conjunction", "raw_data": {"planet1": "Venus", "planet2": "Jupiter"}}]},
-            special_phenomena_data={"events": [{"peak_time": peak, "event_type": "Equinox", "raw_data": {"event": "spring_equinox"}, "title": "Spring Equinox", "description": "Equal day and night"}]},
-            solar_system_events_data={"events": [{"peak_time": peak, "event_type": "Meteor Shower", "title": "Perseids", "description": "Peak"}]},
+            iss_passes_data={
+                "passes": [
+                    {
+                        "peak_time": iss_peak,
+                        "visibility_score": 80,
+                        "visibility_day_night": "Astronomical Night",
+                        "is_visible": True,
+                        "peak_altitude_deg": 45.0,
+                    }
+                ]
+            },
+            planetary_events_data={
+                "events": [
+                    {
+                        "peak_time": peak,
+                        "event_type": "Planetary Conjunction",
+                        "raw_data": {"planet1": "Venus", "planet2": "Jupiter"},
+                    }
+                ]
+            },
+            special_phenomena_data={
+                "events": [
+                    {
+                        "peak_time": peak,
+                        "event_type": "Equinox",
+                        "raw_data": {"event": "spring_equinox"},
+                        "title": "Spring Equinox",
+                        "description": "Equal day and night",
+                    }
+                ]
+            },
+            solar_system_events_data={
+                "events": [
+                    {"peak_time": peak, "event_type": "Meteor Shower", "title": "Perseids", "description": "Peak"}
+                ]
+            },
         )
         assert result["events_count"] >= 1
         assert isinstance(result["upcoming_events"], list)

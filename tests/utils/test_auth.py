@@ -1645,20 +1645,36 @@ class TestAuthSaveUsersMissingBranches:
     """Cover save_users error-recovery branches not yet hit."""
 
     def test_makedirs_fails_no_backup_no_temp(self, tmp_path, monkeypatch):
-        """makedirs fails → backup_created=False, temp not created."""
+        """makedirs fails -> backup_created=False, temp not created.
+
+        Patching the global os.makedirs (as an earlier version of this test did) actually
+        fails inside _exclusive_write()'s own interprocess_lock() first (it also calls
+        os.makedirs, for the lock file's directory, before save_users's body even starts),
+        so save_users's own try/except was never reached at all. Letting the first call
+        through (the lock's) and failing only from the second call onward isolates the
+        failure to save_users's own os.makedirs(os.path.dirname(USERS_FILE)) line.
+        """
         from utils import auth
 
         users_file = tmp_path / "users.json"
         monkeypatch.setattr(auth, "USERS_FILE", str(users_file))
-        manager = auth.UserManager()
+        manager = auth.UserManager()  # first save succeeds normally; the directory now exists
 
-        def _fail_makedirs(*args, **kwargs):
-            raise OSError("disk full")
+        calls = {"n": 0}
+        original_makedirs = os.makedirs
 
-        with patch("os.makedirs", side_effect=_fail_makedirs):
-            with pytest.raises(OSError):
-                manager.save_users()
+        def _fail_from_second_call(path, *args, **kwargs):
+            calls["n"] += 1
+            if calls["n"] >= 2:
+                raise OSError("disk full")
+            return original_makedirs(path, *args, **kwargs)
+
+        monkeypatch.setattr(auth.os, "makedirs", _fail_from_second_call)
+
+        with pytest.raises(OSError):
+            manager.save_users()
         # Both False branches taken: backup_created=False and temp never created
+        assert calls["n"] >= 2
 
 
 class TestAuthDeleteUserMissingBranches:
@@ -1713,8 +1729,6 @@ class TestAuthDeleteUserMissingBranches:
 
     def test_listdir_path_traversal_guard(self, tmp_path, monkeypatch, setup_auth_manager):
         """normpath resolves outside images_dir → skip."""
-        from utils import auth as auth_mod
-
         manager, admin, alice, astrodex_dir, images_dir = setup_auth_manager
         user_id = alice.user_id
 
@@ -1978,6 +1992,13 @@ class TestTotpUserModel:
         user = auth.User(username="v", password_hash="h", role=auth.ROLE_USER, totp_secret=secret)
 
         assert user.verify_totp("") is False
+
+    def test_verify_totp_swallows_exceptions_from_a_corrupt_secret(self):
+        """A totp_secret that isn't valid base32 (e.g. hand-edited users.json) must not
+        raise out of verify_totp - it's a login-path check and must fail closed."""
+        user = auth.User(username="v", password_hash="h", role=auth.ROLE_USER, totp_secret="not-valid-base32!!")
+
+        assert user.verify_totp("123456") is False
 
     def test_provisioning_uri_carries_issuer_and_username(self):
         secret = pyotp.random_base32()

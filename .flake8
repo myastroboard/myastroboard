@@ -12,3 +12,11 @@ exclude =
 per-file-ignores =
     # Flask requires sys.path manipulation before local imports
     backend/app.py: E402
+    # Tests stub sys.modules['psutil'] (or set up env vars / matplotlib backend / stale
+    # test state) before importing app/backend modules - same ordering requirement as
+    # backend/app.py above.
+    tests/conftest.py: E402
+    tests/blueprints/test_app_routes.py: E402
+    tests/blueprints/test_plan_my_night_api.py: E402
+    tests/blueprints/test_skytonight_api.py: E402
+    tests/blueprints/test_skytonight_api_extended.py: E402

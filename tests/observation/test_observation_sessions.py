@@ -229,9 +229,7 @@ class TestValidation:
             (
                 {
                     'username': 'x',
-                    'sessions': [
-                        {'id': 'a', 'nights': [{'id': 'n1', 'date': 'd'}], 'attachments': 'no'}
-                    ],
+                    'sessions': [{'id': 'a', 'nights': [{'id': 'n1', 'date': 'd'}], 'attachments': 'no'}],
                 },
                 "invalid 'attachments'",
             ),

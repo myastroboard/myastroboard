@@ -79,10 +79,13 @@ def test_every_figure_on_an_empty_plate_says_something(fresh_user_page, subtab, 
         assert 'null' not in value, f"{subtab}: a figure rendered null"
 
 
-@pytest.mark.parametrize('subtab, selector', [
-    ('observation-log', '#observation-log-stats'),
-    ('analytics', '#session-analytics-stats'),
-])
+@pytest.mark.parametrize(
+    'subtab, selector',
+    [
+        ('observation-log', '#observation-log-stats'),
+        ('analytics', '#session-analytics-stats'),
+    ],
+)
 def test_a_zero_duration_still_carries_its_unit(fresh_user_page, subtab, selector):
     """The hero of both logbook plates is a duration.
 
@@ -95,9 +98,9 @@ def test_a_zero_duration_still_carries_its_unit(fresh_user_page, subtab, selecto
 
     hero = page.locator(f'{selector} .stat-plate-hero-value').inner_text().strip()
     assert hero != '0', f"{subtab}: the hero duration lost its unit"
-    assert any(character.isalpha() for character in hero), (
-        f"{subtab}: expected a unit alongside the number, got {hero!r}"
-    )
+    assert any(
+        character.isalpha() for character in hero
+    ), f"{subtab}: expected a unit alongside the number, got {hero!r}"
 
 
 def test_the_log_driven_sections_show_their_empty_states(fresh_user_page):
@@ -106,15 +109,14 @@ def test_the_log_driven_sections_show_their_empty_states(fresh_user_page):
     _open_astrodex_subtab(page, 'analytics')
     page.wait_for_selector('#session-analytics-stats.stat-plate', timeout=30000)
 
-    for container in ('#session-analytics-charts', '#session-analytics-coverage',
-                      '#session-analytics-conditions'):
+    for container in ('#session-analytics-charts', '#session-analytics-coverage', '#session-analytics-conditions'):
         page.wait_for_selector(f'{container} .session-analytics-empty', timeout=30000)
-        assert page.locator(f'{container} .session-analytics-empty').inner_text().strip(), (
-            f"{container}: empty state rendered with no message"
-        )
-        assert page.locator(f'{container} canvas').count() == 0, (
-            f"{container}: a chart was drawn on data that is not there"
-        )
+        assert (
+            page.locator(f'{container} .session-analytics-empty').inner_text().strip()
+        ), f"{container}: empty state rendered with no message"
+        assert (
+            page.locator(f'{container} canvas').count() == 0
+        ), f"{container}: a chart was drawn on data that is not there"
 
 
 def test_best_months_is_useful_before_anything_has_been_logged(fresh_user_page):

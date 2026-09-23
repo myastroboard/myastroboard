@@ -1,4 +1,5 @@
 """API tests for Astrodex catalogue alias switching."""
+
 import os
 import sys
 import tempfile
@@ -32,13 +33,7 @@ def client():
 
 
 def _fake_alias_entry(catalogue: str, object_name: str) -> dict:
-    entry = {
-        'group_id': 'OBJ000001',
-        'aliases': {
-            'GaryImm': 'M81',
-            'OpenNGC': 'NGC 3031'
-        }
-    }
+    entry = {'group_id': 'OBJ000001', 'aliases': {'GaryImm': 'M81', 'OpenNGC': 'NGC 3031'}}
 
     if catalogue == 'GaryImm' and object_name == 'M81':
         return entry
@@ -57,16 +52,11 @@ def test_switch_catalogue_name_api(client, monkeypatch):
 
         user = user_manager.get_user_by_username('admin')
         item = astrodex.create_astrodex_item(
-            user.user_id,
-            {'name': 'M81', 'type': 'Galaxy', 'catalogue': 'GaryImm'},
-            username=user.username
+            user.user_id, {'name': 'M81', 'type': 'Galaxy', 'catalogue': 'GaryImm'}, username=user.username
         )
         assert item is not None
 
-        response = client.post(
-            f"/api/astrodex/items/{item['id']}/catalogue-name",
-            json={'catalogue': 'OpenNGC'}
-        )
+        response = client.post(f"/api/astrodex/items/{item['id']}/catalogue-name", json={'catalogue': 'OpenNGC'})
 
         assert response.status_code == 200
         payload = response.get_json()
@@ -98,16 +88,12 @@ def test_get_astrodex_public_mode_includes_other_users_items(client, monkeypatch
         other_user = user_manager.create_user(other_username, 'test123', 'user')
 
         admin_item = astrodex.create_astrodex_item(
-            admin_user.user_id,
-            {'name': 'M31', 'type': 'Galaxy', 'catalogue': 'Messier'},
-            username=admin_user.username
+            admin_user.user_id, {'name': 'M31', 'type': 'Galaxy', 'catalogue': 'Messier'}, username=admin_user.username
         )
         assert admin_item is not None
 
         other_item = astrodex.create_astrodex_item(
-            other_user.user_id,
-            {'name': 'M42', 'type': 'Nebula', 'catalogue': 'Messier'},
-            username=other_user.username
+            other_user.user_id, {'name': 'M42', 'type': 'Nebula', 'catalogue': 'Messier'}, username=other_user.username
         )
         assert other_item is not None
 
@@ -137,16 +123,12 @@ def test_get_astrodex_private_mode_hides_other_users_items(client, monkeypatch):
         other_user = user_manager.create_user(other_username, 'test123', 'user')
 
         admin_item = astrodex.create_astrodex_item(
-            admin_user.user_id,
-            {'name': 'M31', 'type': 'Galaxy', 'catalogue': 'Messier'},
-            username=admin_user.username
+            admin_user.user_id, {'name': 'M31', 'type': 'Galaxy', 'catalogue': 'Messier'}, username=admin_user.username
         )
         assert admin_item is not None
 
         other_item = astrodex.create_astrodex_item(
-            other_user.user_id,
-            {'name': 'M42', 'type': 'Nebula', 'catalogue': 'Messier'},
-            username=other_user.username
+            other_user.user_id, {'name': 'M42', 'type': 'Nebula', 'catalogue': 'Messier'}, username=other_user.username
         )
         assert other_item is not None
 
@@ -175,24 +157,32 @@ def test_get_astrodex_map_shared_mode_includes_other_users_coordinates(client, m
         other_user = user_manager.create_user(other_username, 'test123', 'user')
 
         admin_item = astrodex.create_astrodex_item(
-            admin_user.user_id,
-            {'name': 'M31', 'type': 'Galaxy', 'catalogue': 'Messier'},
-            username=admin_user.username
+            admin_user.user_id, {'name': 'M31', 'type': 'Galaxy', 'catalogue': 'Messier'}, username=admin_user.username
         )
         assert admin_item is not None
-        astrodex.add_picture_to_item(admin_user.user_id, admin_item['id'], {
-            'filename': 'admin_pic.jpg', 'latitude': 45.1, 'longitude': 5.2,
-        })
+        astrodex.add_picture_to_item(
+            admin_user.user_id,
+            admin_item['id'],
+            {
+                'filename': 'admin_pic.jpg',
+                'latitude': 45.1,
+                'longitude': 5.2,
+            },
+        )
 
         other_item = astrodex.create_astrodex_item(
-            other_user.user_id,
-            {'name': 'M42', 'type': 'Nebula', 'catalogue': 'Messier'},
-            username=other_user.username
+            other_user.user_id, {'name': 'M42', 'type': 'Nebula', 'catalogue': 'Messier'}, username=other_user.username
         )
         assert other_item is not None
-        astrodex.add_picture_to_item(other_user.user_id, other_item['id'], {
-            'filename': 'other_pic.jpg', 'latitude': 48.8, 'longitude': 2.3,
-        })
+        astrodex.add_picture_to_item(
+            other_user.user_id,
+            other_item['id'],
+            {
+                'filename': 'other_pic.jpg',
+                'latitude': 48.8,
+                'longitude': 2.3,
+            },
+        )
 
         response = client.get('/api/astrodex/map')
         assert response.status_code == 200
@@ -222,24 +212,32 @@ def test_get_astrodex_map_private_mode_hides_other_users_points(client, monkeypa
         other_user = user_manager.create_user(other_username, 'test123', 'user')
 
         admin_item = astrodex.create_astrodex_item(
-            admin_user.user_id,
-            {'name': 'M31', 'type': 'Galaxy', 'catalogue': 'Messier'},
-            username=admin_user.username
+            admin_user.user_id, {'name': 'M31', 'type': 'Galaxy', 'catalogue': 'Messier'}, username=admin_user.username
         )
         assert admin_item is not None
-        astrodex.add_picture_to_item(admin_user.user_id, admin_item['id'], {
-            'filename': 'admin_pic.jpg', 'latitude': 45.1, 'longitude': 5.2,
-        })
+        astrodex.add_picture_to_item(
+            admin_user.user_id,
+            admin_item['id'],
+            {
+                'filename': 'admin_pic.jpg',
+                'latitude': 45.1,
+                'longitude': 5.2,
+            },
+        )
 
         other_item = astrodex.create_astrodex_item(
-            other_user.user_id,
-            {'name': 'M42', 'type': 'Nebula', 'catalogue': 'Messier'},
-            username=other_user.username
+            other_user.user_id, {'name': 'M42', 'type': 'Nebula', 'catalogue': 'Messier'}, username=other_user.username
         )
         assert other_item is not None
-        astrodex.add_picture_to_item(other_user.user_id, other_item['id'], {
-            'filename': 'other_pic.jpg', 'latitude': 48.8, 'longitude': 2.3,
-        })
+        astrodex.add_picture_to_item(
+            other_user.user_id,
+            other_item['id'],
+            {
+                'filename': 'other_pic.jpg',
+                'latitude': 48.8,
+                'longitude': 2.3,
+            },
+        )
 
         response = client.get('/api/astrodex/map')
         assert response.status_code == 200
@@ -253,6 +251,7 @@ def test_get_astrodex_map_private_mode_hides_other_users_points(client, monkeypa
 
 def test_get_astrodex_map_internal_error_returns_500(client, monkeypatch):
     """An unexpected exception building the map payload is caught and returns a generic 500."""
+
     def _raise(*args, **kwargs):
         raise RuntimeError('boom')
 
@@ -305,16 +304,12 @@ def test_get_astrodex_image_private_mode_blocks_other_user_images(client, monkey
         other_user = user_manager.create_user(other_username, 'test123', 'user')
 
         admin_item = astrodex.create_astrodex_item(
-            admin_user.user_id,
-            {'name': 'M31', 'type': 'Galaxy', 'catalogue': 'Messier'},
-            username=admin_user.username
+            admin_user.user_id, {'name': 'M31', 'type': 'Galaxy', 'catalogue': 'Messier'}, username=admin_user.username
         )
         assert admin_item is not None
 
         other_item = astrodex.create_astrodex_item(
-            other_user.user_id,
-            {'name': 'M42', 'type': 'Nebula', 'catalogue': 'Messier'},
-            username=other_user.username
+            other_user.user_id, {'name': 'M42', 'type': 'Nebula', 'catalogue': 'Messier'}, username=other_user.username
         )
         assert other_item is not None
 
@@ -359,36 +354,42 @@ def _fake_collection_dataset(*_args, **_kwargs):
 
     return {
         'targets': [
-            SkyTonightTarget.from_dict({
-                'target_id': 'dso-m31',
-                'category': 'deep_sky',
-                'object_type': 'Galaxy',
-                'preferred_name': 'Andromeda Galaxy',
-                'catalogue_names': {'Messier': 'M 31'},
-                'aliases': ['M 31', 'Andromeda Galaxy'],
-                'constellation': 'And',
-                'magnitude': 3.4,
-                'coordinates': {'ra_hours': 0.712, 'dec_degrees': 41.269},
-            }),
-            SkyTonightTarget.from_dict({
-                'target_id': 'dso-m42',
-                'category': 'deep_sky',
-                'object_type': 'Nebula',
-                'preferred_name': 'Orion Nebula',
-                'catalogue_names': {'Messier': 'M 42'},
-                'aliases': ['M 42', 'Orion Nebula'],
-                'constellation': 'Ori',
-                'magnitude': 4.0,
-                'coordinates': {'ra_hours': 5.588, 'dec_degrees': -5.391},
-            }),
-            SkyTonightTarget.from_dict({
-                'target_id': 'body-mars',
-                'category': 'bodies',
-                'object_type': 'Planet',
-                'preferred_name': 'Mars',
-                'catalogue_names': {'Bodies': 'Mars'},
-                'coordinates': None,
-            }),
+            SkyTonightTarget.from_dict(
+                {
+                    'target_id': 'dso-m31',
+                    'category': 'deep_sky',
+                    'object_type': 'Galaxy',
+                    'preferred_name': 'Andromeda Galaxy',
+                    'catalogue_names': {'Messier': 'M 31'},
+                    'aliases': ['M 31', 'Andromeda Galaxy'],
+                    'constellation': 'And',
+                    'magnitude': 3.4,
+                    'coordinates': {'ra_hours': 0.712, 'dec_degrees': 41.269},
+                }
+            ),
+            SkyTonightTarget.from_dict(
+                {
+                    'target_id': 'dso-m42',
+                    'category': 'deep_sky',
+                    'object_type': 'Nebula',
+                    'preferred_name': 'Orion Nebula',
+                    'catalogue_names': {'Messier': 'M 42'},
+                    'aliases': ['M 42', 'Orion Nebula'],
+                    'constellation': 'Ori',
+                    'magnitude': 4.0,
+                    'coordinates': {'ra_hours': 5.588, 'dec_degrees': -5.391},
+                }
+            ),
+            SkyTonightTarget.from_dict(
+                {
+                    'target_id': 'body-mars',
+                    'category': 'bodies',
+                    'object_type': 'Planet',
+                    'preferred_name': 'Mars',
+                    'catalogue_names': {'Bodies': 'Mars'},
+                    'coordinates': None,
+                }
+            ),
         ]
     }
 
@@ -403,9 +404,7 @@ def test_collection_catalogues_api(client, monkeypatch):
 
         user = user_manager.get_user_by_username('admin')
         astrodex.create_astrodex_item(
-            user.user_id,
-            {'name': 'M 31', 'type': 'Galaxy', 'catalogue': 'Messier'},
-            username=user.username
+            user.user_id, {'name': 'M 31', 'type': 'Galaxy', 'catalogue': 'Messier'}, username=user.username
         )
 
         response = client.get('/api/astrodex/collection/catalogues')
@@ -429,7 +428,7 @@ def test_collection_page_api(client, monkeypatch):
         item = astrodex.create_astrodex_item(
             user.user_id,
             {'name': 'M31 - Andromeda Galaxy', 'type': 'Galaxy', 'catalogue': 'Messier'},
-            username=user.username
+            username=user.username,
         )
         astrodex.add_picture_to_item(user.user_id, item['id'], {'filename': 'andromeda.jpg', 'is_main': True})
 
@@ -479,6 +478,7 @@ def test_collection_page_api_requires_a_catalogue(client):
 
 def test_collection_catalogues_api_internal_error_returns_500(client, monkeypatch):
     """An unexpected exception building the catalogue list is caught and returns a generic 500."""
+
     def _raise(*args, **kwargs):
         raise RuntimeError('boom')
 
@@ -491,6 +491,7 @@ def test_collection_catalogues_api_internal_error_returns_500(client, monkeypatc
 
 def test_collection_page_api_internal_error_returns_500(client, monkeypatch):
     """An unexpected exception building a collection page is caught and returns a generic 500."""
+
     def _raise(*args, **kwargs):
         raise RuntimeError('boom')
 

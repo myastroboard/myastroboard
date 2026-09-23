@@ -249,9 +249,7 @@ class TestActiveLocationResolver:
     def test_default_id_used_when_no_active(self):
         config = _make_config(3)
         mine = config['locations'][1]['id']
-        user = _FakeUser(
-            preferences={'location': {'attributed_location_ids': [mine], 'default_location_id': mine}}
-        )
+        user = _FakeUser(preferences={'location': {'attributed_location_ids': [mine], 'default_location_id': mine}})
         assert get_active_location(config, user)['id'] == mine
 
     def test_dangling_ids_are_ignored(self):
@@ -280,9 +278,7 @@ class TestActiveLocationResolver:
         config = _make_config(3)
         ids = [p['id'] for p in config['locations']]
         user = _FakeUser(
-            preferences={
-                'location': {'attributed_location_ids': [ids[0], ids[2]], 'order': [ids[2], ids[0]]}
-            }
+            preferences={'location': {'attributed_location_ids': [ids[0], ids[2]], 'order': [ids[2], ids[0]]}}
         )
         result = [p['id'] for p in get_locations_for_user(config, user)]
         assert result == [ids[2], ids[0]]
@@ -368,7 +364,9 @@ class TestLocationScopedCaches:
     def test_drop_location_caches_removes_slots_and_signature(self):
         loc_id = str(uuid.uuid4())
         cache_store.update_location_cache('aurora', loc_id, {'kp': 3})
-        cache_store.update_location_config({'id': loc_id, 'latitude': 1, 'longitude': 2, 'elevation': 3, 'timezone': 'UTC'})
+        cache_store.update_location_config(
+            {'id': loc_id, 'latitude': 1, 'longitude': 2, 'elevation': 3, 'timezone': 'UTC'}
+        )
 
         cache_store.drop_location_caches(loc_id)
 
@@ -793,14 +791,18 @@ class TestLocationTaggingHelpers:
         loc_id = str(uuid.uuid4())
 
         item = astrodex_module.create_astrodex_item(
-            user_id, {'name': 'NGC 7000', 'catalogue': 'OpenNGC'}, 'tagger',
+            user_id,
+            {'name': 'NGC 7000', 'catalogue': 'OpenNGC'},
+            'tagger',
         )
         assert item is not None
         assert 'location_id' not in item
         assert 'location_name' not in item
 
         picture = astrodex_module.add_picture_to_item(
-            user_id, item['id'], {'filename': 'ngc7000.jpg', 'location_id': loc_id, 'location_name': 'Snap Site'},
+            user_id,
+            item['id'],
+            {'filename': 'ngc7000.jpg', 'location_id': loc_id, 'location_name': 'Snap Site'},
         )
         assert picture is not None
         assert picture['location_id'] == loc_id
@@ -857,6 +859,7 @@ class TestLoadConfigMigration:
 # Merged from former test_coverage_edge_cases.py
 # ---------------------------------------------------------------------------
 
+
 def test_repo_config_get_scheduler_locations_import_failure_falls_back(monkeypatch):
     from utils import repo_config
 
@@ -883,6 +886,7 @@ def test_repo_config_get_scheduler_locations_import_failure_falls_back(monkeypat
 # Merged from former test_locations_coverage.py
 # ---------------------------------------------------------------------------
 
+
 class TestRepoConfigEdgeArcs:
     def test_new_location_preset_non_dict_base_keeps_defaults(self):
         preset = new_location_preset(base='not-a-dict')
@@ -891,8 +895,10 @@ class TestRepoConfigEdgeArcs:
 
     def test_ensure_locations_drops_non_dict_entries(self):
         config = {
-            'locations': ['junk', {'name': 'Real', 'latitude': 1, 'longitude': 2,
-                                   'timezone': 'UTC', 'is_install_default': True}],
+            'locations': [
+                'junk',
+                {'name': 'Real', 'latitude': 1, 'longitude': 2, 'timezone': 'UTC', 'is_install_default': True},
+            ],
         }
         changed = _ensure_locations(config)
         assert changed is True
@@ -904,10 +910,24 @@ class TestRepoConfigEdgeArcs:
         # written by an older intermediate build) -> attach to install default.
         config = {
             'locations': [
-                {'id': 'a', 'name': 'A', 'latitude': 1, 'longitude': 2, 'timezone': 'UTC',
-                 'horizon_profile': [], 'is_install_default': False},
-                {'id': 'b', 'name': 'B', 'latitude': 3, 'longitude': 4, 'timezone': 'UTC',
-                 'horizon_profile': [], 'is_install_default': True},
+                {
+                    'id': 'a',
+                    'name': 'A',
+                    'latitude': 1,
+                    'longitude': 2,
+                    'timezone': 'UTC',
+                    'horizon_profile': [],
+                    'is_install_default': False,
+                },
+                {
+                    'id': 'b',
+                    'name': 'B',
+                    'latitude': 3,
+                    'longitude': 4,
+                    'timezone': 'UTC',
+                    'horizon_profile': [],
+                    'is_install_default': True,
+                },
             ],
             'skytonight': {'constraints': {'horizon_profile': [{'az': 0, 'alt': 12}]}},
         }
@@ -921,8 +941,7 @@ class TestRepoConfigEdgeArcs:
         # and the flag invariant promotes that same first preset afterwards.
         config = {
             'locations': [
-                {'id': 'a', 'name': 'A', 'latitude': 1, 'longitude': 2, 'timezone': 'UTC',
-                 'horizon_profile': []},
+                {'id': 'a', 'name': 'A', 'latitude': 1, 'longitude': 2, 'timezone': 'UTC', 'horizon_profile': []},
             ],
             'skytonight': {'constraints': {'horizon_profile': [{'az': 90, 'alt': 8}]}},
         }
@@ -969,12 +988,16 @@ class TestRepoConfigEdgeArcs:
                 {'id': 'd', 'name': 'D', 'is_install_default': False},
             ]
         }
-        user = _FakeUser(preferences={'location': {
-            'attributed_location_ids': [],
-            'active_location_id': 'b',
-            'default_location_id': 'c',
-            'order': [],
-        }})
+        user = _FakeUser(
+            preferences={
+                'location': {
+                    'attributed_location_ids': [],
+                    'active_location_id': 'b',
+                    'default_location_id': 'c',
+                    'order': [],
+                }
+            }
+        )
         stub_manager = types.SimpleNamespace(users={user.user_id: user})
         monkeypatch.setattr(auth_module, 'user_manager', stub_manager)
 
@@ -984,4 +1007,3 @@ class TestRepoConfigEdgeArcs:
     def test_active_location_no_config_returns_default_location(self):
         location = get_active_location({}, None)
         assert location['name'] == 'Paris'
-

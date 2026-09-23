@@ -4,10 +4,10 @@ from datetime import datetime, timezone, timedelta
 from unittest.mock import patch
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _fmt(dt: datetime) -> str:
     """Format a datetime for sun_data strings (UTC, no tz suffix)."""
@@ -37,12 +37,14 @@ def _make_sun_data(**overrides) -> dict:
 # Unit tests for _determine_sky_period
 # ---------------------------------------------------------------------------
 
+
 class TestDetermineSkySeriod:
     """Direct unit tests for the _determine_sky_period helper in app.py."""
 
     @pytest.fixture(autouse=True)
     def _import(self):
         from blueprints import astronomy as _astronomy
+
         self._fn = _astronomy._determine_sky_period
 
     def _call(self, sun_data, tz="UTC"):
@@ -250,6 +252,7 @@ class TestDetermineSkySeriod:
 # ---------------------------------------------------------------------------
 # API endpoint tests for /api/sky-widget
 # ---------------------------------------------------------------------------
+
 
 class TestSkyWidgetApi:
     """Integration tests for GET /api/sky-widget."""

@@ -246,7 +246,6 @@ def test_get_vapid_claims_email_with_email(tmp_path, monkeypatch):
 
 
 def test_get_vapid_claims_email_already_has_mailto(tmp_path, monkeypatch):
-    from utils import app_settings
     from utils import push_manager
 
     _set_cache(
@@ -264,7 +263,6 @@ def test_get_vapid_claims_email_already_has_mailto(tmp_path, monkeypatch):
 
 
 def test_get_vapid_claims_email_empty_returns_default(tmp_path, monkeypatch):
-    from utils import app_settings
     from utils import push_manager
 
     _set_cache(
@@ -287,7 +285,6 @@ def test_get_vapid_claims_email_empty_returns_default(tmp_path, monkeypatch):
 
 
 def test_vapid_contact_status_not_set(monkeypatch):
-    from utils import app_settings
     from utils import push_manager
 
     _set_cache(monkeypatch, {'vapid_contact_email': '', 'trust_proxy_headers': False, 'session_cookie_secure': False})
@@ -299,7 +296,6 @@ def test_vapid_contact_status_not_set(monkeypatch):
 
 
 def test_vapid_contact_status_invalid_domain(monkeypatch):
-    from utils import app_settings
     from utils import push_manager
 
     _set_cache(
@@ -314,7 +310,6 @@ def test_vapid_contact_status_invalid_domain(monkeypatch):
 
 
 def test_vapid_contact_status_valid(monkeypatch):
-    from utils import app_settings
     from utils import push_manager
 
     _set_cache(

@@ -23,8 +23,9 @@ _SAVE_PATHS = [
 
 
 @pytest.mark.parametrize("module, save_name, locked_name, path_name", _SAVE_PATHS)
-def test_save_runs_inside_interprocess_lock_on_the_user_file(monkeypatch, tmp_path, module, save_name, locked_name,
-                                                             path_name):
+def test_save_runs_inside_interprocess_lock_on_the_user_file(
+    monkeypatch, tmp_path, module, save_name, locked_name, path_name
+):
     file_path = str(tmp_path / "user_data.json")
     monkeypatch.setattr(module, path_name, lambda *_args, **_kwargs: file_path)
 

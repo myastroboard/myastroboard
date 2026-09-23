@@ -174,11 +174,16 @@ def test_build_and_save_default_dataset_includes_comets(monkeypatch):
         'skytonight.skytonight_catalogue_builder._load_deep_sky_rows', lambda: ([deep_sky_row], 'targets-yaml')
     )
     monkeypatch.setattr('skytonight.skytonight_catalogue_builder.build_body_targets', lambda: [body_target])
-    monkeypatch.setattr('skytonight.skytonight_catalogue_builder.build_comet_targets', lambda source_mode='mpc+jpl': [comet_target])
+    monkeypatch.setattr(
+        'skytonight.skytonight_catalogue_builder.build_comet_targets', lambda source_mode='mpc+jpl': [comet_target]
+    )
     monkeypatch.setattr(
         'skytonight.skytonight_catalogue_builder.save_targets_dataset', lambda targets, metadata=None: True
     )
-    monkeypatch.setattr('skytonight.skytonight_catalogue_builder._build_standalone_targets_from_json', lambda filename, catalogue_key: [])
+    monkeypatch.setattr(
+        'skytonight.skytonight_catalogue_builder._build_standalone_targets_from_json',
+        lambda filename, catalogue_key: [],
+    )
 
     from skytonight.skytonight_catalogue_builder import build_and_save_default_dataset
 
@@ -196,6 +201,7 @@ def test_build_and_save_default_dataset_includes_comets(monkeypatch):
 # ---------------------------------------------------------------------------
 # _safe_float
 # ---------------------------------------------------------------------------
+
 
 def test_safe_float_returns_none_for_none():
     assert _safe_float(None) is None
@@ -221,6 +227,7 @@ def test_safe_float_handles_zero():
 # _coerce_identifier_list
 # ---------------------------------------------------------------------------
 
+
 def test_coerce_identifier_list_empty_input():
     assert _coerce_identifier_list([]) == []
     assert _coerce_identifier_list(None) == []
@@ -245,6 +252,7 @@ def test_coerce_identifier_list_strips_whitespace():
 # ---------------------------------------------------------------------------
 # _normalize_identifier
 # ---------------------------------------------------------------------------
+
 
 def test_normalize_identifier_messier():
     assert _normalize_identifier('M31') == 'M 31'
@@ -284,6 +292,7 @@ def test_normalize_identifier_empty():
 # ---------------------------------------------------------------------------
 # _collect_catalogue_names
 # ---------------------------------------------------------------------------
+
 
 def _make_row(**kwargs):
     defaults = dict(
@@ -326,7 +335,7 @@ def test_collect_catalogue_names_ic_names_set_openngc_and_openic():
 def test_collect_catalogue_names_ic_names_does_not_override_openngc():
     row = _make_row(ngc_names=['NGC 224'], ic_names=['IC 5'])
     names = _collect_catalogue_names(row)
-    assert names['OpenNGC'] == 'NGC 224'   # not overwritten by IC
+    assert names['OpenNGC'] == 'NGC 224'  # not overwritten by IC
     assert names['OpenIC'] == 'IC 5'
 
 
@@ -371,6 +380,7 @@ def test_collect_catalogue_names_blank_common_name_not_added():
 # _build_aliases
 # ---------------------------------------------------------------------------
 
+
 def test_build_aliases_includes_all_names():
     row = _make_row(
         name='NGC224',
@@ -391,6 +401,7 @@ def test_build_aliases_includes_all_names():
 # ---------------------------------------------------------------------------
 # _canonical_key
 # ---------------------------------------------------------------------------
+
 
 def test_canonical_key_prefers_openngc():
     names = {'OpenNGC': 'NGC 224', 'Messier': 'M 31'}
@@ -426,10 +437,18 @@ def test_canonical_key_falls_back_to_alias():
 # _merge_target
 # ---------------------------------------------------------------------------
 
-def _make_target(target_id='dso-openngc-ngc224', preferred_name='NGC 224',
-                 catalogue_names=None, aliases=None, magnitude=None,
-                 constellation='And', size_arcmin=None, coordinates=None,
-                 source_catalogues=None):
+
+def _make_target(
+    target_id='dso-openngc-ngc224',
+    preferred_name='NGC 224',
+    catalogue_names=None,
+    aliases=None,
+    magnitude=None,
+    constellation='And',
+    size_arcmin=None,
+    coordinates=None,
+    source_catalogues=None,
+):
     return SkyTonightTarget(
         target_id=target_id,
         category='deep_sky',
@@ -490,6 +509,7 @@ def test_merge_target_uses_incoming_coordinates_when_existing_is_none():
 # _load_json_catalogue
 # ---------------------------------------------------------------------------
 
+
 def test_load_json_catalogue_returns_none_when_file_missing(tmp_path, monkeypatch):
     monkeypatch.setattr('skytonight.skytonight_catalogue_builder._CATALOGUES_DIR', str(tmp_path))
     result = _load_json_catalogue('nonexistent.json')
@@ -516,6 +536,7 @@ def test_load_json_catalogue_returns_none_for_invalid_json(tmp_path, monkeypatch
 # _ngc_ic_match_key
 # ---------------------------------------------------------------------------
 
+
 def test_ngc_ic_match_key_pads_ngc_number():
     # 'NGC 891' → same key as 'NGC 0891'
     assert _ngc_ic_match_key('NGC 891') == _ngc_ic_match_key('NGC 0891')
@@ -534,6 +555,7 @@ def test_ngc_ic_match_key_non_ngc_name_fallback():
 # _build_cross_ref_map
 # ---------------------------------------------------------------------------
 
+
 def test_build_cross_ref_map_includes_herschel400_when_json_missing(monkeypatch):
     """When JSON files are missing, Herschel 400 (static) must still be in the map."""
     monkeypatch.setattr('skytonight.skytonight_catalogue_builder._load_json_catalogue', lambda f: None)
@@ -544,7 +566,7 @@ def test_build_cross_ref_map_includes_herschel400_when_json_missing(monkeypatch)
 
 def test_build_cross_ref_map_pensack_list_is_applied(monkeypatch, tmp_path):
     """When pensack500.json is a list, its entries appear in the map."""
-    pensack_data = ['NGC 891', 'NGC 253', '']   # empty string must be skipped
+    pensack_data = ['NGC 891', 'NGC 253', '']  # empty string must be skipped
 
     def fake_load(filename):
         if filename == 'pensack500.json':
@@ -558,7 +580,7 @@ def test_build_cross_ref_map_pensack_list_is_applied(monkeypatch, tmp_path):
 
 def test_build_cross_ref_map_lbn_dict_is_applied(monkeypatch):
     """When lbn.json is a dict, LBN entries appear in the map."""
-    lbn_data = {'NGC 7023': 'LBN 487', '': 'LBN 0'}   # empty key must be skipped
+    lbn_data = {'NGC 7023': 'LBN 487', '': 'LBN 0'}  # empty key must be skipped
 
     def fake_load(filename):
         if filename == 'lbn.json':
@@ -610,6 +632,7 @@ def test_build_cross_ref_map_warns_on_invalid_json(monkeypatch):
 # _apply_cross_refs
 # ---------------------------------------------------------------------------
 
+
 def test_apply_cross_refs_empty_cross_refs_returns_unchanged():
     target = _make_target()
     result = _apply_cross_refs([target], {})
@@ -618,6 +641,7 @@ def test_apply_cross_refs_empty_cross_refs_returns_unchanged():
 
 def test_apply_cross_refs_injects_herschel400():
     from skytonight.skytonight_catalogue_builder import _ngc_ic_match_key
+
     target = _make_target(
         catalogue_names={'OpenNGC': 'NGC 0891'},
         source_catalogues=['OpenNGC'],
@@ -639,6 +663,7 @@ def test_apply_cross_refs_skips_target_without_ngc_ic_key():
 
 def test_apply_cross_refs_enriches_via_openic():
     from skytonight.skytonight_catalogue_builder import _ngc_ic_match_key
+
     target = _make_target(
         catalogue_names={'OpenIC': 'IC 0434'},
         source_catalogues=['OpenIC'],
@@ -652,6 +677,7 @@ def test_apply_cross_refs_enriches_via_openic():
 # ---------------------------------------------------------------------------
 # _build_standalone_targets_from_json
 # ---------------------------------------------------------------------------
+
 
 def test_build_standalone_targets_returns_empty_for_missing_catalogue(monkeypatch):
     monkeypatch.setattr('skytonight.skytonight_catalogue_builder._load_json_catalogue', lambda f: None)
@@ -689,10 +715,22 @@ def test_build_standalone_targets_parses_valid_entries(monkeypatch):
 
 def test_build_standalone_targets_skips_entries_missing_ra_dec(monkeypatch):
     data = [
-        {'name': 'NoCoords', 'ra_hours': None, 'dec_degrees': None,
-         'type': 'Unknown', 'description': '', 'constellation': 'Ori'},
-        {'name': 'Valid', 'ra_hours': 5.5, 'dec_degrees': -5.0,
-         'type': 'Unknown', 'description': '', 'constellation': 'Ori'},
+        {
+            'name': 'NoCoords',
+            'ra_hours': None,
+            'dec_degrees': None,
+            'type': 'Unknown',
+            'description': '',
+            'constellation': 'Ori',
+        },
+        {
+            'name': 'Valid',
+            'ra_hours': 5.5,
+            'dec_degrees': -5.0,
+            'type': 'Unknown',
+            'description': '',
+            'constellation': 'Ori',
+        },
     ]
     monkeypatch.setattr('skytonight.skytonight_catalogue_builder._load_json_catalogue', lambda f: data)
     result = _build_standalone_targets_from_json('test.json', 'TestCat')
@@ -704,8 +742,9 @@ def test_build_standalone_targets_skips_entries_missing_ra_dec(monkeypatch):
 # _collect_catalogue_names — OpenNGC already set when IC row processed
 # ---------------------------------------------------------------------------
 
+
 def test_collect_catalogue_names_ic_row_with_ngc_names_skips_openngc_fallback():
-    """ False branch: IC-named row already has OpenNGC set from ngc_names."""
+    """False branch: IC-named row already has OpenNGC set from ngc_names."""
     row = _make_row(name='IC1234', ngc_names=['NGC 224'], ic_names=[])
     names = _collect_catalogue_names(row)
     assert names.get('OpenNGC') == 'NGC 224'
@@ -716,8 +755,9 @@ def test_collect_catalogue_names_ic_row_with_ngc_names_skips_openngc_fallback():
 # _build_cross_ref_map — if key: False branches
 # ---------------------------------------------------------------------------
 
+
 def test_build_cross_ref_map_pensack_skips_empty_key(monkeypatch):
-    """ False branch: Pensack entry normalizes to empty key -> skipped."""
+    """False branch: Pensack entry normalizes to empty key -> skipped."""
     pensack_data = ['---', 'NGC 5128']
 
     def fake_load(filename):
@@ -732,7 +772,7 @@ def test_build_cross_ref_map_pensack_skips_empty_key(monkeypatch):
 
 
 def test_build_cross_ref_map_lbn_skips_empty_key(monkeypatch):
-    """ False branch: LBN entry raw_ngc_name normalizes to empty key -> skipped."""
+    """False branch: LBN entry raw_ngc_name normalizes to empty key -> skipped."""
     lbn_data = {'---': 'LBN 999', 'NGC 5128': 'LBN 357'}
 
     def fake_load(filename):
@@ -747,7 +787,7 @@ def test_build_cross_ref_map_lbn_skips_empty_key(monkeypatch):
 
 
 def test_build_cross_ref_map_garyimm_skips_empty_key(monkeypatch):
-    """ False branch: GaryImm entry normalizes to empty key -> skipped."""
+    """False branch: GaryImm entry normalizes to empty key -> skipped."""
     garyimm_data = ['---', 'NGC 5128']
 
     def fake_load(filename):
@@ -762,7 +802,7 @@ def test_build_cross_ref_map_garyimm_skips_empty_key(monkeypatch):
 
 
 def test_build_cross_ref_map_arp_skips_empty_key(monkeypatch):
-    """ False branch: Arp entry raw_ngc_name normalizes to empty key -> skipped."""
+    """False branch: Arp entry raw_ngc_name normalizes to empty key -> skipped."""
     arp_data = {'---': 'Arp 999', 'NGC 2': 'Arp 2'}
 
     def fake_load(filename):
@@ -777,8 +817,19 @@ def test_build_cross_ref_map_arp_skips_empty_key(monkeypatch):
 
 
 def test_build_standalone_targets_skips_non_dict_entries(monkeypatch):
-    data = ['not-a-dict', None, 42, {'name': 'Valid', 'ra_hours': 5.5, 'dec_degrees': -5.0,
-                                     'type': 'Unknown', 'description': '', 'constellation': 'Ori'}]
+    data = [
+        'not-a-dict',
+        None,
+        42,
+        {
+            'name': 'Valid',
+            'ra_hours': 5.5,
+            'dec_degrees': -5.0,
+            'type': 'Unknown',
+            'description': '',
+            'constellation': 'Ori',
+        },
+    ]
     monkeypatch.setattr('skytonight.skytonight_catalogue_builder._load_json_catalogue', lambda f: data)
     result = _build_standalone_targets_from_json('test.json', 'TestCat')
     assert len(result) == 1
@@ -825,8 +876,14 @@ def test_build_standalone_targets_handles_extra_catalogues(monkeypatch):
 
 def test_build_standalone_targets_skips_invalid_ra_dec_types(monkeypatch):
     data = [
-        {'name': 'Bad', 'ra_hours': 'not-a-float', 'dec_degrees': 42.0,
-         'type': 'Unknown', 'description': '', 'constellation': 'Ori'},
+        {
+            'name': 'Bad',
+            'ra_hours': 'not-a-float',
+            'dec_degrees': 42.0,
+            'type': 'Unknown',
+            'description': '',
+            'constellation': 'Ori',
+        },
     ]
     monkeypatch.setattr('skytonight.skytonight_catalogue_builder._load_json_catalogue', lambda f: data)
     result = _build_standalone_targets_from_json('test.json', 'TestCat')
@@ -836,6 +893,7 @@ def test_build_standalone_targets_skips_invalid_ra_dec_types(monkeypatch):
 # ---------------------------------------------------------------------------
 # build_targets_from_rows - IC / Caldwell / other branches
 # ---------------------------------------------------------------------------
+
 
 def test_build_targets_from_rows_ic_only_object():
     rows = [
@@ -914,8 +972,8 @@ def test_build_targets_from_rows_merges_duplicate_rows():
     targets = build_targets_from_rows([row1, row2])
     assert len(targets) == 1
     t = targets[0]
-    assert t.magnitude == pytest.approx(10.1)   # first row's magnitude wins
-    assert 'Edge-On Galaxy' in t.aliases          # second row's common name merged
+    assert t.magnitude == pytest.approx(10.1)  # first row's magnitude wins
+    assert 'Edge-On Galaxy' in t.aliases  # second row's common name merged
 
 
 # ---------------------------------------------------------------------------
@@ -926,8 +984,10 @@ def test_build_targets_from_rows_merges_duplicate_rows():
 # _load_pyongc_rows / _load_deep_sky_rows / build_deep_sky_targets
 # ---------------------------------------------------------------------------
 
+
 def test_load_pyongc_rows_raises_when_pyongc_missing(monkeypatch):
     import builtins
+
     real_import = builtins.__import__
 
     def _no_pyongc(name, *args, **kwargs):
@@ -937,6 +997,7 @@ def test_load_pyongc_rows_raises_when_pyongc_missing(monkeypatch):
 
     monkeypatch.setattr(builtins, '__import__', _no_pyongc)
     from skytonight.skytonight_catalogue_builder import _load_pyongc_rows
+
     with pytest.raises(RuntimeError, match='PyOngc is required'):
         _load_pyongc_rows()
 
@@ -944,6 +1005,7 @@ def test_load_pyongc_rows_raises_when_pyongc_missing(monkeypatch):
 def test_load_pyongc_rows_skips_dso_without_coords(monkeypatch):
     """DSO objects whose coords attribute is None must be skipped."""
     import types
+
     dso_no_coords = types.SimpleNamespace(
         coords=None,
         name='NGC0001',
@@ -967,12 +1029,14 @@ def test_load_pyongc_rows_skips_dso_without_coords(monkeypatch):
     fake_ongc.listObjects.return_value = [dso_no_coords, dso_valid]
 
     import sys
+
     fake_pyongc = types.ModuleType('pyongc')
     fake_pyongc.ongc = fake_ongc
     monkeypatch.setitem(sys.modules, 'pyongc', fake_pyongc)
     monkeypatch.setitem(sys.modules, 'pyongc.ongc', fake_ongc)
 
     from skytonight.skytonight_catalogue_builder import _load_pyongc_rows
+
     rows = _load_pyongc_rows()
     assert len(rows) == 1
     assert rows[0].name == 'NGC0224'
@@ -981,6 +1045,7 @@ def test_load_pyongc_rows_skips_dso_without_coords(monkeypatch):
 def test_load_pyongc_rows_skips_dso_with_bad_coord_format(monkeypatch):
     """DSO objects whose coord tuples cause ValueError must be skipped."""
     import types
+
     dso_bad = types.SimpleNamespace(
         coords=(('bad', 'bad', 'bad'), (41, 16, 9)),
         name='NGCBAD',
@@ -995,12 +1060,14 @@ def test_load_pyongc_rows_skips_dso_with_bad_coord_format(monkeypatch):
     fake_ongc.listObjects.return_value = [dso_bad]
 
     import sys
+
     fake_pyongc = types.ModuleType('pyongc')
     fake_pyongc.ongc = fake_ongc
     monkeypatch.setitem(sys.modules, 'pyongc', fake_pyongc)
     monkeypatch.setitem(sys.modules, 'pyongc.ongc', fake_ongc)
 
     from skytonight.skytonight_catalogue_builder import _load_pyongc_rows
+
     rows = _load_pyongc_rows()
     assert rows == []
 
@@ -1008,6 +1075,7 @@ def test_load_pyongc_rows_skips_dso_with_bad_coord_format(monkeypatch):
 def test_load_deep_sky_rows_returns_tuple(monkeypatch):
     monkeypatch.setattr('skytonight.skytonight_catalogue_builder._load_pyongc_rows', lambda: [])
     from skytonight.skytonight_catalogue_builder import _load_deep_sky_rows
+
     rows, source = _load_deep_sky_rows()
     assert rows == []
     assert isinstance(source, str)
@@ -1016,6 +1084,7 @@ def test_load_deep_sky_rows_returns_tuple(monkeypatch):
 def test_build_deep_sky_targets_returns_list(monkeypatch):
     monkeypatch.setattr('skytonight.skytonight_catalogue_builder._load_pyongc_rows', lambda: [])
     from skytonight.skytonight_catalogue_builder import build_deep_sky_targets
+
     result = build_deep_sky_targets()
     assert isinstance(result, list)
 
@@ -1023,6 +1092,7 @@ def test_build_deep_sky_targets_returns_list(monkeypatch):
 # ---------------------------------------------------------------------------
 # _build_standalone_targets_from_json - constellation batch lookup
 # ---------------------------------------------------------------------------
+
 
 def test_build_standalone_targets_resolves_constellation_via_astropy(monkeypatch):
     """When constellation is missing and astropy is available, it is resolved."""
@@ -1035,7 +1105,7 @@ def test_build_standalone_targets_resolves_constellation_via_astropy(monkeypatch
             'mag': 8.0,
             'type': 'Emission Nebula',
             'description': 'Test nebula',
-            'constellation': '',   # intentionally blank → astropy path
+            'constellation': '',  # intentionally blank → astropy path
         }
     ]
     monkeypatch.setattr('skytonight.skytonight_catalogue_builder._load_json_catalogue', lambda f: data)
@@ -1045,7 +1115,7 @@ def test_build_standalone_targets_resolves_constellation_via_astropy(monkeypatch
     import types
 
     fake_np = MagicMock()
-    fake_np.array.side_effect = lambda x: x   # passthrough
+    fake_np.array.side_effect = lambda x: x  # passthrough
     fake_skycoord_instance = MagicMock()
     fake_astropy_coords = MagicMock()
     fake_astropy_coords.SkyCoord.return_value = fake_skycoord_instance
@@ -1089,12 +1159,13 @@ def test_build_standalone_targets_constellation_lookup_failure_fallback(monkeypa
     monkeypatch.setitem(sys.modules, 'numpy', _RaisingModule('numpy'))
 
     result = _build_standalone_targets_from_json('sharpless.json', 'Sharpless')
-    assert len(result) == 1   # entry built with empty constellation
+    assert len(result) == 1  # entry built with empty constellation
 
 
 # ---------------------------------------------------------------------------
 # build_and_save_default_dataset - save failure raises RuntimeError
 # ---------------------------------------------------------------------------
+
 
 def test_build_and_save_default_dataset_raises_on_save_failure(monkeypatch):
     from skytonight.skytonight_catalogue_builder import build_and_save_default_dataset
@@ -1123,6 +1194,7 @@ def test_build_and_save_default_dataset_raises_on_save_failure(monkeypatch):
 # ---------------------------------------------------------------------------
 # _build_cross_ref_map — skip guards
 # ---------------------------------------------------------------------------
+
 
 def test_build_cross_ref_map_garyimm_skips_non_string_and_empty(monkeypatch):
     """non-string and empty entries in garyimm list are skipped."""
@@ -1158,6 +1230,7 @@ def test_build_cross_ref_map_arp_skips_empty_key_or_value(monkeypatch):
 # build_targets_from_rows — empty canonical_name skip
 # ---------------------------------------------------------------------------
 
+
 def test_build_targets_from_rows_skips_row_with_empty_canonical_name(monkeypatch):
     """when _canonical_key returns empty canonical_name the row is skipped."""
     monkeypatch.setattr(
@@ -1172,6 +1245,7 @@ def test_build_targets_from_rows_skips_row_with_empty_canonical_name(monkeypatch
 # ---------------------------------------------------------------------------
 # _build_standalone_targets_from_json — non-normalizable name
 # ---------------------------------------------------------------------------
+
 
 def test_build_standalone_targets_skips_name_normalizing_to_empty(monkeypatch):
     """normalize_object_name returns '' for punctuation-only name → skipped."""

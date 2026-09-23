@@ -22,11 +22,11 @@ def test_is_newer_version_comparisons_and_invalid_input():
     assert module.is_newer_version("1.0", "1.0.0") is False
     assert module.is_newer_version("bad", "1.0.0") is False
     # Additional edge cases
-    assert module.is_newer_version("1.0.0", "1.0.0") is False     # equal
-    assert module.is_newer_version("2.0.0", "1.9.9") is False     # downgrade
-    assert module.is_newer_version("1.0.0", "bad") is False       # invalid latest
-    assert module.is_newer_version("1.0.0", "1.1.0") is True      # minor bump
-    assert module.is_newer_version("1.0.0", "2.0.0") is True      # major bump
+    assert module.is_newer_version("1.0.0", "1.0.0") is False  # equal
+    assert module.is_newer_version("2.0.0", "1.9.9") is False  # downgrade
+    assert module.is_newer_version("1.0.0", "bad") is False  # invalid latest
+    assert module.is_newer_version("1.0.0", "1.1.0") is True  # minor bump
+    assert module.is_newer_version("1.0.0", "2.0.0") is True  # major bump
 
 
 def test_save_version_result_writes_cache(monkeypatch):
@@ -48,14 +48,15 @@ def test_save_version_result_writes_cache(monkeypatch):
     assert saved["ts"] == 999.0
 
 
-
 def test_check_for_updates_returns_cached_data(monkeypatch):
     cached = {"current_version": "1.0.0", "update_available": False}
     module.cache_store._version_update_cache = {"timestamp": 100, "data": cached}
 
     monkeypatch.setattr(module.cache_store, "is_cache_valid", lambda *_args, **_kwargs: True)
     monkeypatch.setattr(module, "get_repo_version", lambda: "1.0.0")
-    monkeypatch.setattr(module.requests, "get", lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("should not fetch")))
+    monkeypatch.setattr(
+        module.requests, "get", lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("should not fetch"))
+    )
 
     result = module.check_for_updates()
     assert result == cached
@@ -67,7 +68,9 @@ def test_check_for_updates_handles_404(monkeypatch):
     monkeypatch.setattr(module.time, "time", lambda: 123.0)
 
     updates = []
-    monkeypatch.setattr(module.cache_store, "update_shared_cache_entry", lambda key, data, ts: updates.append((key, data, ts)))
+    monkeypatch.setattr(
+        module.cache_store, "update_shared_cache_entry", lambda key, data, ts: updates.append((key, data, ts))
+    )
     monkeypatch.setattr(module.requests, "get", lambda *_args, **_kwargs: SimpleNamespace(status_code=404))
 
     result = module.check_for_updates()

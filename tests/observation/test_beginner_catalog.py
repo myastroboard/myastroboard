@@ -34,16 +34,30 @@ def client_admin():
 def _fake_catalog():
     return [
         {
-            'id': 'M42', 'preferred_name': 'Orion Nebula', 'catalogue_id': 'M42',
-            'ra_hours': 5.588, 'dec_degrees': -5.39, 'i18n_key': 'm42',
-            'typical_integration_hours': 2, 'object_type': 'Nebula', 'constellation': 'Ori',
-            'difficulty': 'beginner', 'season': ['winter'],
+            'id': 'M42',
+            'preferred_name': 'Orion Nebula',
+            'catalogue_id': 'M42',
+            'ra_hours': 5.588,
+            'dec_degrees': -5.39,
+            'i18n_key': 'm42',
+            'typical_integration_hours': 2,
+            'object_type': 'Nebula',
+            'constellation': 'Ori',
+            'difficulty': 'beginner',
+            'season': ['winter'],
         },
         {
-            'id': 'M99', 'preferred_name': 'Unmatched Galaxy', 'catalogue_id': 'M99',
-            'ra_hours': 12.0, 'dec_degrees': 14.0, 'i18n_key': 'm99',
-            'typical_integration_hours': 4, 'object_type': 'Galaxy', 'constellation': 'Com',
-            'difficulty': 'intermediate', 'season': ['spring'],
+            'id': 'M99',
+            'preferred_name': 'Unmatched Galaxy',
+            'catalogue_id': 'M99',
+            'ra_hours': 12.0,
+            'dec_degrees': 14.0,
+            'i18n_key': 'm99',
+            'typical_integration_hours': 4,
+            'object_type': 'Galaxy',
+            'constellation': 'Com',
+            'difficulty': 'intermediate',
+            'season': ['spring'],
         },
     ]
 
@@ -56,8 +70,17 @@ class TestLoadBeginnerCatalog:
     def test_entries_have_required_keys_and_no_english_text(self):
         catalog = beginner_catalog.load_beginner_catalog()
         required_keys = {
-            'id', 'preferred_name', 'catalogue_id', 'ra_hours', 'dec_degrees', 'i18n_key',
-            'typical_integration_hours', 'object_type', 'constellation', 'difficulty', 'season',
+            'id',
+            'preferred_name',
+            'catalogue_id',
+            'ra_hours',
+            'dec_degrees',
+            'i18n_key',
+            'typical_integration_hours',
+            'object_type',
+            'constellation',
+            'difficulty',
+            'season',
         }
         for entry in catalog:
             assert required_keys.issubset(entry.keys())
@@ -77,6 +100,7 @@ class TestLoadBeginnerCatalog:
 
     def test_non_list_json_returns_empty_list(self, monkeypatch, tmp_path):
         import json
+
         not_a_list_file = tmp_path / 'not_a_list.json'
         not_a_list_file.write_text(json.dumps({'not': 'a list'}), encoding='utf-8')
         monkeypatch.setattr(beginner_catalog, '_BEGINNER_CATALOG_FILE', str(not_a_list_file))
@@ -85,6 +109,7 @@ class TestLoadBeginnerCatalog:
 
     def test_caches_result_between_calls(self, monkeypatch, tmp_path):
         import json
+
         catalog_file = tmp_path / 'cacheable.json'
         catalog_file.write_text(json.dumps([{'id': 'X1'}]), encoding='utf-8')
         monkeypatch.setattr(beginner_catalog, '_BEGINNER_CATALOG_FILE', str(catalog_file))
@@ -186,7 +211,8 @@ class TestBeginnerCatalogEndpoint:
 
     def test_unexpected_exception_returns_500(self, client_admin, monkeypatch):
         monkeypatch.setattr(
-            beginner_catalog, 'load_beginner_catalog',
+            beginner_catalog,
+            'load_beginner_catalog',
             lambda: (_ for _ in ()).throw(RuntimeError('boom')),
         )
         response = client_admin.get('/api/beginner-catalog?lang=en')
@@ -206,7 +232,8 @@ class TestBeginnerCatalogEndpoint:
     def test_visible_only_true_filters_when_results_exist(self, client_admin, monkeypatch):
         monkeypatch.setattr(beginner_catalog, 'load_beginner_catalog', _fake_catalog)
         monkeypatch.setattr(
-            astrodex_bp_module, 'load_json_file',
+            astrodex_bp_module,
+            'load_json_file',
             lambda *a, **k: {'deep_sky': [{'catalogue_names': {'Messier': 'M 42'}, 'astro_score': 0.5}]},
         )
         monkeypatch.setattr(astrodex_bp_module, 'has_dso_results', lambda *_a, **_k: True)

@@ -406,6 +406,21 @@ class TestVerifyTwoFactor:
         with client.session_transaction() as sess:
             assert 'pending_2fa_user_id' not in sess
 
+    def test_generic_exception_returns_500(self, client, security_settings, make_user, monkeypatch):
+        security_settings([TRUSTED_LAN], two_factor_enabled=True)
+        user, password, secret = make_user(with_totp=True)
+        login(client, user.username, password)
+
+        def _boom():
+            raise RuntimeError('settings file corrupted')
+
+        monkeypatch.setattr(security_settings_mod, 'get_security_settings', _boom)
+
+        resp = client.post('/api/auth/login/verify-2fa', json={'code': pyotp.TOTP(secret).now()})
+
+        assert resp.status_code == 500
+        assert resp.get_json()['error_key'] == 'auth.internal_server_error'
+
 
 # ---------------------------------------------------------------------------
 # _otp_attempts pruning (unit-level: triggering the real 512-key threshold via
@@ -457,6 +472,23 @@ class TestOtpAttemptsPruning:
         client.post('/api/auth/login/verify-2fa', json={'code': '000000'})
 
         assert not any(key.startswith('leftover-') for key in auth_bp_mod._otp_attempts)
+
+    def test_otp_attempts_exceeded_prunes_its_own_expired_hits(self):
+        """Even outside the >512-key bulk prune, a single check must not count a hit
+        that has already aged out of the window."""
+        stale_cutoff = time.time() - auth_bp_mod.PENDING_2FA_TTL_SECONDS - 1
+        auth_bp_mod._otp_attempts['solo-user'] = deque([stale_cutoff] * auth_bp_mod.PENDING_2FA_MAX_ATTEMPTS)
+
+        assert auth_bp_mod._otp_attempts_exceeded('solo-user') is False
+        assert len(auth_bp_mod._otp_attempts['solo-user']) == 0
+
+    def test_record_otp_failure_prunes_expired_hits_before_appending(self):
+        stale_cutoff = time.time() - auth_bp_mod.PENDING_2FA_TTL_SECONDS - 1
+        auth_bp_mod._otp_attempts['solo-user-2'] = deque([stale_cutoff])
+
+        auth_bp_mod._record_otp_failure('solo-user-2')
+
+        assert len(auth_bp_mod._otp_attempts['solo-user-2']) == 1  # the stale one aged out; only the new one remains
 
 
 # ---------------------------------------------------------------------------
@@ -683,6 +715,37 @@ class TestSelfServiceTwoFactor:
         assert resp.status_code == 400
         assert resp.get_json()['error_key'] == 'settings.2fa_disable_error'
 
+    def test_setup_generic_exception_returns_500(self, enrolled_client, monkeypatch):
+        client, _, _ = enrolled_client
+        monkeypatch.setattr(
+            user_manager, 'start_totp_setup', lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('boom'))
+        )
+
+        resp = client.post('/api/auth/2fa/setup')
+
+        assert resp.status_code == 500
+
+    def test_confirm_generic_exception_returns_500(self, enrolled_client, monkeypatch):
+        client, _, _ = enrolled_client
+        client.post('/api/auth/2fa/setup')
+        monkeypatch.setattr(
+            user_manager, 'confirm_totp_setup', lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('boom'))
+        )
+
+        resp = client.post('/api/auth/2fa/confirm', json={'code': '123456'})
+
+        assert resp.status_code == 500
+
+    def test_disable_generic_exception_returns_500(self, enrolled_client, monkeypatch):
+        client, _, password = enrolled_client
+        secret = client.post('/api/auth/2fa/setup').get_json()['secret']
+        client.post('/api/auth/2fa/confirm', json={'code': pyotp.TOTP(secret).now()})
+        monkeypatch.setattr(user_manager, 'disable_totp', lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('boom')))
+
+        resp = client.post('/api/auth/2fa/disable', json={'password': password})
+
+        assert resp.status_code == 500
+
     def test_setup_refused_when_the_instance_switch_is_off(self, client, security_settings, make_user):
         security_settings([TRUSTED_LAN], two_factor_enabled=False)
         user, password, _ = make_user()
@@ -738,6 +801,14 @@ class TestAdminUserTwoFactor:
 
         assert resp.status_code == 400
         assert resp.get_json()['error_key'] == 'users.user_not_found'
+
+    def test_generic_exception_returns_500(self, client_admin, security_settings, make_user, monkeypatch):
+        user, _, _ = make_user(with_totp=True)
+        monkeypatch.setattr(user_manager, 'disable_totp', lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('boom')))
+
+        resp = client_admin.delete(f'/api/users/{user.user_id}/2fa')
+
+        assert resp.status_code == 500
 
     def test_requires_admin(self, client, security_settings, make_user):
         target, _, _ = make_user(with_totp=True)
@@ -894,6 +965,20 @@ class TestSecuritySettingsApi:
         resp = client_admin.post('/api/auth/security-settings', json={'two_factor_enabled': False})
 
         assert resp.get_json()['trusted_networks'] == [TRUSTED_LAN]
+
+    def test_save_generic_exception_returns_500(self, client_admin, monkeypatch):
+        monkeypatch.setattr(
+            security_settings_mod,
+            'save_security_settings',
+            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('boom')),
+        )
+
+        resp = client_admin.post(
+            '/api/auth/security-settings',
+            json={'trusted_networks': [TRUSTED_LAN], 'two_factor_enabled': False},
+        )
+
+        assert resp.status_code == 500
 
     def test_requires_admin(self, client, make_user):
         user, password, _ = make_user()

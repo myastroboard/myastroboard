@@ -58,6 +58,7 @@ class TestIsCelestrakTimeoutError:
 
     def test_requests_timeout_exception(self):
         import requests
+
         exc = requests.exceptions.Timeout("timed out")
         assert _is_celestrak_timeout_error(exc) is True
 
@@ -201,10 +202,12 @@ class TestParseTleFromResponse:
         self.svc = ISSPassService(45.5, -73.5, 50.0, "UTC")
 
     def test_parses_json_format(self):
-        json_payload = json.dumps({
-            "line1": "1 25544U 98067A   26001.00000000  .00001234  00000-0  12345-4 0  9999",
-            "line2": "2 25544  51.6400 001.0000 0001234  00.0000  00.0000 15.50000000123456",
-        })
+        json_payload = json.dumps(
+            {
+                "line1": "1 25544U 98067A   26001.00000000  .00001234  00000-0  12345-4 0  9999",
+                "line2": "2 25544  51.6400 001.0000 0001234  00.0000  00.0000 15.50000000123456",
+            }
+        )
         line1, line2 = self.svc._parse_iss_tle_from_response(json_payload)
         assert line1.startswith("1 ")
         assert line2.startswith("2 ")

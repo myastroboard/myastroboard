@@ -1532,7 +1532,9 @@ class TestExceptionHandling:
             content_type='multipart/form-data',
         ).get_json()['data']
         monkeypatch.setattr(observation_sessions_bp_module.observation_sessions, 'rename_attachment', self._raise)
-        response = client.put(f"/api/observation-sessions/{session['id']}/attachments/{upload['id']}", json={'name': 'x'})
+        response = client.put(
+            f"/api/observation-sessions/{session['id']}/attachments/{upload['id']}", json={'name': 'x'}
+        )
         assert response.status_code == 500
 
     def test_delete_attachment_500(self, client, monkeypatch):

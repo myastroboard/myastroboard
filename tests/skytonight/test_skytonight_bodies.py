@@ -51,9 +51,7 @@ def test_saturn_has_saturne_alias():
 def test_empty_name_body_is_skipped():
     from unittest.mock import patch
 
-    defs_with_empty = list(skytonight_bodies.BODY_DEFINITIONS) + [
-        {'name': '', 'object_type': 'Planet', 'aliases': []}
-    ]
+    defs_with_empty = list(skytonight_bodies.BODY_DEFINITIONS) + [{'name': '', 'object_type': 'Planet', 'aliases': []}]
     with patch.object(skytonight_bodies, 'BODY_DEFINITIONS', defs_with_empty):
         targets = skytonight_bodies.build_body_targets()
 

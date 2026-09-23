@@ -754,13 +754,14 @@ Full details live in [CONTRIBUTING.md](../../CONTRIBUTING.md#before-submitting) 
 
 ```bash
 pytest                              # full test suite
-black backend/                      # Python formatting (PEP 8, 120-char lines)
-flake8 backend/                     # Python linting
+black backend/ tests/               # Python formatting (PEP 8, 120-char lines)
+flake8 backend/ tests/              # Python linting
 pyright backend/                    # static type checking (reads pyrightconfig.json at repo root)
 djlint templates/ static/offline.html --profile jinja --lint --ignore H021,H023,H030,H031,J004,J018
 ```
 
-- `black` and `flake8` are declared in `requirements-dev.txt`; run them on every `backend/` change, not just new files.
+- `black` and `flake8` are declared in `requirements-dev.txt`; run them on every `backend/` and `tests/` change, not just new files.
+- `pyright` stays scoped to `backend/` only - test code's heavy use of `monkeypatch`/`MagicMock`/dynamic attributes would drown real findings in false positives.
 - `pyright` mirrors the Pylance errors shown inline in VSCode - a clean `pyright backend/` run means Pylance should be clean too. If VSCode still shows stale errors after a config edit, run "Python: Restart Language Server".
 - `djlint` lints `templates/` (Jinja2) and `static/offline.html`; the ignored rule codes are explained in [CONTRIBUTING.md](../../CONTRIBUTING.md#ignored-rules-and-why) - do not silently add more ignores without documenting why there.
 - JavaScript has no standalone lint step: formatting is applied on save by VSCode's built-in formatter (`.vscode/settings.json` + `.editorconfig`). Just make sure the file was opened/saved in VSCode, or match the existing 4-space/single-quote style by hand.
@@ -778,8 +779,8 @@ Update `EXPECTED_ROUTES` in that file to match, and document the change in `CHAN
 ### Minimum Bar Before Calling a Change Done
 
 - [ ] `pytest` passes
-- [ ] `black backend/` produces no diff
-- [ ] `flake8 backend/` reports no issues
+- [ ] `black backend/ tests/` produces no diff
+- [ ] `flake8 backend/ tests/` reports no issues
 - [ ] `pyright backend/` reports no errors
 - [ ] `djlint` passes for any touched template
 - [ ] `pytest tests/blueprints/test_route_inventory.py` passes if routes changed

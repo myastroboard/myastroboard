@@ -86,6 +86,50 @@ class TestValueHelpers:
         assert len(mp.text("x" * 500)) == mp.MAX_STATE_LEN
 
 
+class TestDataAccessFallbacks:
+    """Every data-access helper is a lazy import wrapped in a broad except - one broken
+    source (a corrupt cache, a missing package) must never take the whole publish down."""
+
+    def test_tz_falls_back_to_utc_for_an_invalid_name(self):
+        assert mp._tz("Not/A/Real/Zone") == timezone.utc
+
+    def test_parse_dt_returns_none_when_the_iso_string_cannot_be_reparsed(self, monkeypatch):
+        monkeypatch.setattr(mp, "to_iso", lambda value, tz=None: "not-actually-iso")
+        assert mp._parse_dt("whatever") is None
+
+    def test_location_cache_swallows_errors(self, monkeypatch):
+        from cache import cache_store
+
+        monkeypatch.setattr(
+            cache_store, "load_location_cache", lambda name, location_id: (_ for _ in ()).throw(RuntimeError("boom"))
+        )
+        assert mp._location_cache("sun_report", "loc-1") == (None, None)
+
+    def test_shared_cache_swallows_errors(self, monkeypatch):
+        from cache import cache_store
+
+        monkeypatch.setattr(
+            cache_store, "load_shared_cache_entry", lambda name: (_ for _ in ()).throw(RuntimeError("boom"))
+        )
+        assert mp._shared_cache("version_update") is None
+
+    def test_skytonight_results_swallows_errors(self, monkeypatch):
+        from skytonight import skytonight_calculator
+
+        monkeypatch.setattr(
+            skytonight_calculator,
+            "load_calculation_results",
+            lambda location_id=None: (_ for _ in ()).throw(RuntimeError("boom")),
+        )
+        assert mp._skytonight_results("loc-1") == {}
+
+    def test_app_version_swallows_errors(self, monkeypatch):
+        from utils import txtconf_loader
+
+        monkeypatch.setattr(txtconf_loader, "get_repo_version", lambda: (_ for _ in ()).throw(RuntimeError("boom")))
+        assert mp._app_version() == "unknown"
+
+
 # ---------------------------------------------------------------------------
 # Component specs and assembly
 # ---------------------------------------------------------------------------
@@ -94,8 +138,18 @@ class TestValueHelpers:
 class TestAssembly:
 
     def test_sensor_and_binary_sensor_specs(self):
-        key, spec = mp.sensor("score", "Score", device_class="enum", options=["a"], unit="%", state_class="measurement",
-                              icon="mdi:x", precision=1, diagnostic=True, attributes=True)
+        key, spec = mp.sensor(
+            "score",
+            "Score",
+            device_class="enum",
+            options=["a"],
+            unit="%",
+            state_class="measurement",
+            icon="mdi:x",
+            precision=1,
+            diagnostic=True,
+            attributes=True,
+        )
         assert key == "score"
         assert spec["p"] == "sensor" and spec["val_tpl"] == "{{ value_json.score }}"
         assert spec["dev_cla"] == "enum" and spec["ops"] == ["a"] and spec["unit_of_meas"] == "%"
@@ -109,8 +163,13 @@ class TestAssembly:
     def test_assemble_builds_a_complete_device_discovery(self):
         connector = _connector()
         device = mp._assemble(
-            connector, kind="location", object_id="loc-1", name="MyAstroBoard - Backyard", model="Location",
-            version="1.6.0", components=[mp.sensor("a", "A", attributes=True), mp.binary_sensor("b", "B")],
+            connector,
+            kind="location",
+            object_id="loc-1",
+            name="MyAstroBoard - Backyard",
+            model="Location",
+            version="1.6.0",
+            components=[mp.sensor("a", "A", attributes=True), mp.binary_sensor("b", "B")],
             state={"a": 1, "a_attributes": {}, "b": True},
         )
         assert device.device_id == "mab_loc_loc-1"
@@ -118,8 +177,14 @@ class TestAssembly:
         assert device.state_topic == "mab/location/loc-1/state"
         assert device.entity_count == 2
         disc = device.discovery
-        assert disc["dev"] == {"ids": ["mab_loc_loc-1"], "name": "MyAstroBoard - Backyard", "mf": "MyAstroBoard",
-                               "mdl": "Location", "sw": "1.6.0", "via_device": "mab_board"}
+        assert disc["dev"] == {
+            "ids": ["mab_loc_loc-1"],
+            "name": "MyAstroBoard - Backyard",
+            "mf": "MyAstroBoard",
+            "mdl": "Location",
+            "sw": "1.6.0",
+            "via_device": "mab_board",
+        }
         assert disc["o"]["name"] == "MyAstroBoard" and disc["o"]["url"] == mp.HOMEPAGE
         assert disc["avty_t"] == "mab/status"
         assert "stat_t" not in disc  # per component, never shared (an image component would refuse it)
@@ -147,9 +212,15 @@ class TestBoardDevice:
         from skytonight import skytonight_storage
 
         caches["version_update"] = {"update_available": True, "latest_version": "1.7.0"}
-        monkeypatch.setattr(skytonight_storage, "load_scheduler_status", lambda default=None: {
-            "is_executing": False, "last_run": "2026-09-17T06:00:00+02:00", "next_run": "2026-09-17T18:30:00+02:00",
-        })
+        monkeypatch.setattr(
+            skytonight_storage,
+            "load_scheduler_status",
+            lambda default=None: {
+                "is_executing": False,
+                "last_run": "2026-09-17T06:00:00+02:00",
+                "next_run": "2026-09-17T18:30:00+02:00",
+            },
+        )
         monkeypatch.setattr(mp, "_app_version", lambda: "1.6.0")
         device = mp.build_board_device(_connector(), {"last_publish": NOW, "locations": 2, "users": 1})
         assert device.state == {
@@ -191,39 +262,93 @@ class TestBoardDevice:
 def _plant_sky(caches, monkeypatch):
     from skytonight import skytonight_calculator, skytonight_storage
 
-    caches[("sun_report", "loc-1")] = {"sun": {
-        "sunrise": "2026-09-17 07:30", "sunset": "2026-09-17 19:55", "civil_dusk": "2026-09-17 20:25",
-        "civil_dawn": "2026-09-17 07:00", "nautical_dusk": "2026-09-17 21:02", "nautical_dawn": "2026-09-17 06:23",
-        "astronomical_dusk": "2026-09-17 21:41", "astronomical_dawn": "2026-09-17 05:44", "true_night_hours": 8.05,
-    }}
+    caches[("sun_report", "loc-1")] = {
+        "sun": {
+            "sunrise": "2026-09-17 07:30",
+            "sunset": "2026-09-17 19:55",
+            "civil_dusk": "2026-09-17 20:25",
+            "civil_dawn": "2026-09-17 07:00",
+            "nautical_dusk": "2026-09-17 21:02",
+            "nautical_dawn": "2026-09-17 06:23",
+            "astronomical_dusk": "2026-09-17 21:41",
+            "astronomical_dawn": "2026-09-17 05:44",
+            "true_night_hours": 8.05,
+        }
+    }
     caches[("astro_weather", "loc-1")] = {
-        "current_conditions": {"observation_score": 7.25, "seeing_pickering": 6.4, "transparency_score": 7.1,
-                               "limiting_magnitude": 5.6, "dew_risk_level": "moderate", "dew_point_spread": 2.2,
-                               "wind_tracking_impact": "LOW", "tracking_stability_score": 8.0},
+        "current_conditions": {
+            "observation_score": 7.25,
+            "seeing_pickering": 6.4,
+            "transparency_score": 7.1,
+            "limiting_magnitude": 5.6,
+            "dew_risk_level": "moderate",
+            "dew_point_spread": 2.2,
+            "wind_tracking_impact": "LOW",
+            "tracking_stability_score": 8.0,
+        },
         "weather_alerts": [{"message": "Dew likely after 02:00", "level": "warning"}],
     }
-    caches[("moon_report", "loc-1")] = {"moon": {
-        "phase_name": "Waxing Crescent", "illumination_percent": 33.4, "altitude_deg": -12.2, "azimuth_deg": 250.0,
-        "distance_km": 384400.4, "next_moonrise": "2026-09-18T12:10:00+02:00", "next_moonset": "Not found",
-        "next_full_moon": "2026-09-26T05:49:00+02:00", "next_new_moon": "2026-10-10T20:50:00+02:00",
-    }}
+    caches[("moon_report", "loc-1")] = {
+        "moon": {
+            "phase_name": "Waxing Crescent",
+            "illumination_percent": 33.4,
+            "altitude_deg": -12.2,
+            "azimuth_deg": 250.0,
+            "distance_km": 384400.4,
+            "next_moonrise": "2026-09-18T12:10:00+02:00",
+            "next_moonset": "Not found",
+            "next_full_moon": "2026-09-26T05:49:00+02:00",
+            "next_new_moon": "2026-10-10T20:50:00+02:00",
+        }
+    }
     caches[("dark_window", "loc-1")] = {"next_dark_night": {"start": "2026-09-17 22:30", "end": "2026-09-18 05:44"}}
-    caches[("best_window_practical", "loc-1")] = {"best_window": {
-        "start": "2026-09-17 22:30", "end": "2026-09-18 03:10", "duration_hours": 4.67, "moon_condition": "Moon set", "score": 82,
-    }}
-    monkeypatch.setattr(skytonight_calculator, "load_calculation_results", lambda location_id=None: {
-        "metadata": {"night_start": "2026-09-17T21:41:00+02:00", "night_end": "2026-09-18T05:44:00+02:00",
-                     "calculated_at": "2026-09-17T16:00:00+00:00"},
-        "deep_sky": [
-            {"preferred_name": "M31", "object_type": "Galaxy", "constellation": "Andromeda", "magnitude": 3.4,
-             "observation": {"max_altitude": 78.2, "observable_hours": 6.5}, "astro_score": 0.91},
-            {"preferred_name": "M33", "object_type": "Galaxy", "constellation": "Triangulum", "magnitude": 5.7,
-             "observation": {"max_altitude": 70.0}, "astro_score": 0.95},
-            {"preferred_name": "NGC 7000", "object_type": "Nebula", "constellation": "Cygnus", "magnitude": None,
-             "observation": {"max_altitude": 85.0}, "astro_score": 0.91},
-            "not-a-dict",
-        ],
-    })
+    caches[("best_window_practical", "loc-1")] = {
+        "best_window": {
+            "start": "2026-09-17 22:30",
+            "end": "2026-09-18 03:10",
+            "duration_hours": 4.67,
+            "moon_condition": "Moon set",
+            "score": 82,
+        }
+    }
+    monkeypatch.setattr(
+        skytonight_calculator,
+        "load_calculation_results",
+        lambda location_id=None: {
+            "metadata": {
+                "night_start": "2026-09-17T21:41:00+02:00",
+                "night_end": "2026-09-18T05:44:00+02:00",
+                "calculated_at": "2026-09-17T16:00:00+00:00",
+            },
+            "deep_sky": [
+                {
+                    "preferred_name": "M31",
+                    "object_type": "Galaxy",
+                    "constellation": "Andromeda",
+                    "magnitude": 3.4,
+                    "observation": {"max_altitude": 78.2, "observable_hours": 6.5},
+                    "astro_score": 0.91,
+                },
+                {
+                    "preferred_name": "M33",
+                    "object_type": "Galaxy",
+                    "constellation": "Triangulum",
+                    "magnitude": 5.7,
+                    "observation": {"max_altitude": 70.0},
+                    "astro_score": 0.95,
+                },
+                {
+                    "preferred_name": "NGC 7000",
+                    "object_type": "Nebula",
+                    "constellation": "Cygnus",
+                    "magnitude": None,
+                    "observation": {"max_altitude": 85.0},
+                    "astro_score": 0.91,
+                },
+                "not-a-dict",
+            ],
+        },
+    )
     monkeypatch.setattr(skytonight_storage, "load_scheduler_status", lambda default=None: {})
 
 
@@ -288,7 +413,9 @@ class TestLocationDevice:
     def test_sky_period_maps_astronomical_dawn_to_a_period(self, caches, no_skytonight, monkeypatch):
         from astroweather import sun_phases
 
-        monkeypatch.setattr(sun_phases, "determine_sky_period", lambda *a, **k: ("astronomical_night", "astronomical_dawn", 600))
+        monkeypatch.setattr(
+            sun_phases, "determine_sky_period", lambda *a, **k: ("astronomical_night", "astronomical_dawn", 600)
+        )
         device = mp.build_location_device(_connector(["sky_conditions"]), {}, LOCATION, NOW)
         assert device.state["sky_period"] == "astronomical_night"
         assert device.state["next_period"] == "astronomical_twilight"
@@ -297,15 +424,33 @@ class TestLocationDevice:
 
     def test_weather_now_picks_the_nearest_hour_and_astro_numbers(self, caches, monkeypatch):
         _plant_sky(caches, monkeypatch)
-        caches[("weather_forecast", "loc-1")] = {"hourly": [
-            {"date": "2026-09-17T19:00:00+0000", "temperature_2m": 18.0, "cloud_cover": 90},
-            {"date": "2026-09-17T21:00:00+0000", "temperature_2m": 14.26, "relative_humidity_2m": 71.4,
-             "dew_point_2m": 9.1, "cloud_cover": 12, "cloud_cover_low": 5, "cloud_cover_mid": 7, "cloud_cover_high": 0,
-             "wind_speed_10m": 8.44, "wind_direction_10m": 225.0, "precipitation_probability": 3,
-             "precipitation": 0.0, "surface_pressure": 1017.6, "visibility": 24140.0, "weather_code": 1},
-            "junk",
-            {"date": "not a date"},
-        ]}
+        caches[("weather_forecast", "loc-1")] = {
+            "hourly": [
+                {"date": "2026-09-17T19:00:00+0000", "temperature_2m": 18.0, "cloud_cover": 90},
+                {
+                    "date": "2026-09-17T21:00:00+0000",
+                    "temperature_2m": 14.26,
+                    "relative_humidity_2m": 71.4,
+                    "dew_point_2m": 9.1,
+                    "cloud_cover": 12,
+                    "cloud_cover_low": 5,
+                    "cloud_cover_mid": 7,
+                    "cloud_cover_high": 0,
+                    "wind_speed_10m": 8.44,
+                    "wind_direction_10m": 225.0,
+                    "precipitation_probability": 3,
+                    "precipitation": 0.0,
+                    "surface_pressure": 1017.6,
+                    "visibility": 24140.0,
+                    "weather_code": 1,
+                },
+                "junk",
+                {"date": "not a date"},
+                # Farther from NOW than the 21:00 row already picked - proves the nearest-row scan
+                # doesn't just take the last valid row, it keeps the closest one seen so far.
+                {"date": "2026-09-17T23:00:00+0000", "temperature_2m": 5.0},
+            ]
+        }
         device = mp.build_location_device(_connector(["weather_now"]), {}, LOCATION, NOW)
         s = device.state
         assert s["temperature"] == 14.3 and s["humidity"] == 71 and s["cloud_cover"] == 12
@@ -319,25 +464,41 @@ class TestLocationDevice:
         assert set(device.discovery["cmps"]) <= set(s)
 
     def test_weather_now_unknown_enum_values_become_null(self, caches, no_skytonight):
-        caches[("astro_weather", "loc-1")] = {"current_conditions": {"dew_risk_level": "weird", "wind_tracking_impact": ""}}
+        caches[("astro_weather", "loc-1")] = {
+            "current_conditions": {"dew_risk_level": "weird", "wind_tracking_impact": ""}
+        }
         device = mp.build_location_device(_connector(["weather_now"]), {}, LOCATION, NOW)
         assert device.state["dew_risk"] is None and device.state["wind_tracking_impact"] is None
         assert device.state["weather_alert"] is None and device.state["temperature"] is None
 
     def test_upcoming_events_passes_aurora_eclipses_and_aggregator(self, caches, no_skytonight, monkeypatch):
-        caches[("iss_passes", "loc-1")] = {"passes": [
-            {"start_time": "2026-09-17T19:00:00+02:00", "end_time": "2026-09-17T19:06:00+02:00"},  # already over
-            {"start_time": "2026-09-17T23:13:00+02:00", "peak_time": "2026-09-17T23:16:00+02:00",
-             "end_time": "2026-09-17T23:19:00+02:00", "peak_altitude_deg": 64.2, "duration_minutes": 6.4,
-             "visibility_score": 8.7},
-            {"start_time": "2026-09-18T22:00:00+02:00", "end_time": "2026-09-18T22:05:00+02:00"},
-            "junk",
-        ]}
+        caches[("iss_passes", "loc-1")] = {
+            "passes": [
+                {"start_time": "2026-09-17T19:00:00+02:00", "end_time": "2026-09-17T19:06:00+02:00"},  # already over
+                {
+                    "start_time": "2026-09-17T23:13:00+02:00",
+                    "peak_time": "2026-09-17T23:16:00+02:00",
+                    "end_time": "2026-09-17T23:19:00+02:00",
+                    "peak_altitude_deg": 64.2,
+                    "duration_minutes": 6.4,
+                    "visibility_score": 8.7,
+                },
+                {"start_time": "2026-09-18T22:00:00+02:00", "end_time": "2026-09-18T22:05:00+02:00"},
+                "junk",
+            ]
+        }
         caches[("css_passes", "loc-1")] = {"passes": []}
         caches[("aurora", "loc-1")] = {"current": {"kp_index": 4.33, "probability": 22.5, "visibility_level": "Low"}}
-        caches[("solar_eclipse", "loc-1")] = {"solar_eclipse": {
-            "type": "Partial", "obscuration_percent": 45.0, "peak_time": "2026-08-12 14:32:15",
-            "start_time": "2026-08-12 13:05:00", "end_time": "2026-08-12 15:59:00", "visible": True}}
+        caches[("solar_eclipse", "loc-1")] = {
+            "solar_eclipse": {
+                "type": "Partial",
+                "obscuration_percent": 45.0,
+                "peak_time": "2026-08-12 14:32:15",
+                "start_time": "2026-08-12 13:05:00",
+                "end_time": "2026-08-12 15:59:00",
+                "visible": True,
+            }
+        }
         caches[("lunar_eclipse", "loc-1")] = {"lunar_eclipse": None}
 
         class _FakeAggregator:
@@ -346,13 +507,30 @@ class TestLocationDevice:
 
             def aggregate_all_events(self, **kwargs):
                 assert set(kwargs) == {
-                    "solar_eclipse_data", "lunar_eclipse_data", "aurora_data", "iss_passes_data", "css_passes_data",
-                    "moon_phases_data", "planetary_events_data", "special_phenomena_data", "solar_system_events_data",
+                    "solar_eclipse_data",
+                    "lunar_eclipse_data",
+                    "aurora_data",
+                    "iss_passes_data",
+                    "css_passes_data",
+                    "moon_phases_data",
+                    "planetary_events_data",
+                    "special_phenomena_data",
+                    "solar_system_events_data",
                 }
-                return {"events_count": 3, "next_event": {
-                    "title": "ISS pass", "event_type": "iss_pass", "description": "Bright pass",
-                    "start_time": "2026-09-17T23:13:00+02:00", "peak_time": "2026-09-17T23:16:00+02:00",
-                    "end_time": None, "days_until_event": 0, "importance": "high", "visibility": True}}
+                return {
+                    "events_count": 3,
+                    "next_event": {
+                        "title": "ISS pass",
+                        "event_type": "iss_pass",
+                        "description": "Bright pass",
+                        "start_time": "2026-09-17T23:13:00+02:00",
+                        "peak_time": "2026-09-17T23:16:00+02:00",
+                        "end_time": None,
+                        "days_until_event": 0,
+                        "importance": "high",
+                        "visibility": True,
+                    },
+                }
 
         from utils import events_aggregator
 
@@ -360,7 +538,11 @@ class TestLocationDevice:
         device = mp.build_location_device(_connector(["upcoming_events"]), {"language": "fr"}, LOCATION, NOW)
         s = device.state
         assert s["next_iss_pass_at"] == "2026-09-17T23:13:00+02:00"
-        assert s["next_iss_pass_peak_altitude"] == 64 and s["next_iss_pass_duration"] == 6.4 and s["next_iss_pass_score"] == 8.7
+        assert (
+            s["next_iss_pass_peak_altitude"] == 64
+            and s["next_iss_pass_duration"] == 6.4
+            and s["next_iss_pass_score"] == 8.7
+        )
         assert s["next_css_pass_at"] is None
         assert s["aurora_kp"] == 4.3 and s["aurora_probability"] == 22 and s["aurora_visibility"] == "Low"
         assert s["next_solar_eclipse_at"] == "2026-08-12T14:32:15+02:00"
@@ -369,6 +551,36 @@ class TestLocationDevice:
         assert s["next_event"] == "ISS pass" and s["next_event_at"] == "2026-09-17T23:16:00+02:00"
         assert s["next_event_attributes"]["events_count"] == 3 and s["next_event_attributes"]["importance"] == "high"
         assert set(device.discovery["cmps"]) <= set(s)
+
+    def test_upcoming_events_reports_an_actual_lunar_eclipse(self, caches, no_skytonight, monkeypatch):
+        caches[("iss_passes", "loc-1")] = {"passes": []}
+        caches[("css_passes", "loc-1")] = {"passes": []}
+        caches[("lunar_eclipse", "loc-1")] = {
+            "lunar_eclipse": {
+                "type": "Total",
+                "peak_time": "2026-09-07 18:11:00",
+                "partial_begin": "2026-09-07 17:27:00",
+                "partial_end": "2026-09-07 18:55:00",
+                "visible": True,
+            }
+        }
+
+        class _FakeAggregator:
+            def __init__(self, lat, lon, tz, language="en"):
+                pass
+
+            def aggregate_all_events(self, **kwargs):
+                return {"events_count": 0, "next_event": None}
+
+        from utils import events_aggregator
+
+        monkeypatch.setattr(events_aggregator, "EventsAggregator", _FakeAggregator)
+        device = mp.build_location_device(_connector(["upcoming_events"]), {}, LOCATION, NOW)
+        s = device.state
+
+        assert s["next_lunar_eclipse_at"] == "2026-09-07T18:11:00+02:00"  # localised to the location's tz
+        assert s["next_lunar_eclipse_at_attributes"]["type"] == "Total"
+        assert s["next_lunar_eclipse_at_attributes"]["visible"] is True
 
     def test_upcoming_events_survive_an_aggregator_failure(self, caches, no_skytonight, monkeypatch):
         from utils import events_aggregator
@@ -383,7 +595,9 @@ class TestLocationDevice:
 
     def test_all_three_modules_compose_into_one_device(self, caches, monkeypatch):
         _plant_sky(caches, monkeypatch)
-        device = mp.build_location_device(_connector(["sky_conditions", "weather_now", "upcoming_events"]), {}, LOCATION, NOW)
+        device = mp.build_location_device(
+            _connector(["sky_conditions", "weather_now", "upcoming_events"]), {}, LOCATION, NOW
+        )
         cmps = device.discovery["cmps"]
         assert {"sky_period", "temperature", "next_event"} <= set(cmps)
         assert device.entity_count == len(mp.SKY_COMPONENTS) + len(mp.WEATHER_COMPONENTS) + len(mp.EVENTS_COMPONENTS)
@@ -405,51 +619,121 @@ def user_sources(monkeypatch):
     from equipment import equipment_profiles
     from observation import astrodex, observation_sessions, plan_my_night
 
-    astro = {"items": [
-        {"id": "i1", "name": "M31", "catalogue": "Messier", "type": "Galaxy", "constellation": "Andromeda",
-         "pictures": [
-             {"id": "p1", "filename": "a.jpg", "date": "2026-08-01", "created_at": "2026-08-01T22:00:00+00:00", "device": "Old rig"},
-             {"id": "p2", "filename": "b.jpg", "date": "2026-09-10", "created_at": "2026-09-10T23:30:00+00:00",
-              "device": "Newton 200/1000", "rating": 4.5, "integration_minutes": 90},
-         ]},
-        {"id": "i2", "name": "M42", "catalogue": "Messier", "type": "Nebula", "constellation": "orion", "pictures": []},
-        {"id": "i3", "name": "NGC 7000", "catalogue": "NGC", "type": "Nebula", "constellation": "", "pictures": []},
-    ]}
+    astro = {
+        "items": [
+            {
+                "id": "i1",
+                "name": "M31",
+                "catalogue": "Messier",
+                "type": "Galaxy",
+                "constellation": "Andromeda",
+                "pictures": [
+                    {
+                        "id": "p1",
+                        "filename": "a.jpg",
+                        "date": "2026-08-01",
+                        "created_at": "2026-08-01T22:00:00+00:00",
+                        "device": "Old rig",
+                    },
+                    {
+                        "id": "p2",
+                        "filename": "b.jpg",
+                        "date": "2026-09-10",
+                        "created_at": "2026-09-10T23:30:00+00:00",
+                        "device": "Newton 200/1000",
+                        "rating": 4.5,
+                        "integration_minutes": 90,
+                    },
+                ],
+            },
+            {
+                "id": "i2",
+                "name": "M42",
+                "catalogue": "Messier",
+                "type": "Nebula",
+                "constellation": "orion",
+                "pictures": [],
+            },
+            {"id": "i3", "name": "NGC 7000", "catalogue": "NGC", "type": "Nebula", "constellation": "", "pictures": []},
+        ]
+    }
     monkeypatch.setattr(astrodex, "load_user_astrodex", lambda user_id, username=None: astro)
     monkeypatch.setattr(astrodex, "_resolve_image_file_path", lambda filename: f"/img/{filename}")
 
     plan_payload = {
         "state": "current",
         "timeline": {"is_inside_night": True, "progress_percent": 42.6, "current_target_id": "e2"},
-        "current_banner": {"id": "e2", "name": "M33", "catalogue": "Messier", "type": "Galaxy", "planned_minutes": 60,
-                           "timeline_start": "2026-09-17T22:00:00+02:00", "timeline_end": "2026-09-17T23:00:00+02:00",
-                           "visibility": {"status": "ok"}, "meridian_flip": {"state": "mid"}},
+        "current_banner": {
+            "id": "e2",
+            "name": "M33",
+            "catalogue": "Messier",
+            "type": "Galaxy",
+            "planned_minutes": 60,
+            "timeline_start": "2026-09-17T22:00:00+02:00",
+            "timeline_end": "2026-09-17T23:00:00+02:00",
+            "visibility": {"status": "ok"},
+            "meridian_flip": {"state": "mid"},
+        },
         "plan": {
-            "night_start": "2026-09-17T21:41:00+02:00", "night_end": "2026-09-18T05:44:00+02:00",
-            "location_id": "loc-1", "combination_id": "c1",
-            "entries": [{"id": "e1", "name": "M31", "done": True}, {"id": "e2", "name": "M33", "done": False},
-                        {"id": "e3", "name": "M45", "done": False}, "junk"],
+            "night_start": "2026-09-17T21:41:00+02:00",
+            "night_end": "2026-09-18T05:44:00+02:00",
+            "location_id": "loc-1",
+            "combination_id": "c1",
+            "entries": [
+                {"id": "e1", "name": "M31", "done": True},
+                {"id": "e2", "name": "M33", "done": False},
+                {"id": "e3", "name": "M45", "done": False},
+                "junk",
+            ],
         },
     }
     monkeypatch.setattr(plan_my_night, "pick_active_plan", lambda user_id, username: plan_payload)
 
-    monkeypatch.setattr(equipment_profiles, "get_combination", lambda user_id, cid: {
-        "id": "c1", "name": "Newton rig", "telescope_id": "t1", "camera_id": "cam1", "mount_id": "m1",
-        "filter_ids": ["f1", "missing"], "accessory_ids": [], "is_disabled": False,
-    } if cid == "c1" else None)
+    monkeypatch.setattr(
+        equipment_profiles,
+        "get_combination",
+        lambda user_id, cid: (
+            {
+                "id": "c1",
+                "name": "Newton rig",
+                "telescope_id": "t1",
+                "camera_id": "cam1",
+                "mount_id": "m1",
+                "filter_ids": ["f1", "missing"],
+                "accessory_ids": [],
+                "is_disabled": False,
+            }
+            if cid == "c1"
+            else None
+        ),
+    )
     monkeypatch.setattr(equipment_profiles, "load_all_shared_combinations", lambda user_id: [])
-    monkeypatch.setattr(equipment_profiles, "index_owned_and_shared_equipment", lambda user_id: (
-        {"t1": {"name": "Newton 200/1000", "focal_length_mm": 1000, "aperture_mm": 200}, "cam1": {"name": "ASI533"},
-         "m1": {"name": "EQ6-R"}, "f1": {"name": "L-eNhance"}},
-        {},
-    ))
+    monkeypatch.setattr(
+        equipment_profiles,
+        "index_owned_and_shared_equipment",
+        lambda user_id: (
+            {
+                "t1": {"name": "Newton 200/1000", "focal_length_mm": 1000, "aperture_mm": 200},
+                "cam1": {"name": "ASI533"},
+                "m1": {"name": "EQ6-R"},
+                "f1": {"name": "L-eNhance"},
+            },
+            {},
+        ),
+    )
 
     # Entries hang off the session and point at a night by id (observation_sessions.py model).
     sessions = [
-        {"id": "s1", "nights": [{"id": "n1", "date": "2026-09-10"}],
-         "entries": [{"id": "x", "night_id": "n1", "frame_count": 30, "sub_exposure_seconds": 120}]},
-        {"id": "s2", "nights": [{"id": "n2", "date": "2026-08-01"}],
-         "entries": [{"id": "y", "night_id": "n2", "integration_minutes": 45}]},
+        {
+            "id": "s1",
+            "nights": [{"id": "n1", "date": "2026-09-10"}],
+            "entries": [{"id": "x", "night_id": "n1", "frame_count": 30, "sub_exposure_seconds": 120}],
+        },
+        {
+            "id": "s2",
+            "nights": [{"id": "n2", "date": "2026-08-01"}],
+            "entries": [{"id": "y", "night_id": "n2", "integration_minutes": 45}],
+        },
     ]
     monkeypatch.setattr(observation_sessions, "get_user_sessions", lambda user_id: sessions)
     return {"astro": astro, "plan": plan_payload, "sessions": sessions}
@@ -460,13 +744,20 @@ class TestUserDevice:
     def test_requires_opt_in_and_an_enabled_module(self, user_sources):
         assert mp.build_user_device(_connector(["user_activity"]), {}, _user(opted_in=False), NOW) is None
         assert mp.build_user_device(_connector(["sky_conditions"]), {}, _user(), NOW) is None
-        assert mp.build_user_device(_connector(["user_activity"]), {}, SimpleNamespace(user_id="", username="x", preferences={}), NOW) is None
+        assert (
+            mp.build_user_device(
+                _connector(["user_activity"]), {}, SimpleNamespace(user_id="", username="x", preferences={}), NOW
+            )
+            is None
+        )
         assert mp.user_opted_in(SimpleNamespace(preferences=None)) is False
 
     def test_user_activity_state(self, user_sources, monkeypatch):
         from utils import repo_config
 
-        monkeypatch.setattr(repo_config, "get_location_by_id", lambda config, lid: {"name": "Backyard"} if lid == "loc-1" else None)
+        monkeypatch.setattr(
+            repo_config, "get_location_by_id", lambda config, lid: {"name": "Backyard"} if lid == "loc-1" else None
+        )
         device = mp.build_user_device(_connector(["user_activity"]), {"locations": []}, _user(), NOW)
         assert device is not None
         assert device.name == "MyAstroBoard - alice" and device.device_id == "mab_user_u-1"
@@ -530,8 +821,19 @@ class TestUserDevice:
         from equipment import equipment_profiles
 
         monkeypatch.setattr(equipment_profiles, "get_combination", lambda user_id, cid: None)
-        monkeypatch.setattr(equipment_profiles, "load_all_shared_combinations", lambda user_id: [
-            {"id": "c1", "name": "Shared rig", "telescope_id": None, "lens_focal_length_mm": 135, "is_disabled": True}])
+        monkeypatch.setattr(
+            equipment_profiles,
+            "load_all_shared_combinations",
+            lambda user_id: [
+                {
+                    "id": "c1",
+                    "name": "Shared rig",
+                    "telescope_id": None,
+                    "lens_focal_length_mm": 135,
+                    "is_disabled": True,
+                }
+            ],
+        )
         device = mp.build_user_device(_connector(["user_activity"]), {}, _user(), NOW)
         eq = device.state["active_equipment_attributes"]
         assert device.state["active_equipment"] == "Shared rig"
@@ -540,6 +842,185 @@ class TestUserDevice:
         monkeypatch.setattr(equipment_profiles, "load_all_shared_combinations", lambda user_id: [])
         device = mp.build_user_device(_connector(["user_activity"]), {}, _user(), NOW)
         assert device.state["active_equipment"] is None
+
+    def test_shared_combination_match_after_a_non_matching_entry(self, user_sources, monkeypatch):
+        """The scan must keep looking past a shared combination that isn't the one wanted,
+        not just check the first one."""
+        from equipment import equipment_profiles
+
+        monkeypatch.setattr(equipment_profiles, "get_combination", lambda user_id, cid: None)
+        monkeypatch.setattr(
+            equipment_profiles,
+            "load_all_shared_combinations",
+            lambda user_id: [
+                {"id": "other", "name": "Not this one", "is_disabled": False},
+                {"id": "c1", "name": "Shared rig", "telescope_id": None, "is_disabled": False},
+            ],
+        )
+
+        device = mp.build_user_device(_connector(["user_activity"]), {}, _user(), NOW)
+
+        assert device.state["active_equipment"] == "Shared rig"
+
+    def test_equipment_state_swallows_unexpected_errors(self, user_sources, monkeypatch):
+        """Unlike test_source_failures_leave_nulls (where the plan itself fails first, so
+        _equipment_state is never reached with a real combination id), this needs a valid
+        plan/combination_id so the equipment lookup itself is what raises."""
+        from equipment import equipment_profiles
+
+        monkeypatch.setattr(
+            equipment_profiles, "get_combination", lambda user_id, cid: (_ for _ in ()).throw(RuntimeError("boom"))
+        )
+
+        device = mp.build_user_device(_connector(["user_activity"]), {}, _user(), NOW)
+
+        assert device.state["active_equipment"] is None
+
+    def test_sessions_falls_back_to_session_date_range_when_no_entries_are_dated(self, user_sources, monkeypatch):
+        """When no session has a dated entry (session_analytics.iter_entries yields nothing
+        usable), the last-session date still falls back to each session's own night range."""
+        from observation import observation_sessions
+
+        sessions = [{"id": "s1", "nights": [{"id": "n1", "date": "2026-09-05"}], "entries": []}]
+        monkeypatch.setattr(observation_sessions, "get_user_sessions", lambda user_id: sessions)
+
+        device = mp.build_user_device(_connector(["user_activity"]), {}, _user(), NOW)
+        s = device.state
+
+        assert s["sessions_total"] == 1
+        assert s["integration_hours_total"] == 0.0
+        assert s["last_session_date"] == "2026-09-05"
+
+    def test_sessions_fallback_scans_every_session_not_just_the_first(self, user_sources, monkeypatch):
+        """The second (earlier) session's date must not overwrite the first, already-later
+        one - proving the fallback loop actually compares every session rather than
+        stopping, or blindly overwriting, after the first."""
+        from observation import observation_sessions
+
+        sessions = [
+            {"id": "s1", "nights": [{"id": "n1", "date": "2026-09-05"}], "entries": []},
+            {"id": "s2", "nights": [{"id": "n2", "date": "2026-08-01"}], "entries": []},
+        ]
+        monkeypatch.setattr(observation_sessions, "get_user_sessions", lambda user_id: sessions)
+
+        device = mp.build_user_device(_connector(["user_activity"]), {}, _user(), NOW)
+
+        assert device.state["last_session_date"] == "2026-09-05"
+
+    def test_sessions_totals_swallow_unexpected_errors(self, user_sources, monkeypatch):
+        from observation import session_analytics
+
+        monkeypatch.setattr(
+            session_analytics, "iter_entries", lambda sessions: (_ for _ in ()).throw(RuntimeError("boom"))
+        )
+
+        device = mp.build_user_device(_connector(["user_activity"]), {}, _user(), NOW)
+        s = device.state
+
+        assert s["sessions_total"] == 2  # counted before the failure
+        assert s["integration_hours_total"] == 0.0
+        assert s["last_session_date"] is None
+
+    def test_astrodex_pictures_list_skips_non_dict_entries(self, user_sources, monkeypatch):
+        from observation import astrodex
+
+        astro = {
+            "items": [
+                {
+                    "id": "i1",
+                    "name": "M31",
+                    "catalogue": "Messier",
+                    "type": "Galaxy",
+                    "constellation": "andromeda",
+                    "pictures": [
+                        "not-a-dict",
+                        {"filename": "a.jpg", "date": "2026-09-10", "created_at": "2026-09-10T23:30:00"},
+                    ],
+                },
+            ]
+        }
+        monkeypatch.setattr(astrodex, "load_user_astrodex", lambda user_id, username=None: astro)
+
+        device = mp.build_user_device(_connector(["user_activity"]), {}, _user(), NOW)
+
+        assert device.state["astrodex_pictures"] == 1  # the stray string entry was skipped, not counted
+
+    def test_plan_without_current_banner_or_current_target_id(self, user_sources, monkeypatch):
+        from observation import plan_my_night
+
+        payload = {
+            "state": "current",
+            "timeline": {"is_inside_night": True, "progress_percent": 10},  # no current_target_id
+            "current_banner": None,
+            "plan": {
+                "night_start": "2026-09-17T21:41:00+02:00",
+                "night_end": "2026-09-18T05:44:00+02:00",
+                "combination_id": None,
+                "entries": [{"id": "e1", "name": "M31", "done": False}],
+            },
+        }
+        monkeypatch.setattr(plan_my_night, "pick_active_plan", lambda user_id, username: payload)
+
+        device = mp.build_user_device(_connector(["user_activity"]), {}, _user(), NOW)
+        s = device.state
+
+        assert s["plan_current_target"] is None
+        assert s["plan_next_target"] == "M31"  # no current target to exclude - falls back to the full list
+        assert s["plan_location"] is None
+        assert s["active_equipment"] is None
+
+    def test_plan_current_target_id_stale_and_location_lookup_fails(self, user_sources, monkeypatch):
+        """A current_target_id that no longer matches any entry (the plan changed under it)
+        must not crash the "remaining" narrowing, and a broken location lookup must not
+        crash the whole device - just leave plan_location unset."""
+        from observation import plan_my_night
+        from utils import repo_config
+
+        payload = {
+            "state": "current",
+            "timeline": {"is_inside_night": True, "progress_percent": 50, "current_target_id": "does-not-exist"},
+            "current_banner": {"name": "M33"},
+            "plan": {
+                "night_start": "2026-09-17T21:41:00+02:00",
+                "night_end": "2026-09-18T05:44:00+02:00",
+                "location_id": "loc-1",
+                "combination_id": None,
+                "entries": [{"id": "e1", "name": "M31", "done": False}, {"id": "e2", "name": "M45", "done": True}],
+            },
+        }
+        monkeypatch.setattr(plan_my_night, "pick_active_plan", lambda user_id, username: payload)
+        monkeypatch.setattr(
+            repo_config, "get_location_by_id", lambda config, lid: (_ for _ in ()).throw(RuntimeError("boom"))
+        )
+
+        device = mp.build_user_device(_connector(["user_activity"]), {}, _user(), NOW)
+        s = device.state
+
+        assert s["plan_current_target"] == "M33"
+        assert s["plan_next_target"] == "M31"
+        assert s["plan_location"] is None
+
+    def test_plan_no_remaining_targets_after_the_current_one(self, user_sources, monkeypatch):
+        from observation import plan_my_night
+
+        payload = {
+            "state": "current",
+            "timeline": {"is_inside_night": True, "progress_percent": 90, "current_target_id": "e1"},
+            "current_banner": {"name": "M31"},
+            "plan": {
+                "night_start": "2026-09-17T21:41:00+02:00",
+                "night_end": "2026-09-18T05:44:00+02:00",
+                "combination_id": None,
+                "entries": [{"id": "e1", "name": "M31", "done": False}],
+            },
+        }
+        monkeypatch.setattr(plan_my_night, "pick_active_plan", lambda user_id, username: payload)
+
+        device = mp.build_user_device(_connector(["user_activity"]), {}, _user(), NOW)
+        s = device.state
+
+        assert s["plan_current_target"] == "M31"
+        assert s["plan_next_target"] is None
 
     def test_image_module_alone_still_finds_the_latest_picture(self, user_sources, monkeypatch):
         monkeypatch.setattr(mp, "encode_thumbnail", lambda path, edge, size, q: b"JPEGBYTES:" + path.encode())
@@ -602,6 +1083,18 @@ class TestEncodeThumbnail:
         with Image.open(io.BytesIO(data)) as out:
             assert max(out.size) < 1280
 
+    def test_larger_fallback_steps_are_skipped_when_above_max_edge(self, tmp_path):
+        """max_edge=700 sits between the fixed fallback steps 800/1024 (too big to ever
+        try, even as a fallback) and 640 (small enough) - the too-big ones must be
+        skipped via `continue`, landing on 640 once the 700px attempt is over budget."""
+        from PIL import Image
+
+        data = mp.encode_thumbnail(self._png(tmp_path), 700, 10_000, 82)
+
+        assert data is not None
+        with Image.open(io.BytesIO(data)) as out:
+            assert max(out.size) == 640
+
     def test_gives_up_when_nothing_fits(self, tmp_path):
         assert mp.encode_thumbnail(self._png(tmp_path), 1280, 500, 82) is None
 
@@ -619,7 +1112,9 @@ class TestCollect:
     def test_collects_locations_users_and_board_in_order(self, caches, no_skytonight, user_sources, monkeypatch):
         from utils import auth, repo_config
 
-        monkeypatch.setattr(repo_config, "get_scheduler_locations", lambda config: [LOCATION, {"name": "no id"}, "junk"])
+        monkeypatch.setattr(
+            repo_config, "get_scheduler_locations", lambda config: [LOCATION, {"name": "no id"}, "junk"]
+        )
         users = {"u-1": _user(), "u-2": _user(opted_in=False, user_id="u-2", username="bob")}
         monkeypatch.setattr(auth, "user_manager", SimpleNamespace(users=users, _reload_users_if_changed=lambda: None))
         connector = _connector(["sky_conditions", "user_activity", "board_diagnostics"])
@@ -631,7 +1126,9 @@ class TestCollect:
     def test_board_only_when_nothing_else_is_enabled(self, caches, no_skytonight, monkeypatch):
         from utils import repo_config
 
-        monkeypatch.setattr(repo_config, "get_scheduler_locations", lambda config: pytest.fail("must not list locations"))
+        monkeypatch.setattr(
+            repo_config, "get_scheduler_locations", lambda config: pytest.fail("must not list locations")
+        )
         devices = mp.collect(_connector(["board_diagnostics"]), {}, {}, NOW)
         assert [d.kind for d in devices] == ["board"]
         assert devices[0].state["locations_published"] == 0
@@ -639,7 +1136,9 @@ class TestCollect:
     def test_a_failing_builder_is_skipped_not_fatal(self, caches, no_skytonight, user_sources, monkeypatch):
         from utils import auth, repo_config
 
-        monkeypatch.setattr(repo_config, "get_scheduler_locations", lambda config: [LOCATION, dict(LOCATION, id="loc-2")])
+        monkeypatch.setattr(
+            repo_config, "get_scheduler_locations", lambda config: [LOCATION, dict(LOCATION, id="loc-2")]
+        )
         original = mp.build_location_device
 
         def flaky(connector, config, location, now=None):
@@ -648,10 +1147,33 @@ class TestCollect:
             return original(connector, config, location, now)
 
         monkeypatch.setattr(mp, "build_location_device", flaky)
-        monkeypatch.setattr(auth, "user_manager", SimpleNamespace(users={"u-1": _user()}, _reload_users_if_changed=lambda: None))
+        monkeypatch.setattr(
+            auth, "user_manager", SimpleNamespace(users={"u-1": _user()}, _reload_users_if_changed=lambda: None)
+        )
         monkeypatch.setattr(mp, "build_user_device", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
         monkeypatch.setattr(mp, "build_board_device", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
         devices = mp.collect(_connector(["sky_conditions", "user_activity", "board_diagnostics"]), {}, {}, NOW)
+        assert [d.object_id for d in devices] == ["loc-1"]
+
+    def test_a_builder_returning_none_is_skipped(self, caches, no_skytonight, monkeypatch):
+        """Distinct from the failing-builder case above: a location with no applicable
+        components can legitimately build to nothing, without raising at all."""
+        from utils import repo_config
+
+        monkeypatch.setattr(
+            repo_config, "get_scheduler_locations", lambda config: [LOCATION, dict(LOCATION, id="loc-2")]
+        )
+        original = mp.build_location_device
+
+        def maybe_none(connector, config, location, now=None):
+            if location["id"] == "loc-2":
+                return None
+            return original(connector, config, location, now)
+
+        monkeypatch.setattr(mp, "build_location_device", maybe_none)
+
+        devices = mp.collect(_connector(["sky_conditions"]), {}, {}, NOW)
+
         assert [d.object_id for d in devices] == ["loc-1"]
 
     def test_listing_failures_are_logged_not_raised(self, caches, no_skytonight, monkeypatch):
@@ -673,13 +1195,23 @@ class TestLongTermStatistics:
         them after the entity is removed. Ephemeris and forecast values must not opt in."""
         with_stats = {
             key
-            for components in (mp.BOARD_COMPONENTS, mp.SKY_COMPONENTS, mp.WEATHER_COMPONENTS, mp.EVENTS_COMPONENTS, mp.USER_COMPONENTS)
+            for components in (
+                mp.BOARD_COMPONENTS,
+                mp.SKY_COMPONENTS,
+                mp.WEATHER_COMPONENTS,
+                mp.EVENTS_COMPONENTS,
+                mp.USER_COMPONENTS,
+            )
             for key, spec in components
             if "stat_cla" in spec
         }
         assert with_stats == {
-            "astrodex_objects", "astrodex_objects_with_pictures", "astrodex_pictures", "astrodex_constellations",
-            "sessions_total", "integration_hours_total",
+            "astrodex_objects",
+            "astrodex_objects_with_pictures",
+            "astrodex_pictures",
+            "astrodex_constellations",
+            "sessions_total",
+            "integration_hours_total",
         }
         # Counters can decrease (a deleted picture): "total", never "total_increasing"
         assert all(spec["stat_cla"] == "total" for _, spec in mp.USER_COMPONENTS if "stat_cla" in spec)

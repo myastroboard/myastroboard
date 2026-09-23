@@ -1217,6 +1217,7 @@ class TestSpaceflightCacheImagesIntactTuple:
 # Merged from former test_coverage_paths3.py
 # ---------------------------------------------------------------------------
 
+
 class TestSpaceflightTrackerBackoffHelpers:
     """Cover _load_backoff_state and _save_backoff_state edge cases."""
 
@@ -1233,9 +1234,7 @@ class TestSpaceflightTrackerBackoffHelpers:
         backoff_file = tmp_path / "backoff.json"
         future_ts = time.time() + 3600
         # One valid entry, one with non-numeric value
-        backoff_file.write_text(
-            json.dumps({"/valid/": future_ts, "/bad/": "not-a-float"}), encoding="utf-8"
-        )
+        backoff_file.write_text(json.dumps({"/valid/": future_ts, "/bad/": "not-a-float"}), encoding="utf-8")
         monkeypatch.setattr(spaceflight_tracker, "_SPACEFLIGHT_BACKOFF_FILE", str(backoff_file))
 
         result = spaceflight_tracker._load_backoff_state()
@@ -1267,9 +1266,7 @@ class TestSpaceflightTrackerBackoffHelpers:
         """exp_val <= now_ts (expired entry) → if is False → loop continues."""
         backoff_file = tmp_path / "backoff_expired.json"
         expired_ts = time.time() - 3600  # 1 hour in the past → expired
-        backoff_file.write_text(
-            json.dumps({"/expired/": expired_ts}), encoding="utf-8"
-        )
+        backoff_file.write_text(json.dumps({"/expired/": expired_ts}), encoding="utf-8")
         monkeypatch.setattr(spaceflight_tracker, "_SPACEFLIGHT_BACKOFF_FILE", str(backoff_file))
 
         result = spaceflight_tracker._load_backoff_state()

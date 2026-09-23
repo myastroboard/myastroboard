@@ -4,9 +4,9 @@ token generation/verification, slot timing, picture shuffling, and rendering.
 """
 
 import io
-import json
 import os
 import tempfile
+import time
 
 import pytest
 from PIL import Image
@@ -67,6 +67,21 @@ class TestTokens:
         new_token = astrodex_stream.personal_token('user-a')
         assert astrodex_stream.verify_personal_token('user-a', new_token) is True
         assert new_token != old_token
+
+    def test_signing_secret_generation_survives_a_persist_failure(self, temp_data_dir, monkeypatch):
+        """A token must still be produced (just won't survive a restart) if the sidecar
+        write fails on first use - not critical enough to break the whole feature."""
+        monkeypatch.setattr(astrodex_stream, 'save_secrets', lambda name, values: False)
+
+        token = astrodex_stream.personal_token('user-a')
+
+        assert token  # still got a usable, non-empty token
+
+    def test_rotate_raises_when_the_new_secret_cannot_be_persisted(self, temp_data_dir, monkeypatch):
+        monkeypatch.setattr(astrodex_stream, 'save_secrets', lambda name, values: False)
+
+        with pytest.raises(RuntimeError):
+            astrodex_stream.rotate_signing_secret()
 
 
 class TestSlotTiming:
@@ -187,6 +202,24 @@ class TestRendering:
         second = astrodex_stream.personal_frame(user_id, _cfg())
         assert first == second  # identical bytes: the second call hit the cache, not a re-render
 
+    def test_cache_eviction_sweeps_older_buckets_then_falls_back_to_oldest_first(self, temp_data_dir):
+        """Older-bucket entries (the common case - they simply aged out) are swept first;
+        if that alone isn't enough (many distinct feeds landing in the very same bucket),
+        the cache falls back to plain insertion-order eviction to stay under the cap."""
+        astrodex_stream._FRAME_CACHE.clear()
+        max_entries = astrodex_stream._FRAME_CACHE_MAX_ENTRIES
+        bucket = int(time.time() // astrodex_stream._FRAME_CACHE_TTL_SECONDS)
+
+        for i in range(3):
+            astrodex_stream._FRAME_CACHE[(f'old-{i}', 'fp', bucket - 1)] = b'stale'
+        for i in range(max_entries + 2):
+            astrodex_stream._FRAME_CACHE[(f'same-{i}', 'fp', bucket)] = b'stale'
+
+        astrodex_stream._render_cached('new-feed', [], _cfg())
+
+        assert len(astrodex_stream._FRAME_CACHE) <= max_entries
+        assert not any(key[2] == bucket - 1 for key in astrodex_stream._FRAME_CACHE)
+
     def test_shared_feed_includes_owner_username_in_the_banner_personal_does_not(self, temp_data_dir):
         """Not asserting on rendered pixels - just that the banner-line builder picks up
         owner_username for the shared/merged view and leaves it out for the personal one."""
@@ -207,6 +240,54 @@ class TestRendering:
         img = Image.open(io.BytesIO(data))
         assert img.size == (1280, 720)  # did not crash despite the file not existing on disk
 
+    def test_corrupted_picture_file_on_disk_falls_back_to_placeholder(self, temp_data_dir):
+        """A file that exists but isn't a valid image (truncated upload, disk corruption)
+        must be treated the same as a missing one, not crash the stream."""
+        user_id = 'user-corrupt-file'
+        item = astrodex.create_astrodex_item(user_id, {'name': 'M31', 'type': 'Galaxy'})
+        astrodex.add_picture_to_item(user_id, item['id'], {'filename': 'corrupt.jpg', 'date': '2026-09-20'})
+        with open(os.path.join(astrodex.ASTRODEX_IMAGES_DIR, 'corrupt.jpg'), 'wb') as f:
+            f.write(b'not a real jpeg')
+
+        data = astrodex_stream.personal_frame(user_id, _cfg())
+
+        img = Image.open(io.BytesIO(data))
+        assert img.size == (1280, 720)
+
+    def test_crops_a_portrait_source_to_a_landscape_target_by_trimming_height(self, temp_data_dir):
+        """The source's own aspect ratio can be narrower than the target's (unlike every
+        other crop test here, which uses a wide source) - that path trims top/bottom
+        instead of left/right."""
+        user_id = 'user-portrait-crop'
+        _seed_picture(user_id, size=(1000, 2000))  # tall source, ratio 0.5
+
+        data = astrodex_stream.personal_frame(user_id, _cfg(aspect_ratio='16:9'))  # wide target, ratio 1.78
+
+        img = Image.open(io.BytesIO(data))
+        assert img.size == (1280, 720)
+
+    def test_format_date_handles_a_missing_value(self):
+        assert astrodex_stream._format_date(None) == ""
+        assert astrodex_stream._format_date("") == ""
+
+    def test_banner_lines_skips_missing_name_and_date(self):
+        lines = astrodex_stream._banner_lines({'item_name': '', 'date': None, 'owner_username': None})
+        assert lines == []
+
+    def test_draw_banner_is_a_noop_with_no_lines(self):
+        img = Image.new('RGB', (100, 50), (10, 20, 30))
+
+        result = astrodex_stream._draw_banner(img, [])
+
+        assert result is img
+
+    def test_encode_jpeg_converts_a_non_rgb_image(self):
+        img = Image.new('RGBA', (10, 10), (1, 2, 3, 4))
+
+        data = astrodex_stream._encode_jpeg(img)
+
+        assert Image.open(io.BytesIO(data)).mode == 'RGB'
+
 
 class TestSharedFeed:
 
@@ -222,3 +303,27 @@ class TestSharedFeed:
         # _eligible_pictures_shared only carries filename/date/item_name/owner_username -
         # GPS fields are never copied through in the first place.
         assert all(set(p.keys()) == {'filename', 'date', 'item_name', 'owner_username'} for p in pictures)
+
+    def test_shared_feed_skips_pictures_without_a_filename(self, temp_data_dir, monkeypatch):
+        """A picture record can exist without a filename (e.g. an upload that failed
+        partway through) - it must never be offered to the stream as a photo to render."""
+        astrodex.create_astrodex_item('user-a', {'name': 'M31', 'type': 'Galaxy'})
+        monkeypatch.setattr(
+            astrodex,
+            'get_visible_astrodex',
+            lambda **kwargs: {'items': [{'name': 'M31', 'pictures': [{'filename': '', 'date': '2026-09-20'}]}]},
+        )
+
+        assert astrodex_stream._eligible_pictures_shared() == []
+
+
+class TestPersonalEligiblePictures:
+
+    def test_personal_feed_skips_pictures_without_a_filename(self, temp_data_dir):
+        user_id = 'user-no-filename'
+        astrodex.create_astrodex_item(user_id, {'name': 'M31', 'type': 'Galaxy'})
+        data = astrodex.load_user_astrodex(user_id)
+        data['items'][0]['pictures'] = [{'filename': '', 'date': '2026-09-20'}]
+        astrodex.save_user_astrodex(user_id, data)
+
+        assert astrodex_stream._eligible_pictures_personal(user_id) == []

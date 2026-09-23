@@ -5,10 +5,10 @@ from unittest.mock import MagicMock, patch
 
 from connectors.allsky_connector import AllSkyConnector
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make(cfg=None):
     """Return an AllSkyConnector with the given config dict (defaults to minimal)."""
@@ -19,19 +19,28 @@ def _make(cfg=None):
 
 
 def _make_all_modules(enabled=True):
-    return _make({
-        "url": "http://allsky.local",
-        "enabled": True,
-        "modules": {s: {"enabled": enabled} for s in [
-            "live_image", "sensor_data", "keogram",
-            "startrails", "daily_timelapse",
-        ]},
-    })
+    return _make(
+        {
+            "url": "http://allsky.local",
+            "enabled": True,
+            "modules": {
+                s: {"enabled": enabled}
+                for s in [
+                    "live_image",
+                    "sensor_data",
+                    "keogram",
+                    "startrails",
+                    "daily_timelapse",
+                ]
+            },
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
 # BaseConnector — __init__, is_enabled, is_module_enabled
 # ---------------------------------------------------------------------------
+
 
 class TestBaseConnector:
 
@@ -77,6 +86,7 @@ class TestBaseConnector:
 # URL builder methods
 # ---------------------------------------------------------------------------
 
+
 class TestUrlBuilders:
 
     def test_image_url_defaults(self):
@@ -84,8 +94,15 @@ class TestUrlBuilders:
         assert c._image_url() == "http://allsky.local/current/tmp/image.jpg"
 
     def test_image_url_custom_path_and_filename(self):
-        c = _make({"url": "http://allsky.local", "enabled": True, "modules": {},
-                   "image_path": "/custom/path/", "image_filename": "live.jpg"})
+        c = _make(
+            {
+                "url": "http://allsky.local",
+                "enabled": True,
+                "modules": {},
+                "image_path": "/custom/path/",
+                "image_filename": "live.jpg",
+            }
+        )
         assert c._image_url() == "http://allsky.local/custom/path/live.jpg"
 
     def test_sensor_data_url_defaults(self):
@@ -93,8 +110,15 @@ class TestUrlBuilders:
         assert c._sensor_data_url() == "http://allsky.local/current/tmp/allskydata.json"
 
     def test_sensor_data_url_custom(self):
-        c = _make({"url": "http://allsky.local", "enabled": True, "modules": {},
-                   "image_path": "data", "export_json_path": "export.json"})
+        c = _make(
+            {
+                "url": "http://allsky.local",
+                "enabled": True,
+                "modules": {},
+                "image_path": "data",
+                "export_json_path": "export.json",
+            }
+        )
         assert c._sensor_data_url() == "http://allsky.local/data/export.json"
 
     def test_keogram_url(self):
@@ -114,12 +138,11 @@ class TestUrlBuilders:
 # _force_ipv4()
 # ---------------------------------------------------------------------------
 
+
 class TestForceIpv4:
 
     def test_replaces_hostname_with_ipv4(self):
-        with patch("socket.getaddrinfo", return_value=[
-            (None, None, None, None, ("1.2.3.4", 80))
-        ]):
+        with patch("socket.getaddrinfo", return_value=[(None, None, None, None, ("1.2.3.4", 80))]):
             result = AllSkyConnector._force_ipv4("http://allsky.local/image.jpg")
         assert result == "http://1.2.3.4/image.jpg"
 
@@ -137,6 +160,7 @@ class TestForceIpv4:
 # ---------------------------------------------------------------------------
 # _head()
 # ---------------------------------------------------------------------------
+
 
 class TestHead:
 
@@ -189,6 +213,7 @@ class TestHead:
 # health_check()
 # ---------------------------------------------------------------------------
 
+
 class TestHealthCheck:
 
     def test_no_base_url_returns_unreachable(self):
@@ -218,6 +243,7 @@ class TestHealthCheck:
 
     def test_404_generic_for_unknown_module(self):
         """live_image has no hint in _MODULE_404_HINTS → generic fallback."""
+
         def _head_side(url, **kwargs):
             return MagicMock(status_code=404)
 
@@ -246,10 +272,13 @@ class TestHealthCheck:
             assert "HTTP 500" in v["detail"]
 
     def test_reachable_when_base_fails_but_module_ok(self):
-        responses = iter([
-            MagicMock(status_code=503),  # base URL
-            MagicMock(status_code=200),  # first module
-        ] + [MagicMock(status_code=404)] * 10)
+        responses = iter(
+            [
+                MagicMock(status_code=503),  # base URL
+                MagicMock(status_code=200),  # first module
+            ]
+            + [MagicMock(status_code=404)] * 10
+        )
 
         with patch("requests.head", side_effect=lambda *a, **kw: next(responses)):
             result = _make().health_check()
@@ -260,6 +289,7 @@ class TestHealthCheck:
 # get_module_urls()
 # ---------------------------------------------------------------------------
 
+
 class TestGetModuleUrls:
 
     def test_empty_when_no_modules_enabled(self):
@@ -267,33 +297,28 @@ class TestGetModuleUrls:
         assert c.get_module_urls() == {}
 
     def test_live_image_included_when_enabled(self):
-        c = _make({"url": "http://allsky.local", "enabled": True,
-                   "modules": {"live_image": {"enabled": True}}})
+        c = _make({"url": "http://allsky.local", "enabled": True, "modules": {"live_image": {"enabled": True}}})
         urls = c.get_module_urls()
         assert "live_image" in urls
         assert urls["live_image"] == "http://allsky.local/current/tmp/image.jpg"
 
     def test_sensor_data_included_when_enabled(self):
-        c = _make({"url": "http://allsky.local", "enabled": True,
-                   "modules": {"sensor_data": {"enabled": True}}})
+        c = _make({"url": "http://allsky.local", "enabled": True, "modules": {"sensor_data": {"enabled": True}}})
         urls = c.get_module_urls()
         assert "sensor_data" in urls
 
     def test_keogram_included_when_enabled(self):
-        c = _make({"url": "http://allsky.local", "enabled": True,
-                   "modules": {"keogram": {"enabled": True}}})
+        c = _make({"url": "http://allsky.local", "enabled": True, "modules": {"keogram": {"enabled": True}}})
         urls = c.get_module_urls(date_str="20260101")
         assert urls["keogram"] == "http://allsky.local/images/20260101/keogram/keogram-20260101.jpg"
 
     def test_startrails_included_when_enabled(self):
-        c = _make({"url": "http://allsky.local", "enabled": True,
-                   "modules": {"startrails": {"enabled": True}}})
+        c = _make({"url": "http://allsky.local", "enabled": True, "modules": {"startrails": {"enabled": True}}})
         urls = c.get_module_urls(date_str="20260101")
         assert "startrails" in urls
 
     def test_daily_timelapse_included_when_enabled(self):
-        c = _make({"url": "http://allsky.local", "enabled": True,
-                   "modules": {"daily_timelapse": {"enabled": True}}})
+        c = _make({"url": "http://allsky.local", "enabled": True, "modules": {"daily_timelapse": {"enabled": True}}})
         urls = c.get_module_urls(date_str="20260101")
         assert "daily_timelapse" in urls
 
@@ -303,8 +328,7 @@ class TestGetModuleUrls:
         assert len(urls) == 5  # live_image, sensor_data, keogram, startrails, daily_timelapse
 
     def test_date_defaults_to_last_night_when_not_provided(self):
-        c = _make({"url": "http://allsky.local", "enabled": True,
-                   "modules": {"keogram": {"enabled": True}}})
+        c = _make({"url": "http://allsky.local", "enabled": True, "modules": {"keogram": {"enabled": True}}})
         urls = c.get_module_urls()
         assert "keogram" in urls
         assert "/images/" in urls["keogram"] and "/keogram/keogram-" in urls["keogram"]
@@ -314,11 +338,11 @@ class TestGetModuleUrls:
 # fetch_sensor_data()
 # ---------------------------------------------------------------------------
 
+
 class TestFetchSensorData:
 
     def _sensor_enabled(self):
-        return _make({"url": "http://allsky.local", "enabled": True,
-                      "modules": {"sensor_data": {"enabled": True}}})
+        return _make({"url": "http://allsky.local", "enabled": True, "modules": {"sensor_data": {"enabled": True}}})
 
     def test_returns_empty_when_module_disabled(self):
         c = _make()  # sensor_data not enabled

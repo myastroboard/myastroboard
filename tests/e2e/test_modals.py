@@ -20,14 +20,12 @@ MOBILE_VIEWPORT = {"width": 390, "height": 844}
 
 def _residue(page):
     """Everything modal-related that could be left hanging on the page."""
-    return page.evaluate(
-        """() => ({
+    return page.evaluate("""() => ({
             backdrops: document.querySelectorAll('.modal-backdrop').length,
             shown: document.querySelectorAll('.modal.show').length,
             bodyLocked: document.body.classList.contains('modal-open'),
             bodyOverflow: document.body.style.overflow,
-        })"""
-    )
+        })""")
 
 
 def _goto_astrodex(page):
@@ -103,14 +101,12 @@ def test_opening_a_second_modal_closes_the_first_no_stacked_backdrops(logged_in_
 
     page.evaluate("showObjectInfoModal('M42')")
 
-    page.wait_for_function(
-        """() => {
+    page.wait_for_function("""() => {
             const shown = document.querySelectorAll('.modal.show');
             return shown.length === 1 && shown[0].id === 'modal_lg_close'
                 && document.querySelectorAll('.modal-backdrop').length === 1
                 && document.body.classList.contains('modal-open');
-        }"""
-    )
+        }""")
 
     page.evaluate("closeModal('#modal_lg_close')")
     page.wait_for_function("() => document.querySelectorAll('.modal-backdrop').length === 0")

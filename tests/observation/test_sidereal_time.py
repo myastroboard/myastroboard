@@ -211,8 +211,7 @@ class TestGetBestObservationTimes:
 
     def test_altaz_none_path_is_handled(self):
         """altaz is None → continue (defensive guard in the hourly loop)."""
-        import numpy as np
-        from unittest.mock import MagicMock, patch
+        from unittest.mock import patch
         from astropy.coordinates import SkyCoord
 
         svc = SiderealTimeService(45.0, -73.5, timezone="America/Montreal")
@@ -355,8 +354,6 @@ class TestExceptionHandlerBranches:
 
     def test_get_hourly_sidereal_times_exception_returns_empty_list(self, monkeypatch):
         """exception in loop → empty list returned."""
-        from astropy.time import Time
-
         svc = SiderealTimeService(45.0, -73.5)
         monkeypatch.setattr(
             svc, '_calculate_sidereal_info', lambda t: (_ for _ in ()).throw(RuntimeError("calc error"))

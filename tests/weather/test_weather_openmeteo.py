@@ -1,4 +1,5 @@
 """Tests for weather_openmeteo.py — rate-limit helpers and forecast functions."""
+
 import time
 from unittest.mock import MagicMock
 
@@ -63,12 +64,13 @@ class TestGetHourlyForecastCooldowns:
         mock_response.Latitude.return_value = 45.5
         mock_response.Longitude.return_value = -73.5
         mock_response.Elevation.return_value = 50.0
-        mock_response.Timezone.return_value = None  # triggers 
+        mock_response.Timezone.return_value = None  # triggers
 
         monkeypatch.setattr(wom, 'fetch_weather', lambda **kw: mock_response)
         monkeypatch.setattr(wom, 'parse_hourly', lambda resp, vars, timezone_str=None: MagicMock())
         monkeypatch.setattr(
-            wom, 'load_config',
+            wom,
+            'load_config',
             lambda: {'location': {'latitude': 45.5, 'longitude': -73.5, 'timezone': 'UTC', 'name': 'Test'}},
         )
         result = wom.get_hourly_forecast()
@@ -137,9 +139,12 @@ class TestGetHourlyForecastCooldowns:
         wom._FORECAST_LAST_FAILURE_TS = 0.0
         wom._GLOBAL_CONCURRENCY_TS = 0.0
 
-        monkeypatch.setattr(wom, 'fetch_weather', lambda **kw: (_ for _ in ()).throw(Exception("Too many concurrent requests")))
         monkeypatch.setattr(
-            wom, 'load_config',
+            wom, 'fetch_weather', lambda **kw: (_ for _ in ()).throw(Exception("Too many concurrent requests"))
+        )
+        monkeypatch.setattr(
+            wom,
+            'load_config',
             lambda: {'location': {'latitude': 45.5, 'longitude': -73.5, 'timezone': 'UTC', 'name': 'Test'}},
         )
         result = wom.get_hourly_forecast()
@@ -174,8 +179,12 @@ class TestGetHourlyForecastCooldowns:
         """Covers transient API error branch."""
         wom._FORECAST_LAST_FAILURE_TS = 0.0
 
-        monkeypatch.setattr(wom, 'fetch_weather', lambda **kw: (_ for _ in ()).throw(Exception("503 Service Unavailable")))
-        monkeypatch.setattr(wom.requests, 'get', lambda *a, **kw: (_ for _ in ()).throw(Exception("503 Service Unavailable")))
+        monkeypatch.setattr(
+            wom, 'fetch_weather', lambda **kw: (_ for _ in ()).throw(Exception("503 Service Unavailable"))
+        )
+        monkeypatch.setattr(
+            wom.requests, 'get', lambda *a, **kw: (_ for _ in ()).throw(Exception("503 Service Unavailable"))
+        )
         monkeypatch.setattr(
             wom,
             'load_config',
@@ -314,11 +323,25 @@ class TestGetHourlyForecastCooldowns:
 # ---------------------------------------------------------------------------
 
 _FULL_HOURLY_VARS = [
-    "temperature_2m", "relative_humidity_2m", "dew_point_2m",
-    "precipitation_probability", "precipitation", "rain", "weather_code",
-    "visibility", "wind_speed_10m", "wind_direction_10m",
-    "cloud_cover", "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high",
-    "lifted_index", "sunshine_duration", "is_day", "uv_index", "surface_pressure",
+    "temperature_2m",
+    "relative_humidity_2m",
+    "dew_point_2m",
+    "precipitation_probability",
+    "precipitation",
+    "rain",
+    "weather_code",
+    "visibility",
+    "wind_speed_10m",
+    "wind_direction_10m",
+    "cloud_cover",
+    "cloud_cover_low",
+    "cloud_cover_mid",
+    "cloud_cover_high",
+    "lifted_index",
+    "sunshine_duration",
+    "is_day",
+    "uv_index",
+    "surface_pressure",
 ]
 
 
@@ -394,6 +417,7 @@ class TestParseHourly:
 
     def test_returns_dataframe(self):
         import pandas as pd
+
         response = _make_parse_hourly_response()
         result = wom.parse_hourly(response, _FULL_HOURLY_VARS)
         assert isinstance(result, pd.DataFrame)
@@ -420,6 +444,7 @@ class TestParseHourly:
 
     def test_cloudless_is_complement_of_cloud_cover(self):
         import numpy as np
+
         response = _make_parse_hourly_response()
         result = wom.parse_hourly(response, _FULL_HOURLY_VARS)
         assert np.allclose(result["cloudless"].values, 100 - result["cloud_cover"].values)
@@ -671,10 +696,20 @@ class TestParseHourlyJson:
     """Tests for parse_hourly_json — the plain-HTTP fallback parser."""
 
     _CORE_VARS = [
-        "temperature_2m", "relative_humidity_2m", "precipitation_probability",
-        "precipitation", "rain", "weather_code", "visibility", "wind_speed_10m",
-        "wind_direction_10m", "cloud_cover", "cloud_cover_low", "cloud_cover_mid",
-        "cloud_cover_high", "is_day",
+        "temperature_2m",
+        "relative_humidity_2m",
+        "precipitation_probability",
+        "precipitation",
+        "rain",
+        "weather_code",
+        "visibility",
+        "wind_speed_10m",
+        "wind_direction_10m",
+        "cloud_cover",
+        "cloud_cover_low",
+        "cloud_cover_mid",
+        "cloud_cover_high",
+        "is_day",
     ]
 
     def _payload(self, n_hours=2, **overrides):
@@ -737,8 +772,11 @@ class TestMetadataAccessorFailures:
     def test_longitude_decode_failure_falls_back_to_location(self, monkeypatch):
         wom._FORECAST_LAST_FAILURE_TS = 0.0
         location = {
-            'id': 'test-loc', 'latitude': 45.5, 'longitude': -73.5,
-            'timezone': 'UTC', 'name': 'Test',
+            'id': 'test-loc',
+            'latitude': 45.5,
+            'longitude': -73.5,
+            'timezone': 'UTC',
+            'name': 'Test',
         }
 
         mock_response = MagicMock()
@@ -758,8 +796,11 @@ class TestMetadataAccessorFailures:
     def test_elevation_decode_failure_falls_back_to_none(self, monkeypatch):
         wom._FORECAST_LAST_FAILURE_TS = 0.0
         location = {
-            'id': 'test-loc', 'latitude': 45.5, 'longitude': -73.5,
-            'timezone': 'UTC', 'name': 'Test',
+            'id': 'test-loc',
+            'latitude': 45.5,
+            'longitude': -73.5,
+            'timezone': 'UTC',
+            'name': 'Test',
         }
 
         mock_response = MagicMock()
@@ -792,8 +833,11 @@ class TestCoreFallbackConcurrencyReraise:
         wom._FORECAST_LAST_FAILURE_TS = 0.0
         wom._GLOBAL_CONCURRENCY_TS = 0.0
         location = {
-            'id': 'test-loc', 'latitude': 45.5, 'longitude': -73.5,
-            'timezone': 'UTC', 'name': 'Test',
+            'id': 'test-loc',
+            'latitude': 45.5,
+            'longitude': -73.5,
+            'timezone': 'UTC',
+            'name': 'Test',
         }
 
         calls = []

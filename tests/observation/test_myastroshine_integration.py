@@ -341,9 +341,7 @@ def test_get_integration_config_handles_missing_and_none_block():
 
 
 def test_get_integration_config_loads_config_when_omitted(monkeypatch):
-    monkeypatch.setattr(
-        integration, "load_config", lambda: {"connectors": {"myastroshine": {"enabled": True}}}
-    )
+    monkeypatch.setattr(integration, "load_config", lambda: {"connectors": {"myastroshine": {"enabled": True}}})
     assert integration.get_integration_config() == {"enabled": True}
 
 
@@ -396,9 +394,7 @@ def test_load_consumed_from_disk_ignores_non_dict_file(temp_data_dir):
 def test_load_consumed_from_disk_skips_bad_and_expired_entries(temp_data_dir):
     astrodex.ensure_astrodex_directories()
     with open(integration._consumed_file_path(), "w", encoding="utf-8") as handle:
-        json.dump(
-            {"good": time.time() + 300, "unparseable": "xxx", "expired": 1.0}, handle
-        )
+        json.dump({"good": time.time() + 300, "unparseable": "xxx", "expired": 1.0}, handle)
     integration._consumed.clear()
     integration._load_consumed_from_disk()
     assert list(integration._consumed) == ["good"]

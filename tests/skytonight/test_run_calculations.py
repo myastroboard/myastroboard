@@ -14,6 +14,7 @@ run_calculations = calc.run_calculations
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _fake_night():
     """Return a (start, end) pair one hour long, anchored in the past."""
     start = datetime(2026, 5, 28, 21, 0, 0, tzinfo=timezone.utc)
@@ -36,6 +37,7 @@ _MINIMAL_CONFIG = {
 # ---------------------------------------------------------------------------
 # run_calculations - no night window
 # ---------------------------------------------------------------------------
+
 
 def test_run_calculations_no_night_returns_night_found_false(monkeypatch, tmp_path):
     monkeypatch.setattr(calc, 'ensure_skytonight_directories', lambda: None)
@@ -102,8 +104,12 @@ def test_run_calculations_with_explicit_location_skips_install_default_lookup(mo
     monkeypatch.setattr(calc, 'save_json_file', lambda *a, **kw: None)
 
     explicit_location = {
-        'id': 'explicit-loc', 'name': 'Explicit', 'latitude': 10.0, 'longitude': 20.0,
-        'elevation': 0.0, 'timezone': 'UTC',
+        'id': 'explicit-loc',
+        'name': 'Explicit',
+        'latitude': 10.0,
+        'longitude': 20.0,
+        'elevation': 0.0,
+        'timezone': 'UTC',
     }
 
     result = run_calculations(_MINIMAL_CONFIG, location=explicit_location)
@@ -115,6 +121,7 @@ def test_run_calculations_with_explicit_location_skips_install_default_lookup(mo
 # run_calculations - empty dataset with night window
 # ---------------------------------------------------------------------------
 
+
 class _FakeMoon:
     phase = 0.3
     ra_deg = 150.0
@@ -125,8 +132,10 @@ class _FakeTimes:
     """Minimal stand-in for an Astropy Time array used only for indexing."""
 
     def __init__(self):
-        self._data = [datetime(2026, 5, 28, 21, 0, tzinfo=timezone.utc),
-                      datetime(2026, 5, 28, 22, 0, tzinfo=timezone.utc)]
+        self._data = [
+            datetime(2026, 5, 28, 21, 0, tzinfo=timezone.utc),
+            datetime(2026, 5, 28, 22, 0, tzinfo=timezone.utc),
+        ]
 
     def __len__(self):
         return len(self._data)
@@ -136,6 +145,7 @@ class _FakeTimes:
 
     def sidereal_time(self, *a, **kw):
         import types
+
         obj = types.SimpleNamespace()
         obj.hour = [0.0, 1.0]
         return obj
@@ -218,6 +228,7 @@ def test_run_calculations_comet_without_coordinates_is_skipped(monkeypatch):
 # load_calculation_results
 # ---------------------------------------------------------------------------
 
+
 def test_load_calculation_results_merges_split_files(monkeypatch):
     fake_meta = {'calculated_at': '2026-05-28T21:00:00+00:00', 'in_progress': False}
 
@@ -274,6 +285,7 @@ def test_load_calculation_results_falls_back_to_data_file_metadata(monkeypatch):
 # ---------------------------------------------------------------------------
 # Merged from former test_coverage_edge_cases.py
 # ---------------------------------------------------------------------------
+
 
 def test_run_calculations_bortle_to_sqm_and_invalid_bortle(monkeypatch):
     from skytonight import skytonight_calculator as calc
@@ -351,4 +363,3 @@ def test_run_calculations_sqm_parse_success_and_failure(monkeypatch):
     out2 = calc.run_calculations({"locations": [bad], "skytonight": {}})
     assert isinstance(out1, dict)
     assert isinstance(out2, dict)
-

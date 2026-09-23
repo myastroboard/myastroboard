@@ -180,7 +180,9 @@ class TestCacheUpdateFunctionsBasic:
     @patch("cache.cache_updater.cache_store")
     @patch("cache.cache_updater.load_config")
     @patch("cache.cache_updater.MoonService")
-    def test_update_moon_report_with_valid_config(self, mock_moon_service, mock_load_config, mock_cache_store, mock_config):
+    def test_update_moon_report_with_valid_config(
+        self, mock_moon_service, mock_load_config, mock_cache_store, mock_config
+    ):
         """Test moon report cache handles valid config."""
         from cache.cache_updater import update_moon_report_cache
 
@@ -287,9 +289,7 @@ class TestCacheUpdateFunctionsBasic:
         from cache.cache_updater import update_astro_weather_cache
 
         mock_get_analysis.return_value = None
-        mock_cache_store.load_location_cache.return_value = {
-            "data": {"current_conditions": {"observation_score": 5.0}}
-        }
+        mock_cache_store.load_location_cache.return_value = {"data": {"current_conditions": {"observation_score": 5.0}}}
 
         update_astro_weather_cache(config=mock_config)
 
@@ -329,9 +329,7 @@ class TestCacheUpdateFunctionsBasic:
 
     @patch("cache.cache_updater.cache_store")
     @patch("cache.cache_updater.get_astro_weather_analysis")
-    def test_update_astro_weather_cache_swallows_exceptions(
-        self, mock_get_analysis, mock_cache_store, mock_config
-    ):
+    def test_update_astro_weather_cache_swallows_exceptions(self, mock_get_analysis, mock_cache_store, mock_config):
         """An exception during the update is logged, not propagated."""
         from cache.cache_updater import update_astro_weather_cache
 
@@ -445,9 +443,7 @@ class TestAdditionalCachePaths:
             "spaceflight_astronauts": {
                 "data": {"astronauts_in_space": {"results": [{"profile_image": "/api/spaceflight/img/astro.jpg"}]}}
             },
-            "spaceflight_events": {
-                "data": {"results": [{"image_url": "/api/spaceflight/img/event.jpg"}]}
-            },
+            "spaceflight_events": {"data": {"results": [{"image_url": "/api/spaceflight/img/event.jpg"}]}},
         }.get(key)
 
         with patch.dict(sys.modules, {"space.spaceflight_tracker": fake_module}):
@@ -564,8 +560,10 @@ class TestAdditionalCachePaths:
         mock_load_config.return_value = mock_config
         # Provide astronomical_dusk/dawn so _next_astronomical_dusk_utc can run
         report = types.SimpleNamespace(
-            sunrise="06:00", sunset="20:00",
-            astronomical_dusk="Not found", astronomical_dawn="Not found",
+            sunrise="06:00",
+            sunset="20:00",
+            astronomical_dusk="Not found",
+            astronomical_dawn="Not found",
         )
         mock_sun.return_value.get_today_report.return_value = report
         mock_sun.return_value.get_tomorrow_report.return_value = report
@@ -731,9 +729,26 @@ class TestFullInitialization:
     @patch("cache.cache_updater.check_and_handle_config_changes")
     def test_fully_initialize_parallel_failure_and_sequential_moon_report(
         self,
-        _check, _moon_caches, _planner, _sun, _solar, _lunar,
-        _horizon, _aurora, _iss, _css, _planetary, _special, _solsys,
-        _sidereal, _seeing, _best, _weather, mock_load_config, mock_cache_store, mock_config,
+        _check,
+        _moon_caches,
+        _planner,
+        _sun,
+        _solar,
+        _lunar,
+        _horizon,
+        _aurora,
+        _iss,
+        _css,
+        _planetary,
+        _special,
+        _solsys,
+        _sidereal,
+        _seeing,
+        _best,
+        _weather,
+        mock_load_config,
+        mock_cache_store,
+        mock_config,
     ):
         """Parallel job failure is recorded; the run completes."""
         from cache.cache_updater import fully_initialize_caches
@@ -772,9 +787,26 @@ class TestFullInitialization:
     @patch("cache.cache_updater.check_and_handle_config_changes")
     def test_fully_initialize_sequential_non_moon_report_failure(
         self,
-        _check, _moon_caches, _planner, _sun, _solar, _lunar,
-        _horizon, _aurora, _iss, _css, _planetary, _special, _solsys,
-        _sidereal, _seeing, _best, _weather, mock_load_config, mock_cache_store, mock_config,
+        _check,
+        _moon_caches,
+        _planner,
+        _sun,
+        _solar,
+        _lunar,
+        _horizon,
+        _aurora,
+        _iss,
+        _css,
+        _planetary,
+        _special,
+        _solsys,
+        _sidereal,
+        _seeing,
+        _best,
+        _weather,
+        mock_load_config,
+        mock_cache_store,
+        mock_config,
     ):
         """Sequential non-moon_report job failure does not mirror dark_window."""
         from cache.cache_updater import fully_initialize_caches
@@ -796,6 +828,7 @@ class TestFullInitialization:
 # ---------------------------------------------------------------------------
 # Additional tests to increase cache_updater branch/statement coverage
 # ---------------------------------------------------------------------------
+
 
 class TestNextAstronomicalDuskUtc:
     """Tests for _next_astronomical_dusk_utc helper."""
@@ -875,7 +908,9 @@ class TestUpdateMoonCachesAdditional:
     @patch("cache.cache_updater.cache_store")
     @patch("cache.cache_updater.MoonService")
     @patch("cache.cache_updater.load_config")
-    def test_update_moon_caches_with_bytes_value(self, mock_load_config, mock_moon_service, mock_cache_store, mock_config):
+    def test_update_moon_caches_with_bytes_value(
+        self, mock_load_config, mock_moon_service, mock_cache_store, mock_config
+    ):
         """MoonService report values that are bytes are decoded."""
         from cache.cache_updater import update_moon_caches
 
@@ -1267,9 +1302,7 @@ class TestUpdatePlanetaryEventsCache:
         from cache.cache_updater import update_planetary_events_cache
 
         mock_load_config.return_value = mock_config
-        broken_module = types.SimpleNamespace(
-            PlanetaryEventsService=MagicMock(side_effect=RuntimeError("init error"))
-        )
+        broken_module = types.SimpleNamespace(PlanetaryEventsService=MagicMock(side_effect=RuntimeError("init error")))
 
         with patch.dict(sys.modules, {"observation.planetary_events": broken_module}):
             update_planetary_events_cache()  # Should not raise
@@ -1292,9 +1325,7 @@ class TestUpdateSpecialPhenomenaCache:
         from cache.cache_updater import update_special_phenomena_cache
 
         mock_load_config.return_value = mock_config
-        broken_module = types.SimpleNamespace(
-            SpecialPhenomenaService=MagicMock(side_effect=RuntimeError("init error"))
-        )
+        broken_module = types.SimpleNamespace(SpecialPhenomenaService=MagicMock(side_effect=RuntimeError("init error")))
 
         with patch.dict(sys.modules, {"observation.special_phenomena": broken_module}):
             update_special_phenomena_cache()  # Should not raise
@@ -1342,9 +1373,7 @@ class TestUpdateSiderealTimeCache:
         from cache.cache_updater import update_sidereal_time_cache
 
         mock_load_config.return_value = mock_config
-        broken_module = types.SimpleNamespace(
-            SiderealTimeService=MagicMock(side_effect=RuntimeError("init error"))
-        )
+        broken_module = types.SimpleNamespace(SiderealTimeService=MagicMock(side_effect=RuntimeError("init error")))
 
         with patch.dict(sys.modules, {"observation.sidereal_time": broken_module}):
             update_sidereal_time_cache()  # Should not raise
@@ -1542,11 +1571,13 @@ class TestUpdateSpaceflightAstronautsCache:
         mock_cache_store._spaceflight_astronauts_cache = {"data": None, "timestamp": 0}
 
         fake_module = types.SimpleNamespace(
-            get_iss_crew=MagicMock(return_value={
-                "expeditions": [
-                    {"station_name": "ISS", "station_abbrev": "ISS", "crew": [{"name": "Test Astronaut"}]}
-                ],
-            }),
+            get_iss_crew=MagicMock(
+                return_value={
+                    "expeditions": [
+                        {"station_name": "ISS", "station_abbrev": "ISS", "crew": [{"name": "Test Astronaut"}]}
+                    ],
+                }
+            ),
             get_astronauts_in_space=MagicMock(return_value=None),
         )
 
@@ -1565,25 +1596,29 @@ class TestUpdateSpaceflightAstronautsCache:
         mock_cache_store._spaceflight_astronauts_cache = {"data": None, "timestamp": 0}
 
         fake_module = types.SimpleNamespace(
-            get_iss_crew=MagicMock(return_value={
-                "expeditions": [
-                    {
-                        "station_name": "International Space Station",
-                        "station_abbrev": "ISS",
-                        "crew": [
-                            {},  # no "name" key -> skipped
-                            {"name": "Test Astronaut"},
-                        ],
-                    }
-                ],
-            }),
-            get_astronauts_in_space=MagicMock(return_value={
-                "count": 2,
-                "results": [
-                    {"name": "Test Astronaut"},
-                    {"name": "Unmatched Astronaut"},
-                ],
-            }),
+            get_iss_crew=MagicMock(
+                return_value={
+                    "expeditions": [
+                        {
+                            "station_name": "International Space Station",
+                            "station_abbrev": "ISS",
+                            "crew": [
+                                {},  # no "name" key -> skipped
+                                {"name": "Test Astronaut"},
+                            ],
+                        }
+                    ],
+                }
+            ),
+            get_astronauts_in_space=MagicMock(
+                return_value={
+                    "count": 2,
+                    "results": [
+                        {"name": "Test Astronaut"},
+                        {"name": "Unmatched Astronaut"},
+                    ],
+                }
+            ),
         )
 
         with patch.dict(sys.modules, {"space.spaceflight_tracker": fake_module}):
@@ -1801,12 +1836,22 @@ class TestMissingLocationAndExceptionPaths:
         # Patch every other location job so only moon_report actually errors and
         # nothing does real astro work in this control-flow test.
         job_patches = [
-            "update_moon_planner_cache", "update_sun_report_cache", "update_solar_eclipse_cache",
-            "update_lunar_eclipse_cache", "update_horizon_graph_cache", "update_aurora_cache",
-            "update_iss_passes_cache", "update_css_passes_cache", "update_planetary_events_cache",
-            "update_special_phenomena_cache", "update_solar_system_events_cache",
-            "update_sidereal_time_cache", "update_seeing_forecast_cache", "update_best_window_cache",
-            "update_weather_cache", "update_astro_weather_cache",
+            "update_moon_planner_cache",
+            "update_sun_report_cache",
+            "update_solar_eclipse_cache",
+            "update_lunar_eclipse_cache",
+            "update_horizon_graph_cache",
+            "update_aurora_cache",
+            "update_iss_passes_cache",
+            "update_css_passes_cache",
+            "update_planetary_events_cache",
+            "update_special_phenomena_cache",
+            "update_solar_system_events_cache",
+            "update_sidereal_time_cache",
+            "update_seeing_forecast_cache",
+            "update_best_window_cache",
+            "update_weather_cache",
+            "update_astro_weather_cache",
         ]
         from contextlib import ExitStack
 
@@ -1861,9 +1906,7 @@ class TestFullyInitializeCachesAdditional:
         mock_cache_store._spaceflight_launches_cache = launches_cache
         mock_cache_store._spaceflight_astronauts_cache = {"data": None, "timestamp": 0}
 
-        fake_tracker = types.SimpleNamespace(
-            spaceflight_cache_images_intact=MagicMock(return_value=False)
-        )
+        fake_tracker = types.SimpleNamespace(spaceflight_cache_images_intact=MagicMock(return_value=False))
 
         with patch.dict(sys.modules, {"space.spaceflight_tracker": fake_tracker}):
             fully_initialize_caches()
@@ -1874,7 +1917,9 @@ class TestFullyInitializeCachesAdditional:
     @patch("cache.cache_updater.cache_store")
     @patch("cache.cache_updater.load_config")
     @patch("cache.cache_updater.check_and_handle_config_changes")
-    def test_spaceflight_image_integrity_intact_skips_reset(self, _check, mock_load_config, mock_cache_store, mock_config):
+    def test_spaceflight_image_integrity_intact_skips_reset(
+        self, _check, mock_load_config, mock_cache_store, mock_config
+    ):
         """Images are intact so timestamp is NOT reset."""
         from cache.cache_updater import fully_initialize_caches
 
@@ -1903,6 +1948,7 @@ class TestFullyInitializeCachesAdditional:
 # ---------------------------------------------------------------------------
 # Merged from former test_coverage_paths3.py
 # ---------------------------------------------------------------------------
+
 
 class TestCacheUpdaterIersBranches:
     """Cover IERS-related branches in update_iers_cache and fully_initialize_caches."""
@@ -1935,7 +1981,6 @@ class TestCacheUpdaterIersBranches:
     def test_iers_table_mjd_max_without_value_attr(self):
         """mjd_max without .value attribute (plain float)."""
         from cache.cache_updater import fully_initialize_caches
-        import astropy.utils.iers as _iers_mod
 
         class _FakeMJD:
             """Has no .value attribute, so hasattr(mjd_max, 'value') is False."""
@@ -1951,10 +1996,8 @@ class TestCacheUpdaterIersBranches:
 
         with patch("cache.cache_updater.cache_store") as mock_cs:
             with patch("cache.cache_updater.load_config") as mock_cfg:
-                with patch("cache.cache_updater.check_and_handle_config_changes") as mock_chk:
-                    mock_cfg.return_value = {
-                        "location": {"latitude": 48.0, "longitude": 2.0, "timezone": "UTC"}
-                    }
+                with patch("cache.cache_updater.check_and_handle_config_changes"):
+                    mock_cfg.return_value = {"location": {"latitude": 48.0, "longitude": 2.0, "timezone": "UTC"}}
                     mock_cs.is_cache_valid.return_value = True
                     mock_cs.is_cache_valid_for_today.return_value = True
                     mock_cs.sync_cache_from_shared.return_value = None
@@ -1980,9 +2023,7 @@ class TestCacheUpdaterIersBranches:
         with patch("cache.cache_updater.cache_store") as mock_cs:
             with patch("cache.cache_updater.load_config") as mock_cfg:
                 with patch("cache.cache_updater.check_and_handle_config_changes"):
-                    mock_cfg.return_value = {
-                        "location": {"latitude": 48.0, "longitude": 2.0, "timezone": "UTC"}
-                    }
+                    mock_cfg.return_value = {"location": {"latitude": 48.0, "longitude": 2.0, "timezone": "UTC"}}
                     mock_cs.is_cache_valid.return_value = True
                     mock_cs.is_cache_valid_for_today.return_value = True
                     mock_cs.sync_cache_from_shared.return_value = None
@@ -2013,10 +2054,8 @@ class TestCacheUpdaterIersBranches:
         with patch("cache.cache_updater.cache_store") as mock_cs:
             with patch("cache.cache_updater.load_config") as mock_cfg:
                 with patch("cache.cache_updater.check_and_handle_config_changes"):
-                    with patch("cache.cache_updater.update_iers_cache") as mock_iers:
-                        mock_cfg.return_value = {
-                            "location": {"latitude": 48.0, "longitude": 2.0, "timezone": "UTC"}
-                        }
+                    with patch("cache.cache_updater.update_iers_cache"):
+                        mock_cfg.return_value = {"location": {"latitude": 48.0, "longitude": 2.0, "timezone": "UTC"}}
                         mock_cs.is_cache_valid.return_value = True
                         mock_cs.is_cache_valid_for_today.return_value = True
                         mock_cs.sync_cache_from_shared.return_value = None
@@ -2056,6 +2095,7 @@ class TestCacheUpdaterIersBranches:
 # ---------------------------------------------------------------------------
 # Merged from former test_coverage_edge_cases.py
 # ---------------------------------------------------------------------------
+
 
 def test_cache_updater_masked_location_log_safe_coord_exceptions():
     from cache import cache_updater
@@ -2242,7 +2282,9 @@ def test_fully_initialize_caches_preparallel_iers_failure(monkeypatch):
     mock_cs._iers_cache = {"data": None, "timestamp": 0}
 
     monkeypatch.setattr(cache_updater, "check_and_handle_config_changes", lambda: False)
-    monkeypatch.setattr(cache_updater, "load_config", lambda: {"locations": [{"id": "dflt", "is_install_default": True}]})
+    monkeypatch.setattr(
+        cache_updater, "load_config", lambda: {"locations": [{"id": "dflt", "is_install_default": True}]}
+    )
     monkeypatch.setattr(cache_updater, "get_scheduler_locations", lambda cfg: cfg["locations"])
     monkeypatch.setattr(cache_updater, "get_install_default_location", lambda cfg: cfg["locations"][0])
     monkeypatch.setattr(cache_updater, "cache_store", mock_cs)
@@ -2323,7 +2365,6 @@ def test_fully_initialize_caches_iers_absent_but_not_in_parallel(monkeypatch):
         cache_updater.fully_initialize_caches()
 
     assert called == ["dflt"]
-
 
 
 class TestCachedEventHasEnded:

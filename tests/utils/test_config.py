@@ -1,6 +1,7 @@
 """
 Unit tests for configuration management (repo_config.py, config_defaults.py)
 """
+
 import json
 import os
 
@@ -23,6 +24,7 @@ DEFAULT_CONFIG = config_defaults.DEFAULT_CONFIG
 def _set_config_file(monkeypatch, path):
     """Patch CONFIG_FILE in both constants and repo_config modules."""
     from utils import constants
+
     monkeypatch.setattr(constants, "CONFIG_FILE", path)
     monkeypatch.setattr(repo_config, "CONFIG_FILE", path)
 
@@ -96,9 +98,15 @@ class TestDefaultConfig:
     def test_default_config_no_legacy_keys(self):
         """Keys removed in the config refactor must not appear in DEFAULT_CONFIG."""
         legacy = [
-            "selected_catalogues", "use_constraints", "features",
-            "constraints", "bucket_list", "done_list",
-            "custom_targets", "horizon", "output_datestamp",
+            "selected_catalogues",
+            "use_constraints",
+            "features",
+            "constraints",
+            "bucket_list",
+            "done_list",
+            "custom_targets",
+            "horizon",
+            "output_datestamp",
         ]
         for key in legacy:
             assert key not in DEFAULT_CONFIG, f"Legacy key still present: {key}"
@@ -193,13 +201,19 @@ class TestConfigLoading:
         """Partial skytonight blocks are completed with defaults on load."""
         path = os.path.join(temp_dir, "partial.json")
         with open(path, "w", encoding="utf-8") as fp:
-            json.dump({
-                "location": {
-                    "name": "Legacy", "latitude": 40.0, "longitude": -3.0,
-                    "elevation": 100, "timezone": "Europe/Madrid",
+            json.dump(
+                {
+                    "location": {
+                        "name": "Legacy",
+                        "latitude": 40.0,
+                        "longitude": -3.0,
+                        "elevation": 100,
+                        "timezone": "Europe/Madrid",
+                    },
+                    "skytonight": {"constraints": {"altitude_constraint_min": 35}},
                 },
-                "skytonight": {"constraints": {"altitude_constraint_min": 35}},
-            }, fp)
+                fp,
+            )
         _set_config_file(monkeypatch, path)
 
         config = load_config()
@@ -213,7 +227,18 @@ class TestConfigLoading:
     def test_load_config_preserves_custom_location(self, temp_dir, monkeypatch):
         path = os.path.join(temp_dir, "custom_loc.json")
         with open(path, "w", encoding="utf-8") as fp:
-            json.dump({"location": {"name": "Tokyo", "latitude": 35.6, "longitude": 139.7, "elevation": 40, "timezone": "Asia/Tokyo"}}, fp)
+            json.dump(
+                {
+                    "location": {
+                        "name": "Tokyo",
+                        "latitude": 35.6,
+                        "longitude": 139.7,
+                        "elevation": 40,
+                        "timezone": "Asia/Tokyo",
+                    }
+                },
+                fp,
+            )
         _set_config_file(monkeypatch, path)
         config = load_config()
         # v1.2: migrated to a preset, keeping the custom values
@@ -257,7 +282,15 @@ class TestConfigSaving:
         path = os.path.join(temp_dir, "unicode.json")
         _set_config_file(monkeypatch, path)
         # Legacy singular shape on disk: migrated to a preset on load, values kept
-        cfg = {"location": {"name": "Montréal", "latitude": 45.5, "longitude": -73.5, "elevation": 0, "timezone": "America/Montreal"}}
+        cfg = {
+            "location": {
+                "name": "Montréal",
+                "latitude": 45.5,
+                "longitude": -73.5,
+                "elevation": 0,
+                "timezone": "America/Montreal",
+            }
+        }
         assert save_config(cfg) is True
         assert load_config()["locations"][0]["name"] == "Montréal"
 

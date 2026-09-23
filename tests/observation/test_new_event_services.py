@@ -99,7 +99,9 @@ class TestSpecialPhenomenaService:
                 {
                     "event_type": "Milky Way Core Visibility",
                     "title": "Milky Way Core Visible",
-                    "description": "Galactic center visible at 5° altitude. Excellent night for wide-field astrophotography.",
+                    "description": (
+                        "Galactic center visible at 5° altitude. Excellent night for wide-field " "astrophotography."
+                    ),
                     "galactic_center_altitude": 5,
                 }
             ]
@@ -109,7 +111,10 @@ class TestSpecialPhenomenaService:
         translated_event = translated["events"][0]
 
         assert translated_event["title"] == "Voie Lactée visible"
-        assert translated_event["description"] == "Centre galactique visible à 5° d'altitude. Excellente nuit pour l'astrophotographie grand champ."
+        assert (
+            translated_event["description"]
+            == "Centre galactique visible à 5° d'altitude. Excellente nuit pour l'astrophotographie grand champ."
+        )
 
     def test_seasonal_event_translation_uses_requested_language(self):
         phenomena_data = {
@@ -127,7 +132,10 @@ class TestSpecialPhenomenaService:
         translated_event = translated["events"][0]
 
         assert translated_event["title"] == "Solstice d'été"
-        assert translated_event["description"] == "Premier jour de l'été. Jour le plus long de l'année dans l'hémisphère Nord."
+        assert (
+            translated_event["description"]
+            == "Premier jour de l'été. Jour le plus long de l'année dans l'hémisphère Nord."
+        )
 
     def test_zodiacal_light_translation_uses_requested_language(self):
         phenomena_data = {
@@ -135,7 +143,10 @@ class TestSpecialPhenomenaService:
                 {
                     "event_type": "Zodiacal Light Window",
                     "title": "Zodiacal Light Visible (Evening)",
-                    "description": "Faint cone of light from interplanetary dust visible during twilight. Best viewed in dark skies.",
+                    "description": (
+                        "Faint cone of light from interplanetary dust visible during twilight. "
+                        "Best viewed in dark skies."
+                    ),
                     "viewing_type": "Evening",
                     "raw_data": {"event": "zodiacal_light"},
                 }
@@ -146,7 +157,11 @@ class TestSpecialPhenomenaService:
         translated_event = translated["events"][0]
 
         assert translated_event["title"] == "Lumière zodiacale visible (soir)"
-        assert translated_event["description"] == "Faible cône lumineux de poussière interplanétaire visible au crépuscule. Observation optimale sous un ciel sombre."
+        assert (
+            translated_event["description"]
+            == "Faible cône lumineux de poussière interplanétaire visible au crépuscule. "
+            "Observation optimale sous un ciel sombre."
+        )
         assert translated_event["viewing_type"] == "soir"
 
     def test_special_phenomena_api_translates_cached_event_payload(self, authenticated_client, monkeypatch):
@@ -167,7 +182,10 @@ class TestSpecialPhenomenaService:
                 {
                     "event_type": "Zodiacal Light Window",
                     "title": "Zodiacal Light Visible (Evening)",
-                    "description": "Faint cone of light from interplanetary dust visible during twilight. Best viewed in dark skies.",
+                    "description": (
+                        "Faint cone of light from interplanetary dust visible during twilight. "
+                        "Best viewed in dark skies."
+                    ),
                     "viewing_type": "Evening",
                     "raw_data": {"event": "zodiacal_light"},
                 },
@@ -189,9 +207,16 @@ class TestSpecialPhenomenaService:
         assert "events" in payload
         assert len(payload["events"]) == 2
         assert payload["events"][0]["title"] == "Solstice d'été"
-        assert payload["events"][0]["description"] == "Premier jour de l'été. Jour le plus long de l'année dans l'hémisphère Nord."
+        assert (
+            payload["events"][0]["description"]
+            == "Premier jour de l'été. Jour le plus long de l'année dans l'hémisphère Nord."
+        )
         assert payload["events"][1]["title"] == "Lumière zodiacale visible (soir)"
-        assert payload["events"][1]["description"] == "Faible cône lumineux de poussière interplanétaire visible au crépuscule. Observation optimale sous un ciel sombre."
+        assert (
+            payload["events"][1]["description"]
+            == "Faible cône lumineux de poussière interplanétaire visible au crépuscule. "
+            "Observation optimale sous un ciel sombre."
+        )
         assert payload["events"][1]["viewing_type"] == "soir"
 
 

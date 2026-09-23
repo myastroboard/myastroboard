@@ -1,6 +1,7 @@
 ﻿"""Tests for SkyTonight comet ingestion."""
 
 import math
+from datetime import datetime, timezone as _tz
 from unittest.mock import MagicMock, patch
 
 from skytonight import skytonight_comets as _mod
@@ -25,6 +26,7 @@ _fetch_jpl_comet_snapshot = _mod._fetch_jpl_comet_snapshot
 # ---------------------------------------------------------------------------
 # Existing tests
 # ---------------------------------------------------------------------------
+
 
 def test_build_comet_targets_uses_curated_fallback_when_network_unavailable(monkeypatch):
     monkeypatch.setattr('skytonight.skytonight_comets.fetch_mpc_comets', lambda timeout_seconds=12: [])
@@ -64,6 +66,7 @@ def test_enrich_with_jpl_fallback_fills_missing_fields(monkeypatch):
 # _safe_float
 # ---------------------------------------------------------------------------
 
+
 def test_safe_float_returns_none_for_none():
     assert _safe_float(None) is None
 
@@ -82,10 +85,10 @@ def test_safe_float_passes_through_int():
 
 import pytest  # noqa: E402  (placed after fixtures that use it)
 
-
 # ---------------------------------------------------------------------------
 # _target_id_from_name
 # ---------------------------------------------------------------------------
+
 
 def test_target_id_from_name_produces_comet_prefix():
     tid = _target_id_from_name('13P/Olbers')
@@ -101,6 +104,7 @@ def test_target_id_from_name_is_lowercase_normalized():
 # ---------------------------------------------------------------------------
 # _coerce_coordinates
 # ---------------------------------------------------------------------------
+
 
 def test_coerce_coordinates_returns_object_when_both_present():
     coords = _coerce_coordinates({'ra_hours': 5.5, 'dec_degrees': 10.0})
@@ -124,6 +128,7 @@ def test_coerce_coordinates_returns_none_when_both_absent():
 # ---------------------------------------------------------------------------
 # _to_comet_target
 # ---------------------------------------------------------------------------
+
 
 def test_to_comet_target_builds_target_from_complete_row():
     row = {
@@ -167,6 +172,7 @@ def test_to_comet_target_uses_designation_as_name_fallback():
 # _parse_comets_txt_line
 # ---------------------------------------------------------------------------
 
+
 def _make_mpc_line(
     name='13P/Olbers',
     orbit_type='P',
@@ -186,34 +192,34 @@ def _make_mpc_line(
 ):
     """Construct a minimal valid MPC CometEls.txt line."""
     return (
-        '    '                    # [0:4]
-        + orbit_type              # [4]
-        + f'{designation:<7}'     # [5:12]
-        + '  '                    # [12:14]
-        + f'{year:4d}'            # [14:18]
-        + ' '                     # [18]
-        + f'{month:02d}'          # [19:21]
-        + ' '                     # [21]
-        + f'{day:7.4f}'           # [22:29]
-        + ' '                     # [29]
-        + f'{q:9.7f}'             # [30:39]
-        + ' '                     # [39]
-        + f'{e:9.7f}'             # [40:49]
-        + ' '                     # [49]
-        + f'{omega:9.5f}'         # [50:59]
-        + ' '                     # [59]
-        + f'{cap_omega:9.5f}'     # [60:69]
-        + ' '                     # [69]
-        + f'{incl:9.5f}'          # [70:79]
-        + '  '                    # [79:81]
-        + f'{epoch:8s}'           # [81:89]
-        + '  '                    # [89:91]
-        + f'{abs_mag:5.1f}'       # [91:96]
-        + f'{slope:4.1f}'         # [96:100]
-        + '  '                    # [100:102]
-        + f'{name:<56}'           # [102:158] designation/name field
-        + ' '                     # [158] column 159 gap
-        + reference               # [159:] MPC/MPEC publication reference
+        '    '  # [0:4]
+        + orbit_type  # [4]
+        + f'{designation:<7}'  # [5:12]
+        + '  '  # [12:14]
+        + f'{year:4d}'  # [14:18]
+        + ' '  # [18]
+        + f'{month:02d}'  # [19:21]
+        + ' '  # [21]
+        + f'{day:7.4f}'  # [22:29]
+        + ' '  # [29]
+        + f'{q:9.7f}'  # [30:39]
+        + ' '  # [39]
+        + f'{e:9.7f}'  # [40:49]
+        + ' '  # [49]
+        + f'{omega:9.5f}'  # [50:59]
+        + ' '  # [59]
+        + f'{cap_omega:9.5f}'  # [60:69]
+        + ' '  # [69]
+        + f'{incl:9.5f}'  # [70:79]
+        + '  '  # [79:81]
+        + f'{epoch:8s}'  # [81:89]
+        + '  '  # [89:91]
+        + f'{abs_mag:5.1f}'  # [91:96]
+        + f'{slope:4.1f}'  # [96:100]
+        + '  '  # [100:102]
+        + f'{name:<56}'  # [102:158] designation/name field
+        + ' '  # [158] column 159 gap
+        + reference  # [159:] MPC/MPEC publication reference
     )
 
 
@@ -271,6 +277,7 @@ def test_parse_comets_txt_line_falls_back_to_designation_when_name_empty():
 # _solve_kepler_elliptic
 # ---------------------------------------------------------------------------
 
+
 def test_solve_kepler_elliptic_circular_orbit_returns_m():
     # For e=0, E = M trivially
     for M in (0.0, 1.0, 2.5):
@@ -294,6 +301,7 @@ def test_solve_kepler_elliptic_zero_mean_anomaly():
 # _solve_kepler_hyperbolic
 # ---------------------------------------------------------------------------
 
+
 def test_solve_kepler_hyperbolic_zero_returns_zero():
     # For N=0, F=0 is the trivial solution regardless of e
     for e in (1.5, 2.0, 3.0):
@@ -313,6 +321,7 @@ def test_solve_kepler_hyperbolic_satisfies_equation():
 # _curated_fallback_rows
 # ---------------------------------------------------------------------------
 
+
 def test_curated_fallback_rows_returns_known_comets():
     rows = _curated_fallback_rows()
     assert rows
@@ -330,6 +339,7 @@ def test_curated_fallback_rows_include_perihelion_date():
 # ---------------------------------------------------------------------------
 # enrich_with_jpl_fallback - additional edge cases
 # ---------------------------------------------------------------------------
+
 
 def test_enrich_with_jpl_fallback_skips_when_all_fields_present(monkeypatch):
     calls = []
@@ -353,10 +363,7 @@ def test_enrich_with_jpl_fallback_caps_at_50_requests(monkeypatch):
         return {}
 
     monkeypatch.setattr('skytonight.skytonight_comets._fetch_jpl_comet_snapshot', _fake_jpl)
-    rows = [
-        {'name': f'Comet{i}', 'absolute_magnitude': None, 'orbit_class': None}
-        for i in range(60)
-    ]
+    rows = [{'name': f'Comet{i}', 'absolute_magnitude': None, 'orbit_class': None} for i in range(60)]
     enrich_with_jpl_fallback(rows)
     assert len(calls) == 50
 
@@ -371,12 +378,16 @@ def test_enrich_with_jpl_fallback_skips_non_dict_rows(monkeypatch):
 # build_comet_targets - deduplication and source modes
 # ---------------------------------------------------------------------------
 
+
 def test_build_comet_targets_deduplicates_by_target_id(monkeypatch):
     monkeypatch.setattr('skytonight.skytonight_comets.fetch_mpc_comets', lambda **kw: [])
-    monkeypatch.setattr('skytonight.skytonight_comets._curated_fallback_rows', lambda: [
-        {'name': '13P/Olbers', 'magnitude': 7.0},
-        {'name': '13P/Olbers', 'magnitude': 8.0},
-    ])
+    monkeypatch.setattr(
+        'skytonight.skytonight_comets._curated_fallback_rows',
+        lambda: [
+            {'name': '13P/Olbers', 'magnitude': 7.0},
+            {'name': '13P/Olbers', 'magnitude': 8.0},
+        ],
+    )
     targets = build_comet_targets('mpc+jpl')
     olbers = [t for t in targets if '13P' in t.preferred_name]
     assert len(olbers) == 1
@@ -406,6 +417,7 @@ def test_build_comet_targets_all_are_comets(monkeypatch):
 # ---------------------------------------------------------------------------
 # fetch_mpc_comets - network layer
 # ---------------------------------------------------------------------------
+
 
 def test_fetch_mpc_comets_returns_empty_on_network_error(monkeypatch):
     import requests as _requests
@@ -449,6 +461,7 @@ def test_fetch_mpc_comets_parses_valid_response(monkeypatch):
 # _response_preview
 # ---------------------------------------------------------------------------
 
+
 def test_response_preview_short_text_returned_as_is():
     assert _response_preview('hello world') == 'hello world'
 
@@ -470,6 +483,7 @@ def test_response_preview_none_input():
 # _solve_kepler_hyperbolic - near-zero denominator branch
 # ---------------------------------------------------------------------------
 
+
 def test_solve_kepler_hyperbolic_near_zero_denom():
     # For very small N with large e, the denominator can approach 0 near F=0.
     # The function should still return without crashing.
@@ -481,9 +495,11 @@ def test_solve_kepler_hyperbolic_near_zero_denom():
 # _get_earth_heliocentric - astropy path and fallback
 # ---------------------------------------------------------------------------
 
+
 def test_get_earth_heliocentric_fallback_when_astropy_unavailable(monkeypatch):
     """When astropy import fails, the circular approximation is returned."""
     import builtins
+
     real_import = builtins.__import__
 
     def _block_astropy(name, *args, **kwargs):
@@ -492,8 +508,7 @@ def test_get_earth_heliocentric_fallback_when_astropy_unavailable(monkeypatch):
         return real_import(name, *args, **kwargs)
 
     monkeypatch.setattr(builtins, '__import__', _block_astropy)
-    obs = __import__('datetime').datetime(2025, 6, 21, 12, 0, 0,
-                                          tzinfo=__import__('datetime').timezone.utc)
+    obs = __import__('datetime').datetime(2025, 6, 21, 12, 0, 0, tzinfo=__import__('datetime').timezone.utc)
     x, y, z = _get_earth_heliocentric(obs)
     # Fallback returns a unit-circle position in the ecliptic plane
     dist = (x**2 + y**2 + z**2) ** 0.5
@@ -505,9 +520,6 @@ def test_get_earth_heliocentric_fallback_when_astropy_unavailable(monkeypatch):
 # _comet_ra_dec - all three orbit types and error paths
 # ---------------------------------------------------------------------------
 
-from datetime import datetime, timezone as _tz
-
-
 _OBS = datetime(2025, 6, 21, 12, 0, 0, tzinfo=_tz.utc)
 _EARTH = (1.0, 0.0, 0.0)
 
@@ -515,9 +527,16 @@ _EARTH = (1.0, 0.0, 0.0)
 def test_comet_ra_dec_elliptic_orbit():
     """Elliptic orbit (e < 1.0) returns valid RA/Dec."""
     ra, dec, r, g = _comet_ra_dec(
-        q=1.5, e=0.5, omega_deg=45.0, Omega_deg=120.0, i_deg=30.0,
-        peri_year=2024, peri_month=1, peri_day=1.0,
-        obs_time=_OBS, earth_helio=_EARTH,
+        q=1.5,
+        e=0.5,
+        omega_deg=45.0,
+        Omega_deg=120.0,
+        i_deg=30.0,
+        peri_year=2024,
+        peri_month=1,
+        peri_day=1.0,
+        obs_time=_OBS,
+        earth_helio=_EARTH,
     )
     assert ra is not None
     assert dec is not None
@@ -528,9 +547,16 @@ def test_comet_ra_dec_elliptic_orbit():
 def test_comet_ra_dec_parabolic_orbit():
     """Parabolic orbit (|e - 1.0| < 0.005) returns valid RA/Dec."""
     ra, dec, r, g = _comet_ra_dec(
-        q=1.0, e=1.0, omega_deg=30.0, Omega_deg=60.0, i_deg=15.0,
-        peri_year=2024, peri_month=6, peri_day=1.0,
-        obs_time=_OBS, earth_helio=_EARTH,
+        q=1.0,
+        e=1.0,
+        omega_deg=30.0,
+        Omega_deg=60.0,
+        i_deg=15.0,
+        peri_year=2024,
+        peri_month=6,
+        peri_day=1.0,
+        obs_time=_OBS,
+        earth_helio=_EARTH,
     )
     assert ra is not None
     assert dec is not None
@@ -539,9 +565,16 @@ def test_comet_ra_dec_parabolic_orbit():
 def test_comet_ra_dec_hyperbolic_orbit():
     """Hyperbolic orbit (e > 1.0) returns valid RA/Dec."""
     ra, dec, r, g = _comet_ra_dec(
-        q=2.0, e=1.5, omega_deg=100.0, Omega_deg=200.0, i_deg=45.0,
-        peri_year=2024, peri_month=3, peri_day=15.0,
-        obs_time=_OBS, earth_helio=_EARTH,
+        q=2.0,
+        e=1.5,
+        omega_deg=100.0,
+        Omega_deg=200.0,
+        i_deg=45.0,
+        peri_year=2024,
+        peri_month=3,
+        peri_day=15.0,
+        obs_time=_OBS,
+        earth_helio=_EARTH,
     )
     # Result may be None if computation fails (negative r), which is acceptable
     assert ra is None or (0.0 <= ra <= 24.0)
@@ -563,9 +596,16 @@ def test_comet_ra_dec_negative_r_returns_none():
         with patch.object(_mod, '_get_earth_heliocentric', return_value=(0.0, 0.0, 0.0)):
             # Earth at origin â†’ geocentric distance can be very small for near-origin comets
             ra, dec, r, g = _comet_ra_dec(
-                q=1e-20, e=0.5, omega_deg=0.0, Omega_deg=0.0, i_deg=0.0,
-                peri_year=2025, peri_month=6, peri_day=21.0,
-                obs_time=_OBS, earth_helio=(0.0, 0.0, 0.0),
+                q=1e-20,
+                e=0.5,
+                omega_deg=0.0,
+                Omega_deg=0.0,
+                i_deg=0.0,
+                peri_year=2025,
+                peri_month=6,
+                peri_day=21.0,
+                obs_time=_OBS,
+                earth_helio=(0.0, 0.0, 0.0),
             )
             # Either returns None (g_dist < 1e-12) or a valid position
             assert ra is None or isinstance(ra, float)
@@ -577,9 +617,16 @@ def test_comet_ra_dec_returns_none_on_exception():
 
     with patch.object(_mod, '_solve_kepler_elliptic', side_effect=ZeroDivisionError('test')):
         ra, dec, r, g = _comet_ra_dec(
-            q=1.0, e=0.5, omega_deg=0.0, Omega_deg=0.0, i_deg=0.0,
-            peri_year=2025, peri_month=6, peri_day=21.0,
-            obs_time=_OBS, earth_helio=_EARTH,
+            q=1.0,
+            e=0.5,
+            omega_deg=0.0,
+            Omega_deg=0.0,
+            i_deg=0.0,
+            peri_year=2025,
+            peri_month=6,
+            peri_day=21.0,
+            obs_time=_OBS,
+            earth_helio=_EARTH,
         )
     assert ra is None
     assert dec is None
@@ -591,9 +638,16 @@ def test_comet_ra_dec_negative_ra_rad_wrapped():
     # We achieve this by placing comet in the third quadrant (gy < 0, gx < 0)
     # with earth at origin so geocentric = heliocentric
     ra, dec, r, g = _comet_ra_dec(
-        q=1.0, e=0.5, omega_deg=200.0, Omega_deg=190.0, i_deg=5.0,
-        peri_year=2020, peri_month=1, peri_day=1.0,
-        obs_time=_OBS, earth_helio=(0.0, 0.0, 0.0),
+        q=1.0,
+        e=0.5,
+        omega_deg=200.0,
+        Omega_deg=190.0,
+        i_deg=5.0,
+        peri_year=2020,
+        peri_month=1,
+        peri_day=1.0,
+        obs_time=_OBS,
+        earth_helio=(0.0, 0.0, 0.0),
     )
     if ra is not None:
         assert ra >= 0.0
@@ -603,8 +657,10 @@ def test_comet_ra_dec_negative_ra_rad_wrapped():
 # fetch_mpc_comets - generic exception path and empty-response path
 # ---------------------------------------------------------------------------
 
+
 def test_fetch_mpc_comets_returns_empty_on_generic_exception(monkeypatch):
     """Non-requests exceptions (e.g. RuntimeError) during fetch must return []."""
+
     def _raise(*args, **kwargs):
         raise RuntimeError('unexpected error')
 
@@ -615,6 +671,7 @@ def test_fetch_mpc_comets_returns_empty_on_generic_exception(monkeypatch):
 
 def test_fetch_mpc_comets_returns_empty_when_no_parseable_lines(monkeypatch):
     """A response with no valid MPC lines must log a warning and return []."""
+
     class _EmptyResponse:
         status_code = 200
         text = 'this line is too short\n'
@@ -652,6 +709,7 @@ def test_fetch_mpc_comets_position_computed_none_still_appended(monkeypatch):
 # _fetch_jpl_comet_snapshot
 # ---------------------------------------------------------------------------
 
+
 def test_fetch_jpl_comet_snapshot_empty_name_returns_empty():
     assert _fetch_jpl_comet_snapshot('') == {}
 
@@ -659,7 +717,9 @@ def test_fetch_jpl_comet_snapshot_empty_name_returns_empty():
 def test_fetch_jpl_comet_snapshot_returns_empty_on_request_error(monkeypatch):
     import requests as _req
 
-    monkeypatch.setattr('skytonight.skytonight_comets.requests.get', lambda *a, **kw: (_ for _ in ()).throw(_req.RequestException()))
+    monkeypatch.setattr(
+        'skytonight.skytonight_comets.requests.get', lambda *a, **kw: (_ for _ in ()).throw(_req.RequestException())
+    )
     result = _fetch_jpl_comet_snapshot('13P/Olbers')
     assert result == {}
 
@@ -699,6 +759,7 @@ def test_fetch_jpl_comet_snapshot_returns_data_from_full_payload(monkeypatch):
 
 def test_fetch_jpl_comet_snapshot_handles_non_dict_orbit_and_phys(monkeypatch):
     """orbit/phys_par that are not dicts must be coerced to empty dicts."""
+
     class _FakeResp:
         def raise_for_status(self):
             pass
@@ -720,6 +781,7 @@ def test_fetch_jpl_comet_snapshot_handles_non_dict_orbit_and_phys(monkeypatch):
 # ---------------------------------------------------------------------------
 # build_comet_targets - additional modes
 # ---------------------------------------------------------------------------
+
 
 def test_build_comet_targets_jpl_only_mode_uses_fallback(monkeypatch):
     """Mode 'jpl' alone (no 'mpc') must skip fetch_mpc_comets and use fallback."""
@@ -757,7 +819,7 @@ def test_build_comet_targets_row_source_mpc_only(monkeypatch):
 def test_build_comet_targets_skips_none_targets(monkeypatch):
     """Rows with no name or designation result in None from _to_comet_target and must be skipped."""
     fake_rows = [
-        {'name': '', 'designation': ''},   # â†’ _to_comet_target returns None
+        {'name': '', 'designation': ''},  # â†’ _to_comet_target returns None
         {'name': '1P/Halley', 'absolute_magnitude': 5.0, 'orbit_class': 'HTC'},
     ]
     monkeypatch.setattr('skytonight.skytonight_comets.fetch_mpc_comets', lambda **kw: fake_rows)
@@ -771,15 +833,16 @@ def test_build_comet_targets_skips_none_targets(monkeypatch):
 # _parse_comets_txt_line - ValueError/IndexError path
 # ---------------------------------------------------------------------------
 
+
 def test_parse_comets_txt_line_returns_none_on_value_error():
     """A line with 103+ characters but garbled numeric fields must return None."""
     # Build a line long enough but with non-numeric orbit year field
     bad_line = (
-        '    '         # [0:4]
-        'P'            # [4]
-        '0013P  '      # [5:12]
-        '  '           # [12:14]
-        'BAAD'         # [14:18] - not a valid year integer â†’ ValueError
+        '    '  # [0:4]
+        'P'  # [4]
+        '0013P  '  # [5:12]
+        '  '  # [12:14]
+        'BAAD'  # [14:18] - not a valid year integer â†’ ValueError
         ' '
         '10'
         ' '
@@ -809,6 +872,7 @@ def test_parse_comets_txt_line_returns_none_on_value_error():
 # _solve_kepler_hyperbolic - near-zero denominator
 # ---------------------------------------------------------------------------
 
+
 def test_solve_kepler_hyperbolic_denom_near_zero():
     """Near-zero denominator (|e*cosh(F) - 1| < 1e-15) should break early."""
     # e = 1.0 â†’ denom = 1.0*cosh(0) - 1.0 = 0 at F=0, which triggers the break.
@@ -820,6 +884,7 @@ def test_solve_kepler_hyperbolic_denom_near_zero():
 # ---------------------------------------------------------------------------
 # _comet_ra_dec - hyperbolic r <= 0 path
 # ---------------------------------------------------------------------------
+
 
 def test_comet_ra_dec_hyperbolic_r_nonpositive_returns_none(monkeypatch):
     """When r = a*(e*cosh(F) - 1) <= 0, must return (None, None, None, None).
@@ -833,9 +898,16 @@ def test_comet_ra_dec_hyperbolic_r_nonpositive_returns_none(monkeypatch):
     # except (ValueError, ZeroDivisionError, OverflowError) handler â†’ None tuple.
     with patch.object(_mod, '_solve_kepler_hyperbolic', side_effect=OverflowError('test')):
         ra, dec, r, g = _comet_ra_dec(
-            q=1.0, e=1.5, omega_deg=0.0, Omega_deg=0.0, i_deg=0.0,
-            peri_year=2025, peri_month=1, peri_day=1.0,
-            obs_time=_OBS, earth_helio=_EARTH,
+            q=1.0,
+            e=1.5,
+            omega_deg=0.0,
+            Omega_deg=0.0,
+            i_deg=0.0,
+            peri_year=2025,
+            peri_month=1,
+            peri_day=1.0,
+            obs_time=_OBS,
+            earth_helio=_EARTH,
         )
     assert ra is None
     assert dec is None
@@ -844,6 +916,7 @@ def test_comet_ra_dec_hyperbolic_r_nonpositive_returns_none(monkeypatch):
 # ---------------------------------------------------------------------------
 # _get_earth_heliocentric - astropy available path
 # ---------------------------------------------------------------------------
+
 
 def test_get_earth_heliocentric_with_mocked_astropy(monkeypatch):
     """When astropy is available and returns valid data, it is used."""

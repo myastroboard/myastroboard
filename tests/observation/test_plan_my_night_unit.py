@@ -13,6 +13,7 @@ from unittest.mock import patch
 import pytest
 
 from observation import plan_my_night
+
 _parse_datetime = plan_my_night._parse_datetime
 validate_plan_json = plan_my_night.validate_plan_json
 _normalize_name = plan_my_night._normalize_name
@@ -122,7 +123,7 @@ class TestValidatePlanJson:
         payload = {"user_id": "user123"}
         with open(file_path, "w") as f:
             json.dump(payload, f)
-        
+
         is_valid, error = validate_plan_json(file_path)
         assert is_valid is True
         assert error == ""
@@ -135,13 +136,13 @@ class TestValidatePlanJson:
             "plan": {
                 "entries": [
                     {"id": "1", "name": "M31", "catalogue": "Messier"},
-                    {"id": "2", "name": "M42", "catalogue": "Messier"}
+                    {"id": "2", "name": "M42", "catalogue": "Messier"},
                 ]
-            }
+            },
         }
         with open(file_path, "w") as f:
             json.dump(payload, f)
-        
+
         is_valid, error = validate_plan_json(file_path)
         assert is_valid is True
 
@@ -151,7 +152,7 @@ class TestValidatePlanJson:
         payload = {"plan": {}}
         with open(file_path, "w") as f:
             json.dump(payload, f)
-        
+
         is_valid, error = validate_plan_json(file_path)
         assert is_valid is False
         assert "user_id" in error
@@ -161,7 +162,7 @@ class TestValidatePlanJson:
         file_path = os.path.join(temp_plan_dir, "non_dict_root.json")
         with open(file_path, "w") as f:
             json.dump(["not", "a", "dict"], f)
-        
+
         is_valid, error = validate_plan_json(file_path)
         assert is_valid is False
         assert "object" in error.lower()
@@ -172,37 +173,27 @@ class TestValidatePlanJson:
         payload = {"user_id": "user123", "plan": "not a dict"}
         with open(file_path, "w") as f:
             json.dump(payload, f)
-        
+
         is_valid, error = validate_plan_json(file_path)
         assert is_valid is False
 
     def test_entries_not_list(self, temp_plan_dir):
         """Test validation fails when entries is not a list."""
         file_path = os.path.join(temp_plan_dir, "entries_not_list.json")
-        payload = {
-            "user_id": "user123",
-            "plan": {"entries": "not a list"}
-        }
+        payload = {"user_id": "user123", "plan": {"entries": "not a list"}}
         with open(file_path, "w") as f:
             json.dump(payload, f)
-        
+
         is_valid, error = validate_plan_json(file_path)
         assert is_valid is False
 
     def test_entry_missing_id(self, temp_plan_dir):
         """Test validation fails when entry is missing id."""
         file_path = os.path.join(temp_plan_dir, "entry_missing_id.json")
-        payload = {
-            "user_id": "user123",
-            "plan": {
-                "entries": [
-                    {"name": "M31", "catalogue": "Messier"}
-                ]
-            }
-        }
+        payload = {"user_id": "user123", "plan": {"entries": [{"name": "M31", "catalogue": "Messier"}]}}
         with open(file_path, "w") as f:
             json.dump(payload, f)
-        
+
         is_valid, error = validate_plan_json(file_path)
         assert is_valid is False
         assert "id" in error
@@ -210,17 +201,10 @@ class TestValidatePlanJson:
     def test_entry_missing_name(self, temp_plan_dir):
         """Test validation fails when entry is missing name."""
         file_path = os.path.join(temp_plan_dir, "entry_missing_name.json")
-        payload = {
-            "user_id": "user123",
-            "plan": {
-                "entries": [
-                    {"id": "1", "catalogue": "Messier"}
-                ]
-            }
-        }
+        payload = {"user_id": "user123", "plan": {"entries": [{"id": "1", "catalogue": "Messier"}]}}
         with open(file_path, "w") as f:
             json.dump(payload, f)
-        
+
         is_valid, error = validate_plan_json(file_path)
         assert is_valid is False
         assert "name" in error
@@ -230,7 +214,7 @@ class TestValidatePlanJson:
         file_path = os.path.join(temp_plan_dir, "invalid.json")
         with open(file_path, "w") as f:
             f.write("{ invalid json")
-        
+
         is_valid, error = validate_plan_json(file_path)
         assert is_valid is False
         assert "Invalid JSON" in error
@@ -263,11 +247,7 @@ class TestEntryMatches:
 
     def test_entry_matches_by_group_id(self):
         """Test matching by catalogue group ID."""
-        entry = {
-            "name": "M31",
-            "catalogue_group_id": "group123",
-            "catalogue_aliases": {}
-        }
+        entry = {"name": "M31", "catalogue_group_id": "group123", "catalogue_aliases": {}}
         # Mock the _target_group_id to return matching group
         with patch("observation.plan_my_night._target_group_id", return_value="group123"):
             result = _entry_matches(entry, "Messier", "M31")
@@ -275,11 +255,7 @@ class TestEntryMatches:
 
     def test_entry_matches_by_name(self):
         """Test matching by normalized name."""
-        entry = {
-            "name": "M31",
-            "catalogue_group_id": "different-group",
-            "catalogue_aliases": {}
-        }
+        entry = {"name": "M31", "catalogue_group_id": "different-group", "catalogue_aliases": {}}
         with patch("observation.plan_my_night._target_group_id", return_value=None):
             result = _entry_matches(entry, "Messier", "m 31")
             assert result is True
@@ -375,7 +351,7 @@ class TestGetPlanState:
         now = datetime.now().astimezone()
         future_end = (now + timedelta(hours=2)).isoformat()
         plan = {"night_end": future_end}
-        
+
         state = get_plan_state(plan, now_dt=now)
         assert state == "current"
 
@@ -384,7 +360,7 @@ class TestGetPlanState:
         now = datetime.now().astimezone()
         past_end = (now - timedelta(hours=1)).isoformat()
         plan = {"night_end": past_end}
-        
+
         state = get_plan_state(plan, now_dt=now)
         assert state == "previous"
 
@@ -392,7 +368,7 @@ class TestGetPlanState:
         """Test state determination with custom datetime."""
         custom_now = datetime(2026, 4, 17, 22, 0, 0, tzinfo=timezone.utc)
         plan = {"night_end": "2026-04-18T04:00:00"}
-        
+
         state = get_plan_state(plan, now_dt=custom_now)
         assert state == "current"
 
@@ -402,14 +378,10 @@ class TestBuildTargetPayload:
 
     def test_build_basic_target(self):
         """Test building basic target payload."""
-        item_data = {
-            "name": "M31",
-            "type": "Galaxy",
-            "constellation": "Andromeda"
-        }
-        
+        item_data = {"name": "M31", "type": "Galaxy", "constellation": "Andromeda"}
+
         payload = _build_target_payload(item_data, "Messier")
-        
+
         assert payload["name"] == "M31"
         assert payload["catalogue"] == "Messier"
         assert payload["type"] == "Galaxy"
@@ -417,34 +389,28 @@ class TestBuildTargetPayload:
 
     def test_build_target_with_planned_minutes(self):
         """Test building target with planned observation time."""
-        item_data = {
-            "name": "M42",
-            "planned_minutes": 120
-        }
-        
+        item_data = {"name": "M42", "planned_minutes": 120}
+
         payload = _build_target_payload(item_data, "Messier")
-        
+
         assert payload["name"] == "M42"
         assert payload["planned_minutes"] == 120 or "planned_minutes" not in payload
 
     def test_build_target_default_planned_minutes(self):
         """Test that default planned minutes is 60."""
         item_data = {"name": "M51"}
-        
+
         payload = _build_target_payload(item_data, "Messier")
-        
+
         # Implementation may store this differently
         assert payload["name"] == "M51"
 
     def test_build_target_fallback_name_from_id(self):
         """Test that name falls back to id if not present."""
-        item_data = {
-            "id": "target123",
-            "type": "Unknown"
-        }
-        
+        item_data = {"id": "target123", "type": "Unknown"}
+
         payload = _build_target_payload(item_data, "Custom")
-        
+
         assert payload["name"] == "target123"
 
 
@@ -457,18 +423,13 @@ class TestSaveAndLoadUserPlan:
         payload = {
             "user_id": user_id,
             "username": "testuser",
-            "plan": {
-                "plan_date": "2026-04-17",
-                "entries": [
-                    {"id": "1", "name": "M31", "catalogue": "Messier"}
-                ]
-            }
+            "plan": {"plan_date": "2026-04-17", "entries": [{"id": "1", "name": "M31", "catalogue": "Messier"}]},
         }
-        
+
         # Save
         result = save_user_plan(user_id, payload, username="testuser")
         assert result is True
-        
+
         # Load
         loaded = load_user_plan(user_id, "testuser")
         assert loaded["user_id"] == user_id
@@ -478,9 +439,9 @@ class TestSaveAndLoadUserPlan:
     def test_load_nonexistent_plan(self, temp_plan_dir):
         """Test loading plan that doesn't exist returns default."""
         user_id = "22222222-2222-4222-8222-222222222222"
-        
+
         loaded = load_user_plan(user_id)
-        
+
         assert loaded["user_id"] == user_id
         assert loaded["plan"] is None
 
@@ -489,9 +450,7 @@ class TestSaveAndLoadUserPlan:
         user_id = "11111111-1111-4111-8111-111111111111"
         payload = {
             # Missing user_id - should be invalid
-            "plan": {
-                "entries": []
-            }
+            "plan": {"entries": []}
         }
 
         save_user_plan(user_id, payload, username="testuser")
@@ -520,30 +479,18 @@ class TestIsTargetInEntries:
     def test_target_in_entries(self):
         """Test finding target in entries."""
         entries = [
-            {
-                "id": "1",
-                "name": "M31",
-                "catalogue": "Messier",
-                "catalogue_group_id": "group1",
-                "catalogue_aliases": {}
-            }
+            {"id": "1", "name": "M31", "catalogue": "Messier", "catalogue_group_id": "group1", "catalogue_aliases": {}}
         ]
-        
+
         is_target_in_entries(entries, "Messier", "M31")
         # Result depends on matching implementation
 
     def test_target_not_in_entries(self):
         """Test target not found in entries."""
         entries = [
-            {
-                "id": "1",
-                "name": "M42",
-                "catalogue": "Messier",
-                "catalogue_group_id": "",
-                "catalogue_aliases": {}
-            }
+            {"id": "1", "name": "M42", "catalogue": "Messier", "catalogue_group_id": "", "catalogue_aliases": {}}
         ]
-        
+
         result = is_target_in_entries(entries, "Messier", "M31")
         assert result is False
 
@@ -555,60 +502,52 @@ class TestConcurrency:
         """Test concurrent saves to same user plan."""
         user_id = "33333333-3333-4333-8333-333333333333"
         errors = []
-        
+
         def save_plan(index):
             try:
                 payload = {
                     "user_id": user_id,
                     "username": "testuser",
-                    "plan": {
-                        "entries": [
-                            {"id": str(index), "name": f"M{index}", "catalogue": "Messier"}
-                        ]
-                    }
+                    "plan": {"entries": [{"id": str(index), "name": f"M{index}", "catalogue": "Messier"}]},
                 }
                 result = save_user_plan(user_id, payload, username="testuser")
                 if not result:
                     errors.append(f"Save {index} failed")
             except Exception as e:
                 errors.append(str(e))
-        
+
         threads = [Thread(target=save_plan, args=(i,)) for i in range(5)]
         for t in threads:
             t.start()
         for t in threads:
             t.join()
-        
+
         assert len(errors) == 0, f"Concurrent save errors: {errors}"
 
     def test_concurrent_different_users(self, temp_plan_dir):
         """Test concurrent saves to different user plans."""
         errors = []
-        
+
         def save_plan(user_num):
             try:
                 user_id = f"0000000{user_num}-0000-4000-8000-000000000000"
                 payload = {
                     "user_id": user_id,
                     "username": f"user{user_num}",
-                    "plan": {
-                        "entries": [
-                            {"id": "1", "name": "M31", "catalogue": "Messier"}
-                        ]
-                    }
+                    "plan": {"entries": [{"id": "1", "name": "M31", "catalogue": "Messier"}]},
                 }
                 result = save_user_plan(user_id, payload, username=f"user{user_num}")
                 if not result:
                     errors.append(f"User {user_num} save failed")
             except Exception as e:
                 errors.append(str(e))
-        
+
         threads = [Thread(target=save_plan, args=(i,)) for i in range(10)]
         for t in threads:
             t.start()
         for t in threads:
             t.join()
-        
+
         assert len(errors) == 0, f"Concurrent user save errors: {errors}"
 
 
@@ -687,7 +626,9 @@ class TestPlanMutationsAndTimeline:
             "plan": {
                 "night_start": (datetime.now().astimezone() - timedelta(hours=1)).isoformat(),
                 "night_end": (datetime.now().astimezone() + timedelta(hours=1)).isoformat(),
-                "entries": [{"id": "x", "name": "M13", "planned_minutes": 60, "planned_duration": "01:00", "done": False}],
+                "entries": [
+                    {"id": "x", "name": "M13", "planned_minutes": 60, "planned_duration": "01:00", "done": False}
+                ],
             },
         }
         assert save_user_plan(user_id, payload, username="user") is True
@@ -824,21 +765,42 @@ class TestGeneratePlanPdf:
 
         entries = [
             {
-                "id": "e-early", "name": "Early Flip", "target_name": "Early Flip", "catalogue": "Messier",
-                "type": "Galaxy", "constellation": "Andromeda", "done": False, "planned_duration": "01:00",
-                "timeline_start": "2026-08-12T21:05:00Z", "timeline_end": "2026-08-12T22:05:00Z",
+                "id": "e-early",
+                "name": "Early Flip",
+                "target_name": "Early Flip",
+                "catalogue": "Messier",
+                "type": "Galaxy",
+                "constellation": "Andromeda",
+                "done": False,
+                "planned_duration": "01:00",
+                "timeline_start": "2026-08-12T21:05:00Z",
+                "timeline_end": "2026-08-12T22:05:00Z",
                 "meridian_flip": {"state": "early", "flip_time": "2026-08-12T21:10:00Z"},
             },
             {
-                "id": "e-mid", "name": "Mid Flip", "target_name": "Mid Flip", "catalogue": "Messier",
-                "type": "Nebula", "constellation": "Cygnus", "done": False, "planned_duration": "01:00",
-                "timeline_start": "2026-08-12T22:05:00Z", "timeline_end": "2026-08-12T23:05:00Z",
+                "id": "e-mid",
+                "name": "Mid Flip",
+                "target_name": "Mid Flip",
+                "catalogue": "Messier",
+                "type": "Nebula",
+                "constellation": "Cygnus",
+                "done": False,
+                "planned_duration": "01:00",
+                "timeline_start": "2026-08-12T22:05:00Z",
+                "timeline_end": "2026-08-12T23:05:00Z",
                 "meridian_flip": {"state": "mid", "flip_time": "2026-08-12T22:40:00Z"},
             },
             {
-                "id": "e-after", "name": "After Flip", "target_name": "After Flip", "catalogue": "Messier",
-                "type": "Cluster", "constellation": "Lyra", "done": False, "planned_duration": "00:30",
-                "timeline_start": "2026-08-12T23:05:00Z", "timeline_end": "2026-08-12T23:35:00Z",
+                "id": "e-after",
+                "name": "After Flip",
+                "target_name": "After Flip",
+                "catalogue": "Messier",
+                "type": "Cluster",
+                "constellation": "Lyra",
+                "done": False,
+                "planned_duration": "00:30",
+                "timeline_start": "2026-08-12T23:05:00Z",
+                "timeline_end": "2026-08-12T23:35:00Z",
                 "meridian_flip": {"state": "after", "flip_time": "2026-08-13T00:10:00Z"},
             },
         ]
@@ -945,7 +907,9 @@ class TestSaveUserPlanLockedBranches:
         # by patching _safe_plan_path to always raise ValueError
         with patch.object(plan_my_night, '_safe_plan_path', side_effect=ValueError("path traversal")):
             result = plan_my_night._save_user_plan_locked(
-                uid, payload, "testuser",
+                uid,
+                payload,
+                "testuser",
                 os.path.join(temp_plan_dir, "test.json"),
                 os.path.join(temp_plan_dir, "test.tmp"),
                 os.path.join(temp_plan_dir, "test.bak"),
@@ -1040,7 +1004,8 @@ class TestRemoveTargetEdgeCases:
         uid = "aaaa0001-0000-4000-8000-111111111111"
         now = datetime.now().astimezone()
         payload = {
-            "user_id": uid, "username": "user",
+            "user_id": uid,
+            "username": "user",
             "plan": {
                 "night_start": (now - timedelta(hours=5)).isoformat(),
                 "night_end": (now - timedelta(hours=1)).isoformat(),
@@ -1076,13 +1041,13 @@ class TestUpdateTargetEdgeCases:
     def _make_current_plan(self, uid):
         now = datetime.now().astimezone()
         payload = {
-            "user_id": uid, "username": "user",
+            "user_id": uid,
+            "username": "user",
             "plan": {
                 "night_start": (now - timedelta(hours=1)).isoformat(),
                 "night_end": (now + timedelta(hours=3)).isoformat(),
                 "entries": [
-                    {"id": "e1", "name": "M31", "planned_minutes": 60, "done": False,
-                     "planned_duration": "01:00"},
+                    {"id": "e1", "name": "M31", "planned_minutes": 60, "done": False, "planned_duration": "01:00"},
                 ],
             },
         }
@@ -1099,7 +1064,8 @@ class TestUpdateTargetEdgeCases:
         uid = "bbbb0002-0000-4000-8000-000000000000"
         now = datetime.now().astimezone()
         payload = {
-            "user_id": uid, "username": "user",
+            "user_id": uid,
+            "username": "user",
             "plan": {
                 "night_start": (now - timedelta(hours=5)).isoformat(),
                 "night_end": (now - timedelta(hours=1)).isoformat(),
@@ -1170,7 +1136,8 @@ class TestUpdatePlanMetaEdgeCases:
     def _make_current_plan(self, uid):
         now = datetime.now().astimezone()
         payload = {
-            "user_id": uid, "username": "user",
+            "user_id": uid,
+            "username": "user",
             "plan": {
                 "night_start": (now - timedelta(hours=1)).isoformat(),
                 "night_end": (now + timedelta(hours=3)).isoformat(),
@@ -1188,7 +1155,8 @@ class TestUpdatePlanMetaEdgeCases:
         uid = "cccc0002-0000-4000-8000-000000000000"
         now = datetime.now().astimezone()
         payload = {
-            "user_id": uid, "username": "user",
+            "user_id": uid,
+            "username": "user",
             "plan": {
                 "night_start": (now - timedelta(hours=5)).isoformat(),
                 "night_end": (now - timedelta(hours=1)).isoformat(),
@@ -1245,7 +1213,8 @@ class TestReorderTargetEdgeCases:
     def _make_two_entry_plan(self, uid):
         now = datetime.now().astimezone()
         payload = {
-            "user_id": uid, "username": "user",
+            "user_id": uid,
+            "username": "user",
             "plan": {
                 "night_start": (now - timedelta(hours=1)).isoformat(),
                 "night_end": (now + timedelta(hours=3)).isoformat(),
@@ -1266,7 +1235,8 @@ class TestReorderTargetEdgeCases:
         uid = "dddd0002-0000-4000-8000-000000000000"
         now = datetime.now().astimezone()
         payload = {
-            "user_id": uid, "username": "user",
+            "user_id": uid,
+            "username": "user",
             "plan": {
                 "night_start": (now - timedelta(hours=5)).isoformat(),
                 "night_end": (now - timedelta(hours=1)).isoformat(),
@@ -1313,7 +1283,8 @@ class TestGetPlanWithTimelineBranches:
         uid = "eeee1001-0000-4000-8000-000000000000"
         now = datetime.now().astimezone()
         payload = {
-            "user_id": uid, "username": "user",
+            "user_id": uid,
+            "username": "user",
             "plan": {
                 "night_start": (now - timedelta(hours=1)).isoformat(),
                 "night_end": (now + timedelta(hours=3)).isoformat(),
@@ -1333,7 +1304,8 @@ class TestGetPlanWithTimelineBranches:
         now = datetime.now().astimezone()
         # Create a plan where the single entry is currently active
         payload = {
-            "user_id": uid, "username": "user",
+            "user_id": uid,
+            "username": "user",
             "plan": {
                 "night_start": (now - timedelta(minutes=10)).isoformat(),
                 "night_end": (now + timedelta(hours=3)).isoformat(),
@@ -1352,7 +1324,8 @@ class TestGetPlanWithTimelineBranches:
         uid = "eeee1003-0000-4000-8000-000000000000"
         now = datetime.now().astimezone()
         payload = {
-            "user_id": uid, "username": "user",
+            "user_id": uid,
+            "username": "user",
             "plan": {
                 "night_start": (now - timedelta(minutes=10)).isoformat(),
                 "night_end": (now + timedelta(hours=3)).isoformat(),
@@ -1372,7 +1345,8 @@ class TestGetPlanWithTimelineBranches:
         now = datetime.now().astimezone()
         # night_start == night_end → degenerate case
         payload = {
-            "user_id": uid, "username": "user",
+            "user_id": uid,
+            "username": "user",
             "plan": {
                 "night_start": now.isoformat(),
                 "night_end": now.isoformat(),
@@ -1505,8 +1479,13 @@ class TestEntryMatchesAlias:
                 'night_start': (now - timedelta(hours=1)).isoformat(),
                 'night_end': (now + timedelta(hours=5)).isoformat(),
                 'entries': [
-                    {'id': 'e1', 'name': 'M42', 'catalogue': 'Messier',
-                     'catalogue_group_id': '', 'catalogue_aliases': {}},
+                    {
+                        'id': 'e1',
+                        'name': 'M42',
+                        'catalogue': 'Messier',
+                        'catalogue_group_id': '',
+                        'catalogue_aliases': {},
+                    },
                 ],
             },
         }
@@ -1522,17 +1501,23 @@ class TestEntryMatchesAlias:
         night_end = (now + timedelta(hours=5)).isoformat()
         with patch('observation.plan_my_night._target_group_id', return_value=''):
             ok1, reason1, _, _ = create_or_add_target(
-                user_id=user_id, username='testuser',
-                item_data={'name': 'M42'}, catalogue='Messier',
-                night_start=night_start, night_end=night_end,
+                user_id=user_id,
+                username='testuser',
+                item_data={'name': 'M42'},
+                catalogue='Messier',
+                night_start=night_start,
+                night_end=night_end,
             )
         assert ok1 is True
         assert reason1 == 'added'
         with patch('observation.plan_my_night._target_group_id', return_value=''):
             ok2, reason2, _, entry2 = create_or_add_target(
-                user_id=user_id, username='testuser',
-                item_data={'name': 'M42'}, catalogue='Messier',
-                night_start=night_start, night_end=night_end,
+                user_id=user_id,
+                username='testuser',
+                item_data={'name': 'M42'},
+                catalogue='Messier',
+                night_start=night_start,
+                night_end=night_end,
             )
         assert ok2 is True
         assert reason2 == 'already_in_plan'
@@ -1564,8 +1549,7 @@ class TestGetAllPlanStates:
         combo_id = "combo-001"
         payload = {'user_id': uid, 'plan': None}
         save_user_plan(uid, payload, username="user", combination_id=combo_id)
-        combinations = [{'id': combo_id, 'name': 'Test Combo', 'is_own': True,
-                          'owner_username': 'user'}]
+        combinations = [{'id': combo_id, 'name': 'Test Combo', 'is_own': True, 'owner_username': 'user'}]
         result = plan_my_night.get_all_plan_states(uid, "user", combinations)
         assert any(r['combination_id'] == combo_id for r in result)
 
@@ -1573,8 +1557,16 @@ class TestGetAllPlanStates:
         """is_valid/is_disabled from the input combination dict surface on the result."""
         uid = "ffff1006-0000-4000-8000-000000000000"
         combo_id = "combo-002"
-        combinations = [{'id': combo_id, 'name': 'Disabled Combo', 'is_own': True,
-                          'owner_username': None, 'is_valid': False, 'is_disabled': True}]
+        combinations = [
+            {
+                'id': combo_id,
+                'name': 'Disabled Combo',
+                'is_own': True,
+                'owner_username': None,
+                'is_valid': False,
+                'is_disabled': True,
+            }
+        ]
         result = plan_my_night.get_all_plan_states(uid, "user", combinations)
         entry = next(r for r in result if r['combination_id'] == combo_id)
         assert entry['is_valid'] is False
@@ -1603,7 +1595,7 @@ class TestGetAllPlanStates:
                 'night_end': (now + timedelta(hours=3)).isoformat(),
                 'combination_name': 'Old Combo',
                 'entries': [],
-            }
+            },
         }
         save_user_plan(uid, payload, username="user", combination_id=orphan_id)
         # Call with empty combination list (orphan_id is not known)
@@ -1624,7 +1616,7 @@ class TestGetAllPlanStates:
                     {'id': 'x1', 'name': 'M31'},
                     {'id': 'x2', 'name': 'M42'},
                 ],
-            }
+            },
         }
         save_user_plan(uid, payload, username="user")
         result = plan_my_night.get_all_plan_states(uid, "user", [])
@@ -1645,7 +1637,8 @@ class TestCreateOrAddTargetExtra:
 
         # First add
         ok, reason, payload, target = create_or_add_target(
-            user_id=uid, username="user",
+            user_id=uid,
+            username="user",
             item_data={"name": "M31"},
             catalogue="Messier",
             night_start=(now - timedelta(hours=1)).isoformat(),
@@ -1657,7 +1650,8 @@ class TestCreateOrAddTargetExtra:
         # Add same target again (same name → same normalized name)
         with patch("observation.plan_my_night._entry_matches", return_value=True):
             ok2, reason2, _, matched_entry = create_or_add_target(
-                user_id=uid, username="user",
+                user_id=uid,
+                username="user",
                 item_data={"name": "M31"},
                 catalogue="Messier",
                 night_start=(now - timedelta(hours=1)).isoformat(),
@@ -1672,7 +1666,8 @@ class TestCreateOrAddTargetExtra:
         now = datetime.now().astimezone()
         with patch("observation.plan_my_night.save_user_plan", return_value=False):
             ok, reason, _, _ = create_or_add_target(
-                user_id=uid, username="user",
+                user_id=uid,
+                username="user",
                 item_data={"name": "M45"},
                 catalogue="Messier",
                 night_start=(now - timedelta(hours=1)).isoformat(),
@@ -1686,7 +1681,8 @@ class TestCreateOrAddTargetExtra:
         combo_id = "a1b2c3d4-0004-4000-8000-000000000004"
         now = datetime.now().astimezone()
         ok, reason, _, target = create_or_add_target(
-            user_id=uid, username="user",
+            user_id=uid,
+            username="user",
             item_data={"name": "NGC 224"},
             catalogue="NGC",
             night_start=(now - timedelta(hours=1)).isoformat(),
@@ -1746,7 +1742,8 @@ class TestTimelineBeyondNightEnd:
         uid = "aaaaffff-0003-4000-8000-000000000003"
         now = datetime.now().astimezone()
         payload = {
-            "user_id": uid, "username": "user",
+            "user_id": uid,
+            "username": "user",
             "plan": {
                 "night_start": now.isoformat(),
                 "night_end": (now + timedelta(minutes=30)).isoformat(),
@@ -1776,8 +1773,9 @@ class TestGetAllPlanStatesOrphanFilenameSkip:
             json.dump({'user_id': uid, 'plan': None}, f)
 
         # Patch get_all_plan_files to return the weird file
-        with patch('observation.plan_my_night.get_all_plan_files',
-                   return_value=[os.path.join(temp_plan_dir, weird_name)]):
+        with patch(
+            'observation.plan_my_night.get_all_plan_files', return_value=[os.path.join(temp_plan_dir, weird_name)]
+        ):
             result = plan_my_night.get_all_plan_states(uid, "user", [])
         # It should process without crashing; weird file should be skipped
         assert isinstance(result, list)
@@ -1789,6 +1787,7 @@ class TestGeneratePlanPdfBranchCoverage:
     def test_alttime_file_not_found_returns_none(self, tmp_path, monkeypatch):
         """_load_alttime returns None when file doesn't exist on disk."""
         import matplotlib
+
         matplotlib.use("Agg", force=True)
         monkeypatch.setattr(
             "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True
@@ -1798,12 +1797,16 @@ class TestGeneratePlanPdfBranchCoverage:
             "plan": {
                 "night_start": now.isoformat(),
                 "night_end": (now + timedelta(hours=2)).isoformat(),
-                "entries": [{
-                    "id": "e1", "name": "M31", "done": False,
-                    "alttime_file": "nonexistent_target",  # no file on disk
-                    "timeline_start": now.isoformat(),
-                    "timeline_end": (now + timedelta(minutes=30)).isoformat(),
-                }],
+                "entries": [
+                    {
+                        "id": "e1",
+                        "name": "M31",
+                        "done": False,
+                        "alttime_file": "nonexistent_target",  # no file on disk
+                        "timeline_start": now.isoformat(),
+                        "timeline_end": (now + timedelta(minutes=30)).isoformat(),
+                    }
+                ],
             }
         }
         metrics = {"fill_percent": 50.0, "planned_minutes": 30, "night_minutes": 120, "overflow_minutes": 0}
@@ -1813,6 +1816,7 @@ class TestGeneratePlanPdfBranchCoverage:
     def test_bad_timezone_in_alttime_falls_back_to_utc(self, tmp_path, monkeypatch):
         """alttime with bad timezone name → falls back to UTC."""
         import matplotlib
+
         matplotlib.use("Agg", force=True)
         monkeypatch.setattr(
             "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True
@@ -1821,40 +1825,10 @@ class TestGeneratePlanPdfBranchCoverage:
         # Write an alttime file with a bad timezone
         alttime_data = {
             "timezone": "NOT/A_REAL_TIMEZONE",
-            "times_utc": [now.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                          (now + timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M:%SZ")],
-            "altitudes": [30.0, 40.0],
-        }
-        with open(tmp_path / "m31_alttime.json", "w") as f:
-            json.dump(alttime_data, f)
-        payload = {
-            "plan": {
-                "night_start": now.isoformat(),
-                "night_end": (now + timedelta(hours=2)).isoformat(),
-                "entries": [{
-                    "id": "e1", "name": "M31", "done": False,
-                    "alttime_file": "m31",
-                    "timeline_start": now.isoformat(),
-                    "timeline_end": (now + timedelta(minutes=30)).isoformat(),
-                }],
-            }
-        }
-        metrics = {"fill_percent": 25.0, "planned_minutes": 30, "night_minutes": 120, "overflow_minutes": 0}
-        result = generate_plan_pdf(payload, metrics, _DummyI18n())
-        assert result.getvalue().startswith(b"%PDF")
-
-    def test_naive_timeline_datetimes_are_handled(self, tmp_path, monkeypatch):
-        """: naive and offset timezone datetime strings."""
-        import matplotlib
-        matplotlib.use("Agg", force=True)
-        monkeypatch.setattr(
-            "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True
-        )
-        now = datetime(2026, 8, 12, 21, 0, tzinfo=timezone.utc)
-        alttime_data = {
-            "timezone": "UTC",
-            "times_utc": [now.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                          (now + timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M:%SZ")],
+            "times_utc": [
+                now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                (now + timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            ],
             "altitudes": [30.0, 40.0],
         }
         with open(tmp_path / "m31_alttime.json", "w") as f:
@@ -1864,19 +1838,64 @@ class TestGeneratePlanPdfBranchCoverage:
                 "night_start": now.isoformat(),
                 "night_end": (now + timedelta(hours=2)).isoformat(),
                 "entries": [
-                    {   # naive datetime string (no tz)
-                        "id": "e1", "name": "M31", "done": False,
+                    {
+                        "id": "e1",
+                        "name": "M31",
+                        "done": False,
                         "alttime_file": "m31",
-                        "timeline_start": "2026-08-12T21:00:00",   # naive
-                        "timeline_end": "2026-08-12T21:30:00",     # naive
+                        "timeline_start": now.isoformat(),
+                        "timeline_end": (now + timedelta(minutes=30)).isoformat(),
+                    }
+                ],
+            }
+        }
+        metrics = {"fill_percent": 25.0, "planned_minutes": 30, "night_minutes": 120, "overflow_minutes": 0}
+        result = generate_plan_pdf(payload, metrics, _DummyI18n())
+        assert result.getvalue().startswith(b"%PDF")
+
+    def test_naive_timeline_datetimes_are_handled(self, tmp_path, monkeypatch):
+        """: naive and offset timezone datetime strings."""
+        import matplotlib
+
+        matplotlib.use("Agg", force=True)
+        monkeypatch.setattr(
+            "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True
+        )
+        now = datetime(2026, 8, 12, 21, 0, tzinfo=timezone.utc)
+        alttime_data = {
+            "timezone": "UTC",
+            "times_utc": [
+                now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                (now + timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            ],
+            "altitudes": [30.0, 40.0],
+        }
+        with open(tmp_path / "m31_alttime.json", "w") as f:
+            json.dump(alttime_data, f)
+        payload = {
+            "plan": {
+                "night_start": now.isoformat(),
+                "night_end": (now + timedelta(hours=2)).isoformat(),
+                "entries": [
+                    {  # naive datetime string (no tz)
+                        "id": "e1",
+                        "name": "M31",
+                        "done": False,
+                        "alttime_file": "m31",
+                        "timeline_start": "2026-08-12T21:00:00",  # naive
+                        "timeline_end": "2026-08-12T21:30:00",  # naive
                     },
-                    {   # with offset
-                        "id": "e2", "name": "M42", "done": False,
+                    {  # with offset
+                        "id": "e2",
+                        "name": "M42",
+                        "done": False,
                         "timeline_start": "2026-08-12T21:30:00+02:00",
                         "timeline_end": "2026-08-12T22:00:00+02:00",
                     },
-                    {   # malformed
-                        "id": "e3", "name": "M45", "done": False,
+                    {  # malformed
+                        "id": "e3",
+                        "name": "M45",
+                        "done": False,
                         "timeline_start": "not-a-date",
                         "timeline_end": "also-bad",
                     },
@@ -1891,6 +1910,7 @@ class TestGeneratePlanPdfBranchCoverage:
 # ---------------------------------------------------------------------------
 # Additional plan_my_night coverage — non-PDF functions
 # ---------------------------------------------------------------------------
+
 
 class TestPlanMyNightMiscBranches:
     """Cover missing branches in plan_my_night functions."""
@@ -1935,7 +1955,8 @@ class TestPlanMyNightMiscBranches:
         plan_my_night.save_user_plan(user_id, {'plan': plan}, username='user')
         # Add M42 → loop iterates past M31 (→514) → M42 is new, gets added
         ok, reason, _, _ = plan_my_night.create_or_add_target(
-            user_id=user_id, username='user',
+            user_id=user_id,
+            username='user',
             item_data={'name': 'M42'},
             catalogue='Messier',
             night_start=plan['night_start'],
@@ -1977,11 +1998,8 @@ class TestPlanMyNightMiscBranches:
             if call_count[0] >= 2:
                 raise OSError("mkdir failed on second call")
 
-        with patch.object(plan_my_night, 'ensure_plan_directory',
-                          side_effect=_ensure_dir_fail_on_second_call):
-            result = plan_my_night.save_user_plan(
-                user_id, {'plan': {'entries': []}}, username='user'
-            )
+        with patch.object(plan_my_night, 'ensure_plan_directory', side_effect=_ensure_dir_fail_on_second_call):
+            result = plan_my_night.save_user_plan(user_id, {'plan': {'entries': []}}, username='user')
         assert result is False
 
 
@@ -1989,12 +2007,14 @@ class TestPlanMyNightMiscBranches:
 # Additional generate_plan_pdf branch coverage
 # ---------------------------------------------------------------------------
 
+
 class TestGeneratePlanPdfAdditionalBranches:
     """Cover remaining missing branches in generate_plan_pdf."""
 
     def test_json_parse_error_in_load_alttime(self, tmp_path, monkeypatch):
         """invalid JSON in alttime file → exception caught, return None."""
         import matplotlib
+
         matplotlib.use("Agg", force=True)
         monkeypatch.setattr(
             "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True
@@ -2006,12 +2026,16 @@ class TestGeneratePlanPdfAdditionalBranches:
             "plan": {
                 "night_start": now.isoformat(),
                 "night_end": (now + timedelta(hours=2)).isoformat(),
-                "entries": [{
-                    "id": "e1", "name": "M31", "done": False,
-                    "alttime_file": "m31",
-                    "timeline_start": now.isoformat(),
-                    "timeline_end": (now + timedelta(minutes=30)).isoformat(),
-                }],
+                "entries": [
+                    {
+                        "id": "e1",
+                        "name": "M31",
+                        "done": False,
+                        "alttime_file": "m31",
+                        "timeline_start": now.isoformat(),
+                        "timeline_end": (now + timedelta(minutes=30)).isoformat(),
+                    }
+                ],
             }
         }
         metrics = {"fill_percent": 50.0, "planned_minutes": 30, "night_minutes": 120, "overflow_minutes": 0}
@@ -2021,6 +2045,7 @@ class TestGeneratePlanPdfAdditionalBranches:
     def test_combination_name_and_fill_zero_and_overflow(self, tmp_path, monkeypatch):
         """Renders the combination name, and exercises the fill_w<=0.01 and overflow>0 branches."""
         import matplotlib
+
         matplotlib.use("Agg", force=True)
         monkeypatch.setattr(
             "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True
@@ -2042,8 +2067,9 @@ class TestGeneratePlanPdfAdditionalBranches:
 
     def test_chart_skipped_when_no_night_times_in_plan(self, tmp_path, monkeypatch):
         """alttime_map exists but plan has no night_start/end → skip chart.
-           Also covers  via _fmt_hm/_fmt_date called with None."""
+        Also covers  via _fmt_hm/_fmt_date called with None."""
         import matplotlib
+
         matplotlib.use("Agg", force=True)
         monkeypatch.setattr(
             "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True
@@ -2051,8 +2077,10 @@ class TestGeneratePlanPdfAdditionalBranches:
         now = datetime.now(timezone.utc).replace(microsecond=0)
         alttime_data = {
             "timezone": "UTC",
-            "times_utc": [now.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                          (now + timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M:%SZ")],
+            "times_utc": [
+                now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                (now + timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            ],
             "altitudes": [30.0, 40.0],
             "altitude_constraint_min": 30,
             "altitude_constraint_max": 80,
@@ -2061,12 +2089,16 @@ class TestGeneratePlanPdfAdditionalBranches:
         payload = {
             "plan": {
                 # NO night_start / night_end → ns_dt = None
-                "entries": [{
-                    "id": "e1", "name": "M31", "done": False,
-                    "alttime_file": "m31",
-                    "timeline_start": now.isoformat(),
-                    "timeline_end": (now + timedelta(minutes=30)).isoformat(),
-                }],
+                "entries": [
+                    {
+                        "id": "e1",
+                        "name": "M31",
+                        "done": False,
+                        "alttime_file": "m31",
+                        "timeline_start": now.isoformat(),
+                        "timeline_end": (now + timedelta(minutes=30)).isoformat(),
+                    }
+                ],
             }
         }
         metrics = {"fill_percent": 50.0, "planned_minutes": 30, "night_minutes": 120, "overflow_minutes": 0}
@@ -2076,6 +2108,7 @@ class TestGeneratePlanPdfAdditionalBranches:
     def test_chart_entry_skips_with_invalid_and_zero_range_times(self, tmp_path, monkeypatch):
         """entries without start/end, reversed range, empty clip result."""
         import matplotlib
+
         matplotlib.use("Agg", force=True)
         monkeypatch.setattr(
             "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True
@@ -2083,8 +2116,10 @@ class TestGeneratePlanPdfAdditionalBranches:
         now = datetime.now(timezone.utc).replace(microsecond=0)
         alttime_data = {
             "timezone": "UTC",
-            "times_utc": [now.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                          (now + timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M:%SZ")],
+            "times_utc": [
+                now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                (now + timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            ],
             "altitudes": [30.0, 40.0],
             "altitude_constraint_min": 30,
             "altitude_constraint_max": 80,
@@ -2097,19 +2132,25 @@ class TestGeneratePlanPdfAdditionalBranches:
                 "night_start": night_start.isoformat(),
                 "night_end": night_end.isoformat(),
                 "entries": [
-                    {   # no timeline_start → _parse_utc returns None → continue
-                        "id": "e1", "name": "M31", "done": False,
+                    {  # no timeline_start → _parse_utc returns None → continue
+                        "id": "e1",
+                        "name": "M31",
+                        "done": False,
                         "alttime_file": "m31",
                         # No timeline_start or timeline_end
                     },
-                    {   # t_end <= t_start → continue
-                        "id": "e2", "name": "M42", "done": False,
+                    {  # t_end <= t_start → continue
+                        "id": "e2",
+                        "name": "M42",
+                        "done": False,
                         "alttime_file": "m31",
                         "timeline_start": (now + timedelta(hours=1)).isoformat(),
                         "timeline_end": now.isoformat(),  # end BEFORE start
                     },
-                    {   # _clip_alttime returns empty xs → continue
-                        "id": "e3", "name": "M45", "done": False,
+                    {  # _clip_alttime returns empty xs → continue
+                        "id": "e3",
+                        "name": "M45",
+                        "done": False,
                         "alttime_file": "m31",
                         # Alttime data is at 'now' to 'now+30min', but entry window is far future
                         "timeline_start": (now + timedelta(hours=5)).isoformat(),
@@ -2124,8 +2165,9 @@ class TestGeneratePlanPdfAdditionalBranches:
 
     def test_clip_alttime_empty_inputs(self, tmp_path, monkeypatch):
         """_clip_alttime with empty times_utc → returns [], [].
-           Also covers the None-dt skip and the no-valid-points return [], [] case."""
+        Also covers the None-dt skip and the no-valid-points return [], [] case."""
         import matplotlib
+
         matplotlib.use("Agg", force=True)
         monkeypatch.setattr(
             "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True
@@ -2156,13 +2198,17 @@ class TestGeneratePlanPdfAdditionalBranches:
                 "night_end": night_end.isoformat(),
                 "entries": [
                     {
-                        "id": "e1", "name": "M31", "done": False,
+                        "id": "e1",
+                        "name": "M31",
+                        "done": False,
                         "alttime_file": "m31empty",  # empty times_utc
                         "timeline_start": now.isoformat(),
                         "timeline_end": (now + timedelta(minutes=30)).isoformat(),
                     },
                     {
-                        "id": "e2", "name": "M42", "done": False,
+                        "id": "e2",
+                        "name": "M42",
+                        "done": False,
                         "alttime_file": "m31badts",  # invalid timestamps → skipped
                         "timeline_start": now.isoformat(),
                         "timeline_end": (now + timedelta(minutes=30)).isoformat(),
@@ -2177,6 +2223,7 @@ class TestGeneratePlanPdfAdditionalBranches:
     def test_clip_alttime_no_pts_in_window(self, tmp_path, monkeypatch):
         """_clip_alttime with points all before the window → out=[] → return [], []."""
         import matplotlib
+
         matplotlib.use("Agg", force=True)
         monkeypatch.setattr(
             "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True
@@ -2186,8 +2233,10 @@ class TestGeneratePlanPdfAdditionalBranches:
         # alttime data: two points at early hours (20:00 and 20:30)
         alttime_data = {
             "timezone": "UTC",
-            "times_utc": [early.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                          (early + timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M:%SZ")],
+            "times_utc": [
+                early.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                (early + timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            ],
             "altitudes": [30.0, 35.0],
             "altitude_constraint_min": 30,
             "altitude_constraint_max": 80,
@@ -2198,12 +2247,16 @@ class TestGeneratePlanPdfAdditionalBranches:
             "plan": {
                 "night_start": late.isoformat(),
                 "night_end": (late + timedelta(hours=1)).isoformat(),
-                "entries": [{
-                    "id": "e1", "name": "M31", "done": False,
-                    "alttime_file": "m31early",
-                    "timeline_start": late.isoformat(),
-                    "timeline_end": (late + timedelta(minutes=30)).isoformat(),
-                }],
+                "entries": [
+                    {
+                        "id": "e1",
+                        "name": "M31",
+                        "done": False,
+                        "alttime_file": "m31early",
+                        "timeline_start": late.isoformat(),
+                        "timeline_end": (late + timedelta(minutes=30)).isoformat(),
+                    }
+                ],
             }
         }
         metrics = {"fill_percent": 10.0, "planned_minutes": 30, "night_minutes": 60, "overflow_minutes": 0}
@@ -2305,7 +2358,8 @@ class TestVisibilityWarnings:
 
         uid = "eeee3001-0000-4000-8000-000000000000"
         payload = {
-            "user_id": uid, "username": "user",
+            "user_id": uid,
+            "username": "user",
             "plan": {
                 "night_start": night_start.isoformat(),
                 "night_end": night_end.isoformat(),
@@ -2349,7 +2403,8 @@ class TestScheduleOptimizer:
 
         uid = "eeee3002-0000-4000-8000-000000000000"
         payload = {
-            "user_id": uid, "username": "user",
+            "user_id": uid,
+            "username": "user",
             "plan": {
                 "night_start": night_start.isoformat(),
                 "night_end": night_end.isoformat(),
@@ -2357,7 +2412,13 @@ class TestScheduleOptimizer:
                 "location_id": None,
                 # Planned in the *wrong* order: Triangulum (not visible yet) before Neptune.
                 "entries": [
-                    {"id": "triangulum", "name": "Triangulum", "planned_minutes": 60, "alttime_file": "tri", "done": False},
+                    {
+                        "id": "triangulum",
+                        "name": "Triangulum",
+                        "planned_minutes": 60,
+                        "alttime_file": "tri",
+                        "done": False,
+                    },
                     {"id": "neptune", "name": "Neptune", "planned_minutes": 60, "alttime_file": "nep", "done": False},
                 ],
             },
@@ -2387,7 +2448,8 @@ class TestScheduleOptimizer:
 
         uid = "eeee3003-0000-4000-8000-000000000000"
         payload = {
-            "user_id": uid, "username": "user",
+            "user_id": uid,
+            "username": "user",
             "plan": {
                 "night_start": night_start.isoformat(),
                 "night_end": night_end.isoformat(),
@@ -2424,7 +2486,8 @@ class TestScheduleOptimizer:
 
         uid = "eeee3007-0000-4000-8000-000000000000"
         payload = {
-            "user_id": uid, "username": "user",
+            "user_id": uid,
+            "username": "user",
             "plan": {
                 "night_start": night_start.isoformat(),
                 "night_end": night_end.isoformat(),
@@ -2448,12 +2511,11 @@ class TestScheduleOptimizer:
         assert compute_optimized_schedule("eeee3004-0000-4000-8000-000000000000", "user") is None
 
     def test_apply_reorders_entries_and_sets_delay(self, temp_plan_dir, monkeypatch):
-        monkeypatch.setattr(
-            plan_my_night, "_now", lambda: datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
-        )
+        monkeypatch.setattr(plan_my_night, "_now", lambda: datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc))
         uid = "eeee3005-0000-4000-8000-000000000000"
         payload = {
-            "user_id": uid, "username": "user",
+            "user_id": uid,
+            "username": "user",
             "plan": {
                 "night_start": "2026-07-18T06:00:00+00:00",
                 "night_end": "2026-07-18T10:00:00+00:00",
@@ -2477,7 +2539,8 @@ class TestScheduleOptimizer:
     def test_apply_rejects_stale_order(self, temp_plan_dir):
         uid = "eeee3006-0000-4000-8000-000000000000"
         payload = {
-            "user_id": uid, "username": "user",
+            "user_id": uid,
+            "username": "user",
             "plan": {
                 "night_start": "2026-07-18T06:00:00+00:00",
                 "night_end": "2026-07-18T10:00:00+00:00",
@@ -2501,7 +2564,8 @@ class TestScheduleOptimizer:
         monkeypatch.setattr(plan_my_night, "_now", lambda: datetime(2026, 7, 19, 6, 0, tzinfo=timezone.utc))
         uid = "eeee3011-0000-4000-8000-000000000000"
         payload = {
-            "user_id": uid, "username": "user",
+            "user_id": uid,
+            "username": "user",
             "plan": {
                 "night_start": "2026-07-18T06:00:00+00:00",
                 "night_end": "2026-07-18T10:00:00+00:00",
@@ -2516,7 +2580,8 @@ class TestScheduleOptimizer:
         monkeypatch.setattr(plan_my_night, "_now", lambda: datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc))
         uid = "eeee3012-0000-4000-8000-000000000000"
         payload = {
-            "user_id": uid, "username": "user",
+            "user_id": uid,
+            "username": "user",
             "plan": {
                 "night_start": "2026-07-18T06:00:00+00:00",
                 "night_end": "2026-07-18T10:00:00+00:00",
@@ -2531,7 +2596,8 @@ class TestScheduleOptimizer:
         monkeypatch.setattr(plan_my_night, "_now", lambda: datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc))
         uid = "eeee3013-0000-4000-8000-000000000000"
         payload = {
-            "user_id": uid, "username": "user",
+            "user_id": uid,
+            "username": "user",
             "plan": {
                 # night_end <= night_start - malformed/corrupted plan data.
                 "night_start": "2026-07-18T10:00:00+00:00",
@@ -2547,7 +2613,8 @@ class TestScheduleOptimizer:
         monkeypatch.setattr(plan_my_night, "_now", lambda: datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc))
         uid = "eeee3014-0000-4000-8000-000000000000"
         payload = {
-            "user_id": uid, "username": "user",
+            "user_id": uid,
+            "username": "user",
             "plan": {
                 "night_start": "2026-07-18T06:00:00+00:00",
                 "night_end": "2026-07-18T08:00:00+00:00",
@@ -2574,7 +2641,8 @@ class TestScheduleOptimizer:
 
         uid = "eeee3015-0000-4000-8000-000000000000"
         payload = {
-            "user_id": uid, "username": "user",
+            "user_id": uid,
+            "username": "user",
             "plan": {
                 "night_start": "2026-07-18T06:00:00+00:00",
                 "night_end": "2026-07-18T08:00:00+00:00",
@@ -2597,7 +2665,8 @@ class TestScheduleOptimizer:
         monkeypatch.setattr(plan_my_night, "_now", lambda: datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc))
         uid = "eeee3016-0000-4000-8000-000000000000"
         payload = {
-            "user_id": uid, "username": "user",
+            "user_id": uid,
+            "username": "user",
             "plan": {
                 "night_start": "2026-07-18T06:00:00+00:00",
                 "night_end": "2026-07-18T08:00:00+00:00",
@@ -2689,6 +2758,7 @@ class TestMeridianFlip:
     def test_precomputed_lst_uses_the_o1_transit_path(self, monkeypatch):
         """When the caller passes the plan-scoped LST, the per-entry minute-step
         sidereal scan (_meridian_transit_time) must not be touched."""
+
         def _boom(*_a, **_k):
             raise AssertionError('_meridian_transit_time must not run on the fast path')
 
@@ -2788,8 +2858,13 @@ class TestResolvePlanMountSharedFallback:
         monkeypatch.setattr(
             equipment_profiles,
             'get_mount',
-            lambda *_a, **_k: {'id': 'mnt-1', 'name': 'EQ', 'meridian_flip_required': True,
-                               'meridian_flip_delay_min': 10.0, 'meridian_flip_duration_min': 5.0},
+            lambda *_a, **_k: {
+                'id': 'mnt-1',
+                'name': 'EQ',
+                'meridian_flip_required': True,
+                'meridian_flip_delay_min': 10.0,
+                'meridian_flip_duration_min': 5.0,
+            },
         )
         resolved = plan_my_night._resolve_plan_mount('11111111-1111-4111-8111-111111111111', 'combo-shared')
         assert resolved is not None and resolved['meridian_flip_required'] is True
@@ -2824,11 +2899,14 @@ class TestResolvePlanMount:
         from equipment import equipment_profiles
 
         legacy_mount = {'id': 'mnt-legacy', 'name': 'Old EQ6', 'mount_type': 'Equatorial'}
-        monkeypatch.setattr(equipment_profiles, 'get_combination', lambda *_a, **_k: {'id': 'combo-1', 'mount_id': 'mnt-legacy'})
+        monkeypatch.setattr(
+            equipment_profiles, 'get_combination', lambda *_a, **_k: {'id': 'combo-1', 'mount_id': 'mnt-legacy'}
+        )
         monkeypatch.setattr(equipment_profiles, 'load_all_shared_combinations', lambda *_a, **_k: [])
         monkeypatch.setattr(equipment_profiles, 'get_mount', lambda *_a, **_k: None)
         monkeypatch.setattr(
-            equipment_profiles, 'index_owned_and_shared_equipment',
+            equipment_profiles,
+            'index_owned_and_shared_equipment',
             lambda *_a, **_k: ({}, {'mnt-legacy': legacy_mount}),
         )
 
@@ -2846,7 +2924,8 @@ class TestOptimizerFlipAwareOrdering:
         night_end = datetime(2026, 7, 19, 5, 0, tzinfo=timezone.utc)
         monkeypatch.setattr(plan_my_night, "_now", lambda: night_start)
         payload = {
-            "user_id": uid, "username": "user",
+            "user_id": uid,
+            "username": "user",
             "plan": {
                 "night_start": night_start.isoformat(),
                 "night_end": night_end.isoformat(),
@@ -2867,8 +2946,13 @@ class TestOptimizerFlipAwareOrdering:
         self._plan(temp_plan_dir, uid, monkeypatch)
         monkeypatch.setattr(plan_my_night, "_plan_location_latlon", lambda *_a, **_k: (48.0, 2.0))
         monkeypatch.setattr(
-            plan_my_night, "_resolve_plan_mount",
-            lambda *_a, **_k: {'meridian_flip_required': True, 'meridian_flip_delay_min': 0, 'meridian_flip_duration_min': 5},
+            plan_my_night,
+            "_resolve_plan_mount",
+            lambda *_a, **_k: {
+                'meridian_flip_required': True,
+                'meridian_flip_delay_min': 0,
+                'meridian_flip_duration_min': 5,
+            },
         )
 
         def _fake_transit_and_flip(entry, mount, _lat, _lon, night_start, _night_end, _lst_start_hours=None):
@@ -2902,7 +2986,8 @@ class TestOptimizerFlipAwareOrdering:
 
         uid = "eeee3022-0000-4000-8000-000000000000"
         payload = {
-            "user_id": uid, "username": "user",
+            "user_id": uid,
+            "username": "user",
             "plan": {
                 "night_start": night_start.isoformat(),
                 "night_end": night_end.isoformat(),
@@ -2910,10 +2995,20 @@ class TestOptimizerFlipAwareOrdering:
                 "location_id": None,
                 "combination_id": "combo-1",
                 "entries": [
-                    {"id": "early_riser_late_flip", "name": "Early riser", "planned_minutes": 60,
-                     "alttime_file": "early_riser", "done": False},
-                    {"id": "late_riser_early_flip", "name": "Late riser", "planned_minutes": 60,
-                     "alttime_file": "late_riser", "done": False},
+                    {
+                        "id": "early_riser_late_flip",
+                        "name": "Early riser",
+                        "planned_minutes": 60,
+                        "alttime_file": "early_riser",
+                        "done": False,
+                    },
+                    {
+                        "id": "late_riser_early_flip",
+                        "name": "Late riser",
+                        "planned_minutes": 60,
+                        "alttime_file": "late_riser",
+                        "done": False,
+                    },
                 ],
             },
         }
@@ -2921,8 +3016,13 @@ class TestOptimizerFlipAwareOrdering:
 
         monkeypatch.setattr(plan_my_night, "_plan_location_latlon", lambda *_a, **_k: (None, None))
         monkeypatch.setattr(
-            plan_my_night, "_resolve_plan_mount",
-            lambda *_a, **_k: {'meridian_flip_required': True, 'meridian_flip_delay_min': 0, 'meridian_flip_duration_min': 5},
+            plan_my_night,
+            "_resolve_plan_mount",
+            lambda *_a, **_k: {
+                'meridian_flip_required': True,
+                'meridian_flip_delay_min': 0,
+                'meridian_flip_duration_min': 5,
+            },
         )
 
         def _fake_transit_and_flip(entry, mount, _lat, _lon, ns, _ne, _lst=None):
@@ -3063,6 +3163,7 @@ class TestComputeEntryVisibilityCache:
 # Merged from former test_coverage_edge_cases.py
 # ---------------------------------------------------------------------------
 
+
 def test_plan_safe_path_rejects_path_outside_plan_dir():
     from observation import plan_my_night
 
@@ -3097,15 +3198,12 @@ def test_plan_helpers_skip_junk_and_handle_errors(tmp_path, monkeypatch):
     # Non-dict payload
     (tmp_path / 'u2.json').write_text('[1, 2]', encoding='utf-8')
     # Real pinned plan
-    (tmp_path / 'u3.json').write_text(
-        json.dumps({'plan': {'location_id': 'L9', 'targets': []}}), encoding='utf-8'
-    )
+    (tmp_path / 'u3.json').write_text(json.dumps({'plan': {'location_id': 'L9', 'targets': []}}), encoding='utf-8')
 
     assert plan_my_night.count_plans_for_location('') == 0
     assert plan_my_night.delete_plans_for_location('') == 0
     assert plan_my_night.count_plans_for_location('L9') == 1
 
     # os.remove failure is logged, not raised
-    monkeypatch.setattr(plan_my_night.os, 'remove',
-                        lambda *_a: (_ for _ in ()).throw(OSError('locked')))
+    monkeypatch.setattr(plan_my_night.os, 'remove', lambda *_a: (_ for _ in ()).throw(OSError('locked')))
     assert plan_my_night.delete_plans_for_location('L9') == 0

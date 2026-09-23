@@ -138,6 +138,7 @@ def test_configured_tz_formatter_falls_back_to_utc_on_invalid_tz(monkeypatch):
     tz = _ConfiguredTzFormatter._get_tz()
     assert tz is not None
     from datetime import timezone
+
     assert tz == timezone.utc
 
     _ConfiguredTzFormatter._cached_tz = None
@@ -146,12 +147,15 @@ def test_configured_tz_formatter_falls_back_to_utc_on_invalid_tz(monkeypatch):
 
 def test_format_time_with_datefmt():
     """formatTime returns strftime-formatted string when datefmt is provided."""
-    import time
-
     formatter = _ConfiguredTzFormatter()
     record = logging.LogRecord(
-        name="test", level=logging.INFO, pathname="", lineno=0,
-        msg="hello", args=(), exc_info=None,
+        name="test",
+        level=logging.INFO,
+        pathname="",
+        lineno=0,
+        msg="hello",
+        args=(),
+        exc_info=None,
     )
     result = formatter.formatTime(record, datefmt="%Y/%m/%d")
     # Should be a date string in YYYY/MM/DD format
@@ -168,7 +172,13 @@ _BACKEND_DIR = Path(__file__).resolve().parents[2] / "backend"
 
 def _make_record(msg="hello"):
     return logging.LogRecord(
-        name="test", level=logging.WARNING, pathname="", lineno=0, msg=msg, args=(), exc_info=None,
+        name="test",
+        level=logging.WARNING,
+        pathname="",
+        lineno=0,
+        msg=msg,
+        args=(),
+        exc_info=None,
     )
 
 
@@ -261,6 +271,34 @@ def test_release_stream_ignores_close_errors(tmp_path):
     handler.close()
 
 
+def test_release_stream_is_noop_when_already_none(tmp_path):
+    handler = module.MultiProcessRotatingFileHandler(str(tmp_path / "app.log"), encoding="utf-8")
+    assert handler.stream is None  # delay=True: nothing opened yet
+    handler._release_stream()  # must be a no-op, not raise
+    assert handler.stream is None
+    handler.close()
+
+
+def test_emit_keeps_stream_open_on_non_windows(tmp_path, monkeypatch):
+    """The Windows-only close-between-writes step must not fire on other platforms.
+
+    Patches logging_config's own `sys` name (not sys.platform globally) - mutating the
+    real sys module's platform would also flip file_lock.interprocess_lock's own
+    win32/posix branch, which imports fcntl only under the posix branch and would then
+    fail for real on this Windows test machine.
+    """
+    import types
+
+    handler = module.MultiProcessRotatingFileHandler(str(tmp_path / "app.log"), encoding="utf-8")
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    monkeypatch.setattr(module, "sys", types.SimpleNamespace(platform="linux"))
+    try:
+        handler.emit(_make_record("hello"))
+        assert handler.stream is not None
+    finally:
+        handler.close()
+
+
 def test_rollover_uses_on_disk_size_after_truncation(tmp_path):
     """After "Clear logs" truncates the file, no process may rotate a near-empty file."""
     log_path = tmp_path / "app.log"
@@ -320,8 +358,7 @@ def test_emit_errors_are_routed_to_handle_error(tmp_path, monkeypatch):
     handler.close()
 
 
-_WRITER_SCRIPT = textwrap.dedent(
-    """
+_WRITER_SCRIPT = textwrap.dedent("""
     import logging, sys
     from utils.logging_config import MultiProcessRotatingFileHandler
 
@@ -334,8 +371,7 @@ _WRITER_SCRIPT = textwrap.dedent(
     for i in range(count):
         logger.warning("worker=%s line=%05d %s", worker, i, "x" * 40)
     handler.close()
-    """
-)
+    """)
 
 
 @pytest.mark.slow
@@ -348,7 +384,10 @@ def test_concurrent_processes_lose_no_lines_and_keep_backups_ordered(tmp_path):
     procs = [
         subprocess.Popen(
             [sys.executable, "-c", _WRITER_SCRIPT, str(log_path), str(w), str(lines_per_worker)],
-            env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
         )
         for w in range(workers)
     ]
@@ -357,9 +396,7 @@ def test_concurrent_processes_lose_no_lines_and_keep_backups_ordered(tmp_path):
         assert proc.returncode == 0, err
         assert "Traceback" not in err, err  # handleError() prints logging failures to stderr
 
-    backups = sorted(
-        (int(p.name.rsplit(".", 1)[1]), p) for p in tmp_path.glob("app.log.*") if p.suffix != ".lock"
-    )
+    backups = sorted((int(p.name.rsplit(".", 1)[1]), p) for p in tmp_path.glob("app.log.*") if p.suffix != ".lock")
     ordered_newest_first = [log_path] + [p for _num, p in backups]
     contents = [p.read_text(encoding="utf-8").splitlines() for p in reversed(ordered_newest_first)]
 

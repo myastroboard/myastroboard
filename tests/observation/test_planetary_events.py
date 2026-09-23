@@ -135,6 +135,7 @@ class TestToLocalIso:
 
     def test_returns_string(self):
         from astropy.time import Time
+
         svc = PlanetaryEventsService(45.0, -73.5, timezone="America/Montreal")
         t = Time("2026-06-21T12:00:00", format="isot", scale="utc")
         result = svc._to_local_iso(t)
@@ -148,6 +149,7 @@ class TestPrefetchCoords:
         from astropy.time import Time
         from datetime import datetime
         from zoneinfo import ZoneInfo
+
         svc = PlanetaryEventsService(45.0, -73.5)
         now = Time(datetime(2026, 6, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
         svc._prefetch_coords(now, 10)
@@ -158,6 +160,7 @@ class TestPrefetchCoords:
         from astropy.time import Time
         from datetime import datetime
         from zoneinfo import ZoneInfo
+
         svc = PlanetaryEventsService(45.0, -73.5)
         now = Time(datetime(2026, 6, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
         svc._prefetch_coords(now, 5)
@@ -172,6 +175,7 @@ class TestFindConjunctionsAndOppositions:
         from astropy.time import Time
         from datetime import datetime
         from zoneinfo import ZoneInfo
+
         svc = PlanetaryEventsService(45.0, -73.5)
         now = Time(datetime(2026, 1, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
         end = Time(datetime(2026, 12, 31, 0, 0, tzinfo=ZoneInfo("UTC")))
@@ -183,6 +187,7 @@ class TestFindConjunctionsAndOppositions:
         from astropy.time import Time
         from datetime import datetime
         from zoneinfo import ZoneInfo
+
         svc = PlanetaryEventsService(45.0, -73.5)
         now = Time(datetime(2026, 1, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
         end = Time(datetime(2026, 6, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
@@ -194,6 +199,7 @@ class TestFindConjunctionsAndOppositions:
         from astropy.time import Time
         from datetime import datetime
         from zoneinfo import ZoneInfo
+
         svc = PlanetaryEventsService(45.0, -73.5)
         now = Time(datetime(2026, 1, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
         end = Time(datetime(2026, 6, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
@@ -204,6 +210,7 @@ class TestFindConjunctionsAndOppositions:
         from astropy.time import Time
         from datetime import datetime
         from zoneinfo import ZoneInfo
+
         svc = PlanetaryEventsService(45.0, -73.5)
         now = Time(datetime(2026, 1, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
         end = Time(datetime(2026, 6, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
@@ -214,6 +221,7 @@ class TestFindConjunctionsAndOppositions:
         from astropy.time import Time
         from datetime import datetime
         from zoneinfo import ZoneInfo
+
         svc = PlanetaryEventsService(45.0, -73.5)
         now = Time(datetime(2026, 1, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
         end = Time(datetime(2026, 6, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
@@ -230,6 +238,7 @@ class TestFindConjunctionsAndOppositions:
         from astropy.time import Time
         from datetime import datetime
         from zoneinfo import ZoneInfo
+
         svc = PlanetaryEventsService(45.0, -73.5)
         now = Time(datetime(2026, 1, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
         end = Time(datetime(2026, 12, 31, 0, 0, tzinfo=ZoneInfo("UTC")))
@@ -241,6 +250,7 @@ class TestFindConjunctionsAndOppositions:
         from astropy.time import Time
         from datetime import datetime
         from zoneinfo import ZoneInfo
+
         svc = PlanetaryEventsService(45.0, -73.5)
         now = Time(datetime(2026, 1, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
         end = Time(datetime(2026, 12, 31, 0, 0, tzinfo=ZoneInfo("UTC")))
@@ -259,6 +269,7 @@ class TestFindMoonConjunctionsExceptionHandlers:
         from datetime import datetime
         from zoneinfo import ZoneInfo
         from unittest.mock import patch
+
         svc = PlanetaryEventsService(45.0, -73.5)
         now = Time(datetime(2026, 1, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
         with patch("observation.planetary_events.get_body", side_effect=Exception("moon fetch fail")):
@@ -271,6 +282,7 @@ class TestFindMoonConjunctionsExceptionHandlers:
         from datetime import datetime
         from zoneinfo import ZoneInfo
         from unittest.mock import patch
+
         svc = PlanetaryEventsService(45.0, -73.5)
         now = Time(datetime(2026, 1, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
 
@@ -290,6 +302,7 @@ class TestPlanetaryHelperMethods:
     def setup_method(self):
         self.svc = PlanetaryEventsService(45.0, -73.5, timezone="America/Montreal")
         from astropy.time import Time
+
         self.t = Time("2026-06-21T02:00:00", format="isot", scale="utc")
 
     # --- _angular_separation ---
@@ -299,6 +312,7 @@ class TestPlanetaryHelperMethods:
 
     def test_angular_separation_returns_inf_on_exception(self):
         from unittest.mock import patch
+
         with patch("observation.planetary_events.get_body", side_effect=Exception("fail")):
             result = self.svc._angular_separation("Jupiter", "Saturn", self.t)
         assert result == float('inf')
@@ -310,6 +324,7 @@ class TestPlanetaryHelperMethods:
 
     def test_get_elongation_returns_zero_on_exception(self):
         from unittest.mock import patch
+
         with patch("observation.planetary_events.get_body", side_effect=Exception("fail")):
             result = self.svc._get_elongation("Jupiter", self.t)
         assert result == 0.0
@@ -321,12 +336,14 @@ class TestPlanetaryHelperMethods:
 
     def test_is_event_visible_returns_false_on_exception(self):
         from unittest.mock import patch
+
         with patch("observation.planetary_events.get_body", side_effect=Exception("fail")):
             result = self.svc._is_event_visible("Jupiter", "Saturn", self.t)
         assert result is False
 
     def test_is_event_visible_returns_false_when_planet_is_none(self):
         from unittest.mock import patch
+
         with patch("observation.planetary_events.get_body", return_value=None):
             result = self.svc._is_event_visible("Jupiter", "Saturn", self.t)
         assert result is False
@@ -338,12 +355,14 @@ class TestPlanetaryHelperMethods:
 
     def test_is_planet_visible_returns_false_on_exception(self):
         from unittest.mock import patch
+
         with patch("observation.planetary_events.get_body", side_effect=Exception("fail")):
             result = self.svc._is_planet_visible("Jupiter", self.t)
         assert result is False
 
     def test_is_planet_visible_returns_false_when_none(self):
         from unittest.mock import patch
+
         with patch("observation.planetary_events.get_body", return_value=None):
             result = self.svc._is_planet_visible("Jupiter", self.t)
         assert result is False
@@ -355,6 +374,7 @@ class TestGetPlanetaryEventsExceptionPath:
     def test_returns_empty_list_on_exception(self):
         svc = PlanetaryEventsService(45.0, -73.5)
         from unittest.mock import patch
+
         with patch.object(svc, "_find_conjunctions", side_effect=Exception("boom")):
             result = svc.get_planetary_events(days_ahead=30)
         assert result == []
@@ -364,7 +384,8 @@ class TestGetPlanetaryEventsExceptionPath:
         from astropy.time import Time
         from datetime import datetime
         from zoneinfo import ZoneInfo
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock
+
         svc = PlanetaryEventsService(45.0, -73.5)
         now = Time(datetime(2026, 1, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
         end = Time(datetime(2026, 12, 31, 0, 0, tzinfo=ZoneInfo("UTC")))
@@ -387,6 +408,7 @@ class TestPlanetaryFindMethodExceptionHandlers:
         from datetime import datetime
         from zoneinfo import ZoneInfo
         from unittest.mock import MagicMock
+
         svc = PlanetaryEventsService(45.0, -73.5)
         now = Time(datetime(2026, 1, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
         end = Time(datetime(2026, 12, 31, 0, 0, tzinfo=ZoneInfo("UTC")))
@@ -413,6 +435,7 @@ class TestPlanetaryFindMethodExceptionHandlers:
         from astropy.time import Time
         from datetime import datetime
         from zoneinfo import ZoneInfo
+
         svc = PlanetaryEventsService(45.0, -73.5)
         now = Time(datetime(2026, 1, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
         end = Time(datetime(2026, 12, 31, 0, 0, tzinfo=ZoneInfo("UTC")))
@@ -439,11 +462,13 @@ class TestPlanetaryHelperArrayBranches:
     def setup_method(self):
         self.svc = PlanetaryEventsService(45.0, -73.5, timezone="America/Montreal")
         from astropy.time import Time
+
         self.t = Time("2026-06-21T02:00:00", format="isot", scale="utc")
 
     def test_angular_separation_ndarray_branch(self):
         """sep.degree is ndarray."""
         from unittest.mock import patch, MagicMock
+
         fake_sep = MagicMock()
         fake_sep.degree = np.array([5.0])
         fake_body = MagicMock()
@@ -455,6 +480,7 @@ class TestPlanetaryHelperArrayBranches:
     def test_angular_separation_complex_branch(self):
         """sep.degree is complex."""
         from unittest.mock import patch, MagicMock
+
         fake_sep = MagicMock()
         fake_sep.degree = complex(5.0, 0.0)
         fake_body = MagicMock()
@@ -466,6 +492,7 @@ class TestPlanetaryHelperArrayBranches:
     def test_get_elongation_ndarray_branch(self):
         """elong_val is ndarray."""
         from unittest.mock import patch, MagicMock
+
         fake_elong = MagicMock()
         fake_elong.degree = np.array([45.0])
         fake_body = MagicMock()
@@ -477,6 +504,7 @@ class TestPlanetaryHelperArrayBranches:
     def test_get_elongation_complex_branch(self):
         """elong_val is complex."""
         from unittest.mock import patch, MagicMock
+
         fake_elong = MagicMock()
         fake_elong.degree = complex(45.0, 0.0)
         fake_body = MagicMock()
@@ -488,6 +516,7 @@ class TestPlanetaryHelperArrayBranches:
     def test_is_event_visible_altaz_none_returns_false(self):
         """p1.transform_to() returns None."""
         from unittest.mock import patch, MagicMock
+
         fake_body = MagicMock()
         fake_body.transform_to.return_value = None
         with patch("observation.planetary_events.get_body", return_value=fake_body):
@@ -497,6 +526,7 @@ class TestPlanetaryHelperArrayBranches:
     def test_is_event_visible_alt1_ndarray(self):
         """alt1_val is ndarray."""
         from unittest.mock import patch, MagicMock
+
         fake_altaz = MagicMock()
         fake_altaz.alt.degree = np.array([30.0])
         fake_body = MagicMock()
@@ -508,6 +538,7 @@ class TestPlanetaryHelperArrayBranches:
     def test_is_event_visible_alt1_complex(self):
         """alt1_val is complex."""
         from unittest.mock import patch, MagicMock
+
         fake_altaz = MagicMock()
         fake_altaz.alt.degree = complex(30.0, 0.0)
         fake_body = MagicMock()
@@ -519,14 +550,17 @@ class TestPlanetaryHelperArrayBranches:
     def test_is_event_visible_alt2_ndarray(self):
         """alt2_val is ndarray."""
         from unittest.mock import patch, MagicMock
+
         fake_altaz1 = MagicMock()
         fake_altaz1.alt.degree = 30.0
         fake_altaz2 = MagicMock()
         fake_altaz2.alt.degree = np.array([25.0])
         calls = [0]
+
         def transform_side_effect(frame):
             calls[0] += 1
             return fake_altaz1 if calls[0] == 1 else fake_altaz2
+
         fake_body = MagicMock()
         fake_body.transform_to.side_effect = transform_side_effect
         with patch("observation.planetary_events.get_body", return_value=fake_body):
@@ -536,14 +570,17 @@ class TestPlanetaryHelperArrayBranches:
     def test_is_event_visible_alt2_complex(self):
         """alt2_val is complex."""
         from unittest.mock import patch, MagicMock
+
         fake_altaz1 = MagicMock()
         fake_altaz1.alt.degree = 30.0
         fake_altaz2 = MagicMock()
         fake_altaz2.alt.degree = complex(25.0, 0.0)
         calls = [0]
+
         def transform_side_effect(frame):
             calls[0] += 1
             return fake_altaz1 if calls[0] == 1 else fake_altaz2
+
         fake_body = MagicMock()
         fake_body.transform_to.side_effect = transform_side_effect
         with patch("observation.planetary_events.get_body", return_value=fake_body):
@@ -553,6 +590,7 @@ class TestPlanetaryHelperArrayBranches:
     def test_is_planet_visible_altaz_none_returns_false(self):
         """altaz is None."""
         from unittest.mock import patch, MagicMock
+
         fake_body = MagicMock()
         fake_body.transform_to.return_value = None
         with patch("observation.planetary_events.get_body", return_value=fake_body):
@@ -562,14 +600,17 @@ class TestPlanetaryHelperArrayBranches:
     def test_is_planet_visible_sun_obj_none_returns_false(self):
         """sun_obj is None."""
         from unittest.mock import patch, MagicMock
+
         fake_planet = MagicMock()
         fake_planet.transform_to.return_value = MagicMock()
         calls = [0]
+
         def get_body_side(name, *args, **kwargs):
             calls[0] += 1
             if name == 'sun':
                 return None
             return fake_planet
+
         with patch("observation.planetary_events.get_body", side_effect=get_body_side):
             result = self.svc._is_planet_visible("Jupiter", self.t)
         assert result is False
@@ -577,6 +618,7 @@ class TestPlanetaryHelperArrayBranches:
     def test_is_planet_visible_elong_ndarray(self):
         """elong_val is ndarray."""
         from unittest.mock import patch, MagicMock
+
         fake_elong = MagicMock()
         fake_elong.degree = np.array([45.0])
         fake_altaz = MagicMock()
@@ -585,8 +627,10 @@ class TestPlanetaryHelperArrayBranches:
         fake_planet.transform_to.return_value = fake_altaz
         fake_planet.separation.return_value = fake_elong
         fake_sun = MagicMock()
+
         def get_body_side(name, *args, **kwargs):
             return fake_sun if name == 'sun' else fake_planet
+
         with patch("observation.planetary_events.get_body", side_effect=get_body_side):
             result = self.svc._is_planet_visible("Jupiter", self.t)
         assert isinstance(result, bool)
@@ -594,6 +638,7 @@ class TestPlanetaryHelperArrayBranches:
     def test_is_planet_visible_elong_complex(self):
         """elong_val is complex."""
         from unittest.mock import patch, MagicMock
+
         fake_elong = MagicMock()
         fake_elong.degree = complex(45.0, 0.0)
         fake_altaz = MagicMock()
@@ -602,8 +647,10 @@ class TestPlanetaryHelperArrayBranches:
         fake_planet.transform_to.return_value = fake_altaz
         fake_planet.separation.return_value = fake_elong
         fake_sun = MagicMock()
+
         def get_body_side(name, *args, **kwargs):
             return fake_sun if name == 'sun' else fake_planet
+
         with patch("observation.planetary_events.get_body", side_effect=get_body_side):
             result = self.svc._is_planet_visible("Jupiter", self.t)
         assert isinstance(result, bool)
@@ -611,6 +658,7 @@ class TestPlanetaryHelperArrayBranches:
     def test_is_planet_visible_alt_ndarray(self):
         """alt_val is ndarray."""
         from unittest.mock import patch, MagicMock
+
         fake_elong = MagicMock()
         fake_elong.degree = 45.0
         fake_altaz = MagicMock()
@@ -619,8 +667,10 @@ class TestPlanetaryHelperArrayBranches:
         fake_planet.transform_to.return_value = fake_altaz
         fake_planet.separation.return_value = fake_elong
         fake_sun = MagicMock()
+
         def get_body_side(name, *args, **kwargs):
             return fake_sun if name == 'sun' else fake_planet
+
         with patch("observation.planetary_events.get_body", side_effect=get_body_side):
             result = self.svc._is_planet_visible("Jupiter", self.t)
         assert isinstance(result, bool)
@@ -628,6 +678,7 @@ class TestPlanetaryHelperArrayBranches:
     def test_is_planet_visible_alt_complex(self):
         """alt_val is complex."""
         from unittest.mock import patch, MagicMock
+
         fake_elong = MagicMock()
         fake_elong.degree = 45.0
         fake_altaz = MagicMock()
@@ -636,8 +687,10 @@ class TestPlanetaryHelperArrayBranches:
         fake_planet.transform_to.return_value = fake_altaz
         fake_planet.separation.return_value = fake_elong
         fake_sun = MagicMock()
+
         def get_body_side(name, *args, **kwargs):
             return fake_sun if name == 'sun' else fake_planet
+
         with patch("observation.planetary_events.get_body", side_effect=get_body_side):
             result = self.svc._is_planet_visible("Jupiter", self.t)
         assert isinstance(result, bool)

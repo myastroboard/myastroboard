@@ -294,3 +294,35 @@ def test_normalize_network_warns_on_an_unusually_broad_ipv6_prefix(settings_modu
 def test_normalize_network_still_accepts_a_broad_network_after_warning(settings_module):
     """Not a rejection - a genuinely broad trust choice is still honored."""
     assert settings_module.normalize_network('192.168.1.0/2') == '192.0.0.0/2'
+
+
+def test_warn_if_unusually_broad_ignores_unparseable_input(settings_module, caplog):
+    """Defensive fallback: every real caller pre-validates via normalize_network, but a
+    direct call with something unparseable must still not raise or warn."""
+    import logging
+
+    with caplog.at_level(logging.WARNING):
+        settings_module._warn_if_unusually_broad('not-a-network-at-all')
+
+    assert not any('unusually large' in record.message for record in caplog.records)
+
+
+# ---------------------------------------------------------------------------
+# get_effective_trusted_networks / save_security_settings edge branches
+# ---------------------------------------------------------------------------
+
+
+def test_effective_networks_does_not_duplicate_an_explicitly_configured_loopback(settings_module):
+    settings_module.save_security_settings({'trusted_networks': ['127.0.0.0/8'], 'two_factor_enabled': False})
+
+    effective = settings_module.get_effective_trusted_networks()
+
+    assert effective.count('127.0.0.0/8') == 1
+
+
+def test_save_with_missing_key_falls_back_to_its_default(settings_module):
+    """A caller that only supplies one of the two keys must get the hardcoded default
+    for the other, not whatever happened to be cached before."""
+    settings_module.save_security_settings({'trusted_networks': ['10.0.0.0/8']})
+
+    assert settings_module.get_security_settings() == {'trusted_networks': ['10.0.0.0/8'], 'two_factor_enabled': False}

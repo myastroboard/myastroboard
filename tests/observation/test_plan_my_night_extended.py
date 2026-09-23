@@ -1,4 +1,5 @@
 """Extended unit tests for plan_my_night.py pure helper functions."""
+
 import json
 import os
 import uuid
@@ -7,6 +8,7 @@ from datetime import datetime, timezone, timedelta
 import pytest
 
 from observation import plan_my_night
+
 _build_target_payload = plan_my_night._build_target_payload
 _is_valid_combination_id = plan_my_night._is_valid_combination_id
 _is_valid_user_id = plan_my_night._is_valid_user_id
@@ -270,12 +272,9 @@ class TestValidatePlanJson:
         return fname
 
     def test_valid_plan_returns_true(self, tmp_path, monkeypatch):
-        fname = self._write_plan(tmp_path, monkeypatch, {
-            "user_id": str(uuid.uuid4()),
-            "plan": {
-                "entries": [{"id": "e1", "name": "M42"}]
-            }
-        })
+        fname = self._write_plan(
+            tmp_path, monkeypatch, {"user_id": str(uuid.uuid4()), "plan": {"entries": [{"id": "e1", "name": "M42"}]}}
+        )
         ok, msg = validate_plan_json(fname)
         assert ok is True
         assert msg == ""
@@ -287,18 +286,14 @@ class TestValidatePlanJson:
         assert "user_id" in msg
 
     def test_plan_none_is_valid(self, tmp_path, monkeypatch):
-        fname = self._write_plan(tmp_path, monkeypatch, {
-            "user_id": str(uuid.uuid4()),
-            "plan": None
-        })
+        fname = self._write_plan(tmp_path, monkeypatch, {"user_id": str(uuid.uuid4()), "plan": None})
         ok, _ = validate_plan_json(fname)
         assert ok is True
 
     def test_entry_missing_id_returns_false(self, tmp_path, monkeypatch):
-        fname = self._write_plan(tmp_path, monkeypatch, {
-            "user_id": str(uuid.uuid4()),
-            "plan": {"entries": [{"name": "M31"}]}
-        })
+        fname = self._write_plan(
+            tmp_path, monkeypatch, {"user_id": str(uuid.uuid4()), "plan": {"entries": [{"name": "M31"}]}}
+        )
         ok, msg = validate_plan_json(fname)
         assert ok is False
         assert "id" in msg
@@ -493,6 +488,7 @@ class TestIsTargetInCurrentPlan:
 
     def test_empty_entries_returns_false(self, tmp_path, monkeypatch):
         from datetime import timezone, timedelta
+
         monkeypatch.setattr(plan_my_night, "PLAN_DIR", str(tmp_path))
         user_id = str(uuid.uuid4())
         future = (datetime.now(timezone.utc) + timedelta(hours=5)).isoformat()
@@ -507,6 +503,7 @@ class TestIsTargetInCurrentPlan:
 
     def test_previous_plan_returns_false(self, tmp_path, monkeypatch):
         from datetime import timezone, timedelta
+
         monkeypatch.setattr(plan_my_night, "PLAN_DIR", str(tmp_path))
         user_id = str(uuid.uuid4())
         past = (datetime.now(timezone.utc) - timedelta(hours=5)).isoformat()
@@ -557,10 +554,7 @@ class TestValidatePlanJsonExtended:
         monkeypatch.setattr(plan_my_night, "PLAN_DIR", str(tmp_path))
         fname = str(tmp_path / "entry_no_name.json")
         with open(fname, "w") as f:
-            json.dump({
-                "user_id": str(uuid.uuid4()),
-                "plan": {"entries": [{"id": "e1"}]}
-            }, f)
+            json.dump({"user_id": str(uuid.uuid4()), "plan": {"entries": [{"id": "e1"}]}}, f)
         ok, msg = validate_plan_json(fname)
         assert ok is False
         assert "name" in msg
@@ -569,10 +563,7 @@ class TestValidatePlanJsonExtended:
         monkeypatch.setattr(plan_my_night, "PLAN_DIR", str(tmp_path))
         fname = str(tmp_path / "bad_entries.json")
         with open(fname, "w") as f:
-            json.dump({
-                "user_id": str(uuid.uuid4()),
-                "plan": {"entries": "not_a_list"}
-            }, f)
+            json.dump({"user_id": str(uuid.uuid4()), "plan": {"entries": "not_a_list"}}, f)
         ok, msg = validate_plan_json(fname)
         assert ok is False
 
@@ -580,10 +571,7 @@ class TestValidatePlanJsonExtended:
         monkeypatch.setattr(plan_my_night, "PLAN_DIR", str(tmp_path))
         fname = str(tmp_path / "entry_not_dict.json")
         with open(fname, "w") as f:
-            json.dump({
-                "user_id": str(uuid.uuid4()),
-                "plan": {"entries": [42]}  # entry is int, not dict
-            }, f)
+            json.dump({"user_id": str(uuid.uuid4()), "plan": {"entries": [42]}}, f)  # entry is int, not dict
         ok, msg = validate_plan_json(fname)
         assert ok is False
         assert "object" in msg
@@ -618,10 +606,7 @@ class TestLoadUserPlanPlanNotDict:
         monkeypatch.setattr(plan_my_night, "PLAN_DIR", str(tmp_path))
         user_id = str(uuid.uuid4())
         plan_file = tmp_path / f"{user_id}_plan_my_night.json"
-        plan_file.write_text(json.dumps({
-            "user_id": user_id,
-            "plan": "this_is_not_a_dict"  # triggers
-        }))
+        plan_file.write_text(json.dumps({"user_id": user_id, "plan": "this_is_not_a_dict"}))  # triggers
         result = load_user_plan(user_id, "alice")
         assert result["plan"] is None
 

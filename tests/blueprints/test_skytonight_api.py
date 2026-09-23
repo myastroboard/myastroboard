@@ -81,7 +81,9 @@ def test_skytonight_reports_endpoint_returns_compatible_payload(client_admin, mo
     )
     monkeypatch.setattr(skytonight_api_module.astrodex, 'is_item_in_astrodex', lambda *args, **kwargs: False)
     monkeypatch.setattr(skytonight_api_module.plan_my_night, 'is_target_in_current_plan', lambda *args, **kwargs: False)
-    monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_with_timeline', lambda *args, **kwargs: {'state': 'current'})
+    monkeypatch.setattr(
+        skytonight_api_module.plan_my_night, 'get_plan_with_timeline', lambda *args, **kwargs: {'state': 'current'}
+    )
     monkeypatch.setattr(skytonight_api_module, '_get_catalogue_alias_payload', lambda catalogue, item_name: ('', {}))
 
     response = client_admin.get('/api/skytonight/reports')
@@ -107,7 +109,9 @@ def test_skytonight_reports_catalogue_filter(client_admin, monkeypatch):
     )
     monkeypatch.setattr(skytonight_api_module.astrodex, 'is_item_in_astrodex', lambda *args, **kwargs: False)
     monkeypatch.setattr(skytonight_api_module.plan_my_night, 'is_target_in_current_plan', lambda *args, **kwargs: False)
-    monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_with_timeline', lambda *args, **kwargs: {'state': 'current'})
+    monkeypatch.setattr(
+        skytonight_api_module.plan_my_night, 'get_plan_with_timeline', lambda *args, **kwargs: {'state': 'current'}
+    )
     monkeypatch.setattr(skytonight_api_module, '_get_catalogue_alias_payload', lambda catalogue, item_name: ('', {}))
 
     response = client_admin.get('/api/skytonight/reports/Messier')
@@ -157,7 +161,9 @@ def test_dso_annotation_uses_display_name_for_astrodex_matching(monkeypatch):
     )
     monkeypatch.setattr(skytonight_api_module.astrodex, 'load_user_astrodex', lambda *_args, **_kwargs: {'items': []})
     monkeypatch.setattr(skytonight_api_module.astrodex, 'is_item_in_preloaded_astrodex', _capture_astrodex_call)
-    monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_with_timeline', lambda *_a, **_k: {'state': 'none'})
+    monkeypatch.setattr(
+        skytonight_api_module.plan_my_night, 'get_plan_with_timeline', lambda *_a, **_k: {'state': 'none'}
+    )
 
     payload = skytonight_api_module._build_dso_section_payload(None, 'uid-1', 'Emeric')
 
@@ -172,7 +178,8 @@ def test_skytonight_request_location_falls_back_outside_request_context(monkeypa
     than propagate. Forced via monkeypatch so this doesn't depend on whether
     ambient context happens to be pushed by whatever test runs first."""
     monkeypatch.setattr(
-        skytonight_api_module, 'load_config',
+        skytonight_api_module,
+        'load_config',
         lambda: {'locations': [{'id': 'solo-loc', 'is_install_default': True}]},
     )
 
@@ -190,7 +197,8 @@ def test_skytonight_request_location_override_falls_back_outside_request_context
     """Same outside-request-context fallback as _skytonight_request_location,
     but for the pinned-location variant used by e.g. Plan My Night's alttime lookups."""
     monkeypatch.setattr(
-        skytonight_api_module, 'load_config',
+        skytonight_api_module,
+        'load_config',
         lambda: {'locations': [{'id': 'solo-loc', 'is_install_default': True}]},
     )
 
@@ -208,15 +216,19 @@ def test_skytonight_request_location_override_uses_accessible_pinned_location(mo
     """A caller-supplied location_id that the viewer can access must override
     their currently-active preset (e.g. reading a plan's pinned location)."""
     monkeypatch.setattr(
-        skytonight_api_module, 'load_config',
-        lambda: {'locations': [
-            {'id': 'loc-a', 'is_install_default': True},
-            {'id': 'loc-b', 'is_install_default': False},
-        ]},
+        skytonight_api_module,
+        'load_config',
+        lambda: {
+            'locations': [
+                {'id': 'loc-a', 'is_install_default': True},
+                {'id': 'loc-b', 'is_install_default': False},
+            ]
+        },
     )
     monkeypatch.setattr(skytonight_api_module, 'get_current_user', lambda: None)
     monkeypatch.setattr(
-        skytonight_api_module, 'get_locations_for_user',
+        skytonight_api_module,
+        'get_locations_for_user',
         lambda config, user: config['locations'],
     )
 
@@ -229,7 +241,8 @@ def test_skytonight_request_location_override_falls_back_when_not_accessible(mon
     """A location_id the viewer can't access (foreign/stale id) must fall back
     to their active preset rather than leaking another location's data."""
     monkeypatch.setattr(
-        skytonight_api_module, 'load_config',
+        skytonight_api_module,
+        'load_config',
         lambda: {'locations': [{'id': 'loc-a', 'is_install_default': True}]},
     )
     monkeypatch.setattr(skytonight_api_module, 'get_current_user', lambda: None)
@@ -258,6 +271,7 @@ def test_skytonight_log_endpoint_returns_content(client_admin, monkeypatch, tmp_
 # ---------------------------------------------------------------------------
 # /api/skytonight/target-debug endpoint tests
 # ---------------------------------------------------------------------------
+
 
 def test_target_debug_missing_name_returns_400(client_admin):
     response = client_admin.get('/api/skytonight/target-debug')
@@ -355,7 +369,8 @@ class TestGetCatalogueAliasPayload:
     def test_aliases_not_dict_is_replaced(self, monkeypatch):
         """aliases not dict → replaced with {}."""
         monkeypatch.setattr(
-            skytonight_api_module.skytonight_targets, 'get_lookup_entry',
+            skytonight_api_module.skytonight_targets,
+            'get_lookup_entry',
             lambda c, n: {'group_id': 'g1', 'aliases': 'bad_aliases'},
         )
         group_id, aliases = skytonight_api_module._get_catalogue_alias_payload('Messier', 'M 31')
@@ -379,7 +394,8 @@ class TestResolveSourceCatalogue:
     def test_matching_catalogue_is_returned(self, monkeypatch):
         """exact match found → return catalogue label."""
         monkeypatch.setattr(
-            skytonight_api_module.skytonight_targets, 'normalize_object_name',
+            skytonight_api_module.skytonight_targets,
+            'normalize_object_name',
             lambda name: name.lower().replace(' ', ''),
         )
         result = skytonight_api_module._resolve_source_catalogue({'Messier': 'M 31', 'OpenNGC': 'NGC 224'}, 'M 31')
@@ -445,10 +461,14 @@ def _make_calc_result():
                 'magnitude': -2.0,
                 'astro_score': 0.8,
                 'observation': {
-                    'ra_hms': '03h 00m', 'dec_dms': "+16° 00'",
-                    'max_altitude': 40.0, 'azimuth': 170.0,
-                    'max_altitude_time': '23:00', 'meridian_transit': '23:00',
-                    'antimeridian_transit': '11:00', 'observable_hours': 5.0,
+                    'ra_hms': '03h 00m',
+                    'dec_dms': "+16° 00'",
+                    'max_altitude': 40.0,
+                    'azimuth': 170.0,
+                    'max_altitude_time': '23:00',
+                    'meridian_transit': '23:00',
+                    'antimeridian_transit': '11:00',
+                    'observable_hours': 5.0,
                 },
                 'solar_elongation_deg': 120.0,
             }
@@ -460,13 +480,21 @@ def _make_calc_result():
                 'object_type': 'Comet',
                 'magnitude': 7.0,
                 'astro_score': 0.5,
-                'metadata': {'perihelion_date': '2026-10-20', 'absolute_magnitude': 5.0,
-                             'distance_earth_au': 1.2, 'distance_sun_au': 1.5},
+                'metadata': {
+                    'perihelion_date': '2026-10-20',
+                    'absolute_magnitude': 5.0,
+                    'distance_earth_au': 1.2,
+                    'distance_sun_au': 1.5,
+                },
                 'observation': {
-                    'ra_hms': '05h 00m', 'dec_dms': "+20° 00'",
-                    'max_altitude': 35.0, 'azimuth': 160.0,
-                    'rise_time': '21:00', 'set_time': '03:00',
-                    'meridian_transit': '00:00', 'antimeridian_transit': '12:00',
+                    'ra_hms': '05h 00m',
+                    'dec_dms': "+20° 00'",
+                    'max_altitude': 35.0,
+                    'azimuth': 160.0,
+                    'rise_time': '21:00',
+                    'set_time': '03:00',
+                    'meridian_transit': '00:00',
+                    'antimeridian_transit': '12:00',
                     'observable_hours': 6.0,
                 },
             }
@@ -482,8 +510,9 @@ class TestBuildSkytonigtReportsPayloadWithCalcResults:
         calc = _make_calc_result()
         monkeypatch.setattr(skytonight_api_module, 'has_calculation_results', lambda *_a, **_k: True)
         monkeypatch.setattr(skytonight_api_module, 'load_calculation_results', lambda *_a, **_k: calc)
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_with_timeline',
-                            lambda u, n: {'state': 'current'})
+        monkeypatch.setattr(
+            skytonight_api_module.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'current'}
+        )
         monkeypatch.setattr(skytonight_api_module.astrodex, 'load_user_astrodex', lambda uid: {'items': []})
         monkeypatch.setattr(skytonight_api_module.astrodex, 'is_item_in_preloaded_astrodex', lambda *a, **k: False)
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_all_plan_files', lambda uid: [])
@@ -500,8 +529,9 @@ class TestBuildSkytonigtReportsPayloadWithCalcResults:
         calc = _make_calc_result()
         monkeypatch.setattr(skytonight_api_module, 'has_calculation_results', lambda *_a, **_k: True)
         monkeypatch.setattr(skytonight_api_module, 'load_calculation_results', lambda *_a, **_k: calc)
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_with_timeline',
-                            lambda u, n: {'state': 'none'})
+        monkeypatch.setattr(
+            skytonight_api_module.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'}
+        )
         monkeypatch.setattr(skytonight_api_module.astrodex, 'load_user_astrodex', lambda uid: {'items': []})
         monkeypatch.setattr(skytonight_api_module.astrodex, 'is_item_in_preloaded_astrodex', lambda *a, **k: False)
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_all_plan_files', lambda uid: [])
@@ -523,8 +553,9 @@ class TestBuildBodiesSectionPayloadWithCalcResults:
         data = {'bodies': calc['bodies'], 'metadata': {}}
         monkeypatch.setattr(skytonight_api_module, 'has_bodies_results', lambda *_a, **_k: True)
         monkeypatch.setattr(skytonight_api_module, 'load_json_file', lambda *a, **k: data)
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_with_timeline',
-                            lambda u, n: {'state': 'none'})
+        monkeypatch.setattr(
+            skytonight_api_module.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'}
+        )
         monkeypatch.setattr(skytonight_api_module.astrodex, 'load_user_astrodex', lambda uid: {'items': []})
         monkeypatch.setattr(skytonight_api_module.astrodex, 'is_item_in_preloaded_astrodex', lambda *a, **k: False)
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_all_plan_files', lambda uid: [])
@@ -546,8 +577,9 @@ class TestBuildCometsSectionPayloadWithCalcResults:
         data = {'comets': calc['comets'], 'metadata': {}}
         monkeypatch.setattr(skytonight_api_module, 'has_comets_results', lambda *_a, **_k: True)
         monkeypatch.setattr(skytonight_api_module, 'load_json_file', lambda *a, **k: data)
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_with_timeline',
-                            lambda u, n: {'state': 'none'})
+        monkeypatch.setattr(
+            skytonight_api_module.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'}
+        )
         monkeypatch.setattr(skytonight_api_module.astrodex, 'load_user_astrodex', lambda uid: {'items': []})
         monkeypatch.setattr(skytonight_api_module.astrodex, 'is_item_in_preloaded_astrodex', lambda *a, **k: False)
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_all_plan_files', lambda uid: [])
@@ -566,8 +598,9 @@ class TestBuildCometsSectionPayloadWithCalcResults:
         data = {'comets': [comet], 'metadata': {}}
         monkeypatch.setattr(skytonight_api_module, 'has_comets_results', lambda *_a, **_k: True)
         monkeypatch.setattr(skytonight_api_module, 'load_json_file', lambda *a, **k: data)
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_with_timeline',
-                            lambda u, n: {'state': 'none'})
+        monkeypatch.setattr(
+            skytonight_api_module.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'}
+        )
         monkeypatch.setattr(skytonight_api_module.astrodex, 'load_user_astrodex', lambda uid: {'items': []})
         monkeypatch.setattr(skytonight_api_module.astrodex, 'is_item_in_preloaded_astrodex', lambda *a, **k: False)
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_all_plan_files', lambda uid: [])
@@ -586,8 +619,9 @@ class TestBuildDsoSectionPayloadWithCalcResults:
         data = {'deep_sky': calc['deep_sky'], 'metadata': {}}
         monkeypatch.setattr(skytonight_api_module, 'has_dso_results', lambda *_a, **_k: True)
         monkeypatch.setattr(skytonight_api_module, 'load_json_file', lambda *a, **k: data)
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_with_timeline',
-                            lambda u, n: {'state': 'none'})
+        monkeypatch.setattr(
+            skytonight_api_module.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'}
+        )
         monkeypatch.setattr(skytonight_api_module.astrodex, 'load_user_astrodex', lambda uid: {'items': []})
         monkeypatch.setattr(skytonight_api_module.astrodex, 'is_item_in_preloaded_astrodex', lambda *a, **k: False)
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_all_plan_files', lambda uid: [])
@@ -605,8 +639,9 @@ class TestBuildDsoSectionPayloadWithCalcResults:
         data = {'deep_sky': calc['deep_sky'], 'metadata': {}}
         monkeypatch.setattr(skytonight_api_module, 'has_dso_results', lambda *_a, **_k: True)
         monkeypatch.setattr(skytonight_api_module, 'load_json_file', lambda *a, **k: data)
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_with_timeline',
-                            lambda u, n: {'state': 'none'})
+        monkeypatch.setattr(
+            skytonight_api_module.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'}
+        )
         monkeypatch.setattr(skytonight_api_module.astrodex, 'load_user_astrodex', lambda uid: {'items': []})
         monkeypatch.setattr(skytonight_api_module.astrodex, 'is_item_in_preloaded_astrodex', lambda *a, **k: False)
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_all_plan_files', lambda uid: [])
@@ -656,16 +691,22 @@ class TestSchedulerStatusRoutes:
     def test_legacy_scheduler_status(self, client_admin, monkeypatch):
         """legacy route delegates to skytonight_scheduler_status_api."""
         monkeypatch.setattr(skytonight_api_module, 'get_skytonight_scheduler_for_api', lambda: None)
-        monkeypatch.setattr(skytonight_api_module, 'load_config',
-                            lambda: {'skytonight': {'enabled': True}, 'location': {'timezone': 'UTC'}})
+        monkeypatch.setattr(
+            skytonight_api_module,
+            'load_config',
+            lambda: {'skytonight': {'enabled': True}, 'location': {'timezone': 'UTC'}},
+        )
         response = client_admin.get('/api/scheduler/status')
         assert response.status_code == 200
 
     def test_skytonight_scheduler_status_no_scheduler(self, client_admin, monkeypatch):
         """when scheduler is None → fallback response."""
         monkeypatch.setattr(skytonight_api_module, 'get_skytonight_scheduler_for_api', lambda: None)
-        monkeypatch.setattr(skytonight_api_module, 'load_config',
-                            lambda: {'skytonight': {'enabled': False}, 'location': {'timezone': 'UTC'}})
+        monkeypatch.setattr(
+            skytonight_api_module,
+            'load_config',
+            lambda: {'skytonight': {'enabled': False}, 'location': {'timezone': 'UTC'}},
+        )
         response = client_admin.get('/api/skytonight/scheduler/status')
         assert response.status_code == 200
         data = response.get_json()
@@ -673,10 +714,12 @@ class TestSchedulerStatusRoutes:
 
     def test_skytonight_scheduler_status_with_remote(self, client_admin, monkeypatch):
         """remote_scheduler → get_remote status."""
-        monkeypatch.setattr(skytonight_api_module, 'get_skytonight_scheduler_for_api',
-                            lambda: 'remote_scheduler')
-        monkeypatch.setattr(skytonight_api_module, 'get_remote_skytonight_scheduler_status',
-                            lambda: {'running': False, 'worker': 'remote'})
+        monkeypatch.setattr(skytonight_api_module, 'get_skytonight_scheduler_for_api', lambda: 'remote_scheduler')
+        monkeypatch.setattr(
+            skytonight_api_module,
+            'get_remote_skytonight_scheduler_status',
+            lambda: {'running': False, 'worker': 'remote'},
+        )
         response = client_admin.get('/api/skytonight/scheduler/status')
         assert response.status_code == 200
         data = response.get_json()
@@ -720,10 +763,8 @@ class TestTriggerSchedulerRoutes:
     def test_trigger_remote_scheduler_creates_trigger_file(self, client_admin, monkeypatch, tmp_path):
         """remote_scheduler → create trigger file."""
         trigger_file = tmp_path / 'skytonight.trigger'
-        monkeypatch.setattr(skytonight_api_module, 'get_skytonight_scheduler_for_api',
-                            lambda: 'remote_scheduler')
-        monkeypatch.setattr(skytonight_api_module, 'get_skytonight_scheduler_trigger_file',
-                            lambda: str(trigger_file))
+        monkeypatch.setattr(skytonight_api_module, 'get_skytonight_scheduler_for_api', lambda: 'remote_scheduler')
+        monkeypatch.setattr(skytonight_api_module, 'get_skytonight_scheduler_trigger_file', lambda: str(trigger_file))
         response = client_admin.post('/api/skytonight/scheduler/trigger')
         assert response.status_code == 200
         assert response.get_json()['status'] == 'triggered'
@@ -741,8 +782,11 @@ class TestDatasetStatusRoute:
         )
         monkeypatch.setattr(skytonight_api_module, 'get_skytonight_scheduler_for_api', lambda: None)
         monkeypatch.setattr(skytonight_api_module, 'has_calculation_results', lambda *_a, **_k: False)
-        monkeypatch.setattr(skytonight_api_module, 'load_config',
-                            lambda: {'skytonight': {'enabled': True}, 'location': {'timezone': 'UTC'}})
+        monkeypatch.setattr(
+            skytonight_api_module,
+            'load_config',
+            lambda: {'skytonight': {'enabled': True}, 'location': {'timezone': 'UTC'}},
+        )
         response = client_admin.get('/api/skytonight/dataset/status')
         assert response.status_code == 200
         data = response.get_json()
@@ -756,13 +800,16 @@ class TestDatasetStatusRoute:
             'load_targets_dataset',
             lambda *a, **k: {'loaded': True, 'targets': [], 'metadata': {}},
         )
-        monkeypatch.setattr(skytonight_api_module, 'get_skytonight_scheduler_for_api',
-                            lambda: 'remote_scheduler')
-        monkeypatch.setattr(skytonight_api_module, 'get_remote_skytonight_scheduler_status',
-                            lambda: {'running': False, 'is_executing': False})
+        monkeypatch.setattr(skytonight_api_module, 'get_skytonight_scheduler_for_api', lambda: 'remote_scheduler')
+        monkeypatch.setattr(
+            skytonight_api_module,
+            'get_remote_skytonight_scheduler_status',
+            lambda: {'running': False, 'is_executing': False},
+        )
         monkeypatch.setattr(skytonight_api_module, 'has_calculation_results', lambda *_a, **_k: False)
-        monkeypatch.setattr(skytonight_api_module, 'load_config',
-                            lambda: {'skytonight': {'enabled': True}, 'location': {}})
+        monkeypatch.setattr(
+            skytonight_api_module, 'load_config', lambda: {'skytonight': {'enabled': True}, 'location': {}}
+        )
         response = client_admin.get('/api/skytonight/dataset/status')
         assert response.status_code == 200
 
@@ -773,13 +820,12 @@ class TestDatasetStatusRoute:
             'load_targets_dataset',
             lambda *a, **k: {'loaded': True, 'targets': [], 'metadata': {}},
         )
-        mock_sched = type('S', (), {
-            'get_status': lambda self: {'running': True, 'is_executing': False}
-        })()
+        mock_sched = type('S', (), {'get_status': lambda self: {'running': True, 'is_executing': False}})()
         monkeypatch.setattr(skytonight_api_module, 'get_skytonight_scheduler_for_api', lambda: mock_sched)
         monkeypatch.setattr(skytonight_api_module, 'has_calculation_results', lambda *_a, **_k: False)
-        monkeypatch.setattr(skytonight_api_module, 'load_config',
-                            lambda: {'skytonight': {'enabled': True}, 'location': {}})
+        monkeypatch.setattr(
+            skytonight_api_module, 'load_config', lambda: {'skytonight': {'enabled': True}, 'location': {}}
+        )
         response = client_admin.get('/api/skytonight/dataset/status')
         assert response.status_code == 200
 
@@ -789,8 +835,9 @@ class TestDatasetRebuildRoute:
 
     def test_rebuild_returns_status_rebuilt(self, client_admin, monkeypatch):
         """successful rebuild."""
-        monkeypatch.setattr(skytonight_api_module, '_run_skytonight_refresh',
-                            lambda: {'targets_count': 100, 'calculation_run': True})
+        monkeypatch.setattr(
+            skytonight_api_module, '_run_skytonight_refresh', lambda: {'targets_count': 100, 'calculation_run': True}
+        )
         response = client_admin.post('/api/skytonight/dataset/rebuild')
         assert response.status_code == 200
         data = response.get_json()
@@ -798,8 +845,9 @@ class TestDatasetRebuildRoute:
 
     def test_rebuild_exception_returns_500(self, client_admin, monkeypatch):
         """exception during rebuild → 500."""
-        monkeypatch.setattr(skytonight_api_module, '_run_skytonight_refresh',
-                            lambda: (_ for _ in ()).throw(RuntimeError("fail")))
+        monkeypatch.setattr(
+            skytonight_api_module, '_run_skytonight_refresh', lambda: (_ for _ in ()).throw(RuntimeError("fail"))
+        )
         response = client_admin.post('/api/skytonight/dataset/rebuild')
         assert response.status_code == 500
 
@@ -821,16 +869,15 @@ class TestAlttimeRoute:
     def test_valid_alttime_file_returns_data(self, client_admin, monkeypatch, tmp_path):
         """read and return alttime JSON."""
         import json
+
         alttime_data = {'times': [1, 2, 3], 'altitudes': [10, 20, 30]}
         alttime_file = tmp_path / 'dso_ngc224_alttime.json'
         alttime_file.write_text(json.dumps(alttime_data), encoding='utf-8')
 
-        monkeypatch.setattr(skytonight_api_module, '_alttime_json_path',
-                            lambda tid, *_a, **_k: str(alttime_file))
+        monkeypatch.setattr(skytonight_api_module, '_alttime_json_path', lambda tid, *_a, **_k: str(alttime_file))
         monkeypatch.setattr(skytonight_api_module, 'OUTPUT_DIR', str(tmp_path))
         monkeypatch.setattr(skytonight_api_module.os.path, 'isfile', lambda p: True)
-        monkeypatch.setattr(skytonight_api_module, 'load_config',
-                            lambda: {'skytonight': {'constraints': {}}})
+        monkeypatch.setattr(skytonight_api_module, 'load_config', lambda: {'skytonight': {'constraints': {}}})
 
         response = client_admin.get('/api/skytonight/alttime/dso-ngc224')
         assert response.status_code == 200
@@ -892,10 +939,12 @@ class TestCombinationRecommendationsRoute:
 
     def test_no_combinations_returns_empty_recommendations(self, client_admin, monkeypatch):
         """no combinations → empty recommendations."""
-        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_user_combinations',
-                            lambda uid: {'items': []})
-        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_all_shared_combinations',
-                            lambda *a, **k: [])
+        monkeypatch.setattr(
+            skytonight_api_module.equipment_profiles, 'load_user_combinations', lambda uid: {'items': []}
+        )
+        monkeypatch.setattr(
+            skytonight_api_module.equipment_profiles, 'load_all_shared_combinations', lambda *a, **k: []
+        )
         response = client_admin.post(
             '/api/skytonight/combination-recommendations',
             json={'id': 'NGC 224', 'type': 'Galaxy', 'mag': 3.4, 'size': 189.0},
@@ -908,17 +957,25 @@ class TestCombinationRecommendationsRoute:
     def test_with_combinations_returns_recommendations(self, client_admin, monkeypatch):
         """with an enabled, valid combination → recommendations."""
         mock_combo = {'id': 'combo-1', 'name': 'My Combo', 'telescope_id': 'scope-1', 'is_disabled': False}
-        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_user_combinations',
-                            lambda uid: {'items': [mock_combo]})
-        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_all_shared_combinations',
-                            lambda *a, **k: [])
-        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'compute_combination_validity_status',
-                            lambda combo, uid: {'is_valid': True, 'invalid_reasons': [],
-                                                 'disabled_component_ids': []})
-        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'index_telescopes_and_cameras',
-                            lambda uid: ({}, {}))
-        monkeypatch.setattr(skytonight_api_module, '_recommend_combinations_for_target',
-                            lambda t, combos, tel, cam: [{'combination_id': 'combo-1', 'rating_1_to_5': 4}])
+        monkeypatch.setattr(
+            skytonight_api_module.equipment_profiles, 'load_user_combinations', lambda uid: {'items': [mock_combo]}
+        )
+        monkeypatch.setattr(
+            skytonight_api_module.equipment_profiles, 'load_all_shared_combinations', lambda *a, **k: []
+        )
+        monkeypatch.setattr(
+            skytonight_api_module.equipment_profiles,
+            'compute_combination_validity_status',
+            lambda combo, uid: {'is_valid': True, 'invalid_reasons': [], 'disabled_component_ids': []},
+        )
+        monkeypatch.setattr(
+            skytonight_api_module.equipment_profiles, 'index_telescopes_and_cameras', lambda uid: ({}, {})
+        )
+        monkeypatch.setattr(
+            skytonight_api_module,
+            '_recommend_combinations_for_target',
+            lambda t, combos, tel, cam: [{'combination_id': 'combo-1', 'rating_1_to_5': 4}],
+        )
         response = client_admin.post(
             '/api/skytonight/combination-recommendations',
             json={'id': 'NGC 224', 'type': 'Galaxy', 'mag': 3.4, 'size': 189.0},
@@ -930,10 +987,12 @@ class TestCombinationRecommendationsRoute:
     def test_disabled_combination_excluded(self, client_admin, monkeypatch):
         """own combination with is_disabled=True → excluded, no telescopes-recommendations call."""
         mock_combo = {'id': 'combo-1', 'name': 'My Combo', 'telescope_id': 'scope-1', 'is_disabled': True}
-        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_user_combinations',
-                            lambda uid: {'items': [mock_combo]})
-        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_all_shared_combinations',
-                            lambda *a, **k: [])
+        monkeypatch.setattr(
+            skytonight_api_module.equipment_profiles, 'load_user_combinations', lambda uid: {'items': [mock_combo]}
+        )
+        monkeypatch.setattr(
+            skytonight_api_module.equipment_profiles, 'load_all_shared_combinations', lambda *a, **k: []
+        )
         response = client_admin.post(
             '/api/skytonight/combination-recommendations',
             json={'id': 'NGC 224', 'type': 'Galaxy', 'mag': 3.4, 'size': 189.0},
@@ -946,13 +1005,21 @@ class TestCombinationRecommendationsRoute:
     def test_invalid_combination_excluded(self, client_admin, monkeypatch):
         """own combination failing validity → excluded from recommendations."""
         mock_combo = {'id': 'combo-1', 'name': 'My Combo', 'telescope_id': 'scope-1', 'is_disabled': False}
-        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_user_combinations',
-                            lambda uid: {'items': [mock_combo]})
-        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_all_shared_combinations',
-                            lambda *a, **k: [])
-        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'compute_combination_validity_status',
-                            lambda combo, uid: {'is_valid': False, 'invalid_reasons': ['disabled:scope-1'],
-                                                 'disabled_component_ids': ['scope-1']})
+        monkeypatch.setattr(
+            skytonight_api_module.equipment_profiles, 'load_user_combinations', lambda uid: {'items': [mock_combo]}
+        )
+        monkeypatch.setattr(
+            skytonight_api_module.equipment_profiles, 'load_all_shared_combinations', lambda *a, **k: []
+        )
+        monkeypatch.setattr(
+            skytonight_api_module.equipment_profiles,
+            'compute_combination_validity_status',
+            lambda combo, uid: {
+                'is_valid': False,
+                'invalid_reasons': ['disabled:scope-1'],
+                'disabled_component_ids': ['scope-1'],
+            },
+        )
         response = client_admin.post(
             '/api/skytonight/combination-recommendations',
             json={'id': 'NGC 224', 'type': 'Galaxy', 'mag': 3.4, 'size': 189.0},
@@ -964,17 +1031,27 @@ class TestCombinationRecommendationsRoute:
     def test_shared_combination_included(self, client_admin, monkeypatch):
         """valid shared combination (from another user) → included in recommendations."""
         shared_combo = {
-            'id': 'combo-2', 'name': 'Shared Combo', 'telescope_id': 'scope-2',
-            'is_disabled': False, 'is_valid': True, 'owner_username': 'alice',
+            'id': 'combo-2',
+            'name': 'Shared Combo',
+            'telescope_id': 'scope-2',
+            'is_disabled': False,
+            'is_valid': True,
+            'owner_username': 'alice',
         }
-        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_user_combinations',
-                            lambda uid: {'items': []})
-        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_all_shared_combinations',
-                            lambda *a, **k: [shared_combo])
-        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'index_telescopes_and_cameras',
-                            lambda uid: ({}, {}))
-        monkeypatch.setattr(skytonight_api_module, '_recommend_combinations_for_target',
-                            lambda t, combos, tel, cam: [{'combination_id': 'combo-2', 'rating_1_to_5': 3}])
+        monkeypatch.setattr(
+            skytonight_api_module.equipment_profiles, 'load_user_combinations', lambda uid: {'items': []}
+        )
+        monkeypatch.setattr(
+            skytonight_api_module.equipment_profiles, 'load_all_shared_combinations', lambda *a, **k: [shared_combo]
+        )
+        monkeypatch.setattr(
+            skytonight_api_module.equipment_profiles, 'index_telescopes_and_cameras', lambda uid: ({}, {})
+        )
+        monkeypatch.setattr(
+            skytonight_api_module,
+            '_recommend_combinations_for_target',
+            lambda t, combos, tel, cam: [{'combination_id': 'combo-2', 'rating_1_to_5': 3}],
+        )
         response = client_admin.post(
             '/api/skytonight/combination-recommendations',
             json={'id': 'NGC 224', 'type': 'Galaxy', 'mag': 3.4, 'size': 189.0},
@@ -986,13 +1063,19 @@ class TestCombinationRecommendationsRoute:
     def test_disabled_shared_combination_excluded(self, client_admin, monkeypatch):
         """shared combination with is_disabled=True → excluded, same as an own disabled combo."""
         shared_combo = {
-            'id': 'combo-3', 'name': 'Disabled Shared Combo', 'telescope_id': 'scope-3',
-            'is_disabled': True, 'is_valid': True, 'owner_username': 'alice',
+            'id': 'combo-3',
+            'name': 'Disabled Shared Combo',
+            'telescope_id': 'scope-3',
+            'is_disabled': True,
+            'is_valid': True,
+            'owner_username': 'alice',
         }
-        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_user_combinations',
-                            lambda uid: {'items': []})
-        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_all_shared_combinations',
-                            lambda *a, **k: [shared_combo])
+        monkeypatch.setattr(
+            skytonight_api_module.equipment_profiles, 'load_user_combinations', lambda uid: {'items': []}
+        )
+        monkeypatch.setattr(
+            skytonight_api_module.equipment_profiles, 'load_all_shared_combinations', lambda *a, **k: [shared_combo]
+        )
         response = client_admin.post(
             '/api/skytonight/combination-recommendations',
             json={'id': 'NGC 224', 'type': 'Galaxy', 'mag': 3.4, 'size': 189.0},
@@ -1004,13 +1087,19 @@ class TestCombinationRecommendationsRoute:
     def test_invalid_shared_combination_excluded(self, client_admin, monkeypatch):
         """shared combination with is_valid=False → excluded, same as an own invalid combo."""
         shared_combo = {
-            'id': 'combo-4', 'name': 'Invalid Shared Combo', 'telescope_id': 'scope-4',
-            'is_disabled': False, 'is_valid': False, 'owner_username': 'alice',
+            'id': 'combo-4',
+            'name': 'Invalid Shared Combo',
+            'telescope_id': 'scope-4',
+            'is_disabled': False,
+            'is_valid': False,
+            'owner_username': 'alice',
         }
-        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_user_combinations',
-                            lambda uid: {'items': []})
-        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_all_shared_combinations',
-                            lambda *a, **k: [shared_combo])
+        monkeypatch.setattr(
+            skytonight_api_module.equipment_profiles, 'load_user_combinations', lambda uid: {'items': []}
+        )
+        monkeypatch.setattr(
+            skytonight_api_module.equipment_profiles, 'load_all_shared_combinations', lambda *a, **k: [shared_combo]
+        )
         response = client_admin.post(
             '/api/skytonight/combination-recommendations',
             json={'id': 'NGC 224', 'type': 'Galaxy', 'mag': 3.4, 'size': 189.0},
@@ -1034,20 +1123,24 @@ class TestSkymapRoute:
     def test_skymap_returns_targets(self, client_admin, monkeypatch, tmp_path):
         """read and return skymap data."""
         import json
+
         skymap_data = {
             'targets': [
-                {'id': 'ngc224', 'name': 'NGC 224', 'constellation': 'And',
-                 'category': 'deep_sky', 'messier': True},
+                {'id': 'ngc224', 'name': 'NGC 224', 'constellation': 'And', 'category': 'deep_sky', 'messier': True},
             ]
         }
         skymap_file = tmp_path / 'skymap.json'
         skymap_file.write_text(json.dumps(skymap_data), encoding='utf-8')
         monkeypatch.setattr(skytonight_api_module.os.path, 'isfile', lambda p: True)
         monkeypatch.setattr(skytonight_api_module, 'get_skymap_file', lambda *_a, **_k: str(skymap_file))
-        monkeypatch.setattr(skytonight_api_module, 'get_dso_results_file',
-                            lambda *_a, **_k: str(tmp_path / 'dso_results.json'))
-        monkeypatch.setattr(skytonight_api_module, 'load_config',
-                            lambda: {'skytonight': {'constraints': {'altitude_constraint_min': 30, 'horizon_profile': []}}})
+        monkeypatch.setattr(
+            skytonight_api_module, 'get_dso_results_file', lambda *_a, **_k: str(tmp_path / 'dso_results.json')
+        )
+        monkeypatch.setattr(
+            skytonight_api_module,
+            'load_config',
+            lambda: {'skytonight': {'constraints': {'altitude_constraint_min': 30, 'horizon_profile': []}}},
+        )
         response = client_admin.get('/api/skytonight/skymap')
         assert response.status_code == 200
         data = response.get_json()
@@ -1065,8 +1158,9 @@ class TestDataRoutes:
             'load_targets_dataset',
             lambda *a, **k: {'targets': _sample_targets(), 'metadata': {}},
         )
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_with_timeline',
-                            lambda u, n: {'state': 'none'})
+        monkeypatch.setattr(
+            skytonight_api_module.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'}
+        )
         monkeypatch.setattr(skytonight_api_module.astrodex, 'load_user_astrodex', lambda uid: {'items': []})
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_all_plan_files', lambda uid: [])
         monkeypatch.setattr(skytonight_api_module, '_get_catalogue_alias_payload', lambda c, n: ('', {}))
@@ -1081,8 +1175,9 @@ class TestDataRoutes:
             'load_targets_dataset',
             lambda *a, **k: {'targets': _sample_targets(), 'metadata': {}},
         )
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_with_timeline',
-                            lambda u, n: {'state': 'none'})
+        monkeypatch.setattr(
+            skytonight_api_module.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'}
+        )
         monkeypatch.setattr(skytonight_api_module.astrodex, 'load_user_astrodex', lambda uid: {'items': []})
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_all_plan_files', lambda uid: [])
         monkeypatch.setattr(skytonight_api_module, '_get_catalogue_alias_payload', lambda c, n: ('', {}))
@@ -1097,13 +1192,13 @@ class TestDataRoutes:
             'load_targets_dataset',
             lambda *a, **k: {'targets': _sample_targets(), 'metadata': {}},
         )
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_with_timeline',
-                            lambda u, n: {'state': 'none'})
+        monkeypatch.setattr(
+            skytonight_api_module.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'}
+        )
         monkeypatch.setattr(skytonight_api_module.astrodex, 'load_user_astrodex', lambda uid: {'items': []})
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_all_plan_files', lambda uid: [])
         monkeypatch.setattr(skytonight_api_module, '_get_catalogue_alias_payload', lambda c, n: ('', {}))
-        monkeypatch.setattr(skytonight_api_module.skytonight_targets, 'normalize_object_name',
-                            lambda n: n.lower())
+        monkeypatch.setattr(skytonight_api_module.skytonight_targets, 'normalize_object_name', lambda n: n.lower())
         response = client_admin.get('/api/skytonight/data/dso')
         assert response.status_code == 200
 
@@ -1185,10 +1280,7 @@ class TestRouteExceptionHandlers:
     def test_skytonight_log_no_file_returns_empty(self, client_admin, monkeypatch, tmp_path):
         """log file doesn't exist → log_content=''."""
         monkeypatch.setattr(skytonight_api_module, 'ensure_skytonight_directories', lambda: None)
-        monkeypatch.setattr(
-            skytonight_api_module, 'SKYTONIGHT_CALCULATION_LOG_FILE',
-            str(tmp_path / 'nonexistent.log')
-        )
+        monkeypatch.setattr(skytonight_api_module, 'SKYTONIGHT_CALCULATION_LOG_FILE', str(tmp_path / 'nonexistent.log'))
         response = client_admin.get('/api/skytonight/log')
         assert response.status_code == 200
         assert response.get_json()['log_content'] == ''
@@ -1206,7 +1298,8 @@ class TestRouteExceptionHandlers:
     def test_reports_api_exception_returns_500(self, client_admin, monkeypatch):
         """exception in reports route → 500."""
         monkeypatch.setattr(
-            skytonight_api_module, '_build_skytonight_reports_payload',
+            skytonight_api_module,
+            '_build_skytonight_reports_payload',
             lambda *a, **k: (_ for _ in ()).throw(RuntimeError('boom')),
         )
         response = client_admin.get('/api/skytonight/reports')
@@ -1215,7 +1308,8 @@ class TestRouteExceptionHandlers:
     def test_catalogue_reports_api_basic(self, client_admin, monkeypatch):
         """catalogue reports route works."""
         monkeypatch.setattr(
-            skytonight_api_module, '_build_skytonight_reports_payload',
+            skytonight_api_module,
+            '_build_skytonight_reports_payload',
             lambda *a, **k: {'report': [], 'bodies': [], 'comets': []},
         )
         response = client_admin.get('/api/skytonight/reports/Messier')
@@ -1229,7 +1323,8 @@ class TestRouteExceptionHandlers:
     def test_catalogue_reports_exception_returns_500(self, client_admin, monkeypatch):
         """exception in catalogue reports route → 500."""
         monkeypatch.setattr(
-            skytonight_api_module, '_build_skytonight_reports_payload',
+            skytonight_api_module,
+            '_build_skytonight_reports_payload',
             lambda *a, **k: (_ for _ in ()).throw(RuntimeError('boom')),
         )
         response = client_admin.get('/api/skytonight/reports/Messier')
@@ -1238,6 +1333,7 @@ class TestRouteExceptionHandlers:
     def test_alttime_horizon_empty_and_not_in_data(self, client_admin, monkeypatch, tmp_path):
         """horizon_profile empty and not in data → set []."""
         import json
+
         alttime_data = {'times': [1, 2, 3], 'altitudes': [10, 20, 30]}
         alttime_file = tmp_path / 'target_alttime.json'
         alttime_file.write_text(json.dumps(alttime_data), encoding='utf-8')
@@ -1246,8 +1342,9 @@ class TestRouteExceptionHandlers:
         monkeypatch.setattr(skytonight_api_module, '_alttime_json_path', lambda tid, *_a, **_k: str(alttime_file))
         monkeypatch.setattr(skytonight_api_module, 'OUTPUT_DIR', output_dir)
         monkeypatch.setattr(skytonight_api_module.os.path, 'isfile', lambda p: True)
-        monkeypatch.setattr(skytonight_api_module, 'load_config',
-                            lambda: {'skytonight': {'constraints': {'horizon_profile': []}}})
+        monkeypatch.setattr(
+            skytonight_api_module, 'load_config', lambda: {'skytonight': {'constraints': {'horizon_profile': []}}}
+        )
 
         response = client_admin.get('/api/skytonight/alttime/dso-ngc224')
         assert response.status_code == 200
@@ -1257,6 +1354,7 @@ class TestRouteExceptionHandlers:
     def test_alttime_exception_returns_500(self, client_admin, monkeypatch, tmp_path):
         """exception reading alttime file → 500."""
         from unittest.mock import patch as upatch
+
         output_dir = str(tmp_path)
         target_path = str(tmp_path / 'f.json')
 
@@ -1265,6 +1363,7 @@ class TestRouteExceptionHandlers:
         monkeypatch.setattr(skytonight_api_module.os.path, 'isfile', lambda p: True)
 
         import builtins
+
         real_open = builtins.open
 
         def bad_open(path, *a, **k):
@@ -1278,10 +1377,12 @@ class TestRouteExceptionHandlers:
 
     def test_combination_recommendations_invalid_payload(self, client_admin, monkeypatch):
         """non-dict JSON payload → 400."""
-        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_user_combinations',
-                            lambda uid: {'items': []})
-        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_all_shared_combinations',
-                            lambda *a, **k: [])
+        monkeypatch.setattr(
+            skytonight_api_module.equipment_profiles, 'load_user_combinations', lambda uid: {'items': []}
+        )
+        monkeypatch.setattr(
+            skytonight_api_module.equipment_profiles, 'load_all_shared_combinations', lambda *a, **k: []
+        )
         response = client_admin.post(
             '/api/skytonight/combination-recommendations',
             data='"just_a_string"',
@@ -1293,20 +1394,30 @@ class TestRouteExceptionHandlers:
         """mag=None → fallback to 'visual magnitude' key."""
         mock_combo = {'id': 'combo-1', 'name': 'My Combo', 'telescope_id': 'scope-1', 'is_disabled': False}
         mock_telescope = {
-            'id': 'scope-1', 'name': 'My Scope',
-            'aperture_mm': 200, 'focal_length_mm': 1000,
-            'effective_focal_length': 1000, 'effective_focal_ratio': 5.0,
+            'id': 'scope-1',
+            'name': 'My Scope',
+            'aperture_mm': 200,
+            'focal_length_mm': 1000,
+            'effective_focal_length': 1000,
+            'effective_focal_ratio': 5.0,
             'native_focal_ratio': 5.0,
         }
-        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_user_combinations',
-                            lambda uid: {'items': [mock_combo]})
-        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_all_shared_combinations',
-                            lambda *a, **k: [])
-        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'compute_combination_validity_status',
-                            lambda combo, uid: {'is_valid': True, 'invalid_reasons': [],
-                                                 'disabled_component_ids': []})
-        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'index_telescopes_and_cameras',
-                            lambda uid: ({'scope-1': mock_telescope}, {}))
+        monkeypatch.setattr(
+            skytonight_api_module.equipment_profiles, 'load_user_combinations', lambda uid: {'items': [mock_combo]}
+        )
+        monkeypatch.setattr(
+            skytonight_api_module.equipment_profiles, 'load_all_shared_combinations', lambda *a, **k: []
+        )
+        monkeypatch.setattr(
+            skytonight_api_module.equipment_profiles,
+            'compute_combination_validity_status',
+            lambda combo, uid: {'is_valid': True, 'invalid_reasons': [], 'disabled_component_ids': []},
+        )
+        monkeypatch.setattr(
+            skytonight_api_module.equipment_profiles,
+            'index_telescopes_and_cameras',
+            lambda uid: ({'scope-1': mock_telescope}, {}),
+        )
         response = client_admin.post(
             '/api/skytonight/combination-recommendations',
             json={'id': 'NGC 224', 'type': 'Galaxy', 'visual magnitude': 3.4, 'size': 189.0},
@@ -1317,8 +1428,11 @@ class TestRouteExceptionHandlers:
 
     def test_combination_recommendations_exception_returns_500(self, client_admin, monkeypatch):
         """exception → 500."""
-        monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_user_combinations',
-                            lambda uid: (_ for _ in ()).throw(RuntimeError('boom')))
+        monkeypatch.setattr(
+            skytonight_api_module.equipment_profiles,
+            'load_user_combinations',
+            lambda uid: (_ for _ in ()).throw(RuntimeError('boom')),
+        )
         response = client_admin.post(
             '/api/skytonight/combination-recommendations',
             json={'id': 'NGC 224', 'type': 'Galaxy', 'mag': 3.4},
@@ -1337,10 +1451,10 @@ class TestRouteExceptionHandlers:
     def test_skymap_enrichment_with_dso_file(self, client_admin, monkeypatch, tmp_path):
         """skymap enrichment crosses DSO file when needed."""
         import json
+
         skymap_data = {
             'targets': [
-                {'id': 'dso-ngc224', 'name': 'NGC 224', 'constellation': 'And',
-                 'category': 'deep_sky'},
+                {'id': 'dso-ngc224', 'name': 'NGC 224', 'constellation': 'And', 'category': 'deep_sky'},
             ]
         }
         dso_data = {
@@ -1356,10 +1470,16 @@ class TestRouteExceptionHandlers:
         monkeypatch.setattr(skytonight_api_module, 'get_skymap_file', lambda *_a, **_k: str(skymap_file))
         monkeypatch.setattr(skytonight_api_module, 'get_dso_results_file', lambda *_a, **_k: str(dso_file))
         monkeypatch.setattr(skytonight_api_module.os.path, 'isfile', lambda p: True)
-        monkeypatch.setattr(skytonight_api_module, 'load_config',
-                            lambda: {'skytonight': {'constraints': {'altitude_constraint_min': 30, 'horizon_profile': []}}})
-        monkeypatch.setattr(skytonight_api_module, 'load_json_file',
-                            lambda path, default=None: dso_data if 'dso' in str(path) else default)
+        monkeypatch.setattr(
+            skytonight_api_module,
+            'load_config',
+            lambda: {'skytonight': {'constraints': {'altitude_constraint_min': 30, 'horizon_profile': []}}},
+        )
+        monkeypatch.setattr(
+            skytonight_api_module,
+            'load_json_file',
+            lambda path, default=None: dso_data if 'dso' in str(path) else default,
+        )
         response = client_admin.get('/api/skytonight/skymap')
         assert response.status_code == 200
         targets = response.get_json()['targets']
@@ -1367,43 +1487,57 @@ class TestRouteExceptionHandlers:
 
     def test_bodies_route_exception_returns_500(self, client_admin, monkeypatch):
         """exception in bodies route → 500."""
-        monkeypatch.setattr(skytonight_api_module, '_build_bodies_section_payload',
-                            lambda *a, **k: (_ for _ in ()).throw(RuntimeError('boom')))
+        monkeypatch.setattr(
+            skytonight_api_module,
+            '_build_bodies_section_payload',
+            lambda *a, **k: (_ for _ in ()).throw(RuntimeError('boom')),
+        )
         response = client_admin.get('/api/skytonight/data/bodies')
         assert response.status_code == 500
 
     def test_comets_route_exception_returns_500(self, client_admin, monkeypatch):
         """exception in comets route → 500."""
-        monkeypatch.setattr(skytonight_api_module, '_build_comets_section_payload',
-                            lambda *a, **k: (_ for _ in ()).throw(RuntimeError('boom')))
+        monkeypatch.setattr(
+            skytonight_api_module,
+            '_build_comets_section_payload',
+            lambda *a, **k: (_ for _ in ()).throw(RuntimeError('boom')),
+        )
         response = client_admin.get('/api/skytonight/data/comets')
         assert response.status_code == 500
 
     def test_dso_route_exception_returns_500(self, client_admin, monkeypatch):
         """exception in DSO route → 500."""
-        monkeypatch.setattr(skytonight_api_module, '_build_dso_section_payload',
-                            lambda *a, **k: (_ for _ in ()).throw(RuntimeError('boom')))
+        monkeypatch.setattr(
+            skytonight_api_module,
+            '_build_dso_section_payload',
+            lambda *a, **k: (_ for _ in ()).throw(RuntimeError('boom')),
+        )
         response = client_admin.get('/api/skytonight/data/dso')
         assert response.status_code == 500
 
     def test_catalogue_log_exception_returns_500(self, client_admin, monkeypatch):
         """exception in catalogue log route → 500."""
-        monkeypatch.setattr(skytonight_api_module, 'ensure_skytonight_directories',
-                            lambda: (_ for _ in ()).throw(RuntimeError('boom')))
+        monkeypatch.setattr(
+            skytonight_api_module, 'ensure_skytonight_directories', lambda: (_ for _ in ()).throw(RuntimeError('boom'))
+        )
         response = client_admin.get('/api/skytonight/logs/Messier')
         assert response.status_code == 500
 
     def test_log_exists_exception_returns_500(self, client_admin, monkeypatch):
         """exception in log-exists route → 500."""
-        monkeypatch.setattr(skytonight_api_module, 'ensure_skytonight_directories',
-                            lambda: (_ for _ in ()).throw(RuntimeError('boom')))
+        monkeypatch.setattr(
+            skytonight_api_module, 'ensure_skytonight_directories', lambda: (_ for _ in ()).throw(RuntimeError('boom'))
+        )
         response = client_admin.get('/api/skytonight/logs/Messier/exists')
         assert response.status_code == 500
 
     def test_target_debug_exception_returns_500(self, client_admin, monkeypatch):
         """exception in target-debug route → 500."""
-        monkeypatch.setattr(skytonight_api_module, 'compute_target_debug',
-                            lambda name, config=None: (_ for _ in ()).throw(RuntimeError('boom')))
+        monkeypatch.setattr(
+            skytonight_api_module,
+            'compute_target_debug',
+            lambda name, config=None: (_ for _ in ()).throw(RuntimeError('boom')),
+        )
         response = client_admin.get('/api/skytonight/target-debug?name=M+31')
         assert response.status_code == 500
 
@@ -1554,10 +1688,20 @@ class TestCombinationScoringHelpers:
         """two telescope-based combos → recommendations sorted by rating."""
         _recommend_combinations_for_target = skytonight_api_module._recommend_combinations_for_target
         telescopes_by_id = {
-            's1': {'id': 's1', 'name': 'Small Scope', 'effective_focal_length': 500.0,
-                   'effective_focal_ratio': 7.0, 'aperture_mm': 80.0},
-            's2': {'id': 's2', 'name': 'Big Scope', 'effective_focal_length': 1500.0,
-                   'effective_focal_ratio': 5.0, 'aperture_mm': 300.0},
+            's1': {
+                'id': 's1',
+                'name': 'Small Scope',
+                'effective_focal_length': 500.0,
+                'effective_focal_ratio': 7.0,
+                'aperture_mm': 80.0,
+            },
+            's2': {
+                'id': 's2',
+                'name': 'Big Scope',
+                'effective_focal_length': 1500.0,
+                'effective_focal_ratio': 5.0,
+                'aperture_mm': 300.0,
+            },
         }
         combos = [
             {'id': 'c1', 'name': 'Combo Small', 'telescope_id': 's1'},
@@ -1578,8 +1722,12 @@ class TestCombinationScoringHelpers:
         """no telescope_id, but lens_focal_length_mm/lens_focal_ratio set → still scored."""
         _recommend_combinations_for_target = skytonight_api_module._recommend_combinations_for_target
         combo = {
-            'id': 'c1', 'name': 'DSLR + Lens', 'telescope_id': None, 'camera_id': 'cam-1',
-            'lens_focal_length_mm': 200.0, 'lens_focal_ratio': 2.8,
+            'id': 'c1',
+            'name': 'DSLR + Lens',
+            'telescope_id': None,
+            'camera_id': 'cam-1',
+            'lens_focal_length_mm': 200.0,
+            'lens_focal_ratio': 2.8,
         }
         result = _recommend_combinations_for_target(
             {'type': 'Nebula', 'size': 120.0, 'mag': 5.0},
@@ -1612,12 +1760,22 @@ class TestCombinationScoringHelpers:
         """combo with a resolvable camera → fov_diagonal_deg/image_scale/sampling populated."""
         _recommend_combinations_for_target = skytonight_api_module._recommend_combinations_for_target
         telescopes_by_id = {
-            's1': {'id': 's1', 'name': 'Scope', 'effective_focal_length': 1000.0,
-                   'effective_focal_ratio': 5.0, 'aperture_mm': 200.0},
+            's1': {
+                'id': 's1',
+                'name': 'Scope',
+                'effective_focal_length': 1000.0,
+                'effective_focal_ratio': 5.0,
+                'aperture_mm': 200.0,
+            },
         }
         cameras_by_id = {
-            'cam-1': {'id': 'cam-1', 'name': 'Cam', 'sensor_width_mm': 23.5,
-                      'sensor_height_mm': 15.6, 'pixel_size_um': 3.76},
+            'cam-1': {
+                'id': 'cam-1',
+                'name': 'Cam',
+                'sensor_width_mm': 23.5,
+                'sensor_height_mm': 15.6,
+                'pixel_size_um': 3.76,
+            },
         }
         combo = {'id': 'c1', 'name': 'Scope + Cam', 'telescope_id': 's1', 'camera_id': 'cam-1'}
         result = _recommend_combinations_for_target(
@@ -1636,8 +1794,13 @@ class TestCombinationScoringHelpers:
         """camera resolvable but missing sensor dimensions → FOV fields stay None, no crash."""
         _recommend_combinations_for_target = skytonight_api_module._recommend_combinations_for_target
         telescopes_by_id = {
-            's1': {'id': 's1', 'name': 'Scope', 'effective_focal_length': 1000.0,
-                   'effective_focal_ratio': 5.0, 'aperture_mm': 200.0},
+            's1': {
+                'id': 's1',
+                'name': 'Scope',
+                'effective_focal_length': 1000.0,
+                'effective_focal_ratio': 5.0,
+                'aperture_mm': 200.0,
+            },
         }
         cameras_by_id = {'cam-1': {'id': 'cam-1', 'name': 'Cam'}}
         combo = {'id': 'c1', 'name': 'Scope + Cam', 'telescope_id': 's1', 'camera_id': 'cam-1'}
@@ -1661,21 +1824,21 @@ class TestPayloadBuilderStaticPath:
 
     def _common_patches(self, monkeypatch):
         monkeypatch.setattr(skytonight_api_module, 'has_calculation_results', lambda *_a, **_k: False)
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_with_timeline',
-                            lambda u, n: {'state': 'none'})
+        monkeypatch.setattr(
+            skytonight_api_module.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'}
+        )
         monkeypatch.setattr(skytonight_api_module.astrodex, 'load_user_astrodex', lambda uid: {'items': []})
-        monkeypatch.setattr(skytonight_api_module.astrodex, 'is_item_in_preloaded_astrodex',
-                            lambda *a, **k: False)
+        monkeypatch.setattr(skytonight_api_module.astrodex, 'is_item_in_preloaded_astrodex', lambda *a, **k: False)
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_all_plan_files', lambda uid: [])
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'is_target_in_current_plan',
-                            lambda *a, **k: False)
+        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'is_target_in_current_plan', lambda *a, **k: False)
         monkeypatch.setattr(skytonight_api_module, '_get_catalogue_alias_payload', lambda c, n: ('', {}))
 
     def test_empty_targets_logs_info(self, monkeypatch):
         """empty targets list → still returns empty report."""
         self._common_patches(monkeypatch)
         monkeypatch.setattr(
-            skytonight_api_module.skytonight_targets, 'load_targets_dataset',
+            skytonight_api_module.skytonight_targets,
+            'load_targets_dataset',
             lambda *a, **k: {'targets': [], 'metadata': {}},
         )
         result = skytonight_api_module._build_skytonight_reports_payload(None, 'uid-1', 'user1')
@@ -1687,12 +1850,18 @@ class TestPayloadBuilderStaticPath:
         self._common_patches(monkeypatch)
         # Inject metadata as a bad value via a dict-like target
         bad_target = {
-            'target_id': 'dso-ngc224', 'category': 'deep_sky', 'object_type': 'Galaxy',
-            'preferred_name': 'NGC 224', 'catalogue_names': {'OpenNGC': 'NGC 224'},
-            'metadata': 'not_a_dict', 'aliases': [], 'source_catalogues': ['OpenNGC'],
+            'target_id': 'dso-ngc224',
+            'category': 'deep_sky',
+            'object_type': 'Galaxy',
+            'preferred_name': 'NGC 224',
+            'catalogue_names': {'OpenNGC': 'NGC 224'},
+            'metadata': 'not_a_dict',
+            'aliases': [],
+            'source_catalogues': ['OpenNGC'],
         }
         monkeypatch.setattr(
-            skytonight_api_module.skytonight_targets, 'load_targets_dataset',
+            skytonight_api_module.skytonight_targets,
+            'load_targets_dataset',
             lambda *a, **k: {'targets': [bad_target], 'metadata': {}},
         )
         result = skytonight_api_module._build_skytonight_reports_payload(None, 'uid-1', 'user1')
@@ -1702,7 +1871,8 @@ class TestPayloadBuilderStaticPath:
         """catalogue filter skips targets without matching name."""
         self._common_patches(monkeypatch)
         monkeypatch.setattr(
-            skytonight_api_module.skytonight_targets, 'load_targets_dataset',
+            skytonight_api_module.skytonight_targets,
+            'load_targets_dataset',
             lambda *a, **k: {'targets': _sample_targets(), 'metadata': {}},
         )
         # Filter for 'NGC' catalogue - our sample targets don't have this key
@@ -1713,7 +1883,8 @@ class TestPayloadBuilderStaticPath:
         """annotation path when catalogue filter matches."""
         self._common_patches(monkeypatch)
         monkeypatch.setattr(
-            skytonight_api_module.skytonight_targets, 'load_targets_dataset',
+            skytonight_api_module.skytonight_targets,
+            'load_targets_dataset',
             lambda *a, **k: {'targets': _sample_targets(), 'metadata': {}},
         )
         result = skytonight_api_module._build_skytonight_reports_payload('Messier', 'uid-1', 'user1')
@@ -1723,12 +1894,16 @@ class TestPayloadBuilderStaticPath:
         """comet category in static path."""
         self._common_patches(monkeypatch)
         comet_target = {
-            'target_id': 'comet-13p', 'category': 'comets', 'object_type': 'Comet',
-            'preferred_name': '13P/Olbers', 'catalogue_names': {'Comets': '13P/Olbers'},
+            'target_id': 'comet-13p',
+            'category': 'comets',
+            'object_type': 'Comet',
+            'preferred_name': '13P/Olbers',
+            'catalogue_names': {'Comets': '13P/Olbers'},
             'metadata': {'perihelion_date': '2026-10-20'},
         }
         monkeypatch.setattr(
-            skytonight_api_module.skytonight_targets, 'load_targets_dataset',
+            skytonight_api_module.skytonight_targets,
+            'load_targets_dataset',
             lambda *a, **k: {'targets': [comet_target], 'metadata': {}},
         )
         result = skytonight_api_module._build_skytonight_reports_payload(None, 'uid-1', 'user1')
@@ -1737,17 +1912,22 @@ class TestPayloadBuilderStaticPath:
     def test_comets_section_static_metadata_not_dict(self, monkeypatch):
         """comet metadata not dict → replaced with {} in static path."""
         monkeypatch.setattr(skytonight_api_module, 'has_comets_results', lambda *_a, **_k: False)
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_with_timeline',
-                            lambda u, n: {'state': 'none'})
+        monkeypatch.setattr(
+            skytonight_api_module.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'}
+        )
         monkeypatch.setattr(skytonight_api_module.astrodex, 'load_user_astrodex', lambda uid: {'items': []})
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_all_plan_files', lambda uid: [])
         comet_target = {
-            'target_id': 'comet-13p', 'category': 'comets', 'object_type': 'Comet',
-            'preferred_name': '13P/Olbers', 'catalogue_names': {},
+            'target_id': 'comet-13p',
+            'category': 'comets',
+            'object_type': 'Comet',
+            'preferred_name': '13P/Olbers',
+            'catalogue_names': {},
             'metadata': 'bad_metadata',
         }
         monkeypatch.setattr(
-            skytonight_api_module.skytonight_targets, 'load_targets_dataset',
+            skytonight_api_module.skytonight_targets,
+            'load_targets_dataset',
             lambda *a, **k: {'targets': [comet_target], 'metadata': {}},
         )
         result = skytonight_api_module._build_comets_section_payload('uid-1', 'user1')
@@ -1757,16 +1937,17 @@ class TestPayloadBuilderStaticPath:
     def test_dso_section_static_catalogue_filter(self, monkeypatch):
         """DSO static path with catalogue filter."""
         monkeypatch.setattr(skytonight_api_module, 'has_dso_results', lambda *_a, **_k: False)
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_with_timeline',
-                            lambda u, n: {'state': 'none'})
+        monkeypatch.setattr(
+            skytonight_api_module.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'}
+        )
         monkeypatch.setattr(skytonight_api_module.astrodex, 'load_user_astrodex', lambda uid: {'items': []})
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_all_plan_files', lambda uid: [])
         monkeypatch.setattr(
-            skytonight_api_module.skytonight_targets, 'load_targets_dataset',
+            skytonight_api_module.skytonight_targets,
+            'load_targets_dataset',
             lambda *a, **k: {'targets': _sample_targets(), 'metadata': {}},
         )
-        monkeypatch.setattr(skytonight_api_module.skytonight_targets, 'normalize_object_name',
-                            lambda n: n.lower())
+        monkeypatch.setattr(skytonight_api_module.skytonight_targets, 'normalize_object_name', lambda n: n.lower())
         # Filter for Messier → should include NGC 224 (has Messier alias)
         result = skytonight_api_module._build_dso_section_payload('Messier', 'uid-1', 'user1')
         assert isinstance(result['report'], list)
@@ -1776,16 +1957,17 @@ class TestPayloadBuilderStaticPath:
     def test_dso_section_static_no_filter_no_annotation(self, monkeypatch):
         """DSO static path without catalogue, no annotation (skip_deep_sky_annotations)."""
         monkeypatch.setattr(skytonight_api_module, 'has_dso_results', lambda *_a, **_k: False)
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_with_timeline',
-                            lambda u, n: {'state': 'none'})
+        monkeypatch.setattr(
+            skytonight_api_module.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'}
+        )
         monkeypatch.setattr(skytonight_api_module.astrodex, 'load_user_astrodex', lambda uid: {'items': []})
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_all_plan_files', lambda uid: [])
         monkeypatch.setattr(
-            skytonight_api_module.skytonight_targets, 'load_targets_dataset',
+            skytonight_api_module.skytonight_targets,
+            'load_targets_dataset',
             lambda *a, **k: {'targets': _sample_targets(), 'metadata': {}},
         )
-        monkeypatch.setattr(skytonight_api_module.skytonight_targets, 'normalize_object_name',
-                            lambda n: n.lower())
+        monkeypatch.setattr(skytonight_api_module.skytonight_targets, 'normalize_object_name', lambda n: n.lower())
         result = skytonight_api_module._build_dso_section_payload(None, 'uid-1', 'user1')
         assert isinstance(result['report'], list)
         assert len(result['report']) >= 1
@@ -1802,22 +1984,25 @@ class TestPreloadAllCurrentPlanEntries:
                 'entries': [{'id': 'target-1', 'name': 'NGC 224'}],
             }
         }
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_all_plan_files',
-                            lambda uid: ['/fake/uid1_plan_my_night.json'])
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'load_user_plan',
-                            lambda uid, username, combination_id=None: plan_data)
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_state',
-                            lambda plan: 'current')
+        monkeypatch.setattr(
+            skytonight_api_module.plan_my_night, 'get_all_plan_files', lambda uid: ['/fake/uid1_plan_my_night.json']
+        )
+        monkeypatch.setattr(
+            skytonight_api_module.plan_my_night, 'load_user_plan', lambda uid, username, combination_id=None: plan_data
+        )
+        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_state', lambda plan: 'current')
         result = skytonight_api_module._preload_all_current_plan_entries('uid-1', 'user1')
         assert result == [{'id': 'target-1', 'name': 'NGC 224'}]
 
     def test_plan_files_with_non_current_plan_skipped(self, monkeypatch):
         """plan state != 'current' → skip."""
         plan_data = {'plan': {'state': 'none', 'entries': [{'id': 'target-1'}]}}
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_all_plan_files',
-                            lambda uid: ['/fake/uid1_plan_my_night.json'])
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'load_user_plan',
-                            lambda uid, username, combination_id=None: plan_data)
+        monkeypatch.setattr(
+            skytonight_api_module.plan_my_night, 'get_all_plan_files', lambda uid: ['/fake/uid1_plan_my_night.json']
+        )
+        monkeypatch.setattr(
+            skytonight_api_module.plan_my_night, 'load_user_plan', lambda uid, username, combination_id=None: plan_data
+        )
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_state', lambda plan: 'none')
         result = skytonight_api_module._preload_all_current_plan_entries('uid-1', 'user1')
         assert result == []
@@ -1825,19 +2010,25 @@ class TestPreloadAllCurrentPlanEntries:
     def test_plan_files_plan_not_dict_skipped(self, monkeypatch):
         """plan_obj not dict → continue."""
         plan_data = {'plan': 'not_a_dict'}
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_all_plan_files',
-                            lambda uid: ['/fake/uid1_plan_my_night.json'])
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'load_user_plan',
-                            lambda uid, username, combination_id=None: plan_data)
+        monkeypatch.setattr(
+            skytonight_api_module.plan_my_night, 'get_all_plan_files', lambda uid: ['/fake/uid1_plan_my_night.json']
+        )
+        monkeypatch.setattr(
+            skytonight_api_module.plan_my_night, 'load_user_plan', lambda uid, username, combination_id=None: plan_data
+        )
         result = skytonight_api_module._preload_all_current_plan_entries('uid-1', 'user1')
         assert result == []
 
     def test_plan_files_load_exception_swallowed(self, monkeypatch):
         """load_user_plan raises → exception swallowed."""
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_all_plan_files',
-                            lambda uid: ['/fake/uid1_plan_my_night.json'])
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'load_user_plan',
-                            lambda uid, username, combination_id=None: (_ for _ in ()).throw(RuntimeError('fail')))
+        monkeypatch.setattr(
+            skytonight_api_module.plan_my_night, 'get_all_plan_files', lambda uid: ['/fake/uid1_plan_my_night.json']
+        )
+        monkeypatch.setattr(
+            skytonight_api_module.plan_my_night,
+            'load_user_plan',
+            lambda uid, username, combination_id=None: (_ for _ in ()).throw(RuntimeError('fail')),
+        )
         result = skytonight_api_module._preload_all_current_plan_entries('uid-1', 'user1')
         assert result == []
 
@@ -1849,10 +2040,12 @@ class TestPreloadAllCurrentPlanEntries:
                 'entries': [{'id': 'target-2', 'name': 'M 31'}],
             }
         }
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_all_plan_files',
-                            lambda uid: ['/fake/uid1_plan_scope-1.json'])
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'load_user_plan',
-                            lambda uid, username, combination_id=None: plan_data)
+        monkeypatch.setattr(
+            skytonight_api_module.plan_my_night, 'get_all_plan_files', lambda uid: ['/fake/uid1_plan_scope-1.json']
+        )
+        monkeypatch.setattr(
+            skytonight_api_module.plan_my_night, 'load_user_plan', lambda uid, username, combination_id=None: plan_data
+        )
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_state', lambda plan: 'current')
         result = skytonight_api_module._preload_all_current_plan_entries('uid-1', 'user1')
         assert result == [{'id': 'target-2', 'name': 'M 31'}]
@@ -1864,14 +2057,20 @@ class TestCataloguesRouteEdgeCases:
     def test_empty_catalogue_name_not_added(self, client_admin, monkeypatch):
         """catalogue_name empty string → not added to set."""
         from skytonight.skytonight_models import SkyTonightTarget
+
         target_with_empty_catalogue = SkyTonightTarget(
-            target_id='dso-test', category='deep_sky', object_type='Galaxy',
-            preferred_name='Test Galaxy', catalogue_names={'': 'Test Galaxy'},
-            aliases=[], source_catalogues=[''],
+            target_id='dso-test',
+            category='deep_sky',
+            object_type='Galaxy',
+            preferred_name='Test Galaxy',
+            catalogue_names={'': 'Test Galaxy'},
+            aliases=[],
+            source_catalogues=[''],
             translation_key='skytonight.type_galaxy',
         )
         monkeypatch.setattr(
-            skytonight_api_module.skytonight_targets, 'load_targets_dataset',
+            skytonight_api_module.skytonight_targets,
+            'load_targets_dataset',
             lambda *a, **k: {'targets': [target_with_empty_catalogue], 'metadata': {}},
         )
         response = client_admin.get('/api/catalogues')
@@ -1891,7 +2090,7 @@ class TestResolveCatalogueFixedBranches:
     def test_empty_display_name_returns_first_key(self, monkeypatch):
         """normalize_object_name returns empty string → skip loop, return first key."""
         monkeypatch.setattr(skytonight_api_module.skytonight_targets, 'normalize_object_name', lambda n: '')
-        # normalized_display is '' (falsy) → skip the for loop, go straight to 
+        # normalized_display is '' (falsy) → skip the for loop, go straight to
         result = skytonight_api_module._resolve_source_catalogue({'OpenNGC': 'NGC 224', 'Messier': 'M 31'}, 'NGC 224')
         assert result == 'OpenNGC'
 
@@ -1906,11 +2105,16 @@ class TestResolveCatalogueFixedBranches:
     def test_no_catalogue_matches_returns_first_key(self, monkeypatch):
         """no catalogue value normalizes to match display_name → return first key."""
         # Make catalogue values normalize to something different from display
-        monkeypatch.setattr(skytonight_api_module.skytonight_targets, 'normalize_object_name',
-                            lambda n: 'catalogue_val' if n in ('NGC 224', 'M 31') else 'display_val')
+        monkeypatch.setattr(
+            skytonight_api_module.skytonight_targets,
+            'normalize_object_name',
+            lambda n: 'catalogue_val' if n in ('NGC 224', 'M 31') else 'display_val',
+        )
         # display_name='Unknown Object' → normalize → 'display_val'
         # catalogue values normalize to 'catalogue_val' ≠ 'display_val'
-        result = skytonight_api_module._resolve_source_catalogue({'OpenNGC': 'NGC 224', 'Messier': 'M 31'}, 'Unknown Object')
+        result = skytonight_api_module._resolve_source_catalogue(
+            {'OpenNGC': 'NGC 224', 'Messier': 'M 31'}, 'Unknown Object'
+        )
         assert result == 'OpenNGC'
 
 
@@ -1926,10 +2130,12 @@ class TestPreloadPlanEntriesEdgeCases:
             }
         }
         # Use the default plan filename format with user_id as a realistic GUID-like string
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_all_plan_files',
-                            lambda uid: [f'/fake/{uid}_plan_my_night.json'])
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'load_user_plan',
-                            lambda uid, username, combination_id=None: plan_data)
+        monkeypatch.setattr(
+            skytonight_api_module.plan_my_night, 'get_all_plan_files', lambda uid: [f'/fake/{uid}_plan_my_night.json']
+        )
+        monkeypatch.setattr(
+            skytonight_api_module.plan_my_night, 'load_user_plan', lambda uid, username, combination_id=None: plan_data
+        )
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_state', lambda plan: 'current')
         result = skytonight_api_module._preload_all_current_plan_entries('uid-test-123', 'user1')
         assert result == [{'id': 'target-1', 'name': 'NGC 224'}]
@@ -1942,10 +2148,12 @@ class TestPreloadPlanEntriesEdgeCases:
                 'entries': [{'name': 'NGC 224'}],  # no 'id' key
             }
         }
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_all_plan_files',
-                            lambda uid: ['/fake/uid_plan_my_night.json'])
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'load_user_plan',
-                            lambda uid, username, combination_id=None: plan_data)
+        monkeypatch.setattr(
+            skytonight_api_module.plan_my_night, 'get_all_plan_files', lambda uid: ['/fake/uid_plan_my_night.json']
+        )
+        monkeypatch.setattr(
+            skytonight_api_module.plan_my_night, 'load_user_plan', lambda uid, username, combination_id=None: plan_data
+        )
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_state', lambda plan: 'current')
         result = skytonight_api_module._preload_all_current_plan_entries('uid-1', 'user1')
         assert result == []
@@ -1961,10 +2169,12 @@ class TestPreloadPlanEntriesEdgeCases:
                 ],
             }
         }
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_all_plan_files',
-                            lambda uid: ['/fake/uid_plan_my_night.json'])
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'load_user_plan',
-                            lambda uid, username, combination_id=None: plan_data)
+        monkeypatch.setattr(
+            skytonight_api_module.plan_my_night, 'get_all_plan_files', lambda uid: ['/fake/uid_plan_my_night.json']
+        )
+        monkeypatch.setattr(
+            skytonight_api_module.plan_my_night, 'load_user_plan', lambda uid, username, combination_id=None: plan_data
+        )
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_state', lambda plan: 'current')
         result = skytonight_api_module._preload_all_current_plan_entries('uid-1', 'user1')
         assert len(result) == 1
@@ -1974,14 +2184,13 @@ class TestCalcPathMissingBranches:
     """Covers missing branches in calc paths."""
 
     def _base_patches(self, monkeypatch):
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_with_timeline',
-                            lambda u, n: {'state': 'none'})
+        monkeypatch.setattr(
+            skytonight_api_module.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'}
+        )
         monkeypatch.setattr(skytonight_api_module.astrodex, 'load_user_astrodex', lambda uid: {'items': []})
-        monkeypatch.setattr(skytonight_api_module.astrodex, 'is_item_in_preloaded_astrodex',
-                            lambda *a, **k: False)
+        monkeypatch.setattr(skytonight_api_module.astrodex, 'is_item_in_preloaded_astrodex', lambda *a, **k: False)
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_all_plan_files', lambda uid: [])
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'is_target_in_current_plan',
-                            lambda *a, **k: False)
+        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'is_target_in_current_plan', lambda *a, **k: False)
         monkeypatch.setattr(skytonight_api_module, '_get_catalogue_alias_payload', lambda c, n: ('', {}))
 
     def test_calc_catalogue_filter_skips_item_without_matching_name(self, monkeypatch):
@@ -1991,17 +2200,28 @@ class TestCalcPathMissingBranches:
         calc = {
             'deep_sky': [
                 {
-                    'target_id': 'dso-ngc1', 'preferred_name': 'NGC 1',
+                    'target_id': 'dso-ngc1',
+                    'preferred_name': 'NGC 1',
                     'catalogue_names': {'OpenNGC': 'NGC 1'},
-                    'object_type': 'Galaxy', 'constellation': '', 'magnitude': 10.0,
-                    'size_arcmin': 5.0, 'astro_score': 0.5,
-                    'observation': {'ra_hms': '00h', 'dec_dms': '+00°', 'max_altitude': 40.0,
-                                    'observable_fraction': 0.5, 'azimuth': 180.0,
-                                    'meridian_transit': '', 'antimeridian_transit': '',
-                                    'observable_hours': 3.0},
+                    'object_type': 'Galaxy',
+                    'constellation': '',
+                    'magnitude': 10.0,
+                    'size_arcmin': 5.0,
+                    'astro_score': 0.5,
+                    'observation': {
+                        'ra_hms': '00h',
+                        'dec_dms': '+00°',
+                        'max_altitude': 40.0,
+                        'observable_fraction': 0.5,
+                        'azimuth': 180.0,
+                        'meridian_transit': '',
+                        'antimeridian_transit': '',
+                        'observable_hours': 3.0,
+                    },
                 }
             ],
-            'bodies': [], 'comets': [],
+            'bodies': [],
+            'comets': [],
         }
         monkeypatch.setattr(skytonight_api_module, 'has_calculation_results', lambda *_a, **_k: True)
         monkeypatch.setattr(skytonight_api_module, 'load_calculation_results', lambda *_a, **_k: calc)
@@ -2017,14 +2237,21 @@ class TestCalcPathMissingBranches:
             'bodies': [],
             'comets': [
                 {
-                    'target_id': 'comet-bad', 'preferred_name': 'Comet Bad',
-                    'object_type': 'Comet', 'magnitude': 7.0, 'astro_score': 0.5,
+                    'target_id': 'comet-bad',
+                    'preferred_name': 'Comet Bad',
+                    'object_type': 'Comet',
+                    'magnitude': 7.0,
+                    'astro_score': 0.5,
                     'metadata': 'not_a_dict',
                     'observation': {
-                        'ra_hms': '05h', 'dec_dms': '+10°',
-                        'max_altitude': 35.0, 'azimuth': 170.0,
-                        'rise_time': '21:00', 'set_time': '03:00',
-                        'meridian_transit': '00:00', 'antimeridian_transit': '12:00',
+                        'ra_hms': '05h',
+                        'dec_dms': '+10°',
+                        'max_altitude': 35.0,
+                        'azimuth': 170.0,
+                        'rise_time': '21:00',
+                        'set_time': '03:00',
+                        'meridian_transit': '00:00',
+                        'antimeridian_transit': '12:00',
                         'observable_hours': 6.0,
                     },
                 }
@@ -2039,25 +2266,34 @@ class TestCalcPathMissingBranches:
     def test_dso_calc_catalogue_filter_skips_non_matching(self, monkeypatch):
         """DSO calc item not matching catalogue filter → continue."""
         monkeypatch.setattr(skytonight_api_module, 'has_dso_results', lambda *_a, **_k: True)
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_with_timeline',
-                            lambda u, n: {'state': 'none'})
+        monkeypatch.setattr(
+            skytonight_api_module.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'}
+        )
         monkeypatch.setattr(skytonight_api_module.astrodex, 'load_user_astrodex', lambda uid: {'items': []})
-        monkeypatch.setattr(skytonight_api_module.astrodex, 'is_item_in_preloaded_astrodex',
-                            lambda *a, **k: False)
+        monkeypatch.setattr(skytonight_api_module.astrodex, 'is_item_in_preloaded_astrodex', lambda *a, **k: False)
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_all_plan_files', lambda uid: [])
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'is_target_in_current_plan',
-                            lambda *a, **k: False)
+        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'is_target_in_current_plan', lambda *a, **k: False)
         dso_data = {
             'deep_sky': [
                 {
-                    'target_id': 'dso-ngc1', 'preferred_name': 'NGC 1',
+                    'target_id': 'dso-ngc1',
+                    'preferred_name': 'NGC 1',
                     'catalogue_names': {'OpenNGC': 'NGC 1'},
-                    'object_type': 'Galaxy', 'constellation': '', 'magnitude': 10.0,
-                    'size_arcmin': 5.0, 'astro_score': 0.5,
-                    'observation': {'ra_hms': '00h', 'dec_dms': '+00°', 'max_altitude': 40.0,
-                                    'observable_fraction': 0.5, 'azimuth': 180.0,
-                                    'meridian_transit': '', 'antimeridian_transit': '',
-                                    'observable_hours': 3.0},
+                    'object_type': 'Galaxy',
+                    'constellation': '',
+                    'magnitude': 10.0,
+                    'size_arcmin': 5.0,
+                    'astro_score': 0.5,
+                    'observation': {
+                        'ra_hms': '00h',
+                        'dec_dms': '+00°',
+                        'max_altitude': 40.0,
+                        'observable_fraction': 0.5,
+                        'azimuth': 180.0,
+                        'meridian_transit': '',
+                        'antimeridian_transit': '',
+                        'observable_hours': 3.0,
+                    },
                 }
             ],
             'metadata': {},
@@ -2073,25 +2309,29 @@ class TestStaticPathMissingBranches:
 
     def _common_patches(self, monkeypatch):
         monkeypatch.setattr(skytonight_api_module, 'has_calculation_results', lambda *_a, **_k: False)
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_with_timeline',
-                            lambda u, n: {'state': 'none'})
+        monkeypatch.setattr(
+            skytonight_api_module.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'}
+        )
         monkeypatch.setattr(skytonight_api_module.astrodex, 'load_user_astrodex', lambda uid: {'items': []})
-        monkeypatch.setattr(skytonight_api_module.astrodex, 'is_item_in_preloaded_astrodex',
-                            lambda *a, **k: False)
+        monkeypatch.setattr(skytonight_api_module.astrodex, 'is_item_in_preloaded_astrodex', lambda *a, **k: False)
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_all_plan_files', lambda uid: [])
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'is_target_in_current_plan',
-                            lambda *a, **k: False)
+        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'is_target_in_current_plan', lambda *a, **k: False)
         monkeypatch.setattr(skytonight_api_module, '_get_catalogue_alias_payload', lambda c, n: ('', {}))
 
     def test_unknown_category_target_skipped(self, monkeypatch):
         """target with unknown category is skipped (not deep_sky/bodies/comets)."""
         self._common_patches(monkeypatch)
         unknown_target = {
-            'target_id': 'unknown-1', 'category': 'asteroids', 'object_type': 'Asteroid',
-            'preferred_name': 'Asteroid 1', 'catalogue_names': {}, 'metadata': {},
+            'target_id': 'unknown-1',
+            'category': 'asteroids',
+            'object_type': 'Asteroid',
+            'preferred_name': 'Asteroid 1',
+            'catalogue_names': {},
+            'metadata': {},
         }
         monkeypatch.setattr(
-            skytonight_api_module.skytonight_targets, 'load_targets_dataset',
+            skytonight_api_module.skytonight_targets,
+            'load_targets_dataset',
             lambda *a, **k: {'targets': [unknown_target], 'metadata': {}},
         )
         result = skytonight_api_module._build_skytonight_reports_payload(None, 'uid-1', 'user1')
@@ -2102,20 +2342,24 @@ class TestStaticPathMissingBranches:
     def test_dso_static_catalogue_filter_skips_non_matching(self, monkeypatch):
         """DSO static target without matching catalogue → continue."""
         monkeypatch.setattr(skytonight_api_module, 'has_dso_results', lambda *_a, **_k: False)
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_with_timeline',
-                            lambda u, n: {'state': 'none'})
+        monkeypatch.setattr(
+            skytonight_api_module.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'}
+        )
         monkeypatch.setattr(skytonight_api_module.astrodex, 'load_user_astrodex', lambda uid: {'items': []})
-        monkeypatch.setattr(skytonight_api_module.astrodex, 'is_item_in_preloaded_astrodex',
-                            lambda *a, **k: False)
+        monkeypatch.setattr(skytonight_api_module.astrodex, 'is_item_in_preloaded_astrodex', lambda *a, **k: False)
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_all_plan_files', lambda uid: [])
-        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'is_target_in_current_plan',
-                            lambda *a, **k: False)
+        monkeypatch.setattr(skytonight_api_module.plan_my_night, 'is_target_in_current_plan', lambda *a, **k: False)
         dso_target = {
-            'target_id': 'dso-ngc1', 'category': 'deep_sky', 'object_type': 'Galaxy',
-            'preferred_name': 'NGC 1', 'catalogue_names': {'OpenNGC': 'NGC 1'}, 'metadata': {},
+            'target_id': 'dso-ngc1',
+            'category': 'deep_sky',
+            'object_type': 'Galaxy',
+            'preferred_name': 'NGC 1',
+            'catalogue_names': {'OpenNGC': 'NGC 1'},
+            'metadata': {},
         }
         monkeypatch.setattr(
-            skytonight_api_module.skytonight_targets, 'load_targets_dataset',
+            skytonight_api_module.skytonight_targets,
+            'load_targets_dataset',
             lambda *a, **k: {'targets': [dso_target], 'metadata': {}},
         )
         # Request Messier → NGC 1 doesn't have it → skipped
@@ -2128,10 +2372,12 @@ class TestRemainingRouteGaps:
 
     def test_trigger_scheduler_file_creation_exception(self, client_admin, monkeypatch, tmp_path):
         """trigger file creation fails → 500."""
-        monkeypatch.setattr(skytonight_api_module, 'get_skytonight_scheduler_for_api',
-                            lambda: 'remote_scheduler')
-        monkeypatch.setattr(skytonight_api_module, 'get_skytonight_scheduler_trigger_file',
-                            lambda: '/invalid/path/that/does/not/exist/trigger')
+        monkeypatch.setattr(skytonight_api_module, 'get_skytonight_scheduler_for_api', lambda: 'remote_scheduler')
+        monkeypatch.setattr(
+            skytonight_api_module,
+            'get_skytonight_scheduler_trigger_file',
+            lambda: '/invalid/path/that/does/not/exist/trigger',
+        )
         response = client_admin.post('/api/skytonight/scheduler/trigger')
         assert response.status_code == 500
 
@@ -2142,13 +2388,13 @@ class TestRemainingRouteGaps:
             {'target_id': 'body-1', 'category': 'bodies', 'preferred_name': 'Jupiter'},
         ]
         monkeypatch.setattr(
-            skytonight_api_module.skytonight_targets, 'load_targets_dataset',
+            skytonight_api_module.skytonight_targets,
+            'load_targets_dataset',
             lambda *a, **k: {'targets': dict_targets, 'metadata': {}, 'loaded': True},
         )
         monkeypatch.setattr(skytonight_api_module, 'get_skytonight_scheduler_for_api', lambda: None)
         monkeypatch.setattr(skytonight_api_module, 'has_calculation_results', lambda *_a, **_k: False)
-        monkeypatch.setattr(skytonight_api_module, 'load_config',
-                            lambda: {'skytonight': {'enabled': True}})
+        monkeypatch.setattr(skytonight_api_module, 'load_config', lambda: {'skytonight': {'enabled': True}})
         response = client_admin.get('/api/skytonight/dataset/status')
         assert response.status_code == 200
         data = response.get_json()
@@ -2156,8 +2402,9 @@ class TestRemainingRouteGaps:
 
     def test_skytonight_log_exception_returns_500(self, client_admin, monkeypatch):
         """exception in log endpoint → 500."""
-        monkeypatch.setattr(skytonight_api_module, 'ensure_skytonight_directories',
-                            lambda: (_ for _ in ()).throw(RuntimeError('boom')))
+        monkeypatch.setattr(
+            skytonight_api_module, 'ensure_skytonight_directories', lambda: (_ for _ in ()).throw(RuntimeError('boom'))
+        )
         response = client_admin.get('/api/skytonight/log')
         assert response.status_code == 500
 
@@ -2166,14 +2413,18 @@ class TestRemainingRouteGaps:
         output_dir = str(tmp_path / 'output')
         monkeypatch.setattr(skytonight_api_module, 'OUTPUT_DIR', output_dir)
         # _alttime_json_path returns something outside OUTPUT_DIR
-        monkeypatch.setattr(skytonight_api_module, '_alttime_json_path',
-                            lambda tid, *_a, **_k: '/some/other/path/outside_output/file.json')
+        monkeypatch.setattr(
+            skytonight_api_module,
+            '_alttime_json_path',
+            lambda tid, *_a, **_k: '/some/other/path/outside_output/file.json',
+        )
         response = client_admin.get('/api/skytonight/alttime/dso-ngc224')
         assert response.status_code == 400
 
     def test_alttime_horizon_profile_injection(self, client_admin, monkeypatch, tmp_path):
         """current_horizon is non-empty → inject into data."""
         import json
+
         alttime_data = {'times': [1, 2, 3], 'altitudes': [10, 20, 30]}
         alttime_file = tmp_path / 'target_alttime.json'
         alttime_file.write_text(json.dumps(alttime_data), encoding='utf-8')
@@ -2184,7 +2435,8 @@ class TestRemainingRouteGaps:
         monkeypatch.setattr(skytonight_api_module.os.path, 'isfile', lambda p: True)
         # v1.2: the injected horizon comes from the install-default preset
         monkeypatch.setattr(
-            skytonight_api_module, 'load_config',
+            skytonight_api_module,
+            'load_config',
             lambda: {'locations': [{'id': 'alt-loc', 'is_install_default': True, 'horizon_profile': [10, 20, 30]}]},
         )
 
@@ -2196,6 +2448,7 @@ class TestRemainingRouteGaps:
     def test_alttime_horizon_already_in_data_not_overwritten(self, client_admin, monkeypatch, tmp_path):
         """empty horizon_profile and 'horizon_profile' already in data → keep it."""
         import json
+
         alttime_data = {'times': [1, 2], 'altitudes': [10, 20], 'horizon_profile': [5, 15, 25]}
         alttime_file = tmp_path / 'target_alttime.json'
         alttime_file.write_text(json.dumps(alttime_data), encoding='utf-8')
@@ -2204,8 +2457,9 @@ class TestRemainingRouteGaps:
         monkeypatch.setattr(skytonight_api_module, '_alttime_json_path', lambda tid, *_a, **_k: str(alttime_file))
         monkeypatch.setattr(skytonight_api_module, 'OUTPUT_DIR', output_dir)
         monkeypatch.setattr(skytonight_api_module.os.path, 'isfile', lambda p: True)
-        monkeypatch.setattr(skytonight_api_module, 'load_config',
-                            lambda: {'skytonight': {'constraints': {'horizon_profile': []}}})
+        monkeypatch.setattr(
+            skytonight_api_module, 'load_config', lambda: {'skytonight': {'constraints': {'horizon_profile': []}}}
+        )
 
         response = client_admin.get('/api/skytonight/alttime/dso-ngc224')
         assert response.status_code == 200
@@ -2215,10 +2469,10 @@ class TestRemainingRouteGaps:
     def test_skymap_enrichment_dso_file_missing(self, client_admin, monkeypatch, tmp_path):
         """needs_enrichment=True but DSO file doesn't exist → skip enrichment."""
         import json
+
         skymap_data = {
             'targets': [
-                {'id': 'dso-ngc224', 'name': 'NGC 224', 'constellation': '',
-                 'category': 'deep_sky'},
+                {'id': 'dso-ngc224', 'name': 'NGC 224', 'constellation': '', 'category': 'deep_sky'},
             ]
         }
         skymap_file = tmp_path / 'skymap.json'
@@ -2228,10 +2482,12 @@ class TestRemainingRouteGaps:
         monkeypatch.setattr(skytonight_api_module, 'get_skymap_file', lambda *_a, **_k: str(skymap_file))
         monkeypatch.setattr(skytonight_api_module, 'get_dso_results_file', lambda *_a, **_k: str(dso_file))
         # isfile returns True for skymap, False for dso_results
-        monkeypatch.setattr(skytonight_api_module.os.path, 'isfile',
-                            lambda p: p == str(skymap_file))
-        monkeypatch.setattr(skytonight_api_module, 'load_config',
-                            lambda: {'skytonight': {'constraints': {'altitude_constraint_min': 30, 'horizon_profile': []}}})
+        monkeypatch.setattr(skytonight_api_module.os.path, 'isfile', lambda p: p == str(skymap_file))
+        monkeypatch.setattr(
+            skytonight_api_module,
+            'load_config',
+            lambda: {'skytonight': {'constraints': {'altitude_constraint_min': 30, 'horizon_profile': []}}},
+        )
 
         response = client_admin.get('/api/skytonight/skymap')
         assert response.status_code == 200
@@ -2244,13 +2500,13 @@ class TestRemainingRouteGaps:
         """mixed targets - one needing enrichment triggers loop,
         another with 'messier' already set skips the inner enrichment if-body."""
         import json
+
         skymap_data = {
             'targets': [
                 # This one needs enrichment (triggers needs_enrichment=True)
                 {'id': 'dso-ngc1', 'name': 'NGC 1', 'constellation': '', 'category': 'deep_sky'},
                 # This one already has 'messier' → inner enrichment if-body is skipped
-                {'id': 'dso-ngc224', 'name': 'NGC 224', 'constellation': '',
-                 'category': 'deep_sky', 'messier': True},
+                {'id': 'dso-ngc224', 'name': 'NGC 224', 'constellation': '', 'category': 'deep_sky', 'messier': True},
             ]
         }
         dso_data = {
@@ -2266,10 +2522,12 @@ class TestRemainingRouteGaps:
         monkeypatch.setattr(skytonight_api_module, 'get_skymap_file', lambda *_a, **_k: str(skymap_file))
         monkeypatch.setattr(skytonight_api_module, 'get_dso_results_file', lambda *_a, **_k: str(dso_file))
         monkeypatch.setattr(skytonight_api_module.os.path, 'isfile', lambda p: True)
-        monkeypatch.setattr(skytonight_api_module, 'load_config',
-                            lambda: {'skytonight': {'constraints': {'altitude_constraint_min': 30, 'horizon_profile': []}}})
-        monkeypatch.setattr(skytonight_api_module, 'load_json_file',
-                            lambda path, default=None: dso_data)
+        monkeypatch.setattr(
+            skytonight_api_module,
+            'load_config',
+            lambda: {'skytonight': {'constraints': {'altitude_constraint_min': 30, 'horizon_profile': []}}},
+        )
+        monkeypatch.setattr(skytonight_api_module, 'load_json_file', lambda path, default=None: dso_data)
 
         response = client_admin.get('/api/skytonight/skymap')
         assert response.status_code == 200
@@ -2287,22 +2545,37 @@ class TestSkytonightRecommendationsEndpoint:
         return {
             'deep_sky': [
                 {
-                    'target_id': 't-beginner', 'preferred_name': 'Beginner Target',
-                    'catalogue_names': {'Messier': 'M 42'}, 'object_type': 'Nebula',
-                    'magnitude': 4.0, 'size_arcmin': 90.0,
-                    'astro_score': 0.5, 'difficulty': 'beginner', 'difficulty_score': 18,
+                    'target_id': 't-beginner',
+                    'preferred_name': 'Beginner Target',
+                    'catalogue_names': {'Messier': 'M 42'},
+                    'object_type': 'Nebula',
+                    'magnitude': 4.0,
+                    'size_arcmin': 90.0,
+                    'astro_score': 0.5,
+                    'difficulty': 'beginner',
+                    'difficulty_score': 18,
                 },
                 {
-                    'target_id': 't-intermediate', 'preferred_name': 'Intermediate Target',
-                    'catalogue_names': {'OpenNGC': 'NGC 1'}, 'object_type': 'Galaxy',
-                    'magnitude': 9.0, 'size_arcmin': 10.0,
-                    'astro_score': 0.9, 'difficulty': 'intermediate', 'difficulty_score': 50,
+                    'target_id': 't-intermediate',
+                    'preferred_name': 'Intermediate Target',
+                    'catalogue_names': {'OpenNGC': 'NGC 1'},
+                    'object_type': 'Galaxy',
+                    'magnitude': 9.0,
+                    'size_arcmin': 10.0,
+                    'astro_score': 0.9,
+                    'difficulty': 'intermediate',
+                    'difficulty_score': 50,
                 },
                 {
-                    'target_id': 't-advanced', 'preferred_name': 'Advanced Target',
-                    'catalogue_names': {'OpenNGC': 'NGC 2'}, 'object_type': 'Galaxy',
-                    'magnitude': 16.0, 'size_arcmin': 0.5,
-                    'astro_score': 0.7, 'difficulty': 'advanced', 'difficulty_score': 80,
+                    'target_id': 't-advanced',
+                    'preferred_name': 'Advanced Target',
+                    'catalogue_names': {'OpenNGC': 'NGC 2'},
+                    'object_type': 'Galaxy',
+                    'magnitude': 16.0,
+                    'size_arcmin': 0.5,
+                    'astro_score': 0.7,
+                    'difficulty': 'advanced',
+                    'difficulty_score': 80,
                 },
             ]
         }
@@ -2313,7 +2586,8 @@ class TestSkytonightRecommendationsEndpoint:
         monkeypatch.setattr(skytonight_api_module.astrodex, 'is_item_in_astrodex', lambda *a, **k: False)
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'is_target_in_current_plan', lambda *a, **k: False)
         monkeypatch.setattr(
-            skytonight_api_module.user_manager, 'get_user_preferences',
+            skytonight_api_module.user_manager,
+            'get_user_preferences',
             lambda user_id: {'experience_level': experience_level},
         )
 
@@ -2361,13 +2635,15 @@ class TestSkytonightRecommendationsEndpoint:
     def test_estimated_hours_uses_beginner_catalog_match_when_available(self, client_admin, monkeypatch):
         monkeypatch.setattr(skytonight_api_module, 'load_json_file', lambda *a, **k: self._dso_results())
         monkeypatch.setattr(
-            skytonight_api_module.beginner_catalog, 'load_beginner_catalog',
+            skytonight_api_module.beginner_catalog,
+            'load_beginner_catalog',
             lambda: [{'catalogue_id': 'M42', 'typical_integration_hours': 3}],
         )
         monkeypatch.setattr(skytonight_api_module.astrodex, 'is_item_in_astrodex', lambda *a, **k: False)
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'is_target_in_current_plan', lambda *a, **k: False)
         monkeypatch.setattr(
-            skytonight_api_module.user_manager, 'get_user_preferences',
+            skytonight_api_module.user_manager,
+            'get_user_preferences',
             lambda user_id: {'experience_level': 'beginner'},
         )
         response = client_admin.get('/api/skytonight/recommendations?lang=en')
@@ -2385,10 +2661,15 @@ class TestSkytonightRecommendationsEndpoint:
         dso_results = {
             'deep_sky': [
                 {
-                    'target_id': 't-coords', 'preferred_name': 'Coord Target',
-                    'catalogue_names': {'Messier': 'M 42'}, 'object_type': 'Nebula',
-                    'magnitude': 4.0, 'size_arcmin': 90.0, 'astro_score': 0.5,
-                    'difficulty': 'beginner', 'difficulty_score': 18,
+                    'target_id': 't-coords',
+                    'preferred_name': 'Coord Target',
+                    'catalogue_names': {'Messier': 'M 42'},
+                    'object_type': 'Nebula',
+                    'magnitude': 4.0,
+                    'size_arcmin': 90.0,
+                    'astro_score': 0.5,
+                    'difficulty': 'beginner',
+                    'difficulty_score': 18,
                     'coordinates': {'ra_hours': 5.5, 'dec_degrees': -5.4},
                 },
             ]
@@ -2398,7 +2679,8 @@ class TestSkytonightRecommendationsEndpoint:
         monkeypatch.setattr(skytonight_api_module.astrodex, 'is_item_in_astrodex', lambda *a, **k: False)
         monkeypatch.setattr(skytonight_api_module.plan_my_night, 'is_target_in_current_plan', lambda *a, **k: False)
         monkeypatch.setattr(
-            skytonight_api_module.user_manager, 'get_user_preferences',
+            skytonight_api_module.user_manager,
+            'get_user_preferences',
             lambda user_id: {'experience_level': 'beginner'},
         )
         response = client_admin.get('/api/skytonight/recommendations?lang=en')
@@ -2406,12 +2688,11 @@ class TestSkytonightRecommendationsEndpoint:
         assert targets[0]['thumbnail_url'] is not None
         assert targets[0]['thumbnail_url'].startswith('/api/object-image/')
 
-    def test_beginner_catalog_entry_with_blank_catalogue_id_skipped_in_hours_lookup(
-        self, client_admin, monkeypatch
-    ):
+    def test_beginner_catalog_entry_with_blank_catalogue_id_skipped_in_hours_lookup(self, client_admin, monkeypatch):
         self._mock_common(monkeypatch, experience_level='advanced')
         monkeypatch.setattr(
-            skytonight_api_module.beginner_catalog, 'load_beginner_catalog',
+            skytonight_api_module.beginner_catalog,
+            'load_beginner_catalog',
             lambda: [{'catalogue_id': '', 'typical_integration_hours': 9}],
         )
         response = client_admin.get('/api/skytonight/recommendations?lang=en')
@@ -2419,19 +2700,21 @@ class TestSkytonightRecommendationsEndpoint:
 
     def test_unexpected_exception_returns_500(self, client_admin, monkeypatch):
         monkeypatch.setattr(
-            skytonight_api_module.user_manager, 'get_user_preferences',
+            skytonight_api_module.user_manager,
+            'get_user_preferences',
             lambda *a, **k: (_ for _ in ()).throw(RuntimeError('boom')),
         )
         response = client_admin.get('/api/skytonight/recommendations?lang=en')
         assert response.status_code == 500
 
 
-
 def test_skytonight_alttime_path_escape_returns_400(client_admin, monkeypatch):
     """_alttime_json_path resolving outside OUTPUT_DIR is rejected by the
     realpath + startswith confinement guard (the pattern CodeQL's
     py/path-injection query recognises as a sanitizer barrier)."""
-    monkeypatch.setattr(skytonight_api_module, "_alttime_json_path", lambda *_a, **_k: "/definitely/outside/output_dir.json")
+    monkeypatch.setattr(
+        skytonight_api_module, "_alttime_json_path", lambda *_a, **_k: "/definitely/outside/output_dir.json"
+    )
     resp = client_admin.get('/api/skytonight/alttime/valid_target')
     assert resp.status_code == 400
 
@@ -2565,7 +2848,9 @@ def _patch_dso_calc(monkeypatch, items=None):
     monkeypatch.setattr(skytonight_api_module, '_annotate_skytonight_item', lambda *a, **k: None)
     monkeypatch.setattr(skytonight_api_module.astrodex, 'load_user_astrodex', lambda *_a, **_k: {'items': []})
     monkeypatch.setattr(skytonight_api_module, '_preload_all_current_plan_entries', lambda *_a, **_k: [])
-    monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_with_timeline', lambda *_a, **_k: {'state': 'none'})
+    monkeypatch.setattr(
+        skytonight_api_module.plan_my_night, 'get_plan_with_timeline', lambda *_a, **_k: {'state': 'none'}
+    )
     monkeypatch.setattr(
         skytonight_api_module,
         '_skytonight_request_location',
@@ -2602,9 +2887,7 @@ def test_dso_payload_surfaces_surface_brightness_and_advanced_filters_block(monk
 
 def test_dso_surface_brightness_filter_keeps_unknown_rows(monkeypatch):
     _patch_dso_calc(monkeypatch)
-    payload = skytonight_api_module._build_dso_section_payload(
-        None, 'uid-1', 'U', filters=_filters(sb_max=18.0)
-    )
+    payload = skytonight_api_module._build_dso_section_payload(None, 'uid-1', 'U', filters=_filters(sb_max=18.0))
     names = {row['target name'] for row in payload['report']}
     assert names == {'NGC 1', 'NGC 3'}  # NGC 2 (SB 23) dropped, NGC 3 (unknown) kept
 
@@ -2636,15 +2919,19 @@ def test_dso_fallback_flags_filters_that_need_a_calculation(monkeypatch):
     """Static-dataset fallback: only the size filter can run, so the payload must tell
     the UI the surface-brightness / altitude / FOV / integration filters were dropped."""
     monkeypatch.setattr(skytonight_api_module, 'has_dso_results', lambda *_a, **_k: False)
-    monkeypatch.setattr(skytonight_api_module.plan_my_night, 'get_plan_with_timeline', lambda *_a, **_k: {'state': 'none'})
+    monkeypatch.setattr(
+        skytonight_api_module.plan_my_night, 'get_plan_with_timeline', lambda *_a, **_k: {'state': 'none'}
+    )
     monkeypatch.setattr(skytonight_api_module.astrodex, 'load_user_astrodex', lambda *_a, **_k: {'items': []})
     monkeypatch.setattr(skytonight_api_module, '_preload_all_current_plan_entries', lambda *_a, **_k: [])
     monkeypatch.setattr(
-        skytonight_api_module.skytonight_targets, 'load_targets_dataset',
+        skytonight_api_module.skytonight_targets,
+        'load_targets_dataset',
         lambda *_a, **_k: {'targets': [], 'metadata': {}},
     )
     monkeypatch.setattr(
-        skytonight_api_module, '_skytonight_request_location',
+        skytonight_api_module,
+        '_skytonight_request_location',
         lambda: {'id': 'loc-1', 'name': 'Home', 'bortle': 5, 'sqm': None, 'horizon_profile': []},
     )
 
@@ -2670,15 +2957,23 @@ def test_resolve_combination_optics_passes_qe_as_fraction(monkeypatch):
     """Regression: the QE percentage must be divided by 100 before it reaches
     exposure_math, otherwise the integration-time estimate is ~80x too short."""
     monkeypatch.setattr(
-        skytonight_api_module.equipment_profiles, 'get_combination',
+        skytonight_api_module.equipment_profiles,
+        'get_combination',
         lambda *_a, **_k: {'id': 'combo-1', 'telescope_id': 'tel-1', 'camera_id': 'cam-1'},
     )
     monkeypatch.setattr(
-        skytonight_api_module.equipment_profiles, 'index_telescopes_and_cameras',
+        skytonight_api_module.equipment_profiles,
+        'index_telescopes_and_cameras',
         lambda *_a, **_k: (
             {'tel-1': {'focal_length_mm': 500.0, 'native_focal_ratio': 5.0}},
-            {'cam-1': {'sensor_width_mm': 23.5, 'sensor_height_mm': 15.7, 'pixel_size_um': 3.76,
-                       'quantum_efficiency': 80}},
+            {
+                'cam-1': {
+                    'sensor_width_mm': 23.5,
+                    'sensor_height_mm': 15.7,
+                    'pixel_size_um': 3.76,
+                    'quantum_efficiency': 80,
+                }
+            },
         ),
     )
     optics = skytonight_api_module._resolve_combination_optics('uid-1', 'combo-1')
@@ -2732,9 +3027,7 @@ def test_dso_filters_run_before_truncation(monkeypatch):
             }
         )
     _patch_dso_calc(monkeypatch, items=many)
-    payload = skytonight_api_module._build_dso_section_payload(
-        None, 'uid-1', 'U', filters=_filters(size_max=10.0)
-    )
+    payload = skytonight_api_module._build_dso_section_payload(None, 'uid-1', 'U', filters=_filters(size_max=10.0))
     # 750 small targets pass; all are returned (well under the 1000 cap) even though
     # they are scattered through 1500 rows - i.e. the filter ran catalogue-wide.
     assert len(payload['report']) == 750
@@ -2790,9 +3083,7 @@ def test_resolve_combination_optics_falls_back_to_shared(monkeypatch):
 
 def test_resolve_combination_optics_unknown_combination_returns_none(monkeypatch):
     monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'get_combination', lambda *_a, **_k: None)
-    monkeypatch.setattr(
-        skytonight_api_module.equipment_profiles, 'load_all_shared_combinations', lambda *_a, **_k: []
-    )
+    monkeypatch.setattr(skytonight_api_module.equipment_profiles, 'load_all_shared_combinations', lambda *_a, **_k: [])
     assert skytonight_api_module._resolve_combination_optics('uid-1', 'ghost') is None
 
 
@@ -2900,19 +3191,39 @@ def test_dso_static_fallback_applies_size_band(monkeypatch):
     monkeypatch.setattr(skytonight_api_module, '_preload_all_current_plan_entries', lambda *_a, **_k: [])
     monkeypatch.setattr(skytonight_api_module, '_annotate_skytonight_item', lambda *a, **k: None)
     monkeypatch.setattr(
-        skytonight_api_module, '_skytonight_request_location',
+        skytonight_api_module,
+        '_skytonight_request_location',
         lambda: {'id': 'loc-1', 'name': 'Home', 'bortle': 5, 'sqm': None, 'horizon_profile': []},
     )
     targets = [
-        {'category': 'deep_sky', 'preferred_name': 'NGC 10', 'catalogue_names': {'OpenNGC': 'NGC 10'},
-         'object_type': 'Galaxy', 'constellation': 'And', 'size_arcmin': 3.0},
-        {'category': 'deep_sky', 'preferred_name': 'NGC 20', 'catalogue_names': {'OpenNGC': 'NGC 20'},
-         'object_type': 'Galaxy', 'constellation': 'And', 'size_arcmin': 60.0},
-        {'category': 'deep_sky', 'preferred_name': 'NGC 30', 'catalogue_names': {'OpenNGC': 'NGC 30'},
-         'object_type': 'Galaxy', 'constellation': 'And', 'size_arcmin': 500.0},
+        {
+            'category': 'deep_sky',
+            'preferred_name': 'NGC 10',
+            'catalogue_names': {'OpenNGC': 'NGC 10'},
+            'object_type': 'Galaxy',
+            'constellation': 'And',
+            'size_arcmin': 3.0,
+        },
+        {
+            'category': 'deep_sky',
+            'preferred_name': 'NGC 20',
+            'catalogue_names': {'OpenNGC': 'NGC 20'},
+            'object_type': 'Galaxy',
+            'constellation': 'And',
+            'size_arcmin': 60.0,
+        },
+        {
+            'category': 'deep_sky',
+            'preferred_name': 'NGC 30',
+            'catalogue_names': {'OpenNGC': 'NGC 30'},
+            'object_type': 'Galaxy',
+            'constellation': 'And',
+            'size_arcmin': 500.0,
+        },
     ]
     monkeypatch.setattr(
-        skytonight_api_module.skytonight_targets, 'load_targets_dataset',
+        skytonight_api_module.skytonight_targets,
+        'load_targets_dataset',
         lambda *_a, **_k: {'targets': targets, 'metadata': {}},
     )
     payload = skytonight_api_module._build_dso_section_payload(

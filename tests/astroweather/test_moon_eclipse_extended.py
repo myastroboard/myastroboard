@@ -45,9 +45,7 @@ class TestGetNextEclipsePartialKind:
     @patch.object(LunarEclipseService, "_generate_altitude_vs_time")
     @patch.object(LunarEclipseService, "_get_moon_altitude_azimuth")
     @patch("astroweather.moon_eclipse.SearchLunarEclipse")
-    def test_get_next_eclipse_partial_kind_has_no_total_phase(
-        self, mock_search, mock_peak_alt_az, mock_generate
-    ):
+    def test_get_next_eclipse_partial_kind_has_no_total_phase(self, mock_search, mock_peak_alt_az, mock_generate):
         peak_naive_utc = datetime.datetime(2026, 6, 20, 3, 30, 0)
         mock_search.return_value = _Eclipse(
             kind="EclipseKind.Partial",

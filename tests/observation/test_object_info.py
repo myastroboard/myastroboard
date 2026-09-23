@@ -1,9 +1,10 @@
 """Tests for object_info.py - pure functions and mocked-network paths."""
 
 import os
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 import pytest
+import requests as _req_module
 
 from skytonight import skytonight_targets as _st_module  # needed for patching the locally-imported get_lookup_entry
 
@@ -45,6 +46,7 @@ def _reset_object_info_backoff(monkeypatch):
 # is_safe_identifier
 # ---------------------------------------------------------------------------
 
+
 def test_is_safe_identifier_accepts_simple_names():
     assert is_safe_identifier('NGC 224') is True
     assert is_safe_identifier('M 31') is True
@@ -77,6 +79,7 @@ def test_is_safe_identifier_rejects_disallowed_chars():
 # _sanitize_lang
 # ---------------------------------------------------------------------------
 
+
 def test_sanitize_lang_passes_known_langs():
     for lang in ('en', 'fr', 'de', 'es', 'it', 'pt'):
         assert _sanitize_lang(lang) == lang
@@ -95,6 +98,7 @@ def test_sanitize_lang_rejects_injection_attempt():
 # ---------------------------------------------------------------------------
 # _sort_aliases
 # ---------------------------------------------------------------------------
+
 
 def test_sort_aliases_messier_comes_first():
     aliases = ['NGC 224', 'M 31', 'UGC 454']
@@ -152,6 +156,7 @@ def test_sort_aliases_bayer_before_catalogue_numbers():
 # build_catalogue_names_from_aliases
 # ---------------------------------------------------------------------------
 
+
 def test_build_catalogue_names_includes_messier():
     result = build_catalogue_names_from_aliases('M 31', ['NGC 224'])
     assert result.get('Messier') == 'M 31'
@@ -196,6 +201,7 @@ def test_build_catalogue_names_common_name_takes_first_occurrence():
 # _is_wikipedia_candidate
 # ---------------------------------------------------------------------------
 
+
 def test_is_wikipedia_candidate_accepts_normal_names():
     assert _is_wikipedia_candidate('NGC 224') is True
     assert _is_wikipedia_candidate('Andromeda Galaxy') is True
@@ -211,6 +217,7 @@ def test_is_wikipedia_candidate_rejects_simbad_catalog_style():
 # _normalize_wikipedia_term
 # ---------------------------------------------------------------------------
 
+
 def test_normalize_wikipedia_term_collapses_whitespace():
     assert _normalize_wikipedia_term('M  82') == 'M 82'
     assert _normalize_wikipedia_term('  NGC  224  ') == 'NGC 224'
@@ -223,6 +230,7 @@ def test_normalize_wikipedia_term_preserves_single_spaces():
 # ---------------------------------------------------------------------------
 # _get_dss_image_url
 # ---------------------------------------------------------------------------
+
 
 def test_get_dss_image_url_contains_ra_dec():
     url = _get_dss_image_url(ra=10.684, dec=41.269)
@@ -315,6 +323,7 @@ def test_ensure_cached_object_image_serves_from_disk_without_network(monkeypatch
 # get_object_info - unsafe identifier
 # ---------------------------------------------------------------------------
 
+
 def test_get_object_info_rejects_unsafe_identifier():
     result = get_object_info('NGC<224>')
     assert result['error'] == 'invalid_identifier'
@@ -326,6 +335,7 @@ def test_get_object_info_rejects_unsafe_identifier():
 # ---------------------------------------------------------------------------
 # get_object_info - not found (mocked SIMBAD returning None)
 # ---------------------------------------------------------------------------
+
 
 def test_get_object_info_returns_not_found_when_simbad_empty(monkeypatch):
     monkeypatch.setattr(oi, '_resolve_via_simbad', lambda identifier: None)
@@ -343,15 +353,20 @@ def test_get_object_info_returns_not_found_when_simbad_empty(monkeypatch):
 # get_object_info - found with coordinates (mocked full pipeline)
 # ---------------------------------------------------------------------------
 
+
 def test_get_object_info_builds_image_url_when_coordinates_present(monkeypatch):
-    monkeypatch.setattr(oi, '_resolve_via_simbad', lambda identifier: {
-        'id': 'NGC 224',
-        'name': 'NGC 224',
-        'type': 'Galaxy',
-        'ra': 10.684,
-        'dec': 41.269,
-        'aliases': ['M 31', 'Andromeda Galaxy'],
-    })
+    monkeypatch.setattr(
+        oi,
+        '_resolve_via_simbad',
+        lambda identifier: {
+            'id': 'NGC 224',
+            'name': 'NGC 224',
+            'type': 'Galaxy',
+            'ra': 10.684,
+            'dec': 41.269,
+            'aliases': ['M 31', 'Andromeda Galaxy'],
+        },
+    )
     monkeypatch.setattr(oi, '_wikipedia_with_fallback', lambda terms, lang: None)
     monkeypatch.setattr(_st_module, 'get_lookup_entry', lambda *a, **kw: None)
 
@@ -365,19 +380,27 @@ def test_get_object_info_builds_image_url_when_coordinates_present(monkeypatch):
 
 
 def test_get_object_info_includes_wikipedia_when_found(monkeypatch):
-    monkeypatch.setattr(oi, '_resolve_via_simbad', lambda identifier: {
-        'id': 'M 31',
-        'name': 'M 31',
-        'type': 'Galaxy',
-        'ra': 10.684,
-        'dec': 41.269,
-        'aliases': ['NGC 224'],
-    })
-    monkeypatch.setattr(oi, '_wikipedia_with_fallback', lambda terms, lang: {
-        'title': 'Andromeda Galaxy',
-        'description': 'spiral galaxy',
-        'extract': 'The Andromeda Galaxy is a spiral galaxy.',
-    })
+    monkeypatch.setattr(
+        oi,
+        '_resolve_via_simbad',
+        lambda identifier: {
+            'id': 'M 31',
+            'name': 'M 31',
+            'type': 'Galaxy',
+            'ra': 10.684,
+            'dec': 41.269,
+            'aliases': ['NGC 224'],
+        },
+    )
+    monkeypatch.setattr(
+        oi,
+        '_wikipedia_with_fallback',
+        lambda terms, lang: {
+            'title': 'Andromeda Galaxy',
+            'description': 'spiral galaxy',
+            'extract': 'The Andromeda Galaxy is a spiral galaxy.',
+        },
+    )
     monkeypatch.setattr(_st_module, 'get_lookup_entry', lambda *a, **kw: None)
 
     result = get_object_info('M 31')
@@ -389,6 +412,7 @@ def test_get_object_info_includes_wikipedia_when_found(monkeypatch):
 # ---------------------------------------------------------------------------
 # _simbad_identifier_variants
 # ---------------------------------------------------------------------------
+
 
 def test_simbad_variants_vdb():
     assert _simbad_identifier_variants('vdB 146') == ['VdB 146']
@@ -420,14 +444,19 @@ def test_simbad_variants_unknown_returns_empty():
 # get_object_info - local dataset fallback when SIMBAD has no record
 # ---------------------------------------------------------------------------
 
+
 def test_get_object_info_local_fallback_when_simbad_fails(monkeypatch):
     monkeypatch.setattr(oi, '_resolve_via_simbad', lambda identifier: None)
-    monkeypatch.setattr(_st_module, 'get_lookup_entry', lambda *a, **kw: {
-        'preferred_name': 'vdB 146',
-        'object_type': 'Reflection Nebula',
-        'ra_deg': 336.06,
-        'dec_deg': 68.15,
-    })
+    monkeypatch.setattr(
+        _st_module,
+        'get_lookup_entry',
+        lambda *a, **kw: {
+            'preferred_name': 'vdB 146',
+            'object_type': 'Reflection Nebula',
+            'ra_deg': 336.06,
+            'dec_deg': 68.15,
+        },
+    )
     monkeypatch.setattr(oi, '_wikipedia_with_fallback', lambda terms, lang: None)
 
     result = get_object_info('vdB 146')
@@ -463,15 +492,20 @@ def test_get_object_info_variant_lookup_succeeds(monkeypatch):
 
 # ---------------------------------------------------------------------------
 
+
 def test_get_object_info_no_image_when_coordinates_absent(monkeypatch):
-    monkeypatch.setattr(oi, '_resolve_via_simbad', lambda identifier: {
-        'id': 'SomeStar',
-        'name': 'SomeStar',
-        'type': 'Star',
-        'ra': None,
-        'dec': None,
-        'aliases': [],
-    })
+    monkeypatch.setattr(
+        oi,
+        '_resolve_via_simbad',
+        lambda identifier: {
+            'id': 'SomeStar',
+            'name': 'SomeStar',
+            'type': 'Star',
+            'ra': None,
+            'dec': None,
+            'aliases': [],
+        },
+    )
     monkeypatch.setattr(oi, '_wikipedia_with_fallback', lambda terms, lang: None)
     monkeypatch.setattr(_st_module, 'get_lookup_entry', lambda *a, **kw: None)
 
@@ -482,11 +516,8 @@ def test_get_object_info_no_image_when_coordinates_absent(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# _simbad_query — covers 
+# _simbad_query — covers
 # ---------------------------------------------------------------------------
-
-from unittest.mock import patch, MagicMock
-import requests as _req_module
 
 
 class TestSimbadQuery:
@@ -514,7 +545,7 @@ class TestSimbadQuery:
 
 
 # ---------------------------------------------------------------------------
-# _resolve_via_simbad — covers 
+# _resolve_via_simbad — covers
 # ---------------------------------------------------------------------------
 
 
@@ -532,9 +563,7 @@ class TestResolveViaSimbad:
     def test_returns_resolved_dict(self):
         main_result = {
             "data": [["M 31", "Galaxy", 10.684, 41.269]],
-            "metadata": [
-                {"name": "main_id"}, {"name": "otype_txt"}, {"name": "ra"}, {"name": "dec"}
-            ],
+            "metadata": [{"name": "main_id"}, {"name": "otype_txt"}, {"name": "ra"}, {"name": "dec"}],
         }
         alias_result = {
             "data": [["M 31"], ["NGC 224"], ["Andromeda Galaxy"]],
@@ -560,9 +589,7 @@ class TestResolveViaSimbad:
         the modal title) - other aliases, including ones equal to main_id, are kept."""
         main_result = {
             "data": [["NGC 224", "Galaxy", 10.684, 41.269]],
-            "metadata": [
-                {"name": "main_id"}, {"name": "otype_txt"}, {"name": "ra"}, {"name": "dec"}
-            ],
+            "metadata": [{"name": "main_id"}, {"name": "otype_txt"}, {"name": "ra"}, {"name": "dec"}],
         }
         alias_result = {
             "data": [["M 100"], [""], ["NGC 224"], ["Andromeda Galaxy"]],
@@ -584,9 +611,7 @@ class TestResolveViaSimbad:
     def test_handles_none_alias_result(self):
         main_result = {
             "data": [["Some Star", "Star", None, None]],
-            "metadata": [
-                {"name": "main_id"}, {"name": "otype_txt"}, {"name": "ra"}, {"name": "dec"}
-            ],
+            "metadata": [{"name": "main_id"}, {"name": "otype_txt"}, {"name": "ra"}, {"name": "dec"}],
         }
         call_count = [0]
 
@@ -603,7 +628,7 @@ class TestResolveViaSimbad:
 
 
 # ---------------------------------------------------------------------------
-# resolve_identifier_for_catalogue_lookup — covers 
+# resolve_identifier_for_catalogue_lookup — covers
 # ---------------------------------------------------------------------------
 
 
@@ -621,9 +646,7 @@ class TestResolveIdentifierForCatalogueLookup:
     def test_returns_dict_with_required_keys(self):
         main_result = {
             "data": [["M 31", "Galaxy", 10.684, 41.269]],
-            "metadata": [
-                {"name": "main_id"}, {"name": "otype_txt"}, {"name": "ra"}, {"name": "dec"}
-            ],
+            "metadata": [{"name": "main_id"}, {"name": "otype_txt"}, {"name": "ra"}, {"name": "dec"}],
         }
         alias_result = {
             "data": [["M 31"], ["NGC 224"]],
@@ -647,9 +670,7 @@ class TestResolveIdentifierForCatalogueLookup:
     def test_blank_alias_rows_are_excluded(self):
         main_result = {
             "data": [["M 31", "Galaxy", 10.684, 41.269]],
-            "metadata": [
-                {"name": "main_id"}, {"name": "otype_txt"}, {"name": "ra"}, {"name": "dec"}
-            ],
+            "metadata": [{"name": "main_id"}, {"name": "otype_txt"}, {"name": "ra"}, {"name": "dec"}],
         }
         alias_result = {
             "data": [[""], ["   "], ["NGC 224"]],
@@ -669,9 +690,7 @@ class TestResolveIdentifierForCatalogueLookup:
     def test_handles_none_coordinates(self):
         main_result = {
             "data": [["Some Obj", "Star", None, None]],
-            "metadata": [
-                {"name": "main_id"}, {"name": "otype_txt"}, {"name": "ra"}, {"name": "dec"}
-            ],
+            "metadata": [{"name": "main_id"}, {"name": "otype_txt"}, {"name": "ra"}, {"name": "dec"}],
         }
         with patch("observation.object_info._simbad_query", return_value=main_result):
             result = oi.resolve_identifier_for_catalogue_lookup("SomeStar")
@@ -681,7 +700,7 @@ class TestResolveIdentifierForCatalogueLookup:
 
 
 # ---------------------------------------------------------------------------
-# _get_wikipedia_summary — covers 
+# _get_wikipedia_summary — covers
 # ---------------------------------------------------------------------------
 
 
@@ -773,7 +792,7 @@ class TestGetWikipediaSummary:
 
 
 # ---------------------------------------------------------------------------
-# _wikipedia_with_fallback — covers 
+# _wikipedia_with_fallback — covers
 # ---------------------------------------------------------------------------
 
 
@@ -835,7 +854,7 @@ class TestWikipediaWithFallback:
 
 
 # ---------------------------------------------------------------------------
-# _translate_object_type — covers 
+# _translate_object_type — covers
 # ---------------------------------------------------------------------------
 
 
@@ -860,14 +879,18 @@ def test_translate_object_type_non_english_returns_string():
 
 def test_get_object_info_uses_local_type_when_available(monkeypatch):
     """Cover _local_entry found by SIMBAD main_id."""
-    monkeypatch.setattr(oi, '_resolve_via_simbad', lambda identifier: {
-        'id': 'NGC 224',
-        'name': 'NGC 224',
-        'type': 'Sb',  # raw SIMBAD type
-        'ra': 10.684,
-        'dec': 41.269,
-        'aliases': ['M 31'],
-    })
+    monkeypatch.setattr(
+        oi,
+        '_resolve_via_simbad',
+        lambda identifier: {
+            'id': 'NGC 224',
+            'name': 'NGC 224',
+            'type': 'Sb',  # raw SIMBAD type
+            'ra': 10.684,
+            'dec': 41.269,
+            'aliases': ['M 31'],
+        },
+    )
     monkeypatch.setattr(oi, '_wikipedia_with_fallback', lambda terms, lang: None)
 
     def local_lookup(kind, name):
@@ -889,9 +912,7 @@ class TestResolveIdentifierSkyCoordException:
     def test_skycoord_raises_constellation_defaults_to_empty(self):
         main_result = {
             "data": [["M 31", "Galaxy", 10.684, 41.269]],
-            "metadata": [
-                {"name": "main_id"}, {"name": "otype_txt"}, {"name": "ra"}, {"name": "dec"}
-            ],
+            "metadata": [{"name": "main_id"}, {"name": "otype_txt"}, {"name": "ra"}, {"name": "dec"}],
         }
         alias_result = {"data": [], "metadata": [{"name": "id"}]}
         call_count = [0]
@@ -920,7 +941,7 @@ class TestWikipediaWithFallbackNonCandidates:
 
     def test_simbad_style_alias_skipped_in_second_loop(self):
         """term skipped in English fallback loop when lang != 'en'."""
-        with patch("observation.object_info._get_wikipedia_summary") as mock_wiki:
+        with patch("observation.object_info._get_wikipedia_summary"):
             result = oi._wikipedia_with_fallback(["[HB89] 0951+699"], "fr")
         assert result is None
 
@@ -1026,6 +1047,7 @@ class TestBackoffStateRealPersistence:
     def test_load_filters_out_expired_entries(self, monkeypatch, tmp_path):
         self._use_real_persistence(monkeypatch, tmp_path)
         import json
+
         os.makedirs(tmp_path, exist_ok=True)
         with open(oi._BACKOFF_FILE, 'w', encoding='utf-8') as fh:
             json.dump({'simbad': oi.time.time() - 10, 'wikipedia': oi.time.time() + 300}, fh)
@@ -1046,6 +1068,7 @@ class TestBackoffStateRealPersistence:
         oi._backoff_until['simbad'] = oi.time.time() - 10  # already expired
         oi._save_backoff_state()
         import json
+
         with open(oi._BACKOFF_FILE, encoding='utf-8') as fh:
             on_disk = json.load(fh)
         assert on_disk == {}
@@ -1095,6 +1118,7 @@ class TestBackoffStateRealPersistence:
 # ---------------------------------------------------------------------------
 # Merged from former test_coverage_paths3.py
 # ---------------------------------------------------------------------------
+
 
 class TestObjectInfoMissingBranches:
     """Cover missed object_info.py branches."""
