@@ -107,6 +107,7 @@ Python dependencies are listed in `requirements.txt`.
 
 This project follows Semantic Versioning.
 Current version is stored in `VERSION`.
+See [CHANGELOG.md](CHANGELOG.md) for released and upcoming changes.
 
 ## Contributing
 

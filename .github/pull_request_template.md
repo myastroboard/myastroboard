@@ -39,7 +39,8 @@ Fixes #
 ### Code Quality
 
 - [ ] My code follows the [project style guidelines](../CONTRIBUTING.md#style-guidelines)
-- [ ] All code, comments, and documentation are **in English**, and updated according my changes- [ ] 
+- [ ] All code, comments, and documentation are **in English**, and updated according my changes
+- [ ] I have added a `CHANGELOG.md` entry under `## [Unreleased]` (required for `feature/`/`fix/` branches - see [CONTRIBUTING.md#changelog](../CONTRIBUTING.md#changelog))
 - [ ] I have added/updated code comments where necessary, particularly in hard-to-understand areas
 - [ ] I have performed a self-review of my code
 - [ ] I have used the centralized logging system (no `print()` statements in backend)

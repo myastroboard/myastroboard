@@ -206,6 +206,32 @@ jobs:
           format: table
           exit-code: 0
 
+      - name: Extract Unreleased changelog section
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          python3 - <<'PY'
+          import re
+
+          text = open("CHANGELOG.md", encoding="utf-8").read()
+          match = re.search(r"^## \[Unreleased\]\s*\n(.*?)(?=\n## |\Z)", text, re.S | re.M)
+          section = match.group(1) if match else ""
+
+          # Split into (subsection header, body) pairs and drop any whose body is empty
+          # or just the "- None." placeholder, then demote "### " to "## " so the
+          # subsections nest under the "# 📝 Changelog" heading in release_notes.md.
+          parts = re.split(r"(?m)^### (.+)$", section)
+          blocks = []
+          for i in range(1, len(parts), 2):
+              header = parts[i].strip()
+              body = parts[i + 1] if i + 1 < len(parts) else ""
+              if body.strip() in ("", "- None."):
+                  continue
+              blocks.append(f"## {header}\n{body.strip(chr(10))}\n")
+
+          with open("unreleased_notes.md", "w", encoding="utf-8") as f:
+              f.write("\n".join(blocks))
+          PY
+
       - name: Generate Release Notes
         if: startsWith(github.ref, 'refs/tags/')
         id: release_notes
@@ -213,45 +239,46 @@ jobs:
           CURRENT_TAG=${GITHUB_REF#refs/tags/}
           PREVIOUS_TAG=$(git tag --sort=-version:refname | sed -n 2p)
 
-          echo "## 🚀 What's Changed" > release_notes.md
+          > release_notes.md
 
-          # Inject changelog if the file exists and is not empty
-          if [ -s "CHANGELOG_NEXT.md" ]; then
+          # Inject the Unreleased section of CHANGELOG.md if it had any real content
+          if [ -s "unreleased_notes.md" ]; then
+            echo "# 📝 Changelog" >> release_notes.md
             echo "" >> release_notes.md
-            echo "### 📝 Changelog" >> release_notes.md
-            cat CHANGELOG_NEXT.md >> release_notes.md
+            cat unreleased_notes.md >> release_notes.md
             echo "" >> release_notes.md
           fi
 
           if [ -n "$PREVIOUS_TAG" ]; then
-            echo "### 📋 Commits since $PREVIOUS_TAG:" >> release_notes.md
+            echo "# 📋 Commits since $PREVIOUS_TAG:" >> release_notes.md
             git log "$PREVIOUS_TAG..$CURRENT_TAG" \
               --reverse --date-order \
               --pretty=format:"- %s (%an) - %h" \
               --invert-grep --grep="Merge" >> release_notes.md
           else
-            echo "### 📋 Initial Release Commits:" >> release_notes.md
+            echo "# 📋 Initial Release Commits:" >> release_notes.md
             git log --reverse --date-order \
               --pretty=format:"- %s (%an) - %h" \
               --invert-grep --grep="Merge" >> release_notes.md
           fi
 
           echo "" >> release_notes.md
-          echo "## 🐳 Docker Images" >> release_notes.md
           echo "" >> release_notes.md
-          echo "### GitHub Container Registry (ghcr.io) - Preferred" >> release_notes.md
-          echo '```bash' >> release_notes.md
-          echo "docker pull ghcr.io/${{ steps.image.outputs.name }}:${{ steps.version.outputs.VERSION }}" >> release_notes.md
-          echo "docker pull ghcr.io/${{ steps.image.outputs.name }}:latest" >> release_notes.md
-          echo '```' >> release_notes.md
+          echo "# 🐳 Docker Images" >> release_notes.md
           echo "" >> release_notes.md
-          echo "### Docker Hub" >> release_notes.md
+          echo "## Docker Hub - Preferred" >> release_notes.md
           echo '```bash' >> release_notes.md
           echo "docker pull myastroboard/myastroboard:${{ steps.version.outputs.VERSION }}" >> release_notes.md
           echo "docker pull myastroboard/myastroboard:latest" >> release_notes.md
           echo '```' >> release_notes.md
           echo "" >> release_notes.md
-          echo "### Supported platforms" >> release_notes.md
+          echo "## GitHub Container Registry (ghcr.io)" >> release_notes.md
+          echo '```bash' >> release_notes.md
+          echo "docker pull ghcr.io/${{ steps.image.outputs.name }}:${{ steps.version.outputs.VERSION }}" >> release_notes.md
+          echo "docker pull ghcr.io/${{ steps.image.outputs.name }}:latest" >> release_notes.md
+          echo '```' >> release_notes.md
+          echo "" >> release_notes.md
+          echo "## Supported platforms" >> release_notes.md
           echo "| Platform | Architecture |" >> release_notes.md
           echo "|----------|-------------|" >> release_notes.md
           echo "| \`linux/amd64\` | x86_64 (PC, server) |" >> release_notes.md

@@ -205,6 +205,7 @@ myastroboard/
 │   ├── space/                       # Tests for backend/space/* (iss_passes, css_passes, spaceflight_tracker)
 │   ├── equipment/                   # Tests for backend/equipment/* + exposure calculator
 │   └── connectors/                  # Tests for backend/connectors/* (allsky, base, mqtt_connector / mqtt_payloads / mqtt_publisher)
+├── CHANGELOG.md                     # Released + unreleased changes (Keep a Changelog format) - see docs/4.RELEASE.md
 ├── CODEOWNERS                       # Repository ownership rules
 ├── CODE_OF_CONDUCT.md               # Community code of conduct
 ├── CONTRIBUTING.md                  # Contribution guidelines
@@ -772,7 +773,7 @@ If a change touches `app.py` or any `backend/blueprints/*.py` file (route added,
 pytest tests/blueprints/test_route_inventory.py
 ```
 
-Update `EXPECTED_ROUTES` in that file to match, and document the change in `CHANGELOG_NEXT.md`. The failure output lists exactly which routes are unexpected or missing.
+Update `EXPECTED_ROUTES` in that file to match, and document the change in `CHANGELOG.md` (`## [Unreleased]`). The failure output lists exactly which routes are unexpected or missing.
 
 ### Minimum Bar Before Calling a Change Done
 
@@ -782,6 +783,8 @@ Update `EXPECTED_ROUTES` in that file to match, and document the change in `CHAN
 - [ ] `pyright backend/` reports no errors
 - [ ] `djlint` passes for any touched template
 - [ ] `pytest tests/blueprints/test_route_inventory.py` passes if routes changed
+- [ ] `CHANGELOG.md` has a bullet under `## [Unreleased]` for the change (one or two lines, not a
+      novel - see [CONTRIBUTING.md#changelog](../../CONTRIBUTING.md#changelog))
 - [ ] All code/comments/UI text in English (see Language Requirement above)
 - [ ] No `print()` or direct `logging` import in backend code (use `logging_config.get_logger`)
 - [ ] No `innerHTML` / new `DOMUtils.setTrustedHTML` in `static/js/**`

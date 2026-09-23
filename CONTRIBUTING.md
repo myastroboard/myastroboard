@@ -128,25 +128,31 @@ want a bounded first contribution.
 2. **Write Code** - Follow our style guidelines
 3. **Add Tests** - Include tests for new functionality
 4. **Update Documentation** - Update relevant documentation
-5. **Resume modification** - Optional, if necessary using `CHANGELOG_NEXT.md`
+5. **Update the changelog** - Required for any `feature/` or `fix/` branch, see below
 6. **Submit PR** - Use our Pull Request template
 
-### CHANGELOG_NEXT.md
+### Changelog
 
-This file is used at each new release to announce notable change. Use it to brievly explain new feature, notable change, ...
+Every notable change is recorded in [CHANGELOG.md](CHANGELOG.md), under the `## [Unreleased]`
+section at the top of the file, in the matching subsection (`### Features`, `### Fixes`, or
+`### Breaking changes`). Replace a subsection's `- None.` placeholder with your bullet, or add to
+the existing list.
 
-Use `#### title` to organize in sections. In release note the file will be displayed:
+**Any PR from a `feature/` or `fix/` branch must include a CHANGELOG.md entry** - a CI check
+(`Require Changelog Entry`) fails the PR otherwise. Branches under other prefixes (`chore/`,
+`docs/`, `refactor/`, `test/`...) are not required to, though they may add one if the change is
+user-visible.
 
-```
-## 🚀 What's Changed"
+**Keep entries short - one or two lines, not a novel.** A changelog bullet says *what* changed
+and, if it's not obvious, *where* to find it (tab, menu, endpoint) - it is not the place for
+paragraphs of rationale, a full design writeup, or a step-by-step walkthrough. If a feature needs
+more explanation than that, put the detail in `docs/` and link to it from the bullet - the pattern
+already used throughout the file (e.g. `docs/OBSERVATION_LOG.md`, `docs/LOCATIONS.md`).
 
-### 📝 Changelog
-[CHANGELOG_NEXT.md]
-
-### 📋 Commits since $PREVIOUS_TAG:
-...
-
-```
+On release, an automated PR moves the `## [Unreleased]` content to a new dated `## X.Y.Z
+(YYYY-MM-DD)` section and resets `## [Unreleased]` to the empty template - the release notes are
+generated directly from what was under `## [Unreleased]` at tag time, so an entry that reads like
+a novel there ends up in the GitHub release too.
 
 ## Style Guidelines
 
@@ -449,7 +455,7 @@ See `tests/README.md` for details on the fixtures (`live_server_url`, `login`,
 
 `tests/blueprints/test_route_inventory.py` maintains the v1.0 API contract: it fails if any route is added, removed, renamed, or changes its HTTP method.
 
-**If you add or rename an API route**, update `EXPECTED_ROUTES` in that file to match, and document the change in `CHANGELOG_NEXT.md`.
+**If you add or rename an API route**, update `EXPECTED_ROUTES` in that file to match, and document the change in `CHANGELOG.md` (`## [Unreleased]`).
 
 ```bash
 # Quick check after touching app.py or skytonight_api.py
@@ -508,7 +514,8 @@ The failure output lists exactly which routes are unexpected or missing, so you 
    - Link related issues
    - Provide clear description of changes
    - Add screenshots for UI changes
-   - Ensure CI checks pass (`validate-i18n`, `validate-html`, `docker-publish`)
+   - Ensure CI checks pass (`validate-i18n`, `validate-html`, `docker-publish`, and
+     `require-changelog` for `feature/`/`fix/` branches)
 
 3. **Address Review Comments**:
    - Respond to all feedback
@@ -523,6 +530,7 @@ The failure output lists exactly which routes are unexpected or missing, so you 
 - [ ] Self-review completed
 - [ ] Comments added for complex code
 - [ ] Documentation updated
+- [ ] CHANGELOG.md entry added under `## [Unreleased]` (required for `feature/`/`fix/` branches)
 - [ ] Tests added/updated
 - [ ] All tests passing
 - [ ] No merge conflicts

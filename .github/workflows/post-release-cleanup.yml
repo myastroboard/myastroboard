@@ -9,11 +9,11 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to clean up (e.g. 0.8.1) - leave empty to use latest tag'
+        description: 'Version to archive (e.g. 0.8.1) - leave empty to use latest tag'
         required: false
 
 jobs:
-  clear-changelog:
+  archive-changelog:
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     permissions:
@@ -29,6 +29,7 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_PUBLISHED_AT: ${{ github.event.release.published_at }}
           WORKFLOW_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
           INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
@@ -55,15 +56,27 @@ jobs:
 
           echo "VERSION=${TAG#v}" >> $GITHUB_OUTPUT
 
-      - name: Create branch and PR to clear CHANGELOG_NEXT
+          if [ "$EVENT_NAME" = "release" ] && [ -n "$RELEASE_PUBLISHED_AT" ]; then
+            echo "DATE=${RELEASE_PUBLISHED_AT%%T*}" >> $GITHUB_OUTPUT
+          else
+            echo "DATE=$(date -u +%Y-%m-%d)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create branch and PR to archive the CHANGELOG Unreleased section
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
           VERSION: ${{ steps.version.outputs.VERSION }}
+          RELEASE_DATE: ${{ steps.version.outputs.DATE }}
         run: |
           VERSION="${VERSION:-}"
 
           if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
             echo "Invalid VERSION output: $VERSION"
+            exit 1
+          fi
+
+          if ! printf '%s' "$RELEASE_DATE" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
+            echo "Invalid RELEASE_DATE output: $RELEASE_DATE"
             exit 1
           fi
 
@@ -78,19 +91,51 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           git checkout -b "$BRANCH"
-          truncate -s 0 CHANGELOG_NEXT.md
-          git add CHANGELOG_NEXT.md
+
+          VERSION="$VERSION" RELEASE_DATE="$RELEASE_DATE" python3 - <<'PY'
+          import os
+          import re
+          import sys
+
+          version = os.environ["VERSION"]
+          date = os.environ["RELEASE_DATE"]
+
+          path = "CHANGELOG.md"
+          text = open(path, encoding="utf-8").read()
+
+          match = re.search(r"^## \[Unreleased\]\s*\n(.*?)(?=\n## |\Z)", text, re.S | re.M)
+          if not match:
+              sys.exit("Could not find '## [Unreleased]' section in CHANGELOG.md")
+
+          released_body = match.group(1).strip(chr(10))
+          template_body = (
+              "### Features\n\n- None.\n\n"
+              "### Fixes\n\n- None.\n\n"
+              "### Breaking changes\n\n- None."
+          )
+
+          new_section = (
+              f"## [Unreleased]\n\n{template_body}\n\n"
+              f"## {version} ({date})\n\n{released_body}\n"
+          )
+
+          start, end = match.span(0)
+          new_text = text[:start] + new_section + text[end:]
+          open(path, "w", encoding="utf-8").write(new_text)
+          PY
+
+          git add CHANGELOG.md
 
           if git diff --staged --quiet; then
-            echo "CHANGELOG_NEXT.md is already empty, nothing to do."
+            echo "CHANGELOG.md is unchanged, nothing to do."
             exit 0
           fi
 
-          git commit -m "chore: clear CHANGELOG_NEXT after release v${VERSION}"
+          git commit -m "chore: archive CHANGELOG Unreleased section for release v${VERSION}"
           git push origin "$BRANCH"
 
           gh pr create \
-            --title "chore: clear CHANGELOG_NEXT after release v${VERSION}" \
-            --body "Automated cleanup after tagging release v${VERSION}." \
+            --title "chore: archive CHANGELOG Unreleased section for release v${VERSION}" \
+            --body "Automated archival after tagging release v${VERSION}: moves the Unreleased section to a dated ${VERSION} entry and resets Unreleased to the template." \
             --base main \
             --head "$BRANCH"

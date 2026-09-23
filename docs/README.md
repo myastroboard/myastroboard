@@ -57,6 +57,7 @@ Welcome to the comprehensive documentation for MyAstroBoard, the integrated astr
 
 ### For Contributors
 - [Extending MyAstroBoard](EXTENDING.md) - The narrow extension points (catalogues, connectors, translations, export formatters) and the no-new-dependency-cycles rule
+- [Changelog](../CHANGELOG.md) - Released and unreleased changes, one entry per notable change
 - [Release Guide](4.RELEASE.md) - How to publish new versions and create releases
 - [Translation](7.TRANSLATIONS.md) - How to contribute translations
 - [Organization](5.ORGANIZATION.md) - Repository and runtime data organization

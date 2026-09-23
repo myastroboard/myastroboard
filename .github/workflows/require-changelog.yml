@@ -1,0 +1,36 @@
+name: Require Changelog Entry
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+jobs:
+  require-changelog:
+    name: CHANGELOG.md updated (feature/fix branches)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
+      - name: Install pytest
+        run: pip install pytest
+
+      - name: Fetch base branch
+        run: git fetch origin "${{ github.base_ref }}" --depth=1
+
+      - name: Check CHANGELOG.md was updated
+        env:
+          GITHUB_EVENT_NAME: pull_request
+          GITHUB_HEAD_REF: ${{ github.head_ref }}
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+        run: pytest tests/test_changelog_entry.py -m unit -v

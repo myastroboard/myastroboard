@@ -2,7 +2,7 @@
 
 Fails if any route is added, removed, renamed, or changes its HTTP method.
 To update intentionally: modify EXPECTED_ROUTES below and document the
-breaking change in CHANGELOG_NEXT.md.
+breaking change in CHANGELOG.md (## [Unreleased]).
 """
 
 import sys
@@ -57,7 +57,7 @@ EXPECTED_ROUTES = {
     ('/api/config', ('GET',)),
     ('/api/config', ('POST',)),
     ('/api/config/export', ('GET',)),
-    # --- locations (multi-location profiles, v1.2 - see CHANGELOG_NEXT.md) ---
+    # --- locations (multi-location profiles, v1.2 - see CHANGELOG.md) ---
     ('/api/locations', ('GET',)),
     ('/api/locations', ('POST',)),
     ('/api/locations/<location_id>', ('PUT',)),
@@ -287,7 +287,7 @@ def test_no_breaking_route_changes():
     """Fails if any route is added, removed, or changes its HTTP method.
 
     To update intentionally: edit EXPECTED_ROUTES and document the change
-    in CHANGELOG_NEXT.md.
+    in CHANGELOG.md (## [Unreleased]).
     """
     actual = _actual_routes(app)
 
