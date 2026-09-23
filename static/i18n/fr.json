@@ -968,6 +968,7 @@
     "2fa_setup_confirm_code": "Code de votre application",
     "2fa_setup_confirm_btn": "Confirmer et activer",
     "2fa_setup_error": "Impossible de terminer la configuration de la double authentification.",
+    "2fa_disable_error": "Impossible de désactiver la double authentification.",
     "2fa_setup_not_started": "Relancez la configuration de la double authentification avant de confirmer.",
     "2fa_qr_unavailable": "Le QR code n'a pas pu être généré. Saisissez plutôt la clé ci-dessous manuellement.",
     "2fa_active": "La double authentification est active sur votre compte.",

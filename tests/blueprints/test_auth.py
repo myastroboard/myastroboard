@@ -6,8 +6,10 @@ local/global account scopes: /api/auth/login, /api/auth/login/verify-2fa,
 """
 
 import sys
+import time
 import types
 import uuid
+from collections import deque
 from datetime import datetime, timedelta, timezone
 
 import pyotp
@@ -406,6 +408,58 @@ class TestVerifyTwoFactor:
 
 
 # ---------------------------------------------------------------------------
+# _otp_attempts pruning (unit-level: triggering the real 512-key threshold via
+# HTTP would need 512+ distinct users per test, so this drives the module
+# directly - same white-box approach the rest of this file avoids, but the
+# threshold itself isn't reachable any other way)
+# ---------------------------------------------------------------------------
+
+
+class TestOtpAttemptsPruning:
+    def test_prune_drops_a_users_only_entry_once_it_expires(self):
+        """A user who fails once and never returns must not linger forever: their
+        deque has one stale timestamp, never empty, so the old 'drop empty keys'
+        pass could never reach it - this is the bug the review caught."""
+        auth_bp_mod._otp_attempts['stale-user'] = deque([0.0])  # far in the past
+
+        auth_bp_mod._prune_expired_otp_attempts(now=time.time())
+
+        assert 'stale-user' not in auth_bp_mod._otp_attempts
+
+    def test_prune_keeps_a_users_still_valid_entries(self):
+        now = time.time()
+        auth_bp_mod._otp_attempts['active-user'] = deque([now])
+
+        auth_bp_mod._prune_expired_otp_attempts(now=now)
+
+        assert list(auth_bp_mod._otp_attempts['active-user']) == [now]
+
+    def test_prune_partially_trims_a_mixed_deque(self):
+        now = time.time()
+        auth_bp_mod._otp_attempts['mixed-user'] = deque([0.0, now])
+
+        auth_bp_mod._prune_expired_otp_attempts(now=now)
+
+        assert list(auth_bp_mod._otp_attempts['mixed-user']) == [now]
+
+    def test_record_failure_self_heals_the_dict_past_the_threshold(self, client, security_settings, make_user):
+        """End-to-end version of the same fix: once the dict is large enough to
+        trigger pruning, a fresh failure for one user must not leave unrelated
+        one-off stale entries behind."""
+        security_settings([TRUSTED_LAN], two_factor_enabled=True)
+        user, password, _ = make_user(with_totp=True)
+
+        stale_cutoff = time.time() - auth_bp_mod.PENDING_2FA_TTL_SECONDS - 1
+        for i in range(513):
+            auth_bp_mod._otp_attempts[f'leftover-{i}'] = deque([stale_cutoff])
+
+        login(client, user.username, password)
+        client.post('/api/auth/login/verify-2fa', json={'code': '000000'})
+
+        assert not any(key.startswith('leftover-') for key in auth_bp_mod._otp_attempts)
+
+
+# ---------------------------------------------------------------------------
 # Local vs. global account scope
 # ---------------------------------------------------------------------------
 
@@ -610,6 +664,24 @@ class TestSelfServiceTwoFactor:
         resp = client.post('/api/auth/2fa/disable', json={})
 
         assert resp.status_code == 400
+
+    def test_disable_generic_failure_uses_its_own_error_key(self, enrolled_client, monkeypatch):
+        """The disable endpoint's fallback must not reuse the setup flow's error key
+        (which would show a misleading 'could not complete the two-factor setup'
+        message for what is actually a disable failure) - review-flagged."""
+        client, _, password = enrolled_client
+        secret = client.post('/api/auth/2fa/setup').get_json()['secret']
+        client.post('/api/auth/2fa/confirm', json={'code': pyotp.TOTP(secret).now()})
+
+        def _boom(*_a, **_k):
+            raise ValueError("Something unexpected")
+
+        monkeypatch.setattr(user_manager, 'disable_totp', _boom)
+
+        resp = client.post('/api/auth/2fa/disable', json={'password': password})
+
+        assert resp.status_code == 400
+        assert resp.get_json()['error_key'] == 'settings.2fa_disable_error'
 
     def test_setup_refused_when_the_instance_switch_is_off(self, client, security_settings, make_user):
         security_settings([TRUSTED_LAN], two_factor_enabled=False)

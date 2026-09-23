@@ -968,6 +968,7 @@
     "2fa_setup_confirm_code": "Code from your app",
     "2fa_setup_confirm_btn": "Confirm and activate",
     "2fa_setup_error": "Could not complete the two-factor setup.",
+    "2fa_disable_error": "Could not disable two-factor authentication.",
     "2fa_setup_not_started": "Start the two-factor setup again before confirming.",
     "2fa_qr_unavailable": "The QR code could not be drawn. Enter the key below manually instead.",
     "2fa_active": "Two-factor authentication is active on your account.",
