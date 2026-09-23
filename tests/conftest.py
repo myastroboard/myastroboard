@@ -25,10 +25,16 @@ def pytest_sessionfinish(session, exitstatus):
 # Force matplotlib non-GUI backend before any test imports matplotlib or a module
 # that indirectly triggers it. Without this, the Tk backend can be loaded in the
 # main thread and then Tcl/Tk objects get destroyed in background threads (jplephem
-# ThreadPoolExecutor), causing fatal crashes on Windows.
-import matplotlib
+# ThreadPoolExecutor), causing fatal crashes on Windows. Optional: some CI jobs (e.g.
+# the changelog-entry gate) install only `pytest`, with no scientific stack at all -
+# conftest.py must still be importable there, same reasoning as the ImportError
+# guards on the backend-module imports further down this file.
+try:
+    import matplotlib
 
-matplotlib.use('Agg')
+    matplotlib.use('Agg')
+except ImportError:
+    pass
 
 # Set up environment variables BEFORE any imports from backend
 # This prevents permission errors when modules try to create directories
