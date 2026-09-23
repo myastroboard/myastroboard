@@ -486,11 +486,14 @@ The failure output lists exactly which routes are unexpected or missing, so you 
 2. **Run tests and linting**
    ```bash
    pytest
-   black backend/
-   flake8 backend/
+   black backend/ tests/
+   flake8 backend/ tests/
    pyright backend/
    djlint templates/ static/offline.html --profile jinja --lint --ignore H021,H023,H030,H031,J004,J018
    ```
+   `black` and `flake8` cover `tests/` too, not just `backend/`. `pyright` stays scoped to
+   `backend/` - test code leans heavily on `monkeypatch`, `MagicMock` and other dynamic
+   attributes that would drown real findings in false positives.
    `pyright` is the CLI equivalent of the Pylance errors VSCode shows inline — both come from
    `requirements-dev.txt` and read the same `pyrightconfig.json` at the repo root, so a clean
    `pyright backend/` run means Pylance should show no problems either. If VSCode still shows

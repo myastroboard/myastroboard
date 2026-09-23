@@ -1,12 +1,15 @@
 """Tests for connectors/mqtt_publisher.py - the background publisher.
 
-The thread is never started: ``_tick()`` is driven by hand with a fake paho client, a
-scripted config loader, synthetic devices in place of ``mqtt_payloads.collect`` and every
-file (lock, trigger, status, manifest) pointed at a per-test directory.
+The thread is normally never started: ``_tick()`` is driven by hand with a fake paho
+client, a scripted config loader, synthetic devices in place of ``mqtt_payloads.collect``
+and every file (lock, trigger, status, manifest) pointed at a per-test directory. The one
+exception is the thread-lifecycle test itself, which needs a real ``start()``/``stop()``
+round trip to prove the thread actually runs and joins cleanly.
 """
 
 import json
 import os
+import time
 from datetime import datetime, timezone
 
 import pytest
@@ -120,8 +123,13 @@ def _device(kind, object_id, state, image_topic=None, image_id=None, image=None)
 
 def _config(enabled=True, **overrides):
     block = {
-        "url": "mqtt://broker.lan:1883", "enabled": enabled, "username": "u", "base_topic": "mab",
-        "discovery_prefix": "ha", "discovery_enabled": True, "publish_interval_seconds": 60,
+        "url": "mqtt://broker.lan:1883",
+        "enabled": enabled,
+        "username": "u",
+        "base_topic": "mab",
+        "discovery_prefix": "ha",
+        "discovery_enabled": True,
+        "publish_interval_seconds": 60,
         "modules": {"sky_conditions": {"enabled": True}, "board_diagnostics": {"enabled": True}},
     }
     block.update(overrides)
@@ -201,6 +209,12 @@ class TestChannel:
             handle.write("x")
         assert pub._write_json(path, {}) is False
 
+    def test_consume_trigger_swallows_a_remove_failure(self, env, monkeypatch):
+        pub.request_action("publish")
+        monkeypatch.setattr(pub.os, "remove", lambda *a, **k: (_ for _ in ()).throw(OSError("locked")))
+
+        assert pub._consume_trigger() == "publish"  # still reports the action it read
+
 
 # ---------------------------------------------------------------------------
 # Connection lifecycle
@@ -254,6 +268,18 @@ class TestLifecycle:
         assert client.client_id == "my-board" and client.tls is True and client.insecure is True
         assert client.connect_target == ("broker.lan", 8883)
 
+    def test_tls_without_insecure_does_not_disable_certificate_verification(self, env):
+        env["config"] = _config(url="mqtts://broker.lan", tls_insecure=False)
+        env["publisher"]._tick()
+        client = env["clients"][0]
+        assert client.tls is True and client.insecure is False
+
+    def test_anonymous_connection_sets_no_credentials(self, env):
+        env["config"] = _config(username="")
+        env["publisher"]._tick()
+        client = env["clients"][0]
+        assert client.credentials is None
+
     def test_refused_connack_records_an_error(self, env):
         env["publisher"]._tick()
         client = env["clients"][0]
@@ -272,6 +298,31 @@ class TestLifecycle:
         assert client.disconnected is True and client.loop_started is False
         assert env["publisher"]._client is None
         assert pub.read_status()["connected"] is False
+
+    def test_disconnect_swallows_a_wait_for_publish_timeout(self, env):
+        client = _connect(env)
+        publisher = env["publisher"]
+
+        class _SlowInfo:
+            rc = 0
+
+            def wait_for_publish(self, timeout=None):
+                raise RuntimeError("timed out")
+
+        client.publish = lambda *a, **k: _SlowInfo()
+
+        publisher._disconnect(publish_offline=True)  # must not raise
+
+        assert publisher._connected is False
+
+    def test_disconnect_swallows_loop_stop_or_disconnect_errors(self, env):
+        client = _connect(env)
+        publisher = env["publisher"]
+        client.disconnect = lambda: (_ for _ in ()).throw(RuntimeError("boom"))
+
+        publisher._disconnect(publish_offline=True)  # must not raise
+
+        assert publisher._client is None
 
     def test_unrelated_config_change_does_not_reconnect(self, env):
         client = _connect(env)
@@ -295,6 +346,21 @@ class TestLifecycle:
         status = pub.read_status()
         assert status["configured"] is False and status["enabled"] is False
 
+    def test_connect_records_a_broker_parse_error(self, env):
+        """_tick() itself only ever calls _connect() once is_enabled() (which already
+        validates the url) has passed, so this exercises _connect()'s own parse-error
+        handling directly rather than through a URL that would never get this far."""
+        from connectors.mqtt_connector import MqttConnector
+
+        publisher = env["publisher"]
+        connector = MqttConnector(_config()["connectors"]["mqtt"])
+        connector.broker = lambda: (_ for _ in ()).throw(ValueError("bad url"))
+
+        publisher._connect(connector)
+
+        assert publisher._last_error == "bad url"
+        assert publisher._client is None
+
     def test_client_factory_failure_is_an_error_not_a_crash(self, env, monkeypatch):
         def boom(client_id):
             raise RuntimeError("no paho")
@@ -313,6 +379,39 @@ class TestLifecycle:
         env["publisher"]._config_loader = boom
         env["publisher"]._tick()  # no connector yet -> nothing to do, nothing raised
         assert env["clients"] == []
+
+    def test_on_connect_swallows_publish_or_subscribe_errors(self, env):
+        publisher = env["publisher"]
+        publisher._tick()
+        client = env["clients"][0]
+        client.subscribe = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom"))
+
+        client.on_connect(client, None, {}, _Reason())  # must not raise
+
+        assert publisher._connected is True  # still marked connected despite the subscribe failure
+
+    def test_on_connect_without_a_connector_does_nothing(self, env):
+        client = _connect(env)
+        publisher = env["publisher"]
+        publisher._connector = None
+        client.clear()
+
+        client.on_connect(client, None, {}, _Reason())  # must not raise
+
+        assert client.published == []
+
+    def test_on_message_ignored_without_a_connector(self, env):
+        client = _connect(env)
+        publisher = env["publisher"]
+        publisher._connector = None
+
+        # must not raise
+        client.on_message(client, None, type("Msg", (), {"topic": "ha/status", "payload": b"online"})())
+
+    def test_on_message_swallows_unexpected_errors(self, env):
+        client = _connect(env)
+
+        client.on_message(client, None, object())  # no .topic attribute - must not raise
 
     def test_on_disconnect_and_ha_birth_message(self, env):
         client = _connect(env)
@@ -338,10 +437,111 @@ class TestLifecycle:
     def test_second_instance_cannot_take_the_lock(self, env):
         first = env["publisher"]
         assert first._acquire_lock() is True
-        second = pub.MqttPublisher(client_factory=lambda cid: FakeClient(cid), config_loader=lambda: {}, clock=lambda: NOW)
+        second = pub.MqttPublisher(
+            client_factory=lambda cid: FakeClient(cid), config_loader=lambda: {}, clock=lambda: NOW
+        )
         assert second._acquire_lock() is False
         assert second.start() is False
         first._release_lock()
+
+    def test_acquire_lock_failure_is_reported(self, env, monkeypatch, tmp_path):
+        monkeypatch.setattr(pub, "LOCK_FILE", str(tmp_path / "missing-dir" / "lock"))
+        publisher = env["publisher"]
+
+        assert publisher._acquire_lock() is False
+        assert publisher._lock_file is None
+
+    def test_acquire_lock_failure_after_opening_closes_the_file(self, env, monkeypatch):
+        """A failure after open() (here, while writing the pid) must still close and
+        drop the already-opened file handle, not leak it."""
+        publisher = env["publisher"]
+        monkeypatch.setattr(pub.os, "getpid", lambda: (_ for _ in ()).throw(OSError("pid unavailable")))
+
+        assert publisher._acquire_lock() is False
+        assert publisher._lock_file is None
+
+    def test_release_lock_is_a_noop_when_never_acquired(self, env):
+        publisher = env["publisher"]
+
+        publisher._release_lock()  # must not raise
+
+        assert publisher._has_lock is False
+
+    def test_release_lock_skips_unlink_when_the_file_is_already_gone(self, env, monkeypatch):
+        publisher = env["publisher"]
+        assert publisher._acquire_lock() is True
+        real_exists = os.path.exists
+        monkeypatch.setattr(pub.os.path, "exists", lambda p: False if p == pub.LOCK_FILE else real_exists(p))
+
+        publisher._release_lock()
+
+        assert publisher._has_lock is False
+
+    def test_release_lock_swallows_unlock_errors(self, env, monkeypatch):
+        publisher = env["publisher"]
+        assert publisher._acquire_lock() is True
+        monkeypatch.setattr(pub.msvcrt, "locking", lambda *a, **k: (_ for _ in ()).throw(OSError("unlock failed")))
+
+        publisher._release_lock()  # must not raise
+
+        assert publisher._has_lock is False
+
+    def test_release_lock_swallows_a_broken_logger_too(self, env, monkeypatch):
+        """Best-effort logging during release: a log stream already closed at shutdown
+        must not turn a harmless cleanup failure into a crash."""
+        publisher = env["publisher"]
+        assert publisher._acquire_lock() is True
+        monkeypatch.setattr(pub.msvcrt, "locking", lambda *a, **k: (_ for _ in ()).throw(OSError("unlock failed")))
+        monkeypatch.setattr(pub.logger, "error", lambda *a, **k: (_ for _ in ()).throw(ValueError("stream closed")))
+
+        publisher._release_lock()  # must not raise even though logging itself fails
+
+        assert publisher._has_lock is False
+
+    def test_start_runs_the_background_thread_and_stop_joins_it(self, env):
+        publisher = env["publisher"]
+
+        assert publisher.start() is True
+        assert publisher.thread.is_alive() is True
+
+        publisher.stop()
+
+        assert publisher.thread.is_alive() is False
+        assert not os.path.exists(pub.LOCK_FILE)
+
+    def test_run_exits_immediately_when_already_stopped(self, env):
+        publisher = env["publisher"]
+        publisher._stop_event.set()
+
+        assert publisher.start() is True
+        publisher.thread.join(timeout=2)
+
+        assert publisher.thread.is_alive() is False
+        publisher.stop()  # thread already finished; this just releases the lock
+
+    def test_run_logs_and_continues_after_a_tick_exception(self, env, monkeypatch):
+        monkeypatch.setattr(pub, "TICK_SECONDS", 0.02)
+        publisher = env["publisher"]
+        original_tick = publisher._tick
+        calls = {"n": 0}
+
+        def flaky_tick():
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise RuntimeError("boom")
+            return original_tick()
+
+        monkeypatch.setattr(publisher, "_tick", flaky_tick)
+
+        assert publisher.start() is True
+        for _ in range(100):
+            if calls["n"] >= 3:
+                break
+            time.sleep(0.02)
+        publisher.stop()
+
+        assert calls["n"] >= 3  # the loop kept going past the first tick's exception
+        assert "boom" in (publisher._last_error or "")
 
     def test_module_start_and_stop(self, env, monkeypatch):
         started = {}
@@ -365,6 +565,34 @@ class TestLifecycle:
         assert started["stopped"] is True
         assert pub._publisher is None
 
+    def test_module_start_is_a_noop_when_already_running(self, env, monkeypatch):
+        publisher = env["publisher"]
+        assert publisher.start() is True
+        monkeypatch.setattr(pub, "_publisher", publisher)
+
+        try:
+            assert pub.start() is True  # sees the already-alive thread, starts nothing new
+        finally:
+            publisher.stop()
+
+    def test_module_start_returns_false_when_the_lock_is_held_elsewhere(self, env, monkeypatch):
+        holder = env["publisher"]
+        assert holder._acquire_lock() is True  # simulates another process/instance owning it
+        monkeypatch.setattr(pub, "_publisher", None)
+
+        try:
+            assert pub.start() is False
+            assert pub._publisher is None
+        finally:
+            holder._release_lock()
+
+    def test_module_stop_is_a_noop_when_nothing_is_running(self, monkeypatch):
+        monkeypatch.setattr(pub, "_publisher", None)
+
+        pub.stop()  # must not raise
+
+        assert pub._publisher is None
+
 
 # ---------------------------------------------------------------------------
 # Publish cycles
@@ -372,6 +600,18 @@ class TestLifecycle:
 
 
 class TestPublishCycle:
+
+    def test_publish_cycle_is_a_noop_without_a_connector_or_client(self, env):
+        publisher = env["publisher"]
+        publisher._connector = None
+
+        publisher._publish_cycle(force_full=True)  # must not raise
+
+    def test_publish_with_no_client_returns_false(self, env):
+        publisher = env["publisher"]
+        assert publisher._client is None
+
+        assert publisher._publish("some/topic", "x", qos=0, retain=False) is False
 
     def test_first_cycle_publishes_discovery_states_and_manifest(self, env):
         env["devices"] = [_device("location", "loc-1", {"a": 1}), _device("board", "", {"version": "1.6.0"})]
@@ -468,7 +708,7 @@ class TestPublishCycle:
 
     def test_discovery_off_publishes_states_only_and_clears_old_discovery(self, env):
         env["devices"] = [_device("location", "loc-1", {"a": 1})]
-        client = _connect(env)
+        _connect(env)
         publisher = env["publisher"]
         publisher._tick()
         env["config"] = _config(discovery_enabled=False)
@@ -486,7 +726,9 @@ class TestPublishCycle:
         env["publisher"]._tick()
         # A fresh publisher (new process) loads the manifest and clears what is no longer wanted
         env["devices"] = []
-        fresh = pub.MqttPublisher(client_factory=lambda cid: FakeClient(cid), config_loader=lambda: env["config"], clock=lambda: NOW)
+        fresh = pub.MqttPublisher(
+            client_factory=lambda cid: FakeClient(cid), config_loader=lambda: env["config"], clock=lambda: NOW
+        )
         fresh._current_source_signature = lambda: ("z",)
         assert fresh._manifest["discovery"] == ["ha/device/mab_loc_loc-1/config"]
         assert fresh._generated_client_id == client.client_id
@@ -524,16 +766,29 @@ class TestPublishCycle:
 class TestImages:
 
     def test_image_published_once_per_picture_id(self, env):
-        env["devices"] = [_device("user", "u-1", {"x": 1}, image_topic="mab/user/u-1/astrodex/latest_image", image_id="p1", image=b"JPG1")]
+        env["devices"] = [
+            _device(
+                "user", "u-1", {"x": 1}, image_topic="mab/user/u-1/astrodex/latest_image", image_id="p1", image=b"JPG1"
+            )
+        ]
         client = _connect(env)
         publisher = env["publisher"]
         publisher._tick()
-        assert client.last("mab/user/u-1/astrodex/latest_image") == ("mab/user/u-1/astrodex/latest_image", b"JPG1", 1, True)
+        assert client.last("mab/user/u-1/astrodex/latest_image") == (
+            "mab/user/u-1/astrodex/latest_image",
+            b"JPG1",
+            1,
+            True,
+        )
         client.clear()
         publisher._next_due = 0
         publisher._tick()
         assert client.published == []  # same picture id -> nothing
-        env["devices"] = [_device("user", "u-1", {"x": 1}, image_topic="mab/user/u-1/astrodex/latest_image", image_id="p2", image=b"JPG2")]
+        env["devices"] = [
+            _device(
+                "user", "u-1", {"x": 1}, image_topic="mab/user/u-1/astrodex/latest_image", image_id="p2", image=b"JPG2"
+            )
+        ]
         publisher._next_due = 0
         publisher._tick()
         assert client.last("mab/user/u-1/astrodex/latest_image")[1] == b"JPG2"
@@ -551,6 +806,30 @@ class TestImages:
         publisher._tick()
         assert client.last(topic) is None  # neither republished nor cleared
         assert json.load(open(pub.MANIFEST_FILE))["image"] == [topic]
+
+    def test_first_ever_failed_encoding_leaves_the_topic_out_entirely(self, env):
+        """Distinct from the case above: with no previous picture to keep, there is
+        nothing to add to 'desired' either - the topic must simply be absent."""
+        topic = "mab/user/u-1/astrodex/latest_image"
+        env["devices"] = [_device("user", "u-1", {"x": 1}, image_topic=topic, image_id="p1", image=None)]
+        client = _connect(env)
+        publisher = env["publisher"]
+
+        publisher._tick()
+
+        assert client.last(topic) is None
+        assert topic not in publisher._manifest.get("image", [])
+
+    def test_image_publish_failure_does_not_record_the_picture_id(self, env, monkeypatch):
+        topic = "mab/user/u-1/astrodex/latest_image"
+        env["devices"] = [_device("user", "u-1", {"x": 1}, image_topic=topic, image_id="p1", image=b"JPG1")]
+        _connect(env)
+        publisher = env["publisher"]
+        monkeypatch.setattr(publisher, "_publish", lambda *a, **k: False)
+
+        publisher._tick()
+
+        assert publisher._image_ids.get(topic) is None
 
     def test_no_picture_anymore_clears_the_retained_image(self, env):
         topic = "mab/user/u-1/astrodex/latest_image"
@@ -619,3 +898,51 @@ class TestRemove:
 
     def test_remove_without_connector_is_ignored(self, env):
         env["publisher"]._remove_all(None)  # no crash
+
+    def test_remove_waits_for_an_already_connecting_client_without_reconnecting(self, env, monkeypatch):
+        """A client object can already exist but not be connected yet (CONNACK still
+        pending) - remove must just wait for it, not throw it away and reconnect."""
+        env["devices"] = [_device("location", "loc-1", {"a": 1})]
+        publisher = env["publisher"]
+        publisher._tick()  # opens a client, but CONNACK is never simulated
+        client = env["clients"][-1]
+        monkeypatch.setattr(pub, "CONNECT_WAIT_SECONDS", 0.01)
+
+        pub.request_action("remove")
+        publisher._tick()
+
+        assert env["clients"] == [client]  # no second client was created
+        assert "not reachable" in pub.read_status()["last_error"]
+
+
+# ---------------------------------------------------------------------------
+# Real (non-injected) defaults
+# ---------------------------------------------------------------------------
+
+
+class TestDefaults:
+
+    def test_default_client_factory_builds_a_real_paho_client(self):
+        import paho.mqtt.client as mqtt
+
+        client = pub.MqttPublisher._default_client_factory("test-client-id")
+
+        assert isinstance(client, mqtt.Client)
+
+    def test_default_config_loader_reads_real_config(self):
+        config = pub.MqttPublisher._default_config_loader()
+
+        assert isinstance(config, dict)
+
+    def test_current_source_signature_reflects_file_mtimes(self, tmp_path, monkeypatch):
+        from utils import connector_secrets
+
+        monkeypatch.setattr(pub, "CONFIG_FILE", str(tmp_path / "config.json"))
+        monkeypatch.setattr(connector_secrets, "_SECRETS_FILE", str(tmp_path / "secrets.json"))
+
+        assert pub.MqttPublisher._current_source_signature() == (None, None)
+
+        (tmp_path / "config.json").write_text("{}")
+
+        signature = pub.MqttPublisher._current_source_signature()
+        assert signature[0] is not None and signature[1] is None

@@ -9,8 +9,10 @@ POST /api/connectors/astrodex_stream/rotate
 import os
 import sys
 import tempfile
+import time
 import types
 import uuid
+from collections import deque
 
 import pytest
 from PIL import Image
@@ -208,6 +210,17 @@ class TestSharedStream:
         monkeypatch.setattr(bp, 'load_config', lambda: _app_config(private=True))
         assert client.get(f'/api/astrodex/stream/shared/{token}/current.jpg').status_code == 404
 
+    def test_disabled_connector_is_404_on_the_shared_route_too(self, env, client, monkeypatch):
+        monkeypatch.setattr(bp, 'load_config', lambda: _app_config(_cfg(enabled=False)))
+        token = astrodex_stream.shared_token()
+        resp = client.get(f'/api/astrodex/stream/shared/{token}/current.jpg')
+        assert resp.status_code == 404
+
+    def test_wrong_token_is_404(self, env, client, monkeypatch):
+        monkeypatch.setattr(bp, 'load_config', lambda: _app_config(private=False))
+        resp = client.get('/api/astrodex/stream/shared/deadbeef00000000/current.jpg')
+        assert resp.status_code == 404
+
 
 class TestRateLimit:
 
@@ -218,6 +231,31 @@ class TestRateLimit:
         url = f'/api/astrodex/stream/{user_id}/{token}/current.jpg'
         statuses = [client.get(url).status_code for _ in range(4)]
         assert statuses == [200, 200, 200, 429]
+
+    def test_shared_route_is_rate_limited_independently(self, env, client, monkeypatch):
+        monkeypatch.setattr(bp, 'load_config', lambda: _app_config(private=False))
+        monkeypatch.setattr(bp, '_RATE_LIMIT', 3)
+        token = astrodex_stream.shared_token()
+        url = f'/api/astrodex/stream/shared/{token}/current.jpg'
+        statuses = [client.get(url).status_code for _ in range(4)]
+        assert statuses == [200, 200, 200, 429]
+
+    def test_expired_hits_are_dropped_before_counting(self, env):
+        bp._rate_hits['old-client'] = deque([time.time() - bp._RATE_WINDOW_SECONDS - 5])
+
+        assert bp._rate_limited('old-client') is False
+
+        assert len(bp._rate_hits['old-client']) == 1  # the stale hit aged out; only this call's own remains
+
+    def test_stale_empty_entries_are_pruned_once_the_table_grows_past_512(self, env):
+        bp._rate_hits.clear()
+        for i in range(513):
+            bp._rate_hits[f'stale-{i}'] = deque()
+
+        assert bp._rate_limited('fresh-client') is False
+
+        assert 'fresh-client' in bp._rate_hits
+        assert len(bp._rate_hits) < 514  # the swept-out empty, stale entries outnumber the one fresh addition
 
 
 class TestRotate:
@@ -238,3 +276,13 @@ class TestRotate:
         new_token = astrodex_stream.personal_token(user_id)
         fresh = client.get(f'/api/astrodex/stream/{user_id}/{new_token}/current.jpg')
         assert fresh.status_code == 200
+
+    def test_rotate_failure_returns_500(self, env, client_admin, monkeypatch):
+        def _boom():
+            raise RuntimeError('could not persist rotated signing secret')
+
+        monkeypatch.setattr(astrodex_stream, 'rotate_signing_secret', _boom)
+
+        resp = client_admin.post('/api/connectors/astrodex_stream/rotate')
+
+        assert resp.status_code == 500

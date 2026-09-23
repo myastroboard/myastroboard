@@ -6,11 +6,11 @@ import numpy as np
 import pytest
 
 from space import css_passes as css_module
+from utils.events_aggregator import EventsAggregator
 
 CSSPassService = css_module.CSSPassService
 get_css_passes_report = css_module.get_css_passes_report
 LUNAR_ANGULAR_RADIUS_FALLBACK_DEG = css_module.LUNAR_ANGULAR_RADIUS_FALLBACK_DEG
-from utils.events_aggregator import EventsAggregator
 
 mod = css_module  # alias used by the merged-in coverage tests below
 

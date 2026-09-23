@@ -141,7 +141,7 @@ class TestFindMeteorShowerPeaks:
 
     def test_southern_observer_skips_northern_only_showers(self):
         svc = SolarSystemEventsService(-33.9, 151.2, timezone="Australia/Sydney")
-        from datetime import date, timedelta
+        from datetime import date
 
         start_date = date(2026, 1, 1)
         events = svc._find_meteor_shower_peaks(start_date, 365)
@@ -318,7 +318,6 @@ class TestIsRadiantVisible:
 
     def test_altaz_none_returns_false(self):
         """if altaz is None → return False."""
-        import numpy as np
         from astropy.time import Time
         from astropy.coordinates import SkyCoord
 
@@ -705,9 +704,7 @@ class TestComputeTrueBrightnessPeak:
             return (None, 0.0, r_au, delta_au)  # dec=0 -> always overhead at the equator
 
         monkeypatch.setattr('skytonight.skytonight_comets._comet_ra_dec', fake_comet_ra_dec)
-        monkeypatch.setattr(
-            'skytonight.skytonight_comets._get_earth_heliocentric', lambda obs_time: (1.0, 0.0, 0.0)
-        )
+        monkeypatch.setattr('skytonight.skytonight_comets._get_earth_heliocentric', lambda obs_time: (1.0, 0.0, 0.0))
 
         candidate = self._candidate(_FULL_ELEMENTS_METADATA, magnitude=5.0)
         result = svc._compute_true_brightness_peak(candidate, start, end)
@@ -738,9 +735,7 @@ class TestComputeTrueBrightnessPeak:
             return (None, dec_deg, 1.4, 0.5)
 
         monkeypatch.setattr('skytonight.skytonight_comets._comet_ra_dec', fake_comet_ra_dec)
-        monkeypatch.setattr(
-            'skytonight.skytonight_comets._get_earth_heliocentric', lambda obs_time: (1.0, 0.0, 0.0)
-        )
+        monkeypatch.setattr('skytonight.skytonight_comets._get_earth_heliocentric', lambda obs_time: (1.0, 0.0, 0.0))
 
         candidate = self._candidate(_FULL_ELEMENTS_METADATA, magnitude=5.0)
         result = svc._compute_true_brightness_peak(candidate, start, end)
@@ -760,9 +755,7 @@ class TestComputeTrueBrightnessPeak:
             raise ValueError("simulated propagation failure")
 
         monkeypatch.setattr('skytonight.skytonight_comets._comet_ra_dec', fake_comet_ra_dec)
-        monkeypatch.setattr(
-            'skytonight.skytonight_comets._get_earth_heliocentric', lambda obs_time: (1.0, 0.0, 0.0)
-        )
+        monkeypatch.setattr('skytonight.skytonight_comets._get_earth_heliocentric', lambda obs_time: (1.0, 0.0, 0.0))
 
         candidate = self._candidate(_FULL_ELEMENTS_METADATA, magnitude=5.0)
         assert svc._compute_true_brightness_peak(candidate, start, end) is None
@@ -796,9 +789,7 @@ class TestComputeTrueBrightnessPeak:
             return (None, 0.0, 1.4, 0.5)
 
         monkeypatch.setattr('skytonight.skytonight_comets._comet_ra_dec', fake_comet_ra_dec)
-        monkeypatch.setattr(
-            'skytonight.skytonight_comets._get_earth_heliocentric', lambda obs_time: (1.0, 0.0, 0.0)
-        )
+        monkeypatch.setattr('skytonight.skytonight_comets._get_earth_heliocentric', lambda obs_time: (1.0, 0.0, 0.0))
 
         candidate = self._candidate(_FULL_ELEMENTS_METADATA, magnitude=5.0)
         result = svc._compute_true_brightness_peak(candidate, start, end)
@@ -815,9 +806,7 @@ class TestComputeTrueBrightnessPeak:
             return (None, None, 1.4, 0.5)  # declination unknown, but distance data present
 
         monkeypatch.setattr('skytonight.skytonight_comets._comet_ra_dec', fake_comet_ra_dec)
-        monkeypatch.setattr(
-            'skytonight.skytonight_comets._get_earth_heliocentric', lambda obs_time: (1.0, 0.0, 0.0)
-        )
+        monkeypatch.setattr('skytonight.skytonight_comets._get_earth_heliocentric', lambda obs_time: (1.0, 0.0, 0.0))
 
         candidate = self._candidate(_FULL_ELEMENTS_METADATA, magnitude=5.0)
         # Magnitude is computed every day, but max_transit_altitude never gets set since
@@ -838,9 +827,7 @@ class TestComputeTrueBrightnessPeak:
             return (None, 0.0, 1.4, 0.5)
 
         monkeypatch.setattr('skytonight.skytonight_comets._comet_ra_dec', fake_comet_ra_dec)
-        monkeypatch.setattr(
-            'skytonight.skytonight_comets._get_earth_heliocentric', lambda obs_time: (1.0, 0.0, 0.0)
-        )
+        monkeypatch.setattr('skytonight.skytonight_comets._get_earth_heliocentric', lambda obs_time: (1.0, 0.0, 0.0))
 
         candidate = self._candidate(_FULL_ELEMENTS_METADATA, magnitude=5.0)
         result = svc._compute_true_brightness_peak(candidate, start, end)
@@ -863,9 +850,7 @@ class TestBuildCometEventUsesBrightnessPeak:
             return (None, 0.0, r_au, delta_au)  # dec=0 -> well above any altitude floor at lat=0
 
         monkeypatch.setattr('skytonight.skytonight_comets._comet_ra_dec', fake_comet_ra_dec)
-        monkeypatch.setattr(
-            'skytonight.skytonight_comets._get_earth_heliocentric', lambda obs_time: (1.0, 0.0, 0.0)
-        )
+        monkeypatch.setattr('skytonight.skytonight_comets._get_earth_heliocentric', lambda obs_time: (1.0, 0.0, 0.0))
 
         candidate = {
             'name': '10P/Tempel',
@@ -902,9 +887,7 @@ class TestBuildCometEventUsesBrightnessPeak:
             return (None, -24.7, 1.42, 0.41)
 
         monkeypatch.setattr('skytonight.skytonight_comets._comet_ra_dec', fake_comet_ra_dec)
-        monkeypatch.setattr(
-            'skytonight.skytonight_comets._get_earth_heliocentric', lambda obs_time: (1.0, 0.0, 0.0)
-        )
+        monkeypatch.setattr('skytonight.skytonight_comets._get_earth_heliocentric', lambda obs_time: (1.0, 0.0, 0.0))
 
         candidate = {
             'name': '10P/Tempel',

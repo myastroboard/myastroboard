@@ -4848,7 +4848,8 @@ class TestPushApiErrors:
 
     def test_vapid_public_key_exception_returns_503(self, client_admin, monkeypatch):
         """exception in get_vapid_public_key → 503."""
-        import sys, types
+        import sys
+        import types
 
         fake_pm = types.ModuleType('push_manager')
         fake_pm.get_vapid_public_key = lambda: (_ for _ in ()).throw(RuntimeError("no vapid"))
@@ -4858,7 +4859,8 @@ class TestPushApiErrors:
 
     def test_vapid_config_status_exception_returns_500(self, client_admin, monkeypatch):
         """exception in get_vapid_contact_status → 500."""
-        import sys, types
+        import sys
+        import types
 
         fake_pm = types.ModuleType('push_manager')
         fake_pm.get_vapid_contact_status = lambda: (_ for _ in ()).throw(RuntimeError("error"))
@@ -7608,7 +7610,6 @@ class TestLogExportEdgeCases:
 
     def test_log_export_exception_returns_500(self, client_admin, monkeypatch):
         """ZipFile creation raises → 500."""
-        import zipfile as _zf
 
         def _raise(*a, **kw):
             raise OSError("forced zip failure")
@@ -7914,7 +7915,7 @@ class TestAllSkyStatusApi:
             cs._allsky_sensor_cache["data"] = None
 
     def test_fetches_live_when_cache_empty(self, client_admin, monkeypatch):
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import patch
 
         cfg = {
             "url": "http://allsky.local",
@@ -8914,7 +8915,6 @@ class TestPlanMyNightCoveragePaths:
         """Covers entry not in default plan, found in combination plan."""
         from observation import plan_my_night as _pmn
         from observation import astrodex as _adx
-        import os as _os
 
         entry_id = 'test-entry-scope-123'
         combination_plan = {'entries': [{'id': entry_id, 'name': 'M42', 'catalogue': 'Messier'}]}
@@ -10189,7 +10189,7 @@ class TestCachedAstroAnalysisIfDefault:
     def test_returns_cached_data_when_slot_is_valid(self, monkeypatch):
         monkeypatch.setattr(_weather_mod, 'load_config', lambda: {'language': 'en'})
         monkeypatch.setattr(
-            _weather_mod.cache_store, 'load_location_cache', lambda n, l: {'data': {'analysis': 'warm'}}
+            _weather_mod.cache_store, 'load_location_cache', lambda n, loc_id: {'data': {'analysis': 'warm'}}
         )
         monkeypatch.setattr(_weather_mod.cache_store, 'is_cache_valid', lambda entry, ttl: True)
         assert _weather_mod._cached_astro_analysis_if_default(24, 'en', 'loc-1') == {'analysis': 'warm'}

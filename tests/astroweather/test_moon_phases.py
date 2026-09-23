@@ -69,7 +69,7 @@ class TestFmt:
         self.svc = MoonService(48.85, 2.35, 'Europe/Paris')
 
     def test_fmt_none_returns_not_found(self):
-        # 
+        #
         result = self.svc._fmt(None)
         assert result == "Not found"
 
@@ -113,8 +113,7 @@ class TestCoordAltitudeDeg:
         # coord is None
         from astropy.coordinates import AltAz
         from astropy.time import Time
-        from astropy.coordinates import EarthLocation
-        import astropy.units as u
+
         t = Time('2026-06-01T20:00:00', format='isot', scale='utc')
         frame = AltAz(obstime=t, location=self.svc.location)
         result = self.svc._coord_altitude_deg(None, frame)
@@ -124,7 +123,7 @@ class TestCoordAltitudeDeg:
         # transformed.alt is None
         from astropy.coordinates import AltAz
         from astropy.time import Time
-        import astropy.units as u
+
         t = Time('2026-06-01T20:00:00', format='isot', scale='utc')
         frame = AltAz(obstime=t, location=self.svc.location)
 
@@ -141,6 +140,7 @@ class TestCoordAltitudeDeg:
         # alt.to_value returns None (no to_value attribute)
         from astropy.coordinates import AltAz
         from astropy.time import Time
+
         t = Time('2026-06-01T20:00:00', format='isot', scale='utc')
         frame = AltAz(obstime=t, location=self.svc.location)
 
@@ -187,11 +187,13 @@ class TestNextAstronomicalDarkWindow:
         svc = MoonService(48.85, 2.35, 'Europe/Paris')
         start = datetime.datetime(2026, 1, 1, 22, 0, 0, tzinfo=ZoneInfo('Europe/Paris'))
 
-        with patch('astroweather.moon_phases.AstroTime', return_value=MagicMock()), \
-             patch('astroweather.moon_phases.AltAz', return_value=MagicMock()), \
-             patch('astroweather.moon_phases.get_sun', return_value=_make_alt_mock(sun_alts)), \
-             patch('astroweather.moon_phases.get_body', return_value=_make_alt_mock(moon_alts)), \
-             patch.object(MoonService, '_coord_altitude_deg', return_value=None):
+        with patch('astroweather.moon_phases.AstroTime', return_value=MagicMock()), patch(
+            'astroweather.moon_phases.AltAz', return_value=MagicMock()
+        ), patch('astroweather.moon_phases.get_sun', return_value=_make_alt_mock(sun_alts)), patch(
+            'astroweather.moon_phases.get_body', return_value=_make_alt_mock(moon_alts)
+        ), patch.object(
+            MoonService, '_coord_altitude_deg', return_value=None
+        ):
             result = svc._next_astronomical_dark_window(start)
 
         assert isinstance(result, tuple)
@@ -220,10 +222,11 @@ class TestNextAstronomicalDarkWindow:
         svc = MoonService(48.85, 2.35, 'Europe/Paris')
         start = datetime.datetime(2026, 6, 21, 22, 0, 0, tzinfo=ZoneInfo('Europe/Paris'))
 
-        with patch('astroweather.moon_phases.AstroTime', return_value=MagicMock()), \
-             patch('astroweather.moon_phases.AltAz', return_value=MagicMock()), \
-             patch('astroweather.moon_phases.get_sun', return_value=_make_alt_mock(sun_alts)), \
-             patch('astroweather.moon_phases.get_body', return_value=_make_alt_mock(moon_alts)):
+        with patch('astroweather.moon_phases.AstroTime', return_value=MagicMock()), patch(
+            'astroweather.moon_phases.AltAz', return_value=MagicMock()
+        ), patch('astroweather.moon_phases.get_sun', return_value=_make_alt_mock(sun_alts)), patch(
+            'astroweather.moon_phases.get_body', return_value=_make_alt_mock(moon_alts)
+        ):
             result = svc._next_astronomical_dark_window(start)
 
         assert result == ("Not found", "Not found")

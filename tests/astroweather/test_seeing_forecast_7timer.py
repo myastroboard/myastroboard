@@ -141,11 +141,7 @@ class TestSeeingForecastService:
     @pytest.fixture
     def service(self):
         """Create a service instance for testing."""
-        return SeeingForecastService(
-            latitude=48.866667,
-            longitude=2.333333,
-            timezone_str="Europe/Paris"
-        )
+        return SeeingForecastService(latitude=48.866667, longitude=2.333333, timezone_str="Europe/Paris")
 
     def test_service_initialization(self, service):
         """Test service initializes with correct parameters."""
@@ -164,7 +160,12 @@ class TestSeeingForecastService:
 
         forecast_list = [
             {"time": now_utc.isoformat(), "seeing": 4, "description": "Poor", "conditions": "Poor conditions"},
-            {"time": (now_utc + timedelta(hours=2)).isoformat(), "seeing": 5, "description": "Very Poor", "conditions": "Unsuitable"},
+            {
+                "time": (now_utc + timedelta(hours=2)).isoformat(),
+                "seeing": 5,
+                "description": "Very Poor",
+                "conditions": "Unsuitable",
+            },
         ]
 
         result = service._find_best_window(forecast_list, metric_key="seeing", threshold=3, higher_is_better=False)
@@ -176,9 +177,24 @@ class TestSeeingForecastService:
 
         forecast_list = [
             {"time": (now_utc).isoformat(), "seeing": 1, "description": "Excellent", "conditions": "Perfect"},
-            {"time": (now_utc + timedelta(hours=2)).isoformat(), "seeing": 2, "description": "Good", "conditions": "Very good"},
-            {"time": (now_utc + timedelta(hours=4)).isoformat(), "seeing": 2, "description": "Good", "conditions": "Very good"},
-            {"time": (now_utc + timedelta(hours=6)).isoformat(), "seeing": 4, "description": "Poor", "conditions": "Poor conditions"},
+            {
+                "time": (now_utc + timedelta(hours=2)).isoformat(),
+                "seeing": 2,
+                "description": "Good",
+                "conditions": "Very good",
+            },
+            {
+                "time": (now_utc + timedelta(hours=4)).isoformat(),
+                "seeing": 2,
+                "description": "Good",
+                "conditions": "Very good",
+            },
+            {
+                "time": (now_utc + timedelta(hours=6)).isoformat(),
+                "seeing": 4,
+                "description": "Poor",
+                "conditions": "Poor conditions",
+            },
         ]
 
         result = service._find_best_window(forecast_list, metric_key="seeing", threshold=3, higher_is_better=False)
@@ -195,11 +211,36 @@ class TestSeeingForecastService:
         # Short good window (2 hours), then longer good window (6 hours)
         forecast_list = [
             {"time": (now_utc).isoformat(), "seeing": 1, "description": "Excellent", "conditions": "Perfect"},
-            {"time": (now_utc + timedelta(hours=2)).isoformat(), "seeing": 4, "description": "Poor", "conditions": "Poor"},
-            {"time": (now_utc + timedelta(hours=4)).isoformat(), "seeing": 1, "description": "Excellent", "conditions": "Perfect"},
-            {"time": (now_utc + timedelta(hours=6)).isoformat(), "seeing": 2, "description": "Good", "conditions": "Very good"},
-            {"time": (now_utc + timedelta(hours=8)).isoformat(), "seeing": 2, "description": "Good", "conditions": "Very good"},
-            {"time": (now_utc + timedelta(hours=10)).isoformat(), "seeing": 5, "description": "Very Poor", "conditions": "Unsuitable"},
+            {
+                "time": (now_utc + timedelta(hours=2)).isoformat(),
+                "seeing": 4,
+                "description": "Poor",
+                "conditions": "Poor",
+            },
+            {
+                "time": (now_utc + timedelta(hours=4)).isoformat(),
+                "seeing": 1,
+                "description": "Excellent",
+                "conditions": "Perfect",
+            },
+            {
+                "time": (now_utc + timedelta(hours=6)).isoformat(),
+                "seeing": 2,
+                "description": "Good",
+                "conditions": "Very good",
+            },
+            {
+                "time": (now_utc + timedelta(hours=8)).isoformat(),
+                "seeing": 2,
+                "description": "Good",
+                "conditions": "Very good",
+            },
+            {
+                "time": (now_utc + timedelta(hours=10)).isoformat(),
+                "seeing": 5,
+                "description": "Very Poor",
+                "conditions": "Unsuitable",
+            },
         ]
 
         result = service._find_best_window(forecast_list, metric_key="seeing", threshold=3, higher_is_better=False)
@@ -218,7 +259,9 @@ class TestSeeingForecastService:
             {"time": (now_utc + timedelta(hours=9)).isoformat(), "quality_score": 2.0},
         ]
 
-        result = service._find_best_window(forecast_list, metric_key="quality_score", threshold=6, higher_is_better=True)
+        result = service._find_best_window(
+            forecast_list, metric_key="quality_score", threshold=6, higher_is_better=True
+        )
 
         assert result is not None
         assert result["quality_score"] == 8.0  # Best (highest) value tracked in the window
@@ -239,7 +282,7 @@ class TestSeeingForecastService:
                 _astro_point(3, seeing=2),
                 _astro_point(6, seeing=2),
                 _astro_point(9, seeing=3),
-            ]
+            ],
         }
         mock_get.return_value = mock_response
 
@@ -283,10 +326,7 @@ class TestSeeingForecastService:
         init_time = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
 
         mock_response = Mock()
-        mock_response.json.return_value = {
-            "init": init_time.strftime("%Y%m%d%H"),
-            "dataseries": []
-        }
+        mock_response.json.return_value = {"init": init_time.strftime("%Y%m%d%H"), "dataseries": []}
         mock_get.return_value = mock_response
 
         result = service.fetch_tonight_seeing()
@@ -297,10 +337,7 @@ class TestSeeingForecastService:
     def test_fetch_tonight_seeing_builds_correct_params(self, mock_get, service):
         """Test fetch sends correct parameters to API."""
         mock_response = Mock()
-        mock_response.json.return_value = {
-            "init": "2024011500",
-            "dataseries": [_astro_point(3)]
-        }
+        mock_response.json.return_value = {"init": "2024011500", "dataseries": [_astro_point(3)]}
         mock_get.return_value = mock_response
 
         service.fetch_tonight_seeing()
@@ -325,7 +362,9 @@ class TestSeeingForecastService:
         mock_response = Mock()
         mock_response.json.return_value = {
             "init": init_time.strftime("%Y%m%d%H"),
-            "dataseries": [_astro_point(3, seeing=1, transparency=8, cloudcover=1, wind_speed=1, rh2m=0, prec_type="none")],
+            "dataseries": [
+                _astro_point(3, seeing=1, transparency=8, cloudcover=1, wind_speed=1, rh2m=0, prec_type="none")
+            ],
         }
         mock_get.return_value = mock_response
 
@@ -352,11 +391,7 @@ class TestGetSeeingForecastWrapper:
     @patch.object(SeeingForecastService, 'fetch_tonight_seeing')
     def test_get_seeing_forecast_success(self, mock_fetch):
         """Test wrapper calls service correctly."""
-        mock_forecast = {
-            "now": 2,
-            "forecast": [],
-            "best_window": None
-        }
+        mock_forecast = {"now": 2, "forecast": [], "best_window": None}
         mock_fetch.return_value = mock_forecast
 
         result = get_seeing_forecast(45.5, -73.5, "America/Montreal")
@@ -393,8 +428,18 @@ class TestSeeingForecastBranchCoverage:
         now_utc = datetime.now(timezone.utc)
         forecast_list = [
             {"time": now_utc.isoformat(), "seeing": 3, "description": "OK", "conditions": "OK"},
-            {"time": (now_utc + timedelta(hours=3)).isoformat(), "seeing": 1, "description": "Excellent", "conditions": "Perfect"},
-            {"time": (now_utc + timedelta(hours=6)).isoformat(), "seeing": 5, "description": "Poor", "conditions": "Bad"},
+            {
+                "time": (now_utc + timedelta(hours=3)).isoformat(),
+                "seeing": 1,
+                "description": "Excellent",
+                "conditions": "Perfect",
+            },
+            {
+                "time": (now_utc + timedelta(hours=6)).isoformat(),
+                "seeing": 5,
+                "description": "Poor",
+                "conditions": "Bad",
+            },
         ]
         result = service._find_best_window(forecast_list, metric_key="seeing", threshold=3, higher_is_better=False)
         assert result is not None
@@ -422,9 +467,9 @@ class TestSeeingForecastBranchCoverage:
         mock_response.json.return_value = {
             "init": init_time.strftime("%Y%m%d%H"),
             "dataseries": [
-                {**_astro_point("bad", seeing=2), "timepoint": "bad"},   # bad timepoint -> skip
-                {**_astro_point(3), "seeing": "bad"},                    # bad seeing -> skip
-                _astro_point(6, seeing=2),                               # valid
+                {**_astro_point("bad", seeing=2), "timepoint": "bad"},  # bad timepoint -> skip
+                {**_astro_point(3), "seeing": "bad"},  # bad seeing -> skip
+                _astro_point(6, seeing=2),  # valid
             ],
         }
         mock_get.return_value = mock_response
@@ -442,9 +487,9 @@ class TestSeeingForecastBranchCoverage:
         mock_response.json.return_value = {
             "init": init_time.strftime("%Y%m%d%H"),
             "dataseries": [
-                _astro_point(3, seeing=-9999),   # out of range -> skip
-                _astro_point(6, seeing=9),        # out of range -> skip
-                _astro_point(9, seeing=2),        # valid
+                _astro_point(3, seeing=-9999),  # out of range -> skip
+                _astro_point(6, seeing=9),  # out of range -> skip
+                _astro_point(9, seeing=2),  # valid
             ],
         }
         mock_get.return_value = mock_response
@@ -502,7 +547,7 @@ class TestSeeingForecastRemainingBranches:
             "init": init_time.strftime("%Y%m%d%H"),
             "dataseries": [
                 {**_astro_point(None, seeing=2), "timepoint": None},  # timepoint is None -> skip
-                _astro_point(3, seeing=2),                             # valid
+                _astro_point(3, seeing=2),  # valid
             ],
         }
         mock_get.return_value = mock_response
@@ -539,12 +584,42 @@ class TestSeeingForecastRemainingBranches:
         # Bad seeing (closes window 2)
         forecast_list = [
             {"time": now_utc.isoformat(), "seeing": 1, "description": "Excellent", "conditions": "Perfect"},
-            {"time": (now_utc + timedelta(hours=3)).isoformat(), "seeing": 2, "description": "Good", "conditions": "Very good"},
-            {"time": (now_utc + timedelta(hours=6)).isoformat(), "seeing": 2, "description": "Good", "conditions": "Very good"},
-            {"time": (now_utc + timedelta(hours=9)).isoformat(), "seeing": 1, "description": "Excellent", "conditions": "Perfect"},
-            {"time": (now_utc + timedelta(hours=12)).isoformat(), "seeing": 5, "description": "Poor", "conditions": "Bad"},
-            {"time": (now_utc + timedelta(hours=15)).isoformat(), "seeing": 1, "description": "Excellent", "conditions": "Perfect"},
-            {"time": (now_utc + timedelta(hours=18)).isoformat(), "seeing": 5, "description": "Poor", "conditions": "Bad"},
+            {
+                "time": (now_utc + timedelta(hours=3)).isoformat(),
+                "seeing": 2,
+                "description": "Good",
+                "conditions": "Very good",
+            },
+            {
+                "time": (now_utc + timedelta(hours=6)).isoformat(),
+                "seeing": 2,
+                "description": "Good",
+                "conditions": "Very good",
+            },
+            {
+                "time": (now_utc + timedelta(hours=9)).isoformat(),
+                "seeing": 1,
+                "description": "Excellent",
+                "conditions": "Perfect",
+            },
+            {
+                "time": (now_utc + timedelta(hours=12)).isoformat(),
+                "seeing": 5,
+                "description": "Poor",
+                "conditions": "Bad",
+            },
+            {
+                "time": (now_utc + timedelta(hours=15)).isoformat(),
+                "seeing": 1,
+                "description": "Excellent",
+                "conditions": "Perfect",
+            },
+            {
+                "time": (now_utc + timedelta(hours=18)).isoformat(),
+                "seeing": 5,
+                "description": "Poor",
+                "conditions": "Bad",
+            },
         ]
         result = service._find_best_window(forecast_list, metric_key="seeing", threshold=3, higher_is_better=False)
         assert result is not None
@@ -557,11 +632,36 @@ class TestSeeingForecastRemainingBranches:
         # Window 2: 1 good point (3h) at end -> 3 > 12 is False -> doesn't replace best
         forecast_list = [
             {"time": now_utc.isoformat(), "seeing": 1, "description": "Excellent", "conditions": "Perfect"},
-            {"time": (now_utc + timedelta(hours=3)).isoformat(), "seeing": 2, "description": "Good", "conditions": "Very good"},
-            {"time": (now_utc + timedelta(hours=6)).isoformat(), "seeing": 2, "description": "Good", "conditions": "Very good"},
-            {"time": (now_utc + timedelta(hours=9)).isoformat(), "seeing": 1, "description": "Excellent", "conditions": "Perfect"},
-            {"time": (now_utc + timedelta(hours=12)).isoformat(), "seeing": 5, "description": "Poor", "conditions": "Bad"},
-            {"time": (now_utc + timedelta(hours=15)).isoformat(), "seeing": 2, "description": "Good", "conditions": "Very good"},
+            {
+                "time": (now_utc + timedelta(hours=3)).isoformat(),
+                "seeing": 2,
+                "description": "Good",
+                "conditions": "Very good",
+            },
+            {
+                "time": (now_utc + timedelta(hours=6)).isoformat(),
+                "seeing": 2,
+                "description": "Good",
+                "conditions": "Very good",
+            },
+            {
+                "time": (now_utc + timedelta(hours=9)).isoformat(),
+                "seeing": 1,
+                "description": "Excellent",
+                "conditions": "Perfect",
+            },
+            {
+                "time": (now_utc + timedelta(hours=12)).isoformat(),
+                "seeing": 5,
+                "description": "Poor",
+                "conditions": "Bad",
+            },
+            {
+                "time": (now_utc + timedelta(hours=15)).isoformat(),
+                "seeing": 2,
+                "description": "Good",
+                "conditions": "Very good",
+            },
         ]
         result = service._find_best_window(forecast_list, metric_key="seeing", threshold=3, higher_is_better=False)
         assert result is not None
@@ -585,7 +685,7 @@ class TestSeeingForecastIntegration:
                 _astro_point(6, seeing=2),
                 _astro_point(9, seeing=2),
                 _astro_point(12, seeing=3),
-            ]
+            ],
         }
         mock_get.return_value = mock_response
 

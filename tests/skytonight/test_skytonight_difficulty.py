@@ -65,8 +65,16 @@ def test_both_missing_returns_neutral_default():
 
 def test_score_always_in_valid_range_and_difficulty_always_valid():
     cases = [
-        (4.0, 90.0), (17.0, 0.5), (20.0, 0.2), (12.0, 30.0), (8.0, 5.0),
-        (None, None), (3.0, None), (None, 10.0), (0.0, 1.0), (25.0, 0.05),
+        (4.0, 90.0),
+        (17.0, 0.5),
+        (20.0, 0.2),
+        (12.0, 30.0),
+        (8.0, 5.0),
+        (None, None),
+        (3.0, None),
+        (None, 10.0),
+        (0.0, 1.0),
+        (25.0, 0.05),
     ]
     for magnitude, size_arcmin in cases:
         score, difficulty = compute_difficulty_score(_target(magnitude=magnitude, size_arcmin=size_arcmin))

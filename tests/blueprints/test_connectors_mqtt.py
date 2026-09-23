@@ -20,8 +20,12 @@ from connectors.mqtt_connector import MqttConnector
 
 
 def _cfg(**overrides):
-    block = {'url': 'mqtt://broker.lan:1883', 'enabled': True, 'username': 'saved-user',
-             'modules': {'sky_conditions': {'enabled': True}}}
+    block = {
+        'url': 'mqtt://broker.lan:1883',
+        'enabled': True,
+        'username': 'saved-user',
+        'modules': {'sky_conditions': {'enabled': True}},
+    }
     block.update(overrides)
     return {'connectors': {'mqtt': block}}
 
@@ -58,12 +62,15 @@ def saved(monkeypatch):
 
 class TestAccess:
 
-    @pytest.mark.parametrize('method, path', [
-        ('GET', '/api/connectors/mqtt/health'),
-        ('POST', '/api/connectors/mqtt/health'),
-        ('POST', '/api/connectors/mqtt/publish'),
-        ('POST', '/api/connectors/mqtt/remove'),
-    ])
+    @pytest.mark.parametrize(
+        'method, path',
+        [
+            ('GET', '/api/connectors/mqtt/health'),
+            ('POST', '/api/connectors/mqtt/health'),
+            ('POST', '/api/connectors/mqtt/publish'),
+            ('POST', '/api/connectors/mqtt/remove'),
+        ],
+    )
     def test_admin_only_routes(self, client, client_user, method, path):
         assert client.open(path, method=method, json={}).status_code == 401
         assert client_user.open(path, method=method, json={}).status_code == 403
@@ -103,11 +110,19 @@ class TestHealth:
         assert resp.get_json()['error'] == 'url required'
 
     def test_post_uses_typed_credentials_as_is(self, client_admin, saved, probe):
-        resp = client_admin.post('/api/connectors/mqtt/health', json={
-            'url': 'mqtt://other.lan/', 'username': 'typed', 'password': 'typed-pw', 'tls_insecure': True,
-        })
+        resp = client_admin.post(
+            '/api/connectors/mqtt/health',
+            json={
+                'url': 'mqtt://other.lan/',
+                'username': 'typed',
+                'password': 'typed-pw',
+                'tls_insecure': True,
+            },
+        )
         assert resp.status_code == 200 and resp.get_json()['reachable'] is True
-        assert probe['calls'] == [{'url': 'mqtt://other.lan', 'username': 'typed', 'password': 'typed-pw', 'tls_insecure': True}]
+        assert probe['calls'] == [
+            {'url': 'mqtt://other.lan', 'username': 'typed', 'password': 'typed-pw', 'tls_insecure': True}
+        ]
 
     def test_post_blank_password_uses_stored_one_only_for_the_saved_url(self, client_admin, saved, probe):
         client_admin.post('/api/connectors/mqtt/health', json={'url': 'mqtt://broker.lan:1883', 'password': ''})

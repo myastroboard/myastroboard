@@ -54,8 +54,6 @@ class TestApproximateEquinoxSolstice:
         self.svc = SpecialPhenomenaService(45.0, -73.5)
 
     def test_spring_equinox_is_in_march(self):
-        from astropy.time import Time
-
         t = self.svc._approximate_equinox(2026, "spring")
         dt = t.datetime
         assert dt.month == 3
@@ -329,7 +327,6 @@ class TestSpecialPhenomenaBranchCoverage:
     def test_zodiacal_light_moon_conditions_met_appends_event(self):
         """Force ecliptic_alt>20 and moon below horizon to trigger event append."""
         from astropy.time import Time
-        import types
 
         def make_altaz_mock(altitude_deg):
             m = MagicMock()
@@ -475,7 +472,6 @@ class TestSpecialPhenomenaNullAndArrayBranches:
 
     def test_refine_equinox_loop_sun_none_then_real(self):
         """Sun is None on one loop iteration → continue."""
-        import numpy as np
         from astropy.time import Time
 
         approx = Time("2026-03-20T12:00:00", format="isot", scale="utc")
@@ -527,7 +523,6 @@ class TestSpecialPhenomenaNullAndArrayBranches:
 
     def test_refine_solstice_loop_sun_none(self):
         """Sun is None in loop iteration of _refine_solstice_time."""
-        import numpy as np
         from astropy.time import Time
 
         approx = Time("2026-06-21T12:00:00", format="isot", scale="utc")

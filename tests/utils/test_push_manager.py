@@ -13,6 +13,7 @@ if 'psutil' not in sys.modules:
 @pytest.fixture(autouse=True)
 def reset_vapid_cache():
     from utils import push_manager
+
     push_manager._vapid_keys = {}
     yield
     push_manager._vapid_keys = {}
@@ -22,6 +23,7 @@ def test_push_manager_handles_missing_psutil(monkeypatch):
     monkeypatch.delitem(sys.modules, 'psutil', raising=False)
     import importlib
     from utils import push_manager
+
     importlib.reload(push_manager)
     push_manager._vapid_keys = {'private_key': 'PRIV', 'public_key': 'PUB'}
     assert push_manager.get_vapid_public_key() == 'PUB'
@@ -30,6 +32,7 @@ def test_push_manager_handles_missing_psutil(monkeypatch):
 # ---------------------------------------------------------------------------
 # load_or_generate_vapid_keys
 # ---------------------------------------------------------------------------
+
 
 def test_loads_keys_from_disk(tmp_path, monkeypatch):
     from utils import push_manager
@@ -110,6 +113,7 @@ def test_returns_cached_keys_without_regenerating(monkeypatch):
 # get_vapid_public_key
 # ---------------------------------------------------------------------------
 
+
 def test_get_vapid_public_key_returns_public_part():
     from utils import push_manager
 
@@ -121,6 +125,7 @@ def test_get_vapid_public_key_returns_public_part():
 # ---------------------------------------------------------------------------
 # send_push
 # ---------------------------------------------------------------------------
+
 
 def test_send_push_returns_true_on_success(monkeypatch):
     from utils import push_manager
@@ -198,6 +203,7 @@ def test_send_push_serializes_payload_as_json(monkeypatch):
 # _pem_to_raw_b64
 # ---------------------------------------------------------------------------
 
+
 def test_pem_to_raw_b64_converts_key(monkeypatch):
     """convert PEM EC key to raw base64url scalar."""
     from utils import push_manager
@@ -224,6 +230,7 @@ def test_pem_to_raw_b64_converts_key(monkeypatch):
 # ---------------------------------------------------------------------------
 # _generate_keys
 # ---------------------------------------------------------------------------
+
 
 def test_generate_keys_returns_base64_key_pair(monkeypatch):
     """_generate_keys produces private_key and public_key."""
@@ -259,6 +266,7 @@ def test_generate_keys_returns_base64_key_pair(monkeypatch):
 # ---------------------------------------------------------------------------
 # load_or_generate_vapid_keys — additional branches
 # ---------------------------------------------------------------------------
+
 
 def test_load_warns_when_vapid_contact_email_empty(tmp_path, monkeypatch):
     """empty vapid_contact_email → warning emitted once."""
@@ -418,6 +426,7 @@ def test_vapid_contact_email_configured_skips_warning(tmp_path, monkeypatch):
 # get_vapid_claims_email — branch where email already starts with mailto:/https://
 # ---------------------------------------------------------------------------
 
+
 def test_get_vapid_claims_email_already_has_mailto_prefix(monkeypatch):
     """Email already prefixed with 'mailto:' is returned unchanged."""
     from utils import push_manager
@@ -433,7 +442,9 @@ def test_get_vapid_claims_email_already_has_https_prefix(monkeypatch):
     from utils import push_manager
     from utils import app_settings
 
-    monkeypatch.setattr(app_settings, 'get_app_settings', lambda: {'vapid_contact_email': 'https://example.com/contact'})
+    monkeypatch.setattr(
+        app_settings, 'get_app_settings', lambda: {'vapid_contact_email': 'https://example.com/contact'}
+    )
     result = push_manager.get_vapid_claims_email()
     assert result == 'https://example.com/contact'
 
@@ -461,6 +472,7 @@ def test_get_vapid_claims_email_empty_returns_default(monkeypatch):
 # ---------------------------------------------------------------------------
 # get_vapid_contact_status
 # ---------------------------------------------------------------------------
+
 
 def test_get_vapid_contact_status_not_set(monkeypatch):
     """Empty contact email reports not_set."""

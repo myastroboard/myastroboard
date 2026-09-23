@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 
 from weather import weather_astro
+
 AstroWeatherAnalyzer = weather_astro.AstroWeatherAnalyzer
 get_astro_weather_analysis = weather_astro.get_astro_weather_analysis
 get_current_astro_conditions = weather_astro.get_current_astro_conditions
@@ -254,16 +255,13 @@ class TestWeatherAnalysisMetrics:
         result = analyzer.analyze_dew_point_alerts(df)
         assert "dew_risk_level" in result.columns
         assert "dew_point_spread" in result.columns
-        assert set(result["dew_risk_level"].unique()).issubset(
-            {"CRITICAL", "HIGH", "MODERATE", "LOW", "MINIMAL"}
-        )
+        assert set(result["dew_risk_level"].unique()).issubset({"CRITICAL", "HIGH", "MODERATE", "LOW", "MINIMAL"})
 
     def test_wind_tracking_impact(self):
         analyzer = _build_analyzer()
-        df = pd.DataFrame({
-            "wind_speed_10m": [3.0, 7.0, 12.0, 20.0, 30.0],
-            "wind_direction_10m": [0, 90, 180, 270, 360]
-        })
+        df = pd.DataFrame(
+            {"wind_speed_10m": [3.0, 7.0, 12.0, 20.0, 30.0], "wind_direction_10m": [0, 90, 180, 270, 360]}
+        )
         result = analyzer.analyze_wind_tracking_impact(df)
         assert "wind_tracking_impact" in result.columns
         assert "tracking_stability_score" in result.columns
@@ -272,9 +270,11 @@ class TestWeatherAnalysisMetrics:
 
     def test_precipitation_impact(self):
         analyzer = _build_analyzer()
-        df = pd.DataFrame({
-            "precipitation": [0.0, 0.5, 1.0, 2.0, 5.0, np.nan],
-        })
+        df = pd.DataFrame(
+            {
+                "precipitation": [0.0, 0.5, 1.0, 2.0, 5.0, np.nan],
+            }
+        )
         result = analyzer.analyze_precipitation_impact(df)
         assert "precipitation_factor" in result.columns
         assert (result["precipitation_factor"] >= 0).all()
@@ -285,7 +285,11 @@ class TestWeatherAnalysisMetrics:
         # Missing precipitation reading treated as dry (no penalty)
         assert result["precipitation_factor"].iloc[5] == 1.0
         # Between dry and the veto threshold, the penalty decreases monotonically
-        assert result["precipitation_factor"].iloc[1] > result["precipitation_factor"].iloc[2] > result["precipitation_factor"].iloc[3]
+        assert (
+            result["precipitation_factor"].iloc[1]
+            > result["precipitation_factor"].iloc[2]
+            > result["precipitation_factor"].iloc[3]
+        )
 
 
 class TestCacheLogic:
@@ -353,9 +357,7 @@ class TestErrorHandling:
 
     def test_infer_forecast_slot_hours_with_regular_intervals(self):
         analyzer = _build_analyzer()
-        datetimes = pd.Series(
-            pd.date_range("2026-04-17T20:00", periods=5, freq="h")
-        )
+        datetimes = pd.Series(pd.date_range("2026-04-17T20:00", periods=5, freq="h"))
         slot_hours = analyzer._infer_forecast_slot_hours(datetimes)
         assert 0.9 < slot_hours < 1.1  # Should be ~1.0
 
@@ -398,6 +400,7 @@ class TestResolveAstronomicalNightWindow:
         analyzer = _build_analyzer()
         # Force the internal data load to fail to cover the exception path.
         from skytonight import skytonight_calculator
+
         with patch.object(skytonight_calculator, "load_calculation_results", side_effect=RuntimeError("fail")):
             result = analyzer._resolve_astronomical_night_window()
         assert result is None
@@ -406,6 +409,7 @@ class TestResolveAstronomicalNightWindow:
         """night_start or night_end missing → return None."""
         analyzer = _build_analyzer()
         from skytonight import skytonight_calculator
+
         with patch.object(skytonight_calculator, "load_calculation_results", return_value={"metadata": {}}):
             result = analyzer._resolve_astronomical_night_window()
         assert result is None
@@ -414,6 +418,7 @@ class TestResolveAstronomicalNightWindow:
         """invalid timestamps → NaT → return None."""
         analyzer = _build_analyzer()
         from skytonight import skytonight_calculator
+
         with patch.object(
             skytonight_calculator,
             "load_calculation_results",
@@ -426,6 +431,7 @@ class TestResolveAstronomicalNightWindow:
         """valid window returned as tuple."""
         analyzer = _build_analyzer()
         from skytonight import skytonight_calculator
+
         with patch.object(
             skytonight_calculator,
             "load_calculation_results",
@@ -484,7 +490,6 @@ class TestGenerateWeatherAlerts:
     """Tests for _generate_weather_alerts alert branches."""
 
     def _build_alert_df(self, dew_risk, wind_impact, seeing, transparency, dt=None):
-        import numpy as np
         dt = dt or pd.date_range("2026-04-17T20:00:00", periods=6, freq="h")
         return pd.DataFrame(
             {
@@ -942,14 +947,19 @@ class TestGenerateComprehensiveAnalysisSuccess:
         mock_df = _build_sample_dataframe()
         mock_weather = {"data": mock_df, "location": {"name": "Test"}}
 
-        with patch.object(analyzer, "fetch_extended_weather_data", return_value=mock_weather), \
-             patch.object(analyzer, "analyze_cloud_layers", return_value=mock_df), \
-             patch.object(analyzer, "calculate_seeing_forecast", return_value=mock_df), \
-             patch.object(analyzer, "calculate_transparency_forecast", return_value=mock_df), \
-             patch.object(analyzer, "analyze_dew_point_alerts", return_value=mock_df), \
-             patch.object(analyzer, "analyze_wind_tracking_impact", return_value=mock_df), \
-             patch.object(analyzer, "_find_best_observation_periods", return_value=[]), \
-             patch.object(analyzer, "_generate_weather_alerts", return_value=[]):
+        with patch.object(analyzer, "fetch_extended_weather_data", return_value=mock_weather), patch.object(
+            analyzer, "analyze_cloud_layers", return_value=mock_df
+        ), patch.object(analyzer, "calculate_seeing_forecast", return_value=mock_df), patch.object(
+            analyzer, "calculate_transparency_forecast", return_value=mock_df
+        ), patch.object(
+            analyzer, "analyze_dew_point_alerts", return_value=mock_df
+        ), patch.object(
+            analyzer, "analyze_wind_tracking_impact", return_value=mock_df
+        ), patch.object(
+            analyzer, "_find_best_observation_periods", return_value=[]
+        ), patch.object(
+            analyzer, "_generate_weather_alerts", return_value=[]
+        ):
             result = analyzer.generate_comprehensive_analysis(24)
 
         assert result is not None
@@ -1024,12 +1034,14 @@ class TestGetAstroWeatherAnalysisMissingPaths:
 # Merged from former test_coverage_paths3.py
 # ---------------------------------------------------------------------------
 
+
 class TestWeatherAstroBranches:
     """Cover the two missed weather_astro branches."""
 
     @classmethod
     def setup_class(cls):
         from weather import weather_astro
+
         cls.weather_astro = weather_astro
 
     def test_parse_extended_data_timezone_already_string(self):
@@ -1038,7 +1050,6 @@ class TestWeatherAstroBranches:
         analyzer.location = {"name": "Paris", "latitude": 48.0, "longitude": 2.0}
 
         import numpy as np
-        import pandas as pd
 
         mock_hourly = MagicMock()
         t0 = 1720000000
@@ -1064,10 +1075,11 @@ class TestWeatherAstroBranches:
         """TTL not expired but cached data is None → fall through."""
         key = self.weather_astro._analysis_cache_key(24, "nocache_lang")
         now = time.time()
-        with patch("weather.weather_astro.time.time", return_value=now), \
-             patch("weather.weather_astro.is_openmeteo_rate_limited", return_value=True), \
-             patch("weather.weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS_TS", {key: now}), \
-             patch("weather.weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS", {}):
+        with patch("weather.weather_astro.time.time", return_value=now), patch(
+            "weather.weather_astro.is_openmeteo_rate_limited", return_value=True
+        ), patch("weather.weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS_TS", {key: now}), patch(
+            "weather.weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS", {}
+        ):
             result = self.weather_astro.get_astro_weather_analysis(24, "nocache_lang")
         # rate limited + no cache → None
         assert result is None

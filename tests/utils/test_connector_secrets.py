@@ -75,11 +75,57 @@ def test_non_string_or_empty_values_on_disk_are_ignored():
 
 
 def test_save_reports_failure_when_directory_is_unwritable(monkeypatch):
+    """Note: this actually fails inside save_secrets's own interprocess_lock() acquisition
+    (it also calls os.makedirs, for the lock file's directory, before _write_all ever
+    runs) - not inside _write_all's own try/except. See
+    test_write_failure_before_tmp_file_exists_skips_cleanup below for that path."""
     monkeypatch.setattr(cs, '_SECRETS_FILE', os.path.join(_sidecar_path(), 'nested', 'x.json'))
     # The parent "directory" is a plain file path that does not exist and cannot be created
     # under a file - makedirs raises and the save must report False rather than raise.
     with open(os.path.dirname(os.path.dirname(cs._SECRETS_FILE)), 'w', encoding='utf-8') as handle:
         handle.write('{}')
+    assert cs.save_secrets('mqtt', {'password': 'pw'}) is False
+
+
+def test_write_failure_before_tmp_file_exists_skips_cleanup(monkeypatch):
+    """When the failure happens before the tmp file is even created (unlike
+    test_write_failure_reports_false_and_cleans_up_tmp_file, where os.replace fails after
+    a real tmp file was written), there is nothing to clean up - os.path.exists(tmp_path)
+    must be False and the removal must simply be skipped."""
+    import builtins
+
+    original_open = builtins.open
+
+    def raising_open(path, mode='r', **kwargs):
+        if 'w' in mode and str(path).endswith('.tmp'):
+            raise OSError("disk full")
+        return original_open(path, mode, **kwargs)
+
+    monkeypatch.setattr(builtins, 'open', raising_open)
+
+    assert cs.save_secrets('mqtt', {'password': 'pw'}) is False
+
+
+def test_chmod_failure_does_not_prevent_saving(monkeypatch):
+    """Windows / exotic filesystems may not honour chmod - best effort only, the write
+    itself (and the fact the file lives outside backups) is what actually matters."""
+    monkeypatch.setattr(cs.os, 'chmod', lambda *a, **k: (_ for _ in ()).throw(OSError("chmod not supported")))
+    assert cs.save_secrets('mqtt', {'password': 'pw'}) is True
+    assert cs.load_secrets('mqtt') == {'password': 'pw'}
+
+
+def test_write_failure_reports_false_and_cleans_up_tmp_file(monkeypatch):
+    monkeypatch.setattr(cs.os, 'replace', lambda *a, **k: (_ for _ in ()).throw(OSError("disk full")))
+    assert cs.save_secrets('mqtt', {'password': 'pw'}) is False
+    folder, base = os.path.split(_sidecar_path())
+    assert not [name for name in os.listdir(folder) if name.startswith(base) and name.endswith('.tmp')]
+
+
+def test_write_failure_cleanup_remove_error_is_also_swallowed(monkeypatch):
+    """If the replace fails and the cleanup's own os.remove then also fails, save_secrets
+    must still report failure cleanly rather than raise."""
+    monkeypatch.setattr(cs.os, 'replace', lambda *a, **k: (_ for _ in ()).throw(OSError("disk full")))
+    monkeypatch.setattr(cs.os, 'remove', lambda *a, **k: (_ for _ in ()).throw(OSError("remove failed")))
     assert cs.save_secrets('mqtt', {'password': 'pw'}) is False
 
 

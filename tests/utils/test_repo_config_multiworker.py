@@ -54,7 +54,9 @@ def test_first_boot_seeds_persists_and_attributes_after_releasing_lock(config_pa
         events.append(("release", lock_path))
 
     monkeypatch.setattr(repo_config, "interprocess_lock", _recording_lock)
-    monkeypatch.setattr(repo_config, "_attribute_new_location_to_all_users", lambda loc_id: events.append(("attr", loc_id)))
+    monkeypatch.setattr(
+        repo_config, "_attribute_new_location_to_all_users", lambda loc_id: events.append(("attr", loc_id))
+    )
 
     config = repo_config.load_config()
 

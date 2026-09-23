@@ -68,9 +68,7 @@ class TestSqmToBortle:
             sqm = bortle_to_sqm(bortle)
             recovered = sqm_to_bortle(sqm)
             # Midpoints should round-trip to the same or adjacent class
-            assert abs(recovered - bortle) <= 1, (
-                f"Bortle {bortle} → SQM {sqm} → Bortle {recovered}"
-            )
+            assert abs(recovered - bortle) <= 1, f"Bortle {bortle} → SQM {sqm} → Bortle {recovered}"
 
 
 class TestLightPollutionFactor:
@@ -88,7 +86,7 @@ class TestLightPollutionFactor:
     def test_suburban_midpoint(self):
         # SQM 20.0: normalized = (20.0-17)/5 = 0.6; 0.6^1.5 ≈ 0.4648
         factor = light_pollution_factor(20.0)
-        expected = round(0.6 ** 1.5, 4)
+        expected = round(0.6**1.5, 4)
         assert math.isclose(factor, expected, rel_tol=1e-4)
 
     def test_monotone_increasing(self):
@@ -96,8 +94,7 @@ class TestLightPollutionFactor:
         factors = [light_pollution_factor(s) for s in sqm_values]
         for i in range(len(factors) - 1):
             assert factors[i] <= factors[i + 1], (
-                f"Factor not increasing: SQM {sqm_values[i]} → {factors[i]}, "
-                f"SQM {sqm_values[i+1]} → {factors[i+1]}"
+                f"Factor not increasing: SQM {sqm_values[i]} → {factors[i]}, " f"SQM {sqm_values[i+1]} → {factors[i+1]}"
             )
 
     def test_output_in_range(self):

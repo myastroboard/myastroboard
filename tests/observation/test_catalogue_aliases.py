@@ -61,8 +61,9 @@ def test_get_alias_helpers_return_expected_values():
         }
     }
 
-    with patch("observation.catalogue_aliases.load_aliases_table", return_value=aliases_table), \
-         patch("observation.catalogue_aliases.skytonight_targets.get_lookup_entry", return_value={}):
+    with patch("observation.catalogue_aliases.load_aliases_table", return_value=aliases_table), patch(
+        "observation.catalogue_aliases.skytonight_targets.get_lookup_entry", return_value={}
+    ):
         entry = get_alias_entry("Messier", "M 31")
         aliases = get_aliases_map("Messier", "M 31")
         group_id = get_group_id("Messier", "M 31")
@@ -107,9 +108,9 @@ def test_load_aliases_table_exception_returns_empty(monkeypatch):
     """exception during file open → return empty dict."""
     module._aliases_cache = {}
     module._aliases_mtime = None
-    with patch("observation.catalogue_aliases.os.path.exists", return_value=True), \
-         patch("observation.catalogue_aliases.os.path.getmtime", return_value=99.0), \
-         patch("builtins.open", side_effect=IOError("disk error")):
+    with patch("observation.catalogue_aliases.os.path.exists", return_value=True), patch(
+        "observation.catalogue_aliases.os.path.getmtime", return_value=99.0
+    ), patch("builtins.open", side_effect=IOError("disk error")):
         result = load_aliases_table(force_reload=True)
     assert result == {}
 

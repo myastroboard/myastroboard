@@ -1,6 +1,7 @@
 """
 Shared pytest fixtures and configuration for all tests
 """
+
 import os
 import sys
 import signal
@@ -20,11 +21,13 @@ def pytest_sessionfinish(session, exitstatus):
     except (OSError, ValueError):
         pass  # signal registration unsupported in this environment (e.g. non-main thread)
 
+
 # Force matplotlib non-GUI backend before any test imports matplotlib or a module
 # that indirectly triggers it. Without this, the Tk backend can be loaded in the
 # main thread and then Tcl/Tk objects get destroyed in background threads (jplephem
 # ThreadPoolExecutor), causing fatal crashes on Windows.
 import matplotlib
+
 matplotlib.use('Agg')
 
 # Set up environment variables BEFORE any imports from backend
@@ -71,7 +74,6 @@ def _clean_stale_test_state():
 _clean_stale_test_state()
 
 import pytest
-import sys
 import shutil
 import json
 
@@ -87,25 +89,20 @@ def setup_test_environment():
     test_data_dir = tempfile.mkdtemp(prefix="test_data_")
     test_output_dir = tempfile.mkdtemp(prefix="test_output_")
     test_config_dir = tempfile.mkdtemp(prefix="test_config_")
-    
+
     # Set environment variables
     os.environ['DATA_DIR'] = test_data_dir
     os.environ['OUTPUT_DIR'] = test_output_dir
     os.environ['CONFIG_DIR'] = test_config_dir
     os.environ['LOG_LEVEL'] = 'ERROR'
     os.environ['CONSOLE_LOG_LEVEL'] = 'ERROR'
-    
-    yield {
-        'data_dir': test_data_dir,
-        'output_dir': test_output_dir,
-        'config_dir': test_config_dir
-    }
-    
+
+    yield {'data_dir': test_data_dir, 'output_dir': test_output_dir, 'config_dir': test_config_dir}
+
     # Cleanup temporary directories
     shutil.rmtree(test_data_dir, ignore_errors=True)
     shutil.rmtree(test_output_dir, ignore_errors=True)
     shutil.rmtree(test_config_dir, ignore_errors=True)
-
 
 
 @pytest.fixture(autouse=True)
@@ -130,12 +127,14 @@ def reset_app_settings_module_cache():
     """Reset the app_settings module-level cache between tests."""
     try:
         from utils import app_settings
+
         app_settings._cache = None
     except ImportError:
         pass  # app_settings not available in all test configurations
     yield
     try:
         from utils import app_settings
+
         app_settings._cache = None
     except ImportError:
         pass  # app_settings not available in all test configurations
@@ -226,10 +225,7 @@ def mock_catalogues_file(temp_dir):
     """Create a mock catalogues.json file"""
     catalogues_path = os.path.join(temp_dir, 'catalogues.json')
     with open(catalogues_path, 'w') as f:
-        json.dump({
-            "generated_at": "2026-02-23T00:00:00Z",
-            "catalogues": ["Messier", "Herschel400", "OpenNGC"]
-        }, f)
+        json.dump({"generated_at": "2026-02-23T00:00:00Z", "catalogues": ["Messier", "Herschel400", "OpenNGC"]}, f)
     return catalogues_path
 
 
@@ -262,6 +258,7 @@ if 'psutil' not in sys.modules:
 def client():
     """Unauthenticated Flask test client."""
     from app import app as _flask_app
+
     _flask_app.config['TESTING'] = True
     with _flask_app.test_client() as c:
         yield c
@@ -272,6 +269,7 @@ def client_admin():
     """Admin-authenticated Flask test client."""
     from app import app as _flask_app
     from utils.auth import user_manager as _um
+
     _flask_app.config['TESTING'] = True
     with _tmpfile.TemporaryDirectory():
         with _flask_app.test_client() as c:
@@ -288,6 +286,7 @@ def client_admin():
 def client_user():
     """Regular-user (non-admin) Flask test client."""
     from app import app as _flask_app
+
     _flask_app.config['TESTING'] = True
     with _tmpfile.TemporaryDirectory():
         with _flask_app.test_client() as c:

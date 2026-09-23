@@ -23,12 +23,9 @@ COVERAGE_CANVAS = '#sessionAnalyticsCoverageChart'
 # own would be counted as unplaced and would never reach the chart. Right ascension goes in
 # as decimal hours, which is the shape the SkyTonight target cards send.
 SEEDED_TARGETS = [
-    {'name': 'M 31', 'catalogue': 'Messier', 'integration_minutes': 240,
-     'ra': 0.712, 'dec': 41.269, 'best_month': 10},
-    {'name': 'M 42', 'catalogue': 'Messier', 'integration_minutes': 30,
-     'ra': 5.588, 'dec': -5.391, 'best_month': 12},
-    {'name': 'M 13', 'catalogue': 'Messier', 'integration_minutes': 90,
-     'ra': 16.695, 'dec': 36.460, 'best_month': 6},
+    {'name': 'M 31', 'catalogue': 'Messier', 'integration_minutes': 240, 'ra': 0.712, 'dec': 41.269, 'best_month': 10},
+    {'name': 'M 42', 'catalogue': 'Messier', 'integration_minutes': 30, 'ra': 5.588, 'dec': -5.391, 'best_month': 12},
+    {'name': 'M 13', 'catalogue': 'Messier', 'integration_minutes': 90, 'ra': 16.695, 'dec': 36.460, 'best_month': 6},
 ]
 
 
@@ -70,18 +67,18 @@ def test_best_month_reading_matches_the_real_sun(logged_in_page):
     page = logged_in_page
 
     for right_ascension_hours, expected_month in (
-        (0.71, 10),   # M 31
-        (5.59, 12),   # M 42
-        (13.50, 4),   # M 51
-        (16.69, 6),   # M 13
-        (18.89, 7),   # M 57
+        (0.71, 10),  # M 31
+        (5.59, 12),  # M 42
+        (13.50, 4),  # M 51
+        (16.69, 6),  # M 13
+        (18.89, 7),  # M 57
         (0.0, 9),
         (12.0, 3),
     ):
         reading = page.evaluate("hours => _saBestMonth(hours)", right_ascension_hours)
-        assert reading == expected_month, (
-            f"RA {right_ascension_hours}h should read as month {expected_month}, got {reading}"
-        )
+        assert (
+            reading == expected_month
+        ), f"RA {right_ascension_hours}h should read as month {expected_month}, got {reading}"
 
 
 def test_best_month_reading_survives_a_missing_right_ascension(logged_in_page):
@@ -154,8 +151,7 @@ def test_the_backdrop_takes_its_colours_from_the_stylesheet(logged_in_page, live
 
     def backdrop():
         return page.evaluate(
-            "() => sessionAnalyticsCharts.sessionAnalyticsCoverageChart"
-            ".options.plugins.sessionAnalyticsSkyBackdrop"
+            "() => sessionAnalyticsCharts.sessionAnalyticsCoverageChart" ".options.plugins.sessionAnalyticsSkyBackdrop"
         )
 
     default_theme = backdrop()
@@ -165,6 +161,6 @@ def test_the_backdrop_takes_its_colours_from_the_stylesheet(logged_in_page, live
     page.evaluate("_saRenderCoverage(sessionAnalyticsData.coverage)")
     red_theme = backdrop()
 
-    assert red_theme['backgroundTop'] != default_theme['backgroundTop'], (
-        "the red night-vision theme reuses the default sky colour"
-    )
+    assert (
+        red_theme['backgroundTop'] != default_theme['backgroundTop']
+    ), "the red night-vision theme reuses the default sky colour"

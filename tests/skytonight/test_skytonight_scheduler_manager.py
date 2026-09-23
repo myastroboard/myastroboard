@@ -44,14 +44,26 @@ class TestTrimCalculationLog:
 
     def test_skips_empty_lines(self, tmp_path):
         log_file = tmp_path / "empty_lines.log"
-        content = "\n".join(["entry_0", "", "entry_1", "", "entry_2", "", "entry_3",
-                              "entry_4", "entry_5", "entry_6", "entry_7", "entry_8"])
+        content = "\n".join(
+            [
+                "entry_0",
+                "",
+                "entry_1",
+                "",
+                "entry_2",
+                "",
+                "entry_3",
+                "entry_4",
+                "entry_5",
+                "entry_6",
+                "entry_7",
+                "entry_8",
+            ]
+        )
         log_file.write_text(content + "\n", encoding="utf-8")
         # Only non-empty lines count; 9 real lines < 5*2=10, so no trimming
         _trim_calculation_log(str(log_file), max_runs=5)
-        result_lines = [
-            l for l in log_file.read_text(encoding="utf-8").splitlines() if l.strip()
-        ]
+        result_lines = [line for line in log_file.read_text(encoding="utf-8").splitlines() if line.strip()]
         assert len(result_lines) == 9
 
     def test_max_runs_one_keeps_one_run_budget(self, tmp_path):
@@ -70,6 +82,7 @@ class TestAppendSkytonigtCalculationLog:
     def test_writes_json_line_to_file(self, tmp_path):
         from skytonight.skytonight_scheduler_manager import _append_skytonight_calculation_log
         from utils import constants
+
         log_file = tmp_path / "skytonight_calc.log"
         with patch.object(constants, "SKYTONIGHT_CALCULATION_LOG_FILE", str(log_file)):
             with patch("skytonight.skytonight_scheduler_manager.SKYTONIGHT_CALCULATION_LOG_FILE", str(log_file)):
@@ -86,8 +99,10 @@ class TestAppendSkytonigtCalculationLog:
     def test_handles_open_failure_gracefully(self, tmp_path):
         """Should not raise even if the log file can't be written."""
         from skytonight.skytonight_scheduler_manager import _append_skytonight_calculation_log
-        with patch("skytonight.skytonight_scheduler_manager.SKYTONIGHT_CALCULATION_LOG_FILE",
-                   "/nonexistent/path/calc.log"):
+
+        with patch(
+            "skytonight.skytonight_scheduler_manager.SKYTONIGHT_CALCULATION_LOG_FILE", "/nonexistent/path/calc.log"
+        ):
             with patch("skytonight.skytonight_scheduler_manager.ensure_skytonight_directories"):
                 # Should not raise; exception is caught and logged
                 _append_skytonight_calculation_log("status", {})
@@ -98,6 +113,7 @@ class TestGetOrCreateScheduler:
 
     def test_returns_scheduler_if_already_in_config(self):
         from skytonight.skytonight_scheduler_manager import get_or_create_skytonight_scheduler
+
         mock_app = MagicMock()
         mock_scheduler = MagicMock()
         mock_app.config = {"skytonight_scheduler": mock_scheduler}
@@ -107,10 +123,13 @@ class TestGetOrCreateScheduler:
     def test_returns_none_on_lock_failure(self, tmp_path):
         """If lock acquisition fails, should return None gracefully."""
         from skytonight.skytonight_scheduler_manager import get_or_create_skytonight_scheduler
+
         mock_app = MagicMock()
         mock_app.config = {}
-        with patch("skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_lock_file",
-                   return_value=str(tmp_path / "test.lock")):
+        with patch(
+            "skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_lock_file",
+            return_value=str(tmp_path / "test.lock"),
+        ):
             with patch("builtins.open", side_effect=IOError("locked")):
                 result = get_or_create_skytonight_scheduler(mock_app)
         assert result is None
@@ -121,10 +140,15 @@ class TestGetRemoteSchedulerStatus:
 
     def test_returns_dict_when_no_status_file(self):
         from skytonight.skytonight_scheduler_manager import get_remote_skytonight_scheduler_status
-        with patch("skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_status_file",
-                   return_value="/nonexistent/path/status.json"):
-            with patch("skytonight.skytonight_scheduler_manager.load_config",
-                       return_value={"skytonight": {"enabled": True}, "location": {"timezone": "UTC"}}):
+
+        with patch(
+            "skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_status_file",
+            return_value="/nonexistent/path/status.json",
+        ):
+            with patch(
+                "skytonight.skytonight_scheduler_manager.load_config",
+                return_value={"skytonight": {"enabled": True}, "location": {"timezone": "UTC"}},
+            ):
                 result = get_remote_skytonight_scheduler_status()
         assert isinstance(result, dict)
         assert "running" in result
@@ -132,6 +156,7 @@ class TestGetRemoteSchedulerStatus:
 
     def test_reads_status_from_file(self, tmp_path):
         from skytonight.skytonight_scheduler_manager import get_remote_skytonight_scheduler_status
+
         status_data = {
             "running": True,
             "last_run": "2026-01-01T00:00:00Z",
@@ -140,8 +165,10 @@ class TestGetRemoteSchedulerStatus:
         }
         status_file = tmp_path / "scheduler_status.json"
         status_file.write_text(json.dumps(status_data), encoding="utf-8")
-        with patch("skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_status_file",
-                   return_value=str(status_file)):
+        with patch(
+            "skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_status_file",
+            return_value=str(status_file),
+        ):
             with patch("skytonight.skytonight_scheduler_manager.os.path.exists", return_value=True):
                 result = get_remote_skytonight_scheduler_status()
         assert result.get("worker") == "remote"
@@ -149,6 +176,7 @@ class TestGetRemoteSchedulerStatus:
 
     def test_backfills_empty_last_result(self, tmp_path):
         from skytonight.skytonight_scheduler_manager import get_remote_skytonight_scheduler_status
+
         status_data = {
             "running": True,
             "last_result": {},
@@ -163,22 +191,26 @@ class TestGetRemoteSchedulerStatus:
                 "counts": {"deep_sky": 10, "bodies": 5, "comets": 2},
             }
         }
-        with patch("skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_status_file",
-                   return_value=str(status_file)):
+        with patch(
+            "skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_status_file",
+            return_value=str(status_file),
+        ):
             with patch("skytonight.skytonight_scheduler_manager.os.path.exists", return_value=True):
-                with patch("skytonight.skytonight_scheduler_manager.load_calculation_results",
-                           return_value=mock_calc):
+                with patch("skytonight.skytonight_scheduler_manager.load_calculation_results", return_value=mock_calc):
                     result = get_remote_skytonight_scheduler_status()
         # last_result should have been backfilled
         assert "calculation" in result.get("last_result", {})
 
     def test_progress_defaults_set_when_missing(self, tmp_path):
         from skytonight.skytonight_scheduler_manager import get_remote_skytonight_scheduler_status
+
         status_data = {"running": False, "last_result": {"x": 1}, "progress": {}}
         status_file = tmp_path / "status_prog.json"
         status_file.write_text(json.dumps(status_data), encoding="utf-8")
-        with patch("skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_status_file",
-                   return_value=str(status_file)):
+        with patch(
+            "skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_status_file",
+            return_value=str(status_file),
+        ):
             with patch("skytonight.skytonight_scheduler_manager.os.path.exists", return_value=True):
                 result = get_remote_skytonight_scheduler_status()
         assert "execution_duration_seconds" in result["progress"]
@@ -187,11 +219,14 @@ class TestGetRemoteSchedulerStatus:
     def test_progress_not_dict_gets_replaced(self, tmp_path):
         """When progress is not a dict, replace it with defaults."""
         from skytonight.skytonight_scheduler_manager import get_remote_skytonight_scheduler_status
+
         status_data = {"running": True, "last_result": {"k": "v"}, "progress": "bad"}
         status_file = tmp_path / "status_badprog.json"
         status_file.write_text(json.dumps(status_data), encoding="utf-8")
-        with patch("skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_status_file",
-                   return_value=str(status_file)):
+        with patch(
+            "skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_status_file",
+            return_value=str(status_file),
+        ):
             with patch("skytonight.skytonight_scheduler_manager.os.path.exists", return_value=True):
                 result = get_remote_skytonight_scheduler_status()
         assert isinstance(result["progress"], dict)
@@ -200,11 +235,14 @@ class TestGetRemoteSchedulerStatus:
     def test_last_result_not_dict_reset_to_empty(self, tmp_path):
         """last_result that is not a dict is reset to {}."""
         from skytonight.skytonight_scheduler_manager import get_remote_skytonight_scheduler_status
+
         status_data = {"running": True, "last_result": "invalid_string", "progress": {}}
         status_file = tmp_path / "status_last_result.json"
         status_file.write_text(json.dumps(status_data), encoding="utf-8")
-        with patch("skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_status_file",
-                   return_value=str(status_file)):
+        with patch(
+            "skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_status_file",
+            return_value=str(status_file),
+        ):
             with patch("skytonight.skytonight_scheduler_manager.os.path.exists", return_value=True):
                 result = get_remote_skytonight_scheduler_status()
         # Should have been converted to a dict and worker set
@@ -213,14 +251,18 @@ class TestGetRemoteSchedulerStatus:
     def test_exception_on_file_read_returns_fallback(self, tmp_path):
         """Exception during file read returns fallback dict."""
         from skytonight.skytonight_scheduler_manager import get_remote_skytonight_scheduler_status
+
         status_file = tmp_path / "status_corrupt.json"
         status_file.write_text("{ broken json", encoding="utf-8")
-        with patch("skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_status_file",
-                   return_value=str(status_file)):
+        with patch(
+            "skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_status_file",
+            return_value=str(status_file),
+        ):
             with patch("skytonight.skytonight_scheduler_manager.os.path.exists", return_value=True):
-                with patch("skytonight.skytonight_scheduler_manager.load_config",
-                           return_value={"skytonight": {"enabled": True},
-                                         "location": {"timezone": "Europe/Paris"}}):
+                with patch(
+                    "skytonight.skytonight_scheduler_manager.load_config",
+                    return_value={"skytonight": {"enabled": True}, "location": {"timezone": "Europe/Paris"}},
+                ):
                     result = get_remote_skytonight_scheduler_status()
         # Fallback path
         assert result["worker"] == "remote"
@@ -229,14 +271,19 @@ class TestGetRemoteSchedulerStatus:
     def test_backfill_empty_last_result_load_error_suppressed(self, tmp_path):
         """When load_calculation_results raises, empty last_result stays empty."""
         from skytonight.skytonight_scheduler_manager import get_remote_skytonight_scheduler_status
+
         status_data = {"running": True, "last_result": {}, "progress": {}}
         status_file = tmp_path / "status_backfill_err.json"
         status_file.write_text(json.dumps(status_data), encoding="utf-8")
-        with patch("skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_status_file",
-                   return_value=str(status_file)):
+        with patch(
+            "skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_status_file",
+            return_value=str(status_file),
+        ):
             with patch("skytonight.skytonight_scheduler_manager.os.path.exists", return_value=True):
-                with patch("skytonight.skytonight_scheduler_manager.load_calculation_results",
-                           side_effect=RuntimeError("disk error")):
+                with patch(
+                    "skytonight.skytonight_scheduler_manager.load_calculation_results",
+                    side_effect=RuntimeError("disk error"),
+                ):
                     result = get_remote_skytonight_scheduler_status()
         # Should not raise; last_result stays {}
         assert isinstance(result.get("last_result"), dict)
@@ -244,15 +291,17 @@ class TestGetRemoteSchedulerStatus:
     def test_backfill_calc_cache_no_useful_fields(self, tmp_path):
         """When calc cache has no night_start/night_end/counts, last_result stays empty."""
         from skytonight.skytonight_scheduler_manager import get_remote_skytonight_scheduler_status
+
         status_data = {"running": True, "last_result": {}, "progress": {}}
         status_file = tmp_path / "status_no_fields.json"
         status_file.write_text(json.dumps(status_data), encoding="utf-8")
         empty_calc = {"metadata": {}}
-        with patch("skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_status_file",
-                   return_value=str(status_file)):
+        with patch(
+            "skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_status_file",
+            return_value=str(status_file),
+        ):
             with patch("skytonight.skytonight_scheduler_manager.os.path.exists", return_value=True):
-                with patch("skytonight.skytonight_scheduler_manager.load_calculation_results",
-                           return_value=empty_calc):
+                with patch("skytonight.skytonight_scheduler_manager.load_calculation_results", return_value=empty_calc):
                     result = get_remote_skytonight_scheduler_status()
         assert result.get("last_result") == {}
 
@@ -274,13 +323,18 @@ class TestRunSkytonigtRefresh:
         mock_calc_result = {"night_start": "2026-01-01T22:00:00Z", "night_end": "2026-01-02T05:00:00Z"}
 
         with patch("skytonight.skytonight_scheduler_manager.ensure_skytonight_directories"):
-            with patch("skytonight.skytonight_scheduler_manager.load_config",
-                       return_value={"skytonight": {"datasets": {"comets": {"source": "mpc"}}}}):
-                with patch("skytonight.skytonight_scheduler_manager.build_and_save_default_dataset",
-                           return_value=mock_dataset_result):
+            with patch(
+                "skytonight.skytonight_scheduler_manager.load_config",
+                return_value={"skytonight": {"datasets": {"comets": {"source": "mpc"}}}},
+            ):
+                with patch(
+                    "skytonight.skytonight_scheduler_manager.build_and_save_default_dataset",
+                    return_value=mock_dataset_result,
+                ):
                     with patch("skytonight.skytonight_scheduler_manager.invalidate_targets_dataset_cache"):
-                        with patch("skytonight.skytonight_scheduler_manager.run_calculations",
-                                   return_value=mock_calc_result):
+                        with patch(
+                            "skytonight.skytonight_scheduler_manager.run_calculations", return_value=mock_calc_result
+                        ):
                             with patch("skytonight.skytonight_scheduler_manager._append_skytonight_calculation_log"):
                                 result = _run_skytonight_refresh()
 
@@ -293,8 +347,10 @@ class TestRunSkytonigtRefresh:
 
         with patch("skytonight.skytonight_scheduler_manager.ensure_skytonight_directories"):
             with patch("skytonight.skytonight_scheduler_manager.load_config", return_value={}):
-                with patch("skytonight.skytonight_scheduler_manager.build_and_save_default_dataset",
-                           side_effect=RuntimeError("catalogue build failed")):
+                with patch(
+                    "skytonight.skytonight_scheduler_manager.build_and_save_default_dataset",
+                    side_effect=RuntimeError("catalogue build failed"),
+                ):
                     with patch("skytonight.skytonight_scheduler_manager._append_skytonight_calculation_log"):
                         with pytest.raises(RuntimeError, match="catalogue build failed"):
                             _run_skytonight_refresh()
@@ -313,11 +369,15 @@ class TestRunSkytonigtRefresh:
 
         with patch("skytonight.skytonight_scheduler_manager.ensure_skytonight_directories"):
             with patch("skytonight.skytonight_scheduler_manager.load_config", return_value={}):
-                with patch("skytonight.skytonight_scheduler_manager.build_and_save_default_dataset",
-                           return_value=mock_dataset_result):
+                with patch(
+                    "skytonight.skytonight_scheduler_manager.build_and_save_default_dataset",
+                    return_value=mock_dataset_result,
+                ):
                     with patch("skytonight.skytonight_scheduler_manager.invalidate_targets_dataset_cache"):
-                        with patch("skytonight.skytonight_scheduler_manager.run_calculations",
-                                   side_effect=RuntimeError("calc failed")):
+                        with patch(
+                            "skytonight.skytonight_scheduler_manager.run_calculations",
+                            side_effect=RuntimeError("calc failed"),
+                        ):
                             with patch("skytonight.skytonight_scheduler_manager._append_skytonight_calculation_log"):
                                 result = _run_skytonight_refresh()
 
@@ -333,13 +393,14 @@ class TestRunSkytonigtRefresh:
 
         with patch("skytonight.skytonight_scheduler_manager.ensure_skytonight_directories"):
             with patch("skytonight.skytonight_scheduler_manager.load_config", return_value={}):
-                with patch("skytonight.skytonight_scheduler_manager.build_and_save_default_dataset",
-                           return_value=mock_dataset_result):
+                with patch(
+                    "skytonight.skytonight_scheduler_manager.build_and_save_default_dataset",
+                    return_value=mock_dataset_result,
+                ):
                     with patch("skytonight.skytonight_scheduler_manager.invalidate_targets_dataset_cache"):
                         with patch("skytonight.skytonight_scheduler_manager.run_calculations", return_value={}):
                             with patch("skytonight.skytonight_scheduler_manager._append_skytonight_calculation_log"):
                                 # Patch so the import inside the function fails
-                                import sys
                                 # We can't easily make "from skytonight_calculator import _set_progress" fail
                                 # but the try/except means failure is safe anyway
                                 result = _run_skytonight_refresh()
@@ -365,11 +426,15 @@ class TestRunSkytonigtRefresh:
             with patch("skytonight.skytonight_scheduler_manager.load_config", return_value={}):
                 with patch("utils.repo_config.get_scheduler_locations", return_value=[default_loc, other_loc]):
                     with patch("utils.repo_config.get_install_default_location", return_value=default_loc):
-                        with patch("skytonight.skytonight_scheduler_manager.build_and_save_default_dataset",
-                                   return_value=mock_dataset_result):
+                        with patch(
+                            "skytonight.skytonight_scheduler_manager.build_and_save_default_dataset",
+                            return_value=mock_dataset_result,
+                        ):
                             with patch("skytonight.skytonight_scheduler_manager.invalidate_targets_dataset_cache"):
-                                with patch("skytonight.skytonight_scheduler_manager.run_calculations",
-                                           side_effect=lambda config, location: calc_results[location["id"]]):
+                                with patch(
+                                    "skytonight.skytonight_scheduler_manager.run_calculations",
+                                    side_effect=lambda config, location: calc_results[location["id"]],
+                                ):
                                     with patch(
                                         "skytonight.skytonight_scheduler_manager._append_skytonight_calculation_log"
                                     ):
@@ -386,8 +451,10 @@ class TestRunSkytonigtRefresh:
 
         with patch("skytonight.skytonight_scheduler_manager.ensure_skytonight_directories"):
             with patch("skytonight.skytonight_scheduler_manager.load_config", return_value={}):
-                with patch("skytonight.skytonight_scheduler_manager.build_and_save_default_dataset",
-                           return_value=mock_dataset_result):
+                with patch(
+                    "skytonight.skytonight_scheduler_manager.build_and_save_default_dataset",
+                    return_value=mock_dataset_result,
+                ):
                     with patch("skytonight.skytonight_scheduler_manager.invalidate_targets_dataset_cache"):
                         with patch("skytonight.skytonight_scheduler_manager.run_calculations", return_value={}):
                             with patch("skytonight.skytonight_scheduler_manager._append_skytonight_calculation_log"):
@@ -401,13 +468,17 @@ class TestGetOrCreateSkytonigtSchedulerExtended:
     def test_general_exception_returns_none(self, tmp_path):
         """a generic exception during scheduler creation returns None."""
         from skytonight.skytonight_scheduler_manager import get_or_create_skytonight_scheduler
+
         mock_app = MagicMock()
         mock_app.config = {}
 
-        with patch("skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_lock_file",
-                   return_value=str(tmp_path / "scheduler.lock")):
+        with patch(
+            "skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_lock_file",
+            return_value=str(tmp_path / "scheduler.lock"),
+        ):
             # Make opening the file succeed, but lock acquisition fail with generic error
             import sys
+
             if sys.platform == "win32":
                 with patch("msvcrt.locking", side_effect=Exception("unexpected")):
                     result = get_or_create_skytonight_scheduler(mock_app)
@@ -420,13 +491,17 @@ class TestGetOrCreateSkytonigtSchedulerExtended:
     def test_oserror_on_lock_sets_worker_flag_false(self, tmp_path):
         """OSError from msvcrt.locking → logs and returns None."""
         import sys
+
         if sys.platform != "win32":
             pytest.skip("Windows-only code path")
         from skytonight.skytonight_scheduler_manager import get_or_create_skytonight_scheduler
+
         mock_app = MagicMock()
         mock_app.config = {}
-        with patch("skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_lock_file",
-                   return_value=str(tmp_path / "oserr.lock")):
+        with patch(
+            "skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_lock_file",
+            return_value=str(tmp_path / "oserr.lock"),
+        ):
             with patch("msvcrt.locking", side_effect=OSError("already locked")):
                 result = get_or_create_skytonight_scheduler(mock_app)
         assert result is None
@@ -445,36 +520,47 @@ class TestRunSkytonigtRefreshProgressException:
 
         with patch("skytonight.skytonight_scheduler_manager.ensure_skytonight_directories"):
             with patch("skytonight.skytonight_scheduler_manager.load_config", return_value={}):
-                with patch("skytonight.skytonight_scheduler_manager.build_and_save_default_dataset",
-                           return_value=mock_dataset_result):
+                with patch(
+                    "skytonight.skytonight_scheduler_manager.build_and_save_default_dataset",
+                    return_value=mock_dataset_result,
+                ):
                     with patch("skytonight.skytonight_scheduler_manager.invalidate_targets_dataset_cache"):
                         with patch("skytonight.skytonight_scheduler_manager.run_calculations", return_value={}):
                             with patch("skytonight.skytonight_scheduler_manager._append_skytonight_calculation_log"):
                                 # Make _set_progress raise inside the function
-                                with patch.object(skytonight_calculator, "_set_progress",
-                                                  side_effect=RuntimeError("set_progress fail")):
+                                with patch.object(
+                                    skytonight_calculator,
+                                    "_set_progress",
+                                    side_effect=RuntimeError("set_progress fail"),
+                                ):
                                     result = _run_skytonight_refresh()
         assert "dataset_generated" in result
 
     def test_win32_lock_acquired_creates_scheduler(self, tmp_path):
-        """ (win32 path): when lock is acquired, scheduler is created."""
+        """(win32 path): when lock is acquired, scheduler is created."""
         import sys
+
         if sys.platform != "win32":
             pytest.skip("Windows-only test")
 
         from skytonight.skytonight_scheduler_manager import get_or_create_skytonight_scheduler
+
         mock_app = MagicMock()
         mock_app.config = {}
         mock_scheduler = MagicMock()
 
         # SkyTonightScheduler is imported inside the function from skytonight_scheduler module
-        with patch("skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_lock_file",
-                   return_value=str(tmp_path / "sch.lock")):
+        with patch(
+            "skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_lock_file",
+            return_value=str(tmp_path / "sch.lock"),
+        ):
             with patch("msvcrt.locking"):  # locking succeeds (no exception)
-                with patch("skytonight.skytonight_scheduler.SkyTonightScheduler",
-                           return_value=mock_scheduler, create=True):
+                with patch(
+                    "skytonight.skytonight_scheduler.SkyTonightScheduler", return_value=mock_scheduler, create=True
+                ):
                     # Patch the import itself
                     from skytonight import skytonight_scheduler as _sts_mod
+
                     original_cls = getattr(_sts_mod, "SkyTonightScheduler", None)
                     _sts_mod.SkyTonightScheduler = MagicMock(return_value=mock_scheduler)
                     try:
@@ -488,11 +574,14 @@ class TestRunSkytonigtRefreshProgressException:
     def test_lock_already_logged_not_logged_again(self, tmp_path):
         """When lock_logged is already True, skip logging again."""
         from skytonight.skytonight_scheduler_manager import get_or_create_skytonight_scheduler
+
         mock_app = MagicMock()
         mock_app.config = {"skytonight_scheduler_lock_logged": True}
 
-        with patch("skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_lock_file",
-                   return_value=str(tmp_path / "test2.lock")):
+        with patch(
+            "skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_lock_file",
+            return_value=str(tmp_path / "test2.lock"),
+        ):
             with patch("builtins.open", side_effect=IOError("locked")):
                 result = get_or_create_skytonight_scheduler(mock_app)
         assert result is None
@@ -504,11 +593,14 @@ class TestGetSkytonigtSchedulerForApi:
     def test_returns_scheduler_when_available(self):
         """When get_or_create returns a real scheduler, return it."""
         from skytonight.skytonight_scheduler_manager import get_skytonight_scheduler_for_api
+
         mock_scheduler = MagicMock()
 
-        with patch("skytonight.skytonight_scheduler_manager.get_or_create_skytonight_scheduler",
-                   return_value=mock_scheduler):
+        with patch(
+            "skytonight.skytonight_scheduler_manager.get_or_create_skytonight_scheduler", return_value=mock_scheduler
+        ):
             from flask import Flask
+
             app = Flask(__name__)
             with app.app_context():
                 result = get_skytonight_scheduler_for_api()
@@ -518,11 +610,13 @@ class TestGetSkytonigtSchedulerForApi:
         """When no scheduler and no lock file, return None."""
         from skytonight.skytonight_scheduler_manager import get_skytonight_scheduler_for_api
 
-        with patch("skytonight.skytonight_scheduler_manager.get_or_create_skytonight_scheduler",
-                   return_value=None):
-            with patch("skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_lock_file",
-                       return_value=str(tmp_path / "no_lock.lock")):
+        with patch("skytonight.skytonight_scheduler_manager.get_or_create_skytonight_scheduler", return_value=None):
+            with patch(
+                "skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_lock_file",
+                return_value=str(tmp_path / "no_lock.lock"),
+            ):
                 from flask import Flask
+
                 app = Flask(__name__)
                 with app.app_context():
                     result = get_skytonight_scheduler_for_api()
@@ -536,19 +630,22 @@ class TestGetSkytonigtSchedulerForApi:
         lock_file = tmp_path / "held.lock"
         lock_file.write_text("")
 
-        with patch("skytonight.skytonight_scheduler_manager.get_or_create_skytonight_scheduler",
-                   return_value=None):
-            with patch("skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_lock_file",
-                       return_value=str(lock_file)):
+        with patch("skytonight.skytonight_scheduler_manager.get_or_create_skytonight_scheduler", return_value=None):
+            with patch(
+                "skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_lock_file",
+                return_value=str(lock_file),
+            ):
                 if sys.platform == "win32":
                     with patch("msvcrt.locking", side_effect=OSError("locked by other")):
                         from flask import Flask
+
                         app = Flask(__name__)
                         with app.app_context():
                             result = get_skytonight_scheduler_for_api()
                 else:
                     with patch("fcntl.flock", side_effect=IOError("locked by other")):
                         from flask import Flask
+
                         app = Flask(__name__)
                         with app.app_context():
                             result = get_skytonight_scheduler_for_api()
@@ -562,20 +659,23 @@ class TestGetSkytonigtSchedulerForApi:
         lock_file = tmp_path / "free.lock"
         lock_file.write_text("")
 
-        with patch("skytonight.skytonight_scheduler_manager.get_or_create_skytonight_scheduler",
-                   return_value=None):
-            with patch("skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_lock_file",
-                       return_value=str(lock_file)):
+        with patch("skytonight.skytonight_scheduler_manager.get_or_create_skytonight_scheduler", return_value=None):
+            with patch(
+                "skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_lock_file",
+                return_value=str(lock_file),
+            ):
                 if sys.platform == "win32":
                     # locking succeeds → not held by another process → None
                     with patch("msvcrt.locking"):
                         from flask import Flask
+
                         app = Flask(__name__)
                         with app.app_context():
                             result = get_skytonight_scheduler_for_api()
                 else:
                     with patch("fcntl.flock"):  # succeeds → not held
                         from flask import Flask
+
                         app = Flask(__name__)
                         with app.app_context():
                             result = get_skytonight_scheduler_for_api()
@@ -588,12 +688,14 @@ class TestGetSkytonigtSchedulerForApi:
         lock_file = tmp_path / "ioerr.lock"
         lock_file.write_text("")
 
-        with patch("skytonight.skytonight_scheduler_manager.get_or_create_skytonight_scheduler",
-                   return_value=None):
-            with patch("skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_lock_file",
-                       return_value=str(lock_file)):
+        with patch("skytonight.skytonight_scheduler_manager.get_or_create_skytonight_scheduler", return_value=None):
+            with patch(
+                "skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_lock_file",
+                return_value=str(lock_file),
+            ):
                 with patch("builtins.open", side_effect=IOError("cannot open")):
                     from flask import Flask
+
                     app = Flask(__name__)
                     with app.app_context():
                         result = get_skytonight_scheduler_for_api()
@@ -607,6 +709,7 @@ class TestGetOrCreateSchedulerLockLoggedBranch:
         """when skytonight_scheduler_lock_logged is True,
         the if-block body is skipped and we jump directly to ."""
         import sys
+
         module = sys.modules['skytonight.skytonight_scheduler_manager']
         from skytonight.skytonight_scheduler_manager import get_or_create_skytonight_scheduler
 
@@ -617,9 +720,9 @@ class TestGetOrCreateSchedulerLockLoggedBranch:
 
         lock_path = str(tmp_path / "test.lock")
 
-        with patch.object(module, 'get_skytonight_scheduler_lock_file', return_value=lock_path), \
-             patch.object(module.sys, 'platform', 'win32'), \
-             patch.object(module.msvcrt, 'locking', side_effect=OSError("locked")):
+        with patch.object(module, 'get_skytonight_scheduler_lock_file', return_value=lock_path), patch.object(
+            module.sys, 'platform', 'win32'
+        ), patch.object(module.msvcrt, 'locking', side_effect=OSError("locked")):
             result = get_or_create_skytonight_scheduler(mock_app)
 
         assert result is None
@@ -629,6 +732,7 @@ class TestGetOrCreateSchedulerLockLoggedBranch:
 # ---------------------------------------------------------------------------
 # Merged from former test_coverage_paths3.py
 # ---------------------------------------------------------------------------
+
 
 class TestGetOrCreateSchedulerLockCleanup:
     """Cover the lock-file cleanup branches in get_or_create_skytonight_scheduler."""

@@ -1,13 +1,13 @@
 """
 Tests for Shared Equipment feature
 """
+
 import pytest
 import os
 import tempfile
 from unittest.mock import patch, MagicMock
 
 from equipment import equipment_profiles
-
 
 USER_A = "user-a-uuid"
 USER_B = "user-b-uuid"
@@ -48,6 +48,7 @@ def _create_telescope(user_id, name, is_shared=False):
 # is_shared defaults and persistence
 # ============================================================
 
+
 def test_is_shared_defaults_false(temp_data_dir):
     scope = _create_telescope(USER_A, 'Scope A')
     assert scope is not None
@@ -56,10 +57,14 @@ def test_is_shared_defaults_false(temp_data_dir):
 
 def test_set_shared_true(temp_data_dir):
     scope = _create_telescope(USER_A, 'Scope A')
-    updated = equipment_profiles.update_telescope(USER_A, scope['id'], {
-        **scope,
-        'is_shared': True,
-    })
+    updated = equipment_profiles.update_telescope(
+        USER_A,
+        scope['id'],
+        {
+            **scope,
+            'is_shared': True,
+        },
+    )
     assert updated is not None
     assert updated['is_shared'] is True
 
@@ -73,6 +78,7 @@ def test_shared_flag_persisted(temp_data_dir):
 # ============================================================
 # load_all_shared_equipment
 # ============================================================
+
 
 def test_load_shared_from_other_users(temp_data_dir):
     _create_telescope(USER_A, 'Scope A', is_shared=True)
@@ -112,6 +118,7 @@ def test_shared_item_annotated_with_owner(temp_data_dir):
 # ============================================================
 # compute_combination_share_status
 # ============================================================
+
 
 def _create_filter(user_id, name, is_shared=False):
     data = {
@@ -203,6 +210,7 @@ def test_combination_using_shared_equipment_from_other_user(temp_data_dir):
 # Cross-user scenario
 # ============================================================
 
+
 def test_shared_is_shared_field_for_filters(temp_data_dir):
     filt = _create_filter(USER_A, 'OIII', is_shared=True)
     assert filt is not None
@@ -219,12 +227,17 @@ def test_update_shared_to_false(temp_data_dir):
 # Cross-user delete-guard and validity status (feature.md rules)
 # ============================================================
 
+
 def test_shared_telescope_delete_blocked_by_other_users_combination(temp_data_dir):
     """USER_B's shared telescope, referenced by USER_A's own combination, can't be deleted by USER_B."""
     scope_b = _create_telescope(USER_B, 'Bob Scope', is_shared=True)
-    equipment_profiles.create_combination(USER_A, {
-        'name': "Alice's Combo", 'telescope_id': scope_b['id'],
-    })
+    equipment_profiles.create_combination(
+        USER_A,
+        {
+            'name': "Alice's Combo",
+            'telescope_id': scope_b['id'],
+        },
+    )
 
     success, blocked_by = equipment_profiles.delete_telescope(USER_B, scope_b['id'])
     assert success is False
@@ -235,9 +248,13 @@ def test_validity_status_from_owner_perspective_when_shared_item_disabled(temp_d
     """USER_A's combination references USER_B's shared telescope; disabling it (by USER_B) makes
     USER_A's combination invalid when computed from USER_A's perspective."""
     scope_b = _create_telescope(USER_B, 'Bob Scope', is_shared=True)
-    combo = equipment_profiles.create_combination(USER_A, {
-        'name': "Alice's Combo", 'telescope_id': scope_b['id'],
-    })
+    combo = equipment_profiles.create_combination(
+        USER_A,
+        {
+            'name': "Alice's Combo",
+            'telescope_id': scope_b['id'],
+        },
+    )
 
     with patch('utils.auth.user_manager', _mock_user_manager()):
         status = equipment_profiles.compute_combination_validity_status(combo, USER_A)
@@ -254,9 +271,13 @@ def test_validity_status_from_owner_perspective_when_shared_item_disabled(temp_d
 def test_load_all_shared_combinations_attaches_validity_status(temp_data_dir):
     """load_all_shared_combinations includes is_valid alongside is_shared for each entry."""
     scope_b = _create_telescope(USER_B, 'Bob Scope', is_shared=True)
-    equipment_profiles.create_combination(USER_B, {
-        'name': 'Shared Combo', 'telescope_id': scope_b['id'],
-    })
+    equipment_profiles.create_combination(
+        USER_B,
+        {
+            'name': 'Shared Combo',
+            'telescope_id': scope_b['id'],
+        },
+    )
 
     with patch('utils.auth.user_manager', _mock_user_manager()):
         shared = equipment_profiles.load_all_shared_combinations(exclude_user_id=USER_A)

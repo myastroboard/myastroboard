@@ -19,6 +19,7 @@ user_manager = auth.user_manager
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def client_admin():
     app.config['TESTING'] = True
@@ -66,8 +67,10 @@ def client_push_user(push_user):
 # GET /api/push/vapid-public-key
 # ---------------------------------------------------------------------------
 
+
 def test_vapid_public_key_endpoint_returns_key(client_admin, monkeypatch):
     from utils import push_manager
+
     monkeypatch.setattr(push_manager, 'get_vapid_public_key', lambda: 'FAKE_BASE64_PUBLIC_KEY')
 
     resp = client_admin.get('/api/push/vapid-public-key')
@@ -79,6 +82,7 @@ def test_vapid_public_key_endpoint_returns_key(client_admin, monkeypatch):
 
 def test_vapid_public_key_endpoint_no_auth_required(monkeypatch):
     from utils import push_manager
+
     monkeypatch.setattr(push_manager, 'get_vapid_public_key', lambda: 'ANON_KEY')
 
     app.config['TESTING'] = True
@@ -168,9 +172,27 @@ def test_subscribe_rejects_subscription_without_endpoint(client_push_user):
     assert resp.status_code == 400
 
 
+def test_subscribe_skips_logging_when_stored_user_already_has_endpoint(client_push_user, monkeypatch):
+    """The session-held user object can be stale: modify_user re-applies the add to the
+    freshest copy under the lock, whose own duplicate check may then find the endpoint
+    already present (a concurrent add finishing first). That must not log a fresh add."""
+    client, _ = client_push_user
+
+    class _StoredUser:
+        push_subscriptions = [{'endpoint': _SAMPLE_SUB['endpoint']}]
+
+    monkeypatch.setattr(user_manager, 'modify_user', lambda user_id, fn: fn(_StoredUser()))
+
+    resp = client.post('/api/push/subscribe', json={'subscription': _SAMPLE_SUB})
+
+    assert resp.status_code == 200
+    assert resp.get_json()['status'] == 'subscribed'
+
+
 # ---------------------------------------------------------------------------
 # DELETE /api/push/unsubscribe
 # ---------------------------------------------------------------------------
+
 
 def test_unsubscribe_removes_existing_subscription(client_push_user):
     client, user = client_push_user
@@ -224,6 +246,7 @@ def test_unsubscribe_rejects_missing_endpoint_field(client_push_user):
 # User model - push_subscriptions round-trip
 # ---------------------------------------------------------------------------
 
+
 def test_user_defaults_push_subscriptions_to_empty_list():
     u = User('alice', 'hash', 'user')
     assert u.push_subscriptions == []
@@ -273,8 +296,16 @@ def test_user_from_dict_defaults_push_subscriptions_to_empty_list():
 
 def test_user_round_trip_preserves_push_subscriptions():
     subs = [
-        {'endpoint': 'https://push.example.com/1', 'keys': {'p256dh': 'A', 'auth': 'B'}, 'created_at': '2026-01-01T00:00:00'},
-        {'endpoint': 'https://push.example.com/2', 'keys': {'p256dh': 'C', 'auth': 'D'}, 'created_at': '2026-02-01T00:00:00'},
+        {
+            'endpoint': 'https://push.example.com/1',
+            'keys': {'p256dh': 'A', 'auth': 'B'},
+            'created_at': '2026-01-01T00:00:00',
+        },
+        {
+            'endpoint': 'https://push.example.com/2',
+            'keys': {'p256dh': 'C', 'auth': 'D'},
+            'created_at': '2026-02-01T00:00:00',
+        },
     ]
     original = User('charlie', 'hash', 'user', push_subscriptions=subs)
 

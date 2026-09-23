@@ -39,6 +39,7 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Connector cards: the test button now sends the credentials as typed (never the stored ones),
   and a failed test shows why (refused, timeout, not authorized...) instead of a bare
   "Unreachable".
+- Add additional tests to improve coverage
 
 ### Breaking changes
 

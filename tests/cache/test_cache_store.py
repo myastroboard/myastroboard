@@ -386,6 +386,16 @@ class TestSaveLocationSignaturesException:
         monkeypatch.setattr(builtins, 'open', raising_open)
         cache_store._save_location_signatures()  # must not propagate the exception
 
+    def test_save_cleanup_remove_failure_is_also_swallowed(self, tmp_path, monkeypatch):
+        """Even if the tmp file was written but the final replace fails, and the cleanup's
+        own os.remove then also fails, the whole save must still not raise."""
+        loc_file = tmp_path / 'location_cache.json'
+        monkeypatch.setattr(cache_store, '_LOCATION_CACHE_FILE', str(loc_file))
+        monkeypatch.setattr(cache_store.os, 'replace', lambda *a, **k: (_ for _ in ()).throw(OSError("replace failed")))
+        monkeypatch.setattr(cache_store.os, 'remove', lambda *a, **k: (_ for _ in ()).throw(OSError("remove failed")))
+
+        cache_store._save_location_signatures()  # must not raise
+
 
 class TestHasLocationChangedNoneConfig:
     """has_location_changed returns True when new config is None."""
@@ -703,6 +713,7 @@ class TestMsvcrtLock:
 # Merged from former test_coverage_edge_cases.py
 # ---------------------------------------------------------------------------
 
+
 def test_cache_store_default_status_location_ids_handles_exception(monkeypatch):
     from cache import cache_store
 
@@ -730,6 +741,7 @@ def test_cache_store_allsky_job_availability_handles_exception(monkeypatch):
 # ---------------------------------------------------------------------------
 # Merged from former test_locations_coverage.py
 # ---------------------------------------------------------------------------
+
 
 class TestCacheStoreEdgeArcs:
     def test_sync_all_from_shared_full_matrix(self, monkeypatch):

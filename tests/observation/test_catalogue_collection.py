@@ -33,9 +33,7 @@ def _target(
             'constellation': constellation,
             'magnitude': magnitude,
             'size_arcmin': size_arcmin,
-            'coordinates': (
-                None if ra_hours is None else {'ra_hours': ra_hours, 'dec_degrees': dec_degrees}
-            ),
+            'coordinates': (None if ra_hours is None else {'ra_hours': ra_hours, 'dec_degrees': dec_degrees}),
         }
     )
 
@@ -45,11 +43,22 @@ FAKE_TARGETS = [
     _target('dso-m2', {'Messier': 'M 2'}, 'M 2', object_type='Globular Cluster', constellation='Aqr', magnitude=6.5),
     _target('dso-m10', {'Messier': 'M 10'}, 'M 10', object_type='Globular Cluster', constellation='Oph', magnitude=6.6),
     # No published magnitude - exercises the "unrated objects stay last" sort rule.
-    _target('dso-m45', {'Messier': 'M 45'}, 'Pleiades', object_type='Open Cluster', constellation='Tau', magnitude=None),
+    _target(
+        'dso-m45', {'Messier': 'M 45'}, 'Pleiades', object_type='Open Cluster', constellation='Tau', magnitude=None
+    ),
     _target('dso-ic434', {'OpenIC': 'IC 434'}, 'Horsehead Nebula', object_type='Nebula', constellation='Ori'),
     # Real bodies carry neither magnitude nor size - they are computed per night, not catalogued.
-    _target('body-mars', {'Bodies': 'Mars'}, 'Mars', object_type='Planet', constellation='',
-            magnitude=None, size_arcmin=None, ra_hours=None, category='bodies'),
+    _target(
+        'body-mars',
+        {'Bodies': 'Mars'},
+        'Mars',
+        object_type='Planet',
+        constellation='',
+        magnitude=None,
+        size_arcmin=None,
+        ra_hours=None,
+        category='bodies',
+    ),
     _target('comet-x', {'Comets': 'C/2024 X1'}, 'C/2024 X1', object_type='Comet', category='comets'),
 ]
 

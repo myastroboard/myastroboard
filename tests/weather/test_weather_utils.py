@@ -1,6 +1,7 @@
 """
 Unit tests for weather utilities (weather_utils.py)
 """
+
 from unittest.mock import Mock, patch
 
 from weather.weather_utils import create_weather_client, create_fresh_weather_client
@@ -32,11 +33,7 @@ class TestWeatherClientCreation:
 
         # Verify full client creation flow and returned client
         mock_cached_session.assert_called_once()
-        mock_retry.assert_called_once_with(
-            mock_session,
-            retries=RETRY_COUNT,
-            backoff_factor=BACKOFF_FACTOR
-        )
+        mock_retry.assert_called_once_with(mock_session, retries=RETRY_COUNT, backoff_factor=BACKOFF_FACTOR)
         mock_client.assert_called_once_with(session=mock_retry_session)
         assert result == mock_client_instance
 
@@ -107,7 +104,9 @@ class TestFreshWeatherClientCreation:
     @patch('weather.weather_utils.openmeteo_requests.Client')
     @patch('weather.weather_utils.retry')
     @patch('weather.weather_utils.requests.Session')
-    def test_create_fresh_weather_client_does_not_use_cache(self, mock_session_cls, mock_retry, mock_client, mock_cached_session):
+    def test_create_fresh_weather_client_does_not_use_cache(
+        self, mock_session_cls, mock_retry, mock_client, mock_cached_session
+    ):
         """Test that fresh client path does not create a cached session"""
         mock_session_cls.return_value = Mock()
         mock_retry.return_value = Mock()

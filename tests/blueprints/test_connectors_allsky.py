@@ -6,6 +6,7 @@ Covers every branch of all four routes:
   GET /api/connectors/allsky/urls
   GET /api/connectors/allsky/proxy
 """
+
 import sys
 import time
 import types
@@ -19,7 +20,6 @@ if 'psutil' not in sys.modules:
 
 from cache import cache_store
 
-
 # ---------------------------------------------------------------------------
 # Config helpers
 # ---------------------------------------------------------------------------
@@ -28,7 +28,7 @@ _CFG_ALLSKY_ENABLED = {
     "url": "http://allsky.local",
     "enabled": True,
     "modules": {
-        "live_image":  {"enabled": True},
+        "live_image": {"enabled": True},
         "sensor_data": {"enabled": True},
     },
 }
@@ -56,6 +56,7 @@ def _config(allsky_cfg=None):
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(autouse=True)
 def _clear_allsky_caches():
     """Reset connector caches before each test."""
@@ -69,6 +70,7 @@ def _clear_allsky_caches():
 # ---------------------------------------------------------------------------
 # GET /api/connectors/allsky/status
 # ---------------------------------------------------------------------------
+
 
 class TestAllSkyStatus:
 
@@ -117,6 +119,7 @@ class TestAllSkyStatus:
 # ---------------------------------------------------------------------------
 # GET /api/connectors/allsky/health
 # ---------------------------------------------------------------------------
+
 
 class TestAllSkyHealth:
 
@@ -174,8 +177,7 @@ class TestAllSkyHealth:
     # POST — quick URL probe (test button, no save required)
 
     def test_post_requires_login(self, client):
-        resp = client.post('/api/connectors/allsky/health',
-                           json={"url": "http://192.168.1.1"})
+        resp = client.post('/api/connectors/allsky/health', json={"url": "http://192.168.1.1"})
         assert resp.status_code == 401
 
     def test_post_400_when_no_url(self, client_user):
@@ -185,15 +187,13 @@ class TestAllSkyHealth:
     def test_post_reachable_true_on_200(self, client_user):
         mock_resp = MagicMock(status_code=200)
         with patch('requests.head', return_value=mock_resp):
-            resp = client_user.post('/api/connectors/allsky/health',
-                                    json={"url": "http://192.168.1.1"})
+            resp = client_user.post('/api/connectors/allsky/health', json={"url": "http://192.168.1.1"})
         assert resp.status_code == 200
         assert resp.get_json()["reachable"] is True
 
     def test_post_reachable_false_on_connection_error(self, client_user):
         with patch('requests.head', side_effect=_requests.exceptions.ConnectionError):
-            resp = client_user.post('/api/connectors/allsky/health',
-                                    json={"url": "http://192.168.1.1"})
+            resp = client_user.post('/api/connectors/allsky/health', json={"url": "http://192.168.1.1"})
         assert resp.status_code == 200
         assert resp.get_json()["reachable"] is False
 
@@ -202,8 +202,7 @@ class TestAllSkyHealth:
         get_resp = MagicMock(status_code=200)
         with patch('requests.head', return_value=head_resp):
             with patch('requests.get', return_value=get_resp):
-                resp = client_user.post('/api/connectors/allsky/health',
-                                        json={"url": "http://192.168.1.1"})
+                resp = client_user.post('/api/connectors/allsky/health', json={"url": "http://192.168.1.1"})
         assert resp.get_json()["reachable"] is True
 
     def test_post_400_when_invalid_scheme(self, client_user):
@@ -228,9 +227,9 @@ class TestAllSkyHealth:
 
     def test_post_400_when_unresolvable_host(self, client_user):
         import socket
+
         with patch('socket.getaddrinfo', side_effect=socket.gaierror):
-            resp = client_user.post('/api/connectors/allsky/health',
-                                    json={"url": "http://nonexistent.invalid"})
+            resp = client_user.post('/api/connectors/allsky/health', json={"url": "http://nonexistent.invalid"})
         assert resp.status_code == 400
         assert "resolve" in resp.get_json()["error"]
 
@@ -238,6 +237,7 @@ class TestAllSkyHealth:
 # ---------------------------------------------------------------------------
 # GET /api/connectors/allsky/urls
 # ---------------------------------------------------------------------------
+
 
 class TestAllSkyUrls:
 
@@ -300,6 +300,7 @@ class TestAllSkyUrls:
 # GET /api/connectors/allsky/proxy
 # ---------------------------------------------------------------------------
 
+
 class TestAllSkyProxy:
 
     def test_requires_login(self, client):
@@ -337,9 +338,7 @@ class TestAllSkyProxy:
 
     def test_proxies_content_successfully(self, client_user):
         mock_connector = MagicMock()
-        mock_connector.get_module_urls.return_value = {
-            "live_image": "http://allsky.local/current/tmp/image.jpg"
-        }
+        mock_connector.get_module_urls.return_value = {"live_image": "http://allsky.local/current/tmp/image.jpg"}
 
         mock_upstream = MagicMock()
         mock_upstream.status_code = 200
@@ -356,9 +355,7 @@ class TestAllSkyProxy:
 
     def test_504_on_timeout(self, client_user):
         mock_connector = MagicMock()
-        mock_connector.get_module_urls.return_value = {
-            "live_image": "http://allsky.local/current/tmp/image.jpg"
-        }
+        mock_connector.get_module_urls.return_value = {"live_image": "http://allsky.local/current/tmp/image.jpg"}
 
         with patch('blueprints.connectors_allsky.load_config', return_value=_config(_CFG_ALLSKY_ENABLED)):
             with patch('blueprints.connectors_allsky.AllSkyConnector', return_value=mock_connector):
@@ -368,9 +365,7 @@ class TestAllSkyProxy:
 
     def test_502_on_connection_error(self, client_user):
         mock_connector = MagicMock()
-        mock_connector.get_module_urls.return_value = {
-            "live_image": "http://allsky.local/current/tmp/image.jpg"
-        }
+        mock_connector.get_module_urls.return_value = {"live_image": "http://allsky.local/current/tmp/image.jpg"}
 
         with patch('blueprints.connectors_allsky.load_config', return_value=_config(_CFG_ALLSKY_ENABLED)):
             with patch('blueprints.connectors_allsky.AllSkyConnector', return_value=mock_connector):
@@ -380,9 +375,7 @@ class TestAllSkyProxy:
 
     def test_range_header_forwarded(self, client_user):
         mock_connector = MagicMock()
-        mock_connector.get_module_urls.return_value = {
-            "live_image": "http://allsky.local/current/tmp/image.jpg"
-        }
+        mock_connector.get_module_urls.return_value = {"live_image": "http://allsky.local/current/tmp/image.jpg"}
 
         mock_upstream = MagicMock()
         mock_upstream.status_code = 206

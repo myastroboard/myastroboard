@@ -80,8 +80,7 @@ def test_msvcrt_lock_succeeds_after_transient_contention(monkeypatch):
     assert outcomes == []
 
 
-_BUMP_SCRIPT = textwrap.dedent(
-    """
+_BUMP_SCRIPT = textwrap.dedent("""
     import sys
     from utils.file_lock import interprocess_lock
 
@@ -92,8 +91,7 @@ _BUMP_SCRIPT = textwrap.dedent(
                 value = int(handle.read())
             with open(counter_path, "w", encoding="utf-8") as handle:
                 handle.write(str(value + 1))
-    """
-)
+    """)
 
 
 @pytest.mark.slow
@@ -108,7 +106,10 @@ def test_separate_processes_exclude_each_other(tmp_path):
     procs = [
         subprocess.Popen(
             [sys.executable, "-c", _BUMP_SCRIPT, str(lock_path), str(counter), str(times)],
-            env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
         )
         for _ in range(workers)
     ]

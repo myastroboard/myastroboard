@@ -12,7 +12,6 @@ import pytest
 from connectors import mqtt_connector as mc
 from connectors.mqtt_connector import MqttConnector
 
-
 # ---------------------------------------------------------------------------
 # Fakes
 # ---------------------------------------------------------------------------
@@ -116,8 +115,15 @@ class TestParseBrokerUrl:
 
     @pytest.mark.parametrize(
         'bad',
-        ['', 'http://broker.lan', 'broker.lan:1883', 'mqtt://', 'mqtt://broker.lan/path', 'mqtt://broker.lan?x=1',
-         'mqtt://broker.lan:notaport'],
+        [
+            '',
+            'http://broker.lan',
+            'broker.lan:1883',
+            'mqtt://',
+            'mqtt://broker.lan/path',
+            'mqtt://broker.lan?x=1',
+            'mqtt://broker.lan:notaport',
+        ],
     )
     def test_rejects_anything_that_is_not_a_bare_mqtt_url(self, bad):
         host, port, tls, error = mc.parse_broker_url(bad)
@@ -176,7 +182,12 @@ class TestDeclaration:
         assert isinstance(MqttConnector.CONFIG_FIELDS['publish_interval_seconds'], int)
         slugs = [m['slug'] for m in MqttConnector.MODULES]
         assert slugs == [
-            'sky_conditions', 'weather_now', 'upcoming_events', 'user_activity', 'astrodex_image', 'board_diagnostics'
+            'sky_conditions',
+            'weather_now',
+            'upcoming_events',
+            'user_activity',
+            'astrodex_image',
+            'board_diagnostics',
         ]
 
     def test_is_configured_needs_a_parseable_mqtt_url_only(self):
@@ -186,8 +197,16 @@ class TestDeclaration:
         assert MqttConnector({'url': 'mqtt://broker', 'enabled': True}).is_enabled() is True
 
     def test_accessors_apply_defaults_sanitizing_and_clamping(self):
-        c = MqttConnector({'url': 'mqtt://b', 'base_topic': ' my/base# ', 'discovery_prefix': '',
-                           'publish_interval_seconds': '3', 'client_id': ' abc ', 'tls_insecure': 1})
+        c = MqttConnector(
+            {
+                'url': 'mqtt://b',
+                'base_topic': ' my/base# ',
+                'discovery_prefix': '',
+                'publish_interval_seconds': '3',
+                'client_id': ' abc ',
+                'tls_insecure': 1,
+            }
+        )
         assert c.base_topic() == 'my_base_'
         assert c.discovery_prefix() == 'homeassistant'
         assert c.publish_interval_seconds() == MqttConnector.MIN_PUBLISH_INTERVAL_SECONDS
@@ -248,11 +267,23 @@ class TestProbe:
         assert client.connected_to == ('broker.lan', 8883)
         assert client.tls is True and client.insecure is True
 
+    def test_tls_url_with_insecure_false_skips_tls_insecure_set(self):
+        created = []
+        c = MqttConnector({'url': 'mqtts://broker.lan', 'tls_insecure': False})
+        assert c.probe(client_factory=_factory('ok', created))['reachable'] is True
+        client = created[0]
+        assert client.tls is True and client.insecure is False
+
     def test_explicit_arguments_override_the_configured_ones(self):
         created = []
         c = MqttConnector({'url': 'mqtt://saved', 'username': 'saved-u', 'password': 'saved-p'})
-        c.probe(url='mqtt://other', username='typed', password='typed-p', tls_insecure=False,
-                client_factory=_factory('ok', created))
+        c.probe(
+            url='mqtt://other',
+            username='typed',
+            password='typed-p',
+            tls_insecure=False,
+            client_factory=_factory('ok', created),
+        )
         assert created[0].username == 'typed' and created[0].password == 'typed-p'
 
     def test_anonymous_probe_sets_no_credentials(self):
@@ -262,9 +293,15 @@ class TestProbe:
 
     def test_bad_url_and_unresolvable_host(self, monkeypatch):
         c = MqttConnector({'url': 'http://b'})
-        assert c.probe(client_factory=_factory('ok', [])) == {'reachable': False, 'error': 'url must start with mqtt:// or mqtts://'}
+        assert c.probe(client_factory=_factory('ok', [])) == {
+            'reachable': False,
+            'error': 'url must start with mqtt:// or mqtts://',
+        }
         monkeypatch.setattr(mc, 'resolve_broker_host', lambda host, port: (None, 'url host is not allowed'))
-        assert MqttConnector({'url': 'mqtt://b'}).probe(client_factory=_factory('ok', []))['error'] == 'url host is not allowed'
+        assert (
+            MqttConnector({'url': 'mqtt://b'}).probe(client_factory=_factory('ok', []))['error']
+            == 'url host is not allowed'
+        )
 
     @pytest.mark.parametrize(
         'behaviour, expected',
@@ -358,7 +395,12 @@ class TestImportBoundary:
         env = dict(os.environ)
         env.setdefault('DATA_DIR', os.environ.get('DATA_DIR', ''))
         result = subprocess.run(
-            [sys.executable, '-c', code], cwd=os.path.abspath(backend), capture_output=True, text=True, timeout=120, env=env
+            [sys.executable, '-c', code],
+            cwd=os.path.abspath(backend),
+            capture_output=True,
+            text=True,
+            timeout=120,
+            env=env,
         )
         assert result.returncode == 0, result.stderr
         assert result.stdout.strip().endswith('ok')
@@ -370,7 +412,16 @@ class TestImportBoundary:
         from connectors import mqtt_connector
 
         tree = ast.parse(inspect.getsource(mqtt_connector))
-        forbidden = ('cache', 'observation', 'skytonight', 'equipment', 'astroweather', 'weather', 'space', 'utils.auth')
+        forbidden = (
+            'cache',
+            'observation',
+            'skytonight',
+            'equipment',
+            'astroweather',
+            'weather',
+            'space',
+            'utils.auth',
+        )
         for node in tree.body:  # module level only - lazy imports inside functions are fine
             if isinstance(node, ast.ImportFrom):
                 assert not node.module.startswith(forbidden), node.module

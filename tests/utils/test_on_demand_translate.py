@@ -108,6 +108,7 @@ class TestCacheHelpers:
 
     def test_expired_cache_returns_none(self):
         import time
+
         key = ("en", "es", "expiry test")
         _cache_set(key, "prueba", "mymemory")
         # Manually make the entry stale
@@ -124,6 +125,7 @@ class TestCacheHelpers:
         try:
             _clear_cache()
             import time
+
             for i in range(3):
                 _TRANSLATION_CACHE[("en", "fr", f"word{i}")] = (f"mot{i}", time.time(), "mymemory")
             # Adding another entry should evict the oldest

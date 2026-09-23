@@ -6,11 +6,11 @@ import numpy as np
 import pytest
 
 from space import iss_passes as iss_module
+from utils.events_aggregator import EventsAggregator
 
 ISSPassService = iss_module.ISSPassService
 get_iss_passes_report = iss_module.get_iss_passes_report
 LUNAR_ANGULAR_RADIUS_FALLBACK_DEG = iss_module.LUNAR_ANGULAR_RADIUS_FALLBACK_DEG
-from utils.events_aggregator import EventsAggregator
 
 mod = iss_module  # alias used by the merged-in coverage tests below
 
@@ -779,7 +779,6 @@ class TestISSPassServiceLunarTransit:
         monkeypatch.setattr(service, "_find_solar_transits", lambda *args, **kwargs: [])
         monkeypatch.setattr(service, "_find_lunar_transits", lambda *args, **kwargs: [])
 
-        from skyfield.api import Loader
         import os
         from utils.constants import DATA_DIR_CACHE
 

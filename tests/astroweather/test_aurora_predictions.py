@@ -122,8 +122,15 @@ class TestGetAuroraScore:
     def test_returns_dict_with_required_keys(self):
         result = self.svc.get_aurora_score(5.0)
         assert isinstance(result, dict)
-        for key in ("kp_index", "probability", "probability_level", "visibility_level",
-                    "visibility_description", "observer_latitude", "timestamp"):
+        for key in (
+            "kp_index",
+            "probability",
+            "probability_level",
+            "visibility_level",
+            "visibility_description",
+            "observer_latitude",
+            "timestamp",
+        ):
             assert key in result
 
     def test_kp_below_3_gives_none_visibility(self):
@@ -189,6 +196,7 @@ class TestFetchCurrentKpIndex:
     @patch("astroweather.aurora_predictions.requests.get")
     def test_returns_none_on_request_exception(self, mock_get):
         import requests
+
         mock_get.side_effect = requests.RequestException("timeout")
         result = self.svc.fetch_current_kp_index()
         assert result is None
@@ -226,6 +234,7 @@ class TestFetchKpForecast:
     @patch("astroweather.aurora_predictions.requests.get")
     def test_returns_none_on_request_error(self, mock_get):
         import requests
+
         mock_get.side_effect = requests.RequestException("network error")
         result = self.svc.fetch_kp_forecast()
         assert result is None
@@ -381,7 +390,7 @@ class TestFetchCurrentKpIndexEdgeCases:
 
     @patch("astroweather.aurora_predictions.requests.get")
     def test_legacy_list_too_short_returns_none(self, mock_get):
-        """ via list branch: list element with len <= 1 → raw = None."""
+        """via list branch: list element with len <= 1 → raw = None."""
         mock_resp = MagicMock()
         # Single-element list inside the outer list (not len > 1)
         mock_resp.json.return_value = [["only_one_element"]]
@@ -591,6 +600,7 @@ class TestGetDetailedReport:
     def test_report_includes_forecast_entries(self, mock_forecast, mock_current):
         """forecast entries after now are appended to report."""
         from datetime import datetime, timezone, timedelta
+
         future_ts = (datetime.now(timezone.utc) + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%S")
         mock_current.return_value = 3.0
         mock_forecast.return_value = [
@@ -618,6 +628,7 @@ class TestGetDetailedReport:
         """invalid timezone in forecast → tzinfo = UTC."""
         svc = AuroraService(60.0, 25.0, "Invalid/Zone")
         from datetime import datetime, timezone, timedelta
+
         future_ts = (datetime.now(timezone.utc) + timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%S")
         mock_current.return_value = 3.0
         mock_forecast.return_value = [{"timestamp": future_ts, "kp": 3.0}]
@@ -634,7 +645,7 @@ class TestGetDetailedReport:
     @patch("astroweather.aurora_predictions.AuroraService.fetch_current_kp_index")
     @patch("astroweather.aurora_predictions.AuroraService.fetch_kp_forecast")
     def test_forecast_entry_with_bad_timestamp_skipped(self, mock_forecast, mock_current):
-        """ continue: unparseable forecast timestamp → skip entry."""
+        """continue: unparseable forecast timestamp → skip entry."""
         mock_current.return_value = 3.0
         mock_forecast.return_value = [
             {"timestamp": "not-a-date", "kp": 4.0},
@@ -721,6 +732,7 @@ class TestGetDetailedReportMoreBranches:
     def test_forecast_entry_with_no_timestamp_skipped(self, mock_forecast, mock_current):
         """entry without timestamp string → skip."""
         from datetime import datetime, timezone, timedelta
+
         future_ts = (datetime.now(timezone.utc) + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%S")
         mock_current.return_value = 3.0
         mock_forecast.return_value = [
@@ -737,6 +749,7 @@ class TestGetDetailedReportMoreBranches:
     def test_forecast_tz_aware_timestamp_handled(self, mock_forecast, mock_current):
         """tz-aware ISO timestamp → tzinfo already set → skip replace."""
         from datetime import datetime, timezone, timedelta
+
         future_ts = (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat()
         mock_current.return_value = 3.0
         mock_forecast.return_value = [{"timestamp": future_ts, "kp": 4.0}]
@@ -751,6 +764,7 @@ class TestGetAuroraScoreTzAwareForecastTimestamp:
     def test_tz_aware_forecast_timestamp_skips_replace(self):
         """dt_utc.tzinfo is not None → branch NOT taken."""
         from datetime import datetime, timezone, timedelta
+
         svc = AuroraService(55.0, 10.0, "Europe/Paris")
         aware_ts = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
         result = svc.get_aurora_score(4.0, forecast_timestamp=aware_ts)
@@ -780,6 +794,7 @@ class TestGetAuroraReport:
     @patch("astroweather.aurora_predictions.AuroraService.get_detailed_report")
     def test_delegates_to_service(self, mock_report):
         from astroweather.aurora_predictions import get_aurora_report
+
         mock_report.return_value = {"mocked": True}
         result = get_aurora_report(55.0, 10.0, "Europe/Paris")
         assert result == {"mocked": True}
@@ -788,6 +803,7 @@ class TestGetAuroraReport:
     @patch("astroweather.aurora_predictions.AuroraService.get_detailed_report")
     def test_returns_none_on_failure(self, mock_report):
         from astroweather.aurora_predictions import get_aurora_report
+
         mock_report.return_value = None
         result = get_aurora_report(55.0, 10.0, "UTC")
         assert result is None

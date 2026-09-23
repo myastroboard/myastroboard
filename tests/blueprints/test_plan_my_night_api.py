@@ -16,6 +16,7 @@ from observation import astrodex  # type: ignore[import-not-found]
 from observation import plan_my_night  # type: ignore[import-not-found]
 from blueprints import plan_my_night as plan_my_night_bp_module  # type: ignore[import-not-found]
 from skytonight import skytonight_targets  # type: ignore[import-not-found]
+
 app = app_module.app
 from utils.auth import user_manager  # type: ignore[import-not-found]
 
@@ -126,7 +127,7 @@ def test_previous_plan_blocks_new_add(client_admin):
                     'done': False,
                 }
             ],
-        }
+        },
     }
     saved = plan_my_night.save_user_plan(user.user_id, payload, username=user.username)
     assert saved is True
@@ -164,28 +165,44 @@ def test_add_target_uses_skytonight_group_dedup(client_admin, monkeypatch):
 
     monkeypatch.setattr(skytonight_targets, 'get_lookup_entry', fake_lookup_entry)
 
-    first_response = client_admin.post('/api/plan-my-night/targets', json={
-        'item': {'name': 'M 81', 'id': 'M 81', 'type': 'Galaxy', 'source_type': 'report'},
-        'catalogue': 'Messier',
-    })
+    first_response = client_admin.post(
+        '/api/plan-my-night/targets',
+        json={
+            'item': {'name': 'M 81', 'id': 'M 81', 'type': 'Galaxy', 'source_type': 'report'},
+            'catalogue': 'Messier',
+        },
+    )
     assert first_response.status_code == 200
     assert first_response.get_json()['reason'] == 'added'
 
-    second_response = client_admin.post('/api/plan-my-night/targets', json={
-        'item': {'name': 'NGC 3031', 'id': 'NGC 3031', 'type': 'Galaxy', 'source_type': 'report'},
-        'catalogue': 'OpenNGC',
-    })
+    second_response = client_admin.post(
+        '/api/plan-my-night/targets',
+        json={
+            'item': {'name': 'NGC 3031', 'id': 'NGC 3031', 'type': 'Galaxy', 'source_type': 'report'},
+            'catalogue': 'OpenNGC',
+        },
+    )
     assert second_response.status_code == 200
     assert second_response.get_json()['reason'] == 'already_in_plan'
 
 
 def test_add_target_with_combination_id(client_admin):
-    telescope = client_admin.post('/api/equipment/telescopes', json={
-        'name': 'T1', 'telescope_type': 'Refractor', 'aperture_mm': 100, 'focal_length_mm': 1000,
-    }).get_json()['data']
-    combo = client_admin.post('/api/equipment/combinations', json={
-        'name': 'My Combo', 'telescope_id': telescope['id'],
-    }).get_json()['data']
+    telescope = client_admin.post(
+        '/api/equipment/telescopes',
+        json={
+            'name': 'T1',
+            'telescope_type': 'Refractor',
+            'aperture_mm': 100,
+            'focal_length_mm': 1000,
+        },
+    ).get_json()['data']
+    combo = client_admin.post(
+        '/api/equipment/combinations',
+        json={
+            'name': 'My Combo',
+            'telescope_id': telescope['id'],
+        },
+    ).get_json()['data']
 
     target = _sample_target()
     target['combination_id'] = combo['id']
@@ -204,12 +221,22 @@ def test_list_plan_my_night_returns_combination_count(client_admin):
     # equipment_profiles.EQUIPMENT_DIR isn't isolated per-test by this fixture (only
     # PLAN_DIR/ASTRODEX_DIR are), so the admin user's combinations accumulate across
     # tests in this module - assert this combo is present rather than an absolute count.
-    telescope = client_admin.post('/api/equipment/telescopes', json={
-        'name': 'T2', 'telescope_type': 'Refractor', 'aperture_mm': 80, 'focal_length_mm': 600,
-    }).get_json()['data']
-    client_admin.post('/api/equipment/combinations', json={
-        'name': 'Combo A', 'telescope_id': telescope['id'],
-    })
+    telescope = client_admin.post(
+        '/api/equipment/telescopes',
+        json={
+            'name': 'T2',
+            'telescope_type': 'Refractor',
+            'aperture_mm': 80,
+            'focal_length_mm': 600,
+        },
+    ).get_json()['data']
+    client_admin.post(
+        '/api/equipment/combinations',
+        json={
+            'name': 'Combo A',
+            'telescope_id': telescope['id'],
+        },
+    )
 
     response = client_admin.get('/api/plan-my-night/list')
     assert response.status_code == 200
@@ -263,7 +290,7 @@ def test_optimize_blocked_on_previous_plan(client_admin):
                     'done': False,
                 }
             ],
-        }
+        },
     }
     saved = plan_my_night.save_user_plan(user.user_id, payload, username=user.username)
     assert saved is True
@@ -287,10 +314,13 @@ def test_optimize_apply_reorders_and_sets_delay(client_admin):
     assert preview.status_code == 200
     preview_payload = preview.get_json()
 
-    apply_response = client_admin.post('/api/plan-my-night/optimize/apply', json={
-        'order': preview_payload['order'],
-        'start_delay_minutes': preview_payload['start_delay_minutes'],
-    })
+    apply_response = client_admin.post(
+        '/api/plan-my-night/optimize/apply',
+        json={
+            'order': preview_payload['order'],
+            'start_delay_minutes': preview_payload['start_delay_minutes'],
+        },
+    )
     assert apply_response.status_code == 200
     apply_payload = apply_response.get_json()
     assert apply_payload['status'] == 'success'
@@ -302,10 +332,13 @@ def test_optimize_apply_rejects_stale_order(client_admin):
     add_response = client_admin.post('/api/plan-my-night/targets', json=_sample_target())
     assert add_response.status_code == 200
 
-    response = client_admin.post('/api/plan-my-night/optimize/apply', json={
-        'order': ['does-not-exist'],
-        'start_delay_minutes': 0,
-    })
+    response = client_admin.post(
+        '/api/plan-my-night/optimize/apply',
+        json={
+            'order': ['does-not-exist'],
+            'start_delay_minutes': 0,
+        },
+    )
     assert response.status_code == 409
 
 
@@ -354,8 +387,11 @@ def test_optimize_apply_exception_returns_500(client_admin, monkeypatch):
 
     monkeypatch.setattr(plan_my_night_bp_module.plan_my_night, 'apply_optimized_schedule', _boom)
 
-    response = client_admin.post('/api/plan-my-night/optimize/apply', json={
-        'order': preview_payload['order'],
-        'start_delay_minutes': preview_payload['start_delay_minutes'],
-    })
+    response = client_admin.post(
+        '/api/plan-my-night/optimize/apply',
+        json={
+            'order': preview_payload['order'],
+            'start_delay_minutes': preview_payload['start_delay_minutes'],
+        },
+    )
     assert response.status_code == 500

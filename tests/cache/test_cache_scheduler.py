@@ -323,6 +323,7 @@ def test_acquire_lock_fcntl_ioerror_closes_file_and_returns_false(monkeypatch, t
     This test is skipped on Windows.
     """
     import sys
+
     if sys.platform == "win32":
         pytest.skip("fcntl branch not coverable on Windows")
 
@@ -334,6 +335,7 @@ def test_acquire_lock_fcntl_ioerror_closes_file_and_returns_false(monkeypatch, t
     monkeypatch.setattr("builtins.open", lambda *_a, **_k: dummy_file)
 
     import types
+
     mock_fcntl = types.SimpleNamespace(
         LOCK_EX=2,
         LOCK_NB=4,
