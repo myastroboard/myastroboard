@@ -27,6 +27,7 @@ Design notes
 from __future__ import annotations
 
 import contextlib
+import json
 import math
 from collections import OrderedDict
 from datetime import date, timezone
@@ -63,7 +64,7 @@ YEAR_OFFSET_MAX = 5
 _UNSUPPORTED_CATEGORIES = {'bodies', 'comets'}
 _UNSUPPORTED_OTYPE_TOKENS = ('planet', 'comet', 'asteroid', 'moon', 'minor')
 
-_calendar_cache: "OrderedDict[Tuple[str, Optional[str], int], Dict[str, Any]]" = OrderedDict()
+_calendar_cache: "OrderedDict[Tuple[Any, ...], Dict[str, Any]]" = OrderedDict()
 
 
 def clear_cache() -> None:
@@ -352,6 +353,17 @@ def _location_geometry(location: Dict[str, Any]) -> Tuple[float, float, str, Lis
     )
 
 
+def _location_cache_signature(location: Dict[str, Any]) -> Tuple[Any, ...]:
+    """Every preset field the cached results depend on, so editing a location misses the cache.
+
+    Keying on the id alone kept serving results for the old coordinates after an
+    edit, in every worker: the edit is saved by whichever gunicorn worker serves
+    it, and nothing clears the other workers' caches.
+    """
+    lat_deg, lon_deg, timezone_name, horizon = _location_geometry(location)
+    return (location.get('id'), lat_deg, lon_deg, timezone_name, json.dumps(horizon, sort_keys=True, default=str))
+
+
 def _compute_visibility_calendar(identifier: str, location: Dict[str, Any], year: int) -> Dict[str, Any]:
     target = _resolve_target(identifier)
     base = {
@@ -428,9 +440,10 @@ def _compute_visibility_calendar(identifier: str, location: Dict[str, Any], year
 def get_visibility_calendar(identifier: str, location: Dict[str, Any], year: int) -> Dict[str, Any]:
     """Return the 12-month visibility calendar for *identifier* at *location* for *year*.
 
-    Cached in a bounded in-process LRU keyed ``(identifier, location_id, year)``.
+    Cached in a bounded in-process LRU keyed on the identifier, the location's
+    geometry, the year and the altitude constraints.
     """
-    cache_key = (identifier.strip().lower(), location.get('id'), int(year))
+    cache_key = (identifier.strip().lower(), _location_cache_signature(location), int(year), _resolve_constraints())
     cached = _calendar_cache.get(cache_key)
     if cached is not None:
         _calendar_cache.move_to_end(cache_key)
@@ -453,13 +466,13 @@ def get_visibility_calendar(identifier: str, location: Dict[str, Any], year: int
 # which stays one click away behind the v1.4 modal.
 WISHLIST_MONTHS_AHEAD = 3
 
-_dark_hours_cache: "OrderedDict[Tuple[Optional[str], int], List[Dict[str, Any]]]" = OrderedDict()
+_dark_hours_cache: "OrderedDict[Tuple[Any, ...], List[Dict[str, Any]]]" = OrderedDict()
 
 # Night contexts depend only on (site, date) - never on which targets are folded through
 # them - so the same handful serves every wishlist load for that day. Bounded, like the
 # calendar's own LRU: the key space is (locations x dates) and only recent dates are ever
 # asked for.
-_context_cache: "OrderedDict[Tuple[Optional[str], str], Dict[str, Any]]" = OrderedDict()
+_context_cache: "OrderedDict[Tuple[Any, ...], Dict[str, Any]]" = OrderedDict()
 _MAX_CONTEXT_ENTRIES = 32
 
 
@@ -477,7 +490,7 @@ def _cached_night_context(
     night_date: date,
 ) -> Dict[str, Any]:
     """A night context, reused across requests for the same site and date."""
-    cache_key = (location_id, night_date.isoformat())
+    cache_key = (location_id, lat_deg, lon_deg, timezone_name, night_date.isoformat())
     cached = _context_cache.get(cache_key)
     if cached is not None:
         _context_cache.move_to_end(cache_key)
@@ -528,10 +541,10 @@ def dark_hours_by_month(location: Dict[str, Any], year: int) -> List[Dict[str, A
     what the user actually logged.
 
     Deliberately **not** a weather statistic - MyAstroBoard keeps no historical weather
-    (see feature.md 2.6). Cached in a bounded in-process LRU keyed (location_id, year),
-    the same way the per-target calendar is.
+    (see feature.md 2.6). Cached in a bounded in-process LRU keyed on the location's
+    geometry and the year, the same way the per-target calendar is.
     """
-    cache_key = (location.get('id'), int(year))
+    cache_key = (_location_cache_signature(location), int(year))
     cached = _dark_hours_cache.get(cache_key)
     if cached is not None:
         _dark_hours_cache.move_to_end(cache_key)

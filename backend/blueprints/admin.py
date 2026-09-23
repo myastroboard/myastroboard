@@ -16,6 +16,7 @@ from werkzeug.utils import secure_filename
 from utils import app_settings as _app_settings
 from utils.auth import admin_required
 from utils.constants import CONFIG_FILE, DATA_DIR, SKYTONIGHT_LOGS_DIR, SKYTONIGHT_SCHEDULER_STATUS_FILE
+from utils.file_lock import interprocess_lock
 from utils.logging_config import get_logger
 from utils.metrics_collector import collect_metrics
 
@@ -476,9 +477,11 @@ def clear_logs_api():
     try:
         log_file = os.path.join(DATA_DIR, "myastroboard.log")
 
-        # If the file exists, clear it
-        if os.path.exists(log_file):
-            open(log_file, "w").close()
+        # If the file exists, clear it - under the log handler's own lock so it
+        # cannot interleave with a rotation done by another gunicorn worker
+        with interprocess_lock(log_file + ".lock"):
+            if os.path.exists(log_file):
+                open(log_file, "w").close()
 
         return jsonify({"status": "success", "message": "Logs cleared"})
 

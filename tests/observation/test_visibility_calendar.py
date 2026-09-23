@@ -537,3 +537,54 @@ class TestNextVisibilityBatch:
         visibility_calendar._cached_night_context(location_id, 48.0, 2.0, 'Europe/Paris', _date(2026, 1, 1))
         visibility_calendar._cached_night_context(location_id, 48.0, 2.0, 'Europe/Paris', _date(2026, 2, 1))
         assert (location_id, '2026-01-01') not in visibility_calendar._context_cache
+
+
+# ---------------------------------------------------------------------------
+# Cache keys follow location edits (made in any gunicorn worker)
+# ---------------------------------------------------------------------------
+
+
+def _counting_compute(monkeypatch):
+    calls = []
+
+    def _compute(identifier, location, year):
+        calls.append((location.get('latitude'), year))
+        return {'computed': len(calls)}
+
+    monkeypatch.setattr(visibility_calendar, '_compute_visibility_calendar', _compute)
+    monkeypatch.setattr(visibility_calendar, '_resolve_constraints', lambda: (30.0, 80.0))
+    return calls
+
+
+def test_calendar_cache_hit_for_unchanged_location(monkeypatch):
+    calls = _counting_compute(monkeypatch)
+    location = {'id': 'loc-1', 'latitude': 45.0, 'longitude': 5.0, 'timezone': 'UTC'}
+
+    visibility_calendar.get_visibility_calendar('M31', location, 2026)
+    visibility_calendar.get_visibility_calendar('m31', dict(location), 2026)
+
+    assert len(calls) == 1
+
+
+def test_calendar_cache_misses_after_location_coordinates_edit(monkeypatch):
+    calls = _counting_compute(monkeypatch)
+    location = {'id': 'loc-1', 'latitude': 45.0, 'longitude': 5.0, 'timezone': 'UTC'}
+
+    visibility_calendar.get_visibility_calendar('M31', location, 2026)
+    edited = dict(location, latitude=-33.0)
+    result = visibility_calendar.get_visibility_calendar('M31', edited, 2026)
+
+    assert calls == [(45.0, 2026), (-33.0, 2026)]
+    assert result == {'computed': 2}
+
+
+def test_calendar_cache_misses_after_horizon_or_constraint_change(monkeypatch):
+    calls = _counting_compute(monkeypatch)
+    location = {'id': 'loc-1', 'latitude': 45.0, 'longitude': 5.0, 'timezone': 'UTC'}
+
+    visibility_calendar.get_visibility_calendar('M31', location, 2026)
+    visibility_calendar.get_visibility_calendar('M31', dict(location, horizon_profile=[{'az': 0, 'alt': 20}]), 2026)
+    monkeypatch.setattr(visibility_calendar, '_resolve_constraints', lambda: (40.0, 80.0))
+    visibility_calendar.get_visibility_calendar('M31', location, 2026)
+
+    assert len(calls) == 3

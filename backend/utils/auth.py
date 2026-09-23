@@ -8,11 +8,14 @@ import os
 import uuid
 import re
 import shutil
+import threading
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from functools import wraps
 import pyotp
 from flask import session, jsonify, request
 from werkzeug.security import generate_password_hash, check_password_hash
+from utils.file_lock import interprocess_lock
 from utils.logging_config import get_logger
 from utils.i18n_utils import SUPPORTED_LANGUAGES
 
@@ -273,13 +276,63 @@ class User:
         return False
 
 
+def _serialized_users_write(method):
+    """Run a UserManager mutator under the users.json write lock.
+
+    Every gunicorn worker keeps its own copy of the user table and saves it
+    whole, so reload -> modify -> save must not interleave with another
+    worker's save, or one of the two changes is silently reverted.
+    """
+
+    @wraps(method)
+    def wrapper(self, *args, **kwargs):
+        with self._exclusive_write():
+            return method(self, *args, **kwargs)
+
+    return wrapper
+
+
 class UserManager:
     """Manages user storage and operations"""
 
     def __init__(self):
         self.users = {}
         self._users_mtime = None
+        self._write_mutex = threading.RLock()
+        self._write_depth = 0
         self.load_users()
+
+    @contextmanager
+    def _exclusive_write(self):
+        """Hold the users.json write lock across threads and gunicorn workers (reentrant)."""
+        with self._write_mutex:
+            outermost = self._write_depth == 0
+            self._write_depth += 1
+            try:
+                if outermost:
+                    with interprocess_lock(USERS_FILE + '.lock'):
+                        yield
+                else:
+                    yield
+            finally:
+                self._write_depth -= 1
+
+    def modify_user(self, user_id, mutate):
+        """Apply ``mutate(user)`` to the freshest copy of one user and save, atomically across workers.
+
+        For callers outside this class that change a user they looked up
+        earlier: that object may predate another worker's save, and saving
+        the table it belongs to would revert that save. Returns ``mutate``'s
+        result, or None (without saving) when the user no longer exists.
+        """
+        with self._exclusive_write():
+            self._reload_users_if_changed()
+            user = self.users.get(user_id)
+            if user is None:
+                return None
+            result = mutate(user)
+            self.save_users()
+            return result
 
     def load_users(self):
         """Load users from file"""
@@ -319,6 +372,7 @@ class UserManager:
         except Exception as e:
             logger.warning(f"Failed to check users file freshness: {e}")
 
+    @_serialized_users_write
     def save_users(self):
         """Save users to file using atomic write and JSON validation."""
         temp_path = USERS_FILE + '.tmp'
@@ -544,8 +598,11 @@ class UserManager:
                     merged[key] = value
         return merged
 
+    @_serialized_users_write
     def ensure_default_admin(self):
         """Ensure default admin user exists"""
+        # Another worker may have created it while this one waited for the lock
+        self._reload_users_if_changed()
         # Check by username, not by key
         if not self.get_user_by_username(DEFAULT_ADMIN_USERNAME):
             logger.info("Creating default admin user")
@@ -563,6 +620,7 @@ class UserManager:
         except Exception:
             return []
 
+    @_serialized_users_write
     def create_user(self, username, password, role, account_scope=None):
         """Create a new user"""
         self._reload_users_if_changed()
@@ -615,6 +673,7 @@ class UserManager:
         """Get user by username (for backwards compatibility)"""
         return self.get_user_by_username(username)
 
+    @_serialized_users_write
     def update_user(self, user_id, username=None, password=None, role=None, account_scope=None):
         """Update user username, password, role and/or account scope"""
         self._reload_users_if_changed()
@@ -651,6 +710,7 @@ class UserManager:
     # Two-factor authentication (TOTP) - per-user secret lifecycle
     # ------------------------------------------------------------------
 
+    @_serialized_users_write
     def start_totp_setup(self, user_id):
         """Generate and persist a fresh, unconfirmed TOTP secret for a user.
 
@@ -677,6 +737,7 @@ class UserManager:
         logger.info(f"Started 2FA setup for user {user.username} (ID: {user_id})")
         return user
 
+    @_serialized_users_write
     def confirm_totp_setup(self, user_id, code):
         """Activate 2FA for a user once they prove they can generate a valid code."""
         self._reload_users_if_changed()
@@ -696,6 +757,7 @@ class UserManager:
         logger.info(f"2FA confirmed and enabled for user {user.username} (ID: {user_id})")
         return user
 
+    @_serialized_users_write
     def disable_totp(self, user_id, password=None):
         """Clear a user's 2FA state.
 
@@ -717,6 +779,7 @@ class UserManager:
         logger.info(f"2FA disabled for user {user.username} (ID: {user_id})")
         return user
 
+    @_serialized_users_write
     def change_own_password(self, user_id, current_password, new_password):
         """Change password for the authenticated user after verifying current password."""
         self._reload_users_if_changed()
@@ -739,6 +802,7 @@ class UserManager:
         logger.info(f"Password changed for user {user.username} (ID: {user_id})")
         return user
 
+    @_serialized_users_write
     def get_user_preferences(self, user_id):
         """Return effective preferences for a given user."""
         self._reload_users_if_changed()
@@ -753,6 +817,7 @@ class UserManager:
 
         return effective.copy()
 
+    @_serialized_users_write
     def update_user_preferences(self, user_id, preferences):
         """Update preferences for a given user with validation."""
         self._reload_users_if_changed()
@@ -798,6 +863,7 @@ class UserManager:
                 normalized[key] = _copy.deepcopy(block[key])
         return normalized
 
+    @_serialized_users_write
     def set_user_location_prefs(self, user_id, **updates):
         """Partially update a user's preferences.location block (validated keys only)."""
         self._reload_users_if_changed()
@@ -821,6 +887,7 @@ class UserManager:
         logger.info(f"Updated location preferences for user {user.username} (ID: {user_id})")
         return block
 
+    @_serialized_users_write
     def set_location_attribution(self, location_id, user_ids):
         """Attach *location_id* to exactly the users in *user_ids* (detach from others).
 
@@ -851,6 +918,7 @@ class UserManager:
             logger.info(f"Attribution updated for location {location_id}: {len(target_ids)} user(s)")
         return changed
 
+    @_serialized_users_write
     def cleanup_location_references(self, location_id, fallback_location_id):
         """Eagerly remove a deleted preset from every user's location prefs.
 
@@ -884,6 +952,7 @@ class UserManager:
             logger.info(f"Cleaned location {location_id} references from user preferences")
         return changed
 
+    @_serialized_users_write
     def reset_active_location_on_login(self, user_id):
         """On fresh login, reset active_location_id to default_location_id.
 
@@ -901,6 +970,7 @@ class UserManager:
             self.save_users()
             logger.debug(f"Reset active location to default for user {user.username}")
 
+    @_serialized_users_write
     def delete_user(self, user_id, current_user_id=None):
         """Delete a user and safely clean related astrodex data"""
 
@@ -1005,14 +1075,18 @@ class UserManager:
             for user in self.users.values()
         ]
 
+    @staticmethod
+    def _stamp_last_login(user):
+        user.last_login = datetime.now(timezone.utc).isoformat()
+        return user
+
     def authenticate(self, username, password):
         """Authenticate user"""
         self._reload_users_if_changed()
         user = self.get_user_by_username(username)
         if user and user.check_password(password):
-            # Update last login
-            user.last_login = datetime.now(timezone.utc).isoformat()
-            self.save_users()
+            # Update last login on the freshest copy; password hashing above stays outside the write lock
+            user = self.modify_user(user.user_id, self._stamp_last_login) or user
             logger.info(f"Successful authentication for user {username}")
             return user
         # Log failure without revealing if username exists

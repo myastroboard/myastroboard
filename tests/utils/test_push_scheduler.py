@@ -857,15 +857,20 @@ def test_cleanup_removes_dead_endpoints_and_saves(monkeypatch):
 
     saved = []
     monkeypatch.setattr(auth.user_manager, 'save_users', lambda: saved.append(1))
+    monkeypatch.setattr(auth.user_manager, '_reload_users_if_changed', lambda: None)
 
-    user = _make_user(subscriptions=[
+    subs = [
         {'endpoint': 'https://push.example.com/alive', 'keys': {}},
         {'endpoint': 'https://push.example.com/dead', 'keys': {}},
-    ])
+    ]
+    user = _make_user(subscriptions=list(subs))
+    stored = _make_user(subscriptions=list(subs))  # the user table's own (fresher) copy
+    monkeypatch.setitem(auth.user_manager.users, user.user_id, stored)
+
     push_scheduler._cleanup_dead_subscriptions(user, ['https://push.example.com/dead'])
 
-    remaining = [s['endpoint'] for s in user.push_subscriptions]
-    assert remaining == ['https://push.example.com/alive']
+    assert [s['endpoint'] for s in user.push_subscriptions] == ['https://push.example.com/alive']
+    assert [s['endpoint'] for s in stored.push_subscriptions] == ['https://push.example.com/alive']
     assert saved
 
 

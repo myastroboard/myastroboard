@@ -10,6 +10,20 @@ logger = get_logger(__name__)
 push_bp = Blueprint('push', __name__)
 
 
+def _remove_endpoints(user, endpoints):
+    """Drop the given subscription endpoints from the stored user and from ``user`` itself.
+
+    Goes through ``modify_user`` so the change is applied to the freshest copy
+    of the user and never reverts a save another worker made meanwhile.
+    """
+
+    def _drop(stored):
+        stored.push_subscriptions = [s for s in stored.push_subscriptions if s.get('endpoint') not in endpoints]
+
+    user_manager.modify_user(user.user_id, _drop)
+    user.push_subscriptions = [s for s in user.push_subscriptions if s.get('endpoint') not in endpoints]
+
+
 @push_bp.route('/api/push/vapid-public-key', methods=['GET'])
 def get_vapid_public_key():
     """Return the VAPID public key needed by the browser to subscribe."""
@@ -50,19 +64,24 @@ def push_subscribe():
             return jsonify({'error': 'Invalid subscription object'}), 400
 
         endpoint = subscription['endpoint']
-        existing = current_user.push_subscriptions
-        if not any(s.get('endpoint') == endpoint for s in existing):
+
+        def _add(user):
+            if any(s.get('endpoint') == endpoint for s in user.push_subscriptions):
+                return False
             from datetime import datetime as _dt
 
-            existing.append(
+            user.push_subscriptions.append(
                 {
                     'endpoint': endpoint,
                     'keys': subscription.get('keys', {}),
                     'created_at': _dt.now().isoformat(),
                 }
             )
-            user_manager.save_users()
-            logger.info(f"Push subscription added for user {current_user.username}")
+            return True
+
+        if not any(s.get('endpoint') == endpoint for s in current_user.push_subscriptions):
+            if user_manager.modify_user(current_user.user_id, _add):
+                logger.info(f"Push subscription added for user {current_user.username}")
 
         return jsonify({'status': 'subscribed'})
     except Exception as e:
@@ -127,17 +146,27 @@ def push_delete_all_subscriptions():
         index = data.get('index')
 
         if index is None:
-            count = len(current_user.push_subscriptions)
-            current_user.push_subscriptions = []
-            user_manager.save_users()
+
+            def _clear(user):
+                count = len(user.push_subscriptions)
+                user.push_subscriptions = []
+                return count
+
+            count = user_manager.modify_user(current_user.user_id, _clear) or 0
             logger.info(f"All {count} push subscription(s) removed for {current_user.username}")
             return jsonify({'removed': count})
 
         if not isinstance(index, int) or not (0 <= index < len(current_user.push_subscriptions)):
             return jsonify({'error': 'Invalid subscription index'}), 400
 
-        del current_user.push_subscriptions[index]
-        user_manager.save_users()
+        # The index refers to the list the client was shown, so remove that
+        # subscription by endpoint in case the stored list has shifted since.
+        target_endpoint = current_user.push_subscriptions[index].get('endpoint')
+
+        def _remove(user):
+            user.push_subscriptions = [s for s in user.push_subscriptions if s.get('endpoint') != target_endpoint]
+
+        user_manager.modify_user(current_user.user_id, _remove)
         logger.info(f"Push subscription at index {index} removed for {current_user.username}")
         return jsonify({'removed': 1})
     except Exception as e:
@@ -212,10 +241,7 @@ def push_test_trigger(trigger_id):
                 dead_endpoints.append(sub['endpoint'])
 
         if dead_endpoints:
-            current_user.push_subscriptions = [
-                s for s in current_user.push_subscriptions if s.get('endpoint') not in dead_endpoints
-            ]
-            user_manager.save_users()
+            _remove_endpoints(current_user, dead_endpoints)
 
         logger.info(
             f"Test push [{trigger_id}] for {current_user.username}: {delivered}/{n} delivered — {payload['body']}"
@@ -269,10 +295,7 @@ def push_test():
             else:
                 dead_endpoints.append(sub['endpoint'])
         if dead_endpoints:
-            current_user.push_subscriptions = [
-                s for s in current_user.push_subscriptions if s.get('endpoint') not in dead_endpoints
-            ]
-            user_manager.save_users()
+            _remove_endpoints(current_user, dead_endpoints)
             logger.info(f"Removed {len(dead_endpoints)} dead subscription(s) for {current_user.username}")
         logger.info(f"Test push for {current_user.username}: {delivered}/{n} delivered")
         return jsonify({'delivered': delivered, 'total': n, 'cleaned': len(dead_endpoints)})
@@ -295,10 +318,8 @@ def push_unsubscribe():
         if not endpoint:
             return jsonify({'error': 'endpoint is required'}), 400
 
-        before = len(current_user.push_subscriptions)
-        current_user.push_subscriptions = [s for s in current_user.push_subscriptions if s.get('endpoint') != endpoint]
-        if len(current_user.push_subscriptions) < before:
-            user_manager.save_users()
+        if any(s.get('endpoint') == endpoint for s in current_user.push_subscriptions):
+            _remove_endpoints(current_user, [endpoint])
             logger.info(f"Push subscription removed for user {current_user.username}")
 
         return jsonify({'status': 'unsubscribed'})

@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from utils.constants import CONFIG_FILE
 from utils.config_defaults import DEFAULT_CONFIG, DEFAULT_LOCATION, LOCATION_PRESET_EXTRA_FIELDS
 from utils import load_json_file, save_json_file, safe_file_exists
+from utils.file_lock import interprocess_lock
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -71,10 +72,13 @@ def new_location_preset(base=None, is_install_default=False):
     return preset
 
 
-def _ensure_locations(config):
+def _ensure_locations(config, seeded_location_ids=None):
     """Guarantee the ``locations`` list invariants; migrate legacy shape in place.
 
     Returns True when the config dict was modified (caller should persist).
+    When ``seeded_location_ids`` is a list, the id of a newly seeded first
+    preset is appended to it instead of being attributed to users right away,
+    so the caller can attribute it once the config is safely persisted.
 
     Invariants enforced:
     - ``locations`` is a non-empty list (seeded from the legacy singular
@@ -125,7 +129,10 @@ def _ensure_locations(config):
         # future consumer must each remember to check is_admin() too; a
         # location with no explicit attribution record only works by
         # accident if every one of them does.
-        _attribute_new_location_to_all_users(first["id"])
+        if seeded_location_ids is None:
+            _attribute_new_location_to_all_users(first["id"])
+        else:
+            seeded_location_ids.append(first["id"])
     else:
         # Backfill preset fields on existing entries (defensive - e.g. hand-edited config)
         for preset in locations:
@@ -177,14 +184,36 @@ def _attribute_new_location_to_all_users(location_id):
 
 def load_config():
     """Load configuration from file (migrating the legacy location shape once)."""
-    if not safe_file_exists(CONFIG_FILE):
-        # No config file yet — brand-new install, keep location_configured=False.
-        # Persist immediately so the seeded preset's uuid stays stable across
-        # loads/workers (cache slots and user prefs are keyed by that id).
-        config = deepcopy(DEFAULT_CONFIG)
-        _ensure_locations(config)
-        save_config(config)
-        return config
+    if safe_file_exists(CONFIG_FILE):
+        merged = _read_merged_config()
+        if not _ensure_locations(deepcopy(merged), seeded_location_ids=[]):
+            return merged  # the common path: nothing to create or migrate
+
+    # Creating or migrating the file generates fresh location uuids, and cache
+    # slots and user prefs are keyed by them, so only one gunicorn worker may
+    # do it: the others must re-read and adopt that worker's ids instead of
+    # persisting ids of their own over them.
+    seeded_location_ids = []
+    with interprocess_lock(CONFIG_FILE + '.lock'):
+        if safe_file_exists(CONFIG_FILE):
+            config = _read_merged_config()
+            needs_save = _ensure_locations(config, seeded_location_ids)
+        else:
+            # No config file yet - brand-new install, keep location_configured=False.
+            config = deepcopy(DEFAULT_CONFIG)
+            _ensure_locations(config, seeded_location_ids)
+            needs_save = True
+        if needs_save:
+            save_config(config)
+    # Attribute only after releasing the config lock: attribution takes the
+    # users.json lock, and user creation takes them in the opposite order.
+    for location_id in seeded_location_ids:
+        _attribute_new_location_to_all_users(location_id)
+    return config
+
+
+def _read_merged_config():
+    """Read config.json merged over the defaults, with legacy keys normalized (no persistence)."""
     raw = load_json_file(CONFIG_FILE, {})
     merged = _merge_defaults(raw, DEFAULT_CONFIG)
     # Strip legacy top-level 'constraints' key - constraints live exclusively
@@ -193,11 +222,6 @@ def load_config():
     # Existing installs pre-date the location_configured flag; treat them as configured
     if 'location_configured' not in raw:
         merged['location_configured'] = True
-
-    if _ensure_locations(merged):
-        # One-time legacy migration (or invariant repair) - persist immediately so
-        # preset ids are stable across workers/restarts.
-        save_config(merged)
     return merged
 
 

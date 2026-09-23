@@ -16,6 +16,7 @@ import numpy as np
 
 from skytonight import skytonight_targets
 from utils.constants import DATA_DIR
+from utils.file_lock import interprocess_lock
 from utils.logging_config import get_logger
 from skytonight.skytonight_calculator import (
     _horizon_floor_array,
@@ -721,7 +722,8 @@ def save_user_plan(
     temp_path = file_path + '.tmp'
     backup_path = file_path + '.backup'
 
-    with _get_user_plan_lock(user_id):
+    # The thread lock serializes this worker; the file lock serializes every gunicorn worker
+    with _get_user_plan_lock(user_id), interprocess_lock(file_path + '.lock'):
         return _save_user_plan_locked(user_id, payload, username, file_path, temp_path, backup_path)
 
 

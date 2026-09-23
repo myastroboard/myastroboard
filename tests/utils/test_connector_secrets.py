@@ -53,7 +53,8 @@ def test_values_are_trimmed_and_stringified():
 
 def test_write_leaves_no_tmp_file_behind():
     cs.save_secrets('mqtt', {'password': 'pw'})
-    assert not os.path.exists(_sidecar_path() + '.tmp')
+    folder, base = os.path.split(_sidecar_path())
+    assert not [name for name in os.listdir(folder) if name.startswith(base) and name.endswith('.tmp')]
 
 
 def test_unreadable_or_malformed_file_reads_as_empty():
@@ -80,6 +81,27 @@ def test_save_reports_failure_when_directory_is_unwritable(monkeypatch):
     with open(os.path.dirname(os.path.dirname(cs._SECRETS_FILE)), 'w', encoding='utf-8') as handle:
         handle.write('{}')
     assert cs.save_secrets('mqtt', {'password': 'pw'}) is False
+
+
+def test_save_merges_under_cross_process_lock(monkeypatch):
+    """Every worker migrates legacy secrets at startup, so read-merge-write must be serialized across processes."""
+    from contextlib import contextmanager
+
+    events = []
+
+    @contextmanager
+    def _recording_lock(lock_path):
+        events.append(('acquire', lock_path))
+        yield
+        events.append(('release', lock_path))
+
+    real_write_all = cs._write_all
+    monkeypatch.setattr(cs, 'interprocess_lock', _recording_lock)
+    monkeypatch.setattr(cs, '_write_all', lambda data: events.append(('write', None)) or real_write_all(data))
+
+    assert cs.save_secrets('mqtt', {'password': 'pw'}) is True
+    lock_path = cs._SECRETS_FILE + '.lock'
+    assert events == [('acquire', lock_path), ('write', None), ('release', lock_path)]
 
 
 # ---------------------------------------------------------------------------

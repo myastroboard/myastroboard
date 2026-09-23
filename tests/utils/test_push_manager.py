@@ -321,7 +321,7 @@ def test_save_vapid_keys_disk_error_logs_and_returns_keys(tmp_path, monkeypatch)
 
     def mock_open(path, *args, **kw):
         mode = args[0] if args else kw.get('mode', 'r')
-        if str(path) == str(vapid_file) and 'w' in str(mode):
+        if str(path).startswith(str(vapid_file)) and 'w' in str(mode):
             raise PermissionError("read-only filesystem")
         return real_open(path, *args, **kw)
 
@@ -333,6 +333,66 @@ def test_save_vapid_keys_disk_error_logs_and_returns_keys(tmp_path, monkeypatch)
 
     assert keys == fake_keys
     assert errors_logged
+
+
+def test_worker_adopts_keys_another_worker_already_generated(tmp_path, monkeypatch):
+    """A worker whose in-memory cache is empty must load, not regenerate, a key file another worker wrote."""
+    from utils import push_manager
+
+    vapid_file = tmp_path / 'vapid.json'
+    monkeypatch.setattr(push_manager, '_VAPID_FILE', str(vapid_file))
+    monkeypatch.setattr(push_manager, '_vapid_keys', {})
+    first = {'private_key': 'FIRST_PRIV', 'public_key': 'FIRST_PUB'}
+    monkeypatch.setattr(push_manager, '_generate_keys', lambda: first)
+    push_manager.load_or_generate_vapid_keys()
+
+    monkeypatch.setattr(push_manager, '_vapid_keys', {})  # the other worker's empty cache
+    monkeypatch.setattr(push_manager, '_generate_keys', lambda: {'private_key': 'OTHER', 'public_key': 'OTHER'})
+
+    assert push_manager.load_or_generate_vapid_keys() == first
+
+
+def test_generation_happens_inside_cross_process_lock(tmp_path, monkeypatch):
+    from contextlib import contextmanager
+    from utils import push_manager
+
+    vapid_file = tmp_path / 'vapid.json'
+    monkeypatch.setattr(push_manager, '_VAPID_FILE', str(vapid_file))
+    monkeypatch.setattr(push_manager, '_vapid_keys', {})
+    events = []
+
+    @contextmanager
+    def _recording_lock(lock_path):
+        events.append(('acquire', lock_path))
+        yield
+        events.append(('release', lock_path))
+
+    def _generate():
+        events.append(('generate', None))
+        return {'private_key': 'P', 'public_key': 'K'}
+
+    monkeypatch.setattr(push_manager, 'interprocess_lock', _recording_lock)
+    monkeypatch.setattr(push_manager, '_generate_keys', _generate)
+
+    push_manager.load_or_generate_vapid_keys()
+
+    lock_path = str(vapid_file) + '.lock'
+    assert events == [('acquire', lock_path), ('generate', None), ('release', lock_path)]
+
+
+def test_failed_key_write_leaves_no_temp_file(tmp_path, monkeypatch):
+    from utils import push_manager
+
+    vapid_file = tmp_path / 'vapid.json'
+    monkeypatch.setattr(push_manager, '_VAPID_FILE', str(vapid_file))
+
+    def _failing_replace(_src, _dst):
+        raise OSError("rename refused")
+
+    monkeypatch.setattr(push_manager.os, 'replace', _failing_replace)
+    with pytest.raises(OSError):
+        push_manager._write_keys_atomically({'private_key': 'P', 'public_key': 'K'})
+    assert list(tmp_path.iterdir()) == []
 
 
 def test_vapid_contact_email_configured_skips_warning(tmp_path, monkeypatch):
