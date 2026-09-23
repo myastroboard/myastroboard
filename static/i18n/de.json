@@ -968,6 +968,7 @@
     "2fa_setup_confirm_code": "Code aus deiner App",
     "2fa_setup_confirm_btn": "Bestätigen und aktivieren",
     "2fa_setup_error": "Die Einrichtung der Zwei-Faktor-Authentifizierung konnte nicht abgeschlossen werden.",
+    "2fa_disable_error": "Die Zwei-Faktor-Authentifizierung konnte nicht deaktiviert werden.",
     "2fa_setup_not_started": "Starte die Einrichtung der Zwei-Faktor-Authentifizierung erneut, bevor du bestätigst.",
     "2fa_qr_unavailable": "Der QR-Code konnte nicht gezeichnet werden. Gib stattdessen den Schlüssel unten manuell ein.",
     "2fa_active": "Die Zwei-Faktor-Authentifizierung ist für dein Konto aktiv.",

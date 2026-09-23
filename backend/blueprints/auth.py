@@ -61,8 +61,25 @@ def _record_otp_failure(user_id: str) -> None:
             hits.popleft()
         hits.append(now)
         if len(_otp_attempts) > 512:
-            for key in [k for k, v in _otp_attempts.items() if not v]:
-                _otp_attempts.pop(key, None)
+            _prune_expired_otp_attempts(now)
+
+
+def _prune_expired_otp_attempts(now: float) -> None:
+    """Drop every user's expired timestamps, and any user left with none.
+
+    Caller must already hold _otp_attempts_lock (the lock isn't reentrant). Only
+    _record_otp_failure()/_otp_attempts_exceeded() prune an individual user's own
+    deque, and only when that same user is looked up again - a user who fails once
+    and never returns would otherwise leave a permanent one-entry residue that
+    "drop keys with an already-empty deque" never touches (its deque is never empty,
+    just stale), growing the dict without bound over the process's lifetime.
+    """
+    for key in list(_otp_attempts.keys()):
+        hits = _otp_attempts[key]
+        while hits and hits[0] <= now - PENDING_2FA_TTL_SECONDS:
+            hits.popleft()
+        if not hits:
+            _otp_attempts.pop(key, None)
 
 
 def _clear_otp_attempts(user_id: str) -> None:
@@ -408,7 +425,7 @@ def disable_two_factor():
         error_key = _resolve_error_key(
             e,
             [(_eq('Current password is incorrect'), 'users.current_password_incorrect')],
-            'settings.2fa_setup_error',
+            'settings.2fa_disable_error',
         )
         logger.warning(f"2FA disable rejected for user {session.get('username')!r}: {e}")
         return jsonify({'error': 'Invalid request', 'error_key': error_key}), 400

@@ -968,6 +968,7 @@
     "2fa_setup_confirm_code": "Código de tu aplicación",
     "2fa_setup_confirm_btn": "Confirmar y activar",
     "2fa_setup_error": "No se ha podido completar la configuración de la autenticación en dos pasos.",
+    "2fa_disable_error": "No se ha podido desactivar la autenticación en dos pasos.",
     "2fa_setup_not_started": "Vuelve a iniciar la configuración de la autenticación en dos pasos antes de confirmar.",
     "2fa_qr_unavailable": "No se ha podido dibujar el código QR. Introduce la clave de abajo manualmente.",
     "2fa_active": "La autenticación en dos pasos está activa en tu cuenta.",

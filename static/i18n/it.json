@@ -968,6 +968,7 @@
     "2fa_setup_confirm_code": "Codice della tua app",
     "2fa_setup_confirm_btn": "Conferma e attiva",
     "2fa_setup_error": "Impossibile completare la configurazione dell'autenticazione a due fattori.",
+    "2fa_disable_error": "Impossibile disattivare l'autenticazione a due fattori.",
     "2fa_setup_not_started": "Riavvia la configurazione dell'autenticazione a due fattori prima di confermare.",
     "2fa_qr_unavailable": "Non è stato possibile disegnare il codice QR. Inserisci invece la chiave qui sotto manualmente.",
     "2fa_active": "L'autenticazione a due fattori è attiva sul tuo account.",
