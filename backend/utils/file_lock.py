@@ -18,26 +18,26 @@ from typing import Iterator
 
 if sys.platform == "win32":
     import msvcrt
+
+    def _msvcrt_lock(fileno: int) -> None:
+        """Acquire a 1-byte msvcrt lock, retrying past the default ~10s deadlock timeout.
+
+        msvcrt.locking(LK_LOCK) raises OSError after ~10 blocked seconds; under brief
+        contention between workers that is a false failure rather than a real
+        deadlock, so retry a few times before giving up.
+        """
+        attempts = 6
+        for attempt in range(attempts):  # pragma: no branch - fixed positive literal, always >= 1 iteration
+            try:
+                msvcrt.locking(fileno, msvcrt.LK_LOCK, 1)
+                return
+            except OSError:
+                if attempt == attempts - 1:
+                    raise
+                time.sleep(0.2)
+
 else:  # pragma: no cover
     import fcntl
-
-
-def _msvcrt_lock(fileno: int) -> None:
-    """Acquire a 1-byte msvcrt lock, retrying past the default ~10s deadlock timeout.
-
-    msvcrt.locking(LK_LOCK) raises OSError after ~10 blocked seconds; under brief
-    contention between workers that is a false failure rather than a real
-    deadlock, so retry a few times before giving up.
-    """
-    attempts = 6
-    for attempt in range(attempts):  # pragma: no branch - fixed positive literal, always >= 1 iteration
-        try:
-            msvcrt.locking(fileno, msvcrt.LK_LOCK, 1)
-            return
-        except OSError:
-            if attempt == attempts - 1:
-                raise
-            time.sleep(0.2)
 
 
 @contextmanager
