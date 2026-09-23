@@ -72,15 +72,17 @@ def test_change_own_password_rejects_wrong_current_password(isolated_user_manage
 
 
 def test_validate_users_json_data_rejects_mismatched_user_id():
-    is_valid, error_msg = auth.UserManager.validate_users_json_data({
-        "abc": {
-            "user_id": "def",
-            "username": "alice",
-            "password_hash": "hash",
-            "role": "user",
-            "created_at": "2026-03-12T00:00:00"
+    is_valid, error_msg = auth.UserManager.validate_users_json_data(
+        {
+            "abc": {
+                "user_id": "def",
+                "username": "alice",
+                "password_hash": "hash",
+                "role": "user",
+                "created_at": "2026-03-12T00:00:00",
+            }
         }
-    })
+    )
 
     assert not is_valid
     assert "mismatched user_id" in error_msg
@@ -91,10 +93,7 @@ def test_update_user_preferences_updates_only_target_user(isolated_user_manager)
     alice = manager.create_user("alice", "alice-secret", "user")
     bob = manager.create_user("bob", "bob-secret", "user")
 
-    manager.update_user_preferences(alice.user_id, {
-        "time_format": "24h",
-        "density": "compact"
-    })
+    manager.update_user_preferences(alice.user_id, {"time_format": "24h", "density": "compact"})
 
     alice_prefs = manager.get_user_preferences(alice.user_id)
     bob_prefs = manager.get_user_preferences(bob.user_id)
@@ -110,9 +109,7 @@ def test_update_user_preferences_rejects_invalid_values(isolated_user_manager):
     user = manager.create_user("alice", "alice-secret", "user")
 
     with pytest.raises(ValueError, match="Invalid time_format"):
-        manager.update_user_preferences(user.user_id, {
-            "time_format": "invalid-format"
-        })
+        manager.update_user_preferences(user.user_id, {"time_format": "invalid-format"})
 
 
 # ===========================================================================
@@ -210,9 +207,16 @@ class TestUserModel:
         assert u.preferences == auth.DEFAULT_USER_PREFERENCES
 
     def test_preferences_copy_on_init(self):
-        prefs = {'startup_main_tab': 'skytonight', 'time_format': 'auto', 'density': 'comfortable',
-                 'theme_mode': 'auto', 'first_day_of_week': 'monday', 'language': 'en',
-                 'startup_subtab': 'astro-weather', 'notifications': {}}
+        prefs = {
+            'startup_main_tab': 'skytonight',
+            'time_format': 'auto',
+            'density': 'comfortable',
+            'theme_mode': 'auto',
+            'first_day_of_week': 'monday',
+            'language': 'en',
+            'startup_subtab': 'astro-weather',
+            'notifications': {},
+        }
         u = auth.User(username='alice', password_hash='h', role=auth.ROLE_USER, preferences=prefs)
         # Mutation of original doesn't affect user
         prefs['startup_main_tab'] = 'changed'
@@ -386,9 +390,7 @@ class TestUserManagerCreate:
         """User creation itself must not fail just because the location
         lookup did (e.g. config unavailable at that instant)."""
         manager = isolated_user_manager
-        monkeypatch.setattr(
-            'utils.repo_config.load_config', lambda: (_ for _ in ()).throw(RuntimeError('boom'))
-        )
+        monkeypatch.setattr('utils.repo_config.load_config', lambda: (_ for _ in ()).throw(RuntimeError('boom')))
 
         user = manager.create_user('newuser3', 'password123', auth.ROLE_USER)
 
@@ -547,10 +549,12 @@ class TestUserManagerDeleteUser:
 
         # Create astrodex file with picture reference
         astrodex_data = {
-            'items': [{
-                'name': 'M42',
-                'pictures': [{'filename': f'{user_id}_test.jpg'}],
-            }]
+            'items': [
+                {
+                    'name': 'M42',
+                    'pictures': [{'filename': f'{user_id}_test.jpg'}],
+                }
+            ]
         }
         astrodex_file = astrodex_dir / f'{user_id}_astrodex.json'
         astrodex_file.write_text(json.dumps(astrodex_data), encoding='utf-8')
@@ -637,50 +641,58 @@ class TestValidateUsersJsonData:
         assert 'dictionary' in msg
 
     def test_missing_required_field_fails(self):
-        is_valid, msg = auth.UserManager.validate_users_json_data({
-            'uid1': {'user_id': 'uid1', 'username': 'alice', 'role': auth.ROLE_USER, 'created_at': '2026-01-01'}
-            # missing password_hash
-        })
+        is_valid, msg = auth.UserManager.validate_users_json_data(
+            {
+                'uid1': {'user_id': 'uid1', 'username': 'alice', 'role': auth.ROLE_USER, 'created_at': '2026-01-01'}
+                # missing password_hash
+            }
+        )
         assert not is_valid
         assert 'missing' in msg
 
     def test_invalid_role_fails(self):
-        is_valid, msg = auth.UserManager.validate_users_json_data({
-            'uid1': {
-                'user_id': 'uid1',
-                'username': 'alice',
-                'password_hash': 'h',
-                'role': 'superuser',
-                'created_at': '2026-01-01',
+        is_valid, msg = auth.UserManager.validate_users_json_data(
+            {
+                'uid1': {
+                    'user_id': 'uid1',
+                    'username': 'alice',
+                    'password_hash': 'h',
+                    'role': 'superuser',
+                    'created_at': '2026-01-01',
+                }
             }
-        })
+        )
         assert not is_valid
         assert 'invalid role' in msg.lower()
 
     def test_preferences_not_dict_fails(self):
-        is_valid, msg = auth.UserManager.validate_users_json_data({
-            'uid1': {
-                'user_id': 'uid1',
-                'username': 'alice',
-                'password_hash': 'h',
-                'role': auth.ROLE_USER,
-                'created_at': '2026-01-01',
-                'preferences': 'not-a-dict',
+        is_valid, msg = auth.UserManager.validate_users_json_data(
+            {
+                'uid1': {
+                    'user_id': 'uid1',
+                    'username': 'alice',
+                    'password_hash': 'h',
+                    'role': auth.ROLE_USER,
+                    'created_at': '2026-01-01',
+                    'preferences': 'not-a-dict',
+                }
             }
-        })
+        )
         assert not is_valid
         assert 'preferences' in msg
 
     def test_valid_data_passes(self):
-        is_valid, msg = auth.UserManager.validate_users_json_data({
-            'uid1': {
-                'user_id': 'uid1',
-                'username': 'alice',
-                'password_hash': 'h',
-                'role': auth.ROLE_USER,
-                'created_at': '2026-01-01',
+        is_valid, msg = auth.UserManager.validate_users_json_data(
+            {
+                'uid1': {
+                    'user_id': 'uid1',
+                    'username': 'alice',
+                    'password_hash': 'h',
+                    'role': auth.ROLE_USER,
+                    'created_at': '2026-01-01',
+                }
             }
-        })
+        )
         assert is_valid
 
 
@@ -835,7 +847,9 @@ class TestValidateUserPreferences:
         assert is_valid is True
         assert auth.DEFAULT_USER_PREFERENCES['mqtt_publish_enabled'] is False
         assert auth.UserManager.sanitize_user_preferences({})['mqtt_publish_enabled'] is False
-        assert auth.UserManager.sanitize_user_preferences({'mqtt_publish_enabled': True})['mqtt_publish_enabled'] is True
+        assert (
+            auth.UserManager.sanitize_user_preferences({'mqtt_publish_enabled': True})['mqtt_publish_enabled'] is True
+        )
 
     def test_wizard_not_dict_fails(self):
         is_valid, msg = auth.UserManager.validate_user_preferences({'wizard': 'yes'})
@@ -853,9 +867,7 @@ class TestValidateUserPreferences:
         assert 'wizard' in msg
 
     def test_wizard_valid_passes(self):
-        is_valid, msg = auth.UserManager.validate_user_preferences(
-            {'wizard': {'completed': True, 'skipped': False}}
-        )
+        is_valid, msg = auth.UserManager.validate_user_preferences({'wizard': {'completed': True, 'skipped': False}})
         assert is_valid
 
     def test_valid_minimal_preferences(self):
@@ -922,6 +934,7 @@ class TestAuthDecorators:
     def flask_app(self, tmp_path, monkeypatch):
         """Set up a minimal Flask app with auth routes for testing."""
         from app import app as flask_app
+
         flask_app.config['TESTING'] = True
 
         # Use isolated users file
@@ -951,6 +964,7 @@ class TestAuthDecorators:
 
     def test_admin_required_allows_admin(self, flask_app, monkeypatch):
         from blueprints import skytonight_api as _mod
+
         monkeypatch.setattr(_mod, 'get_skytonight_scheduler_for_api', lambda: None)
         with flask_app.test_client() as c:
             admin = auth.user_manager.get_user_by_username(auth.DEFAULT_ADMIN_USERNAME)
@@ -977,6 +991,7 @@ class TestAuthDecorators:
     def test_get_current_user_returns_user_when_session_set(self, flask_app):
         with flask_app.test_request_context('/'):
             from flask import session
+
             session['username'] = auth.DEFAULT_ADMIN_USERNAME
             user = auth.get_current_user()
             assert user is not None
@@ -985,6 +1000,7 @@ class TestAuthDecorators:
     def test_is_user_admin_true(self, flask_app):
         with flask_app.test_request_context('/'):
             from flask import session
+
             session['username'] = auth.DEFAULT_ADMIN_USERNAME
             assert auth.is_user_admin() is True
 
@@ -1046,13 +1062,15 @@ class TestDeleteUserAstrodexCleanup:
         valid_filename = f'{user_id}_pic1.jpg'
         traversal_filename = '../outside.jpg'  # should be ignored (path traversal)
         astrodex_data = {
-            'items': [{
-                'name': 'M42',
-                'pictures': [
-                    {'filename': valid_filename},
-                    {'filename': traversal_filename},  # invalid chars → skipped
-                ],
-            }]
+            'items': [
+                {
+                    'name': 'M42',
+                    'pictures': [
+                        {'filename': valid_filename},
+                        {'filename': traversal_filename},  # invalid chars → skipped
+                    ],
+                }
+            ]
         }
         astrodex_file = astrodex_dir / f'{user_id}_astrodex.json'
         astrodex_file.write_text(json.dumps(astrodex_data), encoding='utf-8')
@@ -1147,8 +1165,9 @@ class TestSaveUsersCleanupPaths:
         manager = auth.UserManager()
 
         # Make validate_users_json_file always fail
-        monkeypatch.setattr(auth.UserManager, 'validate_users_json_file',
-                            classmethod(lambda cls, fp: (False, 'simulated failure')))
+        monkeypatch.setattr(
+            auth.UserManager, 'validate_users_json_file', classmethod(lambda cls, fp: (False, 'simulated failure'))
+        )
 
         with pytest.raises(Exception):
             manager.save_users()
@@ -1180,8 +1199,9 @@ class TestSaveUsersCleanupPaths:
         # Ensure file exists before we try to fail
         manager.create_user('alice', 'pass', auth.ROLE_USER)
         # Make validate always fail to trigger backup restore path
-        monkeypatch.setattr(auth.UserManager, 'validate_users_json_file',
-                            classmethod(lambda cls, fp: (False, 'simulated failure')))
+        monkeypatch.setattr(
+            auth.UserManager, 'validate_users_json_file', classmethod(lambda cls, fp: (False, 'simulated failure'))
+        )
 
         with pytest.raises(Exception):
             manager.save_users()
@@ -1196,8 +1216,7 @@ class TestSaveUsersCleanupPaths:
         manager = auth.UserManager()
         manager.create_user('alice', 'pass', auth.ROLE_USER)
 
-        monkeypatch.setattr(auth.UserManager, 'validate_users_json_file',
-                            classmethod(lambda cls, fp: (False, 'fail')))
+        monkeypatch.setattr(auth.UserManager, 'validate_users_json_file', classmethod(lambda cls, fp: (False, 'fail')))
 
         def _fail_replace(src, dst):
             raise OSError('replace denied')
@@ -1213,8 +1232,7 @@ class TestSaveUsersCleanupPaths:
         manager = auth.UserManager()
         manager.create_user('alice', 'pass', auth.ROLE_USER)
 
-        monkeypatch.setattr(auth.UserManager, 'validate_users_json_file',
-                            classmethod(lambda cls, fp: (False, 'fail')))
+        monkeypatch.setattr(auth.UserManager, 'validate_users_json_file', classmethod(lambda cls, fp: (False, 'fail')))
 
         original_remove = auth.os.remove
 
@@ -1234,8 +1252,7 @@ class TestSaveUsersCleanupPaths:
         manager = auth.UserManager()
         manager.create_user('alice', 'pass', auth.ROLE_USER)
 
-        monkeypatch.setattr(auth.UserManager, 'validate_users_json_file',
-                            classmethod(lambda cls, fp: (False, 'fail')))
+        monkeypatch.setattr(auth.UserManager, 'validate_users_json_file', classmethod(lambda cls, fp: (False, 'fail')))
 
         def _fail_replace(src, dst):
             raise OSError('replace denied')
@@ -1265,6 +1282,7 @@ class TestUserRequiredDecorator:
         @auth.user_required
         def protected():
             from flask import jsonify
+
             return jsonify({'ok': True})
 
         with mini_app.test_client() as c:
@@ -1282,6 +1300,7 @@ class TestUserRequiredDecorator:
         @auth.user_required
         def protected():
             from flask import jsonify
+
             return jsonify({'ok': True})
 
         isolated_user_manager.create_user('viewer', 'pass', auth.ROLE_READ_ONLY)
@@ -1302,6 +1321,7 @@ class TestUserRequiredDecorator:
         @auth.user_required
         def protected():
             from flask import jsonify
+
             return jsonify({'ok': True})
 
         with mini_app.test_client() as c:
@@ -1321,6 +1341,7 @@ class TestUserRequiredDecorator:
         @auth.user_required
         def protected():
             from flask import jsonify
+
             return jsonify({'ok': True})
 
         isolated_user_manager.create_user('regular', 'pass', auth.ROLE_USER)
@@ -1341,6 +1362,7 @@ class TestUserRequiredDecorator:
         @auth.user_required
         def protected():
             from flask import jsonify
+
             return jsonify({'ok': True})
 
         with mini_app.test_client() as c:
@@ -1405,6 +1427,7 @@ class TestLoginRequiredDecoratorPassThrough:
         @auth.login_required
         def guarded():
             from flask import jsonify
+
             return jsonify({'reached': True})
 
         with mini_app.test_client() as c:
@@ -1429,6 +1452,7 @@ class TestAdminRequiredDecoratorUnauthenticated:
         @auth.admin_required
         def admin_only():
             from flask import jsonify
+
             return jsonify({'ok': True})
 
         with mini_app.test_client() as c:
@@ -1446,6 +1470,7 @@ class TestAdminRequiredDecoratorUnauthenticated:
         @auth.admin_required
         def admin_only():
             from flask import jsonify
+
             return jsonify({'ok': True})
 
         isolated_user_manager.create_user('reguser', 'pass', auth.ROLE_USER)
@@ -1466,6 +1491,7 @@ class TestAdminRequiredDecoratorUnauthenticated:
         @auth.admin_required
         def admin_only():
             from flask import jsonify
+
             return jsonify({'ok': True})
 
         with mini_app.test_client() as c:
@@ -1614,6 +1640,7 @@ class TestDeleteUserListdirRemoveFails:
 # Merged from former test_coverage_paths3.py
 # ---------------------------------------------------------------------------
 
+
 class TestAuthSaveUsersMissingBranches:
     """Cover save_users error-recovery branches not yet hit."""
 
@@ -1664,9 +1691,7 @@ class TestAuthDeleteUserMissingBranches:
 
         # Astrodex references an image that does NOT exist on disk
         astrodex_data = {"items": [{"name": "M42", "pictures": [{"filename": f"{user_id}_missing.jpg"}]}]}
-        (astrodex_dir / f"{user_id}_astrodex.json").write_text(
-            json.dumps(astrodex_data), encoding="utf-8"
-        )
+        (astrodex_dir / f"{user_id}_astrodex.json").write_text(json.dumps(astrodex_data), encoding="utf-8")
 
         # No actual image file → os.path.exists(file_path) is False
         manager.delete_user(user_id, current_user_id=admin.user_id)
@@ -1715,6 +1740,7 @@ class TestAuthDeleteUserMissingBranches:
 # Merged from former test_coverage_edge_cases.py
 # ---------------------------------------------------------------------------
 
+
 def test_auth_delete_user_cleans_up_astrodex_files_and_images(tmp_path, monkeypatch):
     from utils import auth
 
@@ -1732,9 +1758,7 @@ def test_auth_delete_user_cleans_up_astrodex_files_and_images(tmp_path, monkeypa
     monkeypatch.setattr("observation.astrodex.ASTRODEX_DIR", str(astrodex_dir))
     monkeypatch.setattr("observation.astrodex.ASTRODEX_IMAGES_DIR", str(images_dir))
 
-    astrodex_payload = {
-        "items": [{"pictures": [{"filename": f"{user.user_id}_img.jpg"}]}]
-    }
+    astrodex_payload = {"items": [{"pictures": [{"filename": f"{user.user_id}_img.jpg"}]}]}
     (astrodex_dir / f"{user.user_id}_astrodex.json").write_text(json.dumps(astrodex_payload), encoding="utf-8")
     (images_dir / f"{user.user_id}_img.jpg").write_bytes(b"x")
     (images_dir / f"{user.user_id}_other.jpg").write_bytes(b"y")
@@ -1749,6 +1773,7 @@ def test_auth_delete_user_cleans_up_astrodex_files_and_images(tmp_path, monkeypa
 # ---------------------------------------------------------------------------
 # Merged from former test_locations_coverage.py
 # ---------------------------------------------------------------------------
+
 
 class TestAuthLocationEdgeArcs:
     @pytest.fixture
@@ -1835,9 +1860,7 @@ class TestAccountScope:
             isolated_user_manager.update_user(user.user_id, account_scope="orbital")
 
     def test_scope_survives_a_save_load_round_trip(self, isolated_user_manager):
-        isolated_user_manager.create_user(
-            "persisted", "secret", auth.ROLE_USER, account_scope=auth.ACCOUNT_SCOPE_LOCAL
-        )
+        isolated_user_manager.create_user("persisted", "secret", auth.ROLE_USER, account_scope=auth.ACCOUNT_SCOPE_LOCAL)
 
         reloaded = auth.UserManager()
 
@@ -1871,9 +1894,7 @@ class TestAccountScope:
         assert user.account_scope == auth.ACCOUNT_SCOPE_GLOBAL
 
     def test_list_users_exposes_scope(self, isolated_user_manager):
-        isolated_user_manager.create_user(
-            "listed", "secret", auth.ROLE_USER, account_scope=auth.ACCOUNT_SCOPE_LOCAL
-        )
+        isolated_user_manager.create_user("listed", "secret", auth.ROLE_USER, account_scope=auth.ACCOUNT_SCOPE_LOCAL)
 
         entry = next(u for u in isolated_user_manager.list_users() if u['username'] == 'listed')
 
@@ -2005,6 +2026,22 @@ class TestUserManagerTotpLifecycle:
         second = isolated_user_manager.start_totp_setup(user.user_id).totp_secret
 
         assert first != second
+
+    def test_setup_rejected_once_2fa_is_already_enabled(self, isolated_user_manager):
+        """Regenerating the secret on an active account would silently turn 2FA off
+        with no re-authentication, bypassing the password check disable_totp()
+        requires - the account must go through disable_totp() first."""
+        user = isolated_user_manager.create_user("already-on", "secret", auth.ROLE_USER)
+        secret = isolated_user_manager.start_totp_setup(user.user_id).totp_secret
+        isolated_user_manager.confirm_totp_setup(user.user_id, pyotp.TOTP(secret).now())
+
+        with pytest.raises(ValueError, match="already enabled"):
+            isolated_user_manager.start_totp_setup(user.user_id)
+
+        # The active secret must survive the rejected attempt untouched.
+        still_active = isolated_user_manager.get_user_by_id(user.user_id)
+        assert still_active.totp_enabled is True
+        assert still_active.totp_secret == secret
 
     def test_confirm_with_a_valid_code_enables_2fa(self, isolated_user_manager):
         user = isolated_user_manager.create_user("confirmer", "secret", auth.ROLE_USER)

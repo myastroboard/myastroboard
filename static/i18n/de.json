@@ -951,6 +951,7 @@
     "trusted_networks_placeholder": "192.168.1.0/24",
     "trusted_networks_add": "Hinzufügen",
     "trusted_networks_remove": "Dieses Netzwerk entfernen",
+    "trusted_networks_remove_confirm": "Möchtest du das vertrauenswürdige Netzwerk '{network}' wirklich entfernen?",
     "trusted_networks_empty": "Kein vertrauenswürdiges Netzwerk konfiguriert.",
     "trusted_networks_duplicate": "Dieses Netzwerk steht bereits in der Liste.",
     "trusted_networks_localhost_hint": "127.0.0.1 und ::1 gelten immer als vertrauenswürdig und müssen nie hinzugefügt werden.",
@@ -973,7 +974,9 @@
     "2fa_activated": "Die Zwei-Faktor-Authentifizierung ist jetzt aktiv.",
     "2fa_deactivated": "Die Zwei-Faktor-Authentifizierung wurde deaktiviert.",
     "2fa_confirmed_at": "Aktiv seit {date}",
-    "2fa_disable_confirm_password": "Mit deinem aktuellen Passwort bestätigen"
+    "2fa_disable_confirm_password": "Mit deinem aktuellen Passwort bestätigen",
+    "trusted_networks_broad_confirm": "Das Netzwerk '{network}' deckt einen ungewöhnlich großen Adressbereich ab - das ist oft ein Tippfehler im Präfix (z. B. /2 statt /24). Trotzdem hinzufügen?",
+    "2fa_already_enabled": "Die Zwei-Faktor-Authentifizierung ist bereits aktiv. Deaktiviere sie zuerst, bevor du sie erneut einrichtest."
   },
   "astrodex": {
     "title": "Astrodex - Ich muss sie alle fangen!",

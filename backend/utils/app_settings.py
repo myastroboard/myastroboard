@@ -8,10 +8,10 @@ This replaces the following environment variables that were previously required 
   SECRET_KEY, TRUST_PROXY_HEADERS, SESSION_COOKIE_SECURE, VAPID_CONTACT_EMAIL
 """
 
-import json
 import os
 import secrets
 
+from utils.json_settings_store import get_file_mtime, load_json_settings, save_json_settings
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -28,6 +28,7 @@ _DEFAULTS: dict = {
 }
 
 _cache: dict | None = None
+_cache_mtime: float | None = None
 
 
 def load_or_generate_secret_key() -> str:
@@ -58,39 +59,29 @@ def load_or_generate_secret_key() -> str:
 
 def load_app_settings() -> dict:
     """Load settings from disk and merge with defaults. Updates the module cache."""
-    global _cache
-    settings = dict(_DEFAULTS)
-    if os.path.exists(_APP_SETTINGS_FILE):
-        try:
-            with open(_APP_SETTINGS_FILE, 'r') as f:
-                saved = json.load(f)
-            for key in _DEFAULTS:
-                if key in saved:
-                    settings[key] = saved[key]
-            logger.debug("App settings loaded from disk")
-        except Exception as e:
-            logger.warning(f"Could not read app_settings.json, using defaults: {e}")
+    global _cache, _cache_mtime
+    settings = load_json_settings(_APP_SETTINGS_FILE, _DEFAULTS, 'App settings')
     _cache = settings
+    _cache_mtime = get_file_mtime(_APP_SETTINGS_FILE)
     return settings
 
 
 def save_app_settings(settings: dict) -> None:
     """Persist settings to disk and update the module cache."""
-    global _cache
-    merged = dict(_DEFAULTS)
-    for key in _DEFAULTS:
-        if key in settings:
-            merged[key] = settings[key]
-    os.makedirs(_DATA_DIR, exist_ok=True)
-    with open(_APP_SETTINGS_FILE, 'w') as f:
-        json.dump(merged, f, indent=2)
+    global _cache, _cache_mtime
+    merged = save_json_settings(_APP_SETTINGS_FILE, _DEFAULTS, settings, 'App settings')
     _cache = merged
-    logger.info("App settings saved")
+    _cache_mtime = get_file_mtime(_APP_SETTINGS_FILE)
 
 
 def get_app_settings() -> dict:
-    """Return cached settings, loading from disk if the cache is cold."""
-    if _cache is None:
+    """Return cached settings, reloading when cold or when the file changed on disk.
+
+    The mtime check keeps a long-lived worker process (`gunicorn -w N`) from serving a
+    stale cache forever once warm - the same multi-worker sync UserManager already does
+    for users.json via `_reload_users_if_changed()`.
+    """
+    if _cache is None or get_file_mtime(_APP_SETTINGS_FILE) != _cache_mtime:
         return load_app_settings()
     return _cache
 

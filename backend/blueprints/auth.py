@@ -3,7 +3,10 @@
 Routes: /api/auth/*, /api/users/*
 """
 
+import time
+from collections import deque
 from datetime import datetime, timedelta, timezone
+from threading import Lock
 
 from flask import Blueprint, request, jsonify, session
 
@@ -25,8 +28,69 @@ _PENDING_2FA_KEYS = (
     'pending_2fa_user_id',
     'pending_2fa_remember_me',
     'pending_2fa_expires_at',
-    'pending_2fa_attempts',
 )
+
+# Server-side OTP attempt counter, keyed by user_id and independent of the session
+# cookie: a counter that only lives in the session (as pending_2fa_attempts used to)
+# resets to zero on every fresh /api/auth/login call, which an attacker who already
+# knows the password can issue at will - trivially defeating the throttle. Windowed
+# the same way as astrodex_stream.py's rate limiter (same accepted multi-worker
+# trade-off: gunicorn -w N gives each worker its own count, so the real ceiling is
+# PENDING_2FA_MAX_ATTEMPTS per worker rather than truly global - still bounded, and
+# consistent with how this codebase already rate-limits elsewhere).
+_otp_attempts_lock = Lock()
+_otp_attempts: dict = {}
+
+
+def _otp_attempts_exceeded(user_id: str) -> bool:
+    now = time.time()
+    with _otp_attempts_lock:
+        hits = _otp_attempts.get(user_id)
+        if not hits:
+            return False
+        while hits and hits[0] <= now - PENDING_2FA_TTL_SECONDS:
+            hits.popleft()
+        return len(hits) >= PENDING_2FA_MAX_ATTEMPTS
+
+
+def _record_otp_failure(user_id: str) -> None:
+    now = time.time()
+    with _otp_attempts_lock:
+        hits = _otp_attempts.setdefault(user_id, deque())
+        while hits and hits[0] <= now - PENDING_2FA_TTL_SECONDS:
+            hits.popleft()
+        hits.append(now)
+        if len(_otp_attempts) > 512:
+            for key in [k for k, v in _otp_attempts.items() if not v]:
+                _otp_attempts.pop(key, None)
+
+
+def _clear_otp_attempts(user_id: str) -> None:
+    with _otp_attempts_lock:
+        _otp_attempts.pop(user_id, None)
+
+
+def _eq(message):
+    """Predicate builder: exact match against a ValueError's str()."""
+    return lambda text: text == message
+
+
+def _prefix_suffix(prefix, suffix=''):
+    """Predicate builder: match a ValueError whose str() carries dynamic content
+    (a user id, a username) between a known prefix and suffix."""
+    return lambda text: text.startswith(prefix) and text.endswith(suffix)
+
+
+def _resolve_error_key(exc: ValueError, rules, default: str) -> str:
+    """Map a ValueError to an i18n error_key via an ordered list of (predicate, key)
+    pairs, tried in order against str(exc). Falls back to *default* when nothing
+    matches (e.g. after a future wording change in utils/auth.py) - the generic
+    message still explains the failure, just less specifically, rather than raising."""
+    text = str(exc)
+    for predicate, key in rules:
+        if predicate(text):
+            return key
+    return default
 
 
 # ============================================================
@@ -64,7 +128,7 @@ def _finish_login(user, remember_me):
 
     # Log successful login with remember_me status
     logger.info(
-        f"Successful login for user {user.username} "
+        f"Successful login for user {user.username!r} "
         + f"(remember_me: {remember_me}, permanent_session: {session.permanent})"
     )
 
@@ -101,7 +165,7 @@ def login():
 
         user = user_manager.authenticate(username, password)
         if not user:
-            logger.warning(f"Failed login attempt for username: {username}")
+            logger.warning(f"Failed login attempt for username: {username!r}")
             return jsonify({'error': 'Invalid credentials', 'error_key': 'auth.invalid_credentials'}), 401
 
         # request.remote_addr already resolves the real client IP behind a trusted
@@ -114,7 +178,7 @@ def login():
         # 1. Local/global scope. With no configured network, "local" is undefined,
         #    so the restriction stays off rather than locking the account out entirely.
         if user.is_local_account() and configured_networks and not client_is_trusted:
-            logger.warning(f"Local account '{username}' login blocked from untrusted network {client_ip}")
+            logger.warning(f"Local account {username!r} login blocked from untrusted network {client_ip!r}")
             return (
                 jsonify(
                     {
@@ -128,7 +192,10 @@ def login():
         # 2. Two-factor. A trusted network skips the OTP step entirely.
         if settings.get('two_factor_enabled') and user.totp_enabled and not client_is_trusted:
             # Pending state only - 'username' stays unset, so every @login_required
-            # route remains locked until the code is verified.
+            # route remains locked until the code is verified. The attempt counter
+            # itself lives server-side (see _otp_attempts above), not in the session:
+            # a session-only counter resets every time this endpoint is called again,
+            # which an attacker who already has the password could do at will.
             session.permanent = False
             _clear_pending_2fa()
             session['pending_2fa_user_id'] = user.user_id
@@ -136,8 +203,7 @@ def login():
             session['pending_2fa_expires_at'] = (
                 datetime.now(timezone.utc) + timedelta(seconds=PENDING_2FA_TTL_SECONDS)
             ).isoformat()
-            session['pending_2fa_attempts'] = 0
-            logger.info(f"Password accepted for user {username} from {client_ip}, awaiting 2FA code")
+            logger.info(f"Password accepted for user {username!r} from {client_ip!r}, awaiting 2FA code")
             return jsonify({'status': '2fa_required'})
 
         return _finish_login(user, remember_me)
@@ -167,26 +233,45 @@ def verify_login_2fa():
             logger.warning("2FA verification rejected: pending session expired")
             return jsonify({'error': 'Verification expired', 'error_key': 'auth.otp_session_expired'}), 400
 
-        attempts = session.get('pending_2fa_attempts', 0)
-        if attempts >= PENDING_2FA_MAX_ATTEMPTS:
-            _clear_pending_2fa()
-            logger.warning(f"2FA verification abandoned after {attempts} failed attempts")
-            return jsonify({'error': 'Too many attempts', 'error_key': 'auth.otp_too_many_attempts'}), 429
-
         user = user_manager.get_user_by_id(pending_user_id)
         if not user or not user.totp_enabled:
             _clear_pending_2fa()
             logger.warning("2FA verification rejected: pending user no longer eligible")
             return jsonify({'error': 'No pending verification', 'error_key': 'auth.otp_session_expired'}), 400
 
+        # Re-check the local-account/trusted-network restriction, not just the OTP
+        # code: an admin could have switched this account to 'local' from an
+        # untrusted network while this pending login was in flight, and that must
+        # take effect immediately rather than only on the user's next full login.
+        client_ip = request.remote_addr
+        settings = _security_settings.get_security_settings()
+        if user.is_local_account() and settings.get('trusted_networks'):
+            if not _security_settings.is_client_ip_trusted(client_ip, settings):
+                _clear_pending_2fa()
+                logger.warning(
+                    f"Local account {user.username!r} 2FA verification blocked from untrusted network {client_ip!r}"
+                )
+                return (
+                    jsonify(
+                        {
+                            'error': 'This account can only sign in from a trusted network',
+                            'error_key': 'auth.local_account_network_restricted',
+                        }
+                    ),
+                    403,
+                )
+
+        if _otp_attempts_exceeded(user.user_id):
+            _clear_pending_2fa()
+            logger.warning(f"2FA verification abandoned after too many failed attempts for user {user.username!r}")
+            return jsonify({'error': 'Too many attempts', 'error_key': 'auth.otp_too_many_attempts'}), 429
+
         if not user.verify_totp(code):
-            session['pending_2fa_attempts'] = attempts + 1
-            logger.warning(
-                f"Invalid 2FA code for user {user.username} from {request.remote_addr} "
-                f"(attempt {attempts + 1}/{PENDING_2FA_MAX_ATTEMPTS})"
-            )
+            _record_otp_failure(user.user_id)
+            logger.warning(f"Invalid 2FA code for user {user.username!r} from {request.remote_addr!r}")
             return jsonify({'error': 'Invalid code', 'error_key': 'auth.invalid_otp_code'}), 401
 
+        _clear_otp_attempts(user.user_id)
         return _finish_login(user, session.get('pending_2fa_remember_me', False))
     except Exception as e:
         logger.error(f"2FA verification error: {e}")
@@ -254,8 +339,13 @@ def start_two_factor_setup():
         user = user_manager.start_totp_setup(current_user.user_id)
         return jsonify({'status': 'success', 'secret': user.totp_secret, 'otpauth_uri': user.get_totp_uri()})
     except ValueError as e:
-        logger.warning(f"2FA setup rejected for user {session.get('username')}: {e}")
-        return jsonify({'error': 'Invalid request', 'error_key': 'settings.2fa_setup_error'}), 400
+        error_key = _resolve_error_key(
+            e,
+            [(_eq('Two-factor authentication is already enabled'), 'settings.2fa_already_enabled')],
+            'settings.2fa_setup_error',
+        )
+        logger.warning(f"2FA setup rejected for user {session.get('username')!r}: {e}")
+        return jsonify({'error': 'Invalid request', 'error_key': error_key}), 400
     except Exception as e:
         logger.error(f"Error starting 2FA setup for user {session.get('username')}: {e}")
         return jsonify({'error': 'Internal server error'}), 500
@@ -279,14 +369,15 @@ def confirm_two_factor_setup():
         user_manager.confirm_totp_setup(current_user.user_id, code)
         return jsonify({'status': 'success'})
     except ValueError as e:
-        error_text = str(e)
-        error_key = 'settings.2fa_setup_error'
-        if error_text == 'Invalid two-factor code':
-            error_key = 'auth.invalid_otp_code'
-        elif error_text == 'Two-factor setup has not been started':
-            error_key = 'settings.2fa_setup_not_started'
-
-        logger.warning(f"2FA confirmation rejected for user {session.get('username')}: {e}")
+        error_key = _resolve_error_key(
+            e,
+            [
+                (_eq('Invalid two-factor code'), 'auth.invalid_otp_code'),
+                (_eq('Two-factor setup has not been started'), 'settings.2fa_setup_not_started'),
+            ],
+            'settings.2fa_setup_error',
+        )
+        logger.warning(f"2FA confirmation rejected for user {session.get('username')!r}: {e}")
         return jsonify({'error': 'Invalid request', 'error_key': error_key}), 400
     except Exception as e:
         logger.error(f"Error confirming 2FA for user {session.get('username')}: {e}")
@@ -314,12 +405,12 @@ def disable_two_factor():
         user_manager.disable_totp(current_user.user_id, password)
         return jsonify({'status': 'success'})
     except ValueError as e:
-        error_text = str(e)
-        error_key = 'settings.2fa_setup_error'
-        if error_text == 'Current password is incorrect':
-            error_key = 'users.current_password_incorrect'
-
-        logger.warning(f"2FA disable rejected for user {session.get('username')}: {e}")
+        error_key = _resolve_error_key(
+            e,
+            [(_eq('Current password is incorrect'), 'users.current_password_incorrect')],
+            'settings.2fa_setup_error',
+        )
+        logger.warning(f"2FA disable rejected for user {session.get('username')!r}: {e}")
         return jsonify({'error': 'Invalid request', 'error_key': error_key}), 400
     except Exception as e:
         logger.error(f"Error disabling 2FA for user {session.get('username')}: {e}")
@@ -582,16 +673,15 @@ def create_user():
             }
         )
     except ValueError as e:
-        error_text = str(e)
-        error_key = 'users.invalid_input'
-
-        if error_text.startswith('User ') and error_text.endswith('already exists'):
-            error_key = 'users.username_already_exists'
-        elif error_text.startswith('Invalid role'):
-            error_key = 'users.invalid_role'
-        elif error_text.startswith('Invalid account scope'):
-            error_key = 'users.invalid_account_scope'
-
+        error_key = _resolve_error_key(
+            e,
+            [
+                (_prefix_suffix('User ', 'already exists'), 'users.username_already_exists'),
+                (lambda t: t.startswith('Invalid role'), 'users.invalid_role'),
+                (lambda t: t.startswith('Invalid account scope'), 'users.invalid_account_scope'),
+            ],
+            'users.invalid_input',
+        )
         logger.warning(f"User creation failed: {e}")
         return jsonify({'error': 'Invalid request', 'error_key': error_key}), 400
     except Exception as e:
@@ -641,18 +731,16 @@ def update_user(user_id):
             }
         )
     except ValueError as e:
-        error_text = str(e)
-        error_key = 'users.invalid_input'
-
-        if error_text.startswith('User with ID ') and error_text.endswith(' not found'):
-            error_key = 'users.user_not_found'
-        elif error_text.startswith('Username ') and error_text.endswith(' already taken'):
-            error_key = 'users.username_already_taken'
-        elif error_text.startswith('Invalid role'):
-            error_key = 'users.invalid_role'
-        elif error_text.startswith('Invalid account scope'):
-            error_key = 'users.invalid_account_scope'
-
+        error_key = _resolve_error_key(
+            e,
+            [
+                (_prefix_suffix('User with ID ', ' not found'), 'users.user_not_found'),
+                (_prefix_suffix('Username ', ' already taken'), 'users.username_already_taken'),
+                (lambda t: t.startswith('Invalid role'), 'users.invalid_role'),
+                (lambda t: t.startswith('Invalid account scope'), 'users.invalid_account_scope'),
+            ],
+            'users.invalid_input',
+        )
         logger.warning(f"User update failed for user_id {user_id}: {e}")
         return jsonify({'error': 'Invalid request', 'error_key': error_key}), 400
     except Exception as e:
@@ -697,7 +785,7 @@ def admin_disable_user_2fa(user_id):
         logger.info(f"2FA cleared for user {user.username} by admin {session.get('username', '?')}")
         return jsonify({'status': 'success'})
     except ValueError as e:
-        error_key = 'users.user_not_found' if str(e) == 'User not found' else 'users.invalid_input'
+        error_key = _resolve_error_key(e, [(_eq('User not found'), 'users.user_not_found')], 'users.invalid_input')
         logger.warning(f"Admin 2FA disable failed for user_id {user_id}: {e}")
         return jsonify({'error': 'Invalid request', 'error_key': error_key}), 400
     except Exception as e:

@@ -143,7 +143,7 @@ The **Parameters → Users** panel (admin only) allows:
 | `POST` | `/api/auth/change-password` | login | Change own password |
 | `GET` | `/api/auth/preferences` | login | Get current user's preferences |
 | `PUT` | `/api/auth/preferences` | login | Update preferences (partial update supported) |
-| `POST` | `/api/auth/2fa/setup` | login | Generate (or regenerate) this user's TOTP secret, returns `{"secret": ..., "otpauth_uri": ...}` |
+| `POST` | `/api/auth/2fa/setup` | login | Generate this user's TOTP secret, returns `{"secret": ..., "otpauth_uri": ...}`; `400` if 2FA is already active for this user (disable it first) |
 | `POST` | `/api/auth/2fa/confirm` | login | Submit `{"code": "123456"}` to activate 2FA after setup |
 | `POST` | `/api/auth/2fa/disable` | login | Submit `{"password": ...}` to turn 2FA off (self-service, re-authenticates) |
 | `GET` | `/api/auth/security-settings` | admin | Read the trusted-network list and the instance-wide 2FA switch |
@@ -221,7 +221,19 @@ Managed in **Parameters → Users**, in the "Trusted networks and two-factor aut
 3. If a save removes the last entry from `trusted_networks` while `two_factor_enabled` was
    previously `true`, it is **silently forced to `false`** as part of the same save (not an
    error - a documented cascade) and a warning is logged. The admin UI shows a confirmation
-   dialog before this happens when removing the last entry.
+   dialog before this happens when removing the last entry, and again when adding an
+   unusually broad entry (see below).
+4. This invariant (rule 2/3) is also enforced as a defensive backstop directly in
+   `save_security_settings()` itself, not only in the API handler above - no future caller,
+   now or later, can persist the inconsistent pair to disk even if it skips the handler's own
+   checks.
+
+A network broader than a plausible home/office LAN (an IPv4 prefix narrower than `/8`, or an
+IPv6 prefix narrower than `/32`) is still accepted - an admin may have a genuine reason - but
+logs a warning and prompts for confirmation in the admin UI before being added, since it is
+often a typo in the prefix (`/24` losing a digit to become `/2`, for example) rather than an
+intentional choice, and a too-broad entry silently makes every login on that IP version bypass
+2FA and the local-account restriction alike.
 
 ---
 
@@ -280,16 +292,20 @@ local/global account check:
 
 1. If the instance switch is on, the user has `totp_enabled: true`, and the client IP is not
    trusted: `POST /api/auth/login` does **not** set the session. It stores a pending state in the
-   session instead (`pending_2fa_user_id`, a 5-minute expiry, an attempt counter) and returns
-   `{"status": "2fa_required"}`, `200`. The session is never `permanent` in this pending state,
-   regardless of `remember_me` - the 30-day cookie only applies once fully authenticated.
+   session instead (`pending_2fa_user_id`, a 5-minute expiry) and returns `{"status": "2fa_required"}`,
+   `200`. The session is never `permanent` in this pending state, regardless of `remember_me` - the
+   30-day cookie only applies once fully authenticated.
 2. The login page shows a second step (6-digit code input). `POST /api/auth/login/verify-2fa`
-   verifies the code against the pending user's secret and, on success, finishes the login exactly
-   as a normal password-only login would (same session keys, same response shape).
-3. **Brute-force guard**: up to 5 incorrect codes per pending login, and the pending state expires
-   after 5 minutes; either condition forces a fresh `/api/auth/login` call. A 6-digit TOTP code is
-   a much smaller search space than a password, so this endpoint is throttled even though the app
-   has no login rate-limiting elsewhere (see [Security notes](#security-notes)).
+   re-checks the local-account/trusted-network restriction (an admin could have changed it while
+   this login was pending), verifies the code against the pending user's secret and, on success,
+   finishes the login exactly as a normal password-only login would (same session keys, same
+   response shape).
+3. **Brute-force guard**: up to 5 incorrect codes per user, and the pending state expires after 5
+   minutes; either condition forces a fresh `/api/auth/login` call. The attempt count is tracked
+   **server-side, keyed by user ID** - not in the session cookie - specifically so that starting a
+   new login (which an attacker who already has the password can always do) does not reset it. A
+   6-digit TOTP code is a much smaller search space than a password, so this endpoint is throttled
+   even though the app has no login rate-limiting elsewhere (see [Security notes](#security-notes)).
 4. `login_required` needs no special handling for the pending state: it only checks for
    `'username' in session`, which stays unset throughout - every existing authenticated route
    stays correctly locked out mid-2FA.

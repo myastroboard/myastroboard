@@ -4,11 +4,12 @@ let currentUser = null;
 let currentUserPreferences = null;
 let offlineRedirectInProgress = false;
 // Trusted networks: working copy edited locally in the admin panel, persisted on Save.
+// Doubles as the "any trusted network configured?" answer the local-scope warning
+// banner needs, so that banner's state doesn't need its own separate copy of it.
 let trustedNetworksDraft = [];
-// Last security settings read from the server, used by the local-scope warning banner.
-let securitySettingsState = { trusted_networks: [], two_factor_enabled: false };
-// Last users list rendered, so the same banner can re-render when settings arrive.
-let lastLoadedUsers = [];
+// How many loaded users are scoped 'local', precomputed by displayUsers() rather than
+// keeping the whole user list around just to re-filter it on every render.
+let lastLocalAccountCount = 0;
 
 function localizeApiError(data, fallbackKey) {
     const localized = data?.error_key ? i18n.t(data.error_key) : null;
@@ -252,8 +253,11 @@ function applyUserPreferences() {
     }
 }
 
-function setCustomizeMessage(type, message) {
-    const messageDiv = document.getElementById('customize-message');
+// Shared by every "set this alert div's type + text, or hide it" message panel in
+// this file (customize, security password, 2FA, trusted networks) - each used to
+// carry its own byte-for-byte copy of this logic, differing only in the element id.
+function setAlertMessage(elementId, type, message) {
+    const messageDiv = document.getElementById(elementId);
     if (!messageDiv) return;
 
     messageDiv.className = 'alert';
@@ -269,6 +273,10 @@ function setCustomizeMessage(type, message) {
 
     messageDiv.textContent = message;
     messageDiv.style.display = 'block';
+}
+
+function setCustomizeMessage(type, message) {
+    setAlertMessage('customize-message', type, message);
 }
 
 function getSubtabLabelKey(subtabName) {
@@ -540,22 +548,7 @@ function populateSecurityUsername() {
 }
 
 function setSecurityPasswordMessage(type, message) {
-    const messageDiv = document.getElementById('security-password-message');
-    if (!messageDiv) return;
-
-    messageDiv.className = 'alert';
-    if (type === 'success') {
-        messageDiv.classList.add('alert-success');
-    } else if (type === 'error') {
-        messageDiv.classList.add('alert-danger');
-    } else {
-        messageDiv.style.display = 'none';
-        messageDiv.textContent = '';
-        return;
-    }
-
-    messageDiv.textContent = message;
-    messageDiv.style.display = 'block';
+    setAlertMessage('security-password-message', type, message);
 }
 
 function setupSecurityPasswordForm() {
@@ -666,7 +659,14 @@ function setupLogoutButton() {
 
 async function loadUsers() {
     if (currentUser?.role !== 'admin') return;
-    
+
+    // Kicked off together, not one after the other: the local-scope warning banner
+    // depends on both this and the security settings, and each independently renders
+    // as soon as its own request resolves - starting both at once is what actually
+    // gives it its "whichever lands first" behavior, rather than always waiting on
+    // this one first.
+    const securitySettingsPromise = loadSecuritySettings();
+
     try {
         const response = await fetchWithRetry('/api/users', {
             credentials: 'include'
@@ -674,7 +674,7 @@ async function loadUsers() {
             maxAttempts: 3,
             timeoutMs: 10000
         });
-        
+
         if (response.status === 401 || response.status === 403) {
             window.location.href = '/login';
             return;
@@ -687,10 +687,11 @@ async function loadUsers() {
 
         const users = await response.json();
         displayUsers(users);
-        loadSecuritySettings();
     } catch (error) {
         console.error('Error loading users:', error);
         showMessage('error', i18n.t('users.failed_to_load_users'));
+    } finally {
+        await securitySettingsPromise;
     }
 }
 
@@ -698,9 +699,10 @@ function displayUsers(users) {
     const usersList = document.getElementById('users-list');
     if (!usersList) return;
 
-    // Kept so the local-scope warning banner can be re-rendered when the security
-    // settings arrive, whichever of the two requests lands first.
-    lastLoadedUsers = users;
+    // Precomputed so the local-scope warning banner can re-render as soon as either
+    // this or the security-settings request resolves, whichever lands first (both are
+    // kicked off together in loadUsers()) without re-filtering the full user list.
+    lastLocalAccountCount = users.filter((user) => user.account_scope === 'local').length;
     renderLocalScopeWarning();
     
     if (users.length === 0) {
@@ -1086,55 +1088,54 @@ function editUsername(userId, currentUsername) {
 }
 
 // Edit user role using modal dialog
-function editRole(userId, username, currentRole) {
+// Build and open the shared "edit one <select> field for this user" modal: title +
+// icon, an info alert naming the user, a single select populated from *options*, and
+// a submit handler that PUTs {[fieldName]: value} to /api/users/<id> - success shows
+// a global message, reloads the table and closes the modal; failure shows an inline
+// error. Shared by editRole() and editAccountScope(), which used to each carry an
+// almost line-for-line copy of this (title/body setup, alerts, select, submit
+// handler shape), differing only in the field name, i18n keys and option list.
+function openEditFieldModal({
+    userId, username, currentValue, fieldName, iconClass, titleKey, infoForKey,
+    selectLabelKey, submitLabelKey, unchangedKey, successKey, errorFallbackKey, options
+}) {
     const titleElement = document.getElementById('modal_lg_close_title');
     DOMUtils.clear(titleElement);
-    DOMUtils.append(titleElement, DOMUtils.createIcon('bi bi-key icon-inline'), i18n.t('users.edit_role'));
-    
+    DOMUtils.append(titleElement, DOMUtils.createIcon(iconClass), i18n.t(titleKey));
+
     const contentElement = document.getElementById('modal_lg_close_body');
     DOMUtils.clear(contentElement);
 
     const infoAlert = document.createElement('div');
     infoAlert.className = 'alert alert-info';
-    infoAlert.append(i18n.t('users.edit_role_for'));
+    infoAlert.append(i18n.t(infoForKey));
     const strong = document.createElement('strong');
     strong.textContent = username;
     infoAlert.appendChild(strong);
 
     const errorAlert = document.createElement('div');
-    errorAlert.id = 'role-modal-error';
     errorAlert.className = 'alert alert-danger';
     errorAlert.style.display = 'none';
 
     const form = document.createElement('form');
-    form.id = 'role-edit-form';
     form.className = 'row g-3';
-
-    const hiddenUserId = document.createElement('input');
-    hiddenUserId.type = 'hidden';
-    hiddenUserId.id = 'edit-user-id';
-    hiddenUserId.value = userId;
 
     const selectCol = document.createElement('div');
     selectCol.className = 'col-md-12';
+    const select = document.createElement('select');
+    select.className = 'form-select';
+    select.id = `edit-field-select-${fieldName}`;
+    select.required = true;
     const label = document.createElement('label');
     label.className = 'form-label';
-    label.setAttribute('for', 'new-role-select');
-    label.textContent = i18n.t('users.new_role');
-    const select = document.createElement('select');
-    select.id = 'new-role-select';
-    select.className = 'form-select';
-    select.required = true;
+    label.setAttribute('for', select.id);
+    label.textContent = i18n.t(selectLabelKey);
 
-    [
-        { value: 'admin', text: 'Admin' },
-        { value: 'user', text: 'User' },
-        { value: 'read-only', text: 'Read-Only' }
-    ].forEach((optionData) => {
+    options.forEach((optionData) => {
         const option = document.createElement('option');
         option.value = optionData.value;
-        option.textContent = optionData.text;
-        option.selected = optionData.value === currentRole;
+        option.textContent = optionData.textKey ? i18n.t(optionData.textKey) : optionData.text;
+        option.selected = optionData.value === currentValue;
         select.appendChild(option);
     });
 
@@ -1142,68 +1143,81 @@ function editRole(userId, username, currentRole) {
     selectCol.appendChild(select);
 
     const actionsCol = document.createElement('div');
-    actionsCol.className = 'col-md-12 d-flex justify-content-end';
-    actionsCol.style.gap = '1rem';
+    actionsCol.className = 'col-md-12 d-flex justify-content-end modal-actions-gap';
     const submitBtn = document.createElement('button');
     submitBtn.type = 'submit';
     submitBtn.className = 'btn btn-primary';
-    submitBtn.textContent = i18n.t('users.save_role');
+    submitBtn.textContent = i18n.t(submitLabelKey);
     actionsCol.appendChild(submitBtn);
 
-    form.appendChild(hiddenUserId);
     form.appendChild(selectCol);
     form.appendChild(actionsCol);
 
     contentElement.appendChild(infoAlert);
     contentElement.appendChild(errorAlert);
     contentElement.appendChild(form);
-    
+
     openModal('#modal_lg_close', { backdrop: 'static' });
 
-    const formElement = document.getElementById('role-edit-form');
-    const errorDiv = document.getElementById('role-modal-error');
-    
-    formElement.onsubmit = async function(e) {
+    form.onsubmit = async (e) => {
         e.preventDefault();
-        
-        const newRole = document.getElementById('new-role-select').value;
-        const userId = document.getElementById('edit-user-id').value;
-        
-        if (newRole === currentRole) {
-            errorDiv.textContent = i18n.t('users.role_unchanged');
-            errorDiv.style.display = 'block';
+
+        const newValue = select.value;
+        if (newValue === currentValue) {
+            errorAlert.textContent = i18n.t(unchangedKey);
+            errorAlert.style.display = 'block';
             return;
         }
-        
+
         try {
             const response = await fetchWithRetry(`/api/users/${userId}`, {
                 method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({ role: newRole })
+                body: JSON.stringify({ [fieldName]: newValue })
             }, {
                 maxAttempts: 1,
                 timeoutMs: 15000
             });
-            
+
             const data = await response.json();
-            
+
             if (response.ok) {
-                showMessage('success', i18n.t('users.role_updated'));
+                showMessage('success', i18n.t(successKey));
                 loadUsers();
                 closeModal('#modal_lg_close');
             } else {
-                errorDiv.textContent = localizeApiError(data, 'users.error_update_role');
-                errorDiv.style.display = 'block';
+                errorAlert.textContent = localizeApiError(data, errorFallbackKey);
+                errorAlert.style.display = 'block';
             }
         } catch (error) {
-            console.error('Error updating role:', error);
-            errorDiv.textContent = i18n.t('users.error_update_role');
-            errorDiv.style.display = 'block';
+            console.error(`Error updating ${fieldName}:`, error);
+            errorAlert.textContent = i18n.t(errorFallbackKey);
+            errorAlert.style.display = 'block';
         }
     };
+}
+
+function editRole(userId, username, currentRole) {
+    openEditFieldModal({
+        userId,
+        username,
+        currentValue: currentRole,
+        fieldName: 'role',
+        iconClass: 'bi bi-key icon-inline',
+        titleKey: 'users.edit_role',
+        infoForKey: 'users.edit_role_for',
+        selectLabelKey: 'users.new_role',
+        submitLabelKey: 'users.save_role',
+        unchangedKey: 'users.role_unchanged',
+        successKey: 'users.role_updated',
+        errorFallbackKey: 'users.error_update_role',
+        options: [
+            { value: 'admin', text: 'Admin' },
+            { value: 'user', text: 'User' },
+            { value: 'read-only', text: 'Read-Only' }
+        ]
+    });
 }
 
 // Change password using modal dialog
@@ -1426,22 +1440,7 @@ async function deleteUser(userId, username) {
 // ============================================================
 
 function setSecurityTwoFactorMessage(type, message) {
-    const messageDiv = document.getElementById('security-2fa-message');
-    if (!messageDiv) return;
-
-    messageDiv.className = 'alert';
-    if (type === 'success') {
-        messageDiv.classList.add('alert-success');
-    } else if (type === 'error') {
-        messageDiv.classList.add('alert-danger');
-    } else {
-        messageDiv.style.display = 'none';
-        messageDiv.textContent = '';
-        return;
-    }
-
-    messageDiv.textContent = message;
-    messageDiv.style.display = 'block';
+    setAlertMessage('security-2fa-message', type, message);
 }
 
 // Render the panel from the current /api/auth/status snapshot: the admin switch
@@ -1744,22 +1743,7 @@ function setupTwoFactorPanel() {
 // ============================================================
 
 function setSecuritySettingsMessage(type, message) {
-    const messageDiv = document.getElementById('security-settings-message');
-    if (!messageDiv) return;
-
-    messageDiv.className = 'alert';
-    if (type === 'success') {
-        messageDiv.classList.add('alert-success');
-    } else if (type === 'error') {
-        messageDiv.classList.add('alert-danger');
-    } else {
-        messageDiv.style.display = 'none';
-        messageDiv.textContent = '';
-        return;
-    }
-
-    messageDiv.textContent = message;
-    messageDiv.style.display = 'block';
+    setAlertMessage('security-settings-message', type, message);
 }
 
 // Same table markup/classes as the Users table (displayUsers) above it, so the two
@@ -1892,6 +1876,20 @@ function isValidNetworkInput(value) {
     return true;
 }
 
+// Same thresholds as the server's _UNUSUALLY_BROAD_PREFIX in security_settings.py.
+// Duplicated rather than shared (client and server are different languages) so a
+// dropped digit ("/24" typed as "/2") gets a chance to be caught right when it's
+// entered, not only after Save.
+function isUnusuallyBroadNetwork(value) {
+    const slashIndex = value.lastIndexOf('/');
+    if (slashIndex === -1) return false; // a bare address is a single host, never broad
+
+    const address = value.slice(0, slashIndex);
+    const prefix = Number(value.slice(slashIndex + 1));
+    const threshold = isValidIPv4Address(address) ? 8 : 32;
+    return prefix < threshold;
+}
+
 function addTrustedNetwork() {
     const input = document.getElementById('trusted-network-input');
     if (!input) return;
@@ -1901,6 +1899,10 @@ function addTrustedNetwork() {
 
     if (!isValidNetworkInput(value)) {
         setSecuritySettingsMessage('error', `${i18n.t('settings.invalid_trusted_network')} (${value})`);
+        return;
+    }
+
+    if (isUnusuallyBroadNetwork(value) && !confirm(i18n.t('settings.trusted_networks_broad_confirm', { network: value }))) {
         return;
     }
 
@@ -1919,8 +1921,14 @@ function removeTrustedNetwork(network) {
     const toggle = document.getElementById('security-2fa-enabled');
     const isLastEntry = trustedNetworksDraft.length === 1;
 
-    // Losing the last trusted network also turns 2FA off instance-wide - say so first.
-    if (isLastEntry && toggle?.checked && !confirm(i18n.t('settings.trusted_networks_remove_last_confirm'))) {
+    // Every removal confirms first, same as deleteUser() - losing the last entry
+    // while 2FA is on shows the more specific warning about that side effect instead
+    // of the generic one.
+    const confirmMessage = (isLastEntry && toggle?.checked)
+        ? i18n.t('settings.trusted_networks_remove_last_confirm')
+        : i18n.t('settings.trusted_networks_remove_confirm', { network });
+
+    if (!confirm(confirmMessage)) {
         return;
     }
 
@@ -1935,10 +1943,9 @@ function renderLocalScopeWarning() {
     const banner = document.getElementById('security-local-scope-warning');
     if (!banner) return;
 
-    const localAccounts = lastLoadedUsers.filter((user) => user.account_scope === 'local').length;
-    const show = securitySettingsState.trusted_networks.length === 0 && localAccounts > 0;
+    const show = trustedNetworksDraft.length === 0 && lastLocalAccountCount > 0;
 
-    banner.textContent = show ? i18n.t('settings.local_scope_warning_banner', { count: localAccounts }) : '';
+    banner.textContent = show ? i18n.t('settings.local_scope_warning_banner', { count: lastLocalAccountCount }) : '';
     banner.style.display = show ? 'block' : 'none';
 }
 
@@ -1947,15 +1954,11 @@ async function loadSecuritySettings() {
 
     try {
         const settings = await fetchJSON('/api/auth/security-settings');
-        securitySettingsState = {
-            trusted_networks: settings.trusted_networks || [],
-            two_factor_enabled: !!settings.two_factor_enabled
-        };
-        trustedNetworksDraft = [...securitySettingsState.trusted_networks];
+        trustedNetworksDraft = settings.trusted_networks || [];
 
         const toggle = document.getElementById('security-2fa-enabled');
         if (toggle) {
-            toggle.checked = securitySettingsState.two_factor_enabled;
+            toggle.checked = !!settings.two_factor_enabled;
         }
         renderTrustedNetworksList();
         renderLocalScopeWarning();
@@ -1993,13 +1996,9 @@ async function saveSecuritySettings() {
         }
 
         // Adopt the server's normalized list (192.168.1.5/24 comes back as 192.168.1.0/24).
-        securitySettingsState = {
-            trusted_networks: data.trusted_networks || [],
-            two_factor_enabled: !!data.two_factor_enabled
-        };
-        trustedNetworksDraft = [...securitySettingsState.trusted_networks];
+        trustedNetworksDraft = data.trusted_networks || [];
         if (toggle) {
-            toggle.checked = securitySettingsState.two_factor_enabled;
+            toggle.checked = !!data.two_factor_enabled;
         }
         renderTrustedNetworksList();
         renderLocalScopeWarning();
@@ -2034,108 +2033,24 @@ function setupSecuritySettingsForm() {
 // ============================================================
 
 function editAccountScope(userId, username, currentScope) {
-    const titleElement = document.getElementById('modal_lg_close_title');
-    DOMUtils.clear(titleElement);
-    DOMUtils.append(titleElement, DOMUtils.createIcon('bi bi-geo icon-inline'), i18n.t('users.edit_account_scope'));
-
-    const contentElement = document.getElementById('modal_lg_close_body');
-    DOMUtils.clear(contentElement);
-
-    const infoAlert = document.createElement('div');
-    infoAlert.className = 'alert alert-info';
-    infoAlert.append(i18n.t('users.edit_account_scope_for'));
-    const strong = document.createElement('strong');
-    strong.textContent = username;
-    infoAlert.appendChild(strong);
-
-    const errorAlert = document.createElement('div');
-    errorAlert.id = 'account-scope-modal-error';
-    errorAlert.className = 'alert alert-danger';
-    errorAlert.style.display = 'none';
-
-    const form = document.createElement('form');
-    form.id = 'account-scope-edit-form';
-    form.className = 'row g-3';
-
-    const selectCol = document.createElement('div');
-    selectCol.className = 'col-md-12';
-    const label = document.createElement('label');
-    label.className = 'form-label';
-    label.setAttribute('for', 'new-account-scope-select');
-    label.textContent = i18n.t('users.new_account_scope');
-    const select = document.createElement('select');
-    select.id = 'new-account-scope-select';
-    select.className = 'form-select';
-    select.required = true;
-
-    [
-        { value: 'global', textKey: 'users.account_scope_global' },
-        { value: 'local', textKey: 'users.account_scope_local' }
-    ].forEach((optionData) => {
-        const option = document.createElement('option');
-        option.value = optionData.value;
-        option.textContent = i18n.t(optionData.textKey);
-        option.selected = optionData.value === currentScope;
-        select.appendChild(option);
+    openEditFieldModal({
+        userId,
+        username,
+        currentValue: currentScope,
+        fieldName: 'account_scope',
+        iconClass: 'bi bi-geo icon-inline',
+        titleKey: 'users.edit_account_scope',
+        infoForKey: 'users.edit_account_scope_for',
+        selectLabelKey: 'users.new_account_scope',
+        submitLabelKey: 'users.save_account_scope',
+        unchangedKey: 'users.account_scope_unchanged',
+        successKey: 'users.account_scope_updated',
+        errorFallbackKey: 'users.error_update_account_scope',
+        options: [
+            { value: 'global', textKey: 'users.account_scope_global' },
+            { value: 'local', textKey: 'users.account_scope_local' }
+        ]
     });
-
-    selectCol.appendChild(label);
-    selectCol.appendChild(select);
-
-    const actionsCol = document.createElement('div');
-    actionsCol.className = 'col-md-12 d-flex justify-content-end modal-actions-gap';
-    const submitBtn = document.createElement('button');
-    submitBtn.type = 'submit';
-    submitBtn.className = 'btn btn-primary';
-    submitBtn.textContent = i18n.t('users.save_account_scope');
-    actionsCol.appendChild(submitBtn);
-
-    form.appendChild(selectCol);
-    form.appendChild(actionsCol);
-
-    contentElement.appendChild(infoAlert);
-    contentElement.appendChild(errorAlert);
-    contentElement.appendChild(form);
-
-    openModal('#modal_lg_close', { backdrop: 'static' });
-
-    form.onsubmit = async function (e) {
-        e.preventDefault();
-
-        const newScope = select.value;
-        if (newScope === currentScope) {
-            errorAlert.textContent = i18n.t('users.account_scope_unchanged');
-            errorAlert.style.display = 'block';
-            return;
-        }
-
-        try {
-            const response = await fetchWithRetry(`/api/users/${userId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ account_scope: newScope })
-            }, {
-                maxAttempts: 1,
-                timeoutMs: 15000
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                showMessage('success', i18n.t('users.account_scope_updated'));
-                loadUsers();
-                closeModal('#modal_lg_close');
-            } else {
-                errorAlert.textContent = localizeApiError(data, 'users.error_update_account_scope');
-                errorAlert.style.display = 'block';
-            }
-        } catch (error) {
-            console.error('Error updating account scope:', error);
-            errorAlert.textContent = i18n.t('users.error_update_account_scope');
-            errorAlert.style.display = 'block';
-        }
-    };
 }
 
 // Recovery path when a user loses their authenticator: no password check here,

@@ -657,11 +657,18 @@ class UserManager:
         Restarting setup always regenerates the secret, so an abandoned enrollment
         never leaves a usable secret behind. The user stays without 2FA until
         confirm_totp_setup() succeeds.
+
+        Raises ValueError when 2FA is already active: regenerating the secret would
+        silently turn it off with no re-authentication, bypassing the password check
+        disable_totp() requires. An already-enrolled user must disable first.
         """
         self._reload_users_if_changed()
         user = self.get_user_by_id(user_id)
         if not user:
             raise ValueError("User not found")
+
+        if user.totp_enabled:
+            raise ValueError("Two-factor authentication is already enabled")
 
         user.totp_secret = pyotp.random_base32()
         user.totp_enabled = False

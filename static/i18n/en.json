@@ -951,6 +951,7 @@
     "trusted_networks_placeholder": "192.168.1.0/24",
     "trusted_networks_add": "Add",
     "trusted_networks_remove": "Remove this network",
+    "trusted_networks_remove_confirm": "Are you sure you want to remove the trusted network '{network}'?",
     "trusted_networks_empty": "No trusted network configured.",
     "trusted_networks_duplicate": "This network is already in the list.",
     "trusted_networks_localhost_hint": "127.0.0.1 and ::1 are always trusted and never need to be added.",
@@ -973,7 +974,9 @@
     "2fa_activated": "Two-factor authentication is now active.",
     "2fa_deactivated": "Two-factor authentication has been disabled.",
     "2fa_confirmed_at": "Active since {date}",
-    "2fa_disable_confirm_password": "Confirm with your current password"
+    "2fa_disable_confirm_password": "Confirm with your current password",
+    "trusted_networks_broad_confirm": "The network '{network}' covers an unusually large range of addresses - this is often a typo in the prefix (e.g. /2 instead of /24). Add it anyway?",
+    "2fa_already_enabled": "Two-factor authentication is already active. Disable it first before setting it up again."
   },
   "astrodex": {
     "title": "Astrodex - Gotta Catch 'Em All!",

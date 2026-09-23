@@ -951,6 +951,7 @@
     "trusted_networks_placeholder": "192.168.1.0/24",
     "trusted_networks_add": "Ajouter",
     "trusted_networks_remove": "Supprimer ce réseau",
+    "trusted_networks_remove_confirm": "êtes-vous sûr de vouloir supprimer le réseau de confiance '{network}' ?",
     "trusted_networks_empty": "Aucun réseau de confiance configuré.",
     "trusted_networks_duplicate": "Ce réseau est déjà dans la liste.",
     "trusted_networks_localhost_hint": "127.0.0.1 et ::1 sont toujours considérés comme sûrs et n'ont jamais besoin d'être ajoutés.",
@@ -973,7 +974,9 @@
     "2fa_activated": "La double authentification est désormais active.",
     "2fa_deactivated": "La double authentification a été désactivée.",
     "2fa_confirmed_at": "Active depuis le {date}",
-    "2fa_disable_confirm_password": "Confirmez avec votre mot de passe actuel"
+    "2fa_disable_confirm_password": "Confirmez avec votre mot de passe actuel",
+    "trusted_networks_broad_confirm": "Le réseau '{network}' couvre une plage d'adresses anormalement large - c'est souvent une erreur de frappe dans le préfixe (par exemple /2 au lieu de /24). L'ajouter quand même ?",
+    "2fa_already_enabled": "La double authentification est déjà active. Désactivez-la d'abord avant de la reconfigurer."
   },
   "astrodex": {
     "title": "Astrodex - Attrapez-les tous !",

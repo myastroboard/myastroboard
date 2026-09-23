@@ -951,6 +951,7 @@
     "trusted_networks_placeholder": "192.168.1.0/24",
     "trusted_networks_add": "Añadir",
     "trusted_networks_remove": "Eliminar esta red",
+    "trusted_networks_remove_confirm": "¿Seguro que quieres eliminar la red de confianza '{network}'?",
     "trusted_networks_empty": "No hay ninguna red de confianza configurada.",
     "trusted_networks_duplicate": "Esta red ya está en la lista.",
     "trusted_networks_localhost_hint": "127.0.0.1 y ::1 siempre son de confianza y nunca hay que añadirlos.",
@@ -973,7 +974,9 @@
     "2fa_activated": "La autenticación en dos pasos ya está activa.",
     "2fa_deactivated": "La autenticación en dos pasos se ha desactivado.",
     "2fa_confirmed_at": "Activa desde el {date}",
-    "2fa_disable_confirm_password": "Confirma con tu contraseña actual"
+    "2fa_disable_confirm_password": "Confirma con tu contraseña actual",
+    "trusted_networks_broad_confirm": "La red '{network}' cubre un rango de direcciones inusualmente amplio - suele ser un error tipográfico en el prefijo (por ejemplo /2 en lugar de /24). ¿Añadirla de todos modos?",
+    "2fa_already_enabled": "La autenticación en dos pasos ya está activa. Desactívala antes de volver a configurarla."
   },
   "astrodex": {
     "title": "Astrodex - ¡Tengo que atraparlos a todos!",

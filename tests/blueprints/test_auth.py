@@ -101,6 +101,19 @@ def make_user():
             pass  # already removed by the test itself
 
 
+@pytest.fixture(autouse=True)
+def reset_otp_attempts():
+    """Clear the server-side OTP attempt counter before and after each test.
+
+    It's a module-level dict independent of the session (that's the whole point - see
+    _otp_attempts's own docstring), so it persists across tests in the same process
+    unless explicitly cleared.
+    """
+    auth_bp_mod._otp_attempts.clear()
+    yield
+    auth_bp_mod._otp_attempts.clear()
+
+
 def login(client, username, password, remote_addr=UNTRUSTED_IP, remember_me=False):
     return client.post(
         '/api/auth/login',
@@ -283,9 +296,40 @@ class TestVerifyTwoFactor:
 
         assert resp.status_code == 401
         assert resp.get_json()['error_key'] == 'auth.invalid_otp_code'
-        with client.session_transaction() as sess:
-            assert sess['pending_2fa_attempts'] == 1
+        # The counter lives server-side (see reset_otp_attempts fixture), not in the
+        # session - that's the fix for the next test.
+        assert auth_bp_mod._otp_attempts_exceeded(user.user_id) is False
+        assert len(auth_bp_mod._otp_attempts.get(user.user_id, [])) == 1
         assert client.get('/api/auth/status').get_json()['authenticated'] is False
+
+    def test_attempt_counter_survives_a_fresh_login(self, client, security_settings, make_user):
+        """The whole point of moving the counter server-side: an attacker who already
+        has the password cannot reset their attempt budget by simply logging in again."""
+        security_settings([TRUSTED_LAN], two_factor_enabled=True)
+        user, password, secret = make_user(with_totp=True)
+
+        for _ in range(auth_bp_mod.PENDING_2FA_MAX_ATTEMPTS):
+            login(client, user.username, password)
+            assert client.post('/api/auth/login/verify-2fa', json={'code': '000000'}).status_code == 401
+
+        # A brand new login (fresh session, fresh pending state) still inherits the
+        # already-exhausted server-side counter for this user.
+        login(client, user.username, password)
+        resp = client.post('/api/auth/login/verify-2fa', json={'code': pyotp.TOTP(secret).now()})
+
+        assert resp.status_code == 429
+        assert resp.get_json()['error_key'] == 'auth.otp_too_many_attempts'
+
+    def test_correct_code_clears_the_attempt_counter(self, client, security_settings, make_user):
+        security_settings([TRUSTED_LAN], two_factor_enabled=True)
+        user, password, secret = make_user(with_totp=True)
+        login(client, user.username, password)
+        client.post('/api/auth/login/verify-2fa', json={'code': '000000'})
+
+        login(client, user.username, password)
+        client.post('/api/auth/login/verify-2fa', json={'code': pyotp.TOTP(secret).now()})
+
+        assert user.user_id not in auth_bp_mod._otp_attempts
 
     def test_too_many_attempts_abandons_the_pending_state(self, client, security_settings, make_user):
         security_settings([TRUSTED_LAN], two_factor_enabled=True)
@@ -391,9 +435,7 @@ class TestAccountScopeAtLogin:
 
         assert login(client, user.username, password, remote_addr='127.0.0.1').get_json()['status'] == 'success'
 
-    def test_local_account_allowed_anywhere_with_no_configured_network(
-        self, client, security_settings, make_user
-    ):
+    def test_local_account_allowed_anywhere_with_no_configured_network(self, client, security_settings, make_user):
         """Documented fallback: without a configured network, "local" is undefined, so
         enforcing it would be a silent full lockout."""
         security_settings([])
@@ -416,6 +458,46 @@ class TestAccountScopeAtLogin:
         assert resp.status_code == 403
         with client.session_transaction() as sess:
             assert 'pending_2fa_user_id' not in sess
+
+    def test_scope_change_mid_pending_2fa_blocks_the_verify_step(self, client, security_settings, make_user):
+        """TOCTOU: an admin switching the account to 'local' while a 2FA challenge is
+        pending must take effect immediately, not only on the user's next full login."""
+        security_settings([TRUSTED_LAN], two_factor_enabled=True)
+        user, password, secret = make_user(account_scope=auth_mod.ACCOUNT_SCOPE_GLOBAL, with_totp=True)
+        assert login(client, user.username, password).get_json()['status'] == '2fa_required'
+
+        user_manager.update_user(user.user_id, account_scope=auth_mod.ACCOUNT_SCOPE_LOCAL)
+
+        # The Flask test client defaults REMOTE_ADDR to 127.0.0.1 (always trusted) when
+        # not given one explicitly - use the same untrusted address login() used above.
+        resp = client.post(
+            '/api/auth/login/verify-2fa',
+            json={'code': pyotp.TOTP(secret).now()},
+            environ_base={'REMOTE_ADDR': UNTRUSTED_IP},
+        )
+
+        assert resp.status_code == 403
+        assert resp.get_json()['error_key'] == 'auth.local_account_network_restricted'
+        assert client.get('/api/auth/status').get_json()['authenticated'] is False
+
+    def test_scope_change_to_local_but_now_trusted_still_completes(self, client, security_settings, make_user):
+        """The re-check uses the same trusted-network logic as login() - from a
+        trusted network the now-local account still completes normally."""
+        security_settings([TRUSTED_LAN], two_factor_enabled=True)
+        user, password, secret = make_user(account_scope=auth_mod.ACCOUNT_SCOPE_GLOBAL, with_totp=True)
+        assert login(client, user.username, password).get_json()['status'] == '2fa_required'
+
+        user_manager.update_user(user.user_id, account_scope=auth_mod.ACCOUNT_SCOPE_LOCAL)
+
+        # verify-2fa reads request.remote_addr fresh on this call, independent of
+        # what the original login() request's address was.
+        resp = client.post(
+            '/api/auth/login/verify-2fa',
+            json={'code': pyotp.TOTP(secret).now()},
+            environ_base={'REMOTE_ADDR': TRUSTED_IP},
+        )
+
+        assert resp.get_json()['status'] == 'success'
 
 
 # ---------------------------------------------------------------------------
@@ -453,6 +535,22 @@ class TestSelfServiceTwoFactor:
         refreshed = user_manager.get_user_by_id(user.user_id)
         assert refreshed.totp_enabled is False
         assert refreshed.totp_secret is None
+
+    def test_setup_rejected_once_already_enabled(self, enrolled_client):
+        """Regenerating the secret on an active account would silently turn 2FA off
+        with no re-authentication - it must go through /2fa/disable (password-gated)
+        first, not be callable again while already active."""
+        client, user, _ = enrolled_client
+        secret = client.post('/api/auth/2fa/setup').get_json()['secret']
+        client.post('/api/auth/2fa/confirm', json={'code': pyotp.TOTP(secret).now()})
+
+        resp = client.post('/api/auth/2fa/setup')
+
+        assert resp.status_code == 400
+        assert resp.get_json()['error_key'] == 'settings.2fa_already_enabled'
+        still_active = user_manager.get_user_by_id(user.user_id)
+        assert still_active.totp_enabled is True
+        assert still_active.totp_secret == secret
 
     def test_status_reports_availability_and_own_state(self, enrolled_client):
         client, user, _ = enrolled_client
@@ -547,9 +645,7 @@ class TestAdminUserTwoFactor:
         assert refreshed.totp_enabled is False
         assert refreshed.totp_secret is None
 
-    def test_clearing_2fa_lets_the_user_sign_in_with_a_password_alone(
-        self, client, security_settings, make_user
-    ):
+    def test_clearing_2fa_lets_the_user_sign_in_with_a_password_alone(self, client, security_settings, make_user):
         security_settings([TRUSTED_LAN], two_factor_enabled=True)
         user, password, _ = make_user(with_totp=True)
         assert login(client, user.username, password).get_json()['status'] == '2fa_required'
@@ -644,9 +740,7 @@ class TestSecuritySettingsApi:
     def isolated_settings_file(self, tmp_path, monkeypatch):
         """Never touch the real data directory while exercising the save endpoint."""
         monkeypatch.setattr(security_settings_mod, '_DATA_DIR', str(tmp_path))
-        monkeypatch.setattr(
-            security_settings_mod, '_SECURITY_SETTINGS_FILE', str(tmp_path / 'security_settings.json')
-        )
+        monkeypatch.setattr(security_settings_mod, '_SECURITY_SETTINGS_FILE', str(tmp_path / 'security_settings.json'))
         monkeypatch.setattr(security_settings_mod, '_cache', None)
         yield
         security_settings_mod._cache = None

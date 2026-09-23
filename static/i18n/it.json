@@ -951,6 +951,7 @@
     "trusted_networks_placeholder": "192.168.1.0/24",
     "trusted_networks_add": "Aggiungi",
     "trusted_networks_remove": "Rimuovi questa rete",
+    "trusted_networks_remove_confirm": "Vuoi davvero rimuovere la rete attendibile '{network}'?",
     "trusted_networks_empty": "Nessuna rete attendibile configurata.",
     "trusted_networks_duplicate": "Questa rete è già presente nell'elenco.",
     "trusted_networks_localhost_hint": "127.0.0.1 e ::1 sono sempre attendibili e non vanno mai aggiunti.",
@@ -973,7 +974,9 @@
     "2fa_activated": "L'autenticazione a due fattori è ora attiva.",
     "2fa_deactivated": "L'autenticazione a due fattori è stata disattivata.",
     "2fa_confirmed_at": "Attiva dal {date}",
-    "2fa_disable_confirm_password": "Conferma con la tua password attuale"
+    "2fa_disable_confirm_password": "Conferma con la tua password attuale",
+    "trusted_networks_broad_confirm": "La rete '{network}' copre un intervallo di indirizzi insolitamente ampio - spesso si tratta di un errore di battitura nel prefisso (ad esempio /2 invece di /24). Aggiungerla comunque?",
+    "2fa_already_enabled": "L'autenticazione a due fattori è già attiva. Disattivala prima di configurarla di nuovo."
   },
   "astrodex": {
     "title": "Astrodex - Dobbiamo prenderli tutti!",
