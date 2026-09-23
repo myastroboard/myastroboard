@@ -8,6 +8,20 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Features
 
+- None.
+
+### Fixes
+
+- None.
+
+### Breaking changes
+
+- None.
+
+## 1.6.0 (2026-09-23)
+
+### Features
+
 - Two-factor authentication (TOTP) available per account, off by default: an admin enables it
   instance-wide under Parameters -> Users (requires at least one trusted network), then each user
   opts in from My Settings -> Security. Setup shows a QR code plus the raw secret as a fallback.
