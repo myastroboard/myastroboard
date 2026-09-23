@@ -65,7 +65,7 @@ the user's own data - an admin cannot publish another user's activity. The admin
 | Upcoming events | off | per location | next event, next ISS / CSS pass, aurora Kp and probability, next solar / lunar eclipse |
 | User activity | off | per opted-in user | Astrodex counters, plan state and progress, current and next target, active equipment, observation log totals |
 | Latest Astrodex picture | off | per opted-in user | the newest Astrodex picture as an `image` entity |
-| Board diagnostics | on | board | version, update available, cache readiness, SkyTonight scheduler state, last publish, published counts |
+| Board diagnostics | on | board | version, update entity, cache readiness, SkyTonight scheduler state, last publish, published counts |
 
 Every location the cache scheduler keeps warm gets a device (in practice every preset). Disable
 the entities you do not need from the device page in Home Assistant.
@@ -148,8 +148,7 @@ tables below are generated from `backend/connectors/mqtt_payloads.py`.
 | Key | Entity name | Kind | Notes |
 |---|---|---|---|
 | `version` | Version | sensor | diagnostic |
-| `update_available` | Update available | binary sensor (update) | diagnostic |
-| `latest_version` | Latest version | sensor | diagnostic |
+| `update` | Update | update | diagnostic - installed/latest version, links to the changelog; no Install button (no remote self-update) |
 | `caches_ready` | Caches ready | binary sensor | diagnostic |
 | `skytonight_running` | SkyTonight calculating | binary sensor (running) | diagnostic |
 | `skytonight_last_run` | SkyTonight last run | sensor (timestamp) | diagnostic |
