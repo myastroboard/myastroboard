@@ -410,7 +410,7 @@ def _sample_times(night_start: datetime, night_end: datetime) -> Time:
     # Astropy isot format requires bare UTC strings without timezone offset (e.g.
     # "2026-04-01T20:00:00.000"), so strip the "+00:00" suffix produced by isoformat().
     iso_strings = [t.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.000') for t in times_utc]
-    return Time(iso_strings, format='isot', scale='utc')
+    return Time(iso_strings, format='isot', scale='utc')  # type: ignore[call-overload]
 
 
 def _compute_altaz_series(
