@@ -15,6 +15,8 @@
   says so) rather than silently locking everyone out.
 - `data/security_settings.json` (trusted networks + the 2FA switch) is host-specific and
   excluded from backups and config export, like `trust_proxy_headers`.
+- The 6-digit code check is throttled per account (5 attempts / 5 minutes), tracked
+  server-side so it can't be reset by simply signing in again.
 
 #### MQTT publisher & Home Assistant integration (v1.6)
 

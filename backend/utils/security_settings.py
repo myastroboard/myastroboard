@@ -16,9 +16,9 @@ They share this data source only; their business logic stays independent.
 """
 
 import ipaddress
-import json
 import os
 
+from utils.json_settings_store import get_file_mtime, load_json_settings, save_json_settings
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -30,12 +30,19 @@ _SECURITY_SETTINGS_FILE = os.path.join(_DATA_DIR, 'security_settings.json')
 # configured list can never lock an admin out of local access.
 ALWAYS_TRUSTED_NETWORKS = ('127.0.0.0/8', '::1/128')
 
+# A "trusted network" in this app is meant to be a home/office LAN, at most - anything
+# broader than this is almost certainly a typo (a dropped digit turning /24 into /2) and
+# gets a log warning so it doesn't fail silently. Not a hard limit: a real admin choice
+# to trust something this broad is still honored, just called out.
+_UNUSUALLY_BROAD_PREFIX = {4: 8, 6: 32}
+
 _DEFAULTS: dict = {
     "trusted_networks": [],
     "two_factor_enabled": False,
 }
 
 _cache: dict | None = None
+_cache_mtime: float | None = None
 
 
 def normalize_network(value) -> str:
@@ -49,7 +56,9 @@ def normalize_network(value) -> str:
     """
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"Invalid trusted network: {value!r}")
-    return str(ipaddress.ip_network(value.strip(), strict=False))
+    normalized = str(ipaddress.ip_network(value.strip(), strict=False))
+    _warn_if_unusually_broad(normalized)
+    return normalized
 
 
 def normalize_networks(values) -> list[str]:
@@ -59,10 +68,30 @@ def normalize_networks(values) -> list[str]:
 
     normalized: list[str] = []
     for value in values:
-        candidate = normalize_network(value)
+        candidate = normalize_network(value)  # already warns on an unusually broad entry
         if candidate not in normalized:
             normalized.append(candidate)
     return normalized
+
+
+def _warn_if_unusually_broad(network_str: str) -> None:
+    """Log a warning for a trusted network broader than a plausible home/office LAN.
+
+    Not a rejection - an admin may have a genuine reason - but a dropped digit (/24
+    silently becoming /2) should show up somewhere an admin reviewing the log would
+    notice, rather than quietly making every login on that IP version bypass 2FA and
+    the local-account restriction.
+    """
+    try:
+        network = ipaddress.ip_network(network_str, strict=False)
+    except ValueError:
+        return
+    threshold = _UNUSUALLY_BROAD_PREFIX.get(network.version)
+    if threshold is not None and network.prefixlen < threshold:
+        logger.warning(
+            f"Trusted network {network_str} covers an unusually large address range "
+            f"(/{network.prefixlen}) - double-check this wasn't a typo"
+        )
 
 
 def client_ip_is_trusted(client_ip, networks) -> bool:
@@ -80,6 +109,13 @@ def client_ip_is_trusted(client_ip, networks) -> bool:
     except ValueError:
         logger.warning(f"Could not parse client IP for trusted-network check: {client_ip!r}")
         return False
+
+    # An IPv4-mapped IPv6 address (e.g. "::ffff:192.168.1.50", which some dual-stack
+    # socket layers surface for what is really an IPv4 connection) parses as an
+    # IPv6Address and would otherwise fail the version check below against every
+    # IPv4 trusted network. Compare it as the IPv4 address it represents instead.
+    if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped is not None:
+        address = address.ipv4_mapped
 
     for entry in networks or ():
         try:
@@ -110,59 +146,67 @@ def is_client_ip_trusted(client_ip, settings: dict | None = None) -> bool:
     return client_ip_is_trusted(client_ip, get_effective_trusted_networks(settings))
 
 
-def load_security_settings() -> dict:
-    """Load settings from disk and merge with defaults. Updates the module cache."""
-    global _cache
-    settings = dict(_DEFAULTS)
-    if os.path.exists(_SECURITY_SETTINGS_FILE):
-        try:
-            with open(_SECURITY_SETTINGS_FILE, 'r') as f:
-                saved = json.load(f)
-            for key in _DEFAULTS:
-                if key in saved:
-                    settings[key] = saved[key]
-            logger.debug("Security settings loaded from disk")
-        except Exception as e:
-            logger.warning(f"Could not read security_settings.json, using defaults: {e}")
+def _coerce_and_enforce_cascade(settings: dict) -> dict:
+    """Normalize a raw settings dict's shape and enforce the 2FA/network invariant.
 
-    # A hand-edited file must never make the whole instance unusable: coerce the
-    # shape here rather than raising, and let the save endpoint do strict validation.
-    if not isinstance(settings['trusted_networks'], list):
+    A hand-edited file (or any other future writer that bypasses the API's own
+    validation) must never make the whole instance unusable or leave an inconsistent
+    pair on disk: coerce the shape defensively here rather than raising, and enforce
+    the same "2FA requires a network" cascade that update_security_settings_api()
+    enforces on the write path, so it holds no matter who wrote the file.
+    """
+    if not isinstance(settings.get('trusted_networks'), list):
         logger.warning("security_settings.json: trusted_networks is not a list, ignoring it")
         settings['trusted_networks'] = []
     else:
         settings['trusted_networks'] = [str(entry) for entry in settings['trusted_networks'] if isinstance(entry, str)]
-    settings['two_factor_enabled'] = bool(settings['two_factor_enabled'])
+    settings['two_factor_enabled'] = bool(settings.get('two_factor_enabled'))
 
     # Documented cascade: 2FA cannot stay on without a configured trusted network.
     if settings['two_factor_enabled'] and not settings['trusted_networks']:
-        logger.warning("security_settings.json has two_factor_enabled without any trusted network, treating it as off")
+        logger.warning("Refusing two_factor_enabled=true with an empty trusted_networks list, forcing it off")
         settings['two_factor_enabled'] = False
 
+    return settings
+
+
+def load_security_settings() -> dict:
+    """Load settings from disk and merge with defaults. Updates the module cache."""
+    global _cache, _cache_mtime
+    settings = load_json_settings(_SECURITY_SETTINGS_FILE, _DEFAULTS, 'Security settings')
+    settings = _coerce_and_enforce_cascade(settings)
     _cache = settings
+    _cache_mtime = get_file_mtime(_SECURITY_SETTINGS_FILE)
     return settings
 
 
 def save_security_settings(settings: dict) -> None:
-    """Persist settings to disk and update the module cache."""
-    global _cache
+    """Persist settings to disk and update the module cache.
+
+    Note: this is a defensive backstop, not the primary UX - update_security_settings_api()
+    already rejects an attempt to newly enable 2FA with no trusted network outright (a
+    clearer error for the admin than a silent no-op). This only guarantees that no
+    caller, now or in the future, can ever persist the inconsistent pair to disk.
+    """
+    global _cache, _cache_mtime
     merged = dict(_DEFAULTS)
     for key in _DEFAULTS:
         if key in settings:
             merged[key] = settings[key]
-    os.makedirs(_DATA_DIR, exist_ok=True)
-    with open(_SECURITY_SETTINGS_FILE, 'w') as f:
-        json.dump(merged, f, indent=2)
+    merged = _coerce_and_enforce_cascade(merged)
+    merged = save_json_settings(_SECURITY_SETTINGS_FILE, _DEFAULTS, merged, 'Security settings')
     _cache = merged
-    logger.info(
-        f"Security settings saved (trusted_networks={len(merged['trusted_networks'])}, "
-        f"two_factor_enabled={merged['two_factor_enabled']})"
-    )
+    _cache_mtime = get_file_mtime(_SECURITY_SETTINGS_FILE)
 
 
 def get_security_settings() -> dict:
-    """Return cached settings, loading from disk if the cache is cold."""
-    if _cache is None:
+    """Return cached settings, reloading when cold or when the file changed on disk.
+
+    The mtime check keeps a long-lived worker process (`gunicorn -w N`) from serving a
+    stale cache forever once warm - the same multi-worker sync UserManager already does
+    for users.json via `_reload_users_if_changed()`.
+    """
+    if _cache is None or get_file_mtime(_SECURITY_SETTINGS_FILE) != _cache_mtime:
         return load_security_settings()
     return _cache
 

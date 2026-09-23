@@ -951,6 +951,7 @@
     "trusted_networks_placeholder": "192.168.1.0/24",
     "trusted_networks_add": "Adicionar",
     "trusted_networks_remove": "Remover esta rede",
+    "trusted_networks_remove_confirm": "Tem a certeza de que quer remover a rede fidedigna '{network}'?",
     "trusted_networks_empty": "Nenhuma rede fidedigna configurada.",
     "trusted_networks_duplicate": "Esta rede já está na lista.",
     "trusted_networks_localhost_hint": "127.0.0.1 e ::1 são sempre fidedignos e nunca precisam de ser adicionados.",
@@ -973,7 +974,9 @@
     "2fa_activated": "A autenticação de dois fatores está agora ativa.",
     "2fa_deactivated": "A autenticação de dois fatores foi desativada.",
     "2fa_confirmed_at": "Ativa desde {date}",
-    "2fa_disable_confirm_password": "Confirme com a sua palavra-passe atual"
+    "2fa_disable_confirm_password": "Confirme com a sua palavra-passe atual",
+    "trusted_networks_broad_confirm": "A rede '{network}' abrange um intervalo de endereços invulgarmente grande - normalmente é um erro de digitação no prefixo (por exemplo /2 em vez de /24). Adicionar mesmo assim?",
+    "2fa_already_enabled": "A autenticação de dois fatores já está ativa. Desative-a primeiro antes de a configurar novamente."
   },
   "astrodex": {
     "title": "Astrodex - Tenho que pegar todos!",
