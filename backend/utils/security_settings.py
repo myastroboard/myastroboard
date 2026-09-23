@@ -121,7 +121,9 @@ def client_ip_is_trusted(client_ip, networks) -> bool:
         try:
             network = ipaddress.ip_network(entry, strict=False)
         except ValueError:
-            logger.warning(f"Skipping unparseable trusted network entry: {entry!r}")
+            # Not logging the entry itself - this list is admin-managed config, not
+            # user-facing input worth echoing into the log for this diagnostic.
+            logger.warning("Skipping unparseable trusted network entry")
             continue
         if address.version == network.version and address in network:
             return True

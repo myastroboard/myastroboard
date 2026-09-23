@@ -456,7 +456,10 @@ def update_security_settings_api():
             try:
                 normalized = _security_settings.normalize_network(raw_entry)
             except ValueError:
-                logger.warning(f"Security settings rejected: invalid trusted network {raw_entry!r}")
+                # Not logging the entry itself - it's already returned to the same
+                # admin who submitted it in the response below, and this list is
+                # admin-managed config, not something worth echoing into the log.
+                logger.warning("Security settings rejected: invalid trusted network entry")
                 return (
                     jsonify(
                         {
