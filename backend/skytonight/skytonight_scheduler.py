@@ -149,6 +149,20 @@ def resolve_schedule(config: Dict[str, Any], now: Optional[datetime] = None) -> 
     )
 
 
+def _set_calculation_progress_listener(listener):
+    """Have the calculator persist live progress via ``listener`` (None to stop).
+
+    Only this worker runs the calculation, but status polls reach every
+    gunicorn worker and the others read the shared status file.
+    """
+    try:
+        from skytonight.skytonight_calculator import set_progress_listener
+
+        set_progress_listener(listener)
+    except Exception as exc:  # pragma: no cover - progress publishing is best-effort
+        logger.debug('Could not set SkyTonight progress listener: %s', exc)
+
+
 class SkyTonightScheduler:
     """Internal scheduler that refreshes the SkyTonight dataset and writes shared status."""
 
@@ -423,6 +437,7 @@ class SkyTonightScheduler:
             self.execution_start_time = datetime.now().astimezone()
             self.last_error = None
             self._write_status()
+            _set_calculation_progress_listener(self._write_status)
 
             try:
                 logger.info('Starting SkyTonight execution cycle')
@@ -446,6 +461,7 @@ class SkyTonightScheduler:
                 append_scheduler_log(f'[{failure_time.isoformat()}] SkyTonight run failed: {error}\n')
                 logger.error('SkyTonight execution cycle failed: %s', error)
             finally:
+                _set_calculation_progress_listener(None)
                 if self.execution_start_time:  # pragma: no branch
                     self.last_execution_duration_seconds = int(
                         (datetime.now().astimezone() - self.execution_start_time).total_seconds()

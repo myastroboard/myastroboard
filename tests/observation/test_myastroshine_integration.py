@@ -418,6 +418,72 @@ def test_mark_handoff_consumed_default_expiry_and_prunes_expired(temp_data_dir):
 
 
 # ---------------------------------------------------------------------------
+# consumed-jti store shared between gunicorn workers (separate processes, one file)
+# ---------------------------------------------------------------------------
+
+
+def _spend_in_other_worker(jti):
+    """Write a jti to the on-disk store without touching this process's in-memory dict."""
+    astrodex.ensure_astrodex_directories()
+    path = integration._consumed_file_path()
+    data = json.load(open(path, encoding="utf-8")) if os.path.exists(path) else {}
+    data[jti] = time.time() + 300
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(data, handle)
+
+
+def test_jti_spent_by_another_worker_is_seen_as_consumed(temp_data_dir):
+    _spend_in_other_worker("jti-other-worker")
+    assert integration.is_handoff_consumed("jti-other-worker") is True
+    assert integration.claim_handoff("jti-other-worker") is False
+
+
+def test_mark_keeps_jtis_persisted_by_another_worker(temp_data_dir):
+    _spend_in_other_worker("jti-from-a")
+    integration.mark_handoff_consumed("jti-from-b", time.time() + 300)
+    on_disk = json.load(open(integration._consumed_file_path(), encoding="utf-8"))
+    assert {"jti-from-a", "jti-from-b"} <= set(on_disk)
+
+
+def test_claim_handoff_is_single_use(temp_data_dir):
+    assert integration.claim_handoff("jti-once", time.time() + 300) is True
+    assert integration.claim_handoff("jti-once", time.time() + 300) is False
+
+
+def test_claim_handoff_reclaims_expired_jti_with_default_expiry(temp_data_dir):
+    integration._consumed["jti-expired"] = time.time() - 5
+    assert integration.claim_handoff("jti-expired") is True
+    assert integration._consumed["jti-expired"] > time.time()
+
+
+def test_release_handoff_removes_jti_from_memory_and_disk(temp_data_dir):
+    integration.claim_handoff("jti-release", time.time() + 300)
+    integration.release_handoff("jti-release")
+    on_disk = json.load(open(integration._consumed_file_path(), encoding="utf-8"))
+    assert "jti-release" not in on_disk
+    assert integration.is_handoff_consumed("jti-release") is False
+
+
+def test_create_enhanced_duplicate_replay_rejected_across_workers(temp_data_dir):
+    item, source = _seed_item_with_picture()
+    claims = _claims_for(item, source)
+    integration.create_enhanced_duplicate(claims, b"jpeg", {"parameters": {}})
+    integration._consumed.clear()  # a different worker never saw the first request in memory
+    with pytest.raises(integration.EnhancedDuplicateError) as excinfo:
+        integration.create_enhanced_duplicate(claims, b"jpeg", {"parameters": {}})
+    assert excinfo.value.status == 409
+
+
+def test_failed_enhanced_duplicate_releases_jti_for_retry(temp_data_dir):
+    item, source = _seed_item_with_picture()
+    claims = dict(_claims_for(item, source), item_id=str(uuid.uuid4()))  # item does not exist
+    with pytest.raises(integration.EnhancedDuplicateError) as excinfo:
+        integration.create_enhanced_duplicate(claims, b"jpeg", {"parameters": {}})
+    assert excinfo.value.status == 404
+    assert integration.is_handoff_consumed(claims["jti"]) is False
+
+
+# ---------------------------------------------------------------------------
 # _find_item_and_picture / build_source_payload / resolve_source_image_path
 # ---------------------------------------------------------------------------
 

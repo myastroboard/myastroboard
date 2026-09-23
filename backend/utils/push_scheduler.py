@@ -125,8 +125,13 @@ def _cleanup_dead_subscriptions(user: Any, endpoints: list) -> None:
     try:
         from utils.auth import user_manager
 
-        user.push_subscriptions = [s for s in user.push_subscriptions if s.get('endpoint') not in endpoints]
-        user_manager.save_users()
+        def _drop(stored: Any) -> None:
+            stored.push_subscriptions = [s for s in stored.push_subscriptions if s.get('endpoint') not in endpoints]
+
+        # `user` was read at the start of this poll; applying the change to a fresh copy under
+        # the users.json write lock keeps it from reverting another worker's save made meanwhile.
+        user_manager.modify_user(user.user_id, _drop)
+        _drop(user)
     except Exception as e:
         logger.warning(f"Failed to clean dead subscriptions for {user.username}: {e}")
 

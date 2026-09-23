@@ -2124,3 +2124,92 @@ class TestUserManagerTotpLifecycle:
         entry = next(u for u in isolated_user_manager.list_users() if u['username'] == 'secretive')
 
         assert 'totp_secret' not in entry
+
+
+# ---------------------------------------------------------------------------
+# users.json shared by several gunicorn workers (one UserManager per process)
+# ---------------------------------------------------------------------------
+
+
+def _second_worker():
+    """Another worker's UserManager: its own in-memory table over the same users.json."""
+    return auth.UserManager()
+
+
+def test_stale_worker_write_does_not_revert_other_worker_change(isolated_user_manager):
+    worker_a = isolated_user_manager
+    user = worker_a.create_user("stargazer", "old-password", auth.ROLE_USER)
+    worker_b = _second_worker()
+    stale_user_in_a = worker_a.get_user_by_id(user.user_id)
+
+    worker_b.change_own_password(user.user_id, "old-password", "new-password")
+
+    # Worker A changes the user it looked up before B's save
+    def _add_subscription(stored):
+        stored.push_subscriptions.append({"endpoint": "https://push.example.com/x", "keys": {}})
+
+    worker_a.modify_user(stale_user_in_a.user_id, _add_subscription)
+
+    reread = _second_worker().get_user_by_id(user.user_id)
+    assert reread.check_password("new-password")
+    assert [s["endpoint"] for s in reread.push_subscriptions] == ["https://push.example.com/x"]
+
+
+def test_modify_user_returns_none_without_saving_for_unknown_user(isolated_user_manager):
+    calls = []
+    with patch.object(isolated_user_manager, "save_users", lambda: calls.append(1)):
+        assert isolated_user_manager.modify_user("no-such-id", lambda u: calls.append(2)) is None
+    assert calls == []
+
+
+def test_modify_user_returns_mutator_result(isolated_user_manager):
+    user = isolated_user_manager.create_user("returns", "pw-123456", auth.ROLE_USER)
+    assert isolated_user_manager.modify_user(user.user_id, lambda u: "done") == "done"
+
+
+def test_authenticate_stamps_last_login_on_fresh_copy(isolated_user_manager):
+    worker_a = isolated_user_manager
+    user = worker_a.create_user("login-user", "pw-123456", auth.ROLE_USER)
+    worker_b = _second_worker()
+    worker_b.update_user_preferences(user.user_id, {"language": "fr"})
+
+    authenticated = worker_a.authenticate("login-user", "pw-123456")
+
+    assert authenticated.last_login
+    reread = _second_worker().get_user_by_id(user.user_id)
+    assert reread.last_login == authenticated.last_login
+    assert reread.preferences["language"] == "fr"
+
+
+def test_second_worker_does_not_create_a_second_default_admin(tmp_path, monkeypatch):
+    """Both workers start with no users.json; the one that loses the lock race must adopt the first admin."""
+    monkeypatch.setattr(auth, "USERS_FILE", str(tmp_path / "users.json"))
+    worker_a = auth.UserManager()
+    worker_b = auth.UserManager.__new__(auth.UserManager)
+    worker_b.users = {}
+    worker_b._users_mtime = None
+    worker_b._write_mutex = worker_a._write_mutex.__class__()
+    worker_b._write_depth = 0
+
+    worker_b.ensure_default_admin()  # its own view is empty, but the file already has an admin
+
+    admins = [u for u in json.load(open(auth.USERS_FILE)).values() if u["username"] == auth.DEFAULT_ADMIN_USERNAME]
+    assert len(admins) == 1
+
+
+def test_users_write_lock_is_reentrant_and_takes_file_lock_once(isolated_user_manager, monkeypatch):
+    from contextlib import contextmanager
+
+    acquired = []
+
+    @contextmanager
+    def _recording_lock(path):
+        acquired.append(path)
+        yield
+
+    monkeypatch.setattr(auth, "interprocess_lock", _recording_lock)
+    with isolated_user_manager._exclusive_write():
+        with isolated_user_manager._exclusive_write():
+            pass
+    assert acquired == [auth.USERS_FILE + ".lock"]
+    assert isolated_user_manager._write_depth == 0

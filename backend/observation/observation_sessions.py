@@ -31,6 +31,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from utils.constants import DATA_DIR
+from utils.file_lock import interprocess_lock
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -380,7 +381,8 @@ def save_user_sessions(user_id: str, sessions_data: Dict, username: Optional[str
     temp_path = file_path + '.tmp'
     backup_path = file_path + '.backup'
 
-    with _get_user_save_lock(user_id):
+    # The thread lock serializes this worker; the file lock serializes every gunicorn worker
+    with _get_user_save_lock(user_id), interprocess_lock(file_path + '.lock'):
         return _save_user_sessions_locked(user_id, username, sessions_data, file_path, temp_path, backup_path)
 
 

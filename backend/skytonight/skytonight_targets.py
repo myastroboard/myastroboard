@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any, Dict, List, Optional, Tuple
 
 from utils.constants import SKYTONIGHT_DATASET_FILE, SKYTONIGHT_PREFERRED_NAME_ORDER
@@ -133,8 +134,19 @@ def load_targets_dataset(force_reload: bool = False, dataset_file: Optional[str]
     global _dataset_cache
 
     target_dataset_file = dataset_file or SKYTONIGHT_DATASET_FILE
+    # The scheduler rebuilds the file in its own worker and only clears its own
+    # cache, so every other gunicorn worker notices the rebuild by the file's mtime.
+    try:
+        file_mtime_ns: Optional[int] = os.stat(target_dataset_file).st_mtime_ns
+    except OSError:
+        file_mtime_ns = None
 
-    if not force_reload and _dataset_cache.get('dataset_file') == target_dataset_file and _dataset_cache.get('loaded'):
+    if (
+        not force_reload
+        and _dataset_cache.get('dataset_file') == target_dataset_file
+        and _dataset_cache.get('loaded')
+        and _dataset_cache.get('file_mtime_ns') == file_mtime_ns
+    ):
         return _dataset_cache
 
     payload = load_json_file(target_dataset_file, default={})
@@ -144,6 +156,7 @@ def load_targets_dataset(force_reload: bool = False, dataset_file: Optional[str]
     _dataset_cache = {
         'loaded': True,
         'dataset_file': target_dataset_file,
+        'file_mtime_ns': file_mtime_ns,
         'metadata': payload.get('metadata', {}) if isinstance(payload.get('metadata', {}), dict) else {},
         'targets': targets,
         'lookup': lookup,

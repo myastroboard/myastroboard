@@ -835,3 +835,63 @@ class TestCacheStoreEdgeArcs:
     def test_execution_metrics_missing_last_run_at(self, monkeypatch):
         monkeypatch.setattr(cache_store, 'get_cache_metrics', lambda: {'jobx': {'last_success': True}})
         assert cache_store._is_execution_metrics_valid('jobx', 60) is False
+
+
+class TestLocationSignaturesAcrossWorkers:
+    """Signatures are written by whichever worker serves a location edit but read by the scheduler's worker."""
+
+    @pytest.fixture
+    def sig_file(self, tmp_path, monkeypatch):
+        path = tmp_path / 'location_cache.json'
+        monkeypatch.setattr(cache_store, '_LOCATION_CACHE_FILE', str(path))
+        monkeypatch.setattr(cache_store, '_location_signatures_mtime_ns', None)
+        return path
+
+    @staticmethod
+    def _preset(loc_id, lat):
+        return {'id': loc_id, 'latitude': lat, 'longitude': 2.0, 'elevation': 10, 'timezone': 'UTC'}
+
+    @staticmethod
+    def _other_worker_writes(path, signatures):
+        path.write_text(json.dumps(signatures), encoding='utf-8')
+        future = time.time() + 5  # guarantee an mtime change even on coarse-grained filesystems
+        os.utime(path, (future, future))
+
+    def test_change_saved_by_other_worker_is_not_seen_as_a_new_change(self, sig_file):
+        update_location_config(self._preset('loc-a', 10.0))  # this worker's startup view
+
+        moved = self._preset('loc-a', 20.0)
+        self._other_worker_writes(sig_file, {'loc-a': get_current_location_signature(moved)})
+
+        assert cache_store.has_location_changed(moved) is False
+
+    def test_update_keeps_entries_other_worker_added(self, sig_file):
+        update_location_config(self._preset('loc-a', 10.0))
+        on_disk = json.loads(sig_file.read_text(encoding='utf-8'))
+        on_disk['loc-b'] = get_current_location_signature(self._preset('loc-b', 30.0))
+        self._other_worker_writes(sig_file, on_disk)
+
+        update_location_config(self._preset('loc-a', 11.0))
+
+        saved = json.loads(sig_file.read_text(encoding='utf-8'))
+        assert set(saved) == {'loc-a', 'loc-b'}
+        assert cache_store.is_location_tracked(self._preset('loc-b', 30.0))
+
+    def test_signature_removed_by_other_worker_is_not_resurrected(self, sig_file):
+        update_location_config(self._preset('loc-a', 10.0))
+        update_location_config(self._preset('loc-gone', 5.0))
+        on_disk = json.loads(sig_file.read_text(encoding='utf-8'))
+        del on_disk['loc-gone']
+        self._other_worker_writes(sig_file, on_disk)
+
+        update_location_config(self._preset('loc-a', 12.0))
+
+        assert 'loc-gone' not in json.loads(sig_file.read_text(encoding='utf-8'))
+
+    def test_save_failure_leaves_no_temp_file(self, sig_file, monkeypatch):
+        def _failing_replace(_src, _dst):
+            raise OSError('rename refused')
+
+        monkeypatch.setattr(cache_store.os, 'replace', _failing_replace)
+        cache_store._save_location_signatures()  # must not raise
+        assert [p.name for p in sig_file.parent.iterdir() if p.name.endswith('.tmp')] == []

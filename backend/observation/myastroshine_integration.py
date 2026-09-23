@@ -27,6 +27,7 @@ import re
 import threading
 import time
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple
 
@@ -34,6 +35,7 @@ from observation import astrodex
 from utils import load_json_file, save_json_file
 from connectors.myastroshine_connector import MyAstroShineConnector
 from utils.connector_secrets import merge_secrets
+from utils.file_lock import interprocess_lock
 from utils.logging_config import get_logger
 from utils.repo_config import load_config
 
@@ -261,19 +263,28 @@ def verify_handoff(cfg: Dict, token: str) -> Optional[Dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 
-def _load_consumed_from_disk() -> None:
+def _merge_consumed_from_disk_locked() -> None:
+    """Fold in unexpired jtis from the on-disk store; the caller holds ``_consumed_lock``.
+
+    Every gunicorn worker keeps its own ``_consumed`` dict, so the file is the
+    only place a jti spent by another worker becomes visible.
+    """
     data = load_json_file(_consumed_file_path(), default={})
     if not isinstance(data, dict):
         return
     now = time.time()
+    for jti, expiry in data.items():
+        try:
+            expiry_f = float(expiry)
+        except (TypeError, ValueError):
+            continue
+        if expiry_f > now:
+            _consumed[jti] = expiry_f
+
+
+def _load_consumed_from_disk() -> None:
     with _consumed_lock:
-        for jti, expiry in data.items():
-            try:
-                expiry_f = float(expiry)
-            except (TypeError, ValueError):
-                continue
-            if expiry_f > now:
-                _consumed[jti] = expiry_f
+        _merge_consumed_from_disk_locked()
 
 
 def _prune_and_persist_locked() -> None:
@@ -288,9 +299,18 @@ def _prune_and_persist_locked() -> None:
         logger.warning("Could not persist consumed handoff jti store: %s", exc)
 
 
+@contextmanager
+def _consumed_store_lock():
+    """Serialize read-merge-write of the jti store across threads and gunicorn workers."""
+    with _consumed_lock, interprocess_lock(_consumed_file_path() + '.lock'):
+        yield
+
+
 def is_handoff_consumed(jti: str) -> bool:
     """Whether this handoff's jti has already been used to create a duplicate."""
     with _consumed_lock:
+        if jti not in _consumed:
+            _merge_consumed_from_disk_locked()  # another worker may have spent it
         expiry = _consumed.get(jti)
         if expiry is None:
             return False
@@ -304,8 +324,35 @@ def mark_handoff_consumed(jti: str, expiry_epoch: Optional[float] = None) -> Non
     """Record a handoff's jti as spent so a later replay is rejected with 409."""
     if expiry_epoch is None:
         expiry_epoch = time.time() + MyAstroShineConnector.HANDOFF_TTL_SECONDS
-    with _consumed_lock:
+    with _consumed_store_lock():
+        _merge_consumed_from_disk_locked()
         _consumed[jti] = float(expiry_epoch)
+        _prune_and_persist_locked()
+
+
+def claim_handoff(jti: str, expiry_epoch: Optional[float] = None) -> bool:
+    """Atomically mark a jti spent; False when it already was (in any worker).
+
+    Check and mark happen under one cross-process lock, so two concurrent
+    callbacks carrying the same handoff cannot both get through.
+    """
+    if expiry_epoch is None:
+        expiry_epoch = time.time() + MyAstroShineConnector.HANDOFF_TTL_SECONDS
+    with _consumed_store_lock():
+        _merge_consumed_from_disk_locked()
+        expiry = _consumed.get(jti)
+        if expiry is not None and expiry > time.time():
+            return False
+        _consumed[jti] = float(expiry_epoch)
+        _prune_and_persist_locked()
+        return True
+
+
+def release_handoff(jti: str) -> None:
+    """Un-spend a claimed jti after the duplicate could not be created, so it can be retried."""
+    with _consumed_store_lock():
+        _merge_consumed_from_disk_locked()
+        _consumed.pop(jti, None)
         _prune_and_persist_locked()
 
 
@@ -466,9 +513,20 @@ def create_enhanced_duplicate(claims: Dict[str, Any], image_bytes: bytes, payloa
     failure; returns ``{"status": "created", "item_id", "picture_id"}`` on success.
     """
     jti = claims.get('jti', '')
-    if not jti or is_handoff_consumed(jti):
+    # Claim before doing any work so a concurrent replay (possibly on another
+    # gunicorn worker) is rejected; un-claim on failure so the handoff can be retried.
+    if not jti or not claim_handoff(jti, claims.get('exp')):
         raise EnhancedDuplicateError(409, 'handoff already consumed')
+    try:
+        return _create_enhanced_duplicate_claimed(claims, image_bytes, payload)
+    except BaseException:
+        release_handoff(jti)
+        raise
 
+
+def _create_enhanced_duplicate_claimed(
+    claims: Dict[str, Any], image_bytes: bytes, payload: Dict[str, Any]
+) -> Dict[str, Any]:
     user_id = claims.get('user_id', '')
     item_id = claims.get('item_id', '')
     source_picture_id = claims.get('picture_id', '')
@@ -508,7 +566,6 @@ def create_enhanced_duplicate(claims: Dict[str, Any], image_bytes: bytes, payloa
     if not new_picture:
         raise EnhancedDuplicateError(404, 'item disappeared while saving')
 
-    mark_handoff_consumed(jti, claims.get('exp'))
     logger.info(
         "MyAstroShine: created enhanced duplicate picture %s on item %s for user %s",
         new_picture.get('id'),

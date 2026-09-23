@@ -1,6 +1,8 @@
 """Tests for SkyTonight target normalization and compatibility helpers."""
 
 import json
+import os
+import time
 
 from skytonight.skytonight_models import SkyTonightCoordinates, SkyTonightTarget
 from skytonight import skytonight_targets
@@ -257,17 +259,37 @@ def test_invalidate_targets_dataset_cache_forces_reload_from_disk(tmp_path):
     cached_dataset = skytonight_targets.load_targets_dataset(force_reload=True, dataset_file=str(dataset_file))
     assert len(cached_dataset['targets']) == 1
 
-    # Mutate the dataset file directly to simulate an external rebuild while the
-    # in-memory cache still holds the previous large target list.
+    skytonight_targets.invalidate_targets_dataset_cache()
+    assert skytonight_targets._dataset_cache == {}
+    reloaded = skytonight_targets.load_targets_dataset(dataset_file=str(dataset_file))
+    assert reloaded is not cached_dataset
+    assert len(reloaded['targets']) == 1
+
+
+def test_unchanged_dataset_file_is_served_from_cache(tmp_path):
+    dataset_file = tmp_path / 'targets.json'
+    skytonight_targets.save_targets_dataset(_sample_targets(), dataset_file=str(dataset_file))
+
+    first = skytonight_targets.load_targets_dataset(force_reload=True, dataset_file=str(dataset_file))
+    second = skytonight_targets.load_targets_dataset(dataset_file=str(dataset_file))
+
+    assert second is first
+
+
+def test_dataset_rebuilt_by_another_worker_is_reloaded(tmp_path):
+    """The scheduler rebuilds targets.json in its own worker; the others notice by mtime, not invalidation."""
+    dataset_file = tmp_path / 'targets.json'
+    skytonight_targets.save_targets_dataset(_sample_targets(), dataset_file=str(dataset_file))
+    cached_dataset = skytonight_targets.load_targets_dataset(force_reload=True, dataset_file=str(dataset_file))
+    assert len(cached_dataset['targets']) == 1
+
     dataset_file.write_text(
         json.dumps({'metadata': {'version': 'new'}, 'targets': []}),
         encoding='utf-8',
     )
+    future = time.time() + 5  # guarantee an mtime change even on coarse-grained filesystems
+    os.utime(dataset_file, (future, future))
 
-    still_cached = skytonight_targets.load_targets_dataset(dataset_file=str(dataset_file))
-    assert len(still_cached['targets']) == 1
-
-    skytonight_targets.invalidate_targets_dataset_cache()
     reloaded = skytonight_targets.load_targets_dataset(dataset_file=str(dataset_file))
     assert reloaded['metadata']['version'] == 'new'
     assert reloaded['targets'] == []

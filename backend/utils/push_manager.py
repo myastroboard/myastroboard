@@ -13,6 +13,7 @@ import json
 import os
 from urllib.parse import urlparse
 
+from utils.file_lock import interprocess_lock
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -84,34 +85,49 @@ def load_or_generate_vapid_keys() -> dict:
     if _vapid_keys.get('private_key'):
         return _vapid_keys
 
-    if os.path.exists(_VAPID_FILE):
-        try:
-            with open(_VAPID_FILE, 'r') as f:
-                keys = json.load(f)
-            if keys.get('private_key') and keys.get('public_key'):
-                # Migrate PEM format (old storage) to raw base64url scalar.
-                if '-----' in keys['private_key']:
-                    keys['private_key'] = _pem_to_raw_b64(keys['private_key'])
-                    with open(_VAPID_FILE, 'w') as f:
-                        json.dump(keys, f, indent=2)
-                    logger.info("VAPID private key migrated from PEM to raw base64url format")
-                _vapid_keys = keys
-                logger.debug("VAPID keys loaded from disk")
-                return _vapid_keys
-        except Exception as e:
-            logger.warning(f"Failed to load VAPID keys, regenerating: {e}")
+    # Every gunicorn worker runs this at startup. Loading and first-time
+    # generation happen under one cross-process lock so all workers end up with
+    # the same key pair: a worker holding a different pair in memory would hand
+    # browsers a public key that the push sender's private key cannot match.
+    with interprocess_lock(_VAPID_FILE + '.lock'):
+        if os.path.exists(_VAPID_FILE):
+            try:
+                with open(_VAPID_FILE, 'r') as f:
+                    keys = json.load(f)
+                if keys.get('private_key') and keys.get('public_key'):
+                    # Migrate PEM format (old storage) to raw base64url scalar.
+                    if '-----' in keys['private_key']:
+                        keys['private_key'] = _pem_to_raw_b64(keys['private_key'])
+                        _write_keys_atomically(keys)
+                        logger.info("VAPID private key migrated from PEM to raw base64url format")
+                    _vapid_keys = keys
+                    logger.debug("VAPID keys loaded from disk")
+                    return _vapid_keys
+            except Exception as e:
+                logger.warning(f"Failed to load VAPID keys, regenerating: {e}")
 
-    logger.info("Generating new VAPID key pair")
-    keys = _generate_keys()
-    try:
-        with open(_VAPID_FILE, 'w') as f:
-            json.dump(keys, f, indent=2)
-        logger.info(f"VAPID keys saved to {_VAPID_FILE}")
-    except Exception as e:
-        logger.error(f"Failed to persist VAPID keys: {e}")
+        logger.info("Generating new VAPID key pair")
+        keys = _generate_keys()
+        try:
+            _write_keys_atomically(keys)
+            logger.info(f"VAPID keys saved to {_VAPID_FILE}")
+        except Exception as e:
+            logger.error(f"Failed to persist VAPID keys: {e}")
 
     _vapid_keys = keys
     return _vapid_keys
+
+
+def _write_keys_atomically(keys: dict) -> None:
+    """Write via a temp file + rename so another worker never reads a half-written key file."""
+    tmp_path = f'{_VAPID_FILE}.{os.getpid()}.tmp'
+    try:
+        with open(tmp_path, 'w') as f:
+            json.dump(keys, f, indent=2)
+        os.replace(tmp_path, _VAPID_FILE)
+    finally:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
 
 
 def get_vapid_public_key() -> str:

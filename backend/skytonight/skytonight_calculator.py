@@ -13,9 +13,10 @@ import gc
 import math
 import os
 import re
+import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, Callable, Dict, List, Optional, Tuple, cast
 from zoneinfo import ZoneInfo
 
 import numpy as np
@@ -231,10 +232,24 @@ def compute_comet_alttime_on_demand(target_id: str, location: Dict[str, Any]) ->
 # ---------------------------------------------------------------------------
 _calculation_progress: Dict[str, Any] = {}
 
+# Called (throttled) on progress updates so the scheduler can persist them to the
+# shared status file: the dict above only lives in the worker running the
+# calculation, while status requests are served by any gunicorn worker.
+_progress_listener: Optional[Callable[[], None]] = None
+_PROGRESS_PUBLISH_INTERVAL_SECONDS = 2.0
+_last_progress_publish = 0.0
+
 
 def get_calculation_progress() -> Dict[str, Any]:
     """Return a snapshot of the current calculation phase information."""
     return dict(_calculation_progress)
+
+
+def set_progress_listener(listener: Optional[Callable[[], None]]) -> None:
+    """Register (or clear, with None) the callback that publishes progress to other workers."""
+    global _progress_listener, _last_progress_publish
+    _progress_listener = listener
+    _last_progress_publish = 0.0
 
 
 def _set_progress(phase: str, processed: int = 0, total: int = 0) -> None:
@@ -242,6 +257,22 @@ def _set_progress(phase: str, processed: int = 0, total: int = 0) -> None:
     _calculation_progress['phase'] = phase
     _calculation_progress['phase_processed'] = processed
     _calculation_progress['phase_total'] = total
+    _publish_progress()
+
+
+def _publish_progress() -> None:
+    global _last_progress_publish
+    listener = _progress_listener
+    if listener is None:
+        return
+    now = time.monotonic()
+    if now - _last_progress_publish < _PROGRESS_PUBLISH_INTERVAL_SECONDS:
+        return
+    _last_progress_publish = now
+    try:
+        listener()
+    except Exception as exc:  # progress publishing must never break a calculation
+        logger.debug('Could not publish SkyTonight progress: %s', exc)
 
 
 # ---------------------------------------------------------------------------

@@ -32,6 +32,7 @@ from datetime import datetime, timezone
 # The two AllSky cache TTLs are the connector's own, declared on its class.
 # connectors/ imports nothing from cache/, so this edge closes no cycle.
 from connectors.allsky_connector import AllSkyConnector
+from utils.file_lock import interprocess_lock
 from utils.constants import (
     WEATHER_CACHE_TTL,
     DATA_DIR_CACHE,
@@ -146,6 +147,8 @@ _GLOBAL_SHARED_CACHES = {
 _LOCATION_CACHE_FILE = os.path.join(DATA_DIR_CACHE, 'location_cache.json')
 _LEGACY_SIGNATURE_KEY = "__legacy__"
 _last_known_location_signatures = {}
+# mtime of the file content currently held in _last_known_location_signatures
+_location_signatures_mtime_ns = None
 
 # Shared cache file (cross-worker)
 # Note: _cache_initialization_in_progress is now stored in the shared cache file
@@ -364,12 +367,14 @@ def migrate_legacy_cache_keys(location_id):
 
 def _load_location_signatures():
     """Load persisted location signatures from disk (migrating the legacy flat shape)."""
-    global _last_known_location_signatures
+    global _last_known_location_signatures, _location_signatures_mtime_ns
     try:
         _ensure_data_dir()
         if os.path.exists(_LOCATION_CACHE_FILE):
+            mtime_ns = os.stat(_LOCATION_CACHE_FILE).st_mtime_ns
             with open(_LOCATION_CACHE_FILE, 'r') as f:
                 loaded = json.load(f)
+            _location_signatures_mtime_ns = mtime_ns
             if isinstance(loaded, dict) and "latitude" in loaded:
                 # Pre-v1.2 flat single-location signature - keep it under the
                 # legacy slot; check_and_handle_config_changes() transfers it
@@ -383,14 +388,45 @@ def _load_location_signatures():
 
 
 def _save_location_signatures():
-    """Persist location signatures to disk"""
+    """Persist location signatures to disk (atomically, so other workers never read a partial file)"""
+    global _location_signatures_mtime_ns
+    tmp_path = f"{_LOCATION_CACHE_FILE}.{os.getpid()}.tmp"
     try:
         _ensure_data_dir()
-        with open(_LOCATION_CACHE_FILE, 'w') as f:
+        with open(tmp_path, 'w') as f:
             json.dump(_last_known_location_signatures, f, indent=2, ensure_ascii=False)
+        os.replace(tmp_path, _LOCATION_CACHE_FILE)
+        _location_signatures_mtime_ns = os.stat(_LOCATION_CACHE_FILE).st_mtime_ns
     except Exception:
         # Not critical if save fails, just means next restart might trigger false positive
-        pass
+        try:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+        except OSError:
+            pass
+
+
+def _refresh_location_signatures():
+    """Re-read the signatures when another gunicorn worker has rewritten the file.
+
+    Location edits are saved by whichever worker serves the request, while
+    change detection runs in the cache scheduler's worker: without this, that
+    worker compares against its import-time copy and resets caches again.
+    """
+    try:
+        mtime_ns = os.stat(_LOCATION_CACHE_FILE).st_mtime_ns
+    except OSError:
+        return
+    if mtime_ns != _location_signatures_mtime_ns:
+        _load_location_signatures()
+
+
+@contextmanager
+def _location_signatures_write():
+    """Read-merge-write the signature file under a cross-process lock."""
+    with interprocess_lock(_LOCATION_CACHE_FILE + '.lock'):
+        _refresh_location_signatures()
+        yield
 
 
 # Load persisted signatures on module import
@@ -428,6 +464,7 @@ def has_location_changed(new_location_config):
     if current_signature is None:
         return True
 
+    _refresh_location_signatures()
     stored = _last_known_location_signatures.get(_signature_slot(new_location_config))
 
     # If last config was not set, location has "changed" (first time)
@@ -444,6 +481,7 @@ def has_location_changed(new_location_config):
 
 def is_location_tracked(location_config):
     """Return True when a signature is already stored for this location."""
+    _refresh_location_signatures()
     stored = _last_known_location_signatures.get(_signature_slot(location_config))
     return bool(stored) and stored.get("latitude") is not None
 
@@ -452,21 +490,24 @@ def update_location_config(new_location_config):
     """Update the tracked signature for this location and persist to disk"""
     signature = get_current_location_signature(new_location_config)
     if signature:
-        _last_known_location_signatures[_signature_slot(new_location_config)] = signature.copy()
-        _save_location_signatures()
+        with _location_signatures_write():
+            _last_known_location_signatures[_signature_slot(new_location_config)] = signature.copy()
+            _save_location_signatures()
 
 
 def remove_location_signature(location_id):
     """Forget the tracked signature of a deleted preset."""
-    if _last_known_location_signatures.pop(location_id, None) is not None:
-        _save_location_signatures()
+    with _location_signatures_write():
+        if _last_known_location_signatures.pop(location_id, None) is not None:
+            _save_location_signatures()
 
 
 def pop_legacy_location_signature():
     """Return and clear the pre-v1.2 flat signature (upgrade path helper)."""
-    legacy = _last_known_location_signatures.pop(_LEGACY_SIGNATURE_KEY, None)
-    if legacy is not None:
-        _save_location_signatures()
+    with _location_signatures_write():
+        legacy = _last_known_location_signatures.pop(_LEGACY_SIGNATURE_KEY, None)
+        if legacy is not None:
+            _save_location_signatures()
     return legacy
 
 

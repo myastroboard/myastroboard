@@ -23,6 +23,7 @@ import os
 import threading
 from typing import Any, Dict, Iterable, Optional
 
+from utils.file_lock import interprocess_lock
 from utils.constants import DATA_DIR
 from utils.logging_config import get_logger
 
@@ -59,7 +60,7 @@ def _read_all() -> Dict[str, Dict[str, str]]:
 def _write_all(data: Dict[str, Dict[str, str]]) -> bool:
     """Atomic write (tmp + replace) with owner-only permissions where the OS honours them."""
     path = _secrets_path()
-    tmp_path = f"{path}.tmp"
+    tmp_path = f"{path}.{os.getpid()}.tmp"
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(tmp_path, 'w', encoding='utf-8') as handle:
@@ -89,22 +90,28 @@ def load_secrets(name: str) -> Dict[str, str]:
 def save_secrets(name: str, values: Dict[str, Any]) -> bool:
     """Merge *values* into the connector's stored credentials.
 
-    A blank value removes the key; nothing else in the file is touched.
+    A blank value removes the key; nothing else in the file is touched. The
+    read-merge-write runs under a cross-process lock: every gunicorn worker
+    migrates legacy secrets at startup, so two workers routinely write at once.
     """
-    with _lock:
-        data = _read_all()
-        current = dict(data.get(name, {}))
-        for key, value in values.items():
-            text = str(value or '').strip()
-            if text:
-                current[key] = text
+    try:
+        with _lock, interprocess_lock(_secrets_path() + '.lock'):
+            data = _read_all()
+            current = dict(data.get(name, {}))
+            for key, value in values.items():
+                text = str(value or '').strip()
+                if text:
+                    current[key] = text
+                else:
+                    current.pop(key, None)
+            if current:
+                data[name] = current
             else:
-                current.pop(key, None)
-        if current:
-            data[name] = current
-        else:
-            data.pop(name, None)
-        return _write_all(data)
+                data.pop(name, None)
+            return _write_all(data)
+    except OSError as exc:
+        logger.error(f"Could not lock connector secrets file {_secrets_path()}: {exc}")
+        return False
 
 
 def merge_secrets(name: str, cfg: Optional[Dict[str, Any]], secret_fields: Iterable[str]) -> Dict[str, Any]:
