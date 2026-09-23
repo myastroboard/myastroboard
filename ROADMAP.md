@@ -221,7 +221,7 @@ absorbed the feature, so no registry is scoped.
 |---|---|
 | **Why** | The connector pattern hardened through AllSky and MyAstroShine (one module per connector, `target_modules`, declared config/secret fields) is solid enough to point outward instead of only pulling data in. A lot of self-hosted astro setups already run Home Assistant for the rest of the observatory (power, roof, weather sensors); publishing MAB's own state as MQTT lets it show up on an existing HA dashboard instead of requiring a second one. Scoped as a publish-only connector - no inbound control, no device layer - so it does not need to wait for the v2.4+ live-equipment cluster. Replaces the dropped "Connector SDK and mab-plugins" idea in this slot - see [Architecture direction](#on-the-former-connector-sdk-and-mab-plugins-was-v16). |
 | **Effort** | Medium |
-| **Status** | ✅ Implemented (connector) - companion cards repository in progress |
+| **Status** | ✅ Implemented (connector) |
 
 #### MQTT Publisher connector
 
