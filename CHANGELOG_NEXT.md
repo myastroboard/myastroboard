@@ -59,6 +59,33 @@
   Pillow for the crop/banner rendering - see [docs/ASTRODEX_STREAM.md](docs/ASTRODEX_STREAM.md)
   for the full setup guide and the reasoning behind that choice.
 
+#### Reliability with several server workers
+
+The Docker image runs two server processes side by side. Several places assumed a single
+process and could lose or mix up data when both were busy at once. All fixed:
+
+- **Log file**: log lines no longer go missing from `data/myastroboard.log` (and so from the
+  Logs page). Rotated backups (`.log.1` ... `.log.5`) now stay in order and only rotate at the
+  real 10 MB size.
+- **Account changes are no longer undone**: saving a push subscription, or cleaning up a dead
+  one, could revert a change made at the same moment (a new password, 2FA just enabled,
+  preferences).
+- **AstroDex, observation sessions, wishlist and Plan My Night saves** can no longer overwrite
+  each other when two saves for the same user land at the same time.
+- **Push notifications**: on a brand-new install, both processes could create different
+  notification keys, so some devices silently never received notifications. If notifications
+  never worked for you, re-enable them once in My Settings -> Notifications.
+- **MyAstroShine**: a handoff link can no longer be used twice, and a failed enhancement can be
+  retried with the same link.
+- **First start / upgrade**: the default location is created only once. Before, the first admin
+  could end up attached to a location that no longer existed.
+- **Connector credentials** can no longer be lost when both processes migrate them at startup.
+- **Visibility calendars** refresh right away after you edit a location's coordinates or
+  horizon. Before, they could show results for the old position.
+- The **SkyTonight target list** refreshes everywhere after a rebuild, the SkyTonight **progress
+  bar** no longer jumps back and forth during a calculation, and editing a location no longer
+  resets its cached data twice.
+
 #### Connector cards
 
 - Connector settings can now be numbers and advanced checkboxes, the test button sends the
