@@ -42,5 +42,5 @@ pywebpush===2.5.0
 # MQTT publisher (Home Assistant connector)
 paho-mqtt===2.1.0
 
-# Image processing (AstroDex Stream connector: crop + banner rendering)
+# Image processing (Astrodex Stream connector: crop + banner rendering)
 Pillow===12.3.0

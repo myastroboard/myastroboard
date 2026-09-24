@@ -199,7 +199,7 @@ This page lists the HTTP routes currently declared across `backend/blueprints/*.
 
 ## MyAstroShine integration (see docs/MYASTROSHINE.md)
 
-AstroDex <-> MyAstroShine image round-trip. Not a `BaseConnector` - config lives under `config.connectors.myastroshine` but the routes and UI are AstroDex-side.
+Astrodex <-> MyAstroShine image round-trip. Not a `BaseConnector` - config lives under `config.connectors.myastroshine` but the routes and UI are Astrodex-side.
 
 - `GET /api/astrodex/integration/status` - `{ enabled: bool }` - drives the per-photo "Send to MyAstroShine" button
 - `GET|POST /api/connectors/myastroshine/health` - Best-effort reachability probe of `<url>/api/health` (loopback / link-local / unspecified / multicast refused). GET probes the saved URL, POST the one in the body. The card's config is served by the shared connector routes above

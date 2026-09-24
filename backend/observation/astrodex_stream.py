@@ -1,5 +1,5 @@
 """
-AstroDex Stream engine - renders the "current frame" of a user's (or the shared) AstroDex
+Astrodex Stream engine - renders the "current frame" of a user's (or the shared) Astrodex
 slideshow as a single JPEG, and mints/verifies the per-user signing token that gates it.
 
 See docs/ASTRODEX_STREAM.md for the full design rationale. In short: this deliberately is
@@ -32,7 +32,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 from PIL import Image, ImageDraw, ImageFont
 
-from connectors.astrodex_stream_connector import AstroDexStreamConnector
+from connectors.astrodex_stream_connector import AstrodexStreamConnector
 from observation import astrodex
 from utils.connector_secrets import load_secrets, save_secrets
 from utils.logging_config import get_logger
@@ -42,7 +42,7 @@ logger = get_logger(__name__)
 _SHARED_SUBJECT = "__shared__"
 _TOKEN_BYTES = 16  # a capability token embedded in a URL, not a MAC needing full SHA-256 length
 
-_CONNECTOR_NAME = AstroDexStreamConnector.name
+_CONNECTOR_NAME = AstrodexStreamConnector.name
 
 # feed_key -> {time-bucket: jpeg bytes}. A short TTL just collapses near-simultaneous polls
 # (a user's own browser tab + a Home Assistant card both requesting the same feed within the
@@ -80,7 +80,7 @@ def _signing_secret() -> str:
         return stored
     secret = os.urandom(32).hex()
     if not save_secrets(_CONNECTOR_NAME, {"signing_secret": secret}):
-        logger.error("AstroDex Stream: could not persist signing secret - tokens will not survive a restart")
+        logger.error("Astrodex Stream: could not persist signing secret - tokens will not survive a restart")
     return secret
 
 
@@ -274,7 +274,7 @@ def _load_source_image(filename: str) -> Optional[Image.Image]:
             img.load()
             return img.convert("RGB")
     except Exception as exc:
-        logger.warning("AstroDex Stream: could not open picture %r: %s", filename, exc)
+        logger.warning("Astrodex Stream: could not open picture %r: %s", filename, exc)
         return None
 
 
@@ -294,7 +294,7 @@ def _font(size: int) -> _AnyFont:
         path = os.path.join(matplotlib.get_data_path(), "fonts", "ttf", "DejaVuSans.ttf")
         font = ImageFont.truetype(path, size)
     except Exception as exc:  # pragma: no cover - matplotlib always ships this file
-        logger.warning("AstroDex Stream: could not load DejaVuSans.ttf, falling back to default: %s", exc)
+        logger.warning("Astrodex Stream: could not load DejaVuSans.ttf, falling back to default: %s", exc)
         font = ImageFont.load_default()
     _font_cache[size] = font
     return font
@@ -349,7 +349,7 @@ def _placeholder_image(target_w: int, target_h: int) -> Image.Image:
     frame = Image.new("RGB", (target_w, target_h), (18, 22, 34))
     draw = ImageDraw.Draw(frame)
     font = _font(max(16, target_w // 30))
-    text = "AstroDex - no photo yet"
+    text = "Astrodex - no photo yet"
     bbox = draw.textbbox((0, 0), text, font=font)
     x = (target_w - (bbox[2] - bbox[0])) // 2
     y = (target_h - (bbox[3] - bbox[1])) // 2 - bbox[1]

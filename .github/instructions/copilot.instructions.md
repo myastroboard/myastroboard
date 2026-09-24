@@ -108,7 +108,7 @@ myastroboard/
 │   ├── connectors/                  # BaseConnector registry - bridges to external tools (see docs/CONNECTORS.md)
 │   │   ├── base_connector.py            # Abstract contract (MODULES, CONFIG_FIELDS, SECRET_FIELDS, target_modules)
 │   │   ├── allsky_connector.py          # AllSky all-sky camera (Observatory tab)
-│   │   ├── myastroshine_connector.py    # MyAstroShine photo round-trip (AstroDex)
+│   │   ├── myastroshine_connector.py    # MyAstroShine photo round-trip (Astrodex)
 │   │   ├── mqtt_connector.py            # MQTT / Home Assistant publisher - declaration + broker probe (no feature imports!)
 │   │   ├── mqtt_publisher.py            # Background publisher thread (lock file, paho client, cycles, cleanup manifest)
 │   │   └── mqtt_payloads.py             # HA discovery + state builders (lazy feature imports) - see docs/HOME_ASSISTANT.md

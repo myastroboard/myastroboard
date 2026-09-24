@@ -260,13 +260,13 @@ Answered during implementation - the full entity and topic reference is in
 
 **i18n in 6 languages.**
 
-#### AstroDex Stream connector
+#### Astrodex Stream connector
 
 A second, unrelated connector landed in the same v1.6 slot: a personal, auto-refreshing photo
-slideshow of a user's AstroDex pictures, servable to Home Assistant's **Generic Camera**
+slideshow of a user's Astrodex pictures, servable to Home Assistant's **Generic Camera**
 integration (or any still-image viewer) without a real video stream.
 
-- `AstroDexStreamConnector` in `backend/connectors/` - same shape as the others, no `MODULES`
+- `AstrodexStreamConnector` in `backend/connectors/` - same shape as the others, no `MODULES`
   (the slideshow is the whole connector), no `SECRET_FIELDS` (the per-user signing key is
   auto-generated, never admin-entered)
 - RTSP and a continuously pushed MJPEG stream were both considered and rejected: the first needs
@@ -584,7 +584,7 @@ Also:
 | v1.3 | Observation Log | Intermediate+ | High | ✅ Implemented |
 | v1.4 | Planning Intelligence (visibility calendar, meridian flip, advanced filters) | Advanced | High | ✅ Implemented |
 | v1.5 | Session Analytics | All | Medium | ✅ Implemented |
-| v1.6 | MQTT Publisher & Home Assistant Integration + AstroDex Stream | All | Medium | ✅ Implemented |
+| v1.6 | MQTT Publisher & Home Assistant Integration + Astrodex Stream | All | Medium | ✅ Implemented |
 | v2.0 | Interactive Sky Chart + mosaic planner | All | High | 💡 Idea |
 | v2.1 | Community & Sharing | All | Medium | 💡 Idea |
 | v2.2 | Integrations (plate solve, PHD2, NINA) | Advanced | High | 💡 Idea |

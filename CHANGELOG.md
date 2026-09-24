@@ -33,10 +33,10 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   127.0.0.1 and ::1 are always trusted. An account can be restricted to sign in only from a
   trusted network (local vs. global scope), defaulting to global for every account.
 - MQTT / Home Assistant connector (Parameters -> Connectors): publishes sky conditions, weather-
-  for-astro numbers, upcoming events, a user's own activity (opt-in), the latest AstroDex picture
+  for-astro numbers, upcoming events, a user's own activity (opt-in), the latest Astrodex picture
   and diagnostics as Home Assistant devices - publish-only, no YAML required. See
   [docs/HOME_ASSISTANT.md](docs/HOME_ASSISTANT.md).
-- AstroDex Stream connector (Parameters -> Connectors): a personal, auto-refreshing photo
+- Astrodex Stream connector (Parameters -> Connectors): a personal, auto-refreshing photo
   slideshow URL for Home Assistant's Generic Camera integration (or any still-image viewer),
   cropped to your chosen aspect ratio with an object-name-and-date banner. Every user gets their
   own signed URL; an admin can rotate the signing key at any time. See
@@ -47,7 +47,7 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Multi-worker reliability: the log file and its rotated backups no longer lose or reorder
   lines, and concurrent account changes (password, 2FA, push subscription) no longer undo each
   other.
-- AstroDex, Observation Log, Wishlist and Plan My Night saves no longer overwrite each other when
+- Astrodex, Observation Log, Wishlist and Plan My Night saves no longer overwrite each other when
   two saves for the same user land at the same time.
 - Push notification keys, the default location, and connector credential migration are now
   created/migrated exactly once instead of racing across the two server workers.

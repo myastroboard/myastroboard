@@ -1453,7 +1453,7 @@ async function _ensureMyAstroShineStatus() {
     return _myAstroShineEnabled;
 }
 
-// AstroDex Stream connector: the personal (+ shared, when the board isn't private) photo
+// Astrodex Stream connector: the personal (+ shared, when the board isn't private) photo
 // feed URL. Same fetch-once-per-tab-entry shape as _ensureMyAstroShineStatus above - the
 // icon button in the header is toggled from the result rather than left to poll.
 let _astrodexStreamUrls = null;

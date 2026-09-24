@@ -1,6 +1,6 @@
 """
-AstroDex Stream connector - a personal, auto-refreshing photo slideshow of a user's
-AstroDex pictures, rendered as a single "current frame" JPEG that any still-image camera
+Astrodex Stream connector - a personal, auto-refreshing photo slideshow of a user's
+Astrodex pictures, rendered as a single "current frame" JPEG that any still-image camera
 viewer (Home Assistant's Generic Camera integration, a browser <img> tag, ...) can poll.
 
 Not a real video stream - see docs/ASTRODEX_STREAM.md#why-not-a-real-video-stream for the
@@ -24,11 +24,11 @@ from typing import Any
 from connectors.base_connector import BaseConnector
 
 
-class AstroDexStreamConnector(BaseConnector):
+class AstrodexStreamConnector(BaseConnector):
     name = "astrodex_stream"
-    label = "AstroDex Stream"
+    label = "Astrodex Stream"
     description = (
-        "Personal, auto-refreshing photo slideshow of your AstroDex pictures - "
+        "Personal, auto-refreshing photo slideshow of your Astrodex pictures - "
         "for Home Assistant's Generic Camera or any still-image viewer"
     )
     min_version = ""

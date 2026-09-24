@@ -1,6 +1,6 @@
-# AstroDex Stream connector
+# Astrodex Stream connector
 
-A personal, auto-refreshing photo slideshow of your AstroDex pictures - cropped to the format
+A personal, auto-refreshing photo slideshow of your Astrodex pictures - cropped to the format
 you choose, with a discreet object-name-and-date banner - that shows up as a live camera in
 **Home Assistant** (or any still-image viewer) without exposing your photos to anyone who
 doesn't have your URL.
@@ -9,7 +9,7 @@ doesn't have your URL.
 
 ## Where to find it
 
-- **Setup**: Parameters -> Connectors -> *AstroDex Stream* card
+- **Setup**: Parameters -> Connectors -> *Astrodex Stream* card
 - **Your URL**: Astrodex -> the small <i class="bi bi-collection-play"></i> icon next to the
   page title, once the connector is enabled
 
@@ -48,7 +48,7 @@ photo changes between slots (see [Shuffling](#shuffling) below).
 
 ## Setup
 
-Parameters -> Connectors -> **AstroDex Stream** -> Configure:
+Parameters -> Connectors -> **Astrodex Stream** -> Configure:
 
 | Field | Notes |
 |---|---|
@@ -94,7 +94,7 @@ No custom Lovelace card is needed - Home Assistant's built-in **Generic Camera**
 already does this:
 
 1. Settings -> Devices & services -> Add integration -> **Generic Camera**.
-2. **Still Image URL**: paste the URL from the AstroDex modal, exactly as copied. The signing
+2. **Still Image URL**: paste the URL from the Astrodex modal, exactly as copied. The signing
    token is already embedded in it - **no username or password field to fill in**, unlike a
    typical camera setup.
 3. Leave **Stream URL** empty - this connector does not serve RTSP (see
@@ -150,8 +150,8 @@ refresh cadence reliably lands on each photo instead of mostly skipping between 
 
 | Symptom | Likely cause |
 |---|---|
-| The <i class="bi bi-collection-play"></i> icon does not appear on the Astrodex page | The connector is not enabled - Parameters -> Connectors -> AstroDex Stream. |
+| The <i class="bi bi-collection-play"></i> icon does not appear on the Astrodex page | The connector is not enabled - Parameters -> Connectors -> Astrodex Stream. |
 | The modal has no shared URL | Astrodex is set to private (Parameters -> Configuration) - the personal URL still works. |
 | The image shows a dark placeholder instead of a photo | The user has no eligible pictures yet (own photos for the personal URL, any visible photo for the shared one). |
-| Home Assistant's camera stopped updating after a "Rotate keys" | Expected - re-add the camera in Home Assistant with the new URL from the AstroDex modal. |
+| Home Assistant's camera stopped updating after a "Rotate keys" | Expected - re-add the camera in Home Assistant with the new URL from the Astrodex modal. |
 | Photos change less often than expected in Home Assistant | Home Assistant polls a still image on its own schedule; it is not pushed. Increase *Display duration per photo* rather than expecting frame-accurate sync. |

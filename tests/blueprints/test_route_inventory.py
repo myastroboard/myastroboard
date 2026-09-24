@@ -165,7 +165,7 @@ EXPECTED_ROUTES = {
     ('/api/astrodex/stream/shared/<token>/current.jpg', ('GET',)),
     ('/api/astrodex/stream/urls', ('GET',)),
     ('/api/astrodex/upload', ('POST',)),
-    # --- myastroshine integration (AstroDex <-> MyAstroShine) ---
+    # --- myastroshine integration (Astrodex <-> MyAstroShine) ---
     ('/api/astrodex/integration/status', ('GET',)),
     ('/api/astrodex/integration/handoff', ('POST',)),
     ('/api/astrodex/integration/source', ('GET',)),

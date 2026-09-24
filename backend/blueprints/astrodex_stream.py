@@ -1,11 +1,11 @@
-"""AstroDex Stream Blueprint. Routes: /api/astrodex/stream/*, /api/connectors/astrodex_stream/rotate
+"""Astrodex Stream Blueprint. Routes: /api/astrodex/stream/*, /api/connectors/astrodex_stream/rotate
 
-Serves the "current frame" of a user's (or the shared) AstroDex slideshow as a single JPEG -
+Serves the "current frame" of a user's (or the shared) Astrodex slideshow as a single JPEG -
 see backend/observation/astrodex_stream.py for the rendering engine and
 docs/ASTRODEX_STREAM.md for the design rationale (this is deliberately not a real video
 stream).
 
-- ``/urls`` is browser-facing (session cookie): drives the AstroDex page's stream modal.
+- ``/urls`` is browser-facing (session cookie): drives the Astrodex page's stream modal.
 - ``/<user_id>/<token>/current.jpg`` and ``/shared/<token>/current.jpg`` are cookieless -
   polled by Home Assistant's Generic Camera integration or a plain ``<img>`` tag,
   authenticated by the HMAC token embedded in the URL rather than a session. Same
@@ -20,7 +20,7 @@ from threading import Lock
 
 from flask import Blueprint, Response, jsonify, request
 
-from connectors.astrodex_stream_connector import AstroDexStreamConnector
+from connectors.astrodex_stream_connector import AstrodexStreamConnector
 from observation import astrodex_stream
 from utils.auth import admin_required, get_current_user, login_required
 from utils.logging_config import get_logger
@@ -57,19 +57,19 @@ def _client_key(*parts: str) -> str:
 
 def _connector_block() -> dict:
     config = load_config()
-    return (config.get('connectors') or {}).get(AstroDexStreamConnector.name) or {}
+    return (config.get('connectors') or {}).get(AstrodexStreamConnector.name) or {}
 
 
 def _connector_config() -> dict:
     """This connector's CONFIG_FIELDS, defaults overlaid with whatever was saved."""
     block = _connector_block()
-    merged = dict(AstroDexStreamConnector.CONFIG_FIELDS)
-    merged.update({k: v for k, v in block.items() if k in AstroDexStreamConnector.CONFIG_FIELDS})
+    merged = dict(AstrodexStreamConnector.CONFIG_FIELDS)
+    merged.update({k: v for k, v in block.items() if k in AstrodexStreamConnector.CONFIG_FIELDS})
     return merged
 
 
 def _enabled() -> bool:
-    return AstroDexStreamConnector(_connector_block()).is_enabled()
+    return AstrodexStreamConnector(_connector_block()).is_enabled()
 
 
 def _not_found():
@@ -132,6 +132,6 @@ def rotate_stream_keys():
     try:
         astrodex_stream.rotate_signing_secret()
     except RuntimeError as exc:
-        logger.error(f"AstroDex Stream: rotate failed: {exc}")
+        logger.error(f"Astrodex Stream: rotate failed: {exc}")
         return jsonify({'error': 'Failed to rotate keys'}), 500
     return jsonify({'status': 'success'})

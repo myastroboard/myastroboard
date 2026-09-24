@@ -190,7 +190,7 @@ def test_listing_masks_short_and_empty_secrets(client_admin, env, monkeypatch):
 
 
 def test_listing_reports_astrodex_target_module(client_admin, env, monkeypatch):
-    """The card badge must say AstroDex - MyAstroShine does not feed the Observatory."""
+    """The card badge must say Astrodex - MyAstroShine does not feed the Observatory."""
     assert _listed(client_admin, monkeypatch)["target_modules"] == ["astrodex"]
 
 

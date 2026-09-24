@@ -1,5 +1,5 @@
 """
-MyAstroShine connector — send an AstroDex photo out for re-processing and bring
+MyAstroShine connector — send an Astrodex photo out for re-processing and bring
 the enhanced result back as a new picture on the same object.
 
 A connector like any other: it talks to an optional external service over HTTP,
@@ -32,7 +32,7 @@ REQUEST_TIMEOUT = 5
 class MyAstroShineConnector(BaseConnector):
     name = "myastroshine"
     label = "MyAstroShine"
-    description = "Send an AstroDex photo to MyAstroShine for re-processing, then bring the result back"
+    description = "Send an Astrodex photo to MyAstroShine for re-processing, then bring the result back"
     # Oldest release implementing the pull + webhook round-trip. Informational: MyAstroShine
     # reports its own version only once a handoff completes, where it is stored per picture
     # as enhanced_source_version.

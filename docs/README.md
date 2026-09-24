@@ -41,9 +41,9 @@ Welcome to the comprehensive documentation for MyAstroBoard, the integrated astr
 #### Observatory & Connectors
 - [Observatory](OBSERVATORY.md) - Live dashboard fed by external connectors (AllSky panels, sensor data, keogram, timelapse)
 - [Connectors](CONNECTORS.md) - Connector architecture, AllSky setup, module reference, and how to add a new connector
-- [MyAstroShine integration](MYASTROSHINE.md) - AstroDex <-> MyAstroShine image round-trip: send a photo out for re-processing, get an enhanced duplicate back
+- [MyAstroShine integration](MYASTROSHINE.md) - Astrodex <-> MyAstroShine image round-trip: send a photo out for re-processing, get an enhanced duplicate back
 - [Home Assistant integration](HOME_ASSISTANT.md) - MQTT publisher with Home Assistant discovery: sky conditions, weather, tonight's targets, events and per-user activity as Home Assistant devices
-- [AstroDex Stream](ASTRODEX_STREAM.md) - personal, auto-refreshing AstroDex photo slideshow for Home Assistant's Generic Camera or any still-image viewer, one signed URL per user
+- [Astrodex Stream](ASTRODEX_STREAM.md) - personal, auto-refreshing Astrodex photo slideshow for Home Assistant's Generic Camera or any still-image viewer, one signed URL per user
 
 ### Administration
 - [Authentication & Users](AUTHENTICATION.md) - Roles, user management, preferences, session security
@@ -101,7 +101,7 @@ Welcome to the comprehensive documentation for MyAstroBoard, the integrated astr
 | External connectors setup | Parameters → Connectors | [CONNECTORS.md](CONNECTORS.md) |
 | Send a photo to MyAstroShine | Astrodex → object → photo actions | [MYASTROSHINE.md](MYASTROSHINE.md) |
 | Show MyAstroBoard in Home Assistant | Parameters → Connectors → MQTT / Home Assistant | [HOME_ASSISTANT.md](HOME_ASSISTANT.md) |
-| Show AstroDex photos as a Home Assistant camera | Astrodex → stream icon / Parameters → Connectors → AstroDex Stream | [ASTRODEX_STREAM.md](ASTRODEX_STREAM.md) |
+| Show Astrodex photos as a Home Assistant camera | Astrodex → stream icon / Parameters → Connectors → Astrodex Stream | [ASTRODEX_STREAM.md](ASTRODEX_STREAM.md) |
 | Push notifications | My Settings → Notifications | [NOTIFICATIONS.md](NOTIFICATIONS.md) |
 | User roles | Parameters → Users | [AUTHENTICATION.md](AUTHENTICATION.md) |
 | Location presets & switcher | Parameters → Locations / sky widget | [LOCATIONS.md](LOCATIONS.md) |

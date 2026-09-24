@@ -1,10 +1,10 @@
 """MyAstroShine integration Blueprint. Routes: /api/astrodex/integration/*
 
-The AstroDex <-> MyAstroShine image round-trip (see docs/MYASTROSHINE.md):
+The Astrodex <-> MyAstroShine image round-trip (see docs/MYASTROSHINE.md):
 
 - ``/status`` / ``/config`` / ``/test`` - browser-facing (session cookie), drive
   the connector card in Parameters -> Connectors and the "Send to MyAstroShine"
-  button in AstroDex.
+  button in Astrodex.
 - ``/handoff`` - browser-facing, mints the signed single-use token the browser
   carries to MyAstroShine.
 - ``/source`` / ``/source/image`` / ``/enhanced`` - **no session cookie**: called
@@ -73,7 +73,7 @@ def _verify_handoff_or_none(token: str):
 @connectors_myastroshine_bp.route('/api/astrodex/integration/status', methods=['GET'])
 @login_required
 def integration_status():
-    """Whether the AstroDex "Send to MyAstroShine" button should be shown."""
+    """Whether the Astrodex "Send to MyAstroShine" button should be shown."""
     try:
         return jsonify({'enabled': integration.integration_enabled()})
     except Exception as exc:

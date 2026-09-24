@@ -147,7 +147,7 @@ These are **not** editable - they are absent from `update_picture()`'s allowed f
   "Re-processed with MyAstroShine on <date>" line with a *view settings* disclosure that pretty-prints
   `enhanced_parameters`.
 - The board gets no push when the enhanced picture arrives (MyAstroShine calls back
-  server-to-server). When the AstroDex browser tab regains focus after a send, it re-fetches and
+  server-to-server). When the Astrodex browser tab regains focus after a send, it re-fetches and
   re-renders the open item, and toasts "Enhanced photo received from MyAstroShine" - no manual
   reload needed.
 
@@ -181,5 +181,5 @@ apart, both declared rather than special-cased:
   container posts the enhanced result back, so it authenticates — hence `SECRET_FIELDS` and the
   cookieless callback routes in `backend/blueprints/connectors_myastroshine.py` (logic in
   `backend/observation/myastroshine_integration.py`).
-- **It surfaces in the AstroDex, not the Observatory** — `target_modules = ["astrodex"]`, and it
+- **It surfaces in the Astrodex, not the Observatory** — `target_modules = ["astrodex"]`, and it
   has no Observatory panel.

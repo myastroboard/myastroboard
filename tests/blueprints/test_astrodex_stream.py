@@ -1,4 +1,4 @@
-"""Route tests for the AstroDex Stream blueprint.
+"""Route tests for the Astrodex Stream blueprint.
 
 GET  /api/astrodex/stream/urls
 GET  /api/astrodex/stream/<user_id>/<token>/current.jpg

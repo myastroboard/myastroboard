@@ -309,7 +309,7 @@ function _connectorFieldCheckbox(c, spec) {
 }
 
 // A connector does not necessarily feed the Observatory: AllSky does, MyAstroShine feeds
-// the AstroDex, and a connector can feed nothing at all (self-contained). `target_modules`
+// the Astrodex, and a connector can feed nothing at all (self-contained). `target_modules`
 // carries the app areas each connector surfaces in; these are navbar tabs, so their labels
 // are reused from the navbar namespace rather than duplicated per connector.
 const _TARGET_MODULE_I18N_KEYS = {
@@ -1046,7 +1046,7 @@ async function loadObservatory() {
 
     const connectors = await fetchJSONOnce('/api/connectors').catch(() => []);
     // Only connectors that declare the Observatory as a target have a panel here: an enabled
-    // MyAstroShine (AstroDex) or MQTT (standalone) connector must not get an empty sub-tab.
+    // MyAstroShine (Astrodex) or MQTT (standalone) connector must not get an empty sub-tab.
     const enabled = (connectors || []).filter(_feedsObservatory);
 
     if (enabled.length === 0) {

@@ -1,6 +1,6 @@
 # Connectors
 
-Connectors integrate external astronomy tools into MyAstroBoard. Once configured and enabled, a connector's data appears in the app tabs it declares — AllSky feeds the **Observatory** tab, MyAstroShine feeds the **AstroDex**, and a connector may feed no tab at all: the MQTT / Home Assistant connector publishes MyAstroBoard's own state *outward* and is standalone.
+Connectors integrate external astronomy tools into MyAstroBoard. Once configured and enabled, a connector's data appears in the app tabs it declares — AllSky feeds the **Observatory** tab, MyAstroShine feeds the **Astrodex**, and a connector may feed no tab at all: the MQTT / Home Assistant connector publishes MyAstroBoard's own state *outward* and is standalone.
 
 ---
 
@@ -219,7 +219,7 @@ class MyAstroShineConnector(BaseConnector):
     CONFIG_FIELDS = {"token": "", "signing_secret": "", "callback_url_override": "", "copy_rating": False}
 ```
 
-**Appears in**: AstroDex — not the Observatory, so it has no Observatory panel.
+**Appears in**: Astrodex — not the Observatory, so it has no Observatory panel.
 
 `is_configured()` requires the two credentials on top of the URL: a URL alone signs no handoff,
 so the card reports *Not installed* until all three are set. `health_check()` probes
@@ -296,9 +296,9 @@ a circular import (a test guards this).
 
 See [HOME_ASSISTANT.md - Troubleshooting](HOME_ASSISTANT.md#troubleshooting).
 
-## AstroDex Stream connector
+## Astrodex Stream connector
 
-A personal, auto-refreshing photo slideshow of a user's AstroDex pictures, rendered as a single
+A personal, auto-refreshing photo slideshow of a user's Astrodex pictures, rendered as a single
 "current frame" JPEG that any still-image camera viewer (Home Assistant's **Generic Camera**
 integration, a plain `<img>` tag, ...) can poll. Deliberately **not** a real video stream (no
 RTSP, no pushed MJPEG) - see [ASTRODEX_STREAM.md](ASTRODEX_STREAM.md#why-not-a-real-video-stream)
@@ -310,10 +310,10 @@ than smooth. Which photo is "current" instead shuffles pseudo-randomly (seeded b
 the time slot, so every viewer polling at the same moment agrees without any shared state) and
 never repeats the same photo twice in a row.
 
-**Appears in**: AstroDex - not the Observatory, so it has no Observatory panel.
+**Appears in**: Astrodex - not the Observatory, so it has no Observatory panel.
 
 ```python
-class AstroDexStreamConnector(BaseConnector):
+class AstrodexStreamConnector(BaseConnector):
     target_modules = ["astrodex"]
     MODULES = []                                      # the slideshow is the whole connector
     SECRET_FIELDS = ()                                 # nothing admin-entered - see below

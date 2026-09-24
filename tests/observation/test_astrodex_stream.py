@@ -1,5 +1,5 @@
 """
-Tests for the AstroDex Stream engine (backend/observation/astrodex_stream.py):
+Tests for the Astrodex Stream engine (backend/observation/astrodex_stream.py):
 token generation/verification, slot timing, picture shuffling, and rendering.
 """
 

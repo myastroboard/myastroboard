@@ -95,7 +95,7 @@ DEFAULT_ALLSKY_CONNECTOR = {
     },
 }
 
-# MyAstroShine connector (AstroDex <-> MyAstroShine image round-trip).
+# MyAstroShine connector (Astrodex <-> MyAstroShine image round-trip).
 # A BaseConnector like AllSky - see connectors/myastroshine_connector.py for the
 # declaration and blueprints/connectors_myastroshine.py for its own routes. The keys
 # below mirror its CONFIG_FIELDS. See docs/MYASTROSHINE.md.

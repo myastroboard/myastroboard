@@ -1,4 +1,4 @@
-"""MyAstroShine integration - AstroDex <-> MyAstroShine image round-trip.
+"""MyAstroShine integration - Astrodex <-> MyAstroShine image round-trip.
 
 This module owns the server side of the "pull + webhook" handoff (see
 docs/MYASTROSHINE.md):
@@ -10,7 +10,7 @@ docs/MYASTROSHINE.md):
   post the enhanced result (:func:`create_enhanced_duplicate`).
 
 It is deliberately **not** a ``BaseConnector``: the feature is bidirectional,
-lives in the AstroDex tab, and has its own routes. Its config is only stored
+lives in the Astrodex tab, and has its own routes. Its config is only stored
 under ``config["connectors"]["myastroshine"]`` so it rides along in the backup
 ZIP and stays consistent with the rest of the connector config.
 
@@ -503,7 +503,7 @@ class EnhancedDuplicateError(Exception):
 
 
 def create_enhanced_duplicate(claims: Dict[str, Any], image_bytes: bytes, payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Create a duplicated AstroDex picture on the same item, carrying the enhanced image.
+    """Create a duplicated Astrodex picture on the same item, carrying the enhanced image.
 
     Never replaces the source: a new picture is appended. Copies the source
     picture's frozen metadata snapshot, stamps the ``enhanced_*`` provenance
