@@ -109,6 +109,14 @@ class AstronomicalEvent:
     # Comet-specific: SkyTonight target_id, used by the frontend to open the
     # altitude-vs-time popup for this event. None for every other event type.
     target_id: Optional[str] = None
+    # Raw (untranslated) variable piece behind a composed title/description, exposed so
+    # MQTT/API consumers can translate client-side instead of parsing the English sentence.
+    # None where the event kind has no such variable, or doesn't set it below.
+    eclipse_type: Optional[str] = None
+    planet: Optional[str] = None
+    planet2: Optional[str] = None
+    shower_name: Optional[str] = None
+    comet_name: Optional[str] = None
 
 
 class EventsAggregator:
@@ -311,6 +319,23 @@ class EventsAggregator:
             )
 
         return fallback_title, fallback_description
+
+    def _raw_planet_fields(self, event_data: Dict[str, Any]) -> tuple[Optional[str], Optional[str]]:
+        """Raw (untranslated) planet name(s) behind a planetary event's composed title."""
+        event_type = event_data.get("event_type", "")
+        raw = event_data.get("raw_data", {}) or {}
+
+        if event_type == EventType.MOON_CONJUNCTION.value:
+            return (raw.get("planet2") or None, None)
+        if event_type == EventType.PLANETARY_CONJUNCTION.value:
+            return (raw.get("planet1") or None, raw.get("planet2") or None)
+        if event_type in (
+            EventType.PLANETARY_OPPOSITION.value,
+            EventType.PLANETARY_ELONGATION.value,
+            EventType.PLANETARY_RETROGRADE.value,
+        ):
+            return (raw.get("planet") or None, None)
+        return (None, None)
 
     def _localize_special_phenomena_text(self, event_data: Dict[str, Any]) -> tuple[str, str]:
         """Localize special phenomena title/description using raw event identifiers."""
@@ -549,6 +574,7 @@ class EventsAggregator:
             score=score,
             raw_data=eclipse_data,
             structure_key="sun",
+            eclipse_type=eclipse_type,
         )
         events.append(event)
         return events
@@ -621,6 +647,7 @@ class EventsAggregator:
             score=lunar_eclipse.get("astrophotography_score"),
             raw_data=eclipse_data,
             structure_key="moon",
+            eclipse_type=eclipse_type,
         )
         events.append(event)
         return events
@@ -1225,6 +1252,7 @@ class EventsAggregator:
 
                 event_type = event_data.get("event_type", "Planetary Event")
                 title, description = self._localize_planetary_text(event_data)
+                planet, planet2 = self._raw_planet_fields(event_data)
                 icon_class = event_data.get("icon_class") or self._infer_icon_class(event_type)
                 icon_color_class = event_data.get("icon_color_class") or self._importance_icon_color_class(importance)
 
@@ -1247,6 +1275,8 @@ class EventsAggregator:
                     score=event_data.get("score"),
                     raw_data=event_data,
                     structure_key="calendar",
+                    planet=planet,
+                    planet2=planet2,
                 )
                 events.append(event)
             except Exception as e:
@@ -1333,6 +1363,9 @@ class EventsAggregator:
                 description = event_data.get("description", "")
                 icon_class = event_data.get("icon_class") or self._infer_icon_class(event_type, "bi bi-meteor")
                 icon_color_class = event_data.get("icon_color_class") or self._importance_icon_color_class(importance)
+                raw = event_data.get("raw_data", {}) or {}
+                shower_name = raw.get("shower") if event_type == EventType.METEOR_SHOWER.value else None
+                comet_name = raw.get("comet") if event_type == EventType.COMET_APPEARANCE.value else None
 
                 event = AstronomicalEvent(
                     id=(
@@ -1355,6 +1388,8 @@ class EventsAggregator:
                     structure_key="calendar",
                     altitude_limited=bool(event_data.get("altitude_limited", False)),
                     target_id=event_data.get("target_id"),
+                    shower_name=shower_name,
+                    comet_name=comet_name,
                 )
                 events.append(event)
             except Exception as e:

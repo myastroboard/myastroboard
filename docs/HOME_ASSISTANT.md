@@ -231,7 +231,7 @@ Nearest hourly forecast row plus the astro analysis.
 
 | Key | Entity name | Kind | Notes |
 |---|---|---|---|
-| `next_event` | Next event | sensor | same "next event" as the dashboard banner; attributes: type, description, start / peak / end, importance |
+| `next_event` | Next event | sensor | same "next event" as the dashboard banner; attributes: event_type, description, start / peak / end, importance, events_count, plus the event's raw (untranslated) variable piece where applicable - `eclipse_type` (solar/lunar eclipses), `planet`/`planet2` (planetary conjunction/opposition/elongation/retrograde, moon conjunction), `shower_name` (meteor showers), `comet_name` (comet appearances); state and `description` are English-only by design (MQTT is a background publish loop with no session language to read) - clients that want a localized display should translate client-side off `event_type` and these attributes, the same way `top_target_attributes.object_type` already needs to be |
 | `next_event_at` | Next event at | sensor (timestamp) |  |
 | `next_iss_pass_at` | Next ISS pass | sensor (timestamp) |  |
 | `next_iss_pass_peak_altitude` | Next ISS pass peak altitude | sensor (°) |  |

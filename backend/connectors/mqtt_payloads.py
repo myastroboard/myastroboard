@@ -778,11 +778,16 @@ def _events_state(location: Dict[str, Any], config: Dict[str, Any], now: datetim
     try:
         from utils.events_aggregator import EventsAggregator
 
+        # MQTT is a background publish loop with no request/session to read a language
+        # from, and the connector has no language setting of its own (nor should it -
+        # title/description below are English-only by design; event_type and the
+        # per-kind attributes are the intended localization seam for MQTT consumers,
+        # e.g. the Lovelace card translating client-side). See feature-lang-mqtt.md.
         aggregator = EventsAggregator(
             float(location.get("latitude") or 0.0),
             float(location.get("longitude") or 0.0),
             str(location.get("timezone") or "UTC"),
-            language=str(config.get("language") or "en"),
+            language="en",
         )
         events = aggregator.aggregate_all_events(
             solar_eclipse_data=caches.get("solar_eclipse"),
@@ -809,6 +814,14 @@ def _events_state(location: Dict[str, Any], config: Dict[str, Any], now: datetim
                 "importance": nxt.get("importance"),
                 "visible": nxt.get("visibility"),
                 "events_count": events.get("events_count"),
+                # Raw (untranslated) variable piece behind the English title/description
+                # above, one per event kind - None where not applicable. See
+                # feature-lang-mqtt.md: this is the localization seam for MQTT consumers.
+                "eclipse_type": text(nxt.get("eclipse_type")),
+                "planet": text(nxt.get("planet")),
+                "planet2": text(nxt.get("planet2")),
+                "shower_name": text(nxt.get("shower_name")),
+                "comet_name": text(nxt.get("comet_name")),
             }
     except Exception as exc:
         logger.debug("MQTT: events aggregation for %s failed: %s", lid, exc)

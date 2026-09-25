@@ -12,7 +12,18 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixes
 
-- None.
+- MQTT / Home Assistant `next_event` sensor: `title`/`description` were silently composed in
+  English regardless of the viewer's language (the connector never had a `language` setting to
+  begin with). Now hardcoded English on purpose, with the event's raw variable piece
+  (`eclipse_type`, `planet`/`planet2`, `shower_name`, `comet_name`) exposed as new attributes so
+  MQTT consumers (e.g. a Lovelace card) can translate client-side instead of showing mixed-language
+  text.
+- Machine-translation bugs found while building that client-side translation table:
+  `skytonight.type_ass` (an OpenNGC catalogue code, not a word) had been translated as slang for
+  "buttocks" in `de`/`es`/`it`/`pt`, `de.json`'s `skytonight.type_open_cluster` read as an
+  imperative ("open the cluster!") instead of the noun phrase, `de.json`'s `eclipse_type.total`/
+  `.partial` used "Gesamt" (sum/aggregate) and an adverb instead of the astronomy adjectives, and
+  `it`/`pt.json`'s entire `planets.*` namespace was left as literal English words. All corrected.
 
 ### Breaking changes
 
