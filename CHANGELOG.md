@@ -12,6 +12,20 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixes
 
+- None.
+
+### Breaking changes
+
+- None.
+
+## 1.6.2 (2026-09-25)
+
+### Features
+
+- None.
+
+### Fixes
+
 - MQTT / Home Assistant `next_event` sensor: `title`/`description` were silently composed in
   English regardless of the viewer's language (the connector never had a `language` setting to
   begin with). Now hardcoded English on purpose, with the event's raw variable piece
