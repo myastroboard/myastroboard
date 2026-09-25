@@ -256,8 +256,8 @@
       "low": "Geringes Interesse - Kaum sichtbar"
     },
     "eclipse_type": {
-      "total": "Gesamt",
-      "partial": "Teilweise",
+      "total": "Totale",
+      "partial": "Partielle",
       "penumbral": "Halbschatten"
     },
     "failed_to_load_lunar_eclipse_data": "Die Daten zur Mondfinsternis konnten nicht geladen werden",
@@ -279,8 +279,8 @@
     "position_at_peak": "Position an der Spitze",
     "astrophoto_score": "Astrofotografie-Score",
     "eclipse_type": {
-      "total": "Gesamt",
-      "partial": "Teilweise",
+      "total": "Totale",
+      "partial": "Partielle",
       "annular": "Ringförmig"
     },
     "type": "Typ:",
@@ -1287,7 +1287,7 @@
     "distance_sun_au": "Entfernung Sonne (AU)",
     "catalogue_names": "Katalog-Kennungen",
     "type_galaxy": "Galaxis",
-    "type_open_cluster": "Cluster öffnen",
+    "type_open_cluster": "Offener Sternhaufen",
     "type_dark_nebula": "Dunkler Nebel",
     "type_emission_nebula": "Emissionsnebel",
     "type_galaxy_group": "Galaxy-Gruppe",
@@ -1321,7 +1321,7 @@
     "type_nightscape": "Nachtlandschaft / Weitwinkel",
     "type_star_trail": "Sternspuren",
     "type_other": "Andere",
-    "type_ass": "*Arsch",
+    "type_ass": "*Ass",
     "type_bn_oc": "BN+OC",
     "type_cl_n": "CL+N",
     "type_dn": "DN",

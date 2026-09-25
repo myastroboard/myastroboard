@@ -525,8 +525,11 @@ class TestLocationDevice:
         }
         caches[("lunar_eclipse", "loc-1")] = {"lunar_eclipse": None}
 
+        captured_language = {}
+
         class _FakeAggregator:
             def __init__(self, lat, lon, tz, language="en"):
+                captured_language["value"] = language
                 self.args = (lat, lon, tz, language)
 
             def aggregate_all_events(self, **kwargs):
@@ -553,6 +556,8 @@ class TestLocationDevice:
                         "days_until_event": 0,
                         "importance": "high",
                         "visibility": True,
+                        "eclipse_type": "Partial",
+                        "planet": "Jupiter",
                     },
                 }
 
@@ -574,7 +579,15 @@ class TestLocationDevice:
         assert s["next_lunar_eclipse_at"] is None and s["next_lunar_eclipse_at_attributes"] == {}
         assert s["next_event"] == "ISS pass" and s["next_event_at"] == "2026-09-17T23:16:00+02:00"
         assert s["next_event_attributes"]["events_count"] == 3 and s["next_event_attributes"]["importance"] == "high"
+        assert s["next_event_attributes"]["eclipse_type"] == "Partial"
+        assert s["next_event_attributes"]["planet"] == "Jupiter"
+        assert s["next_event_attributes"]["shower_name"] is None and s["next_event_attributes"]["comet_name"] is None
         assert set(device.discovery["cmps"]) <= set(s)
+
+        # A "language" key in the connector config is dead: MQTT is a background publish
+        # loop with no request/session, so next_event's title/description must stay
+        # English regardless - a French connector config must not change that.
+        assert captured_language["value"] == "en"
 
     def test_upcoming_events_reports_an_actual_lunar_eclipse(self, caches, no_skytonight, monkeypatch):
         caches[("iss_passes", "loc-1")] = {"passes": []}
