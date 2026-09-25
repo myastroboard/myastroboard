@@ -12,7 +12,10 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixes
 
-- None.
+- Release process: `v1.6.2`'s Docker image was built from the commit just before the `VERSION`
+  bump, so the running app reported itself as `1.6.1` even though it was published under the
+  `1.6.2`/`latest` tags. This release has no functional changes beyond correcting that mismatch -
+  if you're on a correctly-versioned `1.6.2` already, there is nothing new for you here.
 
 ### Breaking changes
 
