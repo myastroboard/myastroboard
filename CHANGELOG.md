@@ -8,6 +8,20 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Features
 
+- None.
+
+### Fixes
+
+- None.
+
+### Breaking changes
+
+- None.
+
+## 1.6.1 (2026-09-25)
+
+### Features
+
 - MQTT / Home Assistant board device: the update indicator is now a native Home Assistant
   `update` entity (installed/latest version, a link to the changelog) instead of a diagnostic
   binary sensor + a separate version sensor, so it shows up in HA's own Updates list and sidebar
