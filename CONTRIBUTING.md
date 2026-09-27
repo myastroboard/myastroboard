@@ -538,6 +538,7 @@ The failure output lists exactly which routes are unexpected or missing, so you 
 - [ ] All tests passing
 - [ ] No merge conflicts
 - [ ] Logging uses centralized system (no `print()`)
+- [ ] Personal data handled per the GDPR rules in `.github/instructions/copilot.instructions.md`, and `docs/PRIVACY.md` updated if the change stores, shares or sends user data
 - [ ] Commit messages follow conventions
 
 ### Review Process

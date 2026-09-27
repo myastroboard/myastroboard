@@ -793,6 +793,7 @@ Update `EXPECTED_ROUTES` in that file to match, and document the change in `CHAN
 - [ ] No `print()` or direct `logging` import in backend code (use `logging_config.get_logger`)
 - [ ] No `innerHTML` / new `DOMUtils.setTrustedHTML` in `static/js/**`
 - [ ] No new static inline `style="..."` / `.style.x =` (use a CSS class; JS show/hide and genuinely dynamic values are the only exceptions)
+- [ ] Personal data rules followed if the change stores, shares or sends user data (see [Personal Data (GDPR)](#personal-data-gdpr)), and `docs/PRIVACY.md` updated accordingly
 
 ## Security Considerations
 
@@ -807,6 +808,38 @@ Update `EXPECTED_ROUTES` in that file to match, and document the change in `CHAN
   - Saving to config
   - Using in file paths (use `slugify_location_name` for location-derived paths)
   - Returning in API responses
+
+### Personal Data (GDPR)
+
+MyAstroBoard is self-hosted: each instance operator is the data controller, and the application must
+make GDPR compliance easy for them. [docs/PRIVACY.md](../../docs/PRIVACY.md) is the operator-facing
+inventory; keep it true. Any feature that stores, shares or sends data about a user follows these rules:
+
+- **Per-user files** are named `<user_id>_...` and live in a directory listed in `user_data_dirs()`
+  (`backend/utils/user_data.py`). That single list drives both account deletion (right to erasure)
+  and the "Download my data" ZIP (right to portability) - a directory missing from it leaves data
+  behind on deletion and out of the export. `tests/utils/test_user_data.py` scans `backend/` and
+  fails when a new `*_DIR` data constant is unclassified or an unknown module builds `<user_id>_`
+  file names: classify it there, never silence it.
+- **Per-user data inside a shared file** (e.g. a key in `users.json` or `config.json`) must be
+  removed in `UserManager.delete_user()` and included by `build_user_export()`.
+- **Image uploads** go through `strip_image_metadata()` (`backend/utils/image_privacy.py`) before
+  being written - never `file.save()` a user picture directly: EXIF carries the GPS position of the
+  observer's home and camera serial numbers.
+- **Private by default**: anything that exposes one user's data to other users (sharing, maps,
+  feeds, MQTT) is off until the user or admin turns it on. A new default that shares more than
+  before applies to new installs only - existing installs keep their behaviour (see how
+  `map_private` is defaulted in `repo_config._read_merged_config()`).
+- **Third parties**: a new outbound call that carries coordinates, an IP address (anything the
+  browser fetches directly) or user content gets a row in the *Third parties* table of PRIVACY.md,
+  with the country when it is outside the EU. No analytics, tracking pixels, or CDN-hosted assets.
+- **Logs**: usernames and IP addresses are acceptable (they are trimmed after
+  `log_retention_days`); passwords, tokens, secrets, push keys, precise coordinates or free-text user
+  content are not.
+- **Secrets are never exported**: password hashes, TOTP secrets and push keys stay out of API
+  responses and of the personal data export.
+- **New kind of personal data** (a new field, a new store, a new integration): update PRIVACY.md
+  (inventory, retention, third parties) in the same change.
 
 ### Dependency Security
 

@@ -1,9 +1,13 @@
 """Tests for utils.user_data - per-user files: purge (erasure) and export (portability)."""
 
+import ast
+import importlib
 import json
+import os
 import types
 import uuid
 import zipfile
+from pathlib import Path
 
 import pytest
 
@@ -120,3 +124,124 @@ class TestExport:
         archive_file, download_name = user_data.build_user_export(_user(username='a/b c'))
         archive_file.close()
         assert '/' not in download_name and ' ' not in download_name
+
+
+# ---------------------------------------------------------------------------
+# Guard: every per-user store must be covered by user_data_dirs()
+#
+# A feature that keeps user files in a directory user_data_dirs() does not list
+# leaves them behind on account deletion and out of the personal data export,
+# silently. These tests scan backend/ so a new store has to be classified here.
+# ---------------------------------------------------------------------------
+
+_BACKEND = Path(__file__).resolve().parents[2] / 'backend'
+
+# Directories holding ``<user_id>_...`` files: must all be in user_data_dirs()
+_PER_USER_DIRS = {
+    ('observation/astrodex.py', 'ASTRODEX_DIR'),
+    ('observation/astrodex.py', 'ASTRODEX_IMAGES_DIR'),
+    ('equipment/equipment_profiles.py', 'EQUIPMENT_DIR'),
+    ('observation/observation_sessions.py', 'OBSERVATION_SESSIONS_DIR'),
+    ('observation/plan_my_night.py', 'PLAN_DIR'),
+    ('observation/wishlist.py', 'WISHLIST_DIR'),
+}
+
+# Data directories that hold no per-user files, with the reason
+_SHARED_DIRS = {
+    ('utils/constants.py', 'DATA_DIR'): 'data root',
+    ('utils/app_settings.py', '_DATA_DIR'): 'data root',
+    ('utils/security_settings.py', '_DATA_DIR'): 'data root',
+    ('utils/constants.py', 'DATA_DIR_CACHE'): 'shared computed caches',
+    ('utils/constants.py', 'SKYTONIGHT_DIR'): 'shared SkyTonight engine data',
+    ('utils/constants.py', 'SKYTONIGHT_CATALOGUES_DIR'): 'shared SkyTonight engine data',
+    ('utils/constants.py', 'SKYTONIGHT_CALCULATIONS_DIR'): 'shared SkyTonight engine data',
+    ('utils/constants.py', 'CONFIG_DIR'): 'shared SkyTonight engine data',
+    ('utils/constants.py', 'OUTPUT_DIR'): 'shared SkyTonight engine data',
+    ('utils/constants.py', 'SKYTONIGHT_OUTPUT_DIR'): 'shared SkyTonight engine data',
+    ('utils/constants.py', 'SKYTONIGHT_LOGS_DIR'): 'shared SkyTonight engine data',
+    ('utils/constants.py', 'SKYTONIGHT_RUNTIME_DIR'): 'shared SkyTonight engine data',
+    ('observation/object_info.py', 'OBJECT_IMAGE_CACHE_DIR'): 'catalogue object images',
+    ('space/css_passes.py', 'SKYFIELD_CACHE_DIR'): 'ephemeris cache',
+    ('space/iss_passes.py', 'SKYFIELD_CACHE_DIR'): 'ephemeris cache',
+    ('space/spaceflight_tracker.py', '_SPACEFLIGHT_IMAGES_DIR'): 'launch images cache',
+}
+
+# Modules allowed to build ``<user_id>_...`` file names (all write into _PER_USER_DIRS)
+_USER_FILE_MODULES = {
+    'blueprints/astrodex.py',
+    'blueprints/observation_sessions.py',
+    'blueprints/plan_my_night.py',
+    'blueprints/skytonight_api.py',
+    'equipment/equipment_profiles.py',
+    'observation/astrodex.py',
+    'observation/myastroshine_integration.py',
+    'observation/observation_sessions.py',
+    'observation/plan_my_night.py',
+    'observation/wishlist.py',
+    'utils/auth.py',
+    'utils/user_data.py',
+}
+
+_HOW_TO_FIX = (
+    "If it stores per-user files, add it to user_data_dirs() in backend/utils/user_data.py "
+    "(so account deletion and the personal data export cover it) and to the lists in this test; "
+    "otherwise classify it as shared here. See the 'Personal Data (GDPR)' section of "
+    ".github/instructions/copilot.instructions.md."
+)
+
+
+def _backend_modules():
+    for path in sorted(_BACKEND.rglob('*.py')):
+        if '__pycache__' not in path.parts:
+            yield path.relative_to(_BACKEND).as_posix(), ast.parse(path.read_text(encoding='utf-8'))
+
+
+def _data_dir_constants():
+    """Module-level ``*_DIR`` constants that point into the data directory (not the source tree)."""
+    found = set()
+    for module, tree in _backend_modules():
+        for node in tree.body:
+            if not isinstance(node, (ast.Assign, ast.AnnAssign)) or node.value is None:
+                continue
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            for target in targets:
+                name = getattr(target, 'id', '')
+                if (name.endswith('_DIR') or name.endswith('_DIR_CACHE')) and '__file__' not in ast.unparse(node.value):
+                    found.add((module, name))
+    return found
+
+
+def _is_user_id(node):
+    return isinstance(node, ast.FormattedValue) and ast.unparse(node.value).endswith(('user_id', 'uid'))
+
+
+def _builds_user_file_name(node):
+    """f'{user_id}_...' or f'{user_id}{SOMETHING_SUFFIX}'."""
+    if not isinstance(node, ast.JoinedStr) or len(node.values) < 2 or not _is_user_id(node.values[0]):
+        return False
+    following = node.values[1]
+    if isinstance(following, ast.Constant):
+        return str(following.value).startswith('_')
+    return isinstance(following, ast.FormattedValue) and ast.unparse(following.value).endswith('SUFFIX')
+
+
+class TestEveryPerUserStoreIsCovered:
+    def test_every_data_directory_is_classified(self):
+        unclassified = _data_dir_constants() - _PER_USER_DIRS - set(_SHARED_DIRS)
+        assert not unclassified, f"Unclassified data directories {sorted(unclassified)}. {_HOW_TO_FIX}"
+
+    def test_classification_lists_have_no_stale_entries(self):
+        stale = (_PER_USER_DIRS | set(_SHARED_DIRS)) - _data_dir_constants()
+        assert not stale, f"These directory constants no longer exist, drop them from the lists: {sorted(stale)}"
+
+    def test_per_user_directories_are_in_user_data_dirs(self):
+        covered = {os.path.realpath(directory) for _folder, directory in user_data.user_data_dirs()}
+        for module, name in sorted(_PER_USER_DIRS):
+            value = getattr(importlib.import_module(module[: -len('.py')].replace('/', '.')), name)
+            assert os.path.realpath(value) in covered, f"{module}:{name} is missing from user_data_dirs()"
+
+    def test_only_known_modules_build_per_user_file_names(self):
+        builders = {module for module, tree in _backend_modules() if any(map(_builds_user_file_name, ast.walk(tree)))}
+        unknown = builders - _USER_FILE_MODULES
+        assert not unknown, f"{sorted(unknown)} build <user_id>_ file names. {_HOW_TO_FIX}"
+        assert _USER_FILE_MODULES - builders == set(), "Drop modules that no longer build such names"
