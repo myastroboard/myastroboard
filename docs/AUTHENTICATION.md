@@ -115,7 +115,10 @@ The **Parameters → Users** panel (admin only) allows:
 - **Create user**: username, password, role, and optionally the account scope (see
   [Local vs. global accounts](#local-vs-global-accounts)).
 - **Edit user**: change username, password, role, or account scope.
-- **Delete user**: removes account; Astrodex and equipment data are **not** automatically deleted (data persists in their per-user files).
+- **Delete user**: removes the account **and every per-user file** (Astrodex and pictures, observation
+  sessions and attachments, equipment, plans, wishlist) - see [Privacy & GDPR](PRIVACY.md).
+- **Export data**: downloads the same personal-data ZIP the user gets from *My Settings → Security →
+  Your data*, to answer an access or portability request.
 - **Reset 2FA**: shown only when the user has two-factor authentication active. Clears it
   unconditionally, no password check - see
   [Lost-authenticator recovery](#lost-authenticator-recovery).
@@ -129,6 +132,7 @@ The **Parameters → Users** panel (admin only) allows:
 | `PUT` | `/api/users/<user_id>` | Update username, password, role, or `account_scope` |
 | `DELETE` | `/api/users/<user_id>` | Delete a user |
 | `DELETE` | `/api/users/<user_id>/2fa` | Clear a user's two-factor authentication (admin only, no password check) |
+| `GET` | `/api/users/<user_id>/export` | ZIP of everything stored about a user (see [Privacy & GDPR](PRIVACY.md#data-subject-rights)) |
 
 ---
 
@@ -136,11 +140,12 @@ The **Parameters → Users** panel (admin only) allows:
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| `POST` | `/api/auth/login` | Public | Submit `{"username": ..., "password": ...}` → sets session cookie, or returns `{"status": "2fa_required"}` when a second step is needed (see [Two-factor authentication](#two-factor-authentication)), or `403` when a local-scoped account signs in from an untrusted network |
+| `POST` | `/api/auth/login` | Public | Submit `{"username": ..., "password": ...}` → sets session cookie, or returns `{"status": "2fa_required"}` when a second step is needed (see [Two-factor authentication](#two-factor-authentication)), `403` when a local-scoped account signs in from an untrusted network, or `429` after too many failures (see [Security notes](#security-notes)) |
 | `POST` | `/api/auth/login/verify-2fa` | pending session | Second login step: submit `{"code": "123456"}` to complete a login that returned `2fa_required` |
 | `POST` | `/api/auth/logout` | login | Clears session |
 | `GET` | `/api/auth/status` | Public | Returns `{"authenticated": bool, "role": ..., "username": ..., "two_factor_available": bool, "totp_enabled": bool, "account_scope": ...}` |
 | `POST` | `/api/auth/change-password` | login | Change own password |
+| `GET` | `/api/users/me/export` | login | ZIP of everything stored about the signed-in user (any role) |
 | `GET` | `/api/auth/preferences` | login | Get current user's preferences |
 | `PUT` | `/api/auth/preferences` | login | Update preferences (partial update supported) |
 | `POST` | `/api/auth/2fa/setup` | login | Generate this user's TOTP secret, returns `{"secret": ..., "otpauth_uri": ...}`; `400` if 2FA is already active for this user (disable it first) |
@@ -304,8 +309,8 @@ local/global account check:
    minutes; either condition forces a fresh `/api/auth/login` call. The attempt count is tracked
    **server-side, keyed by user ID** - not in the session cookie - specifically so that starting a
    new login (which an attacker who already has the password can always do) does not reset it. A
-   6-digit TOTP code is a much smaller search space than a password, so this endpoint is throttled
-   even though the app has no login rate-limiting elsewhere (see [Security notes](#security-notes)).
+   6-digit TOTP code is a much smaller search space than a password, so this endpoint has a tighter
+   limit than password sign-in (see [Security notes](#security-notes)).
 4. `login_required` needs no special handling for the pending state: it only checks for
    `'username' in session`, which stays unset throughout - every existing authenticated route
    stays correctly locked out mid-2FA.
@@ -351,7 +356,14 @@ the login rather than to **skip** a step.
 
 - Session cookies are `HttpOnly` by default (not accessible by JavaScript).
 - Enable `session_cookie_secure = true` + `trust_proxy_headers = true` when deploying with HTTPS behind a reverse proxy.
-- The API does not implement rate limiting on login attempts at the application level — use a reverse proxy with rate-limiting rules for public-facing deployments. `POST /api/auth/login/verify-2fa` is the one exception: it has its own 5-attempt, 5-minute limit (see [Two-factor authentication](#two-factor-authentication)), since a 6-digit code is a much smaller search space than a password.
+- **Password sign-in is throttled**: after 5 failed attempts for the same username from the same IP
+  address, or 20 failed attempts from one IP address across any usernames, within 15 minutes,
+  `POST /api/auth/login` answers `429` with a `Retry-After` header until the window has passed. A
+  successful sign-in resets that username's counter. Counting per IP + username means a stranger
+  cannot lock a user out from the user's own address. The counters live in memory per worker process
+  (`gunicorn -w N` multiplies the ceiling by N) and reset on restart, so a reverse proxy with its own
+  rate limit remains a good complement for public-facing deployments. `POST /api/auth/login/verify-2fa`
+  has its own, tighter 5-attempt, 5-minute limit (see [Two-factor authentication](#two-factor-authentication)).
 - There is no email-based password reset: an admin must reset passwords via the Users panel.
 - Network and 2FA checks in `POST /api/auth/login` run strictly **after** password verification. Checking them first would let an unauthenticated caller probe account existence or configuration (local scope, 2FA status) without a valid credential.
 - Two-factor secrets live directly on the `User` record in `users.json`, the same file and precedent as `password_hash` (already a sensitive field included in backups) - not in the `connectors_secrets.json`-style sidecar used for connector credentials, since that pattern exists specifically to keep those out of backups.

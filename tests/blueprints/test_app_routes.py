@@ -550,6 +550,22 @@ class TestAdminEndpoints:
         resp = client_admin.post('/api/admin/app-settings', json={'trust_proxy_headers': False})
         assert resp.status_code == 200
 
+    def test_log_retention_is_saved_clamped_and_applied_when_changed(self, client_admin, monkeypatch):
+        from blueprints import admin as admin_bp_module
+
+        applied = []
+        monkeypatch.setattr(admin_bp_module, 'apply_log_retention', applied.append)
+
+        assert client_admin.post('/api/admin/app-settings', json={'log_retention_days': 99999}).status_code == 200
+        assert client_admin.get('/api/admin/app-settings').get_json()['log_retention_days'] == 3650
+        assert applied == [3650]
+
+        client_admin.post('/api/admin/app-settings', json={'log_retention_days': 3650})
+        assert applied == [3650]  # unchanged value: no extra pass
+
+        client_admin.post('/api/admin/app-settings', json={'log_retention_days': 'not a number'})
+        assert client_admin.get('/api/admin/app-settings').get_json()['log_retention_days'] == 3650
+
     def test_get_logs_level_returns_200(self, client_admin):
         resp = client_admin.get('/api/logs/level')
         assert resp.status_code == 200

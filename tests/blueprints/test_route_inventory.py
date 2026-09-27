@@ -53,6 +53,8 @@ EXPECTED_ROUTES = {
     ('/api/users/<user_id>', ('DELETE',)),
     ('/api/users/<user_id>', ('PUT',)),
     ('/api/users/<user_id>/2fa', ('DELETE',)),
+    ('/api/users/<user_id>/export', ('GET',)),
+    ('/api/users/me/export', ('GET',)),
     # --- config ---
     ('/api/config', ('GET',)),
     ('/api/config', ('POST',)),

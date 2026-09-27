@@ -65,9 +65,10 @@ attachments (PDF, Word, text) are stored as sent: remove author metadata before 
 it matters.
 
 The coordinates a user types **manually** on an Astrodex picture are different: they are
-deliberate data used by the photo map. By default the map shows them to every user whose Astrodex
-is shared; enable *Configuration -> Astrodex -> Photo map private* to restrict it (see
-[Astrodex](ASTRODEX.md)).
+deliberate data used by the photo map. On a new installation the map is private: each user only sees
+their own pictures. Installations created before this default keep sharing the map with every user
+whose Astrodex is shared, until an administrator enables *Configuration -> Astrodex -> Photo map
+private* (see [Astrodex](ASTRODEX.md)).
 
 ---
 
@@ -118,7 +119,7 @@ the browser IP. Mention them in your privacy notice.
 |---|---|
 | Account and all per-user files | The account is deleted (see below). |
 | Locations | An administrator deletes them. |
-| Application log | Rotated by size: 10 MB per file, 5 archives kept. On a quiet instance this can cover several months - export or trim `data/myastroboard.log*` if you need a shorter period. |
+| Application log | 90 days by default: older lines are removed once a day (*Parameters -> Advanced -> Privacy*, 0 to 3650 days; 0 keeps only the size limit of 10 MB x 6 files). |
 | Backups downloaded from *Configuration* | Under your control, outside the application: they contain everything listed above. |
 
 ---
@@ -127,10 +128,10 @@ the browser IP. Mention them in your privacy notice.
 
 | Right | How to fulfil it today |
 |---|---|
-| Access (Art. 15) | The user sees all their data in the interface. An administrator can extract the user's files from `data/` (all named `<user_id>_...`). |
+| Access (Art. 15) | *My Settings -> Security -> Your data* downloads a ZIP of everything stored about the user; an administrator can download the same archive for any user from *Parameters -> Users -> Export data*. |
 | Rectification (Art. 16) | Users edit their own data; an administrator edits accounts and locations. |
 | Erasure (Art. 17) | An administrator deletes the account in *Users*. This removes the account **and every per-user file**: Astrodex and pictures, observation sessions and attachments, equipment, plans and wishlist. Log lines mentioning the user remain until rotation. |
-| Portability (Art. 20) | PDF export of observation sessions, CSV/PDF export of plans. There is no one-click full export per user yet; an administrator can hand over the user's `<user_id>_*` files (JSON). |
+| Portability (Art. 20) | The same ZIP: account and preferences, locations, Astrodex, observation log, equipment, plans and wishlist as JSON, with pictures and attachments as the original files. Password hashes and two-factor secrets are left out. |
 | Objection / restriction | Handled by the administrator (disable the account, remove a location). |
 
 Accounts deleted **before** full erasure existed may have left files behind. To find them, compare
@@ -141,9 +142,9 @@ files whose id no longer exists.
 
 ## Security measures
 
-- Password hashing, optional two-factor authentication (TOTP) with rate-limited code attempts.
-  Password attempts themselves are not throttled by the application: if the instance is exposed to
-  the Internet, add rate limiting at the reverse proxy or enable 2FA.
+- Password hashing, optional two-factor authentication (TOTP), and throttled sign-in: 5 failed
+  passwords per username and address, or 20 per address, within 15 minutes
+  ([details](AUTHENTICATION.md#security-notes)).
 - Session cookie `HttpOnly`, `SameSite=Lax`, optional `Secure` flag; serve the instance over HTTPS
   behind a reverse proxy ([guide](6.REVERSE_PROXY.md)).
 - Role-based access (admin / user / read-only) and *local-only* accounts restricted to trusted
@@ -185,7 +186,9 @@ of the observing locations; map tiles (Esri - USA) and place names (OpenStreetMa
 loaded by your browser. [Add enabled integrations: MQTT, MyAstroShine...]
 
 Retention: your data is kept while your account exists and deleted with it. Server logs
-are rotated and kept for about [period].
+are kept for [90] days.
+
+You can download all your data at any time from My Settings -> Security -> Your data.
 
 Your rights: access, rectification, erasure, portability, objection. Contact [email].
 You may lodge a complaint with your data protection authority ([e.g. CNIL]).

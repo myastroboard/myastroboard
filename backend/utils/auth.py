@@ -18,6 +18,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from utils.file_lock import interprocess_lock
 from utils.logging_config import get_logger
 from utils.i18n_utils import SUPPORTED_LANGUAGES
+from utils.user_data import purge_user_files
 
 logger = get_logger(__name__)
 
@@ -1078,57 +1079,6 @@ class UserManager:
         # Log failure without revealing if username exists
         logger.warning(f"Failed authentication attempt for username: {username}")
         return None
-
-
-def _user_data_dirs():
-    """Every directory holding per-user files named ``<user_id>_...``.
-
-    Resolved on each call (not at import) so tests that repoint a module's
-    directory constant are honoured.
-    """
-    from equipment import equipment_profiles
-    from observation import astrodex, observation_sessions, plan_my_night, wishlist
-
-    return [
-        astrodex.ASTRODEX_DIR,
-        astrodex.ASTRODEX_IMAGES_DIR,
-        equipment_profiles.EQUIPMENT_DIR,
-        observation_sessions.OBSERVATION_SESSIONS_DIR,
-        observation_sessions.attachments_dir(),
-        plan_my_night.PLAN_DIR,
-        wishlist.WISHLIST_DIR,
-    ]
-
-
-def purge_user_files(user_id):
-    """Delete every per-user file of ``user_id`` (``<user_id>_*``) and return how many were removed.
-
-    Best effort: a file that cannot be removed is logged and skipped so one
-    failure never leaves the rest of the user's data behind.
-    """
-    user_id = str(user_id)
-    if not re.match(r"^[A-Za-z0-9-]+$", user_id):
-        logger.warning(f"Refusing to purge files for malformed user id {user_id!r}")
-        return 0
-
-    prefix = f"{user_id}_"
-    removed = 0
-    for directory in _user_data_dirs():
-        base_dir = os.path.realpath(directory)
-        if not os.path.isdir(base_dir):
-            continue
-        for filename in os.listdir(base_dir):
-            if not filename.startswith(prefix):
-                continue
-            file_path = os.path.realpath(os.path.join(base_dir, filename))
-            if not file_path.startswith(base_dir + os.sep) or not os.path.isfile(file_path):
-                continue
-            try:
-                os.remove(file_path)
-                removed += 1
-            except OSError as remove_error:
-                logger.warning(f"Failed to delete user data file {filename}: {remove_error}")
-    return removed
 
 
 # Global user manager instance

@@ -8,21 +8,31 @@ from collections import deque
 from datetime import datetime, timedelta, timezone
 from threading import Lock
 
-from flask import Blueprint, request, jsonify, session
+from flask import Blueprint, request, jsonify, send_file, session
 
 from utils import security_settings as _security_settings
 from utils.auth import ALLOWED_ACCOUNT_SCOPES, user_manager, login_required, admin_required, get_current_user
 from utils.logging_config import get_logger
+from utils.rate_limit import SlidingWindowCounter
+from utils.user_data import build_user_export
 
 logger = get_logger(__name__)
 
 auth_bp = Blueprint('auth', __name__)
 
 # Pending-2FA window. A 6-digit code is a far smaller search space than a password,
-# so OTP verification is throttled even though password login is not (that gap is
-# documented in docs/AUTHENTICATION.md and belongs to a reverse proxy).
+# so OTP verification gets its own, tighter throttle below.
 PENDING_2FA_TTL_SECONDS = 300
 PENDING_2FA_MAX_ATTEMPTS = 5
+
+# Password sign-in throttle, counting failures only. Keyed by client IP + username so a
+# stranger guessing a user's password cannot lock that user out from their own address,
+# plus a looser per-IP ceiling against spraying many usernames from one address.
+LOGIN_FAILURE_WINDOW_SECONDS = 15 * 60
+LOGIN_MAX_FAILURES_PER_ACCOUNT = 5
+LOGIN_MAX_FAILURES_PER_IP = 20
+_login_failures_by_account = SlidingWindowCounter(LOGIN_MAX_FAILURES_PER_ACCOUNT, LOGIN_FAILURE_WINDOW_SECONDS)
+_login_failures_by_ip = SlidingWindowCounter(LOGIN_MAX_FAILURES_PER_IP, LOGIN_FAILURE_WINDOW_SECONDS)
 
 _PENDING_2FA_KEYS = (
     'pending_2fa_user_id',
@@ -180,14 +190,30 @@ def login():
                 400,
             )
 
-        user = user_manager.authenticate(username, password)
-        if not user:
-            logger.warning(f"Failed login attempt for username: {username!r}")
-            return jsonify({'error': 'Invalid credentials', 'error_key': 'auth.invalid_credentials'}), 401
-
         # request.remote_addr already resolves the real client IP behind a trusted
         # reverse proxy (ProxyFix, wired in app.py from trust_proxy_headers).
         client_ip = request.remote_addr
+        ip_key = client_ip or 'unknown'
+        account_key = f"{ip_key}|{str(username).strip().lower()}"
+
+        # Checked before the password so a throttled client cannot keep probing it
+        if _login_failures_by_account.exceeded(account_key) or _login_failures_by_ip.exceeded(ip_key):
+            retry_after = max(
+                _login_failures_by_account.retry_after(account_key), _login_failures_by_ip.retry_after(ip_key)
+            )
+            logger.warning(f"Login throttled for username {username!r} from {client_ip!r}")
+            response = jsonify({'error': 'Too many failed attempts', 'error_key': 'auth.login_too_many_attempts'})
+            response.headers['Retry-After'] = str(retry_after)
+            return response, 429
+
+        user = user_manager.authenticate(username, password)
+        if not user:
+            _login_failures_by_account.record(account_key)
+            _login_failures_by_ip.record(ip_key)
+            logger.warning(f"Failed login attempt for username: {username!r}")
+            return jsonify({'error': 'Invalid credentials', 'error_key': 'auth.invalid_credentials'}), 401
+
+        _login_failures_by_account.clear(account_key)
         settings = _security_settings.get_security_settings()
         configured_networks = settings.get('trusted_networks') or []
         client_is_trusted = _security_settings.is_client_ip_trusted(client_ip, settings)
@@ -810,4 +836,43 @@ def admin_disable_user_2fa(user_id):
         return jsonify({'error': 'Invalid request', 'error_key': error_key}), 400
     except Exception as e:
         logger.error(f"Error disabling 2FA for user {user_id}: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+# ============================================================
+# Personal data export (GDPR right to data portability)
+# ============================================================
+
+
+def _send_user_export(user, requested_by):
+    archive, download_name = build_user_export(user)
+    logger.info(f"Personal data export of {user.username!r} downloaded by {requested_by!r}")
+    return send_file(archive, mimetype='application/zip', as_attachment=True, download_name=download_name)
+
+
+@auth_bp.route('/api/users/me/export', methods=['GET'])
+@login_required
+def export_my_data():
+    """ZIP of everything stored about the signed-in user (any role, read-only included)."""
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({'error': 'Authentication required'}), 401
+        return _send_user_export(user, user.username)
+    except Exception as e:
+        logger.error(f"Error exporting personal data: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@auth_bp.route('/api/users/<user_id>/export', methods=['GET'])
+@admin_required
+def admin_export_user_data(user_id):
+    """Same ZIP for any user, so an administrator can answer an access or portability request."""
+    try:
+        user = user_manager.get_user_by_id(user_id)
+        if not user:
+            return jsonify({'error': 'User not found', 'error_key': 'users.user_not_found'}), 404
+        return _send_user_export(user, session.get('username', '?'))
+    except Exception as e:
+        logger.error(f"Error exporting personal data of user {user_id}: {e}")
         return jsonify({'error': 'Internal server error'}), 500

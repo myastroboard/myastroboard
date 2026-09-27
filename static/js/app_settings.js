@@ -7,10 +7,12 @@ async function loadAppSettings() {
         const trustEl = document.getElementById('app-setting-trust-proxy');
         const secureEl = document.getElementById('app-setting-session-secure');
         const indexingEl = document.getElementById('app-setting-search-indexing');
+        const retentionEl = document.getElementById('app-setting-log-retention');
         if (emailEl) emailEl.value = settings.vapid_contact_email || '';
         if (trustEl) trustEl.checked = !!settings.trust_proxy_headers;
         if (secureEl) secureEl.checked = !!settings.session_cookie_secure;
         if (indexingEl) indexingEl.checked = !!settings.search_engine_indexing;
+        if (retentionEl) retentionEl.value = settings.log_retention_days ?? 90;
     } catch (err) {
         console.error('Failed to load app settings:', err);
     }
@@ -23,7 +25,11 @@ async function saveAppSettingsNotifications() {
 
 async function saveAppSettingsPrivacy() {
     const indexing = document.getElementById('app-setting-search-indexing')?.checked ?? false;
-    await _saveAppSettings({ search_engine_indexing: indexing }, 'privacy');
+    const retentionEl = document.getElementById('app-setting-log-retention');
+    const partial = { search_engine_indexing: indexing };
+    if (retentionEl && retentionEl.value !== '') partial.log_retention_days = Number(retentionEl.value);
+    await _saveAppSettings(partial, 'privacy');
+    if (retentionEl) loadAppSettings(); // show the value the server kept (clamped to 0-3650)
 }
 
 async function saveAppSettingsProxy() {

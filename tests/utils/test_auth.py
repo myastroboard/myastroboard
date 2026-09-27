@@ -621,9 +621,6 @@ class TestUserManagerDeleteUser:
             assert not (tmp_path / folder / f'{alice.user_id}{suffix}').exists(), folder
             assert (tmp_path / folder / f'{bob.user_id}{suffix}').exists(), folder
 
-    def test_purge_user_files_rejects_malformed_user_id(self):
-        assert auth.purge_user_files('../etc') == 0
-
 
 class TestUserManagerPreferences:
 

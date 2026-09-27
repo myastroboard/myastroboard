@@ -588,6 +588,10 @@
     "default_location_name": "Mon lieu d'observation"
   },
   "settings": {
+    "my_data_title": "Vos données",
+    "my_data_desc": "Téléchargez une archive ZIP de tout ce que cette instance conserve sur vous : compte, préférences, Astrodex et photos, journal d'observation, équipement, plans et liste de souhaits.",
+    "my_data_export_btn": "Télécharger mes données",
+    "my_data_export_started": "Préparation de l'export des données, le téléchargement va démarrer...",
     "customize": "Personnaliser",
     "customize_info": "Personnalisez les valeurs par défaut du tableau de bord et les préférences d'affichage. Ces paramètres s'appliquent uniquement à votre compte.",
     "security": "Sécurité",
@@ -866,6 +870,8 @@
     "app_settings_privacy_title": "Confidentialité et moteurs de recherche",
     "app_settings_privacy_desc": "Par défaut, cette instance est privée : il est demandé aux moteurs de recherche de ne pas l'explorer ni l'indexer, y compris la page de connexion. N'activez ceci que si vous voulez que votre page de connexion soit trouvable sur Google et les autres moteurs de recherche.",
     "app_settings_indexing_label": "Autoriser les moteurs de recherche à indexer la page de connexion",
+    "app_settings_log_retention_label": "Conserver les lignes du journal pendant (jours)",
+    "app_settings_log_retention_help": "Le journal contient des noms d'utilisateur et des adresses IP. Les lignes plus anciennes sont supprimées une fois par jour. 0 les conserve jusqu'à ce que la limite de taille les fasse tourner.",
     "app_settings_proxy_title": "Proxy inverse",
     "app_settings_proxy_desc": "Activez ces paramètres uniquement si MyAstroBoard fonctionne derrière un proxy inverse (NGINX, Traefik, etc.) avec HTTPS. Un redémarrage du conteneur est nécessaire pour appliquer les modifications.",
     "app_settings_trust_proxy_label": "Faire confiance aux en-têtes proxy (X-Forwarded-*)",
@@ -1800,6 +1806,7 @@
     "minutes_short": "{minutes} min"
   },
   "users": {
+    "export_data": "Exporter les données",
     "user_management": "Gestion des utilisateurs",
     "manage_users": "Gérer les utilisateurs et leurs rôles d'accès.",
     "username": "Nom d'utilisateur",
@@ -2372,6 +2379,7 @@
     "otp_back": "Retour à la connexion",
     "invalid_otp_code": "Code de vérification invalide. Veuillez réessayer.",
     "otp_too_many_attempts": "Trop de codes incorrects. Veuillez vous reconnecter.",
+    "login_too_many_attempts": "Trop de tentatives de connexion échouées. Veuillez patienter quelques minutes puis réessayer.",
     "otp_session_expired": "Vérification expirée. Veuillez vous reconnecter.",
     "local_account_network_restricted": "Ce compte ne peut se connecter que depuis un réseau de confiance."
   },

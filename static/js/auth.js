@@ -846,6 +846,14 @@ function displayUsers(users) {
             }));
         }
 
+        actionsCell.appendChild(createActionButton({
+            className: 'btn btn-secondary btn-small user-export-data mb-2 me-2',
+            userId: user.user_id,
+            username: user.username,
+            iconClass: 'bi bi-file-earmark-zip icon-inline',
+            label: i18n.t('users.export_data')
+        }));
+
         if (!isCurrentUser) {
             actionsCell.appendChild(createActionButton({
                 className: 'btn btn-danger btn-small user-delete mb-2 me-2',
@@ -896,6 +904,13 @@ function displayUsers(users) {
                 button.getAttribute('data-username'),
                 button.getAttribute('data-account-scope')
             );
+        });
+    });
+
+    usersList.querySelectorAll('.user-export-data').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const userId = e.target.closest('.user-export-data').getAttribute('data-user-id');
+            downloadUserDataExport(`/api/users/${encodeURIComponent(userId)}/export`);
         });
     });
 
@@ -1721,6 +1736,18 @@ async function disableTwoFactor(password) {
     }
 }
 
+// Personal data export (GDPR portability): the browser downloads the ZIP directly.
+function downloadUserDataExport(url) {
+    window.location.href = url;
+    showMessage('success', i18n.t('settings.my_data_export_started'));
+}
+
+function setupMyDataExport() {
+    document.getElementById('my-data-export-btn')?.addEventListener('click', () => {
+        downloadUserDataExport('/api/users/me/export');
+    });
+}
+
 function setupTwoFactorPanel() {
     document.getElementById('security-2fa-enable-btn')?.addEventListener('click', startTwoFactorSetup);
 
@@ -2141,6 +2168,7 @@ if (document.readyState === 'loading') {
         setupThemePickerSync();
         setupSecurityPasswordForm();
         setupTwoFactorPanel();
+        setupMyDataExport();
         setupSecuritySettingsForm();
         setupGlobalErrorHandler();
     });
@@ -2152,6 +2180,7 @@ if (document.readyState === 'loading') {
     setupThemePickerSync();
     setupSecurityPasswordForm();
     setupTwoFactorPanel();
+    setupMyDataExport();
     setupSecuritySettingsForm();
     setupGlobalErrorHandler();
 }

@@ -1760,6 +1760,19 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="shadow p-2 mb-3 rounded bg-sub-container">
+                    <h2>
+                        <i class="bi bi-file-earmark-zip text-info icon-inline" aria-hidden="true"></i> <span data-i18n="settings.my_data_title">Your data</span>
+                    </h2>
+                    <div class="alert alert-info" role="alert" data-i18n="settings.my_data_desc">
+                        Download a ZIP archive of everything this instance stores about you: account, preferences, Astrodex and pictures, observation log, equipment, plans and wishlist.
+                    </div>
+                    <button type="button" id="my-data-export-btn" class="btn btn-primary">
+                        <i class="bi bi-download icon-inline" aria-hidden="true"></i>
+                        <span data-i18n="settings.my_data_export_btn">Download my data</span>
+                    </button>
+                </div>
             </div>
 
         </div>
@@ -2050,6 +2063,11 @@
                                 <input class="form-check-input" type="checkbox" id="app-setting-search-indexing" role="switch">
                                 <label class="form-check-label" for="app-setting-search-indexing" data-i18n="settings.app_settings_indexing_label">Allow search engines to index the login page</label>
                             </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="app-setting-log-retention" data-i18n="settings.app_settings_log_retention_label">Keep application log lines for (days)</label>
+                            <input class="form-control" type="number" id="app-setting-log-retention" min="0" max="3650" step="1">
+                            <div class="form-text" data-i18n="settings.app_settings_log_retention_help">Logs contain usernames and IP addresses. Older lines are deleted once a day. 0 keeps them until the size limit rotates them out.</div>
                         </div>
                     </div>
                     <div class="button-group mt-2">

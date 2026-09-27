@@ -25,7 +25,11 @@ _DEFAULTS: dict = {
     "trust_proxy_headers": False,
     "session_cookie_secure": False,
     "search_engine_indexing": False,
+    # Days a log line is kept (usernames and IP addresses are personal data); 0 = size-based rotation only
+    "log_retention_days": 90,
 }
+
+LOG_RETENTION_MAX_DAYS = 3650
 
 _cache: dict | None = None
 _cache_mtime: float | None = None
@@ -84,6 +88,22 @@ def get_app_settings() -> dict:
     if _cache is None or get_file_mtime(_APP_SETTINGS_FILE) != _cache_mtime:
         return load_app_settings()
     return _cache
+
+
+def normalize_log_retention_days(value, fallback: int = _DEFAULTS["log_retention_days"]) -> int:
+    """Coerce ``value`` to a whole number of days in [0, LOG_RETENTION_MAX_DAYS], or ``fallback``."""
+    if isinstance(value, bool):
+        return fallback
+    try:
+        days = int(value)
+    except (TypeError, ValueError):
+        return fallback
+    return min(max(days, 0), LOG_RETENTION_MAX_DAYS)
+
+
+def get_log_retention_days() -> int:
+    """Current log retention in days (0 = disabled); registered as the logging retention provider."""
+    return normalize_log_retention_days(get_app_settings().get("log_retention_days"))
 
 
 def reload_app_settings() -> dict:

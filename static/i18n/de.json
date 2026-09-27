@@ -588,6 +588,10 @@
     "default_location_name": "Mein Standort"
   },
   "settings": {
+    "my_data_title": "Deine Daten",
+    "my_data_desc": "Lade ein ZIP-Archiv mit allem herunter, was diese Instanz über dich speichert: Konto, Einstellungen, Astrodex und Bilder, Beobachtungslog, Ausrüstung, Pläne und Wunschliste.",
+    "my_data_export_btn": "Meine Daten herunterladen",
+    "my_data_export_started": "Datenexport wird vorbereitet, der Download startet gleich...",
     "customize": "Anpassen",
     "customize_info": "Personalisieren Sie Dashboard-Standards und Anzeigeeinstellungen. Diese Einstellungen gelten nur für Ihr Konto.",
     "security": "Sicherheit",
@@ -866,6 +870,8 @@
     "app_settings_privacy_title": "Datenschutz und Suchmaschinen",
     "app_settings_privacy_desc": "Standardmäßig ist diese Instanz privat: Suchmaschinen werden gebeten, sie nicht zu crawlen oder zu indexieren, einschließlich der Anmeldeseite. Aktivieren Sie dies nur, wenn Ihre Anmeldeseite bei Google und anderen Suchmaschinen auffindbar sein soll.",
     "app_settings_indexing_label": "Suchmaschinen erlauben, die Anmeldeseite zu indexieren",
+    "app_settings_log_retention_label": "Protokollzeilen aufbewahren für (Tage)",
+    "app_settings_log_retention_help": "Das Protokoll enthält Benutzernamen und IP-Adressen. Ältere Zeilen werden einmal täglich gelöscht. 0 behält sie, bis die Größenbegrenzung sie rotiert.",
     "app_settings_proxy_title": "Reverse Proxy",
     "app_settings_proxy_desc": "Aktivieren Sie diese Einstellungen nur, wenn MyAstroBoard hinter einem Reverse Proxy (NGINX, Traefik, etc.) mit HTTPS betrieben wird. Ein Container-Neustart ist erforderlich, um Änderungen anzuwenden.",
     "app_settings_trust_proxy_label": "Proxy-Headern vertrauen (X-Forwarded-*)",
@@ -1800,6 +1806,7 @@
     "minutes_short": "{minutes} Min."
   },
   "users": {
+    "export_data": "Daten exportieren",
     "user_management": "Benutzerverwaltung",
     "manage_users": "Verwalten Sie Benutzer und ihre Zugriffsrollen.",
     "username": "Benutzername",
@@ -2372,6 +2379,7 @@
     "otp_back": "Zurück zur Anmeldung",
     "invalid_otp_code": "Ungültiger Bestätigungscode. Bitte erneut versuchen.",
     "otp_too_many_attempts": "Zu viele falsche Codes. Bitte melde dich erneut an.",
+    "login_too_many_attempts": "Zu viele fehlgeschlagene Anmeldeversuche. Bitte warte einige Minuten und versuche es erneut.",
     "otp_session_expired": "Die Bestätigung ist abgelaufen. Bitte melde dich erneut an.",
     "local_account_network_restricted": "Dieses Konto kann sich nur aus einem vertrauenswürdigen Netzwerk anmelden."
   },

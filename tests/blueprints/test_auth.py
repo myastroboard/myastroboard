@@ -430,6 +430,53 @@ class TestVerifyTwoFactor:
 # ---------------------------------------------------------------------------
 
 
+class TestPasswordLoginThrottle:
+    def _fail(self, client, username, times, remote_addr=UNTRUSTED_IP):
+        for _ in range(times):
+            assert login(client, username, 'wrong-password', remote_addr=remote_addr).status_code == 401
+
+    def test_blocks_account_after_repeated_failures_even_with_right_password(
+        self, client, security_settings, make_user
+    ):
+        user, password, _ = make_user()
+        self._fail(client, user.username, auth_bp_mod.LOGIN_MAX_FAILURES_PER_ACCOUNT)
+
+        resp = login(client, user.username, password)
+
+        assert resp.status_code == 429
+        assert resp.get_json()['error_key'] == 'auth.login_too_many_attempts'
+        assert int(resp.headers['Retry-After']) > 0
+
+    def test_other_address_is_not_blocked(self, client, security_settings, make_user):
+        user, password, _ = make_user()
+        self._fail(client, user.username, auth_bp_mod.LOGIN_MAX_FAILURES_PER_ACCOUNT)
+
+        assert login(client, user.username, password, remote_addr='198.51.100.7').status_code == 200
+
+    def test_success_resets_the_account_counter(self, client, security_settings, make_user):
+        user, password, _ = make_user()
+        self._fail(client, user.username, auth_bp_mod.LOGIN_MAX_FAILURES_PER_ACCOUNT - 1)
+        assert login(client, user.username, password).status_code == 200
+
+        self._fail(client, user.username, auth_bp_mod.LOGIN_MAX_FAILURES_PER_ACCOUNT - 1)
+        assert login(client, user.username, password).status_code == 200
+
+    def test_blocks_address_spraying_many_usernames(self, client, security_settings, make_user):
+        user, password, _ = make_user()
+        for index in range(auth_bp_mod.LOGIN_MAX_FAILURES_PER_IP):
+            self._fail(client, f'nobody-{index}', 1)
+
+        assert login(client, user.username, password).status_code == 429
+
+    def test_throttle_expires_after_the_window(self, client, security_settings, make_user, monkeypatch):
+        user, password, _ = make_user()
+        self._fail(client, user.username, auth_bp_mod.LOGIN_MAX_FAILURES_PER_ACCOUNT)
+        later = time.time() + auth_bp_mod.LOGIN_FAILURE_WINDOW_SECONDS + 1
+        monkeypatch.setattr('utils.rate_limit.time.time', lambda: later)
+
+        assert login(client, user.username, password).status_code == 200
+
+
 class TestOtpAttemptsPruning:
     def test_prune_drops_a_users_only_entry_once_it_expires(self):
         """A user who fails once and never returns must not linger forever: their
@@ -990,3 +1037,69 @@ class TestSecuritySettingsApi:
     def test_requires_a_session(self, client):
         assert client.get('/api/auth/security-settings').status_code == 401
         assert client.post('/api/auth/security-settings', json={}).status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Personal data export
+# ---------------------------------------------------------------------------
+
+
+class TestPersonalDataExport:
+    @staticmethod
+    def _zip_names(resp):
+        import io
+        import zipfile
+
+        with zipfile.ZipFile(io.BytesIO(resp.data)) as archive:
+            return set(archive.namelist())
+
+    def test_signed_in_user_downloads_their_own_archive(self, client, security_settings, make_user):
+        user, password, _ = make_user()
+        login(client, user.username, password)
+
+        resp = client.get('/api/users/me/export')
+
+        assert resp.status_code == 200
+        assert resp.mimetype == 'application/zip'
+        assert 'attachment' in resp.headers['Content-Disposition']
+        assert {'README.txt', 'account.json', 'locations.json'} <= self._zip_names(resp)
+
+    def test_read_only_user_can_export(self, client, security_settings, make_user):
+        user, password, _ = make_user(role=auth_mod.ROLE_READ_ONLY)
+        login(client, user.username, password)
+
+        assert client.get('/api/users/me/export').status_code == 200
+
+    def test_requires_a_session(self, client):
+        assert client.get('/api/users/me/export').status_code == 401
+
+    def test_admin_exports_another_user(self, client_admin, security_settings, make_user):
+        user, _, _ = make_user()
+
+        resp = client_admin.get(f'/api/users/{user.user_id}/export')
+
+        assert resp.status_code == 200
+        assert user.username in resp.headers['Content-Disposition']
+
+    def test_admin_export_of_unknown_user_returns_404(self, client_admin, security_settings):
+        resp = client_admin.get('/api/users/does-not-exist/export')
+
+        assert resp.status_code == 404
+        assert resp.get_json()['error_key'] == 'users.user_not_found'
+
+    def test_regular_user_cannot_export_someone_else(self, client, security_settings, make_user):
+        user, password, _ = make_user()
+        other, _, _ = make_user()
+        login(client, user.username, password)
+
+        assert client.get(f'/api/users/{other.user_id}/export').status_code == 403
+
+    def test_export_failure_returns_500(self, client_admin, security_settings, make_user, monkeypatch):
+        user, _, _ = make_user()
+
+        def _boom(_user):
+            raise RuntimeError('disk error')
+
+        monkeypatch.setattr(auth_bp_mod, 'build_user_export', _boom)
+        assert client_admin.get(f'/api/users/{user.user_id}/export').status_code == 500
+        assert client_admin.get('/api/users/me/export').status_code == 500

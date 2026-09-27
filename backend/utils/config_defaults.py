@@ -28,7 +28,10 @@ LOCATION_PRESET_EXTRA_FIELDS = {
 }
 
 # Default feature flags
-DEFAULT_ASTRODEX = {"private": False, "map_private": False}
+# map_private defaults to True (photo map shows only your own pictures) for brand-new
+# installs; installs whose config.json predates the key keep the old shared behaviour
+# (see repo_config._read_merged_config).
+DEFAULT_ASTRODEX = {"private": False, "map_private": True}
 
 
 # Default constraint values

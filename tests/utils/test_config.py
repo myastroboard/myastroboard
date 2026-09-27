@@ -5,6 +5,8 @@ Unit tests for configuration management (repo_config.py, config_defaults.py)
 import json
 import os
 
+import pytest
+
 from utils import repo_config
 from utils import config_defaults
 
@@ -181,6 +183,34 @@ class TestConfigLoading:
         assert preset["name"] == DEFAULT_LOCATION["name"]
         assert preset["is_install_default"] is True
         assert preset["id"]
+
+    def test_new_install_photo_map_is_private(self, temp_dir, monkeypatch):
+        _set_config_file(monkeypatch, os.path.join(temp_dir, "fresh.json"))
+        assert load_config()["astrodex"]["map_private"] is True
+        # Written to disk, so later loads keep it private
+        assert load_config()["astrodex"]["map_private"] is True
+
+    @pytest.mark.parametrize("astrodex_block", [None, {"private": True}])
+    def test_existing_install_without_map_private_keeps_shared_map(self, temp_dir, monkeypatch, astrodex_block):
+        path = os.path.join(temp_dir, "existing.json")
+        raw = {"locations": [dict(DEFAULT_LOCATION, id="loc-1", is_install_default=True)]}
+        if astrodex_block is not None:
+            raw["astrodex"] = astrodex_block
+        with open(path, "w", encoding="utf-8") as fp:
+            json.dump(raw, fp)
+        _set_config_file(monkeypatch, path)
+        assert load_config()["astrodex"]["map_private"] is False
+
+    def test_existing_install_keeps_explicit_map_private(self, temp_dir, monkeypatch):
+        path = os.path.join(temp_dir, "explicit.json")
+        raw = {
+            "locations": [dict(DEFAULT_LOCATION, id="loc-1", is_install_default=True)],
+            "astrodex": {"map_private": True},
+        }
+        with open(path, "w", encoding="utf-8") as fp:
+            json.dump(raw, fp)
+        _set_config_file(monkeypatch, path)
+        assert load_config()["astrodex"]["map_private"] is True
 
     def test_load_config_has_required_fields(self, temp_dir, monkeypatch):
         _set_config_file(monkeypatch, os.path.join(temp_dir, "required.json"))

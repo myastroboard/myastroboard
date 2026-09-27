@@ -415,3 +415,26 @@ def test_warn_deprecated_env_vars_logs_warning(monkeypatch):
 
     assert logged
     assert 'Deprecated' in logged[0]
+
+
+class TestLogRetentionDays:
+    @pytest.mark.parametrize(
+        'value, expected',
+        [(30, 30), ('45', 45), (0, 0), (-5, 0), (99999, 3650), ('abc', 90), (None, 90), (True, 90)],
+    )
+    def test_normalize(self, value, expected):
+        from utils import app_settings
+
+        assert app_settings.normalize_log_retention_days(value) == expected
+
+    def test_default_is_90_days(self, monkeypatch):
+        from utils import app_settings
+
+        _set_cache(monkeypatch, {})
+        assert app_settings.get_log_retention_days() == 90
+
+    def test_reads_saved_value(self, monkeypatch):
+        from utils import app_settings
+
+        _set_cache(monkeypatch, {'log_retention_days': 14})
+        assert app_settings.get_log_retention_days() == 14
