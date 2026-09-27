@@ -36,6 +36,7 @@ from utils import load_json_file, save_json_file
 from connectors.myastroshine_connector import MyAstroShineConnector
 from utils.connector_secrets import merge_secrets
 from utils.file_lock import interprocess_lock
+from utils.image_privacy import strip_image_metadata
 from utils.logging_config import get_logger
 from utils.repo_config import load_config
 
@@ -477,10 +478,16 @@ def _save_enhanced_image(user_id: str, image_bytes: bytes) -> Optional[str]:
     """Write the enhanced JPEG under data/astrodex/images/ and return its filename.
 
     Mirrors upload_astrodex_image()'s ``<user_id>_<uuid>.<ext>`` naming and
-    realpath containment barrier. MyAstroShine renders JPEG.
+    realpath containment barrier. MyAstroShine renders JPEG. Metadata is stripped like
+    a direct upload; a body that is not a parseable image is kept as sent, since it
+    comes from the signed peer rather than a browser.
     """
     if not _is_handoff_id(user_id):
         return None
+    try:
+        image_bytes = strip_image_metadata(image_bytes)
+    except ValueError as error:
+        logger.warning("MyAstroShine enhanced image kept unstripped (not a parseable image): %s", error)
     astrodex.ensure_astrodex_directories()
     filename = f"{user_id}_{uuid.uuid4()}.jpg"
     base_dir = os.path.realpath(astrodex.ASTRODEX_IMAGES_DIR)

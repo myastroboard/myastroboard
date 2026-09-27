@@ -248,7 +248,9 @@ independent upload paths into two different places, on purpose.
 - **Allowed types**: `jpg`, `jpeg`, `png`, `webp`, `pdf`, `txt`, `doc`, `docx` - extension-only
   validation via `secure_filename()`, the same allow-list mechanism as Astrodex's own image upload
   (just a different, wider set of extensions). No MIME sniffing, no size cap - matches Astrodex's own
-  upload route, which has neither either.
+  upload route, which has neither either. Image attachments (`jpg`/`jpeg`/`png`/`webp`) are the
+  exception: they must be real images (`400` otherwise) and lose their EXIF/GPS metadata on upload,
+  like Astrodex pictures - see [Privacy & GDPR](PRIVACY.md#photo-metadata).
 - **Storage**: `data/observation_sessions/attachments/` (flat, mirroring `data/astrodex/images/`),
   filenames regenerated as `{user_id}_{uuid4()}.{ext}`, never the original name. The directory path is
   computed by `observation_sessions.attachments_dir()` - a function, not a module-level constant, so

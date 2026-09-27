@@ -26,6 +26,7 @@ from observation import observation_sessions
 from observation import plan_my_night
 from utils.auth import login_required, user_required, get_current_user
 from utils.i18n_utils import I18nManager
+from utils.image_privacy import strip_image_metadata
 from utils.logging_config import get_logger
 from utils.repo_config import load_config, get_locations_for_user, get_location_by_id
 from blueprints.plan_my_night import _resolve_requested_language
@@ -823,6 +824,7 @@ def attach_astrodex_picture_to_entry(session_id, entry_id):
 # ---------------------------------------------------------------------------
 
 ATTACHMENT_ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'webp', 'pdf', 'txt', 'doc', 'docx'}
+ATTACHMENT_IMAGE_EXTENSIONS = {'jpg', 'jpeg', 'png', 'webp'}
 
 
 @observation_sessions_bp.route('/api/observation-sessions/<session_id>/attachments', methods=['POST'])
@@ -852,6 +854,15 @@ def upload_observation_session_attachment(session_id):
         if file_ext not in ATTACHMENT_ALLOWED_EXTENSIONS:
             return jsonify({'error': 'Invalid file type'}), 400
 
+        # Image attachments lose their EXIF/GPS metadata before being stored.
+        image_bytes: Optional[bytes] = None
+        if file_ext in ATTACHMENT_IMAGE_EXTENSIONS:
+            try:
+                image_bytes = strip_image_metadata(file.read())
+            except ValueError as error:
+                logger.warning(f'Rejected session attachment that is not a valid image: {error}')
+                return jsonify({'error': 'Invalid image file'}), 400
+
         unique_filename = f'{user.user_id}_{uuid.uuid4()}.{file_ext}'
 
         observation_sessions.ensure_observation_sessions_directories()
@@ -861,7 +872,11 @@ def upload_observation_session_attachment(session_id):
             logger.warning(f'Attempted path traversal attack: {file_path}')
             return jsonify({'error': 'Invalid file path'}), 400
 
-        file.save(file_path)
+        if image_bytes is None:
+            file.save(file_path)
+        else:
+            with open(file_path, 'wb') as handle:
+                handle.write(image_bytes)
 
         attachment = observation_sessions.add_attachment(
             user.user_id, session_id, unique_filename, original_filename, file.mimetype or ''

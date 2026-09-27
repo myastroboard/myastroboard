@@ -44,6 +44,7 @@ myastroboard/
 │   │   ├── constants.py                 # Shared constants (paths, URLs, timeouts)
 │   │   ├── events_aggregator.py         # Unified upcoming events data
 │   │   ├── i18n_utils.py                # Translation backend helpers
+│   │   ├── image_privacy.py             # Lossless EXIF/GPS metadata stripping for uploaded pictures
 │   │   ├── logging_config.py            # Centralized logger setup
 │   │   ├── metrics_collector.py         # Metrics collection service
 │   │   ├── on_demand_translate.py       # On-demand DeepL/LibreTranslate integration

@@ -3382,18 +3382,32 @@ class TestAstrodexUploadValidation:
         )
         assert resp.status_code == 400
 
-    def test_upload_valid_jpg_returns_200(self, client_admin, monkeypatch):
+    def test_upload_valid_jpg_is_stored_without_gps_metadata(self, client_admin, monkeypatch, tmp_path):
         import io as _io
+        from PIL import Image
         from observation import astrodex as _ad
 
+        monkeypatch.setattr(_ad, 'ASTRODEX_IMAGES_DIR', str(tmp_path))
         monkeypatch.setattr(_ad, 'ensure_astrodex_directories', lambda: None)
 
-        import werkzeug.datastructures as _wd
+        exif = Image.Exif()
+        exif.get_ifd(0x8825)[2] = (48.0, 51.0, 24.0)  # GPSLatitude
+        buffer = _io.BytesIO()
+        Image.new('RGB', (8, 8)).save(buffer, 'JPEG', exif=exif)
 
-        def _patched_save(self, dst, buffer_size=16384):
-            pass
+        data = {'file': (_io.BytesIO(buffer.getvalue()), 'test_photo.jpg')}
+        resp = client_admin.post(
+            '/api/astrodex/upload',
+            data=data,
+            content_type='multipart/form-data',
+        )
+        assert resp.status_code == 200
+        stored = (tmp_path / resp.get_json()['filename']).read_bytes()
+        assert stored.startswith(b'\xff\xd8')
+        assert b'Exif' not in stored
 
-        monkeypatch.setattr(_wd.FileStorage, 'save', _patched_save)
+    def test_upload_jpg_that_is_not_an_image_returns_400(self, client_admin):
+        import io as _io
 
         data = {'file': (_io.BytesIO(b'\xff\xd8\xff' + b'\x00' * 100), 'test_photo.jpg')}
         resp = client_admin.post(
@@ -3401,7 +3415,7 @@ class TestAstrodexUploadValidation:
             data=data,
             content_type='multipart/form-data',
         )
-        assert resp.status_code in (200, 400, 500)
+        assert resp.status_code == 400
 
 
 # ---------------------------------------------------------------------------

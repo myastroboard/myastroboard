@@ -122,6 +122,9 @@ The object editor allows updating:
 ### Managing pictures
 
 - Upload pictures with drag-and-drop or file picker.
+- On upload, EXIF/XMP/IPTC metadata (GPS position, camera serial numbers...) is stripped without
+  re-encoding the pixels; the file must be a real JPEG, PNG, WebP or GIF, otherwise the upload is
+  rejected with `400`. See [Privacy & GDPR](PRIVACY.md#photo-metadata).
 - Reorder pictures; set one as the main (cover) picture.
 - Delete individual pictures.
 - Images larger than the display size are served at original resolution for download.

@@ -20,6 +20,16 @@ if 'psutil' not in sys.modules:
 from app import app
 from blueprints import observation_sessions as observation_sessions_bp_module
 
+
+def _jpeg_bytes():
+    """A tiny real JPEG: image attachments are parsed (metadata stripping) on upload."""
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new('RGB', (4, 4)).save(buffer, 'JPEG')
+    return buffer.getvalue()
+
+
 _TELESCOPE_DATA = {
     'name': 'Test Refractor',
     'telescope_type': 'Refractor',
@@ -972,12 +982,22 @@ class TestAttachments:
     """POST/GET/DELETE .../attachments - generic files, unrelated to the entry ->
     Astrodex picture link above."""
 
+    @staticmethod
+    def _geotagged_jpeg():
+        from PIL import Image
+
+        exif = Image.Exif()
+        exif.get_ifd(0x8825)[2] = (48.0, 51.0, 24.0)  # GPSLatitude
+        buffer = io.BytesIO()
+        Image.new('RGB', (8, 8), (20, 40, 60)).save(buffer, 'JPEG', exif=exif)
+        return buffer.getvalue()
+
     def test_upload_download_and_delete_round_trip(self, client):
         session = _create_session(client)
 
         upload = client.post(
             f"/api/observation-sessions/{session['id']}/attachments",
-            data={'file': (io.BytesIO(b'fake image bytes'), 'guiding-graph.jpg')},
+            data={'file': (io.BytesIO(self._geotagged_jpeg()), 'guiding-graph.jpg')},
             content_type='multipart/form-data',
         )
         assert upload.status_code == 201
@@ -990,13 +1010,25 @@ class TestAttachments:
 
         download = client.get(f"/api/observation-sessions/attachments/{attachment['filename']}")
         assert download.status_code == 200
-        assert download.data == b'fake image bytes'
+        assert download.data.startswith(b'\xff\xd8')
+        assert b'Exif' not in download.data  # GPS metadata stripped on upload
+        download.close()  # release the file handle so the delete below works on Windows
 
         deletion = client.delete(f"/api/observation-sessions/{session['id']}/attachments/{attachment['id']}")
         assert deletion.status_code == 200
 
         after_delete = client.get(f"/api/observation-sessions/attachments/{attachment['filename']}")
         assert after_delete.status_code == 403  # metadata gone -> ownership check fails closed
+
+    def test_upload_rejects_image_extension_that_is_not_an_image(self, client):
+        session = _create_session(client)
+        upload = client.post(
+            f"/api/observation-sessions/{session['id']}/attachments",
+            data={'file': (io.BytesIO(b'not really a picture'), 'photo.jpg')},
+            content_type='multipart/form-data',
+        )
+        assert upload.status_code == 400
+        assert client.get(f"/api/observation-sessions/{session['id']}").get_json().get('attachments', []) == []
 
     def test_upload_accepts_pdf_txt_and_word(self, client):
         session = _create_session(client)
@@ -1040,7 +1072,7 @@ class TestAttachments:
     def test_upload_unknown_session_is_404(self, client):
         response = client.post(
             '/api/observation-sessions/missing/attachments',
-            data={'file': (io.BytesIO(b'data'), 'a.jpg')},
+            data={'file': (io.BytesIO(_jpeg_bytes()), 'a.jpg')},
             content_type='multipart/form-data',
         )
         assert response.status_code == 404
@@ -1056,7 +1088,7 @@ class TestAttachments:
         session = _create_session(client)
         upload = client.post(
             f"/api/observation-sessions/{session['id']}/attachments",
-            data={'file': (io.BytesIO(b'data'), 'a.jpg')},
+            data={'file': (io.BytesIO(_jpeg_bytes()), 'a.jpg')},
             content_type='multipart/form-data',
         ).get_json()['data']
         assert client.get(f"/api/observation-sessions/attachments/{upload['filename']}").status_code == 200
@@ -1072,7 +1104,7 @@ class TestAttachments:
         session = _create_session(client)
         upload = client.post(
             f"/api/observation-sessions/{session['id']}/attachments",
-            data={'file': (io.BytesIO(b'data'), 'guiding-graph.jpg')},
+            data={'file': (io.BytesIO(_jpeg_bytes()), 'guiding-graph.jpg')},
             content_type='multipart/form-data',
         ).get_json()['data']
 
@@ -1085,7 +1117,7 @@ class TestAttachments:
         session = _create_session(client)
         upload = client.post(
             f"/api/observation-sessions/{session['id']}/attachments",
-            data={'file': (io.BytesIO(b'data'), 'guiding-graph.jpg')},
+            data={'file': (io.BytesIO(_jpeg_bytes()), 'guiding-graph.jpg')},
             content_type='multipart/form-data',
         ).get_json()['data']
 
@@ -1107,7 +1139,7 @@ class TestAttachments:
         session = _create_session(client)
         upload = client.post(
             f"/api/observation-sessions/{session['id']}/attachments",
-            data={'file': (io.BytesIO(b'data'), 'guiding-graph.jpg')},
+            data={'file': (io.BytesIO(_jpeg_bytes()), 'guiding-graph.jpg')},
             content_type='multipart/form-data',
         ).get_json()['data']
         client.put(
@@ -1496,7 +1528,7 @@ class TestExceptionHandling:
         monkeypatch.setattr(observation_sessions_bp_module.os, 'remove', _raise_oserror)
         response = client.post(
             f"/api/observation-sessions/{session['id']}/attachments",
-            data={'file': (io.BytesIO(b'data'), 'a.jpg')},
+            data={'file': (io.BytesIO(_jpeg_bytes()), 'a.jpg')},
             content_type='multipart/form-data',
         )
         assert response.status_code == 500
@@ -1506,7 +1538,7 @@ class TestExceptionHandling:
         monkeypatch.setattr(observation_sessions_bp_module.observation_sessions, 'add_attachment', self._raise)
         response = client.post(
             f"/api/observation-sessions/{session['id']}/attachments",
-            data={'file': (io.BytesIO(b'data'), 'a.jpg')},
+            data={'file': (io.BytesIO(_jpeg_bytes()), 'a.jpg')},
             content_type='multipart/form-data',
         )
         assert response.status_code == 500
@@ -1517,7 +1549,7 @@ class TestExceptionHandling:
         session = _create_session(client)
         upload = client.post(
             f"/api/observation-sessions/{session['id']}/attachments",
-            data={'file': (io.BytesIO(b'data'), 'a.jpg')},
+            data={'file': (io.BytesIO(_jpeg_bytes()), 'a.jpg')},
             content_type='multipart/form-data',
         ).get_json()['data']
         monkeypatch.setattr(observation_sessions_bp_module.observation_sessions, 'get_user_sessions', self._raise)
@@ -1528,7 +1560,7 @@ class TestExceptionHandling:
         session = _create_session(client)
         upload = client.post(
             f"/api/observation-sessions/{session['id']}/attachments",
-            data={'file': (io.BytesIO(b'data'), 'a.jpg')},
+            data={'file': (io.BytesIO(_jpeg_bytes()), 'a.jpg')},
             content_type='multipart/form-data',
         ).get_json()['data']
         monkeypatch.setattr(observation_sessions_bp_module.observation_sessions, 'rename_attachment', self._raise)
@@ -1541,7 +1573,7 @@ class TestExceptionHandling:
         session = _create_session(client)
         upload = client.post(
             f"/api/observation-sessions/{session['id']}/attachments",
-            data={'file': (io.BytesIO(b'data'), 'a.jpg')},
+            data={'file': (io.BytesIO(_jpeg_bytes()), 'a.jpg')},
             content_type='multipart/form-data',
         ).get_json()['data']
         monkeypatch.setattr(observation_sessions_bp_module.observation_sessions, 'delete_attachment', self._raise)

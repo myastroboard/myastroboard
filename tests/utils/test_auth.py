@@ -581,6 +581,49 @@ class TestUserManagerDeleteUser:
         manager.delete_user(alice.user_id, current_user_id=admin.user_id)
         assert manager.get_user_by_id(alice.user_id) is None
 
+    def test_delete_user_removes_every_per_user_file(self, isolated_user_manager, monkeypatch, tmp_path):
+        """Right to erasure: equipment, sessions, attachments, plans, wishlist and astrodex
+        files of the deleted user all go, while another user's files stay untouched."""
+        manager = isolated_user_manager
+        admin = manager.get_user_by_username(auth.DEFAULT_ADMIN_USERNAME)
+        alice = manager.create_user('alice', 'pass', auth.ROLE_USER)
+        bob = manager.create_user('bob', 'pass', auth.ROLE_USER)
+
+        dirs = {
+            'observation.astrodex.ASTRODEX_DIR': 'astrodex',
+            'observation.astrodex.ASTRODEX_IMAGES_DIR': 'astrodex_images',
+            'equipment.equipment_profiles.EQUIPMENT_DIR': 'equipments',
+            'observation.observation_sessions.OBSERVATION_SESSIONS_DIR': 'observation_sessions',
+            'observation.plan_my_night.PLAN_DIR': 'projects',
+            'observation.wishlist.WISHLIST_DIR': 'wishlist',
+        }
+        for target, name in dirs.items():
+            (tmp_path / name).mkdir()
+            monkeypatch.setattr(target, str(tmp_path / name))
+        (tmp_path / 'observation_sessions' / 'attachments').mkdir()
+
+        suffixes = {
+            'astrodex': '_astrodex.json',
+            'astrodex_images': '_picture.jpg',
+            'equipments': '_telescopes.json',
+            'observation_sessions': '_sessions.json',
+            'observation_sessions/attachments': '_notes.txt',
+            'projects': '_plan_my_night.json',
+            'wishlist': '_wishlist.json',
+        }
+        for folder, suffix in suffixes.items():
+            for user in (alice, bob):
+                (tmp_path / folder / f'{user.user_id}{suffix}').write_text('{}', encoding='utf-8')
+
+        manager.delete_user(alice.user_id, current_user_id=admin.user_id)
+
+        for folder, suffix in suffixes.items():
+            assert not (tmp_path / folder / f'{alice.user_id}{suffix}').exists(), folder
+            assert (tmp_path / folder / f'{bob.user_id}{suffix}').exists(), folder
+
+    def test_purge_user_files_rejects_malformed_user_id(self):
+        assert auth.purge_user_files('../etc') == 0
+
 
 class TestUserManagerPreferences:
 

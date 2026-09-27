@@ -972,7 +972,7 @@ class UserManager:
 
     @_serialized_users_write
     def delete_user(self, user_id, current_user_id=None):
-        """Delete a user and safely clean related astrodex data"""
+        """Delete a user and every file they own on disk (right to erasure)"""
 
         self._reload_users_if_changed()
 
@@ -1037,27 +1037,13 @@ class UserManager:
                     except Exception as remove_error:
                         logger.warning(f"Failed to delete astrodex image {filename}: {remove_error}")
 
-            # Delete remaining images matching user_id prefix
-            if os.path.exists(base_images_dir):
-                for filename in os.listdir(base_images_dir):
-                    if filename.startswith(f"{user_id}_") and re.match(r"^[a-zA-Z0-9_.-]+$", filename):
-                        file_path = os.path.realpath(os.path.join(base_images_dir, filename))
-
-                        if not file_path.startswith(base_images_dir + os.sep):
-                            continue
-
-                        try:
-                            os.remove(file_path)
-                        except Exception as remove_error:
-                            logger.warning(f"Failed to delete astrodex image {filename}: {remove_error}")
-
-            # Delete astrodex file itself
-            if os.path.exists(astrodex_file):
-                os.remove(astrodex_file)
-                logger.info(f"Deleted astrodex file for {username}")
-
         except Exception as e:
             logger.warning(f"Failed to delete astrodex data for user {user_id}: {e}")
+
+        # Everything else (astrodex file, images, sessions, attachments, equipment,
+        # plans, wishlist) follows the <user_id>_ naming and goes in one sweep.
+        removed = purge_user_files(user_id)
+        logger.info(f"Deleted {removed} data file(s) for {username}")
 
     def list_users(self):
         """List all users (without password hashes)"""
@@ -1092,6 +1078,57 @@ class UserManager:
         # Log failure without revealing if username exists
         logger.warning(f"Failed authentication attempt for username: {username}")
         return None
+
+
+def _user_data_dirs():
+    """Every directory holding per-user files named ``<user_id>_...``.
+
+    Resolved on each call (not at import) so tests that repoint a module's
+    directory constant are honoured.
+    """
+    from equipment import equipment_profiles
+    from observation import astrodex, observation_sessions, plan_my_night, wishlist
+
+    return [
+        astrodex.ASTRODEX_DIR,
+        astrodex.ASTRODEX_IMAGES_DIR,
+        equipment_profiles.EQUIPMENT_DIR,
+        observation_sessions.OBSERVATION_SESSIONS_DIR,
+        observation_sessions.attachments_dir(),
+        plan_my_night.PLAN_DIR,
+        wishlist.WISHLIST_DIR,
+    ]
+
+
+def purge_user_files(user_id):
+    """Delete every per-user file of ``user_id`` (``<user_id>_*``) and return how many were removed.
+
+    Best effort: a file that cannot be removed is logged and skipped so one
+    failure never leaves the rest of the user's data behind.
+    """
+    user_id = str(user_id)
+    if not re.match(r"^[A-Za-z0-9-]+$", user_id):
+        logger.warning(f"Refusing to purge files for malformed user id {user_id!r}")
+        return 0
+
+    prefix = f"{user_id}_"
+    removed = 0
+    for directory in _user_data_dirs():
+        base_dir = os.path.realpath(directory)
+        if not os.path.isdir(base_dir):
+            continue
+        for filename in os.listdir(base_dir):
+            if not filename.startswith(prefix):
+                continue
+            file_path = os.path.realpath(os.path.join(base_dir, filename))
+            if not file_path.startswith(base_dir + os.sep) or not os.path.isfile(file_path):
+                continue
+            try:
+                os.remove(file_path)
+                removed += 1
+            except OSError as remove_error:
+                logger.warning(f"Failed to delete user data file {filename}: {remove_error}")
+    return removed
 
 
 # Global user manager instance
