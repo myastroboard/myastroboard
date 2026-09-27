@@ -31,12 +31,24 @@ def test_feature_or_fix_pr_updates_changelog():
     if not base_ref:
         pytest.skip("No GITHUB_BASE_REF available to diff against")
 
-    base_sha = subprocess.run(
+    result = subprocess.run(
         ["git", "merge-base", f"origin/{base_ref}", "HEAD"],
         capture_output=True,
         text=True,
-        check=True,
-    ).stdout.strip()
+    )
+    if result.returncode != 0:
+        # Shallow clones may not share a common ancestor; fall back to the
+        # fetched tip of the base branch (FETCH_HEAD) so the diff still works.
+        fetch = subprocess.run(
+            ["git", "fetch", "--depth=1", "origin", base_ref],
+            capture_output=True,
+            text=True,
+        )
+        if fetch.returncode != 0:
+            pytest.skip(f"Cannot determine merge-base for '{base_ref}': {result.stderr.strip()}")
+        base_sha = "FETCH_HEAD"
+    else:
+        base_sha = result.stdout.strip()
 
     changed = subprocess.run(
         ["git", "diff", "--name-only", base_sha, "HEAD"],
