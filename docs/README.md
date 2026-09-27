@@ -48,6 +48,7 @@ Welcome to the comprehensive documentation for MyAstroBoard, the integrated astr
 ### Administration
 - [Authentication & Users](AUTHENTICATION.md) - Roles, user management, preferences, session security
 - [Configuration](CONFIGURATION.md) - Global settings, SkyTonight constraints, backup/restore, logs, metrics
+- [Privacy & GDPR](PRIVACY.md) - Personal data inventory, third parties, retention, data subject rights, privacy notice template
 - [Locations](LOCATIONS.md) - Multi-location profiles (v1.2): presets, attribution, per-user default/active location, per-location caches, rate-limit analysis
 
 ### Technical Reference

@@ -8,11 +8,15 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Features
 
-- None.
+- Privacy: new [Privacy & GDPR](docs/PRIVACY.md) guide for instance operators, with a data inventory
+  and a privacy notice template.
 
 ### Fixes
 
-- None.
+- Deleting a user now removes all their files (equipment, observation sessions and attachments,
+  plans, wishlist), not only the Astrodex.
+- Uploaded pictures (Astrodex, session attachments, MyAstroShine returns) are stripped of EXIF/GPS
+  metadata, losslessly; image uploads that are not real images are rejected.
 
 ### Breaking changes
 

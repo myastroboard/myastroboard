@@ -14,6 +14,7 @@ from observation import catalogue_collection
 from observation import wishlist
 from utils.auth import login_required, user_required, get_current_user, user_manager
 from utils.constellation_names import full_constellation_name
+from utils.image_privacy import strip_image_metadata
 from blueprints.plan_my_night import _resolve_requested_language
 from utils.logging_config import get_logger
 from utils.repo_config import load_config, get_locations_for_user, get_location_by_id
@@ -737,6 +738,13 @@ def upload_astrodex_image():
             logger.warning("Invalid user ID")
             return jsonify({'error': 'Invalid user ID'}), 400
 
+        # Strip EXIF/GPS and other metadata: the picture is visible to other users.
+        try:
+            image_bytes = strip_image_metadata(file.read())
+        except ValueError as error:
+            logger.warning(f"Rejected astrodex upload that is not a valid image: {error}")
+            return jsonify({'error': 'Invalid image file'}), 400
+
         # Generate safe unique filename
         unique_filename = f"{user_id}_{uuid.uuid4()}.{file_ext}"
 
@@ -753,8 +761,8 @@ def upload_astrodex_image():
             logger.warning(f"Attempted path traversal attack: {file_path}")
             return jsonify({'error': 'Invalid file path'}), 400
 
-        # Save file
-        file.save(file_path)
+        with open(file_path, 'wb') as handle:
+            handle.write(image_bytes)
 
         return jsonify({'status': 'success', 'filename': unique_filename})
 
