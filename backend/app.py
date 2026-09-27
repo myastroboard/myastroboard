@@ -97,6 +97,11 @@ from utils import app_settings as _app_settings
 
 _startup_settings = _app_settings.get_app_settings()
 
+# Time-based log retention (Parameters -> Advanced -> Privacy), read live from app settings
+from utils.logging_config import set_log_retention_provider
+
+set_log_retention_provider(_app_settings.get_log_retention_days)
+
 # Configure reverse proxy support — configurable via Parameters → Advanced → Reverse proxy
 if _startup_settings['trust_proxy_headers']:  # pragma: no cover
     app.wsgi_app = ProxyFix(

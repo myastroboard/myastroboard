@@ -588,6 +588,10 @@
     "default_location_name": "Minha localização"
   },
   "settings": {
+    "my_data_title": "Os seus dados",
+    "my_data_desc": "Transfira um arquivo ZIP com tudo o que esta instância guarda sobre si: conta, preferências, Astrodex e fotos, registo de observação, equipamento, planos e lista de desejos.",
+    "my_data_export_btn": "Transferir os meus dados",
+    "my_data_export_started": "A preparar a exportação de dados, a transferência começará em breve...",
     "customize": "Personalizar",
     "customize_info": "Personalize os padrões do painel e as preferências de exibição. Essas configurações se aplicam apenas à sua conta.",
     "security": "Segurança",
@@ -866,6 +870,8 @@
     "app_settings_privacy_title": "Privacidade e motores de busca",
     "app_settings_privacy_desc": "Por padrão esta instância é privada: pede-se aos motores de busca que não a rastreiem nem a indexem, incluindo a página de login. Ative isso apenas se quiser que sua página de login seja encontrável no Google e em outros motores de busca.",
     "app_settings_indexing_label": "Permitir que os motores de busca indexem a página de login",
+    "app_settings_log_retention_label": "Manter as linhas do registo durante (dias)",
+    "app_settings_log_retention_help": "O registo contém nomes de utilizador e endereços IP. As linhas mais antigas são eliminadas uma vez por dia. 0 mantém-nas até o limite de tamanho as rodar.",
     "app_settings_proxy_title": "Proxy reverso",
     "app_settings_proxy_desc": "Ative estas configurações apenas se o MyAstroBoard funcionar atrás de um proxy reverso (NGINX, Traefik, etc.) com HTTPS. É necessário reiniciar o contêiner para aplicar as alterações.",
     "app_settings_trust_proxy_label": "Confiar nos cabeçalhos do proxy (X-Forwarded-*)",
@@ -1800,6 +1806,7 @@
     "minutes_short": "{minutes} min"
   },
   "users": {
+    "export_data": "Exportar dados",
     "user_management": "Gerenciamento de usuários",
     "manage_users": "Gerencie usuários e suas funções de acesso.",
     "username": "Nome de usuário",
@@ -2372,6 +2379,7 @@
     "otp_back": "Voltar ao início de sessão",
     "invalid_otp_code": "Código de verificação inválido. Tente novamente.",
     "otp_too_many_attempts": "Demasiados códigos incorretos. Inicie sessão novamente.",
+    "login_too_many_attempts": "Demasiadas tentativas de início de sessão falhadas. Aguarde alguns minutos e tente novamente.",
     "otp_session_expired": "A verificação expirou. Inicie sessão novamente.",
     "local_account_network_restricted": "Esta conta só pode iniciar sessão a partir de uma rede fidedigna."
   },

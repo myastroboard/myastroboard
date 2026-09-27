@@ -45,6 +45,8 @@ This page lists the HTTP routes currently declared across `backend/blueprints/*.
 - `PUT /api/users/<user_id>`
 - `DELETE /api/users/<user_id>`
 - `DELETE /api/users/<user_id>/2fa`
+- `GET /api/users/<user_id>/export` (admin) - personal data ZIP of any user
+- `GET /api/users/me/export` - personal data ZIP of the signed-in user
 
 ## Administration (admin)
 

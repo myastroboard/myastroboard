@@ -50,8 +50,10 @@ myastroboard/
 │   │   ├── on_demand_translate.py       # On-demand DeepL/LibreTranslate integration
 │   │   ├── push_manager.py              # VAPID key management, Web Push send wrapper
 │   │   ├── push_scheduler.py            # Push notification scheduler (N1–N9 trigger evaluation)
+│   │   ├── rate_limit.py                # In-memory sliding-window counter (sign-in throttle)
 │   │   ├── repo_config.py               # Config file load/save helpers
 │   │   ├── txtconf_loader.py            # txtconf loader
+│   │   ├── user_data.py                 # Per-user files: erase on account deletion, personal data export ZIP
 │   │   └── version_checker.py           # GitHub release checks
 │   ├── blueprints/                  # HTTP routes, one Flask Blueprint module per domain
 │   │   ├── auth.py                  # /api/auth/*, /api/users/*

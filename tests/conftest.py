@@ -129,6 +129,25 @@ def isolate_connector_secrets(tmp_path, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def reset_login_throttle():
+    """Clear the in-memory password sign-in failure counters around each test.
+
+    They are process-wide and keyed by client IP, so failed logins from earlier tests
+    (all from the test client's address) would otherwise throttle later ones.
+    """
+    try:
+        from blueprints import auth as auth_bp_module
+    except ImportError:
+        yield
+        return
+    auth_bp_module._login_failures_by_account.clear()
+    auth_bp_module._login_failures_by_ip.clear()
+    yield
+    auth_bp_module._login_failures_by_account.clear()
+    auth_bp_module._login_failures_by_ip.clear()
+
+
+@pytest.fixture(autouse=True)
 def reset_app_settings_module_cache():
     """Reset the app_settings module-level cache between tests."""
     try:

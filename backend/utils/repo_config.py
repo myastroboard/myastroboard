@@ -222,6 +222,12 @@ def _read_merged_config():
     # Existing installs pre-date the location_configured flag; treat them as configured
     if 'location_configured' not in raw:
         merged['location_configured'] = True
+    # Existing installs pre-date the private-by-default photo map; keep their shared map
+    raw_astrodex = raw.get('astrodex') if isinstance(raw, dict) else None
+    if isinstance(merged.get('astrodex'), dict) and (
+        not isinstance(raw_astrodex, dict) or 'map_private' not in raw_astrodex
+    ):
+        merged['astrodex']['map_private'] = False
     return merged
 
 

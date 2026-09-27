@@ -134,6 +134,7 @@ Stored separately in `data/app_settings.json` (see [AUTHENTICATION.md](AUTHENTIC
 | `trust_proxy_headers` | `false` | Enable `X-Forwarded-For` / `X-Forwarded-Proto` forwarding (reverse proxy deployments) |
 | `session_cookie_secure` | `false` | Require HTTPS for session cookie |
 | `search_engine_indexing` | `false` | Allow search engines to crawl and index the login page. Off by default for privacy: `/robots.txt` returns `Disallow: /` and the login page is served with `noindex, nofollow`. When enabled, `/robots.txt` allows `/login` and the login page adds Open Graph/JSON-LD metadata pointing to myastroboard.org |
+| `log_retention_days` | `90` | Days a line stays in `myastroboard.log` and its rotated backups (0-3650). Log lines hold usernames and IP addresses, so older lines are removed once a day per process, and right away when the value is lowered. `0` disables it: only the size-based rotation (10 MB x 6 files) applies. Set in *Parameters → Advanced → Privacy* |
 
 ---
 
@@ -217,6 +218,12 @@ Attach this file to GitHub issues to help maintainers diagnose problems.
 ### Clear logs
 
 `POST /api/logs/clear` truncates the main log file (admin only).
+
+### Retention
+
+Besides the size-based rotation, lines older than `log_retention_days` (default 90, see
+[Application settings](#application-settings-admin)) are removed from the main log and its backups. See
+[Privacy & GDPR](PRIVACY.md#retention).
 
 ---
 

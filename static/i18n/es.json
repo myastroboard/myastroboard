@@ -588,6 +588,10 @@
     "default_location_name": "Mi ubicación"
   },
   "settings": {
+    "my_data_title": "Tus datos",
+    "my_data_desc": "Descarga un archivo ZIP con todo lo que esta instancia guarda sobre ti: cuenta, preferencias, Astrodex y fotos, registro de observación, equipo, planes y lista de deseos.",
+    "my_data_export_btn": "Descargar mis datos",
+    "my_data_export_started": "Preparando la exportación de datos, la descarga comenzará en breve...",
     "customize": "Personalizar",
     "customize_info": "Personalice los valores predeterminados del panel y las preferencias de visualización. Esta configuración se aplica solo a su cuenta.",
     "security": "Seguridad",
@@ -866,6 +870,8 @@
     "app_settings_privacy_title": "Privacidad y motores de búsqueda",
     "app_settings_privacy_desc": "De forma predeterminada esta instancia es privada: se pide a los motores de búsqueda que no la rastreen ni la indexen, incluyendo la página de inicio de sesión. Active esto solo si quiere que su página de inicio de sesión sea encontrable en Google y otros motores de búsqueda.",
     "app_settings_indexing_label": "Permitir que los motores de búsqueda indexen la página de inicio de sesión",
+    "app_settings_log_retention_label": "Conservar las líneas del registro durante (días)",
+    "app_settings_log_retention_help": "El registro contiene nombres de usuario y direcciones IP. Las líneas más antiguas se eliminan una vez al día. 0 las conserva hasta que el límite de tamaño las rote.",
     "app_settings_proxy_title": "Proxy inverso",
     "app_settings_proxy_desc": "Active estos ajustes solo si MyAstroBoard funciona detrás de un proxy inverso (NGINX, Traefik, etc.) con HTTPS. Se requiere reiniciar el contenedor para aplicar los cambios.",
     "app_settings_trust_proxy_label": "Confiar en las cabeceras del proxy (X-Forwarded-*)",
@@ -1800,6 +1806,7 @@
     "minutes_short": "{minutes} min"
   },
   "users": {
+    "export_data": "Exportar datos",
     "user_management": "Gestión de usuarios",
     "manage_users": "Administrar usuarios y sus roles de acceso.",
     "username": "Nombre de usuario",
@@ -2372,6 +2379,7 @@
     "otp_back": "Volver al inicio de sesión",
     "invalid_otp_code": "Código de verificación no válido. Inténtalo de nuevo.",
     "otp_too_many_attempts": "Demasiados códigos incorrectos. Vuelve a iniciar sesión.",
+    "login_too_many_attempts": "Demasiados intentos de inicio de sesión fallidos. Espera unos minutos e inténtalo de nuevo.",
     "otp_session_expired": "La verificación ha caducado. Vuelve a iniciar sesión.",
     "local_account_network_restricted": "Esta cuenta solo puede iniciar sesión desde una red de confianza."
   },

@@ -588,6 +588,10 @@
     "default_location_name": "My Location"
   },
   "settings": {
+    "my_data_title": "Your data",
+    "my_data_desc": "Download a ZIP archive of everything this instance stores about you: account, preferences, Astrodex and pictures, observation log, equipment, plans and wishlist.",
+    "my_data_export_btn": "Download my data",
+    "my_data_export_started": "Preparing the data export, the download will start shortly...",
     "customize": "Customize",
     "customize_info": "Personalize your dashboard defaults and display preferences. These settings apply only to your account.",
     "security": "Security",
@@ -866,6 +870,8 @@
     "app_settings_privacy_title": "Privacy & search engines",
     "app_settings_privacy_desc": "By default this instance is private: search engines are asked not to crawl or index it, including the login page. Enable this only if you want your login page discoverable on Google and other search engines.",
     "app_settings_indexing_label": "Allow search engines to index the login page",
+    "app_settings_log_retention_label": "Keep application log lines for (days)",
+    "app_settings_log_retention_help": "Logs contain usernames and IP addresses. Older lines are deleted once a day. 0 keeps them until the size limit rotates them out.",
     "app_settings_proxy_title": "Reverse proxy",
     "app_settings_proxy_desc": "Enable these settings only if MyAstroBoard runs behind a reverse proxy (NGINX, Traefik, etc.) with HTTPS. A container restart is required to apply changes.",
     "app_settings_trust_proxy_label": "Trust proxy headers (X-Forwarded-*)",
@@ -1800,6 +1806,7 @@
     "minutes_short": "{minutes} min"
   },
   "users": {
+    "export_data": "Export data",
     "user_management": "User Management",
     "manage_users": "Manage users and their access roles.",
     "username": "Username",
@@ -2372,6 +2379,7 @@
     "otp_back": "Back to sign in",
     "invalid_otp_code": "Invalid verification code. Please try again.",
     "otp_too_many_attempts": "Too many incorrect codes. Please sign in again.",
+    "login_too_many_attempts": "Too many failed sign-in attempts. Please wait a few minutes and try again.",
     "otp_session_expired": "Verification expired. Please sign in again.",
     "local_account_network_restricted": "This account can only sign in from a trusted network."
   },

@@ -6,9 +6,10 @@ Provides consistent logging setup across all modules with configurable log level
 import logging
 import os
 import sys
+import time
 from datetime import datetime, timezone
 from logging.handlers import RotatingFileHandler
-from typing import Optional
+from typing import Callable, Optional
 from utils.constants import LOG_FILE, LOG_MAX_BYTES, LOG_BACKUP_COUNT
 from utils.file_lock import interprocess_lock
 
@@ -20,6 +21,20 @@ _file_handler: Optional[logging.Handler] = None
 
 # Environment variable for log level control (DEBUG, INFO, WARNING, ERROR)
 LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO').upper()
+
+# Time-based retention on top of the size-based rotation: log lines contain usernames
+# and IP addresses (personal data), so they should not outlive a configured number of
+# days. The number comes from a provider (app settings) registered by the app at
+# startup - utils.app_settings imports this module, so it cannot be imported here.
+# Checked at most once a day per process, to keep log writes cheap.
+LOG_RETENTION_CHECK_INTERVAL_SECONDS = 24 * 3600
+_retention_days_provider: Optional[Callable[[], int]] = None
+
+# Leading timestamp written by _ConfiguredTzFormatter: "2026-09-27 17:20:22,646 +0000"
+_TIMESTAMP_LENGTH = len('2026-09-27 17:20:22,646 +0000')
+_TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M:%S,%f %z'
+# Bytes read from the head of a log file to find its oldest record
+_HEAD_BYTES = 64 * 1024
 
 
 class _ConfiguredTzFormatter(logging.Formatter):
@@ -74,6 +89,7 @@ class MultiProcessRotatingFileHandler(RotatingFileHandler):
     def __init__(self, filename: str, maxBytes: int = 0, backupCount: int = 0, encoding: Optional[str] = None):
         super().__init__(filename, maxBytes=maxBytes, backupCount=backupCount, encoding=encoding, delay=True)
         self.lock_path = self.baseFilename + ".lock"
+        self.next_retention_check = 0.0
 
     def _reopen_if_replaced(self):
         """Drop the open stream when the path no longer points at the file it writes to."""
@@ -115,9 +131,25 @@ class MultiProcessRotatingFileHandler(RotatingFileHandler):
         msg = "%s\n" % self.format(record)
         return size + len(msg.encode(self.encoding or "utf-8")) >= self.maxBytes
 
+    def _due_retention_days(self) -> int:
+        """Retention in days when the daily pass is due, else 0.
+
+        Called *before* taking the lock: the provider reads app settings, which may log,
+        and a log call re-entering emit() while this process holds the (non-reentrant)
+        lock would deadlock. The check time is bumped first, so that nested call skips it.
+        """
+        now = time.time()
+        if now < self.next_retention_check:
+            return 0
+        self.next_retention_check = now + LOG_RETENTION_CHECK_INTERVAL_SECONDS
+        return _current_retention_days()
+
     def emit(self, record):
         try:
+            retention_days = self._due_retention_days()
             with interprocess_lock(self.lock_path):
+                if retention_days > 0:
+                    _apply_retention_unlocked(self.baseFilename, self.backupCount, retention_days, time.time())
                 self._reopen_if_replaced()
                 super().emit(record)
                 if sys.platform == "win32" and self.stream is not None:
@@ -126,6 +158,118 @@ class MultiProcessRotatingFileHandler(RotatingFileHandler):
                     self._release_stream()
         except Exception:
             self.handleError(record)
+
+
+def _record_time(line: bytes) -> Optional[float]:
+    """Epoch time of a log line that starts a record, None for continuation lines."""
+    try:
+        stamp = line[:_TIMESTAMP_LENGTH].decode('ascii')
+        return datetime.strptime(stamp, _TIMESTAMP_FORMAT).timestamp()
+    except (UnicodeDecodeError, ValueError):
+        return None
+
+
+def _oldest_record_time(path: str) -> Optional[float]:
+    """Time of the first timestamped line in ``path``, None when absent or unreadable."""
+    try:
+        with open(path, 'rb') as handle:
+            head = handle.read(_HEAD_BYTES)
+    except OSError:
+        return None
+    for line in head.splitlines():
+        stamp = _record_time(line)
+        if stamp is not None:
+            return stamp
+    return None
+
+
+def _trim_log_file(path: str, cutoff: float, is_active: bool) -> bool:
+    """Drop the records of ``path`` older than ``cutoff``; return True when the file changed.
+
+    A backup with nothing left to keep is deleted; the active file is emptied instead,
+    so writers keep a stable path. A traceback belongs to the record above it, so the
+    cut is made at the first *timestamped* line recent enough to keep.
+    """
+    data = b''
+    oldest = _oldest_record_time(path)
+    if oldest is None:
+        # Unknown format: fall back to the last write time for the whole file
+        try:
+            expired = os.path.getmtime(path) < cutoff
+        except OSError:
+            return False
+        if not expired:
+            return False
+        keep_from = None
+    elif oldest >= cutoff:
+        return False
+    else:
+        with open(path, 'rb') as handle:
+            data = handle.read()
+        keep_from = None
+        offset = 0
+        for line in data.splitlines(keepends=True):
+            stamp = _record_time(line)
+            if stamp is not None and stamp >= cutoff:
+                keep_from = offset
+                break
+            offset += len(line)
+
+    if keep_from is None:
+        if is_active:
+            open(path, 'wb').close()
+        else:
+            os.remove(path)
+        return True
+
+    tmp_path = path + '.retention.tmp'
+    with open(tmp_path, 'wb') as handle:
+        handle.write(data[keep_from:])
+    os.replace(tmp_path, path)
+    return True
+
+
+def _apply_retention_unlocked(base_path: str, backup_count: int, days: int, now: float) -> int:
+    """Trim the log and its rotated backups to ``days``; return how many files changed."""
+    cutoff = now - days * 86400
+    changed = 0
+    paths = [(base_path, True)] + [(f"{base_path}.{index}", False) for index in range(1, backup_count + 1)]
+    for path, is_active in paths:
+        if not os.path.exists(path):
+            continue
+        try:
+            if _trim_log_file(path, cutoff, is_active):
+                changed += 1
+        except OSError as error:
+            sys.stderr.write(f"Log retention: could not trim {path}: {error}\n")
+    return changed
+
+
+def _current_retention_days() -> int:
+    if _retention_days_provider is None:
+        return 0
+    try:
+        return max(0, int(_retention_days_provider()))
+    except Exception:
+        return 0  # a broken provider must never break logging
+
+
+def set_log_retention_provider(provider: Optional[Callable[[], int]]) -> None:
+    """Register the callable returning the retention in days (0 = size-based rotation only)."""
+    global _retention_days_provider
+    _retention_days_provider = provider
+    if _file_handler is not None:
+        _file_handler.next_retention_check = 0.0  # type: ignore[attr-defined]
+
+
+def apply_log_retention(days: Optional[int] = None) -> int:
+    """Apply the retention now (e.g. right after the setting changed); return how many files changed."""
+    days = _current_retention_days() if days is None else max(0, int(days))
+    if days <= 0:
+        return 0
+    base_path = os.path.abspath(LOG_FILE)  # same path, hence same lock, as the file handler
+    with interprocess_lock(base_path + '.lock'):
+        return _apply_retention_unlocked(base_path, LOG_BACKUP_COUNT, days, time.time())
 
 
 def _get_file_handler() -> logging.Handler:

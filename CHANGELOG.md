@@ -10,6 +10,11 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Privacy: new [Privacy & GDPR](docs/PRIVACY.md) guide for instance operators, with a data inventory
   and a privacy notice template.
+- Privacy: users can download all their data as a ZIP (My Settings -> Security); admins can do it
+  for any user.
+- Privacy: log lines are kept 90 days by default, configurable in Parameters -> Advanced.
+- Security: password sign-in is throttled after repeated failures (`429` with `Retry-After`).
+- Privacy: the Astrodex photo map is private by default on new installs; existing installs keep their setting.
 
 ### Fixes
 

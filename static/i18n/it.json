@@ -588,6 +588,10 @@
     "default_location_name": "La mia posizione"
   },
   "settings": {
+    "my_data_title": "I tuoi dati",
+    "my_data_desc": "Scarica un archivio ZIP con tutto ciò che questa istanza conserva su di te: account, preferenze, Astrodex e foto, registro di osservazione, attrezzatura, piani e lista dei desideri.",
+    "my_data_export_btn": "Scarica i miei dati",
+    "my_data_export_started": "Preparazione dell'esportazione dei dati, il download inizierà a breve...",
     "customize": "Personalizza",
     "customize_info": "Personalizza le impostazioni predefinite della dashboard e le preferenze di visualizzazione. Queste impostazioni si applicano solo al tuo account.",
     "security": "Sicurezza",
@@ -866,6 +870,8 @@
     "app_settings_privacy_title": "Privacy e motori di ricerca",
     "app_settings_privacy_desc": "Per impostazione predefinita questa istanza è privata: ai motori di ricerca viene chiesto di non scansionarla né indicizzarla, inclusa la pagina di accesso. Attiva questa opzione solo se vuoi che la tua pagina di accesso sia trovabile su Google e altri motori di ricerca.",
     "app_settings_indexing_label": "Consenti ai motori di ricerca di indicizzare la pagina di accesso",
+    "app_settings_log_retention_label": "Conserva le righe del registro per (giorni)",
+    "app_settings_log_retention_help": "Il registro contiene nomi utente e indirizzi IP. Le righe più vecchie vengono eliminate una volta al giorno. 0 le conserva finché il limite di dimensione non le ruota.",
     "app_settings_proxy_title": "Proxy inverso",
     "app_settings_proxy_desc": "Abilita queste impostazioni solo se MyAstroBoard funziona dietro un proxy inverso (NGINX, Traefik, ecc.) con HTTPS. È necessario riavviare il container per applicare le modifiche.",
     "app_settings_trust_proxy_label": "Fidati delle intestazioni proxy (X-Forwarded-*)",
@@ -1800,6 +1806,7 @@
     "minutes_short": "{minutes} min"
   },
   "users": {
+    "export_data": "Esporta dati",
     "user_management": "Gestione utenti",
     "manage_users": "Gestisci gli utenti e i loro ruoli di accesso.",
     "username": "Nome utente",
@@ -2372,6 +2379,7 @@
     "otp_back": "Torna all'accesso",
     "invalid_otp_code": "Codice di verifica non valido. Riprova.",
     "otp_too_many_attempts": "Troppi codici errati. Effettua di nuovo l'accesso.",
+    "login_too_many_attempts": "Troppi tentativi di accesso non riusciti. Attendi qualche minuto e riprova.",
     "otp_session_expired": "Verifica scaduta. Effettua di nuovo l'accesso.",
     "local_account_network_restricted": "Questo account può accedere solo da una rete attendibile."
   },

@@ -415,3 +415,165 @@ def test_concurrent_processes_lose_no_lines_and_keep_backups_ordered(tmp_path):
     for w in range(workers):
         seq = [int(m.group(1)) for m in (re.match(rf"worker={w} line=(\d+)", s) for s in written) if m]
         assert seq == list(range(lines_per_worker))
+
+
+# ---------------------------------------------------------------------------
+# Time-based retention
+# ---------------------------------------------------------------------------
+
+_DAY = 86400
+
+
+def _stamp(epoch):
+    from datetime import datetime, timezone
+
+    return datetime.fromtimestamp(epoch, tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S,000 +0000')
+
+
+def _line(epoch, message):
+    return f"{_stamp(epoch)} - test - WARNING - [f:1] - {message}\n"
+
+
+@pytest.fixture
+def retention_provider(monkeypatch):
+    monkeypatch.setattr(module, "_retention_days_provider", None)
+    return lambda days: module.set_log_retention_provider(lambda: days)
+
+
+def test_trim_keeps_recent_records_with_their_continuation_lines(tmp_path):
+    import time as _time
+
+    now = _time.time()
+    log_path = tmp_path / "app.log"
+    log_path.write_text(
+        _line(now - 40 * _DAY, "old from 10.0.0.1")
+        + "Traceback of the old record\n"
+        + _line(now - 5 * _DAY, "recent")
+        + "Traceback of the recent record\n"
+        + _line(now, "newest"),
+        encoding="utf-8",
+    )
+
+    changed = module._apply_retention_unlocked(str(log_path), 0, 30, now)
+
+    assert changed == 1
+    content = log_path.read_text(encoding="utf-8")
+    assert "10.0.0.1" not in content and "old record" not in content
+    assert content.startswith(_stamp(now - 5 * _DAY))
+    assert "Traceback of the recent record" in content and "newest" in content
+
+
+def test_expired_backups_are_deleted_and_expired_active_file_is_emptied(tmp_path):
+    import time as _time
+
+    now = _time.time()
+    log_path = tmp_path / "app.log"
+    log_path.write_text(_line(now - 60 * _DAY, "old active"), encoding="utf-8")
+    (tmp_path / "app.log.1").write_text(_line(now - 70 * _DAY, "old backup"), encoding="utf-8")
+    (tmp_path / "app.log.2").write_text(_line(now - 1 * _DAY, "recent backup"), encoding="utf-8")
+
+    assert module._apply_retention_unlocked(str(log_path), 3, 30, now) == 2
+
+    assert log_path.exists() and log_path.read_text(encoding="utf-8") == ""
+    assert not (tmp_path / "app.log.1").exists()
+    assert "recent backup" in (tmp_path / "app.log.2").read_text(encoding="utf-8")
+
+
+def test_file_without_timestamps_falls_back_to_modification_time(tmp_path):
+    import time as _time
+
+    now = _time.time()
+    old = tmp_path / "app.log.1"
+    old.write_text("legacy format line\n", encoding="utf-8")
+    os.utime(old, (now - 90 * _DAY, now - 90 * _DAY))
+    fresh = tmp_path / "app.log.2"
+    fresh.write_text("legacy format line\n", encoding="utf-8")
+
+    module._apply_retention_unlocked(str(tmp_path / "app.log"), 2, 30, now)
+
+    assert not old.exists()
+    assert fresh.exists()
+
+
+def test_emit_applies_retention_at_most_once_per_interval(tmp_path, retention_provider):
+    import time as _time
+
+    log_path = tmp_path / "app.log"
+    log_path.write_text(_line(_time.time() - 40 * _DAY, "expired"), encoding="utf-8")
+    retention_provider(30)
+    handler = module.MultiProcessRotatingFileHandler(str(log_path), maxBytes=0, backupCount=0, encoding="utf-8")
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    try:
+        handler.emit(_make_record("first"))
+        assert log_path.read_text(encoding="utf-8") == "first\n"
+
+        # Not due again until the interval elapsed: an expired line written now survives
+        with open(log_path, "a", encoding="utf-8") as handle:
+            handle.write(_line(_time.time() - 40 * _DAY, "expired again"))
+        handler.emit(_make_record("second"))
+        assert "expired again" in log_path.read_text(encoding="utf-8")
+    finally:
+        handler.close()
+
+
+def test_retention_disabled_or_broken_provider_leaves_logs_alone(tmp_path, monkeypatch):
+    import time as _time
+
+    log_path = tmp_path / "app.log"
+    log_path.write_text(_line(_time.time() - 400 * _DAY, "very old"), encoding="utf-8")
+
+    def _broken():
+        raise RuntimeError("settings unavailable")
+
+    for provider in (lambda: 0, _broken):
+        monkeypatch.setattr(module, "_retention_days_provider", provider)
+        handler = module.MultiProcessRotatingFileHandler(str(log_path), maxBytes=0, backupCount=0, encoding="utf-8")
+        handler.setFormatter(logging.Formatter("%(message)s"))
+        try:
+            handler.emit(_make_record("line"))
+        finally:
+            handler.close()
+    assert "very old" in log_path.read_text(encoding="utf-8")
+
+
+def test_provider_that_logs_does_not_deadlock_the_handler(tmp_path, monkeypatch):
+    """The provider runs before the lock is taken, so logging from it re-enters emit() safely."""
+    log_path = tmp_path / "app.log"
+    handler = module.MultiProcessRotatingFileHandler(str(log_path), maxBytes=0, backupCount=0, encoding="utf-8")
+    handler.setFormatter(logging.Formatter("%(message)s"))
+
+    def _logging_provider():
+        handler.emit(_make_record("from provider"))
+        return 30
+
+    monkeypatch.setattr(module, "_retention_days_provider", _logging_provider)
+    try:
+        handler.emit(_make_record("outer"))
+    finally:
+        handler.close()
+    assert log_path.read_text(encoding="utf-8").splitlines() == ["from provider", "outer"]
+
+
+def test_apply_log_retention_uses_the_real_log_file(tmp_path, monkeypatch):
+    import time as _time
+
+    log_path = tmp_path / "myastroboard.log"
+    log_path.write_text(_line(_time.time() - 10 * _DAY, "ten days old"), encoding="utf-8")
+    monkeypatch.setattr(module, "LOG_FILE", str(log_path))
+
+    assert module.apply_log_retention(0) == 0
+    assert module.apply_log_retention(30) == 0
+    assert module.apply_log_retention(7) == 1
+    assert log_path.read_text(encoding="utf-8") == ""
+
+
+def test_set_log_retention_provider_rearms_the_shared_handler(monkeypatch, tmp_path):
+    monkeypatch.setattr(module, "LOG_FILE", str(tmp_path / "shared.log"))
+    handler = module._get_file_handler()
+    try:
+        handler.next_retention_check = 10**12
+        module.set_log_retention_provider(lambda: 30)
+        assert handler.next_retention_check == 0.0
+    finally:
+        module.set_log_retention_provider(None)
+        handler.close()
