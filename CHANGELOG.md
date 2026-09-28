@@ -8,6 +8,20 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Features
 
+- None.
+
+### Fixes
+
+- None.
+
+### Breaking changes
+
+- None.
+
+## 1.6.4 (2026-09-28)
+
+### Features
+
 - Privacy: new [Privacy & GDPR](docs/PRIVACY.md) guide for instance operators, with a data inventory
   and a privacy notice template.
 - Privacy: users can download all their data as a ZIP (My Settings -> Security); admins can do it
