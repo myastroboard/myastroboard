@@ -1,8 +1,8 @@
 """CHANGELOG.md requirement check for feature/fix pull requests.
 
-Only enforced in CI on a pull_request event, where GITHUB_HEAD_REF and
-GITHUB_BASE_REF are available to identify the branch and diff against its
-base. Running locally (no such context) always skips.
+Only enforced in CI on a pull_request event, where GITHUB_HEAD_REF identifies
+the branch and HEAD is the PR merge commit to diff against its first parent.
+Running locally (no such context) always skips.
 """
 
 import os
@@ -27,19 +27,23 @@ def test_feature_or_fix_pr_updates_changelog():
     if not head_ref.startswith(_REQUIRED_BRANCH_PREFIXES):
         pytest.skip(f"Branch '{head_ref}' is not a feature/ or fix/ branch")
 
-    base_ref = os.environ.get("GITHUB_BASE_REF")
-    if not base_ref:
-        pytest.skip("No GITHUB_BASE_REF available to diff against")
-
-    base_sha = subprocess.run(
-        ["git", "merge-base", f"origin/{base_ref}", "HEAD"],
+    # On pull_request events actions/checkout checks out refs/pull/N/merge: a
+    # merge commit whose first parent is the base branch the PR was merged
+    # onto. Diffing against HEAD^1 gives exactly the PR's changes, without
+    # depending on origin/<base> (which may have moved since the event).
+    parents = subprocess.run(
+        ["git", "rev-list", "--parents", "-n", "1", "HEAD"],
         capture_output=True,
         text=True,
         check=True,
-    ).stdout.strip()
+    ).stdout.split()
+    assert len(parents) == 3, (
+        "Expected HEAD to be the pull request merge commit (refs/pull/N/merge); "
+        "check the actions/checkout step of the workflow."
+    )
 
     changed = subprocess.run(
-        ["git", "diff", "--name-only", base_sha, "HEAD"],
+        ["git", "diff", "--name-only", "HEAD^1", "HEAD"],
         capture_output=True,
         text=True,
         check=True,
