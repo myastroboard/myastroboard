@@ -12,7 +12,8 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixes
 
-- None.
+- Docker: the image now declares its own `HEALTHCHECK` (on `/health`), no longer only in
+  `docker-compose.yml`.
 
 ### Breaking changes
 

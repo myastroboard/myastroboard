@@ -94,6 +94,11 @@ RUN chmod +x /entrypoint.sh \
 # Expose port
 EXPOSE 5000
 
+# Native healthcheck: used by Home Assistant (no watchdog option) and plain docker run;
+# docker-compose.yml overrides it with its own.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -fsS http://localhost:5000/health || exit 1
+
 # Entrypoint root -> fix perms -> drop user
 ENTRYPOINT ["/entrypoint.sh"]
 
