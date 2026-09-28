@@ -22,6 +22,7 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   plans, wishlist), not only the Astrodex.
 - Uploaded pictures (Astrodex, session attachments, MyAstroShine returns) are stripped of EXIF/GPS
   metadata, losslessly; image uploads that are not real images are rejected.
+- CI: the CHANGELOG check no longer fails when the base branch moves while the job runs.
 
 ### Breaking changes
 
