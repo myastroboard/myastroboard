@@ -110,6 +110,8 @@ COPY VERSION /app/VERSION
 COPY backend/ ./backend/
 COPY templates/ ./templates/
 COPY --from=builder /build/static-dist ./static/
+# Picked up by gunicorn from the working directory: listen address (IPv4 + IPv6)
+COPY gunicorn.conf.py ./gunicorn.conf.py
 
 # Create non-root user
 RUN useradd -m -u 1000 appuser
@@ -135,5 +137,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
 # Entrypoint root -> fix perms -> drop user
 ENTRYPOINT ["/entrypoint.sh"]
 
-# Default command
-CMD ["gunicorn", "-w", "2", "-b", "0.0.0.0:5000", "backend.app:app"]
+# Default command (listen address: gunicorn.conf.py)
+CMD ["gunicorn", "-w", "2", "backend.app:app"]
