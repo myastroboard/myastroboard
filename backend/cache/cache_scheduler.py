@@ -15,6 +15,12 @@ else:  # pragma: no cover
 # Initialize logger for this module
 logger = get_logger(__name__)
 
+# How long stop() waits for a cache update in progress. The thread is a daemon, so
+# an update still running is simply abandoned at exit; waiting for it (a first
+# population can take minutes) made container stops overrun the stop timeout
+# (Docker / Home Assistant: 10 s) and end in a kill.
+CACHE_SCHEDULER_SHUTDOWN_TIMEOUT_SECONDS = 3
+
 
 class CacheScheduler:
     def __init__(self, interval_seconds=CACHE_SCHEDULER_INTERVAL_SECONDS):
@@ -99,7 +105,9 @@ class CacheScheduler:
         """Stop the cache scheduler and release lock"""
         self._stop_event.set()
         if self.thread.is_alive():
-            self.thread.join()
+            self.thread.join(timeout=CACHE_SCHEDULER_SHUTDOWN_TIMEOUT_SECONDS)
+            if self.thread.is_alive():
+                logger.info("Cache update still running at shutdown; abandoning it")
         self._release_lock()
         logger.info("CacheScheduler stopped")
 

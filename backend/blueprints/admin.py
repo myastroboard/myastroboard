@@ -17,7 +17,7 @@ from utils import app_settings as _app_settings
 from utils.auth import admin_required
 from utils.constants import CONFIG_FILE, DATA_DIR, SKYTONIGHT_LOGS_DIR, SKYTONIGHT_SCHEDULER_STATUS_FILE
 from utils.file_lock import interprocess_lock
-from utils.logging_config import apply_log_retention, get_logger
+from utils.logging_config import apply_log_retention, env_log_level, get_logger, refresh_log_levels
 from utils.metrics_collector import collect_metrics
 
 logger = get_logger(__name__)
@@ -30,6 +30,7 @@ admin_bp = Blueprint('admin', __name__)
 def get_app_settings_api():
     """Return current persistent app settings (excludes secret key)."""
     settings = _app_settings.get_app_settings()
+    log_level, console_log_level = _app_settings.get_log_levels()
     return jsonify(
         {
             'vapid_contact_email': settings.get('vapid_contact_email', ''),
@@ -37,6 +38,11 @@ def get_app_settings_api():
             'session_cookie_secure': settings.get('session_cookie_secure', False),
             'search_engine_indexing': settings.get('search_engine_indexing', False),
             'log_retention_days': _app_settings.get_log_retention_days(),
+            'log_level': log_level,
+            'console_log_level': console_log_level,
+            # Set when an environment variable overrides the saved level
+            'log_level_env': env_log_level('LOG_LEVEL'),
+            'console_log_level_env': env_log_level('CONSOLE_LOG_LEVEL'),
         }
     )
 
@@ -47,6 +53,7 @@ def update_app_settings_api():
     """Update persistent app settings. Returns requires_restart=True when proxy settings changed."""
     data = request.get_json(silent=True) or {}
     old_settings = _app_settings.get_app_settings()
+    old_log_level, old_console_log_level = _app_settings.get_log_levels()
 
     new_settings = {
         'vapid_contact_email': str(
@@ -63,9 +70,14 @@ def update_app_settings_api():
             data.get('log_retention_days', old_settings.get('log_retention_days')),
             fallback=_app_settings.get_log_retention_days(),
         ),
+        'log_level': _app_settings.normalize_log_level(data.get('log_level'), old_log_level),
+        'console_log_level': _app_settings.normalize_log_level(data.get('console_log_level'), old_console_log_level),
     }
 
     _app_settings.save_app_settings(new_settings)
+
+    # Log levels apply right away in this worker; the other workers follow within seconds
+    refresh_log_levels(force=True)
 
     # A shorter retention applies right away rather than at the next daily pass
     if new_settings['log_retention_days'] != _app_settings.normalize_log_retention_days(
@@ -85,7 +97,9 @@ def update_app_settings_api():
         f"trust_proxy={new_settings['trust_proxy_headers']}, "
         f"session_secure={new_settings['session_cookie_secure']}, "
         f"search_engine_indexing={new_settings['search_engine_indexing']}, "
-        f"log_retention_days={new_settings['log_retention_days']}"
+        f"log_retention_days={new_settings['log_retention_days']}, "
+        f"log_level={new_settings['log_level']}, "
+        f"console_log_level={new_settings['console_log_level']}"
     )
     return jsonify({'status': 'success', 'requires_restart': requires_restart})
 
@@ -347,6 +361,7 @@ def backup_restore_api():
         if any('app_settings.json' in f for f in restored_files):
             _app_settings.reload_app_settings()
             current_app.config['SESSION_COOKIE_SECURE'] = _app_settings.get_app_settings()['session_cookie_secure']
+            refresh_log_levels(force=True)
 
         logger.info(
             f"Backup restore completed: {len(restored_files)} files restored, "
@@ -415,10 +430,11 @@ def logs_export_api():
 @admin_bp.route('/api/logs/level', methods=['GET'])
 @admin_required
 def get_log_level_api():
-    """Return the current active log level for the file handler"""
-    from utils.logging_config import get_current_log_level
+    """Return the active log levels of the log file and of the console"""
+    from utils.logging_config import get_current_console_log_level, get_current_log_level
 
-    return jsonify({'level': get_current_log_level()})
+    refresh_log_levels()
+    return jsonify({'level': get_current_log_level(), 'console_level': get_current_console_log_level()})
 
 
 @admin_bp.route('/api/logs', methods=['GET'])

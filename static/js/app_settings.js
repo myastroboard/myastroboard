@@ -1,4 +1,4 @@
-// Admin app settings: VAPID contact email, reverse-proxy flags, container restart
+// Admin app settings: VAPID contact email, privacy, log levels, reverse-proxy flags, container restart
 
 async function loadAppSettings() {
     try {
@@ -32,6 +32,50 @@ async function saveAppSettingsPrivacy() {
     if (retentionEl) loadAppSettings(); // show the value the server kept (clamped to 0-3650)
 }
 
+// Log levels (Parameters -> Log export). A LOG_LEVEL / CONSOLE_LOG_LEVEL environment
+// variable overrides the saved level: its select is then disabled, with a note.
+const _LOG_LEVEL_FIELDS = [
+    { key: 'log_level', envKey: 'log_level_env', envVar: 'LOG_LEVEL', id: 'app-setting-log-level' },
+    { key: 'console_log_level', envKey: 'console_log_level_env', envVar: 'CONSOLE_LOG_LEVEL', id: 'app-setting-console-log-level' },
+];
+
+async function loadLogLevels() {
+    try {
+        const settings = await fetchJSON('/api/admin/app-settings');
+        for (const field of _LOG_LEVEL_FIELDS) {
+            const select = document.getElementById(field.id);
+            const note = document.getElementById(`${field.id}-env`);
+            if (!select) continue;
+            const envLevel = settings[field.envKey];
+            select.value = envLevel || settings[field.key];
+            select.disabled = !!envLevel;
+            if (note) {
+                note.replaceChildren();
+                if (envLevel) {
+                    const icon = document.createElement('i');
+                    icon.className = 'bi bi-lock-fill icon-inline';
+                    icon.setAttribute('aria-hidden', 'true');
+                    note.append(icon, ' ', i18n.t('settings.log_level_env_override', {
+                        variable: field.envVar, level: envLevel,
+                    }));
+                }
+                note.style.display = envLevel ? '' : 'none';
+            }
+        }
+    } catch (err) {
+        console.error('Failed to load log levels:', err);
+    }
+}
+
+async function saveAppSettingsLogs() {
+    const partial = {};
+    for (const field of _LOG_LEVEL_FIELDS) {
+        const select = document.getElementById(field.id);
+        if (select && !select.disabled) partial[field.key] = select.value;
+    }
+    await _saveAppSettings(partial, 'logs');
+}
+
 async function saveAppSettingsProxy() {
     const trust = document.getElementById('app-setting-trust-proxy')?.checked ?? false;
     const secure = document.getElementById('app-setting-session-secure')?.checked ?? false;
@@ -52,6 +96,7 @@ async function _saveAppSettings(partial, section) {
             notifications: 'app-settings-notifications-feedback',
             privacy: 'app-settings-privacy-feedback',
             proxy: 'app-settings-proxy-feedback',
+            logs: 'app-settings-logs-feedback',
         };
         _showFeedback(feedbackIds[section]);
 
@@ -113,6 +158,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('save-app-settings-proxy')
         ?.addEventListener('click', saveAppSettingsProxy);
+
+    document.getElementById('save-app-settings-logs')
+        ?.addEventListener('click', saveAppSettingsLogs);
 
     document.getElementById('btn-restart-app')
         ?.addEventListener('click', restartApp);

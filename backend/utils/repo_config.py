@@ -12,6 +12,7 @@ This module owns:
 - helpers to look up / list presets for a given user or for the cache scheduler.
 """
 
+import sys
 import uuid
 from copy import deepcopy
 from datetime import datetime, timezone
@@ -173,6 +174,13 @@ def _attribute_new_location_to_all_users(location_id):
     succeed - a location that ends up unattributed can always be fixed by an
     admin afterward.
     """
+    auth_module = sys.modules.get('utils.auth')
+    if auth_module is not None and not hasattr(auth_module, 'user_manager'):
+        # utils.auth is still loading: on a fresh install its UserManager() is creating
+        # the default admin, which loaded (and so created) this config. There is no
+        # user to attribute yet, and that admin gets every location from create_user().
+        logger.debug(f"Location {location_id!r} created while user storage initializes; nothing to attribute")
+        return
     try:
         from utils.auth import user_manager
 

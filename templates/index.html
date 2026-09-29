@@ -2870,22 +2870,46 @@
             <!-- Log Export Sub-tab -->
             <div id="log-export-subtab" class="sub-tab-content">
 
-                <!-- Current log level info -->
+                <!-- Log levels (app settings; LOG_LEVEL / CONSOLE_LOG_LEVEL env vars override) -->
                 <div class="shadow p-2 mb-3 rounded bg-sub-container">
                     <h2>
-                        <i class="bi bi-info-circle text-info icon-inline" aria-hidden="true"></i>
-                        <span data-i18n="settings.log_level_title">Current Log Level</span>
+                        <i class="bi bi-sliders text-info icon-inline" aria-hidden="true"></i>
+                        <span data-i18n="settings.log_level_title">Log Level</span>
                     </h2>
                     <div class="alert alert-info" role="alert" data-i18n="settings.log_level_info">
-                        The log level controls how much detail is written to the log files. To capture the most detail for troubleshooting, set the level to <strong>DEBUG</strong> via the <code>LOG_LEVEL</code> environment variable, restart the application, reproduce the issue, then export the logs below.
+                        The log level controls how much detail is recorded. To troubleshoot an issue, set the log file level to DEBUG, reproduce the issue, then export the logs below. Changes apply right away, without a restart.
                     </div>
-                    <div class="d-flex align-items-center gap-3 mb-2">
-                        <span data-i18n="settings.log_current_level">Active file log level:</span>
-                        <span id="log-export-current-level" class="badge bg-secondary fs-6">-</span>
+                    <div class="row g-3 mt-1 mb-2">
+                        <div class="col-md-6">
+                            <label class="form-label" for="app-setting-log-level" data-i18n="settings.log_level_file_label">Log file level</label>
+                            <select class="form-select" id="app-setting-log-level">
+                                <option value="DEBUG">DEBUG</option>
+                                <option value="INFO">INFO</option>
+                                <option value="WARNING">WARNING</option>
+                                <option value="ERROR">ERROR</option>
+                            </select>
+                            <div class="form-text" data-i18n="settings.log_level_file_help">Written to myastroboard.log, shown in the Logs tab and included in the export.</div>
+                            <div id="app-setting-log-level-env" class="form-text text-warning-emphasis fw-semibold" style="display:none;"></div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="app-setting-console-log-level" data-i18n="settings.log_level_console_label">Console level</label>
+                            <select class="form-select" id="app-setting-console-log-level">
+                                <option value="DEBUG">DEBUG</option>
+                                <option value="INFO">INFO</option>
+                                <option value="WARNING">WARNING</option>
+                                <option value="ERROR">ERROR</option>
+                            </select>
+                            <div class="form-text" data-i18n="settings.log_level_console_help">The container output: docker logs, or the Log tab of the Home Assistant app.</div>
+                            <div id="app-setting-console-log-level-env" class="form-text text-warning-emphasis fw-semibold" style="display:none;"></div>
+                        </div>
                     </div>
-                    <p class="text-muted small mb-0">
-                        <code>LOG_LEVEL=DEBUG</code> &nbsp;·&nbsp; <span data-i18n="settings.log_level_env_hint">Set in docker-compose.yml or .env, then restart the container.</span>
-                    </p>
+                    <div class="button-group mt-2">
+                        <button type="button" id="save-app-settings-logs" class="btn btn-primary">
+                            <i class="bi bi-save icon-inline" aria-hidden="true"></i>
+                            <span data-i18n="settings.app_settings_save_btn">Save</span>
+                        </button>
+                        <span id="app-settings-logs-feedback" class="ms-3 text-success" style="display:none;" data-i18n="settings.app_settings_saved">Settings saved.</span>
+                    </div>
                 </div>
 
                 <!-- Log export section -->

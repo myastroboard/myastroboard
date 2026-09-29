@@ -98,9 +98,12 @@ from utils import app_settings as _app_settings
 _startup_settings = _app_settings.get_app_settings()
 
 # Time-based log retention (Parameters -> Advanced -> Privacy), read live from app settings
-from utils.logging_config import set_log_retention_provider
+from utils.logging_config import refresh_log_levels, set_log_level_provider, set_log_retention_provider
 
 set_log_retention_provider(_app_settings.get_log_retention_days)
+
+# Log file / console levels (Parameters -> Log export), unless LOG_LEVEL / CONSOLE_LOG_LEVEL are set
+set_log_level_provider(_app_settings.get_log_levels)
 
 # Configure reverse proxy support — configurable via Parameters → Advanced → Reverse proxy
 if _startup_settings['trust_proxy_headers']:  # pragma: no cover
@@ -174,6 +177,12 @@ app.register_blueprint(session_analytics_bp)
 # ============================================================
 # API Utils
 # ============================================================
+
+
+@app.before_request
+def sync_log_levels():
+    """Pick up log levels changed in another gunicorn worker (throttled, a file stat at most)."""
+    refresh_log_levels()
 
 
 @app.before_request
@@ -439,6 +448,14 @@ except Exception as e:  # pragma: no cover
 # Ensure schedulers are stopped when the worker exits
 # (covers gunicorn workers that never reach the __main__ finally block)
 def _stop_schedulers_on_exit():  # pragma: no cover
+    # MQTT first, so Home Assistant gets the "offline" message before the other
+    # (bounded) waits; the whole sequence must fit the container stop timeout.
+    try:
+        from connectors import mqtt_publisher as _mp
+
+        _mp.stop()
+    except Exception as e:
+        logger.warning(f"Error stopping MQTT publisher on exit: {e}")
     skytonight_scheduler = app.config.get('skytonight_scheduler')
     if skytonight_scheduler:
         try:
@@ -457,12 +474,6 @@ def _stop_schedulers_on_exit():  # pragma: no cover
         _ps.stop()
     except Exception as e:  # pragma: no cover
         logger.warning(f"Error stopping push scheduler on exit: {e}")
-    try:
-        from connectors import mqtt_publisher as _mp
-
-        _mp.stop()
-    except Exception as e:
-        logger.warning(f"Error stopping MQTT publisher on exit: {e}")
 
 
 atexit.register(_stop_schedulers_on_exit)

@@ -302,11 +302,13 @@ except Exception as e:
 
 #### Log Levels and Configuration
 
-- **Default File Level**: INFO (set via LOG_LEVEL environment variable)
-- **Default Console Level**: WARNING (set via CONSOLE_LOG_LEVEL environment variable)
+- **Default File Level**: INFO; **Default Console Level**: WARNING
+- **Set in the UI**: Parameters -> Log export, stored as `log_level` / `console_log_level` in
+  `app_settings.json`, applied live (`utils.logging_config.refresh_log_levels`, fed by the
+  `app_settings.get_log_levels` provider; other gunicorn workers follow within seconds)
 - **Available Levels**: DEBUG, INFO, WARNING, ERROR, CRITICAL
 - **Log File**: `/app/data/myastroboard.log` (with rotation)
-- **Environment Control**:
+- **Environment override**: when set, these win over the UI setting (which is then shown disabled):
   ```bash
   LOG_LEVEL=DEBUG          # Controls file output level
   CONSOLE_LOG_LEVEL=INFO   # Controls console output level

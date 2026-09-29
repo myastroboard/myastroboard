@@ -140,3 +140,47 @@ def test_modal_open_does_not_change_the_url_hash(logged_in_page):
     _open_shared_modal(page)
 
     assert page.url == url_before
+
+
+def _open_first_visit(page, live_server_url, hash_fragment=""):
+    """Log in with the Guided Setup Wizard still pending (a fresh install) and load the app."""
+    assert page.request.post(
+        f"{live_server_url}/api/auth/login", data={"username": "admin", "password": "admin"}
+    ).ok
+    assert page.request.put(
+        f"{live_server_url}/api/auth/preferences",
+        data={"preferences": {"wizard": {"completed": False, "skipped": False}}},
+    ).ok
+    page.goto(f"{live_server_url}/" + (f"#{hash_fragment}" if hash_fragment else ""))
+    page.wait_for_function("window.__myastroboardStartupApplied === true", timeout=30000)
+
+
+@pytest.mark.parametrize("hash_fragment", ["", "astrodex"])
+def test_wizard_stays_open_when_the_startup_tab_is_applied(page, live_server_url, hash_fragment):
+    """On a first visit the wizard opens, then initializeApp() switches to the startup
+    tab (or the URL's tab); that tab change used to close the wizard a moment after
+    it appeared. It is persistent: only its own buttons close it."""
+    try:
+        _open_first_visit(page, live_server_url, hash_fragment)
+
+        page.wait_for_selector('#wizard-modal.show', state="visible")
+        page.wait_for_timeout(1000)  # past every startup tab switch and cleanup timer
+        assert page.locator('#wizard-modal').evaluate("el => el.classList.contains('show')")
+        assert _residue(page)["backdrops"] == 1
+
+        # A later navigation leaves it open too
+        page.evaluate("switchMainTab('spaceflight')")
+        page.wait_for_timeout(600)
+        assert page.locator('#wizard-modal').evaluate("el => el.classList.contains('show')")
+
+        # ...while its own close path still works and leaves nothing behind
+        page.evaluate("closeModal('#wizard-modal')")
+        page.wait_for_selector('#wizard-modal.show', state="detached")
+        page.wait_for_function("() => document.querySelectorAll('.modal-backdrop').length === 0")
+        residue = _residue(page)
+        assert not residue["bodyLocked"] and residue["bodyOverflow"] == ""
+    finally:
+        page.request.put(
+            f"{live_server_url}/api/auth/preferences",
+            data={"preferences": {"wizard": {"completed": True, "skipped": False}}},
+        )

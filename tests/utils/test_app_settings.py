@@ -438,3 +438,33 @@ class TestLogRetentionDays:
 
         _set_cache(monkeypatch, {'log_retention_days': 14})
         assert app_settings.get_log_retention_days() == 14
+
+
+class TestLogLevels:
+    @pytest.mark.parametrize(
+        'value, expected',
+        [
+            ('debug', 'DEBUG'),
+            (' Warning ', 'WARNING'),
+            ('CRITICAL', 'CRITICAL'),
+            ('verbose', 'INFO'),
+            (None, 'INFO'),
+            (10, 'INFO'),
+        ],
+    )
+    def test_normalize(self, value, expected):
+        from utils import app_settings
+
+        assert app_settings.normalize_log_level(value, 'INFO') == expected
+
+    def test_defaults_are_info_file_and_warning_console(self, monkeypatch):
+        from utils import app_settings
+
+        _set_cache(monkeypatch, {})
+        assert app_settings.get_log_levels() == ('INFO', 'WARNING')
+
+    def test_reads_saved_values_and_ignores_invalid_ones(self, monkeypatch):
+        from utils import app_settings
+
+        _set_cache(monkeypatch, {'log_level': 'debug', 'console_log_level': 'nonsense'})
+        assert app_settings.get_log_levels() == ('DEBUG', 'WARNING')

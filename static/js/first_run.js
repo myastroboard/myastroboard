@@ -53,9 +53,13 @@ async function checkFirstRun() {
     if (wizardLangSelect) wizardLangSelect.value = i18n.getCurrentLanguage();
 
     _renderWizardStep();
-    // history: false - the wizard is dismissed only via Skip / Skip all, never by
-    // the hardware Back button (which would leave `skipped` unpersisted).
-    _wizard.modal = await openModal(modalEl, { backdrop: 'static', keyboard: false, history: false });
+    // The wizard is dismissed only via its own buttons (Skip / Skip all / Finish), never
+    // by the hardware Back button (which would leave `skipped` unpersisted) - history:
+    // false - nor by a tab change: persistent, since initializeApp() applies the startup
+    // tab right after this opens it on a first visit.
+    _wizard.modal = await openModal(modalEl, {
+        backdrop: 'static', keyboard: false, history: false, persistent: true,
+    });
 }
 
 function initFirstRun() {

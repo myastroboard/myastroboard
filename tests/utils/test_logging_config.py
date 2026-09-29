@@ -577,3 +577,106 @@ def test_set_log_retention_provider_rearms_the_shared_handler(monkeypatch, tmp_p
     finally:
         module.set_log_retention_provider(None)
         handler.close()
+
+
+# ---------------------------------------------------------------------------
+# UI-chosen log levels (provider) and the LOG_LEVEL / CONSOLE_LOG_LEVEL overrides
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def level_state(monkeypatch):
+    """Isolated level state: no provider, default console level, no env override."""
+    import weakref
+
+    monkeypatch.setattr(module, "MultiProcessRotatingFileHandler", DummyRotatingHandler)
+    monkeypatch.setattr(module.os, "makedirs", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(module, "_level_provider", None)
+    monkeypatch.setattr(module, "_next_level_refresh", 0.0)
+    monkeypatch.setattr(module, "CONSOLE_LOG_LEVEL", "WARNING")
+    monkeypatch.setattr(module, "_console_handlers", weakref.WeakSet())
+    monkeypatch.delenv("LOG_LEVEL", raising=False)
+    monkeypatch.delenv("CONSOLE_LOG_LEVEL", raising=False)
+
+
+def _console_handler(logger):
+    return next(h for h in logger.handlers if isinstance(h, logging.StreamHandler))
+
+
+def test_set_console_log_level_updates_following_handlers_only(level_state):
+    following = module.setup_logger("test.console_follow", include_console=True)
+    pinned = module.setup_logger("test.console_pinned", include_console=True, console_level="error")
+
+    module.set_console_log_level("debug")
+
+    assert _console_handler(following).level == logging.DEBUG
+    assert _console_handler(pinned).level == logging.ERROR
+    assert module.get_current_console_log_level() == "DEBUG"
+
+
+def test_provider_levels_apply_when_registered(level_state):
+    logger = module.setup_logger("test.provider", include_console=True)
+
+    module.set_log_level_provider(lambda: ("DEBUG", "ERROR"))
+
+    assert module.get_current_log_level() == "DEBUG"
+    assert module.get_current_console_log_level() == "ERROR"
+    assert module._file_handler.level == logging.DEBUG
+    assert _console_handler(logger).level == logging.ERROR
+
+
+def test_environment_variables_override_provider_levels(level_state, monkeypatch):
+    monkeypatch.setenv("LOG_LEVEL", "warning")
+    monkeypatch.setenv("CONSOLE_LOG_LEVEL", "CRITICAL")
+
+    module.set_log_level_provider(lambda: ("DEBUG", "DEBUG"))
+
+    assert module.get_current_log_level() == "WARNING"
+    assert module.get_current_console_log_level() == "CRITICAL"
+
+
+def test_refresh_is_throttled_unless_forced(level_state):
+    levels = {"file": "INFO", "console": "WARNING"}
+    module.set_log_level_provider(lambda: (levels["file"], levels["console"]))
+
+    levels.update(file="DEBUG", console="DEBUG")  # saved by another worker
+    module.refresh_log_levels()
+    assert module.get_current_log_level() == "INFO"
+
+    module.refresh_log_levels(force=True)
+    assert module.get_current_log_level() == "DEBUG"
+    assert module.get_current_console_log_level() == "DEBUG"
+
+
+def test_refresh_picks_up_changes_after_the_interval(level_state, monkeypatch):
+    levels = {"file": "INFO"}
+    module.set_log_level_provider(lambda: (levels["file"], "WARNING"))
+    levels["file"] = "ERROR"
+
+    monkeypatch.setattr(module, "_next_level_refresh", 0.0)  # interval elapsed
+    module.refresh_log_levels()
+
+    assert module.get_current_log_level() == "ERROR"
+
+
+def test_broken_or_invalid_provider_keeps_current_levels(level_state):
+    def broken():
+        raise RuntimeError("settings unreadable")
+
+    module.set_log_level_provider(broken)
+    assert (module.get_current_log_level(), module.get_current_console_log_level()) == ("INFO", "WARNING")
+
+    module.set_log_level_provider(lambda: ("LOUD", None))
+    assert (module.get_current_log_level(), module.get_current_console_log_level()) == ("INFO", "WARNING")
+
+
+def test_refresh_without_provider_does_nothing(level_state):
+    module.set_global_log_level("error")
+    module.refresh_log_levels(force=True)
+    assert module.get_current_log_level() == "ERROR"
+
+
+@pytest.mark.parametrize("value, expected", [("debug", "DEBUG"), (" Info ", "INFO"), ("verbose", None), ("", None)])
+def test_env_log_level(monkeypatch, value, expected):
+    monkeypatch.setenv("LOG_LEVEL", value)
+    assert module.env_log_level("LOG_LEVEL") == expected
