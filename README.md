@@ -5,7 +5,8 @@
 [![Docker Image Size](https://img.shields.io/docker/image-size/myastroboard/myastroboard/latest)](https://hub.docker.com/r/myastroboard/myastroboard)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0--or--later-blue.svg)](LICENSE)
 
-MyAstroBoard is a self-hosted astronomy dashboard with Docker-first deployment.
+MyAstroBoard is a self-hosted astronomy dashboard with Docker-first deployment, also available as a
+Home Assistant app.
 It combines weather and astronomical conditions, automated SkyTonight execution,
 and planning tools for observation and astrophotography sessions.
 
@@ -78,7 +79,8 @@ See it in the [visual tour](docs/VISUAL_TOUR.md#your-sky), or read the details i
 
 ## Quick Start
 
-- Installation: [docs/1.INSTALLATION.md](docs/1.INSTALLATION.md)
+- Installation: [docs/1.INSTALLATION.md](docs/1.INSTALLATION.md) - Docker Compose, or as a
+  [Home Assistant app](docs/1.INSTALLATION.md#option-2-home-assistant-app)
 - Quick Start: [docs/2.QUICKSTART.md](docs/2.QUICKSTART.md)
 - Update Guide: [docs/3.UPDATE.md](docs/3.UPDATE.md)
 - Reverse Proxy: [docs/6.REVERSE_PROXY.md](docs/6.REVERSE_PROXY.md)
@@ -100,6 +102,9 @@ Deep-sky data is produced from the current SkyTonight/PyOngc pipeline.
 
 - Docker and Docker Compose
 - Linux host or compatible Docker environment
+
+Or, without Docker: Home Assistant OS or Supervised on a 64-bit system (amd64 / aarch64), using the
+[Home Assistant app](docs/1.INSTALLATION.md#option-2-home-assistant-app).
 
 Python dependencies are listed in `requirements.txt`.
 

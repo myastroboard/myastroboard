@@ -14,6 +14,11 @@ Home Assistant restart.
 Ready-made Lovelace cards live in a separate repository:
 [lovelace-myastroboard-card](https://github.com/myastroboard/lovelace-myastroboard-card).
 
+MyAstroBoard itself can also run inside Home Assistant OS, as an app - see
+[Installation, option 2](1.INSTALLATION.md#option-2-home-assistant-app). The MQTT
+integration below works the same whichever way MyAstroBoard is installed (broker host
+`core-mosquitto` when both run in Home Assistant).
+
 ---
 
 ## Requirements
