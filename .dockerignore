@@ -1,0 +1,32 @@
+# Keep the build context to what the Dockerfile COPYs (requirements*.txt, VERSION,
+# backend/, templates/, static/, scripts/, gunicorn.conf.py, entrypoint.sh) and out of
+# local state: a dev machine's caches, virtualenv and data would otherwise be sent to
+# the builder and, for backend/, baked into the image.
+
+# VCS and CI
+.git
+.github
+
+# Local environments, editors and tool caches
+venv
+.venv
+.vscode
+.idea
+.claude
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/.coverage
+**/htmlcov
+**/node_modules
+
+# Runtime data (mounted as a volume at run time)
+data
+
+# Not part of the image
+tests
+docs
+*.md
+docker-compose*.yml

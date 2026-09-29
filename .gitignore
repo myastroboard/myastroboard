@@ -38,9 +38,6 @@ Thumbs.db
 # Logs
 *.log
 
-# Docker
-.dockerignore
-
 # Temporary files
 tmp/
 temp/

@@ -12,7 +12,8 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixes
 
-- None.
+- Docker: the app now listens on IPv6 as well as IPv4, so it is reachable through names that
+  resolve to IPv6, such as `homeassistant.local` in the Home Assistant app's "Open web UI" link.
 
 ### Breaking changes
 
