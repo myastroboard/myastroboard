@@ -14,6 +14,8 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Docker: the image now declares its own `HEALTHCHECK` (on `/health`), no longer only in
   `docker-compose.yml`.
+- Docker (amd64): the app no longer crashes at startup on VMs with a generic CPU model (e.g.
+  Proxmox `kvm64`, the Home Assistant OS VM default); NumPy is rebuilt for older CPUs.
 
 ### Breaking changes
 

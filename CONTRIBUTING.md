@@ -154,6 +154,33 @@ On release, an automated PR moves the `## [Unreleased]` content to a new dated `
 generated directly from what was under `## [Unreleased]` at tag time, so an entry that reads like
 a novel there ends up in the GitHub release too.
 
+### CPU compatibility
+
+The amd64 image must keep running on x86-64 CPUs without x86-64-v2 (no SSE4.2/POPCNT). In
+practice that is a VM with a generic CPU model, e.g. Proxmox `kvm64` - the default of the Home
+Assistant OS VM scripts, so a common setup, not a legacy one. Some PyPI wheels (current NumPy,
+for one) require x86-64-v2 and crash at import there with "Illegal instruction".
+
+The `CPU compatibility` workflow checks this on every PR that touches `requirements.txt` or the
+`Dockerfile` (Dependabot included), and the release workflow runs the same check on the image it
+is about to publish - a failure there blocks the release. Run it locally with:
+
+```bash
+docker build -t myastroboard:cpu-compat .
+sh scripts/check_cpu_compat.sh myastroboard:cpu-compat
+```
+
+When it fails, the log names the root-cause package(s). Then, in order of preference:
+
+1. **Stay on the current version** - close the Dependabot PR with `@dependabot ignore this minor
+   version` (or add an `ignore` entry in `.github/dependabot.yml`). Right for most bumps.
+2. **Rebuild the package from source** - add it to `REBUILD_FOR_OLD_CPUS` in the `Dockerfile`
+   (e.g. `"numpy pandas"`), when the update is needed (security fix, Python support). The compiler
+   defaults target any x86-64 CPU; a package that raises its own baseline (as NumPy does) also needs
+   its build option in the rebuild loop, and one with extra build dependencies needs them in the
+   builder stage.
+3. **Drop support for these CPUs** - a maintainer decision, to be documented and announced.
+
 ## Style Guidelines
 
 ### Language Requirement
@@ -517,8 +544,10 @@ The failure output lists exactly which routes are unexpected or missing, so you 
    - Link related issues
    - Provide clear description of changes
    - Add screenshots for UI changes
-   - Ensure CI checks pass (`validate-i18n`, `validate-html`, `docker-publish`, and
-     `require-changelog` for `feature/`/`fix/` branches)
+   - Ensure CI checks pass (`validate-i18n`, `validate-html`, `docker-publish`,
+     `cpu-compat` when `requirements.txt` or the `Dockerfile` changes - see
+     [CPU compatibility](#cpu-compatibility) - and `require-changelog` for `feature/`/`fix/`
+     branches)
 
 3. **Address Review Comments**:
    - Respond to all feedback

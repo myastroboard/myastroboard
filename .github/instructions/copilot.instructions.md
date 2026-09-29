@@ -846,6 +846,9 @@ inventory; keep it true. Any feature that stores, shares or sends data about a u
 - Keep dependencies updated
 - Run security scans via GitHub Actions
 - Pin versions in requirements.txt
+- The amd64 image must run on CPUs without x86-64-v2 (Proxmox `kvm64`); the `cpu-compat` CI
+  check enforces it. See CONTRIBUTING.md "CPU compatibility" before bumping or adding a compiled
+  dependency.
 
 ## Performance Considerations
 

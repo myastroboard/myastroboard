@@ -1,0 +1,45 @@
+name: CPU compatibility
+
+# Builds the amd64 image and checks it still runs on an x86-64 CPU without
+# x86-64-v2 (Proxmox "kvm64", the Home Assistant OS VM default), so a dependency
+# bump that drops those CPUs fails here instead of on users' machines.
+# The release workflow runs the same check on the image it publishes.
+# See CONTRIBUTING.md "CPU compatibility".
+
+on:
+  pull_request:
+    paths:
+      - requirements.txt
+      - Dockerfile
+      - scripts/check_cpu_compat.sh
+      - scripts/cpu_compat_smoke.py
+      - .github/workflows/cpu-compat.yml
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  kvm64:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+        with:
+          cache-binary: false
+
+      - name: Build amd64 image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: myastroboard:cpu-compat
+          cache-from: type=gha,scope=cpu-compat
+          cache-to: type=gha,scope=cpu-compat,mode=max
+
+      - name: Check the image on an emulated kvm64 CPU
+        run: sh scripts/check_cpu_compat.sh myastroboard:cpu-compat

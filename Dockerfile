@@ -12,16 +12,49 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /build
 
-# Build dependencies: all production wheels now ship prebuilt (sgp4, cryptography,
-# psutil, astropy, numpy, pandas, matplotlib, qh3/jh2 all publish cp314/abi3 wheels),
-# so no compiler toolchain is needed here anymore.
+# Set automatically by BuildKit (amd64 / arm64)
+ARG TARGETARCH
+
+# Build dependencies: all production wheels ship prebuilt (sgp4, cryptography,
+# psutil, astropy, numpy, pandas, matplotlib, qh3/jh2 all publish cp314/abi3 wheels).
+# The C/C++ compiler is only for the amd64 NumPy rebuild below.
 RUN apt-get update && apt-get upgrade -y \
+    && if [ "$TARGETARCH" = "amd64" ]; then \
+         apt-get install -y --no-install-recommends gcc g++; \
+       fi \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and build wheels
 COPY requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip wheel --wheel-dir /wheels -r requirements.txt
+
+# amd64: rebuild from source the packages whose PyPI wheels require an x86-64-v2 CPU
+# (SSE4.2/POPCNT) and crash at import on VMs with a generic CPU model - e.g. Proxmox
+# "kvm64", the default of the Home Assistant OS VM scripts. The cpu-compat workflow
+# (scripts/check_cpu_compat.sh) flags any new offender; see CONTRIBUTING.md
+# "CPU compatibility" before adding one here.
+# NumPy: no baseline (its "min" is X86_V2 itself); it still picks its SSE4/AVX2/
+# AVX-512 kernels at runtime on CPUs that have them. Other packages build with the
+# compiler defaults, which target any x86-64 CPU.
+# --no-cache-dir: pip's wheel cache ignores the -C settings and would silently reuse
+# a wheel built with other options.
+ARG REBUILD_FOR_OLD_CPUS="numpy"
+RUN if [ "$TARGETARCH" = "amd64" ]; then \
+      set -e; \
+      for pkg in $REBUILD_FOR_OLD_CPUS; do \
+        version=$(sed -n "s/^${pkg}===//Ip" requirements.txt); \
+        [ -n "$version" ] || { echo "$pkg: no '${pkg}===' pin in requirements.txt"; exit 1; }; \
+        wheel_name=$(echo "$pkg" | tr 'A-Z.-' 'a-z__'); \
+        find /wheels -iname "${wheel_name}-*.whl" -delete; \
+        extra=""; \
+        if [ "$pkg" = "numpy" ]; then \
+          extra="-Csetup-args=-Dcpu-baseline=none -Csetup-args=-Dallow-noblas=true"; \
+        fi; \
+        pip wheel --no-cache-dir --no-binary "$pkg" --no-deps --wheel-dir /wheels \
+          "${pkg}==${version}" $extra; \
+      done; \
+    fi
 
 # Minify static assets during build so production serves pre-minified files
 COPY scripts/minify_static.py ./scripts/minify_static.py
