@@ -394,28 +394,6 @@ function downloadLogExport() {
     showMessage('success', i18n.t('settings.log_export_started'));
 }
 
-async function loadLogLevel() {
-    const badge = document.getElementById('log-export-current-level');
-    if (!badge) return;
-    try {
-        const data = await fetchJSON('/api/logs/level');
-        const level = data.level || '-';
-        badge.textContent = level;
-        // Color the badge per level
-        const colorMap = {
-            DEBUG:    'bg-secondary',
-            INFO:     'bg-info text-dark',
-            WARNING:  'bg-warning text-dark',
-            ERROR:    'bg-danger',
-            CRITICAL: 'bg-danger'
-        };
-        badge.className = `badge fs-6 ${colorMap[level] || 'bg-secondary'}`;
-    } catch (err) {
-        console.error('Could not load log level:', err);
-        badge.textContent = '-';
-    }
-}
-
 // Enable/disable the restore button based on file selection
 function initRestoreFileInput() {
     const fileInput = document.getElementById('restore-file-input');

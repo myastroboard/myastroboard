@@ -8,10 +8,16 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Features
 
-- None.
+- Logs: the log file and console levels are set in Parameters -> Log export and apply without a
+  restart (e.g. in the Home Assistant app); `LOG_LEVEL` / `CONSOLE_LOG_LEVEL` still override them.
 
 ### Fixes
 
+- Setup wizard: on a fresh install it no longer closes by itself a moment after opening, when the
+  start page loads.
+- Docker: stopping the container is now a clean shutdown (exit code 0, within the 10 s stop timeout)
+  instead of a kill, so the Home Assistant app no longer shows "Error" after being stopped.
+- Fresh install: no more "Could not attribute location ... circular import" warning at first start.
 - Docker: the app now listens on IPv6 as well as IPv4, so it is reachable through names that
   resolve to IPv6, such as `homeassistant.local` in the Home Assistant app's "Open web UI" link.
 

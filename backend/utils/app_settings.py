@@ -12,7 +12,7 @@ import os
 import secrets
 
 from utils.json_settings_store import get_file_mtime, load_json_settings, save_json_settings
-from utils.logging_config import get_logger
+from utils.logging_config import VALID_LOG_LEVELS, get_logger
 
 logger = get_logger(__name__)
 
@@ -27,6 +27,9 @@ _DEFAULTS: dict = {
     "search_engine_indexing": False,
     # Days a log line is kept (usernames and IP addresses are personal data); 0 = size-based rotation only
     "log_retention_days": 90,
+    # Log file / console levels; the LOG_LEVEL / CONSOLE_LOG_LEVEL environment variables win when set
+    "log_level": "INFO",
+    "console_log_level": "WARNING",
 }
 
 LOG_RETENTION_MAX_DAYS = 3650
@@ -104,6 +107,21 @@ def normalize_log_retention_days(value, fallback: int = _DEFAULTS["log_retention
 def get_log_retention_days() -> int:
     """Current log retention in days (0 = disabled); registered as the logging retention provider."""
     return normalize_log_retention_days(get_app_settings().get("log_retention_days"))
+
+
+def normalize_log_level(value, fallback: str) -> str:
+    """Upper-cased log level name when valid (DEBUG ... CRITICAL), else ``fallback``."""
+    name = str(value).strip().upper() if isinstance(value, str) else ''
+    return name if name in VALID_LOG_LEVELS else fallback
+
+
+def get_log_levels() -> tuple:
+    """``(file_level, console_level)`` chosen in the UI; registered as the logging level provider."""
+    settings = get_app_settings()
+    return (
+        normalize_log_level(settings.get("log_level"), _DEFAULTS["log_level"]),
+        normalize_log_level(settings.get("console_log_level"), _DEFAULTS["console_log_level"]),
+    )
 
 
 def reload_app_settings() -> dict:

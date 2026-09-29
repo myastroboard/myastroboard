@@ -566,6 +566,45 @@ class TestAdminEndpoints:
         client_admin.post('/api/admin/app-settings', json={'log_retention_days': 'not a number'})
         assert client_admin.get('/api/admin/app-settings').get_json()['log_retention_days'] == 3650
 
+    @pytest.fixture
+    def restore_log_levels(self, client_admin):
+        """Put the saved levels and this process's live levels back after the test."""
+        from utils import logging_config
+
+        file_level, console_level = logging_config.LOG_LEVEL, logging_config.CONSOLE_LOG_LEVEL
+        yield
+        client_admin.post('/api/admin/app-settings', json={'log_level': 'INFO', 'console_log_level': 'WARNING'})
+        logging_config.set_global_log_level(file_level)
+        logging_config.set_console_log_level(console_level)
+
+    def test_log_levels_are_saved_and_applied_right_away(self, client_admin, monkeypatch, restore_log_levels):
+        monkeypatch.delenv('LOG_LEVEL', raising=False)
+        monkeypatch.delenv('CONSOLE_LOG_LEVEL', raising=False)
+
+        resp = client_admin.post('/api/admin/app-settings', json={'log_level': 'debug', 'console_log_level': 'ERROR'})
+        assert resp.status_code == 200
+
+        data = client_admin.get('/api/admin/app-settings').get_json()
+        assert (data['log_level'], data['console_log_level']) == ('DEBUG', 'ERROR')
+        assert data['log_level_env'] is None and data['console_log_level_env'] is None
+        assert client_admin.get('/api/logs/level').get_json() == {'level': 'DEBUG', 'console_level': 'ERROR'}
+
+        # An unknown level keeps the saved one; saving another section keeps both
+        client_admin.post('/api/admin/app-settings', json={'log_level': 'loud'})
+        client_admin.post('/api/admin/app-settings', json={'search_engine_indexing': False})
+        data = client_admin.get('/api/admin/app-settings').get_json()
+        assert (data['log_level'], data['console_log_level']) == ('DEBUG', 'ERROR')
+
+    def test_log_level_environment_variable_wins_over_saved_level(self, client_admin, monkeypatch, restore_log_levels):
+        monkeypatch.setenv('LOG_LEVEL', 'WARNING')
+        monkeypatch.delenv('CONSOLE_LOG_LEVEL', raising=False)
+
+        client_admin.post('/api/admin/app-settings', json={'log_level': 'DEBUG'})
+
+        data = client_admin.get('/api/admin/app-settings').get_json()
+        assert (data['log_level'], data['log_level_env']) == ('DEBUG', 'WARNING')
+        assert client_admin.get('/api/logs/level').get_json()['level'] == 'WARNING'
+
     def test_get_logs_level_returns_200(self, client_admin):
         resp = client_admin.get('/api/logs/level')
         assert resp.status_code == 200

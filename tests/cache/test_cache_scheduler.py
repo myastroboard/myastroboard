@@ -17,8 +17,9 @@ class DummyThread:
     def is_alive(self):
         return self._alive
 
-    def join(self):
+    def join(self, timeout=None):
         self.joined = True
+        self.join_timeout = timeout
 
 
 class DummyFile:
@@ -121,7 +122,22 @@ def test_stop_sets_event_joins_and_releases(monkeypatch):
 
     assert scheduler._stop_event.is_set() is True
     assert scheduler.thread.joined is True
+    assert scheduler.thread.join_timeout == module.CACHE_SCHEDULER_SHUTDOWN_TIMEOUT_SECONDS
     assert released == [True]
+
+
+def test_stop_abandons_an_update_still_running_after_the_timeout(monkeypatch):
+    """A cache update still running at shutdown (a first population takes minutes) must
+    not hold the container stop past its timeout: the daemon thread is abandoned."""
+    scheduler = module.CacheScheduler(interval_seconds=1)
+    scheduler.thread = DummyThread(alive=True)  # still alive after join(): update in progress
+    released = []
+    monkeypatch.setattr(scheduler, "_release_lock", lambda: released.append(True))
+
+    scheduler.stop()
+
+    assert scheduler.thread.join_timeout == module.CACHE_SCHEDULER_SHUTDOWN_TIMEOUT_SECONDS
+    assert released == [True]  # the lock is still released for the next start
 
 
 def test_update_all_caches_success(monkeypatch):

@@ -22,4 +22,10 @@ find "$DATA_DIR/skytonight/calculations" -maxdepth 1 -type f -name "*.json" -del
 find "$DATA_DIR/skytonight/outputs" -maxdepth 1 -type f -name "*.json" -delete 2>/dev/null || true
 
 echo "[INFO] Starting application as non-root user"
-exec su appuser -c "$*"
+# setpriv switches user and then *becomes* the command, so gunicorn receives the stop
+# signal itself and shuts down cleanly (exit code 0). `su` stayed as the parent,
+# caught SIGTERM, killed gunicorn and exited with an error code - which Home
+# Assistant reports as the app having failed. HOME is what su used to set: gunicorn
+# keeps its control socket there.
+export HOME=/home/appuser USER=appuser LOGNAME=appuser
+exec setpriv --reuid=appuser --regid=appuser --init-groups -- "$@"

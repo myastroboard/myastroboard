@@ -7,6 +7,7 @@ import logging
 import os
 import sys
 import time
+import weakref
 from datetime import datetime, timezone
 from logging.handlers import RotatingFileHandler
 from typing import Callable, Optional
@@ -19,8 +20,24 @@ _loggers = {}
 # The single file handler shared by every logger of this process (created lazily)
 _file_handler: Optional[logging.Handler] = None
 
-# Environment variable for log level control (DEBUG, INFO, WARNING, ERROR)
+# Console handlers following CONSOLE_LOG_LEVEL (those created without an explicit level)
+_console_handlers: "weakref.WeakSet[logging.Handler]" = weakref.WeakSet()
+
+VALID_LOG_LEVELS = ('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL')
+
+# Current levels of the file and console output. They start from the LOG_LEVEL and
+# CONSOLE_LOG_LEVEL environment variables; without them, the levels chosen in the UI
+# (app settings) apply, read through a provider registered by the app at startup -
+# utils.app_settings imports this module, so it cannot be imported here. A set
+# environment variable always wins, so existing docker-compose files keep working.
 LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO').upper()
+CONSOLE_LOG_LEVEL = os.environ.get('CONSOLE_LOG_LEVEL', 'WARNING').upper()
+
+# Each gunicorn worker is its own process: one that did not save the new levels picks
+# them up on its next refresh (at most this often, from request handling).
+LOG_LEVEL_REFRESH_INTERVAL_SECONDS = 5
+_level_provider: Optional[Callable[[], tuple]] = None
+_next_level_refresh = 0.0
 
 # Time-based retention on top of the size-based rotation: log lines contain usernames
 # and IP addresses (personal data), so they should not outlive a configured number of
@@ -292,16 +309,15 @@ def _get_file_handler() -> logging.Handler:
     return _file_handler
 
 
+def _level_number(level: str, default: int) -> int:
+    """Logging constant of a level name, ``default`` for an unknown name."""
+    name = str(level).upper()
+    return getattr(logging, name) if name in VALID_LOG_LEVELS else default
+
+
 def _get_log_level():
     """Convert string log level to logging constant"""
-    levels = {
-        'DEBUG': logging.DEBUG,
-        'INFO': logging.INFO,
-        'WARNING': logging.WARNING,
-        'ERROR': logging.ERROR,
-        'CRITICAL': logging.CRITICAL,
-    }
-    return levels.get(LOG_LEVEL, logging.INFO)
+    return _level_number(LOG_LEVEL, logging.INFO)
 
 
 def setup_logger(name: str, include_console: bool = True, console_level: Optional[str] = None) -> logging.Logger:
@@ -343,9 +359,12 @@ def setup_logger(name: str, include_console: bool = True, console_level: Optiona
     if include_console:
         console_handler = logging.StreamHandler(sys.stdout)
 
-        # Use specified level or default to WARNING for console to reduce noise
-        console_log_level = console_level or os.environ.get('CONSOLE_LOG_LEVEL', 'WARNING')
-        console_handler.setLevel(getattr(logging, console_log_level.upper(), logging.WARNING))
+        # Use the specified level, else follow CONSOLE_LOG_LEVEL (WARNING by default, to reduce noise)
+        if console_level:
+            console_handler.setLevel(_level_number(console_level, logging.WARNING))
+        else:
+            console_handler.setLevel(_level_number(CONSOLE_LOG_LEVEL, logging.WARNING))
+            _console_handlers.add(console_handler)
 
         console_formatter = _ConfiguredTzFormatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         console_handler.setFormatter(console_formatter)
@@ -393,3 +412,56 @@ def set_global_log_level(level: str):
 def get_current_log_level():
     """Get current global log level"""
     return LOG_LEVEL
+
+
+def set_console_log_level(level: str) -> None:
+    """Change the console level of every logger that follows CONSOLE_LOG_LEVEL."""
+    global CONSOLE_LOG_LEVEL
+    CONSOLE_LOG_LEVEL = level.upper()
+    new_level = _level_number(CONSOLE_LOG_LEVEL, logging.WARNING)
+    for handler in list(_console_handlers):
+        handler.setLevel(new_level)
+
+
+def get_current_console_log_level() -> str:
+    """Current console log level (what `docker logs` and the Home Assistant log show)."""
+    return CONSOLE_LOG_LEVEL
+
+
+def env_log_level(variable: str) -> Optional[str]:
+    """Level set by the ``LOG_LEVEL``/``CONSOLE_LOG_LEVEL`` environment variable, None when unset or invalid."""
+    value = os.environ.get(variable, '').strip().upper()
+    return value if value in VALID_LOG_LEVELS else None
+
+
+def set_log_level_provider(provider: Optional[Callable[[], tuple]]) -> None:
+    """Register the callable returning the UI-chosen ``(file_level, console_level)``, and apply it."""
+    global _level_provider, _next_level_refresh
+    _level_provider = provider
+    _next_level_refresh = 0.0
+    refresh_log_levels()
+
+
+def refresh_log_levels(force: bool = False) -> None:
+    """Apply the levels from the provider, unless an environment variable sets them.
+
+    Cheap to call often: it does nothing until LOG_LEVEL_REFRESH_INTERVAL_SECONDS have
+    passed since the last refresh, unless ``force`` is set (right after a change).
+    """
+    global _next_level_refresh
+    if _level_provider is None:
+        return
+    now = time.monotonic()
+    if not force and now < _next_level_refresh:
+        return
+    _next_level_refresh = now + LOG_LEVEL_REFRESH_INTERVAL_SECONDS
+    try:
+        file_level, console_level = _level_provider()
+    except Exception:
+        return  # a broken provider must never break logging
+    file_level = env_log_level('LOG_LEVEL') or str(file_level).upper()
+    console_level = env_log_level('CONSOLE_LOG_LEVEL') or str(console_level).upper()
+    if file_level in VALID_LOG_LEVELS and file_level != LOG_LEVEL:
+        set_global_log_level(file_level)
+    if console_level in VALID_LOG_LEVELS and console_level != CONSOLE_LOG_LEVEL:
+        set_console_log_level(console_level)

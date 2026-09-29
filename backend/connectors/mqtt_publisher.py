@@ -47,6 +47,10 @@ logger = get_logger(__name__)
 
 TICK_SECONDS = 5
 CONNECT_WAIT_SECONDS = 10  # how long a synchronous "remove" waits for the broker
+# How long stop() waits for a tick in progress before publishing "offline" and
+# disconnecting - kept short so a container stop fits its timeout (Docker / Home
+# Assistant: 10 s) alongside the other background jobs.
+SHUTDOWN_JOIN_SECONDS = 3
 
 LOCK_FILE = os.path.join(DATA_DIR_CACHE, "mqtt_publisher.lock")
 TRIGGER_FILE = os.path.join(DATA_DIR_CACHE, "mqtt_publisher.trigger")
@@ -230,7 +234,7 @@ class MqttPublisher:
     def stop(self) -> None:
         self._stop_event.set()
         if self.thread.is_alive():
-            self.thread.join(timeout=TICK_SECONDS * 2)
+            self.thread.join(timeout=SHUTDOWN_JOIN_SECONDS)
         self._disconnect(publish_offline=True)
         self._release_lock()
         logger.info("MQTT publisher stopped")

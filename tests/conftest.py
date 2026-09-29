@@ -64,7 +64,7 @@ def _clean_stale_test_state():
     are kept so runs stay fast.
     """
     data_root = os.environ['DATA_DIR']
-    for name in ('config.json', 'users.json', 'secret_key.txt'):
+    for name in ('config.json', 'users.json', 'secret_key.txt', 'app_settings.json'):
         try:
             os.remove(os.path.join(data_root, name))
         except OSError:

@@ -467,7 +467,7 @@ function switchSubTab(parentTab, subtabName, options = {}) {
             startMetricsAutoRefresh();
             break; // Parameters tab
         case 'log-export':
-            loadLogLevel();
+            loadLogLevels();
             break; // Parameters tab
         case 'connectors':
             loadConnectorsStore();

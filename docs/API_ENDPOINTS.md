@@ -81,7 +81,7 @@ This page lists the HTTP routes currently declared across `backend/blueprints/*.
 
 - `GET /api/metrics`
 - `GET /api/logs`
-- `GET /api/logs/level`
+- `GET /api/logs/level` - Active levels: `{"level": <log file>, "console_level": <console>}`. They are set through `POST /api/admin/app-settings` (`log_level`, `console_log_level`); the `LOG_LEVEL` / `CONSOLE_LOG_LEVEL` environment variables override them when set
 - `POST /api/logs/clear`
 - `GET /api/logs/export` - Download a ZIP archive of all log files (myastroboard.log + skytonight/logs/)
 - `POST /api/convert-coordinates`

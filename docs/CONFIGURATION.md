@@ -135,6 +135,8 @@ Stored separately in `data/app_settings.json` (see [AUTHENTICATION.md](AUTHENTIC
 | `session_cookie_secure` | `false` | Require HTTPS for session cookie |
 | `search_engine_indexing` | `false` | Allow search engines to crawl and index the login page. Off by default for privacy: `/robots.txt` returns `Disallow: /` and the login page is served with `noindex, nofollow`. When enabled, `/robots.txt` allows `/login` and the login page adds Open Graph/JSON-LD metadata pointing to myastroboard.org |
 | `log_retention_days` | `90` | Days a line stays in `myastroboard.log` and its rotated backups (0-3650). Log lines hold usernames and IP addresses, so older lines are removed once a day per process, and right away when the value is lowered. `0` disables it: only the size-based rotation (10 MB x 6 files) applies. Set in *Parameters → Advanced → Privacy* |
+| `log_level` | `"INFO"` | Level written to `myastroboard.log` (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`). Applies without a restart. The `LOG_LEVEL` environment variable, when set, overrides it. Set in *Parameters → Log export* |
+| `console_log_level` | `"WARNING"` | Level of the container output (`docker logs`, the Log tab of the Home Assistant app). The `CONSOLE_LOG_LEVEL` environment variable, when set, overrides it. Set in *Parameters → Log export* |
 
 ---
 
@@ -203,7 +205,16 @@ also [docs/AUTHENTICATION.md](AUTHENTICATION.md).
 
 ### Live log viewer
 
-`GET /api/logs` returns the tail of `data/logs/myastroboard.log` for live viewing in the browser. The log level shown can be checked with `GET /api/logs/level`.
+`GET /api/logs` returns the tail of `data/logs/myastroboard.log` for live viewing in the browser. The active levels can be checked with `GET /api/logs/level` (`{"level": <log file>, "console_level": <console>}`).
+
+### Log levels
+
+Set in *Parameters → Log export*: one level for the log file (default `INFO`) and one for the console output
+(default `WARNING`) - see `log_level` / `console_log_level` in [Application settings](#application-settings-admin).
+To troubleshoot, set the log file level to `DEBUG`, reproduce the issue, then export the logs. A change applies
+right away, without a restart (the other gunicorn worker follows within a few seconds). The `LOG_LEVEL` /
+`CONSOLE_LOG_LEVEL` environment variables still work and, when set, take precedence: the matching setting is
+then shown disabled in the UI.
 
 Log lines are JSONL-formatted (one JSON object per line): `{"level": "INFO", "time": "...", "msg": "...", "module": "..."}`.
 

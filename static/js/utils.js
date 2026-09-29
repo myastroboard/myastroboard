@@ -727,6 +727,8 @@ function closeModal(elementOrId) {
  * @param {() => void} [options.onShown] - runs on shown.bs.modal
  * @param {() => void} [options.onHidden] - runs on hidden.bs.modal
  * @param {boolean} [options.history=true] - push a history entry so Back closes the modal
+ * @param {boolean} [options.persistent=false] - only closeModal() on this modal closes it: a
+ *   tab change (forceCleanupModals) or the Back button leave it on screen
  * @returns {Promise<object|null>} the bootstrap.Modal instance (null when the element is missing)
  *
  * Re-opening a modal that is ALREADY on screen (common for the shared #modal_lg_close /
@@ -749,9 +751,11 @@ async function openModal(elementOrId, options = {}) {
         onShown = null,
         onHidden = null,
         history: useHistory = true,
+        persistent = false,
     } = options;
 
     el.dataset.mabNoHistory = String(useHistory === false);
+    el.dataset.mabPersistent = String(persistent === true);
 
     if (el.classList.contains('show')) {
         // Same modal reopened with refreshed content - don't flicker it closed/open.
@@ -836,19 +840,30 @@ function _reconcileModalHistoryEntry() {
     }, 0);
 }
 
+/** Shown modals that navigation may close - every one but a persistent modal. */
+function _dismissableShownModals() {
+    return [...document.querySelectorAll('.modal.show')].filter(el => el.dataset.mabPersistent !== 'true');
+}
+
 /**
  * Close every shown modal. Used before tab navigation (which changes history
  * itself) and as a stuck-state safety net - clears any stranded backdrop / scroll lock.
+ * A persistent modal (the Guided Setup Wizard) is left alone, backdrop included: the
+ * startup tab is applied right after the wizard opens on a first visit.
  */
 function forceCleanupModals() {
-    const openModals = document.querySelectorAll('.modal.show');
-    if (!openModals.length && !document.querySelector('.modal-backdrop')) return;
+    const openModals = _dismissableShownModals();
+    const persistentOnScreen = document.querySelector(
+        '.modal[data-mab-persistent="true"].show, .modal[data-mab-persistent="true"][data-mab-settled="false"]'
+    );
+    if (!openModals.length && (persistentOnScreen || !document.querySelector('.modal-backdrop'))) return;
     // The caller is about to push its own history entry - abandon our synthetic one
     // in place (it carries the current URL, so it stays transparent to Back/Forward).
     _modalHistoryEntryActive = false;
     openModals.forEach(_hideModalInstance);
     window.setTimeout(() => {
-        if (document.querySelector('.modal.show')) return;
+        // Something still on screen, or still opening, owns the backdrop
+        if (document.querySelector('.modal.show, .modal[data-mab-settled="false"]')) return;
         document.querySelectorAll('.modal-backdrop').forEach(node => node.remove());
         document.body.classList.remove('modal-open');
         document.body.style.removeProperty('overflow');
@@ -887,7 +902,7 @@ function _initModalHistory() {
             _suppressNextPopstate = false;
             return;
         }
-        const shown = document.querySelectorAll('.modal.show');
+        const shown = _dismissableShownModals();
         if (!shown.length) return;
         // The browser already stepped past our synthetic entry - close every modal
         // instead of letting the navigation through.

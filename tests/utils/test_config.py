@@ -4,6 +4,7 @@ Unit tests for configuration management (repo_config.py, config_defaults.py)
 
 import json
 import os
+import sys
 
 import pytest
 
@@ -346,3 +347,50 @@ class TestConfigIntegration:
         reloaded = load_config()
         assert reloaded["skytonight"]["constraints"]["altitude_constraint_min"] == 42
         assert "airmass_constraint" in reloaded["skytonight"]["constraints"]
+
+
+class TestAttributeNewLocationToAllUsers:
+    """Attaching a newly created location to every existing user."""
+
+    def test_attributes_to_every_existing_user(self, monkeypatch):
+        import types
+
+        calls = []
+        manager = types.SimpleNamespace(
+            users={"u1": object(), "u2": object()},
+            set_location_attribution=lambda loc_id, user_ids: calls.append((loc_id, user_ids)),
+        )
+        monkeypatch.setitem(sys.modules, "utils.auth", types.SimpleNamespace(user_manager=manager))
+
+        repo_config._attribute_new_location_to_all_users("loc-1")
+
+        assert calls == [("loc-1", ["u1", "u2"])]
+
+    def test_skips_quietly_while_user_storage_is_still_loading(self, monkeypatch):
+        """Fresh install: utils.auth's UserManager() creates the default admin, which
+        creates the config - utils.auth is then only partially initialized (no
+        user_manager yet). There is nobody to attribute to, so no warning."""
+        import types
+
+        warnings = []
+        monkeypatch.setitem(sys.modules, "utils.auth", types.ModuleType("utils.auth"))
+        monkeypatch.setattr(repo_config.logger, "warning", warnings.append)
+
+        repo_config._attribute_new_location_to_all_users("loc-1")
+
+        assert warnings == []
+
+    def test_other_failures_are_still_reported(self, monkeypatch):
+        import types
+
+        def broken(*_args):
+            raise OSError("users.json unreadable")
+
+        manager = types.SimpleNamespace(users={}, set_location_attribution=broken)
+        monkeypatch.setitem(sys.modules, "utils.auth", types.SimpleNamespace(user_manager=manager))
+        warnings = []
+        monkeypatch.setattr(repo_config.logger, "warning", warnings.append)
+
+        repo_config._attribute_new_location_to_all_users("loc-1")
+
+        assert len(warnings) == 1 and "users.json unreadable" in warnings[0]
