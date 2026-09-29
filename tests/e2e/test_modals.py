@@ -144,9 +144,7 @@ def test_modal_open_does_not_change_the_url_hash(logged_in_page):
 
 def _open_first_visit(page, live_server_url, hash_fragment=""):
     """Log in with the Guided Setup Wizard still pending (a fresh install) and load the app."""
-    assert page.request.post(
-        f"{live_server_url}/api/auth/login", data={"username": "admin", "password": "admin"}
-    ).ok
+    assert page.request.post(f"{live_server_url}/api/auth/login", data={"username": "admin", "password": "admin"}).ok
     assert page.request.put(
         f"{live_server_url}/api/auth/preferences",
         data={"preferences": {"wizard": {"completed": False, "skipped": False}}},
