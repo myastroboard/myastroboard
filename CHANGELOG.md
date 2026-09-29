@@ -12,6 +12,20 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixes
 
+- None.
+
+### Breaking changes
+
+- None.
+
+## 1.6.5 (2026-09-29)
+
+### Features
+
+- None.
+
+### Fixes
+
 - Docker: the image now declares its own `HEALTHCHECK` (on `/health`), no longer only in
   `docker-compose.yml`.
 - Docker (amd64): the app no longer crashes at startup on VMs with a generic CPU model (e.g.
