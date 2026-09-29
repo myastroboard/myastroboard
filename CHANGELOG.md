@@ -8,6 +8,20 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Features
 
+- None.
+
+### Fixes
+
+- None.
+
+### Breaking changes
+
+- None.
+
+## 1.6.6 (2026-09-29)
+
+### Features
+
 - Logs: the log file and console levels are set in Parameters -> Log export and apply without a
   restart (e.g. in the Home Assistant app); `LOG_LEVEL` / `CONSOLE_LOG_LEVEL` still override them.
 
