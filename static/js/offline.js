@@ -46,7 +46,8 @@
     }
 
     function navigateToApp() {
-        window.location.replace('/');
+        // Relative: offline.html sits next to the app root
+        window.location.replace('./');
     }
 
     async function tryReconnect() {

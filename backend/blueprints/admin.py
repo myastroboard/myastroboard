@@ -37,6 +37,7 @@ def get_app_settings_api():
             'trust_proxy_headers': settings.get('trust_proxy_headers', False),
             'session_cookie_secure': settings.get('session_cookie_secure', False),
             'search_engine_indexing': settings.get('search_engine_indexing', False),
+            'external_base_url': _app_settings.get_external_base_url(),
             'log_retention_days': _app_settings.get_log_retention_days(),
             'log_level': log_level,
             'console_log_level': console_log_level,
@@ -55,6 +56,12 @@ def update_app_settings_api():
     old_settings = _app_settings.get_app_settings()
     old_log_level, old_console_log_level = _app_settings.get_log_levels()
 
+    external_base_url = _app_settings.normalize_external_base_url(
+        data.get('external_base_url', old_settings.get('external_base_url', ''))
+    )
+    if external_base_url is None:
+        return jsonify({'error': 'external_base_url must be an http(s):// address'}), 400
+
     new_settings = {
         'vapid_contact_email': str(
             data.get('vapid_contact_email', old_settings.get('vapid_contact_email', ''))
@@ -72,6 +79,7 @@ def update_app_settings_api():
         ),
         'log_level': _app_settings.normalize_log_level(data.get('log_level'), old_log_level),
         'console_log_level': _app_settings.normalize_log_level(data.get('console_log_level'), old_console_log_level),
+        'external_base_url': external_base_url,
     }
 
     _app_settings.save_app_settings(new_settings)
@@ -97,6 +105,7 @@ def update_app_settings_api():
         f"trust_proxy={new_settings['trust_proxy_headers']}, "
         f"session_secure={new_settings['session_cookie_secure']}, "
         f"search_engine_indexing={new_settings['search_engine_indexing']}, "
+        f"external_base_url={new_settings['external_base_url'] or 'unset'}, "
         f"log_retention_days={new_settings['log_retention_days']}, "
         f"log_level={new_settings['log_level']}, "
         f"console_log_level={new_settings['console_log_level']}"

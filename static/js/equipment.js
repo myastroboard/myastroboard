@@ -1244,7 +1244,7 @@ async function saveTelescope(id) {
     data.is_disabled = form.querySelector('#telescope-is-disabled')?.checked ?? false;
 
     try {
-        const url = id ? `/api/equipment/telescopes/${id}` : '/api/equipment/telescopes';
+        const url = id ? appUrl(`/api/equipment/telescopes/${id}`) : appUrl('/api/equipment/telescopes');
         const method = id ? 'PUT' : 'POST';
 
         await fetchJSON(url, {
@@ -1369,7 +1369,7 @@ async function saveCamera(id) {
     data.is_disabled = form.querySelector('#camera-is-disabled')?.checked ?? false;
 
     try {
-        const url = id ? `/api/equipment/cameras/${id}` : '/api/equipment/cameras';
+        const url = id ? appUrl(`/api/equipment/cameras/${id}`) : appUrl('/api/equipment/cameras');
         const method = id ? 'PUT' : 'POST';
 
         await fetchJSON(url, {
@@ -1496,7 +1496,7 @@ async function saveMount(id) {
     data.is_disabled = form.querySelector('#mount-is-disabled')?.checked ?? false;
 
     try {
-        const url = id ? `/api/equipment/mounts/${id}` : '/api/equipment/mounts';
+        const url = id ? appUrl(`/api/equipment/mounts/${id}`) : appUrl('/api/equipment/mounts');
         const method = id ? 'PUT' : 'POST';
 
         await fetchJSON(url, {
@@ -1604,7 +1604,7 @@ async function saveFilter(id) {
     data.is_disabled = form.querySelector('#filter-is-disabled')?.checked ?? false;
 
     try {
-        const url = id ? `/api/equipment/filters/${id}` : '/api/equipment/filters';
+        const url = id ? appUrl(`/api/equipment/filters/${id}`) : appUrl('/api/equipment/filters');
         const method = id ? 'PUT' : 'POST';
 
         await fetchJSON(url, {
@@ -1695,7 +1695,7 @@ async function saveAccessory(id) {
     data.is_disabled = form.querySelector('#accessory-is-disabled')?.checked ?? false;
 
     try {
-        const url = id ? `/api/equipment/accessories/${id}` : '/api/equipment/accessories';
+        const url = id ? appUrl(`/api/equipment/accessories/${id}`) : appUrl('/api/equipment/accessories');
         const method = id ? 'PUT' : 'POST';
 
         await fetchJSON(url, {
@@ -1861,7 +1861,7 @@ async function saveCombination(id) {
     data.accessory_ids = Array.from(accessoryCheckboxes).map(cb => cb.value);
 
     try {
-        const url = id ? `/api/equipment/combinations/${id}` : '/api/equipment/combinations';
+        const url = id ? appUrl(`/api/equipment/combinations/${id}`) : appUrl('/api/equipment/combinations');
         const method = id ? 'PUT' : 'POST';
 
         await fetchJSON(url, {

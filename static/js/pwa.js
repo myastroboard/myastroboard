@@ -1,5 +1,7 @@
 (function registerPWA() {
-    if (!('serviceWorker' in navigator)) {
+    // No service worker under a sub-path (HA ingress panel): sw.js and its cache list are
+    // root-scoped, and the panel is a frame inside Home Assistant that cannot be installed.
+    if (!('serviceWorker' in navigator) || APP_BASE_PATH) {
         return;
     }
 
@@ -130,8 +132,8 @@
             }
 
             const serviceWorkerUrl = appVersion
-                ? `/sw.js?v=${encodeURIComponent(appVersion)}`
-                : '/sw.js';
+                ? appUrl(`/sw.js?v=${encodeURIComponent(appVersion)}`)
+                : appUrl('/sw.js');
 
             await navigator.serviceWorker.register(serviceWorkerUrl, {
                 scope: '/',

@@ -1370,12 +1370,12 @@ function renderPlanMyNight(payload) {
             const exportCsvBtn = makePlanActionButton('plan_my_night.export_csv', 'btn btn-outline-primary btn-sm', async () => {
                 const lang = typeof i18n?.getCurrentLanguage === 'function' ? i18n.getCurrentLanguage() : 'en';
                 const cidParam = currentPlanCombinationId ? `&combination_id=${encodeURIComponent(currentPlanCombinationId)}` : '';
-                _triggerDownload(`/api/plan-my-night/export.csv?lang=${encodeURIComponent(lang)}${cidParam}`);
+                _triggerDownload(appUrl(`/api/plan-my-night/export.csv?lang=${encodeURIComponent(lang)}${cidParam}`));
             });
             const exportPdfBtn = makePlanActionButton('plan_my_night.export_pdf', 'btn btn-outline-primary btn-sm', async () => {
                 const lang = typeof i18n?.getCurrentLanguage === 'function' ? i18n.getCurrentLanguage() : 'en';
                 const cidParam = currentPlanCombinationId ? `&combination_id=${encodeURIComponent(currentPlanCombinationId)}` : '';
-                _triggerDownload(`/api/plan-my-night/export.pdf?lang=${encodeURIComponent(lang)}${cidParam}`);
+                _triggerDownload(appUrl(`/api/plan-my-night/export.pdf?lang=${encodeURIComponent(lang)}${cidParam}`));
             });
             actionsRow.appendChild(exportPdfBtn);
             actionsRow.appendChild(exportCsvBtn);

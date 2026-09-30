@@ -24,6 +24,7 @@ from connectors.myastroshine_connector import MyAstroShineConnector
 from observation import astrodex
 from observation import myastroshine_integration as integration
 from utils.auth import get_current_user, login_required, user_required
+from utils.ingress import external_base_url
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -143,7 +144,18 @@ def mint_handoff_api():
             return jsonify({'error': 'Item or picture not found'}), 404
 
         override = (cfg.get('callback_url_override') or '').strip()
-        callback_base = override or request.url_root
+        callback_base = override or external_base_url()
+        if not callback_base:
+            # Under HA ingress, the request URL needs an HA login MyAstroShine does not have
+            return (
+                jsonify(
+                    {
+                        'error': 'Set Parameters -> Advanced -> External base URL first',
+                        'code': 'external_base_url_required',
+                    }
+                ),
+                409,
+            )
         result = integration.mint_handoff(
             cfg, user_id=user_id, item_id=item_id, picture_id=picture_id, callback_base=callback_base
         )

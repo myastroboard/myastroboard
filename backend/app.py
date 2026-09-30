@@ -117,6 +117,14 @@ if _startup_settings['trust_proxy_headers']:  # pragma: no cover
     )
     logger.info("ProxyFix middleware enabled (trust_proxy_headers=true in app_settings.json)")
 
+# Home Assistant ingress: outermost, so it consumes the Supervisor's X-Forwarded-* before ProxyFix
+from utils import ingress as _ingress
+
+if _ingress.ingress_enabled():  # pragma: no cover - env flag set by the HA app only
+    app.wsgi_app = _ingress.IngressMiddleware(app.wsgi_app)  # type: ignore[method-assign]
+    logger.info(f"Home Assistant ingress enabled (trusted proxy {_ingress.trusted_proxy_ip()})")
+app.session_interface = _ingress.IngressAwareSessionInterface()
+
 # Configure session
 app.secret_key = _app_settings.load_or_generate_secret_key()
 app.config['SESSION_COOKIE_HTTPONLY'] = True
@@ -206,6 +214,16 @@ def log_session_restoration():
                         )
                         # Log once per session to avoid request spam
                         session['_session_restored_logged'] = True
+
+
+@app.context_processor
+def inject_base_path():
+    """``base``: the URL prefix the app is served under ('' at the root, the HA ingress path otherwise).
+
+    Templates write ``{{ base }}/static/...`` instead of ``/static/...``, and JS reads it back
+    from ``window.APP_BASE`` (see static/js/api_helper.js appUrl()).
+    """
+    return {'base': request.script_root}
 
 
 @app.after_request

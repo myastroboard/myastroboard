@@ -59,8 +59,8 @@ function _refreshOrbitalStationMarkerIcons() {
 function _ensureLeafletLoaded() {
     return ensureVendorScriptLoaded(
         () => typeof L !== 'undefined',
-        '/static/vendor/leaflet/dist/leaflet.min.js?v=1.9.4',
-        '/static/vendor/leaflet/dist/leaflet.min.css?v=1.9.4',
+        appUrl('/static/vendor/leaflet/dist/leaflet.min.js?v=1.9.4'),
+        appUrl('/static/vendor/leaflet/dist/leaflet.min.css?v=1.9.4'),
         _leafletLoadState,
         'Leaflet'
     );
@@ -345,7 +345,7 @@ function _appendCelestrakBanner(container, celestrakStatus, station) {
         if (!window.confirm(i18n.t('iss.celestrak_restart_confirm'))) return;
         restartBtn.disabled = true;
         try {
-            const endpoint = station === 'css' ? '/api/css/celestrak/restart' : '/api/iss/celestrak/restart';
+            const endpoint = station === 'css' ? appUrl('/api/css/celestrak/restart') : appUrl('/api/iss/celestrak/restart');
             const resp = await fetch(endpoint, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirmed: true }) });
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
             await loadOrbitalStations();

@@ -2,7 +2,28 @@
 // API Helper - Centralized fetch utilities
 // ======================
 
-const API_BASE = window.location.origin;
+// URL prefix the app is served under: '' at the root, '/api/hassio_ingress/<token>' under
+// Home Assistant ingress (set by the templates from request.script_root). This file loads
+// first on every page so appUrl() and the fetch() wrapper below exist before any request.
+const APP_BASE_PATH = (typeof window.APP_BASE === 'string' ? window.APP_BASE : '').replace(/\/+$/, '');
+const API_BASE = window.location.origin + APP_BASE_PATH;
+
+/**
+ * Prefix a root-relative app path ('/api/...', '/static/...', '/login') with APP_BASE_PATH.
+ * Anything else (absolute http(s) URL, data:/blob:, protocol-relative, relative path, or a
+ * path that already carries the prefix) is returned unchanged, so calling it twice is safe.
+ * Every URL the frontend hands to the browser outside fetch() (img src, link href,
+ * window.location, dynamically loaded scripts, downloads) must go through it.
+ */
+function appUrl(path) {
+    if (typeof path !== 'string' || !path.startsWith('/') || path.startsWith('//')) {
+        return path;
+    }
+    if (APP_BASE_PATH && (path === APP_BASE_PATH || path.startsWith(`${APP_BASE_PATH}/`))) {
+        return path;
+    }
+    return `${APP_BASE_PATH}${path}`;
+}
 
 function resolveEndpoint(endpoint) {
     if (/^https?:\/\//i.test(endpoint)) {
@@ -12,9 +33,16 @@ function resolveEndpoint(endpoint) {
         return `${window.location.protocol}${endpoint}`;
     }
     if (endpoint.startsWith('/')) {
-        return `${API_BASE}${endpoint}`;
+        return `${window.location.origin}${appUrl(endpoint)}`;
     }
     return `${API_BASE}/${endpoint}`;
+}
+
+// Under a prefix, every fetch('/api/...') in the codebase has to reach the prefixed URL too:
+// wrap fetch() once instead of touching each call site (and every future one).
+if (APP_BASE_PATH && typeof window.fetch === 'function') {
+    const unprefixedFetch = window.fetch.bind(window);
+    window.fetch = (resource, ...rest) => unprefixedFetch(appUrl(resource), ...rest);
 }
 
 function sleep(ms) {

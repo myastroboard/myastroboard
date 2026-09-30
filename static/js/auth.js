@@ -98,18 +98,19 @@ async function checkAuthStatus() {
             }
         } else {
             // Not authenticated, redirect to login
-            window.location.href = '/login';
+            window.location.href = appUrl('/login');
         }
     } catch (error) {
         console.error('Error checking auth status:', error);
         if (isOfflineOrNetworkError(error)) {
-            // Network unavailable: show dedicated offline page instead of login.
-            if (!window.location.pathname.includes('/offline.html')) {
-                window.location.href = '/offline.html';
+            // Network unavailable: show dedicated offline page instead of login
+            // (a PWA page: not under a sub-path, where Home Assistant shows its own error).
+            if (!APP_BASE_PATH && !window.location.pathname.includes('/offline.html')) {
+                window.location.href = appUrl('/offline.html');
             }
             return;
         }
-        window.location.href = '/login';
+        window.location.href = appUrl('/login');
     }
 }
 
@@ -638,10 +639,10 @@ async function handleLogout(event) {
             maxAttempts: 1,
             timeoutMs: 10000
         });
-        window.location.href = '/login';
+        window.location.href = appUrl('/login');
     } catch (error) {
         console.error('Logout error:', error);
-        window.location.href = '/login';
+        window.location.href = appUrl('/login');
     }
 }
 
@@ -676,7 +677,7 @@ async function loadUsers() {
         });
 
         if (response.status === 401 || response.status === 403) {
-            window.location.href = '/login';
+            window.location.href = appUrl('/login');
             return;
         }
 
@@ -910,7 +911,7 @@ function displayUsers(users) {
     usersList.querySelectorAll('.user-export-data').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const userId = e.target.closest('.user-export-data').getAttribute('data-user-id');
-            downloadUserDataExport(`/api/users/${encodeURIComponent(userId)}/export`);
+            downloadUserDataExport(appUrl(`/api/users/${encodeURIComponent(userId)}/export`));
         });
     });
 
@@ -1744,7 +1745,7 @@ function downloadUserDataExport(url) {
 
 function setupMyDataExport() {
     document.getElementById('my-data-export-btn')?.addEventListener('click', () => {
-        downloadUserDataExport('/api/users/me/export');
+        downloadUserDataExport(appUrl('/api/users/me/export'));
     });
 }
 
@@ -2126,7 +2127,7 @@ function setupGlobalErrorHandler() {
                 console.warn(`[Auth] 401 Unauthorized: ${method} ${url} - Redirecting to login`);
                 // Only redirect if not already on login page
                 if (!window.location.pathname.includes('/login')) {
-                    window.location.href = '/login';
+                    window.location.href = appUrl('/login');
                 }
             }
 
@@ -2147,10 +2148,10 @@ function setupGlobalErrorHandler() {
             const onOfflinePage = window.location.pathname.includes('/offline.html');
             const onLoginPage = window.location.pathname.includes('/login');
 
-            if (isApiCall && !onOfflinePage && !onLoginPage && isOfflineOrNetworkError(error) && !offlineRedirectInProgress) {
+            if (isApiCall && !APP_BASE_PATH && !onOfflinePage && !onLoginPage && isOfflineOrNetworkError(error) && !offlineRedirectInProgress) {
                 offlineRedirectInProgress = true;
                 console.warn(`[Auth] Network error on ${method} ${url} - Redirecting to offline page`);
-                window.location.href = '/offline.html';
+                window.location.href = appUrl('/offline.html');
             }
 
             throw error;

@@ -31,6 +31,14 @@ function getMoonSvgTemplate() {
                     if (!svg) {
                     throw new Error('moon.svg does not contain a root <svg> element');
                 }
+                // The inlined <image> resolves its root-relative texture href against the page,
+                // not the SVG file: prefix it for sub-path deployments (HA ingress).
+                svg.querySelectorAll('image').forEach((img) => {
+                    ['href', 'xlink:href'].forEach((attr) => {
+                        const value = img.getAttribute(attr);
+                        if (value) img.setAttribute(attr, appUrl(value));
+                    });
+                });
                 return svg;
             })
             .catch((error) => {

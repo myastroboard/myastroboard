@@ -170,7 +170,7 @@ async function submitOtpCode() {
         if (response.ok) {
             showMessage(successMessage, i18n.t('auth.login_success_redirecting'), 2000);
             setTimeout(() => {
-                window.location.href = '/';
+                window.location.href = appUrl('/');
             }, 1000);
             return;
         }
@@ -264,7 +264,7 @@ loginForm.addEventListener('submit', async (e) => {
 
             showMessage(successMessage, i18n.t('auth.login_success_redirecting'), 2000);
             setTimeout(() => {
-                window.location.href = '/';
+                window.location.href = appUrl('/');
             }, 1000);
         } else {
             setLoading(false);

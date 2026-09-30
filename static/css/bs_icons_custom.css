@@ -2,8 +2,8 @@
 @font-face {
     font-family: "bootstrap-icons";
     font-display: swap;
-    src: url("/static/vendor/bootstrap-icons/font/fonts/bootstrap-icons.woff2") format("woff2"),
-         url("/static/vendor/bootstrap-icons/font/fonts/bootstrap-icons.woff") format("woff");
+    src: url("../vendor/bootstrap-icons/font/fonts/bootstrap-icons.woff2") format("woff2"),
+         url("../vendor/bootstrap-icons/font/fonts/bootstrap-icons.woff") format("woff");
 }
 
 /* Custom icons that behave like Bootstrap Icons (bi bi-*) */
@@ -32,31 +32,31 @@
 }
 
 .bi-iss::before {
-    -webkit-mask-image: url('/static/img/icons/iss.svg');
-    mask-image: url('/static/img/icons/iss.svg');
+    -webkit-mask-image: url('../img/icons/iss.svg');
+    mask-image: url('../img/icons/iss.svg');
 }
 
 .bi-telescope::before {
-    -webkit-mask-image: url('/static/img/icons/telescope.svg');
-    mask-image: url('/static/img/icons/telescope.svg');
+    -webkit-mask-image: url('../img/icons/telescope.svg');
+    mask-image: url('../img/icons/telescope.svg');
 }
 
 .bi-conjonction::before {
-    -webkit-mask-image: url('/static/img/icons/conjonction.svg');
-    mask-image: url('/static/img/icons/conjonction.svg');
+    -webkit-mask-image: url('../img/icons/conjonction.svg');
+    mask-image: url('../img/icons/conjonction.svg');
 }
 
 .bi-galaxy::before {
-    -webkit-mask-image: url('/static/img/icons/galaxy.svg');
-    mask-image: url('/static/img/icons/galaxy.svg');
+    -webkit-mask-image: url('../img/icons/galaxy.svg');
+    mask-image: url('../img/icons/galaxy.svg');
 }
 
 .bi-aurora::before {
-    -webkit-mask-image: url('/static/img/icons/aurora.svg');
-    mask-image: url('/static/img/icons/aurora.svg');
+    -webkit-mask-image: url('../img/icons/aurora.svg');
+    mask-image: url('../img/icons/aurora.svg');
 }
 
 .bi-comet::before {
-    -webkit-mask-image: url('/static/img/icons/comet.svg');
-    mask-image: url('/static/img/icons/comet.svg');
+    -webkit-mask-image: url('../img/icons/comet.svg');
+    mask-image: url('../img/icons/comet.svg');
 }

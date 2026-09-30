@@ -619,12 +619,12 @@ function ensureVendorScriptLoaded(isLoaded, scriptUrl, cssUrl, state, libraryNam
             cssUrls.forEach((href) => {
                 const link = document.createElement('link');
                 link.rel = 'stylesheet';
-                link.href = href;
+                link.href = appUrl(href);
                 document.head.appendChild(link);
             });
         }
         const script = document.createElement('script');
-        script.src = scriptUrl;
+        script.src = appUrl(scriptUrl);
         script.onload = resolve;
         script.onerror = () => {
             state.promise = null;

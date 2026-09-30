@@ -257,7 +257,7 @@ function _sfShowLaunchModal(launch) {
         const wrap = document.createElement('div');
         wrap.style.position = 'relative';
         const img = document.createElement('img');
-        img.src = launch.image_url;
+        img.src = appUrl(launch.image_url);
         img.alt = '';
         img.className = 'sf-modal-img w-100';
         img.loading = 'lazy';
@@ -515,7 +515,7 @@ function _renderLaunches(container, data) {
         // Hero image
         if (next.image_url) {
             const img = document.createElement('img');
-            img.src = next.image_url;
+            img.src = appUrl(next.image_url);
             img.alt = '';
             img.className = 'sf-hero-img';
             img.loading = 'lazy';
@@ -645,7 +645,7 @@ function _makeLaunchCard(launch, isPast) {
     // Card image - left side, full card height
     if (launch.image_url) {
         const img = document.createElement('img');
-        img.src = launch.image_url;
+        img.src = appUrl(launch.image_url);
         img.alt = '';
         img.className = 'sf-launch-card-img';
         img.loading = 'eager';
@@ -837,7 +837,7 @@ function _renderAstronauts(container, data) {
 function _sfCrewImg(src, eager) {
     if (src) {
         const img = document.createElement('img');
-        img.src = src;
+        img.src = appUrl(src);
         img.alt = '';
         img.className = 'card-img-top sf-crew-img';
         img.loading = eager ? 'eager' : 'lazy';
@@ -1011,7 +1011,7 @@ function _makeEventCard(ev) {
     // Left thumbnail, same visual system as launch cards.
     if (ev.image_url) {
         const img = document.createElement('img');
-        img.src = ev.image_url;
+        img.src = appUrl(ev.image_url);
         img.alt = '';
         img.className = 'sf-events-card-img';
         img.loading = 'lazy';

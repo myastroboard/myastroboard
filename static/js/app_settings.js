@@ -8,11 +8,13 @@ async function loadAppSettings() {
         const secureEl = document.getElementById('app-setting-session-secure');
         const indexingEl = document.getElementById('app-setting-search-indexing');
         const retentionEl = document.getElementById('app-setting-log-retention');
+        const externalUrlEl = document.getElementById('app-setting-external-base-url');
         if (emailEl) emailEl.value = settings.vapid_contact_email || '';
         if (trustEl) trustEl.checked = !!settings.trust_proxy_headers;
         if (secureEl) secureEl.checked = !!settings.session_cookie_secure;
         if (indexingEl) indexingEl.checked = !!settings.search_engine_indexing;
         if (retentionEl) retentionEl.value = settings.log_retention_days ?? 90;
+        if (externalUrlEl) externalUrlEl.value = settings.external_base_url || '';
     } catch (err) {
         console.error('Failed to load app settings:', err);
     }
@@ -79,7 +81,11 @@ async function saveAppSettingsLogs() {
 async function saveAppSettingsProxy() {
     const trust = document.getElementById('app-setting-trust-proxy')?.checked ?? false;
     const secure = document.getElementById('app-setting-session-secure')?.checked ?? false;
-    await _saveAppSettings({ trust_proxy_headers: trust, session_cookie_secure: secure }, 'proxy');
+    const externalBaseUrl = (document.getElementById('app-setting-external-base-url')?.value || '').trim();
+    await _saveAppSettings(
+        { trust_proxy_headers: trust, session_cookie_secure: secure, external_base_url: externalBaseUrl },
+        'proxy',
+    );
 }
 
 async function _saveAppSettings(partial, section) {
@@ -109,6 +115,9 @@ async function _saveAppSettings(partial, section) {
         }
     } catch (err) {
         console.error('Failed to save app settings:', err);
+        if (err.status === 400 && section === 'proxy') {
+            showMessage('error', i18n.t('settings.app_settings_external_base_url_invalid'));
+        }
     }
 }
 
