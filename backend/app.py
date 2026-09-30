@@ -220,8 +220,8 @@ def log_session_restoration():
 def inject_base_path():
     """``base``: the URL prefix the app is served under ('' at the root, the HA ingress path otherwise).
 
-    Templates write ``{{ base }}/static/...`` instead of ``/static/...``, and JS reads it back
-    from ``window.APP_BASE`` (see static/js/api_helper.js appUrl()).
+    Templates write ``{{ base }}/static/...`` instead of ``/static/...`` and expose it in
+    ``<meta name="app-base">``, which static/js/api_helper.js reads into ``APP_BASE_PATH`` (see appUrl()).
     """
     return {'base': request.script_root}
 
