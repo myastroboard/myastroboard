@@ -122,7 +122,7 @@ from utils import ingress as _ingress
 
 if _ingress.ingress_enabled():  # pragma: no cover - env flag set by the HA app only
     app.wsgi_app = _ingress.IngressMiddleware(app.wsgi_app)  # type: ignore[method-assign]
-    logger.info(f"Home Assistant ingress enabled (trusted proxy {_ingress.trusted_proxy_ip()})")
+    logger.info("Home Assistant ingress enabled")
 app.session_interface = _ingress.IngressAwareSessionInterface()
 
 # Configure session
