@@ -13,7 +13,8 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixes
 
-- None.
+- Parameters: the log retention setting moved from *Privacy & search engines* to *Log export*, next to
+  the log levels.
 
 ### Breaking changes
 

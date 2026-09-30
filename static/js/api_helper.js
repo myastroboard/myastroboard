@@ -3,9 +3,10 @@
 // ======================
 
 // URL prefix the app is served under: '' at the root, '/api/hassio_ingress/<token>' under
-// Home Assistant ingress (set by the templates from request.script_root). This file loads
-// first on every page so appUrl() and the fetch() wrapper below exist before any request.
-const APP_BASE_PATH = (typeof window.APP_BASE === 'string' ? window.APP_BASE : '').replace(/\/+$/, '');
+// Home Assistant ingress (the templates' <meta name="app-base">, from request.script_root).
+// This file loads first on every page so appUrl() and the fetch() wrapper below exist
+// before any request. No meta tag (offline.html) means no prefix.
+const APP_BASE_PATH = (document.querySelector('meta[name="app-base"]')?.content || '').replace(/\/+$/, '');
 const API_BASE = window.location.origin + APP_BASE_PATH;
 
 /**

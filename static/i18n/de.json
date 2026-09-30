@@ -790,7 +790,7 @@
     "restore_success": "Sicherung erfolgreich wiederhergestellt.",
     "restore_reloading": "Wird neu geladen...",
     "restore_failed": "Sicherung konnte nicht wiederhergestellt werden.",
-    "log_level_title": "Protokollierungsgrad",
+    "log_level_title": "Protokollierung",
     "log_level_info": "Der Protokollierungsgrad bestimmt, wie viele Details aufgezeichnet werden. Um ein Problem zu untersuchen, setzen Sie den Grad der Protokolldatei auf DEBUG, reproduzieren Sie das Problem und exportieren Sie dann die Protokolle unten. Änderungen gelten sofort, ohne Neustart.",
     "log_level_file_label": "Grad der Protokolldatei",
     "log_level_file_help": "Wird in myastroboard.log geschrieben, im Tab Protokolle angezeigt und in den Export aufgenommen.",

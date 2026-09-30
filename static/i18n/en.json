@@ -790,7 +790,7 @@
     "restore_success": "Backup restored successfully.",
     "restore_reloading": "Reloading...",
     "restore_failed": "Failed to restore backup.",
-    "log_level_title": "Log Level",
+    "log_level_title": "Logging",
     "log_level_info": "The log level controls how much detail is recorded. To troubleshoot an issue, set the log file level to DEBUG, reproduce the issue, then export the logs below. Changes apply right away, without a restart.",
     "log_level_file_label": "Log file level",
     "log_level_file_help": "Written to myastroboard.log, shown in the Logs tab and included in the export.",

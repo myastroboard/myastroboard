@@ -790,7 +790,7 @@
     "restore_success": "Backup ripristinato correttamente.",
     "restore_reloading": "Ricaricamento...",
     "restore_failed": "Impossibile ripristinare il backup.",
-    "log_level_title": "Livello di registro",
+    "log_level_title": "Registrazione dei log",
     "log_level_info": "Il livello di registro determina quanti dettagli vengono registrati. Per diagnosticare un problema, imposta il livello del file di registro su DEBUG, riproduci il problema, quindi esporta i registri qui sotto. Le modifiche si applicano subito, senza riavvio.",
     "log_level_file_label": "Livello del file di registro",
     "log_level_file_help": "Scritto in myastroboard.log, mostrato nella scheda Registri e incluso nell'esportazione.",
