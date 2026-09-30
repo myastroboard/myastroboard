@@ -76,6 +76,22 @@ class TestMiddleware:
         assert seen['HTTP_HOST'] == 'ha.example.org'
         assert seen['myastroboard.ingress'] is True
 
+    def test_ipv4_mapped_supervisor_address_is_trusted(self):
+        """gunicorn listens on [::]:5000, so the Supervisor arrives as ::ffff:172.30.32.2."""
+        seen = _run(_supervisor_environ(REMOTE_ADDR='::ffff:172.30.32.2'))
+        assert seen['SCRIPT_NAME'] == PREFIX
+        assert seen['REMOTE_ADDR'] == '203.0.113.7'
+        assert seen['myastroboard.ingress'] is True
+
+    def test_ipv4_mapped_untrusted_address_is_still_ignored(self):
+        seen = _run(_supervisor_environ(REMOTE_ADDR='::ffff:192.168.1.50'))
+        assert seen['SCRIPT_NAME'] == ''
+        assert 'myastroboard.ingress' not in seen
+
+    def test_invalid_trusted_proxy_trusts_nobody(self):
+        seen = _run(_supervisor_environ(), proxy_ip='not-an-ip')
+        assert seen['SCRIPT_NAME'] == ''
+
     def test_forwarded_headers_are_consumed(self):
         """An inner ProxyFix must not re-apply them and swap the client IP for the HA core hop."""
         seen = _run(_supervisor_environ(HTTP_X_FORWARDED_PREFIX='/evil'))
@@ -135,6 +151,8 @@ class TestClientIp:
             # Everything left of the hop HA core appended can be spoofed by the browser
             ('6.6.6.6, 203.0.113.7, 172.30.32.1', '203.0.113.7'),
             ('2001:db8::1, 172.30.33.5', '2001:db8::1'),
+            # IPv4-mapped hops: HA core's own hop must still count as hassio, the client unwrapped
+            ('::ffff:203.0.113.7, ::ffff:172.30.32.1', '203.0.113.7'),
             ('203.0.113.7, not-an-ip, 172.30.32.1', '203.0.113.7'),
             ('172.30.32.1, 172.30.32.2', None),
             ('', None),

@@ -66,6 +66,21 @@ def _clean_prefix(raw: str) -> Optional[str]:
     return prefix if _PREFIX_RE.match(prefix) else None
 
 
+def _parse_ip(value: Optional[str]) -> Optional[ipaddress.IPv4Address | ipaddress.IPv6Address]:
+    """Parsed address, with IPv4-mapped IPv6 unwrapped, or None when not an address.
+
+    gunicorn listens on [::]:5000 (dual stack), so an IPv4 peer such as the Supervisor shows
+    up in REMOTE_ADDR as ``::ffff:172.30.32.2``: compare the IPv4 address it stands for.
+    """
+    try:
+        address = ipaddress.ip_address((value or '').strip())
+    except ValueError:
+        return None
+    if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped:
+        return address.ipv4_mapped
+    return address
+
+
 def _client_ip(forwarded_for: str) -> Optional[str]:
     """Rightmost X-Forwarded-For hop outside the hassio network.
 
@@ -73,11 +88,8 @@ def _client_ip(forwarded_for: str) -> Optional[str]:
     from the browser (or whatever proxy sits in front of HA) and could be spoofed.
     """
     for hop in reversed([h.strip() for h in forwarded_for.split(',') if h.strip()]):
-        try:
-            address = ipaddress.ip_address(hop)
-        except ValueError:
-            continue
-        if address not in HASSIO_NETWORK:
+        address = _parse_ip(hop)
+        if address is not None and address not in HASSIO_NETWORK:
             return str(address)
     return None
 
@@ -87,14 +99,15 @@ class IngressMiddleware:
 
     def __init__(self, wsgi_app: Callable[..., Iterable[bytes]], proxy_ip: Optional[str] = None):
         self.wsgi_app = wsgi_app
-        self.proxy_ip = proxy_ip or trusted_proxy_ip()
+        self.proxy_ip = _parse_ip(proxy_ip or trusted_proxy_ip())
 
     def __call__(self, environ: dict, start_response: Callable[..., Any]) -> Iterable[bytes]:
         raw_prefix = environ.pop('HTTP_X_INGRESS_PATH', None)
         if raw_prefix is None:
             return self.wsgi_app(environ, start_response)
 
-        if environ.get('REMOTE_ADDR') != self.proxy_ip:
+        peer = _parse_ip(environ.get('REMOTE_ADDR'))
+        if peer is None or peer != self.proxy_ip:
             logger.warning(f"Ignoring X-Ingress-Path from untrusted address {environ.get('REMOTE_ADDR')!r}")
             return self.wsgi_app(environ, start_response)
 
