@@ -14,10 +14,15 @@ async function loadAllSkyObservatory() {
     const container = document.getElementById('allsky-observatory');
     if (!container) return;
 
-    const [connectors, urls] = await Promise.all([
+    const [connectors, rawUrls] = await Promise.all([
         fetchJSONOnce('/api/connectors').catch(() => []),
         fetchJSONOnce('/api/connectors/allsky/urls').catch(() => null),
     ]);
+    // Proxy URLs come back root-relative ('/api/connectors/allsky/proxy?...'): prefix them
+    // once here for every <img>/<video> below. Direct camera URLs pass through unchanged.
+    const urls = rawUrls
+        ? Object.fromEntries(Object.entries(rawUrls).map(([key, value]) => [key, appUrl(value)]))
+        : null;
 
     const allskyCfg = (connectors || []).find(c => c.name === 'allsky');
     if (!allskyCfg || !allskyCfg.enabled) {

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#0b1220">
     <meta name="msapplication-TileColor" content="#0b1220">
-    <meta name="msapplication-TileImage" content="/static/ico/windows/Square150x150Logo.scale-100.png">
+    <meta name="msapplication-TileImage" content="{{ base }}/static/ico/windows/Square150x150Logo.scale-100.png">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -13,16 +13,20 @@
     <meta name="app-version" content="{{ version }}">
     <meta name="description" content="MyAstroBoard - Astronomy observation planning dashboard with weather forecasts, SkyTonight targets, lunar and solar events, ISS passes, and equipment management.">
     <meta name="robots" content="noindex, nofollow">
-    <script src="/static/js/theme.js?v={{ version }}"></script>
+    <script>window.APP_BASE = {{ base|tojson }};</script>
+    <script src="{{ base }}/static/js/theme.js?v={{ version }}"></script>
     <title data-i18n="common.title_html">MyAstroBoard - Astronomy Observation Planning Dashboard</title>
-    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
-    <link rel="icon" type="image/png" sizes="32x32" href="/static/ico/ios/32.png?v={{ version }}">
-    <link rel="icon" type="image/png" sizes="16x16" href="/static/ico/ios/16.png?v={{ version }}">
+    <link rel="icon" type="image/svg+xml" href="{{ base }}/static/favicon.svg">
+    <link rel="icon" type="image/x-icon" href="{{ base }}/static/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ base }}/static/ico/ios/32.png?v={{ version }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ base }}/static/ico/ios/16.png?v={{ version }}">
+    <script>
+      localStorage.setItem('myastroboard_app_version', '{{ version }}');
+    </script>
+    {# No PWA under a sub-path (HA ingress): the manifest and service worker are root-scoped #}
+    {% if not base %}
     <link rel="manifest" href="/static/manifest.webmanifest?v={{ version }}" id="pwa-manifest">
     <script>
-            localStorage.setItem('myastroboard_app_version', '{{ version }}');
-
       (function() {
         var lang = localStorage.getItem('myastroboard_language') || '';
         var supported = ['fr', 'es', 'de', 'it', 'pt'];
@@ -31,63 +35,64 @@
         }
       })();
     </script>
-    <link rel="apple-touch-icon" sizes="180x180" href="/static/ico/ios/180.png?v={{ version }}">
-    <link href="/static/vendor/bootstrap/css/bootstrap.min.css?v={{ version }}" rel="stylesheet">
+    {% endif %}
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ base }}/static/ico/ios/180.png?v={{ version }}">
+    <link href="{{ base }}/static/vendor/bootstrap/css/bootstrap.min.css?v={{ version }}" rel="stylesheet">
     <!-- Bootstrap Icons loaded asynchronously - icons use font-display:swap so no FOUT on layout -->
-    <link href="/static/vendor/bootstrap-icons/font/bootstrap-icons.min.css?v={{ version }}" rel="stylesheet" media="print" onload="this.media='all'">
-    <noscript><link href="/static/vendor/bootstrap-icons/font/bootstrap-icons.min.css?v={{ version }}" rel="stylesheet"></noscript>
-    <link rel="stylesheet" href="/static/css/bs_icons_custom.css?v={{ version }}">
-    <link rel="stylesheet" href="/static/css/bs_variables.css?v={{ version }}">
-    <link rel="stylesheet" href="/static/css/bs_main.css?v={{ version }}">
-    <link rel="stylesheet" href="/static/css/bs_weather.css?v={{ version }}">
-    <link rel="stylesheet" href="/static/css/bs_sky_widget.css?v={{ version }}">
+    <link href="{{ base }}/static/vendor/bootstrap-icons/font/bootstrap-icons.min.css?v={{ version }}" rel="stylesheet" media="print" onload="this.media='all'">
+    <noscript><link href="{{ base }}/static/vendor/bootstrap-icons/font/bootstrap-icons.min.css?v={{ version }}" rel="stylesheet"></noscript>
+    <link rel="stylesheet" href="{{ base }}/static/css/bs_icons_custom.css?v={{ version }}">
+    <link rel="stylesheet" href="{{ base }}/static/css/bs_variables.css?v={{ version }}">
+    <link rel="stylesheet" href="{{ base }}/static/css/bs_main.css?v={{ version }}">
+    <link rel="stylesheet" href="{{ base }}/static/css/bs_weather.css?v={{ version }}">
+    <link rel="stylesheet" href="{{ base }}/static/css/bs_sky_widget.css?v={{ version }}">
     <!--
         The stylesheets below only apply to secondary tabs that are hidden on initial load
         (SkyTonight, Astrodex, Plan My Night, Equipment, Metrics, Events, Spaceflight, Connectors,
         Leaflet map, Timeline, Logs). Loading them with media="print" keeps them non-render-blocking;
         the onload swap activates them once fetched, well before a user can switch tabs.
     -->
-    <link rel="stylesheet" href="/static/css/bs_logs.css?v={{ version }}" media="print" onload="this.media='all'">
-    <link rel="stylesheet" href="/static/css/bs_skytonight.css?v={{ version }}" media="print" onload="this.media='all'">
-    <link rel="stylesheet" href="/static/css/bs_visibility_calendar.css?v={{ version }}" media="print" onload="this.media='all'">
-    <link rel="stylesheet" href="/static/css/bs_astrodex.css?v={{ version }}" media="print" onload="this.media='all'">
-    <link rel="stylesheet" href="/static/css/bs_astrodex_map.css?v={{ version }}" media="print" onload="this.media='all'">
-    <link rel="stylesheet" href="/static/css/bs_astrodex_collection.css?v={{ version }}" media="print" onload="this.media='all'">
-    <link rel="stylesheet" href="/static/css/bs_plan_my_night.css?v={{ version }}" media="print" onload="this.media='all'">
-    <link rel="stylesheet" href="/static/css/bs_observation_log.css?v={{ version }}" media="print" onload="this.media='all'">
-    <link rel="stylesheet" href="/static/css/bs_session_analytics.css?v={{ version }}" media="print" onload="this.media='all'">
-    <link rel="stylesheet" href="/static/css/bs_equipment.css?v={{ version }}" media="print" onload="this.media='all'">
-    <link rel="stylesheet" href="/static/css/bs_metrics.css?v={{ version }}" media="print" onload="this.media='all'">
-    <link rel="stylesheet" href="/static/css/bs_events.css?v={{ version }}" media="print" onload="this.media='all'">
-    <link rel="stylesheet" href="/static/css/bs_orbital_stations.css?v={{ version }}" media="print" onload="this.media='all'">
-    <link rel="stylesheet" href="/static/css/bs_spaceflight.css?v={{ version }}" media="print" onload="this.media='all'">
-    <link rel="stylesheet" href="/static/css/bs_connectors.css?v={{ version }}" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="{{ base }}/static/css/bs_logs.css?v={{ version }}" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="{{ base }}/static/css/bs_skytonight.css?v={{ version }}" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="{{ base }}/static/css/bs_visibility_calendar.css?v={{ version }}" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="{{ base }}/static/css/bs_astrodex.css?v={{ version }}" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="{{ base }}/static/css/bs_astrodex_map.css?v={{ version }}" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="{{ base }}/static/css/bs_astrodex_collection.css?v={{ version }}" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="{{ base }}/static/css/bs_plan_my_night.css?v={{ version }}" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="{{ base }}/static/css/bs_observation_log.css?v={{ version }}" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="{{ base }}/static/css/bs_session_analytics.css?v={{ version }}" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="{{ base }}/static/css/bs_equipment.css?v={{ version }}" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="{{ base }}/static/css/bs_metrics.css?v={{ version }}" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="{{ base }}/static/css/bs_events.css?v={{ version }}" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="{{ base }}/static/css/bs_orbital_stations.css?v={{ version }}" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="{{ base }}/static/css/bs_spaceflight.css?v={{ version }}" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="{{ base }}/static/css/bs_connectors.css?v={{ version }}" media="print" onload="this.media='all'">
     <!-- Leaflet CSS/JS are lazy-loaded on demand by orbital_stations.js only when the orbital map is rendered -->
-    <link rel="stylesheet" href="/static/css/bs_timeline.css?v={{ version }}" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="{{ base }}/static/css/bs_timeline.css?v={{ version }}" media="print" onload="this.media='all'">
     <noscript>
-        <link rel="stylesheet" href="/static/css/bs_logs.css?v={{ version }}">
-        <link rel="stylesheet" href="/static/css/bs_skytonight.css?v={{ version }}">
-        <link rel="stylesheet" href="/static/css/bs_visibility_calendar.css?v={{ version }}">
-        <link rel="stylesheet" href="/static/css/bs_astrodex.css?v={{ version }}">
-        <link rel="stylesheet" href="/static/css/bs_astrodex_map.css?v={{ version }}">
-        <link rel="stylesheet" href="/static/css/bs_astrodex_collection.css?v={{ version }}">
-        <link rel="stylesheet" href="/static/css/bs_plan_my_night.css?v={{ version }}">
-        <link rel="stylesheet" href="/static/css/bs_observation_log.css?v={{ version }}">
-        <link rel="stylesheet" href="/static/css/bs_session_analytics.css?v={{ version }}">
-        <link rel="stylesheet" href="/static/css/bs_equipment.css?v={{ version }}">
-        <link rel="stylesheet" href="/static/css/bs_metrics.css?v={{ version }}">
-        <link rel="stylesheet" href="/static/css/bs_events.css?v={{ version }}">
-        <link rel="stylesheet" href="/static/css/bs_orbital_stations.css?v={{ version }}">
-        <link rel="stylesheet" href="/static/css/bs_spaceflight.css?v={{ version }}">
-        <link rel="stylesheet" href="/static/css/bs_connectors.css?v={{ version }}">
-        <link rel="stylesheet" href="/static/css/bs_timeline.css?v={{ version }}">
+        <link rel="stylesheet" href="{{ base }}/static/css/bs_logs.css?v={{ version }}">
+        <link rel="stylesheet" href="{{ base }}/static/css/bs_skytonight.css?v={{ version }}">
+        <link rel="stylesheet" href="{{ base }}/static/css/bs_visibility_calendar.css?v={{ version }}">
+        <link rel="stylesheet" href="{{ base }}/static/css/bs_astrodex.css?v={{ version }}">
+        <link rel="stylesheet" href="{{ base }}/static/css/bs_astrodex_map.css?v={{ version }}">
+        <link rel="stylesheet" href="{{ base }}/static/css/bs_astrodex_collection.css?v={{ version }}">
+        <link rel="stylesheet" href="{{ base }}/static/css/bs_plan_my_night.css?v={{ version }}">
+        <link rel="stylesheet" href="{{ base }}/static/css/bs_observation_log.css?v={{ version }}">
+        <link rel="stylesheet" href="{{ base }}/static/css/bs_session_analytics.css?v={{ version }}">
+        <link rel="stylesheet" href="{{ base }}/static/css/bs_equipment.css?v={{ version }}">
+        <link rel="stylesheet" href="{{ base }}/static/css/bs_metrics.css?v={{ version }}">
+        <link rel="stylesheet" href="{{ base }}/static/css/bs_events.css?v={{ version }}">
+        <link rel="stylesheet" href="{{ base }}/static/css/bs_orbital_stations.css?v={{ version }}">
+        <link rel="stylesheet" href="{{ base }}/static/css/bs_spaceflight.css?v={{ version }}">
+        <link rel="stylesheet" href="{{ base }}/static/css/bs_connectors.css?v={{ version }}">
+        <link rel="stylesheet" href="{{ base }}/static/css/bs_timeline.css?v={{ version }}">
     </noscript>
 </head>
 <body>
 
     <div class="hero text-center mb-2 pb-1">
         <h1 class="display-5 fw-bold">
-            <img src="/static/img/favicon-animated.svg" alt="MyAstroBoard Logo" width="40" height="40"> MyAstroBoard
+            <img src="{{ base }}/static/img/favicon-animated.svg" alt="MyAstroBoard Logo" width="40" height="40"> MyAstroBoard
         </h1>
         <!--<p class="lead mb-2" data-i18n="common.slogan">
             Astronomy Observation Planning Dashboard
@@ -2101,6 +2106,11 @@
                                 <label class="form-check-label" for="app-setting-session-secure" data-i18n="settings.app_settings_session_secure_label">HTTPS-only session cookie (Secure flag)</label>
                             </div>
                         </div>
+                        <div class="col-12">
+                            <label class="form-label" for="app-setting-external-base-url" data-i18n="settings.app_settings_external_base_url_label">External base URL</label>
+                            <input type="url" class="form-control" id="app-setting-external-base-url" placeholder="https://astro.example.org" autocomplete="off">
+                            <div class="form-text" data-i18n="settings.app_settings_external_base_url_help">Address other software uses to reach MyAstroBoard: the Astrodex stream (Home Assistant camera, Lovelace card) and the MyAstroShine photo return. Leave empty to use the address in your browser. Required when you use MyAstroBoard from the Home Assistant sidebar.</div>
+                        </div>
                     </div>
 
                     <div id="restart-required-banner" class="alert alert-warning d-flex align-items-center gap-3 mt-2" role="alert" style="display:none;">
@@ -3584,53 +3594,53 @@
         </div>
     </div>
 
-    <script src="/static/vendor/chartjs/chart.umd.min.js?v={{ version }}" defer></script>
+    <script src="{{ base }}/static/vendor/chartjs/chart.umd.min.js?v={{ version }}" defer></script>
     <!-- Plotly (~4.8MB) is lazy-loaded on demand by skytonight.js only when the sky map is rendered -->
     <!-- QR code generator (~20KB): draws the 2FA enrolment code client-side, see auth.js renderTwoFactorQrCode() -->
-    <script src="/static/vendor/qrcode/qrcode.min.js?v={{ version }}" defer></script>
-    <script src="/static/vendor/bootstrap/js/bootstrap.bundle.min.js?v={{ version }}"></script>
-    <script src="/static/js/dom_utils.js?v={{ version }}"></script>
-    <script src="/static/js/i18n.js?v={{ version }}"></script>
-    <script src="/static/js/language_selector.js?v={{ version }}"></script>
-    <script src="/static/js/auth.js?v={{ version }}"></script>
-    <script src="/static/js/api_helper.js?v={{ version }}"></script>
-    <script src="/static/js/events_alerts.js?v={{ version }}"></script>
-    <script src="/static/js/utils.js?v={{ version }}"></script>
-    <script src="/static/js/notifications.js?v={{ version }}"></script>
-    <script src="/static/js/skytonight_scheduler.js?v={{ version }}"></script>
-    <script src="/static/js/moon.js?v={{ version }}"></script>
-    <script src="/static/js/sun.js?v={{ version }}"></script>
-    <script src="/static/js/solar_eclipse.js?v={{ version }}"></script>
-    <script src="/static/js/lunar_eclipse.js?v={{ version }}"></script>
-    <script src="/static/js/horizon_graph.js?v={{ version }}"></script>
-    <script src="/static/js/aurora.js?v={{ version }}"></script>
-    <script src="/static/js/seeing_forecast.js?v={{ version }}"></script>
-    <script src="/static/js/orbital_stations.js?v={{ version }}"></script>
-    <script src="/static/js/spaceflight.js?v={{ version }}"></script>
-    <script src="/static/js/weather.js?v={{ version }}"></script>
-    <script src="/static/js/weather_astro.js?v={{ version }}"></script>
-    <script src="/static/js/weather_alerts.js?v={{ version }}"></script>
-    <script src="/static/js/object_info.js?v={{ version }}"></script>
-    <script src="/static/js/visibility_calendar.js?v={{ version }}"></script>
-    <script src="/static/js/astrodex.js?v={{ version }}"></script>
-    <script src="/static/js/plan_my_night.js?v={{ version }}"></script>
-    <script src="/static/js/equipment.js?v={{ version }}"></script>
-    <script src="/static/js/observation_sessions.js?v={{ version }}"></script>
-    <script src="/static/js/session_analytics.js?v={{ version }}"></script>
-    <script src="/static/js/wishlist.js?v={{ version }}"></script>
-    <script src="/static/js/config.js?v={{ version }}"></script>
-    <script src="/static/js/locations.js?v={{ version }}"></script>
-    <script src="/static/js/astrodex_map.js?v={{ version }}"></script>
-    <script src="/static/js/astrodex_collection.js?v={{ version }}"></script>
-    <script src="/static/js/app_settings.js?v={{ version }}"></script>
-    <script src="/static/js/skytonight.js?v={{ version }}"></script>
-    <script src="/static/js/logs.js?v={{ version }}"></script>
-    <script src="/static/js/metrics.js?v={{ version }}"></script>
-    <script src="/static/js/pwa.js?v={{ version }}"></script>
-    <script src="/static/js/constraint_help.js?v={{ version }}"></script>
-    <script src="/static/js/first_run.js?v={{ version }}"></script>
-    <script src="/static/js/connectors/connectors.js?v={{ version }}"></script>
-    <script src="/static/js/sky_status_widget.js?v={{ version }}"></script>
-    <script src="/static/js/app.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/vendor/qrcode/qrcode.min.js?v={{ version }}" defer></script>
+    <script src="{{ base }}/static/vendor/bootstrap/js/bootstrap.bundle.min.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/api_helper.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/dom_utils.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/i18n.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/language_selector.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/auth.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/events_alerts.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/utils.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/notifications.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/skytonight_scheduler.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/moon.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/sun.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/solar_eclipse.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/lunar_eclipse.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/horizon_graph.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/aurora.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/seeing_forecast.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/orbital_stations.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/spaceflight.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/weather.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/weather_astro.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/weather_alerts.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/object_info.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/visibility_calendar.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/astrodex.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/plan_my_night.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/equipment.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/observation_sessions.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/session_analytics.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/wishlist.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/config.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/locations.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/astrodex_map.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/astrodex_collection.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/app_settings.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/skytonight.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/logs.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/metrics.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/pwa.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/constraint_help.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/first_run.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/connectors/connectors.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/sky_status_widget.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/app.js?v={{ version }}"></script>
 </body>
 </html>

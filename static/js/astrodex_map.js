@@ -12,10 +12,10 @@ const _astrodexMarkerClusterLoadState = { promise: null };
 function _ensureAstrodexMarkerClusterLoaded() {
     return ensureVendorScriptLoaded(
         () => typeof L !== 'undefined' && typeof L.markerClusterGroup === 'function',
-        '/static/vendor/leaflet.markercluster/dist/leaflet.markercluster.js?v=1.5.3',
+        appUrl('/static/vendor/leaflet.markercluster/dist/leaflet.markercluster.js?v=1.5.3'),
         [
-            '/static/vendor/leaflet.markercluster/dist/MarkerCluster.css?v=1.5.3',
-            '/static/vendor/leaflet.markercluster/dist/MarkerCluster.Default.css?v=1.5.3',
+            appUrl('/static/vendor/leaflet.markercluster/dist/MarkerCluster.css?v=1.5.3'),
+            appUrl('/static/vendor/leaflet.markercluster/dist/MarkerCluster.Default.css?v=1.5.3'),
         ],
         _astrodexMarkerClusterLoadState,
         'Leaflet.markercluster'

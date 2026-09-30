@@ -945,7 +945,7 @@ function _mapCameraPresetToPayload(preset) {
 // flow as a single code path instead of two near-identical copies.
 const _WIZARD_EQUIPMENT_KIND_CONFIG = {
     telescope: {
-        endpoint: '/api/equipment/telescopes',
+        endpoint: appUrl('/api/equipment/telescopes'),
         selectId: 'wizard-telescope-preset',
         presetsKey: 'telescopes',
         mapPreset: _mapTelescopePresetToPayload,
@@ -957,7 +957,7 @@ const _WIZARD_EQUIPMENT_KIND_CONFIG = {
         }),
     },
     camera: {
-        endpoint: '/api/equipment/cameras',
+        endpoint: appUrl('/api/equipment/cameras'),
         selectId: 'wizard-camera-preset',
         presetsKey: 'cameras',
         mapPreset: _mapCameraPresetToPayload,
@@ -1006,10 +1006,10 @@ async function _saveEquipmentOfKind(kind) {
 }
 
 const _WIZARD_BUNDLE_ENDPOINT_BY_KIND = {
-    camera: '/api/equipment/cameras',
-    mount: '/api/equipment/mounts',
-    filter: '/api/equipment/filters',
-    accessory: '/api/equipment/accessories',
+    camera: appUrl('/api/equipment/cameras'),
+    mount: appUrl('/api/equipment/mounts'),
+    filter: appUrl('/api/equipment/filters'),
+    accessory: appUrl('/api/equipment/accessories'),
 };
 
 /** Map a bundle sub-item (same field shape as a standalone preset of that kind, see

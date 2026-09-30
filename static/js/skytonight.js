@@ -27,7 +27,7 @@ const _plotlyLoadState = { promise: null };
 function _ensurePlotlyLoaded() {
     return ensureVendorScriptLoaded(
         () => typeof Plotly !== 'undefined',
-        '/static/vendor/plotly/plotly-3.7.0.min.js?v=3.7.0',
+        appUrl('/static/vendor/plotly/plotly-3.7.0.min.js?v=3.7.0'),
         null,
         _plotlyLoadState,
         'Plotly'
@@ -500,14 +500,14 @@ function _buildCapturedBadge() {
  */
 function _loadCardThumbnail(imgEl, thumbnailUrl, identifier) {
     if (thumbnailUrl) {
-        imgEl.src = thumbnailUrl;
+        imgEl.src = appUrl(thumbnailUrl);
         imgEl.style.display = '';
         return;
     }
     if (identifier && typeof fetchObjectInfo === 'function') {
         fetchObjectInfo(identifier).then((data) => {
             if (data?.image?.url) {
-                imgEl.src = data.image.url;
+                imgEl.src = appUrl(data.image.url);
                 imgEl.style.display = '';
             }
         });
@@ -2616,9 +2616,9 @@ async function _showSkyTonightDataSection(sectionKey, container) {
             data = _skytSectionCache[sectionKey];
         } else {
             const endpoint = {
-                report: '/api/skytonight/data/dso',
-                bodies: '/api/skytonight/data/bodies',
-                comets: '/api/skytonight/data/comets',
+                report: appUrl('/api/skytonight/data/dso'),
+                bodies: appUrl('/api/skytonight/data/bodies'),
+                comets: appUrl('/api/skytonight/data/comets'),
             }[sectionKey];
             data = await fetchJSON(endpoint);
             if (data.error) throw new Error(data.error);

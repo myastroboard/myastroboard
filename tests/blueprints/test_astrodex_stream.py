@@ -139,6 +139,20 @@ class TestGetStreamUrls:
         assert data['shared_url'] is not None
         assert '/api/astrodex/stream/shared/' in data['shared_url']
 
+    def test_urls_use_the_external_base_url(self, env, client_user, monkeypatch):
+        monkeypatch.setattr(bp, 'load_config', lambda: _app_config(private=False))
+        monkeypatch.setattr(bp, 'external_base_url', lambda: 'https://astro.example.org')
+        data = client_user.get('/api/astrodex/stream/urls').get_json()
+        assert data['personal_url'].startswith('https://astro.example.org/api/astrodex/stream/')
+        assert data['shared_url'].startswith('https://astro.example.org/api/astrodex/stream/shared/')
+
+    def test_no_reachable_base_url_asks_for_the_setting(self, env, client_user, monkeypatch):
+        """Under HA ingress with no External base URL: no address that would need an HA login."""
+        monkeypatch.setattr(bp, 'load_config', lambda: _app_config(private=False))
+        monkeypatch.setattr(bp, 'external_base_url', lambda: None)
+        data = client_user.get('/api/astrodex/stream/urls').get_json()
+        assert data == {'enabled': True, 'external_base_url_required': True, 'personal_url': None, 'shared_url': None}
+
     def test_private_mode_omits_the_shared_url(self, env, client_user, monkeypatch):
         monkeypatch.setattr(bp, 'load_config', lambda: _app_config(private=True))
         data = client_user.get('/api/astrodex/stream/urls').get_json()

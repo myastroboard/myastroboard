@@ -18,7 +18,7 @@ async function fetchObjectInfo(identifier) {
     if (_objectInfoCache.has(key)) {
         return _objectInfoCache.get(key);
     }
-    const url = `/api/object/${encodeURIComponent(identifier.trim())}?lang=${encodeURIComponent(lang)}`;
+    const url = appUrl(`/api/object/${encodeURIComponent(identifier.trim())}?lang=${encodeURIComponent(lang)}`);
     const promise = fetch(url, { credentials: 'same-origin' })
         .then(resp => {
             if (resp.status >= 500) throw new Error(`HTTP ${resp.status}`);
@@ -111,7 +111,7 @@ function buildObjectInfoCardHtml(data, opts = {}) {
         const imgCol = document.createElement('div');
         imgCol.className = 'col text-center';
         const img = document.createElement('img');
-        img.src = data.image.url;
+        img.src = appUrl(data.image.url);
         img.alt = data.name || '';
         img.className = 'img-fluid rounded shadow-sm';
         img.loading = 'lazy';

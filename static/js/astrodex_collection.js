@@ -381,7 +381,7 @@ function buildCollectionCard(item) {
         img.decoding = 'async';
         // The DSS2 tile behind this URL may still need fetching from CDS server-side, so
         // the request is deferred until the card is near the viewport.
-        img.dataset.src = item.image_url;
+        img.dataset.src = appUrl(item.image_url);
         img.addEventListener('load', () => img.classList.add('is-loaded'));
         img.addEventListener('error', () => {
             img.remove();

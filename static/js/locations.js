@@ -17,8 +17,8 @@ const _locationsLeafletLoadState = { promise: null };
 function _ensureLocationsLeafletLoaded() {
     return ensureVendorScriptLoaded(
         () => typeof L !== 'undefined',
-        '/static/vendor/leaflet/dist/leaflet.min.js?v=1.9.4',
-        '/static/vendor/leaflet/dist/leaflet.min.css?v=1.9.4',
+        appUrl('/static/vendor/leaflet/dist/leaflet.min.js?v=1.9.4'),
+        appUrl('/static/vendor/leaflet/dist/leaflet.min.css?v=1.9.4'),
         _locationsLeafletLoadState,
         'Leaflet'
     );
@@ -320,7 +320,7 @@ async function deleteLocationWithConfirm(loc) {
         const runDelete = async (plansMode) => {
             try {
                 const result = await fetchJSON(
-                    `/api/locations/${encodeURIComponent(loc.id)}?plans=${plansMode}`,
+                    appUrl(`/api/locations/${encodeURIComponent(loc.id)}?plans=${plansMode}`),
                     { method: 'DELETE' }
                 );
                 if (result.status === 'success') {

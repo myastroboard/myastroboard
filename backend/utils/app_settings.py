@@ -10,6 +10,7 @@ This replaces the following environment variables that were previously required 
 
 import os
 import secrets
+from urllib.parse import urlsplit
 
 from utils.json_settings_store import get_file_mtime, load_json_settings, save_json_settings
 from utils.logging_config import VALID_LOG_LEVELS, get_logger
@@ -30,6 +31,9 @@ _DEFAULTS: dict = {
     # Log file / console levels; the LOG_LEVEL / CONSOLE_LOG_LEVEL environment variables win when set
     "log_level": "INFO",
     "console_log_level": "WARNING",
+    # Address other software reaches this instance at (Astrodex stream, MyAstroShine return
+    # address); "" = derived from the request. Required under HA ingress, whose URL needs an HA login.
+    "external_base_url": "",
 }
 
 LOG_RETENTION_MAX_DAYS = 3650
@@ -122,6 +126,28 @@ def get_log_levels() -> tuple:
         normalize_log_level(settings.get("log_level"), _DEFAULTS["log_level"]),
         normalize_log_level(settings.get("console_log_level"), _DEFAULTS["console_log_level"]),
     )
+
+
+def normalize_external_base_url(value) -> str | None:
+    """``http(s)://host[:port][/path]`` without trailing slash, ``""`` when blank, None when invalid."""
+    text = value.strip() if isinstance(value, str) else ''
+    if not text:
+        return ''
+    try:
+        parts = urlsplit(text)
+        _ = parts.port  # raises ValueError on a malformed port
+    except ValueError:
+        return None
+    if parts.scheme not in ('http', 'https') or not parts.hostname or parts.query or parts.fragment:
+        return None
+    if parts.username or parts.password:
+        return None
+    return text.rstrip('/')
+
+
+def get_external_base_url() -> str:
+    """Saved external base URL (validated), or ``""`` when unset."""
+    return normalize_external_base_url(get_app_settings().get("external_base_url")) or ''
 
 
 def reload_app_settings() -> dict:

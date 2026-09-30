@@ -95,12 +95,12 @@ const _CONNECTOR_UI = {
             { key: 'client_id',                labelKey: 'mqtt_client_id_field',        helpKey: 'mqtt_client_id_hint' },
             { key: 'tls_insecure',             labelKey: 'mqtt_tls_insecure_field',     checkbox: true },
         ],
-        statusEndpoint: '/api/connectors/mqtt/status',
+        statusEndpoint: appUrl('/api/connectors/mqtt/status'),
         statusRenderer: _mqttStatusLine,
         actions: [
-            { key: 'publish', labelKey: 'mqtt_publish_now',    icon: 'bi bi-send',  endpoint: '/api/connectors/mqtt/publish',
+            { key: 'publish', labelKey: 'mqtt_publish_now',    icon: 'bi bi-send',  endpoint: appUrl('/api/connectors/mqtt/publish'),
               successKey: 'mqtt_publish_requested' },
-            { key: 'remove',  labelKey: 'mqtt_remove_from_ha', icon: 'bi bi-trash', endpoint: '/api/connectors/mqtt/remove',
+            { key: 'remove',  labelKey: 'mqtt_remove_from_ha', icon: 'bi bi-trash', endpoint: appUrl('/api/connectors/mqtt/remove'),
               confirmKey: 'mqtt_remove_confirm', successKey: 'mqtt_remove_requested', danger: true },
         ],
     },
@@ -118,7 +118,7 @@ const _CONNECTOR_UI = {
         fieldsHelpKey: 'astrodex_stream_fields_help',
         actions: [
             { key: 'rotate', labelKey: 'astrodex_stream_rotate_keys', icon: 'bi bi-key',
-              endpoint: '/api/connectors/astrodex_stream/rotate',
+              endpoint: appUrl('/api/connectors/astrodex_stream/rotate'),
               confirmKey: 'astrodex_stream_rotate_confirm', successKey: 'astrodex_stream_rotate_done', danger: true },
         ],
     },
@@ -964,7 +964,7 @@ function _updateStatusBadge(name, state) {
 // ── Observatory dispatcher ────────────────────────────────────────────────────
 
 const _CONNECTOR_SCRIPTS = {
-    allsky: '/static/js/connectors/allsky.js',
+    allsky: appUrl('/static/js/connectors/allsky.js'),
 };
 
 const _CONNECTOR_LOADERS = {

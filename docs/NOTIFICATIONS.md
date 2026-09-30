@@ -32,6 +32,23 @@ Phase C - Web Push / background (tab may be closed)  ✅ Done
 - Push subscriptions stored per-user in `data/users.json` under `push_subscriptions[]`
 - Background scheduler (`utils/push_scheduler.py`) evaluates triggers every 5 minutes
 
+### Where notifications are available
+
+| Access | In-app (Phase A) | Web Push (Phase C) |
+|---|---|---|
+| HTTPS (reverse proxy) or `localhost` | Yes | Yes |
+| Plain HTTP (e.g. `http://192.168.1.10:5000`) | No | No |
+| Under a sub-path, e.g. the Home Assistant sidebar panel (ingress) | No | No |
+
+- **Plain HTTP**: browsers only expose notifications and service workers in a secure context.
+  The settings page shows `settings.notifications_insecure_context`.
+- **Sub-path / HA ingress**: `sw.js` and its cache list are root-scoped, and the ingress panel is
+  a frame inside Home Assistant that cannot be installed. `pwa.js` skips the service worker,
+  `notificationManager.isSupported` is false, and the settings page shows
+  `settings.notifications_subpath`. Preferences saved there still reach the server and apply to
+  the user's devices subscribed from the direct address. HA users get alerts through the MQTT
+  connector plus a Home Assistant automation (see [HOME_ASSISTANT.md](HOME_ASSISTANT.md)).
+
 ---
 
 ## Trigger IDs

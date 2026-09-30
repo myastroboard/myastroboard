@@ -23,6 +23,7 @@ from flask import Blueprint, Response, jsonify, request
 from connectors.astrodex_stream_connector import AstrodexStreamConnector
 from observation import astrodex_stream
 from utils.auth import admin_required, get_current_user, login_required
+from utils.ingress import external_base_url
 from utils.logging_config import get_logger
 from utils.repo_config import load_config
 
@@ -87,7 +88,10 @@ def get_stream_urls():
 
     config = load_config()
     private_mode = bool(config.get('astrodex', {}).get('private', False))
-    base = request.host_url.rstrip('/')
+    base = external_base_url()
+    if base is None:
+        # Under HA ingress with no External base URL set: every address would need an HA login
+        return jsonify({'enabled': True, 'external_base_url_required': True, 'personal_url': None, 'shared_url': None})
     personal_token = astrodex_stream.personal_token(user.user_id)
     payload = {
         'enabled': True,

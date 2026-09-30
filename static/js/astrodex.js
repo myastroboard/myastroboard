@@ -753,8 +753,8 @@ function renderAstrodexGrid(items, isAllowedAstrodex) {
         const isOwnedByCurrentUser = item.is_owned_by_current_user !== false;
         const mainPicture = getCardMainPicture(item);
         const imageUrl = mainPicture
-            ? `/api/astrodex/images/${mainPicture.filename}`
-            : '/static/img/default_astro_object.svg';
+            ? appUrl(`/api/astrodex/images/${mainPicture.filename}`)
+            : appUrl('/static/img/default_astro_object.svg');
 
         const photoCount = Number(item.total_pictures ?? (item.pictures ? item.pictures.length : 0));
         const canOpenSharedSlideshow = photoCount > 0;
@@ -1473,6 +1473,15 @@ async function showAstrodexStreamModal() {
     const urls = _astrodexStreamUrls || await _ensureAstrodexStreamStatus();
     if (!urls) return;
 
+    // Opened from the HA sidebar panel with no External base URL set: no usable address to show
+    if (urls.external_base_url_required) {
+        createModal(i18n.t('astrodex.stream_modal_title'), `
+            <div class="alert alert-warning mb-0">${escapeHtml(i18n.t('astrodex.stream_external_base_url_required'))}</div>
+        `, 'lg');
+        openModal('#modal_lg_close');
+        return;
+    }
+
     const sharedSection = urls.shared_url ? `
         <div class="mb-3">
             <label class="form-label fw-semibold">${i18n.t('astrodex.stream_shared_url_label')}</label>
@@ -1591,7 +1600,7 @@ function renderPicturesGrid(item) {
     }
 
     return editablePictures.map(picture => {
-        const imageUrl = `/api/astrodex/images/${picture.filename}`;
+        const imageUrl = appUrl(`/api/astrodex/images/${picture.filename}`);
         const escapedImageUrl = escapeHtml(imageUrl);
 
         // Equipment line: a linked combination wins over the free-text device
@@ -2133,7 +2142,10 @@ async function sendPictureToMyAstroShine(itemId, pictureId) {
         }
     } catch (error) {
         console.error('Error opening MyAstroShine:', error);
-        showMessage('error', i18n.t('astrodex.send_to_myastroshine_error'));
+        // 409: opened from the HA sidebar panel with no External base URL to give MyAstroShine
+        showMessage('error', i18n.t(error.status === 409
+            ? 'astrodex.send_to_myastroshine_external_base_url_required'
+            : 'astrodex.send_to_myastroshine_error'));
     }
 }
 
@@ -2435,7 +2447,7 @@ function _mountPictureSlideshow(slideshowPictures, opts) {
 
     function updateModalContent() {
         const picture = slideshowPictures[currentIndex];
-        const imageUrl = `/api/astrodex/images/${picture.filename}`;
+        const imageUrl = appUrl(`/api/astrodex/images/${picture.filename}`);
         const ownerUsername = picture.owner_username || '';
         const showOwner = !!ownerUsername && picture.is_owned_by_current_user === false;
 

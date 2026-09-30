@@ -90,7 +90,7 @@ class I18nManager {
 
         try {
             const versionQuery = this.appVersion ? `?v=${encodeURIComponent(this.appVersion)}` : '';
-            const url = `/static/i18n/${lang}.json${versionQuery}`;
+            const url = appUrl(`/static/i18n/${lang}.json${versionQuery}`);
             //console.log(`[i18n] Loading language from: ${url}`);
             const response = await fetch(url);
             if (!response.ok) {

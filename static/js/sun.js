@@ -21,7 +21,7 @@ async function loadSun() {
         const icon = document.createElement('div');
         icon.className = 'p-2';
         const sunVisual = document.createElement('img');
-        sunVisual.src = '/static/img/sun.svg';
+        sunVisual.src = appUrl('/static/img/sun.svg');
         sunVisual.alt = i18n.t('common.sun');
         sunVisual.width = 80;
         sunVisual.height = 80;

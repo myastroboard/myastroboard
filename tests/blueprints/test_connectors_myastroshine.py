@@ -446,6 +446,31 @@ def test_handoff_uses_callback_override(client_admin, env, admin_id, monkeypatch
     assert claims["callback_base"] == "http://192.168.1.9:5000"
 
 
+def test_handoff_uses_external_base_url_when_no_override(client_admin, env, admin_id, monkeypatch):
+    from blueprints import connectors_myastroshine as bp
+
+    monkeypatch.setattr(bp, "external_base_url", lambda: "https://astro.example.org")
+    item, picture = _seed(admin_id)
+    resp = client_admin.post(
+        "/api/astrodex/integration/handoff", json={"item_id": item["id"], "picture_id": picture["id"]}
+    )
+    claims = integration.verify_handoff(_cfg(), resp.get_json()["handoff"])
+    assert claims["callback_base"] == "https://astro.example.org"
+
+
+def test_handoff_409_when_no_reachable_base_url(client_admin, env, admin_id, monkeypatch):
+    """Under HA ingress with no External base URL, refuse rather than mint an unreachable callback."""
+    from blueprints import connectors_myastroshine as bp
+
+    monkeypatch.setattr(bp, "external_base_url", lambda: None)
+    item, picture = _seed(admin_id)
+    resp = client_admin.post(
+        "/api/astrodex/integration/handoff", json={"item_id": item["id"], "picture_id": picture["id"]}
+    )
+    assert resp.status_code == 409
+    assert resp.get_json()["code"] == "external_base_url_required"
+
+
 # ---------------------------------------------------------------------------
 # /source + /source/image
 # ---------------------------------------------------------------------------

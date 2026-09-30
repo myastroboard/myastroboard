@@ -9,7 +9,7 @@
    no legacy HTML-template exception applies.
    ===================================================== */
 
-const OBSERVATION_LOG_API = '/api/observation-sessions';
+const OBSERVATION_LOG_API = appUrl('/api/observation-sessions');
 const _OBS_CUSTOM_LOCATION_VALUE = '__other__';
 const _OBS_NO_COMBINATION_VALUE = '';
 
@@ -1033,7 +1033,7 @@ function _obsBuildEntryRow(session, entry) {
         thumbButton.className = 'observation-log-entry-thumb btn p-0 border-0';
         thumbButton.title = i18n.t('observation_log.view_photo');
         const thumbImg = document.createElement('img');
-        thumbImg.src = `/api/astrodex/images/${resolvedPicture.picture.filename}`;
+        thumbImg.src = appUrl(`/api/astrodex/images/${resolvedPicture.picture.filename}`);
         thumbImg.alt = entry.name || '';
         thumbImg.loading = 'lazy';
         thumbButton.appendChild(thumbImg);
@@ -2294,7 +2294,7 @@ function _obsBuildAttachmentRow(session, attachment) {
     row.className = 'list-group-item d-flex align-items-center justify-content-between gap-2';
 
     const link = document.createElement('a');
-    link.href = `/api/observation-sessions/attachments/${encodeURIComponent(attachment.filename)}`;
+    link.href = appUrl(`/api/observation-sessions/attachments/${encodeURIComponent(attachment.filename)}`);
     link.target = '_blank';
     link.rel = 'noopener';
     link.className = 'observation-log-attachment-link d-flex align-items-center gap-2 text-truncate';

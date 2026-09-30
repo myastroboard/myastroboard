@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#0b1220">
     <meta name="msapplication-TileColor" content="#0b1220">
-    <meta name="msapplication-TileImage" content="/static/ico/windows/Square150x150Logo.scale-100.png">
+    <meta name="msapplication-TileImage" content="{{ base }}/static/ico/windows/Square150x150Logo.scale-100.png">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -45,33 +45,36 @@
     {% else %}
     <meta name="robots" content="noindex, nofollow">
     {% endif %}
-    <script src="/static/js/theme.js?v={{ version }}"></script>
+    <script>window.APP_BASE = {{ base|tojson }};</script>
+    <script src="{{ base }}/static/js/theme.js?v={{ version }}"></script>
     <title data-i18n="auth.login_page_title">Login - MyAstroBoard</title>
-    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
-    <link rel="icon" type="image/png" sizes="32x32" href="/static/ico/ios/32.png?v={{ version }}">
-    <link rel="icon" type="image/png" sizes="16x16" href="/static/ico/ios/16.png?v={{ version }}">
+    <link rel="icon" type="image/svg+xml" href="{{ base }}/static/favicon.svg">
+    <link rel="icon" type="image/x-icon" href="{{ base }}/static/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ base }}/static/ico/ios/32.png?v={{ version }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ base }}/static/ico/ios/16.png?v={{ version }}">
+    {% if not base %}
     <link rel="manifest" href="/manifest.webmanifest?v={{ version }}">
-    <link rel="apple-touch-icon" sizes="180x180" href="/static/ico/ios/180.png?v={{ version }}">
-    <link href="/static/vendor/bootstrap/css/bootstrap.min.css?v={{ version }}" rel="stylesheet">
-    <link href="/static/vendor/bootstrap-icons/font/bootstrap-icons.min.css?v={{ version }}" rel="stylesheet" media="print" onload="this.media='all'">
-    <noscript><link href="/static/vendor/bootstrap-icons/font/bootstrap-icons.min.css?v={{ version }}" rel="stylesheet"></noscript>
-    <link rel="stylesheet" href="/static/css/bs_icons_custom.css?v={{ version }}">
-    <link rel="stylesheet" href="/static/css/bs_variables.css?v={{ version }}">
-    <link rel="stylesheet" href="/static/css/bs_main.css?v={{ version }}">
-    <link rel="stylesheet" href="/static/css/bs_login.css?v={{ version }}">
+    {% endif %}
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ base }}/static/ico/ios/180.png?v={{ version }}">
+    <link href="{{ base }}/static/vendor/bootstrap/css/bootstrap.min.css?v={{ version }}" rel="stylesheet">
+    <link href="{{ base }}/static/vendor/bootstrap-icons/font/bootstrap-icons.min.css?v={{ version }}" rel="stylesheet" media="print" onload="this.media='all'">
+    <noscript><link href="{{ base }}/static/vendor/bootstrap-icons/font/bootstrap-icons.min.css?v={{ version }}" rel="stylesheet"></noscript>
+    <link rel="stylesheet" href="{{ base }}/static/css/bs_icons_custom.css?v={{ version }}">
+    <link rel="stylesheet" href="{{ base }}/static/css/bs_variables.css?v={{ version }}">
+    <link rel="stylesheet" href="{{ base }}/static/css/bs_main.css?v={{ version }}">
+    <link rel="stylesheet" href="{{ base }}/static/css/bs_login.css?v={{ version }}">
 </head>
 <body class="login-page">
     <div class="login-container">
         <div class="login-header">
-            <h1><img src="/static/img/favicon-animated.svg" alt="MyAstroBoard Logo" width="48" height="48" class="login-logo-icon"> MyAstroBoard</h1>
+            <h1><img src="{{ base }}/static/img/favicon-animated.svg" alt="MyAstroBoard Logo" width="48" height="48" class="login-logo-icon"> MyAstroBoard</h1>
             <p data-i18n="auth.please_authenticate">Please log in to continue</p>
         </div>
         
         <div id="error-message" class="error-message"></div>
         <div id="success-message" class="success-message"></div>
         
-        <form id="login-form" class="login-form" method="post" action="/api/auth/login">
+        <form id="login-form" class="login-form" method="post" action="{{ base }}/api/auth/login">
             <div class="form-floating mb-3">
                 <input type="text" class="form-control" id="username" name="username" placeholder="Username" data-i18n-placeholder="users.username" required autofocus autocomplete="username">
                 <label for="username" data-i18n="users.username" id="username-label"><i class="bi bi-person-circle icon-inline" aria-hidden="true"></i>Username</label>
@@ -125,9 +128,10 @@
     </div>
 
     <!-- Bootstrap JS -->
-    <script src="/static/vendor/bootstrap/js/bootstrap.bundle.min.js?v={{ version }}"></script>
-    <script src="/static/js/i18n.js?v={{ version }}"></script>
-    <script src="/static/js/pwa.js?v={{ version }}"></script>
-    <script src="/static/js/login.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/vendor/bootstrap/js/bootstrap.bundle.min.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/api_helper.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/i18n.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/pwa.js?v={{ version }}"></script>
+    <script src="{{ base }}/static/js/login.js?v={{ version }}"></script>
 </body>
 </html>

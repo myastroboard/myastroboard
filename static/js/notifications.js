@@ -16,8 +16,8 @@ const NOTIF_TRIGGERS = Object.freeze({
     N9: 'N9', // Heads-up ahead of a meteor shower / comet visibility window's peak
 });
 
-const NOTIF_ICON = '/static/ico/android/launchericon-192x192.png';
-const NOTIF_BADGE     = '/static/ico/android/launchericon-72x72.png';
+const NOTIF_ICON = appUrl('/static/ico/android/launchericon-192x192.png');
+const NOTIF_BADGE     = appUrl('/static/ico/android/launchericon-72x72.png');
 
 const _NOTIF_DEFAULTS = Object.freeze({
     enabled:          true,
@@ -46,7 +46,9 @@ class NotificationManager {
     // ── Support & permission ─────────────────────────────────────────────
 
     get isSupported() {
-        return typeof Notification !== 'undefined';
+        // Not under a sub-path (HA ingress panel): no service worker there, and the page is
+        // a frame inside Home Assistant - see _notifPermissionBannerState() for the message.
+        return typeof Notification !== 'undefined' && !APP_BASE_PATH;
     }
 
     get permission() {
@@ -251,7 +253,7 @@ function _urlBase64ToUint8Array(base64String) {
 }
 
 async function _subscribeToPush() {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    if (APP_BASE_PATH || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
     try {
         const resp = await fetch('/api/push/vapid-public-key', { credentials: 'same-origin' });
         if (!resp.ok) return;
@@ -435,7 +437,7 @@ function _scheduleNextPoll() {
 }
 
 function startNotificationPoller() {
-    if (_notifPollTimer !== null) return;
+    if (_notifPollTimer !== null || !notificationManager.isSupported) return;
     _runNotificationChecks().then(_scheduleNextPoll);
 }
 
@@ -444,6 +446,9 @@ function startNotificationPoller() {
 // ======================
 
 function _notifPermissionBannerState() {
+    if (APP_BASE_PATH) {
+        return { cls: 'alert-info', i18n: 'settings.notifications_subpath', fallback: 'Notifications are not available when MyAstroBoard is opened from the Home Assistant sidebar.' };
+    }
     // The Notification API silently denies permission requests on insecure origins (plain
     // HTTP, not localhost) - flag this distinctly so it doesn't look like a generic "not
     // enabled yet" state that a click on Enable would fix.
@@ -765,6 +770,8 @@ function initNotificationSettingsUI() {
 
     // Test button - uses server-side push so it works on iOS PWA too
     const testBtn = document.getElementById('notif-test-btn');
+    // Nothing to test under a sub-path (HA ingress): the banner above explains why
+    if (testBtn && APP_BASE_PATH) testBtn.style.display = 'none';
     if (testBtn && !testBtn._notifBound) {
         testBtn._notifBound = true;
         testBtn.addEventListener('click', async () => {
