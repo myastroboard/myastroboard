@@ -12,6 +12,20 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixes
 
+- None.
+
+### Breaking changes
+
+- None.
+
+## 1.6.8 (2026-09-30)
+
+### Features
+
+- None.
+
+### Fixes
+
 - Home Assistant sidebar panel (ingress): requests from the Supervisor were refused (404 on every page)
   because gunicorn reports its IPv4 address in IPv6 form (`::ffff:172.30.32.2`).
 
