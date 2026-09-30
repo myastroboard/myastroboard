@@ -100,7 +100,8 @@ class IngressMiddleware:
 
         prefix = _clean_prefix(raw_prefix)
         if prefix is None:
-            logger.warning(f"Ignoring malformed X-Ingress-Path {raw_prefix!r}")
+            # Value not logged: it carries the per-install ingress token
+            logger.warning("Ignoring malformed X-Ingress-Path header")
             return self.wsgi_app(environ, start_response)
 
         environ['SCRIPT_NAME'] = prefix
