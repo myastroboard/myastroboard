@@ -8,6 +8,20 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Features
 
+- None.
+
+### Fixes
+
+- None.
+
+### Breaking changes
+
+- None.
+
+## 1.6.7 (2026-09-30)
+
+### Features
+
 - Sub-path support: MyAstroBoard runs under a path prefix (Home Assistant sidebar panel via ingress,
   or `X-Forwarded-Prefix` behind a reverse proxy), with a new *External base URL* setting.
 
