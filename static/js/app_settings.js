@@ -7,13 +7,11 @@ async function loadAppSettings() {
         const trustEl = document.getElementById('app-setting-trust-proxy');
         const secureEl = document.getElementById('app-setting-session-secure');
         const indexingEl = document.getElementById('app-setting-search-indexing');
-        const retentionEl = document.getElementById('app-setting-log-retention');
         const externalUrlEl = document.getElementById('app-setting-external-base-url');
         if (emailEl) emailEl.value = settings.vapid_contact_email || '';
         if (trustEl) trustEl.checked = !!settings.trust_proxy_headers;
         if (secureEl) secureEl.checked = !!settings.session_cookie_secure;
         if (indexingEl) indexingEl.checked = !!settings.search_engine_indexing;
-        if (retentionEl) retentionEl.value = settings.log_retention_days ?? 90;
         if (externalUrlEl) externalUrlEl.value = settings.external_base_url || '';
     } catch (err) {
         console.error('Failed to load app settings:', err);
@@ -27,14 +25,10 @@ async function saveAppSettingsNotifications() {
 
 async function saveAppSettingsPrivacy() {
     const indexing = document.getElementById('app-setting-search-indexing')?.checked ?? false;
-    const retentionEl = document.getElementById('app-setting-log-retention');
-    const partial = { search_engine_indexing: indexing };
-    if (retentionEl && retentionEl.value !== '') partial.log_retention_days = Number(retentionEl.value);
-    await _saveAppSettings(partial, 'privacy');
-    if (retentionEl) loadAppSettings(); // show the value the server kept (clamped to 0-3650)
+    await _saveAppSettings({ search_engine_indexing: indexing }, 'privacy');
 }
 
-// Log levels (Parameters -> Log export). A LOG_LEVEL / CONSOLE_LOG_LEVEL environment
+// Log levels and retention (Parameters -> Log export). A LOG_LEVEL / CONSOLE_LOG_LEVEL environment
 // variable overrides the saved level: its select is then disabled, with a note.
 const _LOG_LEVEL_FIELDS = [
     { key: 'log_level', envKey: 'log_level_env', envVar: 'LOG_LEVEL', id: 'app-setting-log-level' },
@@ -44,6 +38,8 @@ const _LOG_LEVEL_FIELDS = [
 async function loadLogLevels() {
     try {
         const settings = await fetchJSON('/api/admin/app-settings');
+        const retentionEl = document.getElementById('app-setting-log-retention');
+        if (retentionEl) retentionEl.value = settings.log_retention_days ?? 90;
         for (const field of _LOG_LEVEL_FIELDS) {
             const select = document.getElementById(field.id);
             const note = document.getElementById(`${field.id}-env`);
@@ -75,7 +71,10 @@ async function saveAppSettingsLogs() {
         const select = document.getElementById(field.id);
         if (select && !select.disabled) partial[field.key] = select.value;
     }
+    const retentionEl = document.getElementById('app-setting-log-retention');
+    if (retentionEl && retentionEl.value !== '') partial.log_retention_days = Number(retentionEl.value);
     await _saveAppSettings(partial, 'logs');
+    if (retentionEl) loadLogLevels(); // show the value the server kept (clamped to 0-3650)
 }
 
 async function saveAppSettingsProxy() {

@@ -45,7 +45,7 @@
     {% else %}
     <meta name="robots" content="noindex, nofollow">
     {% endif %}
-    <script>window.APP_BASE = {{ base|tojson }};</script>
+    <meta name="app-base" content="{{ base }}">
     <script src="{{ base }}/static/js/theme.js?v={{ version }}"></script>
     <title data-i18n="auth.login_page_title">Login - MyAstroBoard</title>
     <link rel="icon" type="image/svg+xml" href="{{ base }}/static/favicon.svg">

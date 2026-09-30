@@ -185,7 +185,7 @@ class TestPagesUnderIngress:
         assert f'href="{PREFIX}/static/css/bs_main.css' in html
         assert f'src="{PREFIX}/static/js/api_helper.js' in html
         assert f'action="{PREFIX}/api/auth/login"' in html
-        assert f'window.APP_BASE = "{PREFIX}";' in html
+        assert f'<meta name="app-base" content="{PREFIX}">' in html
         assert 'rel="manifest"' not in html
         assert '"/static/' not in html
 
@@ -194,7 +194,7 @@ class TestPagesUnderIngress:
         html = ingress_client.get('/login').get_data(as_text=True)
         assert 'href="/static/css/bs_main.css' in html
         assert 'rel="manifest"' in html
-        assert 'window.APP_BASE = "";' in html
+        assert '<meta name="app-base" content="">' in html
 
     def test_unauthenticated_root_redirects_inside_the_prefix(self, ingress_client):
         resp = ingress_client.get('/', headers=INGRESS_HEADERS, environ_base=SUPERVISOR)

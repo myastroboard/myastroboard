@@ -790,7 +790,7 @@
     "restore_success": "Sauvegarde restaurée avec succès.",
     "restore_reloading": "Rechargement...",
     "restore_failed": "Échec de la restauration de la sauvegarde.",
-    "log_level_title": "Niveau de journalisation",
+    "log_level_title": "Journalisation",
     "log_level_info": "Le niveau de journalisation détermine la quantité de détails enregistrés. Pour diagnostiquer un problème, passez le niveau du fichier de journal à DEBUG, reproduisez le problème, puis exportez les journaux ci-dessous. Les changements s'appliquent immédiatement, sans redémarrage.",
     "log_level_file_label": "Niveau du fichier de journal",
     "log_level_file_help": "Écrit dans myastroboard.log, affiché dans l'onglet Journaux et inclus dans l'export.",

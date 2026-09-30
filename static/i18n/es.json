@@ -790,7 +790,7 @@
     "restore_success": "Copia de seguridad restaurada correctamente.",
     "restore_reloading": "Recargando...",
     "restore_failed": "No se pudo restaurar la copia de seguridad.",
-    "log_level_title": "Nivel de registro",
+    "log_level_title": "Registros",
     "log_level_info": "El nivel de registro determina cuánto detalle se guarda. Para diagnosticar un problema, ponga el nivel del archivo de registro en DEBUG, reproduzca el problema y luego exporte los registros a continuación. Los cambios se aplican de inmediato, sin reiniciar.",
     "log_level_file_label": "Nivel del archivo de registro",
     "log_level_file_help": "Se escribe en myastroboard.log, se muestra en la pestaña Registros y se incluye en la exportación.",
