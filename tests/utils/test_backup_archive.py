@@ -177,3 +177,19 @@ def test_empty_archive_plan(populated):
         archive.writestr('readme.txt', 'hello')
     with zipfile.ZipFile(io.BytesIO(buf.getvalue())) as archive:
         assert backup_archive.plan_restore(archive).empty
+
+
+def test_plans_in_an_archive_are_ignored(populated):
+    """Plans are working data, never restored, even from an archive that carries them."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w') as archive:
+        archive.writestr(f'projects/{ALICE}_plan_my_night.json', '{"plan": null}')
+    with zipfile.ZipFile(io.BytesIO(buf.getvalue())) as archive:
+        assert backup_archive.plan_restore(archive).empty
+
+
+def test_backup_without_accounts_has_no_users_file(media_dirs):
+    with engine.transaction() as conn:
+        conn.execute(delete(schema.users))
+    with zipfile.ZipFile(io.BytesIO(_backup_bytes())) as archive:
+        assert 'users.json' not in archive.namelist()

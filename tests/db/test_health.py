@@ -57,3 +57,7 @@ def test_integrity_check_reports_dangling_rows():
     result = health.integrity_check()
     assert result['ok'] is False
     assert any('wishlist_items' in problem for problem in result['problems'])
+
+
+def test_missing_database_file_has_no_size(tmp_path):
+    assert health._file_size(str(tmp_path / 'absent.db')) == 0

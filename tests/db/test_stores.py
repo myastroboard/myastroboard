@@ -99,6 +99,19 @@ class TestDocuments:
         assert documents.delete_document('u-1', 'plan', 'combo-1') is True
         assert documents.get_document('u-1', 'plan', 'combo-1') is None
 
+    def test_plain_documents_and_missing_ones(self):
+        """A kind with no collection tables is stored whole; deleting what is not there reports False."""
+        users_store.upsert_users([_user()])
+        documents.put_document('u-1', 'notes', {'text': 'clear skies'})
+        documents.put_document('u-1', 'plan', {'plan': 1}, doc_key='combo-1')
+        documents.put_document('u-1', 'plan', {'plan': 2}, doc_key='combo-2')
+
+        assert documents.list_documents('plan', doc_key='combo-2') == [('u-1', 'combo-2', {'plan': 2})]
+        assert documents.delete_document('u-1', 'notes', 'other-key') is False
+        documents.delete_kind('notes')
+        assert documents.get_document('u-1', 'notes') is None
+        assert documents.delete_document('u-1', 'notes') is False
+
     def test_replace_keeps_created_at(self):
         """Replacing a document updates it but keeps its first created_at column."""
         users_store.upsert_users([_user()])
@@ -145,4 +158,10 @@ class TestUsersStore:
         """An empty batch does not bump the revision."""
         before = users_store.users_revision()
         users_store.upsert_users([])
+        assert users_store.users_revision() == before
+
+    def test_deleting_an_unknown_account(self):
+        """Deleting an account that does not exist changes nothing and reports False."""
+        before = users_store.users_revision()
+        assert users_store.delete_user('nobody') is False
         assert users_store.users_revision() == before

@@ -977,24 +977,20 @@ class UserManager:
         logger.info(f"Deleted user {username} (ID: {user_id})")
 
         # --- Cleanup astrodex pictures safely (older uploads lack the <user_id>_ prefix) ---
-        try:
-            from observation.astrodex import ASTRODEX_IMAGES_DIR
+        from observation.astrodex import ASTRODEX_IMAGES_DIR
 
-            base_images_dir = os.path.realpath(ASTRODEX_IMAGES_DIR)
-            for filename in image_filenames:
-                file_path = os.path.realpath(os.path.join(base_images_dir, filename))
+        base_images_dir = os.path.realpath(ASTRODEX_IMAGES_DIR)
+        for filename in image_filenames:
+            file_path = os.path.realpath(os.path.join(base_images_dir, filename))
 
-                if not file_path.startswith(base_images_dir + os.sep):
-                    continue
+            if not file_path.startswith(base_images_dir + os.sep):
+                continue
 
-                if os.path.exists(file_path):
-                    try:
-                        os.remove(file_path)
-                    except Exception as remove_error:
-                        logger.warning(f"Failed to delete astrodex image {filename}: {remove_error}")
-
-        except Exception as e:
-            logger.warning(f"Failed to delete astrodex pictures for user {user_id}: {e}")
+            if os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                except Exception as remove_error:
+                    logger.warning(f"Failed to delete astrodex image {filename}: {remove_error}")
 
         # Every other file (pictures, session attachments) follows the <user_id>_ naming
         removed = purge_user_files(user_id)

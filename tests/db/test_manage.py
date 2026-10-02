@@ -61,3 +61,12 @@ def test_refuses_to_run_in_maintenance(monkeypatch):
     monkeypatch.setattr(bootstrap, 'maintenance_reason', lambda: 'users.json is corrupt')
     with pytest.raises(SystemExit, match='maintenance'):
         manage.main(['status'])
+
+
+def test_status_reports_the_legacy_import(capsys):
+    from db import engine, legacy_import
+
+    with engine.transaction() as conn:
+        legacy_import._record_status(conn, 'users.json', 'abc', 'deleted')
+    assert manage.main(['status']) == 0
+    assert 'Legacy JSON import: 1 deleted' in capsys.readouterr().out
