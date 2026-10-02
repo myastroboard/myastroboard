@@ -8,6 +8,20 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Features
 
+- None.
+
+### Fixes
+
+- None.
+
+### Breaking changes
+
+- None.
+
+## 1.7.0 (2026-10-02)
+
+### Features
+
 - Footer update notice opens a *What's new* window listing the changelog entries since the installed version,
   with breaking changes gathered on top, instead of linking straight to GitHub.
 - Storage moves from JSON files to a SQLite database (`data/myastroboard.db`) with versioned schema
