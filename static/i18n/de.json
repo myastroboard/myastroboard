@@ -1997,7 +1997,21 @@
     "cache_status_valid": "Gültig",
     "cache_status_stale": "Abgelaufen",
     "cache_status_failed": "Fehler",
-    "cache_status_unknown": "-"
+    "cache_status_unknown": "-",
+    "database_title": "Datenbank",
+    "database_status": "Status",
+    "database_schema": "Schemaversion",
+    "database_schema_outdated": "{current} (erwartet {expected})",
+    "database_size": "Größe",
+    "database_journal": "Journal-Modus",
+    "database_journal_warning": "Die Datenbank kann ihr Write-Ahead-Log nicht nutzen: Das Datenverzeichnis liegt höchstwahrscheinlich auf einer Netzwerkfreigabe (NFS, SMB). Sie funktioniert trotzdem, aber langsamer; legen Sie data/ auf eine lokale Festplatte.",
+    "database_integrity": "Integrität",
+    "database_integrity_help": "Prüft, ob die Datenbankdatei intakt ist und jeder Datensatz auf vorhandene Daten verweist.",
+    "database_integrity_check": "Integrität prüfen",
+    "database_integrity_running": "Prüfung läuft...",
+    "database_integrity_ok": "Kein Problem gefunden.",
+    "database_integrity_failed": "{count} Problem(e) gefunden - stellen Sie eine Sicherung wieder her oder holen Sie Hilfe:",
+    "database_integrity_error": "Die Prüfung konnte nicht ausgeführt werden."
   },
   "equipment": {
     "combinations": "Kombinationen",

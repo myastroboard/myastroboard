@@ -612,6 +612,9 @@ function setupEventListeners() {
     document.getElementById('backup-restore-btn')?.addEventListener('click', restoreBackup);
     document.getElementById('migration-backups-report-btn')?.addEventListener('click', downloadMigrationReport);
     document.getElementById('migration-backups-delete-btn')?.addEventListener('click', deleteMigrationBackups);
+
+    // Metrics - database integrity check
+    document.getElementById('db-integrity-btn')?.addEventListener('click', runDatabaseIntegrityCheck);
     initRestoreFileInput();
 
     // Log Export

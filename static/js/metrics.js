@@ -84,6 +84,8 @@ async function loadSystemMetrics() {
         
         console.debug('Process data:', data.process);
         
+        updateDatabaseMetrics(data.database);
+
         // Update Container/VM detection
         if (data.environment) {
             updateEnvironmentMetrics(data.environment);
@@ -668,6 +670,76 @@ function updateProgressBar(elementId, percent) {
         bar.classList.add('bg-warning');
     } else {
         bar.classList.add('bg-success');
+    }
+}
+
+// Database block: schema version, size, journal mode (from /api/metrics)
+function updateDatabaseMetrics(database) {
+    const schemaEl = document.getElementById('db-schema');
+    const sizeEl = document.getElementById('db-size');
+    const journalEl = document.getElementById('db-journal');
+    const warningEl = document.getElementById('db-journal-warning');
+    if (!schemaEl || !sizeEl || !journalEl) return;
+
+    if (!database) {
+        schemaEl.textContent = i18n.t('units.na');
+        sizeEl.textContent = i18n.t('units.na');
+        journalEl.textContent = i18n.t('units.na');
+        return;
+    }
+
+    schemaEl.textContent = database.schema_up_to_date
+        ? (database.schema_revision || '-')
+        : i18n.t('metrics.database_schema_outdated', {
+            current: database.schema_revision || '-',
+            expected: database.schema_head || '-'
+        });
+    schemaEl.className = `badge ${database.schema_up_to_date ? 'bg-success' : 'bg-danger'}`;
+
+    const walPart = database.wal_size ? ` + ${formatBytes(database.wal_size)} WAL` : '';
+    sizeEl.textContent = `${formatBytes(database.size)}${walPart}`;
+
+    journalEl.textContent = (database.journal_mode || '-').toUpperCase();
+    journalEl.className = `badge ${database.wal_active ? 'bg-success' : 'bg-warning text-dark'}`;
+    if (warningEl) warningEl.classList.toggle('d-none', !!database.wal_active);
+}
+
+async function runDatabaseIntegrityCheck() {
+    const btn = document.getElementById('db-integrity-btn');
+    const resultEl = document.getElementById('db-integrity-result');
+    if (!resultEl) return;
+
+    if (btn) btn.disabled = true;
+    resultEl.className = 'small mt-2 text-muted';
+    resultEl.textContent = i18n.t('metrics.database_integrity_running');
+    try {
+        const resp = await fetch(`${API_BASE}/api/admin/database/integrity-check`, { method: 'POST' });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const result = await resp.json();
+        resultEl.replaceChildren();
+        if (result.ok) {
+            resultEl.className = 'small mt-2 text-success';
+            resultEl.textContent = i18n.t('metrics.database_integrity_ok');
+        } else {
+            resultEl.className = 'small mt-2 text-danger';
+            const title = document.createElement('div');
+            title.textContent = i18n.t('metrics.database_integrity_failed', { count: (result.problems || []).length });
+            resultEl.appendChild(title);
+            const list = document.createElement('ul');
+            list.className = 'mb-0 font-monospace';
+            (result.problems || []).forEach(problem => {
+                const item = document.createElement('li');
+                item.textContent = problem;
+                list.appendChild(item);
+            });
+            resultEl.appendChild(list);
+        }
+    } catch (error) {
+        console.error('Error checking database integrity:', error);
+        resultEl.className = 'small mt-2 text-danger';
+        resultEl.textContent = i18n.t('metrics.database_integrity_error');
+    } finally {
+        if (btn) btn.disabled = false;
     }
 }
 

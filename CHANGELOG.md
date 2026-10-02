@@ -12,6 +12,7 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   migrations; existing data is imported, verified and archived automatically on first start - see
   [docs/DATABASE.md](docs/DATABASE.md).
 - `backend/db/manage.py` command line for recovery (reset a password, disable 2FA) without editing files.
+- Parameters -> Metrics gets a Database block: schema version, size, journal mode, integrity check.
 - Parameters -> Backup / Restore shows the 1.7 upgrade archive (`data/backups/`) and deletes it once no longer needed.
 
 ### Fixes

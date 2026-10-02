@@ -1997,7 +1997,21 @@
     "cache_status_valid": "Valido",
     "cache_status_stale": "Scaduto",
     "cache_status_failed": "Errore",
-    "cache_status_unknown": "-"
+    "cache_status_unknown": "-",
+    "database_title": "Database",
+    "database_status": "Stato",
+    "database_schema": "Versione dello schema",
+    "database_schema_outdated": "{current} (attesa {expected})",
+    "database_size": "Dimensione",
+    "database_journal": "Modalità journal",
+    "database_journal_warning": "Il database non può usare il suo registro WAL: la cartella dei dati si trova molto probabilmente su una condivisione di rete (NFS, SMB). Funziona comunque, ma più lentamente; tieni data/ su un disco locale.",
+    "database_integrity": "Integrità",
+    "database_integrity_help": "Verifica che il file del database sia integro e che ogni record punti a dati esistenti.",
+    "database_integrity_check": "Verifica l'integrità",
+    "database_integrity_running": "Verifica in corso...",
+    "database_integrity_ok": "Nessun problema rilevato.",
+    "database_integrity_failed": "{count} problema/i rilevato/i - ripristina un backup o chiedi aiuto:",
+    "database_integrity_error": "Impossibile eseguire la verifica."
   },
   "equipment": {
     "combinations": "Combinazioni",

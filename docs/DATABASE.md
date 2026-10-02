@@ -61,6 +61,13 @@ secrets, VAPID keys and session key are not in it.
 For a file-level copy of the whole database, stop the container first, or copy
 `myastroboard.db` together with its `-wal` and `-shm` companions.
 
+## Diagnostics
+
+**Parameters -> Metrics -> Database** shows the schema version (and whether it matches what
+the application expects), the database size and its journal mode, with a warning when the
+write-ahead log is unavailable (data directory on a network share). **Check integrity** runs
+SQLite's integrity and foreign key checks and lists any problem found.
+
 ## Recovery from the command line
 
 Hand-editing `users.json` (lost admin password, lost authenticator) is replaced by a
