@@ -2,7 +2,7 @@
 Flask===3.1.3
 flask-compress===1.25
 flask-cors===6.0.5
-Werkzeug===3.1.8
+Werkzeug===3.1.9
 gunicorn===26.2.0
 
 # Astronomy libraries (essential)
@@ -34,7 +34,7 @@ Flask-Login===0.6.3
 pyotp===2.10.0
 
 # Storage (SQLite database + schema migrations)
-SQLAlchemy===2.1.1
+SQLAlchemy===2.1.2
 alembic===1.20.0
 
 # Version comparison
