@@ -2093,3 +2093,43 @@ def test_nested_users_writes_share_one_transaction(isolated_user_manager):
             raise RuntimeError("outer step failed")
     assert all(u["username"] != "inner" for u in users_store.get_all_users().values())
     assert isolated_user_manager.get_user_by_username("inner") is None
+
+
+class TestUsernamesIgnoreCase:
+    """One name, whatever its case: no "Emeric" next to "emeric", and either spelling signs in."""
+
+    def test_creating_a_name_that_differs_only_by_case_is_refused(self, isolated_user_manager):
+        isolated_user_manager.create_user('Emeric', 'password-1', auth.ROLE_USER)
+        with pytest.raises(ValueError, match='already exists'):
+            isolated_user_manager.create_user('eMERIC', 'password-2', auth.ROLE_USER)
+
+    def test_renaming_to_a_name_that_differs_only_by_case_is_refused(self, isolated_user_manager):
+        isolated_user_manager.create_user('Emeric', 'password-1', auth.ROLE_USER)
+        gael = isolated_user_manager.create_user('Gael', 'password-2', auth.ROLE_USER)
+        with pytest.raises(ValueError, match='already taken'):
+            isolated_user_manager.update_user(gael.user_id, username='emeric')
+
+    def test_changing_the_case_of_ones_own_name_is_allowed(self, isolated_user_manager):
+        user = isolated_user_manager.create_user('emeric', 'password-1', auth.ROLE_USER)
+        assert isolated_user_manager.update_user(user.user_id, username='Emeric').username == 'Emeric'
+
+    def test_sign_in_with_another_case(self, isolated_user_manager):
+        isolated_user_manager.create_user('Emeric', 'password-1', auth.ROLE_USER)
+        user = isolated_user_manager.authenticate('emeric', 'password-1')
+        assert user is not None and user.username == 'Emeric'
+
+    def test_older_accounts_differing_only_by_case_keep_their_exact_names(self, isolated_user_manager):
+        """Accounts from before this rule: each answers to its exact name, an ambiguous spelling to none."""
+        from db import users_store
+
+        upper = auth.User(username='Emeric', password_hash='x', role=auth.ROLE_USER)
+        lower = auth.User(username='emeric', password_hash='x', role=auth.ROLE_USER)
+        users_store.upsert_users([upper.to_dict(), lower.to_dict()])
+        manager = auth.UserManager()
+
+        assert manager.get_user_by_username('Emeric').user_id == upper.user_id
+        assert manager.get_user_by_username('emeric').user_id == lower.user_id
+        assert manager.get_user_by_username('EMERIC') is None
+
+    def test_non_text_names_never_match(self):
+        assert auth._same_username(None, 'emeric') is False

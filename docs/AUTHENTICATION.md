@@ -115,6 +115,8 @@ The **Parameters → Users** panel (admin only) allows:
 - **Create user**: username, password, role, and optionally the account scope (see
   [Local vs. global accounts](#local-vs-global-accounts)).
 - **Edit user**: change username, password, role, or account scope.
+- Usernames ignore case: "Emeric" and "emeric" are the same name, so the second cannot be created,
+  and either spelling signs in.
 - **Delete user**: removes the account **and every per-user file** (Astrodex and pictures, observation
   sessions and attachments, equipment, plans, wishlist) - see [Privacy & GDPR](PRIVACY.md).
 - **Export data**: downloads the same personal-data ZIP the user gets from *My Settings → Security →
