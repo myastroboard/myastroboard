@@ -244,10 +244,8 @@ def load_config():
     return config
 
 
-def _read_merged_config(raw=None):
-    """The stored config merged over the defaults, with legacy keys normalized (no persistence)."""
-    if raw is None:
-        raw = read_raw_config() or {}
+def _read_merged_config(raw):
+    """``raw`` (the stored config) merged over the defaults, with legacy keys normalized (no persistence)."""
     merged = _merge_defaults(raw, DEFAULT_CONFIG)
     # Strip legacy top-level 'constraints' key - constraints live exclusively
     # under skytonight.constraints from now on.

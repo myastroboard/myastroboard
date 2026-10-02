@@ -1858,3 +1858,49 @@ def test_astrodex_count_skips_junk_items_and_pictures():
         },
     )
     assert astrodex.count_pictures_for_location('L1') == 2
+
+
+def test_count_pictures_without_location_is_zero():
+    assert astrodex.count_pictures_for_location('') == 0
+
+
+def test_load_all_users_astrodex_skips_documents_that_are_not_objects():
+    documents.put_document('u1', astrodex.ASTRODEX_KIND, 'corrupt')
+    documents.put_document('u2', astrodex.ASTRODEX_KIND, {'items': []})
+    collections = astrodex.load_all_users_astrodex({'u2': 'bob'})
+    assert [collection['username'] for collection in collections] == ['bob']
+
+
+class TestOperationsOnALaterItem:
+    """Every item operation finds its target past other items, and leaves those untouched."""
+
+    @pytest.fixture
+    def items(self, temp_data_dir):
+        first = astrodex.create_astrodex_item('testuser', {'name': 'M31', 'type': 'Galaxy'})
+        second = astrodex.create_astrodex_item('testuser', {'name': 'M42', 'type': 'Nebula'})
+        picture = astrodex.add_picture_to_item('testuser', second['id'], {'filename': 'm42.jpg'})
+        astrodex.add_picture_to_item('testuser', second['id'], {'filename': 'm42-b.jpg'})
+        return first, second, picture
+
+    def test_update_item(self, items):
+        first, second, _picture = items
+        assert astrodex.update_astrodex_item('testuser', second['id'], {'notes': 'Orion'})['notes'] == 'Orion'
+        assert astrodex.get_astrodex_item('testuser', first['id']).get('notes', '') == ''
+
+    def test_delete_item(self, items):
+        first, second, _picture = items
+        assert astrodex.delete_astrodex_item('testuser', second['id'])
+        assert [item['id'] for item in astrodex.load_user_astrodex('testuser')['items']] == [first['id']]
+
+    def test_update_picture(self, items):
+        _first, second, picture = items
+        updated = astrodex.update_picture('testuser', second['id'], picture['id'], {'notes': 'clear'})
+        assert updated['notes'] == 'clear'
+
+    def test_set_main_picture(self, items):
+        _first, second, picture = items
+        assert astrodex.set_main_picture('testuser', second['id'], picture['id'])
+
+    def test_delete_picture(self, items):
+        _first, second, picture = items
+        assert astrodex.delete_picture('testuser', second['id'], picture['id'])

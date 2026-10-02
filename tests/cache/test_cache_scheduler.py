@@ -140,6 +140,21 @@ def test_stop_abandons_an_update_still_running_after_the_timeout(monkeypatch):
     assert released == [True]  # the lock is still released for the next start
 
 
+def test_stop_waits_for_an_update_that_finishes_in_time(monkeypatch):
+    """The running update ends during join(): nothing is abandoned."""
+    scheduler = module.CacheScheduler(interval_seconds=1)
+    thread = DummyThread(alive=True)
+    thread.join = lambda timeout=None: setattr(thread, '_alive', False)
+    scheduler.thread = thread
+    monkeypatch.setattr(scheduler, "_release_lock", lambda: None)
+    logged = []
+    monkeypatch.setattr(module.logger, "info", logged.append)
+
+    scheduler.stop()
+
+    assert not any('abandoning' in message for message in logged)
+
+
 def test_update_all_caches_success(monkeypatch):
     scheduler = module.CacheScheduler(interval_seconds=1)
     called = []

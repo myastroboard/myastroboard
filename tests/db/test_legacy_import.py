@@ -234,6 +234,130 @@ def test_archive_failure_stops_before_import(tmp_path, empty_db, monkeypatch):
     assert (tmp_path / 'users.json').exists()
 
 
+@pytest.mark.parametrize(
+    'users, problem',
+    [
+        ([], 'root is not an object'),
+        ({'id-a': 'admin'}, 'is not an object'),
+        ({'id-a': {'user_id': 'id-a', 'username': 'a', 'role': 'user'}}, 'lacks password_hash'),
+        ({'id-a': {'user_id': 'id-b', 'username': 'a', 'password_hash': 'x', 'role': 'user'}}, 'mismatched user_id'),
+    ],
+)
+def test_malformed_users_file_is_refused(tmp_path, users, problem):
+    """users.json is critical: any account that cannot be imported as-is stops the import."""
+    from db import legacy_sources
+
+    _write(tmp_path / 'users.json', users)
+    with pytest.raises(UnreadableDocument, match=problem):
+        legacy_sources._convert_users(str(tmp_path / 'users.json'))
+
+
+def test_unusable_optional_files_are_quarantined(tmp_path, empty_db):
+    """A non-critical setting, an empty secret key or a document whose root is not an object is set aside."""
+    _write(tmp_path / 'users.json', _users_json())
+    _write(tmp_path / 'app_settings.json', [1, 2])
+    _write(tmp_path / 'secret_key.txt', '  ')
+    _write(tmp_path / 'astrodex' / 'id-bob_astrodex.json', [])
+
+    report = legacy_import.run_if_needed(str(tmp_path))
+
+    assert report is not None and report.succeeded, report and report.failure
+    assert sorted(report.unreadable) == ['app_settings.json', 'astrodex/id-bob_astrodex.json', 'secret_key.txt']
+    assert (tmp_path / 'backups' / 'unreadable' / 'app_settings.json').exists()
+    assert _statuses()['secret_key.txt'] == 'unreadable'
+
+
+def test_document_with_its_backup_is_imported_once(tmp_path, empty_db):
+    """A document next to its .backup is one legacy file; the .backup is archived and removed with it."""
+    from db import documents
+
+    _write(tmp_path / 'users.json', _users_json())
+    _write(tmp_path / 'astrodex' / 'id-bob_astrodex.json', {'items': []})
+    _write(tmp_path / 'astrodex' / 'id-bob_astrodex.json.backup', {'items': []})
+
+    report = legacy_import.run_if_needed(str(tmp_path))
+
+    assert report is not None and report.succeeded, report and report.failure
+    assert 'astrodex/id-bob_astrodex.json' in report.imported
+    assert not (tmp_path / 'astrodex' / 'id-bob_astrodex.json.backup').exists()
+    assert documents.get_document('id-bob', 'astrodex') == {'items': []}
+
+
+def test_orphan_left_as_a_lone_backup_is_quarantined(tmp_path, empty_db):
+    """A crashed 1.6 save of an unknown user leaves only the .backup: that is what gets moved aside."""
+    _write(tmp_path / 'users.json', _users_json())
+    _write(tmp_path / 'astrodex' / 'id-ghost_astrodex.json.backup', {'items': []})
+
+    report = legacy_import.run_if_needed(str(tmp_path))
+
+    assert report is not None and report.succeeded, report and report.failure
+    assert report.orphaned == ['astrodex/id-ghost_astrodex.json']
+    assert (tmp_path / 'backups' / 'orphans' / 'astrodex' / 'id-ghost_astrodex.json.backup').exists()
+
+
+def test_files_reappearing_after_the_import_are_refused(tmp_path, empty_db):
+    """Going back to 1.6 then upgrading again: the database is never overwritten by the old files."""
+    _write(tmp_path / 'users.json', _users_json())
+    assert legacy_import.run_if_needed(str(tmp_path)).succeeded
+
+    _write(tmp_path / 'users.json', _users_json())
+    report = legacy_import.run_if_needed(str(tmp_path))
+
+    assert report is not None and not report.succeeded
+    assert 'reappeared' in (report.failure or '')
+    assert (tmp_path / 'users.json').exists()
+
+
+def test_file_gone_before_the_import_is_skipped(tmp_path, empty_db, monkeypatch):
+    """A file discovered but removed before it is read (e.g. by the operator) is simply skipped."""
+    from db import legacy_sources
+
+    missing = str(tmp_path / 'gone' / 'notes.json')
+    source = LegacySource('vanishing', lambda root: [missing], lambda path: [])
+    monkeypatch.setattr(legacy_sources, 'SOURCES', [source])
+
+    report = legacy_import.run_if_needed(str(tmp_path))
+
+    assert report is not None and report.succeeded, report and report.failure
+    assert report.imported == [] and _statuses() == {}
+    assert legacy_import.resolve_legacy_file(missing) is None
+
+
+def test_unwritable_backups_folder_fails_without_a_report(tmp_path, empty_db):
+    """When data/backups cannot be created, the import stops and only the log tells why."""
+    _write(tmp_path / 'users.json', _users_json())
+    _write(tmp_path / 'backups', 'a file where the folder should be')
+
+    report = legacy_import.run_if_needed(str(tmp_path))
+
+    assert report is not None and not report.succeeded
+    assert (tmp_path / 'users.json').exists()
+
+
+class TestArchiveVerification:
+    """The archive is read back before anything is imported; any doubt stops the import."""
+
+    @pytest.fixture
+    def legacy_file(self, tmp_path):
+        _write(tmp_path / 'users.json', _users_json())
+        return [str(tmp_path / 'users.json')]
+
+    def test_corrupt_member(self, tmp_path, legacy_file, monkeypatch):
+        monkeypatch.setattr(zipfile.ZipFile, 'testzip', lambda self: 'users.json')
+        with pytest.raises(legacy_import.LegacyImportError, match='is corrupt'):
+            legacy_import._write_archive(str(tmp_path), legacy_file)
+
+    def test_missing_member(self, tmp_path, legacy_file, monkeypatch):
+        monkeypatch.setattr(zipfile.ZipFile, 'namelist', lambda self: [])
+        with pytest.raises(legacy_import.LegacyImportError, match='does not contain every'):
+            legacy_import._write_archive(str(tmp_path), legacy_file)
+
+    def test_member_differs_from_the_original(self, tmp_path, legacy_file, monkeypatch):
+        monkeypatch.setattr(legacy_import, '_sha256', lambda path: 'not-the-hash')
+        with pytest.raises(legacy_import.LegacyImportError, match='differs from the original'):
+            legacy_import._write_archive(str(tmp_path), legacy_file)
+
+
 class TestBootstrap:
     def test_failed_import_enters_maintenance(self, tmp_path, empty_db, monkeypatch):
         """A failed import keeps the process in maintenance mode."""

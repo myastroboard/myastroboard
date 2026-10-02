@@ -495,6 +495,31 @@ def test_file_without_timestamps_falls_back_to_modification_time(tmp_path):
     assert fresh.exists()
 
 
+def test_unreadable_log_files_are_left_alone(tmp_path, monkeypatch, capsys):
+    """A file that cannot be opened, stat-ed or trimmed is skipped (reported on stderr), never fatal."""
+    import time as _time
+
+    now = _time.time()
+    log_path = tmp_path / "app.log"
+    log_path.write_text("legacy format line\n", encoding="utf-8")
+    (tmp_path / "app.log.1").write_text("legacy format line\n", encoding="utf-8")
+
+    assert module._oldest_record_time(str(tmp_path / "missing.log")) is None
+
+    def failing_getmtime(path):
+        raise OSError("stale handle")
+
+    monkeypatch.setattr(module.os.path, "getmtime", failing_getmtime)
+    assert module._trim_log_file(str(log_path), now, is_active=True) is False
+
+    def failing_trim(path, cutoff, is_active):
+        raise OSError("read-only file system")
+
+    monkeypatch.setattr(module, "_trim_log_file", failing_trim)
+    assert module._apply_retention_unlocked(str(log_path), 1, 30, now) == 0
+    assert "could not trim" in capsys.readouterr().err
+
+
 def test_emit_applies_retention_at_most_once_per_interval(tmp_path, retention_provider):
     import time as _time
 
@@ -680,3 +705,8 @@ def test_refresh_without_provider_does_nothing(level_state):
 def test_env_log_level(monkeypatch, value, expected):
     monkeypatch.setenv("LOG_LEVEL", value)
     assert module.env_log_level("LOG_LEVEL") == expected
+
+
+def test_no_retention_without_a_provider(monkeypatch):
+    monkeypatch.setattr(module, "_retention_days_provider", None)
+    assert module._current_retention_days() == 0

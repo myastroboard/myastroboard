@@ -130,6 +130,11 @@ class TestMiddleware:
         seen = _run(_supervisor_environ(HTTP_X_FORWARDED_PROTO='gopher'))
         assert seen['wsgi.url_scheme'] == 'http'
 
+    def test_missing_forwarded_host_keeps_the_host(self):
+        env = _supervisor_environ()
+        del env['HTTP_X_FORWARDED_HOST']
+        assert _run(env)['HTTP_HOST'] == 'a0d7b954-myastroboard:5000'
+
     def test_missing_forwarded_for_keeps_the_supervisor_address(self):
         env = _supervisor_environ()
         del env['HTTP_X_FORWARDED_FOR']

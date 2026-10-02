@@ -462,6 +462,21 @@ class TestAttachments:
         reloaded = observation_sessions.get_session(user_id, session['id'])
         assert reloaded['attachments'] == []
 
+    def test_delete_attachment_file_removal_error_still_removes_metadata(self, temp_data_dir, user_id, monkeypatch):
+        """A file that cannot be removed is logged; the attachment entry still goes."""
+        session = _create_session(user_id)
+        attachment = observation_sessions.add_attachment(user_id, session['id'], 'abc.jpg', 'a.jpg', 'image/jpeg')
+        observation_sessions.ensure_observation_sessions_directories()
+        with open(os.path.join(observation_sessions.attachments_dir(), 'abc.jpg'), 'wb') as file_obj:
+            file_obj.write(b'fake image bytes')
+
+        def failing_remove(path):
+            raise PermissionError('locked')
+
+        monkeypatch.setattr(observation_sessions.os, 'remove', failing_remove)
+        assert observation_sessions.delete_attachment(user_id, session['id'], attachment['id']) is True
+        assert observation_sessions.get_session(user_id, session['id'])['attachments'] == []
+
     def test_delete_attachment_missing_file_on_disk_still_removes_metadata(self, temp_data_dir, user_id):
         """The file was already gone (manual cleanup, etc.) - the metadata is still removed."""
         session = _create_session(user_id)

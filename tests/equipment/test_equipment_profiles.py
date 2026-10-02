@@ -2655,3 +2655,13 @@ class TestIndexTelescopesAndCameras:
         assert 'shared-scope' in telescopes_by_id
         assert own_camera['id'] in cameras_by_id
         assert 'shared-cam' in cameras_by_id
+
+
+def test_unreadable_equipment_loads_as_empty(temp_data_dir, test_user_id, monkeypatch):
+    """A database error while reading equipment is logged and the user sees an empty list."""
+
+    def failing_get(*args, **kwargs):
+        raise OSError('db locked')
+
+    monkeypatch.setattr(equipment_profiles.documents, 'get_document', failing_get)
+    assert equipment_profiles._load_equipment_document(test_user_id, 'telescopes') is None

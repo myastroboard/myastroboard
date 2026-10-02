@@ -271,6 +271,10 @@ class TestIconAndImportanceMapping:
 class TestPlanetaryEventLocalization:
     """Tests for planetary event localization."""
 
+    def test_moon_conjunction_names_the_planet(self, aggregator):
+        event_data = {"event_type": "Moon Conjunction", "raw_data": {"planet1": "Moon", "planet2": "Saturn"}}
+        assert aggregator._raw_planet_fields(event_data) == ("Saturn", None)
+
     def test_localize_conjunction(self, aggregator):
         """Test localizing conjunction event."""
         event_data = {

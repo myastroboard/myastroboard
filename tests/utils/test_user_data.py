@@ -126,6 +126,37 @@ class TestExport:
         archive_file.close()
         assert '/' not in download_name and ' ' not in download_name
 
+    def test_skips_what_cannot_be_exported(self, data_dirs, monkeypatch):
+        """Unknown document kinds, unsafe or missing pictures and a failing location lookup are left out."""
+
+        def failing_locations(config, user):
+            raise RuntimeError('config unreadable')
+
+        monkeypatch.setattr('utils.repo_config.get_locations_for_user', failing_locations)
+        alice = _user()
+        uid = alice.user_id
+        pictures = [{'filename': f'{uid}_photo.jpg'}, {'filename': '../secret.jpg'}, {'filename': 'missing.jpg'}]
+        documents.put_document(uid, 'astrodex', {'items': [{'id': 'i', 'name': 'M 42', 'pictures': pictures}]})
+        documents.put_document(uid, 'notes', {'text': 'not a known kind'})
+
+        archive_file, _name = user_data.build_user_export(alice)
+        try:
+            with zipfile.ZipFile(archive_file) as archive:
+                names = set(archive.namelist())
+                locations = json.loads(archive.read('locations.json'))
+        finally:
+            archive_file.close()
+
+        assert names == {'README.txt', 'account.json', 'locations.json', f'astrodex/{uid}_astrodex.json'}
+        assert locations == []
+
+    def test_unreadable_astrodex_exports_no_legacy_picture(self, data_dirs, monkeypatch):
+        def failing_load(user_id):
+            raise OSError('database locked')
+
+        monkeypatch.setattr('observation.astrodex.load_user_astrodex', failing_load)
+        assert user_data._legacy_astrodex_pictures(str(uuid.uuid4())) == []
+
 
 # ---------------------------------------------------------------------------
 # Guard: every per-user store must be covered by user_data_dirs()

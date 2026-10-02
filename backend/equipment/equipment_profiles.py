@@ -375,12 +375,12 @@ def load_all_shared_equipment(equipment_type: str, exclude_user_id: str) -> List
 
     shared_items: List[Dict] = []
     try:
+        # Only object rows carry is_shared, so every item here is a dict
         for owner_id, item in queries.shared_equipment(equipment_type, exclude_user_id):
-            if isinstance(item, dict):
-                annotated = dict(item)
-                annotated['owner_id'] = owner_id
-                annotated['owner_username'] = user_map.get(owner_id, owner_id)
-                shared_items.append(annotated)
+            annotated = dict(item)
+            annotated['owner_id'] = owner_id
+            annotated['owner_username'] = user_map.get(owner_id, owner_id)
+            shared_items.append(annotated)
     except Exception as e:
         logger.error(f"Error scanning shared equipment ({equipment_type}): {e}")
 

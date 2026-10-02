@@ -1071,6 +1071,13 @@ class TestPersonalDataExport:
     def test_requires_a_session(self, client):
         assert client.get('/api/users/me/export').status_code == 401
 
+    def test_session_of_a_deleted_account_is_refused(self, client, security_settings, make_user):
+        user, password, _ = make_user()
+        login(client, user.username, password)
+        auth_mod.user_manager.delete_user(user.user_id)
+
+        assert client.get('/api/users/me/export').status_code == 401
+
     def test_admin_exports_another_user(self, client_admin, security_settings, make_user):
         user, _, _ = make_user()
 

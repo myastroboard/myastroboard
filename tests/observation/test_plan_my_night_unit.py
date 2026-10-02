@@ -798,6 +798,41 @@ class TestClearAllPlans:
             deleted = plan_my_night.clear_all_plans(uid)
         assert deleted == 0  # Nothing deleted due to error
 
+    def test_plans_already_gone_are_not_counted(self, temp_plan_dir, monkeypatch):
+        """Another worker deleted the plan first: nothing to count, nothing to log as an error."""
+        uid = "ffff0003-0000-4000-8000-000000000000"
+        save_user_plan(uid, {'user_id': uid, 'plan': None}, username="user")
+        monkeypatch.setattr(plan_my_night.documents, 'delete_document', lambda *args: False)
+        monkeypatch.setattr(plan_my_night.queries, 'plans_for_location', lambda location_id: [(uid, 'default')])
+
+        assert plan_my_night.clear_all_plans(uid) == 0
+        assert plan_my_night.delete_plans_for_location('loc-1') == 0
+
+
+class TestPurgeLegacyTelescopePlans:
+    UID = "ffff0004-0000-4000-8000-000000000000"
+
+    @pytest.fixture
+    def legacy_plan(self, temp_plan_dir):
+        plan_my_night.documents.put_document(
+            self.UID, plan_my_night.PLAN_KIND, {'user_id': self.UID, 'plan': {'telescope_id': 't1'}}, 'default'
+        )
+
+    def test_purges_telescope_keyed_plans(self, legacy_plan):
+        assert plan_my_night.purge_legacy_telescope_plans() == 1
+        assert plan_my_night.list_user_plan_combination_ids(self.UID) == []
+
+    def test_plan_already_gone_is_not_counted(self, legacy_plan, monkeypatch):
+        monkeypatch.setattr(plan_my_night.documents, 'delete_document', lambda *args: False)
+        assert plan_my_night.purge_legacy_telescope_plans() == 0
+
+    def test_delete_error_is_logged_not_raised(self, legacy_plan, monkeypatch):
+        def failing_delete(*args):
+            raise OSError('db locked')
+
+        monkeypatch.setattr(plan_my_night.documents, 'delete_document', failing_delete)
+        assert plan_my_night.purge_legacy_telescope_plans() == 0
+
 
 # ============================================================
 # remove_target - edge cases

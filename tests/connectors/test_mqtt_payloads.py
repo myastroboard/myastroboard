@@ -177,6 +177,11 @@ class TestAssembly:
         assert "'latest_version': value_json.latest_version" in spec["val_tpl"]
         assert spec["val_tpl"].strip().endswith("| tojson }}")
 
+    def test_update_spec_minimal(self):
+        """Without release URL, icon or diagnostic flag, none of those keys is published."""
+        _key, spec = mp.update("update", "Update", installed_version_key="v", latest_version_key="latest")
+        assert not {"rel_u", "ic", "ent_cat"} & set(spec)
+
     def test_assemble_builds_a_complete_device_discovery(self):
         connector = _connector()
         device = mp._assemble(

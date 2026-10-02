@@ -1152,25 +1152,22 @@ class TestDeleteUserAstrodexCleanup:
         assert not img_file.exists()
         assert not img_file2.exists()
 
-    def test_delete_user_astrodex_file_read_error_logged(self, isolated_user_manager, tmp_path, monkeypatch):
-        """Covers exception when reading astrodex file."""
+    def test_delete_user_astrodex_read_error_logged(self, isolated_user_manager, tmp_path, monkeypatch):
+        """An Astrodex that cannot be read does not block the account deletion (no picture to remove)."""
         manager = isolated_user_manager
         admin = manager.get_user_by_username(auth.DEFAULT_ADMIN_USERNAME)
         alice = manager.create_user('alice', 'pass', auth.ROLE_USER)
         user_id = alice.user_id
 
-        astrodex_dir = tmp_path / 'astrodex'
         images_dir = tmp_path / 'astrodex_images'
-        astrodex_dir.mkdir()
         images_dir.mkdir()
-
-        # Write invalid JSON to astrodex file
-        documents.put_document(user_id, 'astrodex', 'corrupt')
-
-        monkeypatch.setattr('observation.astrodex.ASTRODEX_DIR', str(astrodex_dir))
         monkeypatch.setattr('observation.astrodex.ASTRODEX_IMAGES_DIR', str(images_dir))
 
-        # Should not raise
+        def failing_load(_user_id):
+            raise OSError('database locked')
+
+        monkeypatch.setattr('observation.astrodex.load_user_astrodex', failing_load)
+
         manager.delete_user(user_id, current_user_id=admin.user_id)
         assert manager.get_user_by_id(user_id) is None
 
@@ -1467,41 +1464,6 @@ class TestUpdateUserPreferencesMergedValidation:
 
         with pytest.raises(ValueError, match='merged validation failed'):
             manager.update_user_preferences(user.user_id, {'theme_mode': 'dark'})
-
-
-class TestDeleteUserPathConfinement:
-    """Covers path confinement check raises ValueError."""
-
-    def test_delete_user_path_confinement_check(self, isolated_user_manager, tmp_path, monkeypatch):
-        """Covers astrodex_file not within base_astrodex_dir → ValueError → caught."""
-        manager = isolated_user_manager
-        admin = manager.get_user_by_username(auth.DEFAULT_ADMIN_USERNAME)
-        alice = manager.create_user('alice', 'pass', auth.ROLE_USER)
-        user_id = alice.user_id
-
-        # Create dirs
-        astrodex_dir = tmp_path / 'astrodex'
-        images_dir = tmp_path / 'astrodex_images'
-        astrodex_dir.mkdir()
-        images_dir.mkdir()
-
-        monkeypatch.setattr('observation.astrodex.ASTRODEX_DIR', str(astrodex_dir))
-        monkeypatch.setattr('observation.astrodex.ASTRODEX_IMAGES_DIR', str(images_dir))
-
-        # Patch os.path.normpath to return a path outside the base dir
-        original_normpath = os.path.normpath
-
-        def patched_normpath(path):
-            if '_astrodex.json' in str(path):
-                # Return a path outside the astrodex dir
-                return str(tmp_path / 'outside_astrodex.json')
-            return original_normpath(path)
-
-        monkeypatch.setattr(os.path, 'normpath', patched_normpath)
-
-        # Should not raise - ValueError is caught by outer except
-        manager.delete_user(user_id, current_user_id=admin.user_id)
-        assert manager.get_user_by_id(user_id) is None
 
 
 class TestDeleteUserImageTraversalGuard:
