@@ -229,3 +229,197 @@ def test_check_for_updates_unexpected_exception(monkeypatch):
 
     assert result["error"] == "Internal error"
     assert result["update_available"] is False
+
+
+_SAMPLE_CHANGELOG = """# Changelog
+
+Intro text with a [link](https://keepachangelog.com/).
+
+## [Unreleased]
+
+### Features
+
+- Unreleased work that must never be shown.
+
+## 1.3.0 (2026-03-10)
+
+### Features
+
+- New dashboard, see
+  [docs/DASH.md](docs/DASH.md) for details.
+- Second feature with `code`.
+
+### Fixes
+
+- None.
+
+### Breaking changes
+
+- Config file moved.
+
+## 1.2.0 (2026-03-01)
+
+### Features
+
+- None.
+
+### Fixes
+
+- Fixed a crash.
+
+### Breaking changes
+
+- None.
+
+## 1.1.0 (2026-02-01)
+
+### Fixes
+
+- Already installed, must be excluded.
+
+## 0.1.0 to 0.7.9 - Early development (2026-02-04 to 2026-05-24)
+
+- Ignored legacy block.
+"""
+
+
+def test_parse_changelog_keeps_only_versions_between_installed_and_latest():
+    releases = module.parse_changelog(_SAMPLE_CHANGELOG, "1.1.0", "1.3.0", "v1.3.0")
+
+    assert [r["version"] for r in releases] == ["1.3.0", "1.2.0"]
+    assert releases[0]["date"] == "2026-03-10"
+
+
+def test_parse_changelog_joins_wrapped_bullets_and_drops_none_placeholders():
+    latest, previous = module.parse_changelog(_SAMPLE_CHANGELOG, "1.1.0", "1.3.0", "v1.3.0")
+
+    assert latest["features"][0].startswith("New dashboard, see [docs/DASH.md](")
+    assert latest["features"][0].endswith(") for details.")
+    assert latest["features"][1] == "Second feature with `code`."
+    assert latest["fixes"] == []
+    assert latest["breaking"] == ["Config file moved."]
+    assert previous["features"] == []
+    assert previous["fixes"] == ["Fixed a crash."]
+    assert previous["breaking"] == []
+
+
+def test_parse_changelog_points_relative_links_at_the_release_tag():
+    latest = module.parse_changelog(_SAMPLE_CHANGELOG, "1.2.0", "1.3.0", "v1.3.0")[0]
+
+    assert "(https://github.com/myastroboard/myastroboard/blob/v1.3.0/docs/DASH.md)" in latest["features"][0]
+
+
+def test_parse_changelog_never_returns_unreleased_or_newer_than_latest():
+    releases = module.parse_changelog(_SAMPLE_CHANGELOG, "1.1.0", "1.2.0", "v1.2.0")
+
+    assert [r["version"] for r in releases] == ["1.2.0"]
+    assert all("Unreleased" not in entry for r in releases for entry in r["features"])
+
+
+def test_parse_changelog_caps_the_number_of_releases(monkeypatch):
+    monkeypatch.setattr(module, "CHANGELOG_MAX_RELEASES", 1)
+
+    releases = module.parse_changelog(_SAMPLE_CHANGELOG, "1.0.0", "1.3.0", "v1.3.0")
+
+    assert [r["version"] for r in releases] == ["1.3.0"]
+
+
+def test_fetch_release_changes_success(monkeypatch):
+    calls = []
+
+    def _get(url, **_kwargs):
+        calls.append(url)
+        return SimpleNamespace(status_code=200, text=_SAMPLE_CHANGELOG)
+
+    monkeypatch.setattr(module.requests, "get", _get)
+
+    releases = module.fetch_release_changes("1.2.0", "1.3.0", "v1.3.0")
+
+    assert calls == ["https://raw.githubusercontent.com/myastroboard/myastroboard/v1.3.0/CHANGELOG.md"]
+    assert [r["version"] for r in releases] == ["1.3.0"]
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        SimpleNamespace(status_code=404, text=""),
+        SimpleNamespace(status_code=200, text="x" * (module.CHANGELOG_MAX_BYTES + 1)),
+    ],
+)
+def test_fetch_release_changes_returns_none_on_bad_response(monkeypatch, response):
+    monkeypatch.setattr(module.requests, "get", lambda *_args, **_kwargs: response)
+
+    assert module.fetch_release_changes("1.2.0", "1.3.0", "v1.3.0") is None
+
+
+def test_fetch_release_changes_returns_none_on_network_error(monkeypatch):
+    def _raise(*_args, **_kwargs):
+        raise requests.Timeout("timeout")
+
+    monkeypatch.setattr(module.requests, "get", _raise)
+
+    assert module.fetch_release_changes("1.2.0", "1.3.0", "v1.3.0") is None
+
+
+def test_fetch_release_changes_rejects_unexpected_tag_without_fetching(monkeypatch):
+    monkeypatch.setattr(
+        module.requests, "get", lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("should not fetch"))
+    )
+
+    assert module.fetch_release_changes("1.2.0", "1.3.0", "../../evil") is None
+    assert module.fetch_release_changes("1.2.0", "1.3.0", "") is None
+
+
+def test_check_for_updates_includes_changes_when_update_available(monkeypatch):
+    class ReleaseResponse:
+        status_code = 200
+
+        @staticmethod
+        def raise_for_status():
+            return None
+
+        @staticmethod
+        def json():
+            return {"tag_name": "v1.3.0", "html_url": "https://example/1.3.0", "name": "", "published_at": ""}
+
+    def _get(url, **_kwargs):
+        if url.endswith("CHANGELOG.md"):
+            return SimpleNamespace(status_code=200, text=_SAMPLE_CHANGELOG)
+        return ReleaseResponse()
+
+    monkeypatch.setattr(module.cache_store, "is_cache_valid", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(module, "get_repo_version", lambda: "1.1.0")
+    monkeypatch.setattr(module.cache_store, "update_shared_cache_entry", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(module.requests, "get", _get)
+
+    result = module.check_for_updates()
+
+    assert result["update_available"] is True
+    assert [r["version"] for r in result["changes"]] == ["1.3.0", "1.2.0"]
+
+
+def test_check_for_updates_skips_changelog_when_up_to_date(monkeypatch):
+    class ReleaseResponse:
+        status_code = 200
+
+        @staticmethod
+        def raise_for_status():
+            return None
+
+        @staticmethod
+        def json():
+            return {"tag_name": "v1.3.0", "html_url": "", "name": "", "published_at": ""}
+
+    def _get(url, **_kwargs):
+        assert not url.endswith("CHANGELOG.md"), "changelog must not be fetched without an update"
+        return ReleaseResponse()
+
+    monkeypatch.setattr(module.cache_store, "is_cache_valid", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(module, "get_repo_version", lambda: "1.3.0")
+    monkeypatch.setattr(module.cache_store, "update_shared_cache_entry", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(module.requests, "get", _get)
+
+    result = module.check_for_updates()
+
+    assert result["update_available"] is False
+    assert result["changes"] is None

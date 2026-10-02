@@ -96,7 +96,7 @@ receives account data, but some receive coordinates or the user's IP address.
 | Esri ArcGIS map tiles (USA) | The browser's IP + the map area viewed | Browser | Background of the maps (locations, photo map) |
 | Browser push services (Google FCM, Mozilla, Apple) | An opaque notification payload | Server | Web Push, only for users who enabled notifications |
 | CelesTrak, The Space Devs, NOAA SWPC, JPL, Minor Planet Center, CDS Strasbourg, wheretheiss.at | Nothing personal | Server | Satellites, launches, space weather, ephemerides, object images |
-| GitHub | Nothing personal | Server | Check for new releases |
+| GitHub | Nothing personal | Server | Check for new releases and download their changelog |
 | MyMemory | Public spaceflight texts only | Server | On-demand translation of launch descriptions |
 
 Optional integrations send data only when an administrator enables them:

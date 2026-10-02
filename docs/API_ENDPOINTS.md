@@ -95,7 +95,9 @@ This page lists the HTTP routes currently declared across `backend/blueprints/*.
 - `GET /health`
 - `GET /api/cache`
 - `GET /api/version`
-- `GET /api/version/check-updates`
+- `GET /api/version/check-updates` - latest GitHub release (cached 4 h). When an update is available, `changes` lists the
+  CHANGELOG.md sections between the installed and the latest version (`version`, `date`, `features`, `fixes`, `breaking`;
+  newest first), or is `null` when the changelog could not be fetched.
 - `GET /api/catalogues`
 
 ## Scheduler

@@ -3282,8 +3282,9 @@
             </div>
             <div class="footer-section footer-update">
                 <span id="update-notification" class="text-light" style="display: none;">
-                    <i class="bi bi-stars icon-inline" aria-hidden="true"></i>
-                    <span data-i18n="common.update_available">A new version is available!</span> <a id="update-link" href="#" class="link-light link-offset-2 link-underline-opacity-25 link-underline-opacity-100-hover"></a>
+                    <span class="footer-update-dot" aria-hidden="true"></span>
+                    <span id="update-text"></span>
+                    <button type="button" id="update-whats-new-btn" class="footer-update-btn" data-i18n="whats_new.footer_link">See what's new</button>
                 </span>
             </div>
             <div class="footer-section footer-actions">
@@ -3584,6 +3585,33 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body weather-alerts-modal-body" id="weather-alerts-modal-body"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- What's new: changes between the installed and the latest release - body built by app.js -->
+    <div class="modal fade" id="whats-new-modal" tabindex="-1" aria-labelledby="whats-new-modal-title" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div class="whats-new-heading">
+                        <div class="whats-new-icon"><i class="bi bi-stars" aria-hidden="true"></i></div>
+                        <div class="whats-new-heading-text">
+                            <h5 class="modal-title mb-0" id="whats-new-modal-title" data-i18n="whats_new.title">A new version is available</h5>
+                            <div class="whats-new-range" id="whats-new-range"></div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="whats-new-modal-body"></div>
+                <div class="modal-footer">
+                    <a id="whats-new-release-link" class="btn btn-outline-secondary btn-sm" href="https://github.com/myastroboard/myastroboard/releases/latest" target="_blank" rel="noopener noreferrer">
+                        <i class="bi bi-github" aria-hidden="true"></i>
+                        <span data-i18n="whats_new.release_link">See the release on GitHub</span>
+                        <i class="bi bi-box-arrow-up-right icon-xs" aria-hidden="true"></i>
+                    </a>
+                    <button type="button" class="btn btn-primary btn-sm" data-bs-dismiss="modal" data-i18n="common.close">Close</button>
+                </div>
             </div>
         </div>
     </div>

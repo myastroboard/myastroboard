@@ -354,6 +354,204 @@ label,
     text-align: center;
 }
 
+.footer-update-dot {
+    display: inline-block;
+    width: 0.5rem;
+    height: 0.5rem;
+    margin-right: 0.35rem;
+    border-radius: 50%;
+    vertical-align: middle;
+    background: var(--accent-2);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-2) 25%, transparent);
+}
+
+.footer-update-btn {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+}
+
+/* Middle-dot separator after the "vX.Y.Z is available" text, kept out of the underline */
+.footer-update-btn::before {
+    content: "\00B7";
+    display: inline-block;
+    margin: 0 0.4rem 0 0.15rem;
+    text-decoration: none;
+}
+
+.footer-update-btn:hover,
+.footer-update-btn:focus-visible {
+    text-decoration-color: currentColor;
+}
+
+/* What's new modal (changes between the installed and the latest release) */
+.whats-new-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    min-width: 0;
+}
+
+.whats-new-heading-text {
+    min-width: 0;
+}
+
+.whats-new-icon {
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    background: var(--accent-gradient);
+    color: var(--text-light);
+    font-size: 1.2rem;
+}
+
+.whats-new-range {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    margin-top: 0.15rem;
+    font-size: 0.85rem;
+}
+
+.whats-new-range-count {
+    opacity: 0.75;
+}
+
+.whats-new-release {
+    border: 1px solid var(--surface-border-strong);
+    border-radius: var(--border-radius-card);
+    background: var(--surface-elevated);
+}
+
+.whats-new-release + .whats-new-release {
+    margin-top: 0.65rem;
+}
+
+.whats-new-release > summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 0.85rem;
+    cursor: pointer;
+    list-style: none;
+}
+
+.whats-new-release > summary::-webkit-details-marker {
+    display: none;
+}
+
+.whats-new-release > summary::before {
+    content: "\F285"; /* bi-chevron-right */
+    font-family: bootstrap-icons;
+    font-size: 0.8rem;
+    opacity: 0.7;
+    transition: transform 0.2s;
+}
+
+.whats-new-release[open] > summary::before {
+    transform: rotate(90deg);
+}
+
+.whats-new-release > summary:focus-visible {
+    outline: 2px solid var(--accent-1);
+    outline-offset: 2px;
+    border-radius: var(--border-radius-card);
+}
+
+.whats-new-version {
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.whats-new-date {
+    font-size: 0.8rem;
+    opacity: 0.7;
+    font-variant-numeric: tabular-nums;
+}
+
+.whats-new-counts {
+    display: flex;
+    gap: 0.3rem;
+    margin-left: auto;
+}
+
+.whats-new-release-body {
+    display: grid;
+    gap: 0.6rem;
+    padding: 0 0.85rem 0.75rem 2.05rem;
+}
+
+.whats-new-group-title {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-bottom: 0.2rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+}
+
+.whats-new-group-title.is-feature {
+    color: var(--success-700);
+}
+
+.whats-new-group-title.is-fix {
+    color: var(--accent-1);
+}
+
+html[data-theme="dark"] .whats-new-group-title.is-feature,
+html[data-theme="red"] .whats-new-group-title.is-feature {
+    color: var(--success-500);
+}
+
+.whats-new-list {
+    display: grid;
+    gap: 0.25rem;
+    margin: 0;
+    padding-left: 1.1rem;
+    font-size: 0.9rem;
+    line-height: 1.45;
+}
+
+.whats-new-list code {
+    font-size: 0.82em;
+}
+
+.whats-new-breaking {
+    font-size: 0.9rem;
+}
+
+.whats-new-breaking .whats-new-list {
+    margin-top: 0.35rem;
+}
+
+.whats-new-howto {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.4rem;
+    margin-top: 0.85rem;
+    font-size: 0.82rem;
+    opacity: 0.85;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .whats-new-release > summary::before {
+        transition: none;
+    }
+}
+
 .footer-actions {
     flex: 1 1 auto;
     min-width: 0;
