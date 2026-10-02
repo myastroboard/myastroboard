@@ -1997,7 +1997,21 @@
     "cache_status_valid": "Valid",
     "cache_status_stale": "Stale",
     "cache_status_failed": "Failed",
-    "cache_status_unknown": "-"
+    "cache_status_unknown": "-",
+    "database_title": "Database",
+    "database_status": "Status",
+    "database_schema": "Schema version",
+    "database_schema_outdated": "{current} (expected {expected})",
+    "database_size": "Size",
+    "database_journal": "Journal mode",
+    "database_journal_warning": "The database cannot use its write-ahead log: the data directory is most likely on a network share (NFS, SMB). It still works, but slower; keep data/ on a local disk.",
+    "database_integrity": "Integrity",
+    "database_integrity_help": "Checks that the database file is sound and that every record points to existing data.",
+    "database_integrity_check": "Check integrity",
+    "database_integrity_running": "Checking...",
+    "database_integrity_ok": "No problem found.",
+    "database_integrity_failed": "{count} problem(s) found - restore a backup or contact support:",
+    "database_integrity_error": "The check could not be run."
   },
   "equipment": {
     "combinations": "Combinations",

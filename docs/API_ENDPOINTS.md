@@ -76,6 +76,7 @@ This page lists the HTTP routes currently declared across `backend/blueprints/*.
 
 - `GET /api/backup/download` - Download a ZIP archive (config.json, app_settings.json, users.json, astrodex/, equipments/, observation_sessions/, wishlist/), built from the database
 - `POST /api/backup/restore` - Restore from a previously created backup ZIP (`multipart/form-data`, field `file`)
+- `POST /api/admin/database/integrity-check` (admin) - Run SQLite's integrity and foreign key checks (`{ok, problems}`)
 - `GET /api/admin/migration-backups` (admin) - What the 1.7 upgrade left in `data/backups/` (archive, reports, files set aside, size)
 - `GET /api/admin/migration-backups/report` (admin) - Download the newest import report
 - `DELETE /api/admin/migration-backups` (admin) - Delete the upgrade archive, reports and files set aside (irreversible)

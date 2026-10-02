@@ -4,7 +4,7 @@ import os
 from typing import Any, Dict
 
 from db import migrate
-from db.engine import database_path, read
+from db.engine import get_engine, read
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -22,7 +22,7 @@ def _file_size(path: str) -> int:
 
 def database_status() -> Dict[str, Any]:
     """Schema version, size and journal mode - cheap enough for the Metrics auto-refresh."""
-    path = database_path()
+    path = str(get_engine().url.database or '')
     current = migrate.current_revision()
     head = migrate.head_revision()
     with read() as conn:

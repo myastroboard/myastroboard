@@ -1997,7 +1997,21 @@
     "cache_status_valid": "Válido",
     "cache_status_stale": "Expirado",
     "cache_status_failed": "Falhou",
-    "cache_status_unknown": "-"
+    "cache_status_unknown": "-",
+    "database_title": "Base de dados",
+    "database_status": "Estado",
+    "database_schema": "Versão do esquema",
+    "database_schema_outdated": "{current} (esperada {expected})",
+    "database_size": "Tamanho",
+    "database_journal": "Modo de diário",
+    "database_journal_warning": "A base de dados não consegue usar o seu registo WAL: a pasta de dados está muito provavelmente numa partilha de rede (NFS, SMB). Continua a funcionar, mas mais devagar; mantenha data/ num disco local.",
+    "database_integrity": "Integridade",
+    "database_integrity_help": "Verifica se o ficheiro da base de dados está íntegro e se cada registo aponta para dados existentes.",
+    "database_integrity_check": "Verificar integridade",
+    "database_integrity_running": "A verificar...",
+    "database_integrity_ok": "Nenhum problema encontrado.",
+    "database_integrity_failed": "{count} problema(s) encontrado(s) - restaure uma cópia de segurança ou peça ajuda:",
+    "database_integrity_error": "Não foi possível executar a verificação."
   },
   "equipment": {
     "combinations": "Combinações",

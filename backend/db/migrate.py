@@ -5,6 +5,7 @@ the working directory.
 """
 
 import os
+from functools import lru_cache
 from typing import Optional
 
 from alembic import command
@@ -28,8 +29,9 @@ def alembic_config() -> Config:
     return config
 
 
+@lru_cache(maxsize=1)
 def head_revision() -> Optional[str]:
-    """The newest revision shipped with this version of the application."""
+    """The newest revision shipped with this version of the application (fixed for the process)."""
     return ScriptDirectory.from_config(alembic_config()).get_current_head()
 
 

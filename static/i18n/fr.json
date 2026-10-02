@@ -1997,7 +1997,21 @@
     "cache_status_valid": "Valide",
     "cache_status_stale": "Expiré",
     "cache_status_failed": "Échec",
-    "cache_status_unknown": "-"
+    "cache_status_unknown": "-",
+    "database_title": "Base de données",
+    "database_status": "État",
+    "database_schema": "Version du schéma",
+    "database_schema_outdated": "{current} (attendue {expected})",
+    "database_size": "Taille",
+    "database_journal": "Mode de journal",
+    "database_journal_warning": "La base de données ne peut pas utiliser son journal WAL : le dossier de données est très probablement sur un partage réseau (NFS, SMB). Elle fonctionne quand même, mais plus lentement ; gardez data/ sur un disque local.",
+    "database_integrity": "Intégrité",
+    "database_integrity_help": "Vérifie que le fichier de la base est sain et que chaque enregistrement pointe vers des données existantes.",
+    "database_integrity_check": "Vérifier l'intégrité",
+    "database_integrity_running": "Vérification...",
+    "database_integrity_ok": "Aucun problème détecté.",
+    "database_integrity_failed": "{count} problème(s) détecté(s) - restaurez une sauvegarde ou demandez de l'aide :",
+    "database_integrity_error": "La vérification n'a pas pu être lancée."
   },
   "equipment": {
     "combinations": "Combinaisons",
