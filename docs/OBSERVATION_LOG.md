@@ -276,10 +276,8 @@ independent upload paths into two different places, on purpose.
   file is owned entirely by its session, so `delete_session()` removes them from disk before removing
   the session record. A missing file on disk (already cleaned up by other means) doesn't block the
   deletion - only logged.
-- **Already covered by the admin backup ZIP with zero extra code**: `data/observation_sessions/` was
-  already a full recursive entry in `admin.py`'s `BACKUP_ENTRIES`/`RESTORE_ALLOWED_PREFIXES` before
-  attachments existed, so the new `attachments/` subdirectory is picked up automatically. Verified with
-  an actual backup → delete → restore round trip in the test suite, not just assumed.
+- **Covered by the admin backup ZIP**: `observation_sessions/attachments/` is one of the binary
+  folders of `utils/backup_archive.py`, restored with the sessions themselves.
 
 ---
 
@@ -287,21 +285,20 @@ independent upload paths into two different places, on purpose.
 
 Mechanically identical to `backend/observation/astrodex.py`:
 
-- Directory: `data/observation_sessions/` (top-level, mirroring `data/astrodex/`).
-- One file per user: `data/observation_sessions/<user_id>_sessions.json`.
+- Database tables `observation_sessions`, `observation_nights`, `observation_entries` and
+  `observation_attachments`, one row per object (`observation_sessions/<user_id>_sessions.json`
+  inside a backup ZIP).
 - Attachment files: `data/observation_sessions/attachments/` (flat, mirroring `data/astrodex/images/`)
   - see [Attachments](#attachments).
-- File shape: `{user_id, username, created_at, updated_at, sessions: [...]}`.
-- `load_user_sessions()` never raises to the caller: a corrupted file is copied to
-  `.corrupted.<timestamp>` and an empty payload returned (the file is overwritten on the next save).
-- `save_user_sessions()` takes a per-user `threading.Lock` and runs the full atomic sequence: stamp
-  `updated_at` → `.backup` copy → write `.tmp` → `validate_sessions_json()` (root is a dict, has
+- Document shape: `{user_id, username, created_at, updated_at, sessions: [...]}`.
+- `load_user_sessions()` never raises to the caller: an unreadable or malformed stored value yields
+  an empty payload (replaced on the next save).
+- `save_user_sessions()` stamps `updated_at`, runs `validate_sessions_data()` (root is a dict, has
   `username`, has a list `sessions`; each session has `id` and a non-empty `nights` list, each night
-  has `id` and `date`; any entry's `night_id`, if set, must resolve within that session's own nights) →
-  `os.replace()` → drop the backup on success, restore from it on any exception.
-- All path expressions go through `_safe_sessions_path()` (realpath + containment check).
-- `data/observation_sessions/` is included in the admin backup ZIP (`GET /api/backup/download`) and
-  in the restore allow-list.
+  has `id` and `date`; any entry's `night_id`, if set, must resolve within that session's own nights)
+  and writes the user's rows in one transaction - nothing is stored when validation fails.
+- The observation log and its attachments are included in the admin backup ZIP
+  (`GET /api/backup/download`) and restored by `POST /api/backup/restore`.
 
 `backend/observation/observation_sessions.py` never imports `astrodex` or `plan_my_night` at module
 scope - resolving an entry to an Astrodex item is the blueprint layer's job.

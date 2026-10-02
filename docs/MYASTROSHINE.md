@@ -58,7 +58,7 @@ secret** (64 hex chars), shown once.
 |---|---|
 | **Display label** | Optional, defaults to "MyAstroShine" |
 | **MyAstroShine base URL** | What the **browser** opens, e.g. `http://192.168.1.42:8002`. Use a static LAN IP, not a `.local` name. If you open the board from outside your LAN the MyAstroShine tab will not load - that is expected, MyAstroShine is LAN-only. |
-| **Token** / **Signing secret** | Paste both from step 1. Stored in `data/connectors_secrets.json` (never in `config.json` or a backup), masked in every API response, "blank = keep current" on save. |
+| **Token** / **Signing secret** | Paste both from step 1. Stored in the connector secrets store (never in the configuration or a backup), masked in every API response, "blank = keep current" on save. |
 | **Callback URL override** (advanced) | Only if the MyAstroShine container cannot reach this dashboard's public URL on its own (no NAT hair-pinning). e.g. `http://192.168.1.42:5000`, or the board's service name on a shared Docker network. When set, it wins over the URL derived from the reverse-proxy headers. |
 | **Copy the source photo's rating** | Off by default - a re-processed image is a new artifact to re-judge. |
 | **Enable connector** | The button and endpoints activate only when enabled **and** URL + token + signing secret are all set. |
@@ -101,8 +101,8 @@ Shine    --POST /enhanced  (multipart + signature)-->  Board        new duplicat
   input) - it is still re-checked against MyAstroShine's allowlist before any callback.
 - **TTL 12 h** (`MyAstroShineConnector.HANDOFF_TTL_SECONDS`) - long enough for a full evening editing
   session. **Single use**: the `jti` is marked spent when `/enhanced` succeeds, so a replay is
-  rejected with `409`. The spent-jti set is kept in memory and mirrored to
-  `data/astrodex/myastroshine_consumed_handoffs.json` so a worker restart still blocks a replay.
+  rejected with `409`. The spent-jti set is a database setting, checked and updated in one
+  transaction, so a replay is refused by every worker and across restarts.
 
 ### Enhanced upload signature
 
@@ -160,11 +160,10 @@ These are **not** editable - they are absent from `update_picture()`'s allowed f
 - `callback_base` is board-set and re-verified against MyAstroShine's allowlist.
 - The handoff pins `user_id` + `item_id` + `picture_id`, so a return can only ever write into that
   user's Astrodex, on that item. All three are re-checked to a strict uuid shape at every entry
-  point (defence in depth on top of the signature), and `get_user_astrodex_file()` confines the
-  resulting path to `data/astrodex/` with a realpath barrier.
+  point (defence in depth on top of the signature) before the user's Astrodex is read.
 - Enhanced image is confined to `data/astrodex/images/` with the same realpath barrier as the
   normal upload path.
-- `token` / `signing_secret` live in `data/connectors_secrets.json` (outside `config.json` and
+- `token` / `signing_secret` live in the connector secrets store (outside the configuration and
   outside the backup ZIP - re-enter them after restoring a backup on another machine), are
   masked in API responses, and "blank = keep".
 - No new CSP `connect-src` entry and no CORS: the browser never makes a cross-origin request.

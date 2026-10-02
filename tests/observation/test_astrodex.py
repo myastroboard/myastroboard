@@ -4,9 +4,9 @@ Tests for Astrodex module
 
 import pytest
 import os
-import json
 import tempfile
 
+from db import documents
 from observation import astrodex
 from observation import catalogue_aliases
 from skytonight import skytonight_targets
@@ -306,28 +306,18 @@ class TestCombinationPhotoStats:
 
     def test_count_pictures_for_combination_skips_non_dict_item(self, temp_data_dir):
         """A malformed item (not a dict) in the items list is skipped, not raised."""
-        astrodex.ensure_astrodex_directories()
-        fpath = astrodex.get_user_astrodex_file('weiruser')
-        with open(fpath, 'w', encoding='utf-8') as f:
-            json.dump(
-                {
-                    'items': [
-                        'not-a-dict',
-                        {'id': 'item1', 'pictures': [{'combination_id': 'combo-1'}]},
-                    ]
-                },
-                f,
-            )
+        documents.put_document(
+            'weiruser',
+            astrodex.ASTRODEX_KIND,
+            {'items': ['not-a-dict', {'id': 'item1', 'pictures': [{'combination_id': 'combo-1'}]}]},
+        )
         assert astrodex.count_pictures_for_combination('combo-1') == 1
 
-    def test_count_pictures_for_combination_skips_unreadable_file(self, temp_data_dir):
-        """A corrupt/unreadable astrodex file is skipped (best-effort count), not raised."""
-        astrodex.ensure_astrodex_directories()
+    def test_count_pictures_for_combination_ignores_malformed_documents(self, temp_data_dir):
+        """A malformed astrodex of another user does not break the count."""
         good_item = astrodex.create_astrodex_item('gooduser', {'name': 'M31', 'type': 'Galaxy'})
         astrodex.add_picture_to_item('gooduser', good_item['id'], {'filename': 'a.jpg', 'combination_id': 'combo-1'})
-        bad_fpath = astrodex.get_user_astrodex_file('baduser')
-        with open(bad_fpath, 'w', encoding='utf-8') as f:
-            f.write('{not valid json')
+        documents.put_document('baduser', astrodex.ASTRODEX_KIND, 'not an astrodex')
 
         assert astrodex.count_pictures_for_combination('combo-1') == 1
 
@@ -421,157 +411,57 @@ class TestAstrodexStats:
         assert stats['types']['Star Cluster'] == 1
 
 
-class TestAstrodexBackupMechanism:
-    """Test backup and recovery mechanism for data safety"""
+class TestAstrodexStorageSafety:
+    """A failed save never leaves a half-written or invalid astrodex behind"""
 
-    def test_validate_astrodex_json_valid(self, temp_data_dir):
-        """Test validation of valid astrodex JSON"""
-        # Create a valid astrodex file
-        item_data = {'name': 'M31', 'type': 'Galaxy'}
-        astrodex.create_astrodex_item('testuser', item_data)
+    def test_stored_document_validates(self, temp_data_dir):
+        astrodex.create_astrodex_item('testuser', {'name': 'M31', 'type': 'Galaxy'})
+        stored = documents.get_document('testuser', astrodex.ASTRODEX_KIND)
+        assert astrodex.validate_astrodex_data(stored) == (True, "")
 
-        file_path = astrodex.get_user_astrodex_file('testuser')
-        is_valid, error_msg = astrodex.validate_astrodex_json(file_path)
-
-        assert is_valid is True
-        assert error_msg == ""
-
-    def test_validate_astrodex_json_invalid(self, temp_data_dir):
-        """Test validation of invalid JSON"""
-        file_path = astrodex.get_user_astrodex_file('testuser')
-
-        # Write invalid JSON
-        with open(file_path, 'w') as f:
-            f.write("{ invalid json }")
-
-        is_valid, error_msg = astrodex.validate_astrodex_json(file_path)
-
-        assert is_valid is False
-        assert "Invalid JSON" in error_msg
-
-    def test_validate_astrodex_json_missing_fields(self, temp_data_dir):
-        """Test validation of JSON with missing required fields"""
-        file_path = astrodex.get_user_astrodex_file('testuser')
-
-        # Write JSON without required fields
-        with open(file_path, 'w') as f:
-            json.dump({'invalid': 'data'}, f)
-
-        is_valid, error_msg = astrodex.validate_astrodex_json(file_path)
-
+    def test_validation_reports_missing_fields(self):
+        is_valid, error_msg = astrodex.validate_astrodex_data({'invalid': 'data'})
         assert is_valid is False
         assert "username" in error_msg or "items" in error_msg
 
-    def test_backup_created_during_save(self, temp_data_dir):
-        """Test that backup is created during save operation"""
-        # Create initial item
-        item_data = {'name': 'M31', 'type': 'Galaxy'}
-        item = astrodex.create_astrodex_item('testuser', item_data)
+    def test_failed_write_keeps_the_previous_version(self, temp_data_dir, monkeypatch):
+        item = astrodex.create_astrodex_item('testuser', {'name': 'M31', 'type': 'Galaxy'})
+        original = documents.get_document('testuser', astrodex.ASTRODEX_KIND)
 
-        file_path = astrodex.get_user_astrodex_file('testuser')
-        backup_path = file_path + '.backup'
-
-        # Backup should not exist after successful save
-        assert not os.path.exists(backup_path)
-
-        # Update item (triggers save)
-        astrodex.update_astrodex_item('testuser', item['id'], {'notes': 'Test update'})
-
-        # Backup should still not exist (cleaned up after success)
-        assert not os.path.exists(backup_path)
-
-    def test_save_recovery_from_corruption(self, temp_data_dir, monkeypatch):
-        """Test that backup is restored if write fails"""
-        # Create initial valid item
-        item_data = {'name': 'M31', 'type': 'Galaxy'}
-        item = astrodex.create_astrodex_item('testuser', item_data)
-
-        file_path = astrodex.get_user_astrodex_file('testuser')
-
-        # Read original content
-        with open(file_path, 'r') as f:
-            original_content = f.read()
-
-        # Monkey patch json.dump to fail
-        original_dump = json.dump
-
-        def failing_dump(*args, **kwargs):
+        def failing_put(*args, **kwargs):
             raise ValueError("Simulated write failure")
 
-        monkeypatch.setattr(json, 'dump', failing_dump)
+        monkeypatch.setattr(documents, 'put_document', failing_put)
+        assert astrodex.update_astrodex_item('testuser', item['id'], {'notes': 'Should fail'}) is None
+        monkeypatch.undo()
 
-        # Try to update - should fail but restore backup
-        result = astrodex.update_astrodex_item('testuser', item['id'], {'notes': 'Should fail'})
-
-        # Restore original json.dump
-        monkeypatch.setattr(json, 'dump', original_dump)
-
-        assert result is None  # Update failed
-
-        # Original file should still be intact (restored from backup)
-        with open(file_path, 'r') as f:
-            current_content = f.read()
-
-        assert current_content == original_content
+        assert documents.get_document('testuser', astrodex.ASTRODEX_KIND) == original
 
     def test_validation_prevents_corrupt_save(self, temp_data_dir, monkeypatch):
-        """Test that validation prevents saving corrupt data"""
-        # Create initial item
-        item_data = {'name': 'M31', 'type': 'Galaxy'}
-        item = astrodex.create_astrodex_item('testuser', item_data)
+        item = astrodex.create_astrodex_item('testuser', {'name': 'M31', 'type': 'Galaxy'})
+        original = documents.get_document('testuser', astrodex.ASTRODEX_KIND)
 
-        file_path = astrodex.get_user_astrodex_file('testuser')
+        monkeypatch.setattr(astrodex, 'validate_astrodex_data', lambda data: (False, "Simulated validation failure"))
+        assert astrodex.update_astrodex_item('testuser', item['id'], {'notes': 'Should fail validation'}) is None
 
-        # Read original content
-        with open(file_path, 'r') as f:
-            original_data = json.load(f)
+        assert documents.get_document('testuser', astrodex.ASTRODEX_KIND) == original
 
-        # Monkey patch validation to fail
-        def failing_validation(*args, **kwargs):
-            return False, "Simulated validation failure"
+    def test_malformed_stored_value_reads_as_empty(self, temp_data_dir):
+        documents.put_document('testuser', astrodex.ASTRODEX_KIND, ['not', 'an', 'astrodex'])
+        data = astrodex.load_user_astrodex('testuser', username='testuser')
+        assert data['items'] == []
+        assert data['username'] == 'testuser'
 
-        monkeypatch.setattr(astrodex, 'validate_astrodex_json', failing_validation)
+    def test_read_error_reads_as_empty(self, temp_data_dir, monkeypatch):
+        def failing_get(*args, **kwargs):
+            raise PermissionError("access denied")
 
-        # Try to update - should fail validation
-        result = astrodex.update_astrodex_item('testuser', item['id'], {'notes': 'Should fail validation'})
-
-        assert result is None  # Update failed
-
-        # Original file should still be intact
-        with open(file_path, 'r') as f:
-            current_data = json.load(f)
-
-        assert current_data == original_data
-
-    def test_temp_file_cleanup_on_error(self, temp_data_dir, monkeypatch):
-        """Test that temporary files are cleaned up on error"""
-        # Create initial item
-        item_data = {'name': 'M31', 'type': 'Galaxy'}
-        item = astrodex.create_astrodex_item('testuser', item_data)
-
-        file_path = astrodex.get_user_astrodex_file('testuser')
-        temp_path = file_path + '.tmp'
-        backup_path = file_path + '.backup'
-
-        # Monkey patch validation to fail
-        def failing_validation(*args, **kwargs):
-            return False, "Simulated validation failure"
-
-        monkeypatch.setattr(astrodex, 'validate_astrodex_json', failing_validation)
-
-        # Try to update - should fail
-        result = astrodex.update_astrodex_item('testuser', item['id'], {'notes': 'Should fail'})
-
-        assert result is None
-
-        # Temporary and backup files should be cleaned up
-        assert not os.path.exists(temp_path)
-        assert not os.path.exists(backup_path)
+        monkeypatch.setattr(documents, 'get_document', failing_get)
+        assert astrodex.load_user_astrodex('testuser', username='testuser')['items'] == []
 
     def test_save_works_for_new_user(self, temp_data_dir):
-        """Test that save works correctly for new user with no existing file"""
-        item_data = {'name': 'M31', 'type': 'Galaxy'}
-        astrodex.create_astrodex_item('newuser', item_data)
+        astrodex.create_astrodex_item('newuser', {'name': 'M31', 'type': 'Galaxy'})
+        assert len(astrodex.load_user_astrodex('newuser')['items']) == 1
 
 
 class TestAstrodexAliases:
@@ -1171,6 +1061,24 @@ class TestAstrodexMapPoints:
         assert owners == {'alice', 'bob'}
 
 
+class TestValidateAstrodexData:
+    @pytest.mark.parametrize(
+        'payload, fragment',
+        [
+            ([1, 2, 3], 'dictionary'),
+            ({'items': []}, 'username'),
+            ({'username': 'u'}, 'items'),
+            ({'username': 'u', 'items': ['x']}, 'not a dictionary'),
+            ({'username': 'u', 'items': [{'name': 'M31'}]}, "'id'"),
+            ({'username': 'u', 'items': [{'id': 'i'}]}, "'name'"),
+        ],
+    )
+    def test_invalid_payloads(self, payload, fragment):
+        is_valid, msg = astrodex.validate_astrodex_data(payload)
+        assert not is_valid
+        assert fragment in msg
+
+
 class TestAstrodexMissingBranches:
     """Tests targeting uncovered branches in astrodex.py helper functions."""
 
@@ -1333,86 +1241,6 @@ class TestAstrodexMissingBranches:
         result = astrodex.is_item_in_preloaded_astrodex(data, 'M99')
         assert result is False
 
-    def test_load_user_astrodex_json_error(self, temp_data_dir):
-        astrodex.ensure_astrodex_directories()
-        file_path = astrodex.get_user_astrodex_file('testuser')
-        with open(file_path, 'w') as f:
-            f.write('{ invalid json !!!}')
-        data = astrodex.load_user_astrodex('testuser', username='testuser')
-        assert data['items'] == []
-        assert data['username'] == 'testuser'
-
-    def test_validate_astrodex_json_missing_username(self, temp_data_dir):
-        import tempfile
-        import json as _json
-
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            _json.dump({'items': []}, f)
-            tmp_path = f.name
-        is_valid, msg = astrodex.validate_astrodex_json(tmp_path)
-        assert not is_valid
-        assert 'username' in msg
-        os.unlink(tmp_path)
-
-    def test_validate_astrodex_json_missing_items(self, temp_data_dir):
-        import tempfile
-        import json as _json
-
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            _json.dump({'username': 'alice'}, f)
-            tmp_path = f.name
-        is_valid, msg = astrodex.validate_astrodex_json(tmp_path)
-        assert not is_valid
-        assert 'items' in msg
-        os.unlink(tmp_path)
-
-    def test_validate_astrodex_json_not_dict(self, temp_data_dir):
-        import tempfile
-        import json as _json
-
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            _json.dump([1, 2, 3], f)
-            tmp_path = f.name
-        is_valid, msg = astrodex.validate_astrodex_json(tmp_path)
-        assert not is_valid
-        assert 'dictionary' in msg
-        os.unlink(tmp_path)
-
-    def test_validate_astrodex_json_item_missing_id(self, temp_data_dir):
-        import tempfile
-        import json as _json
-
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            _json.dump({'username': 'alice', 'items': [{'name': 'M42'}]}, f)
-            tmp_path = f.name
-        is_valid, msg = astrodex.validate_astrodex_json(tmp_path)
-        assert not is_valid
-        assert 'id' in msg
-        os.unlink(tmp_path)
-
-    def test_validate_astrodex_json_item_missing_name(self, temp_data_dir):
-        import tempfile
-        import json as _json
-
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            _json.dump({'username': 'alice', 'items': [{'id': 'abc'}]}, f)
-            tmp_path = f.name
-        is_valid, msg = astrodex.validate_astrodex_json(tmp_path)
-        assert not is_valid
-        assert 'name' in msg
-        os.unlink(tmp_path)
-
-    def test_validate_astrodex_json_invalid_json(self, temp_data_dir):
-        import tempfile
-
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            f.write('{bad json')
-            tmp_path = f.name
-        is_valid, msg = astrodex.validate_astrodex_json(tmp_path)
-        assert not is_valid
-        assert 'JSON' in msg
-        os.unlink(tmp_path)
-
     def test_can_user_view_image_empty_filename(self, temp_data_dir):
         result = astrodex.can_user_view_image('user1', '', private_mode=True)
         assert result is False
@@ -1439,47 +1267,6 @@ class TestAstrodexMissingBranches:
         # Load with a different username - should update username in file
         data = astrodex.load_user_astrodex('testuser', username='newname')
         assert data['username'] == 'newname'
-
-    def test_load_user_astrodex_generic_exception_returns_empty(self, temp_data_dir, monkeypatch):
-        """Generic exception in load_user_astrodex → returns empty skeleton."""
-        astrodex.ensure_astrodex_directories()
-        # Write a valid file first
-        file_path = astrodex.get_user_astrodex_file('testuser')
-        with open(file_path, 'w') as f:
-            json.dump({'username': 'testuser', 'items': []}, f)
-        # Patch open to raise a non-JSON exception
-        original_open = open
-
-        def bad_open(path, *args, **kwargs):
-            if path == file_path:
-                raise PermissionError("access denied")
-            return original_open(path, *args, **kwargs)
-
-        monkeypatch.setattr('builtins.open', bad_open)
-        data = astrodex.load_user_astrodex('testuser', username='testuser')
-        assert data['items'] == []
-
-    def test_load_user_astrodex_corrupted_backup_failure(self, temp_data_dir, monkeypatch):
-        """Backup copy fails when recovering from corrupted JSON."""
-        import shutil
-
-        astrodex.ensure_astrodex_directories()
-        file_path = astrodex.get_user_astrodex_file('testuser')
-        with open(file_path, 'w') as f:
-            f.write('{ corrupted json !!!')
-
-        def fail_copy2(*args, **kwargs):
-            raise OSError("disk full")
-
-        monkeypatch.setattr(shutil, 'copy2', fail_copy2)
-        data = astrodex.load_user_astrodex('testuser', username='testuser')
-        assert data['items'] == []
-
-    def test_validate_astrodex_json_general_exception(self, temp_data_dir):
-        """Non-JSON exception in validate_astrodex_json → Validation error."""
-        is_valid, msg = astrodex.validate_astrodex_json('/nonexistent/path/file.json')
-        assert not is_valid
-        assert 'Validation error' in msg or 'Invalid JSON' in msg or len(msg) > 0
 
     def test_save_backup_creation_failure_continues(self, temp_data_dir, monkeypatch):
         """Backup creation raises but save still proceeds."""
@@ -1518,32 +1305,6 @@ class TestAstrodexMissingBranches:
         result = astrodex.save_user_astrodex('testuser', data)
         # Save succeeds even if backup cleanup fails
         assert result is True
-
-    def test_save_backup_restore_failure_on_error(self, temp_data_dir, monkeypatch):
-        """Backup restore raises when save fails."""
-        import shutil
-
-        astrodex.create_astrodex_item('testuser', {'name': 'M31'})
-        call_count = [0]
-        original_copy2 = shutil.copy2
-
-        def selective_copy2(src, dst):
-            call_count[0] += 1
-            if call_count[0] > 1:  # 2nd call = restore attempt
-                raise OSError("cannot restore")
-            return original_copy2(src, dst)
-
-        monkeypatch.setattr(shutil, 'copy2', selective_copy2)
-        # Also make json.dump fail to trigger the error path
-        import json as _json
-
-        def fail_dump(*args, **kwargs):
-            raise ValueError("write fail")
-
-        monkeypatch.setattr(_json, 'dump', fail_dump)
-        data = astrodex.load_user_astrodex('testuser')
-        result = astrodex.save_user_astrodex('testuser', data)
-        assert result is False
 
     def test_create_astrodex_item_empty_name_returns_none(self, temp_data_dir):
         """create_astrodex_item with empty name returns None."""
@@ -1803,13 +1564,8 @@ class TestAstrodexyRemainingBranches:
         key = astrodex._get_item_merge_key(item)
         assert key.startswith('name:')
 
-    def test_get_user_astrodex_file_rejects_out_of_tree_id(self, temp_data_dir):
-        """A user id that would escape ASTRODEX_DIR is swapped for a fixed missing name."""
-        path = astrodex.get_user_astrodex_file(os.path.join('..', '..', 'etc', 'passwd'))
-        base = os.path.realpath(astrodex.ASTRODEX_DIR)
-        assert path == os.path.join(base, astrodex._REJECTED_ASTRODEX_FILE)
-        assert not os.path.exists(path)
-        # Callers just see an empty collection rather than a raised error.
+    def test_path_like_user_id_reads_as_empty(self, temp_data_dir):
+        """A path-like user id is just an unknown key in the database: an empty collection."""
         assert astrodex.load_user_astrodex(os.path.join('..', '..', 'etc', 'passwd'))['items'] == []
 
     def test_save_failure_cleanup_no_backup_no_temp(self, temp_data_dir, monkeypatch):
@@ -2080,35 +1836,25 @@ class TestAstrodexyRemainingBranches:
 # ---------------------------------------------------------------------------
 
 
-def test_astrodex_count_pictures_returns_zero_when_dir_missing(monkeypatch):
-    from observation import astrodex
-
-    monkeypatch.setattr(astrodex, "ASTRODEX_DIR", os.path.join(tempfile.gettempdir(), "missing-astrodex-dir"))
-    assert astrodex.count_pictures_for_location("loc-1") == 0
-
-
 # ---------------------------------------------------------------------------
 # Merged from former test_locations_coverage.py (TestHelperEdgeArcs)
 # ---------------------------------------------------------------------------
 
 
-def test_astrodex_count_skips_non_astrodex_and_corrupt_files(tmp_path, monkeypatch):
+def test_astrodex_count_skips_junk_items_and_pictures():
     """Location lives on pictures, not items (v1.2) - count_pictures_for_location
-    walks each item's pictures list, tolerating junk items/pictures."""
-    monkeypatch.setattr(astrodex, 'ASTRODEX_DIR', str(tmp_path))
-    (tmp_path / 'notes.txt').write_text('not astrodex', encoding='utf-8')
-    (tmp_path / 'u1_astrodex.json').write_text('{corrupt', encoding='utf-8')
-    (tmp_path / 'u2_astrodex.json').write_text(
-        json.dumps(
-            {
-                'items': [
-                    {'pictures': [{'location_id': 'L1'}, 'junk-picture']},
-                    'junk-item',
-                    {'pictures': [{'location_id': 'other'}]},
-                    {'pictures': [{'location_id': 'L1'}]},
-                ]
-            }
-        ),
-        encoding='utf-8',
+    counts every user's pictures, tolerating junk items/pictures."""
+    documents.put_document('u1', astrodex.ASTRODEX_KIND, 'corrupt')
+    documents.put_document(
+        'u2',
+        astrodex.ASTRODEX_KIND,
+        {
+            'items': [
+                {'id': 'a', 'pictures': [{'location_id': 'L1'}, 'junk-picture']},
+                'junk-item',
+                {'id': 'b', 'pictures': [{'location_id': 'other'}]},
+                {'id': 'c', 'pictures': [{'location_id': 'L1'}]},
+            ]
+        },
     )
     assert astrodex.count_pictures_for_location('L1') == 2

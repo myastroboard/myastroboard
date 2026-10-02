@@ -16,6 +16,8 @@ import uuid
 
 import pytest
 
+from db import settings_store
+
 from observation import astrodex
 from observation import myastroshine_integration as integration
 
@@ -43,15 +45,13 @@ def _cfg(**overrides):
 
 @pytest.fixture
 def temp_data_dir(monkeypatch):
-    """Isolated DATA_DIR + a clean in-memory consumed-jti store per test."""
+    """Isolated DATA_DIR (the consumed-jti store is in the per-test database)."""
     with tempfile.TemporaryDirectory() as tmpdir:
         monkeypatch.setenv("DATA_DIR", tmpdir)
         astrodex.ASTRODEX_DIR = os.path.join(tmpdir, "astrodex")
         astrodex.ASTRODEX_IMAGES_DIR = os.path.join(astrodex.ASTRODEX_DIR, "images")
-        integration._consumed.clear()
         monkeypatch.setattr(integration, "get_integration_config", lambda config=None: _cfg())
         yield tmpdir
-        integration._consumed.clear()
 
 
 def _seed_item_with_picture(user_id=_UID):
@@ -315,13 +315,9 @@ def test_create_enhanced_duplicate_rejects_bad_ids(temp_data_dir):
     assert excinfo.value.status == 401
 
 
-def test_consumed_jti_persists_to_disk(temp_data_dir):
+def test_consumed_jti_is_stored(temp_data_dir):
     integration.mark_handoff_consumed("jti-persist", time.time() + 300)
-    on_disk = json.load(open(integration._consumed_file_path(), encoding="utf-8"))
-    assert "jti-persist" in on_disk
-
-    integration._consumed.clear()
-    integration._load_consumed_from_disk()
+    assert "jti-persist" in _stored_jtis()
     assert integration.is_handoff_consumed("jti-persist") is True
 
 
@@ -378,67 +374,50 @@ def test_verify_handoff_rejects_non_numeric_exp():
 
 
 # ---------------------------------------------------------------------------
-# consumed-jti store: disk load resilience + expiry pruning
+# consumed-jti store: resilience + expiry pruning + sharing between workers
 # ---------------------------------------------------------------------------
 
 
-def test_load_consumed_from_disk_ignores_non_dict_file(temp_data_dir):
-    astrodex.ensure_astrodex_directories()
-    with open(integration._consumed_file_path(), "w", encoding="utf-8") as handle:
-        json.dump(["not", "a", "dict"], handle)
-    integration._consumed.clear()
-    integration._load_consumed_from_disk()
-    assert integration._consumed == {}
+def _stored_jtis():
+    return settings_store.get_setting(integration.CONSUMED_HANDOFFS_KEY) or {}
 
 
-def test_load_consumed_from_disk_skips_bad_and_expired_entries(temp_data_dir):
-    astrodex.ensure_astrodex_directories()
-    with open(integration._consumed_file_path(), "w", encoding="utf-8") as handle:
-        json.dump({"good": time.time() + 300, "unparseable": "xxx", "expired": 1.0}, handle)
-    integration._consumed.clear()
-    integration._load_consumed_from_disk()
-    assert list(integration._consumed) == ["good"]
+def _store_jtis(value):
+    """Write the store directly, as another gunicorn worker would."""
+    settings_store.put_setting(integration.CONSUMED_HANDOFFS_KEY, value)
 
 
-def test_is_handoff_consumed_drops_expired_entry(temp_data_dir):
-    integration._consumed["stale"] = time.time() - 5
-    assert integration.is_handoff_consumed("stale") is False
-    assert "stale" not in integration._consumed
+def test_malformed_store_reads_as_nothing_consumed(temp_data_dir):
+    _store_jtis(["not", "a", "dict"])
+    assert integration.is_handoff_consumed("anything") is False
+    assert integration.claim_handoff("anything", time.time() + 300) is True
+
+
+def test_bad_and_expired_entries_are_ignored(temp_data_dir):
+    _store_jtis({"good": time.time() + 300, "unparseable": "xxx", "expired": 1.0})
+    assert integration.is_handoff_consumed("good") is True
+    assert integration.is_handoff_consumed("unparseable") is False
+    assert integration.is_handoff_consumed("expired") is False
 
 
 def test_mark_handoff_consumed_default_expiry_and_prunes_expired(temp_data_dir):
-    integration._consumed["already-expired"] = time.time() - 10
+    _store_jtis({"already-expired": time.time() - 10})
     integration.mark_handoff_consumed("fresh")  # no explicit expiry -> TTL default
-    assert integration._consumed["fresh"] > time.time()
-    assert "already-expired" not in integration._consumed
-
-
-# ---------------------------------------------------------------------------
-# consumed-jti store shared between gunicorn workers (separate processes, one file)
-# ---------------------------------------------------------------------------
-
-
-def _spend_in_other_worker(jti):
-    """Write a jti to the on-disk store without touching this process's in-memory dict."""
-    astrodex.ensure_astrodex_directories()
-    path = integration._consumed_file_path()
-    data = json.load(open(path, encoding="utf-8")) if os.path.exists(path) else {}
-    data[jti] = time.time() + 300
-    with open(path, "w", encoding="utf-8") as handle:
-        json.dump(data, handle)
+    stored = _stored_jtis()
+    assert stored["fresh"] > time.time()
+    assert "already-expired" not in stored
 
 
 def test_jti_spent_by_another_worker_is_seen_as_consumed(temp_data_dir):
-    _spend_in_other_worker("jti-other-worker")
+    _store_jtis({"jti-other-worker": time.time() + 300})
     assert integration.is_handoff_consumed("jti-other-worker") is True
     assert integration.claim_handoff("jti-other-worker") is False
 
 
-def test_mark_keeps_jtis_persisted_by_another_worker(temp_data_dir):
-    _spend_in_other_worker("jti-from-a")
+def test_mark_keeps_jtis_stored_by_another_worker(temp_data_dir):
+    _store_jtis({"jti-from-a": time.time() + 300})
     integration.mark_handoff_consumed("jti-from-b", time.time() + 300)
-    on_disk = json.load(open(integration._consumed_file_path(), encoding="utf-8"))
-    assert {"jti-from-a", "jti-from-b"} <= set(on_disk)
+    assert {"jti-from-a", "jti-from-b"} <= set(_stored_jtis())
 
 
 def test_claim_handoff_is_single_use(temp_data_dir):
@@ -447,24 +426,37 @@ def test_claim_handoff_is_single_use(temp_data_dir):
 
 
 def test_claim_handoff_reclaims_expired_jti_with_default_expiry(temp_data_dir):
-    integration._consumed["jti-expired"] = time.time() - 5
+    _store_jtis({"jti-expired": time.time() - 5})
     assert integration.claim_handoff("jti-expired") is True
-    assert integration._consumed["jti-expired"] > time.time()
+    assert _stored_jtis()["jti-expired"] > time.time()
 
 
-def test_release_handoff_removes_jti_from_memory_and_disk(temp_data_dir):
+def test_release_handoff_removes_jti(temp_data_dir):
     integration.claim_handoff("jti-release", time.time() + 300)
     integration.release_handoff("jti-release")
-    on_disk = json.load(open(integration._consumed_file_path(), encoding="utf-8"))
-    assert "jti-release" not in on_disk
+    assert "jti-release" not in _stored_jtis()
     assert integration.is_handoff_consumed("jti-release") is False
+
+
+def test_concurrent_claims_of_one_jti_let_exactly_one_through(temp_data_dir):
+    import threading
+
+    results = []
+    threads = [
+        threading.Thread(target=lambda: results.append(integration.claim_handoff("jti-race", time.time() + 300)))
+        for _ in range(6)
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert sorted(results) == [False] * 5 + [True]
 
 
 def test_create_enhanced_duplicate_replay_rejected_across_workers(temp_data_dir):
     item, source = _seed_item_with_picture()
     claims = _claims_for(item, source)
     integration.create_enhanced_duplicate(claims, b"jpeg", {"parameters": {}})
-    integration._consumed.clear()  # a different worker never saw the first request in memory
     with pytest.raises(integration.EnhancedDuplicateError) as excinfo:
         integration.create_enhanced_duplicate(claims, b"jpeg", {"parameters": {}})
     assert excinfo.value.status == 409
@@ -540,6 +532,7 @@ def test_create_enhanced_duplicate_appends_note(temp_data_dir):
 def test_create_enhanced_duplicate_note_without_base_notes(temp_data_dir):
     item = astrodex.create_astrodex_item(_UID, {"name": "M13", "type": "Cluster"})
     source = astrodex.add_picture_to_item(_UID, item["id"], {"filename": "s.jpg"})
+    astrodex.ensure_astrodex_directories()
     with open(os.path.join(astrodex.ASTRODEX_IMAGES_DIR, "s.jpg"), "wb") as handle:
         handle.write(b"\xff\xd8\xff")
     integration.create_enhanced_duplicate(

@@ -46,7 +46,7 @@ On first startup, a single admin account is created automatically:
 
 ## Users storage
 
-All user accounts are stored in `data/users.json`. This file contains:
+All user accounts are stored in the database (`data/myastroboard.db`, `users` table - see [DATABASE.md](DATABASE.md)). Each account holds:
 
 ```json
 [
@@ -81,7 +81,7 @@ is needed.
 
 MyAstroBoard uses Flask server-side sessions (cookie-based, signed with a persistent `SECRET_KEY`).
 
-The `SECRET_KEY` is generated once on first startup and stored in `data/secret_key.txt`. It persists across container restarts so existing sessions remain valid. **Never delete `secret_key.txt`** — doing so invalidates all active sessions.
+The `SECRET_KEY` is generated once on first startup and stored in the database. It persists across container restarts so existing sessions remain valid; deleting the database invalidates all active sessions.
 
 The session cookie name is `session`. Session expiry follows Flask defaults (browser session unless `SESSION_COOKIE_SECURE` is enabled).
 
@@ -89,7 +89,7 @@ The session cookie name is `session`. Session expiry follows Flask defaults (bro
 
 ## User preferences
 
-Each user has a `preferences` object stored inside `users.json`. These are saved via `PUT /api/auth/preferences`.
+Each user has a `preferences` object stored on their account. These are saved via `PUT /api/auth/preferences`.
 
 | Preference | Allowed values | Default | Description |
 |------------|---------------|---------|-------------|
@@ -158,7 +158,7 @@ The **Parameters → Users** panel (admin only) allows:
 
 ## Advanced settings (admin)
 
-Stored in `data/app_settings.json` via `backend/utils/app_settings.py`:
+Stored in the database (setting `app_settings`) via `backend/utils/app_settings.py`:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
@@ -173,7 +173,7 @@ These are managed in **Parameters → Advanced → Application** in the admin UI
 
 ## Trusted networks
 
-**Module**: `backend/utils/security_settings.py` · **File**: `data/security_settings.json`
+**Module**: `backend/utils/security_settings.py` · **Stored as**: database setting `security_settings`
 
 Trusted networks are the shared foundation for both two-factor authentication and local/global
 accounts below: an admin-managed list of CIDR blocks or bare IP addresses, matched against the
@@ -210,7 +210,7 @@ trust it to **allow** a step - but they are otherwise unrelated checks.
   reaching the mapped port, not just localhost - the real fix for a LAN or public deployment is a
   reverse proxy in front (nginx/Traefik) with `trust_proxy_headers = true`, per
   [6.REVERSE_PROXY.md](6.REVERSE_PROXY.md).
-- **Not included in backups**: `security_settings.json` is excluded from both
+- **Not included in backups**: the security settings are excluded from both
   `/api/backup/download` and `/api/config/export`, for the same reason as `trust_proxy_headers` -
   see [docs/CONFIGURATION.md](CONFIGURATION.md#backup-and-restore).
 
@@ -256,10 +256,10 @@ QR codes are rendered **client-side** from a small vendored JS library
 
 ### Two levels of control
 
-1. **Instance switch** (`security_settings.json`, `two_factor_enabled`): an admin turns 2FA on or
+1. **Instance switch** (security settings, `two_factor_enabled`): an admin turns 2FA on or
    off for the whole install. Requires at least one trusted network (see above). Managed in
    **Parameters → Users**.
-2. **Per-user opt-in** (`users.json`, `totp_enabled`): once the instance switch is on, each user
+2. **Per-user opt-in** (account, `totp_enabled`): once the instance switch is on, each user
    individually enables 2FA for their own account in **My Settings → Security**. A user whose
    account was never opted in is never challenged at login, even with the instance switch on.
 
@@ -324,10 +324,16 @@ Intended for a lost or reset authenticator device.
 ### Lost-authenticator recovery
 
 If a user loses their authenticator device and no other admin is available to disable 2FA for
-them via the Users panel, an admin with filesystem access to `data/users.json` can manually edit
-that user's entry, setting `"totp_enabled": false` (the secret can be left in place or cleared).
-`UserManager` reloads the file automatically on next access (mtime-based, no restart required) -
-the user can log in with just their password on the next attempt.
+them via the Users panel, anyone with shell access to the host can turn it off from the command
+line ([DATABASE.md](DATABASE.md#recovery-from-the-command-line)):
+
+```bash
+docker exec -u appuser myastroboard python backend/db/manage.py disable-2fa <username>
+```
+
+Every worker sees the change on its next request (no restart required) - the user can log in with
+just their password on the next attempt. `reset-password <username>` recovers a lost password the
+same way.
 
 ---
 
@@ -366,4 +372,4 @@ the login rather than to **skip** a step.
   has its own, tighter 5-attempt, 5-minute limit (see [Two-factor authentication](#two-factor-authentication)).
 - There is no email-based password reset: an admin must reset passwords via the Users panel.
 - Network and 2FA checks in `POST /api/auth/login` run strictly **after** password verification. Checking them first would let an unauthenticated caller probe account existence or configuration (local scope, 2FA status) without a valid credential.
-- Two-factor secrets live directly on the `User` record in `users.json`, the same file and precedent as `password_hash` (already a sensitive field included in backups) - not in the `connectors_secrets.json`-style sidecar used for connector credentials, since that pattern exists specifically to keep those out of backups.
+- Two-factor secrets live directly on the `User` record, the same record and precedent as `password_hash` (already a sensitive field included in backups) - not in the separate secrets store used for connector credentials, since that pattern exists specifically to keep those out of backups.

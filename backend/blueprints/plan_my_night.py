@@ -1,7 +1,6 @@
 """Plan My Night Blueprint. Routes: /api/plan-my-night/*"""
 
 import io
-import os
 import re
 from datetime import datetime
 from typing import Optional
@@ -536,11 +535,7 @@ def add_plan_target_to_astrodex(entry_id):
         entry = next((candidate for candidate in plan.get('entries', []) if candidate.get('id') == entry_id), None)
         if not entry:
             # Try searching across all plans if not found in default
-            for file_path in plan_my_night.get_all_plan_files(user.user_id):
-                tid = None
-                fname = os.path.basename(file_path)
-                if fname != f'{user.user_id}_plan_my_night.json':
-                    tid = fname.replace(f'{user.user_id}_plan_', '').replace('.json', '')
+            for tid in plan_my_night.list_user_plan_combination_ids(user.user_id):
                 sub_payload = plan_my_night.load_user_plan(user.user_id, user.username, combination_id=tid)
                 sub_plan = sub_payload.get('plan') or {}
                 candidate = next((e for e in sub_plan.get('entries', []) if e.get('id') == entry_id), None)

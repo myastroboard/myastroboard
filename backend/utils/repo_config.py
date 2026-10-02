@@ -1,9 +1,10 @@
 """
 Manage configuration loading and saving, plus the multi-location preset model (v1.2).
 
-Location presets are stored as an admin-managed ``locations`` list inside
-``data/config.json``. Per-user selection (attribution, default, active, order)
-lives in ``users.json`` under ``preferences.location`` (see utils/auth.py).
+Location presets are stored as an admin-managed ``locations`` list inside the
+configuration (``settings`` table, key ``config``). Per-user selection (attribution,
+default, active, order) lives on each account under ``preferences.location``
+(see utils/auth.py).
 This module owns:
 
 - the one-time migration of the legacy singular ``location`` key,
@@ -17,13 +18,15 @@ import uuid
 from copy import deepcopy
 from datetime import datetime, timezone
 
-from utils.constants import CONFIG_FILE
+from db import settings_store
+from db.engine import transaction
 from utils.config_defaults import DEFAULT_CONFIG, DEFAULT_LOCATION, LOCATION_PRESET_EXTRA_FIELDS
-from utils import load_json_file, save_json_file, safe_file_exists
-from utils.file_lock import interprocess_lock
+from utils import _sanitize_for_json
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+CONFIG_KEY = 'config'
 
 
 def _merge_defaults(config, defaults):
@@ -190,39 +193,61 @@ def _attribute_new_location_to_all_users(location_id):
         logger.warning(f"Could not attribute location {location_id!r} to existing users: {exc}")
 
 
+def read_raw_config():
+    """The stored configuration dict, or None when there is none yet (or it is damaged)."""
+    try:
+        raw = settings_store.get_setting(CONFIG_KEY)
+    except Exception as exc:
+        logger.error(f"Could not read the configuration: {exc}")
+        return None
+    return raw if isinstance(raw, dict) else None
+
+
+def config_exists():
+    """True once a configuration has been stored."""
+    return read_raw_config() is not None
+
+
+def config_revision():
+    """Revision of the stored configuration (change detector for long-running loops)."""
+    return settings_store.setting_revision(CONFIG_KEY)
+
+
 def load_config():
-    """Load configuration from file (migrating the legacy location shape once)."""
-    if safe_file_exists(CONFIG_FILE):
-        merged = _read_merged_config()
+    """Load the configuration (migrating the legacy location shape once)."""
+    raw = read_raw_config()
+    if raw is not None:
+        merged = _read_merged_config(raw)
         if not _ensure_locations(deepcopy(merged), seeded_location_ids=[]):
             return merged  # the common path: nothing to create or migrate
 
-    # Creating or migrating the file generates fresh location uuids, and cache
+    # Creating or migrating the config generates fresh location uuids, and cache
     # slots and user prefs are keyed by them, so only one gunicorn worker may
     # do it: the others must re-read and adopt that worker's ids instead of
-    # persisting ids of their own over them.
+    # persisting ids of their own over them. The write transaction serializes that.
     seeded_location_ids = []
-    with interprocess_lock(CONFIG_FILE + '.lock'):
-        if safe_file_exists(CONFIG_FILE):
-            config = _read_merged_config()
+    with transaction():
+        raw = read_raw_config()
+        if raw is not None:
+            config = _read_merged_config(raw)
             needs_save = _ensure_locations(config, seeded_location_ids)
         else:
-            # No config file yet - brand-new install, keep location_configured=False.
+            # No config yet - brand-new install, keep location_configured=False.
             config = deepcopy(DEFAULT_CONFIG)
             _ensure_locations(config, seeded_location_ids)
             needs_save = True
         if needs_save:
             save_config(config)
-    # Attribute only after releasing the config lock: attribution takes the
-    # users.json lock, and user creation takes them in the opposite order.
+    # Attribute in a transaction of its own, once the config is committed.
     for location_id in seeded_location_ids:
         _attribute_new_location_to_all_users(location_id)
     return config
 
 
-def _read_merged_config():
-    """Read config.json merged over the defaults, with legacy keys normalized (no persistence)."""
-    raw = load_json_file(CONFIG_FILE, {})
+def _read_merged_config(raw=None):
+    """The stored config merged over the defaults, with legacy keys normalized (no persistence)."""
+    if raw is None:
+        raw = read_raw_config() or {}
     merged = _merge_defaults(raw, DEFAULT_CONFIG)
     # Strip legacy top-level 'constraints' key - constraints live exclusively
     # under skytonight.constraints from now on.
@@ -240,8 +265,13 @@ def _read_merged_config():
 
 
 def save_config(config):
-    """Save configuration to file"""
-    return save_json_file(CONFIG_FILE, config)
+    """Store the configuration; True on success."""
+    try:
+        settings_store.put_setting(CONFIG_KEY, _sanitize_for_json(config))
+        return True
+    except Exception as exc:
+        logger.error(f"Could not save the configuration: {exc}")
+        return False
 
 
 # ---------------------------------------------------------------------------

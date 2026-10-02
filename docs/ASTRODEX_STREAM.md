@@ -111,7 +111,7 @@ refresh cadence reliably lands on each photo instead of mostly skipping between 
 
 - **One token per user, nothing stored per user.** A stream URL embeds
   `HMAC-SHA256(user_id, signing_secret)`. The signing secret is 32 random bytes generated once on
-  first use and kept in `data/connectors_secrets.json` (excluded from backups, like the MQTT
+  first use and kept in the connector secrets store (excluded from backups, like the MQTT
   password and the MyAstroShine token) - never shown to or entered by an admin. Verifying a
   request just recomputes the token from the user id in the URL, so nothing is stored per user
   and a lost/rotated token needs no cleanup.

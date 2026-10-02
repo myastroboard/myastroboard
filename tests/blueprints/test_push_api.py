@@ -314,10 +314,7 @@ def test_user_round_trip_preserves_push_subscriptions():
     assert restored.push_subscriptions == subs
 
 
-def test_user_manager_persists_push_subscriptions(tmp_path, monkeypatch):
-    users_file = tmp_path / 'users.json'
-    monkeypatch.setattr(auth, 'USERS_FILE', str(users_file))
-
+def test_user_manager_persists_push_subscriptions():
     mgr = auth.UserManager()
     user = mgr.create_user('dave', 'pw', 'user')
     user.push_subscriptions = [{'endpoint': 'https://push.example.com/dave', 'keys': {}}]

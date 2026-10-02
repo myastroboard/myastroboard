@@ -1045,7 +1045,7 @@ def test_pick_active_plan_prefers_inside_night(monkeypatch):
 
     monkeypatch.setattr(
         plan_my_night,
-        'get_all_plan_files',
+        'list_user_plan_combination_ids',
         lambda _uid: [
             '/x/u1_plan_combo1.json',
             '/x/u1_plan_my_night.json',
@@ -1535,29 +1535,16 @@ def test_load_cache_returns_none_when_entry_is_none(monkeypatch):
 def test_pick_active_plan_no_plan_files(monkeypatch):
     from observation import plan_my_night
 
-    monkeypatch.setattr(plan_my_night, 'get_all_plan_files', lambda _uid: [])
+    monkeypatch.setattr(plan_my_night, 'list_user_plan_combination_ids', lambda _uid: [])
     monkeypatch.setattr(plan_my_night, 'get_plan_with_timeline', lambda *a, **k: {})
     assert plan_my_night.pick_active_plan('u1', 'alice') is None
-
-
-def test_pick_active_plan_file_wrong_prefix_skipped(monkeypatch):
-    """Files not matching user prefix are skipped."""
-    from observation import plan_my_night
-
-    monkeypatch.setattr(plan_my_night, 'get_all_plan_files', lambda _uid: ['/x/u2_plan_my_night.json'])
-    monkeypatch.setattr(
-        plan_my_night,
-        'get_plan_with_timeline',
-        lambda *a, **k: {'state': 'current', 'timeline': {'is_inside_night': False}},
-    )
-    assert plan_my_night.pick_active_plan('u1', 'alice') is None  # Wrong user prefix
 
 
 def test_pick_active_plan_state_none_excluded(monkeypatch):
     """Plans with state='none' are excluded from candidates."""
     from observation import plan_my_night
 
-    monkeypatch.setattr(plan_my_night, 'get_all_plan_files', lambda _uid: ['/x/u1_plan_my_night.json'])
+    monkeypatch.setattr(plan_my_night, 'list_user_plan_combination_ids', lambda _uid: ['/x/u1_plan_my_night.json'])
     monkeypatch.setattr(
         plan_my_night,
         'get_plan_with_timeline',
@@ -1570,7 +1557,7 @@ def test_pick_active_plan_exception_loading_plan(monkeypatch):
     """Exception when loading a plan is swallowed."""
     from observation import plan_my_night
 
-    monkeypatch.setattr(plan_my_night, 'get_all_plan_files', lambda _uid: ['/x/u1_plan_my_night.json'])
+    monkeypatch.setattr(plan_my_night, 'list_user_plan_combination_ids', lambda _uid: ['/x/u1_plan_my_night.json'])
 
     def _boom(*a, **k):
         raise RuntimeError('boom')
@@ -1821,7 +1808,7 @@ def test_pick_active_plan_fallback_returns_current_state(monkeypatch):
 
     monkeypatch.setattr(
         plan_my_night,
-        'get_all_plan_files',
+        'list_user_plan_combination_ids',
         lambda _uid: [
             '/x/u1_plan_my_night.json',
             '/x/u1_plan_combo2.json',
@@ -1844,7 +1831,7 @@ def test_pick_active_plan_fallback_returns_first_candidate(monkeypatch):
     """when no candidate is state='current', return candidates[0]."""
     from observation import plan_my_night
 
-    monkeypatch.setattr(plan_my_night, 'get_all_plan_files', lambda _uid: ['/x/u1_plan_my_night.json'])
+    monkeypatch.setattr(plan_my_night, 'list_user_plan_combination_ids', lambda _uid: ['/x/u1_plan_my_night.json'])
     monkeypatch.setattr(
         plan_my_night,
         'get_plan_with_timeline',

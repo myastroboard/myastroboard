@@ -7,6 +7,7 @@ import uuid
 
 import pytest
 
+from db import documents
 from observation import observation_sessions
 
 
@@ -23,6 +24,11 @@ def temp_data_dir(monkeypatch):
 @pytest.fixture
 def user_id():
     return str(uuid.uuid4())
+
+
+def _store(user_id, value):
+    """Write the stored sessions directly, bypassing save validation."""
+    documents.put_document(user_id, observation_sessions.SESSIONS_KIND, value)
 
 
 def _create_session(user_id, **overrides):
@@ -51,17 +57,12 @@ class TestStorage:
     """Directory handling, load/save round-trips and write safety."""
 
     def test_ensure_directories(self, temp_data_dir):
-        """The data directory is created on demand."""
+        """The attachments directory is created on demand."""
         observation_sessions.ensure_observation_sessions_directories()
-        assert os.path.isdir(observation_sessions.OBSERVATION_SESSIONS_DIR)
-
-    def test_sessions_file_naming(self, temp_data_dir, user_id):
-        """Per-user files follow the <user_id>_sessions.json convention."""
-        path = observation_sessions.get_user_sessions_file(user_id)
-        assert os.path.basename(path) == f'{user_id}_sessions.json'
+        assert os.path.isdir(observation_sessions.attachments_dir())
 
     def test_load_empty_returns_default_payload(self, temp_data_dir, user_id):
-        """Loading a user with no file yields an empty, well-formed payload."""
+        """Loading a user with nothing stored yields an empty, well-formed payload."""
         data = observation_sessions.load_user_sessions(user_id, username='tester')
         assert data['username'] == 'tester'
         assert data['sessions'] == []
@@ -77,24 +78,9 @@ class TestStorage:
         assert len(reloaded['sessions']) == 1
         assert reloaded['sessions'][0]['id'] == 'abc'
 
-    def test_corrupted_file_is_backed_up_and_reset(self, temp_data_dir, user_id):
-        """A corrupted JSON file is copied aside and an empty payload returned."""
-        path = observation_sessions.get_user_sessions_file(user_id)
-        with open(path, 'w', encoding='utf-8') as file_obj:
-            file_obj.write('{not json')
-
-        data = observation_sessions.load_user_sessions(user_id, username='tester')
-        assert data['sessions'] == []
-
-        backups = [name for name in os.listdir(observation_sessions.OBSERVATION_SESSIONS_DIR) if '.corrupted.' in name]
-        assert len(backups) == 1
-
     def test_non_dict_root_returns_default_payload(self, temp_data_dir, user_id):
-        """A valid JSON file whose root is not an object is treated as empty."""
-        path = observation_sessions.get_user_sessions_file(user_id)
-        with open(path, 'w', encoding='utf-8') as file_obj:
-            json.dump([1, 2, 3], file_obj)
-
+        """A stored value whose root is not an object is treated as empty."""
+        _store(user_id, [1, 2, 3])
         assert observation_sessions.load_user_sessions(user_id)['sessions'] == []
 
     def test_username_change_is_persisted_on_load(self, temp_data_dir, user_id):
@@ -103,8 +89,8 @@ class TestStorage:
         observation_sessions.load_user_sessions(user_id, username='renamed')
         assert observation_sessions.load_user_sessions(user_id)['username'] == 'renamed'
 
-    def test_save_rejects_invalid_payload_and_restores_backup(self, temp_data_dir, user_id):
-        """A payload failing validation leaves the previous file intact."""
+    def test_save_rejects_invalid_payload_and_keeps_the_previous_one(self, temp_data_dir, user_id):
+        """A payload failing validation leaves the stored sessions intact."""
         _create_session(user_id)
         good = observation_sessions.load_user_sessions(user_id)
 
@@ -112,88 +98,45 @@ class TestStorage:
         broken['sessions'] = [{'date': '2026-01-01'}]  # missing 'id'
         assert observation_sessions.save_user_sessions(user_id, broken) is False
 
-        # The original session survived the failed write
         assert len(observation_sessions.load_user_sessions(user_id)['sessions']) == 1
 
-    def test_path_outside_directory_is_rejected(self, temp_data_dir):
-        """The path sanitizer refuses anything escaping the sessions directory."""
-        with pytest.raises(ValueError):
-            observation_sessions._safe_sessions_path(os.path.join(temp_data_dir, 'elsewhere.json'))
-
-    def test_load_with_invalid_user_id_returns_default_payload(self, temp_data_dir):
-        """A user id that would resolve outside the sessions directory degrades to an
-        empty payload instead of raising."""
-        data = observation_sessions.load_user_sessions('../escaped', username='tester')
-        assert data['sessions'] == []
-
-    def test_corrupted_file_backup_failure_is_swallowed(self, temp_data_dir, user_id, monkeypatch):
-        """A backup failure while recovering from corruption must not stop the reset."""
-        path = observation_sessions.get_user_sessions_file(user_id)
-        with open(path, 'w', encoding='utf-8') as file_obj:
-            file_obj.write('{not json')
-
-        def _raise(*args, **kwargs):
-            raise OSError('backup boom')
-
-        monkeypatch.setattr(observation_sessions.shutil, 'copy2', _raise)
-        data = observation_sessions.load_user_sessions(user_id, username='tester')
-        assert data['sessions'] == []
-
-    def test_load_swallows_non_json_decode_errors(self, temp_data_dir, user_id, monkeypatch):
-        """An unexpected error while reading (not just malformed JSON) still degrades
-        gracefully to an empty payload rather than propagating."""
+    def test_read_error_returns_default_payload(self, temp_data_dir, user_id, monkeypatch):
+        """An error while reading degrades gracefully to an empty payload rather than propagating."""
         _create_session(user_id)
 
         def _raise(*args, **kwargs):
             raise RuntimeError('unexpected read failure')
 
-        monkeypatch.setattr(observation_sessions.json, 'load', _raise)
-        data = observation_sessions.load_user_sessions(user_id)
-        assert data['sessions'] == []
-
-    def test_non_list_sessions_field_is_reset(self, temp_data_dir, user_id):
-        """A well-formed JSON file whose 'sessions' value isn't a list is treated as empty."""
-        path = observation_sessions.get_user_sessions_file(user_id)
-        with open(path, 'w', encoding='utf-8') as file_obj:
-            json.dump({'username': 'tester', 'sessions': 'not-a-list'}, file_obj)
-
+        monkeypatch.setattr(documents, 'get_document', _raise)
         assert observation_sessions.load_user_sessions(user_id)['sessions'] == []
 
-    def test_save_with_invalid_user_id_fails(self, temp_data_dir):
-        """A user id that would resolve outside the sessions directory fails to save."""
-        assert observation_sessions.save_user_sessions('../escaped', {'sessions': []}) is False
-
-    def test_backup_creation_failure_does_not_block_save(self, temp_data_dir, user_id, monkeypatch):
-        """A failed backup attempt (e.g. disk hiccup) is logged but never blocks the write
-        itself - the atomic replace is the real safety net."""
-        _create_session(user_id)
-        data = observation_sessions.load_user_sessions(user_id)
-
+    def test_storage_error_fails_the_save(self, temp_data_dir, user_id, monkeypatch):
         def _raise(*args, **kwargs):
-            raise OSError('backup boom')
+            raise OSError('disk full')
 
-        monkeypatch.setattr(observation_sessions.shutil, 'copy2', _raise)
-        assert observation_sessions.save_user_sessions(user_id, data) is True
+        monkeypatch.setattr(documents, 'put_document', _raise)
+        data = {'username': 'tester', 'sessions': []}
+        assert observation_sessions.save_user_sessions(user_id, data) is False
 
-    def test_save_failure_without_prior_file_skips_restore(self, temp_data_dir, user_id):
-        """A validation failure on a brand-new file (nothing to back up/restore yet)
-        still cleans up its own temp file without erroring on the missing backup."""
+    def test_non_list_sessions_field_is_reset(self, temp_data_dir, user_id):
+        """A stored value whose 'sessions' isn't a list is treated as empty."""
+        _store(user_id, {'username': 'tester', 'sessions': 'not-a-list'})
+        assert observation_sessions.load_user_sessions(user_id)['sessions'] == []
+
+    def test_invalid_first_save_stores_nothing(self, temp_data_dir, user_id):
         bad_data = {'username': 'tester', 'sessions': [{'date': '2026-01-01'}]}  # missing 'id'
         assert observation_sessions.save_user_sessions(user_id, bad_data, username='tester') is False
-        assert not os.path.exists(observation_sessions.get_user_sessions_file(user_id))
+        assert documents.get_document(user_id, observation_sessions.SESSIONS_KIND) is None
 
 
 class TestValidation:
-    """validate_sessions_json contract."""
+    """validate_sessions_data contract."""
 
-    def test_valid_file(self, temp_data_dir, user_id):
-        """A file written by save_user_sessions validates."""
+    def test_valid_document(self, temp_data_dir, user_id):
+        """A document written by save_user_sessions validates."""
         _create_session(user_id)
-        is_valid, message = observation_sessions.validate_sessions_json(
-            observation_sessions.get_user_sessions_file(user_id)
-        )
-        assert is_valid is True
-        assert message == ''
+        stored = documents.get_document(user_id, observation_sessions.SESSIONS_KIND)
+        assert observation_sessions.validate_sessions_data(stored) == (True, '')
 
     @pytest.mark.parametrize(
         'payload, expected_fragment',
@@ -235,35 +178,11 @@ class TestValidation:
             ),
         ],
     )
-    def test_invalid_payloads(self, temp_data_dir, user_id, payload, expected_fragment):
+    def test_invalid_payloads(self, payload, expected_fragment):
         """Each structural defect is reported with a descriptive message."""
-        observation_sessions.ensure_observation_sessions_directories()
-        path = observation_sessions.get_user_sessions_file(user_id)
-        with open(path, 'w', encoding='utf-8') as file_obj:
-            json.dump(payload, file_obj)
-
-        is_valid, message = observation_sessions.validate_sessions_json(path)
+        is_valid, message = observation_sessions.validate_sessions_data(payload)
         assert is_valid is False
         assert expected_fragment in message
-
-    def test_invalid_json(self, temp_data_dir, user_id):
-        """Unparseable JSON is reported rather than raised."""
-        observation_sessions.ensure_observation_sessions_directories()
-        path = observation_sessions.get_user_sessions_file(user_id)
-        with open(path, 'w', encoding='utf-8') as file_obj:
-            file_obj.write('{')
-
-        is_valid, message = observation_sessions.validate_sessions_json(path)
-        assert is_valid is False
-        assert 'Invalid JSON' in message
-
-    def test_validation_error_for_unreadable_path(self, temp_data_dir):
-        """A path that fails the containment check reports a validation error rather
-        than raising - covers the generic except branch (as opposed to JSONDecodeError)."""
-        outside_path = os.path.join(temp_data_dir, 'elsewhere.json')
-        is_valid, message = observation_sessions.validate_sessions_json(outside_path)
-        assert is_valid is False
-        assert 'Validation error' in message
 
 
 class TestSessionCrud:
@@ -1144,20 +1063,18 @@ class TestStats:
         assert stats['average_rating'] == pytest.approx(4.5)
 
     def test_stats_skip_non_dict_sessions_and_entries(self, temp_data_dir, user_id):
-        """Malformed entries in a hand-edited or partially-corrupted file are skipped
+        """Malformed entries in a hand-edited or partially-corrupted document are skipped
         rather than raising."""
-        path = observation_sessions.get_user_sessions_file(user_id)
-        with open(path, 'w', encoding='utf-8') as file_obj:
-            json.dump(
-                {
-                    'username': 'tester',
-                    'sessions': [
-                        'not-a-session',
-                        {'id': 's1', 'date': '2026-01-01', 'entries': ['not-an-entry', {'name': 'M31'}]},
-                    ],
-                },
-                file_obj,
-            )
+        _store(
+            user_id,
+            {
+                'username': 'tester',
+                'sessions': [
+                    'not-a-session',
+                    {'id': 's1', 'date': '2026-01-01', 'entries': ['not-an-entry', {'name': 'M31'}]},
+                ],
+            },
+        )
 
         stats = observation_sessions.get_session_stats(user_id)
         assert stats['total_sessions'] == 1
@@ -1200,40 +1117,15 @@ class TestReferenceCounts:
         assert observation_sessions.count_sessions_for_location('loc-2') == 0
         assert observation_sessions.count_sessions_for_location('') == 0
 
-    def test_counts_are_fail_open_on_unreadable_files(self, temp_data_dir, user_id):
-        """An unparseable file is skipped rather than taking the whole scan down."""
-        _create_session(user_id, combination_id='combo-1')
-        broken_path = os.path.join(observation_sessions.OBSERVATION_SESSIONS_DIR, f'{uuid.uuid4()}_sessions.json')
-        with open(broken_path, 'w', encoding='utf-8') as file_obj:
-            file_obj.write('{oops')
-
-        assert observation_sessions.count_sessions_for_combination('combo-1') == 1
-
-    def test_location_counts_are_fail_open_on_unreadable_files(self, temp_data_dir, user_id):
-        """The shared count-by-field helper is just as fail-open as the combination
-        counter above."""
-        _create_session(user_id, location_id='loc-1')
-        broken_path = os.path.join(observation_sessions.OBSERVATION_SESSIONS_DIR, f'{uuid.uuid4()}_sessions.json')
-        with open(broken_path, 'w', encoding='utf-8') as file_obj:
-            file_obj.write('{oops')
-
-        assert observation_sessions.count_sessions_for_location('loc-1') == 1
-
     def test_count_sessions_for_combination_skips_non_dict_sessions_in_storage(self, temp_data_dir, user_id):
-        """A corrupt (non-dict) session entry surviving in a user's file is skipped
+        """A corrupt (non-dict) session entry surviving in a user's document is skipped
         rather than crashing the scan."""
-        observation_sessions.ensure_observation_sessions_directories()
-        path = observation_sessions.get_user_sessions_file(user_id)
-        with open(path, 'w', encoding='utf-8') as file_obj:
-            json.dump({'username': 'tester', 'sessions': [123, {'id': 'a', 'combination_id': 'combo-1'}]}, file_obj)
+        _store(user_id, {'username': 'tester', 'sessions': [123, {'id': 'a', 'combination_id': 'combo-1'}]})
 
         assert observation_sessions.count_sessions_for_combination('combo-1') == 1
 
-    def test_counts_without_directory(self, monkeypatch, temp_data_dir):
-        """A missing data directory counts as zero references."""
-        monkeypatch.setattr(
-            observation_sessions, 'OBSERVATION_SESSIONS_DIR', os.path.join(temp_data_dir, 'never-created')
-        )
+    def test_counts_without_any_session(self, temp_data_dir):
+        """No stored session counts as zero references."""
         assert observation_sessions.count_sessions_for_combination('combo-1') == 0
 
     def test_load_all_users_sessions(self, temp_data_dir, user_id):
@@ -1246,24 +1138,12 @@ class TestReferenceCounts:
         assert {collection['user_id'] for collection in collections} == {user_id, other_user}
         assert all(len(collection['sessions']) == 1 for collection in collections)
 
-    def test_iter_session_files_skips_unrelated_files(self, temp_data_dir, user_id):
-        """A stray file in the sessions directory (not matching the naming convention)
-        is ignored rather than breaking the scan."""
+    def test_scan_skips_malformed_documents(self, temp_data_dir, user_id):
+        """A malformed stored value of another user is ignored rather than breaking the scan."""
         _create_session(user_id, combination_id='combo-1')
-        stray_path = os.path.join(observation_sessions.OBSERVATION_SESSIONS_DIR, 'stray.txt')
-        with open(stray_path, 'w', encoding='utf-8') as file_obj:
-            file_obj.write('not a sessions file')
+        _store(str(uuid.uuid4()), ['not', 'a', 'sessions', 'document'])
 
         assert observation_sessions.count_sessions_for_combination('combo-1') == 1
-
-    def test_load_all_users_sessions_skips_unrelated_files(self, temp_data_dir, user_id):
-        _create_session(user_id)
-        stray_path = os.path.join(observation_sessions.OBSERVATION_SESSIONS_DIR, 'stray.txt')
-        with open(stray_path, 'w', encoding='utf-8') as file_obj:
-            file_obj.write('not a sessions file')
-
-        collections = observation_sessions.load_all_users_sessions()
-        assert len(collections) == 1
 
 
 class _DummyI18n:

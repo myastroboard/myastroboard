@@ -934,15 +934,24 @@ class TestDefaults:
 
         assert isinstance(config, dict)
 
-    def test_current_source_signature_reflects_file_mtimes(self, tmp_path, monkeypatch):
-        from utils import connector_secrets
+    def test_current_source_signature_reflects_store_revisions(self):
+        from utils import connector_secrets, repo_config
 
-        monkeypatch.setattr(pub, "CONFIG_FILE", str(tmp_path / "config.json"))
-        monkeypatch.setattr(connector_secrets, "_SECRETS_FILE", str(tmp_path / "secrets.json"))
+        before = pub.MqttPublisher._current_source_signature()
 
+        repo_config.save_config(repo_config.load_config())
+        after_config = pub.MqttPublisher._current_source_signature()
+        assert after_config[0] != before[0] and after_config[1] == before[1]
+
+        connector_secrets.save_secrets("mqtt", {"password": "pw"})
+        after_secrets = pub.MqttPublisher._current_source_signature()
+        assert after_secrets[0] == after_config[0] and after_secrets[1] != after_config[1]
+
+    def test_current_source_signature_survives_a_store_error(self, monkeypatch):
+        from utils import repo_config
+
+        def _boom():
+            raise OSError("db gone")
+
+        monkeypatch.setattr(repo_config, "config_revision", _boom)
         assert pub.MqttPublisher._current_source_signature() == (None, None)
-
-        (tmp_path / "config.json").write_text("{}")
-
-        signature = pub.MqttPublisher._current_source_signature()
-        assert signature[0] is not None and signature[1] is None

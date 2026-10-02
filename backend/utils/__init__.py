@@ -14,7 +14,7 @@ import yaml
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Dict, Optional
-from utils.constants import CONFIG_FILE, DATA_DIR
+from utils.constants import DATA_DIR
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -203,6 +203,16 @@ def format_file_size(size_bytes: float) -> str:
     return f"{size:.1f} TB"
 
 
+def _config_exists() -> bool:
+    """True once a configuration is stored (lazy import: repo_config imports this package)."""
+    try:
+        from utils.repo_config import config_exists
+
+        return config_exists()
+    except Exception:
+        return False
+
+
 def get_environment_info() -> Dict[str, str]:
     """
     Get useful environment information for debugging
@@ -212,7 +222,7 @@ def get_environment_info() -> Dict[str, str]:
     """
     return {
         'data_dir': DATA_DIR,
-        'config_file_exists': str(safe_file_exists(CONFIG_FILE)),
+        'config_file_exists': str(_config_exists()),
         'python_version': sys.version,
         'platform': os.name,
         'working_directory': os.getcwd(),

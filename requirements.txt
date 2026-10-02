@@ -33,6 +33,10 @@ Flask-Login===0.6.3
 # TOTP two-factor authentication (pure Python, no transitive dependencies)
 pyotp===2.10.0
 
+# Storage (SQLite database + schema migrations)
+SQLAlchemy===2.1.1
+alembic===1.20.0
+
 # Version comparison
 packaging===26.3
 

@@ -205,9 +205,8 @@ A reversed seeing axis is a correctness bug, not a cosmetic one, and has its own
 A wishlist item records **intent**: an object you want to capture. It is the only new
 persistent state v1.5 introduces - everything else is derived.
 
-Storage is `data/wishlist/<user_id>_wishlist.json`, one file per user, with the same
-per-user lock and atomic backup / temp-write / validate / replace / restore sequence the
-Observation Log uses. Wishlists are permanently private, and they are included in the admin
+Storage is the `wishlist_items` database table (one row per item),
+validated before every write like the Observation Log. Wishlists are permanently private, and they are included in the admin
 backup ZIP.
 
 ### Two rules

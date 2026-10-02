@@ -1,93 +1,100 @@
-"""config.json creation / migration when several gunicorn workers start at once.
+"""Config creation / migration when several gunicorn workers start at once.
 
 Seeding the config generates fresh location uuids that cache slots and user
 prefs are keyed by, so a worker that loses the race must adopt the winner's ids
 instead of persisting its own over them.
 """
 
-import json
 from contextlib import contextmanager
 
 import pytest
 
+from db import settings_store
+from tests.db_helpers import delete_setting
 from utils import repo_config
 
 
-@pytest.fixture
-def config_path(tmp_path, monkeypatch):
-    path = tmp_path / "config.json"
-    monkeypatch.setattr(repo_config, "CONFIG_FILE", str(path))
+@pytest.fixture(autouse=True)
+def no_stored_config(monkeypatch):
+    """Start from a brand-new install (no config) and skip user attribution."""
+    delete_setting(repo_config.CONFIG_KEY)
     monkeypatch.setattr(repo_config, "_attribute_new_location_to_all_users", lambda _loc_id: None)
-    return path
 
 
-def _config_written_by_other_worker(path, location_id):
+def _config_written_by_other_worker(location_id):
     other = repo_config.deepcopy(repo_config.DEFAULT_CONFIG)
     repo_config._ensure_locations(other, seeded_location_ids=[])
     other["locations"][0]["id"] = location_id
-    path.write_text(json.dumps(other), encoding="utf-8")
+    settings_store.put_setting(repo_config.CONFIG_KEY, other)
 
 
-def test_loser_of_first_boot_race_adopts_the_winners_location_id(config_path, monkeypatch):
-    @contextmanager
-    def _lock_won_by_other_worker_first(_lock_path):
-        # While this worker waited for the lock, the other one created config.json
-        _config_written_by_other_worker(config_path, "winner-location-id")
-        yield
-
-    monkeypatch.setattr(repo_config, "interprocess_lock", _lock_won_by_other_worker_first)
-
-    config = repo_config.load_config()
-
-    assert [loc["id"] for loc in config["locations"]] == ["winner-location-id"]
-    on_disk = json.loads(config_path.read_text(encoding="utf-8"))
-    assert [loc["id"] for loc in on_disk["locations"]] == ["winner-location-id"]
-
-
-def test_first_boot_seeds_persists_and_attributes_after_releasing_lock(config_path, monkeypatch):
-    events = []
+def _transaction_entered_after(callback):
+    """A transaction() stand-in running ``callback`` first: another worker wrote while this one waited."""
+    real_transaction = repo_config.transaction
 
     @contextmanager
-    def _recording_lock(lock_path):
-        events.append(("acquire", lock_path))
-        yield
-        events.append(("release", lock_path))
+    def _transaction():
+        callback()
+        with real_transaction() as conn:
+            yield conn
 
-    monkeypatch.setattr(repo_config, "interprocess_lock", _recording_lock)
+    return _transaction
+
+
+def test_loser_of_first_boot_race_adopts_the_winners_location_id(monkeypatch):
     monkeypatch.setattr(
-        repo_config, "_attribute_new_location_to_all_users", lambda loc_id: events.append(("attr", loc_id))
+        repo_config, "transaction", _transaction_entered_after(lambda: _config_written_by_other_worker("winner-id"))
     )
 
     config = repo_config.load_config()
 
+    assert [loc["id"] for loc in config["locations"]] == ["winner-id"]
+    stored = settings_store.get_setting(repo_config.CONFIG_KEY)
+    assert [loc["id"] for loc in stored["locations"]] == ["winner-id"]
+
+
+def test_first_boot_seeds_persists_and_attributes_after_commit(monkeypatch):
+    events = []
+    real_transaction = repo_config.transaction
+
+    @contextmanager
+    def _recording_transaction():
+        events.append("begin")
+        with real_transaction() as conn:
+            yield conn
+        events.append("commit")
+
+    monkeypatch.setattr(repo_config, "transaction", _recording_transaction)
+    monkeypatch.setattr(repo_config, "_attribute_new_location_to_all_users", lambda loc_id: events.append(loc_id))
+
+    config = repo_config.load_config()
+
     seeded_id = config["locations"][0]["id"]
-    lock_path = str(config_path) + ".lock"
-    assert events == [("acquire", lock_path), ("release", lock_path), ("attr", seeded_id)]
-    assert json.loads(config_path.read_text(encoding="utf-8"))["locations"][0]["id"] == seeded_id
+    assert events == ["begin", "commit", seeded_id]
+    assert settings_store.get_setting(repo_config.CONFIG_KEY)["locations"][0]["id"] == seeded_id
 
 
-def test_valid_config_is_read_without_taking_the_lock(config_path, monkeypatch):
-    repo_config.load_config()  # seed a valid file
+def test_valid_config_is_read_without_a_write_transaction(monkeypatch):
+    repo_config.load_config()  # seed a valid config
 
-    def _unexpected_lock(_lock_path):
-        raise AssertionError("the common read path must not lock")
+    def _unexpected_transaction():
+        raise AssertionError("the common read path must not open a write transaction")
 
-    monkeypatch.setattr(repo_config, "interprocess_lock", _unexpected_lock)
+    monkeypatch.setattr(repo_config, "transaction", _unexpected_transaction)
     assert repo_config.load_config()["locations"]
 
 
-def test_legacy_migration_done_by_other_worker_is_not_redone(config_path, monkeypatch):
+def test_legacy_migration_done_by_other_worker_is_not_redone(monkeypatch):
     legacy = repo_config.deepcopy(repo_config.DEFAULT_CONFIG)
     legacy.pop("locations", None)
     legacy["location"] = {"name": "Old site", "latitude": 45.0, "longitude": 5.0}
-    config_path.write_text(json.dumps(legacy), encoding="utf-8")
+    settings_store.put_setting(repo_config.CONFIG_KEY, legacy)
 
-    @contextmanager
-    def _other_worker_migrated_first(_lock_path):
-        _config_written_by_other_worker(config_path, "migrated-by-other-worker")
-        yield
-
-    monkeypatch.setattr(repo_config, "interprocess_lock", _other_worker_migrated_first)
+    monkeypatch.setattr(
+        repo_config,
+        "transaction",
+        _transaction_entered_after(lambda: _config_written_by_other_worker("migrated-by-other-worker")),
+    )
 
     config = repo_config.load_config()
 

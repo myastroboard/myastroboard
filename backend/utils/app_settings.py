@@ -1,8 +1,9 @@
 """
 Persistent application settings manager.
 
-Settings are stored in DATA_DIR/app_settings.json and survive container rebuilds.
-The SECRET_KEY is stored separately in DATA_DIR/secret_key.txt (generated once, never changes).
+Settings are stored in the database (``settings`` table, key ``app_settings``) and survive
+container rebuilds. The SECRET_KEY is stored separately (key ``secret_key``; generated once,
+never changes).
 
 This replaces the following environment variables that were previously required in docker-compose:
   SECRET_KEY, TRUST_PROXY_HEADERS, SESSION_COOKIE_SECURE, VAPID_CONTACT_EMAIL
@@ -12,14 +13,14 @@ import os
 import secrets
 from urllib.parse import urlsplit
 
-from utils.json_settings_store import get_file_mtime, load_json_settings, save_json_settings
+from db import settings_store
+from utils.json_settings_store import get_settings_revision, load_json_settings, save_json_settings
 from utils.logging_config import VALID_LOG_LEVELS, get_logger
 
 logger = get_logger(__name__)
 
-_DATA_DIR = os.environ.get('DATA_DIR', '/app/data')
-_SECRET_KEY_FILE = os.path.join(_DATA_DIR, 'secret_key.txt')
-_APP_SETTINGS_FILE = os.path.join(_DATA_DIR, 'app_settings.json')
+APP_SETTINGS_KEY = 'app_settings'
+SECRET_KEY_KEY = 'secret_key'
 
 _DEFAULTS: dict = {
     "vapid_contact_email": "",
@@ -39,60 +40,68 @@ _DEFAULTS: dict = {
 LOG_RETENTION_MAX_DAYS = 3650
 
 _cache: dict | None = None
-_cache_mtime: float | None = None
+_cache_revision: int | None = None
+
+
+def _read_secret_key() -> str | None:
+    value = settings_store.get_setting(SECRET_KEY_KEY)
+    return value.strip() if isinstance(value, str) and value.strip() else None
 
 
 def load_or_generate_secret_key() -> str:
-    """Return the persistent SECRET_KEY, generating and saving it on first call."""
+    """Return the persistent SECRET_KEY, generating and saving it on first call.
+
+    Generation runs in one write transaction, so every gunicorn worker ends up with the
+    same key (a worker signing sessions with its own key would log users out at random).
+    """
     _warn_deprecated_env_vars()
 
-    os.makedirs(_DATA_DIR, exist_ok=True)
-    if os.path.exists(_SECRET_KEY_FILE):
-        try:
-            with open(_SECRET_KEY_FILE, 'r') as f:
-                key = f.read().strip()
-            if key:
-                logger.debug("SECRET_KEY loaded from data directory")
-                return key
-        except Exception as e:
-            logger.warning(f"Could not read secret_key.txt, regenerating: {e}")
-
-    key = secrets.token_hex(32)
     try:
-        with open(_SECRET_KEY_FILE, 'w') as f:
-            f.write(key)
-        logger.info(f"New SECRET_KEY generated and saved to {_SECRET_KEY_FILE}")
-    except Exception as e:
-        logger.error(f"Failed to persist SECRET_KEY to disk: {e}")
+        key = _read_secret_key()
+        if key:
+            logger.debug("SECRET_KEY loaded from the database")
+            return key
 
-    return key
+        def _generate(current):
+            if isinstance(current, str) and current.strip():
+                return None, current.strip()
+            fresh = secrets.token_hex(32)
+            return fresh, fresh
+
+        key = settings_store.modify_setting(SECRET_KEY_KEY, _generate)
+        logger.info("New SECRET_KEY generated and saved")
+        return key
+    except Exception as e:
+        logger.error(f"Failed to persist SECRET_KEY: {e}")
+        return secrets.token_hex(32)
 
 
 def load_app_settings() -> dict:
-    """Load settings from disk and merge with defaults. Updates the module cache."""
-    global _cache, _cache_mtime
-    settings = load_json_settings(_APP_SETTINGS_FILE, _DEFAULTS, 'App settings')
+    """Load settings from the database and merge with defaults. Updates the module cache."""
+    global _cache, _cache_revision
+    revision = get_settings_revision(APP_SETTINGS_KEY)
+    settings = load_json_settings(APP_SETTINGS_KEY, _DEFAULTS, 'App settings')
     _cache = settings
-    _cache_mtime = get_file_mtime(_APP_SETTINGS_FILE)
+    _cache_revision = revision
     return settings
 
 
 def save_app_settings(settings: dict) -> None:
-    """Persist settings to disk and update the module cache."""
-    global _cache, _cache_mtime
-    merged = save_json_settings(_APP_SETTINGS_FILE, _DEFAULTS, settings, 'App settings')
+    """Persist settings and update the module cache."""
+    global _cache, _cache_revision
+    merged = save_json_settings(APP_SETTINGS_KEY, _DEFAULTS, settings, 'App settings')
     _cache = merged
-    _cache_mtime = get_file_mtime(_APP_SETTINGS_FILE)
+    _cache_revision = get_settings_revision(APP_SETTINGS_KEY)
 
 
 def get_app_settings() -> dict:
-    """Return cached settings, reloading when cold or when the file changed on disk.
+    """Return cached settings, reloading when cold or when another worker saved.
 
-    The mtime check keeps a long-lived worker process (`gunicorn -w N`) from serving a
-    stale cache forever once warm - the same multi-worker sync UserManager already does
-    for users.json via `_reload_users_if_changed()`.
+    The revision check keeps a long-lived worker process (`gunicorn -w N`) from serving a
+    stale cache forever once warm - the same multi-worker sync UserManager does
+    via `_reload_users_if_changed()`.
     """
-    if _cache is None or get_file_mtime(_APP_SETTINGS_FILE) != _cache_mtime:
+    if _cache is None or get_settings_revision(APP_SETTINGS_KEY) != _cache_revision:
         return load_app_settings()
     return _cache
 
@@ -151,7 +160,7 @@ def get_external_base_url() -> str:
 
 
 def reload_app_settings() -> dict:
-    """Force a reload from disk (call after external file changes)."""
+    """Force a reload from the database (call after a restore)."""
     global _cache
     _cache = None
     return load_app_settings()

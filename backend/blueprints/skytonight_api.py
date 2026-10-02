@@ -141,11 +141,7 @@ def _preload_all_current_plan_entries(user_id: str, username: str) -> list:
     """Aggregate entries from all current (non-previous) plans for a user across all combinations."""
     all_entries: list = []
     seen_ids: set = set()
-    for file_path in plan_my_night.get_all_plan_files(user_id):
-        fname = os.path.basename(file_path)
-        cid: Optional[str] = None
-        if fname != f'{user_id}_plan_my_night.json':
-            cid = fname.replace(f'{user_id}_plan_', '').replace('.json', '')
+    for cid in plan_my_night.list_user_plan_combination_ids(user_id):
         try:
             payload = plan_my_night.load_user_plan(user_id, username, combination_id=cid)
             plan_obj = payload.get('plan')

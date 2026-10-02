@@ -21,38 +21,24 @@ an entry to an Astrodex item is the blueprint layer's job (see
 """
 
 import io
-import json
 import os
-import shutil
 import textwrap
-import threading
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
+from db import documents, queries
 from utils.constants import DATA_DIR
-from utils.file_lock import interprocess_lock
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-# Per-user write locks to prevent race conditions on concurrent saves
-_user_save_locks: Dict[str, threading.Lock] = {}
-_user_save_locks_mutex = threading.Lock()
-
-
-def _get_user_save_lock(user_id: str) -> threading.Lock:
-    """Get or create a per-user lock for serializing session file writes."""
-    with _user_save_locks_mutex:
-        if user_id not in _user_save_locks:
-            _user_save_locks[user_id] = threading.Lock()
-        return _user_save_locks[user_id]
-
-
-# Observation Log data directory (top-level, mirrors data/astrodex/)
+# Observation Log directory: holds the session attachments (attachments/); the sessions
+# themselves are in the database
 OBSERVATION_SESSIONS_DIR = os.path.join(DATA_DIR, 'observation_sessions')
 
-SESSIONS_FILE_SUFFIX = '_sessions.json'
+# user_documents kind of the per-user observation log
+SESSIONS_KIND = 'observation_sessions'
 
 # Session ("trip") level fields a PUT may change. A session can span several nights
 # (see NIGHT_UPDATABLE_FIELDS below) - date/start_time/end_time/sqm/seeing/transparency
@@ -116,27 +102,6 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _safe_sessions_path(path: str) -> str:
-    """Resolve *path* and verify it lives inside OBSERVATION_SESSIONS_DIR.
-
-    This is the canonical sanitizer for path expressions in this module. The
-    containment check uses realpath + startswith (rather than os.path.commonpath)
-    because that is the pattern CodeQL's py/path-injection query recognises as a
-    sanitizer barrier, and callers must use the *returned* resolved path.
-
-    OBSERVATION_SESSIONS_DIR is read at call time (not cached) so test fixtures that
-    monkeypatch it are honoured.
-
-    Raises ValueError if the path would escape the directory (which also excludes the
-    directory itself, never a valid file path).
-    """
-    base_real = os.path.realpath(OBSERVATION_SESSIONS_DIR)
-    resolved = os.path.realpath(path)
-    if not resolved.startswith(base_real + os.sep):
-        raise ValueError(f'Path outside observation sessions directory: {path!r}')
-    return resolved
-
-
 def _coerce_optional_float(value: Any, minimum: Optional[float] = None, maximum: Optional[float] = None):
     """Best-effort float parse for a loosely-typed numeric field.
 
@@ -191,8 +156,8 @@ def _optional_text(value: Any, max_length: int = 200):
 
 def attachments_dir() -> str:
     """Attachment files live in a subdirectory of OBSERVATION_SESSIONS_DIR - a function,
-    not a module-level constant, so it's read at call time (like _safe_sessions_path())
-    and honours test fixtures that monkeypatch OBSERVATION_SESSIONS_DIR. Already covered
+    not a module-level constant, so it's read at call time and honours test fixtures
+    that monkeypatch OBSERVATION_SESSIONS_DIR. Already covered
     by the admin backup ZIP's existing recursive `observation_sessions` entry - no new
     backup/restore wiring needed."""
     return os.path.join(OBSERVATION_SESSIONS_DIR, 'attachments')
@@ -202,12 +167,6 @@ def ensure_observation_sessions_directories() -> None:
     """Ensure the Observation Log data directory (and its attachments subdirectory) exist."""
     os.makedirs(OBSERVATION_SESSIONS_DIR, exist_ok=True)
     os.makedirs(attachments_dir(), exist_ok=True)
-
-
-def get_user_sessions_file(user_id: str) -> str:
-    """Get the path to a user's observation sessions file using their UUID."""
-    ensure_observation_sessions_directories()
-    return _safe_sessions_path(os.path.join(OBSERVATION_SESSIONS_DIR, f'{user_id}{SESSIONS_FILE_SUFFIX}'))
 
 
 def _default_payload(user_id: str, username: Optional[str] = None) -> Dict:
@@ -263,37 +222,18 @@ def _migrate_session_to_nights(session: Dict) -> bool:
 def load_user_sessions(user_id: str, username: Optional[str] = None) -> Dict:
     """Load a user's observation sessions.
 
-    Never raises to the caller: a corrupted file is backed up to
-    ``.corrupted.<timestamp>`` and an empty payload is returned (the file is overwritten
-    on the next save), mirroring ``astrodex.load_user_astrodex``.
+    Never raises to the caller: an unreadable or malformed stored value yields an empty
+    payload (replaced on the next save), mirroring ``astrodex.load_user_astrodex``.
     """
     try:
-        file_path = get_user_sessions_file(user_id)
-    except (ValueError, OSError) as error:
-        logger.error(f'Cannot resolve sessions file for user {user_id}: {error}')
-        return _default_payload(user_id, username)
-
-    if not os.path.exists(file_path):
-        return _default_payload(user_id, username)
-
-    try:
-        with open(file_path, 'r', encoding='utf-8') as file_obj:
-            data = json.load(file_obj)
-    except json.JSONDecodeError as error:
-        logger.error(f'Error loading observation sessions for user {user_id}: {error}')
-        logger.error('Corrupted file will be backed up and reset')
-        backup_path = file_path + '.corrupted.' + datetime.now().strftime('%Y%m%d_%H%M%S')
-        try:
-            shutil.copy2(file_path, backup_path)
-            logger.info(f'Backed up corrupted file to {backup_path}')
-        except Exception as backup_error:
-            logger.error(f'Failed to backup corrupted file: {backup_error}')
-        return _default_payload(user_id, username)
+        data = documents.get_document(user_id, SESSIONS_KIND)
     except Exception as error:
         logger.error(f'Error loading observation sessions for user {user_id}: {error}')
         return _default_payload(user_id, username)
 
     if not isinstance(data, dict):
+        if data is not None:
+            logger.error(f'Stored observation sessions of user {user_id} are malformed; starting from empty')
         return _default_payload(user_id, username)
 
     data.setdefault('user_id', user_id)
@@ -314,88 +254,47 @@ def load_user_sessions(user_id: str, username: Optional[str] = None) -> Dict:
     return data
 
 
-def validate_sessions_json(file_path: str) -> Tuple[bool, str]:
-    """Validate that a file contains a well-formed observation sessions payload.
+def validate_sessions_data(data: Any) -> Tuple[bool, str]:
+    """Validate a well-formed observation sessions payload before it is stored.
 
     Returns:
         Tuple of (is_valid, error_message)
     """
-    try:
-        safe_path = _safe_sessions_path(file_path)
-        with open(safe_path, 'r', encoding='utf-8') as file_obj:
-            data = json.load(file_obj)
+    if not isinstance(data, dict):
+        return False, 'JSON root is not a dictionary'
 
-        if not isinstance(data, dict):
-            return False, 'JSON root is not a dictionary'
+    if 'username' not in data:
+        return False, "Missing 'username' field"
 
-        if 'username' not in data:
-            return False, "Missing 'username' field"
+    if 'sessions' not in data or not isinstance(data['sessions'], list):
+        return False, "Missing or invalid 'sessions' field"
 
-        if 'sessions' not in data or not isinstance(data['sessions'], list):
-            return False, "Missing or invalid 'sessions' field"
+    for index, session in enumerate(data['sessions']):
+        if not isinstance(session, dict):
+            return False, f'Session {index} must be an object'
+        if not session.get('id'):
+            return False, f"Session {index} missing 'id' field"
+        nights = session.get('nights')
+        if not isinstance(nights, list) or not nights:
+            return False, f"Session {index} missing 'nights' field"
+        night_ids = set()
+        for night in nights:
+            if not isinstance(night, dict) or not night.get('id') or not night.get('date'):
+                return False, f'Session {index} has an invalid night entry'
+            night_ids.add(night['id'])
+        if not isinstance(session.get('entries', []), list):
+            return False, f"Session {index} has an invalid 'entries' field"
+        for entry in session.get('entries', []):
+            if isinstance(entry, dict) and entry.get('night_id') and entry['night_id'] not in night_ids:
+                return False, f'Session {index} has an entry referencing an unknown night'
+        if 'attachments' in session and not isinstance(session['attachments'], list):
+            return False, f"Session {index} has an invalid 'attachments' field"
 
-        for index, session in enumerate(data['sessions']):
-            if not isinstance(session, dict):
-                return False, f'Session {index} must be an object'
-            if not session.get('id'):
-                return False, f"Session {index} missing 'id' field"
-            nights = session.get('nights')
-            if not isinstance(nights, list) or not nights:
-                return False, f"Session {index} missing 'nights' field"
-            night_ids = set()
-            for night in nights:
-                if not isinstance(night, dict) or not night.get('id') or not night.get('date'):
-                    return False, f'Session {index} has an invalid night entry'
-                night_ids.add(night['id'])
-            if not isinstance(session.get('entries', []), list):
-                return False, f"Session {index} has an invalid 'entries' field"
-            for entry in session.get('entries', []):
-                if isinstance(entry, dict) and entry.get('night_id') and entry['night_id'] not in night_ids:
-                    return False, f'Session {index} has an entry referencing an unknown night'
-            if 'attachments' in session and not isinstance(session['attachments'], list):
-                return False, f"Session {index} has an invalid 'attachments' field"
-
-        return True, ''
-    except json.JSONDecodeError as error:
-        return False, f'Invalid JSON: {error}'
-    except Exception as error:
-        return False, f'Validation error: {error}'
+    return True, ''
 
 
 def save_user_sessions(user_id: str, sessions_data: Dict, username: Optional[str] = None) -> bool:
-    """Save a user's observation sessions with the full atomic backup/recovery sequence.
-
-    Process (identical to astrodex.save_user_astrodex):
-      1. Back up the existing file
-      2. Write to a temporary file
-      3. Validate the temporary file
-      4. Atomically replace the original
-      5. Drop the backup on success, restore from it on failure
-    """
-    try:
-        file_path = get_user_sessions_file(user_id)
-    except (ValueError, OSError) as error:
-        logger.error(f'Cannot resolve sessions file for user {user_id}: {error}')
-        return False
-
-    temp_path = file_path + '.tmp'
-    backup_path = file_path + '.backup'
-
-    # The thread lock serializes this worker; the file lock serializes every gunicorn worker
-    with _get_user_save_lock(user_id), interprocess_lock(file_path + '.lock'):
-        return _save_user_sessions_locked(user_id, username, sessions_data, file_path, temp_path, backup_path)
-
-
-def _save_user_sessions_locked(
-    user_id: str,
-    username: Optional[str],
-    sessions_data: Dict,
-    file_path: str,
-    temp_path: str,
-    backup_path: str,
-) -> bool:
-    backup_created = False
-
+    """Validate and store a user's observation sessions (one transaction, nothing half-written)."""
     try:
         sessions_data['updated_at'] = _now_iso()
         sessions_data['user_id'] = user_id
@@ -404,66 +303,17 @@ def _save_user_sessions_locked(
         sessions_data.setdefault('username', username or 'unknown')
         sessions_data.setdefault('created_at', _now_iso())
 
-        if os.path.exists(file_path):
-            try:
-                shutil.copy2(file_path, backup_path)
-                backup_created = True
-                logger.debug(f'Created backup: {backup_path}')
-            except Exception as backup_error:
-                logger.error(f'Failed to create backup for user {user_id}: {backup_error}')
-                # Continue anyway - the atomic replace still provides some safety
-
-        with open(temp_path, 'w', encoding='utf-8') as file_obj:
-            json.dump(sessions_data, file_obj, indent=2, ensure_ascii=False)
-
-        is_valid, error_message = validate_sessions_json(temp_path)
+        is_valid, error_message = validate_sessions_data(sessions_data)
         if not is_valid:
             raise ValueError(f'JSON validation failed: {error_message}')
 
-        os.replace(temp_path, file_path)
+        documents.put_document(user_id, SESSIONS_KIND, sessions_data)
         logger.info(f'Successfully saved observation sessions for user {user_id}')
-
-        if backup_created and os.path.exists(backup_path):
-            try:
-                os.remove(backup_path)
-            except Exception as cleanup_error:  # pragma: no cover
-                logger.warning(f'Failed to remove backup: {cleanup_error}')
-
         return True
 
     except Exception as error:
         logger.error(f'Error saving observation sessions for user {user_id}: {error}')
-
-        if backup_created and os.path.exists(backup_path):
-            try:
-                shutil.copy2(backup_path, file_path)
-                logger.info(f'Restored observation sessions from backup for user {user_id}')
-            except Exception as restore_error:  # pragma: no cover
-                logger.error(f'Failed to restore from backup: {restore_error}')
-
-        for cleanup_path in (temp_path, backup_path):
-            if os.path.exists(cleanup_path):
-                try:
-                    os.remove(cleanup_path)
-                except Exception as cleanup_error:  # pragma: no cover
-                    logger.warning(f'Failed to remove {cleanup_path}: {cleanup_error}')
-
         return False
-
-
-def _iter_session_files() -> List[str]:
-    """Return every observation sessions file path (all users), safely resolved."""
-    if not os.path.isdir(OBSERVATION_SESSIONS_DIR):
-        return []
-    paths: List[str] = []
-    for filename in os.listdir(OBSERVATION_SESSIONS_DIR):
-        if not filename.endswith(SESSIONS_FILE_SUFFIX):
-            continue
-        try:
-            paths.append(_safe_sessions_path(os.path.join(OBSERVATION_SESSIONS_DIR, filename)))
-        except ValueError:  # pragma: no cover
-            continue  # failed containment check — skip
-    return paths
 
 
 def load_all_users_sessions(usernames_by_id: Optional[Dict[str, str]] = None) -> List[Dict]:
@@ -472,14 +322,10 @@ def load_all_users_sessions(usernames_by_id: Optional[Dict[str, str]] = None) ->
     Used by the delete-guard scans below, not by any UI route - sessions are private and
     never shown across users.
     """
-    ensure_observation_sessions_directories()
     usernames_by_id = usernames_by_id or {}
 
     collections: List[Dict] = []
-    for filename in sorted(os.listdir(OBSERVATION_SESSIONS_DIR)):
-        if not filename.endswith(SESSIONS_FILE_SUFFIX):
-            continue
-        user_id = filename[: -len(SESSIONS_FILE_SUFFIX)]
+    for user_id, _doc_key, _data in documents.list_documents(SESSIONS_KIND):
         data = load_user_sessions(user_id, usernames_by_id.get(user_id))
         collections.append(
             {
@@ -1309,27 +1155,6 @@ def get_session_stats(user_id: str) -> Dict:
     }
 
 
-def _count_sessions_matching(field: str, value: str) -> int:
-    """Count sessions (all users) whose session-level *field* equals *value*.
-
-    Fail-open on unreadable files (skipped), matching
-    astrodex.count_pictures_for_combination / plan_my_night.count_plans_for_combination.
-    """
-    if not value:
-        return 0
-    count = 0
-    for file_path in _iter_session_files():
-        try:
-            with open(file_path, 'r', encoding='utf-8') as file_obj:
-                data = json.load(file_obj)
-            for session in data.get('sessions', []):
-                if isinstance(session, dict) and session.get(field) == value:
-                    count += 1
-        except Exception:
-            continue  # unreadable file — skip, this is a best-effort count
-    return count
-
-
 def count_sessions_for_combination(combination_id: str) -> int:
     """Count sessions (all users) referencing an equipment combination - pre-delete check.
 
@@ -1343,22 +1168,7 @@ def count_sessions_for_combination(combination_id: str) -> int:
     """
     if not combination_id:
         return 0
-    count = 0
-    for file_path in _iter_session_files():
-        try:
-            with open(file_path, 'r', encoding='utf-8') as file_obj:
-                data = json.load(file_obj)
-            for session in data.get('sessions', []):
-                if not isinstance(session, dict):
-                    continue
-                if session.get('combination_id') == combination_id or any(
-                    isinstance(entry, dict) and entry.get('combination_id') == combination_id
-                    for entry in session.get('entries', []) or []
-                ):
-                    count += 1
-        except Exception:
-            continue  # unreadable file — skip, this is a best-effort count
-    return count
+    return queries.count_sessions_for_combination(combination_id)
 
 
 def count_sessions_for_location(location_id: str) -> int:
@@ -1368,7 +1178,9 @@ def count_sessions_for_location(location_id: str) -> int:
     orphan-flagged when a preset is removed - a session is a historical record, and its
     frozen ``location_name`` snapshot stays valid as display-only history.
     """
-    return _count_sessions_matching('location_id', location_id)
+    if not location_id:
+        return 0
+    return queries.count_sessions_for_location(location_id)
 
 
 # ---------------------------------------------------------------------------

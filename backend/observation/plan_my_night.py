@@ -5,8 +5,6 @@ import csv
 import json
 import os
 import re
-import shutil
-import threading
 import uuid
 import io
 from datetime import datetime, timedelta, timezone
@@ -15,8 +13,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 
 from skytonight import skytonight_targets
-from utils.constants import DATA_DIR
-from utils.file_lock import interprocess_lock
+from db import documents, queries
 from utils.logging_config import get_logger
 from skytonight.skytonight_calculator import (
     _horizon_floor_array,
@@ -27,44 +24,9 @@ from skytonight.skytonight_calculator import (
 
 logger = get_logger(__name__)
 
-# Per-user write locks to prevent race conditions on concurrent saves
-_user_plan_locks: Dict[str, threading.Lock] = {}
-_user_plan_locks_mutex = threading.Lock()
-
-
-def _get_user_plan_lock(user_id: str) -> threading.Lock:
-    """Get or create a per-user lock for serializing plan file writes."""
-    with _user_plan_locks_mutex:
-        if user_id not in _user_plan_locks:
-            _user_plan_locks[user_id] = threading.Lock()
-        return _user_plan_locks[user_id]
-
-
-PLAN_DIR = os.path.join(DATA_DIR, 'projects')
-
-
-def _safe_plan_path(path: str) -> str:
-    """Resolve *path* and verify it lives inside PLAN_DIR.
-
-    This is the canonical sanitizer for path expressions in this module.
-    CodeQL (CWE-022) requires the realpath check to occur at the call site of
-    each file operation; callers must use the *returned* resolved path. The
-    containment check uses realpath + startswith (rather than
-    os.path.commonpath) because that is the pattern CodeQL's py/path-injection
-    query recognises as a sanitizer barrier.
-
-    PLAN_DIR is read at call time (not cached) so that test fixtures that
-    monkeypatch plan_my_night.PLAN_DIR are honoured correctly.
-
-    Raises ValueError if the path would escape the plan directory (this also
-    excludes the plan root directory itself, which is never a valid file path).
-    """
-    plan_dir_real = os.path.realpath(PLAN_DIR)
-    resolved = os.path.realpath(path)
-    if not resolved.startswith(plan_dir_real + os.sep):
-        raise ValueError(f'Path outside plan directory: {path!r}')
-    return resolved
-
+# user_documents kind of a plan; the document key is the combination id, or
+# _COMBINATION_ID_DEFAULT for the "no equipment selected" plan
+PLAN_KIND = 'plan'
 
 _COMBINATION_ID_DEFAULT = 'default'
 
@@ -590,46 +552,21 @@ def _compute_entry_meridian_flip(
     }
 
 
-def ensure_plan_directory() -> None:
-    os.makedirs(PLAN_DIR, exist_ok=True)
+def _plan_doc_key(combination_id: Optional[str]) -> str:
+    """Document key of a plan: the combination id, or the default key when there is none."""
+    if combination_id and _is_valid_combination_id(combination_id):
+        return combination_id
+    return _COMBINATION_ID_DEFAULT
 
 
-def get_user_plan_file(user_id: str, combination_id: Optional[str] = None) -> str:
-    ensure_plan_directory()
-    if not _is_valid_user_id(user_id):
-        raise ValueError(f'Invalid user_id format: {user_id!r}')
-    cid = combination_id if _is_valid_combination_id(combination_id) else _COMBINATION_ID_DEFAULT
-    if cid == _COMBINATION_ID_DEFAULT:
-        # No-combination filename kept as-is - this predates combinations and stays the
-        # on-disk name for the "no equipment selected" plan.
-        path = os.path.join(PLAN_DIR, f'{user_id}_plan_my_night.json')
-    else:
-        path = os.path.join(PLAN_DIR, f'{user_id}_plan_{cid}.json')
-    # _safe_plan_path resolves symlinks and verifies containment; returns the
-    # realpath so downstream callers always operate on a canonical, safe path.
-    return _safe_plan_path(path)
-
-
-def get_all_plan_files(user_id: str) -> list:
-    """Return all plan file paths that exist for this user."""
+def list_user_plan_combination_ids(user_id: str) -> List[Optional[str]]:
+    """Combination id of every stored plan of this user (None for the no-combination plan)."""
     if not _is_valid_user_id(user_id):
         return []
-    ensure_plan_directory()
-    result = []
-    for fname in os.listdir(PLAN_DIR):
-        if (
-            fname.startswith(f'{user_id}_plan')
-            and fname.endswith('.json')
-            and '.corrupted.' not in fname
-            and '.backup' not in fname
-            and fname != f'{user_id}_plan_my_night.json.tmp'
-        ):
-            try:
-                resolved = _safe_plan_path(os.path.join(PLAN_DIR, fname))
-                result.append(resolved)
-            except ValueError:
-                pass  # filename failed path-traversal check — skip it
-    return result
+    return [
+        None if doc_key == _COMBINATION_ID_DEFAULT else doc_key
+        for doc_key, _payload in documents.list_user_documents(user_id, PLAN_KIND)
+    ]
 
 
 def _default_payload(user_id: str, username: Optional[str] = None) -> Dict:
@@ -643,29 +580,17 @@ def _default_payload(user_id: str, username: Optional[str] = None) -> Dict:
 
 
 def load_user_plan(user_id: str, username: Optional[str] = None, combination_id: Optional[str] = None) -> Dict:
-    # get_user_plan_file already calls _safe_plan_path and returns the resolved
-    # path.  Re-applying _safe_plan_path here makes the sanitization explicit at
-    # the call site, which is required for CodeQL to recognise the barrier.
-    file_path = _safe_plan_path(get_user_plan_file(user_id, combination_id))
-    if not os.path.exists(file_path):
-        return _default_payload(user_id, username)
-
+    if not _is_valid_user_id(user_id):
+        raise ValueError(f'Invalid user_id format: {user_id!r}')
     try:
-        with open(file_path, 'r', encoding='utf-8') as file_obj:
-            payload = json.load(file_obj)
-    except json.JSONDecodeError as error:
-        logger.error(f'Error loading plan for user {user_id}: {error}')
-        backup_path = _safe_plan_path(file_path + '.corrupted.' + datetime.now().strftime('%Y%m%d_%H%M%S'))
-        try:
-            shutil.copy2(file_path, backup_path)
-        except Exception as backup_error:
-            logger.error(f'Failed to backup corrupted plan file {file_path}: {backup_error}')
-        return _default_payload(user_id, username)
+        payload = documents.get_document(user_id, PLAN_KIND, _plan_doc_key(combination_id))
     except Exception as error:
         logger.error(f'Error loading plan for user {user_id}: {error}')
         return _default_payload(user_id, username)
 
     if not isinstance(payload, dict):
+        if payload is not None:
+            logger.error(f'Stored plan of user {user_id} is malformed; starting from an empty one')
         return _default_payload(user_id, username)
 
     payload.setdefault('user_id', user_id)
@@ -682,73 +607,38 @@ def load_user_plan(user_id: str, username: Optional[str] = None, combination_id:
     return payload
 
 
-def validate_plan_json(file_path: str) -> Tuple[bool, str]:
-    try:
-        safe_path = _safe_plan_path(file_path)
-        with open(safe_path, 'r', encoding='utf-8') as file_obj:
-            payload = json.load(file_obj)
+def validate_plan_data(payload: Any) -> Tuple[bool, str]:
+    """Validate a plan payload before it is stored."""
+    if not isinstance(payload, dict):
+        return False, 'JSON root must be an object'
 
-        if not isinstance(payload, dict):
-            return False, 'JSON root must be an object'
+    if 'user_id' not in payload:
+        return False, "Missing 'user_id'"
 
-        if 'user_id' not in payload:
-            return False, "Missing 'user_id'"
+    plan = payload.get('plan')
+    if plan is not None:
+        if not isinstance(plan, dict):
+            return False, "'plan' must be an object or null"
+        if not isinstance(plan.get('entries', []), list):
+            return False, "'plan.entries' must be a list"
 
-        plan = payload.get('plan')
-        if plan is not None:
-            if not isinstance(plan, dict):
-                return False, "'plan' must be an object or null"
-            if not isinstance(plan.get('entries', []), list):
-                return False, "'plan.entries' must be a list"
-
-            for index, entry in enumerate(plan.get('entries', [])):
-                if not isinstance(entry, dict):
-                    return False, f'Entry {index} must be an object'
-                if not entry.get('id'):
-                    return False, f'Entry {index} missing id'
-                if not entry.get('name'):
-                    return False, f'Entry {index} missing name'
-        return True, ''
-    except json.JSONDecodeError as error:
-        return False, f'Invalid JSON: {error}'
-    except Exception as error:
-        return False, f'Validation failed: {error}'
+        for index, entry in enumerate(plan.get('entries', [])):
+            if not isinstance(entry, dict):
+                return False, f'Entry {index} must be an object'
+            if not entry.get('id'):
+                return False, f'Entry {index} missing id'
+            if not entry.get('name'):
+                return False, f'Entry {index} missing name'
+    return True, ''
 
 
 def save_user_plan(
     user_id: str, payload: Dict, username: Optional[str] = None, combination_id: Optional[str] = None
 ) -> bool:
-    file_path = get_user_plan_file(user_id, combination_id)
-    temp_path = file_path + '.tmp'
-    backup_path = file_path + '.backup'
-
-    # The thread lock serializes this worker; the file lock serializes every gunicorn worker
-    with _get_user_plan_lock(user_id), interprocess_lock(file_path + '.lock'):
-        return _save_user_plan_locked(user_id, payload, username, file_path, temp_path, backup_path)
-
-
-def _save_user_plan_locked(
-    user_id: str,
-    payload: Dict,
-    username: Optional[str],
-    file_path: str,
-    temp_path: str,
-    backup_path: str,
-) -> bool:
-    # Validate all three paths at the entry point so every file operation in
-    # this function operates on a sanitized, realpath-resolved path.
+    """Validate and store one plan (one transaction, nothing half-written)."""
+    if not _is_valid_user_id(user_id):
+        raise ValueError(f'Invalid user_id format: {user_id!r}')
     try:
-        file_path = _safe_plan_path(file_path)
-        temp_path = _safe_plan_path(temp_path)
-        backup_path = _safe_plan_path(backup_path)
-    except ValueError as ve:
-        logger.error(f'_save_user_plan_locked: path validation failed for user {user_id}: {ve}')
-        return False
-
-    backup_created = False
-
-    try:
-        ensure_plan_directory()
         payload['user_id'] = user_id
         if username:
             payload['username'] = username
@@ -756,47 +646,14 @@ def _save_user_plan_locked(
         payload.setdefault('created_at', _to_iso(_now()))
         payload['updated_at'] = _to_iso(_now())
 
-        if os.path.exists(file_path):
-            try:
-                shutil.copy2(file_path, backup_path)
-                backup_created = True
-            except Exception as backup_error:
-                logger.error(f'Failed to backup plan file for user {user_id}: {backup_error}')
-
-        with open(temp_path, 'w', encoding='utf-8') as file_obj:
-            json.dump(payload, file_obj, indent=2, ensure_ascii=False)
-
-        is_valid, error_message = validate_plan_json(temp_path)
+        is_valid, error_message = validate_plan_data(payload)
         if not is_valid:
             raise ValueError(error_message)
 
-        os.replace(temp_path, file_path)
-
-        if backup_created and os.path.exists(backup_path):
-            os.remove(backup_path)
-
+        documents.put_document(user_id, PLAN_KIND, payload, _plan_doc_key(combination_id))
         return True
     except Exception as error:
         logger.error(f'Error saving plan for user {user_id}: {error}')
-
-        if backup_created and os.path.exists(backup_path):
-            try:
-                os.replace(backup_path, file_path)
-            except Exception as restore_error:
-                logger.error(f'Failed to restore plan backup for user {user_id}: {restore_error}')
-
-        if os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-            except Exception as cleanup_error:
-                logger.warning(f'Failed to clean temp plan file for user {user_id}: {cleanup_error}')
-
-        if backup_created and os.path.exists(backup_path):
-            try:
-                os.remove(backup_path)
-            except Exception:
-                pass  # best-effort backup cleanup on save failure; non-fatal
-
         return False
 
 
@@ -1007,46 +864,30 @@ def clear_plan(user_id: str, username: str, combination_id: Optional[str] = None
 
 
 def clear_all_plans(user_id: str) -> int:
-    """Delete all plan files for this user. Returns the number of files deleted."""
+    """Delete all plans of this user. Returns the number of plans deleted."""
     deleted = 0
-    for file_path in get_all_plan_files(user_id):
+    for combination_id in list_user_plan_combination_ids(user_id):
         try:
-            os.remove(file_path)
-            deleted += 1
+            if documents.delete_document(user_id, PLAN_KIND, _plan_doc_key(combination_id)):
+                deleted += 1
         except Exception as err:
-            logger.error(f'Error deleting plan file {file_path}: {err}')
+            logger.error(f'Error deleting plan {combination_id or _COMBINATION_ID_DEFAULT} of {user_id}: {err}')
     return deleted
 
 
-def _iter_all_plan_files() -> list:
-    """Return every plan file path in PLAN_DIR (all users), safely resolved."""
-    ensure_plan_directory()
-    result = []
-    for fname in os.listdir(PLAN_DIR):
-        if not fname.endswith('.json') or '.corrupted.' in fname or '.backup' in fname or fname.endswith('.tmp'):
-            continue
-        try:
-            result.append(_safe_plan_path(os.path.join(PLAN_DIR, fname)))
-        except ValueError:
-            pass  # failed containment check — skip
-    return result
-
-
-def _plan_references_location(file_path: str, location_id: str) -> bool:
-    try:
-        with open(file_path, 'r', encoding='utf-8') as file_obj:
-            payload = json.load(file_obj)
+def _iter_all_plans():
+    """``(user_id, doc_key, plan)`` for every stored plan dict (all users)."""
+    for user_id, doc_key, payload in documents.list_documents(PLAN_KIND):
         plan = payload.get('plan') if isinstance(payload, dict) else None
-        return bool(isinstance(plan, dict) and plan.get('location_id') == location_id)
-    except Exception:
-        return False
+        if isinstance(plan, dict):
+            yield user_id, doc_key, plan
 
 
 def count_plans_for_location(location_id: str) -> int:
     """Count plans (all users) pinned to a location preset - pre-delete check."""
     if not location_id:
         return 0
-    return sum(1 for path in _iter_all_plan_files() if _plan_references_location(path, location_id))
+    return queries.count_plans(location_id=location_id)
 
 
 def delete_plans_for_location(location_id: str) -> int:
@@ -1058,26 +899,15 @@ def delete_plans_for_location(location_id: str) -> int:
     if not location_id:
         return 0
     deleted = 0
-    for file_path in _iter_all_plan_files():
-        if _plan_references_location(file_path, location_id):
-            try:
-                os.remove(file_path)
+    for user_id, doc_key in queries.plans_for_location(location_id):
+        try:
+            if documents.delete_document(user_id, PLAN_KIND, doc_key):
                 deleted += 1
-            except Exception as err:
-                logger.error(f'Error cascade-deleting plan file {file_path}: {err}')
+        except Exception as err:
+            logger.error(f'Error cascade-deleting plan {doc_key} of {user_id}: {err}')
     if deleted:
         logger.info(f'Cascade-deleted {deleted} plan(s) pinned to location {location_id}')
     return deleted
-
-
-def _plan_references_combination(file_path: str, combination_id: str) -> bool:
-    try:
-        with open(file_path, 'r', encoding='utf-8') as file_obj:
-            payload = json.load(file_obj)
-        plan = payload.get('plan') if isinstance(payload, dict) else None
-        return bool(isinstance(plan, dict) and plan.get('combination_id') == combination_id)
-    except Exception:
-        return False
 
 
 def count_plans_for_combination(combination_id: str) -> int:
@@ -1088,29 +918,27 @@ def count_plans_for_combination(combination_id: str) -> int:
     """
     if not combination_id:
         return 0
-    return sum(1 for path in _iter_all_plan_files() if _plan_references_combination(path, combination_id))
+    return queries.count_plans(combination_id=combination_id)
 
 
 def purge_legacy_telescope_plans() -> int:
-    """Delete plan files still keyed by the pre-combination schema (a raw ``telescope_id`` field).
+    """Delete plans still keyed by the pre-combination schema (a raw ``telescope_id`` field).
 
     Plans are daily/ephemeral, so there is no migration path from the old telescope-keyed
-    schema - any plan file whose ``plan`` dict still contains the legacy ``telescope_id`` key
+    schema - any plan whose ``plan`` dict still contains the legacy ``telescope_id`` key
     (an unambiguous marker: this module never writes that key again) is simply deleted.
     Called once at app startup.
     """
     deleted = 0
-    for file_path in _iter_all_plan_files():
+    for user_id, doc_key, plan in list(_iter_all_plans()):
+        if 'telescope_id' not in plan:
+            continue
         try:
-            with open(file_path, 'r', encoding='utf-8') as file_obj:
-                payload = json.load(file_obj)
-            plan = payload.get('plan') if isinstance(payload, dict) else None
-            if isinstance(plan, dict) and 'telescope_id' in plan:
-                os.remove(file_path)
+            if documents.delete_document(user_id, PLAN_KIND, doc_key):
                 deleted += 1
-                logger.info(f'Purged legacy telescope-keyed plan file: {file_path}')
+                logger.info(f'Purged legacy telescope-keyed plan {doc_key} of {user_id}')
         except Exception as error:
-            logger.error(f'Error checking plan file {file_path} for legacy schema: {error}')
+            logger.error(f'Error purging legacy plan {doc_key} of {user_id}: {error}')
     return deleted
 
 
@@ -1239,21 +1067,13 @@ def pick_active_plan(user_id: str, username: str) -> Optional[Dict]:
 
     Shared by the push scheduler (N1/N2 triggers) and the MQTT publisher (user device).
     """
-    plan_files = get_all_plan_files(user_id)
-    if not plan_files:
-        logger.debug(f"No plan files found for {username}")
+    combination_ids = list_user_plan_combination_ids(user_id)
+    if not combination_ids:
+        logger.debug(f"No plans found for {username}")
         return None
 
-    prefix = f'{user_id}_plan_'
-    suffix = '.json'
-
     candidates = []
-    for file_path in plan_files:
-        fname = os.path.basename(file_path)
-        if not (fname.startswith(prefix) and fname.endswith(suffix)):
-            continue
-        raw_cid = fname[len(prefix) : -len(suffix)]
-        combination_id = None if raw_cid == 'my_night' else raw_cid
+    for combination_id in combination_ids:
         try:
             payload = get_plan_with_timeline(user_id, username, combination_id=combination_id)
             state = payload.get('state', 'none')
@@ -1700,9 +1520,8 @@ def get_all_plan_states(user_id: str, username: str, combinations: list) -> list
     *new* plan while still showing state correctly for existing plans on a since-disabled one.
     """
     result = []
-    # Include the default plan (no combination selected) only if it exists on disk
-    default_file = get_user_plan_file(user_id, None)
-    if os.path.exists(default_file):
+    # Include the default plan (no combination selected) only if it is stored
+    if None in list_user_plan_combination_ids(user_id):
         payload = load_user_plan(user_id, username, combination_id=None)
         plan = payload.get('plan')
         state = get_plan_state(plan)
@@ -1750,16 +1569,10 @@ def get_all_plan_states(user_id: str, username: str, combinations: list) -> list
             }
         )
 
-    # Detect orphaned plans: plan files exist but their combination is no longer accessible
+    # Detect orphaned plans: plans exist but their combination is no longer accessible
     # (shared combination was removed, unshared by its owner, or deleted)
-    prefix = f'{user_id}_plan_'
-    suffix = '.json'
-    for plan_file in get_all_plan_files(user_id):
-        fname = os.path.basename(plan_file)
-        if not (fname.startswith(prefix) and fname.endswith(suffix)):
-            continue
-        cid = fname[len(prefix) : -len(suffix)]
-        if cid == 'my_night' or cid in known_ids:
+    for cid in list_user_plan_combination_ids(user_id):
+        if cid is None or cid in known_ids:
             continue
         payload = load_user_plan(user_id, username, combination_id=cid)
         plan = payload.get('plan')

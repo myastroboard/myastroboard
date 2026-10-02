@@ -1,12 +1,13 @@
 """
 Instance security settings manager (trusted networks + global 2FA switch).
 
-Settings are stored in DATA_DIR/security_settings.json and survive container rebuilds.
+Settings are stored in the database (``settings`` table, key ``security_settings``) and
+survive container rebuilds.
 This mirrors utils/app_settings.py (same _DEFAULTS / load_ / save_ / get_ / reload_ shape),
 deliberately kept out of data/config.json: the two validation rules below are stateful
 (old list vs. new list) and would not fit the generic /api/config merge handler.
 
-The file is intentionally excluded from /api/backup/download and /api/config/export:
+They are intentionally excluded from /api/backup/download and /api/config/export:
 trusted network ranges are host/deployment-specific, same reasoning as trust_proxy_headers.
 
 Two features consume the trusted-network list, for opposite purposes:
@@ -16,17 +17,15 @@ They share this data source only; their business logic stays independent.
 """
 
 import ipaddress
-import os
 
-from utils.json_settings_store import get_file_mtime, load_json_settings, save_json_settings
+from utils.json_settings_store import get_settings_revision, load_json_settings, save_json_settings
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-_DATA_DIR = os.environ.get('DATA_DIR', '/app/data')
-_SECURITY_SETTINGS_FILE = os.path.join(_DATA_DIR, 'security_settings.json')
+SECURITY_SETTINGS_KEY = 'security_settings'
 
-# Loopback is always trusted and is never written to the file, so clearing the
+# Loopback is always trusted and is never stored, so clearing the
 # configured list can never lock an admin out of local access.
 ALWAYS_TRUSTED_NETWORKS = ('127.0.0.0/8', '::1/128')
 
@@ -42,7 +41,7 @@ _DEFAULTS: dict = {
 }
 
 _cache: dict | None = None
-_cache_mtime: float | None = None
+_cache_revision: int | None = None
 
 
 def normalize_network(value) -> str:
@@ -99,7 +98,7 @@ def client_ip_is_trusted(client_ip, networks) -> bool:
 
     An unparseable or missing client IP is never trusted. Individual unparseable
     entries in *networks* are skipped rather than raising: the list is validated on
-    save, so a bad entry here means a hand-edited file and must not break login.
+    save, so a bad entry here means a hand-edited value and must not break login.
     """
     if not client_ip:
         return False
@@ -151,11 +150,11 @@ def is_client_ip_trusted(client_ip, settings: dict | None = None) -> bool:
 def _coerce_and_enforce_cascade(settings: dict) -> dict:
     """Normalize a raw settings dict's shape and enforce the 2FA/network invariant.
 
-    A hand-edited file (or any other future writer that bypasses the API's own
+    A hand-edited value (or any other future writer that bypasses the API's own
     validation) must never make the whole instance unusable or leave an inconsistent
     pair on disk: coerce the shape defensively here rather than raising, and enforce
     the same "2FA requires a network" cascade that update_security_settings_api()
-    enforces on the write path, so it holds no matter who wrote the file.
+    enforces on the write path, so it holds no matter who wrote the value.
     """
     if not isinstance(settings.get('trusted_networks'), list):
         logger.warning("security_settings.json: trusted_networks is not a list, ignoring it")
@@ -173,48 +172,49 @@ def _coerce_and_enforce_cascade(settings: dict) -> dict:
 
 
 def load_security_settings() -> dict:
-    """Load settings from disk and merge with defaults. Updates the module cache."""
-    global _cache, _cache_mtime
-    settings = load_json_settings(_SECURITY_SETTINGS_FILE, _DEFAULTS, 'Security settings')
+    """Load settings from the database and merge with defaults. Updates the module cache."""
+    global _cache, _cache_revision
+    revision = get_settings_revision(SECURITY_SETTINGS_KEY)
+    settings = load_json_settings(SECURITY_SETTINGS_KEY, _DEFAULTS, 'Security settings')
     settings = _coerce_and_enforce_cascade(settings)
     _cache = settings
-    _cache_mtime = get_file_mtime(_SECURITY_SETTINGS_FILE)
+    _cache_revision = revision
     return settings
 
 
 def save_security_settings(settings: dict) -> None:
-    """Persist settings to disk and update the module cache.
+    """Persist settings and update the module cache.
 
     Note: this is a defensive backstop, not the primary UX - update_security_settings_api()
     already rejects an attempt to newly enable 2FA with no trusted network outright (a
     clearer error for the admin than a silent no-op). This only guarantees that no
-    caller, now or in the future, can ever persist the inconsistent pair to disk.
+    caller, now or in the future, can ever persist the inconsistent pair.
     """
-    global _cache, _cache_mtime
+    global _cache, _cache_revision
     merged = dict(_DEFAULTS)
     for key in _DEFAULTS:
         if key in settings:
             merged[key] = settings[key]
     merged = _coerce_and_enforce_cascade(merged)
-    merged = save_json_settings(_SECURITY_SETTINGS_FILE, _DEFAULTS, merged, 'Security settings')
+    merged = save_json_settings(SECURITY_SETTINGS_KEY, _DEFAULTS, merged, 'Security settings')
     _cache = merged
-    _cache_mtime = get_file_mtime(_SECURITY_SETTINGS_FILE)
+    _cache_revision = get_settings_revision(SECURITY_SETTINGS_KEY)
 
 
 def get_security_settings() -> dict:
-    """Return cached settings, reloading when cold or when the file changed on disk.
+    """Return cached settings, reloading when cold or when another worker saved.
 
-    The mtime check keeps a long-lived worker process (`gunicorn -w N`) from serving a
-    stale cache forever once warm - the same multi-worker sync UserManager already does
-    for users.json via `_reload_users_if_changed()`.
+    The revision check keeps a long-lived worker process (`gunicorn -w N`) from serving a
+    stale cache forever once warm - the same multi-worker sync UserManager does
+    via `_reload_users_if_changed()`.
     """
-    if _cache is None or get_file_mtime(_SECURITY_SETTINGS_FILE) != _cache_mtime:
+    if _cache is None or get_settings_revision(SECURITY_SETTINGS_KEY) != _cache_revision:
         return load_security_settings()
     return _cache
 
 
 def reload_security_settings() -> dict:
-    """Force a reload from disk (call after external file changes)."""
+    """Force a reload from the database (call after a restore)."""
     global _cache
     _cache = None
     return load_security_settings()

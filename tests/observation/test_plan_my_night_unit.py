@@ -12,10 +12,10 @@ from unittest.mock import patch
 
 import pytest
 
+
 from observation import plan_my_night
 
 _parse_datetime = plan_my_night._parse_datetime
-validate_plan_json = plan_my_night.validate_plan_json
 _normalize_name = plan_my_night._normalize_name
 _entry_matches = plan_my_night._entry_matches
 is_target_in_entries = plan_my_night.is_target_in_entries
@@ -50,7 +50,6 @@ apply_optimized_schedule = plan_my_night.apply_optimized_schedule
 def temp_plan_dir(monkeypatch):
     """Create a temporary directory for plan files."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        plan_my_night.PLAN_DIR = tmpdir
         yield tmpdir
 
 
@@ -114,116 +113,36 @@ class TestParseDatetime:
         assert result.year == 2026
 
 
-class TestValidatePlanJson:
-    """Tests for validate_plan_json function."""
+class TestValidatePlanData:
+    """validate_plan_data contract (run before every save)."""
 
-    def test_valid_empty_plan(self, temp_plan_dir):
-        """Test validation of valid empty plan."""
-        file_path = os.path.join(temp_plan_dir, "valid.json")
-        payload = {"user_id": "user123"}
-        with open(file_path, "w") as f:
-            json.dump(payload, f)
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            {"user_id": "user123"},
+            {"user_id": "user123", "plan": None},
+            {"user_id": "user123", "plan": {"entries": [{"id": "1", "name": "M31"}, {"id": "2", "name": "M42"}]}},
+        ],
+    )
+    def test_valid_payloads(self, payload):
+        assert plan_my_night.validate_plan_data(payload) == (True, "")
 
-        is_valid, error = validate_plan_json(file_path)
-        assert is_valid is True
-        assert error == ""
-
-    def test_valid_plan_with_entries(self, temp_plan_dir):
-        """Test validation of plan with valid entries."""
-        file_path = os.path.join(temp_plan_dir, "valid_with_entries.json")
-        payload = {
-            "user_id": "user123",
-            "plan": {
-                "entries": [
-                    {"id": "1", "name": "M31", "catalogue": "Messier"},
-                    {"id": "2", "name": "M42", "catalogue": "Messier"},
-                ]
-            },
-        }
-        with open(file_path, "w") as f:
-            json.dump(payload, f)
-
-        is_valid, error = validate_plan_json(file_path)
-        assert is_valid is True
-
-    def test_missing_user_id(self, temp_plan_dir):
-        """Test validation fails when user_id is missing."""
-        file_path = os.path.join(temp_plan_dir, "missing_user_id.json")
-        payload = {"plan": {}}
-        with open(file_path, "w") as f:
-            json.dump(payload, f)
-
-        is_valid, error = validate_plan_json(file_path)
+    @pytest.mark.parametrize(
+        "payload, fragment",
+        [
+            (["not", "a", "dict"], "object"),
+            ({"plan": {}}, "user_id"),
+            ({"user_id": "u", "plan": "not a dict"}, "object or null"),
+            ({"user_id": "u", "plan": {"entries": "not a list"}}, "list"),
+            ({"user_id": "u", "plan": {"entries": [42]}}, "object"),
+            ({"user_id": "u", "plan": {"entries": [{"name": "M31"}]}}, "id"),
+            ({"user_id": "u", "plan": {"entries": [{"id": "1"}]}}, "name"),
+        ],
+    )
+    def test_invalid_payloads(self, payload, fragment):
+        is_valid, error = plan_my_night.validate_plan_data(payload)
         assert is_valid is False
-        assert "user_id" in error
-
-    def test_non_dict_root(self, temp_plan_dir):
-        """Test validation fails for non-dict root."""
-        file_path = os.path.join(temp_plan_dir, "non_dict_root.json")
-        with open(file_path, "w") as f:
-            json.dump(["not", "a", "dict"], f)
-
-        is_valid, error = validate_plan_json(file_path)
-        assert is_valid is False
-        assert "object" in error.lower()
-
-    def test_plan_not_dict(self, temp_plan_dir):
-        """Test validation fails when plan is not a dict."""
-        file_path = os.path.join(temp_plan_dir, "plan_not_dict.json")
-        payload = {"user_id": "user123", "plan": "not a dict"}
-        with open(file_path, "w") as f:
-            json.dump(payload, f)
-
-        is_valid, error = validate_plan_json(file_path)
-        assert is_valid is False
-
-    def test_entries_not_list(self, temp_plan_dir):
-        """Test validation fails when entries is not a list."""
-        file_path = os.path.join(temp_plan_dir, "entries_not_list.json")
-        payload = {"user_id": "user123", "plan": {"entries": "not a list"}}
-        with open(file_path, "w") as f:
-            json.dump(payload, f)
-
-        is_valid, error = validate_plan_json(file_path)
-        assert is_valid is False
-
-    def test_entry_missing_id(self, temp_plan_dir):
-        """Test validation fails when entry is missing id."""
-        file_path = os.path.join(temp_plan_dir, "entry_missing_id.json")
-        payload = {"user_id": "user123", "plan": {"entries": [{"name": "M31", "catalogue": "Messier"}]}}
-        with open(file_path, "w") as f:
-            json.dump(payload, f)
-
-        is_valid, error = validate_plan_json(file_path)
-        assert is_valid is False
-        assert "id" in error
-
-    def test_entry_missing_name(self, temp_plan_dir):
-        """Test validation fails when entry is missing name."""
-        file_path = os.path.join(temp_plan_dir, "entry_missing_name.json")
-        payload = {"user_id": "user123", "plan": {"entries": [{"id": "1", "catalogue": "Messier"}]}}
-        with open(file_path, "w") as f:
-            json.dump(payload, f)
-
-        is_valid, error = validate_plan_json(file_path)
-        assert is_valid is False
-        assert "name" in error
-
-    def test_invalid_json(self, temp_plan_dir):
-        """Test validation fails for invalid JSON."""
-        file_path = os.path.join(temp_plan_dir, "invalid.json")
-        with open(file_path, "w") as f:
-            f.write("{ invalid json")
-
-        is_valid, error = validate_plan_json(file_path)
-        assert is_valid is False
-        assert "Invalid JSON" in error
-
-    def test_file_not_found(self, temp_plan_dir):
-        """Test validation fails for missing file."""
-        file_path = os.path.join(temp_plan_dir, "nonexistent.json")
-        is_valid, error = validate_plan_json(file_path)
-        assert is_valid is False
+        assert fragment in error
 
 
 class TestNormalizeName:
@@ -824,48 +743,12 @@ class TestGeneratePlanPdf:
 _TEST_UID = "aaaa1111-2222-3333-4444-555566667777"
 
 
-class TestGetAllPlanFilesPathError:
-    """Covers ValueError from _safe_plan_path is silently skipped."""
-
-    def test_skips_file_with_traversal_path(self, temp_plan_dir, monkeypatch):
-        fname = f"{_TEST_UID}_plan_my_night.json"
-        with open(os.path.join(temp_plan_dir, fname), 'w') as f:
-            json.dump({'user_id': _TEST_UID}, f)
-
-        original = plan_my_night._safe_plan_path
-
-        def mock_safe(path):
-            if fname in path:
-                raise ValueError("path traversal detected")
-            return original(path)
-
-        monkeypatch.setattr(plan_my_night, '_safe_plan_path', mock_safe)
-        result = plan_my_night.get_all_plan_files(_TEST_UID)
-        assert result == []
-
-
 class TestLoadUserPlanExceptionPaths:
     """Covers exception paths and the username=None case in load_user_plan."""
 
-    def test_json_corrupted_backup_fails(self, temp_plan_dir, monkeypatch):
-        """Covers corrupted JSON + backup copy fails."""
-        file_path = plan_my_night.get_user_plan_file(_TEST_UID)
-        with open(file_path, 'w', encoding='utf-8') as f:
-            f.write('{invalid json')
-
-        with patch('observation.plan_my_night.shutil.copy2', side_effect=PermissionError("no copy")):
-            result = load_user_plan(_TEST_UID, "testuser")
-
-        assert result['user_id'] == _TEST_UID
-        assert result['plan'] is None
-
-    def test_general_exception_returns_default(self, temp_plan_dir, monkeypatch):
-        """Covers non-JSON exception → default payload."""
-        file_path = plan_my_night.get_user_plan_file(_TEST_UID)
-        with open(file_path, 'w', encoding='utf-8') as f:
-            json.dump({'user_id': _TEST_UID}, f)
-
-        with patch('observation.plan_my_night.json.load', side_effect=PermissionError("no access")):
+    def test_read_error_returns_default(self, temp_plan_dir, monkeypatch):
+        """A database read error yields the default payload."""
+        with patch('observation.plan_my_night.documents.get_document', side_effect=PermissionError("no access")):
             result = load_user_plan(_TEST_UID, "testuser")
 
         assert result['user_id'] == _TEST_UID
@@ -896,66 +779,6 @@ class TestSaveUserPlanWithoutUsername:
 # ============================================================
 
 
-class TestSaveUserPlanLockedBranches:
-    """Covers branches in _save_user_plan_locked."""
-
-    def test_path_validation_failure_returns_false(self, temp_plan_dir):
-        """ValueError from _safe_plan_path returns False."""
-        uid = "eeee0001-0000-4000-8000-000000000000"
-        payload = {'user_id': uid, 'plan': None}
-        # Patch _save_user_plan_locked directly to trigger the path validation failure
-        # by patching _safe_plan_path to always raise ValueError
-        with patch.object(plan_my_night, '_safe_plan_path', side_effect=ValueError("path traversal")):
-            result = plan_my_night._save_user_plan_locked(
-                uid,
-                payload,
-                "testuser",
-                os.path.join(temp_plan_dir, "test.json"),
-                os.path.join(temp_plan_dir, "test.tmp"),
-                os.path.join(temp_plan_dir, "test.bak"),
-            )
-        assert result is False
-
-    def test_backup_copy_failure_continues(self, temp_plan_dir):
-        """backup copy fails but save still continues."""
-        uid = "eeee0002-0000-4000-8000-000000000000"
-        # First, create an existing plan file so backup is attempted
-        payload = {'user_id': uid, 'plan': None}
-        save_user_plan(uid, payload, username="u1")
-
-        # Now try again; shutil.copy2 fails but save should still succeed
-        with patch('observation.plan_my_night.shutil.copy2', side_effect=PermissionError("no backup")):
-            result = save_user_plan(uid, {'user_id': uid, 'plan': None}, username="u1")
-        assert result is True
-
-    def test_exception_during_save_restores_backup(self, temp_plan_dir):
-        """when an error occurs after backup, backup is restored."""
-        uid = "eeee0003-0000-4000-8000-000000000000"
-        payload = {'user_id': uid, 'plan': None}
-        save_user_plan(uid, payload, username="u1")
-
-        # Force json.dump to fail after backup is created
-        with patch('observation.plan_my_night.json.dump', side_effect=RuntimeError("disk full")):
-            result = save_user_plan(uid, {'user_id': uid, 'plan': None}, username="u1")
-        assert result is False
-
-    def test_exception_cleanup_temp_file_failure_logged(self, temp_plan_dir):
-        """temp file cleanup failure is warned but not raised."""
-        uid = "eeee0004-0000-4000-8000-000000000000"
-        payload = {'user_id': uid, 'plan': None}
-
-        # Force a failure during write AND make os.remove fail for the temp file
-        with patch('observation.plan_my_night.json.dump', side_effect=RuntimeError("disk full")):
-            with patch('observation.plan_my_night.os.remove', side_effect=OSError("cleanup fail")):
-                result = save_user_plan(uid, payload, username="u1")
-        assert result is False
-
-
-# ============================================================
-# clear_all_plans
-# ============================================================
-
-
 class TestClearAllPlans:
     """Covers clear_all_plans error logging path."""
 
@@ -971,7 +794,7 @@ class TestClearAllPlans:
         payload = {'user_id': uid, 'plan': None}
         save_user_plan(uid, payload, username="user")
 
-        with patch('observation.plan_my_night.os.remove', side_effect=OSError("permission denied")):
+        with patch('observation.plan_my_night.documents.delete_document', side_effect=OSError("db locked")):
             deleted = plan_my_night.clear_all_plans(uid)
         assert deleted == 0  # Nothing deleted due to error
 
@@ -1700,40 +1523,6 @@ class TestCreateOrAddTargetExtra:
 # ============================================================
 
 
-class TestSaveUserPlanLockedErrorPaths:
-    """Cover : restore/cleanup failure handlers in _save_user_plan_locked."""
-
-    def test_restore_backup_failure_is_logged(self, temp_plan_dir):
-        """when os.replace(backup, file) itself raises, error is logged."""
-        uid = "aaaaffff-0001-4000-8000-000000000001"
-        # Create an initial plan so backup is attempted
-        save_user_plan(uid, {'user_id': uid, 'plan': None}, username="u1")
-        # Fail the dump AND the backup restore
-        with patch('observation.plan_my_night.json.dump', side_effect=RuntimeError("disk full")):
-            with patch('observation.plan_my_night.os.replace', side_effect=OSError("restore fail")):
-                result = save_user_plan(uid, {'user_id': uid, 'plan': None}, username="u1")
-        assert result is False
-
-    def test_backup_cleanup_failure_is_silenced(self, temp_plan_dir):
-        """os.remove(backup) raises during error cleanup — silently swallowed."""
-        uid = "aaaaffff-0002-4000-8000-000000000002"
-        # Create an initial plan so backup is attempted
-        save_user_plan(uid, {'user_id': uid, 'plan': None}, username="u1")
-        remove_calls = []
-
-        def mock_remove(path):
-            remove_calls.append(path)
-            raise OSError("cannot remove")
-
-        # Fail dump so we enter the except block, then fail ALL os.remove calls
-        with patch('observation.plan_my_night.json.dump', side_effect=RuntimeError("disk full")):
-            # Also fail os.replace(backup→file) so the backup still exists
-            with patch('observation.plan_my_night.os.replace', side_effect=OSError("restore fail")):
-                with patch('observation.plan_my_night.os.remove', side_effect=mock_remove):
-                    result = save_user_plan(uid, {'user_id': uid, 'plan': None}, username="u1")
-        assert result is False
-
-
 class TestTimelineBeyondNightEnd:
     """entry with duration extending past night_end gets capped."""
 
@@ -1759,26 +1548,6 @@ class TestTimelineBeyondNightEnd:
         entries = result.get("plan", {}).get("entries", [])
         long_entry = next((e for e in entries if e.get("id") == "long"), None)
         assert long_entry is not None
-
-
-class TestGetAllPlanStatesOrphanFilenameSkip:
-    """file with non-matching name pattern is skipped in orphan detection."""
-
-    def test_non_matching_filename_is_skipped(self, temp_plan_dir):
-        """A file named {uid}_plan.json (no underscore after _plan) is skipped."""
-        uid = "aaaaffff-0004-4000-8000-000000000004"
-        # Create a file with a slightly wrong name (no underscore between _plan and suffix)
-        weird_name = f"{uid}_plan.json"
-        with open(os.path.join(temp_plan_dir, weird_name), 'w') as f:
-            json.dump({'user_id': uid, 'plan': None}, f)
-
-        # Patch get_all_plan_files to return the weird file
-        with patch(
-            'observation.plan_my_night.get_all_plan_files', return_value=[os.path.join(temp_plan_dir, weird_name)]
-        ):
-            result = plan_my_night.get_all_plan_states(uid, "user", [])
-        # It should process without crashing; weird file should be skipped
-        assert isinstance(result, list)
 
 
 class TestGeneratePlanPdfBranchCoverage:
@@ -1926,7 +1695,6 @@ class TestPlanMyNightMiscBranches:
 
     def test_is_target_in_current_plan_loop_continues_past_nonmatch(self, tmp_path, monkeypatch):
         """first entry doesn't match → loop continues to find the second."""
-        monkeypatch.setattr(plan_my_night, 'PLAN_DIR', str(tmp_path))
         user_id = "aabbccdd-1234-4aaa-8aaa-aabbccddaabb"
         now = datetime.now().astimezone()
         plan = {
@@ -1944,7 +1712,6 @@ class TestPlanMyNightMiscBranches:
 
     def test_create_or_add_target_loop_continues_past_nonmatch(self, tmp_path, monkeypatch):
         """existing entry doesn't match → loop continues, new entry added."""
-        monkeypatch.setattr(plan_my_night, 'PLAN_DIR', str(tmp_path))
         user_id = "bbccddee-1234-4bbb-8bbb-bbccddeebbcc"
         now = datetime.now().astimezone()
         plan = {
@@ -1968,7 +1735,6 @@ class TestPlanMyNightMiscBranches:
 
     def test_get_plan_with_timeline_zero_planned_minutes(self, tmp_path, monkeypatch):
         """planned_minutes=0 → end_dt stays equal to start_dt."""
-        monkeypatch.setattr(plan_my_night, 'PLAN_DIR', str(tmp_path))
         user_id = "ccddeeaa-1234-4ccc-8ccc-ccddeeaaccdd"
         now = datetime.now().astimezone()
         plan = {
@@ -1981,26 +1747,6 @@ class TestPlanMyNightMiscBranches:
         entry = result['plan']['entries'][0]
         # With planned_minutes=0, end_dt = cursor = start_dt → timeline_start == timeline_end
         assert entry['timeline_start'] == entry['timeline_end']
-
-    def test_save_user_plan_temp_file_missing_during_error_recovery(self, tmp_path, monkeypatch):
-        """exception before temp file created → os.path.exists(temp_path) is False.
-
-        ensure_plan_directory is called twice: once in get_user_plan_file (must succeed)
-        and once in _save_user_plan_locked (where we raise to trigger the error path).
-        """
-        monkeypatch.setattr(plan_my_night, 'PLAN_DIR', str(tmp_path))
-        user_id = "ddeeffaa-1234-4ddd-8ddd-ddeeffaaddee"
-
-        call_count = [0]
-
-        def _ensure_dir_fail_on_second_call():
-            call_count[0] += 1
-            if call_count[0] >= 2:
-                raise OSError("mkdir failed on second call")
-
-        with patch.object(plan_my_night, 'ensure_plan_directory', side_effect=_ensure_dir_fail_on_second_call):
-            result = plan_my_night.save_user_plan(user_id, {'plan': {'entries': []}}, username='user')
-        assert result is False
 
 
 # ---------------------------------------------------------------------------
@@ -3164,46 +2910,24 @@ class TestComputeEntryVisibilityCache:
 # ---------------------------------------------------------------------------
 
 
-def test_plan_safe_path_rejects_path_outside_plan_dir():
-    from observation import plan_my_night
-
-    with pytest.raises(ValueError):
-        plan_my_night._safe_plan_path("D:/not-important.json")
-
-
-def test_iter_all_plan_files_skips_valueerror(monkeypatch):
-    from observation import plan_my_night
-
-    monkeypatch.setattr(plan_my_night, "ensure_plan_directory", lambda: None)
-    monkeypatch.setattr(plan_my_night.os, "listdir", lambda _p: ["ok.json"])
-    monkeypatch.setattr(plan_my_night, "_safe_plan_path", lambda _p: (_ for _ in ()).throw(ValueError()))
-    assert plan_my_night._iter_all_plan_files() == []
-
-
 # ---------------------------------------------------------------------------
 # Merged from former test_locations_coverage.py (TestHelperEdgeArcs)
 # ---------------------------------------------------------------------------
 
 
-def test_plan_helpers_skip_junk_and_handle_errors(tmp_path, monkeypatch):
-    monkeypatch.setattr(plan_my_night, 'PLAN_DIR', str(tmp_path))
+def test_plan_helpers_skip_junk_and_handle_errors(monkeypatch):
+    from db import documents as _documents
 
-    # Skipped: backups, tmp, corrupted-marker, non-json
-    (tmp_path / 'a.json.backup').write_text('{}', encoding='utf-8')
-    (tmp_path / 'b.corrupted.json').write_text('{}', encoding='utf-8')
-    (tmp_path / 'c.tmp').write_text('{}', encoding='utf-8')
-    (tmp_path / 'readme.txt').write_text('x', encoding='utf-8')
-    # Unreadable plan file -> _plan_references_location returns False
-    (tmp_path / 'u1.json').write_text('{corrupt', encoding='utf-8')
-    # Non-dict payload
-    (tmp_path / 'u2.json').write_text('[1, 2]', encoding='utf-8')
-    # Real pinned plan
-    (tmp_path / 'u3.json').write_text(json.dumps({'plan': {'location_id': 'L9', 'targets': []}}), encoding='utf-8')
+    _documents.put_document('u1', 'plan', 'corrupt', 'default')
+    _documents.put_document('u2', 'plan', {'plan': [1, 2]}, 'default')
+    _documents.put_document('u3', 'plan', {'plan': {'location_id': 'L9', 'targets': []}}, 'default')
 
     assert plan_my_night.count_plans_for_location('') == 0
     assert plan_my_night.delete_plans_for_location('') == 0
     assert plan_my_night.count_plans_for_location('L9') == 1
 
-    # os.remove failure is logged, not raised
-    monkeypatch.setattr(plan_my_night.os, 'remove', lambda *_a: (_ for _ in ()).throw(OSError('locked')))
+    # A deletion failure is logged, not raised
+    monkeypatch.setattr(
+        plan_my_night.documents, 'delete_document', lambda *_a: (_ for _ in ()).throw(OSError('locked'))
+    )
     assert plan_my_night.delete_plans_for_location('L9') == 0

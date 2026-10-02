@@ -80,7 +80,7 @@ the entities you do not need from the device page in Home Assistant.
 | Field | Default | Notes |
 |---|---|---|
 | Broker URL | - | `mqtt://host[:1883]` or `mqtts://host[:8883]` |
-| Username / Password | blank | The password is stored in `data/connectors_secrets.json`, **outside** `config.json`, and is never part of a backup or config export: re-enter it after restoring a backup on another machine |
+| Username / Password | blank | The password is stored in the connector secrets store, **outside** the configuration, and is never part of a backup or config export: re-enter it after restoring a backup on another machine |
 | Home Assistant MQTT Discovery | on | Off = only the plain state topics are published (for another consumer than Home Assistant) |
 | Base topic (advanced) | `myastroboard` | Root of every topic; two boards on one broker use two base topics |
 | Discovery prefix (advanced) | `homeassistant` | Must match the MQTT integration's discovery prefix |
@@ -318,8 +318,8 @@ action:
 ## Privacy and security
 
 - Outbound only. No command topic exists; nothing Home Assistant publishes is acted upon.
-- The password lives in `data/connectors_secrets.json` (owner-only permissions), never in
-  `config.json`, backups, the config export or any API response (the card only sees a mask).
+- The password lives in the connector secrets store, never in the configuration, backups, the
+  config export or any API response (the card only sees a mask).
 - The card's test button never pairs the stored password with a URL that differs from the saved
   one, and the MQTT routes are admin-only.
 - `mqtts://` gives TLS; *Accept self-signed certificates* is meant for a LAN broker with its own

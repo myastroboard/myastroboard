@@ -24,12 +24,12 @@ Phase C - Web Push / background (tab may be closed)  ✅ Done
 
 ### Phase B - Settings UI
 - My Settings → Notifications sub-tab (N1–N9 toggles, lead times, Kp threshold, test button)
-- Preferences stored server-side in `data/users.json` under `preferences.notifications`
+- Preferences stored server-side on the account under `preferences.notifications`
 
 ### Phase C - Web Push
 - Notifications fire even when the app tab is closed
-- VAPID key pair persisted in `data/vapid.json` (generated once on first startup)
-- Push subscriptions stored per-user in `data/users.json` under `push_subscriptions[]`
+- VAPID key pair persisted in the database (setting `vapid`, generated once on first startup)
+- Push subscriptions stored per-user on the account under `push_subscriptions[]`
 - Background scheduler (`utils/push_scheduler.py`) evaluates triggers every 5 minutes
 
 ### Where notifications are available
@@ -91,7 +91,7 @@ See [LOCATIONS.md](LOCATIONS.md) for the full multi-location model.
 | `templates/index.html` | Notifications sub-tab (My Settings → Notifications) |
 | `static/sw.js` | `push` + `notificationclick` event listeners |
 | `static/i18n/*.json` | `notifications.*` namespace (N1–N9 titles/bodies) + `settings.notifications_*` |
-| `data/vapid.json` | Generated VAPID key pair - **never delete or regenerate** (invalidates all subscriptions) |
+| database setting `vapid` | Generated VAPID key pair - **never delete or regenerate** (invalidates all subscriptions) |
 
 ---
 
@@ -112,7 +112,7 @@ const granted = await notificationManager.requestPermission();
 
 ### Preferences
 
-Stored server-side in `users.json` under `preferences.notifications`. Read via `window.myastroboardUserPreferences.notifications`.
+Stored server-side on the account under `preferences.notifications`. Read via `window.myastroboardUserPreferences.notifications`.
 
 ```javascript
 const prefs = notificationManager.getPrefs();
@@ -185,15 +185,15 @@ The in-app **Test** button calls `POST /api/push/test`, which sends a real serve
 
 ### VAPID keys
 
-Generated once on first startup by `push_manager.load_or_generate_vapid_keys()` and saved to `data/vapid.json`:
+Generated once on first startup by `push_manager.load_or_generate_vapid_keys()` and saved in the database (setting `vapid`):
 
 ```json
 { "private_key": "<43-char base64url raw EC scalar>", "public_key": "<87-char base64url uncompressed point>" }
 ```
 
-The private key is stored as a raw base64url-encoded 32-byte EC scalar (the format expected by `py_vapid.Vapid.from_string()`). PEM format is **not** used - older `vapid.json` files containing `-----BEGIN ... KEY-----` are automatically migrated to the correct format on startup.
+The private key is stored as a raw base64url-encoded 32-byte EC scalar (the format expected by `py_vapid.Vapid.from_string()`). PEM format is **not** used - older keys containing `-----BEGIN ... KEY-----` are automatically migrated to the correct format on startup.
 
-**Never delete or regenerate `vapid.json`** - doing so invalidates all existing push subscriptions. `_subscribeToPush()` detects VAPID key rotation via `PushSubscription.options.applicationServerKey` comparison and forces a transparent re-subscribe if the key changed.
+**Never delete or regenerate the VAPID keys** - doing so invalidates all existing push subscriptions. `_subscribeToPush()` detects VAPID key rotation via `PushSubscription.options.applicationServerKey` comparison and forces a transparent re-subscribe if the key changed.
 
 ### Push subscription flow
 
@@ -201,7 +201,7 @@ The private key is stored as a raw base64url-encoded 32-byte EC scalar (the form
 2. `_subscribeToPush()` fetches `GET /api/push/vapid-public-key`
 3. Browser calls `pushManager.subscribe({ applicationServerKey: publicKey })`
 4. Subscription POSTed to `POST /api/push/subscribe`
-5. Stored under user's `push_subscriptions[]` in `users.json`
+5. Stored under the user's `push_subscriptions[]` on their account
 
 ### API routes
 

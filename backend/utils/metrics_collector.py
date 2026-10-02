@@ -329,6 +329,17 @@ def detect_docker_in_docker(processes):
     }
 
 
+def _database_status():
+    """Database diagnostics (schema, size, journal mode), or None when they cannot be read."""
+    try:
+        from db.health import database_status
+
+        return database_status()
+    except Exception as e:
+        logger.warning(f"Could not read the database status: {e}")
+        return None
+
+
 def collect_metrics():
     """
     Collect all system metrics with container/VM detection.
@@ -423,6 +434,7 @@ def collect_metrics():
                 'packets_recv': net_io.packets_recv,
             },
             'platform': platform_info,
+            'database': _database_status(),
         }
         # Don't pin the 30s cache to a result whose disk details aren't ready
         # yet - let the next poll re-run so folder sizes appear as soon as the

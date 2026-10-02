@@ -8,6 +8,8 @@ import sys
 
 import pytest
 
+from tests.db_helpers import delete_setting
+
 from utils import repo_config
 from utils import config_defaults
 
@@ -25,11 +27,13 @@ DEFAULT_CONFIG = config_defaults.DEFAULT_CONFIG
 
 
 def _set_config_file(monkeypatch, path):
-    """Patch CONFIG_FILE in both constants and repo_config modules."""
-    from utils import constants
+    """Start from the config the test wrote to *path* (a pre-1.7 config.json shape), or from none."""
+    from db import settings_store
 
-    monkeypatch.setattr(constants, "CONFIG_FILE", path)
-    monkeypatch.setattr(repo_config, "CONFIG_FILE", path)
+    delete_setting("config")
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as fp:
+            settings_store.put_setting("config", json.load(fp))
 
 
 class TestDefaultConfig:
@@ -188,7 +192,7 @@ class TestConfigLoading:
     def test_new_install_photo_map_is_private(self, temp_dir, monkeypatch):
         _set_config_file(monkeypatch, os.path.join(temp_dir, "fresh.json"))
         assert load_config()["astrodex"]["map_private"] is True
-        # Written to disk, so later loads keep it private
+        # Stored, so later loads keep it private
         assert load_config()["astrodex"]["map_private"] is True
 
     @pytest.mark.parametrize("astrodex_block", [None, {"private": True}])
@@ -287,15 +291,28 @@ class TestConfigSaving:
         path = os.path.join(temp_dir, "saved.json")
         _set_config_file(monkeypatch, path)
         assert save_config(sample_config) is True
-        assert os.path.exists(path)
-        with open(path, "r", encoding="utf-8") as fp:
-            assert json.load(fp) == sample_config
+        from db import settings_store
 
-    def test_save_config_creates_parent_directory(self, temp_dir, sample_config, monkeypatch):
-        path = os.path.join(temp_dir, "nested", "dir", "config.json")
-        _set_config_file(monkeypatch, path)
-        assert save_config(sample_config) is True
-        assert os.path.exists(path)
+        assert settings_store.get_setting("config") == sample_config
+
+    def test_save_config_reports_storage_failure(self, sample_config, monkeypatch):
+        from db import settings_store
+
+        def _boom(_key, _value):
+            raise OSError("disk full")
+
+        monkeypatch.setattr(settings_store, "put_setting", _boom)
+        assert save_config(sample_config) is False
+
+    def test_unreadable_config_is_treated_as_missing(self, monkeypatch):
+        from db import settings_store
+
+        def _boom(_key):
+            raise OSError("db gone")
+
+        monkeypatch.setattr(settings_store, "get_setting", _boom)
+        assert repo_config.read_raw_config() is None
+        assert repo_config.config_exists() is False
 
     def test_save_and_load_roundtrip(self, temp_dir, sample_config, monkeypatch):
         path = os.path.join(temp_dir, "roundtrip.json")

@@ -568,6 +568,7 @@ The failure output lists exactly which routes are unexpected or missing, so you 
 - [ ] No merge conflicts
 - [ ] Logging uses centralized system (no `print()`)
 - [ ] Personal data handled per the GDPR rules in `.github/instructions/copilot.instructions.md`, and `docs/PRIVACY.md` updated if the change stores, shares or sends user data
+- [ ] A change to `backend/db/schema.py` comes with an Alembic revision (see [docs/DATABASE.md](docs/DATABASE.md#changing-the-schema))
 - [ ] Commit messages follow conventions
 
 ### Review Process
@@ -605,6 +606,10 @@ Contributors will be acknowledged in:
   `import` that closes a dependency loop between two of them. A shared helper goes in `utils/`; a
   genuine request-time call into another feature that would close a loop uses a commented lazy
   import inside the function. See [docs/EXTENDING.md](docs/EXTENDING.md#the-one-hard-rule-no-new-cross-feature-dependency-cycles).
+- **Persistent data goes in the database** (`backend/db/`): per-user records through
+  `db/documents.py`, install-wide values through `db/settings_store.py`, read-modify-write inside one
+  `db.engine.transaction()`. No new JSON data file under `data/` (caches excepted). Schema changes
+  need an Alembic revision - see [docs/DATABASE.md](docs/DATABASE.md#for-contributors).
 
 ### Frontend (`static/js/`, `static/css/`, `templates/`)
 - Maintain vanilla JavaScript (no frameworks)

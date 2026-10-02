@@ -7,7 +7,6 @@ import json
 import os
 import uuid
 import re
-import shutil
 import threading
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -15,7 +14,11 @@ from functools import wraps
 import pyotp
 from flask import session, jsonify, request
 from werkzeug.security import generate_password_hash, check_password_hash
-from utils.file_lock import interprocess_lock
+from db import bootstrap as db_bootstrap
+from db import users_store
+from db.engine import data_dir as db_data_dir
+from db.engine import transaction as db_transaction
+from db.legacy_sources import legacy_users_file_pending
 from utils.logging_config import get_logger
 from utils.i18n_utils import SUPPORTED_LANGUAGES
 from utils.user_data import purge_user_files
@@ -140,16 +143,13 @@ DEFAULT_USER_PREFERENCES = {
     },
 }
 
-# Users storage file
-USERS_FILE = os.path.join(os.environ.get('DATA_DIR', '/app/data'), 'users.json')
-
 
 def normalize_account_scope(value):
     """Coerce a stored account_scope to a known value.
 
-    Unlike `role`, an unrecognised scope does not invalidate the whole users file:
-    an admin hand-editing users.json (the documented lost-authenticator recovery
-    path) must not be able to lock everyone out with a typo. It falls back to
+    Unlike `role`, an unrecognised scope does not invalidate the whole user table:
+    a hand-edited account (pre-1.7 users.json, restored backups) must not be able
+    to lock everyone out with a typo. It falls back to
     'global', which is also the default for entries that predate the field.
     """
     if value is None:
@@ -277,12 +277,33 @@ class User:
         return False
 
 
-def _serialized_users_write(method):
-    """Run a UserManager mutator under the users.json write lock.
+def _astrodex_picture_filenames(user_id):
+    """Safe file names of every picture in the user's Astrodex (empty on any read error)."""
+    filenames = set()
+    try:
+        from observation.astrodex import load_user_astrodex
 
-    Every gunicorn worker keeps its own copy of the user table and saves it
-    whole, so reload -> modify -> save must not interleave with another
-    worker's save, or one of the two changes is silently reverted.
+        for item in load_user_astrodex(user_id).get("items", []):
+            for picture in item.get("pictures", []) if isinstance(item, dict) else []:
+                filename = picture.get("filename") if isinstance(picture, dict) else None
+                if filename and re.match(r"^[a-zA-Z0-9_.-]+$", filename):
+                    filenames.add(filename)
+    except Exception as read_error:
+        logger.warning(f"Failed to read astrodex for cleanup: {read_error}")
+    return filenames
+
+
+def _canonical_user(user):
+    """Stable JSON of a User, to tell which users changed since they were loaded."""
+    return json.dumps(user.to_dict(), sort_keys=True, ensure_ascii=False, default=str)
+
+
+def _serialized_users_write(method):
+    """Run a UserManager mutator inside one users write transaction.
+
+    Every gunicorn worker keeps its own copy of the user table, so
+    reload -> modify -> save must not interleave with another worker's save,
+    or one of the two changes is silently reverted.
     """
 
     @wraps(method)
@@ -294,29 +315,32 @@ def _serialized_users_write(method):
 
 
 class UserManager:
-    """Manages user storage and operations"""
+    """Manages user storage and operations.
+
+    Accounts live in the ``users`` table (see ``db/users_store.py``). Each process keeps
+    them in ``self.users`` and reloads when the store revision moves, i.e. when another
+    gunicorn worker saved.
+    """
 
     def __init__(self):
         self.users = {}
-        self._users_mtime = None
+        self._users_revision = None
+        # Canonical JSON of each user as last loaded/saved: save_users() writes only the
+        # users that differ, so a save never reverts another worker's change to someone else.
+        self._snapshot = {}
         self._write_mutex = threading.RLock()
-        self._write_depth = 0
         self.load_users()
 
     @contextmanager
     def _exclusive_write(self):
-        """Hold the users.json write lock across threads and gunicorn workers (reentrant)."""
+        """Serialize users-table writes across threads and gunicorn workers (reentrant).
+
+        The database transaction (BEGIN IMMEDIATE) excludes the other workers; the
+        RLock keeps this worker's threads from interleaving on ``self.users``.
+        """
         with self._write_mutex:
-            outermost = self._write_depth == 0
-            self._write_depth += 1
-            try:
-                if outermost:
-                    with interprocess_lock(USERS_FILE + '.lock'):
-                        yield
-                else:
-                    yield
-            finally:
-                self._write_depth -= 1
+            with db_transaction():
+                yield
 
     def modify_user(self, user_id, mutate):
         """Apply ``mutate(user)`` to the freshest copy of one user and save, atomically across workers.
@@ -336,101 +360,66 @@ class UserManager:
             return result
 
     def load_users(self):
-        """Load users from file"""
-        if os.path.exists(USERS_FILE):
-            try:
-                with open(USERS_FILE, 'r') as f:
-                    data = json.load(f)
-                    is_valid, error_msg = self.validate_users_json_data(data)
-                    if not is_valid:
-                        raise ValueError(f"Invalid users data: {error_msg}")
-                    self.users = {key: User.from_dict(user_data) for key, user_data in data.items()}
-                self._users_mtime = os.path.getmtime(USERS_FILE)
-                logger.debug(f"Loaded {len(self.users)} users from {USERS_FILE}")
-            except Exception as e:
-                logger.error(f"Error loading users: {e}")
-                self.users = {}
-                self._users_mtime = None
-        else:
-            logger.info("No users file found, starting fresh")
+        """Load every account from the database."""
+        try:
+            revision = users_store.users_revision()
+            data = users_store.get_all_users()
+            is_valid, error_msg = self.validate_users_json_data(data)
+            if not is_valid:
+                raise ValueError(f"Invalid users data: {error_msg}")
+            self.users = {key: User.from_dict(user_data) for key, user_data in data.items()}
+            self._snapshot = {key: _canonical_user(user) for key, user in self.users.items()}
+            self._users_revision = revision
+            logger.debug(f"Loaded {len(self.users)} users from the database")
+        except Exception as e:
+            logger.error(f"Error loading users: {e}")
             self.users = {}
-            self._users_mtime = None
-            # Only create default admin if users file is missing
-            self.ensure_default_admin()
+            self._snapshot = {}
+            self._users_revision = None
+            return
+        if not self.users:
+            self._create_default_admin_if_allowed()
+
+    def _create_default_admin_if_allowed(self):
+        """First start: create admin/admin, unless pre-1.7 accounts are still waiting to be imported."""
+        if db_bootstrap.is_maintenance() or legacy_users_file_pending(db_data_dir()):
+            logger.error("No account in the database while users.json is not imported yet; not creating admin")
+            return
+        logger.info("No users in the database, starting fresh")
+        self.ensure_default_admin()
 
     def _reload_users_if_changed(self):
-        """Reload users from disk when file changed (multi-worker sync)."""
+        """Reload users when another worker saved (multi-worker sync)."""
         try:
-            if not os.path.exists(USERS_FILE):
-                if self.users:
-                    self.users = {}
-                self._users_mtime = None
-                return
-
-            current_mtime = os.path.getmtime(USERS_FILE)
-            if self._users_mtime is None or current_mtime != self._users_mtime:
+            if self._users_revision is None or users_store.users_revision() != self._users_revision:
                 self.load_users()
         except Exception as e:
-            logger.warning(f"Failed to check users file freshness: {e}")
+            logger.warning(f"Failed to check users freshness: {e}")
+
+    def invalidate_cache(self):
+        """Force a reload on next access (tests swap the database under a live manager)."""
+        self._users_revision = None
 
     @_serialized_users_write
     def save_users(self):
-        """Save users to file using atomic write and JSON validation."""
-        temp_path = USERS_FILE + '.tmp'
-        backup_path = USERS_FILE + '.backup'
-        backup_created = False
+        """Write the users that changed since they were loaded (validated first).
 
-        try:
-            # Ensure data directory exists
-            os.makedirs(os.path.dirname(USERS_FILE), exist_ok=True)
+        Never deletes a row: an account is removed only by delete_user(), because the
+        foreign keys remove all of its documents with it.
+        """
+        data = {user_id: user.to_dict() for user_id, user in self.users.items()}
+        is_valid, error_msg = self.validate_users_json_data(data)
+        if not is_valid:
+            logger.error(f"Error saving users: {error_msg}")
+            raise ValueError(f"users validation failed: {error_msg}")
 
-            data = {user_id: user.to_dict() for user_id, user in self.users.items()}
-
-            # Keep a backup of current file before replacing it.
-            if os.path.exists(USERS_FILE):
-                shutil.copy2(USERS_FILE, backup_path)
-                backup_created = True
-
-            # Write to a temporary file first.
-            with open(temp_path, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
-
-            # Validate temporary JSON structure before replacing the live users file.
-            is_valid, error_msg = self.validate_users_json_file(temp_path)
-            if not is_valid:
-                raise ValueError(f"users.json validation failed: {error_msg}")
-
-            os.replace(temp_path, USERS_FILE)
-            self._users_mtime = os.path.getmtime(USERS_FILE)
-
-            if backup_created and os.path.exists(backup_path):
-                os.remove(backup_path)
-
-            logger.debug(f"Saved {len(self.users)} users to {USERS_FILE}")
-        except Exception as e:
-            logger.error(f"Error saving users: {e}")
-
-            # Restore previous users file when possible.
-            if backup_created and os.path.exists(backup_path):
-                try:
-                    os.replace(backup_path, USERS_FILE)
-                    self._users_mtime = os.path.getmtime(USERS_FILE)
-                except Exception as restore_error:
-                    logger.error(f"Failed to restore users backup: {restore_error}")
-
-            if os.path.exists(temp_path):
-                try:
-                    os.remove(temp_path)
-                except Exception as cleanup_error:
-                    logger.warning(f"Failed to remove users temp file: {cleanup_error}")
-
-            if backup_created and os.path.exists(backup_path):
-                try:
-                    os.remove(backup_path)
-                except Exception as cleanup_error:
-                    logger.warning(f"Failed to remove users backup file: {cleanup_error}")
-
-            raise
+        canonical = {user_id: _canonical_user(user) for user_id, user in self.users.items()}
+        changed = [data[user_id] for user_id, value in canonical.items() if self._snapshot.get(user_id) != value]
+        if changed:
+            users_store.upsert_users(changed)
+            self._users_revision = users_store.users_revision()
+        self._snapshot = canonical
+        logger.debug(f"Saved {len(changed)} changed user(s)")
 
     @staticmethod
     def validate_users_json_data(data):
@@ -466,18 +455,6 @@ class UserManager:
                     return False, f"User {user_id} invalid preferences: {prefs_error}"
 
         return True, ""
-
-    @classmethod
-    def validate_users_json_file(cls, file_path):
-        """Validate users JSON file content and structure."""
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            return cls.validate_users_json_data(data)
-        except json.JSONDecodeError as e:
-            return False, f"Invalid JSON: {e}"
-        except Exception as e:
-            return False, f"Validation error: {e}"
 
     @staticmethod
     def validate_user_preferences(preferences):
@@ -973,7 +950,7 @@ class UserManager:
 
     @_serialized_users_write
     def delete_user(self, user_id, current_user_id=None):
-        """Delete a user and every file they own on disk (right to erasure)"""
+        """Delete a user, every document and every file they own (right to erasure)"""
 
         self._reload_users_if_changed()
 
@@ -989,43 +966,21 @@ class UserManager:
 
         username = user.username
 
-        # Remove user from memory + persist
+        # Picture file names must be read before the documents go with the account
+        image_filenames = _astrodex_picture_filenames(user_id)
+
+        # Remove the row and every document the user owns, in one transaction
+        users_store.delete_user(user_id)
         del self.users[user_id]
-        self.save_users()
+        self._snapshot.pop(user_id, None)
 
         logger.info(f"Deleted user {username} (ID: {user_id})")
 
-        # --- Cleanup astrodex files safely ---
+        # --- Cleanup astrodex pictures safely (older uploads lack the <user_id>_ prefix) ---
         try:
-            from observation.astrodex import ASTRODEX_DIR, ASTRODEX_IMAGES_DIR
+            from observation.astrodex import ASTRODEX_IMAGES_DIR
 
-            base_astrodex_dir = os.path.realpath(ASTRODEX_DIR)
             base_images_dir = os.path.realpath(ASTRODEX_IMAGES_DIR)
-
-            astrodex_file = os.path.realpath(os.path.join(base_astrodex_dir, f"{user_id}_astrodex.json"))
-
-            # Ensure confinement
-            if not astrodex_file.startswith(base_astrodex_dir + os.sep):
-                raise ValueError("Invalid astrodex file path")
-
-            image_filenames = set()
-
-            # Read astrodex file safely
-            if os.path.exists(astrodex_file):
-                try:
-                    with open(astrodex_file, "r", encoding="utf-8") as f:
-                        astrodex_data = json.load(f)
-
-                    for item in astrodex_data.get("items", []):
-                        for picture in item.get("pictures", []):
-                            filename = picture.get("filename")
-                            if filename and re.match(r"^[a-zA-Z0-9_.-]+$", filename):
-                                image_filenames.add(filename)
-
-                except Exception as read_error:
-                    logger.warning(f"Failed to read astrodex file for cleanup: {read_error}")
-
-            # Delete referenced images safely
             for filename in image_filenames:
                 file_path = os.path.realpath(os.path.join(base_images_dir, filename))
 
@@ -1039,10 +994,9 @@ class UserManager:
                         logger.warning(f"Failed to delete astrodex image {filename}: {remove_error}")
 
         except Exception as e:
-            logger.warning(f"Failed to delete astrodex data for user {user_id}: {e}")
+            logger.warning(f"Failed to delete astrodex pictures for user {user_id}: {e}")
 
-        # Everything else (astrodex file, images, sessions, attachments, equipment,
-        # plans, wishlist) follows the <user_id>_ naming and goes in one sweep.
+        # Every other file (pictures, session attachments) follows the <user_id>_ naming
         removed = purge_user_files(user_id)
         logger.info(f"Deleted {removed} data file(s) for {username}")
 

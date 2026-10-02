@@ -72,6 +72,10 @@ EXPECTED_ROUTES = {
     ('/api/admin/app-settings', ('GET',)),
     ('/api/admin/app-settings', ('POST',)),
     ('/api/admin/restart', ('POST',)),
+    ('/api/admin/database/integrity-check', ('POST',)),
+    ('/api/admin/migration-backups', ('GET',)),
+    ('/api/admin/migration-backups', ('DELETE',)),
+    ('/api/admin/migration-backups/report', ('GET',)),
     # --- system ---
     ('/api/backup/download', ('GET',)),
     ('/api/backup/restore', ('POST',)),

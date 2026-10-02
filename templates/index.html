@@ -2829,11 +2829,12 @@
 
                     <p class="mb-2 fw-semibold" data-i18n="settings.backup_includes_label">Included in the archive:</p>
                     <ul class="list-unstyled ms-2 mb-3" id="backup-includes-list">
-                        <li><i class="bi bi-file-earmark-text text-muted icon-inline" aria-hidden="true"></i> <code>data/config.json</code></li>
-                        <li><i class="bi bi-file-earmark-person text-muted icon-inline" aria-hidden="true"></i> <code>data/users.json</code></li>
-                        <li><i class="bi bi-folder text-muted icon-inline" aria-hidden="true"></i> <code>data/astrodex/</code></li>
-                        <li><i class="bi bi-folder text-muted icon-inline" aria-hidden="true"></i> <code>data/equipments/</code></li>
-                        <li><i class="bi bi-folder text-muted icon-inline" aria-hidden="true"></i> <code>data/observation_sessions/</code></li>
+                        <li><i class="bi bi-file-earmark-text text-muted icon-inline" aria-hidden="true"></i> <code>config.json</code>, <code>app_settings.json</code></li>
+                        <li><i class="bi bi-file-earmark-person text-muted icon-inline" aria-hidden="true"></i> <code>users.json</code></li>
+                        <li><i class="bi bi-folder text-muted icon-inline" aria-hidden="true"></i> <code>astrodex/</code></li>
+                        <li><i class="bi bi-folder text-muted icon-inline" aria-hidden="true"></i> <code>equipments/</code></li>
+                        <li><i class="bi bi-folder text-muted icon-inline" aria-hidden="true"></i> <code>observation_sessions/</code></li>
+                        <li><i class="bi bi-folder text-muted icon-inline" aria-hidden="true"></i> <code>wishlist/</code></li>
                     </ul>
 
                     <div class="d-flex gap-2 flex-wrap">
@@ -2869,6 +2870,29 @@
                         <i class="bi bi-arrow-counterclockwise icon-inline" aria-hidden="true"></i>
                         <span data-i18n="settings.restore_button">Restore Backup</span>
                     </button>
+                </div>
+
+                <!-- What the 1.7 upgrade left in data/backups/ - shown only while it is there -->
+                <div id="migration-backups-section" class="shadow p-2 mb-3 rounded bg-sub-container d-none">
+                    <h2>
+                        <i class="bi bi-archive text-secondary icon-inline" aria-hidden="true"></i>
+                        <span data-i18n="settings.migration_backups_title">1.7 upgrade archive</span>
+                    </h2>
+                    <div class="alert alert-warning" role="alert" data-i18n="settings.migration_backups_warning">
+                        When upgrading to 1.7, the previous data files were archived before being moved into the database. This archive is the only way back to version 1.6, and it contains sensitive data (password hashes, two-factor and connector secrets): delete it once you no longer need to go back.
+                    </div>
+                    <ul class="list-unstyled ms-2 mb-3" id="migration-backups-details"></ul>
+                    <div id="migration-backups-message" class="alert d-none" role="alert"></div>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <button type="button" id="migration-backups-report-btn" class="btn btn-secondary">
+                            <i class="bi bi-file-earmark-text icon-inline" aria-hidden="true"></i>
+                            <span data-i18n="settings.migration_backups_report">Download import report</span>
+                        </button>
+                        <button type="button" id="migration-backups-delete-btn" class="btn btn-danger">
+                            <i class="bi bi-trash icon-inline" aria-hidden="true"></i>
+                            <span data-i18n="settings.migration_backups_delete">Delete archive</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 

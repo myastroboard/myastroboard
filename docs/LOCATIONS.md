@@ -27,7 +27,7 @@ calculation (weather, astro forecasts, aurora, ISS/CSS passes, seeing, events, s
 
 | Term | Meaning |
 |---|---|
-| **Location preset** | Admin-created record: name, lat/lon, elevation, timezone, Bortle/SQM, per-location horizon profile. Stored in `config.json` under `locations[]`. |
+| **Location preset** | Admin-created record: name, lat/lon, elevation, timezone, Bortle/SQM, per-location horizon profile. Stored in the configuration under `locations[]`. |
 | **Install default** | Exactly one preset carries `is_install_default: true` at all times. It is the fallback for users with no attributed location, the cadence anchor for the nightly SkyTonight batch, and the anchor for legacy compatibility. |
 | **Attribution** | Admin-controlled many-to-many: a preset can be attributed to several users, a user can hold several presets. Admins implicitly have access to every preset. |
 | **Default location** (per user) | The durable preference "what should be shown when I connect" (`preferences.location.default_location_id`). |
@@ -37,7 +37,7 @@ The sky-widget switcher panel opens on click/tap only (never hover - a hover-ope
 
 ## Data model
 
-### `config.json` — presets (admin-managed, global)
+### Configuration — presets (admin-managed, global)
 
 ```jsonc
 {
@@ -65,7 +65,7 @@ upgrade (see [Migration](#migration-from-single-location-installs)). `id` is the
 key used by user preferences, cache slots, Astrodex items and Plan My Night plans — it
 survives renames.
 
-### `users.json` — per-user selection (`preferences.location`)
+### Account preferences — per-user selection (`preferences.location`)
 
 ```jsonc
 "location": {
@@ -295,4 +295,4 @@ Automatic, one-time, on the first `load_config()` after upgrade
    behavior exactly.
 
 Rollback note: the migration is one-way (the singular key is removed). Downgrading to a
-pre-v1.2 image requires restoring `data/config.json` from a backup.
+pre-v1.2 image requires restoring `config.json` from a backup (and 1.6 or older, see [DATABASE.md](DATABASE.md)).

@@ -5,17 +5,18 @@
 import io
 import json
 import os
-import shutil
 import time
 import zipfile
 from datetime import datetime, timezone
 
 from flask import Blueprint, request, jsonify, send_file, session, current_app
-from werkzeug.utils import secure_filename
 
+from db import legacy_import
 from utils import app_settings as _app_settings
+from utils import backup_archive
+from utils import repo_config
 from utils.auth import admin_required
-from utils.constants import CONFIG_FILE, DATA_DIR, SKYTONIGHT_LOGS_DIR, SKYTONIGHT_SCHEDULER_STATUS_FILE
+from utils.constants import DATA_DIR, SKYTONIGHT_LOGS_DIR, SKYTONIGHT_SCHEDULER_STATUS_FILE
 from utils.file_lock import interprocess_lock
 from utils.logging_config import apply_log_retention, env_log_level, get_logger, refresh_log_levels
 from utils.metrics_collector import collect_metrics
@@ -162,12 +163,14 @@ def get_system_metrics():
 @admin_bp.route('/api/config/export', methods=['GET'])
 @admin_required
 def export_config_api():
-    """Download the raw CONFIG_FILE JSON"""
+    """Download the stored configuration as config.json"""
     try:
-        if not os.path.isfile(CONFIG_FILE):
+        raw = repo_config.read_raw_config()
+        if raw is None:
             return jsonify({"error": "Config file not found"}), 404
 
-        return send_file(CONFIG_FILE, mimetype="application/json", as_attachment=True, download_name="config.json")
+        payload = io.BytesIO(json.dumps(raw, indent=2, ensure_ascii=False).encode('utf-8'))
+        return send_file(payload, mimetype="application/json", as_attachment=True, download_name="config.json")
 
     except Exception as e:
         logger.error(f"Error exporting config: {e}")
@@ -178,43 +181,15 @@ def export_config_api():
 @admin_required
 def backup_download_api():
     """
-    Create and stream a ZIP archive containing key user data files:
-      - data/config.json
-      - data/users.json
-      - data/astrodex/  (full directory)
-      - data/equipments/ (full directory)
-      - data/observation_sessions/ (full directory)
-      - data/wishlist/ (full directory)
-    The archive is built in memory so no temporary file is left on disk.
+    Stream a ZIP archive of the user data: configuration, accounts, Astrodex (with pictures),
+    equipment, observation log (with attachments) and wishlists, in the pre-1.7 JSON layout
+    (see utils/backup_archive.py). Built in memory so no temporary file is left on disk.
     """
-    # Evolutive list: each entry is (source_path, archive_name, is_dir)
-    BACKUP_ENTRIES = [
-        (os.path.join(DATA_DIR, 'config.json'), 'config.json', False),
-        (os.path.join(DATA_DIR, 'users.json'), 'users.json', False),
-        (os.path.join(DATA_DIR, 'app_settings.json'), 'app_settings.json', False),
-        (os.path.join(DATA_DIR, 'astrodex'), 'astrodex', True),
-        (os.path.join(DATA_DIR, 'equipments'), 'equipments', True),
-        (os.path.join(DATA_DIR, 'observation_sessions'), 'observation_sessions', True),
-        (os.path.join(DATA_DIR, 'wishlist'), 'wishlist', True),
-    ]
     try:
         buf = io.BytesIO()
         timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
         zip_filename = f"myastroboard_backup_{timestamp}.zip"
-
-        with zipfile.ZipFile(buf, mode='w', compression=zipfile.ZIP_DEFLATED) as zf:
-            for source_path, arc_name, is_dir in BACKUP_ENTRIES:
-                if is_dir:
-                    if os.path.isdir(source_path):
-                        for root, _dirs, files in os.walk(source_path):
-                            for fname in files:
-                                full_path = os.path.join(root, fname)
-                                rel = os.path.relpath(full_path, os.path.dirname(source_path))
-                                zf.write(full_path, rel)
-                else:
-                    if os.path.isfile(source_path):
-                        zf.write(source_path, arc_name)
-
+        backup_archive.write_backup(buf)
         buf.seek(0)
         logger.info(f"Backup archive created: {zip_filename}")
         return send_file(buf, mimetype='application/zip', as_attachment=True, download_name=zip_filename)
@@ -227,45 +202,18 @@ def backup_download_api():
 @admin_required
 def backup_restore_api():
     """
-    Restore user data from a previously created backup ZIP archive.
-    The ZIP must contain the files/folders produced by /api/backup/download.
-    Supported top-level entries: config.json, users.json, astrodex/, equipments/,
-    observation_sessions/
-    Unknown entries are silently ignored (forward-compatible).
+    Restore user data from a backup ZIP produced by /api/backup/download (1.7, or 1.6 - same
+    layout). Recognised entries: config.json, users.json, app_settings.json, astrodex/,
+    equipments/, observation_sessions/, wishlist/. Unknown entries are silently ignored.
 
-    Validation performed before any write:
-      1. Extension must be .zip
-      2. Must be a valid ZIP magic
-      3. Must contain at least one recognised entry
-      4. JSON files (config.json, users.json) must be valid JSON
+    Every recognised entry is parsed and validated before anything is written; the database
+    part is then written in one transaction. A folder present in the archive replaces that
+    whole kind of data (stale documents or pictures from the previous state do not survive);
+    users.json replaces the account list (accounts absent from it are deleted with their data).
 
-    No size cap is enforced: Astrodex portfolios containing many large
-    astrophotography images can legitimately exceed hundreds of MB.  The
-    endpoint is admin-only and operates on the user's own data.
-
-    Restore is atomic per directory:
-      - astrodex/, equipments/ and observation_sessions/ are cleared before the new
-        files are written so stale files from the previous state do not survive the
-        restore.
-      - config.json and users.json are written directly (they are complete files).
+    No size cap is enforced: Astrodex portfolios containing many large astrophotography
+    images can legitimately exceed hundreds of MB. The endpoint is admin-only.
     """
-    # Evolutive allow-list: archive paths that are accepted during restore
-    # Format: normalized_prefix -> destination base path
-    # Entries whose value is a directory will have that directory cleared first.
-    RESTORE_ALLOWED_PREFIXES = {
-        'config.json': os.path.join(DATA_DIR, 'config.json'),
-        'users.json': os.path.join(DATA_DIR, 'users.json'),
-        'app_settings.json': os.path.join(DATA_DIR, 'app_settings.json'),
-        'astrodex': os.path.join(DATA_DIR, 'astrodex'),
-        'equipments': os.path.join(DATA_DIR, 'equipments'),
-        'observation_sessions': os.path.join(DATA_DIR, 'observation_sessions'),
-        'wishlist': os.path.join(DATA_DIR, 'wishlist'),
-    }
-    # Directories that must be cleared before restoring their contents
-    RESTORE_CLEAR_DIRS = {'astrodex', 'equipments', 'observation_sessions', 'wishlist'}
-    # JSON files whose content must be valid JSON
-    RESTORE_VALIDATE_JSON = {'config.json', 'users.json', 'app_settings.json'}
-
     if 'file' not in request.files:
         return jsonify({'error': 'No file uploaded'}), 400
 
@@ -274,119 +222,97 @@ def backup_restore_api():
         return jsonify({'error': 'Uploaded file must be a .zip archive'}), 400
 
     try:
-        raw = upload.read()
-        buf = io.BytesIO(raw)
+        buf = io.BytesIO(upload.read())
         if not zipfile.is_zipfile(buf):
             return jsonify({'error': 'File is not a valid ZIP archive'}), 400
         buf.seek(0)
 
-        # --- Phase 1: validation (no writes yet) ---
-        recognised_entries = []  # (info, top_prefix, arc_path, rel_parts)
-        json_blobs = {}  # arc_path -> bytes  (only for JSON-validated files)
+        with zipfile.ZipFile(buf, 'r') as archive:
+            try:
+                plan = backup_archive.plan_restore(archive)
+            except backup_archive.BackupArchiveError as error:
+                return jsonify({'error': str(error)}), 400
+            if plan.empty:
+                return (
+                    jsonify(
+                        {
+                            'error': 'Archive contains no recognised backup entries '
+                            '(expected config.json, users.json, app_settings.json, astrodex/, '
+                            'equipments/ or observation_sessions/)'
+                        }
+                    ),
+                    400,
+                )
+            report = backup_archive.apply_restore(archive, plan)
 
-        with zipfile.ZipFile(buf, 'r') as zf:
-            for info in zf.infolist():
-                arc_path = info.filename.replace('\\', '/').lstrip('/')
-
-                if arc_path.endswith('/'):
-                    continue  # directory entry
-
-                # Match against allow-list; sanitize each path component with secure_filename
-                # so no tainted data from the ZIP flows into the destination path.
-                top_prefix = None
-                rel_parts = []
-                for prefix in RESTORE_ALLOWED_PREFIXES:
-                    if arc_path == prefix or arc_path.startswith(prefix + '/'):
-                        top_prefix = prefix
-                        rel = arc_path[len(prefix) :].lstrip('/')
-                        if rel:
-                            parts = [secure_filename(p) for p in rel.split('/') if p]
-                            if not all(parts):  # reject if any component empty after sanitization
-                                top_prefix = None
-                                continue
-                            rel_parts = parts
-                        break
-
-                if top_prefix is None:
-                    continue  # silently skip unrecognised entries
-
-                # Validate JSON content before accepting
-                if arc_path in RESTORE_VALIDATE_JSON:
-                    blob = zf.read(info.filename)
-                    try:
-                        json.loads(blob)
-                    except Exception:
-                        return jsonify({'error': f'{arc_path} is not valid JSON - archive may be corrupt'}), 400
-                    json_blobs[arc_path] = blob
-
-                recognised_entries.append((info, top_prefix, arc_path, rel_parts))
-
-        if not recognised_entries:
-            return (
-                jsonify(
-                    {
-                        'error': 'Archive contains no recognised backup entries '
-                        '(expected config.json, users.json, app_settings.json, astrodex/, '
-                        'equipments/ or observation_sessions/)'
-                    }
-                ),
-                400,
-            )
-
-        # --- Phase 2: clear target directories ---
-        buf.seek(0)
-        cleared_dirs = set()
-        for _info, top_prefix, _arc_path, _rel_parts in recognised_entries:
-            if top_prefix in RESTORE_CLEAR_DIRS and top_prefix not in cleared_dirs:
-                # Derive target_dir from the static allowlist (breaks the user-data taint chain)
-                target_dir = os.path.abspath(RESTORE_ALLOWED_PREFIXES[top_prefix])
-                if os.path.isdir(target_dir):
-                    shutil.rmtree(target_dir)
-                os.makedirs(target_dir, exist_ok=True)
-                cleared_dirs.add(top_prefix)
-                logger.info(f"Restore: cleared directory {target_dir}")
-
-        # --- Phase 3: write files ---
-        restored_files = []
-        skipped_files = []
-
-        with zipfile.ZipFile(buf, 'r') as zf:
-            for info, top_prefix, arc_path, rel_parts in recognised_entries:
-                # Reconstruct destination entirely from trusted sources - no tainted data used
-                base_dest = os.path.abspath(RESTORE_ALLOWED_PREFIXES[top_prefix])
-                safe_dest = os.path.join(base_dest, *rel_parts) if rel_parts else base_dest
-                os.makedirs(os.path.dirname(safe_dest), exist_ok=True)
-
-                if arc_path in json_blobs:
-                    # Already read and validated - write directly
-                    with open(safe_dest, 'wb') as dst:
-                        dst.write(json_blobs[arc_path])
-                else:
-                    with zf.open(info) as src, open(safe_dest, 'wb') as dst:
-                        shutil.copyfileobj(src, dst)
-                restored_files.append(arc_path)
-
-        # Reload app_settings cache if it was part of the restore
-        if any('app_settings.json' in f for f in restored_files):
+        if 'app_settings' in plan.settings:
             _app_settings.reload_app_settings()
             current_app.config['SESSION_COOKIE_SECURE'] = _app_settings.get_app_settings()['session_cookie_secure']
             refresh_log_levels(force=True)
 
-        logger.info(
-            f"Backup restore completed: {len(restored_files)} files restored, "
-            f"{len(skipped_files)} skipped, dirs cleared: {sorted(cleared_dirs)}"
-        )
+        logger.info(f"Backup restore completed: {report.restored} item(s) restored, {len(report.skipped)} skipped")
         return jsonify(
             {
                 'status': 'success',
-                'restored': len(restored_files),
-                'skipped': len(skipped_files),
-                'message': f'{len(restored_files)} file(s) restored successfully',
+                'restored': report.restored,
+                'skipped': len(report.skipped),
+                'message': f'{report.restored} file(s) restored successfully',
             }
         )
 
     except Exception as e:  # pragma: no cover
         logger.error(f"Error restoring backup: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@admin_bp.route('/api/admin/database/integrity-check', methods=['POST'])
+@admin_required
+def database_integrity_check_api():
+    """Run SQLite's integrity and foreign key checks on demand (Metrics page)."""
+    try:
+        from db.health import integrity_check
+
+        return jsonify(integrity_check())
+    except Exception as e:
+        logger.error(f"Error checking database integrity: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@admin_bp.route('/api/admin/migration-backups', methods=['GET'])
+@admin_required
+def get_migration_backups_api():
+    """What the 1.7 upgrade left in data/backups/ (archive of the 1.6 files, report, files set aside)."""
+    try:
+        return jsonify(legacy_import.migration_backups_summary())
+    except Exception as e:
+        logger.error(f"Error reading migration backups: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@admin_bp.route('/api/admin/migration-backups/report', methods=['GET'])
+@admin_required
+def download_migration_report_api():
+    """Download the newest import report as a text file."""
+    try:
+        path = legacy_import.latest_report_path()
+        if path is None:
+            return jsonify({'error': 'No import report'}), 404
+        return send_file(path, mimetype='text/plain', as_attachment=True, download_name=os.path.basename(path))
+    except Exception as e:
+        logger.error(f"Error sending the import report: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@admin_bp.route('/api/admin/migration-backups', methods=['DELETE'])
+@admin_required
+def delete_migration_backups_api():
+    """Delete the 1.7 upgrade leftovers. Irreversible: the archive is the only way back to 1.6."""
+    try:
+        removed = legacy_import.delete_migration_backups()
+        logger.info(f"Admin {session.get('username')} deleted the pre-1.7 migration backups")
+        return jsonify({'status': 'success', 'removed': removed})
+    except Exception as e:
+        logger.error(f"Error deleting migration backups: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
 

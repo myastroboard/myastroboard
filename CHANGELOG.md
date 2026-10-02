@@ -8,7 +8,11 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Features
 
-- None.
+- Storage moves from JSON files to a SQLite database (`data/myastroboard.db`) with versioned schema
+  migrations; existing data is imported, verified and archived automatically on first start - see
+  [docs/DATABASE.md](docs/DATABASE.md).
+- `backend/db/manage.py` command line for recovery (reset a password, disable 2FA) without editing files.
+- Parameters -> Backup / Restore shows the 1.7 upgrade archive (`data/backups/`) and deletes it once no longer needed.
 
 ### Fixes
 
@@ -16,7 +20,9 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Breaking changes
 
-- None.
+- One-way data migration: once 1.7 has started, going back to 1.6 means restoring
+  `data/backups/pre-1.7-*.zip`. Hand-editing `users.json`/`config.json` is replaced by the
+  `manage.py` command line and the Admin backup/restore.
 
 ## 1.6.8 (2026-09-30)
 

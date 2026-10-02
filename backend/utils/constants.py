@@ -16,7 +16,6 @@ SKYTONIGHT_DATASET_FILE = os.path.join(SKYTONIGHT_CATALOGUES_DIR, 'targets.json'
 SKYTONIGHT_CALCULATIONS_DIR = os.path.join(SKYTONIGHT_DIR, 'calculations')
 
 # File paths
-CONFIG_FILE = os.path.join(DATA_DIR, 'config.json')
 LOG_FILE = os.path.join(DATA_DIR, 'myastroboard.log')
 CONDITIONS_FILE = os.path.join(DATA_DIR_CACHE, 'conditions.json')
 CONFIG_DIR = os.path.join(SKYTONIGHT_DIR, 'configs')
