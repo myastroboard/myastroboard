@@ -356,6 +356,7 @@ def auth_status():
                     'account_scope': user.account_scope,
                 }
             )
+        session.clear()  # the account no longer exists (deleted, or replaced by a backup restore)
     return jsonify({'authenticated': False})
 
 
