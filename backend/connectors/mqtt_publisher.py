@@ -34,7 +34,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from connectors.mqtt_connector import MqttConnector
 from utils.connector_secrets import load_secrets
-from utils.constants import CONFIG_FILE, DATA_DIR_CACHE
+from utils.constants import DATA_DIR_CACHE
 from utils.logging_config import get_logger
 
 # Windows-compatible file locking (same split as cache_scheduler.py)
@@ -208,16 +208,13 @@ class MqttPublisher:
 
     @staticmethod
     def _current_source_signature() -> Any:
-        """Cheap change detector for the config and the secrets sidecar (mtimes)."""
-        from utils import connector_secrets
+        """Cheap change detector for the config and the connector secrets (store revisions)."""
+        from utils import connector_secrets, repo_config
 
-        stamps = []
-        for path in (CONFIG_FILE, connector_secrets._SECRETS_FILE):
-            try:
-                stamps.append(os.stat(path).st_mtime_ns)
-            except OSError:
-                stamps.append(None)
-        return tuple(stamps)
+        try:
+            return (repo_config.config_revision(), connector_secrets.secrets_revision())
+        except Exception:
+            return (None, None)
 
     # ------------------------------------------------------------------
     # Lifecycle

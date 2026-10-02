@@ -26,7 +26,6 @@ def client_admin(monkeypatch):
     app.config['TESTING'] = True
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        plan_my_night.PLAN_DIR = os.path.join(tmpdir, 'projects')
         astrodex.ASTRODEX_DIR = os.path.join(tmpdir, 'astrodex')
         astrodex.ASTRODEX_IMAGES_DIR = os.path.join(astrodex.ASTRODEX_DIR, 'images')
         astrodex.ensure_astrodex_directories()
@@ -53,19 +52,16 @@ def client_admin(monkeypatch):
 def client_read_only(monkeypatch):
     app.config['TESTING'] = True
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        plan_my_night.PLAN_DIR = os.path.join(tmpdir, 'projects')
+    read_only = user_manager.get_user_by_username('readonly_plan_test')
+    if not read_only:
+        read_only = user_manager.create_user('readonly_plan_test', 'test123', 'read-only')
 
-        read_only = user_manager.get_user_by_username('readonly_plan_test')
-        if not read_only:
-            read_only = user_manager.create_user('readonly_plan_test', 'test123', 'read-only')
-
-        with app.test_client() as test_client:
-            with test_client.session_transaction() as session:
-                session['user_id'] = read_only.user_id
-                session['username'] = read_only.username
-                session['role'] = read_only.role
-            yield test_client
+    with app.test_client() as test_client:
+        with test_client.session_transaction() as session:
+            session['user_id'] = read_only.user_id
+            session['username'] = read_only.username
+            session['role'] = read_only.role
+        yield test_client
 
 
 def _sample_target(name='M42'):
@@ -218,9 +214,8 @@ def test_add_target_with_combination_id(client_admin):
 
 
 def test_list_plan_my_night_returns_combination_count(client_admin):
-    # equipment_profiles.EQUIPMENT_DIR isn't isolated per-test by this fixture (only
-    # PLAN_DIR/ASTRODEX_DIR are), so the admin user's combinations accumulate across
-    # tests in this module - assert this combo is present rather than an absolute count.
+    # Assert this combo is present rather than an absolute count, so the test does not
+    # depend on what else the admin user owns.
     telescope = client_admin.post(
         '/api/equipment/telescopes',
         json={

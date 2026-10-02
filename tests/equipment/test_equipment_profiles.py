@@ -3,8 +3,8 @@ Tests for Equipment Profiles Module
 """
 
 import pytest
-import os
-import json
+
+from db import documents
 import tempfile
 import sys
 import types
@@ -17,8 +17,6 @@ def temp_data_dir(monkeypatch):
     """Create a temporary data directory for testing"""
     with tempfile.TemporaryDirectory() as tmpdir:
         monkeypatch.setenv('DATA_DIR', tmpdir)
-        # Recreate the module-level EQUIPMENT_DIR with new temp path
-        equipment_profiles.EQUIPMENT_DIR = os.path.join(tmpdir, 'equipments')
         yield tmpdir
 
 
@@ -642,7 +640,7 @@ class TestEquipmentDeleteGuard:
 
         Patches observation.astrodex.count_pictures_for_combination directly (the module
         delete_combination lazily imports from) rather than creating real Astrodex picture
-        data, since this test's temp_data_dir fixture only isolates EQUIPMENT_DIR.
+        data, to keep this test about the combination guard alone.
         """
         import observation.astrodex as astrodex_module
 
@@ -677,8 +675,8 @@ class TestEquipmentDeleteGuard:
         """A combination pinned to any Plan My Night plan can't be deleted (M5 rule).
 
         Patches observation.plan_my_night.count_plans_for_combination directly (the module
-        delete_combination lazily imports from) rather than creating real plan files, since
-        this test's temp_data_dir fixture only isolates EQUIPMENT_DIR - same approach as
+        delete_combination lazily imports from) rather than creating real plans, to keep this
+        test about the combination guard alone - same approach as
         test_delete_combination_blocked_by_picture above.
         """
         import observation.astrodex as astrodex_module
@@ -717,8 +715,8 @@ class TestEquipmentDeleteGuard:
         """A combination referenced by any Observation Log session can't be deleted (v1.3 rule).
 
         Patches observation.observation_sessions.count_sessions_for_combination directly (the
-        module delete_combination lazily imports from) rather than creating real session files,
-        since this test's temp_data_dir fixture only isolates EQUIPMENT_DIR - same approach as
+        module delete_combination lazily imports from) rather than creating real sessions,
+        to keep this test about the combination guard alone - same approach as
         the picture/plan guard tests above.
         """
         import observation.astrodex as astrodex_module
@@ -962,22 +960,16 @@ class TestFindCombinationsReferencing:
         )
         assert equipment_profiles._find_combinations_referencing('telescopes', 'no-such-id') == []
 
-    def test_inner_exception_on_invalid_combinations_file_blocks_delete(self, temp_data_dir, test_user_id):
-        """An unreadable combinations file fails the guard closed (blocks delete) rather than
-        being silently skipped - it might still reference the equipment being deleted."""
-        equipment_profiles.ensure_equipment_directories()
-        bad_file = os.path.join(equipment_profiles.EQUIPMENT_DIR, 'someone_combinations.json')
-        with open(bad_file, 'w') as f:
-            f.write('{invalid')
-        matches = equipment_profiles._find_combinations_referencing('telescopes', 'any-id')
-        assert len(matches) == 1
-        assert matches[0]['owner_id'] == 'someone'
+    def test_malformed_combinations_reference_nothing(self, temp_data_dir, test_user_id):
+        """A malformed stored value holds no combination row, so it cannot block a delete."""
+        documents.put_document('someone', 'equipment.combinations', 'corrupt')
+        assert equipment_profiles._find_combinations_referencing('telescopes', 'any-id') == []
 
     def test_outer_exception_returns_empty_list(self, temp_data_dir, monkeypatch):
-        def raise_oops(_path):
+        def raise_oops(*_args):
             raise Exception("oops")
 
-        monkeypatch.setattr(equipment_profiles.os, 'listdir', raise_oops)
+        monkeypatch.setattr(equipment_profiles.queries, 'combinations_referencing', raise_oops)
         assert equipment_profiles._find_combinations_referencing('telescopes', 'any-id') == []
 
 
@@ -1153,9 +1145,8 @@ def test_equipment_summary(temp_data_dir, test_user_id):
 # ============================================================
 
 
-def test_safe_save_creates_backup(temp_data_dir, test_user_id):
-    """Test that safe save creates backups"""
-    # Create initial data
+def test_safe_save_round_trip(temp_data_dir, test_user_id):
+    """A save through safe_save_equipment reads back unchanged"""
     telescope_data = {
         'name': 'Original',
         'telescope_type': 'Refractor',
@@ -1163,20 +1154,11 @@ def test_safe_save_creates_backup(temp_data_dir, test_user_id):
         'focal_length_mm': 400,
         'reducer_barlow_factor': 1.0,
     }
-
     equipment_profiles.create_telescope(test_user_id, telescope_data)
 
-    file_path = equipment_profiles.get_user_equipment_file(test_user_id, 'telescopes')
-    assert os.path.exists(file_path)
-
-    # Update should use safe save
     data = equipment_profiles.load_user_telescopes(test_user_id)
-    success = equipment_profiles.save_user_telescopes(test_user_id, data)
-
-    assert success is True
-    # Backup should be cleaned up after successful save
-    backup_path = file_path + '.backup'
-    assert not os.path.exists(backup_path)
+    assert equipment_profiles.save_user_telescopes(test_user_id, data) is True
+    assert equipment_profiles.load_user_telescopes(test_user_id)['items'] == data['items']
 
 
 def test_update_and_delete_camera_mount_filter_accessory_and_combination(temp_data_dir, test_user_id):
@@ -1338,7 +1320,7 @@ def test_update_and_delete_camera_mount_filter_accessory_and_combination(temp_da
     assert equipment_profiles.delete_camera(test_user_id, camera['id']) == (True, None)
 
 
-def test_load_helpers_return_defaults_on_invalid_json(temp_data_dir, test_user_id):
+def test_load_helpers_return_defaults_on_malformed_values(temp_data_dir, test_user_id):
     pairs = [
         ('cameras', equipment_profiles.load_user_cameras),
         ('mounts', equipment_profiles.load_user_mounts),
@@ -1347,9 +1329,7 @@ def test_load_helpers_return_defaults_on_invalid_json(temp_data_dir, test_user_i
         ('combinations', equipment_profiles.load_user_combinations),
     ]
     for eq_type, loader in pairs:
-        p = equipment_profiles.get_user_equipment_file(test_user_id, eq_type)
-        with open(p, 'w', encoding='utf-8') as f:
-            f.write('{invalid json')
+        documents.put_document(test_user_id, f'equipment.{eq_type}', 'corrupt')
         loaded = loader(test_user_id)
         assert isinstance(loaded, dict)
         assert isinstance(loaded.get('items', []), list)
@@ -1369,31 +1349,27 @@ def test_shared_equipment_and_combination_status(temp_data_dir, monkeypatch):
     )
     monkeypatch.setitem(sys.modules, 'utils.auth', fake_auth)
 
-    tel_file = equipment_profiles.get_user_equipment_file(user_a, 'telescopes')
-    cam_file = equipment_profiles.get_user_equipment_file(user_a, 'cameras')
-    combo_file = equipment_profiles.get_user_equipment_file(user_a, 'combinations')
-
-    with open(tel_file, 'w', encoding='utf-8') as f:
-        json.dump({'items': [{'id': 't1', 'name': 'Scope', 'is_shared': True}]}, f)
-    with open(cam_file, 'w', encoding='utf-8') as f:
-        json.dump({'items': [{'id': 'c1', 'name': 'Cam', 'is_shared': True}]}, f)
-    with open(combo_file, 'w', encoding='utf-8') as f:
-        json.dump(
-            {
-                'items': [
-                    {
-                        'id': 'combo1',
-                        'name': 'Shared Combo',
-                        'telescope_id': 't1',
-                        'camera_id': 'c1',
-                        'mount_id': None,
-                        'filter_ids': [],
-                        'accessory_ids': [],
-                    }
-                ]
-            },
-            f,
-        )
+    documents.put_document(
+        user_a, 'equipment.telescopes', {'items': [{'id': 't1', 'name': 'Scope', 'is_shared': True}]}
+    )
+    documents.put_document(user_a, 'equipment.cameras', {'items': [{'id': 'c1', 'name': 'Cam', 'is_shared': True}]})
+    documents.put_document(
+        user_a,
+        'equipment.combinations',
+        {
+            'items': [
+                {
+                    'id': 'combo1',
+                    'name': 'Shared Combo',
+                    'telescope_id': 't1',
+                    'camera_id': 'c1',
+                    'mount_id': None,
+                    'filter_ids': [],
+                    'accessory_ids': [],
+                }
+            ]
+        },
+    )
 
     shared_tel = equipment_profiles.load_all_shared_equipment('telescopes', exclude_user_id=user_b)
     assert len(shared_tel) == 1
@@ -1431,15 +1407,9 @@ def test_shared_equipment_and_combination_status(temp_data_dir, monkeypatch):
     assert shared_combos[0]['owner_username'] == 'alice'
 
 
-def test_safe_save_equipment_returns_false_when_validation_fails(tmp_path):
-    target = tmp_path / 'equipment.json'
-    target.write_text(json.dumps({'items': []}), encoding='utf-8')
-
-    with pytest.MonkeyPatch.context() as mp:
-        mp.setattr(equipment_profiles, 'validate_equipment_json', lambda _p: (False, 'bad'))
-        ok = equipment_profiles.safe_save_equipment(str(target), {'items': []})
-
-    assert ok is False
+def test_safe_save_equipment_returns_false_when_validation_fails(monkeypatch):
+    monkeypatch.setattr(equipment_profiles, 'validate_equipment_data', lambda _data: (False, 'bad'))
+    assert equipment_profiles.safe_save_equipment('u1', 'cameras', {'items': []}) is False
 
 
 def test_analyze_combination_handles_missing_specs_and_missing_combination(temp_data_dir, test_user_id):
@@ -1531,13 +1501,11 @@ class TestDataclassBranchCoverage:
 
     def test_old_mount_json_without_flip_keys_loads_with_defaults(self, temp_data_dir, test_user_id):
         # Simulate a pre-v1.4 mount file with none of the flip keys.
-        equipment_profiles.ensure_equipment_directories()
-        path = equipment_profiles.get_user_equipment_file(test_user_id, 'mounts')
-        with open(path, 'w') as handle:
-            json.dump(
-                {'items': [{'id': 'legacy', 'name': 'Old EQ', 'mount_type': 'Equatorial', 'payload_capacity_kg': 15}]},
-                handle,
-            )
+        documents.put_document(
+            test_user_id,
+            'equipment.mounts',
+            {'items': [{'id': 'legacy', 'name': 'Old EQ', 'mount_type': 'Equatorial', 'payload_capacity_kg': 15}]},
+        )
         # get_mount backfills the v1.4 flip fields directly - no round-trip through the
         # dataclass required by consumers such as the meridian-flip estimator.
         loaded = equipment_profiles.get_mount(test_user_id, 'legacy')
@@ -1592,55 +1560,36 @@ class TestDataclassBranchCoverage:
         assert analysis.recommendations == []
 
 
-class TestValidateEquipmentJson:
-    """Covers all error paths in validate_equipment_json."""
+class TestValidateEquipmentData:
+    """Covers all error paths in validate_equipment_data."""
 
-    def test_non_dict_root_returns_false(self, tmp_path):
-        p = tmp_path / 'test.json'
-        p.write_text(json.dumps([1, 2, 3]))
-        ok, msg = equipment_profiles.validate_equipment_json(str(p))
+    def test_non_dict_root_returns_false(self):
+        ok, msg = equipment_profiles.validate_equipment_data([1, 2, 3])
         assert ok is False
         assert 'object' in msg
 
-    def test_missing_items_key_returns_false(self, tmp_path):
-        p = tmp_path / 'test.json'
-        p.write_text(json.dumps({'name': 'no items'}))
-        ok, msg = equipment_profiles.validate_equipment_json(str(p))
+    def test_missing_items_key_returns_false(self):
+        ok, msg = equipment_profiles.validate_equipment_data({'name': 'no items'})
         assert ok is False
         assert 'items' in msg
 
-    def test_invalid_json_decode_error(self, tmp_path):
-        p = tmp_path / 'test.json'
-        p.write_text('{invalid json', encoding='utf-8')
-        ok, msg = equipment_profiles.validate_equipment_json(str(p))
-        assert ok is False
-        assert 'Invalid JSON' in msg
-
-    def test_file_not_found_general_exception(self):
-        ok, msg = equipment_profiles.validate_equipment_json('/nonexistent/path/file.json')
-        assert ok is False
-        assert 'Validation error' in msg
+    def test_valid_document(self):
+        assert equipment_profiles.validate_equipment_data({'items': []}) == (True, '')
 
 
 class TestSafeSaveEquipmentEdgeCases:
-    """Covers missing branches in safe_save_equipment."""
+    """Covers the failure branches of safe_save_equipment."""
 
-    def test_validation_fails_no_backup_to_restore(self, tmp_path, monkeypatch):
-        target = tmp_path / 'new_equip.json'
-        monkeypatch.setattr(equipment_profiles, 'validate_equipment_json', lambda _p: (False, 'bad'))
-        ok = equipment_profiles.safe_save_equipment(str(target), {'items': []})
-        assert ok is False
+    def test_validation_failure_stores_nothing(self):
+        assert equipment_profiles.safe_save_equipment('u1', 'telescopes', {'no': 'items'}) is False
+        assert documents.get_document('u1', 'equipment.telescopes') is None
 
-    def test_shutil_move_exception_triggers_recovery(self, tmp_path, monkeypatch):
-        target = tmp_path / 'equipment.json'
-        target.write_text(json.dumps({'items': []}), encoding='utf-8')
-
-        def fail_move(*_args):
+    def test_storage_failure_returns_false(self, monkeypatch):
+        def _boom(*_args, **_kwargs):
             raise IOError("disk full")
 
-        monkeypatch.setattr(equipment_profiles.shutil, 'move', fail_move)
-        ok = equipment_profiles.safe_save_equipment(str(target), {'items': []})
-        assert ok is False
+        monkeypatch.setattr(documents, 'put_document', _boom)
+        assert equipment_profiles.safe_save_equipment('u1', 'telescopes', {'items': []}) is False
 
 
 class TestLoadAllSharedEquipmentExceptions:
@@ -1653,10 +1602,7 @@ class TestLoadAllSharedEquipmentExceptions:
             user_manager=types.SimpleNamespace(list_users=lambda: [{'user_id': 'owner1', 'username': 'alice'}])
         )
         monkeypatch.setitem(sys.modules, 'utils.auth', fake_auth)
-        equipment_profiles.ensure_equipment_directories()
-        bad_file = os.path.join(equipment_profiles.EQUIPMENT_DIR, 'owner1_telescopes.json')
-        with open(bad_file, 'w') as f:
-            f.write('{invalid')
+        documents.put_document('owner1', 'equipment.telescopes', 'corrupt')
         result = equipment_profiles.load_all_shared_equipment('telescopes', exclude_user_id='owner2')
         assert result == []
 
@@ -1666,10 +1612,10 @@ class TestLoadAllSharedEquipmentExceptions:
         fake_auth = types.SimpleNamespace(user_manager=types.SimpleNamespace(list_users=lambda: []))
         monkeypatch.setitem(sys.modules, 'utils.auth', fake_auth)
 
-        def raise_oops(_path):
+        def raise_oops(*_args):
             raise Exception("oops")
 
-        monkeypatch.setattr(equipment_profiles.os, 'listdir', raise_oops)
+        monkeypatch.setattr(equipment_profiles.queries, 'shared_equipment', raise_oops)
         result = equipment_profiles.load_all_shared_equipment('telescopes', exclude_user_id='user2')
         assert result == []
 
@@ -1685,9 +1631,9 @@ class TestComputeShareStatusBranches:
             user_manager=types.SimpleNamespace(list_users=lambda: [{'user_id': user_a, 'username': 'alice'}])
         )
         monkeypatch.setitem(sys.modules, 'utils.auth', fake_auth)
-        tel_file = equipment_profiles.get_user_equipment_file(user_a, 'telescopes')
-        with open(tel_file, 'w', encoding='utf-8') as f:
-            json.dump({'items': [{'id': 't1', 'name': 'Scope', 'is_shared': False}]}, f)
+        documents.put_document(
+            user_a, 'equipment.telescopes', {'items': [{'id': 't1', 'name': 'Scope', 'is_shared': False}]}
+        )
         status = equipment_profiles.compute_combination_share_status(
             {'telescope_id': 't1', 'camera_id': None, 'mount_id': None, 'filter_ids': [], 'accessory_ids': []},
             user_a,
@@ -1700,9 +1646,7 @@ class TestCRUDExceptionAndNotFound:
     """Covers exception and not-found paths in CRUD functions."""
 
     def test_load_user_telescopes_invalid_json(self, temp_data_dir, test_user_id):
-        p = equipment_profiles.get_user_equipment_file(test_user_id, 'telescopes')
-        with open(p, 'w', encoding='utf-8') as f:
-            f.write('{invalid json')
+        documents.put_document(test_user_id, 'equipment.telescopes', 'corrupt')
         loaded = equipment_profiles.load_user_telescopes(test_user_id)
         assert isinstance(loaded, dict)
         assert isinstance(loaded.get('items', []), list)
@@ -2548,68 +2492,6 @@ class TestAnalyzeCombination:
         assert not any("within recommended" in s for s in result.suitability)
 
 
-class TestSafeSaveRecoveryBranches:
-    """error-recovery paths in safe_save_equipment."""
-
-    def test_no_backup_exists_on_move_failure_skips_restore(self, tmp_path, monkeypatch):
-        """new file, no backup, shutil.move fails → if backup: False → skip to 372."""
-        new_file = str(tmp_path / 'new_equip.json')
-        monkeypatch.setattr(equipment_profiles.shutil, 'move', lambda *a: (_ for _ in ()).throw(IOError("disk full")))
-        ok = equipment_profiles.safe_save_equipment(new_file, {'items': []})
-        assert ok is False
-
-    def test_restore_copy2_fails_logs_error(self, tmp_path, monkeypatch):
-        """existing file, backup created, move fails, restore copy2 also fails."""
-        target = tmp_path / 'equip.json'
-        target.write_text(json.dumps({'items': []}), encoding='utf-8')
-        copy2_calls = [0]
-        real_copy2 = equipment_profiles.shutil.copy2
-
-        def _copy2(src, dst):
-            copy2_calls[0] += 1
-            if copy2_calls[0] >= 2:
-                raise IOError("restore failed")
-            return real_copy2(src, dst)  # first call (backup) actually copies
-
-        monkeypatch.setattr(equipment_profiles.shutil, 'copy2', _copy2)
-        monkeypatch.setattr(equipment_profiles.shutil, 'move', lambda *a: (_ for _ in ()).throw(IOError("disk full")))
-        ok = equipment_profiles.safe_save_equipment(str(target), {'items': []})
-        assert ok is False
-
-    def test_no_temp_file_on_open_failure(self, tmp_path, monkeypatch):
-        """exception before temp created (step 2 fails) → temp doesn't exist."""
-        import builtins
-
-        target = tmp_path / 'equip.json'
-        target.write_text(json.dumps({'items': []}), encoding='utf-8')
-        real_open = builtins.open
-
-        def _fail_temp(path, *args, **kwargs):
-            if str(path).endswith('.tmp'):
-                raise IOError("disk full")
-            return real_open(path, *args, **kwargs)
-
-        monkeypatch.setattr(builtins, 'open', _fail_temp)
-        ok = equipment_profiles.safe_save_equipment(str(target), {'items': []})
-        assert ok is False
-
-    def test_temp_remove_fails_is_swallowed(self, tmp_path, monkeypatch):
-        """temp cleanup raises → swallowed → still returns False."""
-        target = tmp_path / 'equip.json'
-        target.write_text(json.dumps({'items': []}), encoding='utf-8')
-        monkeypatch.setattr(equipment_profiles.shutil, 'move', lambda *a: (_ for _ in ()).throw(IOError("disk full")))
-        real_remove = equipment_profiles.os.remove
-
-        def _fail_remove(path):
-            if str(path).endswith('.tmp'):
-                raise OSError("cannot remove")
-            return real_remove(path)
-
-        monkeypatch.setattr(equipment_profiles.os, 'remove', _fail_remove)
-        ok = equipment_profiles.safe_save_equipment(str(target), {'items': []})
-        assert ok is False
-
-
 class TestSharedEquipmentAdditionalBranches:
     """."""
 
@@ -2619,10 +2501,9 @@ class TestSharedEquipmentAdditionalBranches:
             user_manager=types.SimpleNamespace(list_users=lambda: [{'user_id': 'owner1', 'username': 'alice'}])
         )
         monkeypatch.setitem(sys.modules, 'utils.auth', fake_auth)
-        equipment_profiles.ensure_equipment_directories()
-        tel_file = os.path.join(equipment_profiles.EQUIPMENT_DIR, 'owner1_telescopes.json')
-        with open(tel_file, 'w', encoding='utf-8') as f:
-            json.dump({'items': [{'id': 't1', 'name': 'Scope', 'is_shared': False}]}, f)
+        documents.put_document(
+            'owner1', 'equipment.telescopes', {'items': [{'id': 't1', 'name': 'Scope', 'is_shared': False}]}
+        )
         result = equipment_profiles.load_all_shared_equipment('telescopes', exclude_user_id='other')
         assert result == []
 
@@ -2639,10 +2520,9 @@ class TestSharedEquipmentAdditionalBranches:
             )
         )
         monkeypatch.setitem(sys.modules, 'utils.auth', fake_auth)
-        equipment_profiles.ensure_equipment_directories()
-        tel_file = equipment_profiles.get_user_equipment_file(owner_id, 'telescopes')
-        with open(tel_file, 'w', encoding='utf-8') as f:
-            json.dump({'items': [{'id': 't1', 'name': 'SharedScope', 'is_shared': True}]}, f)
+        documents.put_document(
+            owner_id, 'equipment.telescopes', {'items': [{'id': 't1', 'name': 'SharedScope', 'is_shared': True}]}
+        )
         # viewer references owner's shared telescope: t1 is in shared_by_id, not own_by_id
         status = equipment_profiles.compute_combination_share_status(
             {'telescope_id': 't1', 'camera_id': None, 'mount_id': None, 'filter_ids': [], 'accessory_ids': []},
@@ -2657,25 +2537,23 @@ class TestSharedEquipmentAdditionalBranches:
             user_manager=types.SimpleNamespace(list_users=lambda: [{'user_id': 'excludeme', 'username': 'excluded'}])
         )
         monkeypatch.setitem(sys.modules, 'utils.auth', fake_auth)
-        equipment_profiles.ensure_equipment_directories()
-        combo_file = os.path.join(equipment_profiles.EQUIPMENT_DIR, 'excludeme_combinations.json')
-        with open(combo_file, 'w', encoding='utf-8') as f:
-            json.dump(
-                {
-                    'items': [
-                        {
-                            'id': 'c1',
-                            'telescope_id': None,
-                            'camera_id': None,
-                            'mount_id': None,
-                            'filter_ids': [],
-                            'accessory_ids': [],
-                            'is_shared': True,
-                        }
-                    ]
-                },
-                f,
-            )
+        documents.put_document(
+            'excludeme',
+            'equipment.combinations',
+            {
+                'items': [
+                    {
+                        'id': 'c1',
+                        'telescope_id': None,
+                        'camera_id': None,
+                        'mount_id': None,
+                        'filter_ids': [],
+                        'accessory_ids': [],
+                        'is_shared': True,
+                    }
+                ]
+            },
+        )
         result = equipment_profiles.load_all_shared_combinations(exclude_user_id='excludeme')
         assert result == []
 
@@ -2685,10 +2563,7 @@ class TestSharedEquipmentAdditionalBranches:
             user_manager=types.SimpleNamespace(list_users=lambda: [{'user_id': 'owner1', 'username': 'alice'}])
         )
         monkeypatch.setitem(sys.modules, 'utils.auth', fake_auth)
-        equipment_profiles.ensure_equipment_directories()
-        combo_file = os.path.join(equipment_profiles.EQUIPMENT_DIR, 'owner1_combinations.json')
-        with open(combo_file, 'w', encoding='utf-8') as f:
-            f.write('{invalid json}')
+        documents.put_document('owner1', 'equipment.combinations', 'corrupt')
         result = equipment_profiles.load_all_shared_combinations(exclude_user_id='other')
         assert result == []
 
@@ -2699,33 +2574,31 @@ class TestSharedEquipmentAdditionalBranches:
             user_manager=types.SimpleNamespace(list_users=lambda: [{'user_id': owner_id, 'username': 'alice'}])
         )
         monkeypatch.setitem(sys.modules, 'utils.auth', fake_auth)
-        equipment_profiles.ensure_equipment_directories()
-        combo_file = os.path.join(equipment_profiles.EQUIPMENT_DIR, f'{owner_id}_combinations.json')
-        with open(combo_file, 'w', encoding='utf-8') as f:
-            json.dump(
-                {
-                    'items': [
-                        {
-                            'id': 'c1',
-                            'telescope_id': 'missing',
-                            'camera_id': None,
-                            'mount_id': None,
-                            'filter_ids': [],
-                            'accessory_ids': [],
-                        }
-                    ]
-                },
-                f,
-            )
+        documents.put_document(
+            owner_id,
+            'equipment.combinations',
+            {
+                'items': [
+                    {
+                        'id': 'c1',
+                        'telescope_id': 'missing',
+                        'camera_id': None,
+                        'mount_id': None,
+                        'filter_ids': [],
+                        'accessory_ids': [],
+                    }
+                ]
+            },
+        )
         result = equipment_profiles.load_all_shared_combinations(exclude_user_id='other')
         assert result == []
 
     def test_load_shared_combinations_outer_exception_returns_empty(self, temp_data_dir, monkeypatch):
-        """os.listdir raises → outer except → return []."""
+        """The store raises → outer except → return []."""
         fake_auth = types.SimpleNamespace(user_manager=types.SimpleNamespace(list_users=lambda: []))
         monkeypatch.setitem(sys.modules, 'utils.auth', fake_auth)
         monkeypatch.setattr(
-            equipment_profiles.os, 'listdir', lambda _: (_ for _ in ()).throw(Exception("listdir fail"))
+            equipment_profiles.documents, 'list_documents', lambda *_a: (_ for _ in ()).throw(Exception("db fail"))
         )
         result = equipment_profiles.load_all_shared_combinations(exclude_user_id='other')
         assert result == []
@@ -2746,15 +2619,16 @@ class TestIndexTelescopesAndCameras:
             )
         )
         monkeypatch.setitem(sys.modules, 'utils.auth', fake_auth)
-        equipment_profiles.ensure_equipment_directories()
 
         # Another user's shared telescope and camera
-        tel_file = equipment_profiles.get_user_equipment_file(owner_id, 'telescopes')
-        with open(tel_file, 'w', encoding='utf-8') as f:
-            json.dump({'items': [{'id': 'shared-scope', 'name': 'Shared Scope', 'is_shared': True}]}, f)
-        cam_file = equipment_profiles.get_user_equipment_file(owner_id, 'cameras')
-        with open(cam_file, 'w', encoding='utf-8') as f:
-            json.dump({'items': [{'id': 'shared-cam', 'name': 'Shared Cam', 'is_shared': True}]}, f)
+        documents.put_document(
+            owner_id,
+            'equipment.telescopes',
+            {'items': [{'id': 'shared-scope', 'name': 'Shared Scope', 'is_shared': True}]},
+        )
+        documents.put_document(
+            owner_id, 'equipment.cameras', {'items': [{'id': 'shared-cam', 'name': 'Shared Cam', 'is_shared': True}]}
+        )
 
         # Viewer's own telescope and camera
         own_scope = equipment_profiles.create_telescope(

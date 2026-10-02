@@ -4,14 +4,13 @@ Manages user collections of celestial objects they have photographed
 """
 
 import copy
-import json
 import os
 import re
-import threading
 import uuid
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
-from utils.file_lock import interprocess_lock
+from db import documents, queries
+from utils.constants import DATA_DIR
 from utils.logging_config import get_logger
 from constellation import Constellation
 from observation import catalogue_aliases
@@ -19,22 +18,11 @@ from skytonight import skytonight_targets
 
 logger = get_logger(__name__)
 
-# Per-user write locks to prevent race conditions on concurrent saves
-_user_save_locks: Dict[str, threading.Lock] = {}
-_user_save_locks_mutex = threading.Lock()
-
-
-def _get_user_save_lock(user_id: str) -> threading.Lock:
-    """Get or create a per-user lock for serializing file writes."""
-    with _user_save_locks_mutex:
-        if user_id not in _user_save_locks:
-            _user_save_locks[user_id] = threading.Lock()
-        return _user_save_locks[user_id]
-
-
-# Astrodex data directory
-ASTRODEX_DIR = os.path.join(os.environ.get('DATA_DIR', '/app/data'), 'astrodex')
+# Astrodex directory: holds the pictures (images/); the per-user collections are in the database
+ASTRODEX_DIR = os.path.join(DATA_DIR, 'astrodex')
 ASTRODEX_IMAGES_DIR = os.path.join(ASTRODEX_DIR, 'images')
+# user_documents kind of the per-user astrodex
+ASTRODEX_KIND = 'astrodex'
 
 # Default image for items without pictures
 DEFAULT_IMAGE = 'default_astro_object.png'
@@ -267,27 +255,21 @@ def _build_stats_from_items(items: List[Dict]) -> Dict:
 
 
 def load_all_users_astrodex(usernames_by_id: Optional[Dict[str, str]] = None) -> List[Dict]:
-    """Load astrodex collections for all users that have an astrodex file."""
-    ensure_astrodex_directories()
+    """Load astrodex collections for all users that have one."""
     usernames_by_id = usernames_by_id or {}
 
     collections: List[Dict] = []
-    suffix = '_astrodex.json'
-
-    for filename in os.listdir(ASTRODEX_DIR):
-        if not filename.endswith(suffix):
+    for user_id, _doc_key, data in documents.list_documents(ASTRODEX_KIND):
+        if not isinstance(data, dict):
             continue
-
-        user_id = filename[: -len(suffix)]
         username = usernames_by_id.get(user_id)
-        data = load_user_astrodex(user_id, username)
         collections.append(
             {
                 'user_id': user_id,
-                'username': data.get('username') or username or 'unknown',
+                'username': username or data.get('username') or 'unknown',
                 'created_at': data.get('created_at'),
                 'updated_at': data.get('updated_at'),
-                'items': data.get('items', []),
+                'items': data.get('items', []) if isinstance(data.get('items'), list) else [],
             }
         )
 
@@ -474,22 +456,7 @@ def can_user_view_image(
     if not filename:
         return False
 
-    if private_mode:
-        data = load_user_astrodex(user_id, (usernames_by_id or {}).get(user_id))
-        for item in data.get('items', []):
-            for picture in item.get('pictures', []):
-                if picture.get('filename') == filename:
-                    return True
-        return False
-
-    collections = load_all_users_astrodex(usernames_by_id)
-    for collection in collections:
-        for item in collection.get('items', []):
-            for picture in item.get('pictures', []):
-                if picture.get('filename') == filename:
-                    return True
-
-    return False
+    return queries.astrodex_picture_exists(filename, user_id if private_mode else None)
 
 
 def ensure_astrodex_directories():
@@ -498,27 +465,13 @@ def ensure_astrodex_directories():
     os.makedirs(ASTRODEX_IMAGES_DIR, exist_ok=True)
 
 
-_REJECTED_ASTRODEX_FILE = '__rejected___astrodex.json'
-
-
-def get_user_astrodex_file(user_id: str) -> str:
-    """Get the path to a user's astrodex data file using user UUID.
-
-    ``user_id`` is a server-issued uuid in normal use, but every caller ends up
-    here, so the containment check lives in one place: realpath + startswith
-    (the pattern CodeQL's py/path-injection query recognises as a sanitizer
-    barrier, same as upload_astrodex_image / _resolve_image_file_path). A value
-    that would escape ASTRODEX_DIR is swapped for a fixed, guaranteed-missing
-    name inside the directory, so callers just see "no such astrodex" and bulk
-    iteration over many users is never interrupted.
-    """
-    ensure_astrodex_directories()
-    base_dir = os.path.realpath(ASTRODEX_DIR)
-    file_path = os.path.realpath(os.path.join(base_dir, f'{user_id}_astrodex.json'))
-    if not file_path.startswith(base_dir + os.sep):
-        logger.warning("Rejected out-of-tree astrodex user id: %r", user_id)
-        return os.path.join(base_dir, _REJECTED_ASTRODEX_FILE)
-    return file_path
+def _empty_astrodex(user_id: str, username: Optional[str]) -> Dict:
+    return {
+        'user_id': user_id,
+        'username': username or 'unknown',
+        'created_at': datetime.now(timezone.utc).isoformat(),
+        'items': [],
+    }
 
 
 def load_user_astrodex(user_id: str, username: Optional[str] = None) -> Dict:
@@ -528,105 +481,55 @@ def load_user_astrodex(user_id: str, username: Optional[str] = None) -> Dict:
         user_id: User's UUID
         username: Optional username for metadata
     """
-    file_path = get_user_astrodex_file(user_id)
-
-    if not os.path.exists(file_path):
-        return {
-            'user_id': user_id,
-            'username': username or 'unknown',
-            'created_at': datetime.now(timezone.utc).isoformat(),
-            'items': [],
-        }
-
     try:
-        with open(file_path, 'r') as f:
-            data = json.load(f)
-        if username and data.get('username') != username:
-            data['username'] = username
-            data['user_id'] = user_id
-            save_user_astrodex(user_id, data, username=username)
-        return data
-    except json.JSONDecodeError as e:
-        # JSON is corrupted - try to recover or reset
-        logger.error(f"Error loading astrodex for {username}: {e}")
-        logger.error("Corrupted file will be backed up and reset")
-
-        # Create backup of corrupted file
-        backup_path = file_path + '.corrupted.' + datetime.now().strftime('%Y%m%d_%H%M%S')
-        try:
-            import shutil
-
-            shutil.copy2(file_path, backup_path)
-            logger.info(f"Backed up corrupted file to {backup_path}")
-        except Exception as backup_error:
-            logger.error(f"Failed to backup corrupted file: {backup_error}")
-
-        # Return fresh astrodex (file will be overwritten on next save)
-        return {
-            'user_id': user_id,
-            'username': username or 'unknown',
-            'created_at': datetime.now(timezone.utc).isoformat(),
-            'items': [],
-        }
+        data = documents.get_document(user_id, ASTRODEX_KIND)
     except Exception as e:
         logger.error(f"Error loading astrodex for user {user_id}: {e}")
-        return {
-            'user_id': user_id,
-            'username': username or 'unknown',
-            'created_at': datetime.now(timezone.utc).isoformat(),
-            'items': [],
-        }
+        return _empty_astrodex(user_id, username)
+
+    if not isinstance(data, dict) or not isinstance(data.get('items'), list):
+        if data is not None:
+            logger.error(f"Stored astrodex of user {user_id} is malformed; starting from an empty one")
+        return _empty_astrodex(user_id, username)
+
+    if username and data.get('username') != username:
+        data['username'] = username
+        data['user_id'] = user_id
+        save_user_astrodex(user_id, data, username=username)
+    return data
 
 
-def validate_astrodex_json(file_path: str) -> tuple[bool, str]:
+def validate_astrodex_data(data) -> tuple[bool, str]:
     """
-    Validate that a file contains valid astrodex JSON
-
-    Args:
-        file_path: Path to JSON file to validate
+    Validate an astrodex document before it is stored
 
     Returns:
         Tuple of (is_valid, error_message)
     """
-    try:
-        with open(file_path, 'r') as f:
-            data = json.load(f)
+    if not isinstance(data, dict):
+        return False, "JSON root is not a dictionary"
 
-        # Check required top-level fields
-        if not isinstance(data, dict):
-            return False, "JSON root is not a dictionary"
+    if 'username' not in data:
+        return False, "Missing 'username' field"
 
-        if 'username' not in data:
-            return False, "Missing 'username' field"
+    if 'items' not in data or not isinstance(data['items'], list):
+        return False, "Missing or invalid 'items' field"
 
-        if 'items' not in data or not isinstance(data['items'], list):
-            return False, "Missing or invalid 'items' field"
+    # Validate each item has required fields
+    for idx, item in enumerate(data['items']):
+        if not isinstance(item, dict):
+            return False, f"Item {idx} is not a dictionary"
+        if 'id' not in item:
+            return False, f"Item {idx} missing 'id' field"
+        if 'name' not in item:
+            return False, f"Item {idx} missing 'name' field"
 
-        # Validate each item has required fields
-        for idx, item in enumerate(data['items']):
-            if 'id' not in item:
-                return False, f"Item {idx} missing 'id' field"
-            if 'name' not in item:
-                return False, f"Item {idx} missing 'name' field"
-
-        return True, ""
-
-    except json.JSONDecodeError as e:
-        return False, f"Invalid JSON: {e}"
-    except Exception as e:
-        return False, f"Validation error: {e}"
+    return True, ""
 
 
 def save_user_astrodex(user_id: str, astrodex_data: Dict, username: Optional[str] = None) -> bool:
     """
-    Save a user's astrodex data with backup and recovery mechanism
-
-    Process:
-    1. Create backup of existing file (if exists)
-    2. Write new data to temporary file
-    3. Validate the temporary file
-    4. Atomically replace original with temp file
-    5. Delete backup on success, restore on failure
+    Validate and store a user's astrodex data (one transaction, so nothing half-written)
 
     Args:
         user_id: User's UUID
@@ -635,26 +538,6 @@ def save_user_astrodex(user_id: str, astrodex_data: Dict, username: Optional[str
     Returns:
         True on success, False on failure
     """
-    file_path = get_user_astrodex_file(user_id)
-    temp_path = file_path + '.tmp'
-    backup_path = file_path + '.backup'
-
-    # The thread lock serializes this worker; the file lock serializes every gunicorn worker
-    with _get_user_save_lock(user_id), interprocess_lock(file_path + '.lock'):
-        return _save_user_astrodex_locked(user_id, username, astrodex_data, file_path, temp_path, backup_path)
-
-
-def _save_user_astrodex_locked(
-    user_id: str,
-    username: Optional[str],
-    astrodex_data: Dict,
-    file_path: str,
-    temp_path: str,
-    backup_path: str,
-) -> bool:
-    # Track if we created a backup (for cleanup)
-    backup_created = False
-
     try:
         astrodex_data['updated_at'] = datetime.now(timezone.utc).isoformat()
         astrodex_data['user_id'] = user_id
@@ -663,71 +546,16 @@ def _save_user_astrodex_locked(
 
         _sanitize_astrodex_for_persistence(astrodex_data)
 
-        # Step 1: Create backup of existing file
-        if os.path.exists(file_path):
-            try:
-                import shutil
-
-                shutil.copy2(file_path, backup_path)
-                backup_created = True
-                logger.debug(f"Created backup: {backup_path}")
-            except Exception as backup_error:
-                logger.error(f"Failed to create backup for user {user_id}: {backup_error}")
-                # Continue anyway - atomic write still provides some safety
-
-        # Step 2: Write to temporary file
-        with open(temp_path, 'w') as f:
-            json.dump(astrodex_data, f, indent=2)
-        logger.debug(f"Wrote temporary file: {temp_path}")
-
-        # Step 3: Validate the temporary file
-        is_valid, error_msg = validate_astrodex_json(temp_path)
+        is_valid, error_msg = validate_astrodex_data(astrodex_data)
         if not is_valid:
-            raise ValueError(f"JSON validation failed: {error_msg}")
-        logger.debug("Validated temporary file successfully")
+            raise ValueError(f"Astrodex validation failed: {error_msg}")
 
-        # Step 4: Atomic rename (on POSIX systems, this is atomic)
-        os.replace(temp_path, file_path)
+        documents.put_document(user_id, ASTRODEX_KIND, astrodex_data)
         logger.info(f"Successfully saved astrodex for user {user_id}")
-
-        # Step 5: Clean up backup on success
-        if backup_created and os.path.exists(backup_path):
-            try:
-                os.remove(backup_path)
-                logger.debug(f"Removed backup: {backup_path}")
-            except Exception as cleanup_error:
-                logger.warning(f"Failed to remove backup: {cleanup_error}")
-                # Not critical - backup will be overwritten next time
-
         return True
 
     except Exception as e:
         logger.error(f"Error saving astrodex for user {user_id}: {e}")
-
-        # Restore from backup if it exists
-        if backup_created and os.path.exists(backup_path):
-            try:
-                import shutil
-
-                shutil.copy2(backup_path, file_path)
-                logger.info(f"Restored astrodex from backup for user {user_id}")
-            except Exception as restore_error:
-                logger.error(f"Failed to restore from backup: {restore_error}")
-
-        # Clean up temporary file if it exists
-        if os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-            except Exception as cleanup_error:  # pragma: no cover
-                logger.warning(f"Failed to remove temp file: {cleanup_error}")
-
-        # Clean up backup file
-        if backup_created and os.path.exists(backup_path):
-            try:
-                os.remove(backup_path)
-            except Exception as cleanup_error:  # pragma: no cover
-                logger.warning(f"Failed to remove backup file: {cleanup_error}")
-
         return False
 
 
@@ -810,52 +638,22 @@ def count_pictures_for_location(location_id: str) -> int:
     tied to one place. Read-only pre-delete check: deleting a preset never
     cascades to Astrodex - pictures keep their frozen location_name snapshot.
     """
-    if not location_id or not os.path.isdir(ASTRODEX_DIR):
+    if not location_id:
         return 0
-    count = 0
-    for fname in os.listdir(ASTRODEX_DIR):
-        if not fname.endswith('_astrodex.json'):
-            continue
-        try:
-            with open(os.path.join(ASTRODEX_DIR, fname), 'r', encoding='utf-8') as file_obj:
-                data = json.load(file_obj)
-            for item in data.get('items', []):
-                if not isinstance(item, dict):
-                    continue
-                for picture in item.get('pictures', []):
-                    if isinstance(picture, dict) and picture.get('location_id') == location_id:
-                        count += 1
-        except Exception:
-            continue  # unreadable file — skip, this is a best-effort count
-    return count
+    return queries.count_astrodex_pictures(location_id=location_id)
 
 
 def count_pictures_for_combination(combination_id: str) -> int:
     """Count Astrodex pictures (all users) referencing an equipment combination.
 
     Delete-guard pre-check for equipment_profiles.delete_combination(). Mirrors
-    count_pictures_for_location(): scans every user's file directly (not
+    count_pictures_for_location(): counts every user's pictures (not
     get_visible_astrodex()'s privacy-aware merge) since a delete-guard must catch
     every reference regardless of what the deleting user can currently see.
     """
-    if not combination_id or not os.path.isdir(ASTRODEX_DIR):
+    if not combination_id:
         return 0
-    count = 0
-    for fname in os.listdir(ASTRODEX_DIR):
-        if not fname.endswith('_astrodex.json'):
-            continue
-        try:
-            with open(os.path.join(ASTRODEX_DIR, fname), 'r', encoding='utf-8') as file_obj:
-                data = json.load(file_obj)
-            for item in data.get('items', []):
-                if not isinstance(item, dict):
-                    continue
-                for picture in item.get('pictures', []):
-                    if isinstance(picture, dict) and picture.get('combination_id') == combination_id:
-                        count += 1
-        except Exception:
-            continue  # unreadable file — skip, this is a best-effort count
-    return count
+    return queries.count_astrodex_pictures(combination_id=combination_id)
 
 
 def build_combination_photo_index(

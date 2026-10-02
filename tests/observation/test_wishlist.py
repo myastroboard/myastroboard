@@ -5,21 +5,26 @@ and frozen at add time, and "captured" is derived on every read rather than stor
 """
 
 import json
-import os
-import tempfile
 
 import pytest
 
+from db import documents
 from observation import wishlist
 
 
 @pytest.fixture
-def isolated_wishlist(monkeypatch):
-    """Point wishlist storage at a temporary directory."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        directory = os.path.join(tmpdir, 'wishlist')
-        monkeypatch.setattr(wishlist, 'WISHLIST_DIR', directory)
-        yield directory
+def isolated_wishlist():
+    """Wishlists live in this test's own database (conftest.isolated_database)."""
+    return None
+
+
+def _stored(user_id='user-1'):
+    return documents.get_document(user_id, wishlist.WISHLIST_KIND)
+
+
+def _store(value, user_id='user-1'):
+    """Write a stored wishlist directly, bypassing save validation."""
+    documents.put_document(user_id, wishlist.WISHLIST_KIND, value)
 
 
 @pytest.fixture
@@ -83,106 +88,50 @@ class TestStorage:
         assert len(report['added']) == 1
         assert wishlist.load_user_wishlist('user-1')['items'][0]['name'] == 'M 31'
 
-    def test_file_is_written_where_expected(self, isolated_wishlist, stub_resolver):
+    def test_document_is_stored(self, isolated_wishlist, stub_resolver):
         _add()
-        path = os.path.join(isolated_wishlist, 'user-1_wishlist.json')
-        assert os.path.isfile(path)
-        with open(path, encoding='utf-8') as handle:
-            assert json.load(handle)['items'][0]['name'] == 'M 31'
+        assert _stored()['items'][0]['name'] == 'M 31'
 
-    def test_corrupted_file_is_backed_up_and_reset(self, isolated_wishlist, stub_resolver):
-        """A truncated write must not take the whole wishlist down with it."""
-        _add()
-        path = os.path.join(isolated_wishlist, 'user-1_wishlist.json')
-        with open(path, 'w', encoding='utf-8') as handle:
-            handle.write('{ this is not json')
-
+    def test_malformed_stored_value_is_reset(self, isolated_wishlist, stub_resolver):
+        """A damaged stored value must not take the whole wishlist down with it."""
+        _store(['not', 'a', 'wishlist'])
         assert wishlist.load_user_wishlist('user-1')['items'] == []
-        assert any(name.startswith('user-1_wishlist.json.corrupted.') for name in os.listdir(isolated_wishlist))
 
     def test_non_dict_items_are_dropped_on_load(self, isolated_wishlist, stub_resolver):
         _add()
-        path = os.path.join(isolated_wishlist, 'user-1_wishlist.json')
-        with open(path, encoding='utf-8') as handle:
-            data = json.load(handle)
+        data = _stored()
         data['items'].append('junk')
-        with open(path, 'w', encoding='utf-8') as handle:
-            json.dump(data, handle)
+        _store(data)
 
         assert len(wishlist.load_user_wishlist('user-1')['items']) == 1
 
-    def test_path_traversal_is_refused(self, isolated_wishlist):
-        with pytest.raises(ValueError):
-            wishlist._safe_wishlist_path(os.path.join(isolated_wishlist, '..', 'escape.json'))
-
-    def test_users_have_separate_files(self, isolated_wishlist, stub_resolver):
+    def test_users_have_separate_documents(self, isolated_wishlist, stub_resolver):
         _add(user_id='user-1')
         _add(user_id='user-2', name='M 42')
         assert [item['name'] for item in wishlist.load_user_wishlist('user-1')['items']] == ['M 31']
         assert [item['name'] for item in wishlist.load_user_wishlist('user-2')['items']] == ['M 42']
 
-    def test_load_with_invalid_user_id_returns_default_payload(self, isolated_wishlist):
-        """A user id that would resolve outside the wishlist directory degrades to an
-        empty payload instead of raising."""
-        data = wishlist.load_user_wishlist('../escaped', username='tester')
+    def test_read_error_returns_default_payload(self, isolated_wishlist, monkeypatch):
+        def _boom(*_args, **_kwargs):
+            raise OSError('db gone')
+
+        monkeypatch.setattr(documents, 'get_document', _boom)
+        data = wishlist.load_user_wishlist('user-1', username='tester')
         assert data['items'] == []
 
-    def test_save_with_invalid_user_id_fails(self, isolated_wishlist):
-        assert wishlist.save_user_wishlist('../escaped', {'items': []}) is False
+    def test_storage_error_fails_the_save(self, isolated_wishlist, monkeypatch):
+        def _boom(*_args, **_kwargs):
+            raise OSError('disk full')
 
-    def test_corrupted_file_backup_failure_is_swallowed(self, isolated_wishlist, stub_resolver, monkeypatch):
-        """A backup failure while recovering from corruption must not stop the reset."""
-        _add()
-        path = os.path.join(isolated_wishlist, 'user-1_wishlist.json')
-        with open(path, 'w', encoding='utf-8') as handle:
-            handle.write('{ this is not json')
-
-        def _raise(*args, **kwargs):
-            raise OSError('backup boom')
-
-        monkeypatch.setattr(wishlist.shutil, 'copy2', _raise)
-        assert wishlist.load_user_wishlist('user-1')['items'] == []
-
-    def test_load_swallows_non_json_decode_errors(self, isolated_wishlist, stub_resolver):
-        """An unexpected read error (not just malformed JSON) still degrades gracefully
-        to an empty payload rather than propagating."""
-        _add()
-        path = os.path.join(isolated_wishlist, 'user-1_wishlist.json')
-        with open(path, 'wb') as handle:
-            handle.write(b'\xff\xfe\x00\x01')  # invalid utf-8, so decoding itself fails
-
-        assert wishlist.load_user_wishlist('user-1')['items'] == []
-
-    def test_non_dict_json_root_returns_default_payload(self, isolated_wishlist):
-        wishlist.ensure_wishlist_directories()
-        path = os.path.join(isolated_wishlist, 'user-3_wishlist.json')
-        with open(path, 'w', encoding='utf-8') as handle:
-            json.dump([1, 2, 3], handle)
-        data = wishlist.load_user_wishlist('user-3')
-        assert data['items'] == []
-        assert data['user_id'] == 'user-3'
+        monkeypatch.setattr(documents, 'put_document', _boom)
+        assert wishlist.save_user_wishlist('user-1', {'items': []}) is False
 
     def test_missing_items_field_defaults_to_empty_list(self, isolated_wishlist):
-        wishlist.ensure_wishlist_directories()
-        path = os.path.join(isolated_wishlist, 'user-2_wishlist.json')
-        with open(path, 'w', encoding='utf-8') as handle:
-            json.dump({'username': 'tester'}, handle)
+        _store({'username': 'tester'}, user_id='user-2')
         assert wishlist.load_user_wishlist('user-2')['items'] == []
 
-    def test_backup_creation_failure_does_not_block_save(self, isolated_wishlist, stub_resolver, monkeypatch):
-        """A failed backup attempt (e.g. disk hiccup) is logged but never blocks the write
-        itself - the atomic replace is the real safety net."""
-        _add()
-        data = wishlist.load_user_wishlist('user-1')
-
-        def _raise(*args, **kwargs):
-            raise OSError('backup boom')
-
-        monkeypatch.setattr(wishlist.shutil, 'copy2', _raise)
-        assert wishlist.save_user_wishlist('user-1', data, username='tester') is True
-
-    def test_save_rejects_invalid_payload_and_restores_backup(self, isolated_wishlist, stub_resolver):
-        """A payload failing validation leaves the previous file intact."""
+    def test_save_rejects_invalid_payload_and_keeps_the_previous_one(self, isolated_wishlist, stub_resolver):
+        """A payload failing validation leaves the stored wishlist intact."""
         _add()
         good = wishlist.load_user_wishlist('user-1')
 
@@ -190,17 +139,14 @@ class TestStorage:
         broken['items'] = [{'id': 'x'}]  # missing 'name'
         assert wishlist.save_user_wishlist('user-1', broken, username='tester') is False
 
-        # The original item survived the failed write
         restored = wishlist.load_user_wishlist('user-1')['items']
         assert len(restored) == 1
         assert restored[0]['name'] == 'M 31'
 
-    def test_save_failure_without_prior_file_skips_restore(self, isolated_wishlist):
-        """A validation failure on a brand-new file (nothing to back up/restore yet)
-        still cleans up its own temp file without erroring on the missing backup."""
+    def test_invalid_first_save_stores_nothing(self, isolated_wishlist):
         bad_data = {'username': 'tester', 'items': [{'id': 'x'}]}  # missing 'name'
         assert wishlist.save_user_wishlist('user-1', bad_data, username='tester') is False
-        assert not os.path.exists(wishlist.get_user_wishlist_file('user-1'))
+        assert _stored() is None
 
 
 class TestAddTargets:
@@ -460,88 +406,44 @@ class TestValidation:
 
     def test_valid_payload_passes(self, isolated_wishlist, stub_resolver):
         _add()
-        path = os.path.join(isolated_wishlist, 'user-1_wishlist.json')
-        assert wishlist.validate_wishlist_json(path) == (True, '')
+        assert wishlist.validate_wishlist_data(_stored()) == (True, '')
 
     def test_item_without_an_id_is_rejected(self, isolated_wishlist, stub_resolver):
         _add()
-        path = os.path.join(isolated_wishlist, 'user-1_wishlist.json')
-        with open(path, encoding='utf-8') as handle:
-            data = json.load(handle)
+        data = _stored()
         del data['items'][0]['id']
-        with open(path, 'w', encoding='utf-8') as handle:
-            json.dump(data, handle)
-        is_valid, message = wishlist.validate_wishlist_json(path)
+        is_valid, message = wishlist.validate_wishlist_data(data)
         assert is_valid is False
         assert 'id' in message
 
     def test_item_with_an_invalid_priority_is_rejected(self, isolated_wishlist, stub_resolver):
         _add()
-        path = os.path.join(isolated_wishlist, 'user-1_wishlist.json')
-        with open(path, encoding='utf-8') as handle:
-            data = json.load(handle)
+        data = _stored()
         data['items'][0]['priority'] = 'urgent'
-        with open(path, 'w', encoding='utf-8') as handle:
-            json.dump(data, handle)
-        assert wishlist.validate_wishlist_json(path)[0] is False
+        assert wishlist.validate_wishlist_data(data)[0] is False
 
-    def test_missing_items_list_is_rejected(self, isolated_wishlist):
-        wishlist.ensure_wishlist_directories()
-        path = os.path.join(isolated_wishlist, 'user-1_wishlist.json')
-        with open(path, 'w', encoding='utf-8') as handle:
-            json.dump({'username': 'tester'}, handle)
-        assert wishlist.validate_wishlist_json(path)[0] is False
+    def test_missing_items_list_is_rejected(self):
+        assert wishlist.validate_wishlist_data({'username': 'tester'})[0] is False
 
-    def test_non_dict_root_is_rejected(self, isolated_wishlist):
-        wishlist.ensure_wishlist_directories()
-        path = os.path.join(isolated_wishlist, 'array.json')
-        with open(path, 'w', encoding='utf-8') as handle:
-            json.dump([1, 2, 3], handle)
-        is_valid, message = wishlist.validate_wishlist_json(path)
+    def test_non_dict_root_is_rejected(self):
+        is_valid, message = wishlist.validate_wishlist_data([1, 2, 3])
         assert is_valid is False
         assert 'dictionary' in message
 
-    def test_missing_username_field_is_rejected(self, isolated_wishlist):
-        wishlist.ensure_wishlist_directories()
-        path = os.path.join(isolated_wishlist, 'no_username.json')
-        with open(path, 'w', encoding='utf-8') as handle:
-            json.dump({'items': []}, handle)
-        is_valid, message = wishlist.validate_wishlist_json(path)
+    def test_missing_username_field_is_rejected(self):
+        is_valid, message = wishlist.validate_wishlist_data({'items': []})
         assert is_valid is False
         assert 'username' in message
 
-    def test_item_that_is_not_a_dict_is_rejected(self, isolated_wishlist):
-        wishlist.ensure_wishlist_directories()
-        path = os.path.join(isolated_wishlist, 'bad_item.json')
-        with open(path, 'w', encoding='utf-8') as handle:
-            json.dump({'username': 'tester', 'items': ['not a dict']}, handle)
-        is_valid, message = wishlist.validate_wishlist_json(path)
+    def test_item_that_is_not_a_dict_is_rejected(self):
+        is_valid, message = wishlist.validate_wishlist_data({'username': 'tester', 'items': ['not a dict']})
         assert is_valid is False
         assert 'object' in message
 
-    def test_item_without_a_name_is_rejected(self, isolated_wishlist):
-        wishlist.ensure_wishlist_directories()
-        path = os.path.join(isolated_wishlist, 'no_name.json')
-        with open(path, 'w', encoding='utf-8') as handle:
-            json.dump({'username': 'tester', 'items': [{'id': 'x'}]}, handle)
-        is_valid, message = wishlist.validate_wishlist_json(path)
+    def test_item_without_a_name_is_rejected(self):
+        is_valid, message = wishlist.validate_wishlist_data({'username': 'tester', 'items': [{'id': 'x'}]})
         assert is_valid is False
         assert 'name' in message
-
-    def test_malformed_json_is_reported(self, isolated_wishlist):
-        wishlist.ensure_wishlist_directories()
-        path = os.path.join(isolated_wishlist, 'broken.json')
-        with open(path, 'w', encoding='utf-8') as handle:
-            handle.write('{ this is not json')
-        is_valid, message = wishlist.validate_wishlist_json(path)
-        assert is_valid is False
-        assert 'Invalid JSON' in message
-
-    def test_path_outside_directory_is_a_validation_error(self, isolated_wishlist):
-        outside_path = os.path.join(isolated_wishlist, '..', 'outside.json')
-        is_valid, message = wishlist.validate_wishlist_json(outside_path)
-        assert is_valid is False
-        assert 'Validation error' in message
 
 
 class TestMovingTargets:

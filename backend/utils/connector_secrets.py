@@ -1,53 +1,34 @@
 """
-Connector credentials store - the SECRET_FIELDS of every BaseConnector, kept out of config.json.
+Connector credentials store - the SECRET_FIELDS of every BaseConnector, kept out of the config.
 
-Credentials used to live in ``config.json -> connectors.<name>``. That file is shipped
-verbatim by the backup ZIP (``/api/backup/download``) and by ``/api/config/export``, so a
-broker password or an API token would travel with every backup. They now live in a sidecar,
-``DATA_DIR/connectors_secrets.json``::
+Credentials used to live in ``config -> connectors.<name>``. The config is shipped verbatim
+by the backup ZIP (``/api/backup/download``) and by ``/api/config/export``, so a broker
+password or an API token would travel with every backup. They now live apart, in the
+``connectors_secrets`` setting::
 
     {"mqtt": {"password": "..."}, "myastroshine": {"token": "...", "signing_secret": "..."}}
 
-which is deliberately absent from the backup allow-lists, like ``secret_key.txt`` and
-``vapid.json``. A backup restored on a fresh host therefore needs the connector credentials
-re-entered once - the same rule those two files already follow.
+which is deliberately absent from the backup and export, like the secret key and the VAPID
+keys. A backup restored on a fresh host therefore needs the connector credentials re-entered
+once - the same rule those two already follow.
 
 ``merge_secrets`` is what a connector is constructed with: the config block overlaid with the
-sidecar values. A value still sitting in ``config.json`` (an install upgraded but not yet
-migrated) keeps working through that fallback; ``migrate_legacy_secrets`` moves it over and
-strips it from the config, once, at startup and on every save.
+stored values. A value still sitting in the config (an install upgraded but not yet migrated)
+keeps working through that fallback; ``migrate_legacy_secrets`` moves it over and strips it
+from the config, once, at startup and on every save.
 """
 
-import json
-import os
-import threading
 from typing import Any, Dict, Iterable, Optional
 
-from utils.file_lock import interprocess_lock
-from utils.constants import DATA_DIR
+from db import settings_store
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-_SECRETS_FILE = os.path.join(DATA_DIR, 'connectors_secrets.json')
-_lock = threading.Lock()
+SECRETS_KEY = 'connectors_secrets'
 
 
-def _secrets_path() -> str:
-    """The sidecar path, resolved at call time so tests can re-point the module attribute."""
-    return _SECRETS_FILE
-
-
-def _read_all() -> Dict[str, Dict[str, str]]:
-    path = _secrets_path()
-    if not os.path.isfile(path):
-        return {}
-    try:
-        with open(path, 'r', encoding='utf-8') as handle:
-            data = json.load(handle)
-    except (OSError, ValueError) as exc:
-        logger.warning(f"Could not read connector secrets file {path}: {exc}")
-        return {}
+def _clean(data: Any) -> Dict[str, Dict[str, str]]:
     if not isinstance(data, dict):
         return {}
     cleaned: Dict[str, Dict[str, str]] = {}
@@ -57,67 +38,58 @@ def _read_all() -> Dict[str, Dict[str, str]]:
     return cleaned
 
 
-def _write_all(data: Dict[str, Dict[str, str]]) -> bool:
-    """Atomic write (tmp + replace) with owner-only permissions where the OS honours them."""
-    path = _secrets_path()
-    tmp_path = f"{path}.{os.getpid()}.tmp"
+def _read_all() -> Dict[str, Dict[str, str]]:
     try:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(tmp_path, 'w', encoding='utf-8') as handle:
-            json.dump(data, handle, indent=2)
-        try:
-            os.chmod(tmp_path, 0o600)
-        except OSError:
-            pass  # Windows / exotic filesystems: best effort, the file is still outside backups
-        os.replace(tmp_path, path)
-        return True
-    except OSError as exc:
-        logger.error(f"Could not write connector secrets file {path}: {exc}")
-        try:
-            if os.path.exists(tmp_path):
-                os.remove(tmp_path)
-        except OSError:
-            pass
-        return False
+        return _clean(settings_store.get_setting(SECRETS_KEY))
+    except Exception as exc:
+        logger.warning(f"Could not read connector secrets: {exc}")
+        return {}
+
+
+def secrets_revision() -> int:
+    """Revision of the stored credentials (change detector for long-running publishers)."""
+    return settings_store.setting_revision(SECRETS_KEY)
 
 
 def load_secrets(name: str) -> Dict[str, str]:
     """The stored credentials of one connector (``{}`` when none)."""
-    with _lock:
-        return dict(_read_all().get(name, {}))
+    return dict(_read_all().get(name, {}))
 
 
 def save_secrets(name: str, values: Dict[str, Any]) -> bool:
     """Merge *values* into the connector's stored credentials.
 
-    A blank value removes the key; nothing else in the file is touched. The
-    read-merge-write runs under a cross-process lock: every gunicorn worker
-    migrates legacy secrets at startup, so two workers routinely write at once.
+    A blank value removes the key; nothing else is touched. The read-merge-write is one
+    transaction: every gunicorn worker migrates legacy secrets at startup, so two workers
+    routinely write at once.
     """
-    try:
-        with _lock, interprocess_lock(_secrets_path() + '.lock'):
-            data = _read_all()
-            current = dict(data.get(name, {}))
-            for key, value in values.items():
-                text = str(value or '').strip()
-                if text:
-                    current[key] = text
-                else:
-                    current.pop(key, None)
-            if current:
-                data[name] = current
+
+    def _merge(current):
+        data = _clean(current)
+        merged = dict(data.get(name, {}))
+        for key, value in values.items():
+            text = str(value or '').strip()
+            if text:
+                merged[key] = text
             else:
-                data.pop(name, None)
-            return _write_all(data)
-    except OSError as exc:
-        logger.error(f"Could not lock connector secrets file {_secrets_path()}: {exc}")
+                merged.pop(key, None)
+        if merged:
+            data[name] = merged
+        else:
+            data.pop(name, None)
+        return data, True
+
+    try:
+        return settings_store.modify_setting(SECRETS_KEY, _merge)
+    except Exception as exc:
+        logger.error(f"Could not store connector secrets: {exc}")
         return False
 
 
 def merge_secrets(name: str, cfg: Optional[Dict[str, Any]], secret_fields: Iterable[str]) -> Dict[str, Any]:
-    """The connector's config block with its credentials overlaid from the sidecar.
+    """The connector's config block with its credentials overlaid from the secrets store.
 
-    The sidecar wins whenever it holds a value; otherwise a legacy value still present in the
+    The stored value wins whenever it holds a value; otherwise a legacy value still present in the
     config block is kept, so an un-migrated install keeps working.
     """
     merged = dict(cfg or {})
@@ -130,11 +102,11 @@ def merge_secrets(name: str, cfg: Optional[Dict[str, Any]], secret_fields: Itera
 
 
 def migrate_legacy_secrets(name: str, secret_fields: Iterable[str], config: Dict[str, Any]) -> bool:
-    """Move credentials still stored in ``config["connectors"][name]`` into the sidecar.
+    """Move credentials still stored in ``config["connectors"][name]`` into the secrets store.
 
     Returns True when *config* was modified (the caller is then expected to persist it).
     Idempotent: a config block without secret values is left untouched. A value already in the
-    sidecar wins over the legacy one, which is simply dropped.
+    secrets store wins over the legacy one, which is simply dropped.
     """
     connectors_cfg = config.get('connectors')
     if not isinstance(connectors_cfg, dict):
@@ -155,7 +127,7 @@ def migrate_legacy_secrets(name: str, secret_fields: Iterable[str], config: Dict
         if to_store and not save_secrets(name, to_store):
             # Never strip a credential from the config when it could not be stored elsewhere.
             return False
-        logger.info(f"Moved {len(legacy)} credential(s) of connector '{name}' out of config.json")
+        logger.info(f"Moved {len(legacy)} credential(s) of connector '{name}' out of the config")
 
     for field in present:
         block.pop(field, None)
@@ -166,7 +138,7 @@ def migrate_all_legacy_secrets(config: Dict[str, Any], registry: Optional[Dict[s
     """Run ``migrate_legacy_secrets`` for every registered connector; True when *config* changed.
 
     Called once at application startup (``app.py``) so an upgraded install stops carrying
-    credentials in config.json before its next backup, without waiting for a save.
+    credentials in the config before its next backup, without waiting for a save.
     """
     if registry is None:
         # Lazy: utils/ must not depend on the connectors package at import time.

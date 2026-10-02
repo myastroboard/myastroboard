@@ -27,22 +27,24 @@ and has no analytics, tracking or advertising code.
 
 ## What personal data is stored
 
-Everything lives in the `data/` directory (the Docker volume). Per-user files are named
+Everything lives in the `data/` directory (the Docker volume): records in the SQLite
+database `myastroboard.db` ([details](DATABASE.md)), pictures and attachments as files named
 `<user_id>_...`, where `user_id` is a random UUID.
 
 | Data | Location in `data/` | Notes |
 |---|---|---|
-| Account: username, password hash, role, creation date, last login | `users.json` | Passwords are hashed (werkzeug); never stored in clear. |
-| Two-factor secret (if enabled) | `users.json` | TOTP seed, needed to verify codes. |
-| Preferences (language, time format, default/active location...) | `users.json` | |
-| Web Push subscriptions | `users.json` | Browser push endpoint + keys, only if the user enabled notifications. |
-| Observing locations: name, latitude, longitude, timezone | `config.json` | A location is often the user's home: treat coordinates as personal data. |
-| Astrodex: observed objects, notes, pictures, optional picture coordinates | `astrodex/` | See [Photo metadata](#photo-metadata) below. |
-| Observation log: sessions, notes, conditions, attachments | `observation_sessions/` | |
-| Equipment profiles | `equipments/` | |
-| Plan My Night plans | `projects/` | |
-| Wishlist | `wishlist/` | |
+| Account: username, password hash, role, creation date, last login | database, `users` table | Passwords are hashed (werkzeug); never stored in clear. |
+| Two-factor secret (if enabled) | database, `users` table | TOTP seed, needed to verify codes. |
+| Preferences (language, time format, default/active location...) | database, `users` table | |
+| Web Push subscriptions | database, `users` table | Browser push endpoint + keys, only if the user enabled notifications. |
+| Observing locations: name, latitude, longitude, timezone | database, configuration | A location is often the user's home: treat coordinates as personal data. |
+| Astrodex: observed objects, notes, optional picture coordinates | database, `astrodex_items` / `astrodex_pictures` | See [Photo metadata](#photo-metadata) below. |
+| Astrodex pictures | `astrodex/images/` | |
+| Observation log: sessions, notes, conditions | database, `observation_*` tables | |
+| Observation log attachments | `observation_sessions/attachments/` | |
+| Equipment profiles, Plan My Night plans, wishlist | database, `equipment_*`, `plans`/`plan_entries`, `wishlist_items` | |
 | Application log | `myastroboard.log*` | Contains usernames and client IP addresses (sign-ins, refused access). See [Retention](#retention). |
+| Pre-1.7 data archive | `backups/pre-1.7-*.zip` | Written once by the 1.7 upgrade (every 1.6 data file, secrets included); delete it from *Parameters -> Backup / Restore* once you no longer need to go back to 1.6. Data of accounts deleted later remains in it until then. |
 
 The browser keeps only the session cookie and a few display settings in `localStorage`
 (language, time format, a photo filter, the last seen app version). None of them is used for tracking.
@@ -130,13 +132,15 @@ the browser IP. Mention them in your privacy notice.
 |---|---|
 | Access (Art. 15) | *My Settings -> Security -> Your data* downloads a ZIP of everything stored about the user; an administrator can download the same archive for any user from *Parameters -> Users -> Export data*. |
 | Rectification (Art. 16) | Users edit their own data; an administrator edits accounts and locations. |
-| Erasure (Art. 17) | An administrator deletes the account in *Users*. This removes the account **and every per-user file**: Astrodex and pictures, observation sessions and attachments, equipment, plans and wishlist. Log lines mentioning the user remain until rotation. |
+| Erasure (Art. 17) | An administrator deletes the account in *Users*. This removes the account **and all of its data**: Astrodex and pictures, observation sessions and attachments, equipment, plans and wishlist. Log lines mentioning the user remain until rotation. |
 | Portability (Art. 20) | The same ZIP: account and preferences, locations, Astrodex, observation log, equipment, plans and wishlist as JSON, with pictures and attachments as the original files. Password hashes and two-factor secrets are left out. |
 | Objection / restriction | Handled by the administrator (disable the account, remove a location). |
 
-Accounts deleted **before** full erasure existed may have left files behind. To find them, compare
-the `<user_id>` prefixes of the files in `data/` with the ids in `data/users.json`, and delete the
-files whose id no longer exists.
+Accounts deleted **before** full erasure existed may have left files behind. The 1.7 upgrade moved
+such leftovers (data of accounts that no longer exist) to `data/backups/orphans/`; delete that folder
+once checked. Pictures and attachments of such accounts can be found by comparing the `<user_id>`
+prefixes of the files in `astrodex/images/` and `observation_sessions/attachments/` with
+`python backend/db/manage.py list-users`.
 
 ---
 

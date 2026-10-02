@@ -9,7 +9,6 @@ Covers:
 - the /api/locations* admin CRUD + attribution + switcher endpoints
 """
 
-import json
 import os
 import types
 import uuid
@@ -755,7 +754,6 @@ class TestLocationTaggingHelpers:
     def test_plan_pinned_location_and_cascade_delete(self, temp_dir, monkeypatch):
         from observation import plan_my_night
 
-        monkeypatch.setattr(plan_my_night, 'PLAN_DIR', temp_dir)
         user_id = str(uuid.uuid4())
         loc_id = str(uuid.uuid4())
 
@@ -813,14 +811,13 @@ class TestLocationTaggingHelpers:
 
 
 # ---------------------------------------------------------------------------
-# load_config end-to-end migration (file-backed)
+# load_config end-to-end migration (stored config)
 # ---------------------------------------------------------------------------
 
 
 class TestLoadConfigMigration:
-    def test_load_config_migrates_and_persists_once(self, temp_dir, monkeypatch):
-        config_file = os.path.join(temp_dir, 'config.json')
-        monkeypatch.setattr(repo_config, 'CONFIG_FILE', config_file)
+    def test_load_config_migrates_and_persists_once(self):
+        from db import settings_store
 
         legacy = {
             'location': {
@@ -834,8 +831,7 @@ class TestLoadConfigMigration:
             },
             'skytonight': {'enabled': True, 'constraints': {'horizon_profile': [{'az': 90, 'alt': 20}]}},
         }
-        with open(config_file, 'w', encoding='utf-8') as f:
-            json.dump(legacy, f)
+        settings_store.put_setting('config', legacy)
 
         config = repo_config.load_config()
         assert 'location' not in config
@@ -848,9 +844,8 @@ class TestLoadConfigMigration:
         config2 = repo_config.load_config()
         assert config2['locations'][0]['id'] == first_id
 
-        # The on-disk file no longer carries the legacy key
-        with open(config_file, 'r', encoding='utf-8') as f:
-            on_disk = json.load(f)
+        # The stored config no longer carries the legacy key
+        on_disk = settings_store.get_setting('config')
         assert 'location' not in on_disk
         assert on_disk['locations'][0]['id'] == first_id
 

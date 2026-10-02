@@ -1,9 +1,14 @@
-"""Per-user files on disk: where they live, erasing them, exporting them.
+"""Per-user data: erasing it, exporting it.
 
-Every feature stores a user's data in files named ``<user_id>_...`` inside its own
-directory. This module is the single list of those directories, used both for the
-right to erasure (account deletion) and for the right to data portability (the
-"Download my data" ZIP).
+A user's data lives in two places:
+
+- the database: the account row and the per-user records (Astrodex, observation log,
+  wishlist, equipment, plans - see ``db/documents.py``). Deleting the account deletes them
+  (``db/users_store.delete_user``);
+- binary files named ``<user_id>_...`` (Astrodex pictures, session attachments).
+  ``user_data_dirs()`` is the single list of those directories, used both for the right
+  to erasure (account deletion) and for the right to data portability (the "Download my
+  data" ZIP).
 
 Feature modules are imported lazily, inside the functions, so utils stays importable
 without them (and without import cycles).
@@ -53,18 +58,33 @@ def user_data_dirs() -> List[Tuple[str, str]]:
     Resolved on each call (not at import) so tests that repoint a module's directory
     constant are honoured.
     """
-    from equipment import equipment_profiles
-    from observation import astrodex, observation_sessions, plan_my_night, wishlist
+    from observation import astrodex, observation_sessions
 
     return [
-        ('astrodex', astrodex.ASTRODEX_DIR),
         ('astrodex/images', astrodex.ASTRODEX_IMAGES_DIR),
-        ('equipment', equipment_profiles.EQUIPMENT_DIR),
-        ('observation_sessions', observation_sessions.OBSERVATION_SESSIONS_DIR),
         ('observation_sessions/attachments', observation_sessions.attachments_dir()),
-        ('plans', plan_my_night.PLAN_DIR),
-        ('wishlist', wishlist.WISHLIST_DIR),
     ]
+
+
+# Archive folder of each document folder in the export (json_layout uses the data-directory names)
+_EXPORT_FOLDERS = {'equipments': 'equipment', 'projects': 'plans'}
+
+
+def _user_documents(user_id: str) -> List[Tuple[str, Dict]]:
+    """``(archive path, document)`` for every per-user document of ``user_id``."""
+    from db import documents
+    from db.json_layout import document_path
+
+    exported: List[Tuple[str, Dict]] = []
+    for kind, doc_key, data in documents.list_all_user_documents(user_id):
+        try:
+            path = document_path(kind, user_id, doc_key)
+        except ValueError:
+            logger.warning(f"Export: unknown document kind {kind!r} of {user_id}, skipped")
+            continue
+        folder, filename = path.split('/', 1)
+        exported.append((f"{_EXPORT_FOLDERS.get(folder, folder)}/{filename}", data))
+    return exported
 
 
 def _is_valid_user_id(user_id: str) -> bool:
@@ -90,6 +110,8 @@ def _iter_user_files(user_id: str, include_working_files: bool):
 
 def purge_user_files(user_id) -> int:
     """Delete every per-user file of ``user_id`` (``<user_id>_*``) and return how many were removed.
+
+    Only the binary files: the documents go with the account row (db/users_store.delete_user).
 
     Best effort: a file that cannot be removed is logged and skipped so one failure
     never leaves the rest of the user's data behind.
@@ -184,6 +206,8 @@ def build_user_export(user) -> Tuple[IO[bytes], str]:
         )
         _write_json(archive, 'account.json', _account_record(user))
         _write_json(archive, 'locations.json', _locations_record(user))
+        for archive_path, document in _user_documents(str(user.user_id)):
+            _write_json(archive, archive_path, document)
         for folder, filename, file_path in _iter_user_files(str(user.user_id), include_working_files=False):
             archive.write(file_path, f"{folder}/{filename}", compress_type=_compression_for(filename))
         for filename, file_path in _legacy_astrodex_pictures(str(user.user_id)):

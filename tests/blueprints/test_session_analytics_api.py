@@ -290,7 +290,6 @@ def isolated_wishlist(monkeypatch):
     """Point wishlist storage at a temporary directory."""
     with tempfile.TemporaryDirectory() as tmpdir:
         directory = os.path.join(tmpdir, 'wishlist')
-        monkeypatch.setattr(wishlist, 'WISHLIST_DIR', directory)
         yield directory
 
 

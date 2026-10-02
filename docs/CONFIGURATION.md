@@ -1,6 +1,6 @@
 # Configuration
 
-MyAstroBoard stores its runtime configuration in `data/config.json`. All settings are managed through the **Parameters** tab (admin only) in the UI or via the `/api/config` endpoint.
+MyAstroBoard stores its runtime configuration in its database (`data/myastroboard.db`, see [DATABASE.md](DATABASE.md)); `/api/config/export` downloads it as `config.json`. All settings are managed through the **Parameters** tab (admin only) in the UI or via the `/api/config` endpoint.
 
 ---
 
@@ -21,7 +21,7 @@ MyAstroBoard stores its runtime configuration in `data/config.json`. All setting
 
 ## Locations (v1.2 — multi-location profiles)
 
-Since v1.2, `config.json` holds an admin-managed `locations` list (up to `MAX_LOCATIONS = 5` presets) instead of a single `location` object. At least one preset is **required** before most calculations can run; editing a preset's coordinates resets only that preset's caches.
+Since v1.2, the configuration holds an admin-managed `locations` list (up to `MAX_LOCATIONS = 5` presets) instead of a single `location` object. At least one preset is **required** before most calculations can run; editing a preset's coordinates resets only that preset's caches.
 
 Full reference — data model, attribution, per-user default/active location, rate-limit analysis behind the cap: **[LOCATIONS.md](LOCATIONS.md)**.
 
@@ -60,7 +60,7 @@ See [SKYTONIGHT.md — Light Pollution Integration](SKYTONIGHT.md) for how these
 
 ## SkyTonight constraints
 
-These values live under `config.json → skytonight.constraints`. They define which objects are considered observable. All constraints are always active.
+These values live under `skytonight.constraints` in the configuration. They define which objects are considered observable. All constraints are always active.
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -99,7 +99,7 @@ The profile is set in **Parameters → Locations → (edit a preset) → Custom 
 
 ## Scheduler configuration
 
-`config.json → skytonight.scheduler`
+Configuration key: `skytonight.scheduler`
 
 | Field | Description |
 |-------|-------------|
@@ -112,7 +112,7 @@ See [SKYTONIGHT.md — Scheduler](SKYTONIGHT.md) for scheduling logic.
 
 ## Dataset configuration
 
-`config.json → skytonight.datasets`
+Configuration key: `skytonight.datasets`
 
 | Field | Default | Description |
 |-------|---------|-------------|
@@ -126,7 +126,7 @@ See [SKYTONIGHT.md — Scheduler](SKYTONIGHT.md) for scheduling logic.
 
 ## Application settings (admin)
 
-Stored separately in `data/app_settings.json` (see [AUTHENTICATION.md](AUTHENTICATION.md)):
+Stored separately (database setting `app_settings`, see [AUTHENTICATION.md](AUTHENTICATION.md)):
 
 | Setting | Default | Description |
 |---------|---------|-------------|
@@ -145,7 +145,7 @@ Stored separately in `data/app_settings.json` (see [AUTHENTICATION.md](AUTHENTIC
 
 **Sub-tab**: Parameters → Connectors
 
-Connector configuration is stored in `config.json → connectors.<name>`. See [CONNECTORS.md](CONNECTORS.md) for the full reference.
+Connector configuration is stored in the configuration under `connectors.<name>`. See [CONNECTORS.md](CONNECTORS.md) for the full reference.
 
 ```json
 "connectors": {
@@ -175,18 +175,22 @@ Connector configuration is stored in `config.json → connectors.<name>`. See [C
 
 ### Download backup
 
-`GET /api/backup/download` produces a ZIP archive containing:
+`GET /api/backup/download` produces a ZIP archive, built from the database in the same JSON
+layout as 1.6 backups:
 
 | File / folder | Content |
 |---------------|---------|
 | `config.json` | All site configuration |
+| `app_settings.json` | App settings (Parameters → Advanced) |
 | `users.json` | All user accounts (with password hashes) |
 | `astrodex/` | All Astrodex collections (one JSON per user + `images/` subdirectory) |
 | `equipments/` | All equipment profiles (one JSON per user per equipment type) |
+| `observation_sessions/` | All observation logs (one JSON per user + `attachments/` subdirectory) |
+| `wishlist/` | All wishlists (one JSON per user) |
 
 The archive is named `myastroboard_backup_<timestamp>.zip`.
 
-**Not included**: `data/security_settings.json` (trusted networks, instance-wide 2FA switch) is
+**Not included**: the security settings (trusted networks, instance-wide 2FA switch) are
 deliberately excluded from both the backup ZIP and `/api/config/export`, for the same reason as
 `trust_proxy_headers`: a LAN CIDR block from one install is meaningless - or actively wrong - on a
 restored host. Re-configure trusted networks by hand after a restore on a different machine. See
@@ -194,9 +198,9 @@ also [docs/AUTHENTICATION.md](AUTHENTICATION.md).
 
 ### Restore backup
 
-`POST /api/backup/restore` (multipart form, field `file`) accepts a backup ZIP and restores its contents. The existing files are overwritten.
+`POST /api/backup/restore` (multipart form, field `file`) accepts a backup ZIP (from 1.7 or 1.6) and restores its contents. Every entry is validated before anything is written, then the database is updated in one transaction: each folder present in the archive replaces that kind of data, and `users.json` replaces the account list (accounts absent from it are deleted with their data). Documents of accounts that are not in the database are skipped.
 
-> **After a restore**: The app re-reads configuration from disk on the next request. Cache is reset automatically. A page reload is required to reflect restored user accounts.
+> **After a restore**: every gunicorn worker picks the restored data up on its next request. A page reload is required to reflect restored user accounts.
 
 ---
 
@@ -257,7 +261,7 @@ The metrics tab is the first place to check if a cache job is repeatedly failing
 
 ## App restart
 
-`POST /api/admin/restart` (admin only) triggers a graceful application restart. This is needed after changes to `app_settings.json` that affect Flask configuration (e.g. enabling `session_cookie_secure`).
+`POST /api/admin/restart` (admin only) triggers a graceful application restart. This is needed after changes to the app settings that affect Flask configuration (e.g. enabling `session_cookie_secure`).
 
 ---
 
@@ -268,10 +272,10 @@ The metrics tab is the first place to check if a cache job is repeatedly failing
 | `GET` | `/api/config` | login | Read full config; also exposes the caller's *active* location under `location` (compat shim) |
 | `POST` | `/api/config` | admin | Save global config; a legacy `location` payload updates the install default preset (its caches only are reset) |
 | — | `/api/locations*` | admin/login | Location preset CRUD, attribution, switcher — see [LOCATIONS.md](LOCATIONS.md) and [API_ENDPOINTS.md](API_ENDPOINTS.md) |
-| `GET` | `/api/config/export` | admin | Download `config.json` directly |
+| `GET` | `/api/config/export` | admin | Download the configuration as `config.json` |
 | `GET` | `/api/skyquality` | login | Current sky quality parameters and computed LP factor |
-| `GET` | `/api/admin/app-settings` | admin | Read `app_settings.json` |
-| `POST` | `/api/admin/app-settings` | admin | Save `app_settings.json` |
+| `GET` | `/api/admin/app-settings` | admin | Read the app settings |
+| `POST` | `/api/admin/app-settings` | admin | Save the app settings |
 | `POST` | `/api/admin/restart` | admin | Restart the app |
 | `GET` | `/api/backup/download` | admin | Download backup ZIP |
 | `POST` | `/api/backup/restore` | admin | Restore from backup ZIP |

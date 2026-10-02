@@ -287,6 +287,53 @@ integration (or any still-image viewer) without a real video stream.
 
 ---
 
+### v1.7 - Database Storage
+
+| | |
+|---|---|
+| **Why** | Everything persistent lived in JSON files under `data/`, one per user and per feature. Two gunicorn workers writing them needed file locks, temp files and backup copies in every module, an account deletion could leave files behind, and every search across users (delete guards, shared equipment, picture visibility) re-read every user's files. A relational database with versioned migrations gives transactions, referential integrity and a schema that can evolve safely - groundwork the 2.x releases (sky chart overlays, sharing, integrations) build on. |
+| **Effort** | High |
+| **Status** | ✅ Implemented |
+
+#### SQLite storage, fully relational
+
+- One SQLite database, `data/myastroboard.db` - no extra container, still zero configuration
+- One row per object: Astrodex items and pictures, observation sessions, nights, entries and
+  attachments, wishlist items, equipment, combinations and their filters/accessories, plans and
+  plan entries; accounts and settings (configuration, app/security settings, secrets, VAPID keys)
+- Parent -> child foreign keys with cascades, unique ids per user, indexed search columns; each
+  row also keeps the object as JSON, so a field the schema does not know yet is never lost
+- Every write is one transaction, which also serializes the gunicorn workers (no file locks)
+- Cross-user searches are SQL queries instead of loops over every user's data
+- Pictures, attachments, caches and SkyTonight results stay files
+
+#### Schema migrations (Alembic)
+
+- Versioned, reversible migrations, applied automatically at start under a cross-process lock
+  (one worker migrates, the other waits)
+- CI checks that migrations apply both ways and match the table definitions
+
+#### One-shot import of the 1.6 data
+
+- On first start: archive every 1.6 file into `data/backups/pre-1.7-<date>.zip` (re-read and
+  checked), import everything in one transaction, read each record back and compare it with its
+  file, and only then delete the JSON files; a report is written next to the archive
+- Files of deleted accounts and unreadable per-user files are moved aside, never lost
+- Any failure: nothing imported, nothing deleted, the instance shows a maintenance page and can
+  go back to 1.6 untouched
+
+#### Backup, privacy and recovery
+
+- Admin backup ZIP keeps the 1.6 JSON layout (1.6 backups restore on 1.7), secrets still excluded
+- Account deletion removes all of the user's rows in one transaction; "Download my data" is
+  built from the database
+- `backend/db/manage.py` command line replaces hand-editing `users.json` (reset a password,
+  disable 2FA, status)
+
+Full reference: [docs/DATABASE.md](docs/DATABASE.md).
+
+---
+
 ### v2.0 - Interactive Sky Chart
 
 | | |
@@ -585,6 +632,7 @@ Also:
 | v1.4 | Planning Intelligence (visibility calendar, meridian flip, advanced filters) | Advanced | High | ✅ Implemented |
 | v1.5 | Session Analytics | All | Medium | ✅ Implemented |
 | v1.6 | MQTT Publisher & Home Assistant Integration + Astrodex Stream | All | Medium | ✅ Implemented |
+| v1.7 | Database storage (SQLite, relational, Alembic migrations, verified 1.6 import) | All | High | ✅ Implemented |
 | v2.0 | Interactive Sky Chart + mosaic planner | All | High | 💡 Idea |
 | v2.1 | Community & Sharing | All | Medium | 💡 Idea |
 | v2.2 | Integrations (plate solve, PHD2, NINA) | Advanced | High | 💡 Idea |

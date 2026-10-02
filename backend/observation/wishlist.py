@@ -14,46 +14,25 @@ Two deliberate design rules
    pure numeric loop and never has to re-parse the heterogeneous ``ra`` field that Plan
    My Night and the Observation Log carry (see that module's docstring).
 
-Storage mirrors ``observation_sessions``: one JSON file per user, a per-user write lock,
-and the atomic backup / temp-write / validate / replace / restore sequence. Wishlists are
+Storage mirrors ``observation_sessions``: one document per user in the database
+(``user_documents``, kind ``wishlist``), validated before every write. Wishlists are
 permanently private, like the Observation Log - there is no shared or merged view.
 """
 
-import json
-import os
-import shutil
-import threading
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
+from db import documents
 from observation import target_coordinates
 from utils import normalize_catalogue_key as _normalize_key
-from utils.constants import DATA_DIR, MAX_WISHLIST_ITEMS
-from utils.file_lock import interprocess_lock
+from utils.constants import MAX_WISHLIST_ITEMS
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-# Per-user write locks, so two concurrent saves cannot interleave.
-_user_save_locks: Dict[str, threading.Lock] = {}
-_user_save_locks_mutex = threading.Lock()
-
-
-def _get_user_save_lock(user_id: str) -> threading.Lock:
-    """Get or create a per-user lock for serializing wishlist file writes."""
-    with _user_save_locks_mutex:
-        if user_id not in _user_save_locks:
-            _user_save_locks[user_id] = threading.Lock()
-        return _user_save_locks[user_id]
-
-
-# Wishlist data directory (top-level, mirrors data/observation_sessions/). Defined here
-# rather than in utils/constants.py so test fixtures can monkeypatch this module
-# attribute, exactly like observation_sessions.OBSERVATION_SESSIONS_DIR.
-WISHLIST_DIR = os.path.join(DATA_DIR, 'wishlist')
-
-WISHLIST_FILE_SUFFIX = '_wishlist.json'
+# user_documents kind of the per-user wishlist
+WISHLIST_KIND = 'wishlist'
 
 PRIORITIES = ('high', 'normal', 'low')
 DEFAULT_PRIORITY = 'normal'
@@ -89,32 +68,6 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _safe_wishlist_path(path: str) -> str:
-    """Resolve *path* and verify it lives inside WISHLIST_DIR.
-
-    Same realpath + startswith containment check ``observation_sessions`` uses, which is
-    the pattern CodeQL's py/path-injection query recognises as a sanitizer barrier;
-    callers must use the returned resolved path. WISHLIST_DIR is read at call time so
-    test fixtures that monkeypatch it are honoured.
-    """
-    base_real = os.path.realpath(WISHLIST_DIR)
-    resolved = os.path.realpath(path)
-    if not resolved.startswith(base_real + os.sep):
-        raise ValueError(f'Path outside wishlist directory: {path!r}')
-    return resolved
-
-
-def ensure_wishlist_directories() -> None:
-    """Ensure the wishlist data directory exists."""
-    os.makedirs(WISHLIST_DIR, exist_ok=True)
-
-
-def get_user_wishlist_file(user_id: str) -> str:
-    """Path to a user's wishlist file, keyed on their UUID."""
-    ensure_wishlist_directories()
-    return _safe_wishlist_path(os.path.join(WISHLIST_DIR, f'{user_id}{WISHLIST_FILE_SUFFIX}'))
-
-
 def _clean_text(value: Any, max_length: int = _MAX_NOTES_LENGTH) -> str:
     return str(value or '').strip()[:max_length]
 
@@ -138,35 +91,18 @@ def _default_payload(user_id: str, username: Optional[str] = None) -> Dict[str, 
 def load_user_wishlist(user_id: str, username: Optional[str] = None) -> Dict[str, Any]:
     """Load a user's wishlist.
 
-    Never raises: a corrupted file is backed up to ``.corrupted.<timestamp>`` and an
-    empty payload returned, mirroring ``observation_sessions.load_user_sessions``.
+    Never raises: an unreadable or malformed stored value yields an empty payload,
+    mirroring ``observation_sessions.load_user_sessions``.
     """
     try:
-        file_path = get_user_wishlist_file(user_id)
-    except (ValueError, OSError) as error:
-        logger.error(f'Cannot resolve wishlist file for user {user_id}: {error}')
-        return _default_payload(user_id, username)
-
-    if not os.path.exists(file_path):
-        return _default_payload(user_id, username)
-
-    try:
-        with open(file_path, 'r', encoding='utf-8') as file_obj:
-            data = json.load(file_obj)
-    except json.JSONDecodeError as error:
-        logger.error(f'Error loading wishlist for user {user_id}: {error}')
-        backup_path = file_path + '.corrupted.' + datetime.now().strftime('%Y%m%d_%H%M%S')
-        try:
-            shutil.copy2(file_path, backup_path)
-            logger.info(f'Backed up corrupted wishlist to {backup_path}')
-        except Exception as backup_error:
-            logger.error(f'Failed to backup corrupted wishlist: {backup_error}')
-        return _default_payload(user_id, username)
+        data = documents.get_document(user_id, WISHLIST_KIND)
     except Exception as error:
         logger.error(f'Error loading wishlist for user {user_id}: {error}')
         return _default_payload(user_id, username)
 
     if not isinstance(data, dict):
+        if data is not None:
+            logger.error(f'Stored wishlist of user {user_id} is malformed; starting from empty')
         return _default_payload(user_id, username)
 
     data.setdefault('user_id', user_id)
@@ -179,63 +115,30 @@ def load_user_wishlist(user_id: str, username: Optional[str] = None) -> Dict[str
     return data
 
 
-def validate_wishlist_json(file_path: str) -> Tuple[bool, str]:
-    """Validate that a file contains a well-formed wishlist payload."""
-    try:
-        safe_path = _safe_wishlist_path(file_path)
-        with open(safe_path, 'r', encoding='utf-8') as file_obj:
-            data = json.load(file_obj)
+def validate_wishlist_data(data: Any) -> Tuple[bool, str]:
+    """Validate a well-formed wishlist payload before it is stored."""
+    if not isinstance(data, dict):
+        return False, 'JSON root is not a dictionary'
+    if 'username' not in data:
+        return False, "Missing 'username' field"
+    if not isinstance(data.get('items'), list):
+        return False, "Missing or invalid 'items' field"
 
-        if not isinstance(data, dict):
-            return False, 'JSON root is not a dictionary'
-        if 'username' not in data:
-            return False, "Missing 'username' field"
-        if not isinstance(data.get('items'), list):
-            return False, "Missing or invalid 'items' field"
+    for index, item in enumerate(data['items']):
+        if not isinstance(item, dict):
+            return False, f'Item {index} must be an object'
+        if not item.get('id'):
+            return False, f"Item {index} missing 'id' field"
+        if not item.get('name'):
+            return False, f"Item {index} missing 'name' field"
+        if item.get('priority') not in PRIORITIES:
+            return False, f'Item {index} has an invalid priority'
 
-        for index, item in enumerate(data['items']):
-            if not isinstance(item, dict):
-                return False, f'Item {index} must be an object'
-            if not item.get('id'):
-                return False, f"Item {index} missing 'id' field"
-            if not item.get('name'):
-                return False, f"Item {index} missing 'name' field"
-            if item.get('priority') not in PRIORITIES:
-                return False, f'Item {index} has an invalid priority'
-
-        return True, ''
-    except json.JSONDecodeError as error:
-        return False, f'Invalid JSON: {error}'
-    except Exception as error:
-        return False, f'Validation error: {error}'
+    return True, ''
 
 
 def save_user_wishlist(user_id: str, wishlist_data: Dict[str, Any], username: Optional[str] = None) -> bool:
-    """Save a user's wishlist through the atomic backup/validate/replace sequence."""
-    try:
-        file_path = get_user_wishlist_file(user_id)
-    except (ValueError, OSError) as error:
-        logger.error(f'Cannot resolve wishlist file for user {user_id}: {error}')
-        return False
-
-    temp_path = file_path + '.tmp'
-    backup_path = file_path + '.backup'
-
-    # The thread lock serializes this worker; the file lock serializes every gunicorn worker
-    with _get_user_save_lock(user_id), interprocess_lock(file_path + '.lock'):
-        return _save_user_wishlist_locked(user_id, username, wishlist_data, file_path, temp_path, backup_path)
-
-
-def _save_user_wishlist_locked(
-    user_id: str,
-    username: Optional[str],
-    wishlist_data: Dict[str, Any],
-    file_path: str,
-    temp_path: str,
-    backup_path: str,
-) -> bool:
-    backup_created = False
-
+    """Validate and store a user's wishlist (one transaction, nothing half-written)."""
     try:
         wishlist_data['updated_at'] = _now_iso()
         wishlist_data['user_id'] = user_id
@@ -244,48 +147,15 @@ def _save_user_wishlist_locked(
         wishlist_data.setdefault('username', username or 'unknown')
         wishlist_data.setdefault('created_at', _now_iso())
 
-        if os.path.exists(file_path):
-            try:
-                shutil.copy2(file_path, backup_path)
-                backup_created = True
-            except Exception as backup_error:
-                logger.error(f'Failed to create wishlist backup for user {user_id}: {backup_error}')
-                # Continue anyway - the atomic replace still provides some safety
-
-        with open(temp_path, 'w', encoding='utf-8') as file_obj:
-            json.dump(wishlist_data, file_obj, indent=2, ensure_ascii=False)
-
-        is_valid, error_message = validate_wishlist_json(temp_path)
+        is_valid, error_message = validate_wishlist_data(wishlist_data)
         if not is_valid:
             raise ValueError(f'JSON validation failed: {error_message}')
 
-        os.replace(temp_path, file_path)
-
-        if backup_created and os.path.exists(backup_path):
-            try:
-                os.remove(backup_path)
-            except Exception as cleanup_error:  # pragma: no cover
-                logger.warning(f'Failed to remove wishlist backup: {cleanup_error}')
-
+        documents.put_document(user_id, WISHLIST_KIND, wishlist_data)
         return True
 
     except Exception as error:
         logger.error(f'Error saving wishlist for user {user_id}: {error}')
-
-        if backup_created and os.path.exists(backup_path):
-            try:
-                shutil.copy2(backup_path, file_path)
-                logger.info(f'Restored wishlist from backup for user {user_id}')
-            except Exception as restore_error:  # pragma: no cover
-                logger.error(f'Failed to restore wishlist from backup: {restore_error}')
-
-        for cleanup_path in (temp_path, backup_path):
-            if os.path.exists(cleanup_path):
-                try:
-                    os.remove(cleanup_path)
-                except Exception as cleanup_error:  # pragma: no cover
-                    logger.warning(f'Failed to remove {cleanup_path}: {cleanup_error}')
-
         return False
 
 

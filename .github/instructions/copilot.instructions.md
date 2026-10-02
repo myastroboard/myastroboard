@@ -34,11 +34,12 @@ myastroboard/
 ├── backend/
 │   ├── __pycache__/                 # Python bytecode cache
 │   ├── app.py                       # Flask app factory: settings, extensions, blueprint registration, startup/scheduler init (no routes)
+│   ├── db/                          # SQLite storage (v1.7): engine, schema, Alembic migrations, stores, 1.6 JSON import - docs/DATABASE.md
 │   ├── utils/                       # Cross-cutting support modules (config, i18n, logging, auth, generic helpers)
 │   │   ├── __init__.py                  # Common backend utility functions (includes slugify_location_name) - former utils.py
 │   │   ├── route_helpers.py             # Shared cross-domain route helpers (_resolve_active_location, _active_location_cache)
 │   │   ├── app_settings.py              # Persistent app settings (VAPID email, proxy headers)
-│   │   ├── connector_secrets.py         # Connector credentials sidecar (data/connectors_secrets.json, outside backups)
+│   │   ├── connector_secrets.py         # Connector credentials store (database setting, outside backups)
 │   │   ├── auth.py                      # Authentication and user management
 │   │   ├── config_defaults.py           # Default config values
 │   │   ├── constants.py                 # Shared constants (paths, URLs, timeouts)
@@ -128,16 +129,13 @@ myastroboard/
 │   │   ├── skytonight_storage.py        # SkyTonight: filesystem helpers for runtime state
 │   │   └── skytonight_targets.py        # SkyTonight: dataset access, name resolution, lookup table
 ├── data/                            # Runtime persisted data (volume-mounted)
-│   ├── astrodex/                    # Astrodex JSON + images
+│   ├── astrodex/images/             # Astrodex pictures
+│   ├── backups/                     # pre-1.7 JSON archive + import report (written by the 1.7 upgrade)
 │   ├── cache/                       # Runtime cache payloads
-│   ├── config.json                  # Main app config
-│   ├── connectors_secrets.json      # Connector credentials (MQTT password, MyAstroShine token) - never in backups
-│   ├── equipments/                  # Equipment profile JSON files
+│   ├── myastroboard.db              # SQLite database: accounts, per-user records (relational), configuration, settings
 │   ├── myastroboard.log             # Application log file
-│   ├── observation_sessions/        # Observation Log JSON (one <user_id>_sessions.json per user)
-│   ├── projects/                    # User project data
-│   ├── skytonight/                  # SkyTonight runtime data (see below)
-│   └── users.json                   # User accounts + preferences
+│   ├── observation_sessions/attachments/  # Observation Log attachments
+│   └── skytonight/                  # SkyTonight runtime data (see below)
 ├── docs/                            # Project documentation
 │   ├── img/                         # Documentation images
 │   ├── 1.INSTALLATION.md            # Installation guide
@@ -304,7 +302,7 @@ except Exception as e:
 
 - **Default File Level**: INFO; **Default Console Level**: WARNING
 - **Set in the UI**: Parameters -> Log export, stored as `log_level` / `console_log_level` in
-  `app_settings.json`, applied live (`utils.logging_config.refresh_log_levels`, fed by the
+  the app settings, applied live (`utils.logging_config.refresh_log_levels`, fed by the
   `app_settings.get_log_levels` provider; other gunicorn workers follow within seconds)
 - **Available Levels**: DEBUG, INFO, WARNING, ERROR, CRITICAL
 - **Log File**: `/app/data/myastroboard.log` (with rotation)
@@ -413,8 +411,9 @@ night, events <-> skytonight, skytonight <-> weather) and are being unwound one 
 
 ### 1. Configuration Management
 
-- **Pattern**: JSON file-based configuration with environment variable overrides
-- **Location**: `data/config.json`
+- **Pattern**: JSON document in the database (`settings` table, key `config`; `utils/repo_config.py`
+  `load_config()` / `save_config()`), downloadable as `config.json` (`/api/config/export`)
+- **Location**: `data/myastroboard.db` - see [docs/DATABASE.md](../../docs/DATABASE.md)
 - **Structure**: Hierarchical with sections:
   - `locations`: List of admin-managed location presets (v1.2 multi-location profiles) - each with uuid4 `id`, name, latitude, longitude, elevation, timezone, bortle, sqm, per-preset `horizon_profile`, `is_install_default` flag. The legacy singular `location` key is auto-migrated on first load (see `docs/LOCATIONS.md`).
   - `constraints`: Altitude (min/max), airmass, size (min/max), moon separation, observability threshold, azimuth convention (under `skytonight.constraints`; `horizon_profile` moved to location presets in v1.2)
@@ -422,14 +421,15 @@ night, events <-> skytonight, skytonight <-> weather) and are being unwound one 
   - `astrodex`: Private flag
 - **Default values**: Managed by `backend/utils/config_defaults.py` (`DEFAULT_CONFIG`, `DEFAULT_CONSTRAINTS`, `DEFAULT_SKYTONIGHT`)
 - **Persistence**: Stored in Docker volume, survives container rebuilds
-- **Why**: Simple, human-readable, easy to backup/restore, flexible
+- **Why**: Transactional across gunicorn workers, versioned schema (Alembic); the backup ZIP keeps it human-readable
 - **CRITICAL RULE (v1.2)**: Backend code MUST NEVER read `config["location"]` directly. Resolve the request's location with `repo_config.get_active_location(config, get_current_user())` (per-user active location), or `repo_config.get_install_default_location(config)` for install-wide jobs (SkyTonight calculation, scheduler anchors). The cache scheduler iterates `repo_config.get_scheduler_locations(config)`. Cap: `constants.MAX_LOCATIONS = 5` (hard-coded, never admin-configurable - rationale in `docs/LOCATIONS.md`).
 
 ### 1.1. User Management
 
-- **Pattern**: JSON file-based user storage with hashed passwords
-- **Location**: `data/users.json`
-- **Structure**: Dictionary of users with:
+- **Pattern**: `users` table (`db/users_store.py`), cached per process by `UserManager` and reloaded when the
+  store revision moves; a write goes through `UserManager` methods (`modify_user()` for a user looked up earlier)
+- **Location**: `data/myastroboard.db`
+- **Structure**: One row per user with:
   - `username`: Unique username
   - `password_hash`: Bcrypt hashed password (never stored in plaintext)
   - `role`: One of `admin`, `user`, `read-only`
@@ -444,7 +444,7 @@ night, events <-> skytonight, skytonight <-> weather) and are being unwound one 
 
 ### 1.2. User Customization Preferences
 
-- **Pattern**: Per-user preference object persisted in `data/users.json`
+- **Pattern**: Per-user preference object persisted on the account (`users` table)
 - **Scope**: Preferences are always user-scoped; never shared globally across users
 - **Current Keys**:
   - `startup_main_tab`: default main tab at login
@@ -540,7 +540,7 @@ night, events <-> skytonight, skytonight <-> weather) and are being unwound one 
   - 500 Internal Server Error - Server errors
 - **Authentication Flow**:
   - Session-based authentication using Flask sessions
-  - Credentials stored in `/app/data/users.json` with hashed passwords
+  - Credentials stored in the database (`users` table) with hashed passwords
   - Default admin user created on first run (username: admin, password: admin)
   - Password change warning shown when using default password
 - **Why**: Clear separation, security through authentication, role-based access control
@@ -817,14 +817,17 @@ MyAstroBoard is self-hosted: each instance operator is the data controller, and 
 make GDPR compliance easy for them. [docs/PRIVACY.md](../../docs/PRIVACY.md) is the operator-facing
 inventory; keep it true. Any feature that stores, shares or sends data about a user follows these rules:
 
-- **Per-user files** are named `<user_id>_...` and live in a directory listed in `user_data_dirs()`
-  (`backend/utils/user_data.py`). That single list drives both account deletion (right to erasure)
-  and the "Download my data" ZIP (right to portability) - a directory missing from it leaves data
-  behind on deletion and out of the export. `tests/utils/test_user_data.py` scans `backend/` and
-  fails when a new `*_DIR` data constant is unclassified or an unknown module builds `<user_id>_`
-  file names: classify it there, never silence it.
-- **Per-user data inside a shared file** (e.g. a key in `users.json` or `config.json`) must be
-  removed in `UserManager.delete_user()` and included by `build_user_export()`.
+- **Per-user records** live in the database tables (one row per object; `db/collections.py`
+  maps each feature's dict to them, `db/documents.py` is the API). `users_store.delete_user()` deletes them with the account (right to
+  erasure) and `build_user_export()` exports every one of them (right to portability) - a new kind
+  needs a path in `db/json_layout.py` to be exported. Never keep per-user JSON in a file.
+- **Per-user binary files** (pictures, attachments) are named `<user_id>_...` and live in a directory
+  listed in `user_data_dirs()` (`backend/utils/user_data.py`), which drives both their deletion and
+  their export. `tests/utils/test_user_data.py` scans `backend/` and fails when a new `*_DIR` data
+  constant is unclassified or an unknown module builds `<user_id>_` file names: classify it there,
+  never silence it.
+- **Per-user data inside a shared record** (e.g. a key in the configuration) must be removed in
+  `UserManager.delete_user()` and included by `build_user_export()`.
 - **Image uploads** go through `strip_image_metadata()` (`backend/utils/image_privacy.py`) before
   being written - never `file.save()` a user picture directly: EXIF carries the GPS position of the
   observer's home and camera serial numbers.

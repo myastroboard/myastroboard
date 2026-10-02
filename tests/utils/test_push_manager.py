@@ -6,6 +6,9 @@ import types
 
 import pytest
 
+from db import settings_store
+from tests.db_helpers import delete_setting
+
 if 'psutil' not in sys.modules:
     sys.modules['psutil'] = types.ModuleType('psutil')
 
@@ -34,13 +37,11 @@ def test_push_manager_handles_missing_psutil(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_loads_keys_from_disk(tmp_path, monkeypatch):
+def test_loads_stored_keys():
     from utils import push_manager
 
     expected = {'private_key': 'PRIV_PEM', 'public_key': 'BASE64_PUB'}
-    vapid_file = tmp_path / 'vapid.json'
-    vapid_file.write_text(json.dumps(expected))
-    monkeypatch.setattr(push_manager, '_VAPID_FILE', str(vapid_file))
+    settings_store.put_setting('vapid', expected)
 
     keys = push_manager.load_or_generate_vapid_keys()
 
@@ -48,29 +49,23 @@ def test_loads_keys_from_disk(tmp_path, monkeypatch):
     assert push_manager._vapid_keys == expected
 
 
-def test_generates_and_persists_when_no_file(tmp_path, monkeypatch):
+def test_generates_and_persists_when_none_stored(monkeypatch):
     from utils import push_manager
 
-    vapid_file = tmp_path / 'vapid.json'
-    monkeypatch.setattr(push_manager, '_VAPID_FILE', str(vapid_file))
-
+    delete_setting('vapid')
     fake_keys = {'private_key': 'GEN_PRIV', 'public_key': 'GEN_PUB'}
     monkeypatch.setattr(push_manager, '_generate_keys', lambda: fake_keys)
 
     keys = push_manager.load_or_generate_vapid_keys()
 
     assert keys == fake_keys
-    assert vapid_file.exists()
-    assert json.loads(vapid_file.read_text()) == fake_keys
+    assert settings_store.get_setting('vapid') == fake_keys
 
 
-def test_regenerates_on_corrupt_file(tmp_path, monkeypatch):
+def test_regenerates_on_malformed_value(monkeypatch):
     from utils import push_manager
 
-    vapid_file = tmp_path / 'vapid.json'
-    vapid_file.write_text('not { valid json !!!')
-    monkeypatch.setattr(push_manager, '_VAPID_FILE', str(vapid_file))
-
+    settings_store.put_setting('vapid', 'not an object')
     fake_keys = {'private_key': 'NEW_PRIV', 'public_key': 'NEW_PUB'}
     monkeypatch.setattr(push_manager, '_generate_keys', lambda: fake_keys)
 
@@ -79,13 +74,10 @@ def test_regenerates_on_corrupt_file(tmp_path, monkeypatch):
     assert keys == fake_keys
 
 
-def test_regenerates_when_file_missing_required_keys(tmp_path, monkeypatch):
+def test_regenerates_when_value_missing_required_keys(monkeypatch):
     from utils import push_manager
 
-    vapid_file = tmp_path / 'vapid.json'
-    vapid_file.write_text(json.dumps({'public_key': 'ONLY_PUBLIC'}))  # missing private_key
-    monkeypatch.setattr(push_manager, '_VAPID_FILE', str(vapid_file))
-
+    settings_store.put_setting('vapid', {'public_key': 'ONLY_PUBLIC'})  # missing private_key
     fake_keys = {'private_key': 'REGEN_PRIV', 'public_key': 'REGEN_PUB'}
     monkeypatch.setattr(push_manager, '_generate_keys', lambda: fake_keys)
 
@@ -268,14 +260,12 @@ def test_generate_keys_returns_base64_key_pair(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_load_warns_when_vapid_contact_email_empty(tmp_path, monkeypatch):
+def test_load_warns_when_vapid_contact_email_empty(monkeypatch):
     """empty vapid_contact_email → warning emitted once."""
     from utils import push_manager
     from utils import app_settings
 
     push_manager._VAPID_CONTACT_WARNING_EMITTED = False
-    vapid_file = tmp_path / 'vapid.json'
-    monkeypatch.setattr(push_manager, '_VAPID_FILE', str(vapid_file))
     monkeypatch.setattr(
         app_settings,
         'get_app_settings',
@@ -295,45 +285,51 @@ def test_load_warns_when_vapid_contact_email_empty(tmp_path, monkeypatch):
     push_manager._VAPID_CONTACT_WARNING_EMITTED = False
 
 
-def test_load_migrates_pem_private_key_to_raw_b64(tmp_path, monkeypatch):
-    """PEM private key in file gets migrated to raw base64url."""
+def test_load_migrates_pem_private_key_to_raw_b64(monkeypatch):
+    """A PEM private key in storage gets migrated to raw base64url."""
     from utils import push_manager
 
     pem_keys = {
         'private_key': '-----BEGIN EC PRIVATE KEY-----\nDUMMY\n-----END EC PRIVATE KEY-----',
         'public_key': 'BASE64_PUBLIC',
     }
-    vapid_file = tmp_path / 'vapid.json'
-    vapid_file.write_text(json.dumps(pem_keys))
-    monkeypatch.setattr(push_manager, '_VAPID_FILE', str(vapid_file))
+    settings_store.put_setting('vapid', pem_keys)
     monkeypatch.setattr(push_manager, '_pem_to_raw_b64', lambda pem: 'CONVERTED_RAW_B64')
 
     keys = push_manager.load_or_generate_vapid_keys()
 
     assert keys['private_key'] == 'CONVERTED_RAW_B64'
-    saved = json.loads(vapid_file.read_text())
-    assert saved['private_key'] == 'CONVERTED_RAW_B64'
+    assert settings_store.get_setting('vapid')['private_key'] == 'CONVERTED_RAW_B64'
 
 
-def test_save_vapid_keys_disk_error_logs_and_returns_keys(tmp_path, monkeypatch):
-    """exception writing VAPID keys → error logged, keys still returned."""
+def test_unconvertible_pem_key_is_replaced(monkeypatch):
+    """A PEM key that cannot be converted is replaced by a fresh pair, stored."""
     from utils import push_manager
-    import builtins
 
-    vapid_file = tmp_path / 'vapid.json'
-    monkeypatch.setattr(push_manager, '_VAPID_FILE', str(vapid_file))
+    settings_store.put_setting('vapid', {'private_key': '-----BROKEN-----', 'public_key': 'PUB'})
+
+    def _fail(_pem):
+        raise ValueError('bad pem')
+
+    fresh = {'private_key': 'FRESH', 'public_key': 'FRESH_PUB'}
+    monkeypatch.setattr(push_manager, '_pem_to_raw_b64', _fail)
+    monkeypatch.setattr(push_manager, '_generate_keys', lambda: fresh)
+
+    assert push_manager.load_or_generate_vapid_keys() == fresh
+    assert settings_store.get_setting('vapid') == fresh
+
+
+def test_storage_error_logs_and_returns_keys(monkeypatch):
+    """A database failure → error logged, a usable key pair still returned."""
+    from utils import push_manager
+
     fake_keys = {'private_key': 'PRIV', 'public_key': 'PUB'}
     monkeypatch.setattr(push_manager, '_generate_keys', lambda: fake_keys)
 
-    real_open = builtins.open
+    def _boom(_key, _mutate):
+        raise OSError('read-only filesystem')
 
-    def mock_open(path, *args, **kw):
-        mode = args[0] if args else kw.get('mode', 'r')
-        if str(path).startswith(str(vapid_file)) and 'w' in str(mode):
-            raise PermissionError("read-only filesystem")
-        return real_open(path, *args, **kw)
-
-    monkeypatch.setattr(builtins, 'open', mock_open)
+    monkeypatch.setattr(settings_store, 'modify_setting', _boom)
     errors_logged = []
     monkeypatch.setattr(push_manager.logger, 'error', lambda msg, *a, **kw: errors_logged.append(msg))
 
@@ -343,12 +339,11 @@ def test_save_vapid_keys_disk_error_logs_and_returns_keys(tmp_path, monkeypatch)
     assert errors_logged
 
 
-def test_worker_adopts_keys_another_worker_already_generated(tmp_path, monkeypatch):
-    """A worker whose in-memory cache is empty must load, not regenerate, a key file another worker wrote."""
+def test_worker_adopts_keys_another_worker_already_generated(monkeypatch):
+    """A worker whose in-memory cache is empty must load, not regenerate, keys another worker stored."""
     from utils import push_manager
 
-    vapid_file = tmp_path / 'vapid.json'
-    monkeypatch.setattr(push_manager, '_VAPID_FILE', str(vapid_file))
+    delete_setting('vapid')
     monkeypatch.setattr(push_manager, '_vapid_keys', {})
     first = {'private_key': 'FIRST_PRIV', 'public_key': 'FIRST_PUB'}
     monkeypatch.setattr(push_manager, '_generate_keys', lambda: first)
@@ -360,50 +355,7 @@ def test_worker_adopts_keys_another_worker_already_generated(tmp_path, monkeypat
     assert push_manager.load_or_generate_vapid_keys() == first
 
 
-def test_generation_happens_inside_cross_process_lock(tmp_path, monkeypatch):
-    from contextlib import contextmanager
-    from utils import push_manager
-
-    vapid_file = tmp_path / 'vapid.json'
-    monkeypatch.setattr(push_manager, '_VAPID_FILE', str(vapid_file))
-    monkeypatch.setattr(push_manager, '_vapid_keys', {})
-    events = []
-
-    @contextmanager
-    def _recording_lock(lock_path):
-        events.append(('acquire', lock_path))
-        yield
-        events.append(('release', lock_path))
-
-    def _generate():
-        events.append(('generate', None))
-        return {'private_key': 'P', 'public_key': 'K'}
-
-    monkeypatch.setattr(push_manager, 'interprocess_lock', _recording_lock)
-    monkeypatch.setattr(push_manager, '_generate_keys', _generate)
-
-    push_manager.load_or_generate_vapid_keys()
-
-    lock_path = str(vapid_file) + '.lock'
-    assert events == [('acquire', lock_path), ('generate', None), ('release', lock_path)]
-
-
-def test_failed_key_write_leaves_no_temp_file(tmp_path, monkeypatch):
-    from utils import push_manager
-
-    vapid_file = tmp_path / 'vapid.json'
-    monkeypatch.setattr(push_manager, '_VAPID_FILE', str(vapid_file))
-
-    def _failing_replace(_src, _dst):
-        raise OSError("rename refused")
-
-    monkeypatch.setattr(push_manager.os, 'replace', _failing_replace)
-    with pytest.raises(OSError):
-        push_manager._write_keys_atomically({'private_key': 'P', 'public_key': 'K'})
-    assert list(tmp_path.iterdir()) == []
-
-
-def test_vapid_contact_email_configured_skips_warning(tmp_path, monkeypatch):
+def test_vapid_contact_email_configured_skips_warning(monkeypatch):
     """VAPID contact email IS set → skip the warning block."""
     from utils import push_manager
     from utils import app_settings
@@ -412,9 +364,7 @@ def test_vapid_contact_email_configured_skips_warning(tmp_path, monkeypatch):
 
     monkeypatch.setattr(app_settings, 'get_app_settings', lambda: {'vapid_contact_email': 'admin@example.com'})
 
-    vapid_file = tmp_path / 'vapid.json'
-    vapid_file.write_text(json.dumps({'private_key': 'PRIV', 'public_key': 'PUB'}))
-    monkeypatch.setattr(push_manager, '_VAPID_FILE', str(vapid_file))
+    settings_store.put_setting('vapid', {'private_key': 'PRIV', 'public_key': 'PUB'})
 
     keys = push_manager.load_or_generate_vapid_keys()
 

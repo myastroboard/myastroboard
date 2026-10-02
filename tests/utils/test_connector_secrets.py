@@ -1,17 +1,17 @@
-"""Tests for utils/connector_secrets.py - the credentials sidecar kept out of config.json.
+"""Tests for utils/connector_secrets.py - the credentials store kept out of the config.
 
-The autouse ``isolate_connector_secrets`` fixture in conftest.py already points the sidecar
-at a per-test file, so these tests read and write it freely.
+Every test runs on its own database (conftest.isolated_database), so these tests read and
+write the store freely.
 """
 
-import json
-import os
+import threading
 
+from db import settings_store
 from utils import connector_secrets as cs
 
 
-def _sidecar_path():
-    return cs._SECRETS_FILE
+def _stored():
+    return settings_store.get_setting(cs.SECRETS_KEY)
 
 
 # ---------------------------------------------------------------------------
@@ -19,16 +19,15 @@ def _sidecar_path():
 # ---------------------------------------------------------------------------
 
 
-def test_load_secrets_is_empty_when_no_file():
+def test_load_secrets_is_empty_when_nothing_stored():
     assert cs.load_secrets('mqtt') == {}
-    assert not os.path.exists(_sidecar_path())
+    assert _stored() is None
 
 
 def test_save_then_load_round_trip():
     assert cs.save_secrets('mqtt', {'password': 'hunter2'}) is True
     assert cs.load_secrets('mqtt') == {'password': 'hunter2'}
-    on_disk = json.load(open(_sidecar_path(), encoding='utf-8'))
-    assert on_disk == {'mqtt': {'password': 'hunter2'}}
+    assert _stored() == {'mqtt': {'password': 'hunter2'}}
 
 
 def test_save_merges_into_existing_values_and_leaves_other_connectors_alone():
@@ -43,7 +42,7 @@ def test_blank_value_removes_the_key_and_empty_connector_is_dropped():
     cs.save_secrets('mqtt', {'password': 'pw'})
     cs.save_secrets('mqtt', {'password': ''})
     assert cs.load_secrets('mqtt') == {}
-    assert json.load(open(_sidecar_path(), encoding='utf-8')) == {}
+    assert _stored() == {}
 
 
 def test_values_are_trimmed_and_stringified():
@@ -51,103 +50,49 @@ def test_values_are_trimmed_and_stringified():
     assert cs.load_secrets('mqtt') == {'password': 'pw'}
 
 
-def test_write_leaves_no_tmp_file_behind():
-    cs.save_secrets('mqtt', {'password': 'pw'})
-    folder, base = os.path.split(_sidecar_path())
-    assert not [name for name in os.listdir(folder) if name.startswith(base) and name.endswith('.tmp')]
-
-
-def test_unreadable_or_malformed_file_reads_as_empty():
-    with open(_sidecar_path(), 'w', encoding='utf-8') as handle:
-        handle.write('{not json')
-    assert cs.load_secrets('mqtt') == {}
-
-    with open(_sidecar_path(), 'w', encoding='utf-8') as handle:
-        json.dump(['not', 'a', 'dict'], handle)
+def test_malformed_stored_value_reads_as_empty():
+    settings_store.put_setting(cs.SECRETS_KEY, ['not', 'a', 'dict'])
     assert cs.load_secrets('mqtt') == {}
 
 
-def test_non_string_or_empty_values_on_disk_are_ignored():
-    with open(_sidecar_path(), 'w', encoding='utf-8') as handle:
-        json.dump({'mqtt': {'password': 42, 'username': '', 'ok': 'yes'}, 'bad': 'nope'}, handle)
+def test_unreadable_store_reads_as_empty(monkeypatch):
+    def _boom(_key):
+        raise OSError('denied')
+
+    monkeypatch.setattr(settings_store, 'get_setting', _boom)
+    assert cs.load_secrets('mqtt') == {}
+
+
+def test_non_string_or_empty_stored_values_are_ignored():
+    settings_store.put_setting(cs.SECRETS_KEY, {'mqtt': {'password': 42, 'username': '', 'ok': 'yes'}, 'bad': 'nope'})
     assert cs.load_secrets('mqtt') == {'ok': 'yes'}
     assert cs.load_secrets('bad') == {}
 
 
-def test_save_reports_failure_when_directory_is_unwritable(monkeypatch):
-    """Note: this actually fails inside save_secrets's own interprocess_lock() acquisition
-    (it also calls os.makedirs, for the lock file's directory, before _write_all ever
-    runs) - not inside _write_all's own try/except. See
-    test_write_failure_before_tmp_file_exists_skips_cleanup below for that path."""
-    monkeypatch.setattr(cs, '_SECRETS_FILE', os.path.join(_sidecar_path(), 'nested', 'x.json'))
-    # The parent "directory" is a plain file path that does not exist and cannot be created
-    # under a file - makedirs raises and the save must report False rather than raise.
-    with open(os.path.dirname(os.path.dirname(cs._SECRETS_FILE)), 'w', encoding='utf-8') as handle:
-        handle.write('{}')
+def test_save_reports_failure_when_the_store_fails(monkeypatch):
+    def _boom(_key, _mutate):
+        raise OSError('disk full')
+
+    monkeypatch.setattr(settings_store, 'modify_setting', _boom)
     assert cs.save_secrets('mqtt', {'password': 'pw'}) is False
 
 
-def test_write_failure_before_tmp_file_exists_skips_cleanup(monkeypatch):
-    """When the failure happens before the tmp file is even created (unlike
-    test_write_failure_reports_false_and_cleans_up_tmp_file, where os.replace fails after
-    a real tmp file was written), there is nothing to clean up - os.path.exists(tmp_path)
-    must be False and the removal must simply be skipped."""
-    import builtins
-
-    original_open = builtins.open
-
-    def raising_open(path, mode='r', **kwargs):
-        if 'w' in mode and str(path).endswith('.tmp'):
-            raise OSError("disk full")
-        return original_open(path, mode, **kwargs)
-
-    monkeypatch.setattr(builtins, 'open', raising_open)
-
-    assert cs.save_secrets('mqtt', {'password': 'pw'}) is False
+def test_concurrent_saves_of_different_connectors_keep_both():
+    """Every worker migrates legacy secrets at startup: read-merge-write must not lose a value."""
+    threads = [
+        threading.Thread(target=cs.save_secrets, args=(name, {'password': name})) for name in ('a', 'b', 'c', 'd')
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert set(_stored()) == {'a', 'b', 'c', 'd'}
 
 
-def test_chmod_failure_does_not_prevent_saving(monkeypatch):
-    """Windows / exotic filesystems may not honour chmod - best effort only, the write
-    itself (and the fact the file lives outside backups) is what actually matters."""
-    monkeypatch.setattr(cs.os, 'chmod', lambda *a, **k: (_ for _ in ()).throw(OSError("chmod not supported")))
-    assert cs.save_secrets('mqtt', {'password': 'pw'}) is True
-    assert cs.load_secrets('mqtt') == {'password': 'pw'}
-
-
-def test_write_failure_reports_false_and_cleans_up_tmp_file(monkeypatch):
-    monkeypatch.setattr(cs.os, 'replace', lambda *a, **k: (_ for _ in ()).throw(OSError("disk full")))
-    assert cs.save_secrets('mqtt', {'password': 'pw'}) is False
-    folder, base = os.path.split(_sidecar_path())
-    assert not [name for name in os.listdir(folder) if name.startswith(base) and name.endswith('.tmp')]
-
-
-def test_write_failure_cleanup_remove_error_is_also_swallowed(monkeypatch):
-    """If the replace fails and the cleanup's own os.remove then also fails, save_secrets
-    must still report failure cleanly rather than raise."""
-    monkeypatch.setattr(cs.os, 'replace', lambda *a, **k: (_ for _ in ()).throw(OSError("disk full")))
-    monkeypatch.setattr(cs.os, 'remove', lambda *a, **k: (_ for _ in ()).throw(OSError("remove failed")))
-    assert cs.save_secrets('mqtt', {'password': 'pw'}) is False
-
-
-def test_save_merges_under_cross_process_lock(monkeypatch):
-    """Every worker migrates legacy secrets at startup, so read-merge-write must be serialized across processes."""
-    from contextlib import contextmanager
-
-    events = []
-
-    @contextmanager
-    def _recording_lock(lock_path):
-        events.append(('acquire', lock_path))
-        yield
-        events.append(('release', lock_path))
-
-    real_write_all = cs._write_all
-    monkeypatch.setattr(cs, 'interprocess_lock', _recording_lock)
-    monkeypatch.setattr(cs, '_write_all', lambda data: events.append(('write', None)) or real_write_all(data))
-
-    assert cs.save_secrets('mqtt', {'password': 'pw'}) is True
-    lock_path = cs._SECRETS_FILE + '.lock'
-    assert events == [('acquire', lock_path), ('write', None), ('release', lock_path)]
+def test_revision_moves_on_save():
+    before = cs.secrets_revision()
+    cs.save_secrets('mqtt', {'password': 'pw'})
+    assert cs.secrets_revision() == before + 1
 
 
 # ---------------------------------------------------------------------------

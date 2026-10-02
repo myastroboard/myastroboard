@@ -394,6 +394,87 @@ function downloadLogExport() {
     showMessage('success', i18n.t('settings.log_export_started'));
 }
 
+// ======================
+// 1.7 upgrade archive (data/backups/)
+// ======================
+
+async function loadMigrationBackups() {
+    const section = document.getElementById('migration-backups-section');
+    const details = document.getElementById('migration-backups-details');
+    if (!section || !details) return;
+
+    try {
+        const resp = await fetch(`${API_BASE}/api/admin/migration-backups`);
+        if (!resp.ok) {
+            section.classList.add('d-none');
+            return;
+        }
+        const data = await resp.json();
+        if (!data.exists) {
+            section.classList.add('d-none');
+            return;
+        }
+
+        details.replaceChildren();
+        const addLine = (icon, text) => {
+            const li = document.createElement('li');
+            const i = document.createElement('i');
+            i.className = `bi ${icon} text-muted icon-inline`;
+            i.setAttribute('aria-hidden', 'true');
+            li.appendChild(i);
+            li.appendChild(document.createTextNode(` ${text}`));
+            details.appendChild(li);
+        };
+        (data.archives || []).forEach(archive => {
+            addLine('bi-file-zip', i18n.t('settings.migration_backups_archive', {
+                name: archive.name,
+                date: formatDateTime(archive.created_at),
+                size: formatBytes(archive.size)
+            }));
+        });
+        if (data.orphans || data.unreadable) {
+            addLine('bi-folder', i18n.t('settings.migration_backups_set_aside', {
+                orphans: data.orphans || 0,
+                unreadable: data.unreadable || 0
+            }));
+        }
+        addLine('bi-hdd', i18n.t('settings.migration_backups_total', { size: formatBytes(data.total_size) }));
+
+        const reportBtn = document.getElementById('migration-backups-report-btn');
+        if (reportBtn) reportBtn.classList.toggle('d-none', !(data.reports || []).length);
+        section.classList.remove('d-none');
+    } catch (error) {
+        console.error('Error loading migration backups:', error);
+        section.classList.add('d-none');
+    }
+}
+
+function downloadMigrationReport() {
+    window.location.href = `${API_BASE}/api/admin/migration-backups/report`;
+}
+
+async function deleteMigrationBackups() {
+    const msgEl = document.getElementById('migration-backups-message');
+    if (!window.confirm(i18n.t('settings.migration_backups_delete_confirm'))) return;
+
+    const btn = document.getElementById('migration-backups-delete-btn');
+    if (btn) btn.disabled = true;
+    try {
+        const resp = await fetch(`${API_BASE}/api/admin/migration-backups`, { method: 'DELETE' });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        showMessage('success', i18n.t('settings.migration_backups_deleted'));
+        await loadMigrationBackups();
+    } catch (error) {
+        console.error('Error deleting migration backups:', error);
+        if (msgEl) {
+            msgEl.className = 'alert alert-danger';
+            msgEl.textContent = i18n.t('settings.migration_backups_delete_failed');
+        }
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
 // Enable/disable the restore button based on file selection
 function initRestoreFileInput() {
     const fileInput = document.getElementById('restore-file-input');

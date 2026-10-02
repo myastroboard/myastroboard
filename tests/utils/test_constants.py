@@ -9,7 +9,6 @@ from utils.constants import (
     DATA_DIR,
     OUTPUT_DIR,
     CONFIG_DIR,
-    CONFIG_FILE,
     LOG_FILE,
     CONDITIONS_FILE,
     URL_OPENMETEO,
@@ -49,12 +48,6 @@ class TestDirectoryConstants:
 
 class TestFilePathConstants:
     """Test file path constants"""
-
-    def test_config_file_path(self):
-        """Test CONFIG_FILE is constructed correctly"""
-        assert isinstance(CONFIG_FILE, str)
-        assert CONFIG_FILE.endswith('config.json')
-        assert DATA_DIR in CONFIG_FILE
 
     def test_log_file_path(self):
         """Test LOG_FILE is constructed correctly"""

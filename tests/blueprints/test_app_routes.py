@@ -4465,9 +4465,6 @@ class TestChangePasswordValidation:
 class TestPlanMyNightRouteHandlers:
 
     def test_plan_add_target_with_data_returns_response(self, client_admin, monkeypatch, tmp_path):
-        from observation import plan_my_night as _pmn
-
-        monkeypatch.setattr(_pmn, 'PLAN_DIR', str(tmp_path))
         from datetime import datetime, timezone, timedelta
 
         future = (datetime.now(timezone.utc) + timedelta(hours=6)).isoformat()
@@ -5924,14 +5921,21 @@ class TestLogsApiEdgeCases:
 class TestExportConfigEdgeCases:
 
     def test_config_not_found_returns_404(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.os.path, 'isfile', lambda _: False)
+        monkeypatch.setattr(_admin_mod.repo_config, 'read_raw_config', lambda: None)
         resp = client_admin.get('/api/config/export')
         assert resp.status_code == 404
 
     def test_config_export_exception_returns_500(self, client_admin, monkeypatch):
-        monkeypatch.setattr(_app_mod.os.path, 'isfile', lambda _: (_ for _ in ()).throw(RuntimeError("disk error")))
+        monkeypatch.setattr(
+            _admin_mod.repo_config, 'read_raw_config', lambda: (_ for _ in ()).throw(RuntimeError("db error"))
+        )
         resp = client_admin.get('/api/config/export')
         assert resp.status_code == 500
+
+    def test_config_export_returns_the_stored_config(self, client_admin):
+        resp = client_admin.get('/api/config/export')
+        assert resp.status_code == 200
+        assert 'locations' in resp.get_json(force=True)
 
 
 # ---------------------------------------------------------------------------
@@ -6372,7 +6376,7 @@ class TestPlanMyNightRoutes:
         monkeypatch.setattr(
             _app_mod.plan_my_night, 'get_plan_with_timeline', lambda *_a, **_k: {'plan': {'entries': []}}
         )
-        monkeypatch.setattr(_app_mod.plan_my_night, 'get_all_plan_files', lambda *_a, **_k: [])
+        monkeypatch.setattr(_app_mod.plan_my_night, 'list_user_plan_combination_ids', lambda *_a, **_k: [])
         resp = client_admin.post('/api/plan-my-night/targets/nonexistent/add-to-astrodex')
         assert resp.status_code == 404
 
@@ -7515,7 +7519,7 @@ class TestAddPlanTargetToAstrodexBranches:
         entry_id = 'test-search-loop-entry'
 
         monkeypatch.setattr(_pmn, 'get_plan_with_timeline', lambda *a, **kw: {'plan': {'entries': []}})
-        monkeypatch.setattr(_pmn, 'get_all_plan_files', lambda uid: [f'/fake/{uid}_plan_scope1.json'])
+        monkeypatch.setattr(_pmn, 'list_user_plan_combination_ids', lambda uid: ['scope1'])
         monkeypatch.setattr(
             _pmn,
             'load_user_plan',
@@ -7640,18 +7644,20 @@ class TestUserCrudGenericValueError:
 
 
 class TestBackupRestoreDirNotExist:
-    """Cover os.path.isdir(target_dir) is False → skip rmtree."""
+    """A picture folder that does not exist yet is created by the restore."""
 
     def test_astrodex_restore_when_dir_missing(self, client_admin, monkeypatch, tmp_path):
         import io
         import zipfile
-        import json
 
-        monkeypatch.setattr(_admin_mod, 'DATA_DIR', str(tmp_path))
+        from observation import astrodex as _astrodex
+
+        images_dir = tmp_path / 'not-yet' / 'images'
+        monkeypatch.setattr(_astrodex, 'ASTRODEX_IMAGES_DIR', str(images_dir))
 
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, 'w') as zf:
-            zf.writestr('astrodex/item1.json', json.dumps({'id': 'x', 'name': 'M31'}))
+            zf.writestr('astrodex/images/pic.jpg', b'jpeg')
         buf.seek(0)
 
         resp = client_admin.post(
@@ -7660,6 +7666,7 @@ class TestBackupRestoreDirNotExist:
             content_type='multipart/form-data',
         )
         assert resp.status_code in (200, 201)
+        assert (images_dir / 'pic.jpg').read_bytes() == b'jpeg'
 
 
 # ---------------------------------------------------------------------------
@@ -7783,7 +7790,7 @@ class TestBestWindowSyncTrueButCacheStillInvalid:
 
 
 # ---------------------------------------------------------------------------
-# default plan file in get_all_plan_files loop
+# default plan in the list_user_plan_combination_ids loop
 # entry not found in first sub-plan, found in second
 # ---------------------------------------------------------------------------
 
@@ -7799,7 +7806,7 @@ class TestAddPlanTargetDefaultAndMultiPlan:
         entry_id = 'test-default-plan-entry'
 
         monkeypatch.setattr(_pmn, 'get_plan_with_timeline', lambda *a, **kw: {'plan': {'entries': []}})
-        monkeypatch.setattr(_pmn, 'get_all_plan_files', lambda uid: [f'/fake/{uid}_plan_my_night.json'])
+        monkeypatch.setattr(_pmn, 'list_user_plan_combination_ids', lambda uid: [None])
         monkeypatch.setattr(
             _pmn,
             'load_user_plan',
@@ -7824,10 +7831,10 @@ class TestAddPlanTargetDefaultAndMultiPlan:
         monkeypatch.setattr(_pmn, 'get_plan_with_timeline', lambda *a, **kw: {'plan': {'entries': []}})
         monkeypatch.setattr(
             _pmn,
-            'get_all_plan_files',
+            'list_user_plan_combination_ids',
             lambda uid: [
-                f'/fake/{uid}_plan_combo1.json',
-                f'/fake/{uid}_plan_combo2.json',
+                'combo1',
+                'combo2',
             ],
         )
 
@@ -8990,8 +8997,8 @@ class TestPlanMyNightCoveragePaths:
 
         monkeypatch.setattr(
             _pmn,
-            'get_all_plan_files',
-            lambda uid: [f'data/plans/{uid}_plan_combo1.json'],
+            'list_user_plan_combination_ids',
+            lambda uid: ['combo1'],
         )
         monkeypatch.setattr(
             _pmn,

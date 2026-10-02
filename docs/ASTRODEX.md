@@ -16,7 +16,7 @@ Astrodex is your personal astrophotography logbook — a Pokédex-style catalogu
 
 Each item represents **one target object** (a galaxy, nebula, cluster…). An item can have **multiple pictures** attached — one per session or per processing attempt.
 
-Items are **per-user**: each account has its own private collection in `data/astrodex/<user_id>.json`. Items from different users sharing the same target are merged into a combined view when browsing.
+Items are **per-user**: each account has its own private collection (database tables `astrodex_items` and `astrodex_pictures`, one row per item and per picture). Items from different users sharing the same target are merged into a combined view when browsing.
 
 ### Catalogue integration
 
@@ -30,7 +30,7 @@ For names the local SkyTonight dataset doesn't know (mostly stars, e.g. "Vega", 
 
 ## Item data model
 
-Each item stored in `data/astrodex/<user_id>.json` has the following fields:
+Each item of a user's Astrodex has the following fields:
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -159,7 +159,7 @@ Shows every geotagged picture (one with `latitude`/`longitude` set via a locatio
 
 This does **not** perform any EXIF GPS extraction — it only visualizes coordinates a user already entered manually. It is powered by a dedicated, lightweight endpoint:
 
-`GET /api/astrodex/map` returns a flat list of geotagged pictures across all visible users, gated by its own **`config['astrodex']['map_private']`** flag (Configuration → Astrodex → "Photo map private"; on by default for new installs, off for installs whose `config.json` predates the setting) — deliberately **independent** from the general `config['astrodex']['private']` sharing flag used by `/api/astrodex`. When `map_private` is off, every shared user's pictures appear on the map with their real coordinates, even though `/api/astrodex` itself always strips other users' exact coordinates for privacy in its own merged view. This app targets small trusted deployments (family/astro-club), so the map keeps its own, separately-labeled switch rather than being tied to the general sharing toggle; since real-world photo locations are often the observer's home, new installs start with it private.
+`GET /api/astrodex/map` returns a flat list of geotagged pictures across all visible users, gated by its own **`config['astrodex']['map_private']`** flag (Configuration → Astrodex → "Photo map private"; on by default for new installs, off for installs whose configuration predates the setting) — deliberately **independent** from the general `config['astrodex']['private']` sharing flag used by `/api/astrodex`. When `map_private` is off, every shared user's pictures appear on the map with their real coordinates, even though `/api/astrodex` itself always strips other users' exact coordinates for privacy in its own merged view. This app targets small trusted deployments (family/astro-club), so the map keeps its own, separately-labeled switch rather than being tied to the general sharing toggle; since real-world photo locations are often the observer's home, new installs start with it private.
 
 ---
 
@@ -270,7 +270,8 @@ When multiple users on the same instance image the same object, items are **merg
 
 ## Storage and backup
 
-- Per-user JSON file: `data/astrodex/<user_id>.json`
+- Per-user collection: database tables `astrodex_items` and `astrodex_pictures` (one row per item and
+  per picture; `astrodex/<user_id>_astrodex.json` inside a backup ZIP)
 - Images directory: `data/astrodex/images/`
 - Both are included in the **Backup / Restore** ZIP (see [CONFIGURATION.md](CONFIGURATION.md)).
 

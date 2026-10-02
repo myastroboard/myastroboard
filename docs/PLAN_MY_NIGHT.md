@@ -6,7 +6,7 @@ Plan My Night lets each `admin` or `user` build a private target timeline for a 
 
 - `admin` and `user` can create, edit, reorder, complete, and clear plans.
 - `read-only` users can view the Astrodex tab but cannot access Plan My Night actions.
-- Plans are stored per user, one file per equipment combination: `data/projects/<user_id>_plan_<combination_id>.json` (or `data/projects/<user_id>_plan_my_night.json` for the default plan when no combination is selected). A user can hold a separate plan per combination at once.
+- Plans are stored per user, one per equipment combination (database tables `plans` and `plan_entries`, keyed by the combination id, or `default` for the plan with no combination selected). A user can hold a separate plan per combination at once.
 
 ## Equipment Combination Selector
 

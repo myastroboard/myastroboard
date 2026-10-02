@@ -24,18 +24,15 @@ import hmac
 import json
 import os
 import re
-import threading
 import time
 import uuid
-from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple
 
+from db import settings_store
 from observation import astrodex
-from utils import load_json_file, save_json_file
 from connectors.myastroshine_connector import MyAstroShineConnector
 from utils.connector_secrets import merge_secrets
-from utils.file_lock import interprocess_lock
 from utils.image_privacy import strip_image_metadata
 from utils.logging_config import get_logger
 from utils.repo_config import load_config
@@ -75,21 +72,10 @@ ENHANCED_PICTURE_FIELDS = (
     'enhanced_source_version',
 )
 
-# Consumed handoff jti store. In-memory (fast path) with a best-effort JSON
-# mirror so a worker restart inside the token's TTL window still rejects a
-# replay. jti -> expiry epoch seconds.
-_consumed_lock = threading.Lock()
-_consumed: Dict[str, float] = {}
-_CONSUMED_FILENAME = 'myastroshine_consumed_handoffs.json'
-
-
-def _consumed_file_path() -> str:
-    """Resolved fresh from astrodex.ASTRODEX_DIR so tests that repoint it still work.
-
-    The name does not end in ``_astrodex.json`` so load_all_users_astrodex()
-    never mistakes it for a user's collection.
-    """
-    return os.path.join(astrodex.ASTRODEX_DIR, _CONSUMED_FILENAME)
+# Consumed handoff jti store (``settings`` table, key below): jti -> expiry epoch seconds.
+# One write transaction per check-and-mark, so a jti spent in one gunicorn worker is
+# immediately spent for all of them.
+CONSUMED_HANDOFFS_KEY = 'myastroshine_consumed_handoffs'
 
 
 # ---------------------------------------------------------------------------
@@ -264,100 +250,67 @@ def verify_handoff(cfg: Dict, token: str) -> Optional[Dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 
-def _merge_consumed_from_disk_locked() -> None:
-    """Fold in unexpired jtis from the on-disk store; the caller holds ``_consumed_lock``.
-
-    Every gunicorn worker keeps its own ``_consumed`` dict, so the file is the
-    only place a jti spent by another worker becomes visible.
-    """
-    data = load_json_file(_consumed_file_path(), default={})
-    if not isinstance(data, dict):
-        return
-    now = time.time()
-    for jti, expiry in data.items():
+def _unexpired(stored: Any, now: float) -> Dict[str, float]:
+    """The stored jtis that have not expired yet (malformed entries dropped)."""
+    if not isinstance(stored, dict):
+        return {}
+    alive: Dict[str, float] = {}
+    for jti, expiry in stored.items():
         try:
             expiry_f = float(expiry)
         except (TypeError, ValueError):
             continue
         if expiry_f > now:
-            _consumed[jti] = expiry_f
-
-
-def _load_consumed_from_disk() -> None:
-    with _consumed_lock:
-        _merge_consumed_from_disk_locked()
-
-
-def _prune_and_persist_locked() -> None:
-    now = time.time()
-    expired = [jti for jti, expiry in _consumed.items() if expiry <= now]
-    for jti in expired:
-        _consumed.pop(jti, None)
-    try:
-        astrodex.ensure_astrodex_directories()
-        save_json_file(_consumed_file_path(), dict(_consumed))
-    except OSError as exc:  # pragma: no cover - best-effort mirror only
-        logger.warning("Could not persist consumed handoff jti store: %s", exc)
-
-
-@contextmanager
-def _consumed_store_lock():
-    """Serialize read-merge-write of the jti store across threads and gunicorn workers."""
-    with _consumed_lock, interprocess_lock(_consumed_file_path() + '.lock'):
-        yield
+            alive[str(jti)] = expiry_f
+    return alive
 
 
 def is_handoff_consumed(jti: str) -> bool:
     """Whether this handoff's jti has already been used to create a duplicate."""
-    with _consumed_lock:
-        if jti not in _consumed:
-            _merge_consumed_from_disk_locked()  # another worker may have spent it
-        expiry = _consumed.get(jti)
-        if expiry is None:
-            return False
-        if expiry <= time.time():
-            _consumed.pop(jti, None)
-            return False
-        return True
+    return jti in _unexpired(settings_store.get_setting(CONSUMED_HANDOFFS_KEY), time.time())
 
 
 def mark_handoff_consumed(jti: str, expiry_epoch: Optional[float] = None) -> None:
     """Record a handoff's jti as spent so a later replay is rejected with 409."""
     if expiry_epoch is None:
         expiry_epoch = time.time() + MyAstroShineConnector.HANDOFF_TTL_SECONDS
-    with _consumed_store_lock():
-        _merge_consumed_from_disk_locked()
-        _consumed[jti] = float(expiry_epoch)
-        _prune_and_persist_locked()
+
+    def _mark(stored):
+        alive = _unexpired(stored, time.time())
+        alive[jti] = float(expiry_epoch)
+        return alive, None
+
+    settings_store.modify_setting(CONSUMED_HANDOFFS_KEY, _mark)
 
 
 def claim_handoff(jti: str, expiry_epoch: Optional[float] = None) -> bool:
     """Atomically mark a jti spent; False when it already was (in any worker).
 
-    Check and mark happen under one cross-process lock, so two concurrent
-    callbacks carrying the same handoff cannot both get through.
+    Check and mark happen in one write transaction, so two concurrent callbacks
+    carrying the same handoff cannot both get through.
     """
     if expiry_epoch is None:
         expiry_epoch = time.time() + MyAstroShineConnector.HANDOFF_TTL_SECONDS
-    with _consumed_store_lock():
-        _merge_consumed_from_disk_locked()
-        expiry = _consumed.get(jti)
-        if expiry is not None and expiry > time.time():
-            return False
-        _consumed[jti] = float(expiry_epoch)
-        _prune_and_persist_locked()
-        return True
+
+    def _claim(stored):
+        alive = _unexpired(stored, time.time())
+        if jti in alive:
+            return None, False
+        alive[jti] = float(expiry_epoch)
+        return alive, True
+
+    return settings_store.modify_setting(CONSUMED_HANDOFFS_KEY, _claim)
 
 
 def release_handoff(jti: str) -> None:
     """Un-spend a claimed jti after the duplicate could not be created, so it can be retried."""
-    with _consumed_store_lock():
-        _merge_consumed_from_disk_locked()
-        _consumed.pop(jti, None)
-        _prune_and_persist_locked()
 
+    def _release(stored):
+        alive = _unexpired(stored, time.time())
+        alive.pop(jti, None)
+        return alive, None
 
-_load_consumed_from_disk()
+    settings_store.modify_setting(CONSUMED_HANDOFFS_KEY, _release)
 
 
 # ---------------------------------------------------------------------------

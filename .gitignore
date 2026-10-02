@@ -22,6 +22,7 @@ htmlcov/
 
 # Data files (runtime data directory only - do not shadow static/data/)
 /data/
+/data-*/
 *.db
 *.sqlite
 

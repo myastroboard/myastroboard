@@ -74,8 +74,11 @@ This page lists the HTTP routes currently declared across `backend/blueprints/*.
 
 ## Backup & Restore
 
-- `GET /api/backup/download` - Download a ZIP archive (config.json, users.json, astrodex/, equipments/)
+- `GET /api/backup/download` - Download a ZIP archive (config.json, app_settings.json, users.json, astrodex/, equipments/, observation_sessions/, wishlist/), built from the database
 - `POST /api/backup/restore` - Restore from a previously created backup ZIP (`multipart/form-data`, field `file`)
+- `GET /api/admin/migration-backups` (admin) - What the 1.7 upgrade left in `data/backups/` (archive, reports, files set aside, size)
+- `GET /api/admin/migration-backups/report` (admin) - Download the newest import report
+- `DELETE /api/admin/migration-backups` (admin) - Delete the upgrade archive, reports and files set aside (irreversible)
 
 ## Platform & Utility
 
@@ -160,7 +163,7 @@ This page lists the HTTP routes currently declared across `backend/blueprints/*.
 ## Connectors
 
 - `GET /api/connectors` — List all registered connectors with installed/enabled state, module config, `target_modules` (app tabs the connector surfaces in), and a config block whose `SECRET_FIELDS` are masked (`****` + last 4, plus a `has_<field>` boolean)
-- `POST /api/connectors/<name>/config` (admin) — Save one connector's config; merged server-side, `int` / `bool` fields coerced to their declared type, and a blank or still-masked secret means "keep current". Secrets are written to `data/connectors_secrets.json`, never to `config.json`
+- `POST /api/connectors/<name>/config` (admin) — Save one connector's config; merged server-side, `int` / `bool` fields coerced to their declared type, and a blank or still-masked secret means "keep current". Secrets are written to the connector secrets store, never to the configuration
 - `GET /api/connectors/allsky/status` — Return cached AllSky sensor data (`allskydata.json`); requires `sensor_data` module enabled
 - `GET /api/connectors/allsky/health` — Run a per-module health check against the AllSky instance; accepts `?fresh=1` to bypass cache
 - `GET /api/connectors/allsky/urls` — Return proxy URLs for all enabled AllSky modules; accepts `?date=YYYYMMDD`

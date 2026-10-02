@@ -90,11 +90,9 @@ def env(monkeypatch):
         astrodex.ASTRODEX_DIR = os.path.join(tmpdir, "astrodex")
         astrodex.ASTRODEX_IMAGES_DIR = os.path.join(astrodex.ASTRODEX_DIR, "images")
         astrodex.ensure_astrodex_directories()
-        integration._consumed.clear()
         _bp._rate_hits.clear()  # the cookieless-endpoint rate limiter is process-global
         monkeypatch.setattr(integration, "get_integration_config", lambda config=None: _cfg())
         yield tmpdir
-        integration._consumed.clear()
         _bp._rate_hits.clear()
 
 

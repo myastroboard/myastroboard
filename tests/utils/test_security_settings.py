@@ -1,30 +1,33 @@
 """Tests for security_settings.py: trusted networks and the instance-wide 2FA switch."""
 
-import json
-
 import pytest
+
+from db import settings_store
 
 
 @pytest.fixture(autouse=True)
 def reset_security_settings_cache():
-    """Clear the module-level cache (and its mtime marker) before and after each test."""
+    """Clear the module-level cache (and its revision marker) before and after each test."""
     from utils import security_settings
 
     security_settings._cache = None
-    security_settings._cache_mtime = None
+    security_settings._cache_revision = None
     yield
     security_settings._cache = None
-    security_settings._cache_mtime = None
+    security_settings._cache_revision = None
 
 
 @pytest.fixture
-def settings_module(tmp_path, monkeypatch):
-    """security_settings pointed at an isolated data directory."""
+def settings_module():
+    """security_settings over this test's own database (see conftest.isolated_database)."""
     from utils import security_settings
 
-    monkeypatch.setattr(security_settings, '_DATA_DIR', str(tmp_path))
-    monkeypatch.setattr(security_settings, '_SECURITY_SETTINGS_FILE', str(tmp_path / 'security_settings.json'))
     return security_settings
+
+
+def _store(value):
+    """Write the stored security settings directly, as another worker or a restore would."""
+    settings_store.put_setting('security_settings', value)
 
 
 # ---------------------------------------------------------------------------
@@ -32,16 +35,16 @@ def settings_module(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_defaults_when_no_file(settings_module):
+def test_defaults_when_never_saved(settings_module):
     settings = settings_module.load_security_settings()
 
     assert settings == {'trusted_networks': [], 'two_factor_enabled': False}
 
 
-def test_save_then_load_round_trip(tmp_path, settings_module):
+def test_save_then_load_round_trip(settings_module):
     settings_module.save_security_settings({'trusted_networks': ['192.168.1.0/24'], 'two_factor_enabled': True})
 
-    on_disk = json.loads((tmp_path / 'security_settings.json').read_text())
+    on_disk = settings_store.get_setting('security_settings')
     assert on_disk == {'trusted_networks': ['192.168.1.0/24'], 'two_factor_enabled': True}
 
     settings_module._cache = None
@@ -49,7 +52,7 @@ def test_save_then_load_round_trip(tmp_path, settings_module):
 
 
 def test_get_settings_uses_cache_when_file_unchanged(settings_module):
-    """A warm cache whose mtime still matches the file is returned without a re-read."""
+    """A warm cache whose revision still matches the store is returned without a re-read."""
     settings_module.save_security_settings({'trusted_networks': ['10.0.0.0/8'], 'two_factor_enabled': True})
 
     # A second call with nothing having touched the file in between must not need to
@@ -59,37 +62,27 @@ def test_get_settings_uses_cache_when_file_unchanged(settings_module):
     assert settings_module.get_security_settings()['trusted_networks'] == ['10.0.0.0/8']
 
 
-def test_get_settings_reloads_when_file_changes_on_disk(tmp_path, settings_module):
-    """Multi-worker sync: a cache that no longer matches the file's mtime is stale and
+def test_get_settings_reloads_when_another_worker_saved(settings_module):
+    """Multi-worker sync: a cache older than the stored revision is stale and
     must be refreshed automatically, not just a cache that's cold - the exact class of
     bug a long-lived `gunicorn -w N` worker would otherwise hit forever once warm."""
     settings_module.save_security_settings({'trusted_networks': ['10.0.0.0/8'], 'two_factor_enabled': True})
 
-    (tmp_path / 'security_settings.json').write_text(
-        json.dumps({'trusted_networks': ['172.16.0.0/12'], 'two_factor_enabled': False})
-    )
-    # Pretend this worker's cache predates the file (another worker saved since) -
-    # matches the direct-mtime-manipulation pattern already used for UserManager's
-    # own reload tests, avoiding a flaky reliance on real wall-clock mtime gaps.
-    settings_module._cache_mtime = 0
+    _store({'trusted_networks': ['172.16.0.0/12'], 'two_factor_enabled': False})
 
     assert settings_module.get_security_settings()['trusted_networks'] == ['172.16.0.0/12']
 
 
-def test_reload_picks_up_external_change(tmp_path, settings_module):
+def test_reload_picks_up_external_change(settings_module):
     settings_module.save_security_settings({'trusted_networks': ['10.0.0.0/8'], 'two_factor_enabled': False})
 
-    (tmp_path / 'security_settings.json').write_text(
-        json.dumps({'trusted_networks': ['172.16.0.0/12'], 'two_factor_enabled': False})
-    )
+    _store({'trusted_networks': ['172.16.0.0/12'], 'two_factor_enabled': False})
 
     assert settings_module.reload_security_settings()['trusted_networks'] == ['172.16.0.0/12']
 
 
-def test_unknown_keys_in_file_are_ignored(tmp_path, settings_module):
-    (tmp_path / 'security_settings.json').write_text(
-        json.dumps({'trusted_networks': ['10.0.0.0/8'], 'two_factor_enabled': False, 'unexpected': 'value'})
-    )
+def test_unknown_stored_keys_are_ignored(settings_module):
+    _store({'trusted_networks': ['10.0.0.0/8'], 'two_factor_enabled': False, 'unexpected': 'value'})
 
     assert settings_module.load_security_settings() == {
         'trusted_networks': ['10.0.0.0/8'],
@@ -97,23 +90,21 @@ def test_unknown_keys_in_file_are_ignored(tmp_path, settings_module):
     }
 
 
-def test_corrupt_file_falls_back_to_defaults(tmp_path, settings_module):
-    (tmp_path / 'security_settings.json').write_text('{not json')
+def test_wrong_shape_falls_back_to_defaults(settings_module):
+    _store('not an object')
 
     assert settings_module.load_security_settings() == {'trusted_networks': [], 'two_factor_enabled': False}
 
 
-def test_hand_edited_non_list_networks_is_coerced(tmp_path, settings_module):
-    (tmp_path / 'security_settings.json').write_text(
-        json.dumps({'trusted_networks': '192.168.1.0/24', 'two_factor_enabled': False})
-    )
+def test_hand_edited_non_list_networks_is_coerced(settings_module):
+    _store({'trusted_networks': '192.168.1.0/24', 'two_factor_enabled': False})
 
     assert settings_module.load_security_settings()['trusted_networks'] == []
 
 
-def test_two_factor_forced_off_when_file_has_no_network(tmp_path, settings_module):
-    """The documented cascade also applies to a hand-edited file, not just to saves."""
-    (tmp_path / 'security_settings.json').write_text(json.dumps({'trusted_networks': [], 'two_factor_enabled': True}))
+def test_two_factor_forced_off_when_stored_without_network(settings_module):
+    """The documented cascade also applies to a hand-edited value, not just to saves."""
+    _store({'trusted_networks': [], 'two_factor_enabled': True})
 
     assert settings_module.load_security_settings()['two_factor_enabled'] is False
 
@@ -207,11 +198,11 @@ def test_loopback_trusted_even_with_empty_configured_list(settings_module):
     assert settings_module.is_client_ip_trusted('192.168.1.42') is False
 
 
-def test_loopback_is_never_written_to_the_file(tmp_path, settings_module):
+def test_loopback_is_never_stored(settings_module):
     """ALWAYS_TRUSTED_NETWORKS is unioned at check time, never persisted."""
     settings_module.save_security_settings({'trusted_networks': ['192.168.1.0/24'], 'two_factor_enabled': True})
 
-    on_disk = json.loads((tmp_path / 'security_settings.json').read_text())
+    on_disk = settings_store.get_setting('security_settings')
     assert on_disk['trusted_networks'] == ['192.168.1.0/24']
 
 

@@ -1,4 +1,4 @@
-"""Tests for utils.user_data - per-user files: purge (erasure) and export (portability)."""
+"""Tests for utils.user_data - per-user data: purge (erasure) and export (portability)."""
 
 import ast
 import importlib
@@ -11,15 +11,13 @@ from pathlib import Path
 
 import pytest
 
+from db import documents
 from utils import user_data
 
 _DIR_TARGETS = {
     'observation.astrodex.ASTRODEX_DIR': 'astrodex',
     'observation.astrodex.ASTRODEX_IMAGES_DIR': 'astrodex_images',
-    'equipment.equipment_profiles.EQUIPMENT_DIR': 'equipments',
     'observation.observation_sessions.OBSERVATION_SESSIONS_DIR': 'observation_sessions',
-    'observation.plan_my_night.PLAN_DIR': 'projects',
-    'observation.wishlist.WISHLIST_DIR': 'wishlist',
 }
 
 
@@ -49,32 +47,33 @@ def _user(user_id=None, username='alice'):
 
 
 def _populate(root, user_id):
-    (root / 'astrodex' / f'{user_id}_astrodex.json').write_text(
-        json.dumps({'items': [{'pictures': [{'filename': 'legacy_m42.jpg'}]}]}), encoding='utf-8'
+    """Documents in the database, pictures and attachments on disk."""
+    documents.put_document(
+        user_id, 'astrodex', {'items': [{'id': 'i', 'name': 'M 42', 'pictures': [{'filename': 'legacy_m42.jpg'}]}]}
     )
+    documents.put_document(user_id, 'equipment.telescopes', {'items': []})
+    documents.put_document(user_id, 'observation_sessions', {'sessions': []})
+    documents.put_document(user_id, 'plan', {'plan': None}, doc_key='default')
+    documents.put_document(user_id, 'wishlist', {'items': []})
     (root / 'astrodex_images' / f'{user_id}_photo.jpg').write_bytes(b'\xff\xd8jpeg')
     (root / 'astrodex_images' / 'legacy_m42.jpg').write_bytes(b'\xff\xd8legacy')
-    (root / 'equipments' / f'{user_id}_telescopes.json').write_text('[]', encoding='utf-8')
-    (root / 'observation_sessions' / f'{user_id}_sessions.json').write_text('[]', encoding='utf-8')
-    (root / 'observation_sessions' / f'{user_id}_sessions.json.lock').write_text('', encoding='utf-8')
     (root / 'observation_sessions' / 'attachments' / f'{user_id}_notes.txt').write_text('n', encoding='utf-8')
-    (root / 'projects' / f'{user_id}_plan_my_night.json').write_text('{}', encoding='utf-8')
-    (root / 'wishlist' / f'{user_id}_wishlist.json').write_text('[]', encoding='utf-8')
+    (root / 'observation_sessions' / 'attachments' / f'{user_id}_draft.tmp').write_text('', encoding='utf-8')
 
 
 class TestPurge:
     def test_rejects_malformed_user_id(self, data_dirs):
         assert user_data.purge_user_files('../etc') == 0
 
-    def test_removes_only_that_users_files_including_lock_files(self, data_dirs):
+    def test_removes_only_that_users_files_including_working_files(self, data_dirs):
         alice, bob = str(uuid.uuid4()), str(uuid.uuid4())
         _populate(data_dirs, alice)
         _populate(data_dirs, bob)
 
-        assert user_data.purge_user_files(alice) == 8
+        assert user_data.purge_user_files(alice) == 3
 
         assert not list(data_dirs.rglob(f'{alice}_*'))
-        assert len(list(data_dirs.rglob(f'{bob}_*'))) == 8
+        assert len(list(data_dirs.rglob(f'{bob}_*'))) == 3
 
 
 class TestExport:
@@ -90,10 +89,12 @@ class TestExport:
                 names = set(archive.namelist())
                 account = json.loads(archive.read('account.json'))
                 locations = json.loads(archive.read('locations.json'))
+                plan = json.loads(archive.read(f'plans/{alice.user_id}_plan_my_night.json'))
         finally:
             archive_file.close()
 
         uid = alice.user_id
+        assert plan == {'plan': None}
         assert names == {
             'README.txt',
             'account.json',
@@ -138,19 +139,14 @@ _BACKEND = Path(__file__).resolve().parents[2] / 'backend'
 
 # Directories holding ``<user_id>_...`` files: must all be in user_data_dirs()
 _PER_USER_DIRS = {
-    ('observation/astrodex.py', 'ASTRODEX_DIR'),
     ('observation/astrodex.py', 'ASTRODEX_IMAGES_DIR'),
-    ('equipment/equipment_profiles.py', 'EQUIPMENT_DIR'),
-    ('observation/observation_sessions.py', 'OBSERVATION_SESSIONS_DIR'),
-    ('observation/plan_my_night.py', 'PLAN_DIR'),
-    ('observation/wishlist.py', 'WISHLIST_DIR'),
 }
 
 # Data directories that hold no per-user files, with the reason
 _SHARED_DIRS = {
     ('utils/constants.py', 'DATA_DIR'): 'data root',
-    ('utils/app_settings.py', '_DATA_DIR'): 'data root',
-    ('utils/security_settings.py', '_DATA_DIR'): 'data root',
+    ('observation/astrodex.py', 'ASTRODEX_DIR'): 'holds images/ (ASTRODEX_IMAGES_DIR, covered)',
+    ('observation/observation_sessions.py', 'OBSERVATION_SESSIONS_DIR'): 'holds attachments/ (covered)',
     ('utils/constants.py', 'DATA_DIR_CACHE'): 'shared computed caches',
     ('utils/constants.py', 'SKYTONIGHT_DIR'): 'shared SkyTonight engine data',
     ('utils/constants.py', 'SKYTONIGHT_CATALOGUES_DIR'): 'shared SkyTonight engine data',
@@ -170,21 +166,14 @@ _SHARED_DIRS = {
 _USER_FILE_MODULES = {
     'blueprints/astrodex.py',
     'blueprints/observation_sessions.py',
-    'blueprints/plan_my_night.py',
-    'blueprints/skytonight_api.py',
-    'equipment/equipment_profiles.py',
-    'observation/astrodex.py',
     'observation/myastroshine_integration.py',
-    'observation/observation_sessions.py',
-    'observation/plan_my_night.py',
-    'observation/wishlist.py',
-    'utils/auth.py',
     'utils/user_data.py',
 }
 
 _HOW_TO_FIX = (
     "If it stores per-user files, add it to user_data_dirs() in backend/utils/user_data.py "
-    "(so account deletion and the personal data export cover it) and to the lists in this test; "
+    "(so account deletion and the personal data export cover it) and to the lists in this test - "
+    "per-user JSON data belongs in the database (db/documents.py), not in files; "
     "otherwise classify it as shared here. See the 'Personal Data (GDPR)' section of "
     ".github/instructions/copilot.instructions.md."
 )

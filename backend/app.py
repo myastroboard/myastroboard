@@ -25,6 +25,12 @@ from datetime import timedelta
 # Add backend to path for imports
 sys.path.insert(0, os.path.dirname(__file__))
 
+# Schema upgrade + one-shot import of the pre-1.7 JSON files, before any module below
+# loads data (utils.auth builds the user manager at import time).
+from db import bootstrap as db_bootstrap
+
+db_bootstrap.ensure_database_ready()
+
 from astropy.utils import iers as _iers
 
 # Keep auto_download off; the cache scheduler downloads IERS-A to a known path
@@ -185,6 +191,24 @@ app.register_blueprint(session_analytics_bp)
 # ============================================================
 # API Utils
 # ============================================================
+
+
+_MAINTENANCE_ALLOWED_ENDPOINTS = {'static', 'misc.health_simple_api'}
+
+
+@app.before_request
+def block_requests_in_maintenance():
+    """After a failed legacy data import, serve nothing but a 503 (see db/bootstrap.py)."""
+    if not db_bootstrap.is_maintenance() or request.endpoint in _MAINTENANCE_ALLOWED_ENDPOINTS:
+        return None
+    message = (
+        'MyAstroBoard could not import its data files into the new database. Nothing was lost: the '
+        'original files are untouched and a copy is in data/backups/. See the application log and the '
+        'import report in data/backups/, then restart, or go back to the previous version.'
+    )
+    if request.path.startswith('/api/'):
+        return {'error': 'maintenance', 'message': message}, 503
+    return Response(message, status=503, mimetype='text/plain')
 
 
 @app.before_request

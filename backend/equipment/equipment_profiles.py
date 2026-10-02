@@ -3,21 +3,15 @@ Equipment Profiles Module - Astrophotography Equipment Management
 Manages user equipment profiles: telescopes, cameras, mounts, filters, and combinations
 """
 
-import json
-import os
 import uuid
-import shutil
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, asdict, fields
 from enum import Enum
+from db import documents, queries
 from utils.logging_config import get_logger
-from utils.constants import DATA_DIR
 
 logger = get_logger(__name__)
-
-# Equipment data directory
-EQUIPMENT_DIR = os.path.join(DATA_DIR, 'equipments')
 
 
 def _get_float_or_none(value, default=None):
@@ -301,115 +295,68 @@ class CombinationAnalysis:
 
 
 # ============================================================
-# Directory & File Management
+# Storage (user_documents kind "equipment.<type>", one document per user and type)
 # ============================================================
 
 
-def ensure_equipment_directories():
-    """Ensure equipment directories exist"""
-    os.makedirs(EQUIPMENT_DIR, exist_ok=True)
+def equipment_kind(equipment_type: str) -> str:
+    """user_documents kind holding one user's equipment of *equipment_type*."""
+    return f'equipment.{equipment_type}'
 
 
-def get_user_equipment_file(user_id: str, equipment_type: str) -> str:
-    """Get the path to a user's equipment file"""
-    ensure_equipment_directories()
-    return os.path.join(EQUIPMENT_DIR, f'{user_id}_{equipment_type}.json')
-
-
-def validate_equipment_json(file_path: str) -> Tuple[bool, str]:
+def validate_equipment_data(data) -> Tuple[bool, str]:
     """
-    Validate that a file contains valid equipment JSON
-
-    Args:
-        file_path: Path to JSON file to validate
+    Validate an equipment document before it is stored
 
     Returns:
         Tuple of (is_valid, error_message)
     """
+    if not isinstance(data, dict):
+        return False, "JSON root must be an object"
+
+    if 'items' not in data or not isinstance(data['items'], list):
+        return False, "Missing or invalid 'items' array"
+
+    return True, ""
+
+
+def _load_equipment_document(user_id: str, equipment_type: str) -> Optional[Dict]:
+    """The stored document, or None when there is none (or it cannot be used)."""
     try:
-        with open(file_path, 'r') as f:
-            data = json.load(f)
-
-        # Basic structure validation
-        if not isinstance(data, dict):
-            return False, "JSON root must be an object"
-
-        if 'items' not in data or not isinstance(data['items'], list):
-            return False, "Missing or invalid 'items' array"
-
-        return True, ""
-
-    except json.JSONDecodeError as e:
-        return False, f"Invalid JSON: {e}"
+        data = documents.get_document(user_id, equipment_kind(equipment_type))
     except Exception as e:
-        return False, f"Validation error: {e}"
+        logger.error(f"Error loading {equipment_type} for {user_id}: {e}")
+        return None
+    if data is not None and not validate_equipment_data(data)[0]:
+        logger.error(f"Stored {equipment_type} of {user_id} are malformed; starting from empty")
+        return None
+    return data
 
 
-def safe_save_equipment(file_path: str, data: Dict) -> bool:
+def safe_save_equipment(user_id: str, equipment_type: str, data: Dict) -> bool:
     """
-    Safely save equipment data with backup and validation
-
-    Args:
-        file_path: Path to equipment file
-        data: Equipment data to save
+    Validate and store a user's equipment of one type (one transaction, nothing half-written)
 
     Returns:
         True if save successful, False otherwise
     """
-    backup_path = file_path + '.backup'
-    temp_path = file_path + '.tmp'
-
+    is_valid, error_msg = validate_equipment_data(data)
+    if not is_valid:
+        logger.error(f"Validation failed for {equipment_type} of {user_id}: {error_msg}")
+        return False
     try:
-        # Step 1: Backup existing file if it exists
-        if os.path.exists(file_path):
-            shutil.copy2(file_path, backup_path)
-            logger.debug(f"Created backup: {backup_path}")
-
-        # Step 2: Write to temporary file
-        with open(temp_path, 'w') as f:
-            json.dump(data, f, indent=2, default=str)
-        logger.debug(f"Wrote temporary file: {temp_path}")
-
-        # Step 3: Validate temporary file
-        is_valid, error_msg = validate_equipment_json(temp_path)
-        if not is_valid:
-            logger.error(f"Validation failed for {temp_path}: {error_msg}")
-            # Restore from backup
-            if os.path.exists(backup_path):
-                shutil.copy2(backup_path, file_path)
-                logger.info(f"Restored from backup: {backup_path}")
-            os.remove(temp_path)
-            return False
-
-        # Step 4: Move temporary file to final location
-        shutil.move(temp_path, file_path)
-        logger.debug(f"Moved {temp_path} to {file_path}")
-
-        # Step 5: Delete backup on success
-        if os.path.exists(backup_path):
-            os.remove(backup_path)
-            logger.debug(f"Deleted backup: {backup_path}")
-
+        documents.put_document(user_id, equipment_kind(equipment_type), data)
         return True
-
     except Exception as e:
         logger.error(f"Error during safe save: {e}")
-        # Attempt to restore from backup
-        if os.path.exists(backup_path) and os.path.exists(file_path):
-            try:
-                shutil.copy2(backup_path, file_path)
-                logger.info(f"Restored from backup after error: {backup_path}")
-            except Exception as restore_error:
-                logger.error(f"Failed to restore from backup: {restore_error}")
-
-        # Clean up temporary file
-        if os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-            except Exception:
-                pass  # best-effort temp-file cleanup; failure is non-fatal
-
         return False
+
+
+def _iter_equipment_documents(equipment_type: str):
+    """``(owner_id, data)`` for every user's document of *equipment_type* (malformed ones skipped)."""
+    for owner_id, _doc_key, data in documents.list_documents(equipment_kind(equipment_type)):
+        if isinstance(data, dict) and isinstance(data.get('items'), list):
+            yield owner_id, data
 
 
 # ============================================================
@@ -425,28 +372,15 @@ def load_all_shared_equipment(equipment_type: str, exclude_user_id: str) -> List
     from utils.auth import user_manager
 
     user_map = {u['user_id']: u['username'] for u in user_manager.list_users()}
-    ensure_equipment_directories()
 
     shared_items: List[Dict] = []
     try:
-        for fname in os.listdir(EQUIPMENT_DIR):
-            if not fname.endswith(f'_{equipment_type}.json'):
-                continue
-            owner_id = fname[: -(len(equipment_type) + 6)]  # strip _{type}.json
-            if owner_id == exclude_user_id:
-                continue
-            fpath = os.path.join(EQUIPMENT_DIR, fname)
-            try:
-                with open(fpath, 'r') as f:
-                    data = json.load(f)
-            except Exception:
-                continue
-            for item in data.get('items', []):
-                if item.get('is_shared'):
-                    annotated = dict(item)
-                    annotated['owner_id'] = owner_id
-                    annotated['owner_username'] = user_map.get(owner_id, owner_id)
-                    shared_items.append(annotated)
+        for owner_id, item in queries.shared_equipment(equipment_type, exclude_user_id):
+            if isinstance(item, dict):
+                annotated = dict(item)
+                annotated['owner_id'] = owner_id
+                annotated['owner_username'] = user_map.get(owner_id, owner_id)
+                shared_items.append(annotated)
     except Exception as e:
         logger.error(f"Error scanning shared equipment ({equipment_type}): {e}")
 
@@ -454,20 +388,6 @@ def load_all_shared_equipment(equipment_type: str, exclude_user_id: str) -> List
 
 
 _BASIC_EQUIPMENT_TYPES = ('telescopes', 'cameras', 'mounts', 'filters', 'accessories')
-
-# Fields on a combination referencing a single equipment id, keyed by the equipment type
-# scanned in EQUIPMENT_DIR (matches the `_{type}.json` file suffix / load_all_shared_equipment
-# parameter convention). 'cameras' includes guide_camera_id since either field can reference one.
-_COMBINATION_SCALAR_REFERENCE_FIELDS: Dict[str, Tuple[str, ...]] = {
-    'telescopes': ('telescope_id',),
-    'cameras': ('camera_id', 'guide_camera_id'),
-    'mounts': ('mount_id',),
-}
-# Fields on a combination referencing a list of equipment ids.
-_COMBINATION_LIST_REFERENCE_FIELDS: Dict[str, str] = {
-    'filters': 'filter_ids',
-    'accessories': 'accessory_ids',
-}
 
 
 def index_owned_and_shared_equipment(user_id: str) -> Tuple[Dict[str, Dict], Dict[str, Dict]]:
@@ -499,7 +419,7 @@ def index_telescopes_and_cameras(user_id: str) -> Tuple[Dict[str, Dict], Dict[st
     """Return (telescopes_by_id, cameras_by_id) merging this user's own + all shared items.
 
     Used by SkyTonight's combination-aware scoring to resolve a combination's
-    telescope_id/camera_id into full equipment dicts without re-scanning EQUIPMENT_DIR
+    telescope_id/camera_id into full equipment dicts without re-reading every equipment document
     per combination.
     """
     telescopes_by_id: Dict[str, Dict] = {}
@@ -533,45 +453,14 @@ def _find_combinations_referencing(equipment_type: str, equipment_id: str) -> Li
     """Return {name, owner_id} for every combination (any user) referencing this equipment id.
 
     Used as a delete-guard: equipment referenced by a combination cannot be removed while the
-    reference exists. Scans every user's combinations file (not just the owner's) because a
+    reference exists. Searches every user's combinations (not just the owner's) because a
     *shared* item can be referenced by another user's combination.
-
-    A combinations file that fails to read/parse (mid-write, corruption, permission hiccup) is
-    treated as "unknown, might still reference this equipment" rather than silently skipped - the
-    guard fails closed (blocks the delete) instead of failing open, since ignoring an unreadable
-    file could let a still-referenced item be deleted out from under that user's combination.
     """
-    ensure_equipment_directories()
-    scalar_fields = _COMBINATION_SCALAR_REFERENCE_FIELDS.get(equipment_type, ())
-    list_field = _COMBINATION_LIST_REFERENCE_FIELDS.get(equipment_type)
-
-    matches: List[Dict] = []
     try:
-        for fname in os.listdir(EQUIPMENT_DIR):
-            if not fname.endswith('_combinations.json'):
-                continue
-            owner_id = fname[: -(len('combinations') + 6)]
-            fpath = os.path.join(EQUIPMENT_DIR, fname)
-            try:
-                with open(fpath, 'r') as f:
-                    data = json.load(f)
-            except Exception as e:
-                logger.error(
-                    f"Could not read {fpath} while checking references for "
-                    f"{equipment_type}/{equipment_id}; blocking delete to be safe: {e}"
-                )
-                matches.append({'name': '(unreadable combination - please retry)', 'owner_id': owner_id})
-                continue
-            for combo in data.get('items', []):
-                referenced = any(combo.get(field) == equipment_id for field in scalar_fields)
-                if not referenced and list_field:
-                    referenced = equipment_id in (combo.get(list_field) or [])
-                if referenced:
-                    matches.append({'name': combo.get('name', ''), 'owner_id': owner_id})
+        return queries.combinations_referencing(equipment_type, equipment_id)
     except Exception as e:
         logger.error(f"Error scanning combinations referencing {equipment_type}/{equipment_id}: {e}")
-
-    return matches
+        return []
 
 
 def compute_combination_validity_status(
@@ -676,21 +565,11 @@ def load_all_shared_combinations(exclude_user_id: str) -> List[Dict]:
     from utils.auth import user_manager
 
     user_map = {u['user_id']: u['username'] for u in user_manager.list_users()}
-    ensure_equipment_directories()
 
     result: List[Dict] = []
     try:
-        for fname in os.listdir(EQUIPMENT_DIR):
-            if not fname.endswith('_combinations.json'):
-                continue
-            owner_id = fname[: -(len('combinations') + 6)]  # strip _combinations.json
+        for owner_id, data in _iter_equipment_documents('combinations'):
             if owner_id == exclude_user_id:
-                continue
-            fpath = os.path.join(EQUIPMENT_DIR, fname)
-            try:
-                with open(fpath, 'r') as f:
-                    data = json.load(f)
-            except Exception:
                 continue
             for combo in data.get('items', []):
                 # Compute from the owner's perspective
@@ -714,24 +593,16 @@ def load_all_shared_combinations(exclude_user_id: str) -> List[Dict]:
 
 def load_user_telescopes(user_id: str) -> Dict:
     """Load user's telescope profiles"""
-    file_path = get_user_equipment_file(user_id, 'telescopes')
-
-    if not os.path.exists(file_path):
+    data = _load_equipment_document(user_id, 'telescopes')
+    if data is None:
         return {'user_id': user_id, 'created_at': datetime.now(timezone.utc).isoformat(), 'items': []}
-
-    try:
-        with open(file_path, 'r') as f:
-            return json.load(f)
-    except Exception as e:
-        logger.error(f"Error loading telescopes for {user_id}: {e}")
-        return {'user_id': user_id, 'created_at': datetime.now(timezone.utc).isoformat(), 'items': []}
+    return data
 
 
 def save_user_telescopes(user_id: str, data: Dict) -> bool:
     """Save user's telescope profiles with safety checks"""
-    file_path = get_user_equipment_file(user_id, 'telescopes')
     data['updated_at'] = datetime.now(timezone.utc).isoformat()
-    return safe_save_equipment(file_path, data)
+    return safe_save_equipment(user_id, 'telescopes', data)
 
 
 def create_telescope(user_id: str, telescope_data: Dict) -> Optional[Dict]:
@@ -849,24 +720,16 @@ def delete_telescope(user_id: str, telescope_id: str) -> Tuple[bool, Optional[Li
 
 def load_user_cameras(user_id: str) -> Dict:
     """Load user's camera profiles"""
-    file_path = get_user_equipment_file(user_id, 'cameras')
-
-    if not os.path.exists(file_path):
+    data = _load_equipment_document(user_id, 'cameras')
+    if data is None:
         return {'user_id': user_id, 'created_at': datetime.now(timezone.utc).isoformat(), 'items': []}
-
-    try:
-        with open(file_path, 'r') as f:
-            return json.load(f)
-    except Exception as e:
-        logger.error(f"Error loading cameras for {user_id}: {e}")
-        return {'user_id': user_id, 'created_at': datetime.now(timezone.utc).isoformat(), 'items': []}
+    return data
 
 
 def save_user_cameras(user_id: str, data: Dict) -> bool:
     """Save user's camera profiles with safety checks"""
-    file_path = get_user_equipment_file(user_id, 'cameras')
     data['updated_at'] = datetime.now(timezone.utc).isoformat()
-    return safe_save_equipment(file_path, data)
+    return safe_save_equipment(user_id, 'cameras', data)
 
 
 def create_camera(user_id: str, camera_data: Dict) -> Optional[Dict]:
@@ -984,24 +847,16 @@ def delete_camera(user_id: str, camera_id: str) -> Tuple[bool, Optional[List[str
 
 def load_user_mounts(user_id: str) -> Dict:
     """Load user's mount profiles"""
-    file_path = get_user_equipment_file(user_id, 'mounts')
-
-    if not os.path.exists(file_path):
+    data = _load_equipment_document(user_id, 'mounts')
+    if data is None:
         return {'user_id': user_id, 'created_at': datetime.now(timezone.utc).isoformat(), 'items': []}
-
-    try:
-        with open(file_path, 'r') as f:
-            return json.load(f)
-    except Exception as e:
-        logger.error(f"Error loading mounts for {user_id}: {e}")
-        return {'user_id': user_id, 'created_at': datetime.now(timezone.utc).isoformat(), 'items': []}
+    return data
 
 
 def save_user_mounts(user_id: str, data: Dict) -> bool:
     """Save user's mount profiles with safety checks"""
-    file_path = get_user_equipment_file(user_id, 'mounts')
     data['updated_at'] = datetime.now(timezone.utc).isoformat()
-    return safe_save_equipment(file_path, data)
+    return safe_save_equipment(user_id, 'mounts', data)
 
 
 def create_mount(user_id: str, mount_data: Dict) -> Optional[Dict]:
@@ -1125,24 +980,16 @@ def delete_mount(user_id: str, mount_id: str) -> Tuple[bool, Optional[List[str]]
 
 def load_user_filters(user_id: str) -> Dict:
     """Load user's filter profiles"""
-    file_path = get_user_equipment_file(user_id, 'filters')
-
-    if not os.path.exists(file_path):
+    data = _load_equipment_document(user_id, 'filters')
+    if data is None:
         return {'user_id': user_id, 'created_at': datetime.now(timezone.utc).isoformat(), 'items': []}
-
-    try:
-        with open(file_path, 'r') as f:
-            return json.load(f)
-    except Exception as e:
-        logger.error(f"Error loading filters for {user_id}: {e}")
-        return {'user_id': user_id, 'created_at': datetime.now(timezone.utc).isoformat(), 'items': []}
+    return data
 
 
 def save_user_filters(user_id: str, data: Dict) -> bool:
     """Save user's filter profiles with safety checks"""
-    file_path = get_user_equipment_file(user_id, 'filters')
     data['updated_at'] = datetime.now(timezone.utc).isoformat()
-    return safe_save_equipment(file_path, data)
+    return safe_save_equipment(user_id, 'filters', data)
 
 
 def create_filter(user_id: str, filter_data: Dict) -> Optional[Dict]:
@@ -1248,29 +1095,19 @@ def delete_filter(user_id: str, filter_id: str) -> Tuple[bool, Optional[List[str
 
 def load_user_accessories(user_id: str) -> Dict:
     """Load user's accessory profiles"""
-    file_path = get_user_equipment_file(user_id, 'accessories')
-    if not os.path.exists(file_path):
+    data = _load_equipment_document(user_id, 'accessories')
+    if data is None:
         return {
             'items': [],
             'created_at': datetime.now(timezone.utc).isoformat(),
             'updated_at': datetime.now(timezone.utc).isoformat(),
         }
-    try:
-        with open(file_path, 'r') as f:
-            return json.load(f)
-    except Exception as e:
-        logger.error(f"Error loading accessories: {e}")
-        return {
-            'items': [],
-            'created_at': datetime.now(timezone.utc).isoformat(),
-            'updated_at': datetime.now(timezone.utc).isoformat(),
-        }
+    return data
 
 
 def save_user_accessories(user_id: str, data: Dict) -> bool:
     """Save user's accessory profiles"""
-    file_path = get_user_equipment_file(user_id, 'accessories')
-    return safe_save_equipment(file_path, data)
+    return safe_save_equipment(user_id, 'accessories', data)
 
 
 def create_accessory(user_id: str, accessory_data: Dict) -> Optional[Dict]:
@@ -1423,24 +1260,16 @@ def calculate_fov(
 
 def load_user_combinations(user_id: str) -> Dict:
     """Load user's equipment combinations"""
-    file_path = get_user_equipment_file(user_id, 'combinations')
-
-    if not os.path.exists(file_path):
+    data = _load_equipment_document(user_id, 'combinations')
+    if data is None:
         return {'user_id': user_id, 'created_at': datetime.now(timezone.utc).isoformat(), 'items': []}
-
-    try:
-        with open(file_path, 'r') as f:
-            return json.load(f)
-    except Exception as e:
-        logger.error(f"Error loading combinations for {user_id}: {e}")
-        return {'user_id': user_id, 'created_at': datetime.now(timezone.utc).isoformat(), 'items': []}
+    return data
 
 
 def save_user_combinations(user_id: str, data: Dict) -> bool:
     """Save user's equipment combinations with safety checks"""
-    file_path = get_user_equipment_file(user_id, 'combinations')
     data['updated_at'] = datetime.now(timezone.utc).isoformat()
-    return safe_save_equipment(file_path, data)
+    return safe_save_equipment(user_id, 'combinations', data)
 
 
 def create_combination(user_id: str, combination_data: Dict) -> Optional[Dict]:

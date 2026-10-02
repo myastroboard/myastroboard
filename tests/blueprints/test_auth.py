@@ -927,10 +927,8 @@ class TestAdminUserTwoFactor:
 
 class TestSecuritySettingsApi:
     @pytest.fixture(autouse=True)
-    def isolated_settings_file(self, tmp_path, monkeypatch):
-        """Never touch the real data directory while exercising the save endpoint."""
-        monkeypatch.setattr(security_settings_mod, '_DATA_DIR', str(tmp_path))
-        monkeypatch.setattr(security_settings_mod, '_SECURITY_SETTINGS_FILE', str(tmp_path / 'security_settings.json'))
+    def isolated_settings_file(self, monkeypatch):
+        """Start each test from a cold cache (the database itself is per-test)."""
         monkeypatch.setattr(security_settings_mod, '_cache', None)
         yield
         security_settings_mod._cache = None

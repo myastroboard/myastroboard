@@ -7,18 +7,31 @@ from unittest.mock import patch
 
 import pyotp
 import pytest
+
+from db import documents
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from sqlalchemy import select
+
+from db import engine
 from utils import auth
 from utils.repo_config import get_user_location_prefs
 
 
 @pytest.fixture
-def isolated_user_manager(tmp_path, monkeypatch):
-    """Create a UserManager instance using an isolated users file."""
-    users_file = tmp_path / "users.json"
-    monkeypatch.setattr(auth, "USERS_FILE", str(users_file))
+def isolated_user_manager():
+    """A fresh UserManager over this test's own database (see conftest.isolated_database)."""
     return auth.UserManager()
+
+
+def _empty_users_table():
+    """Remove every account, as on the very first start of an install."""
+    from sqlalchemy import delete
+
+    from db import engine, schema
+
+    with engine.transaction() as conn:
+        conn.execute(delete(schema.users))
 
 
 def test_admin_can_delete_default_admin_if_not_self(isolated_user_manager):
@@ -239,104 +252,110 @@ class TestUserModel:
 
 class TestUserManagerLoadSave:
 
-    def test_load_users_creates_default_admin_when_no_file(self, tmp_path, monkeypatch):
-        users_file = tmp_path / 'users.json'
-        monkeypatch.setattr(auth, 'USERS_FILE', str(users_file))
+    def test_load_users_creates_default_admin_when_table_empty(self):
+        _empty_users_table()
         manager = auth.UserManager()
         admin = manager.get_user_by_username(auth.DEFAULT_ADMIN_USERNAME)
         assert admin is not None
         assert admin.role == auth.ROLE_ADMIN
 
-    def test_load_users_reads_existing_file(self, tmp_path, monkeypatch):
-        users_file = tmp_path / 'users.json'
-        monkeypatch.setattr(auth, 'USERS_FILE', str(users_file))
-        # Create a manager (which creates default admin and saves)
+    def test_no_default_admin_while_legacy_users_file_waits(self, tmp_path, monkeypatch):
+        """A users.json not imported yet must never be shadowed by a fresh admin/admin."""
+        _empty_users_table()
+        monkeypatch.setenv('DATA_DIR', str(tmp_path))
+        (tmp_path / 'users.json').write_text('{}', encoding='utf-8')
+        manager = auth.UserManager()
+        assert manager.users == {}
+
+    def test_no_default_admin_in_maintenance_mode(self, monkeypatch):
+        _empty_users_table()
+        monkeypatch.setattr(auth.db_bootstrap, 'is_maintenance', lambda: True)
+        manager = auth.UserManager()
+        assert manager.users == {}
+
+    def test_load_users_reads_existing_rows(self):
         manager1 = auth.UserManager()
         manager1.create_user('bob', 'bob-pass', auth.ROLE_USER)
 
-        # Load fresh manager
         manager2 = auth.UserManager()
         assert manager2.get_user_by_username('bob') is not None
 
-    def test_load_users_handles_invalid_json(self, tmp_path, monkeypatch):
-        users_file = tmp_path / 'users.json'
-        users_file.write_text('{invalid json', encoding='utf-8')
-        monkeypatch.setattr(auth, 'USERS_FILE', str(users_file))
-        manager = auth.UserManager()
-        # Should silently fail and have empty users
-        assert manager.users == {}
+    def test_load_users_handles_invalid_row(self):
+        from db import users_store
 
-    def test_load_users_handles_invalid_data_structure(self, tmp_path, monkeypatch):
-        users_file = tmp_path / 'users.json'
-        # Valid JSON but wrong structure (missing required fields)
-        bad_data = {
-            'uid1': {
-                'user_id': 'uid1',
-                'username': 'bad',
-                # missing password_hash, role, created_at
-            }
-        }
-        users_file.write_text(json.dumps(bad_data), encoding='utf-8')
-        monkeypatch.setattr(auth, 'USERS_FILE', str(users_file))
+        # A row lacking password_hash/created_at fails validation
+        users_store.upsert_users([{'user_id': 'uid1', 'username': 'bad', 'role': 'user'}])
         manager = auth.UserManager()
         assert manager.users == {}
 
-    def test_save_users_atomic_write(self, isolated_user_manager, tmp_path):
-        manager = isolated_user_manager
-        manager.create_user('alice', 'alice-pass', auth.ROLE_USER)
-        # Ensure file saved
-        assert os.path.exists(auth.USERS_FILE)
+    def test_load_users_handles_invalid_role(self):
+        from db import users_store
 
-    def test_save_users_backup_cleaned_on_success(self, isolated_user_manager):
-        manager = isolated_user_manager
-        backup_path = auth.USERS_FILE + '.backup'
-        manager.create_user('alice', 'alice-pass', auth.ROLE_USER)
-        # Backup should be removed on success
-        assert not os.path.exists(backup_path)
+        users_store.upsert_users(
+            [{'user_id': 'uid1', 'username': 'bad', 'role': 'emperor', 'password_hash': 'x', 'created_at': 'now'}]
+        )
+        manager = auth.UserManager()
+        assert manager.users == {}
+
+    def test_save_users_persists_to_database(self, isolated_user_manager):
+        from db import users_store
+
+        alice = isolated_user_manager.create_user('alice', 'alice-pass', auth.ROLE_USER)
+        assert users_store.get_user(alice.user_id)['username'] == 'alice'
+
+    def test_save_users_writes_only_changed_users(self, isolated_user_manager, monkeypatch):
+        from db import users_store
+
+        alice = isolated_user_manager.create_user('alice', 'alice-pass', auth.ROLE_USER)
+        written = []
+        real_upsert = users_store.upsert_users
+
+        def _recording_upsert(users):
+            users = list(users)
+            written.extend(user['username'] for user in users)
+            real_upsert(users)
+
+        monkeypatch.setattr(users_store, 'upsert_users', _recording_upsert)
+        isolated_user_manager.update_user(alice.user_id, role=auth.ROLE_READ_ONLY)
+        assert written == ['alice']
+        written.clear()
+        isolated_user_manager.save_users()
+        assert written == []
 
 
 class TestUserManagerReloadIfChanged:
 
-    def test_reload_when_mtime_changes(self, tmp_path, monkeypatch):
-        users_file = tmp_path / 'users.json'
-        monkeypatch.setattr(auth, 'USERS_FILE', str(users_file))
+    def test_reload_when_another_worker_saves(self):
         manager = auth.UserManager()
-        # Manually create another user and rewrite the file externally
-        # Force different mtime by changing the mtime attribute
-        manager._users_mtime = 0  # pretend file is stale
-        # Next call should trigger reload
-        manager.get_user_by_username(auth.DEFAULT_ADMIN_USERNAME)
-        # Should have reloaded
-        assert manager._users_mtime != 0
+        other = auth.UserManager()
+        other.create_user('alice', 'alice-pass', auth.ROLE_USER)
+        assert manager.get_user_by_username('alice') is not None
 
-    def test_reload_clears_users_when_file_deleted(self, tmp_path, monkeypatch):
-        users_file = tmp_path / 'users.json'
-        monkeypatch.setattr(auth, 'USERS_FILE', str(users_file))
+    def test_reload_after_another_worker_deletes_a_user(self):
         manager = auth.UserManager()
-        # Add a user
-        manager.create_user('alice', 'alice-pass', auth.ROLE_USER)
-        assert len(manager.users) >= 2  # admin + alice
+        admin = manager.get_user_by_username(auth.DEFAULT_ADMIN_USERNAME)
+        alice = manager.create_user('alice', 'alice-pass', auth.ROLE_USER)
+        other = auth.UserManager()
+        other.delete_user(alice.user_id, current_user_id=admin.user_id)
+        assert manager.get_user_by_id(alice.user_id) is None
 
-        # Delete the file and reset mtime
-        os.remove(str(users_file))
-        manager._users_mtime = None
+    def test_invalidate_cache_forces_reload(self):
+        manager = auth.UserManager()
+        manager.users = {}
+        manager.invalidate_cache()
+        assert manager.get_user_by_username(auth.DEFAULT_ADMIN_USERNAME) is not None
 
-        manager._reload_users_if_changed()
-        # File gone → users cleared
-        assert manager.users == {}
+    def test_reload_handles_exception_gracefully(self, monkeypatch):
+        from db import users_store
 
-    def test_reload_handles_exception_gracefully(self, tmp_path, monkeypatch):
-        users_file = tmp_path / 'users.json'
-        monkeypatch.setattr(auth, 'USERS_FILE', str(users_file))
         manager = auth.UserManager()
 
-        # Make getmtime raise an exception
-        original_getmtime = os.path.getmtime
-        monkeypatch.setattr(os.path, 'getmtime', lambda p: (_ for _ in ()).throw(OSError('fail')))
+        def _boom():
+            raise OSError('fail')
+
+        monkeypatch.setattr(users_store, 'users_revision', _boom)
         # Should not raise
         manager._reload_users_if_changed()
-        # Restore
-        monkeypatch.setattr(os.path, 'getmtime', original_getmtime)
 
 
 class TestUserManagerCreate:
@@ -556,8 +575,7 @@ class TestUserManagerDeleteUser:
                 }
             ]
         }
-        astrodex_file = astrodex_dir / f'{user_id}_astrodex.json'
-        astrodex_file.write_text(json.dumps(astrodex_data), encoding='utf-8')
+        documents.put_document(user_id, 'astrodex', astrodex_data)
 
         # Create the image file
         img_file = images_dir / f'{user_id}_test.jpg'
@@ -569,8 +587,8 @@ class TestUserManagerDeleteUser:
 
         manager.delete_user(user_id, current_user_id=admin.user_id)
 
-        # Astrodex file should be deleted
-        assert not astrodex_file.exists()
+        # The astrodex went with the account
+        assert documents.get_document(user_id, 'astrodex') is None
 
     def test_delete_user_handles_astrodex_cleanup_failure_gracefully(self, isolated_user_manager, monkeypatch):
         manager = isolated_user_manager
@@ -581,9 +599,14 @@ class TestUserManagerDeleteUser:
         manager.delete_user(alice.user_id, current_user_id=admin.user_id)
         assert manager.get_user_by_id(alice.user_id) is None
 
-    def test_delete_user_removes_every_per_user_file(self, isolated_user_manager, monkeypatch, tmp_path):
-        """Right to erasure: equipment, sessions, attachments, plans, wishlist and astrodex
-        files of the deleted user all go, while another user's files stay untouched."""
+    def test_delete_user_removes_every_per_user_file(
+        self, isolated_user_manager, monkeypatch, tmp_path, enforce_foreign_keys
+    ):
+        """Right to erasure: every record (astrodex, equipment, sessions, plans, wishlist)
+        and every file (pictures, attachments) of the deleted user goes, while another
+        user's data stays untouched."""
+        from db import collections
+
         manager = isolated_user_manager
         admin = manager.get_user_by_username(auth.DEFAULT_ADMIN_USERNAME)
         alice = manager.create_user('alice', 'pass', auth.ROLE_USER)
@@ -592,34 +615,49 @@ class TestUserManagerDeleteUser:
         dirs = {
             'observation.astrodex.ASTRODEX_DIR': 'astrodex',
             'observation.astrodex.ASTRODEX_IMAGES_DIR': 'astrodex_images',
-            'equipment.equipment_profiles.EQUIPMENT_DIR': 'equipments',
             'observation.observation_sessions.OBSERVATION_SESSIONS_DIR': 'observation_sessions',
-            'observation.plan_my_night.PLAN_DIR': 'projects',
-            'observation.wishlist.WISHLIST_DIR': 'wishlist',
         }
         for target, name in dirs.items():
             (tmp_path / name).mkdir()
             monkeypatch.setattr(target, str(tmp_path / name))
         (tmp_path / 'observation_sessions' / 'attachments').mkdir()
 
-        suffixes = {
-            'astrodex': '_astrodex.json',
-            'astrodex_images': '_picture.jpg',
-            'equipments': '_telescopes.json',
-            'observation_sessions': '_sessions.json',
-            'observation_sessions/attachments': '_notes.txt',
-            'projects': '_plan_my_night.json',
-            'wishlist': '_wishlist.json',
+        records = {
+            'astrodex': {'items': [{'id': 'i', 'name': 'M 31', 'pictures': [{'id': 'p', 'filename': 'x.jpg'}]}]},
+            'equipment.telescopes': {'items': [{'id': 't', 'name': 'Scope'}]},
+            'equipment.combinations': {'items': [{'id': 'c', 'filter_ids': ['f']}]},
+            'observation_sessions': {
+                'sessions': [
+                    {
+                        'id': 's',
+                        'nights': [{'id': 'n', 'date': 'd'}],
+                        'entries': [{'id': 'e', 'night_id': 'n'}],
+                        'attachments': [{'id': 'a', 'filename': 'f.txt'}],
+                    }
+                ]
+            },
+            'wishlist': {'items': [{'id': 'w', 'name': 'M 42'}]},
         }
-        for folder, suffix in suffixes.items():
-            for user in (alice, bob):
-                (tmp_path / folder / f'{user.user_id}{suffix}').write_text('{}', encoding='utf-8')
+        for user in (alice, bob):
+            for kind, value in records.items():
+                documents.put_document(user.user_id, kind, value)
+            documents.put_document(user.user_id, 'plan', {'plan': {'entries': [{'id': 'e', 'name': 'M 1'}]}}, 'default')
+            (tmp_path / 'astrodex_images' / f'{user.user_id}_picture.jpg').write_bytes(b'jpeg')
+            (tmp_path / 'observation_sessions' / 'attachments' / f'{user.user_id}_notes.txt').write_text('n')
 
         manager.delete_user(alice.user_id, current_user_id=admin.user_id)
 
-        for folder, suffix in suffixes.items():
-            assert not (tmp_path / folder / f'{alice.user_id}{suffix}').exists(), folder
-            assert (tmp_path / folder / f'{bob.user_id}{suffix}').exists(), folder
+        for kind in records:
+            assert documents.get_document(alice.user_id, kind) is None, kind
+            assert documents.get_document(bob.user_id, kind) is not None, kind
+        assert documents.get_document(alice.user_id, 'plan', 'default') is None
+        with engine.read() as conn:
+            for table in collections.COLLECTION_TABLES:
+                owners = set(conn.execute(select(table.c.user_id)).scalars())
+                assert alice.user_id not in owners, table.name
+                assert bob.user_id in owners, table.name
+        assert not list(tmp_path.rglob(f'{alice.user_id}_*'))
+        assert len(list(tmp_path.rglob(f'{bob.user_id}_*'))) == 2
 
 
 class TestUserManagerPreferences:
@@ -734,31 +772,6 @@ class TestValidateUsersJsonData:
             }
         )
         assert is_valid
-
-
-class TestValidateUsersJsonFile:
-
-    def test_invalid_json_fails(self, tmp_path):
-        f = tmp_path / 'bad.json'
-        f.write_text('{invalid}', encoding='utf-8')
-        is_valid, msg = auth.UserManager.validate_users_json_file(str(f))
-        assert not is_valid
-        assert 'JSON' in msg
-
-    def test_file_not_found_fails(self, tmp_path):
-        is_valid, msg = auth.UserManager.validate_users_json_file(str(tmp_path / 'nonexistent.json'))
-        assert not is_valid
-
-    def test_valid_file_passes(self, tmp_path):
-        f = tmp_path / 'users.json'
-        f.write_text(json.dumps({}), encoding='utf-8')
-        is_valid, msg = auth.UserManager.validate_users_json_file(str(f))
-        assert is_valid
-
-
-# ===========================================================================
-# validate_user_preferences edge cases
-# ===========================================================================
 
 
 class TestValidateUserPreferences:
@@ -977,12 +990,8 @@ class TestAuthDecorators:
 
         flask_app.config['TESTING'] = True
 
-        # Use isolated users file
-        users_file = tmp_path / 'users.json'
-        monkeypatch.setattr(auth, 'USERS_FILE', str(users_file))
-        # Reset user manager state
-        auth.user_manager._users_mtime = None
-        auth.user_manager.users = {}
+        # Reset user manager state onto this test's database
+        auth.user_manager.invalidate_cache()
         auth.user_manager.load_users()
 
         return flask_app
@@ -1057,17 +1066,27 @@ class TestAuthDecorators:
 
 class TestSaveUsersFailurePaths:
 
-    def test_save_users_restores_backup_on_validation_failure(self, tmp_path, monkeypatch):
-        users_file = tmp_path / 'users.json'
-        monkeypatch.setattr(auth, 'USERS_FILE', str(users_file))
-        manager = auth.UserManager()
+    def test_save_users_rejects_invalid_data_and_keeps_database(self, isolated_user_manager):
+        from db import users_store
 
-        # Patch validate_users_json_file to fail, triggering backup restore
-        monkeypatch.setattr(auth.UserManager, 'validate_users_json_file', classmethod(lambda cls, fp: (False, 'fail')))
+        alice = isolated_user_manager.create_user('alice', 'pass', auth.ROLE_USER)
+        isolated_user_manager.users[alice.user_id].role = 'emperor'
 
-        # This should raise and restore backup
-        with pytest.raises(Exception):
-            manager.save_users()
+        with pytest.raises(ValueError):
+            isolated_user_manager.save_users()
+        assert users_store.get_user(alice.user_id)['role'] == auth.ROLE_USER
+
+    def test_database_error_rolls_back_the_whole_write(self, isolated_user_manager, monkeypatch):
+        """A failure inside a multi-step write leaves the table as it was."""
+        from db import users_store
+
+        def _fail(_users):
+            raise OSError('disk full')
+
+        monkeypatch.setattr(users_store, 'upsert_users', _fail)
+        with pytest.raises(OSError):
+            isolated_user_manager.create_user('alice', 'pass', auth.ROLE_USER)
+        assert all(u['username'] != 'alice' for u in users_store.get_all_users().values())
 
     def test_ensure_default_admin_does_not_duplicate(self, isolated_user_manager):
         manager = isolated_user_manager
@@ -1112,8 +1131,7 @@ class TestDeleteUserAstrodexCleanup:
                 }
             ]
         }
-        astrodex_file = astrodex_dir / f'{user_id}_astrodex.json'
-        astrodex_file.write_text(json.dumps(astrodex_data), encoding='utf-8')
+        documents.put_document(user_id, 'astrodex', astrodex_data)
 
         # Create the image files
         img_file = images_dir / valid_filename
@@ -1128,8 +1146,8 @@ class TestDeleteUserAstrodexCleanup:
 
         manager.delete_user(user_id, current_user_id=admin.user_id)
 
-        # Astrodex file should be deleted
-        assert not astrodex_file.exists()
+        # The astrodex went with the account
+        assert documents.get_document(user_id, 'astrodex') is None
         # Image files should be deleted
         assert not img_file.exists()
         assert not img_file2.exists()
@@ -1147,8 +1165,7 @@ class TestDeleteUserAstrodexCleanup:
         images_dir.mkdir()
 
         # Write invalid JSON to astrodex file
-        astrodex_file = astrodex_dir / f'{user_id}_astrodex.json'
-        astrodex_file.write_text('{invalid json', encoding='utf-8')
+        documents.put_document(user_id, 'astrodex', 'corrupt')
 
         monkeypatch.setattr('observation.astrodex.ASTRODEX_DIR', str(astrodex_dir))
         monkeypatch.setattr('observation.astrodex.ASTRODEX_IMAGES_DIR', str(images_dir))
@@ -1171,8 +1188,7 @@ class TestDeleteUserAstrodexCleanup:
 
         valid_filename = f'{user_id}_pic1.jpg'
         astrodex_data = {'items': [{'name': 'M42', 'pictures': [{'filename': valid_filename}]}]}
-        astrodex_file = astrodex_dir / f'{user_id}_astrodex.json'
-        astrodex_file.write_text(json.dumps(astrodex_data), encoding='utf-8')
+        documents.put_document(user_id, 'astrodex', astrodex_data)
 
         img_file = images_dir / valid_filename
         img_file.write_bytes(b'data')
@@ -1193,118 +1209,6 @@ class TestDeleteUserAstrodexCleanup:
 
         # Should not raise - failure should be silently logged
         manager.delete_user(user_id, current_user_id=admin.user_id)
-
-
-class TestSaveUsersCleanupPaths:
-    """Covers cleanup paths in save_users."""
-
-    def test_save_users_temp_file_removed_on_error(self, tmp_path, monkeypatch):
-        """Covers temp file cleanup after validation failure."""
-        users_file = tmp_path / 'users.json'
-        monkeypatch.setattr(auth, 'USERS_FILE', str(users_file))
-        manager = auth.UserManager()
-
-        # Make validate_users_json_file always fail
-        monkeypatch.setattr(
-            auth.UserManager, 'validate_users_json_file', classmethod(lambda cls, fp: (False, 'simulated failure'))
-        )
-
-        with pytest.raises(Exception):
-            manager.save_users()
-
-        # The temp file should not remain
-        assert not os.path.exists(str(users_file) + '.tmp')
-
-    def test_save_users_backup_removed_on_success(self, tmp_path, monkeypatch):
-        """Covers backup cleaned up after successful save."""
-        users_file = tmp_path / 'users.json'
-        monkeypatch.setattr(auth, 'USERS_FILE', str(users_file))
-        manager = auth.UserManager()
-
-        # Create a backup file that would normally be created and cleaned
-        backup_path = str(users_file) + '.backup'
-
-        # First create a valid file so a backup is made on next save
-        manager.create_user('alice', 'pass', auth.ROLE_USER)
-
-        # Backup should have been cleaned up
-        assert not os.path.exists(backup_path)
-
-    def test_save_users_restore_backup_on_error(self, tmp_path, monkeypatch):
-        """Covers backup restored when save fails."""
-        users_file = tmp_path / 'users.json'
-        monkeypatch.setattr(auth, 'USERS_FILE', str(users_file))
-        manager = auth.UserManager()
-
-        # Ensure file exists before we try to fail
-        manager.create_user('alice', 'pass', auth.ROLE_USER)
-        # Make validate always fail to trigger backup restore path
-        monkeypatch.setattr(
-            auth.UserManager, 'validate_users_json_file', classmethod(lambda cls, fp: (False, 'simulated failure'))
-        )
-
-        with pytest.raises(Exception):
-            manager.save_users()
-
-        # File should still exist (restored from backup)
-        assert users_file.exists()
-
-    def test_save_users_restore_replace_fails(self, tmp_path, monkeypatch):
-        """os.replace raises during backup restore."""
-        users_file = tmp_path / 'users.json'
-        monkeypatch.setattr(auth, 'USERS_FILE', str(users_file))
-        manager = auth.UserManager()
-        manager.create_user('alice', 'pass', auth.ROLE_USER)
-
-        monkeypatch.setattr(auth.UserManager, 'validate_users_json_file', classmethod(lambda cls, fp: (False, 'fail')))
-
-        def _fail_replace(src, dst):
-            raise OSError('replace denied')
-
-        monkeypatch.setattr(auth.os, 'replace', _fail_replace)
-        with pytest.raises(Exception):
-            manager.save_users()
-
-    def test_save_users_temp_remove_fails(self, tmp_path, monkeypatch):
-        """os.remove raises on temp file cleanup."""
-        users_file = tmp_path / 'users.json'
-        monkeypatch.setattr(auth, 'USERS_FILE', str(users_file))
-        manager = auth.UserManager()
-        manager.create_user('alice', 'pass', auth.ROLE_USER)
-
-        monkeypatch.setattr(auth.UserManager, 'validate_users_json_file', classmethod(lambda cls, fp: (False, 'fail')))
-
-        original_remove = auth.os.remove
-
-        def _fail_tmp_remove(path):
-            if str(path).endswith('.tmp'):
-                raise OSError('cannot remove tmp')
-            original_remove(path)
-
-        monkeypatch.setattr(auth.os, 'remove', _fail_tmp_remove)
-        with pytest.raises(Exception):
-            manager.save_users()
-
-    def test_save_users_backup_cleanup_fails_after_restore_failure(self, tmp_path, monkeypatch):
-        """: restore replace fails AND backup remove fails."""
-        users_file = tmp_path / 'users.json'
-        monkeypatch.setattr(auth, 'USERS_FILE', str(users_file))
-        manager = auth.UserManager()
-        manager.create_user('alice', 'pass', auth.ROLE_USER)
-
-        monkeypatch.setattr(auth.UserManager, 'validate_users_json_file', classmethod(lambda cls, fp: (False, 'fail')))
-
-        def _fail_replace(src, dst):
-            raise OSError('replace denied')
-
-        def _fail_backup_remove(path):
-            if str(path).endswith('.backup'):
-                raise OSError('cannot remove backup')
-
-        monkeypatch.setattr(auth.os, 'replace', _fail_replace)
-        monkeypatch.setattr(auth.os, 'remove', _fail_backup_remove)
-        with pytest.raises(Exception):
-            manager.save_users()
 
 
 class TestUserRequiredDecorator:
@@ -1618,8 +1522,7 @@ class TestDeleteUserImageTraversalGuard:
         # Create astrodex file with a picture filename
         valid_filename = f'{user_id}_pic1.jpg'
         astrodex_data = {'items': [{'name': 'M42', 'pictures': [{'filename': valid_filename}]}]}
-        astrodex_file = astrodex_dir / f'{user_id}_astrodex.json'
-        astrodex_file.write_text(json.dumps(astrodex_data), encoding='utf-8')
+        documents.put_document(user_id, 'astrodex', astrodex_data)
 
         monkeypatch.setattr('observation.astrodex.ASTRODEX_DIR', str(astrodex_dir))
         monkeypatch.setattr('observation.astrodex.ASTRODEX_IMAGES_DIR', str(images_dir))
@@ -1681,42 +1584,6 @@ class TestDeleteUserListdirRemoveFails:
 # ---------------------------------------------------------------------------
 
 
-class TestAuthSaveUsersMissingBranches:
-    """Cover save_users error-recovery branches not yet hit."""
-
-    def test_makedirs_fails_no_backup_no_temp(self, tmp_path, monkeypatch):
-        """makedirs fails -> backup_created=False, temp not created.
-
-        Patching the global os.makedirs (as an earlier version of this test did) actually
-        fails inside _exclusive_write()'s own interprocess_lock() first (it also calls
-        os.makedirs, for the lock file's directory, before save_users's body even starts),
-        so save_users's own try/except was never reached at all. Letting the first call
-        through (the lock's) and failing only from the second call onward isolates the
-        failure to save_users's own os.makedirs(os.path.dirname(USERS_FILE)) line.
-        """
-        from utils import auth
-
-        users_file = tmp_path / "users.json"
-        monkeypatch.setattr(auth, "USERS_FILE", str(users_file))
-        manager = auth.UserManager()  # first save succeeds normally; the directory now exists
-
-        calls = {"n": 0}
-        original_makedirs = os.makedirs
-
-        def _fail_from_second_call(path, *args, **kwargs):
-            calls["n"] += 1
-            if calls["n"] >= 2:
-                raise OSError("disk full")
-            return original_makedirs(path, *args, **kwargs)
-
-        monkeypatch.setattr(auth.os, "makedirs", _fail_from_second_call)
-
-        with pytest.raises(OSError):
-            manager.save_users()
-        # Both False branches taken: backup_created=False and temp never created
-        assert calls["n"] >= 2
-
-
 class TestAuthDeleteUserMissingBranches:
     """Cover delete_user image-cleanup branches not yet hit."""
 
@@ -1724,8 +1591,6 @@ class TestAuthDeleteUserMissingBranches:
     def setup_auth_manager(self, tmp_path, monkeypatch):
         from utils import auth
 
-        isolated_users = tmp_path / "users.json"
-        monkeypatch.setattr(auth, "USERS_FILE", str(isolated_users))
         manager = auth.UserManager()
         admin = manager.get_user_by_username(auth.DEFAULT_ADMIN_USERNAME)
         alice = manager.create_user("alice_cov3", "pass", auth.ROLE_USER)
@@ -1747,7 +1612,7 @@ class TestAuthDeleteUserMissingBranches:
 
         # Astrodex references an image that does NOT exist on disk
         astrodex_data = {"items": [{"name": "M42", "pictures": [{"filename": f"{user_id}_missing.jpg"}]}]}
-        (astrodex_dir / f"{user_id}_astrodex.json").write_text(json.dumps(astrodex_data), encoding="utf-8")
+        documents.put_document(user_id, 'astrodex', astrodex_data)
 
         # No actual image file → os.path.exists(file_path) is False
         manager.delete_user(user_id, current_user_id=admin.user_id)
@@ -1798,8 +1663,6 @@ class TestAuthDeleteUserMissingBranches:
 def test_auth_delete_user_cleans_up_astrodex_files_and_images(tmp_path, monkeypatch):
     from utils import auth
 
-    users_file = tmp_path / "users.json"
-    monkeypatch.setattr(auth, "USERS_FILE", str(users_file))
     manager = auth.UserManager()
     admin = manager.get_user_by_username(auth.DEFAULT_ADMIN_USERNAME)
     user = manager.create_user("cov_user", "pw", auth.ROLE_USER)
@@ -1819,7 +1682,7 @@ def test_auth_delete_user_cleans_up_astrodex_files_and_images(tmp_path, monkeypa
 
     manager.delete_user(user.user_id, current_user_id=admin.user_id)
     assert manager.get_user_by_id(user.user_id) is None
-    assert not (astrodex_dir / f"{user.user_id}_astrodex.json").exists()
+    assert documents.get_document(user.user_id, 'astrodex') is None
     assert not (images_dir / f"{user.user_id}_img.jpg").exists()
     assert not (images_dir / f"{user.user_id}_other.jpg").exists()
 
@@ -1834,8 +1697,6 @@ class TestAuthLocationEdgeArcs:
     def manager(self, tmp_path, monkeypatch):
         from utils import auth as auth_module
 
-        users_file = str(tmp_path / 'users.json')
-        monkeypatch.setattr(auth_module, 'USERS_FILE', users_file)
         manager = auth_module.UserManager()
         return manager
 
@@ -2188,12 +2049,12 @@ class TestUserManagerTotpLifecycle:
 
 
 # ---------------------------------------------------------------------------
-# users.json shared by several gunicorn workers (one UserManager per process)
+# One users table shared by several gunicorn workers (one UserManager per process)
 # ---------------------------------------------------------------------------
 
 
 def _second_worker():
-    """Another worker's UserManager: its own in-memory table over the same users.json."""
+    """Another worker's UserManager: its own in-memory copy of the same users table."""
     return auth.UserManager()
 
 
@@ -2242,35 +2103,31 @@ def test_authenticate_stamps_last_login_on_fresh_copy(isolated_user_manager):
     assert reread.preferences["language"] == "fr"
 
 
-def test_second_worker_does_not_create_a_second_default_admin(tmp_path, monkeypatch):
-    """Both workers start with no users.json; the one that loses the lock race must adopt the first admin."""
-    monkeypatch.setattr(auth, "USERS_FILE", str(tmp_path / "users.json"))
+def test_second_worker_does_not_create_a_second_default_admin():
+    """Both workers start on an empty table; the one that loses the race must adopt the first admin."""
+    from db import users_store
+
+    _empty_users_table()
     worker_a = auth.UserManager()
     worker_b = auth.UserManager.__new__(auth.UserManager)
     worker_b.users = {}
-    worker_b._users_mtime = None
+    worker_b._users_revision = None
+    worker_b._snapshot = {}
     worker_b._write_mutex = worker_a._write_mutex.__class__()
-    worker_b._write_depth = 0
 
-    worker_b.ensure_default_admin()  # its own view is empty, but the file already has an admin
+    worker_b.ensure_default_admin()  # its own view is empty, but the table already has an admin
 
-    admins = [u for u in json.load(open(auth.USERS_FILE)).values() if u["username"] == auth.DEFAULT_ADMIN_USERNAME]
+    admins = [u for u in users_store.get_all_users().values() if u["username"] == auth.DEFAULT_ADMIN_USERNAME]
     assert len(admins) == 1
 
 
-def test_users_write_lock_is_reentrant_and_takes_file_lock_once(isolated_user_manager, monkeypatch):
-    from contextlib import contextmanager
+def test_nested_users_writes_share_one_transaction(isolated_user_manager):
+    """A failure after a nested write rolls the nested write back too."""
+    from db import users_store
 
-    acquired = []
-
-    @contextmanager
-    def _recording_lock(path):
-        acquired.append(path)
-        yield
-
-    monkeypatch.setattr(auth, "interprocess_lock", _recording_lock)
-    with isolated_user_manager._exclusive_write():
+    with pytest.raises(RuntimeError):
         with isolated_user_manager._exclusive_write():
-            pass
-    assert acquired == [auth.USERS_FILE + ".lock"]
-    assert isolated_user_manager._write_depth == 0
+            isolated_user_manager.create_user("inner", "pw-123456", auth.ROLE_USER)
+            raise RuntimeError("outer step failed")
+    assert all(u["username"] != "inner" for u in users_store.get_all_users().values())
+    assert isolated_user_manager.get_user_by_username("inner") is None

@@ -469,6 +469,9 @@ function switchSubTab(parentTab, subtabName, options = {}) {
         case 'log-export':
             loadLogLevels();
             break; // Parameters tab
+        case 'backup-restore':
+            loadMigrationBackups();
+            break; // Parameters tab
         case 'connectors':
             loadConnectorsStore();
             break; // Parameters tab
@@ -607,6 +610,8 @@ function setupEventListeners() {
     // Backup / Restore
     document.getElementById('backup-download-btn')?.addEventListener('click', downloadBackup);
     document.getElementById('backup-restore-btn')?.addEventListener('click', restoreBackup);
+    document.getElementById('migration-backups-report-btn')?.addEventListener('click', downloadMigrationReport);
+    document.getElementById('migration-backups-delete-btn')?.addEventListener('click', deleteMigrationBackups);
     initRestoreFileInput();
 
     // Log Export

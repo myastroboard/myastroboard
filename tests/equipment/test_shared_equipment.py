@@ -3,7 +3,6 @@ Tests for Shared Equipment feature
 """
 
 import pytest
-import os
 import tempfile
 from unittest.mock import patch, MagicMock
 
@@ -22,7 +21,6 @@ USER_LIST = [
 def temp_data_dir(monkeypatch):
     with tempfile.TemporaryDirectory() as tmpdir:
         monkeypatch.setenv('DATA_DIR', tmpdir)
-        equipment_profiles.EQUIPMENT_DIR = os.path.join(tmpdir, 'equipments')
         yield tmpdir
 
 

@@ -88,6 +88,74 @@ backend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'backend
 sys.path.insert(0, backend_path)
 
 
+# ---------------------------------------------------------------------------
+# Database: every test runs on its own copy of a template database.
+#
+# The template is built here, at conftest import time - before the backend modules
+# are imported during collection, since some of them read the database on import
+# (utils.auth creates the default admin then). Whatever those imports write lands in
+# the template, so each test starts from the "freshly started app" state.
+# ---------------------------------------------------------------------------
+
+_TEMPLATE_DB_PATH = os.path.join(tempfile.mkdtemp(prefix='myastroboard_test_db_'), 'template.db')
+_template_db_bytes = None
+
+try:
+    from db import bootstrap as _db_bootstrap
+    from db import engine as _db_engine
+    from db import migrate as _db_migrate
+except ImportError:  # minimal CI jobs (changelog gate) run without the backend dependencies
+    _db_engine = None
+else:
+    _db_migrate.upgrade_to_head(_db_engine.configure_engine(f'sqlite:///{_TEMPLATE_DB_PATH}'))
+    # The legacy JSON import is exercised by its own tests, never against the shared temp root.
+    _db_bootstrap._ready = True
+
+
+def _template_db() -> bytes:
+    """The template database, checkpointed into a single file, read once."""
+    global _template_db_bytes
+    if _template_db_bytes is None:
+        assert _db_engine is not None
+        with _db_engine.get_engine().connect() as conn:
+            conn.exec_driver_sql('PRAGMA wal_checkpoint(TRUNCATE)')
+        _db_engine.configure_engine(f'sqlite:///{_TEMPLATE_DB_PATH}').dispose()
+        with open(_TEMPLATE_DB_PATH, 'rb') as handle:
+            _template_db_bytes = handle.read()
+    return _template_db_bytes
+
+
+@pytest.fixture(autouse=True)
+def isolated_database(tmp_path_factory):
+    """Point the engine at a fresh copy of the template database for this test.
+
+    Foreign keys are off here: most tests store documents for made-up user ids. Tests
+    about account deletion and its cascade use the ``enforce_foreign_keys`` fixture.
+    """
+    if _db_engine is None:
+        yield None
+        return
+    # Its own directory, not tmp_path: tests that inspect tmp_path must not find the database there
+    db_path = tmp_path_factory.mktemp('db') / 'myastroboard.db'
+    db_path.write_bytes(_template_db())
+    _db_engine.configure_engine(f'sqlite:///{db_path}', enforce_foreign_keys=False)
+    try:
+        from utils.auth import user_manager
+
+        user_manager.invalidate_cache()
+    except ImportError:
+        pass  # backend not importable in this CI job
+    yield str(db_path)
+    _db_engine.configure_engine(f'sqlite:///{_TEMPLATE_DB_PATH}').dispose()
+
+
+@pytest.fixture
+def enforce_foreign_keys(isolated_database):
+    """This test's database with foreign keys enforced, as in production."""
+    _db_engine.configure_engine(f'sqlite:///{isolated_database}', enforce_foreign_keys=True)
+    yield isolated_database
+
+
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_environment():
     """Set up test environment variables before any tests run"""
@@ -109,23 +177,6 @@ def setup_test_environment():
     shutil.rmtree(test_data_dir, ignore_errors=True)
     shutil.rmtree(test_output_dir, ignore_errors=True)
     shutil.rmtree(test_config_dir, ignore_errors=True)
-
-
-@pytest.fixture(autouse=True)
-def isolate_connector_secrets(tmp_path, monkeypatch):
-    """Point the connector-credentials sidecar at a per-test file.
-
-    The module binds its path to DATA_DIR at import time (the shared temp root - see
-    _clean_stale_test_state), so without this a credential saved by one test would be
-    listed, masked, by the next.
-    """
-    try:
-        from utils import connector_secrets
-    except ImportError:
-        yield
-        return
-    monkeypatch.setattr(connector_secrets, '_SECRETS_FILE', str(tmp_path / 'connectors_secrets.json'))
-    yield
 
 
 @pytest.fixture(autouse=True)

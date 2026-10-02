@@ -20,8 +20,8 @@ One module per connector on each side, named after it:
 | Blueprint | `blueprints/connectors.py` | `blueprints/connectors_allsky.py` | `blueprints/connectors_myastroshine.py` | `blueprints/connectors_mqtt.py` |
 | Tests | `tests/blueprints/test_connectors.py` | `tests/blueprints/test_connectors_allsky.py` | `tests/blueprints/test_connectors_myastroshine.py` | `tests/blueprints/test_connectors_mqtt.py`, `tests/connectors/test_mqtt_*.py` |
 
-Credentials of every connector (`SECRET_FIELDS`) live in `utils/connector_secrets.py`'s sidecar,
-not in `config.json` - see [Secrets](#secrets).
+Credentials of every connector (`SECRET_FIELDS`) live in `utils/connector_secrets.py`'s store,
+not in the configuration - see [Secrets](#secrets).
 
 `blueprints/connectors.py` serves the two routes every connector shares — the listing and the
 config save; a connector's own routes go in its own blueprint module, registered in
@@ -58,17 +58,17 @@ field blank unless the admin types a new value. The merge happens server-side in
 `POST /api/connectors/<name>/config` (admin only), so a value the browser was never given cannot
 be echoed back and overwrite the real one.
 
-Credentials never sit in `config.json` either (v1.6). They live in
-`data/connectors_secrets.json`, written by `utils/connector_secrets.py` (atomic, owner-only
-permissions) and deliberately absent from the backup ZIP and the config export - the same rule
-`secret_key.txt` and `vapid.json` already follow. Consequences:
+Credentials never sit in the configuration either (v1.6). They live in a separate database
+setting (`connectors_secrets`), written by `utils/connector_secrets.py` in one transaction, and
+deliberately absent from the backup ZIP and the config export - the same rule the session secret
+key and the VAPID keys already follow. Consequences:
 
 - a backup restored on a fresh host needs each connector's credentials re-entered once;
 - a connector is always constructed from `merge_secrets(name, config_block, cls.SECRET_FIELDS)`,
-  the config block overlaid with the sidecar (`blueprints/connectors.py`,
+  the config block overlaid with the stored secrets (`blueprints/connectors.py`,
   `observation/myastroshine_integration.get_integration_config`, `connectors/mqtt_publisher.py`);
 - an install upgraded from an earlier version is migrated at startup and on the first save:
-  values still found in `config.json` move to the sidecar and are stripped from the config.
+  values still found in the configuration move to the secrets store and are stripped from it.
 
 ### Target modules
 
@@ -100,7 +100,7 @@ Each connector card shows its current status badge (Enabled / Installed / Not in
 
 Under the description each card shows an **Appears in** row: one badge per app tab the connector feeds, or a *Standalone* badge when it feeds none.
 
-Configuration is stored in `config.json → connectors.<name>`, written by
+Configuration is stored in the configuration under `connectors.<name>`, written by
 `POST /api/connectors/<name>/config`.
 
 ### Base URL — use a static IP address
@@ -330,7 +330,7 @@ returns `True` - there is no external URL or credential, nothing to "install".
 
 **Per-user signing key**: rather than storing a secret per user, a stream URL embeds an
 HMAC-SHA256 token of the user id, keyed by a signing secret generated once on first use
-(`connectors_secrets.json`, never entered by an admin - same idea as the auto-generated VAPID
+(connector secrets store, never entered by an admin - same idea as the auto-generated VAPID
 keys). Verifying a request just recomputes the token. Rotating the secret (the card's **Rotate
 keys** action, `POST /api/connectors/astrodex_stream/rotate`) invalidates every URL at once - the
 only revocation mechanism.

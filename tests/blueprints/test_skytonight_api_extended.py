@@ -7,6 +7,8 @@ import types
 
 import pytest
 
+from db import documents
+
 if 'psutil' not in sys.modules:
     sys.modules['psutil'] = types.ModuleType('psutil')
 
@@ -475,9 +477,7 @@ class TestAdditionalSkytonightRouteBranches:
 class TestPreloadAllCurrentPlanEntries:
 
     def test_returns_empty_for_user_with_no_plans(self, monkeypatch, tmp_path):
-        from observation import plan_my_night as pmn
 
-        monkeypatch.setattr(pmn, 'PLAN_DIR', str(tmp_path))
         import uuid
 
         user_id = str(uuid.uuid4())
@@ -485,91 +485,62 @@ class TestPreloadAllCurrentPlanEntries:
         assert result == []
 
     def test_returns_entries_from_current_plan(self, monkeypatch, tmp_path):
-        from observation import plan_my_night as pmn
         import uuid
         from datetime import datetime, timezone, timedelta
 
-        monkeypatch.setattr(pmn, 'PLAN_DIR', str(tmp_path))
         user_id = str(uuid.uuid4())
         future = (datetime.now(timezone.utc) + timedelta(hours=5)).isoformat()
         entry = {'id': 'e1', 'name': 'M42', 'catalogue': 'Messier'}
-        plan_file = tmp_path / f'{user_id}_plan_my_night.json'
-        plan_file.write_text(
-            _json.dumps(
-                {
-                    'user_id': user_id,
-                    'plan': {'night_end': future, 'entries': [entry]},
-                }
-            )
+        documents.put_document(
+            user_id, 'plan', {'user_id': user_id, 'plan': {'night_end': future, 'entries': [entry]}}, 'default'
         )
         result = _preload_all_current_plan_entries(user_id, 'alice')
         assert len(result) == 1
         assert result[0]['id'] == 'e1'
 
     def test_skips_previous_plans(self, monkeypatch, tmp_path):
-        from observation import plan_my_night as pmn
         import uuid
         from datetime import datetime, timezone, timedelta
 
-        monkeypatch.setattr(pmn, 'PLAN_DIR', str(tmp_path))
         user_id = str(uuid.uuid4())
         past = (datetime.now(timezone.utc) - timedelta(hours=5)).isoformat()
         entry = {'id': 'e1', 'name': 'M31', 'catalogue': 'Messier'}
-        plan_file = tmp_path / f'{user_id}_plan_my_night.json'
-        plan_file.write_text(
-            _json.dumps(
-                {
-                    'user_id': user_id,
-                    'plan': {'night_end': past, 'entries': [entry]},
-                }
-            )
+        documents.put_document(
+            user_id, 'plan', {'user_id': user_id, 'plan': {'night_end': past, 'entries': [entry]}}, 'default'
         )
         result = _preload_all_current_plan_entries(user_id, 'alice')
         assert result == []
 
     def test_skips_plan_obj_not_dict(self, monkeypatch, tmp_path):
         """Covers plan_obj not a dict → continue."""
-        from observation import plan_my_night as pmn
         import uuid
 
-        monkeypatch.setattr(pmn, 'PLAN_DIR', str(tmp_path))
         user_id = str(uuid.uuid4())
-        plan_file = tmp_path / f'{user_id}_plan_my_night.json'
-        plan_file.write_text(_json.dumps({'user_id': user_id, 'plan': 'not_a_dict'}))
+        documents.put_document(user_id, 'plan', {'user_id': user_id, 'plan': 'not_a_dict'}, 'default')
         result = _preload_all_current_plan_entries(user_id, 'alice')
         assert result == []
 
     def test_exception_in_plan_load_is_silenced(self, monkeypatch, tmp_path):
         """Covers except Exception: pass and return all_entries."""
-        from observation import plan_my_night as pmn
         import uuid
 
-        monkeypatch.setattr(pmn, 'PLAN_DIR', str(tmp_path))
         user_id = str(uuid.uuid4())
         # Create a file that will cause an exception when loading
-        plan_file = tmp_path / f'{user_id}_plan_my_night.json'
-        plan_file.write_text('{invalid json')
+        documents.put_document(user_id, 'plan', 'corrupt', 'default')
         result = _preload_all_current_plan_entries(user_id, 'alice')
         assert result == []  # exception silenced, returns empty list
 
     def test_deduplicates_entries_across_combinations(self, monkeypatch, tmp_path):
-        from observation import plan_my_night as pmn
         import uuid
         from datetime import datetime, timezone, timedelta
 
-        monkeypatch.setattr(pmn, 'PLAN_DIR', str(tmp_path))
         user_id = str(uuid.uuid4())
         combo_id = str(uuid.uuid4())
         future = (datetime.now(timezone.utc) + timedelta(hours=5)).isoformat()
         entry = {'id': 'shared-entry', 'name': 'M42'}
-        for suffix in ['_plan_my_night.json', f'_plan_{combo_id}.json']:
-            (tmp_path / f'{user_id}{suffix}').write_text(
-                _json.dumps(
-                    {
-                        'user_id': user_id,
-                        'plan': {'night_end': future, 'entries': [entry]},
-                    }
-                )
+        for doc_key in ['default', combo_id]:
+            documents.put_document(
+                user_id, 'plan', {'user_id': user_id, 'plan': {'night_end': future, 'entries': [entry]}}, doc_key
             )
         result = _preload_all_current_plan_entries(user_id, 'alice')
         assert len(result) == 1
@@ -724,7 +695,7 @@ class TestSkytonightReportsRealBuilder:
             lambda *_a, **_k: {'deep_sky': [], 'bodies': [], 'comets': [], 'metadata': {}},
         )
         monkeypatch.setattr(_skytonight_api_mod.skytonight_targets, 'load_targets_dataset', lambda: [])
-        monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_all_plan_files', lambda uid: [])
+        monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'list_user_plan_combination_ids', lambda uid: [])
         resp = client_admin.get('/api/skytonight/reports')
         assert resp.status_code == 200
         data = resp.get_json()
@@ -738,7 +709,7 @@ class TestSkytonightReportsRealBuilder:
             lambda *_a, **_k: {'deep_sky': [], 'bodies': [], 'comets': [], 'metadata': {}},
         )
         monkeypatch.setattr(_skytonight_api_mod.skytonight_targets, 'load_targets_dataset', lambda: [])
-        monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_all_plan_files', lambda uid: [])
+        monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'list_user_plan_combination_ids', lambda uid: [])
         resp = client_admin.get('/api/skytonight/reports/Messier')
         assert resp.status_code == 200
 
@@ -1464,7 +1435,7 @@ class TestBuildBodiesSectionPayload:
         monkeypatch.setattr(_skytonight_api_mod, 'load_json_file', lambda *a, **k: bodies_data)
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'})
         monkeypatch.setattr(_skytonight_api_mod.astrodex, 'load_user_astrodex', lambda u: {'items': []})
-        monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_all_plan_files', lambda uid: [])
+        monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'list_user_plan_combination_ids', lambda uid: [])
         monkeypatch.setattr(_skytonight_api_mod.astrodex, 'is_item_in_preloaded_astrodex', lambda *a, **k: False)
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'is_target_in_entries', lambda *a, **k: False)
         monkeypatch.setattr(_skytonight_api_mod.skytonight_targets, 'get_lookup_entry', lambda c, n: None)
@@ -1494,7 +1465,7 @@ class TestBuildBodiesSectionPayload:
         monkeypatch.setattr(_skytonight_api_mod, 'load_json_file', lambda *a, **k: bodies_data)
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'})
         monkeypatch.setattr(_skytonight_api_mod.astrodex, 'load_user_astrodex', lambda u: {'items': []})
-        monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_all_plan_files', lambda uid: [])
+        monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'list_user_plan_combination_ids', lambda uid: [])
         monkeypatch.setattr(_skytonight_api_mod.astrodex, 'is_item_in_preloaded_astrodex', lambda *a, **k: False)
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'is_target_in_entries', lambda *a, **k: False)
         monkeypatch.setattr(_skytonight_api_mod.skytonight_targets, 'get_lookup_entry', lambda c, n: None)
@@ -1524,7 +1495,7 @@ class TestBuildBodiesSectionPayload:
         )
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'})
         monkeypatch.setattr(_skytonight_api_mod.astrodex, 'load_user_astrodex', lambda u: {'items': []})
-        monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_all_plan_files', lambda uid: [])
+        monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'list_user_plan_combination_ids', lambda uid: [])
         monkeypatch.setattr(_skytonight_api_mod.astrodex, 'is_item_in_preloaded_astrodex', lambda *a, **k: False)
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'is_target_in_entries', lambda *a, **k: False)
         monkeypatch.setattr(_skytonight_api_mod.skytonight_targets, 'get_lookup_entry', lambda c, n: None)
@@ -1539,7 +1510,7 @@ class TestBuildBodiesSectionPayload:
         monkeypatch.setattr(_skytonight_api_mod.skytonight_targets, 'load_targets_dataset', lambda: [])
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'})
         monkeypatch.setattr(_skytonight_api_mod.astrodex, 'load_user_astrodex', lambda u: {'items': []})
-        monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_all_plan_files', lambda uid: [])
+        monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'list_user_plan_combination_ids', lambda uid: [])
 
         result = _build_bodies_section_payload('uid-1', 'alice')
         assert result['bodies'] == []
@@ -1587,7 +1558,7 @@ class TestBuildCometsSectionPayload:
         monkeypatch.setattr(_skytonight_api_mod, 'load_json_file', lambda *a, **k: comets_data)
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'})
         monkeypatch.setattr(_skytonight_api_mod.astrodex, 'load_user_astrodex', lambda u: {'items': []})
-        monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_all_plan_files', lambda uid: [])
+        monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'list_user_plan_combination_ids', lambda uid: [])
         monkeypatch.setattr(_skytonight_api_mod.astrodex, 'is_item_in_preloaded_astrodex', lambda *a, **k: False)
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'is_target_in_entries', lambda *a, **k: False)
         monkeypatch.setattr(_skytonight_api_mod.skytonight_targets, 'get_lookup_entry', lambda c, n: None)
@@ -1620,7 +1591,7 @@ class TestBuildCometsSectionPayload:
         monkeypatch.setattr(_skytonight_api_mod, 'load_json_file', lambda *a, **k: comets_data)
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'})
         monkeypatch.setattr(_skytonight_api_mod.astrodex, 'load_user_astrodex', lambda u: {'items': []})
-        monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_all_plan_files', lambda uid: [])
+        monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'list_user_plan_combination_ids', lambda uid: [])
         monkeypatch.setattr(_skytonight_api_mod.astrodex, 'is_item_in_preloaded_astrodex', lambda *a, **k: False)
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'is_target_in_entries', lambda *a, **k: False)
         monkeypatch.setattr(_skytonight_api_mod.skytonight_targets, 'get_lookup_entry', lambda c, n: None)
@@ -1651,7 +1622,7 @@ class TestBuildCometsSectionPayload:
         )
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'})
         monkeypatch.setattr(_skytonight_api_mod.astrodex, 'load_user_astrodex', lambda u: {'items': []})
-        monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_all_plan_files', lambda uid: [])
+        monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'list_user_plan_combination_ids', lambda uid: [])
         monkeypatch.setattr(_skytonight_api_mod.astrodex, 'is_item_in_preloaded_astrodex', lambda *a, **k: False)
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'is_target_in_entries', lambda *a, **k: False)
         monkeypatch.setattr(_skytonight_api_mod.skytonight_targets, 'get_lookup_entry', lambda c, n: None)
@@ -1680,7 +1651,7 @@ class TestBuildCometsSectionPayload:
         )
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'})
         monkeypatch.setattr(_skytonight_api_mod.astrodex, 'load_user_astrodex', lambda u: {'items': []})
-        monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_all_plan_files', lambda uid: [])
+        monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'list_user_plan_combination_ids', lambda uid: [])
         monkeypatch.setattr(_skytonight_api_mod.astrodex, 'is_item_in_preloaded_astrodex', lambda *a, **k: False)
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'is_target_in_entries', lambda *a, **k: False)
         monkeypatch.setattr(_skytonight_api_mod.skytonight_targets, 'get_lookup_entry', lambda c, n: None)
@@ -1727,7 +1698,7 @@ class TestBuildDsoSectionPayload:
         monkeypatch.setattr(_skytonight_api_mod, 'load_json_file', lambda *a, **k: dso_data)
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'})
         monkeypatch.setattr(_skytonight_api_mod.astrodex, 'load_user_astrodex', lambda u: {'items': []})
-        monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_all_plan_files', lambda uid: [])
+        monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'list_user_plan_combination_ids', lambda uid: [])
         monkeypatch.setattr(_skytonight_api_mod.astrodex, 'is_item_in_preloaded_astrodex', lambda *a, **k: False)
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'is_target_in_entries', lambda *a, **k: False)
         monkeypatch.setattr(_skytonight_api_mod.skytonight_targets, 'get_lookup_entry', lambda c, n: None)
@@ -1762,7 +1733,7 @@ class TestBuildDsoSectionPayload:
         monkeypatch.setattr(_skytonight_api_mod, 'load_json_file', lambda *a, **k: dso_data)
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'})
         monkeypatch.setattr(_skytonight_api_mod.astrodex, 'load_user_astrodex', lambda u: {'items': []})
-        monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_all_plan_files', lambda uid: [])
+        monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'list_user_plan_combination_ids', lambda uid: [])
         monkeypatch.setattr(_skytonight_api_mod.astrodex, 'is_item_in_preloaded_astrodex', lambda *a, **k: False)
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'is_target_in_entries', lambda *a, **k: False)
         monkeypatch.setattr(_skytonight_api_mod.skytonight_targets, 'get_lookup_entry', lambda c, n: None)
@@ -1792,7 +1763,7 @@ class TestBuildDsoSectionPayload:
         monkeypatch.setattr(_skytonight_api_mod, 'load_json_file', lambda *a, **k: dso_data)
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'})
         monkeypatch.setattr(_skytonight_api_mod.astrodex, 'load_user_astrodex', lambda u: {'items': []})
-        monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_all_plan_files', lambda uid: [])
+        monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'list_user_plan_combination_ids', lambda uid: [])
         monkeypatch.setattr(_skytonight_api_mod.os.path, 'isfile', lambda p: False)
 
         result = _build_dso_section_payload('OpenNGC', 'uid-1', 'alice')
@@ -1821,7 +1792,7 @@ class TestBuildDsoSectionPayload:
         )
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'})
         monkeypatch.setattr(_skytonight_api_mod.astrodex, 'load_user_astrodex', lambda u: {'items': []})
-        monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_all_plan_files', lambda uid: [])
+        monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'list_user_plan_combination_ids', lambda uid: [])
         monkeypatch.setattr(_skytonight_api_mod.astrodex, 'is_item_in_preloaded_astrodex', lambda *a, **k: False)
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'is_target_in_entries', lambda *a, **k: False)
         monkeypatch.setattr(_skytonight_api_mod.skytonight_targets, 'get_lookup_entry', lambda c, n: None)
@@ -1853,7 +1824,7 @@ class TestBuildDsoSectionPayload:
         )
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'})
         monkeypatch.setattr(_skytonight_api_mod.astrodex, 'load_user_astrodex', lambda u: {'items': []})
-        monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_all_plan_files', lambda uid: [])
+        monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'list_user_plan_combination_ids', lambda uid: [])
         monkeypatch.setattr(_skytonight_api_mod.skytonight_targets, 'normalize_object_name', lambda n: n)
 
         # No catalogue → skip_deep_sky_annotations=True in fallback
@@ -1885,7 +1856,7 @@ class TestBuildDsoSectionPayload:
         )
         monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_plan_with_timeline', lambda u, n: {'state': 'none'})
         monkeypatch.setattr(_skytonight_api_mod.astrodex, 'load_user_astrodex', lambda u: {'items': []})
-        monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'get_all_plan_files', lambda uid: [])
+        monkeypatch.setattr(_skytonight_api_mod.plan_my_night, 'list_user_plan_combination_ids', lambda uid: [])
 
         # Filter by Messier - NGC 891 has no Messier entry → excluded
         result = _build_dso_section_payload('Messier', 'uid-1', 'alice')

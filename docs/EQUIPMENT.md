@@ -17,7 +17,7 @@ The **Equipment** tab lets you catalogue all your astronomy gear. Profiles pre-f
 | **Accessory** | Accessories | Field flattener, focuser, filter wheel, etc. |
 | **Combination** | Combinations | Named set of telescope + camera + mount + filters + accessories |
 
-Data is stored per-user in `data/equipments/<user_id>_<type>.json`.
+Data is stored in the database: `equipment_items` (one row per telescope, camera, mount, filter or accessory), `equipment_combinations` and `combination_equipment` (the filters and accessories of each combination); `equipments/<user_id>_<type>.json` inside a backup ZIP.
 
 ---
 
