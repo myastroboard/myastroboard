@@ -1108,3 +1108,32 @@ class TestPersonalDataExport:
         monkeypatch.setattr(auth_bp_mod, 'build_user_export', _boom)
         assert client_admin.get(f'/api/users/{user.user_id}/export').status_code == 500
         assert client_admin.get('/api/users/me/export').status_code == 500
+
+
+class TestSessionOfAMissingAccount:
+    """A session whose account is gone (deleted, or replaced by a backup restore) is dropped.
+
+    Keeping it made / and /login redirect to each other forever.
+    """
+
+    @pytest.fixture
+    def stale_client(self, client, security_settings, make_user):
+        user, password, _ = make_user()
+        login(client, user.username, password)
+        user_manager.delete_user(user.user_id)
+        return client
+
+    def test_login_page_is_served(self, stale_client):
+        assert stale_client.get('/login').status_code == 200
+        with stale_client.session_transaction() as sess:
+            assert 'username' not in sess
+
+    def test_dashboard_redirects_to_login(self, stale_client):
+        response = stale_client.get('/')
+        assert response.status_code == 302 and response.headers['Location'].endswith('/login')
+        assert stale_client.get('/login').status_code == 200
+
+    def test_status_reports_signed_out_and_clears_the_session(self, stale_client):
+        assert stale_client.get('/api/auth/status').get_json() == {'authenticated': False}
+        with stale_client.session_transaction() as sess:
+            assert 'username' not in sess

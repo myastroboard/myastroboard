@@ -277,10 +277,25 @@ def set_cache_headers(response):
     return response
 
 
+def _session_user():
+    """The signed-in user; a session whose account no longer exists is cleared.
+
+    Such a session (account deleted, or replaced by a backup restore) would otherwise
+    bounce between / and /login forever: the page redirects on "not authenticated"
+    while /login sees a session and redirects back.
+    """
+    if 'username' not in session:
+        return None
+    user = get_current_user()
+    if user is None:
+        session.clear()
+    return user
+
+
 @app.route('/')
 def index():
     """Render main dashboard or redirect to login"""
-    if 'username' not in session:
+    if not _session_user():
         return redirect(url_for('login_page'))
 
     # Get version for cache busting
@@ -292,7 +307,7 @@ def index():
 @app.route('/login')
 def login_page():
     """Render login page - redirect to dashboard if already authenticated"""
-    if 'username' in session:
+    if _session_user():
         return redirect(url_for('index'))
     # Get version for cache busting
     version = get_repo_version()
