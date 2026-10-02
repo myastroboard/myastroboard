@@ -44,10 +44,6 @@ _DOCUMENT_FOLDER_KINDS = {
 }
 
 
-class BackupArchiveError(ValueError):
-    """The uploaded archive cannot be restored; nothing was changed."""
-
-
 def _binary_dirs() -> Dict[str, str]:
     """Archive folder -> directory of the binary files shipped in the backup."""
     from observation import astrodex, observation_sessions
@@ -109,6 +105,8 @@ class RestorePlan:
     documents: Dict[str, List[Tuple[str, str, str, Dict[str, Any]]]] = field(default_factory=dict)
     # archive folder -> [(zip member, sanitized relative parts)]
     binaries: Dict[str, List[Tuple[zipfile.ZipInfo, List[str]]]] = field(default_factory=dict)
+    # Why the archive cannot be restored (shown to the admin); nothing is written when set
+    error: Optional[str] = None
 
     @property
     def empty(self) -> bool:
@@ -121,15 +119,31 @@ class RestoreReport:
     skipped: List[str] = field(default_factory=list)
 
 
-def _load_json_member(archive: zipfile.ZipFile, info: zipfile.ZipInfo, name: str) -> Any:
+# Returned by _load_json_member for a member that cannot be read or parsed
+_UNREADABLE = object()
+
+
+def _load_json_member(archive: zipfile.ZipFile, info: zipfile.ZipInfo) -> Any:
     try:
         return json.loads(archive.read(info).decode('utf-8-sig'))
-    except Exception as error:
-        raise BackupArchiveError(f'{name} is not valid JSON - archive may be corrupt') from error
+    except Exception:
+        return _UNREADABLE
+
+
+def _object_member_error(name: str, value: Any) -> Optional[str]:
+    if value is _UNREADABLE:
+        return f'{name} is not valid JSON - archive may be corrupt'
+    if not isinstance(value, dict):
+        return f'{name} is not a JSON object - archive may be corrupt'
+    return None
 
 
 def plan_restore(archive: zipfile.ZipFile) -> RestorePlan:
-    """Parse and validate every recognised member (no write). Unknown members are ignored."""
+    """Parse and validate every recognised member (no write). Unknown members are ignored.
+
+    An archive that cannot be restored comes back with ``error`` set (a message written
+    here, never an exception's text, as it is shown to the admin).
+    """
     from werkzeug.utils import secure_filename
 
     from utils.auth import UserManager
@@ -141,16 +155,21 @@ def plan_restore(archive: zipfile.ZipFile) -> RestorePlan:
         if name.endswith('/'):
             continue
         if name in _SETTING_FILES:
-            value = _load_json_member(archive, info, name)
-            if not isinstance(value, dict):
-                raise BackupArchiveError(f'{name} is not a JSON object - archive may be corrupt')
+            value = _load_json_member(archive, info)
+            plan.error = _object_member_error(name, value)
+            if plan.error:
+                return plan
             plan.settings[_SETTING_FILES[name]] = value
             continue
         if name == _USERS_FILE:
-            users = _load_json_member(archive, info, name)
+            users = _load_json_member(archive, info)
+            if users is _UNREADABLE:
+                plan.error = f'{name} is not valid JSON - archive may be corrupt'
+                return plan
             is_valid, error = UserManager.validate_users_json_data(users)
             if not is_valid:
-                raise BackupArchiveError(f'users.json is invalid: {error}')
+                plan.error = f'users.json is invalid: {error}'
+                return plan
             plan.users = users
             continue
         folder = next((f for f in binary_folders if name.startswith(f + '/')), None)
@@ -166,9 +185,10 @@ def plan_restore(archive: zipfile.ZipFile) -> RestorePlan:
         top = name.split('/', 1)[0]
         if top not in _DOCUMENT_FOLDER_KINDS or kind not in _DOCUMENT_FOLDER_KINDS[top]:
             continue  # e.g. plans: never part of a backup
-        data = _load_json_member(archive, info, name)
-        if not isinstance(data, dict):
-            raise BackupArchiveError(f'{name} is not a JSON object - archive may be corrupt')
+        data = _load_json_member(archive, info)
+        plan.error = _object_member_error(name, data)
+        if plan.error:
+            return plan
         plan.documents.setdefault(top, []).append((kind, user_id, doc_key, data))
     # A folder seen only through its binary files still replaces its documents (1.6 cleared
     # the whole directory): an archive with astrodex pictures but no astrodex JSON empties it.
