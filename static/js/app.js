@@ -724,7 +724,7 @@ async function checkForUpdates() {
 
         // Show notification if update is available and semver confirms it.
         if (updateInfo.update_available && updateInfo.release_url && isActuallyNewer) {
-            showUpdateNotification(updateInfo.release_url, updateInfo.latest_version);
+            showUpdateNotification(updateInfo);
         }
     } catch (error) {
         // Silently fail - update checks are not critical
@@ -752,19 +752,240 @@ function isVersionNewer(currentVersion, latestVersion) {
     return false;
 }
 
-function showUpdateNotification(releaseUrl, version) {
+// Last update-check payload shown in the footer, kept so the what's-new modal can be (re)built
+// on click and on language change.
+let latestUpdateInfo = null;
+
+function showUpdateNotification(updateInfo) {
     const notification = document.getElementById('update-notification');
-    const link = document.getElementById('update-link');
-    
-    if (notification && link) {
-        link.href = releaseUrl;
-        link.textContent = i18n.t('common.update_version_link', { version });
-        notification.style.display = 'block';
-        //console.debug(`Update notification shown for version v${version}`);
-    } else {
+    const text = document.getElementById('update-text');
+    const button = document.getElementById('update-whats-new-btn');
+
+    if (!notification || !text || !button) {
         console.warn('Update notification elements not found in DOM');
-        if (!notification) console.warn('Missing element: update-notification');
-        if (!link) console.warn('Missing element: update-link');
+        return;
+    }
+    latestUpdateInfo = updateInfo;
+    text.textContent = i18n.t('whats_new.footer_available', { version: updateInfo.latest_version });
+    if (!button.dataset.bound) {
+        button.dataset.bound = '1';
+        button.addEventListener('click', openWhatsNewModal);
+    }
+    notification.style.display = 'block';
+}
+
+window.addEventListener('i18nLanguageChanged', () => {
+    if (!latestUpdateInfo) return;
+    const text = document.getElementById('update-text');
+    if (text) text.textContent = i18n.t('whats_new.footer_available', { version: latestUpdateInfo.latest_version });
+    const modal = document.getElementById('whats-new-modal');
+    if (modal && modal.classList.contains('show')) renderWhatsNew(latestUpdateInfo);
+});
+
+function openWhatsNewModal() {
+    if (!latestUpdateInfo) return;
+    renderWhatsNew(latestUpdateInfo);
+    openModal('whats-new-modal');
+}
+
+/**
+ * Append a changelog entry (one markdown line) to `parent` as DOM nodes.
+ * Only the inline subset the changelog uses is rendered: `code`, **strong**, *em* and
+ * [text](https://...) links; everything else stays plain text.
+ */
+function appendChangelogMarkdown(parent, markdown) {
+    const pattern = /`([^`]+)`|\[([^\]]+)\]\((https:\/\/[^)\s]+)\)|\*\*([^*]+)\*\*|\*([^*]+)\*/g;
+    let last = 0;
+    let match;
+    while ((match = pattern.exec(markdown)) !== null) {
+        if (match.index > last) parent.appendChild(document.createTextNode(markdown.slice(last, match.index)));
+        let node;
+        if (match[1] !== undefined) {
+            node = document.createElement('code');
+            node.textContent = match[1];
+        } else if (match[2] !== undefined) {
+            node = document.createElement('a');
+            node.href = match[3];
+            node.target = '_blank';
+            node.rel = 'noopener noreferrer';
+            node.textContent = match[2];
+        } else if (match[4] !== undefined) {
+            node = document.createElement('strong');
+            node.textContent = match[4];
+        } else {
+            node = document.createElement('em');
+            node.textContent = match[5];
+        }
+        parent.appendChild(node);
+        last = pattern.lastIndex;
+    }
+    if (last < markdown.length) parent.appendChild(document.createTextNode(markdown.slice(last)));
+}
+
+function _whatsNewIcon(name) {
+    const icon = document.createElement('i');
+    icon.className = `bi ${name}`;
+    icon.setAttribute('aria-hidden', 'true');
+    return icon;
+}
+
+function _whatsNewBadge(className, text) {
+    const badge = document.createElement('span');
+    badge.className = `badge ${className}`;
+    badge.textContent = text;
+    return badge;
+}
+
+function _whatsNewList(entries, suffixFn) {
+    const list = document.createElement('ul');
+    list.className = 'whats-new-list';
+    entries.forEach((entry) => {
+        const item = document.createElement('li');
+        appendChangelogMarkdown(item, entry.text ?? entry);
+        const suffix = suffixFn ? suffixFn(entry) : '';
+        if (suffix) {
+            const span = document.createElement('span');
+            span.className = 'opacity-75';
+            span.textContent = ` (${suffix})`;
+            item.appendChild(span);
+        }
+        list.appendChild(item);
+    });
+    return list;
+}
+
+function _whatsNewGroup(className, iconName, titleKey, entries) {
+    const group = document.createElement('div');
+    const title = document.createElement('div');
+    title.className = `whats-new-group-title ${className}`;
+    title.appendChild(_whatsNewIcon(iconName));
+    title.appendChild(document.createTextNode(i18n.t(titleKey)));
+    group.appendChild(title);
+    group.appendChild(_whatsNewList(entries));
+    return group;
+}
+
+function _formatReleaseDate(isoDate) {
+    if (!isoDate) return '';
+    const date = new Date(`${isoDate}T00:00:00Z`);
+    if (Number.isNaN(date.getTime())) return isoDate;
+    return new Intl.DateTimeFormat(i18n.getHtmlLang(), {
+        day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC',
+    }).format(date);
+}
+
+function renderWhatsNew(updateInfo) {
+    const range = document.getElementById('whats-new-range');
+    const body = document.getElementById('whats-new-modal-body');
+    const releaseLink = document.getElementById('whats-new-release-link');
+    if (!range || !body) return;
+
+    const releases = Array.isArray(updateInfo.changes) ? updateInfo.changes : null;
+    if (releaseLink && updateInfo.release_url) releaseLink.href = updateInfo.release_url;
+
+    DOMUtils.clear(range);
+    range.appendChild(_whatsNewBadge('text-bg-secondary', `v${updateInfo.current_version}`));
+    range.appendChild(_whatsNewIcon('bi-arrow-right'));
+    range.appendChild(_whatsNewBadge('text-bg-primary', `v${updateInfo.latest_version}`));
+    if (releases && releases.length) {
+        const count = document.createElement('span');
+        count.className = 'whats-new-range-count';
+        count.textContent = releases.length > 1
+            ? i18n.t('whats_new.version_count', { count: releases.length })
+            : i18n.t('whats_new.version_count_one');
+        range.appendChild(count);
+    }
+
+    DOMUtils.clear(body);
+    if (!releases || !releases.length) {
+        // Changelog could not be fetched: the footer link to the GitHub release is all we have
+        const message = document.createElement('p');
+        message.className = 'mb-2';
+        message.textContent = i18n.t('whats_new.unavailable');
+        const hint = document.createElement('p');
+        hint.className = 'mb-0 small opacity-75';
+        hint.textContent = i18n.t('whats_new.unavailable_hint', { version: updateInfo.latest_version });
+        body.append(message, hint);
+    } else {
+        // Breaking changes of every skipped release are gathered on top: the reason to read this first
+        const breaking = [];
+        releases.forEach((release) => {
+            (release.breaking || []).forEach((text) => breaking.push({ text, version: release.version }));
+        });
+        if (breaking.length) {
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-warning whats-new-breaking mb-3';
+            alert.setAttribute('role', 'alert');
+            const title = document.createElement('strong');
+            title.appendChild(_whatsNewIcon('bi-exclamation-triangle-fill'));
+            title.appendChild(document.createTextNode(` ${i18n.t('whats_new.breaking_title')}`));
+            alert.appendChild(title);
+            alert.appendChild(_whatsNewList(breaking, (entry) => (releases.length > 1 ? `v${entry.version}` : '')));
+            body.appendChild(alert);
+        }
+
+        releases.forEach((release, index) => {
+            const details = document.createElement('details');
+            details.className = 'whats-new-release';
+            details.open = index === 0;
+
+            const summary = document.createElement('summary');
+            const version = document.createElement('span');
+            version.className = 'whats-new-version';
+            version.textContent = `v${release.version}`;
+            summary.appendChild(version);
+            if (release.date) {
+                const date = document.createElement('span');
+                date.className = 'whats-new-date';
+                date.textContent = _formatReleaseDate(release.date);
+                summary.appendChild(date);
+            }
+            if (index === 0) summary.appendChild(_whatsNewBadge('text-bg-primary', i18n.t('whats_new.latest')));
+
+            const counts = document.createElement('span');
+            counts.className = 'whats-new-counts';
+            const features = release.features || [];
+            const fixes = release.fixes || [];
+            if (features.length) {
+                const badge = _whatsNewBadge('rounded-pill text-bg-success', '');
+                badge.append(_whatsNewIcon('bi-plus-circle'), ` ${features.length}`);
+                badge.title = i18n.t('whats_new.features');
+                counts.appendChild(badge);
+            }
+            if (fixes.length) {
+                const badge = _whatsNewBadge('rounded-pill text-bg-info', '');
+                badge.append(_whatsNewIcon('bi-wrench-adjustable'), ` ${fixes.length}`);
+                badge.title = i18n.t('whats_new.fixes');
+                counts.appendChild(badge);
+            }
+            if ((release.breaking || []).length) {
+                counts.appendChild(_whatsNewBadge('rounded-pill text-bg-danger', i18n.t('whats_new.breaking_badge')));
+            }
+            summary.appendChild(counts);
+            details.appendChild(summary);
+
+            const content = document.createElement('div');
+            content.className = 'whats-new-release-body';
+            if (features.length) content.appendChild(_whatsNewGroup('is-feature', 'bi-plus-circle', 'whats_new.features', features));
+            if (fixes.length) content.appendChild(_whatsNewGroup('is-fix', 'bi-wrench-adjustable', 'whats_new.fixes', fixes));
+            details.appendChild(content);
+            body.appendChild(details);
+        });
+    }
+
+    // Only an admin can act on an update
+    if (currentUser?.role === 'admin') {
+        const howto = document.createElement('div');
+        howto.className = 'whats-new-howto';
+        howto.appendChild(_whatsNewIcon('bi-arrow-repeat'));
+        const text = document.createElement('span');
+        const label = document.createElement('strong');
+        label.textContent = i18n.t('whats_new.how_to_update');
+        const command = document.createElement('code');
+        command.textContent = 'docker compose pull && docker compose up -d';
+        text.append(label, ' ', command, i18n.t('whats_new.how_to_update_ha'));
+        howto.appendChild(text);
+        body.appendChild(howto);
     }
 }
 

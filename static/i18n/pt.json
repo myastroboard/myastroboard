@@ -43,9 +43,24 @@
     "day": "Dia",
     "night": "Noite",
     "modal_not_initialized": "Modal de configuração não inicializado corretamente",
-    "comming_soon": "Esta funcionalidade está em desenvolvimento e estará disponível!",
-    "update_available": "Uma nova versão está disponível!",
-    "update_version_link": "Consulte a versão v{version}"
+    "comming_soon": "Esta funcionalidade está em desenvolvimento e estará disponível!"
+  },
+  "whats_new": {
+    "footer_available": "v{version} está disponível",
+    "footer_link": "Ver as novidades",
+    "title": "Uma nova versão está disponível",
+    "version_count": "{count} versões",
+    "version_count_one": "1 versão",
+    "latest": "mais recente",
+    "features": "Novidades",
+    "fixes": "Correções",
+    "breaking_title": "Ler antes de atualizar",
+    "breaking_badge": "incompatível",
+    "unavailable": "Não foi possível carregar a lista de alterações do GitHub.",
+    "unavailable_hint": "Os detalhes da v{version} estão na página da release.",
+    "release_link": "Ver a release no GitHub",
+    "how_to_update": "Para atualizar:",
+    "how_to_update_ha": ", ou a partir da app Home Assistant."
   },
   "navbar": {
     "astrophotography": "Astrofotografia",
