@@ -143,6 +143,7 @@ def test_documents_of_unknown_users_are_skipped(populated):
     [
         ('config.json', '{nope', 'config.json is not valid JSON'),
         ('config.json', '[1, 2]', 'config.json is not a JSON object'),
+        ('users.json', '{nope', 'users.json is not valid JSON'),
         ('users.json', '{"x": {"user_id": "y"}}', 'users.json is invalid'),
         (f'astrodex/{ALICE}_astrodex.json', '"text"', 'is not a JSON object'),
     ],
@@ -154,8 +155,8 @@ def test_invalid_members_reject_the_whole_archive(populated, name, payload, mess
         archive.writestr(name, payload)
 
     with zipfile.ZipFile(io.BytesIO(buf.getvalue())) as archive:
-        with pytest.raises(backup_archive.BackupArchiveError, match=message):
-            backup_archive.plan_restore(archive)
+        plan = backup_archive.plan_restore(archive)
+    assert message in (plan.error or '')
     assert users_store.get_all_users() == before
 
 

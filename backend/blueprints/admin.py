@@ -228,10 +228,9 @@ def backup_restore_api():
         buf.seek(0)
 
         with zipfile.ZipFile(buf, 'r') as archive:
-            try:
-                plan = backup_archive.plan_restore(archive)
-            except backup_archive.BackupArchiveError as error:
-                return jsonify({'error': str(error)}), 400
+            plan = backup_archive.plan_restore(archive)
+            if plan.error:
+                return jsonify({'error': plan.error}), 400
             if plan.empty:
                 return (
                     jsonify(
