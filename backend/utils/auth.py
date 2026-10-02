@@ -277,6 +277,11 @@ class User:
         return False
 
 
+def _same_username(first, second):
+    """Account names are compared without regard to case ("Emeric" and "emeric" are one name)."""
+    return isinstance(first, str) and isinstance(second, str) and first.casefold() == second.casefold()
+
+
 def _astrodex_picture_filenames(user_id):
     """Safe file names of every picture in the user's Astrodex (empty on any read error)."""
     filenames = set()
@@ -603,7 +608,7 @@ class UserManager:
         """Create a new user"""
         self._reload_users_if_changed()
 
-        if self.get_user_by_username(username):
+        if self._username_taken(username):
             raise ValueError(f"User {username} already exists")
 
         if role not in [ROLE_ADMIN, ROLE_USER, ROLE_READ_ONLY]:
@@ -635,12 +640,24 @@ class UserManager:
         return user
 
     def get_user_by_username(self, username):
-        """Get user by username"""
+        """Get user by username, ignoring case.
+
+        An exact match wins: accounts created before names were case-insensitive may
+        differ only by case, and each keeps answering to its own spelling. A name that
+        matches several of them only by case finds none.
+        """
         self._reload_users_if_changed()
         for user in self.users.values():
             if user.username == username:
                 return user
-        return None
+        matches = [user for user in self.users.values() if _same_username(user.username, username)]
+        return matches[0] if len(matches) == 1 else None
+
+    def _username_taken(self, username, exclude_user_id=None):
+        """True when another account already uses ``username``, whatever its case."""
+        return any(
+            _same_username(user.username, username) for user in self.users.values() if user.user_id != exclude_user_id
+        )
 
     def get_user_by_id(self, user_id):
         """Get user by UUID"""
@@ -661,8 +678,7 @@ class UserManager:
 
         # If changing username, check for conflicts
         if username and username != user.username:
-            existing_user = self.get_user_by_username(username)
-            if existing_user and existing_user.user_id != user_id:
+            if self._username_taken(username, exclude_user_id=user_id):
                 raise ValueError(f"Username {username} already taken")
             logger.info(f"Changing username from {user.username} to {username}")
             user.username = username
