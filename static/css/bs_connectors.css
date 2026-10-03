@@ -13,8 +13,59 @@
     letter-spacing: 0.015em;
 }
 
+/* Connector cards: each row of cards shares three tracks - header, body, config panel -
+   through subgrid, so headers and Configure buttons line up across the row and an open
+   panel starts right under its own button, whatever the height of its neighbours. */
+.connector-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+}
+
+@media (min-width: 768px) {
+    .connector-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 1200px) {
+    .connector-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+/* Spinner and load-error message span the whole width */
+.connector-grid > :not(.connector-col) {
+    grid-column: 1 / -1;
+}
+
+.connector-col {
+    display: grid;
+    grid-row: span 3;
+    grid-template-rows: subgrid;
+    row-gap: 0;
+}
+
+.connector-card {
+    display: grid;
+    grid-row: 1 / 3;
+    grid-template-rows: subgrid;
+    row-gap: 0;
+}
+
+.connector-card.is-open {
+    grid-row: 1 / 4;
+}
+
 .connector-config-panel {
     background: color-mix(in srgb, var(--surface-elevated) 86%, var(--surface-card));
+}
+
+.connector-module-setup {
+    padding: 0.5rem 0.75rem;
+    border-left: 3px solid var(--bs-info);
+    border-radius: var(--border-radius);
+    background: color-mix(in srgb, var(--surface-elevated) 70%, var(--surface-card));
 }
 
 .allsky-media-fit {

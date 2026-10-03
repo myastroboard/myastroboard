@@ -12,7 +12,10 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixes
 
-- None.
+- AllSky connector supports AllSky v2026.10 as well as v2024.12 (auto-detected); the card explains the Export
+  module setup - see [docs/CONNECTORS.md](docs/CONNECTORS.md#allsky-versions).
+- Connector cards: *Configure* buttons line up across a row, and an open settings panel starts right
+  under its button instead of below a gap when a neighbouring card is taller.
 
 ### Breaking changes
 

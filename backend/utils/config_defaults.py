@@ -86,7 +86,7 @@ DEFAULT_ALLSKY_CONNECTOR = {
     "enabled": False,
     "url": "",
     "label": "My AllSky Camera",
-    "image_path": "current/tmp",
+    "image_path": "current",
     "image_filename": "image.jpg",
     "export_json_path": "allskydata.json",
     "modules": {

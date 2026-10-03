@@ -51,10 +51,32 @@ const _CONNECTOR_UI = {
         icon: 'bi bi-camera-video me-2 text-info',
         urlLabelKey: 'url_field',
         advanced: [
-            { key: 'image_path',       labelKey: 'allsky_image_path',       placeholder: 'current/tmp' },
+            { key: 'image_path',       labelKey: 'allsky_image_path',       placeholder: 'current' },
             { key: 'image_filename',   labelKey: 'allsky_image_filename',   placeholder: 'image.jpg' },
             { key: 'export_json_path', labelKey: 'allsky_export_json_path', placeholder: 'allskydata.json' },
         ],
+        // Setup to do on the AllSky side, shown under the module it concerns. A step's
+        // `value` (a string, or a function of the saved config) gets a read-only field with a
+        // copy button - for settings to paste into the AllSky WebUI as-is.
+        moduleSetup: {
+            sensor_data: {
+                sections: [
+                    { steps: [{ textKey: 'allsky_sensor_setup_pipelines' }] },
+                    {
+                        headingKey: 'allsky_sensor_setup_v2026_heading',
+                        steps: [
+                            { textKey: 'allsky_sensor_setup_file_location',
+                              value: cfg => `\${ALLSKY_TMP}/current_images/${cfg.export_json_path || 'allskydata.json'}` },
+                            { textKey: 'allsky_sensor_setup_extra_data',
+                              value: 'DAY_OR_NIGHT,ALLSKY_VERSION,AS_TEMPERATURE_C,AS_GAIN,AS_sEXPOSURE,AS_MEAN' },
+                            { textKey: 'allsky_sensor_setup_dew_heater',
+                              value: 'AS_DEWCONTROLHUMIDITY,AS_DEWCONTROLDEW,AS_DEWCONTROLHEATER' },
+                        ],
+                    },
+                ],
+                noteKey: 'allsky_sensor_setup_legacy_note',
+            },
+        },
     },
     myastroshine: {
         icon: 'bi bi-stars me-2 text-info',
@@ -371,11 +393,13 @@ function _minVersionRow(minVersion) {
 }
 
 function _connectorCard(c) {
+    // Laid out on the .connector-grid subgrid (bs_connectors.css): header, body and config
+    // panel each sit on a track shared with the other cards of the row.
     const col = document.createElement('div');
-    col.className = 'col-12 col-md-6 col-xl-4';
+    col.className = 'connector-col';
 
     const card = document.createElement('div');
-    card.className = 'card h-100';
+    card.className = 'card connector-card';
     card.id = `connector-card-${c.name}`;
 
     // Header
@@ -415,7 +439,7 @@ function _connectorCard(c) {
 
     // Body
     const body = document.createElement('div');
-    body.className = 'card-body';
+    body.className = 'card-body d-flex flex-column';
 
     const desc = document.createElement('p');
     desc.className = 'text-muted small mb-2';
@@ -428,7 +452,8 @@ function _connectorCard(c) {
     if (verRow) body.appendChild(verRow);
 
     const configBtn = document.createElement('button');
-    configBtn.className = 'btn btn-sm btn-outline-primary w-100 connector-configure-btn';
+    // mt-auto: pinned to the bottom of the body track, level across the row
+    configBtn.className = 'btn btn-sm btn-outline-primary w-100 mt-auto connector-configure-btn';
     configBtn.dataset.connector = c.name;
     configBtn.appendChild(DOMUtils.createIcon('bi bi-gear me-1'));
     configBtn.appendChild(document.createTextNode(i18n.t('connectors.configure')));
@@ -596,6 +621,8 @@ function _connectorConfigForm(c) {
         modDesc.textContent = i18n.t(`connectors.module_${m.slug}_desc`);
         info.appendChild(modLbl);
         info.appendChild(modDesc);
+        const setup = (ui.moduleSetup || {})[m.slug];
+        if (setup) info.appendChild(_moduleSetupBlock(c, m.slug, setup));
 
         const healthBadge = document.createElement('span');
         healthBadge.className = 'connector-module-health badge bg-secondary small align-self-center';
@@ -674,6 +701,93 @@ function _connectorConfigForm(c) {
     return frag;
 }
 
+/**
+ * Collapsible "set up on the remote side" instructions for one module (see `moduleSetup`
+ * in _CONNECTOR_UI): a toggle link, then numbered steps, each optionally carrying a value
+ * to copy into the remote tool.
+ */
+function _moduleSetupBlock(c, slug, setup) {
+    const frag = document.createDocumentFragment();
+    const collapseId = `connector-module-setup-${c.name}-${slug}`;
+
+    const toggle = document.createElement('a');
+    toggle.className = 'small d-inline-block mt-1';
+    toggle.dataset.bsToggle = 'collapse';
+    toggle.href = `#${collapseId}`;
+    toggle.setAttribute('role', 'button');
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.setAttribute('aria-controls', collapseId);
+    toggle.appendChild(DOMUtils.createIcon('bi bi-tools me-1'));
+    toggle.appendChild(document.createTextNode(i18n.t(`connectors.${c.name}_setup_toggle`)));
+    frag.appendChild(toggle);
+
+    const body = document.createElement('div');
+    body.className = 'collapse connector-module-setup small mt-2';
+    body.id = collapseId;
+
+    // Numbering runs on across sections, so a note can refer to "step 1" unambiguously.
+    let stepNumber = 1;
+    setup.sections.forEach(section => {
+        if (section.headingKey) {
+            const heading = document.createElement('p');
+            heading.className = 'fw-semibold mb-1';
+            heading.textContent = i18n.t(`connectors.${section.headingKey}`);
+            body.appendChild(heading);
+        }
+        const list = document.createElement('ol');
+        list.className = 'mb-2 ps-3';
+        list.start = stepNumber;
+        stepNumber += section.steps.length;
+        section.steps.forEach(step => {
+            const item = document.createElement('li');
+            item.className = 'mb-2';
+            item.appendChild(document.createTextNode(i18n.t(`connectors.${step.textKey}`)));
+            if (step.value !== undefined) {
+                const value = typeof step.value === 'function' ? step.value(c.config || {}) : step.value;
+                item.appendChild(_copyableValue(value));
+            }
+            list.appendChild(item);
+        });
+        body.appendChild(list);
+    });
+
+    if (setup.noteKey) {
+        const note = document.createElement('p');
+        note.className = 'text-muted mb-0';
+        note.appendChild(DOMUtils.createIcon('bi bi-info-circle me-1'));
+        note.appendChild(document.createTextNode(i18n.t(`connectors.${setup.noteKey}`)));
+        body.appendChild(note);
+    }
+
+    frag.appendChild(body);
+    return frag;
+}
+
+/** Read-only monospace field + copy button, for a value to paste elsewhere as-is. */
+function _copyableValue(value) {
+    const group = document.createElement('div');
+    group.className = 'input-group input-group-sm mt-1';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.readOnly = true;
+    input.className = 'form-control font-monospace';
+    input.value = value;
+    input.title = value;  // the field is narrower than most values
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-outline-secondary';
+    btn.title = i18n.t('connectors.copy_value');
+    btn.setAttribute('aria-label', i18n.t('connectors.copy_value'));
+    btn.appendChild(DOMUtils.createIcon('bi bi-clipboard'));
+    btn.addEventListener('click', async () => {
+        const copied = await copyInputToClipboard(input);
+        showMessage(copied ? 'success' : 'error', i18n.t(copied ? 'connectors.value_copied' : 'connectors.copy_failed'));
+    });
+    group.appendChild(input);
+    group.appendChild(btn);
+    return group;
+}
+
 /** Re-fetch and repaint a connector's status line, if it declares one. */
 async function _refreshConnectorStatus(name) {
     const ui = _connectorUI(name);
@@ -718,40 +832,41 @@ function _suggestCard() {
     const url = 'https://github.com/myastroboard/myastroboard/discussions/new?category=ideas&labels=enhancement,connector';
 
     const col = document.createElement('div');
-    col.className = 'col-12 col-md-6 col-xl-4';
+    col.className = 'connector-col';
 
+    // Same header / body / bottom-button shape as a connector card, so it sits on the
+    // same subgrid tracks and its button lines up with the Configure buttons.
     const card = document.createElement('div');
-    card.className = 'card h-100 text-center py-4 px-3 connector-suggest-card';
+    card.className = 'card connector-card connector-suggest-card';
+
+    const header = document.createElement('div');
+    header.className = 'card-header';
+    header.appendChild(DOMUtils.createIcon('bi bi-plug me-2 text-info'));
+    header.appendChild(document.createTextNode(i18n.t('connectors.suggest_title')));
 
     const body = document.createElement('div');
-    body.className = 'card-body d-flex flex-column align-items-center justify-content-center';
-
-    body.appendChild(DOMUtils.createIcon('bi bi-plug fs-2 text-primary mb-3 d-block'));
-
-    const title = document.createElement('h6');
-    title.className = 'fw-semibold mb-2';
-    title.textContent = i18n.t('connectors.suggest_title');
-    body.appendChild(title);
+    body.className = 'card-body d-flex flex-column';
 
     const desc = document.createElement('p');
-    desc.className = 'text-muted small mb-3';
+    desc.className = 'text-muted small mb-2';
     desc.textContent = i18n.t('connectors.suggest_desc');
     body.appendChild(desc);
+
+    const examples = document.createElement('p');
+    examples.className = 'text-muted small mb-3';
+    examples.textContent = i18n.t('connectors.suggest_examples');
+    body.appendChild(examples);
 
     const link = document.createElement('a');
     link.href = url;
     link.target = '_blank';
     link.rel = 'noopener';
-    link.className = 'btn btn-sm btn-outline-primary';
+    link.className = 'btn btn-sm btn-outline-primary w-100 mt-auto';
     link.appendChild(DOMUtils.createIcon('bi bi-lightbulb me-1'));
     link.appendChild(document.createTextNode(i18n.t('connectors.suggest_btn')));
     body.appendChild(link);
 
-    const examples = document.createElement('p');
-    examples.className = 'text-muted mt-3 mb-0 small';
-    examples.textContent = i18n.t('connectors.suggest_examples');
-    body.appendChild(examples);
-
+    card.appendChild(header);
     card.appendChild(body);
     col.appendChild(card);
     return col;
@@ -762,7 +877,10 @@ function _bindConnectorEvents(c) {
     const panel = document.getElementById(`connector-panel-${c.name}`);
     if (configureBtn && panel) {
         configureBtn.addEventListener('click', () => {
-            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+            const open = panel.style.display === 'none';
+            panel.style.display = open ? 'block' : 'none';
+            // A closed card ends at its Configure button rather than spanning the panel track
+            document.getElementById(`connector-card-${c.name}`)?.classList.toggle('is-open', open);
         });
     }
 

@@ -3,11 +3,31 @@
 import requests as _requests
 from unittest.mock import MagicMock, patch
 
-from connectors.allsky_connector import AllSkyConnector
+import pytest
+
+from connectors import allsky_connector
+from connectors.allsky_connector import AllSkyConnector, _normalize_sensor_data
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _clear_layout_cache():
+    """The probed AllSky layout is remembered per process - never across tests."""
+    allsky_connector._resolved_image_paths.clear()
+    yield
+    allsky_connector._resolved_image_paths.clear()
+
+
+def _head_ok_for(*ok_suffixes):
+    """requests.head stub: 200 for URLs ending with one of ``ok_suffixes``, 404 otherwise."""
+
+    def _side(url, **kwargs):
+        return MagicMock(status_code=200 if url.endswith(ok_suffixes) else 404)
+
+    return _side
 
 
 def _make(cfg=None):
@@ -91,7 +111,7 @@ class TestUrlBuilders:
 
     def test_image_url_defaults(self):
         c = _make()
-        assert c._image_url() == "http://allsky.local/current/tmp/image.jpg"
+        assert c._image_url() == "http://allsky.local/current/image.jpg"
 
     def test_image_url_custom_path_and_filename(self):
         c = _make(
@@ -107,7 +127,7 @@ class TestUrlBuilders:
 
     def test_sensor_data_url_defaults(self):
         c = _make()
-        assert c._sensor_data_url() == "http://allsky.local/current/tmp/allskydata.json"
+        assert c._sensor_data_url() == "http://allsky.local/current/allskydata.json"
 
     def test_sensor_data_url_custom(self):
         c = _make(
@@ -292,15 +312,22 @@ class TestHealthCheck:
 
 class TestGetModuleUrls:
 
+    @pytest.fixture(autouse=True)
+    def _layout_probe_ok(self):
+        """Every layout probe answers 200, so the configured image_path is kept."""
+        with patch("requests.head", return_value=MagicMock(status_code=200)):
+            yield
+
     def test_empty_when_no_modules_enabled(self):
         c = _make()
         assert c.get_module_urls() == {}
 
     def test_live_image_included_when_enabled(self):
         c = _make({"url": "http://allsky.local", "enabled": True, "modules": {"live_image": {"enabled": True}}})
-        urls = c.get_module_urls()
+        with patch("requests.head", side_effect=_head_ok_for("/current/image.jpg")):
+            urls = c.get_module_urls()
         assert "live_image" in urls
-        assert urls["live_image"] == "http://allsky.local/current/tmp/image.jpg"
+        assert urls["live_image"] == "http://allsky.local/current/image.jpg"
 
     def test_sensor_data_included_when_enabled(self):
         c = _make({"url": "http://allsky.local", "enabled": True, "modules": {"sensor_data": {"enabled": True}}})
@@ -341,6 +368,12 @@ class TestGetModuleUrls:
 
 class TestFetchSensorData:
 
+    @pytest.fixture(autouse=True)
+    def _layout_probe_ok(self):
+        """Every layout probe answers 200, so the configured image_path is kept."""
+        with patch("requests.head", return_value=MagicMock(status_code=200)):
+            yield
+
     def _sensor_enabled(self):
         return _make({"url": "http://allsky.local", "enabled": True, "modules": {"sensor_data": {"enabled": True}}})
 
@@ -378,3 +411,152 @@ class TestFetchSensorData:
         with patch("requests.get", side_effect=RuntimeError("unexpected")):
             result = self._sensor_enabled().fetch_sensor_data()
         assert result == {}
+
+    def test_new_format_keys_are_normalized(self):
+        """AllSky v2026 exports keys without the AS_ prefix; they come back under the legacy name too."""
+        data = {"TEMPERATURE_C": 12.5, "DAY_OR_NIGHT": "NIGHT", "ALLSKY_VERSION": "v2026.10.01"}
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.return_value = None
+        mock_resp.json.return_value = data
+        with patch("requests.get", return_value=mock_resp):
+            result = self._sensor_enabled().fetch_sensor_data()
+        assert result["AS_TEMPERATURE_C"] == 12.5
+        assert result["TEMPERATURE_C"] == 12.5
+        assert result["DAY_OR_NIGHT"] == "NIGHT"
+        assert result["ALLSKY_VERSION"] == "v2026.10.01"
+
+
+# ---------------------------------------------------------------------------
+# _normalize_sensor_data()
+# ---------------------------------------------------------------------------
+
+
+class TestNormalizeSensorData:
+
+    def test_legacy_payload_unchanged(self):
+        data = {"AS_TEMPERATURE_C": "12.5", "AS_GAIN": "100", "DAY_OR_NIGHT": "NIGHT", "ALLSKY_VERSION": "v2024.12"}
+        result = _normalize_sensor_data(data)
+        for key, value in data.items():
+            assert result[key] == value
+
+    def test_unprefixed_keys_get_as_alias(self):
+        result = _normalize_sensor_data({"TEMPERATURE_C": 3.2, "sEXPOSURE": "1/250", "DEWCONTROLHUMIDITY": 81})
+        assert result["AS_TEMPERATURE_C"] == 3.2
+        assert result["AS_sEXPOSURE"] == "1/250"
+        assert result["AS_DEWCONTROLHUMIDITY"] == 81
+
+    def test_existing_as_key_wins_over_alias(self):
+        result = _normalize_sensor_data({"GAIN": 1, "AS_GAIN": 2})
+        assert result["AS_GAIN"] == 2
+
+    def test_allsky_keys_not_prefixed(self):
+        result = _normalize_sensor_data({"ALLSKY_VERSION": "v2026.10.01"})
+        assert "AS_ALLSKY_VERSION" not in result
+
+    def test_day_or_night_from_prefixed_key(self):
+        assert _normalize_sensor_data({"AS_DAY_OR_NIGHT": "DAY"})["DAY_OR_NIGHT"] == "DAY"
+
+    def test_null_values_kept(self):
+        """v2026 writes null for a requested variable it cannot find; the UI skips nulls."""
+        result = _normalize_sensor_data({"DEWCONTROLHEATER": None})
+        assert result["AS_DEWCONTROLHEATER"] is None
+
+    @pytest.mark.parametrize("payload", [None, [], "text", 42])
+    def test_non_dict_payload_gives_empty(self, payload):
+        assert _normalize_sensor_data(payload) == {}
+
+
+# ---------------------------------------------------------------------------
+# AllSky layout detection (current/ vs legacy current/tmp/)
+# ---------------------------------------------------------------------------
+
+
+class TestLayoutDetection:
+
+    def _live(self, image_path=None):
+        cfg = {"url": "http://allsky.local", "enabled": True, "modules": {"live_image": {"enabled": True}}}
+        if image_path is not None:
+            cfg["image_path"] = image_path
+        return _make(cfg)
+
+    def test_new_layout_with_new_default(self):
+        with patch("requests.head", side_effect=_head_ok_for("/current/image.jpg")):
+            urls = self._live().get_module_urls()
+        assert urls["live_image"] == "http://allsky.local/current/image.jpg"
+
+    def test_legacy_allsky_with_new_default_falls_back(self):
+        """AllSky v2024.12 serves the live image under current/tmp/ only."""
+        with patch("requests.head", side_effect=_head_ok_for("/current/tmp/image.jpg")):
+            urls = self._live().get_module_urls()
+        assert urls["live_image"] == "http://allsky.local/current/tmp/image.jpg"
+
+    def test_upgraded_allsky_with_legacy_saved_path(self):
+        """A config saved before v2026 keeps image_path=current/tmp; the new layout is still found."""
+        with patch("requests.head", side_effect=_head_ok_for("/current/image.jpg")):
+            urls = self._live("current/tmp").get_module_urls()
+        assert urls["live_image"] == "http://allsky.local/current/image.jpg"
+
+    def test_legacy_allsky_with_legacy_saved_path_probes_once(self):
+        with patch("requests.head", side_effect=_head_ok_for("/current/tmp/image.jpg")) as head:
+            urls = self._live("current/tmp").get_module_urls()
+        assert urls["live_image"] == "http://allsky.local/current/tmp/image.jpg"
+        assert head.call_count == 1
+
+    def test_custom_path_is_not_probed(self):
+        with patch("requests.head") as head:
+            urls = self._live("/my/folder/").get_module_urls()
+        assert urls["live_image"] == "http://allsky.local/my/folder/image.jpg"
+        head.assert_not_called()
+
+    def test_nothing_reachable_keeps_configured_path(self):
+        with patch("requests.head", side_effect=_requests.exceptions.ConnectionError):
+            urls = self._live("current/tmp").get_module_urls()
+        assert urls["live_image"] == "http://allsky.local/current/tmp/image.jpg"
+
+    def test_resolution_is_cached(self):
+        connector = self._live()
+        with patch("requests.head", side_effect=_head_ok_for("/current/tmp/image.jpg")) as head:
+            connector.get_module_urls()
+            calls = head.call_count
+            connector.get_module_urls()
+            _make(connector.config).get_module_urls()
+        assert head.call_count == calls
+
+    def test_cache_expires(self):
+        connector = self._live()
+        with patch("requests.head", side_effect=_head_ok_for("/current/tmp/image.jpg")) as head:
+            connector.get_module_urls()
+            calls = head.call_count
+            with patch("connectors.allsky_connector.time.time", return_value=10**12):
+                connector.get_module_urls()
+        assert head.call_count > calls
+
+    def test_sensor_data_resolved_independently(self):
+        """The live image and the Export JSON are each looked up on their own."""
+        connector = _make(
+            {
+                "url": "http://allsky.local",
+                "enabled": True,
+                "modules": {"live_image": {"enabled": True}, "sensor_data": {"enabled": True}},
+            }
+        )
+        with patch("requests.head", side_effect=_head_ok_for("/current/image.jpg", "/current/tmp/allskydata.json")):
+            urls = connector.get_module_urls()
+        assert urls["live_image"] == "http://allsky.local/current/image.jpg"
+        assert urls["sensor_data"] == "http://allsky.local/current/tmp/allskydata.json"
+
+    def test_health_check_reports_fallback_url(self):
+        with patch("requests.head", side_effect=_head_ok_for("/current/tmp/image.jpg")):
+            result = self._live().health_check()
+        assert result["modules"]["live_image"]["ok"] is True
+        assert result["modules"]["live_image"]["url"] == "http://allsky.local/current/tmp/image.jpg"
+
+    def test_health_check_reprobes_despite_cache(self):
+        connector = self._live()
+        with patch("requests.head", side_effect=_head_ok_for("/current/tmp/image.jpg")):
+            connector.get_module_urls()
+        with patch("requests.head", side_effect=_head_ok_for("/current/image.jpg")):
+            result = connector.health_check()
+            urls = connector.get_module_urls()
+        assert result["modules"]["live_image"]["url"] == "http://allsky.local/current/image.jpg"
+        assert urls["live_image"] == "http://allsky.local/current/image.jpg"
