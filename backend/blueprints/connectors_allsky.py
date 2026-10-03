@@ -22,6 +22,8 @@ connectors_allsky_bp = Blueprint('connectors_allsky', __name__)
 # Bound once, so the route's caching does not depend on the AllSkyConnector object itself
 # (which tests replace to stub out the network). The value's home stays the connector class.
 _HEALTH_CACHE_TTL = AllSkyConnector.HEALTH_CACHE_TTL
+_SENSOR_CACHE_TTL = AllSkyConnector.SENSOR_CACHE_TTL
+_SENSOR_EMPTY_RETRY = AllSkyConnector.SENSOR_EMPTY_RETRY
 
 # AllSky image/video files are named after the session date (YYYYMMDD). date_str is
 # interpolated directly into the upstream URL path (see AllSkyConnector._keogram_url and
@@ -41,8 +43,14 @@ def allsky_status_api():
     if not allsky_cfg.get("modules", {}).get("sensor_data", {}).get("enabled"):
         return jsonify({"error": "sensor_data module not enabled"}), 404
 
-    data = cache_store._allsky_sensor_cache.get("data")
-    if data is None:
+    # The age is checked here, not left to the cache updater: that job runs in the scheduler's
+    # process, and this in-memory entry is per process. An empty result (Export file not
+    # written yet, AllSky offline) is retried sooner, so it does not stick for the full TTL.
+    cached = cache_store._allsky_sensor_cache
+    data = cached.get("data")
+    age = time.time() - cached.get("timestamp", 0)
+    max_age = _SENSOR_CACHE_TTL if data else _SENSOR_EMPTY_RETRY
+    if data is None or age >= max_age:
         data = AllSkyConnector(allsky_cfg).fetch_sensor_data()
         cache_store._allsky_sensor_cache["data"] = data
         cache_store._allsky_sensor_cache["timestamp"] = time.time()
