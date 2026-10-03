@@ -381,6 +381,64 @@ function _openAllSkyZoomModal(urls) {
 
 // ── Sensor data ───────────────────────────────────────────────────────────────
 
+const _roundTo2 = n => Math.round(n * 100) / 100;
+// Numeric values rounded; anything else (a legacy preformatted string) shown as exported
+const _num = value => (Number.isFinite(Number(value)) ? _roundTo2(Number(value)) : value);
+
+/**
+ * Rows for the AllSky Fans module (allsky_fans): a state row (+ PWM duty %) and a
+ * temperature row (+ activation threshold) per fan found in the export. v2026 publishes
+ * AS_FANS_*1 / AS_FANS_*2; v2024 published a single fan as OTH_FANS / OTH_TEMPERATURE / OTH_FANT.
+ */
+function _allSkyFanRows(data, hasValue) {
+    const fans = [1, 2]
+        .filter(n => hasValue(`AS_FANS_FAN_STATE${n}`) || hasValue(`AS_FANS_TEMPERATURE${n}`))
+        .map(n => ({
+            n, state: `AS_FANS_FAN_STATE${n}`, temperature: `AS_FANS_TEMPERATURE${n}`,
+            limit: `AS_FANS_TEMP_LIMIT${n}`, duty: `AS_FANS_PWM_DUTY_PERCENT${n}`,
+        }));
+    if (!fans.length && (hasValue('OTH_FANS') || hasValue('OTH_TEMPERATURE'))) {
+        fans.push({ n: 1, state: 'OTH_FANS', temperature: 'OTH_TEMPERATURE', limit: 'OTH_FANT', duty: null });
+    }
+
+    const rows = [];
+    fans.forEach(fan => {
+        const suffix = fans.length > 1 ? ` ${fan.n}` : '';
+        rows.push({
+            key: fan.state, label: `${i18n.t('observatory.fan')}${suffix}`, unit: '', icon: 'bi-fan',
+            format: value => {
+                // v2026 exports a boolean, v2024 the text "On" / "Off"
+                const on = value === true || String(value).toLowerCase() === 'on';
+                const off = value === false || String(value).toLowerCase() === 'off';
+                const state = on || off ? i18n.t(on ? 'observatory.fan_on' : 'observatory.fan_off') : value;
+                // Duty % only means something while the fan runs on PWM
+                const duty = fan.duty && on && hasValue(fan.duty) ? ` (${_num(data[fan.duty])} %)` : '';
+                return `${state}${duty}`;
+            },
+        });
+        rows.push({
+            key: fan.temperature, label: `${i18n.t('observatory.fan_temperature')}${suffix}`, unit: '', icon: 'bi-thermometer',
+            format: value => {
+                const limit = hasValue(fan.limit)
+                    ? ` (${i18n.t('observatory.fan_threshold')} ${_num(data[fan.limit])} °C)`
+                    : '';
+                return `${_num(value)} °C${limit}`;
+            },
+        });
+    });
+    return rows;
+}
+
+/** Exposure in microseconds -> "250 µs", "1.5 ms", "30 s" (what AllSky's sEXPOSURE showed). */
+function _formatExposureUs(raw) {
+    const us = Number(raw);
+    if (!Number.isFinite(us)) return raw;
+    if (us < 1000) return `${_roundTo2(us)} µs`;
+    if (us < 1e6) return `${_roundTo2(us / 1000)} ms`;
+    return `${_roundTo2(us / 1e6)} s`;
+}
+
+
 async function _pollAllSkySensor() {
     const body = document.getElementById('allsky-sensor-body');
     if (!body) return;
@@ -406,17 +464,21 @@ async function _pollAllSkySensor() {
         }
     }
 
-    const humidityKey  = data['AS_DEWCONTROLHUMIDITY'] != null ? 'AS_DEWCONTROLHUMIDITY' : 'AS_HUMIDITY';
-    const exposureKey  = data['AS_sEXPOSURE'] != null ? 'AS_sEXPOSURE' : 'AS_EXPOSURE_US';
-    const exposureUnit = exposureKey === 'AS_EXPOSURE_US' ? 'µs' : '';
+    // AllSky v2026+ exports a requested variable it has no value for as "" or null
+    const hasValue = key => data[key] != null && data[key] !== '';
+    const humidityKey  = hasValue('AS_DEWCONTROLHUMIDITY') ? 'AS_DEWCONTROLHUMIDITY' : 'AS_HUMIDITY';
+    // AllSky v2026 leaves sEXPOSURE empty (no module publishes it): format EXPOSURE_US instead
+    const exposureKey  = hasValue('AS_sEXPOSURE') ? 'AS_sEXPOSURE' : 'AS_EXPOSURE_US';
 
     const rows = [
         { key: 'AS_TEMPERATURE_C',    label: i18n.t('observatory.temperature'),     unit: '°C', icon: 'bi-thermometer-half' },
         { key: humidityKey,           label: i18n.t('observatory.humidity'),         unit: '%',  icon: 'bi-droplet-half' },
         { key: 'AS_DEWCONTROLDEW',    label: i18n.t('observatory.dew_point'),        unit: '°C', icon: 'bi-water' },
         { key: 'AS_DEWCONTROLHEATER', label: i18n.t('observatory.dew_heater'),       unit: '',   icon: 'bi-lightning-charge' },
+        ..._allSkyFanRows(data, hasValue),
         { key: 'AS_GAIN',             label: i18n.t('observatory.gain'),             unit: '',   icon: 'bi-sliders' },
-        { key: exposureKey,           label: i18n.t('observatory.exposure'),         unit: exposureUnit, icon: 'bi-clock' },
+        { key: exposureKey,           label: i18n.t('observatory.exposure'),         unit: '',   icon: 'bi-clock',
+          format: exposureKey === 'AS_EXPOSURE_US' ? _formatExposureUs : null },
         { key: 'AS_MEAN',             label: i18n.t('observatory.mean_brightness'),  unit: '',   icon: 'bi-brightness-high' },
         { key: 'ALLSKY_VERSION',      label: i18n.t('observatory.version'),          unit: '',   icon: 'bi-info-circle' },
     ];
@@ -425,8 +487,8 @@ async function _pollAllSkySensor() {
     table.className = 'table table-sm table-borderless mb-0 small';
     let hasRows = false;
 
-    for (const { key, label, unit, icon } of rows) {
-        if (data[key] == null) continue;
+    for (const { key, label, unit, icon, format } of rows) {
+        if (!hasValue(key)) continue;
         hasRows = true;
         const tr = document.createElement('tr');
         const td1 = document.createElement('td');
@@ -435,10 +497,15 @@ async function _pollAllSkySensor() {
         td1.appendChild(document.createTextNode(label));
         const td2 = document.createElement('td');
         td2.className = 'fw-semibold';
-        // AllSky v2026+ exports typed numbers (older releases exported preformatted strings)
-        const value = typeof data[key] === 'number' && !Number.isInteger(data[key])
-            ? Math.round(data[key] * 100) / 100
-            : data[key];
+        // AllSky v2026+ exports typed values (older releases exported preformatted strings)
+        let value = data[key];
+        if (format) {
+            value = format(value);
+        } else if (typeof value === 'number' && !Number.isInteger(value)) {
+            value = Math.round(value * 100) / 100;
+        } else if (typeof value === 'boolean') {
+            value = i18n.t(value ? 'observatory.heater_on' : 'observatory.heater_off');
+        }
         td2.textContent = `${value}${unit ? ' ' + unit : ''}`;
         tr.appendChild(td1);
         tr.appendChild(td2);

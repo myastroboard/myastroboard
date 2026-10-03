@@ -115,6 +115,37 @@ class TestAllSkyStatus:
         assert resp.get_json() == fresh_data
         assert cache_store._allsky_sensor_cache["data"] == fresh_data
 
+    def _get_status(self, client_user, fetched):
+        mock_connector = MagicMock()
+        mock_connector.fetch_sensor_data.return_value = fetched
+        with patch('blueprints.connectors_allsky.load_config', return_value=_config(_CFG_ALLSKY_ENABLED)):
+            with patch('blueprints.connectors_allsky.AllSkyConnector', return_value=mock_connector):
+                resp = client_user.get('/api/connectors/allsky/status')
+        return resp, mock_connector
+
+    def test_refetches_when_cache_older_than_ttl(self, client_user):
+        """The scheduler refreshes this cache in its own process only - the route checks age itself."""
+        cache_store._allsky_sensor_cache["data"] = {"AS_TEMPERATURE_C": 1.0}
+        cache_store._allsky_sensor_cache["timestamp"] = time.time() - 301
+        resp, connector = self._get_status(client_user, {"AS_TEMPERATURE_C": 9.0})
+        connector.fetch_sensor_data.assert_called_once()
+        assert resp.get_json() == {"AS_TEMPERATURE_C": 9.0}
+
+    def test_empty_result_retried_after_a_minute(self, client_user):
+        """An empty read (Export file not written yet) must not stick for the whole TTL."""
+        cache_store._allsky_sensor_cache["data"] = {}
+        cache_store._allsky_sensor_cache["timestamp"] = time.time() - 61
+        resp, connector = self._get_status(client_user, {"AS_TEMPERATURE_C": 9.0})
+        connector.fetch_sensor_data.assert_called_once()
+        assert resp.get_json() == {"AS_TEMPERATURE_C": 9.0}
+
+    def test_recent_empty_result_not_refetched(self, client_user):
+        cache_store._allsky_sensor_cache["data"] = {}
+        cache_store._allsky_sensor_cache["timestamp"] = time.time() - 10
+        resp, connector = self._get_status(client_user, {"AS_TEMPERATURE_C": 9.0})
+        connector.fetch_sensor_data.assert_not_called()
+        assert resp.get_json() == {}
+
 
 # ---------------------------------------------------------------------------
 # GET /api/connectors/allsky/health

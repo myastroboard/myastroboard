@@ -86,6 +86,8 @@ class AllSkyConnector(BaseConnector):
     # 5 min: sensor values drift slowly, and reachability does not need tighter polling.
     SENSOR_CACHE_TTL = 300
     HEALTH_CACHE_TTL = 300
+    # An empty sensor read (Export file missing, AllSky offline) is retried after this long.
+    SENSOR_EMPTY_RETRY = 60
     # How long a probed image_path (see KNOWN_IMAGE_PATHS) is trusted before probing again.
     LAYOUT_CACHE_TTL = 300
 
