@@ -2,6 +2,11 @@
 
 First off, thank you for considering contributing to MyAstroBoard! It's people like you that make MyAstroBoard such a great tool for the astronomy community.
 
+This guide covers what is specific to MyAstroBoard. The rules shared by every repository of the
+organization (branches, commits, changelog, AI disclosure, coding rules) are in the
+[organization's contributing guide](https://github.com/myastroboard/.github/blob/main/CONTRIBUTING.md)
+and the [organization standards](https://github.com/myastroboard/.github/blob/main/standards/ORG_STANDARDS.md).
+
 ## Table of Contents
 
 - [Code of Conduct](#code-of-conduct)

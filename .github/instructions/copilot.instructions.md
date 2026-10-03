@@ -1,6 +1,16 @@
+---
+applyTo: "**"
+---
+
 # Copilot Instructions for MyAstroBoard
 
-This document provides comprehensive guidance for GitHub Copilot (or other AI assistants) when working on the MyAstroBoard project.
+The MyAstroBoard-specific rules for GitHub Copilot, Claude Code (through `CLAUDE.md`) and any other AI
+assistant. They sit on top of the **organization standards**
+([org-standards.instructions.md](org-standards.instructions.md), synced from
+[myastroboard/.github](https://github.com/myastroboard/.github/tree/main/standards)), which apply in
+full and are not repeated here: non-negotiables, English and ASCII punctuation, the generic logging,
+frontend, architecture, GDPR, test, git and changelog rules, and the definition of done. This file
+only adds how MyAstroBoard implements them, and what is specific to it.
 
 ## Project Overview
 
@@ -50,7 +60,7 @@ myastroboard/
 │   │   ├── metrics_collector.py         # Metrics collection service
 │   │   ├── on_demand_translate.py       # On-demand DeepL/LibreTranslate integration
 │   │   ├── push_manager.py              # VAPID key management, Web Push send wrapper
-│   │   ├── push_scheduler.py            # Push notification scheduler (N1–N9 trigger evaluation)
+│   │   ├── push_scheduler.py            # Push notification scheduler (N1-N9 trigger evaluation)
 │   │   ├── rate_limit.py                # In-memory sliding-window counter (sign-in throttle)
 │   │   ├── repo_config.py               # Config file load/save helpers
 │   │   ├── txtconf_loader.py            # txtconf loader
@@ -106,7 +116,7 @@ myastroboard/
 │   │   ├── cache_store.py               # Shared cache persistence
 │   │   └── cache_updater.py             # Cache refresh orchestration
 │   ├── space/                       # Spaceflight tracking
-│   │   ├── css_passes.py                # CSS (China Space Station, NORAD 48274) passes – full parallel mirror of iss_passes.py
+│   │   ├── css_passes.py                # CSS (China Space Station, NORAD 48274) passes - full parallel mirror of iss_passes.py
 │   │   ├── iss_passes.py                # ISS passes, solar transit, and lunar transit integration
 │   │   └── spaceflight_tracker.py       # Launch Library 2 client (launches, astronauts, events)
 │   ├── connectors/                  # BaseConnector registry - bridges to external tools (see docs/CONNECTORS.md)
@@ -255,18 +265,14 @@ skytonight/
 
 ### General Guidelines
 
-- **LANGUAGE REQUIREMENT**: All code, comments, documentation, and user-facing text MUST be in English
-- This includes: variable names, function names, class names, comments, docstrings, error messages, UI text, and documentation
-- Exception: Only external library names or technical terms that are internationally recognized
+- Language and ASCII punctuation: organization standards, section 3. User-facing text goes
+  through i18n (see *Internationalization* below).
 
 ### Python
 
-- Follow PEP 8 style guidelines
-- Use type hints where beneficial for clarity
-- Docstrings for all public functions/classes
-- Maximum line length: 120 characters
-- Use f-strings for string formatting
-- Prefer explicit over implicit
+- **ruff** formats and lints: 120-character lines, quotes left as written, configured in
+  `pyproject.toml` (extends `.github/org/ruff.base.toml`)
+- Type hints where beneficial; docstrings for all public functions/classes; f-strings
 
 ### Unified Logging System
 
@@ -322,20 +328,11 @@ except Exception as e:
 
 #### Logging Guidelines
 
-- Use **DEBUG** for detailed tracing and variable dumps
-- Use **INFO** for normal program flow and important events
-- Use **WARNING** for unexpected conditions that don't stop execution
-- Use **ERROR** for exceptions and error conditions
-- Use **CRITICAL** for severe errors that may stop the program
-- Include relevant context in log messages (user input, file paths, etc.)
-- Use f-strings for efficient string formatting in log messages
+Levels, context, and what never to log: organization standards, section 4.
 
 ### JavaScript
 
-- Use modern ES6+ syntax
-- Async/await for asynchronous operations
-- Clear, descriptive variable names
-- Comment complex logic
+- Modern ES6+ syntax, async/await for asynchronous operations
 
 #### Frontend XSS Security Rules (MANDATORY)
 
@@ -386,9 +383,8 @@ and `closeModal(elementOrId?)` (one id, or every shown modal when called bare).
 
 ### File Organization
 
-- One class per file when possible
-- Keep related functionality together
-- Separate concerns (data loading, business logic, presentation)
+One responsibility per file and no new import cycles: organization standards, section 6. How it
+applies to this backend:
 
 #### Module boundaries (MANDATORY)
 
@@ -789,9 +785,8 @@ Update `EXPECTED_ROUTES` in that file to match, and document the change in `CHAN
 - [ ] `pyright backend/` reports no errors
 - [ ] `djlint` passes for any touched template
 - [ ] `pytest tests/blueprints/test_route_inventory.py` passes if routes changed
-- [ ] `CHANGELOG.md` has a bullet under `## [Unreleased]` for the change (one or two lines, not a
-      novel - see [CONTRIBUTING.md#changelog](../../CONTRIBUTING.md#changelog))
-- [ ] All code/comments/UI text in English (see Language Requirement above)
+- [ ] The organization standards' definition of done (section 14): changelog entry, English and
+      ASCII text, docs updated
 - [ ] No `print()` or direct `logging` import in backend code (use `logging_config.get_logger`)
 - [ ] No `innerHTML` / new `DOMUtils.setTrustedHTML` in `static/js/**`
 - [ ] No new static inline `style="..."` / `.style.x =` (use a CSS class; JS show/hide and genuinely dynamic values are the only exceptions)
@@ -812,6 +807,8 @@ Update `EXPECTED_ROUTES` in that file to match, and document the change in `CHAN
   - Returning in API responses
 
 ### Personal Data (GDPR)
+
+How MyAstroBoard implements the organization standards' section 8, with the exact modules to use.
 
 MyAstroBoard is self-hosted: each instance operator is the data controller, and the application must
 make GDPR compliance easy for them. [docs/PRIVACY.md](../../docs/PRIVACY.md) is the operator-facing
@@ -848,9 +845,7 @@ inventory; keep it true. Any feature that stores, shares or sends data about a u
 
 ### Dependency Security
 
-- Keep dependencies updated
-- Run security scans via GitHub Actions
-- Pin versions in requirements.txt
+- Pinned versions and Dependabot: organization standards, section 7.
 - The amd64 image must run on CPUs without x86-64-v2 (Proxmox `kvm64`); the `cpu-compat` CI
   check enforces it. See CONTRIBUTING.md "CPU compatibility" before bumping or adding a compiled
   dependency.
@@ -1533,26 +1528,7 @@ The background cache is **selective-refresh**: the scheduler polls every 25 min 
 - [API Endpoints](../../docs/API_ENDPOINTS.md)
 - [Cache System](../../docs/CACHE_SYSTEM.md)
 
-### Docker
-
-- [Docker Documentation](https://docs.docker.com/)
-
-### Web Development
+### Web stack
 
 - [Flask Documentation](https://flask.palletsprojects.com/)
 - [Chart.js Documentation](https://www.chartjs.org/docs/)
-- [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API)
-
-## Contact & Support
-
-- **GitHub Issues**: https://github.com/myastroboard/myastroboard/issues
-- **Documentation**: https://github.com/myastroboard/myastroboard/tree/main/docs
-
-## License
-
-AGPL-3.0 License - See LICENSE file for details
-
----
-
-**Last Updated**: 2026-06-03
-**Maintainer**: WorldOfGZ
