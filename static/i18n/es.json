@@ -2772,7 +2772,7 @@
     "module_sensor_data_label": "Datos del sensor",
     "module_sensor_data_desc": "Temperatura, humedad, ganancia, exposición, brillo - requiere el módulo Export de AllSky añadido a los pipelines Día & Noche",
     "allsky_setup_toggle": "Configuración en AllSky",
-    "allsky_sensor_setup_pipelines": "En el Module Manager de la interfaz de AllSky, añada el módulo \"Export Allsky Data\" a los pipelines Día y Noche.",
+    "allsky_sensor_setup_pipelines": "En el Module Manager de la interfaz de AllSky, añada el módulo \"Export Allsky Data\" (allsky_export) a los pipelines Día y Noche.",
     "allsky_sensor_setup_v2026_heading": "AllSky v2026.10 y posteriores - en los ajustes del módulo Export:",
     "allsky_sensor_setup_file_location": "File Location - la ubicación por defecto ya no es accesible por la red:",
     "allsky_sensor_setup_extra_data": "Extra data to export - añada estas variables, separadas por comas (solo se exportan las variables listadas):",

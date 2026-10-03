@@ -172,7 +172,7 @@ AllSky v2026.10 changed two things the connector reads. Both versions work witho
 
 ### Sensor data module
 
-The `sensor_data` module reads a JSON file produced by the AllSky **Export** overlay module. This overlay must be added to **both the Day and Night pipelines** in AllSky settings, otherwise the file is never written.
+The `sensor_data` module reads a JSON file produced by the AllSky **Export Allsky Data** module (`allsky_export`, built in - not *Allsky Kamera* / `allsky_allskykamera`, which uploads to allskykamera.space). This overlay must be added to **both the Day and Night pipelines** in AllSky settings, otherwise the file is never written.
 
 The connector card shows these steps under the *Sensor data* module (*How to set it up in AllSky*), with a copy button for each value.
 
