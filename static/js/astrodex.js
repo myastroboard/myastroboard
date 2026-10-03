@@ -1518,28 +1518,7 @@ async function _copyStreamUrl(inputId) {
     const input = document.getElementById(inputId);
     if (!input) return;
 
-    // navigator.clipboard only exists in a secure context (HTTPS, or exactly "localhost") -
-    // on a plain http:// LAN address, which is the normal way this self-hosted app is reached,
-    // the object is undefined outright, not just permission-denied. Fall back to the legacy
-    // execCommand('copy'), which is the only copy mechanism that still works there.
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-        try {
-            await navigator.clipboard.writeText(input.value);
-            showMessage('success', i18n.t('astrodex.stream_url_copied'));
-            return;
-        } catch (error) {
-            console.warn('navigator.clipboard write failed, falling back to execCommand:', error);
-        }
-    }
-
-    input.select();
-    input.setSelectionRange(0, input.value.length);
-    let copied = false;
-    try {
-        copied = document.execCommand('copy');
-    } catch (error) {
-        console.warn('execCommand("copy") failed:', error);
-    }
+    const copied = await copyInputToClipboard(input);
     showMessage(copied ? 'success' : 'error', i18n.t(copied ? 'astrodex.stream_url_copied' : 'astrodex.stream_copy_failed'));
 }
 

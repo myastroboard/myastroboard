@@ -435,7 +435,11 @@ async function _pollAllSkySensor() {
         td1.appendChild(document.createTextNode(label));
         const td2 = document.createElement('td');
         td2.className = 'fw-semibold';
-        td2.textContent = `${data[key]}${unit ? ' ' + unit : ''}`;
+        // AllSky v2026+ exports typed numbers (older releases exported preformatted strings)
+        const value = typeof data[key] === 'number' && !Number.isInteger(data[key])
+            ? Math.round(data[key] * 100) / 100
+            : data[key];
+        td2.textContent = `${value}${unit ? ' ' + unit : ''}`;
         tr.appendChild(td1);
         tr.appendChild(td2);
         table.appendChild(tr);

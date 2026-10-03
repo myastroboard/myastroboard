@@ -259,6 +259,34 @@ function capitalizeWords(str) {
     });
 }
 
+/**
+ * Copy the value of a text <input> to the clipboard. Resolves to true when it was copied.
+ *
+ * navigator.clipboard only exists in a secure context (HTTPS, or exactly "localhost") -
+ * on a plain http:// LAN address, which is the normal way this self-hosted app is reached,
+ * the object is undefined outright, not just permission-denied. Fall back to the legacy
+ * execCommand('copy'), which is the only copy mechanism that still works there.
+ */
+async function copyInputToClipboard(input) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        try {
+            await navigator.clipboard.writeText(input.value);
+            return true;
+        } catch (error) {
+            console.warn('navigator.clipboard write failed, falling back to execCommand:', error);
+        }
+    }
+
+    input.select();
+    input.setSelectionRange(0, input.value.length);
+    try {
+        return document.execCommand('copy');
+    } catch (error) {
+        console.warn('execCommand("copy") failed:', error);
+        return false;
+    }
+}
+
 // Helper function to escape HTML
 function escapeHtml(str) {
     return String(str)

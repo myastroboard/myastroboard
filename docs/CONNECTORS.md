@@ -117,6 +117,9 @@ The **test button** (wifi icon, next to the URL field) immediately probes the UR
 
 The **health-check button** (heart icon, after saving) runs a full per-module probe and reports status badges (✓ / ✗) with a detail message (200 OK, 404 + hint, timeout, etc.) for each enabled module.
 
+A module that needs setup on the remote side can declare `moduleSetup` in `_CONNECTOR_UI`: the card
+then shows a collapsible list of steps under that module, each optionally with a value to copy.
+
 The test button also sends the connector's other fields as typed, so a connector that needs
 credentials to answer (MQTT) can probe with them before anything is saved. A connector that
 runs something in the background can declare a `statusEndpoint` and `actions` in
@@ -129,9 +132,25 @@ and action buttons under the save row.
 
 [AllSky](https://github.com/AllskyTeam/allsky) is an open-source all-sky camera system. It serves data entirely through file serving (no REST API).
 
-**Minimum version**: v2024.12
+**Minimum version**: v2024.12 (v2026.10 supported too)
 
 **Appears in**: Observatory
+
+### AllSky versions
+
+AllSky v2026.10 changed two things the connector reads. Both versions work without reconfiguring:
+
+| | v2024.12 | v2026.10 onwards |
+|---|---|---|
+| Live image URL | `/current/tmp/image.jpg` | `/current/image.jpg` (`/current/` now serves `tmp/current_images`) |
+| Export JSON | every `AS_*` / `ALLSKY_*` variable, full names | only the variables listed in *Extra data to export*, with the `AS_` prefix stripped (`AS_TEMPERATURE_C` -> `TEMPERATURE_C`) |
+| Export JSON default location | `${ALLSKY_TMP}/allskydata.json`, served as `/current/tmp/allskydata.json` | same file, but no longer served by the web server |
+
+- **Layout detection**: when `image_path` is `current` or `current/tmp`, the other one is tried too.
+  The first that answers is remembered for 5 minutes (per worker), and the health check always probes again.
+  A custom `image_path` is used as-is.
+- **Key normalisation**: each un-prefixed key of the Export JSON is also exposed under its `AS_` name,
+  so both formats display the same way.
 
 ### Modules
 
@@ -147,13 +166,22 @@ and action buttons under the save row.
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `image_path` | `current/tmp` | Path to the live image directory, relative to the base URL |
+| `image_path` | `current` | Path to the live image directory, relative to the base URL (`current/tmp` before AllSky v2026.10 - both are detected automatically) |
 | `image_filename` | `image.jpg` | Filename of the live image |
 | `export_json_path` | `allskydata.json` | Path to the AllSky Export JSON file, relative to `image_path` |
 
 ### Sensor data module
 
 The `sensor_data` module reads a JSON file produced by the AllSky **Export** overlay module. This overlay must be added to **both the Day and Night pipelines** in AllSky settings, otherwise the file is never written.
+
+The connector card shows these steps under the *Sensor data* module (*How to set it up in AllSky*), with a copy button for each value.
+
+**AllSky v2026.10 onwards**: in the Module Manager, open the Export module settings in both pipelines and set:
+
+- **File Location**: `${ALLSKY_TMP}/current_images/allskydata.json`. The default `${ALLSKY_TMP}/allskydata.json` is no longer reachable over HTTP.
+- **Extra data to export**: the variables to show. Only listed variables are exported now, for example:
+  `DAY_OR_NIGHT,ALLSKY_VERSION,AS_TEMPERATURE_C,AS_GAIN,AS_sEXPOSURE,AS_MEAN`. Add
+  `AS_DEWCONTROLHUMIDITY,AS_DEWCONTROLDEW,AS_DEWCONTROLHEATER` when the Dew Heater module is installed.
 
 When sensor data is available the Observatory tab shows:
 
@@ -199,7 +227,9 @@ All resource URLs are served through the MyAstroBoard backend at `/api/connector
 | Day/Night badge not shown | `sensor_data` module disabled, or Export overlay not in pipeline | Enable `sensor_data` and add Export module to AllSky pipelines |
 | Keogram / startrails show *Not yet generated* | End-of-night processing not run yet | Normal during the night; images appear after AllSky finishes its end-of-night run |
 | Daily timelapse shows empty video player | No timelapse generated yet | Normal; the placeholder appears automatically once AllSky produces the file |
-| Sensor data unavailable | Export JSON not found or AllSky offline | Check AllSky Export module path matches `export_json_path` in advanced settings |
+| Sensor data unavailable | Export JSON not found or AllSky offline | Check AllSky Export module path matches `export_json_path` in advanced settings; on AllSky v2026.10+ the File Location must be under `${ALLSKY_TMP}/current_images/` |
+| Sensor data shows only the version / Day-Night badge | AllSky v2026.10+ exports only the *Extra data to export* list | Add the sensor variables to that list (see [Sensor data module](#sensor-data-module)) |
+| Live image stopped loading after upgrading AllSky | Live image moved from `current/tmp/` to `current/` | Detected automatically; run the health check to refresh the detection immediately |
 
 ---
 
