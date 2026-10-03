@@ -1,0 +1,23 @@
+# Shared ruff baseline for every Python repository of the MyAstroBoard organization.
+#
+# Source of truth: standards/ruff.base.toml in myastroboard/.github. Each repository receives a
+# synced copy at .github/org/ruff.base.toml - do not edit the copy. A repository's own ruff.toml
+# extends it:
+#
+#     extend = ".github/org/ruff.base.toml"
+#     target-version = "py314"
+#     line-length = 120            # optional override
+#
+#     [lint]
+#     extend-select = ["SIM", "S"] # stricter, repository-specific rules
+#
+# target-version is left to each repository (they run different Python versions).
+
+line-length = 100
+
+[lint]
+# E/W pycodestyle, F pyflakes, I isort, UP pyupgrade, B bugbear.
+select = ["E", "F", "W", "I", "UP", "B"]
+
+[format]
+docstring-code-format = true
