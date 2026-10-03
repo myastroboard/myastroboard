@@ -2772,7 +2772,7 @@
     "module_sensor_data_label": "Données capteur",
     "module_sensor_data_desc": "Température, humidité, gain, exposition, luminosité - nécessite le module Export AllSky ajouté aux pipelines Jour & Nuit",
     "allsky_setup_toggle": "Configuration côté AllSky",
-    "allsky_sensor_setup_pipelines": "Dans le Module Manager de l'interface AllSky, ajoutez le module \"Export Allsky Data\" aux pipelines Jour et Nuit.",
+    "allsky_sensor_setup_pipelines": "Dans le Module Manager de l'interface AllSky, ajoutez le module \"Export Allsky Data\" (allsky_export) aux pipelines Jour et Nuit.",
     "allsky_sensor_setup_v2026_heading": "AllSky v2026.10 et suivantes - dans les réglages du module Export :",
     "allsky_sensor_setup_file_location": "File Location - l'emplacement par défaut n'est plus accessible par le réseau :",
     "allsky_sensor_setup_extra_data": "Extra data to export - ajoutez ces variables, séparées par des virgules (seules les variables listées sont exportées) :",

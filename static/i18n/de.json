@@ -2772,7 +2772,7 @@
     "module_sensor_data_label": "Sensordaten",
     "module_sensor_data_desc": "Temperatur, Luftfeuchtigkeit, Verstärkung, Belichtung, Helligkeit - benötigt AllSky Export-Modul in Tag- & Nacht-Pipeline",
     "allsky_setup_toggle": "Einrichtung in AllSky",
-    "allsky_sensor_setup_pipelines": "Fügen Sie im Module Manager der AllSky-WebUI das Modul \"Export Allsky Data\" zur Tag- und zur Nacht-Pipeline hinzu.",
+    "allsky_sensor_setup_pipelines": "Fügen Sie im Module Manager der AllSky-WebUI das Modul \"Export Allsky Data\" (allsky_export) zur Tag- und zur Nacht-Pipeline hinzu.",
     "allsky_sensor_setup_v2026_heading": "AllSky v2026.10 und neuer - in den Einstellungen des Export-Moduls:",
     "allsky_sensor_setup_file_location": "File Location - der Standardort ist über das Netzwerk nicht mehr erreichbar:",
     "allsky_sensor_setup_extra_data": "Extra data to export - diese Variablen kommagetrennt hinzufügen (nur aufgeführte Variablen werden exportiert):",
