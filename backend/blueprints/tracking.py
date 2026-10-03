@@ -6,13 +6,12 @@ Routes: /api/object/*, /api/object-image/*, /api/iss/*, /api/css/*,
 
 import os
 import re
-from typing import Any, Dict
+from typing import Any
 
-from flask import Blueprint, request, jsonify, send_from_directory
+from flask import Blueprint, jsonify, request, send_from_directory
 
 from cache import cache_store
-from space import css_passes
-from space import iss_passes
+from space import css_passes, iss_passes
 from utils.auth import login_required
 from utils.constants import (
     CACHE_TTL_CSS_PASSES,
@@ -72,7 +71,8 @@ def get_object_info_api(identifier):
     If the object is not found, returns 404 with {"error": "not_found"}.
     If the identifier is invalid, returns 400 with {"error": "invalid_identifier"}.
     """
-    from observation.object_info import is_safe_identifier as _oi_safe, get_object_info as _oi_get
+    from observation.object_info import get_object_info as _oi_get
+    from observation.object_info import is_safe_identifier as _oi_safe
 
     lang = request.args.get('lang', 'en', type=str)
     # Sanitize lang to a safe value
@@ -105,7 +105,7 @@ def get_object_image_api(filename):
     (data/cache/object_images/) so subsequent requests - from any user - are
     served locally instead of round-tripping to CDS, which is slow.
     """
-    from observation.object_info import OBJECT_IMAGE_CACHE_DIR, parse_object_image_filename, ensure_cached_object_image
+    from observation.object_info import OBJECT_IMAGE_CACHE_DIR, ensure_cached_object_image, parse_object_image_filename
 
     coords = parse_object_image_filename(filename)
     if coords is None:
@@ -124,7 +124,7 @@ def get_iss_passes_api():
     """Return ISS passes report, from cache only"""
     try:
 
-        def _with_celestrak_status(payload: Dict[str, Any]) -> Dict[str, Any]:
+        def _with_celestrak_status(payload: dict[str, Any]) -> dict[str, Any]:
             merged = dict(payload)
             merged["celestrak_status"] = iss_passes.get_celestrak_status()
             merged["tle_source"] = iss_passes.get_iss_tle_source_info()
@@ -196,7 +196,7 @@ def get_css_passes_api():
     """Return CSS (Tiangong) passes report, from cache only."""
     try:
 
-        def _with_celestrak_status(payload: Dict[str, Any]) -> Dict[str, Any]:
+        def _with_celestrak_status(payload: dict[str, Any]) -> dict[str, Any]:
             merged = dict(payload)
             merged["celestrak_status"] = css_passes.get_css_celestrak_status()
             merged["tle_source"] = css_passes.get_css_tle_source_info()
@@ -344,7 +344,7 @@ def spaceflight_image(filename):
         if not os.path.exists(_safe_cache_path(img_dir, filename)):
             if os.path.exists(_safe_cache_path(img_dir, sidecar_name)):
                 try:
-                    with open(_safe_cache_path(img_dir, sidecar_name), 'r', encoding='utf-8') as sf:
+                    with open(_safe_cache_path(img_dir, sidecar_name), encoding='utf-8') as sf:
                         original_url = sf.read().strip()
                     import requests as _req
 

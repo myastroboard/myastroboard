@@ -7,14 +7,13 @@ import json
 import os
 import time
 import zipfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from flask import Blueprint, request, jsonify, send_file, session, current_app
+from flask import Blueprint, current_app, jsonify, request, send_file, session
 
 from db import legacy_import
 from utils import app_settings as _app_settings
-from utils import backup_archive
-from utils import repo_config
+from utils import backup_archive, repo_config
 from utils.auth import admin_required
 from utils.constants import DATA_DIR, SKYTONIGHT_LOGS_DIR, SKYTONIGHT_SCHEDULER_STATUS_FILE
 from utils.file_lock import interprocess_lock
@@ -187,7 +186,7 @@ def backup_download_api():
     """
     try:
         buf = io.BytesIO()
-        timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
+        timestamp = datetime.now(UTC).strftime('%Y%m%d_%H%M%S')
         zip_filename = f"myastroboard_backup_{timestamp}.zip"
         backup_archive.write_backup(buf)
         buf.seek(0)
@@ -332,7 +331,7 @@ def logs_export_api():
     ]
     try:
         buf = io.BytesIO()
-        timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
+        timestamp = datetime.now(UTC).strftime('%Y%m%d_%H%M%S')
         zip_filename = f"myastroboard_logs_{timestamp}.zip"
 
         with zipfile.ZipFile(buf, mode='w', compression=zipfile.ZIP_DEFLATED) as zf:
@@ -380,7 +379,7 @@ def get_logs_api():
 
         # Read log file if it exists
         if os.path.exists(log_file):
-            with open(log_file, 'r', encoding='utf-8') as f:
+            with open(log_file, encoding='utf-8') as f:
                 logs = f.readlines()
 
             # Get parameters

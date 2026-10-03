@@ -26,12 +26,12 @@ import os
 import re
 import time
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Dict, Optional, Tuple
+from datetime import UTC, datetime
+from typing import Any
 
+from connectors.myastroshine_connector import MyAstroShineConnector
 from db import settings_store
 from observation import astrodex
-from connectors.myastroshine_connector import MyAstroShineConnector
 from utils.connector_secrets import merge_secrets
 from utils.image_privacy import strip_image_metadata
 from utils.logging_config import get_logger
@@ -83,7 +83,7 @@ CONSUMED_HANDOFFS_KEY = 'myastroshine_consumed_handoffs'
 # ---------------------------------------------------------------------------
 
 
-def get_integration_config(config: Optional[Dict] = None) -> Dict[str, Any]:
+def get_integration_config(config: dict | None = None) -> dict[str, Any]:
     """Return the ``connectors.myastroshine`` config block, credentials included.
 
     The token and signing secret live in the connector-secrets sidecar (utils/connector_secrets.py),
@@ -96,7 +96,7 @@ def get_integration_config(config: Optional[Dict] = None) -> Dict[str, Any]:
     return merge_secrets(MyAstroShineConnector.name, block, MyAstroShineConnector.SECRET_FIELDS)
 
 
-def integration_enabled(cfg: Optional[Dict] = None) -> bool:
+def integration_enabled(cfg: dict | None = None) -> bool:
     """Effective-enabled: the switch is on AND url/token/signing_secret are all set."""
     if cfg is None:
         cfg = get_integration_config()
@@ -150,7 +150,7 @@ def _hmac_hex(secret: str, message: bytes) -> str:
     return hmac.new(secret.encode('utf-8'), message, hashlib.sha256).hexdigest()
 
 
-def verify_return_signature(cfg: Dict, payload_obj: Any, image_bytes: bytes, signature_header: str) -> bool:
+def verify_return_signature(cfg: dict, payload_obj: Any, image_bytes: bytes, signature_header: str) -> bool:
     """Constant-time check of the ``X-Webhook-Signature`` on an inbound enhanced upload.
 
     The signing input is ``canonical_json(payload) + "\\n" + sha256_hex(image_bytes)``:
@@ -161,7 +161,7 @@ def verify_return_signature(cfg: Dict, payload_obj: Any, image_bytes: bytes, sig
     if not secret or not signature_header:
         return False
     image_hash = hashlib.sha256(image_bytes).hexdigest()
-    signing_input = f"{canonical_json(payload_obj)}\n{image_hash}".encode('utf-8')
+    signing_input = f"{canonical_json(payload_obj)}\n{image_hash}".encode()
     expected = f"sha256={_hmac_hex(secret, signing_input)}"
     return hmac.compare_digest(expected, signature_header)
 
@@ -171,7 +171,7 @@ def verify_return_signature(cfg: Dict, payload_obj: Any, image_bytes: bytes, sig
 # ---------------------------------------------------------------------------
 
 
-def mint_handoff(cfg: Dict, *, user_id: str, item_id: str, picture_id: str, callback_base: str) -> Dict[str, str]:
+def mint_handoff(cfg: dict, *, user_id: str, item_id: str, picture_id: str, callback_base: str) -> dict[str, str]:
     """Mint an opaque, single-use handoff token for the browser to carry.
 
     ``callback_base`` is set by the board (never user input) - it is the URL the
@@ -202,7 +202,7 @@ def mint_handoff(cfg: Dict, *, user_id: str, item_id: str, picture_id: str, call
     }
 
 
-def verify_handoff(cfg: Dict, token: str) -> Optional[Dict[str, Any]]:
+def verify_handoff(cfg: dict, token: str) -> dict[str, Any] | None:
     """Verify a handoff token's signature, ``kid`` and expiry. Returns claims or None.
 
     Does NOT check the single-use ``jti`` - read endpoints (``/source``,
@@ -222,7 +222,7 @@ def verify_handoff(cfg: Dict, token: str) -> Optional[Dict[str, Any]]:
 
     try:
         claims = json.loads(_b64url_decode(body))
-    except (ValueError, json.JSONDecodeError):
+    except ValueError, json.JSONDecodeError:
         logger.warning("MyAstroShine handoff rejected: undecodable payload")
         return None
 
@@ -233,7 +233,7 @@ def verify_handoff(cfg: Dict, token: str) -> Optional[Dict[str, Any]]:
         return None
     try:
         expires = int(claims.get('exp', 0))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     if time.time() >= expires:
         logger.info("MyAstroShine handoff rejected: expired")
@@ -250,15 +250,15 @@ def verify_handoff(cfg: Dict, token: str) -> Optional[Dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 
-def _unexpired(stored: Any, now: float) -> Dict[str, float]:
+def _unexpired(stored: Any, now: float) -> dict[str, float]:
     """The stored jtis that have not expired yet (malformed entries dropped)."""
     if not isinstance(stored, dict):
         return {}
-    alive: Dict[str, float] = {}
+    alive: dict[str, float] = {}
     for jti, expiry in stored.items():
         try:
             expiry_f = float(expiry)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             continue
         if expiry_f > now:
             alive[str(jti)] = expiry_f
@@ -270,7 +270,7 @@ def is_handoff_consumed(jti: str) -> bool:
     return jti in _unexpired(settings_store.get_setting(CONSUMED_HANDOFFS_KEY), time.time())
 
 
-def mark_handoff_consumed(jti: str, expiry_epoch: Optional[float] = None) -> None:
+def mark_handoff_consumed(jti: str, expiry_epoch: float | None = None) -> None:
     """Record a handoff's jti as spent so a later replay is rejected with 409."""
     if expiry_epoch is None:
         expiry_epoch = time.time() + MyAstroShineConnector.HANDOFF_TTL_SECONDS
@@ -283,7 +283,7 @@ def mark_handoff_consumed(jti: str, expiry_epoch: Optional[float] = None) -> Non
     settings_store.modify_setting(CONSUMED_HANDOFFS_KEY, _mark)
 
 
-def claim_handoff(jti: str, expiry_epoch: Optional[float] = None) -> bool:
+def claim_handoff(jti: str, expiry_epoch: float | None = None) -> bool:
     """Atomically mark a jti spent; False when it already was (in any worker).
 
     Check and mark happen in one write transaction, so two concurrent callbacks
@@ -318,7 +318,7 @@ def release_handoff(jti: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _find_item_and_picture(user_id: str, item_id: str, picture_id: str) -> Tuple[Optional[Dict], Optional[Dict]]:
+def _find_item_and_picture(user_id: str, item_id: str, picture_id: str) -> tuple[dict | None, dict | None]:
     # user_id builds a per-user file path inside load_user_astrodex(); re-check
     # its shape here, right before that call, regardless of upstream validation.
     if not _is_handoff_id(user_id):
@@ -334,7 +334,7 @@ def _find_item_and_picture(user_id: str, item_id: str, picture_id: str) -> Tuple
     return None, None
 
 
-def build_source_payload(claims: Dict[str, Any], token: str = '') -> Optional[Dict[str, Any]]:
+def build_source_payload(claims: dict[str, Any], token: str = '') -> dict[str, Any] | None:
     """Build the source-picture metadata payload MyAstroShine loads into an edit session.
 
     ``token`` is the raw handoff string; it is echoed back into ``image.url`` so
@@ -397,7 +397,7 @@ def build_source_payload(claims: Dict[str, Any], token: str = '') -> Optional[Di
     }
 
 
-def resolve_source_image_path(claims: Dict[str, Any]) -> Optional[str]:
+def resolve_source_image_path(claims: dict[str, Any]) -> str | None:
     """Resolve the source picture's image to an absolute path inside the images dir.
 
     Returns None when the picture is gone or the stored filename escapes the
@@ -424,10 +424,10 @@ def resolve_source_image_path(claims: Dict[str, Any]) -> Optional[str]:
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
-def _save_enhanced_image(user_id: str, image_bytes: bytes) -> Optional[str]:
+def _save_enhanced_image(user_id: str, image_bytes: bytes) -> str | None:
     """Write the enhanced JPEG under data/astrodex/images/ and return its filename.
 
     Mirrors upload_astrodex_image()'s ``<user_id>_<uuid>.<ext>`` naming and
@@ -462,7 +462,7 @@ class EnhancedDuplicateError(Exception):
         self.message = message
 
 
-def create_enhanced_duplicate(claims: Dict[str, Any], image_bytes: bytes, payload: Dict[str, Any]) -> Dict[str, Any]:
+def create_enhanced_duplicate(claims: dict[str, Any], image_bytes: bytes, payload: dict[str, Any]) -> dict[str, Any]:
     """Create a duplicated Astrodex picture on the same item, carrying the enhanced image.
 
     Never replaces the source: a new picture is appended. Copies the source
@@ -485,8 +485,8 @@ def create_enhanced_duplicate(claims: Dict[str, Any], image_bytes: bytes, payloa
 
 
 def _create_enhanced_duplicate_claimed(
-    claims: Dict[str, Any], image_bytes: bytes, payload: Dict[str, Any]
-) -> Dict[str, Any]:
+    claims: dict[str, Any], image_bytes: bytes, payload: dict[str, Any]
+) -> dict[str, Any]:
     user_id = claims.get('user_id', '')
     item_id = claims.get('item_id', '')
     source_picture_id = claims.get('picture_id', '')
@@ -504,7 +504,7 @@ def _create_enhanced_duplicate_claimed(
     cfg = get_integration_config()
     parameters = payload.get('parameters') if isinstance(payload.get('parameters'), dict) else {}
 
-    new_picture_data: Dict[str, Any] = {field: source.get(field) for field in _COPIED_PICTURE_FIELDS}
+    new_picture_data: dict[str, Any] = {field: source.get(field) for field in _COPIED_PICTURE_FIELDS}
     new_picture_data['rating'] = source.get('rating') if cfg.get('copy_rating') else None
     new_picture_data['enhanced_by'] = 'myastroshine'
     new_picture_data['enhanced_at'] = _now_iso()

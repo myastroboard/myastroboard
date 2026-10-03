@@ -76,7 +76,6 @@ def _add(user_id='user-1', username='tester', **target):
 
 
 class TestStorage:
-
     def test_empty_wishlist_for_a_new_user(self, isolated_wishlist):
         data = wishlist.load_user_wishlist('user-1', 'tester')
         assert data['items'] == []
@@ -150,7 +149,6 @@ class TestStorage:
 
 
 class TestAddTargets:
-
     def test_coordinates_are_resolved_and_frozen_at_add_time(self, isolated_wishlist, stub_resolver):
         """The visibility pass must be a pure numeric loop later on."""
         item = _add()['added'][0]
@@ -250,7 +248,6 @@ class TestItemKey:
 
 
 class TestUpdateAndDelete:
-
     def test_update_priority_and_notes(self, isolated_wishlist, stub_resolver):
         item_id = _add()['added'][0]['id']
         updated = wishlist.update_item('user-1', item_id, {'priority': 'high', 'notes': 'wide field'})
@@ -295,7 +292,6 @@ class TestUpdateAndDelete:
 
 
 class TestDerivedCapturedState:
-
     def _item(self, name='M 31', group_id='dso-ngc0224', aliases=None):
         return {
             'id': 'item-1',
@@ -362,7 +358,6 @@ class TestWishlistIndex:
 
 
 class TestSorting:
-
     def _item(self, name, captured=False, priority='normal', hours=None):
         return {
             'id': name,
@@ -403,7 +398,6 @@ class TestSorting:
 
 
 class TestValidation:
-
     def test_valid_payload_passes(self, isolated_wishlist, stub_resolver):
         _add()
         assert wishlist.validate_wishlist_data(_stored()) == (True, '')

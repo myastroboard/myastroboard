@@ -4,8 +4,8 @@ import json
 import os
 import time
 
-from skytonight.skytonight_models import SkyTonightCoordinates, SkyTonightTarget
 from skytonight import skytonight_targets
+from skytonight.skytonight_models import SkyTonightCoordinates, SkyTonightTarget
 
 
 def _sample_targets():

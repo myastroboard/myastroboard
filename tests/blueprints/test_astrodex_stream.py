@@ -20,9 +20,8 @@ from PIL import Image
 if 'psutil' not in sys.modules:
     sys.modules['psutil'] = types.ModuleType('psutil')
 
-from observation import astrodex
-from observation import astrodex_stream
 from blueprints import astrodex_stream as bp
+from observation import astrodex, astrodex_stream
 
 
 def _cfg(**overrides):
@@ -120,7 +119,6 @@ def _seed_picture(uid, filename='pic.jpg'):
 
 
 class TestGetStreamUrls:
-
     def test_requires_login(self, env, client):
         resp = client.get('/api/astrodex/stream/urls')
         assert resp.status_code == 401
@@ -162,7 +160,6 @@ class TestGetStreamUrls:
 
 
 class TestPersonalStream:
-
     def test_serves_a_jpeg_with_a_valid_token(self, env, client, user_id, monkeypatch):
         monkeypatch.setattr(bp, 'load_config', lambda: _app_config())
         _seed_picture(user_id)
@@ -200,7 +197,6 @@ class TestPersonalStream:
 
 
 class TestSharedStream:
-
     def test_serves_a_jpeg_when_not_private(self, env, client, monkeypatch):
         monkeypatch.setattr(bp, 'load_config', lambda: _app_config(private=False))
         token = astrodex_stream.shared_token()
@@ -237,7 +233,6 @@ class TestSharedStream:
 
 
 class TestRateLimit:
-
     def test_returns_429_past_the_limit(self, env, client, user_id, monkeypatch):
         monkeypatch.setattr(bp, 'load_config', lambda: _app_config())
         monkeypatch.setattr(bp, '_RATE_LIMIT', 3)
@@ -273,7 +268,6 @@ class TestRateLimit:
 
 
 class TestRotate:
-
     def test_requires_admin(self, env, client_user):
         resp = client_user.post('/api/connectors/astrodex_stream/rotate')
         assert resp.status_code == 403

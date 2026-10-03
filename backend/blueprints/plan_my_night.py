@@ -3,26 +3,24 @@
 import io
 import re
 from datetime import datetime
-from typing import Optional
 from zoneinfo import ZoneInfo
 
-from flask import Blueprint, request, jsonify, send_file
+from flask import Blueprint, jsonify, request, send_file
 
-from observation import astrodex
-from observation import plan_my_night
-from utils.auth import login_required, user_required, get_current_user
+from astroweather.sun_phases import SunService
+from observation import astrodex, plan_my_night
+from skytonight.skytonight_calculator import load_calculation_results
+from utils.auth import get_current_user, login_required, user_required
 from utils.i18n_utils import I18nManager
 from utils.logging_config import get_logger
 from utils.route_helpers import _resolve_active_location
-from skytonight.skytonight_calculator import load_calculation_results
-from astroweather.sun_phases import SunService
 
 logger = get_logger(__name__)
 
 plan_my_night_bp = Blueprint('plan_my_night', __name__)
 
 
-def _resolve_observing_night_for_plan() -> Optional[dict]:
+def _resolve_observing_night_for_plan() -> dict | None:
     """Return the nautical night window for Plan My Night.
 
     Uses nautical dusk/dawn (sun at -12 deg) so the observing session starts
@@ -41,7 +39,7 @@ def _resolve_observing_night_for_plan() -> Optional[dict]:
             tz = ZoneInfo(str(tz_name))
             sun_service = SunService(latitude=float(lat), longitude=float(lon), timezone=str(tz_name))
 
-            def _parse(time_str: str) -> Optional[datetime]:
+            def _parse(time_str: str) -> datetime | None:
                 text = str(time_str or '').strip()
                 if not text or text == 'Not found':
                     return None
@@ -156,7 +154,7 @@ def _compute_plan_fill_metrics(plan: dict) -> dict:
         try:
             planned_minutes += max(0, int(str(planned_raw)))
             continue
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             pass  # planned_minutes is not a plain integer — fall through to duration string parse
         planned_minutes += _parse_duration_minutes(entry.get('planned_duration'))
 

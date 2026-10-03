@@ -15,8 +15,9 @@ Lossless by construction:
   object (or a key holding something that is not a list) is stored as is.
 """
 
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Any, Dict, Iterator, List, Optional, Tuple
+from typing import Any
 
 from sqlalchemy import Boolean, Float, String, delete, insert, select
 from sqlalchemy.engine import Connection
@@ -35,15 +36,15 @@ class Node:
     table: Table
     key: str
     # Object fields copied into the same-named query columns
-    columns: Tuple[str, ...] = ()
+    columns: tuple[str, ...] = ()
     # False: ``key`` holds one object (a plan), not a list
     many: bool = True
     # The list holds plain values (ids), stored in ``value_column``
     scalar: bool = False
-    value_column: Optional[str] = None
+    value_column: str | None = None
     # Constant columns telling apart the nodes sharing one table (equipment type, role)
-    fixed: Tuple[Tuple[str, Any], ...] = ()
-    children: Tuple['Node', ...] = ()
+    fixed: tuple[tuple[str, Any], ...] = ()
+    children: tuple[Node, ...] = ()
 
 
 def _equipment(equipment_type: str) -> Node:
@@ -55,7 +56,7 @@ def _equipment(equipment_type: str) -> Node:
     )
 
 
-KINDS: Dict[str, Node] = {
+KINDS: dict[str, Node] = {
     'astrodex': Node(
         schema.astrodex_items,
         'items',
@@ -119,7 +120,7 @@ KINDS: Dict[str, Node] = {
 }
 
 # Every collection table, children before parents (safe deletion order without cascades)
-COLLECTION_TABLES: Tuple[Table, ...] = (
+COLLECTION_TABLES: tuple[Table, ...] = (
     schema.astrodex_pictures,
     schema.astrodex_items,
     schema.observation_nights,
@@ -167,7 +168,7 @@ def _column_value(table: Table, column: str, value: Any) -> Any:
     return value  # pragma: no cover - every query column is one of the above
 
 
-def _owner_filter(node: Node, user_id: Optional[str], doc_key: Optional[str]):
+def _owner_filter(node: Node, user_id: str | None, doc_key: str | None):
     table = node.table
     conditions = [table.c[name] == value for name, value in node.fixed]
     if user_id is not None:
@@ -180,7 +181,7 @@ def _owner_filter(node: Node, user_id: Optional[str], doc_key: Optional[str]):
 # --- Writing -----------------------------------------------------------------------------
 
 
-def delete_rows(conn: Connection, kind: str, user_id: Optional[str] = None, doc_key: Optional[str] = None) -> None:
+def delete_rows(conn: Connection, kind: str, user_id: str | None = None, doc_key: str | None = None) -> None:
     """Delete the rows of ``kind`` (of one document, one user, or everybody when both are None)."""
     for node in reversed(list(_walk(KINDS[kind]))):
         conn.execute(delete(node.table).where(*_owner_filter(node, user_id, doc_key)))
@@ -197,11 +198,11 @@ def _insert(
     node: Node,
     user_id: str,
     doc_key: str,
-    parent_pk: Optional[int],
+    parent_pk: int | None,
     position: int,
     element: Any,
 ) -> None:
-    row: Dict[str, Any] = {'user_id': user_id, 'doc_key': doc_key, 'position': position}
+    row: dict[str, Any] = {'user_id': user_id, 'doc_key': doc_key, 'position': position}
     row.update(dict(node.fixed))
     if parent_pk is not None:
         row['parent_pk'] = parent_pk
@@ -219,7 +220,7 @@ def _insert(
         return
 
     data = dict(element)
-    split_children: List[Tuple[Node, Any]] = []
+    split_children: list[tuple[Node, Any]] = []
     for child in node.children:
         value = data.get(child.key, _MISSING)
         if value is not _MISSING and _splittable(child, value):
@@ -259,10 +260,10 @@ def write(conn: Connection, kind: str, user_id: str, doc_key: str, document: Any
 # --- Reading -----------------------------------------------------------------------------
 
 
-def _rows_by_parent(conn: Connection, node: Node, user_id: str, doc_key: str) -> Dict[Optional[int], List[Any]]:
+def _rows_by_parent(conn: Connection, node: Node, user_id: str, doc_key: str) -> dict[int | None, list[Any]]:
     table = node.table
     columns = [table.c.pk, table.c.data] + ([table.c.parent_pk] if 'parent_pk' in table.c else [])
-    grouped: Dict[Optional[int], List[Any]] = {}
+    grouped: dict[int | None, list[Any]] = {}
     query = select(*columns).where(*_owner_filter(node, user_id, doc_key)).order_by(table.c.position)
     for row in conn.execute(query):
         parent = row.parent_pk if 'parent_pk' in table.c else None
@@ -270,7 +271,7 @@ def _rows_by_parent(conn: Connection, node: Node, user_id: str, doc_key: str) ->
     return grouped
 
 
-def _assemble(row: Any, node: Node, fetched: Dict[Node, Dict[Optional[int], List[Any]]]) -> Any:
+def _assemble(row: Any, node: Node, fetched: dict[Node, dict[int | None, list[Any]]]) -> Any:
     data = row.data
     if node.scalar or not isinstance(data, dict) or SPLIT_MARKER not in data:
         return data

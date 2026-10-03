@@ -10,7 +10,6 @@ from __future__ import annotations
 import html
 import re
 import time
-from typing import Dict, List, Tuple
 
 import requests
 
@@ -18,14 +17,14 @@ from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-_TRANSLATION_CACHE: Dict[Tuple[str, str, str], Tuple[str, float, str]] = {}
+_TRANSLATION_CACHE: dict[tuple[str, str, str], tuple[str, float, str]] = {}
 _CACHE_TTL_SECONDS = 24 * 60 * 60
 _CACHE_MAX_ENTRIES = 2000
 _MAX_TEXT_LENGTH = 5000
 _MYMEMORY_MAX_QUERY_CHARS = 450
 
 
-def _cache_get(key: Tuple[str, str, str]) -> Tuple[str, str] | None:
+def _cache_get(key: tuple[str, str, str]) -> tuple[str, str] | None:
     cached = _TRANSLATION_CACHE.get(key)
     if not cached:
         return None
@@ -36,7 +35,7 @@ def _cache_get(key: Tuple[str, str, str]) -> Tuple[str, str] | None:
     return translated_text, provider
 
 
-def _cache_set(key: Tuple[str, str, str], translated_text: str, provider: str) -> None:
+def _cache_set(key: tuple[str, str, str], translated_text: str, provider: str) -> None:
     if len(_TRANSLATION_CACHE) >= _CACHE_MAX_ENTRIES:
         # Dict preserves insertion order; drop the oldest cache entry.
         oldest = next(iter(_TRANSLATION_CACHE), None)
@@ -69,12 +68,12 @@ def _translate_with_mymemory(text: str, source_lang: str, target_lang: str) -> s
         return None
 
 
-def _split_long_segment(segment: str, max_len: int) -> List[str]:
+def _split_long_segment(segment: str, max_len: int) -> list[str]:
     """Split a long segment by sentence-like boundaries, then by whitespace if needed."""
     if len(segment) <= max_len:
         return [segment]
 
-    pieces: List[str] = []
+    pieces: list[str] = []
     # Keep sentence punctuation attached to each sentence.
     sentence_parts = re.split(r"(?<=[.!?])\s+", segment)
     current = ""
@@ -121,14 +120,14 @@ def _split_long_segment(segment: str, max_len: int) -> List[str]:
     return pieces
 
 
-def _chunk_text_for_provider(text: str, max_len: int) -> List[str]:
+def _chunk_text_for_provider(text: str, max_len: int) -> list[str]:
     """
     Build provider-safe chunks preserving paragraph boundaries where possible.
     """
     if len(text) <= max_len:
         return [text]
 
-    chunks: List[str] = []
+    chunks: list[str] = []
     paragraphs = text.split("\n")
 
     for paragraph in paragraphs:
@@ -146,7 +145,7 @@ def _translate_with_mymemory_chunked(text: str, source_lang: str, target_lang: s
     Translate text with transparent chunking to stay within provider query limits.
     """
     chunks = _chunk_text_for_provider(text, _MYMEMORY_MAX_QUERY_CHARS)
-    translated_chunks: List[str] = []
+    translated_chunks: list[str] = []
 
     for chunk in chunks:
         if not chunk:

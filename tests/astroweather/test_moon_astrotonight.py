@@ -3,8 +3,10 @@ Tests for moon_astrotonight.py (AstroTonightService).
 Focuses on pure-logic _score, BestWindow dataclass, and mocked best_windows_all_modes.
 """
 
-import pytest
 from unittest.mock import patch
+
+import pytest
+
 from astroweather.moon_astrotonight import AstroTonightService, BestWindow
 
 
@@ -134,20 +136,20 @@ class TestBestWindowsAllModesReal:
     def test_each_window_is_bestwindow_instance(self):
         svc = AstroTonightService(45.5, -73.5, "America/Montreal")
         result = svc.best_windows_all_modes()
-        for mode, window in result.items():
+        for window in result.values():
             assert isinstance(window, BestWindow)
 
     def test_duration_is_non_negative(self):
         svc = AstroTonightService(45.5, -73.5, "America/Montreal")
         result = svc.best_windows_all_modes()
-        for mode, window in result.items():
+        for window in result.values():
             assert window.duration_hours >= 0.0
 
     def test_score_is_valid(self):
         svc = AstroTonightService(45.5, -73.5, "America/Montreal")
         result = svc.best_windows_all_modes()
         valid_scores = {0, 10, 40, 65, 85, 100}
-        for mode, window in result.items():
+        for window in result.values():
             assert window.score in valid_scores
 
     def test_moon_illumination_returns_float(self):
@@ -174,8 +176,9 @@ class TestBestWindowsAllModesBranchCoverage:
          - slots 35-39: not dark → close window2 (25 < 100 → False branch at 141)
          - slots 40+:  dark → window3 opens and stays open → closes at end of scan
         """
+        from unittest.mock import MagicMock, patch
+
         import numpy as np
-        from unittest.mock import patch, MagicMock
 
         svc = AstroTonightService(45.5, -73.5, "America/Montreal")
 
@@ -203,12 +206,12 @@ class TestBestWindowsAllModesBranchCoverage:
             coord.transform_to.return_value = transformed
             return coord
 
-        with patch('astroweather.moon_astrotonight.get_sun', return_value=_make_alt_mock(sun_alts)), patch(
-            'astroweather.moon_astrotonight.get_body', return_value=_make_alt_mock(moon_alts)
-        ), patch('astroweather.moon_astrotonight.Time', return_value=MagicMock()), patch(
-            'astroweather.moon_astrotonight.AltAz', return_value=MagicMock()
-        ), patch.object(
-            svc, '_moon_illumination', return_value=50.0
+        with (
+            patch('astroweather.moon_astrotonight.get_sun', return_value=_make_alt_mock(sun_alts)),
+            patch('astroweather.moon_astrotonight.get_body', return_value=_make_alt_mock(moon_alts)),
+            patch('astroweather.moon_astrotonight.Time', return_value=MagicMock()),
+            patch('astroweather.moon_astrotonight.AltAz', return_value=MagicMock()),
+            patch.object(svc, '_moon_illumination', return_value=50.0),
         ):
             result = svc.best_windows_all_modes()
 
@@ -218,8 +221,9 @@ class TestBestWindowsAllModesBranchCoverage:
 
     def test_end_window_shorter_than_best_does_not_replace(self):
         """end-of-scan window duration < best mid-scan → no update."""
+        from unittest.mock import MagicMock, patch
+
         import numpy as np
-        from unittest.mock import patch, MagicMock
 
         svc = AstroTonightService(45.5, -73.5, "America/Montreal")
         n = 145  # 18:00 → 06:00 at 5-min steps
@@ -241,12 +245,12 @@ class TestBestWindowsAllModesBranchCoverage:
             coord.transform_to.return_value = transformed
             return coord
 
-        with patch('astroweather.moon_astrotonight.get_sun', return_value=_make_alt_mock(sun_alts)), patch(
-            'astroweather.moon_astrotonight.get_body', return_value=_make_alt_mock(moon_alts)
-        ), patch('astroweather.moon_astrotonight.Time', return_value=MagicMock()), patch(
-            'astroweather.moon_astrotonight.AltAz', return_value=MagicMock()
-        ), patch.object(
-            svc, '_moon_illumination', return_value=50.0
+        with (
+            patch('astroweather.moon_astrotonight.get_sun', return_value=_make_alt_mock(sun_alts)),
+            patch('astroweather.moon_astrotonight.get_body', return_value=_make_alt_mock(moon_alts)),
+            patch('astroweather.moon_astrotonight.Time', return_value=MagicMock()),
+            patch('astroweather.moon_astrotonight.AltAz', return_value=MagicMock()),
+            patch.object(svc, '_moon_illumination', return_value=50.0),
         ):
             result = svc.best_windows_all_modes()
 

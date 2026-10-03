@@ -4,8 +4,10 @@ Focuses on pure-logic helpers that are easy to unit-test.
 """
 
 import json
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
+
 from skytonight.skytonight_scheduler_manager import _trim_calculation_log
 
 
@@ -130,7 +132,7 @@ class TestGetOrCreateScheduler:
             "skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_lock_file",
             return_value=str(tmp_path / "test.lock"),
         ):
-            with patch("builtins.open", side_effect=IOError("locked")):
+            with patch("builtins.open", side_effect=OSError("locked")):
                 result = get_or_create_skytonight_scheduler(mock_app)
         assert result is None
 
@@ -513,8 +515,8 @@ class TestRunSkytonigtRefreshProgressException:
 
     def test_set_progress_exception_is_swallowed(self):
         """_set_progress('build_dataset') raises →  (except/pass) are covered."""
-        from skytonight.skytonight_scheduler_manager import _run_skytonight_refresh
         from skytonight import skytonight_calculator
+        from skytonight.skytonight_scheduler_manager import _run_skytonight_refresh
 
         mock_dataset_result = {"metadata": {"generated_at": None, "sources": [], "counts": {}}}
 
@@ -582,7 +584,7 @@ class TestRunSkytonigtRefreshProgressException:
             "skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_lock_file",
             return_value=str(tmp_path / "test2.lock"),
         ):
-            with patch("builtins.open", side_effect=IOError("locked")):
+            with patch("builtins.open", side_effect=OSError("locked")):
                 result = get_or_create_skytonight_scheduler(mock_app)
         assert result is None
 
@@ -624,8 +626,9 @@ class TestGetSkytonigtSchedulerForApi:
 
     def test_returns_remote_scheduler_when_lock_held_by_other(self, tmp_path):
         """When lock file exists and is held elsewhere, return 'remote_scheduler'."""
-        from skytonight.skytonight_scheduler_manager import get_skytonight_scheduler_for_api
         import sys
+
+        from skytonight.skytonight_scheduler_manager import get_skytonight_scheduler_for_api
 
         lock_file = tmp_path / "held.lock"
         lock_file.write_text("")
@@ -643,7 +646,7 @@ class TestGetSkytonigtSchedulerForApi:
                         with app.app_context():
                             result = get_skytonight_scheduler_for_api()
                 else:
-                    with patch("fcntl.flock", side_effect=IOError("locked by other")):
+                    with patch("fcntl.flock", side_effect=OSError("locked by other")):
                         from flask import Flask
 
                         app = Flask(__name__)
@@ -653,8 +656,9 @@ class TestGetSkytonigtSchedulerForApi:
 
     def test_returns_none_when_lock_file_not_held(self, tmp_path):
         """When lock file exists but can be acquired, no remote scheduler - return None."""
-        from skytonight.skytonight_scheduler_manager import get_skytonight_scheduler_for_api
         import sys
+
+        from skytonight.skytonight_scheduler_manager import get_skytonight_scheduler_for_api
 
         lock_file = tmp_path / "free.lock"
         lock_file.write_text("")
@@ -693,7 +697,7 @@ class TestGetSkytonigtSchedulerForApi:
                 "skytonight.skytonight_scheduler_manager.get_skytonight_scheduler_lock_file",
                 return_value=str(lock_file),
             ):
-                with patch("builtins.open", side_effect=IOError("cannot open")):
+                with patch("builtins.open", side_effect=OSError("cannot open")):
                     from flask import Flask
 
                     app = Flask(__name__)
@@ -720,9 +724,11 @@ class TestGetOrCreateSchedulerLockLoggedBranch:
 
         lock_path = str(tmp_path / "test.lock")
 
-        with patch.object(module, 'get_skytonight_scheduler_lock_file', return_value=lock_path), patch.object(
-            module.sys, 'platform', 'win32'
-        ), patch.object(module.msvcrt, 'locking', side_effect=OSError("locked")):
+        with (
+            patch.object(module, 'get_skytonight_scheduler_lock_file', return_value=lock_path),
+            patch.object(module.sys, 'platform', 'win32'),
+            patch.object(module.msvcrt, 'locking', side_effect=OSError("locked")),
+        ):
             result = get_or_create_skytonight_scheduler(mock_app)
 
         assert result is None
@@ -756,7 +762,7 @@ class TestGetOrCreateSchedulerLockCleanup:
                 mock_msvcrt.LK_NBLCK = 1
                 with patch(
                     "skytonight.skytonight_scheduler.SkyTonightScheduler",
-                    side_effect=IOError("io error during scheduler creation"),
+                    side_effect=OSError("io error during scheduler creation"),
                 ):
                     result = get_or_create_skytonight_scheduler(self._make_app())
         assert result is None
@@ -782,7 +788,7 @@ class TestGetOrCreateSchedulerLockCleanup:
                     mock_msvcrt.LK_NBLCK = 1
                     with patch(
                         "skytonight.skytonight_scheduler.SkyTonightScheduler",
-                        side_effect=IOError("io error"),
+                        side_effect=OSError("io error"),
                     ):
                         result = get_or_create_skytonight_scheduler(self._make_app())
         assert result is None

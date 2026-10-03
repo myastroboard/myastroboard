@@ -7,14 +7,15 @@ import copy
 import os
 import re
 import uuid
-from datetime import datetime, timezone
-from typing import Dict, List, Optional
-from db import documents, queries
-from utils.constants import DATA_DIR
-from utils.logging_config import get_logger
+from datetime import UTC, datetime
+
 from constellation import Constellation
+
+from db import documents, queries
 from observation import catalogue_aliases
 from skytonight import skytonight_targets
+from utils.constants import DATA_DIR
+from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
@@ -34,7 +35,7 @@ MAX_EXTERNAL_ALIASES = 20
 MAX_EXTERNAL_ALIAS_STRING_LENGTH = 80
 
 
-def _sanitize_external_aliases(value) -> Dict[str, str]:
+def _sanitize_external_aliases(value) -> dict[str, str]:
     """Validate/clean a client-supplied external_aliases mapping (catalogue key -> name).
 
     Persists SIMBAD-derived alternate names (CommonName, HD, HIP, SAO, TYC, …) captured
@@ -44,7 +45,7 @@ def _sanitize_external_aliases(value) -> Dict[str, str]:
     """
     if not isinstance(value, dict):
         return {}
-    cleaned: Dict[str, str] = {}
+    cleaned: dict[str, str] = {}
     for key, val in value.items():
         if len(cleaned) >= MAX_EXTERNAL_ALIASES:
             break
@@ -64,7 +65,7 @@ def _normalize_name(name: str) -> str:
 
 def _strip_parenthesized_text(value: str) -> str:
     """Remove parenthesized segments using a linear scan."""
-    result_chars: List[str] = []
+    result_chars: list[str] = []
     depth = 0
 
     for char in value:
@@ -85,13 +86,13 @@ def _normalize_whitespace(value: str) -> str:
     return ' '.join(str(value).split())
 
 
-def _extract_name_candidates(name: str) -> List[str]:
+def _extract_name_candidates(name: str) -> list[str]:
     """Extract likely catalogue identifier candidates from a raw target label."""
     raw = str(name or '').strip()
     if not raw:
         return []
 
-    candidates: List[str] = [raw]
+    candidates: list[str] = [raw]
 
     no_parentheses = _normalize_whitespace(_strip_parenthesized_text(raw))
     if no_parentheses and no_parentheses not in candidates:
@@ -119,7 +120,7 @@ def _extract_name_candidates(name: str) -> List[str]:
     return candidates
 
 
-def _get_alias_for_catalogue(aliases: Dict[str, str], catalogue: str) -> str:
+def _get_alias_for_catalogue(aliases: dict[str, str], catalogue: str) -> str:
     """Return alias name for a catalogue using case-insensitive key lookup."""
     if not catalogue or not isinstance(aliases, dict):
         return ''
@@ -136,7 +137,7 @@ def _get_alias_for_catalogue(aliases: Dict[str, str], catalogue: str) -> str:
     return ''
 
 
-def _get_alias_metadata(catalogue: str, object_name: str) -> tuple[str, Dict[str, str]]:
+def _get_alias_metadata(catalogue: str, object_name: str) -> tuple[str, dict[str, str]]:
     """Get aliases group metadata from the SkyTonight target resolver."""
     if not catalogue or not object_name:
         return '', {}
@@ -153,7 +154,7 @@ def _get_alias_metadata(catalogue: str, object_name: str) -> tuple[str, Dict[str
     return group_id, aliases
 
 
-def _get_item_alias_metadata(item: Dict) -> tuple[str, Dict[str, str]]:
+def _get_item_alias_metadata(item: dict) -> tuple[str, dict[str, str]]:
     """Get item aliases metadata from current aliases table (no persisted cache)."""
     inferred_group_id, inferred_aliases = _get_alias_metadata(item.get('catalogue', ''), item.get('name', ''))
     if inferred_aliases:
@@ -162,7 +163,7 @@ def _get_item_alias_metadata(item: Dict) -> tuple[str, Dict[str, str]]:
     return '', {}
 
 
-def _sanitize_item_for_persistence(item: Dict) -> None:
+def _sanitize_item_for_persistence(item: dict) -> None:
     """Remove transient and unused fields from a persisted astrodex item."""
     if not isinstance(item, dict):
         return
@@ -171,7 +172,7 @@ def _sanitize_item_for_persistence(item: Dict) -> None:
         item.pop(field_name, None)
 
 
-def _sanitize_astrodex_for_persistence(astrodex_data: Dict) -> None:
+def _sanitize_astrodex_for_persistence(astrodex_data: dict) -> None:
     """Normalize astrodex payload before writing to disk."""
     if not isinstance(astrodex_data, dict):
         return
@@ -184,7 +185,7 @@ def _sanitize_astrodex_for_persistence(astrodex_data: Dict) -> None:
         _sanitize_item_for_persistence(item)
 
 
-def _get_item_merge_key(item: Dict) -> str:
+def _get_item_merge_key(item: dict) -> str:
     """Build a stable merge key for an astrodex item (aliases group first)."""
     group_id, aliases = _get_item_alias_metadata(item)
     if group_id:
@@ -202,7 +203,7 @@ def _get_item_merge_key(item: Dict) -> str:
     return f"id:{item.get('id', '')}"
 
 
-def _attach_picture_owner_metadata(item: Dict, owner_user_id: str, owner_username: str, current_user_id: str) -> None:
+def _attach_picture_owner_metadata(item: dict, owner_user_id: str, owner_username: str, current_user_id: str) -> None:
     """Attach ownership metadata to all pictures of an item for UI permissions."""
     pictures = item.get('pictures', [])
     if not isinstance(pictures, list):
@@ -220,7 +221,7 @@ def _attach_picture_owner_metadata(item: Dict, owner_user_id: str, owner_usernam
 _PRIVATE_PICTURE_FIELDS = ('latitude', 'longitude', 'elevation')
 
 
-def _strip_private_picture_fields(picture: Dict) -> Dict:
+def _strip_private_picture_fields(picture: dict) -> dict:
     """Remove a picture's precise coordinates in place, keeping location_name.
 
     Coordinates are private to the picture's owner (v1.2) - the shared/merged
@@ -234,13 +235,13 @@ def _strip_private_picture_fields(picture: Dict) -> Dict:
     return picture
 
 
-def _build_stats_from_items(items: List[Dict]) -> Dict:
+def _build_stats_from_items(items: list[dict]) -> dict:
     """Build astrodex stats from an arbitrary visible items list."""
     total_items = len(items)
     items_with_pictures = sum(1 for item in items if item.get('pictures'))
     total_pictures = sum(len(item.get('pictures', [])) for item in items)
 
-    types_count: Dict[str, int] = {}
+    types_count: dict[str, int] = {}
     for item in items:
         item_type = item.get('type', 'Unknown')
         types_count[item_type] = types_count.get(item_type, 0) + 1
@@ -254,11 +255,11 @@ def _build_stats_from_items(items: List[Dict]) -> Dict:
     }
 
 
-def load_all_users_astrodex(usernames_by_id: Optional[Dict[str, str]] = None) -> List[Dict]:
+def load_all_users_astrodex(usernames_by_id: dict[str, str] | None = None) -> list[dict]:
     """Load astrodex collections for all users that have one."""
     usernames_by_id = usernames_by_id or {}
 
-    collections: List[Dict] = []
+    collections: list[dict] = []
     for user_id, _doc_key, data in documents.list_documents(ASTRODEX_KIND):
         if not isinstance(data, dict):
             continue
@@ -278,10 +279,10 @@ def load_all_users_astrodex(usernames_by_id: Optional[Dict[str, str]] = None) ->
 
 def get_visible_astrodex(
     current_user_id: str,
-    current_username: Optional[str] = None,
+    current_username: str | None = None,
     private_mode: bool = False,
-    usernames_by_id: Optional[Dict[str, str]] = None,
-) -> Dict:
+    usernames_by_id: dict[str, str] | None = None,
+) -> dict:
     """
     Return astrodex payload visible to current user.
 
@@ -292,7 +293,7 @@ def get_visible_astrodex(
     own_items = current_user.get('items', []) if isinstance(current_user.get('items', []), list) else []
 
     if private_mode:
-        visible_items: List[Dict] = []
+        visible_items: list[dict] = []
         for raw_item in own_items:
             item = copy.deepcopy(raw_item)
             enrich_item_with_catalogue_aliases(item)
@@ -316,7 +317,7 @@ def get_visible_astrodex(
     usernames_by_id = usernames_by_id or {}
     all_collections = load_all_users_astrodex(usernames_by_id)
 
-    grouped: Dict[str, List[Dict]] = {}
+    grouped: dict[str, list[dict]] = {}
 
     for collection in all_collections:
         owner_user_id = collection.get('user_id', '')
@@ -332,7 +333,7 @@ def get_visible_astrodex(
             merge_key = _get_item_merge_key(item)
             grouped.setdefault(merge_key, []).append(item)
 
-    merged_items: List[Dict] = []
+    merged_items: list[dict] = []
     for source_items in grouped.values():
         own_item = next((item for item in source_items if item.get('owner_user_id') == current_user_id), None)
         base_item = own_item or source_items[0]
@@ -340,7 +341,7 @@ def get_visible_astrodex(
         merged_item = copy.deepcopy(base_item)
         merged_item['is_owned_by_current_user'] = own_item is not None
 
-        merged_pictures: List[Dict] = []
+        merged_pictures: list[dict] = []
         seen_picture_keys = set()
         for source_item in source_items:
             for picture in source_item.get('pictures', []):
@@ -382,10 +383,10 @@ def get_visible_astrodex(
 
 def get_astrodex_map_points(
     current_user_id: str,
-    current_username: Optional[str] = None,
+    current_username: str | None = None,
     map_private: bool = False,
-    usernames_by_id: Optional[Dict[str, str]] = None,
-) -> Dict:
+    usernames_by_id: dict[str, str] | None = None,
+) -> dict:
     """
     Return a flat list of geotagged Astrodex pictures for the Photo Map view.
 
@@ -410,7 +411,7 @@ def get_astrodex_map_points(
     else:
         collections = load_all_users_astrodex(usernames_by_id or {})
 
-    points: List[Dict] = []
+    points: list[dict] = []
     total_without_location = 0
 
     for collection in collections:
@@ -450,7 +451,7 @@ def get_astrodex_map_points(
 
 
 def can_user_view_image(
-    user_id: str, filename: str, private_mode: bool, usernames_by_id: Optional[Dict[str, str]] = None
+    user_id: str, filename: str, private_mode: bool, usernames_by_id: dict[str, str] | None = None
 ) -> bool:
     """Check if user can access an astrodex image according to privacy mode."""
     if not filename:
@@ -465,16 +466,16 @@ def ensure_astrodex_directories():
     os.makedirs(ASTRODEX_IMAGES_DIR, exist_ok=True)
 
 
-def _empty_astrodex(user_id: str, username: Optional[str]) -> Dict:
+def _empty_astrodex(user_id: str, username: str | None) -> dict:
     return {
         'user_id': user_id,
         'username': username or 'unknown',
-        'created_at': datetime.now(timezone.utc).isoformat(),
+        'created_at': datetime.now(UTC).isoformat(),
         'items': [],
     }
 
 
-def load_user_astrodex(user_id: str, username: Optional[str] = None) -> Dict:
+def load_user_astrodex(user_id: str, username: str | None = None) -> dict:
     """Load a user's astrodex data using user UUID
 
     Args:
@@ -527,7 +528,7 @@ def validate_astrodex_data(data) -> tuple[bool, str]:
     return True, ""
 
 
-def save_user_astrodex(user_id: str, astrodex_data: Dict, username: Optional[str] = None) -> bool:
+def save_user_astrodex(user_id: str, astrodex_data: dict, username: str | None = None) -> bool:
     """
     Validate and store a user's astrodex data (one transaction, so nothing half-written)
 
@@ -539,7 +540,7 @@ def save_user_astrodex(user_id: str, astrodex_data: Dict, username: Optional[str
         True on success, False on failure
     """
     try:
-        astrodex_data['updated_at'] = datetime.now(timezone.utc).isoformat()
+        astrodex_data['updated_at'] = datetime.now(UTC).isoformat()
         astrodex_data['user_id'] = user_id
         if username:
             astrodex_data['username'] = username
@@ -559,7 +560,7 @@ def save_user_astrodex(user_id: str, astrodex_data: Dict, username: Optional[str
         return False
 
 
-def create_astrodex_item(user_id: str, item_data: Dict, username: Optional[str] = None) -> Optional[Dict]:
+def create_astrodex_item(user_id: str, item_data: dict, username: str | None = None) -> dict | None:
     """
     Create a new item in user's astrodex
 
@@ -605,8 +606,8 @@ def create_astrodex_item(user_id: str, item_data: Dict, username: Optional[str] 
         'constellation': item_data.get('constellation', ''),
         'notes': item_data.get('notes', ''),
         'pictures': [],
-        'created_at': datetime.now(timezone.utc).isoformat(),
-        'updated_at': datetime.now(timezone.utc).isoformat(),
+        'created_at': datetime.now(UTC).isoformat(),
+        'updated_at': datetime.now(UTC).isoformat(),
     }
 
     external_aliases = _sanitize_external_aliases(item_data.get('external_aliases'))
@@ -620,7 +621,7 @@ def create_astrodex_item(user_id: str, item_data: Dict, username: Optional[str] 
     return None
 
 
-def get_astrodex_item(user_id: str, item_id: str) -> Optional[Dict]:
+def get_astrodex_item(user_id: str, item_id: str) -> dict | None:
     """Get a specific item from user's astrodex"""
     astrodex = load_user_astrodex(user_id)
 
@@ -658,10 +659,10 @@ def count_pictures_for_combination(combination_id: str) -> int:
 
 def build_combination_photo_index(
     current_user_id: str,
-    current_username: Optional[str] = None,
+    current_username: str | None = None,
     private_mode: bool = False,
-    usernames_by_id: Optional[Dict[str, str]] = None,
-) -> Dict[str, List[Dict]]:
+    usernames_by_id: dict[str, str] | None = None,
+) -> dict[str, list[dict]]:
     """Index every visible Astrodex picture by its combination_id (pictures with none are
     skipped). Reuses get_visible_astrodex()'s privacy rules (own-only vs merged-across-users),
     so combination photo stats never expose more than the rest of Astrodex already does.
@@ -671,7 +672,7 @@ def build_combination_photo_index(
     once per combination.
     """
     visible = get_visible_astrodex(current_user_id, current_username, private_mode, usernames_by_id)
-    index: Dict[str, List[Dict]] = {}
+    index: dict[str, list[dict]] = {}
     for item in visible.get('items', []):
         for picture in item.get('pictures', []):
             combination_id = picture.get('combination_id')
@@ -687,14 +688,14 @@ def build_combination_photo_index(
 def get_pictures_for_combination(
     combination_id: str,
     current_user_id: str,
-    current_username: Optional[str] = None,
+    current_username: str | None = None,
     private_mode: bool = False,
-    usernames_by_id: Optional[Dict[str, str]] = None,
-) -> List[Dict]:
+    usernames_by_id: dict[str, str] | None = None,
+) -> list[dict]:
     """Like build_combination_photo_index() but for a single combination_id - use this for the
     single-combination endpoint instead of indexing every other combination's pictures too."""
     visible = get_visible_astrodex(current_user_id, current_username, private_mode, usernames_by_id)
-    pictures: List[Dict] = []
+    pictures: list[dict] = []
     for item in visible.get('items', []):
         for picture in item.get('pictures', []):
             if picture.get('combination_id') != combination_id:
@@ -706,7 +707,7 @@ def get_pictures_for_combination(
     return pictures
 
 
-def summarize_combination_pictures(pictures: List[Dict]) -> Dict:
+def summarize_combination_pictures(pictures: list[dict]) -> dict:
     """Compute {photo_count, average_rating, picture_refs} for one combination's pictures.
 
     average_rating is the mean of only the *rated* pictures (unrated ones count toward
@@ -724,7 +725,7 @@ def summarize_combination_pictures(pictures: List[Dict]) -> Dict:
             continue
         try:
             ratings.append(float(value))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             logger.warning(
                 "Ignoring non-numeric rating %r on picture %s - counting it as unrated",
                 value,
@@ -737,7 +738,7 @@ def summarize_combination_pictures(pictures: List[Dict]) -> Dict:
     }
 
 
-def update_astrodex_item(user_id: str, item_id: str, updates: Dict) -> Optional[Dict]:
+def update_astrodex_item(user_id: str, item_id: str, updates: dict) -> dict | None:
     """Update an existing item in user's astrodex"""
     astrodex = load_user_astrodex(user_id)
 
@@ -749,7 +750,7 @@ def update_astrodex_item(user_id: str, item_id: str, updates: Dict) -> Optional[
                 if field in updates:
                     item[field] = updates[field]
 
-            item['updated_at'] = datetime.now(timezone.utc).isoformat()
+            item['updated_at'] = datetime.now(UTC).isoformat()
 
             if save_user_astrodex(user_id, astrodex):
                 return item
@@ -758,7 +759,7 @@ def update_astrodex_item(user_id: str, item_id: str, updates: Dict) -> Optional[
     return None
 
 
-def _resolve_image_file_path(filename: Optional[str]) -> Optional[str]:
+def _resolve_image_file_path(filename: str | None) -> str | None:
     """Resolve a stored picture filename to an absolute path inside ASTRODEX_IMAGES_DIR,
     or None if it escapes that directory.
 
@@ -797,7 +798,7 @@ def delete_astrodex_item(user_id: str, item_id: str) -> bool:
                     if os.path.exists(file_path):
                         os.remove(file_path)
                         logger.info(f"Deleted image file: {file_path}")
-                except (OSError, IOError) as e:
+                except OSError as e:
                     logger.error(f"Error deleting image file {filename}: {e}")
                     # Continue anyway - the metadata will still be removed
 
@@ -811,7 +812,7 @@ def delete_astrodex_item(user_id: str, item_id: str) -> bool:
     return False
 
 
-def add_picture_to_item(user_id: str, item_id: str, picture_data: Dict) -> Optional[Dict]:
+def add_picture_to_item(user_id: str, item_id: str, picture_data: dict) -> dict | None:
     """
     Add a picture to an astrodex item
 
@@ -885,7 +886,7 @@ def add_picture_to_item(user_id: str, item_id: str, picture_data: Dict) -> Optio
                 'combination_used_components': picture_data.get('combination_used_components') or None,
                 'rating': picture_data.get('rating'),
                 'is_main': False,  # New pictures are not main by default
-                'created_at': datetime.now(timezone.utc).isoformat(),
+                'created_at': datetime.now(UTC).isoformat(),
             }
 
             # MyAstroShine re-processing provenance - only stored when supplied,
@@ -905,7 +906,7 @@ def add_picture_to_item(user_id: str, item_id: str, picture_data: Dict) -> Optio
                 new_picture['is_main'] = True
 
             item['pictures'].append(new_picture)
-            item['updated_at'] = datetime.now(timezone.utc).isoformat()
+            item['updated_at'] = datetime.now(UTC).isoformat()
 
             if save_user_astrodex(user_id, astrodex):
                 return new_picture
@@ -914,7 +915,7 @@ def add_picture_to_item(user_id: str, item_id: str, picture_data: Dict) -> Optio
     return None
 
 
-def update_picture(user_id: str, item_id: str, picture_id: str, updates: Dict) -> Optional[Dict]:
+def update_picture(user_id: str, item_id: str, picture_id: str, updates: dict) -> dict | None:
     """Update a picture in an astrodex item"""
     astrodex = load_user_astrodex(user_id)
 
@@ -950,7 +951,7 @@ def update_picture(user_id: str, item_id: str, picture_id: str, updates: Dict) -
                         if field in updates:
                             picture[field] = updates[field]
 
-                    item['updated_at'] = datetime.now(timezone.utc).isoformat()
+                    item['updated_at'] = datetime.now(UTC).isoformat()
 
                     if save_user_astrodex(user_id, astrodex):
                         return picture
@@ -985,7 +986,7 @@ def delete_picture(user_id: str, item_id: str, picture_id: str) -> bool:
                 item['pictures'][0]['is_main'] = True
 
             if len(item['pictures']) < original_count:
-                item['updated_at'] = datetime.now(timezone.utc).isoformat()
+                item['updated_at'] = datetime.now(UTC).isoformat()
 
                 # Delete the physical file if it exists
                 if deleted_filename:
@@ -995,7 +996,7 @@ def delete_picture(user_id: str, item_id: str, picture_id: str) -> bool:
                             if os.path.exists(file_path):
                                 os.remove(file_path)
                                 logger.info(f"Deleted image file: {file_path}")
-                        except (OSError, IOError) as e:
+                        except OSError as e:
                             logger.error(f"Error deleting image file {deleted_filename}: {e}")
                             # Continue anyway - the metadata is still removed
 
@@ -1018,13 +1019,13 @@ def set_main_picture(user_id: str, item_id: str, picture_id: str) -> bool:
             for picture in item['pictures']:
                 if picture['id'] == picture_id:
                     picture['is_main'] = True
-                    item['updated_at'] = datetime.now(timezone.utc).isoformat()
+                    item['updated_at'] = datetime.now(UTC).isoformat()
                     return save_user_astrodex(user_id, astrodex)
 
     return False
 
 
-def get_main_picture(item: Dict) -> Optional[Dict]:
+def get_main_picture(item: dict) -> dict | None:
     """Get the main picture for an item, or None if no pictures"""
     if not item.get('pictures'):
         return None
@@ -1038,7 +1039,7 @@ def get_main_picture(item: Dict) -> Optional[Dict]:
     return item['pictures'][0] if item['pictures'] else None
 
 
-def _find_matching_astrodex_item(items: List[Dict], item_name: str, catalogue: str = '') -> Optional[Dict]:
+def _find_matching_astrodex_item(items: list[dict], item_name: str, catalogue: str = '') -> dict | None:
     """Return the first item in *items* that represents the same object as ``item_name``.
 
     Shared matching core behind ``is_item_in_astrodex*`` / ``find_item_in_astrodex``.
@@ -1123,7 +1124,7 @@ def is_item_in_preloaded_astrodex(astrodex_data: dict, item_name: str, catalogue
     return _find_matching_astrodex_item(items, item_name, catalogue) is not None
 
 
-def enrich_item_with_catalogue_aliases(item: Dict) -> Dict:
+def enrich_item_with_catalogue_aliases(item: dict) -> dict:
     """Attach aliases metadata at runtime (not persisted).
 
     Prefers the live SkyTonight DSO catalogue lookup; falls back to the item's own
@@ -1138,7 +1139,7 @@ def enrich_item_with_catalogue_aliases(item: Dict) -> Dict:
     return item
 
 
-def switch_item_catalogue_name(user_id: str, item_id: str, target_catalogue: str) -> Optional[Dict]:
+def switch_item_catalogue_name(user_id: str, item_id: str, target_catalogue: str) -> dict | None:
     """Switch displayed object name to one of its catalogue aliases."""
     astrodex = load_user_astrodex(user_id)
 
@@ -1179,7 +1180,7 @@ def switch_item_catalogue_name(user_id: str, item_id: str, target_catalogue: str
         else:  # pragma: no cover
             item.pop('catalogue_aliases', None)
         item.pop('catalogue_group_id', None)
-        item['updated_at'] = datetime.now(timezone.utc).isoformat()
+        item['updated_at'] = datetime.now(UTC).isoformat()
 
         if save_user_astrodex(user_id, astrodex):
             return item
@@ -1188,13 +1189,13 @@ def switch_item_catalogue_name(user_id: str, item_id: str, target_catalogue: str
     return None
 
 
-def get_astrodex_stats(user_id: str) -> Dict:
+def get_astrodex_stats(user_id: str) -> dict:
     """Get statistics about user's astrodex"""
     astrodex = load_user_astrodex(user_id)
     return _build_stats_from_items(astrodex['items'])
 
 
-def get_constellations_list() -> List[str]:
+def get_constellations_list() -> list[str]:
     """Get a human-readable list of constellation names from the Constellation enum"""
 
     def humanize(name: str) -> str:

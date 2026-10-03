@@ -28,7 +28,7 @@ import io
 import os
 import random
 import time
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -47,11 +47,11 @@ _CONNECTOR_NAME = AstrodexStreamConnector.name
 # feed_key -> {time-bucket: jpeg bytes}. A short TTL just collapses near-simultaneous polls
 # (a user's own browser tab + a Home Assistant card both requesting the same feed within the
 # same second or two) into a single render; it is not a freshness cache in any other sense.
-_FRAME_CACHE: Dict[Tuple[str, str, int], bytes] = {}
+_FRAME_CACHE: dict[tuple[str, str, int], bytes] = {}
 _FRAME_CACHE_TTL_SECONDS = 2
 _FRAME_CACHE_MAX_ENTRIES = 256
 
-ASPECT_RATIOS: Dict[str, Tuple[int, int]] = {
+ASPECT_RATIOS: dict[str, tuple[int, int]] = {
     "16:9": (16, 9),
     "9:16": (9, 16),
     "4:3": (4, 3),
@@ -117,10 +117,10 @@ def verify_shared_token(token: str) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def _eligible_pictures_personal(user_id: str) -> List[Dict[str, Any]]:
+def _eligible_pictures_personal(user_id: str) -> list[dict[str, Any]]:
     """This user's own pictures, ordered stably, item name attached, no owner (always self)."""
     data = astrodex.load_user_astrodex(user_id)
-    pictures: List[Dict[str, Any]] = []
+    pictures: list[dict[str, Any]] = []
     for item in data.get("items", []) or []:
         item_name = item.get("name", "")
         for picture in item.get("pictures", []) or []:
@@ -139,7 +139,7 @@ def _eligible_pictures_personal(user_id: str) -> List[Dict[str, Any]]:
     return pictures
 
 
-def _eligible_pictures_shared() -> List[Dict[str, Any]]:
+def _eligible_pictures_shared() -> list[dict[str, Any]]:
     """Every user's pictures in the merged (non-private) view, owner attached, GPS stripped.
 
     current_user_id="" never matches a real owner, so get_visible_astrodex()'s existing
@@ -148,7 +148,7 @@ def _eligible_pictures_shared() -> List[Dict[str, Any]]:
     single viewer behind the shared feed.
     """
     visible = astrodex.get_visible_astrodex(current_user_id="", private_mode=False)
-    pictures: List[Dict[str, Any]] = []
+    pictures: list[dict[str, Any]] = []
     for item in visible.get("items", []) or []:
         item_name = item.get("name", "")
         for picture in item.get("pictures", []) or []:
@@ -181,7 +181,7 @@ def _current_slot(now: float, display_seconds: int) -> int:
     return int(now // cycle)
 
 
-def _raw_cycle_shuffle(seed: str, cycle: int, count: int) -> List[int]:
+def _raw_cycle_shuffle(seed: str, cycle: int, count: int) -> list[int]:
     """A fixed, seeded shuffle of range(count), with no cross-cycle adjustment - one full,
     non-repeating pass through the collection. Deterministic: the same (seed, cycle) always
     shuffles the same way. Kept separate from _cycle_order() below so that the boundary check
@@ -193,7 +193,7 @@ def _raw_cycle_shuffle(seed: str, cycle: int, count: int) -> List[int]:
     return order
 
 
-def _cycle_order(seed: str, cycle: int, count: int) -> List[int]:
+def _cycle_order(seed: str, cycle: int, count: int) -> list[int]:
     """The order actually shown for one full cycle - _raw_cycle_shuffle(), with its first two
     positions swapped if the shuffle would otherwise open on the same picture the previous
     cycle closed on. Computed as a whole and indexed by the caller, never recomputed
@@ -239,7 +239,7 @@ def _slot_to_picture_index(seed: str, slot: int, count: int) -> int:
 # ---------------------------------------------------------------------------
 
 
-def _target_size(aspect_ratio: str) -> Tuple[int, int]:
+def _target_size(aspect_ratio: str) -> tuple[int, int]:
     w_ratio, h_ratio = ASPECT_RATIOS.get(aspect_ratio, ASPECT_RATIOS[DEFAULT_ASPECT_RATIO])
     if w_ratio >= h_ratio:
         width = RENDER_LONG_EDGE
@@ -265,7 +265,7 @@ def _center_crop_resize(image: Image.Image, target_w: int, target_h: int) -> Ima
     return image.resize((target_w, target_h), Image.Resampling.LANCZOS, box=box)
 
 
-def _load_source_image(filename: str) -> Optional[Image.Image]:
+def _load_source_image(filename: str) -> Image.Image | None:
     path = astrodex._resolve_image_file_path(filename)
     if not path or not os.path.isfile(path):
         return None
@@ -278,8 +278,8 @@ def _load_source_image(filename: str) -> Optional[Image.Image]:
         return None
 
 
-_AnyFont = Union[ImageFont.FreeTypeFont, ImageFont.ImageFont]
-_font_cache: Dict[int, _AnyFont] = {}
+_AnyFont = ImageFont.FreeTypeFont | ImageFont.ImageFont
+_font_cache: dict[int, _AnyFont] = {}
 
 
 def _font(size: int) -> _AnyFont:
@@ -306,7 +306,7 @@ def _format_date(value: Any) -> str:
     return str(value).split("T", 1)[0]
 
 
-def _banner_lines(picture: Dict[str, Any]) -> List[str]:
+def _banner_lines(picture: dict[str, Any]) -> list[str]:
     lines = []
     name = picture.get("item_name")
     if name:
@@ -320,7 +320,7 @@ def _banner_lines(picture: Dict[str, Any]) -> List[str]:
     return lines
 
 
-def _draw_banner(image: Image.Image, lines: List[str]) -> Image.Image:
+def _draw_banner(image: Image.Image, lines: list[str]) -> Image.Image:
     """A small, semi-transparent bottom-right banner - secondary info, kept discreet."""
     if not lines:
         return image
@@ -365,7 +365,7 @@ def _encode_jpeg(frame: Image.Image) -> bytes:
     return buf.getvalue()
 
 
-def render_current_frame(pictures: List[Dict[str, Any]], config: Dict[str, Any], seed: str = "") -> bytes:
+def render_current_frame(pictures: list[dict[str, Any]], config: dict[str, Any], seed: str = "") -> bytes:
     display_seconds = int(config.get("display_seconds") or 20)
     aspect_ratio = str(config.get("aspect_ratio") or DEFAULT_ASPECT_RATIO)
     target_w, target_h = _target_size(aspect_ratio)
@@ -385,14 +385,14 @@ def render_current_frame(pictures: List[Dict[str, Any]], config: Dict[str, Any],
     return _encode_jpeg(frame)
 
 
-def _config_fingerprint(config: Dict[str, Any]) -> str:
+def _config_fingerprint(config: dict[str, Any]) -> str:
     """The subset of config that changes what gets rendered - part of the cache key so a
     config change (or, as in the test suite, varying it between calls) can never return a
     stale render for a different aspect ratio than the one just requested."""
     return "|".join(str(config.get(k)) for k in ("display_seconds", "aspect_ratio"))
 
 
-def _render_cached(feed_key: str, pictures: List[Dict[str, Any]], config: Dict[str, Any]) -> bytes:
+def _render_cached(feed_key: str, pictures: list[dict[str, Any]], config: dict[str, Any]) -> bytes:
     bucket = int(time.time() // _FRAME_CACHE_TTL_SECONDS)
     cache_key = (feed_key, _config_fingerprint(config), bucket)
     cached = _FRAME_CACHE.get(cache_key)
@@ -412,9 +412,9 @@ def _render_cached(feed_key: str, pictures: List[Dict[str, Any]], config: Dict[s
     return data
 
 
-def personal_frame(user_id: str, config: Dict[str, Any]) -> bytes:
+def personal_frame(user_id: str, config: dict[str, Any]) -> bytes:
     return _render_cached(f"user:{user_id}", _eligible_pictures_personal(user_id), config)
 
 
-def shared_frame(config: Dict[str, Any]) -> bytes:
+def shared_frame(config: dict[str, Any]) -> bytes:
     return _render_cached("shared", _eligible_pictures_shared(), config)

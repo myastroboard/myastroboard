@@ -71,7 +71,7 @@ def test_generate_body_positions_unknown_body_returns_empty():
 def test_get_horizon_data_uses_local_date(monkeypatch):
     svc = module.HorizonGraphService(45.0, -73.0, "UTC")
 
-    fixed_now = datetime.datetime(2026, 3, 11, 18, 0, tzinfo=datetime.timezone.utc)
+    fixed_now = datetime.datetime(2026, 3, 11, 18, 0, tzinfo=datetime.UTC)
 
     class FakeDateTime(datetime.datetime):
         @classmethod

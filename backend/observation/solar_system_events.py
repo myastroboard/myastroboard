@@ -11,17 +11,18 @@ Provides detailed visibility information for each event.
 """
 
 import math
-from datetime import datetime, timedelta, date
-from typing import List, Dict, Any, Optional, Tuple
+from datetime import date, datetime, timedelta
+from typing import Any
 from zoneinfo import ZoneInfo
-from utils import parse_iso_to_utc, distant_epoch_precision_warnings_muted
-from utils.logging_config import get_logger
-from utils.i18n_utils import I18nManager
 
-from astropy.coordinates import EarthLocation, AltAz, SkyCoord, ICRS
-from astropy.time import Time
-from astropy import units as u
 import numpy as np
+from astropy import units as u
+from astropy.coordinates import ICRS, AltAz, EarthLocation, SkyCoord
+from astropy.time import Time
+
+from utils import distant_epoch_precision_warnings_muted, parse_iso_to_utc
+from utils.i18n_utils import I18nManager
+from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
@@ -236,7 +237,7 @@ class SolarSystemEventsService:
         # Determine hemisphere
         self.hemisphere = 'Northern' if latitude >= 0 else 'Southern'
 
-    def get_solar_system_events(self, days_ahead: int = 365) -> List[Dict[str, Any]]:
+    def get_solar_system_events(self, days_ahead: int = 365) -> list[dict[str, Any]]:
         """
         Get all solar system events for the next N days.
 
@@ -273,7 +274,7 @@ class SolarSystemEventsService:
         return events
 
     @staticmethod
-    def _shower_activity_window(peak_date: datetime, shower_data: Dict[str, Any]):
+    def _shower_activity_window(peak_date: datetime, shower_data: dict[str, Any]):
         """Return (start_dt, end_dt) UTC datetimes bracketing the peak for the shower's
         real IMO activity period.
 
@@ -292,7 +293,7 @@ class SolarSystemEventsService:
         end_dt = datetime(end_year, end_month, end_day, 23, 59, 0, tzinfo=ZoneInfo("UTC"))
         return start_dt, end_dt
 
-    def _find_meteor_shower_peaks(self, start_date: date, days_ahead: int) -> List[Dict[str, Any]]:
+    def _find_meteor_shower_peaks(self, start_date: date, days_ahead: int) -> list[dict[str, Any]]:
         """Find meteor shower peak events.
 
         Each shower is checked for both the start year and the following year so a
@@ -388,7 +389,7 @@ class SolarSystemEventsService:
     # MPC catalogue is skipped so the events list stays a short, meaningful set.
     _COMET_NOTABLE_ABS_MAG_MAX = 10.0
 
-    def _find_comet_visibility_windows(self, start_date: date, days_ahead: int) -> List[Dict[str, Any]]:
+    def _find_comet_visibility_windows(self, start_date: date, days_ahead: int) -> list[dict[str, Any]]:
         """Find comet visibility windows around each comet's perihelion.
 
         Comet apparitions are one-off dated events (unlike the annually-recurring
@@ -406,7 +407,7 @@ class SolarSystemEventsService:
             candidates = self._curated_comet_candidates()
             source = 'curated'
 
-        events: List[Dict[str, Any]] = []
+        events: list[dict[str, Any]] = []
         for candidate in candidates:
             try:
                 event = self._build_comet_event(candidate, start_date, end_date, source)
@@ -417,7 +418,7 @@ class SolarSystemEventsService:
 
         return events
 
-    def _dataset_comet_candidates(self) -> List[Dict[str, Any]]:
+    def _dataset_comet_candidates(self) -> list[dict[str, Any]]:
         """Notable-comet candidates derived from the live MPC-sourced dataset.
 
         Keeps only comets with a parseable perihelion date and an absolute
@@ -433,7 +434,7 @@ class SolarSystemEventsService:
             logger.debug(f"Comet dataset unavailable, using curated fallback: {e}")
             return []
 
-        candidates: List[Dict[str, Any]] = []
+        candidates: list[dict[str, Any]] = []
         for target in dataset.get('targets', []):
             is_dict = isinstance(target, dict)
             category = target.get('category') if is_dict else getattr(target, 'category', None)
@@ -462,7 +463,7 @@ class SolarSystemEventsService:
         return candidates
 
     @staticmethod
-    def _extract_orbital_elements(metadata: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def _extract_orbital_elements(metadata: dict[str, Any]) -> dict[str, Any] | None:
         """Pull the raw MPC orbital elements out of a comet's dataset metadata.
 
         Returns None when any element is missing or unparseable (e.g. curated
@@ -482,12 +483,12 @@ class SolarSystemEventsService:
                 'perihelion_day': float(metadata['perihelion_day']),
                 'slope': float(metadata['slope']),
             }
-        except (KeyError, TypeError, ValueError):
+        except KeyError, TypeError, ValueError:
             return None
 
-    def _curated_comet_candidates(self) -> List[Dict[str, Any]]:
+    def _curated_comet_candidates(self) -> list[dict[str, Any]]:
         """Fallback candidates from the small hardcoded NOTABLE_COMETS list."""
-        candidates: List[Dict[str, Any]] = []
+        candidates: list[dict[str, Any]] = []
         for name, data in self.NOTABLE_COMETS.items():
             try:
                 perihelion = datetime(
@@ -499,7 +500,7 @@ class SolarSystemEventsService:
                     0,
                     tzinfo=ZoneInfo("UTC"),
                 )
-            except (KeyError, ValueError):
+            except KeyError, ValueError:
                 continue
             candidates.append(
                 {
@@ -512,18 +513,18 @@ class SolarSystemEventsService:
         return candidates
 
     @staticmethod
-    def _parse_perihelion(value: Any) -> Optional[datetime]:
+    def _parse_perihelion(value: Any) -> datetime | None:
         """Parse a 'YYYY-MM-DD' perihelion date into a UTC datetime at noon."""
         if not value:
             return None
         try:
             parsed = datetime.strptime(str(value)[:10], "%Y-%m-%d")
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             return None
         return parsed.replace(hour=12, tzinfo=ZoneInfo("UTC"))
 
     @staticmethod
-    def _equipment_label(magnitude: Optional[float]) -> str:
+    def _equipment_label(magnitude: float | None) -> str:
         """Map a comet's apparent magnitude (absolute magnitude as a fallback) to a rough equipment hint."""
         if magnitude is None:
             return 'telescope'
@@ -538,15 +539,15 @@ class SolarSystemEventsService:
         return self.i18n.t(f'events_api.solar_system.visibility_{equipment}')
 
     @staticmethod
-    def _apparent_magnitude(abs_mag: float, slope: float, r_au: float, delta_au: float) -> Optional[float]:
+    def _apparent_magnitude(abs_mag: float, slope: float, r_au: float, delta_au: float) -> float | None:
         """Standard MPC comet brightness law: m = H + 5*log10(delta) + 2.5*n*log10(r)."""
         if r_au <= 0 or delta_au <= 0:
             return None
         return abs_mag + 5.0 * math.log10(delta_au) + 2.5 * slope * math.log10(r_au)
 
     def _compute_true_brightness_peak(
-        self, candidate: Dict[str, Any], visibility_start: datetime, visibility_end: datetime
-    ) -> Optional[Tuple[datetime, float, float]]:
+        self, candidate: dict[str, Any], visibility_start: datetime, visibility_end: datetime
+    ) -> tuple[datetime, float, float] | None:
         """Find the day of maximum apparent brightness within a comet's visibility window.
 
         Perihelion (closest approach to the Sun) and the day a comet is
@@ -573,9 +574,9 @@ class SolarSystemEventsService:
         except Exception:
             return None
 
-        best_date: Optional[datetime] = None
-        best_magnitude: Optional[float] = None
-        max_transit_altitude: Optional[float] = None
+        best_date: datetime | None = None
+        best_magnitude: float | None = None
+        max_transit_altitude: float | None = None
         total_days = max(0, (visibility_end - visibility_start).days)
 
         for offset in range(total_days + 1):
@@ -614,8 +615,8 @@ class SolarSystemEventsService:
         return best_date, round(best_magnitude, 1), max_transit_altitude
 
     def _build_comet_event(
-        self, candidate: Dict[str, Any], start_date: date, end_date: date, source: str
-    ) -> Optional[Dict[str, Any]]:
+        self, candidate: dict[str, Any], start_date: date, end_date: date, source: str
+    ) -> dict[str, Any] | None:
         """Build one comet event dict when its ±30-day window overlaps the search range."""
         perihelion_date: datetime = candidate['perihelion']
         magnitude = candidate.get('magnitude')
@@ -669,7 +670,7 @@ class SolarSystemEventsService:
             },
         }
 
-    def _find_asteroid_occultations(self, start_date: date, days_ahead: int) -> List[Dict[str, Any]]:
+    def _find_asteroid_occultations(self, start_date: date, days_ahead: int) -> list[dict[str, Any]]:
         """
         Find asteroid occultation events.
 

@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import numpy as np
 
-from astroweather.sun_phases import SunService, SunAstroInfo
+from astroweather.sun_phases import SunAstroInfo, SunService
 
 
 class _FakeAlt:
@@ -64,7 +64,7 @@ class TestSunServiceBranches:
         svc = SunService(45.5, -73.5, "UTC")
         mock_get_sun.return_value = _FakeSun(12.34)
 
-        dt = datetime.datetime(2026, 1, 1, 12, 0, tzinfo=datetime.timezone.utc)
+        dt = datetime.datetime(2026, 1, 1, 12, 0, tzinfo=datetime.UTC)
         altitude = svc._sun_altitude(dt)
 
         assert altitude == 12.34
@@ -92,9 +92,9 @@ class TestSunsetAltitudeConvention:
         # Analytic crossing of the standard altitude, interpolated between samples.
         deg_per_sample = 10.0 / (n - 1)
         idx = (5.0 - SUN_STANDARD_ALTITUDE) / deg_per_sample
-        start_utc = datetime.datetime(2026, 6, 5, 12, 0, tzinfo=datetime.timezone.utc)
+        start_utc = datetime.datetime(2026, 6, 5, 12, 0, tzinfo=datetime.UTC)
         expected = start_utc + datetime.timedelta(minutes=idx * 5)
-        got = datetime.datetime.strptime(report.sunset, "%Y-%m-%d %H:%M").replace(tzinfo=datetime.timezone.utc)
+        got = datetime.datetime.strptime(report.sunset, "%Y-%m-%d %H:%M").replace(tzinfo=datetime.UTC)
 
         # Interpolation should land within a minute of the analytic crossing (the old
         # snap-to-next-sample behaviour would have been up to 5 minutes late).

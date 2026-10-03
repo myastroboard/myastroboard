@@ -3,18 +3,16 @@
 import json
 import os
 import re
-from typing import Dict, Optional
-
-from utils.logging_config import get_logger
 
 from skytonight import skytonight_targets
+from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
 ALIASES_FILE = os.path.join(os.path.dirname(__file__), '..', 'catalogue_aliases.json')
 
-_aliases_cache: Dict = {}
-_aliases_mtime: Optional[float] = None
+_aliases_cache: dict = {}
+_aliases_mtime: float | None = None
 
 
 def normalize_object_name(name: str) -> str:
@@ -30,7 +28,7 @@ def make_lookup_key(catalogue: str, object_name: str) -> str:
     return f"{str(catalogue or '').strip().lower()}::{normalize_object_name(object_name)}"
 
 
-def load_aliases_table(force_reload: bool = False) -> Dict:
+def load_aliases_table(force_reload: bool = False) -> dict:
     """Load aliases table from backend/catalogue_aliases.json with cache."""
     global _aliases_cache, _aliases_mtime
 
@@ -42,7 +40,7 @@ def load_aliases_table(force_reload: bool = False) -> Dict:
         if not force_reload and _aliases_cache and _aliases_mtime == current_mtime:
             return _aliases_cache
 
-        with open(ALIASES_FILE, 'r', encoding='utf-8') as file:
+        with open(ALIASES_FILE, encoding='utf-8') as file:
             data = json.load(file)
 
         _aliases_cache = data if isinstance(data, dict) else {}
@@ -54,7 +52,7 @@ def load_aliases_table(force_reload: bool = False) -> Dict:
         return {}
 
 
-def get_alias_entry(catalogue: str, object_name: str) -> Dict:
+def get_alias_entry(catalogue: str, object_name: str) -> dict:
     """Get aliases entry for a given catalogue/object pair."""
     if not catalogue or not object_name:
         return {}
@@ -69,7 +67,7 @@ def get_alias_entry(catalogue: str, object_name: str) -> Dict:
     return lookup.get(key, {}) if isinstance(lookup, dict) else {}
 
 
-def get_aliases_map(catalogue: str, object_name: str) -> Dict[str, str]:
+def get_aliases_map(catalogue: str, object_name: str) -> dict[str, str]:
     """Get aliases map for a catalogue/object pair."""
     entry = get_alias_entry(catalogue, object_name)
     aliases = entry.get('aliases', {}) if isinstance(entry, dict) else {}
@@ -83,7 +81,7 @@ def get_group_id(catalogue: str, object_name: str) -> str:
     return str(group_id or '')
 
 
-def merge_item_with_alias_entry(item: Dict) -> Dict:
+def merge_item_with_alias_entry(item: dict) -> dict:
     """Attach runtime aliases metadata from current aliases table."""
     if not isinstance(item, dict):
         return item

@@ -759,13 +759,13 @@ Full details live in [CONTRIBUTING.md](../../CONTRIBUTING.md#before-submitting) 
 
 ```bash
 pytest                              # full test suite
-black backend/ tests/               # Python formatting (PEP 8, 120-char lines)
-flake8 backend/ tests/              # Python linting
+ruff format .                       # Python formatting (120-char lines, quotes left as written)
+ruff check .                        # Python linting (pyproject.toml extends .github/org/ruff.base.toml)
 pyright backend/                    # static type checking (reads pyrightconfig.json at repo root)
 djlint templates/ static/offline.html --profile jinja --lint --ignore H021,H023,H030,H031,J004,J018
 ```
 
-- `black` and `flake8` are declared in `requirements-dev.txt`; run them on every `backend/` and `tests/` change, not just new files.
+- `ruff` is declared in `requirements-dev.txt` and covers the whole repository; CI runs both commands on every push.
 - `pyright` stays scoped to `backend/` only - test code's heavy use of `monkeypatch`/`MagicMock`/dynamic attributes would drown real findings in false positives.
 - `pyright` mirrors the Pylance errors shown inline in VSCode - a clean `pyright backend/` run means Pylance should be clean too. If VSCode still shows stale errors after a config edit, run "Python: Restart Language Server".
 - `djlint` lints `templates/` (Jinja2) and `static/offline.html`; the ignored rule codes are explained in [CONTRIBUTING.md](../../CONTRIBUTING.md#ignored-rules-and-why) - do not silently add more ignores without documenting why there.
@@ -784,8 +784,8 @@ Update `EXPECTED_ROUTES` in that file to match, and document the change in `CHAN
 ### Minimum Bar Before Calling a Change Done
 
 - [ ] `pytest` passes
-- [ ] `black backend/ tests/` produces no diff
-- [ ] `flake8 backend/ tests/` reports no issues
+- [ ] `ruff format --check .` produces no diff
+- [ ] `ruff check .` reports no issues
 - [ ] `pyright backend/` reports no errors
 - [ ] `djlint` passes for any touched template
 - [ ] `pytest tests/blueprints/test_route_inventory.py` passes if routes changed
@@ -1288,6 +1288,7 @@ weather_namespace = manager.get_namespace('weather_alerts')
 from flask import jsonify
 from i18n_utils import create_translated_alert, I18nManager
 
+
 @app.route('/api/weather/alerts', methods=['GET'])
 @login_required
 def get_weather_alerts_api():
@@ -1298,12 +1299,7 @@ def get_weather_alerts_api():
 
     # Create alerts with translated messages
     alerts = [
-        create_translated_alert(
-            alert_type='DEW_WARNING',
-            severity='HIGH',
-            time=alert_time,
-            language=language
-        ),
+        create_translated_alert(alert_type='DEW_WARNING', severity='HIGH', time=alert_time, language=language),
         # ... more alerts
     ]
 
@@ -1315,11 +1311,13 @@ def get_weather_alerts_api():
 ```python
 from i18n_utils import init_i18n_for_request
 
+
 @app.before_request
 def setup_i18n():
     """Initialize i18n for each request"""
     language = request.args.get('lang', 'en')
     g.i18n = init_i18n_for_request(language)
+
 
 # Later in route handler
 @app.route('/api/some-endpoint', methods=['GET'])
@@ -1390,16 +1388,10 @@ element.textContent = "This is a message";
 
 ```python
 # GOOD: Use translated messages in API responses
-return jsonify({
-    'status': 'error',
-    'message': i18n.t('common.error')
-})
+return jsonify({'status': 'error', 'message': i18n.t('common.error')})
 
 # AVOID: Hardcoded English strings
-return jsonify({
-    'status': 'error',
-    'message': 'An error occurred'
-})
+return jsonify({'status': 'error', 'message': 'An error occurred'})
 ```
 
 #### API Language Propagation Rule

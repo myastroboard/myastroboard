@@ -8,7 +8,6 @@ test_connectors_allsky.py, test_connectors_myastroshine.py.
 
 import sys
 import types
-
 from unittest.mock import patch
 
 if 'psutil' not in sys.modules:
@@ -45,7 +44,6 @@ def _config(allsky_cfg=None):
 
 
 class TestListConnectors:
-
     def test_requires_login(self, client):
         resp = client.get('/api/connectors')
         assert resp.status_code == 401
@@ -120,8 +118,9 @@ class TestListConnectors:
                 return {}
 
         registry = {'standalone': _StandaloneConnector}
-        with patch.dict('connectors.REGISTRY', registry, clear=True), patch(
-            'blueprints.connectors.load_config', return_value=_config()
+        with (
+            patch.dict('connectors.REGISTRY', registry, clear=True),
+            patch('blueprints.connectors.load_config', return_value=_config()),
         ):
             resp = client_user.get('/api/connectors')
         data = resp.get_json()
@@ -139,7 +138,6 @@ class TestListConnectors:
 
 
 class TestSaveConnectorConfig:
-
     def test_known_module_is_merged_and_unknown_or_malformed_entries_are_ignored(self, client_admin, monkeypatch):
         saved = {}
         monkeypatch.setattr('blueprints.connectors.load_config', lambda: {'connectors': {}})
@@ -202,7 +200,6 @@ def _stub_registry():
 
 
 class TestTypedFieldsAndSecrets:
-
     def _save(self, client_admin, monkeypatch, payload, stored_cfg=None):
         saved = {}
         monkeypatch.setattr('blueprints.connectors.load_config', lambda: {'connectors': dict(stored_cfg or {})})

@@ -4,6 +4,7 @@ Covers pure-logic rating methods, constants, and mocked event finders.
 """
 
 import math
+from datetime import UTC
 from unittest.mock import patch
 
 import pytest
@@ -318,8 +319,8 @@ class TestIsRadiantVisible:
 
     def test_altaz_none_returns_false(self):
         """if altaz is None → return False."""
-        from astropy.time import Time
         from astropy.coordinates import SkyCoord
+        from astropy.time import Time
 
         svc = SolarSystemEventsService(45.0, -73.5)
         t = Time("2026-08-12T02:00:00", format="isot", scale="utc")
@@ -330,10 +331,11 @@ class TestIsRadiantVisible:
 
     def test_ndarray_altitude_branch(self):
         """alt_val is ndarray → float(np.real(...)) extraction."""
-        import numpy as np
-        from astropy.time import Time
-        from astropy.coordinates import SkyCoord
         from unittest.mock import MagicMock
+
+        import numpy as np
+        from astropy.coordinates import SkyCoord
+        from astropy.time import Time
 
         svc = SolarSystemEventsService(45.0, -73.5)
         t = Time("2026-08-12T02:00:00", format="isot", scale="utc")
@@ -384,8 +386,9 @@ class TestCometExceptionHandler:
         svc = SolarSystemEventsService(45.0, -73.5)
 
         # Force the dataset path to be skipped so the curated fallback runs.
-        with patch.object(svc, "_dataset_comet_candidates", return_value=[]), patch.object(
-            svc, "_build_comet_event", side_effect=ValueError("simulated build error")
+        with (
+            patch.object(svc, "_dataset_comet_candidates", return_value=[]),
+            patch.object(svc, "_build_comet_event", side_effect=ValueError("simulated build error")),
         ):
             events = svc._find_comet_visibility_windows(date(2026, 1, 1), 365)
         assert events == []
@@ -439,8 +442,9 @@ class TestCometDatasetSource:
     """Comet events come from the live MPC-fed dataset, not a hardcoded year list."""
 
     def test_uses_dataset_comets_when_available(self, monkeypatch):
-        import skytonight.skytonight_targets as targets_mod
         from datetime import date
+
+        import skytonight.skytonight_targets as targets_mod
 
         fake_dataset = {
             "targets": [
@@ -477,8 +481,9 @@ class TestCometDatasetSource:
         assert all(e["raw_data"]["source"] == "dataset" for e in events)
 
     def test_falls_back_to_curated_when_dataset_empty(self, monkeypatch):
-        import skytonight.skytonight_targets as targets_mod
         from datetime import date
+
+        import skytonight.skytonight_targets as targets_mod
 
         monkeypatch.setattr(targets_mod, "load_targets_dataset", lambda *a, **k: {"targets": []})
         svc = SolarSystemEventsService(45.0, 0.0, timezone="UTC")
@@ -670,18 +675,18 @@ class TestComputeTrueBrightnessPeak:
         return {'name': 'Test Comet', 'magnitude': magnitude, 'orbital_elements': orbital_elements}
 
     def test_returns_none_without_orbital_elements(self):
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timedelta
 
         svc = SolarSystemEventsService(45.0, 0.0, timezone="UTC")
-        start = datetime(2026, 7, 3, 12, 0, 0, tzinfo=timezone.utc)
+        start = datetime(2026, 7, 3, 12, 0, 0, tzinfo=UTC)
         end = start + timedelta(days=6)
         assert svc._compute_true_brightness_peak(self._candidate(None), start, end) is None
 
     def test_returns_none_without_magnitude(self):
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timedelta
 
         svc = SolarSystemEventsService(45.0, 0.0, timezone="UTC")
-        start = datetime(2026, 7, 3, 12, 0, 0, tzinfo=timezone.utc)
+        start = datetime(2026, 7, 3, 12, 0, 0, tzinfo=UTC)
         end = start + timedelta(days=6)
         candidate = self._candidate(_FULL_ELEMENTS_METADATA, magnitude=None)
         assert svc._compute_true_brightness_peak(candidate, start, end) is None
@@ -690,10 +695,10 @@ class TestComputeTrueBrightnessPeak:
         """Earth's closest approach a day after perihelion should pull the
         computed peak away from perihelion itself - this is the scenario a
         real apparition (e.g. 10P/Tempel 2026) can show in practice."""
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timedelta
 
         svc = SolarSystemEventsService(45.0, 0.0, timezone="UTC")
-        perihelion = datetime(2026, 8, 2, 12, 0, 0, tzinfo=timezone.utc)
+        perihelion = datetime(2026, 8, 2, 12, 0, 0, tzinfo=UTC)
         start = perihelion - timedelta(days=3)
         end = perihelion + timedelta(days=3)
         closest_earth_day = (perihelion + timedelta(days=1)).date()
@@ -720,10 +725,10 @@ class TestComputeTrueBrightnessPeak:
     def test_max_transit_altitude_is_the_window_wide_maximum(self, monkeypatch):
         """The altitude tracked is the best day in the whole window, independent
         of which day happens to be the brightest."""
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timedelta
 
         svc = SolarSystemEventsService(45.0, 0.0, timezone="UTC")
-        start = datetime(2026, 8, 1, 12, 0, 0, tzinfo=timezone.utc)
+        start = datetime(2026, 8, 1, 12, 0, 0, tzinfo=UTC)
         end = start + timedelta(days=3)
         best_altitude_day = (start + timedelta(days=2)).date()
 
@@ -745,10 +750,10 @@ class TestComputeTrueBrightnessPeak:
         assert max_transit_altitude == pytest.approx(90.0)  # dec == lat -> straight overhead
 
     def test_days_with_failed_propagation_are_skipped(self, monkeypatch):
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timedelta
 
         svc = SolarSystemEventsService(45.0, 0.0, timezone="UTC")
-        start = datetime(2026, 8, 1, 12, 0, 0, tzinfo=timezone.utc)
+        start = datetime(2026, 8, 1, 12, 0, 0, tzinfo=UTC)
         end = start + timedelta(days=2)
 
         def fake_comet_ra_dec(*args, **kwargs):
@@ -762,10 +767,10 @@ class TestComputeTrueBrightnessPeak:
 
     def test_returns_none_when_skytonight_comets_import_fails(self, monkeypatch):
         import sys
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timedelta
 
         svc = SolarSystemEventsService(45.0, 0.0, timezone="UTC")
-        start = datetime(2026, 8, 1, 12, 0, 0, tzinfo=timezone.utc)
+        start = datetime(2026, 8, 1, 12, 0, 0, tzinfo=UTC)
         end = start + timedelta(days=2)
 
         # Setting the module to None in sys.modules makes any import of it raise
@@ -776,10 +781,10 @@ class TestComputeTrueBrightnessPeak:
         assert svc._compute_true_brightness_peak(candidate, start, end) is None
 
     def test_days_with_missing_distance_data_are_skipped(self, monkeypatch):
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timedelta
 
         svc = SolarSystemEventsService(45.0, 0.0, timezone="UTC")
-        start = datetime(2026, 8, 1, 12, 0, 0, tzinfo=timezone.utc)
+        start = datetime(2026, 8, 1, 12, 0, 0, tzinfo=UTC)
         end = start + timedelta(days=2)
         missing_data_day = start.date()
 
@@ -796,10 +801,10 @@ class TestComputeTrueBrightnessPeak:
         assert result is not None
 
     def test_days_with_no_declination_skip_altitude_tracking(self, monkeypatch):
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timedelta
 
         svc = SolarSystemEventsService(45.0, 0.0, timezone="UTC")
-        start = datetime(2026, 8, 1, 12, 0, 0, tzinfo=timezone.utc)
+        start = datetime(2026, 8, 1, 12, 0, 0, tzinfo=UTC)
         end = start + timedelta(days=1)
 
         def fake_comet_ra_dec(q, e, omega, Omega, incl, py, pm, pd, obs_time, earth_helio):
@@ -814,10 +819,10 @@ class TestComputeTrueBrightnessPeak:
         assert svc._compute_true_brightness_peak(candidate, start, end) is None
 
     def test_days_with_non_positive_distance_skip_magnitude(self, monkeypatch):
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timedelta
 
         svc = SolarSystemEventsService(45.0, 0.0, timezone="UTC")
-        start = datetime(2026, 8, 1, 12, 0, 0, tzinfo=timezone.utc)
+        start = datetime(2026, 8, 1, 12, 0, 0, tzinfo=UTC)
         end = start + timedelta(days=1)
         bad_magnitude_day = start.date()
 
@@ -838,10 +843,10 @@ class TestBuildCometEventUsesBrightnessPeak:
     """Integration: _build_comet_event should prefer the true brightness peak."""
 
     def test_peak_time_shifts_away_from_perihelion_when_earth_is_closer_later(self, monkeypatch):
-        from datetime import date, datetime, timedelta, timezone
+        from datetime import date, datetime, timedelta
 
         svc = SolarSystemEventsService(45.0, 0.0, timezone="UTC")
-        perihelion = datetime(2026, 8, 2, 12, 0, 0, tzinfo=timezone.utc)
+        perihelion = datetime(2026, 8, 2, 12, 0, 0, tzinfo=UTC)
         closest_earth_day = (perihelion + timedelta(days=1)).date()
 
         def fake_comet_ra_dec(q, e, omega, Omega, incl, py, pm, pd, obs_time, earth_helio):
@@ -874,13 +879,13 @@ class TestBuildCometEventUsesBrightnessPeak:
     def test_altitude_limited_when_target_never_clears_the_site_floor(self, monkeypatch):
         """Reproduces the 10P/Tempel case: a real, notable comet that never
         rises high enough above a specific site's horizon to be observed."""
-        from datetime import date, datetime, timezone
+        from datetime import date, datetime
 
         # altitude_constraint_min=25, airmass_constraint=1.8 -> effective floor ~33.75 deg
         svc = SolarSystemEventsService(
             48.64, 5.51, timezone="Europe/Paris", altitude_constraint_min=25.0, airmass_constraint=1.8
         )
-        perihelion = datetime(2026, 8, 2, 12, 0, 0, tzinfo=timezone.utc)
+        perihelion = datetime(2026, 8, 2, 12, 0, 0, tzinfo=UTC)
 
         def fake_comet_ra_dec(q, e, omega, Omega, incl, py, pm, pd, obs_time, earth_helio):
             # dec=-24.7 near latitude 48.64 -> max transit altitude ~16.7 deg, well under the floor.

@@ -19,8 +19,8 @@ import os
 import re
 import tempfile
 import zipfile
-from datetime import datetime, timezone
-from typing import IO, Dict, List, Tuple
+from datetime import UTC, datetime
+from typing import IO
 
 from utils.logging_config import get_logger
 
@@ -52,7 +52,7 @@ Data files are JSON (UTF-8), readable by any text editor or program.
 """
 
 
-def user_data_dirs() -> List[Tuple[str, str]]:
+def user_data_dirs() -> list[tuple[str, str]]:
     """``(archive folder, directory)`` for every directory holding ``<user_id>_...`` files.
 
     Resolved on each call (not at import) so tests that repoint a module's directory
@@ -70,12 +70,12 @@ def user_data_dirs() -> List[Tuple[str, str]]:
 _EXPORT_FOLDERS = {'equipments': 'equipment', 'projects': 'plans'}
 
 
-def _user_documents(user_id: str) -> List[Tuple[str, Dict]]:
+def _user_documents(user_id: str) -> list[tuple[str, dict]]:
     """``(archive path, document)`` for every per-user document of ``user_id``."""
     from db import documents
     from db.json_layout import document_path
 
-    exported: List[Tuple[str, Dict]] = []
+    exported: list[tuple[str, dict]] = []
     for kind, doc_key, data in documents.list_all_user_documents(user_id):
         try:
             path = document_path(kind, user_id, doc_key)
@@ -131,11 +131,11 @@ def purge_user_files(user_id) -> int:
     return removed
 
 
-def _legacy_astrodex_pictures(user_id: str) -> List[Tuple[str, str]]:
+def _legacy_astrodex_pictures(user_id: str) -> list[tuple[str, str]]:
     """Pictures the user's Astrodex references without the ``<user_id>_`` prefix (older uploads)."""
     from observation import astrodex
 
-    pictures: List[Tuple[str, str]] = []
+    pictures: list[tuple[str, str]] = []
     try:
         data = astrodex.load_user_astrodex(user_id)
     except Exception as error:
@@ -153,7 +153,7 @@ def _legacy_astrodex_pictures(user_id: str) -> List[Tuple[str, str]]:
     return pictures
 
 
-def _account_record(user) -> Dict:
+def _account_record(user) -> dict:
     return {
         'user_id': user.user_id,
         'username': user.username,
@@ -167,7 +167,7 @@ def _account_record(user) -> Dict:
     }
 
 
-def _locations_record(user) -> List[Dict]:
+def _locations_record(user) -> list[dict]:
     from utils.repo_config import get_locations_for_user, load_config
 
     try:
@@ -185,7 +185,7 @@ def _compression_for(filename: str) -> int:
     return zipfile.ZIP_STORED if os.path.splitext(filename)[1].lower() in _STORED_EXTENSIONS else zipfile.ZIP_DEFLATED
 
 
-def build_user_export(user) -> Tuple[IO[bytes], str]:
+def build_user_export(user) -> tuple[IO[bytes], str]:
     """Write a ZIP of everything stored about ``user``; return ``(file object at offset 0, download name)``.
 
     The archive goes to a temporary file rather than memory, since pictures can be
@@ -194,7 +194,7 @@ def build_user_export(user) -> Tuple[IO[bytes], str]:
     if not _is_valid_user_id(str(user.user_id)):
         raise ValueError('Invalid user id')
 
-    exported_at = datetime.now(timezone.utc)
+    exported_at = datetime.now(UTC)
     archive_file = tempfile.TemporaryFile()
     with zipfile.ZipFile(archive_file, mode='w') as archive:
         archive.writestr(

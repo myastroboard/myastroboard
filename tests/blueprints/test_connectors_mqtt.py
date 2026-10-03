@@ -61,7 +61,6 @@ def saved(monkeypatch):
 
 
 class TestAccess:
-
     @pytest.mark.parametrize(
         'method, path',
         [
@@ -86,7 +85,6 @@ class TestAccess:
 
 
 class TestHealth:
-
     def test_get_probes_the_saved_config_with_stored_credentials(self, client_admin, saved, probe):
         resp = client_admin.get('/api/connectors/mqtt/health')
         assert resp.status_code == 200
@@ -164,7 +162,6 @@ class TestHealth:
 
 
 class TestPublisherRoutes:
-
     def test_status_returns_the_publisher_status(self, client_admin, saved, monkeypatch):
         from connectors import mqtt_publisher
 

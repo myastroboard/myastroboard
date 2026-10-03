@@ -7,7 +7,7 @@ blueprints/connectors.py.
 import re
 import time
 
-from flask import Blueprint, request, jsonify, abort, Response, stream_with_context
+from flask import Blueprint, Response, abort, jsonify, request, stream_with_context
 
 from cache import cache_store
 from connectors.allsky_connector import AllSkyConnector
@@ -91,7 +91,7 @@ def allsky_health_api():
             ip_obj = _ipaddress.ip_address(resolved_ip)
             if ip_obj.is_loopback or ip_obj.is_link_local or ip_obj.is_unspecified or ip_obj.is_multicast:
                 return jsonify({"reachable": False, "error": "url host is not allowed"}), 400
-        except (_socket.gaierror, ValueError):
+        except _socket.gaierror, ValueError:
             return jsonify({"reachable": False, "error": "unable to resolve host"}), 400
         safe_scheme = 'https' if parsed.scheme == 'https' else 'http'
         safe_url = f"{safe_scheme}://{resolved_ip}"

@@ -7,13 +7,10 @@ from unittest.mock import patch
 
 import pyotp
 import pytest
-
-from db import documents
+from sqlalchemy import select
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from sqlalchemy import select
-
-from db import engine
+from db import documents, engine
 from utils import auth
 from utils.repo_config import get_user_location_prefs
 
@@ -131,7 +128,6 @@ def test_update_user_preferences_rejects_invalid_values(isolated_user_manager):
 
 
 class TestUserModel:
-
     def test_user_id_auto_generated(self):
         u = auth.User(username='alice', password_hash='hash', role=auth.ROLE_USER)
         assert u.user_id is not None
@@ -251,7 +247,6 @@ class TestUserModel:
 
 
 class TestUserManagerLoadSave:
-
     def test_load_users_creates_default_admin_when_table_empty(self):
         _empty_users_table()
         manager = auth.UserManager()
@@ -324,7 +319,6 @@ class TestUserManagerLoadSave:
 
 
 class TestUserManagerReloadIfChanged:
-
     def test_reload_when_another_worker_saves(self):
         manager = auth.UserManager()
         other = auth.UserManager()
@@ -359,7 +353,6 @@ class TestUserManagerReloadIfChanged:
 
 
 class TestUserManagerCreate:
-
     def test_create_user_success(self, isolated_user_manager):
         manager = isolated_user_manager
         user = manager.create_user('newuser', 'password123', auth.ROLE_USER)
@@ -429,7 +422,6 @@ class TestUserManagerCreate:
 
 
 class TestUserManagerGetUser:
-
     def test_get_user_by_username_returns_none_for_missing(self, isolated_user_manager):
         assert isolated_user_manager.get_user_by_username('nobody') is None
 
@@ -449,7 +441,6 @@ class TestUserManagerGetUser:
 
 
 class TestUserManagerUpdateUser:
-
     def test_update_username(self, isolated_user_manager):
         manager = isolated_user_manager
         user = manager.create_user('alice', 'pass', auth.ROLE_USER)
@@ -496,7 +487,6 @@ class TestUserManagerUpdateUser:
 
 
 class TestUserManagerChangePassword:
-
     def test_change_own_password_user_not_found(self, isolated_user_manager):
         with pytest.raises(ValueError, match='User not found'):
             isolated_user_manager.change_own_password('no-such-id', 'old', 'new')
@@ -515,7 +505,6 @@ class TestUserManagerChangePassword:
 
 
 class TestUserManagerAuthenticate:
-
     def test_authenticate_correct_credentials(self, isolated_user_manager):
         manager = isolated_user_manager
         manager.create_user('alice', 'mypassword', auth.ROLE_USER)
@@ -542,7 +531,6 @@ class TestUserManagerAuthenticate:
 
 
 class TestUserManagerDeleteUser:
-
     def test_delete_nonexistent_user_raises(self, isolated_user_manager):
         with pytest.raises(ValueError, match='not found'):
             isolated_user_manager.delete_user('no-such-id')
@@ -661,7 +649,6 @@ class TestUserManagerDeleteUser:
 
 
 class TestUserManagerPreferences:
-
     def test_get_user_preferences_user_not_found(self, isolated_user_manager):
         with pytest.raises(ValueError, match='User not found'):
             isolated_user_manager.get_user_preferences('no-such-id')
@@ -698,7 +685,6 @@ class TestUserManagerPreferences:
 
 
 class TestValidateUsersJsonData:
-
     def test_not_a_dict_fails(self):
         is_valid, msg = auth.UserManager.validate_users_json_data([])
         assert not is_valid
@@ -775,7 +761,6 @@ class TestValidateUsersJsonData:
 
 
 class TestValidateUserPreferences:
-
     def test_not_dict_fails(self):
         is_valid, msg = auth.UserManager.validate_user_preferences('not-a-dict')
         assert not is_valid
@@ -957,7 +942,6 @@ class TestValidateUserPreferences:
 
 
 class TestSanitizeUserPreferences:
-
     def test_none_input_returns_defaults(self):
         result = auth.UserManager.sanitize_user_preferences(None)
         assert result == auth.DEFAULT_USER_PREFERENCES
@@ -982,7 +966,6 @@ class TestSanitizeUserPreferences:
 
 
 class TestAuthDecorators:
-
     @pytest.fixture
     def flask_app(self, tmp_path, monkeypatch):
         """Set up a minimal Flask app with auth routes for testing."""
@@ -1065,7 +1048,6 @@ class TestAuthDecorators:
 
 
 class TestSaveUsersFailurePaths:
-
     def test_save_users_rejects_invalid_data_and_keeps_database(self, isolated_user_manager):
         from db import users_store
 

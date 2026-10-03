@@ -327,7 +327,7 @@ A "Failed" badge appears in the Duration column if the last execution threw an e
 for job_name, shared_key, update_fn, ttl, cache_entry in cache_jobs:
     cache_store.sync_cache_from_shared(shared_key, cache_entry)
     if cache_store.is_cache_valid(cache_entry, ttl):
-        continue   # skip - still fresh
+        continue  # skip - still fresh
     # run the job and record timing
     t0 = time.time()
     update_fn()
@@ -351,12 +351,7 @@ Per-job metrics are stored under the `_cache_metrics` key in `data/cache/astro_c
 ### Location Change Detection
 ```python
 # Signature-based comparison
-new_signature = {
-    "latitude": 45.5,
-    "longitude": -73.5,
-    "elevation": 100,
-    "timezone": "America/Montreal"
-}
+new_signature = {"latitude": 45.5, "longitude": -73.5, "elevation": 100, "timezone": "America/Montreal"}
 # If any value differs → reset_all_caches() → all timestamps zeroed
 ```
 

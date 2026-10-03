@@ -18,10 +18,9 @@ import pytest
 if 'psutil' not in sys.modules:
     sys.modules['psutil'] = types.ModuleType('psutil')
 
-import app as _app_mod
-from cache import cache_store as _cache_store
 import time as _time
-from utils import route_helpers as _route_helpers_mod
+
+import app as _app_mod
 from blueprints import admin as _admin_mod
 from blueprints import astrodex as _astrodex_mod
 from blueprints import astronomy as _astronomy_mod
@@ -35,11 +34,13 @@ from blueprints import plan_my_night as _plan_my_night_mod
 from blueprints import push as _push_mod
 from blueprints import tracking as _tracking_mod
 from blueprints import weather as _weather_mod
+from cache import cache_store as _cache_store
+from utils import route_helpers as _route_helpers_mod
 
 
 def _install_default_location_id():
     """The admin client's active location = the install default preset (v1.2)."""
-    from utils.repo_config import load_config, get_install_default_location
+    from utils.repo_config import get_install_default_location, load_config
 
     return get_install_default_location(load_config()).get('id')
 
@@ -131,6 +132,8 @@ def _isolate_location_cache_hydration(monkeypatch):
     yield
 
 
+from datetime import UTC
+
 from app import app
 from utils.auth import user_manager
 
@@ -183,7 +186,6 @@ def client_user():
 
 
 class TestHealthEndpoints:
-
     def test_health_api_returns_200(self, client):
         resp = client.get('/api/health')
         assert resp.status_code == 200
@@ -203,7 +205,6 @@ class TestHealthEndpoints:
 
 
 class TestStaticFileRoutes:
-
     def test_manifest_webmanifest_returns_200(self, client):
         resp = client.get('/manifest.webmanifest')
         assert resp.status_code == 200
@@ -241,7 +242,6 @@ class TestStaticFileRoutes:
 
 
 class TestPageRoutes:
-
     def test_login_page_unauthenticated(self, client):
         resp = client.get('/login')
         assert resp.status_code == 200
@@ -266,7 +266,6 @@ class TestPageRoutes:
 
 
 class TestAuthEndpoints:
-
     def test_auth_status_no_session(self, client):
         resp = client.get('/api/auth/status')
         assert resp.status_code == 200
@@ -307,7 +306,6 @@ class TestAuthEndpoints:
 
 
 class TestConfigEndpoints:
-
     def test_get_config_returns_200(self, client_admin):
         resp = client_admin.get('/api/config')
         assert resp.status_code == 200
@@ -529,7 +527,6 @@ class TestConfigEndpoints:
 
 
 class TestAdminEndpoints:
-
     def test_get_users_returns_200(self, client_admin):
         resp = client_admin.get('/api/users')
         assert resp.status_code == 200
@@ -634,7 +631,6 @@ class TestAdminEndpoints:
 
 
 class TestVersionEndpoints:
-
     def test_get_version_returns_200(self, client_admin, monkeypatch):
         monkeypatch.setattr(_misc_mod, 'get_repo_version', lambda: '1.0.0')
         resp = client_admin.get('/api/version')
@@ -661,7 +657,6 @@ class TestVersionEndpoints:
 
 
 class TestCacheEndpoints:
-
     def test_cache_status_returns_200(self, client_admin):
         resp = client_admin.get('/api/cache')
         assert resp.status_code == 200
@@ -679,7 +674,6 @@ class TestCacheEndpoints:
 
 
 class TestCachedReportEndpoints:
-
     def test_moon_report_returns_202_when_no_cache(self, client_admin):
         # Cache is empty in test environment — should return 202 pending
         resp = client_admin.get('/api/moon/report')
@@ -714,7 +708,6 @@ class TestCachedReportEndpoints:
 
 
 class TestPushEndpoints:
-
     def test_vapid_public_key_returns_200(self, client, monkeypatch):
         from utils import push_manager as _pm
 
@@ -746,7 +739,6 @@ class TestPushEndpoints:
 
 
 class TestSpaceEndpoints:
-
     def test_iss_passes_returns_response(self, client_admin):
         resp = client_admin.get('/api/iss/passes')
         assert resp.status_code in (200, 202)
@@ -774,7 +766,6 @@ class TestSpaceEndpoints:
 
 
 class TestCoordinateConversion:
-
     def test_missing_body_returns_400(self, client_admin):
         resp = client_admin.post('/api/convert-coordinates', json={})
         assert resp.status_code == 400
@@ -797,7 +788,6 @@ class TestCoordinateConversion:
 
 
 class TestSkyQualityEndpoint:
-
     def test_returns_200_or_error(self, client_admin):
         resp = client_admin.get('/api/skyquality')
         assert resp.status_code in (200, 400, 503)
@@ -813,7 +803,6 @@ class TestSkyQualityEndpoint:
 
 
 class TestUserManagement:
-
     def test_create_user_missing_body_returns_400(self, client_admin):
         resp = client_admin.post('/api/users', json={})
         assert resp.status_code == 400
@@ -840,7 +829,6 @@ class TestUserManagement:
 
 
 class TestWeatherEndpoints:
-
     def test_weather_forecast_returns_response(self, client_admin):
         resp = client_admin.get('/api/weather/forecast')
         assert resp.status_code in (200, 202, 400)
@@ -860,7 +848,6 @@ class TestWeatherEndpoints:
 
 
 class TestMoonExtendedEndpoints:
-
     def test_next_7_nights_returns_response(self, client_admin):
         resp = client_admin.get('/api/moon/next-7-nights')
         assert resp.status_code in (200, 202, 400)
@@ -980,7 +967,6 @@ class TestMoonExtendedEndpoints:
 
 
 class TestConfigExport:
-
     def test_export_returns_200_or_404(self, client_admin):
         resp = client_admin.get('/api/config/export')
         assert resp.status_code in (200, 404)
@@ -997,7 +983,6 @@ class TestConfigExport:
 
 
 class TestLogsEndpoints:
-
     def test_logs_export_returns_response(self, client_admin):
         resp = client_admin.get('/api/logs/export')
         assert resp.status_code in (200, 404, 500)
@@ -1017,7 +1002,6 @@ class TestLogsEndpoints:
 
 
 class TestChangePassword:
-
     def test_missing_body_returns_400(self, client_admin):
         resp = client_admin.post('/api/auth/change-password', json={})
         assert resp.status_code == 400
@@ -1040,7 +1024,6 @@ class TestChangePassword:
 
 
 class TestSpaceflightEvents:
-
     def test_events_returns_response(self, client_admin):
         resp = client_admin.get('/api/spaceflight/events')
         assert resp.status_code in (200, 202, 503)
@@ -1066,7 +1049,6 @@ class TestSpaceflightEvents:
 
 
 class TestPreferencesPut:
-
     def test_update_preferences_returns_200(self, client_admin):
         resp = client_admin.put('/api/auth/preferences', json={'preferences': {'language': 'en'}})
         assert resp.status_code == 200
@@ -1082,7 +1064,6 @@ class TestPreferencesPut:
 
 
 class TestPushSubscribe:
-
     def test_subscribe_missing_body_returns_400(self, client_admin):
         resp = client_admin.post('/api/push/subscribe', json={})
         assert resp.status_code == 400
@@ -1102,7 +1083,6 @@ class TestPushSubscribe:
 
 
 class TestObjectInfoEndpoint:
-
     def test_valid_object_returns_response(self, client_admin, monkeypatch):
         from observation import object_info as _oi
 
@@ -1121,7 +1101,6 @@ class TestObjectInfoEndpoint:
 
 
 class TestIssRestart:
-
     def test_restart_returns_response(self, client_admin):
         resp = client_admin.post('/api/iss/celestrak/restart')
         assert resp.status_code in (200, 400, 500)
@@ -1133,7 +1112,6 @@ class TestIssRestart:
 
 
 class TestWeatherAstroAnalysis:
-
     def test_astro_analysis_returns_response(self, client_admin):
         resp = client_admin.get('/api/weather/astro-analysis')
         assert resp.status_code in (200, 202, 400, 500)
@@ -1165,7 +1143,6 @@ class TestWeatherAstroAnalysis:
 
 
 class TestAdminRestart:
-
     def test_restart_returns_200(self, client_admin, monkeypatch):
         # Prevent the deferred thread from starting so it never sends SIGTERM
         import threading
@@ -1192,7 +1169,6 @@ class TestAdminRestart:
 
 
 class TestReportEndpointsWithCache:
-
     def test_sun_today_returns_response(self, client_admin):
         resp = client_admin.get('/api/sun/today')
         assert resp.status_code in (200, 202, 400, 404)
@@ -1232,7 +1208,6 @@ class TestReportEndpointsWithCache:
 
 
 class TestRoutesWithPopulatedCache:
-
     def test_moon_report_from_cache(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
         monkeypatch.setitem(_LEGACY['moon_report'], 'data', {'moon': 'data'})
@@ -1303,7 +1278,6 @@ class TestRoutesWithPopulatedCache:
 
 
 class TestUserCrud:
-
     def test_delete_nonexistent_user_returns_404(self, client_admin):
         fake_id = str(uuid.uuid4())
         resp = client_admin.delete(f'/api/users/{fake_id}')
@@ -1326,7 +1300,6 @@ class TestUserCrud:
 
 
 class TestCoordinateConversionValid:
-
     def test_valid_decimal_degrees(self, client_admin):
         resp = client_admin.post(
             '/api/convert-coordinates',
@@ -1345,7 +1318,6 @@ class TestCoordinateConversionValid:
 
 
 class TestPushTest:
-
     def test_push_test_with_valid_trigger_returns_response(self, client_admin):
         resp = client_admin.post('/api/push/test/iss_pass')
         assert resp.status_code in (200, 400, 404)
@@ -1361,7 +1333,6 @@ class TestPushTest:
 
 
 class TestConfigPost:
-
     def test_post_full_config_returns_200(self, client_admin):
         resp = client_admin.post(
             '/api/config',
@@ -1389,7 +1360,6 @@ class TestConfigPost:
 
 
 class TestSuccessfulLogin:
-
     @pytest.fixture
     def temp_user_credentials(self):
         """Create a fresh test user for login tests then delete it."""
@@ -1433,7 +1403,6 @@ class TestSuccessfulLogin:
 
 
 class TestEventsEndpoints:
-
     def test_events_upcoming_no_cache_returns_202(self, client_admin):
         resp = client_admin.get('/api/events/upcoming')
         assert resp.status_code in (200, 202, 400)
@@ -1483,7 +1452,6 @@ class TestEventsEndpoints:
 
 
 class TestPlanMyNightApiRoutes:
-
     def test_plan_list_returns_200(self, client_admin):
         resp = client_admin.get('/api/plan-my-night/list')
         assert resp.status_code == 200
@@ -1523,7 +1491,6 @@ class TestPlanMyNightApiRoutes:
 
 
 class TestAstrodexRoutes:
-
     def test_astrodex_get_returns_200(self, client_admin):
         resp = client_admin.get('/api/astrodex')
         assert resp.status_code == 200
@@ -1543,7 +1510,6 @@ class TestAstrodexRoutes:
 
 
 class TestStaleDataBranch:
-
     def test_moon_report_stale_data_returns_200(self, client_admin, monkeypatch):
         call_count = [0]
 
@@ -1571,7 +1537,6 @@ class TestStaleDataBranch:
 
 
 class TestEventsUpcomingFullCache:
-
     def _patch_all_caches(self, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
         monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda name, cache: True)
@@ -1623,7 +1588,6 @@ class TestEventsUpcomingFullCache:
 
 
 class TestTonightPlan:
-
     def test_tonight_plan_returns_response(self, client_admin):
         resp = client_admin.get('/api/plan-my-night/tonight-plan')
         assert resp.status_code in (200, 202, 400, 404)
@@ -1643,7 +1607,6 @@ class TestTonightPlan:
 
 
 class TestEquipmentTelescopes:
-
     def test_get_telescopes_returns_200(self, client_admin):
         resp = client_admin.get('/api/equipment/telescopes')
         assert resp.status_code == 200
@@ -1693,7 +1656,6 @@ class TestEquipmentTelescopes:
 
 
 class TestEquipmentCameras:
-
     def test_get_cameras_returns_200(self, client_admin):
         resp = client_admin.get('/api/equipment/cameras')
         assert resp.status_code == 200
@@ -1921,7 +1883,6 @@ class TestEquipmentNumericValidation:
 
 
 class TestEquipmentMounts:
-
     def test_get_mounts_returns_200(self, client_admin):
         resp = client_admin.get('/api/equipment/mounts')
         assert resp.status_code == 200
@@ -1966,7 +1927,6 @@ class TestEquipmentMounts:
 
 
 class TestEquipmentFilters:
-
     def test_get_filters_returns_200(self, client_admin):
         resp = client_admin.get('/api/equipment/filters')
         assert resp.status_code == 200
@@ -2011,7 +1971,6 @@ class TestEquipmentFilters:
 
 
 class TestEquipmentAccessories:
-
     def test_get_accessories_returns_200(self, client_admin):
         resp = client_admin.get('/api/equipment/accessories')
         assert resp.status_code == 200
@@ -2056,7 +2015,6 @@ class TestEquipmentAccessories:
 
 
 class TestEquipmentCombinations:
-
     def test_get_combinations_returns_200(self, client_admin):
         resp = client_admin.get('/api/equipment/combinations')
         assert resp.status_code == 200
@@ -2097,7 +2055,6 @@ class TestEquipmentCombinations:
 
 
 class TestEquipmentFovAndSummary:
-
     def test_fov_calculator_valid_params(self, client_admin):
         resp = client_admin.post(
             '/api/equipment/fov-calculator',
@@ -2168,7 +2125,6 @@ class TestDifficultyLookupCache:
 
 
 class TestAstrodexCrud:
-
     def _create_item(self, client_admin):
         """Helper to create an astrodex item and return its id."""
         import uuid as _uuid
@@ -2318,7 +2274,6 @@ class TestAstrodexCrud:
 
 
 class TestBackupEndpoints:
-
     def test_backup_download_returns_200(self, client_admin):
         resp = client_admin.get('/api/backup/download')
         assert resp.status_code in (200, 500)
@@ -2380,7 +2335,6 @@ class TestBackupEndpoints:
 
 
 class TestDmsConversion:
-
     def test_valid_dms_returns_200(self, client_admin):
         resp = client_admin.post('/api/convert-coordinates', json={'dms': '48d38m36.16s'})
         assert resp.status_code in (200, 400)
@@ -2449,7 +2403,6 @@ class TestDmsConversion:
 
 
 class TestBestWindowAllMode:
-
     def test_best_window_all_mode_no_cache(self, client_admin):
         resp = client_admin.get('/api/tonight/best-window?mode=all')
         assert resp.status_code in (200, 202, 400)
@@ -2486,7 +2439,6 @@ class TestBestWindowAllMode:
 
 
 class TestPlanMyNightTargetOps:
-
     def test_update_target_nonexistent_returns_404(self, client_admin):
         resp = client_admin.put('/api/plan-my-night/targets/nonexistent-id', json={'done': True})
         assert resp.status_code in (200, 404, 400)
@@ -2530,7 +2482,6 @@ class TestPlanMyNightTargetOps:
 
 
 class TestPushSubscriptionsManagement:
-
     def test_list_subscriptions_returns_200(self, client_admin):
         resp = client_admin.get('/api/push/subscriptions')
         assert resp.status_code == 200
@@ -2609,7 +2560,6 @@ class TestPushSubscriptionsManagement:
 
 
 class TestUserCrudErrors:
-
     def test_create_user_duplicate_returns_400(self, client_admin):
         # Try to create admin again (already exists)
         resp = client_admin.post(
@@ -2656,7 +2606,6 @@ class TestUserCrudErrors:
 
 
 class TestPreferencesErrors:
-
     def test_update_preferences_missing_key_returns_400(self, client_admin):
         resp = client_admin.put('/api/auth/preferences', json={})
         assert resp.status_code == 400
@@ -2688,7 +2637,6 @@ class TestPreferencesErrors:
 
 
 class TestPasswordChangeErrors:
-
     def test_change_password_short_new_password_returns_400(self, client_admin, monkeypatch):
         def _raise(user_id, current, new):
             raise ValueError('New password must be at least 6 characters')
@@ -2722,11 +2670,10 @@ class TestPasswordChangeErrors:
 
 
 class TestBackupRestoreValid:
-
     def test_backup_restore_with_valid_config_json(self, client_admin):
         import io as _io
-        import zipfile as _zf
         import json as _json
+        import zipfile as _zf
 
         buf = _io.BytesIO()
         with _zf.ZipFile(buf, mode='w') as z:
@@ -2763,7 +2710,6 @@ class TestBackupRestoreValid:
 
 
 class TestSkyQualityVariants:
-
     def test_sky_quality_both_bortle_and_sqm(self, client_admin, monkeypatch):
         monkeypatch.setattr(
             _route_helpers_mod,
@@ -2817,7 +2763,6 @@ class TestSkyQualityVariants:
 
 
 class TestAdminAppSettingsFullCoverage:
-
     def test_post_app_settings_trust_proxy_true(self, client_admin):
         resp = client_admin.post('/api/admin/app-settings', json={'trust_proxy_headers': True})
         assert resp.status_code == 200
@@ -2835,7 +2780,6 @@ class TestAdminAppSettingsFullCoverage:
 
 
 class TestPushTestTrigger:
-
     def test_trigger_unknown_returns_400(self, client_admin):
         resp = client_admin.post('/api/push/test/UNKNOWN')
         assert resp.status_code in (400, 401)
@@ -2852,7 +2796,6 @@ class TestPushTestTrigger:
 
 
 class TestLogsDeepCoverage:
-
     def test_logs_with_offset_returns_200(self, client_admin):
         resp = client_admin.get('/api/logs?offset=0&limit=10')
         assert resp.status_code == 200
@@ -2870,7 +2813,6 @@ class TestLogsDeepCoverage:
 
 
 class TestConfigPostHorizonProfile:
-
     def test_post_config_with_clear_horizon_flag(self, client_admin, monkeypatch):
         # v1.2: the clear flag empties the install-default PRESET's profile;
         # skytonight.constraints never carries horizon_profile again.
@@ -2901,7 +2843,6 @@ class TestConfigPostHorizonProfile:
 
 
 class TestCacheStaleDataBranches:
-
     def test_aurora_stale_data_returns_200(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: False)
         monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda name, cache: False)
@@ -2983,7 +2924,6 @@ class TestCacheStaleDataBranches:
 
 
 class TestWeatherStaleData:
-
     def test_weather_forecast_stale_data_returns_200(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: False)
         monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda name, cache: False)
@@ -3008,7 +2948,6 @@ class TestWeatherStaleData:
 
 
 class TestSolarSystemEventsCache:
-
     def test_solar_system_stale_data_returns_200(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: False)
         monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda name, cache: False)
@@ -3034,7 +2973,6 @@ class TestSolarSystemEventsCache:
 
 
 class TestOnDemandTranslate:
-
     def test_translate_endpoint_missing_body_returns_error(self, client_admin):
         resp = client_admin.post('/api/translate', json={})
         assert resp.status_code in (200, 400, 404, 405, 500)
@@ -3050,7 +2988,6 @@ class TestOnDemandTranslate:
 
 
 class TestISSPassesWindowDays:
-
     def test_iss_passes_cached_different_window_returns_202(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
         monkeypatch.setitem(_LEGACY['iss_passes'], 'data', {'passes': [], 'window_days': 5})
@@ -3071,7 +3008,6 @@ class TestISSPassesWindowDays:
 
 
 class TestVersionCheckUpdatesErrorPath:
-
     def test_check_updates_exception_returns_500(self, client_admin, monkeypatch):
         def _boom():
             raise RuntimeError('network error')
@@ -3090,7 +3026,6 @@ class TestVersionCheckUpdatesErrorPath:
 
 
 class TestMoonPlannerEndpoints:
-
     def test_moon_next_7_nights_no_cache_returns_202(self, client_admin):
         resp = client_admin.get('/api/moon/next-7-nights')
         assert resp.status_code in (200, 202, 400)
@@ -3108,7 +3043,6 @@ class TestMoonPlannerEndpoints:
 
 
 class TestLogsSetLevel:
-
     def test_set_log_level_returns_response(self, client_admin):
         resp = client_admin.post('/api/logs/level', json={'level': 'DEBUG'})
         assert resp.status_code in (200, 400, 404, 405)
@@ -3124,7 +3058,6 @@ class TestLogsSetLevel:
 
 
 class TestTonightPlanCache:
-
     def test_tonight_plan_with_moon_planner_cache(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
         monkeypatch.setitem(_LEGACY['moon_planner'], 'data', {'nights': []})
@@ -3138,7 +3071,6 @@ class TestTonightPlanCache:
 
 
 class TestPlanMyNightClearAll:
-
     def test_clear_all_plans_returns_200(self, client_admin):
         resp = client_admin.delete('/api/plan-my-night/clear-all')
         assert resp.status_code in (200, 400, 500)
@@ -3179,7 +3111,6 @@ class TestPlanMyNightClearAll:
 
 
 class TestSpecialPhenomenaTranslation:
-
     def test_phenomena_with_fr_lang_header(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
         monkeypatch.setitem(
@@ -3232,7 +3163,6 @@ class TestSpecialPhenomenaTranslation:
 
 
 class TestTranslateOnDemand:
-
     def test_translate_empty_text_returns_400(self, client_admin):
         resp = client_admin.post('/api/translate/on-demand', json={'text': '', 'target_lang': 'fr'})
         assert resp.status_code == 400
@@ -3274,13 +3204,13 @@ class TestTranslateOnDemand:
 
 
 class TestSpaceflightLaunchVidurls:
-
     def test_vidurls_invalid_id_returns_400(self, client_admin):
         resp = client_admin.get('/api/spaceflight/launch/invalid-id!/vidurls')
         assert resp.status_code == 400
 
     def test_vidurls_valid_uuid_returns_200(self, client_admin, monkeypatch):
         import uuid as _uuid
+
         from space import spaceflight_tracker as _st
 
         fake_uuid = str(_uuid.uuid4())
@@ -3414,7 +3344,6 @@ class TestEquipmentLifecycle:
 
 
 class TestAstrodexUploadValidation:
-
     def test_upload_invalid_extension_returns_400(self, client_admin):
         import io as _io
 
@@ -3439,7 +3368,9 @@ class TestAstrodexUploadValidation:
 
     def test_upload_valid_jpg_is_stored_without_gps_metadata(self, client_admin, monkeypatch, tmp_path):
         import io as _io
+
         from PIL import Image
+
         from observation import astrodex as _ad
 
         monkeypatch.setattr(_ad, 'ASTRODEX_IMAGES_DIR', str(tmp_path))
@@ -3479,7 +3410,6 @@ class TestAstrodexUploadValidation:
 
 
 class TestSpecialPhenomenaTranslationBranches:
-
     def _make_cache_with_events(self, events):
         return {
             'events': events,
@@ -3612,7 +3542,6 @@ class TestSpecialPhenomenaTranslationBranches:
 
 
 class TestSolarSystemEventTranslationBranches:
-
     def test_comet_event_fr(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
         monkeypatch.setitem(
@@ -3674,7 +3603,6 @@ class TestSolarSystemEventTranslationBranches:
 
 
 class TestAdminLogsLevel:
-
     def test_set_log_level_debug(self, client_admin):
         resp = client_admin.post('/api/logs/level', json={'level': 'DEBUG'})
         assert resp.status_code in (200, 400, 404, 405)
@@ -3690,7 +3618,6 @@ class TestAdminLogsLevel:
 
 
 class TestAstrodexItemLifecycle:
-
     def test_create_update_delete_item(self, client_admin):
         import uuid as _uuid
 
@@ -4171,7 +4098,6 @@ class TestAstrodexPictureEquipment:
 
 
 class TestPushTestWithSubscriptions:
-
     def test_push_test_legacy_with_subscription_and_mock(self, client_admin, monkeypatch):
         admin_user = user_manager.get_user_by_username('admin')
         original_subs = list(admin_user.push_subscriptions)
@@ -4248,7 +4174,6 @@ class TestPushTestWithSubscriptions:
 
 
 class TestCacheSchedulerManagement:
-
     def test_get_or_create_cache_scheduler_returns_something(self, monkeypatch):
         # Unmocked, start() runs update_all_caches() synchronously on its first pass
         # (the thread's immediate run, joined by stop() before it can return) - writing
@@ -4275,7 +4200,6 @@ class TestCacheSchedulerManagement:
 
 
 class TestISSLocation:
-
     def test_iss_location_returns_response(self, client_admin):
         resp = client_admin.get('/api/iss/location')
         assert resp.status_code in (200, 202, 400, 500)
@@ -4291,7 +4215,6 @@ class TestISSLocation:
 
 
 class TestSpaceflightImage:
-
     def test_spaceflight_img_valid_hex_filename(self, client_admin):
         # Valid hex filename pattern but missing — should be 404
         resp = client_admin.get('/api/spaceflight/img/abc123def456abc123def456abc123de.jpg')
@@ -4308,7 +4231,6 @@ class TestSpaceflightImage:
 
 
 class TestObjectInfoDeep:
-
     def test_object_m31_returns_response(self, client_admin, monkeypatch):
         from observation import object_info as _oi
 
@@ -4334,7 +4256,6 @@ class TestObjectInfoDeep:
 
 
 class TestPushSubscribeIdempotent:
-
     def test_subscribe_same_endpoint_twice_returns_200(self, client_admin, monkeypatch):
         endpoint = 'https://push.mozilla.com/push/idempotent-test-12345'
         admin_user = user_manager.get_user_by_username('admin')
@@ -4365,7 +4286,6 @@ class TestPushSubscribeIdempotent:
 
 
 class TestConfigImport:
-
     def test_import_config_unauthenticated_returns_401(self, client):
         resp = client.post('/api/config/import', data={})
         assert resp.status_code in (401, 404, 405)
@@ -4381,7 +4301,6 @@ class TestConfigImport:
 
 
 class TestMoonPlannerStaleData:
-
     def test_moon_planner_stale_returns_200(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: False)
         monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda name, cache: False)
@@ -4396,7 +4315,6 @@ class TestMoonPlannerStaleData:
 
 
 class TestSiderealTimeWithLocation:
-
     def test_sidereal_time_with_no_location_returns_400(self, client_admin, monkeypatch):
         monkeypatch.setattr(
             _route_helpers_mod, 'load_config', lambda: _v12_config({'latitude': None, 'longitude': None})
@@ -4411,7 +4329,6 @@ class TestSiderealTimeWithLocation:
 
 
 class TestUpcomingEventsFullAggregation:
-
     def test_upcoming_events_with_fr_lang(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
         monkeypatch.setattr(_cache_store, 'sync_cache_from_shared', lambda name, cache: True)
@@ -4441,7 +4358,6 @@ class TestUpcomingEventsFullAggregation:
 
 
 class TestChangePasswordValidation:
-
     def test_short_new_password_returns_400(self, client_admin):
         resp = client_admin.post(
             '/api/auth/change-password',
@@ -4463,17 +4379,16 @@ class TestChangePasswordValidation:
 
 
 class TestPlanMyNightRouteHandlers:
-
     def test_plan_add_target_with_data_returns_response(self, client_admin, monkeypatch, tmp_path):
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta
 
-        future = (datetime.now(timezone.utc) + timedelta(hours=6)).isoformat()
+        future = (datetime.now(UTC) + timedelta(hours=6)).isoformat()
         resp = client_admin.post(
             '/api/plan-my-night/targets',
             json={
                 'name': 'M42',
                 'catalogue': 'Messier',
-                'night_start': (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat(),
+                'night_start': (datetime.now(UTC) + timedelta(hours=1)).isoformat(),
                 'night_end': future,
             },
         )
@@ -4510,7 +4425,6 @@ class TestPlanMyNightRouteHandlers:
 
 
 class TestCacheSyncPath:
-
     def test_moon_report_after_sync_returns_200(self, client_admin, monkeypatch):
         call_count = [0]
 
@@ -4544,7 +4458,6 @@ class TestCacheSyncPath:
 
 
 class TestSunReportEndpoint:
-
     def test_sun_report_with_cache_returns_200(self, client_admin, monkeypatch):
         monkeypatch.setattr(_cache_store, 'is_cache_valid', lambda c, t: True)
         monkeypatch.setitem(_LEGACY['sun_report'], 'data', {'sun': 'data'})
@@ -4565,7 +4478,6 @@ class TestSunReportEndpoint:
 
 
 class TestIssPassesSyncPath:
-
     def test_iss_after_sync_returns_200(self, client_admin, monkeypatch):
         # v1.2: a fresh per-location slot (as if just hydrated from the shared
         # file) with the matching window serves directly.
@@ -4640,7 +4552,6 @@ class TestPushSubscribeAndList:
 
 
 class TestStaticVersionedUrl:
-
     def test_static_file_with_version_param(self, client):
         resp = client.get('/static/css/theme.css?v=1.0.0')
         # May return 200 or 404, but either way the after_request handler runs
@@ -5567,7 +5478,6 @@ class TestEnrichPlanEntriesWithAstrodexStatus:
 
 
 class TestSkyQualityInvalidValues:
-
     def test_both_sqm_and_bortle_invalid_returns_not_configured(self, client_admin, monkeypatch):
         monkeypatch.setattr(_route_helpers_mod, 'load_config', lambda: _v12_config({'sqm': 'bad', 'bortle': 'worse'}))
         resp = client_admin.get('/api/skyquality')
@@ -5713,7 +5623,6 @@ class TestGetCurrentUserNullPaths:
 
 
 class TestCacheRouteExceptionHandlers:
-
     def _raise(self, *_):
         raise RuntimeError("simulated cache failure")
 
@@ -5766,7 +5675,7 @@ class TestCacheRouteExceptionHandlers:
 
     def test_iss_location_exception_returns_500(self, client_admin, monkeypatch):
         monkeypatch.setattr(
-            _app_mod.iss_passes, 'get_current_position', lambda *_a, **_k: (_ for _ in ()).throw(IOError("fail"))
+            _app_mod.iss_passes, 'get_current_position', lambda *_a, **_k: (_ for _ in ()).throw(OSError("fail"))
         )
         resp = client_admin.get('/api/iss/location')
         assert resp.status_code == 500
@@ -5808,7 +5717,6 @@ class TestCacheRouteExceptionHandlers:
 
 
 class TestObjectInfoEdgeCases:
-
     def test_invalid_identifier_returns_400(self, client_admin):
         resp = client_admin.get('/api/object/!!!invalid!!!')
         assert resp.status_code == 400
@@ -5830,7 +5738,6 @@ class TestObjectInfoEdgeCases:
 
 
 class TestObjectImageApi:
-
     def test_unauthenticated_returns_401(self, client):
         resp = client.get('/api/object-image/10.684000_41.269000.jpg')
         assert resp.status_code == 401
@@ -5876,7 +5783,6 @@ class TestObjectImageApi:
 
 
 class TestLogsApiEdgeCases:
-
     def test_level_filter_returns_matching(self, client_admin, monkeypatch, tmp_path):
         log_file = tmp_path / "myastroboard.log"
         log_file.write_text("INFO line\nDEBUG line\nINFO another\n")
@@ -5919,7 +5825,6 @@ class TestLogsApiEdgeCases:
 
 
 class TestExportConfigEdgeCases:
-
     def test_config_not_found_returns_404(self, client_admin, monkeypatch):
         monkeypatch.setattr(_admin_mod.repo_config, 'read_raw_config', lambda: None)
         resp = client_admin.get('/api/config/export')
@@ -5944,7 +5849,6 @@ class TestExportConfigEdgeCases:
 
 
 class TestPreferencesEdgeCases:
-
     def test_get_preferences_value_error_returns_400(self, client_admin, monkeypatch):
         import app as _a
 
@@ -5970,7 +5874,6 @@ class TestPreferencesEdgeCases:
 
 
 class TestUserManagementEdgeCases:
-
     def test_create_user_other_value_error_returns_400(self, client_admin, monkeypatch):
         import app as _a
 
@@ -6036,7 +5939,6 @@ class TestUserManagementEdgeCases:
 
 
 class TestIssSpaceflightExceptions:
-
     def test_iss_celestrak_restart_exception_returns_500(self, client_admin, monkeypatch):
         monkeypatch.setattr(
             _app_mod.iss_passes, 'clear_celestrak_block_flag', lambda: (_ for _ in ()).throw(RuntimeError("fail"))
@@ -6084,7 +5986,6 @@ class TestIssSpaceflightExceptions:
 
 
 class TestOnDemandTranslateException:
-
     def test_exception_returns_500(self, client_admin, monkeypatch):
         monkeypatch.setattr(
             _tracking_mod, 'translate_text_on_demand', lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("fail"))
@@ -6208,7 +6109,6 @@ class TestTranslateSpecialPhenomenaEvents:
 
 
 class TestMoreCacheExceptions:
-
     def _raise(self, *_):
         raise RuntimeError("simulated cache failure")
 
@@ -7366,6 +7266,7 @@ class TestSiderealTimeCacheSkipSync:
 
     def test_valid_today_cache_skips_sync(self, client_admin, monkeypatch):
         from unittest.mock import MagicMock
+
         from observation import sidereal_time as _st
 
         mock_svc = MagicMock()
@@ -7513,8 +7414,8 @@ class TestAddPlanTargetToAstrodexBranches:
 
     def test_entry_found_in_secondary_plan(self, client_admin, monkeypatch):
         """entry not in default plan → search all plans → found."""
-        from observation import plan_my_night as _pmn
         from observation import astrodex as _ad
+        from observation import plan_my_night as _pmn
 
         entry_id = 'test-search-loop-entry'
 
@@ -7800,8 +7701,8 @@ class TestAddPlanTargetDefaultAndMultiPlan:
 
     def test_default_plan_file_gets_cid_none(self, client_admin, monkeypatch):
         """fname is the default plan file → cid stays None."""
-        from observation import plan_my_night as _pmn
         from observation import astrodex as _ad
+        from observation import plan_my_night as _pmn
 
         entry_id = 'test-default-plan-entry'
 
@@ -7823,8 +7724,8 @@ class TestAddPlanTargetDefaultAndMultiPlan:
 
     def test_entry_found_in_second_plan_file(self, client_admin, monkeypatch):
         """first sub-plan has no match → loop continues to second."""
-        from observation import plan_my_night as _pmn
         from observation import astrodex as _ad
+        from observation import plan_my_night as _pmn
 
         entry_id = 'test-second-plan-entry'
 
@@ -7929,7 +7830,6 @@ _ALLSKY_CFG_FULL = {
 
 
 class TestListConnectorsApi:
-
     def test_returns_list_with_allsky(self, client_admin, monkeypatch):
         monkeypatch.setattr(_connectors_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         resp = client_admin.get('/api/connectors')
@@ -7959,7 +7859,6 @@ class TestListConnectorsApi:
 
 
 class TestAllSkyStatusApi:
-
     def test_returns_404_when_not_configured(self, client_admin, monkeypatch):
         monkeypatch.setattr(_connectors_allsky_mod, 'load_config', lambda: {"connectors": {}})
         resp = client_admin.get('/api/connectors/allsky/status')
@@ -8011,7 +7910,6 @@ class TestAllSkyStatusApi:
 
 
 class TestAllSkyHealthApi:
-
     def test_get_no_url_returns_200_not_reachable(self, client_admin, monkeypatch):
         monkeypatch.setattr(_connectors_allsky_mod, 'load_config', lambda: {"connectors": {}})
         resp = client_admin.get('/api/connectors/allsky/health')
@@ -8021,8 +7919,9 @@ class TestAllSkyHealthApi:
     def test_get_returns_cached_health(self, client_admin, monkeypatch):
         cfg = {"url": "http://allsky.local", "enabled": True, "modules": {}}
         monkeypatch.setattr(_connectors_allsky_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
-        from cache import cache_store as cs
         import time
+
+        from cache import cache_store as cs
 
         cs._allsky_health_cache["data"] = {"reachable": True, "modules": {}}
         cs._allsky_health_cache["timestamp"] = time.time()
@@ -8039,8 +7938,9 @@ class TestAllSkyHealthApi:
 
         cfg = {"url": "http://allsky.local", "enabled": True, "modules": {}}
         monkeypatch.setattr(_connectors_allsky_mod, 'load_config', lambda: {"connectors": {"allsky": cfg}})
-        from cache import cache_store as cs
         import time
+
+        from cache import cache_store as cs
 
         cs._allsky_health_cache["data"] = {"reachable": True, "modules": {}}
         cs._allsky_health_cache["timestamp"] = time.time()
@@ -8078,7 +7978,7 @@ class TestAllSkyHealthApi:
         assert resp.get_json()['reachable'] is False
 
     def test_post_reachable_url(self, client_admin, monkeypatch):
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         mock_resp = MagicMock(status_code=200)
         with patch('requests.head', return_value=mock_resp):
@@ -8089,7 +7989,7 @@ class TestAllSkyHealthApi:
         assert resp.get_json()['reachable'] is True
 
     def test_post_405_falls_back_to_get(self, client_admin, monkeypatch):
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         head_resp = MagicMock(status_code=405)
         get_resp = MagicMock(status_code=200)
@@ -8104,8 +8004,9 @@ class TestAllSkyHealthApi:
         assert resp.get_json()['reachable'] is True
 
     def test_post_connection_error_returns_not_reachable(self, client_admin, monkeypatch):
-        import requests as _req
         from unittest.mock import patch
+
+        import requests as _req
 
         with patch('requests.head', side_effect=_req.exceptions.ConnectionError):
             resp = client_admin.post(
@@ -8115,7 +8016,7 @@ class TestAllSkyHealthApi:
         assert resp.get_json()['reachable'] is False
 
     def test_post_500_not_reachable(self, client_admin, monkeypatch):
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         mock_resp = MagicMock(status_code=500)
         with patch('requests.head', return_value=mock_resp):
@@ -8127,7 +8028,6 @@ class TestAllSkyHealthApi:
 
 
 class TestAllSkyUrlsApi:
-
     def test_returns_404_when_not_configured(self, client_admin, monkeypatch):
         monkeypatch.setattr(_connectors_allsky_mod, 'load_config', lambda: {"connectors": {}})
         resp = client_admin.get('/api/connectors/allsky/urls')
@@ -8151,7 +8051,6 @@ class TestAllSkyUrlsApi:
 
 
 class TestAllSkyProxyApi:
-
     def test_missing_module_param_returns_400(self, client_admin, monkeypatch):
         resp = client_admin.get('/api/connectors/allsky/proxy')
         assert resp.status_code == 400
@@ -8167,7 +8066,7 @@ class TestAllSkyProxyApi:
         assert resp.status_code == 404
 
     def test_proxy_streams_content(self, client_admin, monkeypatch):
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         monkeypatch.setattr(_connectors_allsky_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         mock_resp = MagicMock()
@@ -8182,8 +8081,9 @@ class TestAllSkyProxyApi:
         resp.close()
 
     def test_proxy_timeout_returns_504(self, client_admin, monkeypatch):
-        import requests as _req
         from unittest.mock import patch
+
+        import requests as _req
 
         monkeypatch.setattr(_connectors_allsky_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         with patch('socket.getaddrinfo', return_value=[(None, None, None, None, ("1.2.3.4", 80))]):
@@ -8192,8 +8092,9 @@ class TestAllSkyProxyApi:
         assert resp.status_code == 504
 
     def test_proxy_connection_error_returns_502(self, client_admin, monkeypatch):
-        import requests as _req
         from unittest.mock import patch
+
+        import requests as _req
 
         monkeypatch.setattr(_connectors_allsky_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         with patch('socket.getaddrinfo', return_value=[(None, None, None, None, ("1.2.3.4", 80))]):
@@ -8202,7 +8103,7 @@ class TestAllSkyProxyApi:
         assert resp.status_code == 502
 
     def test_proxy_range_header_forwarded(self, client_admin, monkeypatch):
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         monkeypatch.setattr(_connectors_allsky_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         mock_resp = MagicMock()
@@ -8225,7 +8126,7 @@ class TestAllSkyProxyApi:
         resp.close()
 
     def test_proxy_dns_failure_uses_original_url(self, client_admin, monkeypatch):
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         monkeypatch.setattr(_connectors_allsky_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         mock_resp = MagicMock()
@@ -8239,7 +8140,7 @@ class TestAllSkyProxyApi:
         resp.close()
 
     def test_proxy_empty_dns_result_uses_original_url(self, client_admin, monkeypatch):
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         monkeypatch.setattr(_connectors_allsky_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         mock_resp = MagicMock()
@@ -8253,7 +8154,7 @@ class TestAllSkyProxyApi:
         resp.close()
 
     def test_proxy_non200_upstream_still_returned(self, client_admin, monkeypatch):
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         monkeypatch.setattr(_connectors_allsky_mod, 'load_config', lambda: {"connectors": {"allsky": _ALLSKY_CFG_FULL}})
         mock_resp = MagicMock()
@@ -8273,7 +8174,6 @@ class TestAllSkyProxyApi:
 
 
 class TestCSSPasses:
-
     def test_css_passes_unauthenticated_returns_401(self, client):
         resp = client.get('/api/css/passes')
         assert resp.status_code == 401
@@ -8341,7 +8241,6 @@ class TestCSSPasses:
 
 
 class TestCSSLocation:
-
     def test_css_location_unauthenticated_returns_401(self, client):
         resp = client.get('/api/css/location')
         assert resp.status_code == 401
@@ -8374,7 +8273,6 @@ class TestCSSLocation:
 
 
 class TestCSSCelestrakRestart:
-
     def test_css_celestrak_restart_unauthenticated_returns_401(self, client):
         resp = client.post('/api/css/celestrak/restart')
         assert resp.status_code == 401
@@ -8544,8 +8442,8 @@ class TestCatalogueLookupSimbad:
 
     def test_simbad_lookup_name_in_catalogue(self, client_admin, monkeypatch):
         """Covers SIMBAD found, name matches catalogue value."""
-        from skytonight import skytonight_targets as _skt
         from observation import object_info as _oi
+        from skytonight import skytonight_targets as _skt
 
         monkeypatch.setattr(_skt, 'get_lookup_entry', lambda *a, **kw: None)
         monkeypatch.setattr(_oi, 'is_safe_identifier', lambda name: True)
@@ -8570,8 +8468,8 @@ class TestCatalogueLookupSimbad:
     def test_simbad_lookup_prefers_common_name(self, client_admin, monkeypatch):
         """Covers the Vega case: a SIMBAD "NAME …" identifier wins as preferred_name
         over an obscure Flamsteed/Bayer designation, surfaced as 'CommonName'."""
-        from skytonight import skytonight_targets as _skt
         from observation import object_info as _oi
+        from skytonight import skytonight_targets as _skt
 
         monkeypatch.setattr(_skt, 'get_lookup_entry', lambda *a, **kw: None)
         monkeypatch.setattr(_oi, 'is_safe_identifier', lambda name: True)
@@ -8595,8 +8493,8 @@ class TestCatalogueLookupSimbad:
 
     def test_simbad_lookup_name_not_in_catalogue(self, client_admin, monkeypatch):
         """Covers SIMBAD path where name does NOT match any catalogue value → use alias."""
-        from skytonight import skytonight_targets as _skt
         from observation import object_info as _oi
+        from skytonight import skytonight_targets as _skt
 
         monkeypatch.setattr(_skt, 'get_lookup_entry', lambda *a, **kw: None)
         monkeypatch.setattr(_oi, 'is_safe_identifier', lambda name: True)
@@ -8619,8 +8517,8 @@ class TestCatalogueLookupSimbad:
 
     def test_simbad_lookup_no_aliases_uses_name(self, client_admin, monkeypatch):
         """Covers branch where aliases list is empty → preferred_name = name."""
-        from skytonight import skytonight_targets as _skt
         from observation import object_info as _oi
+        from skytonight import skytonight_targets as _skt
 
         monkeypatch.setattr(_skt, 'get_lookup_entry', lambda *a, **kw: None)
         monkeypatch.setattr(_oi, 'is_safe_identifier', lambda name: True)
@@ -8642,8 +8540,8 @@ class TestCatalogueLookupSimbad:
 
     def test_simbad_returns_none_gives_not_found(self, client_admin, monkeypatch):
         """Covers is_safe_identifier=True but SIMBAD returns None."""
-        from skytonight import skytonight_targets as _skt
         from observation import object_info as _oi
+        from skytonight import skytonight_targets as _skt
 
         monkeypatch.setattr(_skt, 'get_lookup_entry', lambda *a, **kw: None)
         monkeypatch.setattr(_oi, 'is_safe_identifier', lambda name: True)
@@ -8824,8 +8722,8 @@ class TestPushExceptionPaths:
 
     def test_push_test_with_dead_endpoint(self, client_admin, monkeypatch):
         """Covers dead endpoint cleaned up in push_test."""
-        from utils.auth import user_manager as _um
         from utils import push_manager as _pm
+        from utils.auth import user_manager as _um
 
         monkeypatch.setattr(_pm, 'send_push', lambda *_a, **_k: False)
         monkeypatch.setattr(_um, 'save_users', lambda: None)
@@ -8989,8 +8887,8 @@ class TestPlanMyNightCoveragePaths:
 
     def test_plan_search_across_combinations(self, client_admin, monkeypatch):
         """Covers entry not in default plan, found in combination plan."""
-        from observation import plan_my_night as _pmn
         from observation import astrodex as _adx
+        from observation import plan_my_night as _pmn
 
         entry_id = 'test-entry-scope-123'
         combination_plan = {'entries': [{'id': entry_id, 'name': 'M42', 'catalogue': 'Messier'}]}
@@ -9026,6 +8924,7 @@ class TestAstrodexUploadPaths:
     def test_upload_exception_returns_500(self, client_admin, monkeypatch):
         """Covers exception during upload."""
         import io as _io
+
         from observation import astrodex as _adx
 
         def raise_error():
@@ -9431,8 +9330,8 @@ class TestSimbadFalseBranch:
 
     def test_simbad_unsafe_identifier_returns_not_found(self, client_admin, monkeypatch):
         """Covers is_safe_identifier False → immediate not_found."""
-        from skytonight import skytonight_targets as _skt
         from observation import object_info as _oi
+        from skytonight import skytonight_targets as _skt
 
         monkeypatch.setattr(_skt, 'get_lookup_entry', lambda *a, **kw: None)
         monkeypatch.setattr(_oi, 'is_safe_identifier', lambda name: False)
@@ -9449,7 +9348,7 @@ class TestAstrodexSwitchException:
         from observation import astrodex as _adx
 
         def raise_unexpected(*_, **__):
-            raise IOError('unexpected')
+            raise OSError('unexpected')
 
         monkeypatch.setattr(_adx, 'switch_item_catalogue_name', raise_unexpected)
         resp = client_admin.post(
@@ -9695,7 +9594,7 @@ class TestMiscRemainingPaths:
         import zipfile as _zf
 
         def bad_zipfile(*a, **kw):
-            raise IOError('disk full')
+            raise OSError('disk full')
 
         monkeypatch.setattr(_zf, 'ZipFile', bad_zipfile)
         resp = client_admin.get('/api/backup/download')
@@ -9900,9 +9799,11 @@ class TestMiscRemainingPaths:
 
     def test_astrodex_image_serve_found(self, client_admin, monkeypatch):
         """Covers image found and send_from_directory called."""
-        from observation import astrodex as _adx
-        import flask as _flask
         import os as _os
+
+        import flask as _flask
+
+        from observation import astrodex as _adx
 
         monkeypatch.setattr(_adx, 'can_user_view_image', lambda uid, filename: True)
         monkeypatch.setattr(_adx, 'ASTRODEX_IMAGES_DIR', _os.path.dirname(__file__))

@@ -17,8 +17,9 @@ Usage:
 
 import json
 import os
-from typing import Dict, Any
 from datetime import datetime
+from typing import Any
+
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -36,7 +37,7 @@ _TRANSLATION_FILENAMES = {
 SUPPORTED_LANGUAGES = list(_TRANSLATION_FILENAMES.keys())
 
 # Cache for loaded translations
-_translation_cache: Dict[str, Dict] = {}
+_translation_cache: dict[str, dict] = {}
 
 
 def _is_safe_path(base_dir: str, candidate_path: str) -> bool:
@@ -51,7 +52,7 @@ def _is_safe_path(base_dir: str, candidate_path: str) -> bool:
     return candidate_real.startswith(base_real + os.sep)
 
 
-def _load_translation_file(language: str) -> Dict:
+def _load_translation_file(language: str) -> dict:
     """
     Load translation file for a specific language
 
@@ -92,12 +93,12 @@ def _load_translation_file(language: str) -> Dict:
         return {}
 
     try:
-        with open(translation_path, 'r', encoding='utf-8') as f:
+        with open(translation_path, encoding='utf-8') as f:
             translations = json.load(f)
         _translation_cache[language] = translations
         logger.debug(f"Loaded translations for language: {language}")
         return translations
-    except (json.JSONDecodeError, IOError) as e:
+    except (OSError, json.JSONDecodeError) as e:
         logger.error(f"Error loading translations for '{language}': {e}")
         return {}
 
@@ -188,7 +189,7 @@ class I18nManager:
         """Get current language code"""
         return self.language
 
-    def get_namespace(self, namespace: str) -> Dict:
+    def get_namespace(self, namespace: str) -> dict:
         """
         Get all translations for a specific namespace
 
@@ -236,7 +237,7 @@ def get_translated_message(key: str, language: str = DEFAULT_LANGUAGE, **params)
 
 def create_translated_alert(
     alert_type: str, severity: str, time: str, language: str = DEFAULT_LANGUAGE
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Create a weather alert dictionary with translated message
 

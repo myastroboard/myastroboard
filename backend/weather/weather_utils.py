@@ -4,11 +4,13 @@ Provides centralized weather client creation to avoid code duplication
 """
 
 import os
-import requests
+
 import openmeteo_requests
+import requests
 import requests_cache
 from retry_requests import retry
-from utils.constants import WEATHER_CACHE_TTL, OPENMETEO_RETRY_COUNT, OPENMETEO_BACKOFF_FACTOR, DATA_DIR_CACHE
+
+from utils.constants import DATA_DIR_CACHE, OPENMETEO_BACKOFF_FACTOR, OPENMETEO_RETRY_COUNT, WEATHER_CACHE_TTL
 
 # Ensure cache directory exists
 os.makedirs(DATA_DIR_CACHE, exist_ok=True)

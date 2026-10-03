@@ -307,7 +307,6 @@ class TestResolveTarget:
 
 
 class TestLookupDatasetEntry:
-
     def test_returns_the_entry_for_a_known_object(self, monkeypatch):
         monkeypatch.setattr(target_coordinates.skytonight_targets, 'get_lookup_entry', lambda *_: {'group_id': 'g1'})
         assert target_coordinates.lookup_dataset_entry('M 31', 'Messier') == {'group_id': 'g1'}

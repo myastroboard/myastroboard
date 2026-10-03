@@ -51,8 +51,8 @@ def _pem_to_raw_b64(pem_str: str) -> str:
 
 def _generate_keys() -> dict:
     """Generate a new VAPID EC key pair using py_vapid (bundled with pywebpush)."""
-    from py_vapid import Vapid
     from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat  # type: ignore[import]
+    from py_vapid import Vapid
 
     vapid = Vapid()
     vapid.generate_keys()
@@ -158,7 +158,7 @@ def send_push(subscription_info: dict, payload: dict, ttl: int = 0, urgency: str
         aud = f"{parsed.scheme}://{parsed.netloc}"
 
         logger.debug(
-            f"Sending push to {endpoint[:60]} | trigger={payload.get('tag', '?')} " f"ttl={ttl}s urgency={urgency}"
+            f"Sending push to {endpoint[:60]} | trigger={payload.get('tag', '?')} ttl={ttl}s urgency={urgency}"
         )
 
         webpush(

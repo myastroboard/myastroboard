@@ -50,9 +50,9 @@ def test_js_has_no_unprefixed_root_urls():
                 continue
             if (_ROOT_LITERAL.search(line) or _NAVIGATION_TO_ROOT.search(line)) and not _SAFE.search(line):
                 offenders.append(f"{path.relative_to(ROOT).as_posix()}:{number}: {line.strip()}")
-    assert (
-        not offenders
-    ), "Root-absolute URLs that break under a sub-path (HA ingress); wrap them in appUrl():\n" + "\n".join(offenders)
+    assert not offenders, (
+        "Root-absolute URLs that break under a sub-path (HA ingress); wrap them in appUrl():\n" + "\n".join(offenders)
+    )
 
 
 @pytest.mark.unit

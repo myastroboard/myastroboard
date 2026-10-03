@@ -1,12 +1,24 @@
-[tool.black]
+[tool.ruff]
+# Organization baseline (E, F, W, I, UP, B), synced from myastroboard/.github.
+extend = ".github/org/ruff.base.toml"
+target-version = "py314"
+# Wider than the organization's 100: the code base was written for 120.
 line-length = 120
-skip-string-normalization = true
-exclude = '''
-/(
-    venv
-  | \.venv
-  | \.git
-  | __pycache__
-  | data
-)/
-'''
+# backend/ is on sys.path (pyrightconfig.json extraPaths): its modules are first-party imports.
+src = ["backend", "tests"]
+extend-exclude = ["data", "data-bkp*", "venv"]
+
+[tool.ruff.format]
+# Kept from black's skip-string-normalization: no repository-wide quote rewrite.
+quote-style = "preserve"
+
+[tool.ruff.lint.per-file-ignores]
+# Flask requires sys.path manipulation before local imports
+"backend/app.py" = ["E402"]
+# Tests stub sys.modules['psutil'] (or set up env vars / matplotlib backend / stale test state)
+# before importing app/backend modules - same ordering requirement as backend/app.py above.
+"tests/conftest.py" = ["E402"]
+"tests/blueprints/test_app_routes.py" = ["E402"]
+"tests/blueprints/test_plan_my_night_api.py" = ["E402"]
+"tests/blueprints/test_skytonight_api.py" = ["E402"]
+"tests/blueprints/test_skytonight_api_extended.py" = ["E402"]

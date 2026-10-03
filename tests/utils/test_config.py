@@ -9,9 +9,7 @@ import sys
 import pytest
 
 from tests.db_helpers import delete_setting
-
-from utils import repo_config
-from utils import config_defaults
+from utils import config_defaults, repo_config
 
 load_config = repo_config.load_config
 save_config = repo_config.save_config
@@ -32,7 +30,7 @@ def _set_config_file(monkeypatch, path):
 
     delete_setting("config")
     if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as fp:
+        with open(path, encoding="utf-8") as fp:
             settings_store.put_setting("config", json.load(fp))
 
 
@@ -321,8 +319,9 @@ class TestConfigSaving:
         loaded = load_config()
         assert loaded["locations"] == sample_config["locations"]
         assert loaded["min_altitude"] == sample_config["min_altitude"]
-        assert loaded["skytonight"]["constraints"]["altitude_constraint_min"] == (
-            sample_config["skytonight"]["constraints"]["altitude_constraint_min"]
+        assert (
+            loaded["skytonight"]["constraints"]["altitude_constraint_min"]
+            == (sample_config["skytonight"]["constraints"]["altitude_constraint_min"])
         )
         assert "skytonight" in loaded
 

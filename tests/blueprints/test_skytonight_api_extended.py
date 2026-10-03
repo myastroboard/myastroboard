@@ -20,6 +20,8 @@ _preload_all_current_plan_entries = _skytonight_api_mod._preload_all_current_pla
 _resolve_source_catalogue = _skytonight_api_mod._resolve_source_catalogue
 _target_attr = _skytonight_api_mod._target_attr
 _target_catalogue_names = _skytonight_api_mod._target_catalogue_names
+from datetime import UTC
+
 from app import app
 from utils.auth import user_manager
 
@@ -49,7 +51,6 @@ def _empty_dataset():
 
 
 class TestCataloguesEndpoint:
-
     def test_returns_list(self, client_admin, monkeypatch):
         monkeypatch.setattr(_skytonight_api_mod.skytonight_targets, 'load_targets_dataset', lambda: [])
         resp = client_admin.get('/api/catalogues')
@@ -69,7 +70,6 @@ class TestCataloguesEndpoint:
 
 
 class TestSkytonightSchedulerStatus:
-
     def test_no_scheduler_returns_200_with_running_false(self, client_admin, monkeypatch):
         monkeypatch.setattr(_skytonight_api_mod, 'get_skytonight_scheduler_for_api', lambda: None)
         resp = client_admin.get('/api/skytonight/scheduler/status')
@@ -90,7 +90,6 @@ class TestSkytonightSchedulerStatus:
 
 
 class TestSchedulerStatusLegacy:
-
     def test_returns_200(self, client_admin, monkeypatch):
         monkeypatch.setattr(_skytonight_api_mod, 'get_skytonight_scheduler_for_api', lambda: None)
         resp = client_admin.get('/api/scheduler/status')
@@ -103,7 +102,6 @@ class TestSchedulerStatusLegacy:
 
 
 class TestSkytonightDatasetStatus:
-
     def test_returns_200_with_dataset_dict(self, client_admin, monkeypatch):
         monkeypatch.setattr(
             _skytonight_api_mod.skytonight_targets,
@@ -131,7 +129,6 @@ class TestSkytonightDatasetStatus:
 
 
 class TestSkytonightLog:
-
     def test_no_log_file_returns_empty_string(self, client_admin, monkeypatch, tmp_path):
         monkeypatch.setattr(
             _skytonight_api_mod,
@@ -172,7 +169,6 @@ class TestSkytonightLog:
 
 
 class TestSkytonightReports:
-
     def test_returns_200_with_mocked_payload_builder(self, client_admin, monkeypatch):
         monkeypatch.setattr(
             _skytonight_api_mod,
@@ -201,7 +197,6 @@ class TestSkytonightReports:
 
 
 class TestSkytonightReportsByCatalogue:
-
     def test_valid_catalogue_returns_200(self, client_admin, monkeypatch):
         monkeypatch.setattr(
             _skytonight_api_mod,
@@ -222,7 +217,6 @@ class TestSkytonightReportsByCatalogue:
 
 
 class TestSkytonightDataEndpoints:
-
     def test_bodies_returns_200_with_mocked_builder(self, client_admin, monkeypatch):
         monkeypatch.setattr(
             _skytonight_api_mod,
@@ -267,7 +261,6 @@ class TestSkytonightDataEndpoints:
 
 
 class TestSkytonightCatalogueLogs:
-
     def test_invalid_catalogue_returns_400(self, client_admin):
         resp = client_admin.get('/api/skytonight/logs/bad!name')
         assert resp.status_code == 400
@@ -288,7 +281,6 @@ class TestSkytonightCatalogueLogs:
 
 
 class TestSkytonightCatalogueLogsExists:
-
     def test_invalid_catalogue_returns_400(self, client_admin):
         resp = client_admin.get('/api/skytonight/logs/bad!name/exists')
         assert resp.status_code == 400
@@ -310,7 +302,6 @@ class TestSkytonightCatalogueLogsExists:
 
 
 class TestAdditionalSkytonightRouteBranches:
-
     def test_scheduler_trigger_remote_success(self, client_admin, monkeypatch, tmp_path):
         trigger_file = tmp_path / 'trigger.flag'
         monkeypatch.setattr(_skytonight_api_mod, 'get_skytonight_scheduler_for_api', lambda: 'remote_scheduler')
@@ -475,7 +466,6 @@ class TestAdditionalSkytonightRouteBranches:
 
 
 class TestPreloadAllCurrentPlanEntries:
-
     def test_returns_empty_for_user_with_no_plans(self, monkeypatch, tmp_path):
 
         import uuid
@@ -486,10 +476,10 @@ class TestPreloadAllCurrentPlanEntries:
 
     def test_returns_entries_from_current_plan(self, monkeypatch, tmp_path):
         import uuid
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta
 
         user_id = str(uuid.uuid4())
-        future = (datetime.now(timezone.utc) + timedelta(hours=5)).isoformat()
+        future = (datetime.now(UTC) + timedelta(hours=5)).isoformat()
         entry = {'id': 'e1', 'name': 'M42', 'catalogue': 'Messier'}
         documents.put_document(
             user_id, 'plan', {'user_id': user_id, 'plan': {'night_end': future, 'entries': [entry]}}, 'default'
@@ -500,10 +490,10 @@ class TestPreloadAllCurrentPlanEntries:
 
     def test_skips_previous_plans(self, monkeypatch, tmp_path):
         import uuid
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta
 
         user_id = str(uuid.uuid4())
-        past = (datetime.now(timezone.utc) - timedelta(hours=5)).isoformat()
+        past = (datetime.now(UTC) - timedelta(hours=5)).isoformat()
         entry = {'id': 'e1', 'name': 'M31', 'catalogue': 'Messier'}
         documents.put_document(
             user_id, 'plan', {'user_id': user_id, 'plan': {'night_end': past, 'entries': [entry]}}, 'default'
@@ -532,11 +522,11 @@ class TestPreloadAllCurrentPlanEntries:
 
     def test_deduplicates_entries_across_combinations(self, monkeypatch, tmp_path):
         import uuid
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta
 
         user_id = str(uuid.uuid4())
         combo_id = str(uuid.uuid4())
-        future = (datetime.now(timezone.utc) + timedelta(hours=5)).isoformat()
+        future = (datetime.now(UTC) + timedelta(hours=5)).isoformat()
         entry = {'id': 'shared-entry', 'name': 'M42'}
         for doc_key in ['default', combo_id]:
             documents.put_document(
@@ -552,7 +542,6 @@ class TestPreloadAllCurrentPlanEntries:
 
 
 class TestResolveSourceCatalogue:
-
     def test_empty_catalogue_names_returns_skytonight(self):
         result = _resolve_source_catalogue({}, 'M42')
         assert result == 'SkyTonight'
@@ -581,7 +570,6 @@ class TestResolveSourceCatalogue:
 
 
 class TestAnnotateSkytonightItem:
-
     def test_empty_name_sets_false_flags(self):
         item = {'name': '', 'id': ''}
         _annotate_skytonight_item(item, 'user1', 'alice', 'Messier', 'current')
@@ -614,7 +602,6 @@ class TestAnnotateSkytonightItem:
 
 
 class TestTargetAttr:
-
     def test_dict_target(self):
         assert _target_attr({'key': 'val'}, 'key') == 'val'
         assert _target_attr({'key': 'val'}, 'missing', 'default') == 'default'
@@ -628,7 +615,6 @@ class TestTargetAttr:
 
 
 class TestTargetCatalogueNames:
-
     def test_dict_with_catalogue_names(self):
         target = {'catalogue_names': {'Messier': 'M42', 'OpenNGC': 'NGC 1976'}}
         result = _target_catalogue_names(target)
@@ -644,7 +630,6 @@ class TestTargetCatalogueNames:
 
 
 class TestGetCatalogueAliasPayload:
-
     def test_empty_inputs_return_empty(self):
         group_id, aliases = _get_catalogue_alias_payload('', '')
         assert group_id == ''
@@ -686,7 +671,6 @@ class TestGetCatalogueAliasPayload:
 
 
 class TestSkytonightReportsRealBuilder:
-
     def test_returns_200_with_empty_calc_results(self, client_admin, monkeypatch):
         monkeypatch.setattr(_skytonight_api_mod, 'has_calculation_results', lambda *_a, **_k: True)
         monkeypatch.setattr(
@@ -720,7 +704,6 @@ class TestSkytonightReportsRealBuilder:
 
 
 class TestSkytonightTargetDebug:
-
     def test_missing_target_id_returns_400(self, client_admin):
         resp = client_admin.get('/api/skytonight/target-debug')
         assert resp.status_code == 400
@@ -761,7 +744,6 @@ _build_dso_section_payload = _skytonight_api_mod._build_dso_section_payload
 
 
 class TestToFloat:
-
     def test_none_returns_none(self):
         assert _to_float(None) is None
 
@@ -782,7 +764,6 @@ class TestToFloat:
 
 
 class TestScoreInRange:
-
     def test_value_in_range_returns_5(self):
         assert _score_in_range(50.0, 30.0, 70.0) == 5.0
 
@@ -811,7 +792,6 @@ class TestScoreInRange:
 
 
 class TestIdealFocalRange:
-
     def test_very_large_object(self):
         low, high = _ideal_focal_range(150.0, 'Galaxy')
         assert low == 100.0 and high == 350.0
@@ -871,7 +851,6 @@ class TestIdealFocalRange:
 
 
 class TestApertureScore:
-
     def test_none_magnitude_uses_default_range(self):
         score = _aperture_score(125.0, None)
         # 125 in [70, 180] → should be 5.0
@@ -900,7 +879,6 @@ class TestApertureScore:
 
 
 class TestSpeedScore:
-
     def test_nebula_fast_scope(self):
         assert _speed_score(4.0, 'Emission Nebula') == 5.0
 
@@ -933,7 +911,6 @@ class TestSpeedScore:
 
 
 class TestRecommendCombinationsForTarget:
-
     def _make_telescope(self, tid, aperture=200.0, focal=1000.0, ratio=5.0):
         return {
             'id': tid,
@@ -1148,7 +1125,6 @@ class TestRecommendCombinationsForTarget:
 
 
 class TestAlttimeJsonPath:
-
     def test_sanitizes_special_chars(self, monkeypatch):
         monkeypatch.setattr(_skytonight_api_mod, 'OUTPUT_DIR', '/data/output')
         path = _alttime_json_path('NGC 1976')
@@ -1167,7 +1143,6 @@ class TestAlttimeJsonPath:
 
 
 class TestBuildSkytonightReportsPayloadCalculated:
-
     def _make_calc_results(self, include_deep_sky=True, include_bodies=True, include_comets=True):
         results = {
             'metadata': {'computed_at': '2026-01-01T00:00:00Z'},
@@ -1406,7 +1381,6 @@ class TestBuildSkytonightReportsPayloadCalculated:
 
 
 class TestBuildBodiesSectionPayload:
-
     def test_calculated_path_with_bodies(self, monkeypatch):
         bodies_data = {
             'metadata': {'computed_at': '2026-01-01'},
@@ -1523,7 +1497,6 @@ class TestBuildBodiesSectionPayload:
 
 
 class TestBuildCometsSectionPayload:
-
     def test_calculated_path_with_comets(self, monkeypatch):
         comets_data = {
             'metadata': {'computed_at': '2026-01-01'},
@@ -1667,7 +1640,6 @@ class TestBuildCometsSectionPayload:
 
 
 class TestBuildDsoSectionPayload:
-
     def test_calculated_path_with_dso(self, monkeypatch):
         dso_data = {
             'metadata': {'computed_at': '2026-01-01'},
@@ -1869,7 +1841,6 @@ class TestBuildDsoSectionPayload:
 
 
 class TestSkymapEndpointBranches:
-
     def test_skymap_file_absent_returns_empty(self, client_admin, monkeypatch):
         monkeypatch.setattr(_skytonight_api_mod.os.path, 'isfile', lambda p: False)
         resp = client_admin.get('/api/skytonight/skymap')
@@ -1934,7 +1905,6 @@ class TestSkymapEndpointBranches:
 
 
 class TestSchedulerStatusAdditionalBranches:
-
     def test_scheduler_is_object_calls_get_status(self, client_admin, monkeypatch):
         mock_sched_obj = type('Sched', (), {'get_status': lambda self: {'running': True, 'is_executing': False}})()
         monkeypatch.setattr(_skytonight_api_mod, 'get_skytonight_scheduler_for_api', lambda: mock_sched_obj)
@@ -1960,7 +1930,6 @@ class TestSchedulerStatusAdditionalBranches:
 
 
 class TestDatasetStatusAdditionalBranches:
-
     def test_dataset_status_with_object_scheduler(self, client_admin, monkeypatch):
         dataset = {
             'targets': [
@@ -2008,7 +1977,6 @@ class TestDatasetStatusAdditionalBranches:
 
 
 class TestDatasetRebuildEndpoint:
-
     def test_dataset_rebuild_success(self, client_admin, monkeypatch):
         monkeypatch.setattr(_skytonight_api_mod, '_run_skytonight_refresh', lambda: {'targets': 42})
         resp = client_admin.post('/api/skytonight/dataset/rebuild')
@@ -2024,7 +1992,6 @@ class TestDatasetRebuildEndpoint:
 
 
 class TestCatalogueLogsAdditionalBranches:
-
     def test_valid_catalogue_with_non_empty_log(self, client_admin, monkeypatch, tmp_path):
         log_file = tmp_path / 'calc.log'
         log_file.write_text('some log content', encoding='utf-8')
@@ -2065,7 +2032,6 @@ class TestCatalogueLogsAdditionalBranches:
 
 
 class TestAlttimeEndpointAdditionalBranches:
-
     def test_alttime_path_traversal_rejected(self, client_admin, monkeypatch, tmp_path):
         """Path traversal guard — file_path not under OUTPUT_DIR → 400."""
         monkeypatch.setattr(_skytonight_api_mod, 'OUTPUT_DIR', str(tmp_path))
@@ -2111,7 +2077,6 @@ class TestAlttimeEndpointAdditionalBranches:
 
 
 class TestCombinationRecommendationsEndpointBranches:
-
     def test_unauthenticated_returns_401(self):
         app.config['TESTING'] = True
         with app.test_client() as c:
@@ -2193,7 +2158,6 @@ class TestCombinationRecommendationsEndpointBranches:
 
 
 class TestLegacyTriggerEndpoint:
-
     def test_legacy_trigger_no_scheduler_returns_500(self, client_admin, monkeypatch):
         monkeypatch.setattr(_skytonight_api_mod, 'get_skytonight_scheduler_for_api', lambda: None)
         resp = client_admin.post('/api/scheduler/trigger')
@@ -2214,7 +2178,6 @@ class TestLegacyTriggerEndpoint:
 
 
 class TestCataloguesEndpointWithData:
-
     def test_returns_sorted_catalogues(self, client_admin, monkeypatch):
         from skytonight.skytonight_models import SkyTonightTarget
 

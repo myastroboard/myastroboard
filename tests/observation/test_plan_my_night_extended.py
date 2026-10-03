@@ -1,12 +1,11 @@
 """Extended unit tests for plan_my_night.py pure helper functions."""
 
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from db import documents
-
 from observation import plan_my_night
 
 _build_target_payload = plan_my_night._build_target_payload
@@ -27,7 +26,6 @@ save_user_plan = plan_my_night.save_user_plan
 
 
 class TestIsValidUserId:
-
     def test_valid_uuid(self):
         assert _is_valid_user_id(str(uuid.uuid4())) is True
 
@@ -62,7 +60,6 @@ class TestIsValidUserId:
 
 
 class TestIsValidCombinationId:
-
     def test_default_is_valid(self):
         assert _is_valid_combination_id("default") is True
 
@@ -88,7 +85,6 @@ class TestIsValidCombinationId:
 
 
 class TestParseDatetime:
-
     def test_none_returns_none(self):
         assert _parse_datetime(None) is None
 
@@ -96,7 +92,7 @@ class TestParseDatetime:
         assert _parse_datetime("") is None
 
     def test_datetime_object_returns_itself(self):
-        dt = datetime(2026, 1, 15, 20, 0, tzinfo=timezone.utc)
+        dt = datetime(2026, 1, 15, 20, 0, tzinfo=UTC)
         result = _parse_datetime(dt)
         assert result is not None
         assert result.year == 2026
@@ -132,7 +128,6 @@ class TestParseDatetime:
 
 
 class TestParseHhmmToMinutes:
-
     def test_zero(self):
         assert _parse_hhmm_to_minutes("00:00") == 0
 
@@ -171,7 +166,6 @@ class TestParseHhmmToMinutes:
 
 
 class TestMinutesToHhmm:
-
     def test_zero(self):
         assert _minutes_to_hhmm(0) == "00:00"
 
@@ -200,7 +194,6 @@ class TestMinutesToHhmm:
 
 
 class TestGetPlanState:
-
     def test_none_plan_returns_none(self):
         assert get_plan_state(None) == "none"
 
@@ -208,20 +201,20 @@ class TestGetPlanState:
         assert get_plan_state({}) == "none"
 
     def test_future_night_end_returns_current(self):
-        future = (datetime.now(timezone.utc) + timedelta(hours=5)).isoformat()
+        future = (datetime.now(UTC) + timedelta(hours=5)).isoformat()
         plan = {"night_end": future}
         assert get_plan_state(plan) == "current"
 
     def test_past_night_end_returns_previous(self):
-        past = (datetime.now(timezone.utc) - timedelta(hours=5)).isoformat()
+        past = (datetime.now(UTC) - timedelta(hours=5)).isoformat()
         plan = {"night_end": past}
         assert get_plan_state(plan) == "previous"
 
     def test_explicit_now_dt(self):
-        night_end = datetime(2026, 1, 1, 6, 0, tzinfo=timezone.utc)
+        night_end = datetime(2026, 1, 1, 6, 0, tzinfo=UTC)
         plan = {"night_end": night_end.isoformat()}
-        before = datetime(2026, 1, 1, 3, 0, tzinfo=timezone.utc)
-        after = datetime(2026, 1, 1, 8, 0, tzinfo=timezone.utc)
+        before = datetime(2026, 1, 1, 3, 0, tzinfo=UTC)
+        after = datetime(2026, 1, 1, 8, 0, tzinfo=UTC)
         assert get_plan_state(plan, now_dt=before) == "current"
         assert get_plan_state(plan, now_dt=after) == "previous"
 
@@ -273,7 +266,6 @@ class TestValidatePlanData:
 
 
 class TestLoadUserPlan:
-
     def test_returns_default_when_no_file(self, tmp_path, monkeypatch):
         user_id = str(uuid.uuid4())
         result = load_user_plan(user_id, "alice")
@@ -294,7 +286,6 @@ class TestLoadUserPlan:
 
 
 class TestSaveUserPlan:
-
     def test_saves_plan_successfully(self, tmp_path, monkeypatch):
         user_id = str(uuid.uuid4())
         payload = {"user_id": user_id, "plan": None}
@@ -316,7 +307,6 @@ class TestSaveUserPlan:
 
 
 class TestBuildTargetPayload:
-
     def test_basic_fields(self):
         item = {
             "name": "M42",
@@ -357,7 +347,6 @@ class TestBuildTargetPayload:
 
 
 class TestListUserPlanCombinationIds:
-
     def test_invalid_user_returns_empty(self):
         assert plan_my_night.list_user_plan_combination_ids("not-a-uuid") == []
 
@@ -383,7 +372,6 @@ class TestListUserPlanCombinationIds:
 
 
 class TestLoadUserPlanErrors:
-
     def test_corrupted_json_returns_default(self, tmp_path, monkeypatch):
         user_id = str(uuid.uuid4())
         documents.put_document(user_id, 'plan', 'corrupt', 'default')
@@ -404,17 +392,16 @@ class TestLoadUserPlanErrors:
 
 
 class TestIsTargetInCurrentPlan:
-
     def test_no_plan_returns_false(self, tmp_path, monkeypatch):
         user_id = str(uuid.uuid4())
         result = is_target_in_current_plan(user_id, "alice", "Messier", "M42")
         assert result is False
 
     def test_empty_entries_returns_false(self, tmp_path, monkeypatch):
-        from datetime import timezone, timedelta
+        from datetime import timedelta
 
         user_id = str(uuid.uuid4())
-        future = (datetime.now(timezone.utc) + timedelta(hours=5)).isoformat()
+        future = (datetime.now(UTC) + timedelta(hours=5)).isoformat()
         payload = {
             "user_id": user_id,
             "plan": {"entries": [], "night_end": future},
@@ -424,10 +411,10 @@ class TestIsTargetInCurrentPlan:
         assert result is False
 
     def test_previous_plan_returns_false(self, tmp_path, monkeypatch):
-        from datetime import timezone, timedelta
+        from datetime import timedelta
 
         user_id = str(uuid.uuid4())
-        past = (datetime.now(timezone.utc) - timedelta(hours=5)).isoformat()
+        past = (datetime.now(UTC) - timedelta(hours=5)).isoformat()
         payload = {
             "user_id": user_id,
             "plan": {"entries": [{"id": "e1", "name": "M42"}], "night_end": past},
@@ -443,7 +430,6 @@ class TestIsTargetInCurrentPlan:
 
 
 class TestSaveUserPlanEdgeCases:
-
     def test_save_creates_backup_of_existing_file(self, tmp_path, monkeypatch):
         user_id = str(uuid.uuid4())
         # Save once to create the file
@@ -466,7 +452,6 @@ class TestSaveUserPlanEdgeCases:
 
 
 class TestInvalidUserId:
-
     def test_load_with_invalid_user_id_raises(self):
         with pytest.raises(ValueError, match="Invalid user_id"):
             plan_my_night.load_user_plan("not-a-uuid")
@@ -482,7 +467,6 @@ class TestInvalidUserId:
 
 
 class TestLoadUserPlanPlanNotDict:
-
     def test_plan_field_not_dict_is_reset_to_none(self, tmp_path, monkeypatch):
         user_id = str(uuid.uuid4())
         documents.put_document(user_id, 'plan', {"user_id": user_id, "plan": "this_is_not_a_dict"}, 'default')
@@ -496,7 +480,6 @@ class TestLoadUserPlanPlanNotDict:
 
 
 class TestCountPlansForCombination:
-
     def test_empty_combination_id_returns_zero(self, tmp_path, monkeypatch):
         assert plan_my_night.count_plans_for_combination("") == 0
         assert plan_my_night.count_plans_for_combination(None) == 0
@@ -534,7 +517,6 @@ class TestCountPlansForCombination:
 
 
 class TestPurgeLegacyTelescopePlans:
-
     def _store(self, plan):
         user_id = str(uuid.uuid4())
         documents.put_document(user_id, "plan", {"plan": plan}, "default")

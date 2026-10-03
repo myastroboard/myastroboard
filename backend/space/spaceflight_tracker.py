@@ -12,9 +12,10 @@ import json
 import os
 import time
 import urllib.parse
+from datetime import UTC, datetime
+from typing import Any
+
 import requests
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
 
 from utils.constants import DATA_DIR_CACHE
 from utils.logging_config import get_logger
@@ -32,14 +33,14 @@ _SPACEFLIGHT_BACKOFF_FILE = os.path.join(DATA_DIR_CACHE, 'spaceflight_backoff.js
 # prune - without the grace it would be deleted as an orphan and immediately re-fetched.
 _PRUNE_GRACE_SECONDS = 600
 
-_STATION_ABBREV_MAP: Dict[str, str] = {
+_STATION_ABBREV_MAP: dict[str, str] = {
     "international space station": "ISS",
     "tiangong space station": "CSS",
     "tiangong": "CSS",
 }
 
 
-def _cache_image(url: Optional[str]) -> Optional[str]:
+def _cache_image(url: str | None) -> str | None:
     """
     Download *url* into the local image cache directory and return the local
     serving path ``/api/spaceflight/img/<hash>.<ext>``.
@@ -77,22 +78,22 @@ def _cache_image(url: Optional[str]) -> Optional[str]:
 # path for up to _BACKOFF_TTL seconds so the scheduler/API endpoints don't
 # hammer the free-tier quota while it recovers.
 _BACKOFF_TTL = 3600  # seconds - match the spaceflight launches TTL
-_backoff_until: Dict[str, float] = {}
+_backoff_until: dict[str, float] = {}
 
 
-def _load_backoff_state() -> Dict[str, float]:
+def _load_backoff_state() -> dict[str, float]:
     """Load persisted per-path LL2 backoff expirations from disk."""
     try:
         if not os.path.exists(_SPACEFLIGHT_BACKOFF_FILE):
             return {}
-        with open(_SPACEFLIGHT_BACKOFF_FILE, 'r', encoding='utf-8') as fh:
+        with open(_SPACEFLIGHT_BACKOFF_FILE, encoding='utf-8') as fh:
             raw = json.load(fh)
         now_ts = time.time()
         state = {}
         for path, exp in (raw or {}).items():
             try:
                 exp_val = float(exp)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 continue
             if exp_val > now_ts:
                 state[str(path)] = exp_val
@@ -117,7 +118,7 @@ def _save_backoff_state() -> None:
 _backoff_until = _load_backoff_state()
 
 
-def _get(path: str, params: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+def _get(path: str, params: dict[str, Any] | None = None) -> dict[str, Any] | None:
     """Execute a GET request against the LL2 API and return the JSON response."""
     # Re-load shared backoff state so restarts/other workers don't re-hit rate limits.
     _backoff_until.update(_load_backoff_state())
@@ -172,7 +173,7 @@ def _get(path: str, params: Optional[Dict[str, Any]] = None) -> Optional[Dict[st
 # ---------------------------------------------------------------------------
 
 
-def _normalise_launch(raw: Dict[str, Any]) -> Dict[str, Any]:
+def _normalise_launch(raw: dict[str, Any]) -> dict[str, Any]:
     """Slim representation of a launch object."""
     status = raw.get("status") or {}
     rocket = raw.get("rocket") or {}
@@ -215,7 +216,7 @@ def _normalise_launch(raw: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _normalise_astronaut(raw: Dict[str, Any]) -> Dict[str, Any]:
+def _normalise_astronaut(raw: dict[str, Any]) -> dict[str, Any]:
     """Slim representation of an astronaut."""
     agency = raw.get("agency") or {}
     return {
@@ -233,7 +234,7 @@ def _normalise_astronaut(raw: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _normalise_expedition(raw: Dict[str, Any]) -> Dict[str, Any]:
+def _normalise_expedition(raw: dict[str, Any]) -> dict[str, Any]:
     """Slim representation of a space station expedition."""
     station = raw.get("spacestation") or {}
     station_name = station.get("name")
@@ -265,7 +266,7 @@ def _normalise_expedition(raw: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _normalise_event(raw: Dict[str, Any]) -> Dict[str, Any]:
+def _normalise_event(raw: dict[str, Any]) -> dict[str, Any]:
     """Slim representation of a space event."""
     event_type = raw.get("type") or {}
     programs = [p.get("name") for p in raw.get("programs", []) if p.get("name")]
@@ -294,7 +295,7 @@ def _normalise_event(raw: Dict[str, Any]) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def get_upcoming_launches(limit: int = 12) -> Optional[Dict[str, Any]]:
+def get_upcoming_launches(limit: int = 12) -> dict[str, Any] | None:
     """Fetch upcoming launches (NET ≥ now)."""
     raw = _get("/launch/upcoming/", params={"limit": limit, "format": "json"})
     if raw is None:
@@ -303,11 +304,11 @@ def get_upcoming_launches(limit: int = 12) -> Optional[Dict[str, Any]]:
     return {
         "count": raw.get("count", len(results)),
         "results": results,
-        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "fetched_at": datetime.now(UTC).isoformat(),
     }
 
 
-def get_past_launches(limit: int = 10) -> Optional[Dict[str, Any]]:
+def get_past_launches(limit: int = 10) -> dict[str, Any] | None:
     """Fetch recent past launches (NET < now), sorted descending."""
     raw = _get("/launch/previous/", params={"limit": limit, "format": "json", "ordering": "-net"})
     if raw is None:
@@ -316,11 +317,11 @@ def get_past_launches(limit: int = 10) -> Optional[Dict[str, Any]]:
     return {
         "count": raw.get("count", len(results)),
         "results": results,
-        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "fetched_at": datetime.now(UTC).isoformat(),
     }
 
 
-def get_iss_crew() -> Optional[Dict[str, Any]]:
+def get_iss_crew() -> dict[str, Any] | None:
     """Fetch all currently active space station expeditions (ISS, CSS, etc.)."""
     raw = _get("/expedition/", params={"format": "json", "limit": 5, "ordering": "-start"})
     if raw is None:
@@ -338,11 +339,11 @@ def get_iss_crew() -> Optional[Dict[str, Any]]:
         active.append(_normalise_expedition(exp))
     return {
         "expeditions": active,
-        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "fetched_at": datetime.now(UTC).isoformat(),
     }
 
 
-def get_astronauts_in_space() -> Optional[Dict[str, Any]]:
+def get_astronauts_in_space() -> dict[str, Any] | None:
     """Fetch all astronauts currently in space."""
     raw = _get("/astronaut/", params={"in_space": "true", "limit": 30, "format": "json"})
     if raw is None:
@@ -351,11 +352,11 @@ def get_astronauts_in_space() -> Optional[Dict[str, Any]]:
     return {
         "count": raw.get("count", len(results)),
         "results": results,
-        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "fetched_at": datetime.now(UTC).isoformat(),
     }
 
 
-def get_upcoming_space_events(limit: int = 15) -> Optional[Dict[str, Any]]:
+def get_upcoming_space_events(limit: int = 15) -> dict[str, Any] | None:
     """Fetch upcoming space events (dockings, EVAs, milestones…)."""
     raw = _get("/event/upcoming/", params={"limit": limit, "format": "json"})
     if raw is None:
@@ -364,7 +365,7 @@ def get_upcoming_space_events(limit: int = 15) -> Optional[Dict[str, Any]]:
     return {
         "count": raw.get("count", len(results)),
         "results": results,
-        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "fetched_at": datetime.now(UTC).isoformat(),
     }
 
 
@@ -373,10 +374,10 @@ def get_upcoming_space_events(limit: int = 15) -> Optional[Dict[str, Any]]:
 # Per-launch in-process cache with 5-minute TTL.
 # ---------------------------------------------------------------------------
 _VIDURLS_TTL = 300  # seconds
-_vidurls_cache: Dict[str, Dict[str, Any]] = {}
+_vidurls_cache: dict[str, dict[str, Any]] = {}
 
 
-def get_launch_vidurls(launch_id: str) -> List[Dict[str, Any]]:
+def get_launch_vidurls(launch_id: str) -> list[dict[str, Any]]:
     """
     Fetch the vidURLs for a single launch from the LL2 detail endpoint.
     Results are cached in-process for _VIDURLS_TTL seconds to protect the

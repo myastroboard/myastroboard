@@ -6,33 +6,24 @@ All /api/skytonight/* and /api/catalogues routes, plus the payload-builder helpe
 import json
 import os
 import re
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from flask import Blueprint, jsonify, request
 
-from observation import astrodex
-from observation import beginner_catalog
-from equipment import equipment_profiles
-from observation import object_info
-from observation import plan_my_night
-from observation import visibility_calendar
-from observation import wishlist
-from equipment import exposure_math
+from equipment import equipment_profiles, exposure_math
+from observation import astrodex, beginner_catalog, object_info, plan_my_night, visibility_calendar, wishlist
 from skytonight import skytonight_targets
-from utils.auth import admin_required, get_current_user, login_required, user_manager
-from utils.constellation_names import full_constellation_name
-from utils.constants import (
-    OUTPUT_DIR,
-    SKYTONIGHT_CALCULATION_LOG_FILE,
+from skytonight.skytonight_calculator import (
+    compute_comet_alttime_on_demand,
+    compute_target_debug,
+    load_calculation_results,
 )
-from utils.logging_config import get_logger
-from utils.repo_config import load_config, get_active_location, get_locations_for_user
 from skytonight.skytonight_scheduler_manager import (
+    _run_skytonight_refresh,
     get_remote_skytonight_scheduler_status,
     get_skytonight_scheduler_for_api,
-    _run_skytonight_refresh,
 )
 from skytonight.skytonight_storage import (
     ensure_skytonight_directories,
@@ -40,19 +31,25 @@ from skytonight.skytonight_storage import (
     get_bodies_results_file,
     get_comets_results_file,
     get_dso_results_file,
-    get_scheduler_trigger_file as get_skytonight_scheduler_trigger_file,
     get_skymap_file,
     has_bodies_results,
     has_calculation_results,
     has_comets_results,
     has_dso_results,
 )
-from skytonight.skytonight_calculator import (
-    compute_comet_alttime_on_demand,
-    compute_target_debug,
-    load_calculation_results,
+from skytonight.skytonight_storage import (
+    get_scheduler_trigger_file as get_skytonight_scheduler_trigger_file,
 )
-from utils import load_json_file, normalize_catalogue_key as _normalize_catalogue_key
+from utils import load_json_file
+from utils import normalize_catalogue_key as _normalize_catalogue_key
+from utils.auth import admin_required, get_current_user, login_required, user_manager
+from utils.constants import (
+    OUTPUT_DIR,
+    SKYTONIGHT_CALCULATION_LOG_FILE,
+)
+from utils.constellation_names import full_constellation_name
+from utils.logging_config import get_logger
+from utils.repo_config import get_active_location, get_locations_for_user, load_config
 
 logger = get_logger(__name__)
 
@@ -63,7 +60,7 @@ skytonight_bp = Blueprint('skytonight', __name__)
 # ---------------------------------------------------------------------------
 
 
-def _skytonight_request_location() -> Dict[str, Any]:
+def _skytonight_request_location() -> dict[str, Any]:
     """The location preset SkyTonight endpoints serve for this request.
 
     v1.2: the nightly calculation runs once per scheduler location, so every
@@ -79,7 +76,7 @@ def _skytonight_request_location() -> Dict[str, Any]:
     return get_active_location(config, user)
 
 
-def _skytonight_request_location_override(location_id: Optional[str]) -> Dict[str, Any]:
+def _skytonight_request_location_override(location_id: str | None) -> dict[str, Any]:
     """Resolve the location preset for this request, optionally pinned to *location_id*.
 
     Used by endpoints that need to read a specific location's result files regardless
@@ -109,7 +106,7 @@ def _target_attr(target: object, key: str, default=None):
     return getattr(target, key, default)
 
 
-def _target_catalogue_names(target: object) -> Dict[str, str]:
+def _target_catalogue_names(target: object) -> dict[str, str]:
     value = _target_attr(target, 'catalogue_names', {})
     return value if isinstance(value, dict) else {}
 
@@ -159,7 +156,7 @@ def _preload_all_current_plan_entries(user_id: str, username: str) -> list:
     return all_entries
 
 
-def _resolve_source_catalogue(catalogue_names: Dict[str, str], display_name: str) -> str:
+def _resolve_source_catalogue(catalogue_names: dict[str, str], display_name: str) -> str:
     """Pick the catalogue label that matches the chosen display name."""
     if not isinstance(catalogue_names, dict) or not catalogue_names:
         return 'SkyTonight'
@@ -174,14 +171,14 @@ def _resolve_source_catalogue(catalogue_names: Dict[str, str], display_name: str
 
 
 def _annotate_skytonight_item(
-    item: Dict[str, Any],
+    item: dict[str, Any],
     user_id: str,
     username: str,
     source_catalogue: str,
     plan_state: str,
-    _preloaded_astrodex: Optional[Dict[str, Any]] = None,
-    _preloaded_plan_entries: Optional[list] = None,
-    _preloaded_wishlist: Optional[set] = None,
+    _preloaded_astrodex: dict[str, Any] | None = None,
+    _preloaded_plan_entries: list | None = None,
+    _preloaded_wishlist: set | None = None,
 ) -> None:
     """Annotate a single item with astrodex / plan-my-night / wishlist presence flags.
 
@@ -225,7 +222,7 @@ def _annotate_skytonight_item(
 _ALTTIME_ID_SAFE = re.compile(r'[^a-z0-9_-]')
 
 
-def _alttime_json_path(target_id: str, location_id: Optional[str] = None, alttime_dir: Optional[str] = None) -> str:
+def _alttime_json_path(target_id: str, location_id: str | None = None, alttime_dir: str | None = None) -> str:
     """Return absolute path for a target's altitude-time JSON file (per location).
 
     Pass a pre-resolved *alttime_dir* (from :func:`get_alttime_dir`, called once)
@@ -242,7 +239,7 @@ def _alttime_json_path(target_id: str, location_id: Optional[str] = None, alttim
 # ---------------------------------------------------------------------------
 
 
-def _build_skytonight_reports_payload(catalogue: Optional[str], user_id: str, username: str) -> Dict[str, Any]:
+def _build_skytonight_reports_payload(catalogue: str | None, user_id: str, username: str) -> dict[str, Any]:
     """Build the SkyTonight reports payload served to the frontend.
 
     When the scheduler has already computed a calculation results cache (i.e.
@@ -259,7 +256,7 @@ def _build_skytonight_reports_payload(catalogue: Optional[str], user_id: str, us
     location_id = _skytonight_request_location().get('id')
     wishlist_index = _preload_wishlist_index(user_id, username)
 
-    base_result: Dict[str, Any] = {
+    base_result: dict[str, Any] = {
         'report': [],
         'bodies': [],
         'comets': [],
@@ -281,7 +278,7 @@ def _build_skytonight_reports_payload(catalogue: Optional[str], user_id: str, us
                 break
 
             # Catalogue filter
-            calc_catalogue_names: Dict[str, str] = calc_item.get('catalogue_names', {})
+            calc_catalogue_names: dict[str, str] = calc_item.get('catalogue_names', {})
             if catalogue:
                 display_name = str(calc_catalogue_names.get(catalogue, '') or '').strip()
                 if not display_name:
@@ -302,7 +299,7 @@ def _build_skytonight_reports_payload(catalogue: Optional[str], user_id: str, us
             const_full = full_constellation_name(const_abbr)
             ra_hms = observation.get('ra_hms', '')
             dec_dms = observation.get('dec_dms', '')
-            row: Dict[str, Any] = {
+            row: dict[str, Any] = {
                 'id': canonical_id,
                 'target name': preferred_display_name,
                 'type': calc_item.get('object_type', ''),
@@ -498,7 +495,7 @@ def _build_skytonight_reports_payload(catalogue: Optional[str], user_id: str, us
     return base_result
 
 
-def _build_bodies_section_payload(user_id: str, username: str) -> Dict[str, Any]:
+def _build_bodies_section_payload(user_id: str, username: str) -> dict[str, Any]:
     """Build the Solar system bodies payload for the reactive UI section."""
     plan_payload = plan_my_night.get_plan_with_timeline(user_id, username)
     plan_state = plan_payload.get('state', 'none')
@@ -517,7 +514,7 @@ def _build_bodies_section_payload(user_id: str, username: str) -> Dict[str, Any]
             observation = calc_item.get('observation', {})
             ra_hms = observation.get('ra_hms', '')
             dec_dms = observation.get('dec_dms', '')
-            row: Dict[str, Any] = {
+            row: dict[str, Any] = {
                 'target name': calc_item.get('preferred_name', ''),
                 'type': calc_item.get('object_type', ''),
                 'visual magnitude': calc_item.get('magnitude'),
@@ -594,7 +591,7 @@ def _build_bodies_section_payload(user_id: str, username: str) -> Dict[str, Any]
     }
 
 
-def _build_comets_section_payload(user_id: str, username: str) -> Dict[str, Any]:
+def _build_comets_section_payload(user_id: str, username: str) -> dict[str, Any]:
     """Build the comets payload for the reactive UI section."""
     plan_payload = plan_my_night.get_plan_with_timeline(user_id, username)
     plan_state = plan_payload.get('state', 'none')
@@ -616,7 +613,7 @@ def _build_comets_section_payload(user_id: str, username: str) -> Dict[str, Any]
                 metadata = {}
             ra_hms = observation.get('ra_hms', '')
             dec_dms = observation.get('dec_dms', '')
-            row: Dict[str, Any] = {
+            row: dict[str, Any] = {
                 'target name': calc_item.get('preferred_name', ''),
                 'type': calc_item.get('object_type', ''),
                 'visual magnitude': calc_item.get('magnitude'),
@@ -701,27 +698,27 @@ def _build_comets_section_payload(user_id: str, username: str) -> Dict[str, Any]
     }
 
 
-def _clamp_optional_float(value: Any, low: float, high: float) -> Optional[float]:
+def _clamp_optional_float(value: Any, low: float, high: float) -> float | None:
     """Parse a query-param float and clamp it to [low, high]; None on any bad value."""
     if value in (None, ''):
         return None
     try:
         return max(low, min(high, float(value)))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 
-def _clamp_optional_hour(value: Any) -> Optional[int]:
+def _clamp_optional_hour(value: Any) -> int | None:
     """Parse an integer local hour (0-23) query param; None on any bad value."""
     if value in (None, ''):
         return None
     try:
         return int(value) % 24
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 
-def _parse_dso_advanced_filters(args: Any, constraints: Dict[str, Any]) -> Dict[str, Any]:
+def _parse_dso_advanced_filters(args: Any, constraints: dict[str, Any]) -> dict[str, Any]:
     """Parse and clamp the advanced DSO filter query params (v1.4).
 
     Malformed values are dropped (treated as "not set") rather than 400-ing the
@@ -744,7 +741,7 @@ def _parse_dso_advanced_filters(args: Any, constraints: Dict[str, Any]) -> Dict[
     }
 
 
-def _dso_advanced_filters_active(filters: Optional[Dict[str, Any]]) -> bool:
+def _dso_advanced_filters_active(filters: dict[str, Any] | None) -> bool:
     if not filters:
         return False
     return any(
@@ -753,7 +750,7 @@ def _dso_advanced_filters_active(filters: Optional[Dict[str, Any]]) -> bool:
     )
 
 
-def _dso_advanced_filters_need_calculation(filters: Optional[Dict[str, Any]]) -> bool:
+def _dso_advanced_filters_need_calculation(filters: dict[str, Any] | None) -> bool:
     """True when an active advanced filter can only run against scheduler-computed data.
 
     The static-dataset fallback (no nightly calculation yet for the active location)
@@ -769,7 +766,7 @@ def _dso_advanced_filters_need_calculation(filters: Optional[Dict[str, Any]]) ->
     )
 
 
-def _resolve_combination_optics(user_id: str, combination_id: str) -> Optional[Dict[str, Any]]:
+def _resolve_combination_optics(user_id: str, combination_id: str) -> dict[str, Any] | None:
     """Resolve one combination (own or shared) to the optics the FOV / integration filters need.
 
     Mirrors ``_recommend_combinations_for_target``: effective focal length / ratio from the
@@ -803,7 +800,7 @@ def _resolve_combination_optics(user_id: str, combination_id: str) -> Optional[D
     if not focal_length or not focal_ratio:
         return None
 
-    optics: Dict[str, Any] = {
+    optics: dict[str, Any] = {
         'combination_id': combination_id,
         'combination_name': str(combo.get('name') or ''),
         'focal_length_mm': focal_length,
@@ -824,7 +821,7 @@ def _resolve_combination_optics(user_id: str, combination_id: str) -> Optional[D
                 fov = equipment_profiles.calculate_fov(focal_length, sensor_w, sensor_h, pixel)
                 optics['fov_h_arcmin'] = round(fov.horizontal_fov_deg * 60.0, 2)
                 optics['fov_v_arcmin'] = round(fov.vertical_fov_deg * 60.0, 2)
-            except (TypeError, ValueError, ZeroDivisionError):
+            except TypeError, ValueError, ZeroDivisionError:
                 # Malformed sensor/optics numbers: leave fov_*_arcmin as None so the
                 # "fits my sensor" filter treats this combination's FOV as unknown
                 # (a missing FOV never excludes a row) rather than 500-ing the table.
@@ -833,12 +830,12 @@ def _resolve_combination_optics(user_id: str, combination_id: str) -> Optional[D
 
 
 def _dso_row_passes_advanced_filters(
-    row: Dict[str, Any],
-    calc_item: Dict[str, Any],
-    filters: Dict[str, Any],
-    optics: Optional[Dict[str, Any]],
-    bortle: Optional[float],
-    sqm: Optional[float],
+    row: dict[str, Any],
+    calc_item: dict[str, Any],
+    filters: dict[str, Any],
+    optics: dict[str, Any] | None,
+    bortle: float | None,
+    sqm: float | None,
 ) -> bool:
     """Apply the v1.4 advanced filters to one calculated DSO row.
 
@@ -876,9 +873,9 @@ def _dso_row_passes_advanced_filters(
                 return False
 
     # --- FOV fit + estimated minimum integration time (need a combination) ---
-    fits: Optional[bool] = None
-    fill_pct: Optional[float] = None
-    est_integration_h: Optional[float] = None
+    fits: bool | None = None
+    fill_pct: float | None = None
+    est_integration_h: float | None = None
     if optics is not None:
         min_fov_arcmin = None
         if optics.get('fov_h_arcmin') and optics.get('fov_v_arcmin'):
@@ -915,11 +912,11 @@ def _dso_row_passes_advanced_filters(
 
 
 def _build_dso_section_payload(
-    catalogue: Optional[str],
+    catalogue: str | None,
     user_id: str,
     username: str,
-    filters: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    filters: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Build the deep-sky objects payload for the reactive UI section.
 
     ``filters`` carries the v1.4 advanced filters (angular size, surface brightness,
@@ -951,7 +948,7 @@ def _build_dso_section_payload(
         for calc_item in data.get('deep_sky', []):
             if rows_added >= max_rows:  # pragma: no cover
                 break
-            calc_catalogue_names: Dict[str, str] = calc_item.get('catalogue_names', {})
+            calc_catalogue_names: dict[str, str] = calc_item.get('catalogue_names', {})
             if catalogue:
                 display_name = str(calc_catalogue_names.get(catalogue, '') or '').strip()
                 if not display_name:
@@ -971,7 +968,7 @@ def _build_dso_section_payload(
             const_full = full_constellation_name(const_abbr)
             ra_hms = observation.get('ra_hms', '')
             dec_dms = observation.get('dec_dms', '')
-            row: Dict[str, Any] = {
+            row: dict[str, Any] = {
                 'id': canonical_id,
                 'target name': preferred_display_name,
                 'type': calc_item.get('object_type', ''),
@@ -1111,16 +1108,16 @@ def _build_dso_section_payload(
     }
 
 
-def _to_float(value: Any) -> Optional[float]:
+def _to_float(value: Any) -> float | None:
     try:
         if value is None or value == '':
             return None
         return float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 
-def _camera_qe_fraction(camera: Dict[str, Any]) -> Optional[float]:
+def _camera_qe_fraction(camera: dict[str, Any]) -> float | None:
     """Camera quantum efficiency as a 0-1 fraction for ``exposure_math``.
 
     ``Camera.quantum_efficiency`` is stored as a percentage (0-100), which is also
@@ -1151,7 +1148,7 @@ def _score_in_range(value: float, min_value: float, max_value: float) -> float:
     return max(1.0, 5.0 - 4.0 * penalty)
 
 
-def _ideal_focal_range(size_arcmin: Optional[float], object_type: str) -> tuple[float, float]:
+def _ideal_focal_range(size_arcmin: float | None, object_type: str) -> tuple[float, float]:
     """Estimate a practical focal-length band from target apparent size/type."""
     if size_arcmin is not None and size_arcmin > 0:
         if size_arcmin >= 120:
@@ -1174,7 +1171,7 @@ def _ideal_focal_range(size_arcmin: Optional[float], object_type: str) -> tuple[
     return (450.0, 1400.0)
 
 
-def _aperture_score(aperture_mm: float, magnitude: Optional[float]) -> float:
+def _aperture_score(aperture_mm: float, magnitude: float | None) -> float:
     """Estimate how suitable aperture is for target brightness."""
     if magnitude is None:
         return _score_in_range(aperture_mm, 70.0, 180.0)
@@ -1200,7 +1197,7 @@ def _speed_score(f_ratio: float, object_type: str) -> float:
     return 3.5
 
 
-def _fov_match_score(fov_diagonal_deg: float, size_arcmin: Optional[float]) -> Optional[float]:
+def _fov_match_score(fov_diagonal_deg: float, size_arcmin: float | None) -> float | None:
     """Score how well a combination's diagonal FOV frames the target (None if size unknown).
 
     A target filling roughly 10-60% of the frame's diagonal is considered a good framing;
@@ -1213,17 +1210,17 @@ def _fov_match_score(fov_diagonal_deg: float, size_arcmin: Optional[float]) -> O
 
 
 def _recommend_combinations_for_target(
-    target_payload: Dict[str, Any],
-    combinations: list[Dict[str, Any]],
-    telescopes_by_id: Dict[str, Dict[str, Any]],
-    cameras_by_id: Dict[str, Dict[str, Any]],
-) -> list[Dict[str, Any]]:
+    target_payload: dict[str, Any],
+    combinations: list[dict[str, Any]],
+    telescopes_by_id: dict[str, dict[str, Any]],
+    cameras_by_id: dict[str, dict[str, Any]],
+) -> list[dict[str, Any]]:
     size_arcmin = _to_float(target_payload.get('size'))
     magnitude = _to_float(target_payload.get('mag'))
     object_type = str(target_payload.get('type') or target_payload.get('object_type') or '')
 
     ideal_f_min, ideal_f_max = _ideal_focal_range(size_arcmin, object_type)
-    recommendations: list[Dict[str, Any]] = []
+    recommendations: list[dict[str, Any]] = []
 
     for combo in combinations:
         telescope = telescopes_by_id.get(combo.get('telescope_id') or '')
@@ -1264,7 +1261,7 @@ def _recommend_combinations_for_target(
                         focal_length, sensor_width, sensor_height, pixel_size
                     )
                     fov_score = _fov_match_score(fov_calculation.diagonal_fov_deg, size_arcmin)
-            except (TypeError, ValueError, ZeroDivisionError):
+            except TypeError, ValueError, ZeroDivisionError:
                 fov_calculation = None
                 fov_score = None
 
@@ -1469,7 +1466,7 @@ def skytonight_log_api():
         if not os.path.isfile(SKYTONIGHT_CALCULATION_LOG_FILE):
             return jsonify({'log_content': ''})
 
-        with open(SKYTONIGHT_CALCULATION_LOG_FILE, 'r', encoding='utf-8') as file_obj:
+        with open(SKYTONIGHT_CALCULATION_LOG_FILE, encoding='utf-8') as file_obj:
             return jsonify({'log_content': file_obj.read()})
     except Exception as e:
         logger.error(f'Error getting SkyTonight log content: {e}')
@@ -1532,10 +1529,10 @@ def get_skytonight_alttime_api(target_id):
     if not file_path.startswith(output_dir_abs + os.sep):
         return jsonify({'error': 'Invalid target identifier'}), 400
 
-    data: Optional[Dict[str, Any]] = None
+    data: dict[str, Any] | None = None
     if os.path.isfile(file_path):
         try:
-            with open(file_path, 'r', encoding='utf-8') as fobj:
+            with open(file_path, encoding='utf-8') as fobj:
                 data = json.load(fobj)
         except Exception:
             logger.exception(f'Error reading alttime JSON for target {target_id}')
@@ -1585,13 +1582,13 @@ def get_skytonight_visibility_calendar_api():
     try:
         now_local = datetime.now(ZoneInfo(tz_name))
     except Exception:
-        now_local = datetime.now(timezone.utc)
+        now_local = datetime.now(UTC)
     current_year = now_local.year
 
     year_raw = request.args.get('year')
     try:
         year = int(year_raw) if year_raw not in (None, '') else current_year
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         year = current_year
     year = max(
         current_year + visibility_calendar.YEAR_OFFSET_MIN,
@@ -1628,7 +1625,7 @@ def get_skytonight_combination_recommendations_api():
         combos_blob = equipment_profiles.load_user_combinations(user_id)
         own_combinations = list(combos_blob.get('items', []) if isinstance(combos_blob, dict) else [])
 
-        active_combinations: list[Dict[str, Any]] = []
+        active_combinations: list[dict[str, Any]] = []
         for combo in own_combinations:
             if combo.get('is_disabled'):
                 continue
@@ -1686,7 +1683,7 @@ def get_skytonight_skymap_api():
     if not os.path.isfile(skymap_file):
         return jsonify({'targets': []}), 200
     try:
-        with open(skymap_file, 'r', encoding='utf-8') as fobj:
+        with open(skymap_file, encoding='utf-8') as fobj:
             data = json.load(fobj)
         targets = data.get('targets', [])
 
@@ -1788,7 +1785,7 @@ def get_skytonight_data_dso_api():
 
 
 # Difficulty tiers a given experience_level preference is allowed to see.
-_EXPERIENCE_LEVEL_ALLOWED_DIFFICULTIES: Dict[str, set] = {
+_EXPERIENCE_LEVEL_ALLOWED_DIFFICULTIES: dict[str, set] = {
     'beginner': {'beginner'},
     'intermediate': {'beginner', 'intermediate'},
     'advanced': {'beginner', 'intermediate', 'advanced'},
@@ -1802,7 +1799,7 @@ def _experience_level_allowed_difficulties(experience_level: str) -> set:
     )
 
 
-def _filter_targets_by_experience_level(targets: List[Dict[str, Any]], experience_level: str) -> List[Dict[str, Any]]:
+def _filter_targets_by_experience_level(targets: list[dict[str, Any]], experience_level: str) -> list[dict[str, Any]]:
     """Return only the targets whose `difficulty` tier is allowed for experience_level."""
     allowed = _experience_level_allowed_difficulties(experience_level)
     return [item for item in targets if item.get('difficulty', 'intermediate') in allowed]
@@ -1810,7 +1807,7 @@ def _filter_targets_by_experience_level(targets: List[Dict[str, Any]], experienc
 
 # Fallback estimated integration time (hours) by difficulty tier, used when a
 # recommended target has no matching entry in the curated beginner catalog.
-_DIFFICULTY_ESTIMATED_HOURS: Dict[str, float] = {
+_DIFFICULTY_ESTIMATED_HOURS: dict[str, float] = {
     'beginner': 2.0,
     'intermediate': 4.0,
     'advanced': 8.0,
@@ -1820,9 +1817,9 @@ _RECOMMENDATIONS_DEFAULT_LIMIT = 5
 _RECOMMENDATIONS_MAX_LIMIT = 10
 
 
-def _build_beginner_catalog_hours_lookup() -> Dict[str, float]:
+def _build_beginner_catalog_hours_lookup() -> dict[str, float]:
     """Return a normalized-catalogue-id -> typical_integration_hours lookup from the beginner catalog."""
-    lookup: Dict[str, float] = {}
+    lookup: dict[str, float] = {}
     for entry in beginner_catalog.load_beginner_catalog():
         key = _normalize_catalogue_key(entry.get('catalogue_id'))
         hours = entry.get('typical_integration_hours')
@@ -1846,7 +1843,7 @@ def get_skytonight_recommendations_api():
 
         try:
             limit = int(request.args.get('limit', _RECOMMENDATIONS_DEFAULT_LIMIT))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             limit = _RECOMMENDATIONS_DEFAULT_LIMIT
         limit = max(1, min(limit, _RECOMMENDATIONS_MAX_LIMIT))
 
@@ -1866,7 +1863,7 @@ def get_skytonight_recommendations_api():
 
         targets = []
         for item in candidates:
-            catalogue_names: Dict[str, str] = item.get('catalogue_names', {}) or {}
+            catalogue_names: dict[str, str] = item.get('catalogue_names', {}) or {}
             preferred_name = str(item.get('preferred_name', '') or '').strip()
             difficulty = item.get('difficulty', 'intermediate')
             source_catalogue = _resolve_source_catalogue(catalogue_names, preferred_name)
@@ -1958,7 +1955,7 @@ def get_catalogue_log(catalogue):
         if os.path.getsize(log_file) == 0:
             return jsonify({"error": "Log file is empty"}), 404
 
-        with open(log_file, 'r', encoding='utf-8') as f:
+        with open(log_file, encoding='utf-8') as f:
             log_content = f.read()
 
         return jsonify(

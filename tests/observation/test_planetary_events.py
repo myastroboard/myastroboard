@@ -4,7 +4,8 @@ Covers pure-logic rating, constants, and vectorized find_runs helper.
 """
 
 import numpy as np
-from observation.planetary_events import PlanetaryEventsService, PLANETS
+
+from observation.planetary_events import PLANETS, PlanetaryEventsService
 
 
 class TestPlanetaryEventsConstants:
@@ -72,8 +73,8 @@ class TestParabolicMin:
     """Tests for the static _parabolic_min helper."""
 
     def _t_arr(self, n):
-        from astropy.time import Time
         from astropy import units as u
+        from astropy.time import Time
 
         return Time("2026-01-01") + np.arange(n) * 1.0 * u.day
 
@@ -146,9 +147,10 @@ class TestPrefetchCoords:
     """Tests for _prefetch_coords vectorized caching."""
 
     def test_prefetch_stores_t_arr(self):
-        from astropy.time import Time
         from datetime import datetime
         from zoneinfo import ZoneInfo
+
+        from astropy.time import Time
 
         svc = PlanetaryEventsService(45.0, -73.5)
         now = Time(datetime(2026, 6, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
@@ -157,9 +159,10 @@ class TestPrefetchCoords:
         assert len(svc._t_arr) >= 1
 
     def test_prefetch_stores_all_planet_coords(self):
-        from astropy.time import Time
         from datetime import datetime
         from zoneinfo import ZoneInfo
+
+        from astropy.time import Time
 
         svc = PlanetaryEventsService(45.0, -73.5)
         now = Time(datetime(2026, 6, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
@@ -172,9 +175,10 @@ class TestFindConjunctionsAndOppositions:
     """Tests for _find_conjunctions and _find_oppositions with real data."""
 
     def test_find_conjunctions_returns_list(self):
-        from astropy.time import Time
         from datetime import datetime
         from zoneinfo import ZoneInfo
+
+        from astropy.time import Time
 
         svc = PlanetaryEventsService(45.0, -73.5)
         now = Time(datetime(2026, 1, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
@@ -184,9 +188,10 @@ class TestFindConjunctionsAndOppositions:
         assert isinstance(events, list)
 
     def test_find_conjunctions_returns_empty_without_prefetch(self):
-        from astropy.time import Time
         from datetime import datetime
         from zoneinfo import ZoneInfo
+
+        from astropy.time import Time
 
         svc = PlanetaryEventsService(45.0, -73.5)
         now = Time(datetime(2026, 1, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
@@ -196,9 +201,10 @@ class TestFindConjunctionsAndOppositions:
         assert events == []
 
     def test_find_oppositions_returns_empty_without_prefetch(self):
-        from astropy.time import Time
         from datetime import datetime
         from zoneinfo import ZoneInfo
+
+        from astropy.time import Time
 
         svc = PlanetaryEventsService(45.0, -73.5)
         now = Time(datetime(2026, 1, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
@@ -207,9 +213,10 @@ class TestFindConjunctionsAndOppositions:
         assert events == []
 
     def test_find_elongations_returns_empty_without_prefetch(self):
-        from astropy.time import Time
         from datetime import datetime
         from zoneinfo import ZoneInfo
+
+        from astropy.time import Time
 
         svc = PlanetaryEventsService(45.0, -73.5)
         now = Time(datetime(2026, 1, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
@@ -218,9 +225,10 @@ class TestFindConjunctionsAndOppositions:
         assert events == []
 
     def test_find_retrograde_returns_empty_without_prefetch(self):
-        from astropy.time import Time
         from datetime import datetime
         from zoneinfo import ZoneInfo
+
+        from astropy.time import Time
 
         svc = PlanetaryEventsService(45.0, -73.5)
         now = Time(datetime(2026, 1, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
@@ -235,9 +243,10 @@ class TestFindConjunctionsAndOppositions:
         assert isinstance(events, list)
 
     def test_find_oppositions_returns_list_with_prefetch(self):
-        from astropy.time import Time
         from datetime import datetime
         from zoneinfo import ZoneInfo
+
+        from astropy.time import Time
 
         svc = PlanetaryEventsService(45.0, -73.5)
         now = Time(datetime(2026, 1, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
@@ -247,9 +256,10 @@ class TestFindConjunctionsAndOppositions:
         assert isinstance(events, list)
 
     def test_find_retrograde_returns_list_with_prefetch(self):
-        from astropy.time import Time
         from datetime import datetime
         from zoneinfo import ZoneInfo
+
+        from astropy.time import Time
 
         svc = PlanetaryEventsService(45.0, -73.5)
         now = Time(datetime(2026, 1, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
@@ -265,10 +275,11 @@ class TestFindMoonConjunctionsExceptionHandlers:
     per-planet position fetch (swallowed, skips that planet only)."""
 
     def test_returns_empty_on_moon_fetch_failure(self):
-        from astropy.time import Time
         from datetime import datetime
-        from zoneinfo import ZoneInfo
         from unittest.mock import patch
+        from zoneinfo import ZoneInfo
+
+        from astropy.time import Time
 
         svc = PlanetaryEventsService(45.0, -73.5)
         now = Time(datetime(2026, 1, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
@@ -277,11 +288,12 @@ class TestFindMoonConjunctionsExceptionHandlers:
         assert events == []
 
     def test_swallows_per_planet_fetch_failure(self):
-        from astropy.time import Time
-        from astropy.coordinates import get_body as real_get_body
         from datetime import datetime
-        from zoneinfo import ZoneInfo
         from unittest.mock import patch
+        from zoneinfo import ZoneInfo
+
+        from astropy.coordinates import get_body as real_get_body
+        from astropy.time import Time
 
         svc = PlanetaryEventsService(45.0, -73.5)
         now = Time(datetime(2026, 1, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
@@ -381,10 +393,11 @@ class TestGetPlanetaryEventsExceptionPath:
 
     def test_find_conjunctions_exception_in_loop_swallowed(self):
         """Exception inside conjunction iteration is caught per-planet-pair."""
-        from astropy.time import Time
         from datetime import datetime
-        from zoneinfo import ZoneInfo
         from unittest.mock import MagicMock
+        from zoneinfo import ZoneInfo
+
+        from astropy.time import Time
 
         svc = PlanetaryEventsService(45.0, -73.5)
         now = Time(datetime(2026, 1, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
@@ -404,10 +417,11 @@ class TestPlanetaryFindMethodExceptionHandlers:
     _find_elongations, and _find_retrograde_periods."""
 
     def _make_svc_with_bad_coords(self):
-        from astropy.time import Time
         from datetime import datetime
-        from zoneinfo import ZoneInfo
         from unittest.mock import MagicMock
+        from zoneinfo import ZoneInfo
+
+        from astropy.time import Time
 
         svc = PlanetaryEventsService(45.0, -73.5)
         now = Time(datetime(2026, 1, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
@@ -432,9 +446,10 @@ class TestPlanetaryFindMethodExceptionHandlers:
         assert isinstance(result, list)
 
     def test_find_retrograde_exception_per_planet_swallowed(self):
-        from astropy.time import Time
         from datetime import datetime
         from zoneinfo import ZoneInfo
+
+        from astropy.time import Time
 
         svc = PlanetaryEventsService(45.0, -73.5)
         now = Time(datetime(2026, 1, 1, 0, 0, tzinfo=ZoneInfo("UTC")))
@@ -467,7 +482,7 @@ class TestPlanetaryHelperArrayBranches:
 
     def test_angular_separation_ndarray_branch(self):
         """sep.degree is ndarray."""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         fake_sep = MagicMock()
         fake_sep.degree = np.array([5.0])
@@ -479,7 +494,7 @@ class TestPlanetaryHelperArrayBranches:
 
     def test_angular_separation_complex_branch(self):
         """sep.degree is complex."""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         fake_sep = MagicMock()
         fake_sep.degree = complex(5.0, 0.0)
@@ -491,7 +506,7 @@ class TestPlanetaryHelperArrayBranches:
 
     def test_get_elongation_ndarray_branch(self):
         """elong_val is ndarray."""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         fake_elong = MagicMock()
         fake_elong.degree = np.array([45.0])
@@ -503,7 +518,7 @@ class TestPlanetaryHelperArrayBranches:
 
     def test_get_elongation_complex_branch(self):
         """elong_val is complex."""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         fake_elong = MagicMock()
         fake_elong.degree = complex(45.0, 0.0)
@@ -515,7 +530,7 @@ class TestPlanetaryHelperArrayBranches:
 
     def test_is_event_visible_altaz_none_returns_false(self):
         """p1.transform_to() returns None."""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         fake_body = MagicMock()
         fake_body.transform_to.return_value = None
@@ -525,7 +540,7 @@ class TestPlanetaryHelperArrayBranches:
 
     def test_is_event_visible_alt1_ndarray(self):
         """alt1_val is ndarray."""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         fake_altaz = MagicMock()
         fake_altaz.alt.degree = np.array([30.0])
@@ -537,7 +552,7 @@ class TestPlanetaryHelperArrayBranches:
 
     def test_is_event_visible_alt1_complex(self):
         """alt1_val is complex."""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         fake_altaz = MagicMock()
         fake_altaz.alt.degree = complex(30.0, 0.0)
@@ -549,7 +564,7 @@ class TestPlanetaryHelperArrayBranches:
 
     def test_is_event_visible_alt2_ndarray(self):
         """alt2_val is ndarray."""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         fake_altaz1 = MagicMock()
         fake_altaz1.alt.degree = 30.0
@@ -569,7 +584,7 @@ class TestPlanetaryHelperArrayBranches:
 
     def test_is_event_visible_alt2_complex(self):
         """alt2_val is complex."""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         fake_altaz1 = MagicMock()
         fake_altaz1.alt.degree = 30.0
@@ -589,7 +604,7 @@ class TestPlanetaryHelperArrayBranches:
 
     def test_is_planet_visible_altaz_none_returns_false(self):
         """altaz is None."""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         fake_body = MagicMock()
         fake_body.transform_to.return_value = None
@@ -599,7 +614,7 @@ class TestPlanetaryHelperArrayBranches:
 
     def test_is_planet_visible_sun_obj_none_returns_false(self):
         """sun_obj is None."""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         fake_planet = MagicMock()
         fake_planet.transform_to.return_value = MagicMock()
@@ -617,7 +632,7 @@ class TestPlanetaryHelperArrayBranches:
 
     def test_is_planet_visible_elong_ndarray(self):
         """elong_val is ndarray."""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         fake_elong = MagicMock()
         fake_elong.degree = np.array([45.0])
@@ -637,7 +652,7 @@ class TestPlanetaryHelperArrayBranches:
 
     def test_is_planet_visible_elong_complex(self):
         """elong_val is complex."""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         fake_elong = MagicMock()
         fake_elong.degree = complex(45.0, 0.0)
@@ -657,7 +672,7 @@ class TestPlanetaryHelperArrayBranches:
 
     def test_is_planet_visible_alt_ndarray(self):
         """alt_val is ndarray."""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         fake_elong = MagicMock()
         fake_elong.degree = 45.0
@@ -677,7 +692,7 @@ class TestPlanetaryHelperArrayBranches:
 
     def test_is_planet_visible_alt_complex(self):
         """alt_val is complex."""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         fake_elong = MagicMock()
         fake_elong.degree = 45.0

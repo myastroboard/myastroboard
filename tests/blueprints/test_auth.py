@@ -10,7 +10,7 @@ import time
 import types
 import uuid
 from collections import deque
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pyotp
 import pytest
@@ -354,7 +354,7 @@ class TestVerifyTwoFactor:
         login(client, user.username, password)
 
         with client.session_transaction() as sess:
-            sess['pending_2fa_expires_at'] = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
+            sess['pending_2fa_expires_at'] = (datetime.now(UTC) - timedelta(seconds=1)).isoformat()
 
         resp = client.post('/api/auth/login/verify-2fa', json={'code': pyotp.TOTP(secret).now()})
 

@@ -21,7 +21,8 @@ import secrets
 import socket
 import ssl
 import time
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 from urllib.parse import urlparse
 
 from connectors.base_connector import BaseConnector
@@ -39,7 +40,7 @@ DEFAULT_PORT = 1883
 DEFAULT_TLS_PORT = 8883
 
 
-def parse_broker_url(url: str) -> tuple[Optional[str], Optional[int], bool, Optional[str]]:
+def parse_broker_url(url: str) -> tuple[str | None, int | None, bool, str | None]:
     """``mqtt://host[:port]`` / ``mqtts://host[:port]`` -> ``(host, port, tls, error)``.
 
     Exactly one of ``(host, port)`` or ``error`` is set, like ``resolve_broker_host()`` below -
@@ -64,7 +65,7 @@ def parse_broker_url(url: str) -> tuple[Optional[str], Optional[int], bool, Opti
     return parsed.hostname, int(port), tls, None
 
 
-def resolve_broker_host(host: str, port: int) -> tuple[Optional[str], Optional[str]]:
+def resolve_broker_host(host: str, port: int) -> tuple[str | None, str | None]:
     """Resolve *host* and refuse the address ranges the other connector probes refuse.
 
     Returns ``(ip, None)`` or ``(None, error)``. Loopback, link-local (cloud metadata
@@ -75,7 +76,7 @@ def resolve_broker_host(host: str, port: int) -> tuple[Optional[str], Optional[s
         addrinfo = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
         resolved_ip = str(addrinfo[0][4][0])
         ip_obj = ipaddress.ip_address(resolved_ip)
-    except (socket.gaierror, ValueError, IndexError):
+    except socket.gaierror, ValueError, IndexError:
         return None, 'unable to resolve host'
     if ip_obj.is_loopback or ip_obj.is_link_local or ip_obj.is_unspecified or ip_obj.is_multicast:
         return None, 'url host is not allowed'
@@ -201,7 +202,7 @@ class MqttConnector(BaseConnector):
         raw = self.config.get("publish_interval_seconds", self.CONFIG_FIELDS["publish_interval_seconds"])
         try:
             value = int(raw)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             value = int(self.CONFIG_FIELDS["publish_interval_seconds"])
         return max(self.MIN_PUBLISH_INTERVAL_SECONDS, value)
 
@@ -260,11 +261,11 @@ class MqttConnector(BaseConnector):
 
     def probe(
         self,
-        url: Optional[str] = None,
-        username: Optional[str] = None,
-        password: Optional[str] = None,
-        tls_insecure: Optional[bool] = None,
-        client_factory: Optional[Callable[[str], Any]] = None,
+        url: str | None = None,
+        username: str | None = None,
+        password: str | None = None,
+        tls_insecure: bool | None = None,
+        client_factory: Callable[[str], Any] | None = None,
     ) -> dict:
         """One MQTT CONNECT / DISCONNECT against *url* (default: the configured broker).
 
@@ -328,7 +329,7 @@ class MqttConnector(BaseConnector):
             return {"reachable": False, "error": f"broker refused the connection: {reason}"}
         return {"reachable": True, "error": None}
 
-    def health_check(self, password: Optional[str] = None) -> dict:
+    def health_check(self, password: str | None = None) -> dict:
         """Connection probe against the saved broker plus one line per module.
 
         *password* lets a caller supply the credential explicitly rather than through

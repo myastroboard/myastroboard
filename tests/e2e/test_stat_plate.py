@@ -27,7 +27,7 @@ PLATES = [
 def fresh_user_page(page, live_server_url, login):
     """A page logged in as a brand new account that has never logged anything."""
     login(page, live_server_url)
-    username = 'plate_%s' % uuid.uuid4().hex[:8]
+    username = f'plate_{uuid.uuid4().hex[:8]}'
     created = page.request.post(
         f"{live_server_url}/api/users",
         data={'username': username, 'password': 'plate-test-pw', 'role': 'user'},
@@ -98,9 +98,9 @@ def test_a_zero_duration_still_carries_its_unit(fresh_user_page, subtab, selecto
 
     hero = page.locator(f'{selector} .stat-plate-hero-value').inner_text().strip()
     assert hero != '0', f"{subtab}: the hero duration lost its unit"
-    assert any(
-        character.isalpha() for character in hero
-    ), f"{subtab}: expected a unit alongside the number, got {hero!r}"
+    assert any(character.isalpha() for character in hero), (
+        f"{subtab}: expected a unit alongside the number, got {hero!r}"
+    )
 
 
 def test_the_log_driven_sections_show_their_empty_states(fresh_user_page):
@@ -111,12 +111,12 @@ def test_the_log_driven_sections_show_their_empty_states(fresh_user_page):
 
     for container in ('#session-analytics-charts', '#session-analytics-coverage', '#session-analytics-conditions'):
         page.wait_for_selector(f'{container} .session-analytics-empty', timeout=30000)
-        assert (
-            page.locator(f'{container} .session-analytics-empty').inner_text().strip()
-        ), f"{container}: empty state rendered with no message"
-        assert (
-            page.locator(f'{container} canvas').count() == 0
-        ), f"{container}: a chart was drawn on data that is not there"
+        assert page.locator(f'{container} .session-analytics-empty').inner_text().strip(), (
+            f"{container}: empty state rendered with no message"
+        )
+        assert page.locator(f'{container} canvas').count() == 0, (
+            f"{container}: a chart was drawn on data that is not there"
+        )
 
 
 def test_best_months_is_useful_before_anything_has_been_logged(fresh_user_page):

@@ -1,7 +1,7 @@
-﻿"""Tests for SkyTonight comet ingestion."""
+"""Tests for SkyTonight comet ingestion."""
 
 import math
-from datetime import datetime, timezone as _tz
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 from skytonight import skytonight_comets as _mod
@@ -520,7 +520,7 @@ def test_get_earth_heliocentric_fallback_when_astropy_unavailable(monkeypatch):
 # _comet_ra_dec - all three orbit types and error paths
 # ---------------------------------------------------------------------------
 
-_OBS = datetime(2025, 6, 21, 12, 0, 0, tzinfo=_tz.utc)
+_OBS = datetime(2025, 6, 21, 12, 0, 0, tzinfo=UTC)
 _EARTH = (1.0, 0.0, 0.0)
 
 
@@ -920,9 +920,9 @@ def test_comet_ra_dec_hyperbolic_r_nonpositive_returns_none(monkeypatch):
 
 def test_get_earth_heliocentric_with_mocked_astropy(monkeypatch):
     """When astropy is available and returns valid data, it is used."""
-    import types
     import sys
-    from datetime import datetime, timezone
+    import types
+    from datetime import datetime
 
     # Build a fake astropy.time.Time
     fake_time_instance = MagicMock()
@@ -962,7 +962,7 @@ def test_get_earth_heliocentric_with_mocked_astropy(monkeypatch):
     monkeypatch.setitem(sys.modules, 'astropy.coordinates', fake_astropy_coords)
     monkeypatch.setitem(sys.modules, 'astropy.units', fake_astropy_units)
 
-    obs = datetime(2025, 6, 21, 12, 0, 0, tzinfo=timezone.utc)
+    obs = datetime(2025, 6, 21, 12, 0, 0, tzinfo=UTC)
 
     # The actual arithmetic uses the return value of (e_bary - s_bary).get_xyz().to_value
     # which we set to [0.9, 0.1, 0.02].

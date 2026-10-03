@@ -5,16 +5,15 @@ Routes: /api/skyquality, /api/convert-coordinates, /api/timezones,
 """
 
 import re
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 from zoneinfo import ZoneInfo, available_timezones
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, jsonify, request
 
 from cache import cache_store
 from utils.auth import login_required
 from utils.logging_config import get_logger
-from utils.repo_config import load_config, get_scheduler_locations, get_install_default_location
+from utils.repo_config import get_install_default_location, get_scheduler_locations, load_config
 from utils.route_helpers import _resolve_active_location
 from utils.txtconf_loader import get_repo_version
 from utils.version_checker import check_for_updates
@@ -44,18 +43,18 @@ def get_sky_quality_api():
     and all numeric fields are null - the LP integration is inactive.
     """
     from weather.sky_quality import (
-        bortle_to_sqm,
-        sqm_to_bortle,
-        light_pollution_factor,
         BORTLE_DESCRIPTIONS,
+        bortle_to_sqm,
+        light_pollution_factor,
+        sqm_to_bortle,
     )
 
     location = _resolve_active_location()
     raw_sqm = location.get('sqm')
     raw_bortle = location.get('bortle')
 
-    sqm: Optional[float] = None
-    bortle: Optional[int] = None
+    sqm: float | None = None
+    bortle: int | None = None
     sqm_source: str = "not_configured"
 
     if raw_sqm is not None and raw_bortle is not None:
@@ -66,21 +65,21 @@ def get_sky_quality_api():
             sqm = float(raw_sqm)
             bortle = int(raw_bortle)
             sqm_source = "user_measured"
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             pass  # malformed config value — leave sqm/bortle as None, endpoint returns 404
     elif raw_sqm is not None:
         try:
             sqm = float(raw_sqm)
             bortle = sqm_to_bortle(sqm)
             sqm_source = "user_measured"
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             pass  # malformed config value — leave sqm/bortle as None
     elif raw_bortle is not None:
         try:
             bortle = int(raw_bortle)
             sqm = bortle_to_sqm(bortle)
             sqm_source = "bortle_midpoint"
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             pass  # malformed config value — leave sqm/bortle as None
 
     if sqm is not None and bortle is not None:
@@ -148,7 +147,7 @@ def convert_coordinates_api():
 @misc_bp.route('/api/timezones', methods=['GET'])
 @login_required
 def get_timezones_api():
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     result = []
 
     for tz in sorted(available_timezones()):
@@ -164,13 +163,13 @@ def get_timezones_api():
 @misc_bp.route('/api/health', methods=['GET'])
 def health_api():
     """Health check endpoint"""
-    return jsonify({"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()})
+    return jsonify({"status": "healthy", "timestamp": datetime.now(UTC).isoformat()})
 
 
 @misc_bp.route('/health', methods=['GET'])
 def health_simple_api():
     """Simple health check endpoint for Docker healthcheck"""
-    return jsonify({"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()})
+    return jsonify({"status": "healthy", "timestamp": datetime.now(UTC).isoformat()})
 
 
 @misc_bp.route('/api/cache', methods=['GET'])

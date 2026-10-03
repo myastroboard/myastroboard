@@ -9,7 +9,7 @@ LunarEclipseInfo dataclass shapes) rather than re-testing the same paths.
 import datetime
 from unittest.mock import patch
 
-from astroweather.moon_eclipse import LunarEclipseService, LunarEclipseInfo, EclipsePoint
+from astroweather.moon_eclipse import EclipsePoint, LunarEclipseInfo, LunarEclipseService
 
 
 class _Peak:

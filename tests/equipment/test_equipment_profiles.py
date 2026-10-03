@@ -2,13 +2,13 @@
 Tests for Equipment Profiles Module
 """
 
+import sys
+import tempfile
+import types
+
 import pytest
 
 from db import documents
-import tempfile
-import sys
-import types
-
 from equipment import equipment_profiles
 
 
@@ -720,8 +720,8 @@ class TestEquipmentDeleteGuard:
         the picture/plan guard tests above.
         """
         import observation.astrodex as astrodex_module
-        import observation.plan_my_night as plan_my_night_module
         import observation.observation_sessions as observation_sessions_module
+        import observation.plan_my_night as plan_my_night_module
 
         monkeypatch.setattr(astrodex_module, 'count_pictures_for_combination', lambda combination_id: 0)
         monkeypatch.setattr(plan_my_night_module, 'count_plans_for_combination', lambda combination_id: 0)
@@ -1586,7 +1586,7 @@ class TestSafeSaveEquipmentEdgeCases:
 
     def test_storage_failure_returns_false(self, monkeypatch):
         def _boom(*_args, **_kwargs):
-            raise IOError("disk full")
+            raise OSError("disk full")
 
         monkeypatch.setattr(documents, 'put_document', _boom)
         assert equipment_profiles.safe_save_equipment('u1', 'telescopes', {'items': []}) is False

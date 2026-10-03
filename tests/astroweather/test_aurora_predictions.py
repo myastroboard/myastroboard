@@ -4,9 +4,11 @@ Covers AuroraService pure-logic methods and mocked HTTP calls.
 """
 
 import time
+from datetime import UTC
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import patch, MagicMock
+
 from astroweather import aurora_predictions
 from astroweather.aurora_predictions import AuroraService
 
@@ -599,9 +601,9 @@ class TestGetDetailedReport:
     @patch("astroweather.aurora_predictions.AuroraService.fetch_kp_forecast")
     def test_report_includes_forecast_entries(self, mock_forecast, mock_current):
         """forecast entries after now are appended to report."""
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta
 
-        future_ts = (datetime.now(timezone.utc) + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%S")
+        future_ts = (datetime.now(UTC) + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%S")
         mock_current.return_value = 3.0
         mock_forecast.return_value = [
             {"timestamp": future_ts, "kp": 4.0},
@@ -627,9 +629,9 @@ class TestGetDetailedReport:
     def test_forecast_with_invalid_timezone_falls_back(self, mock_forecast, mock_current):
         """invalid timezone in forecast → tzinfo = UTC."""
         svc = AuroraService(60.0, 25.0, "Invalid/Zone")
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta
 
-        future_ts = (datetime.now(timezone.utc) + timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%S")
+        future_ts = (datetime.now(UTC) + timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%S")
         mock_current.return_value = 3.0
         mock_forecast.return_value = [{"timestamp": future_ts, "kp": 3.0}]
         report = svc.get_detailed_report()
@@ -731,9 +733,9 @@ class TestGetDetailedReportMoreBranches:
     @patch("astroweather.aurora_predictions.AuroraService.fetch_kp_forecast")
     def test_forecast_entry_with_no_timestamp_skipped(self, mock_forecast, mock_current):
         """entry without timestamp string → skip."""
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta
 
-        future_ts = (datetime.now(timezone.utc) + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%S")
+        future_ts = (datetime.now(UTC) + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%S")
         mock_current.return_value = 3.0
         mock_forecast.return_value = [
             {"kp": 4.0},  # no 'timestamp' key
@@ -748,9 +750,9 @@ class TestGetDetailedReportMoreBranches:
     @patch("astroweather.aurora_predictions.AuroraService.fetch_kp_forecast")
     def test_forecast_tz_aware_timestamp_handled(self, mock_forecast, mock_current):
         """tz-aware ISO timestamp → tzinfo already set → skip replace."""
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta
 
-        future_ts = (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat()
+        future_ts = (datetime.now(UTC) + timedelta(hours=2)).isoformat()
         mock_current.return_value = 3.0
         mock_forecast.return_value = [{"timestamp": future_ts, "kp": 4.0}]
         report = self.svc.get_detailed_report()
@@ -763,10 +765,10 @@ class TestGetAuroraScoreTzAwareForecastTimestamp:
 
     def test_tz_aware_forecast_timestamp_skips_replace(self):
         """dt_utc.tzinfo is not None → branch NOT taken."""
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta
 
         svc = AuroraService(55.0, 10.0, "Europe/Paris")
-        aware_ts = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+        aware_ts = (datetime.now(UTC) + timedelta(hours=1)).isoformat()
         result = svc.get_aurora_score(4.0, forecast_timestamp=aware_ts)
         assert result["timestamp"] is not None
 

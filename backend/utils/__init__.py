@@ -3,17 +3,18 @@ Common utilities and helper functions for MyAstroBoard backend
 Provides reusable functionality to avoid code duplication
 """
 
-import os
-import re
 import json
 import math
+import os
+import re
 import sys
 import unicodedata
 import uuid
-import yaml
 from contextlib import contextmanager
-from datetime import datetime, timezone
-from typing import Dict, Optional
+from datetime import UTC, datetime
+
+import yaml
+
 from utils.constants import DATA_DIR
 from utils.logging_config import get_logger
 
@@ -77,7 +78,7 @@ class IndentDumper(yaml.Dumper):
     """Custom YAML dumper that ensures proper indentation for lists"""
 
     def increase_indent(self, flow=False, indentless=False):
-        return super(IndentDumper, self).increase_indent(flow, False)
+        return super().increase_indent(flow, False)
 
 
 def ensure_directory_exists(path: str) -> None:
@@ -110,11 +111,11 @@ def safe_file_exists(file_path: str) -> bool:
     """
     try:
         return os.path.exists(file_path) and os.path.isfile(file_path)
-    except (OSError, TypeError):
+    except OSError, TypeError:
         return False
 
 
-def load_json_file(file_path: str, default: Optional[dict] = None) -> dict:
+def load_json_file(file_path: str, default: dict | None = None) -> dict:
     """
     Safely load a JSON file with fallback to default value
 
@@ -130,9 +131,9 @@ def load_json_file(file_path: str, default: Optional[dict] = None) -> dict:
 
     try:
         if safe_file_exists(file_path):
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, encoding='utf-8') as f:
                 return json.load(f)
-    except (json.JSONDecodeError, OSError, UnicodeDecodeError):
+    except json.JSONDecodeError, OSError, UnicodeDecodeError:
         pass  # corrupt or unreadable file — return the caller-supplied default
 
     return default
@@ -181,7 +182,7 @@ def validate_coordinates(lat: float, lon: float) -> bool:
     """
     try:
         return -90 <= float(lat) <= 90 and -180 <= float(lon) <= 180
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return False
 
 
@@ -213,7 +214,7 @@ def _config_exists() -> bool:
         return False
 
 
-def get_environment_info() -> Dict[str, str]:
+def get_environment_info() -> dict[str, str]:
     """
     Get useful environment information for debugging
 
@@ -230,7 +231,7 @@ def get_environment_info() -> Dict[str, str]:
     }
 
 
-def normalize_catalogue_key(value: Optional[str]) -> str:
+def normalize_catalogue_key(value: str | None) -> str:
     """Normalize a catalogue/target name for loose cross-referencing (uppercase, no separators)."""
     return re.sub(r'[^A-Za-z0-9]', '', str(value or '')).upper()
 
@@ -239,7 +240,7 @@ def normalize_catalogue_key(value: Optional[str]) -> str:
 # misspellings that don't match the modern IAU-sanctioned names used by our i18n
 # files. Correct astropy.coordinates.get_constellation()'s output before it's used
 # as a display name or translation key.
-_ASTROPY_CONSTELLATION_FIXES: Dict[str, str] = {
+_ASTROPY_CONSTELLATION_FIXES: dict[str, str] = {
     'Ophiucus': 'Ophiuchus',
     'Chamaleon': 'Chamaeleon',
     'Pisces Austrinus': 'Piscis Austrinus',
@@ -251,7 +252,7 @@ def fix_astropy_constellation_name(name: str) -> str:
     return _ASTROPY_CONSTELLATION_FIXES.get(name, name)
 
 
-def parse_iso_to_utc(value: Optional[str]) -> datetime:
+def parse_iso_to_utc(value: str | None) -> datetime:
     """Parse an ISO 8601 string (with or without offset) into an aware UTC datetime.
 
     Event services store times as local ISO strings carrying the observer's UTC
@@ -268,12 +269,12 @@ def parse_iso_to_utc(value: Optional[str]) -> datetime:
     """
     try:
         parsed = datetime.fromisoformat(str(value))
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         logger.warning("Unparseable event timestamp %r - sorting this event last", value)
-        return datetime.max.replace(tzinfo=timezone.utc)
+        return datetime.max.replace(tzinfo=UTC)
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc)
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 
 @contextmanager
@@ -299,9 +300,9 @@ def distant_epoch_precision_warnings_muted():
     """
     import warnings
 
-    from erfa import ErfaWarning
     from astropy.utils import iers
     from astropy.utils.exceptions import AstropyWarning
+    from erfa import ErfaWarning
 
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore', message='.*dubious year.*', category=ErfaWarning)

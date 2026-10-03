@@ -234,7 +234,7 @@ def integration_enhanced_api():
         payload_obj = json.loads(request.form.get('payload', '') or '{}')
         if not isinstance(payload_obj, dict):
             raise ValueError('payload must be a JSON object')
-    except (ValueError, json.JSONDecodeError):
+    except ValueError, json.JSONDecodeError:
         return jsonify({'error': 'payload must be valid JSON'}), 400
 
     signature = request.headers.get('X-Webhook-Signature', '')

@@ -31,7 +31,7 @@ ordinary longitude half an arcminute west of Greenwich.
 
 import math
 import re
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 from observation.astrodex import _extract_name_candidates
 from skytonight import skytonight_targets
@@ -57,7 +57,7 @@ _FIELD = re.compile(r"\d+(?:\.\d+)?")
 _MAX_RA_HOURS = 24.0
 
 
-def _sexagesimal_to_float(value: str) -> Optional[float]:
+def _sexagesimal_to_float(value: str) -> float | None:
     """Parse a sexagesimal string into a signed decimal value in its leading unit.
 
     The sign is read off the string before the fields are, so a "-0" degrees value keeps
@@ -82,7 +82,7 @@ def _sexagesimal_to_float(value: str) -> Optional[float]:
     return -magnitude if negative else magnitude
 
 
-def _as_finite_float(value: Any) -> Optional[float]:
+def _as_finite_float(value: Any) -> float | None:
     """Return *value* as a float when it already is a real number, else None."""
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
@@ -90,7 +90,7 @@ def _as_finite_float(value: Any) -> Optional[float]:
     return number if math.isfinite(number) else None
 
 
-def parse_ra_to_degrees(value: Any) -> Optional[float]:
+def parse_ra_to_degrees(value: Any) -> float | None:
     """Parse a stored right ascension into degrees in ``[0, 360)``.
 
     Accepts a decimal-hours number, an ``"21h 31m 48.32s"`` / ``"21:31:48.32"`` string, or
@@ -119,7 +119,7 @@ def parse_ra_to_degrees(value: Any) -> Optional[float]:
     return degrees % 360.0
 
 
-def parse_dec_to_degrees(value: Any) -> Optional[float]:
+def parse_dec_to_degrees(value: Any) -> float | None:
     """Parse a stored declination into degrees in ``[-90, 90]``.
 
     Accepts a decimal-degrees number, a ``"48° 26' 17.40\\""`` / ``"-05:12:33"``
@@ -142,7 +142,7 @@ def parse_dec_to_degrees(value: Any) -> Optional[float]:
     return degrees
 
 
-def _coordinates_from_lookup_entry(entry: Dict[str, Any]) -> Optional[Tuple[float, float]]:
+def _coordinates_from_lookup_entry(entry: dict[str, Any]) -> tuple[float, float] | None:
     """Read ``ra_deg``/``dec_deg`` off a SkyTonight lookup entry, if both are usable."""
     if not isinstance(entry, dict):
         return None
@@ -155,7 +155,7 @@ def _coordinates_from_lookup_entry(entry: Dict[str, Any]) -> Optional[Tuple[floa
     return ra_deg, dec_deg
 
 
-def lookup_dataset_entry(name: Any, catalogue: Any = '') -> Dict[str, Any]:
+def lookup_dataset_entry(name: Any, catalogue: Any = '') -> dict[str, Any]:
     """Return the SkyTonight lookup entry for *name*, or ``{}`` when it is not in the dataset.
 
     Tries the record's own catalogue first, then every identifier that can be pulled out
@@ -177,7 +177,7 @@ def lookup_dataset_entry(name: Any, catalogue: Any = '') -> Dict[str, Any]:
     return {}
 
 
-def resolve_from_dataset(name: Any, catalogue: Any = '') -> Optional[Tuple[float, float]]:
+def resolve_from_dataset(name: Any, catalogue: Any = '') -> tuple[float, float] | None:
     """Look *name* up in the SkyTonight dataset and return its ``(ra_deg, dec_deg)``."""
     label = str(name or '').strip()
     if not label:
@@ -197,7 +197,7 @@ def resolve_coordinates(
     catalogue: Any = '',
     ra: Any = None,
     dec: Any = None,
-) -> Optional[Tuple[float, float]]:
+) -> tuple[float, float] | None:
     """Resolve a frozen target record to ``(ra_deg, dec_deg)``, or None if it cannot be.
 
     Applies the module's documented resolution order: dataset lookup first (canonical),
@@ -219,7 +219,7 @@ def resolve_target(
     catalogue: Any = '',
     ra: Any = None,
     dec: Any = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Resolve a frozen target record to the identity + coordinates its consumers need.
 
     Used by the sky coverage map (which has to fold Observation Log entries and Astrodex

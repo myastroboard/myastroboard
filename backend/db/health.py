@@ -1,7 +1,7 @@
 """Database diagnostics for the admin Metrics page."""
 
 import os
-from typing import Any, Dict
+from typing import Any
 
 from db import migrate
 from db.engine import get_engine, read
@@ -20,7 +20,7 @@ def _file_size(path: str) -> int:
         return 0
 
 
-def database_status() -> Dict[str, Any]:
+def database_status() -> dict[str, Any]:
     """Schema version, size and journal mode - cheap enough for the Metrics auto-refresh."""
     path = str(get_engine().url.database or '')
     current = migrate.current_revision()
@@ -39,7 +39,7 @@ def database_status() -> Dict[str, Any]:
     }
 
 
-def integrity_check() -> Dict[str, Any]:
+def integrity_check() -> dict[str, Any]:
     """Run SQLite's ``integrity_check``: ``{'ok': bool, 'problems': [...]}``."""
     with read() as conn:
         rows = [str(row[0]) for row in conn.exec_driver_sql(f'PRAGMA integrity_check({_INTEGRITY_MAX_ERRORS})')]

@@ -12,26 +12,27 @@ Features:
 """
 
 import copy
-import time
 import threading
+import time
+from datetime import datetime, timedelta
+from typing import Any, cast
+
 import numpy as np
 import pandas as pd
-from typing import Any, Dict, List, Optional, Tuple, cast
-from datetime import datetime, timedelta
 
-from utils.repo_config import load_config
 from utils.constants import (
-    URL_OPENMETEO,
     ASTRO_BEST_PERIOD_MIN_DURATION_HOURS,
-)
-from utils.logging_config import get_logger
-from weather.weather_utils import create_weather_client
-from weather.weather_openmeteo import (
-    is_openmeteo_rate_limited,
-    record_openmeteo_rate_limit,
-    _is_openmeteo_transient_error,
+    URL_OPENMETEO,
 )
 from utils.i18n_utils import create_translated_alert
+from utils.logging_config import get_logger
+from utils.repo_config import load_config
+from weather.weather_openmeteo import (
+    _is_openmeteo_transient_error,
+    is_openmeteo_rate_limited,
+    record_openmeteo_rate_limit,
+)
+from weather.weather_utils import create_weather_client
 
 # Create logger with centralized configuration
 logger = get_logger(__name__)
@@ -45,21 +46,21 @@ JET_STREAM_ALTITUDE = 9000  # meters (typical jet stream altitude)
 PRECIPITATION_VETO_MM = 2.0  # mm/h of forecast precipitation that fully zeroes the observation score
 
 _ASTRO_ANALYSIS_LOCK = threading.Lock()
-_ASTRO_ANALYSIS_LAST_SUCCESS: Dict[Tuple[int, str, str], Dict[str, Any]] = {}
-_ASTRO_ANALYSIS_LAST_SUCCESS_TS: Dict[Tuple[int, str, str], float] = {}
-_ASTRO_ANALYSIS_LAST_FAILURE_TS: Dict[Tuple[int, str, str], float] = {}
+_ASTRO_ANALYSIS_LAST_SUCCESS: dict[tuple[int, str, str], dict[str, Any]] = {}
+_ASTRO_ANALYSIS_LAST_SUCCESS_TS: dict[tuple[int, str, str], float] = {}
+_ASTRO_ANALYSIS_LAST_FAILURE_TS: dict[tuple[int, str, str], float] = {}
 _ASTRO_ANALYSIS_FAILURE_COOLDOWN = 90.0  # seconds to wait before retrying after a failed fetch
 _ASTRO_ANALYSIS_CACHE_TTL = 1800.0  # 30 minutes - Open-Meteo data doesn't change faster than hourly
 
 
-def _analysis_cache_key(hours: int, language: str, location_id: str = "") -> Tuple[int, str, str]:
+def _analysis_cache_key(hours: int, language: str, location_id: str = "") -> tuple[int, str, str]:
     # location_id is part of the key (v1.2): without it, one location's analysis
     # would silently be served for a different location's tab in multi-location
     # installs (the pre-v1.2 key was only (hours, language)).
     return (int(hours), language or "en", location_id or "")
 
 
-def _get_last_successful_analysis(hours: int, language: str, location_id: str = "") -> Optional[Dict[str, Any]]:
+def _get_last_successful_analysis(hours: int, language: str, location_id: str = "") -> dict[str, Any] | None:
     key = _analysis_cache_key(hours, language, location_id)
     cached = _ASTRO_ANALYSIS_LAST_SUCCESS.get(key)
     if cached is None:
@@ -67,7 +68,7 @@ def _get_last_successful_analysis(hours: int, language: str, location_id: str = 
     return copy.deepcopy(cached)
 
 
-def _store_last_successful_analysis(hours: int, language: str, data: Dict[str, Any], location_id: str = "") -> None:
+def _store_last_successful_analysis(hours: int, language: str, data: dict[str, Any], location_id: str = "") -> None:
     key = _analysis_cache_key(hours, language, location_id)
     _ASTRO_ANALYSIS_LAST_SUCCESS[key] = copy.deepcopy(data)
     _ASTRO_ANALYSIS_LAST_SUCCESS_TS[key] = time.time()
@@ -80,7 +81,7 @@ def _is_openmeteo_concurrency_error(exc: Exception) -> bool:
 class AstroWeatherAnalyzer:
     """Advanced weather analysis for astrophotography"""
 
-    def __init__(self, language: str = "en", location: Optional[Dict[str, Any]] = None):
+    def __init__(self, language: str = "en", location: dict[str, Any] | None = None):
         self.config = load_config()
         if isinstance(location, dict) and location.get("latitude") is not None:
             self.location = location
@@ -90,7 +91,7 @@ class AstroWeatherAnalyzer:
             self.location = get_install_default_location(self.config)
         self.language = language
 
-    def fetch_extended_weather_data(self, forecast_hours: int = 24) -> Optional[Dict]:
+    def fetch_extended_weather_data(self, forecast_hours: int = 24) -> dict | None:
         """
         Fetch extended weather data with additional atmospheric variables
         for astrophotography analysis
@@ -210,7 +211,7 @@ class AstroWeatherAnalyzer:
                 logger.debug("Full traceback:", exc_info=True)
             return None
 
-    def _parse_extended_data(self, response, hourly_vars: List[str]) -> Dict:
+    def _parse_extended_data(self, response, hourly_vars: list[str]) -> dict:
         """Parse the extended weather response into organized data structure"""
         hourly = response.Hourly()
 
@@ -579,7 +580,7 @@ class AstroWeatherAnalyzer:
 
         return result
 
-    def generate_comprehensive_analysis(self, forecast_hours: int = 24) -> Optional[Dict]:
+    def generate_comprehensive_analysis(self, forecast_hours: int = 24) -> dict | None:
         """
         Generate comprehensive astrophotography weather analysis
         combining all advanced metrics
@@ -651,7 +652,7 @@ class AstroWeatherAnalyzer:
         """
         return (((seeing * 10 + transparency + cloud + tracking) / 4) / 10) * precipitation_factor
 
-    def _generate_current_summary(self, current_row: Optional[pd.Series]) -> Dict:
+    def _generate_current_summary(self, current_row: pd.Series | None) -> dict:
         """Generate summary of current conditions"""
         if current_row is None:
             return {"status": "No current data available"}
@@ -677,7 +678,7 @@ class AstroWeatherAnalyzer:
             ),
         }
 
-    def _resolve_astronomical_night_window(self) -> Optional[Tuple[pd.Timestamp, pd.Timestamp]]:
+    def _resolve_astronomical_night_window(self) -> tuple[pd.Timestamp, pd.Timestamp] | None:
         """Resolve astronomical night bounds from this location's SkyTonight metadata."""
         try:
             from skytonight.skytonight_calculator import load_calculation_results
@@ -720,7 +721,7 @@ class AstroWeatherAnalyzer:
         # Clamp to a sane range to avoid outliers creating unrealistic durations.
         return max(0.25, min(slot_hours, 3.0))
 
-    def _find_best_observation_periods(self, df: pd.DataFrame) -> List[Dict]:
+    def _find_best_observation_periods(self, df: pd.DataFrame) -> list[dict]:
         """Find the best periods for astrophotography within the forecast"""
         if len(df) == 0:
             return []
@@ -775,7 +776,7 @@ class AstroWeatherAnalyzer:
         periods = []
         current_period_start = None
         current_period_last_slot = None
-        current_period_qualities: List[float] = []
+        current_period_qualities: list[float] = []
 
         def _finalize_current_period() -> None:
             if (
@@ -828,7 +829,7 @@ class AstroWeatherAnalyzer:
         periods.sort(key=lambda x: (x["average_quality"], x["duration_hours"]), reverse=True)
         return periods[:5]
 
-    def _generate_weather_alerts(self, df: pd.DataFrame) -> List[Dict]:
+    def _generate_weather_alerts(self, df: pd.DataFrame) -> list[dict]:
         """Generate weather alerts for astrophotography conditions"""
         alerts = []
 
@@ -890,8 +891,8 @@ class AstroWeatherAnalyzer:
 
 
 def get_astro_weather_analysis(
-    hours: int = 24, language: str = "en", location: Optional[Dict[str, Any]] = None
-) -> Optional[Dict]:
+    hours: int = 24, language: str = "en", location: dict[str, Any] | None = None
+) -> dict | None:
     """
     Main function to get comprehensive astrophotography weather analysis.
     ``location`` is a v1.2 location preset; falls back to the install default.
@@ -970,7 +971,7 @@ def get_astro_weather_analysis(
         _ASTRO_ANALYSIS_LOCK.release()
 
 
-def get_current_astro_conditions(location: Optional[Dict[str, Any]] = None) -> Optional[Dict]:
+def get_current_astro_conditions(location: dict[str, Any] | None = None) -> dict | None:
     """
     Get current astrophotography conditions summary for a location preset
     """

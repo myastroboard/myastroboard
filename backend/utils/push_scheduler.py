@@ -17,8 +17,8 @@ import os
 import sys
 import threading
 import time
-from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from utils.logging_config import get_logger
 
@@ -33,16 +33,16 @@ POLL_INTERVAL_SLOW = 5 * 60  # 5 min - default
 POLL_INTERVAL_FAST = 60  # 1 min - during/near active observation sessions
 
 # {user_id: {trigger_id: last_sent_epoch_seconds}}
-_last_sent: Dict[str, Dict[str, float]] = {}
+_last_sent: dict[str, dict[str, float]] = {}
 _lock = threading.Lock()
 
 # {user_id: set_of_entry_ids} - prevents re-sending N2 for the same plan entry
-_n2_notified: Dict[str, set] = {}
+_n2_notified: dict[str, set] = {}
 
 # True when any user has an active or near (≤30 min) observation session
 _any_active_night: bool = False
 
-_scheduler_thread: Optional[threading.Thread] = None
+_scheduler_thread: threading.Thread | None = None
 _stop_event = threading.Event()
 _lock_file = None  # held open for the lifetime of the process that wins the lock
 
@@ -160,7 +160,7 @@ def _t(user: Any, key: str, **params) -> str:
     return get_translated_message(f'settings.{key}', language=lang, **params)
 
 
-def _with_location(user: Any, body: str, location_name: Optional[str], multi_location: Optional[bool]) -> str:
+def _with_location(user: Any, body: str, location_name: str | None, multi_location: bool | None) -> str:
     """Append the location name to a push body - only for multi-location users.
 
     Single-location installs (the vast majority) keep messages exactly as they
@@ -171,12 +171,12 @@ def _with_location(user: Any, body: str, location_name: Optional[str], multi_loc
     return _t(user, 'push_location_suffix', body=body, location_name=location_name)
 
 
-def _loc_trigger_key(trigger_id: str, location_id: Optional[str]) -> str:
+def _loc_trigger_key(trigger_id: str, location_id: str | None) -> str:
     """Cooldown key per (trigger, location) so two watched locations don't suppress each other."""
     return f'{trigger_id}@{location_id}' if location_id else trigger_id
 
 
-def _check_n7_aurora(user: Any, cache_data: Optional[dict], loc: Optional[dict] = None) -> None:
+def _check_n7_aurora(user: Any, cache_data: dict | None, loc: dict | None = None) -> None:
     if not cache_data:
         logger.debug(f"N7 skip {user.username}: no aurora cache")
         return
@@ -218,7 +218,7 @@ def _check_n7_aurora(user: Any, cache_data: Optional[dict], loc: Optional[dict] 
     )  # aurora: immediate delivery, can last ~1 h
 
 
-def _check_n1_plan_start(user: Any, plan_payload: Optional[dict], multi_location: bool = False) -> None:
+def _check_n1_plan_start(user: Any, plan_payload: dict | None, multi_location: bool = False) -> None:
     if not plan_payload or plan_payload.get('state') == 'none':
         logger.debug(f"N1 skip {user.username}: no active plan")
         return
@@ -240,8 +240,8 @@ def _check_n1_plan_start(user: Any, plan_payload: Optional[dict], multi_location
     try:
         night_start = datetime.fromisoformat(night_start_str)
         if night_start.tzinfo is None:
-            night_start = night_start.replace(tzinfo=timezone.utc)
-        now = datetime.now(timezone.utc)
+            night_start = night_start.replace(tzinfo=UTC)
+        now = datetime.now(UTC)
         ms_until = (night_start - now).total_seconds()
         lead_s = t.get('lead_minutes', 15) * 60
         logger.debug(f"N1 {user.username}: night_start in {ms_until:.0f}s, lead={lead_s}s")
@@ -264,7 +264,7 @@ def _check_n1_plan_start(user: Any, plan_payload: Optional[dict], multi_location
         logger.debug(f"N1 check error for {user.username}: {e}")
 
 
-def _check_n2_next_target(user: Any, plan_payload: Optional[dict], multi_location: bool = False) -> None:
+def _check_n2_next_target(user: Any, plan_payload: dict | None, multi_location: bool = False) -> None:
     if not plan_payload or plan_payload.get('state') == 'none':
         logger.debug(f"N2 skip {user.username}: no active plan")
         return
@@ -279,7 +279,7 @@ def _check_n2_next_target(user: Any, plan_payload: Optional[dict], multi_locatio
 
     entries = (plan_payload.get('plan') or {}).get('entries', [])
     lead_s = t.get('lead_minutes', 5) * 60
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     notified_set = _n2_notified.setdefault(user.user_id, set())
 
@@ -293,7 +293,7 @@ def _check_n2_next_target(user: Any, plan_payload: Optional[dict], multi_locatio
         try:
             start = datetime.fromisoformat(start_str)
             if start.tzinfo is None:
-                start = start.replace(tzinfo=timezone.utc)
+                start = start.replace(tzinfo=UTC)
             ms_until = (start - now).total_seconds()
             if ms_until <= 0:
                 continue
@@ -331,7 +331,7 @@ def _check_n2_next_target(user: Any, plan_payload: Optional[dict], multi_locatio
         logger.debug(f"N2 skip {user.username}: no undone targets with a future start time")
 
 
-def _check_n6_darkness(user: Any, cache_data: Optional[dict], loc: Optional[dict] = None) -> None:
+def _check_n6_darkness(user: Any, cache_data: dict | None, loc: dict | None = None) -> None:
     if not cache_data:
         logger.debug(f"N6 skip {user.username}: no sun_report cache")
         return
@@ -354,8 +354,8 @@ def _check_n6_darkness(user: Any, cache_data: Optional[dict], loc: Optional[dict
     try:
         dusk = datetime.fromisoformat(dusk_str)
         if dusk.tzinfo is None:
-            dusk = dusk.replace(tzinfo=timezone.utc)
-        now = datetime.now(timezone.utc)
+            dusk = dusk.replace(tzinfo=UTC)
+        now = datetime.now(UTC)
         ms_until = (dusk - now).total_seconds()
         lead_s = t.get('lead_minutes', 20) * 60
         logger.debug(f"N6 {user.username}: dusk in {ms_until:.0f}s, lead={lead_s}s")
@@ -385,7 +385,7 @@ def _check_n6_darkness(user: Any, cache_data: Optional[dict], loc: Optional[dict
         logger.debug(f"N6 check error for {user.username}: {e}")
 
 
-def _check_n3_iss(user: Any, cache_data: Optional[dict], loc: Optional[dict] = None) -> None:
+def _check_n3_iss(user: Any, cache_data: dict | None, loc: dict | None = None) -> None:
     if not cache_data:
         logger.debug(f"N3 skip {user.username}: no iss_passes cache")
         return
@@ -397,7 +397,7 @@ def _check_n3_iss(user: Any, cache_data: Optional[dict], loc: Optional[dict] = N
 
     loc = loc or {}
     lead_s = t.get('lead_minutes', 10) * 60
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     candidates = []
     for transit in cache_data.get('solar_transits', []):
@@ -406,7 +406,7 @@ def _check_n3_iss(user: Any, cache_data: Optional[dict], loc: Optional[dict] = N
             try:
                 dt = datetime.fromisoformat(start_str)
                 if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=timezone.utc)
+                    dt = dt.replace(tzinfo=UTC)
                 if dt > now:
                     candidates.append((dt, 'solar'))
             except Exception as e:
@@ -417,7 +417,7 @@ def _check_n3_iss(user: Any, cache_data: Optional[dict], loc: Optional[dict] = N
             try:
                 dt = datetime.fromisoformat(start_str)
                 if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=timezone.utc)
+                    dt = dt.replace(tzinfo=UTC)
                 if dt > now:
                     candidates.append((dt, 'lunar'))
             except Exception as e:
@@ -450,7 +450,7 @@ def _check_n3_iss(user: Any, cache_data: Optional[dict], loc: Optional[dict] = N
     )  # short window (≤10 min): needs immediate delivery
 
 
-def _check_n8_css(user: Any, cache_data: Optional[dict], loc: Optional[dict] = None) -> None:
+def _check_n8_css(user: Any, cache_data: dict | None, loc: dict | None = None) -> None:
     if not cache_data:
         logger.debug(f"N8 skip {user.username}: no css_passes cache")
         return
@@ -462,7 +462,7 @@ def _check_n8_css(user: Any, cache_data: Optional[dict], loc: Optional[dict] = N
 
     loc = loc or {}
     lead_s = t.get('lead_minutes', 10) * 60
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     candidates = []
     for transit in cache_data.get('solar_transits', []):
@@ -471,7 +471,7 @@ def _check_n8_css(user: Any, cache_data: Optional[dict], loc: Optional[dict] = N
             try:
                 dt = datetime.fromisoformat(start_str)
                 if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=timezone.utc)
+                    dt = dt.replace(tzinfo=UTC)
                 if dt > now:
                     candidates.append((dt, 'solar'))
             except Exception as e:
@@ -482,7 +482,7 @@ def _check_n8_css(user: Any, cache_data: Optional[dict], loc: Optional[dict] = N
             try:
                 dt = datetime.fromisoformat(start_str)
                 if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=timezone.utc)
+                    dt = dt.replace(tzinfo=UTC)
                 if dt > now:
                     candidates.append((dt, 'lunar'))
             except Exception as e:
@@ -515,11 +515,9 @@ def _check_n8_css(user: Any, cache_data: Optional[dict], loc: Optional[dict] = N
     )  # short window (≤10 min): needs immediate delivery
 
 
-def _check_n4_n5_eclipse(
-    user: Any, solar_data: Optional[dict], lunar_data: Optional[dict], loc: Optional[dict] = None
-) -> None:
+def _check_n4_n5_eclipse(user: Any, solar_data: dict | None, lunar_data: dict | None, loc: dict | None = None) -> None:
     triggers = _get_notif_prefs(user)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     loc = loc or {}
 
     # payload_key is the one the eclipse cache jobs actually write (update_solar_eclipse_cache /
@@ -543,7 +541,7 @@ def _check_n4_n5_eclipse(
         try:
             peak = datetime.fromisoformat(peak_str)
             if peak.tzinfo is None:
-                peak = peak.replace(tzinfo=timezone.utc)
+                peak = peak.replace(tzinfo=UTC)
             ms_until = (peak - now).total_seconds()
             lead_s = t.get('lead_minutes', 30) * 60
             logger.debug(f"{trigger_id} {user.username}: peak in {ms_until:.0f}s, lead={lead_s}s")
@@ -594,7 +592,7 @@ def _n9_event_title(user: Any, event: dict) -> str:
     return event.get('title') or 'Solar system event'
 
 
-def _n9_days_until(peak: datetime, now: datetime, tz_name: Optional[str]) -> int:
+def _n9_days_until(peak: datetime, now: datetime, tz_name: str | None) -> int:
     """Whole calendar days between now and `peak`, in the observing site's own timezone.
 
     Rounding the raw duration would call a peak 11 hours out "0 days" - not a sentence in
@@ -602,7 +600,7 @@ def _n9_days_until(peak: datetime, now: datetime, tz_name: Optional[str]) -> int
     local midnight. Comparing local dates instead gives the same day granularity the
     calendar UI already shows (EventsAggregator.days_until_event): 0 is today, 1 tomorrow.
     """
-    tz: Any = timezone.utc
+    tz: Any = UTC
     if tz_name:
         try:
             from zoneinfo import ZoneInfo
@@ -613,7 +611,7 @@ def _n9_days_until(peak: datetime, now: datetime, tz_name: Optional[str]) -> int
     return (peak.astimezone(tz).date() - now.astimezone(tz).date()).days
 
 
-def _check_n9_solsys_window(user: Any, cache_data: Optional[dict], loc: Optional[dict] = None) -> None:
+def _check_n9_solsys_window(user: Any, cache_data: dict | None, loc: dict | None = None) -> None:
     """N9 - heads-up ahead of a multi-day solar-system event's peak (meteor shower, comet
     visibility window...). Unlike eclipses/transits, these events carry a start_time..end_time
     span around peak_time rather than being a single instant, but the trigger still follows the
@@ -630,7 +628,7 @@ def _check_n9_solsys_window(user: Any, cache_data: Optional[dict], loc: Optional
         return
 
     loc = loc or {}
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     lead_s = t.get('lead_minutes', 2880) * 60
     tz_name = (cache_data.get('location') or {}).get('timezone')
 
@@ -645,11 +643,11 @@ def _check_n9_solsys_window(user: Any, cache_data: Optional[dict], loc: Optional
             end = datetime.fromisoformat(end_str)
             peak = datetime.fromisoformat(peak_str)
             if start.tzinfo is None:
-                start = start.replace(tzinfo=timezone.utc)
+                start = start.replace(tzinfo=UTC)
             if end.tzinfo is None:
-                end = end.replace(tzinfo=timezone.utc)
+                end = end.replace(tzinfo=UTC)
             if peak.tzinfo is None:
-                peak = peak.replace(tzinfo=timezone.utc)
+                peak = peak.replace(tzinfo=UTC)
         except Exception as e:
             logger.debug(f"N9 {user.username}: bad window timestamps: {e}")
             continue
@@ -691,7 +689,7 @@ def _check_n9_solsys_window(user: Any, cache_data: Optional[dict], loc: Optional
 # ---------------------------------------------------------------------------
 
 
-def _load_cache(key: str) -> Optional[dict]:
+def _load_cache(key: str) -> dict | None:
     try:
         from cache.cache_store import load_shared_cache_entry
 
@@ -701,7 +699,7 @@ def _load_cache(key: str) -> Optional[dict]:
         return None
 
 
-def _pick_active_plan(user_id: str, username: str) -> Optional[dict]:
+def _pick_active_plan(user_id: str, username: str) -> dict | None:
     """The user's live plan, if any - see observation.plan_my_night.pick_active_plan."""
     try:
         from observation.plan_my_night import pick_active_plan
@@ -725,7 +723,7 @@ def _poll() -> None:
 
     try:
         from utils.auth import user_manager
-        from utils.repo_config import load_config, get_locations_for_user
+        from utils.repo_config import get_locations_for_user, load_config
 
         config = load_config()
 
@@ -739,9 +737,9 @@ def _poll() -> None:
             'lunar_eclipse',
             'solar_system_events',
         )
-        location_caches: Dict[str, Dict[str, Optional[dict]]] = {}
+        location_caches: dict[str, dict[str, dict | None]] = {}
 
-        def _caches_for(location_id: str) -> Dict[str, Optional[dict]]:
+        def _caches_for(location_id: str) -> dict[str, dict | None]:
             if location_id not in location_caches:
                 location_caches[location_id] = {
                     name: _load_cache(f'{name}:{location_id}') for name in _LOCATION_CACHE_NAMES
@@ -781,8 +779,8 @@ def _poll() -> None:
                         try:
                             ns = datetime.fromisoformat(night_start_str)
                             if ns.tzinfo is None:
-                                ns = ns.replace(tzinfo=timezone.utc)
-                            secs_until = (ns - datetime.now(timezone.utc)).total_seconds()
+                                ns = ns.replace(tzinfo=UTC)
+                            secs_until = (ns - datetime.now(UTC)).total_seconds()
                             if 0 < secs_until < 30 * 60:
                                 any_active = True
                         except Exception:
@@ -868,7 +866,7 @@ def _release_lock() -> None:
     except Exception as e:
         try:
             logger.error(f"Error releasing push scheduler lock: {e}")
-        except (ValueError, OSError):
+        except ValueError, OSError:
             pass  # Log stream already closed during process shutdown
     finally:
         # Close even when unlocking failed above - otherwise the OS lock (and the

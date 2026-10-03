@@ -11,8 +11,7 @@ import time
 import pytest
 from PIL import Image
 
-from observation import astrodex
-from observation import astrodex_stream
+from observation import astrodex, astrodex_stream
 
 
 @pytest.fixture
@@ -41,7 +40,6 @@ def _seed_picture(user_id, filename='pic.jpg', item_name='M31', date='2026-09-20
 
 
 class TestTokens:
-
     def test_personal_token_is_deterministic_and_user_specific(self, temp_data_dir):
         t1 = astrodex_stream.personal_token('user-a')
         t2 = astrodex_stream.personal_token('user-a')
@@ -85,7 +83,6 @@ class TestTokens:
 
 
 class TestSlotTiming:
-
     def test_slot_is_stable_within_a_cycle(self, temp_data_dir):
         assert astrodex_stream._current_slot(0.0, display_seconds=10) == 0
         assert astrodex_stream._current_slot(9.9, display_seconds=10) == 0
@@ -100,7 +97,6 @@ class TestSlotTiming:
 
 
 class TestShuffling:
-
     def test_same_seed_and_slot_always_picks_the_same_index(self, temp_data_dir):
         """The property every simultaneous viewer relies on: no shared state, just a
         reproducible function of (seed, slot)."""
@@ -160,7 +156,6 @@ class TestShuffling:
 
 
 class TestRendering:
-
     def test_zero_pictures_renders_a_placeholder_at_the_configured_size(self, temp_data_dir):
         data = astrodex_stream.personal_frame('nobody', _cfg(aspect_ratio='4:3'))
         img = Image.open(io.BytesIO(data))
@@ -290,7 +285,6 @@ class TestRendering:
 
 
 class TestSharedFeed:
-
     def test_shared_feed_strips_gps_and_merges_across_users(self, temp_data_dir):
         item_a = astrodex.create_astrodex_item('user-a', {'name': 'M31', 'type': 'Galaxy'})
         astrodex.add_picture_to_item(
@@ -318,7 +312,6 @@ class TestSharedFeed:
 
 
 class TestPersonalEligiblePictures:
-
     def test_personal_feed_skips_pictures_without_a_filename(self, temp_data_dir):
         user_id = 'user-no-filename'
         astrodex.create_astrodex_item(user_id, {'name': 'M31', 'type': 'Galaxy'})

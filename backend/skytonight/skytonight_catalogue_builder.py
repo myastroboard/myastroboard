@@ -2,30 +2,31 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, timezone
 import json
 import os
 import re
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from collections.abc import Iterable
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any
 
-from utils.logging_config import get_logger
 from skytonight.skytonight_bodies import build_body_targets
 from skytonight.skytonight_comets import build_comet_targets
 from skytonight.skytonight_models import SkyTonightCoordinates, SkyTonightTarget
 from skytonight.skytonight_targets import (
+    choose_preferred_catalogue_name,
     normalize_catalogue_name,
     normalize_object_name,
     save_targets_dataset,
-    choose_preferred_catalogue_name,
 )
 from utils import fix_astropy_constellation_name
+from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
 _CATALOGUES_DIR = os.path.join(os.path.dirname(__file__), '..', 'catalogues')
 
-DEFAULT_CALDWELL_MAP: Dict[str, str] = {}
+DEFAULT_CALDWELL_MAP: dict[str, str] = {}
 IDENTIFIER_PATTERN = re.compile(r'\b(M\s*\d+|NGC\s*\d+|IC\s*\d+)\b', re.IGNORECASE)
 
 # ── Herschel 400 - Astronomical League program (NGC objects only) ─────────────
@@ -408,34 +409,34 @@ class PyOngcRow:
     name: str
     object_type: str
     constellation: str
-    ra_hours: Optional[float]
-    dec_degrees: Optional[float]
-    magnitude: Optional[float]
-    size_arcmin: Optional[float]
-    messier: Optional[str]
-    ngc_names: List[str]
-    ic_names: List[str]
-    common_names: List[str]
-    other_identifiers: List[str]
+    ra_hours: float | None
+    dec_degrees: float | None
+    magnitude: float | None
+    size_arcmin: float | None
+    messier: str | None
+    ngc_names: list[str]
+    ic_names: list[str]
+    common_names: list[str]
+    other_identifiers: list[str]
 
 
-def _safe_float(value: Any) -> Optional[float]:
+def _safe_float(value: Any) -> float | None:
     if value is None:
         return None
     try:
         numeric = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     return numeric
 
 
-def _coerce_identifier_list(values: Any) -> List[str]:
+def _coerce_identifier_list(values: Any) -> list[str]:
     if not values:
         return []
     if isinstance(values, str):
         return [values] if values.strip() else []
 
-    coerced: List[str] = []
+    coerced: list[str] = []
     for value in values:
         text = str(value or '').strip()
         if text:
@@ -461,8 +462,8 @@ def _normalize_identifier(identifier: str) -> str:
     return text
 
 
-def _collect_catalogue_names(row: PyOngcRow, caldwell_map: Optional[Dict[str, str]] = None) -> Dict[str, str]:
-    names: Dict[str, str] = {}
+def _collect_catalogue_names(row: PyOngcRow, caldwell_map: dict[str, str] | None = None) -> dict[str, str]:
+    names: dict[str, str] = {}
 
     if row.messier:
         names['Messier'] = _normalize_identifier(row.messier)
@@ -511,7 +512,7 @@ def _collect_catalogue_names(row: PyOngcRow, caldwell_map: Optional[Dict[str, st
     return names
 
 
-def _build_aliases(row: PyOngcRow, catalogue_names: Dict[str, str]) -> List[str]:
+def _build_aliases(row: PyOngcRow, catalogue_names: dict[str, str]) -> list[str]:
     aliases = {
         str(row.name or '').strip(),
         *catalogue_names.values(),
@@ -524,7 +525,7 @@ def _build_aliases(row: PyOngcRow, catalogue_names: Dict[str, str]) -> List[str]
     return sorted(aliases)
 
 
-def _canonical_key(catalogue_names: Dict[str, str], fallback_name: str) -> Tuple[str, str]:
+def _canonical_key(catalogue_names: dict[str, str], fallback_name: str) -> tuple[str, str]:
     if 'OpenNGC' in catalogue_names:
         return ('OpenNGC', normalize_object_name(catalogue_names['OpenNGC']))
     if 'Messier' in catalogue_names:
@@ -607,13 +608,13 @@ def _ngc_ic_match_key(name: str) -> str:
     return normalize_object_name(name.strip())
 
 
-def _build_cross_ref_map() -> Dict[str, Dict[str, str]]:
+def _build_cross_ref_map() -> dict[str, dict[str, str]]:
     """Build a unified cross-reference map: _ngc_ic_match_key(ngc_name) → {catalogue: name}.
 
     Merges Herschel 400 (static), Pensack 500, LBN, GaryImm, and Arp (all JSON).
     The result is passed to _apply_cross_refs() after the main PyOngc build.
     """
-    cross_refs: Dict[str, Dict[str, str]] = {}
+    cross_refs: dict[str, dict[str, str]] = {}
 
     # ── Herschel 400 ─────────────────────────────────────────────────────────
     for ngc_num in _HERSCHEL400_NGC:
@@ -676,20 +677,20 @@ def _build_cross_ref_map() -> Dict[str, Dict[str, str]]:
 
 
 def _apply_cross_refs(
-    targets: List[SkyTonightTarget],
-    cross_refs: Dict[str, Dict[str, str]],
-) -> List[SkyTonightTarget]:
+    targets: list[SkyTonightTarget],
+    cross_refs: dict[str, dict[str, str]],
+) -> list[SkyTonightTarget]:
     """Inject cross-catalogue membership (Herschel400, Pensack500, LBN, GaryImm, Arp) into targets."""
     if not cross_refs:
         return targets
 
     enriched = 0
-    result: List[SkyTonightTarget] = []
+    result: list[SkyTonightTarget] = []
     for target in targets:
         # Lookup by all NGC/IC names this target carries.
         # Use _ngc_ic_match_key so that PyOngc's zero-padded names (e.g. "NGC 0891")
         # produce the same key as the JSON entries (e.g. "NGC 891" → "ngc0891").
-        extra: Dict[str, str] = {}
+        extra: dict[str, str] = {}
         for cat_key in ('OpenNGC', 'OpenIC'):
             val = target.catalogue_names.get(cat_key, '')
             if val:
@@ -730,7 +731,7 @@ def _apply_cross_refs(
 # IC 1318 = the Gamma Cygni Nebula complex, not the star Sadr; NGC 1990 = the
 # reflection nebula around Alnilam). Keyed on the raw PyOngc row name (e.g.
 # "IC1318", no space) since that's stable across catalogue-name resolution.
-_OBJECT_TYPE_OVERRIDES: Dict[str, str] = {
+_OBJECT_TYPE_OVERRIDES: dict[str, str] = {
     'IC1318': 'Nebula',
     'NGC1990': 'Nebula',
     'IC4681': 'Nebula',
@@ -739,10 +740,10 @@ _OBJECT_TYPE_OVERRIDES: Dict[str, str] = {
 
 
 def build_targets_from_rows(
-    rows: Iterable[PyOngcRow], caldwell_map: Optional[Dict[str, str]] = None
-) -> List[SkyTonightTarget]:
+    rows: Iterable[PyOngcRow], caldwell_map: dict[str, str] | None = None
+) -> list[SkyTonightTarget]:
     """Normalize PyOngc rows into deduplicated SkyTonight targets."""
-    targets_by_key: Dict[Tuple[str, str], SkyTonightTarget] = {}
+    targets_by_key: dict[tuple[str, str], SkyTonightTarget] = {}
 
     for row in rows:
         if row.ra_hours is None or row.dec_degrees is None:
@@ -784,14 +785,14 @@ def build_targets_from_rows(
     return sorted(targets_by_key.values(), key=lambda item: item.preferred_name.lower())
 
 
-def _load_pyongc_rows() -> List[PyOngcRow]:
+def _load_pyongc_rows() -> list[PyOngcRow]:
     """Load deep-sky objects from PyOngc when available."""
     try:
         from pyongc import ongc  # type: ignore[import-not-found]
     except ImportError as error:
         raise RuntimeError('PyOngc is required to build the SkyTonight deep-sky dataset') from error
 
-    rows: List[PyOngcRow] = []
+    rows: list[PyOngcRow] = []
     for dso in ongc.listObjects():
         coords = getattr(dso, 'coords', None)
         if coords is None:
@@ -802,7 +803,7 @@ def _load_pyongc_rows() -> List[PyOngcRow]:
             dec_sign = -1.0 if float(coords[1][0]) < 0 else 1.0
             dec_abs = abs(float(coords[1][0])) + (float(coords[1][1]) / 60.0) + (float(coords[1][2]) / 3600.0)
             dec_degrees = dec_sign * dec_abs
-        except (TypeError, ValueError, IndexError):
+        except TypeError, ValueError, IndexError:
             continue
 
         dimensions = getattr(dso, 'dimensions', (None, None, None))
@@ -844,17 +845,17 @@ def _load_pyongc_rows() -> List[PyOngcRow]:
     return rows
 
 
-def _load_deep_sky_rows() -> Tuple[List[PyOngcRow], str]:
+def _load_deep_sky_rows() -> tuple[list[PyOngcRow], str]:
     return _load_pyongc_rows(), 'PyOngc'
 
 
-def build_deep_sky_targets(caldwell_map: Optional[Dict[str, str]] = None) -> List[SkyTonightTarget]:
+def build_deep_sky_targets(caldwell_map: dict[str, str] | None = None) -> list[SkyTonightTarget]:
     """Build normalized SkyTonight deep-sky targets from PyOngc."""
     rows, _source = _load_deep_sky_rows()
     return build_targets_from_rows(rows, caldwell_map=caldwell_map)
 
 
-def _build_standalone_targets_from_json(filename: str, catalogue_key: str) -> List[SkyTonightTarget]:
+def _build_standalone_targets_from_json(filename: str, catalogue_key: str) -> list[SkyTonightTarget]:
     """Create SkyTonightTarget records from a standalone-objects JSON catalogue.
 
     Each JSON entry must have:
@@ -873,7 +874,7 @@ def _build_standalone_targets_from_json(filename: str, catalogue_key: str) -> Li
         return []
 
     # Phase 1 - parse all valid entries into intermediate dicts
-    parsed: List[Dict] = []
+    parsed: list[dict] = []
     skipped = 0
     for entry in data:
         if not isinstance(entry, dict):
@@ -888,7 +889,7 @@ def _build_standalone_targets_from_json(filename: str, catalogue_key: str) -> Li
         try:
             ra_h = float(ra_hours)
             dec_d = float(dec_degrees)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             skipped += 1
             continue
         canonical_name = normalize_object_name(name)
@@ -921,16 +922,16 @@ def _build_standalone_targets_from_json(filename: str, catalogue_key: str) -> Li
             decs = np.array([parsed[i]['dec_d'] for i in missing_idx])
             coords = SkyCoord(ra=ras, dec=decs, unit='deg')
             names = get_constellation(coords)
-            for i, con in zip(missing_idx, names):
+            for i, con in zip(missing_idx, names, strict=False):
                 parsed[i]['constellation'] = fix_astropy_constellation_name(str(con))
             logger.info(f'{filename}: resolved constellations for {len(missing_idx)} entries via astropy')
         except Exception as exc:
             logger.warning(f'{filename}: constellation batch lookup failed - {exc}')
 
     # Phase 3 - build SkyTonightTarget objects
-    targets: List[SkyTonightTarget] = []
+    targets: list[SkyTonightTarget] = []
     for e in parsed:
-        catalogue_names: Dict[str, str] = {catalogue_key: e['name']}
+        catalogue_names: dict[str, str] = {catalogue_key: e['name']}
         for extra_cat in e['extra_cats']:
             catalogue_names[extra_cat] = e['name']
         # Only promote description to CommonName for GaryImm standalone objects,
@@ -969,9 +970,9 @@ def _build_standalone_targets_from_json(filename: str, catalogue_key: str) -> Li
 
 
 def build_and_save_default_dataset(
-    caldwell_map: Optional[Dict[str, str]] = None,
+    caldwell_map: dict[str, str] | None = None,
     comet_source_mode: str = 'mpc+jpl',
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Build the first SkyTonight dataset and persist it to the configured dataset file."""
     rows, source_name = _load_deep_sky_rows()
     deep_sky_targets = build_targets_from_rows(rows, caldwell_map=caldwell_map)
@@ -1036,7 +1037,7 @@ def build_and_save_default_dataset(
     ]
 
     metadata = {
-        'generated_at': datetime.now(timezone.utc).isoformat(),
+        'generated_at': datetime.now(UTC).isoformat(),
         'sources': deduplicated_sources,
         'counts': {
             'deep_sky': len(deep_sky_targets) + len(standalone_targets),

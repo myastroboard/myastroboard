@@ -2,11 +2,13 @@
 Unit tests for backend utilities (utils.py)
 """
 
-import pytest
-import os
 import json
-import yaml
+import os
+from datetime import UTC
 from unittest.mock import patch
+
+import pytest
+import yaml
 
 # Import the functions to test
 from utils import (
@@ -14,14 +16,14 @@ from utils import (
     _NumpySafeEncoder,
     _sanitize_for_json,
     ensure_directory_exists,
-    slugify_location_name,
-    safe_file_exists,
-    load_json_file,
-    save_json_file,
-    validate_coordinates,
     format_file_size,
     get_environment_info,
+    load_json_file,
     parse_iso_to_utc,
+    safe_file_exists,
+    save_json_file,
+    slugify_location_name,
+    validate_coordinates,
 )
 
 
@@ -29,10 +31,9 @@ class TestParseIsoToUtc:
     """Tests for parse_iso_to_utc (event ordering by absolute instant)."""
 
     def test_naive_string_treated_as_utc(self):
-        from datetime import timezone
 
         result = parse_iso_to_utc("2026-01-01T12:00:00")
-        assert result.tzinfo == timezone.utc
+        assert result.tzinfo == UTC
         assert result.hour == 12
 
     def test_offset_aware_converted_to_utc(self):
@@ -49,9 +50,9 @@ class TestParseIsoToUtc:
         assert earlier_instant > later_instant  # lexicographic order is the opposite
 
     def test_invalid_input_sorts_last(self):
-        from datetime import datetime, timezone
+        from datetime import datetime
 
-        sentinel = datetime.max.replace(tzinfo=timezone.utc)
+        sentinel = datetime.max.replace(tzinfo=UTC)
         assert parse_iso_to_utc(None) == sentinel
         assert parse_iso_to_utc("not-a-date") == sentinel
 
@@ -132,7 +133,7 @@ class TestJsonFileOperations:
         assert os.path.exists(file_path)
 
         # Verify content
-        with open(file_path, 'r') as f:
+        with open(file_path) as f:
             loaded = json.load(f)
         assert loaded == data
 
@@ -358,38 +359,45 @@ class TestDistantEpochPrecisionWarningsMuted:
     def test_mutes_dubious_year_erfa_warning(self):
         """The ERFA 'dubious year' warning is swallowed inside the block."""
         import warnings
+
         from erfa import ErfaWarning
+
         from utils import distant_epoch_precision_warnings_muted
 
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             with distant_epoch_precision_warnings_muted():
-                warnings.warn('ERFA function "dtf2d" yielded 1 of "dubious year"', ErfaWarning)
+                warnings.warn('ERFA function "dtf2d" yielded 1 of "dubious year"', ErfaWarning, stacklevel=1)
 
         assert caught == []
 
     def test_mutes_polar_motion_warning(self):
         """The astropy polar-motion range warning is swallowed inside the block."""
         import warnings
+
         from astropy.utils.exceptions import AstropyWarning
+
         from utils import distant_epoch_precision_warnings_muted
 
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             with distant_epoch_precision_warnings_muted():
-                warnings.warn("Tried to get polar motions for times after IERS data is valid.", AstropyWarning)
+                warnings.warn(
+                    "Tried to get polar motions for times after IERS data is valid.", AstropyWarning, stacklevel=1
+                )
 
         assert caught == []
 
     def test_does_not_mute_unrelated_warnings(self):
         """Muting is targeted - other warnings still surface."""
         import warnings
+
         from utils import distant_epoch_precision_warnings_muted
 
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             with distant_epoch_precision_warnings_muted():
-                warnings.warn("something else entirely", UserWarning)
+                warnings.warn("something else entirely", UserWarning, stacklevel=1)
 
         assert len(caught) == 1
         assert "something else entirely" in str(caught[0].message)
@@ -397,6 +405,7 @@ class TestDistantEpochPrecisionWarningsMuted:
     def test_restores_iers_config_afterwards(self):
         """The IERS accuracy setting is process-wide, so it must be restored."""
         from astropy.utils import iers
+
         from utils import distant_epoch_precision_warnings_muted
 
         before = iers.conf.iers_degraded_accuracy
@@ -412,6 +421,7 @@ class TestDistantEpochPrecisionWarningsMuted:
         exception is invisible to it, which makes the tail of the test look dead.
         """
         from astropy.utils import iers
+
         from utils import distant_epoch_precision_warnings_muted
 
         before = iers.conf.iers_degraded_accuracy

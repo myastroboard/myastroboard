@@ -11,15 +11,16 @@ Sidereal time is the hour angle of the vernal equinox,
 used to determine the positions of celestial objects.
 """
 
-from datetime import datetime, timedelta, date
-from typing import Dict, Any, List, Optional
+from datetime import date, datetime, timedelta
+from typing import Any
 from zoneinfo import ZoneInfo
-from utils.logging_config import get_logger
 
-from astropy.time import Time
-from astropy.coordinates import EarthLocation, AltAz
-from astropy import units as u
 import numpy as np
+from astropy import units as u
+from astropy.coordinates import AltAz, EarthLocation
+from astropy.time import Time
+
+from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
@@ -51,7 +52,7 @@ class SiderealTimeService:
         self.timezone = timezone
         self.location = EarthLocation(lat=latitude * u.deg, lon=longitude * u.deg, height=elevation * u.m)
 
-    def get_current_sidereal_info(self) -> Dict[str, Any]:
+    def get_current_sidereal_info(self) -> dict[str, Any]:
         """
         Get current sidereal time and related information.
 
@@ -67,7 +68,7 @@ class SiderealTimeService:
             logger.error(f"Error getting current sidereal time: {e}")
             return {}
 
-    def get_sidereal_info_for_time(self, target_datetime: datetime) -> Dict[str, Any]:
+    def get_sidereal_info_for_time(self, target_datetime: datetime) -> dict[str, Any]:
         """
         Get sidereal time information for a specific time.
 
@@ -84,7 +85,7 @@ class SiderealTimeService:
             logger.error(f"Error calculating sidereal time: {e}")
             return {}
 
-    def get_hourly_sidereal_times(self, target_date: date, num_hours: int = 24) -> List[Dict[str, Any]]:
+    def get_hourly_sidereal_times(self, target_date: date, num_hours: int = 24) -> list[dict[str, Any]]:
         """
         Get sidereal times for each hour of a given day.
         Useful for planning observations over a night.
@@ -117,8 +118,8 @@ class SiderealTimeService:
         return results
 
     def get_object_lst_for_transit(
-        self, ra_degrees: float, target_date: date, dec_degrees: Optional[float] = None
-    ) -> Dict[str, Any]:
+        self, ra_degrees: float, target_date: date, dec_degrees: float | None = None
+    ) -> dict[str, Any]:
         """
         Get the Local Sidereal Time when an object at a given RA will transit (cross meridian).
         Useful for planning observations of specific objects.
@@ -185,7 +186,7 @@ class SiderealTimeService:
             logger.error(f"Error calculating object transit time: {e}")
             return {}
 
-    def _calculate_sidereal_info(self, time_obj: Time) -> Dict[str, Any]:
+    def _calculate_sidereal_info(self, time_obj: Time) -> dict[str, Any]:
         """Calculate comprehensive sidereal time information."""
         try:
             # Greenwich Apparent Sidereal Time (includes nutation / the equation of
@@ -252,7 +253,7 @@ class SiderealTimeService:
 
     def get_best_observation_times(
         self, target_ra_hours: float, target_dec_degrees: float, observation_date: date, min_altitude: float = 20.0
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Get the best observation times for a target object.
 
@@ -266,7 +267,7 @@ class SiderealTimeService:
             Dictionary with observation timing information
         """
         try:
-            from astropy.coordinates import SkyCoord, ICRS
+            from astropy.coordinates import ICRS, SkyCoord
 
             # Convert RA hours to degrees
             target_ra_degrees = (target_ra_hours / 24.0) * 360.0

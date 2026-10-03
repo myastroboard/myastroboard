@@ -13,20 +13,22 @@ The four surfaces are separate routes rather than one payload so the ephemeris-b
 does not hold up the three that are instant (see feature.md, decision D6).
 """
 
-from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from datetime import UTC, datetime
+from typing import Any
 from zoneinfo import ZoneInfo
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, jsonify, request
 
-from observation import astrodex
-from observation import catalogue_collection
-from observation import observation_sessions
-from observation import session_analytics
-from observation import target_coordinates
-from observation import visibility_calendar
-from observation import wishlist
-from utils.auth import login_required, user_required, get_current_user
+from observation import (
+    astrodex,
+    catalogue_collection,
+    observation_sessions,
+    session_analytics,
+    target_coordinates,
+    visibility_calendar,
+    wishlist,
+)
+from utils.auth import get_current_user, login_required, user_required
 from utils.constants import MAX_WISHLIST_ITEMS
 from utils.logging_config import get_logger
 from utils.route_helpers import _resolve_active_location
@@ -42,7 +44,7 @@ _YEAR_MIN = 1900
 _YEAR_MAX = 2200
 
 
-def _observer_today(location: Dict[str, Any]) -> Any:
+def _observer_today(location: dict[str, Any]) -> Any:
     """Today's date at the active location.
 
     "This month" has to mean the observer's month: a session logged at 01:30 local on the
@@ -55,17 +57,17 @@ def _observer_today(location: Dict[str, Any]) -> Any:
             return datetime.now(ZoneInfo(timezone_name)).date()
         except Exception:
             logger.debug(f'Unusable timezone on active location: {timezone_name!r}; falling back to UTC')
-    return datetime.now(timezone.utc).date()
+    return datetime.now(UTC).date()
 
 
-def _requested_year(default_year: int) -> Optional[int]:
+def _requested_year(default_year: int) -> int | None:
     """Parse ``?year=``, or None when it is present but not a plausible year."""
     raw = request.args.get('year')
     if raw is None or str(raw).strip() == '':
         return default_year
     try:
         year = int(str(raw).strip())
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     return year if _YEAR_MIN <= year <= _YEAR_MAX else None
 
@@ -259,7 +261,7 @@ def _attach_visibility(items, location) -> None:
     except Exception as error:
         logger.error(f'Could not compute wishlist visibility: {error}')
         return
-    for item, row in zip(items, rows):
+    for item, row in zip(items, rows, strict=False):
         item.update(row)
 
 

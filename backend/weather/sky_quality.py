@@ -8,8 +8,6 @@ midpoint table unless the user also provides a direct SQM reading.
 
 from __future__ import annotations
 
-from typing import Optional
-
 # ---------------------------------------------------------------------------
 # Bortle ↔ SQM midpoint table
 # ---------------------------------------------------------------------------
@@ -108,7 +106,7 @@ def light_pollution_factor(sqm: float) -> float:
     return round(normalized**1.5, 4)
 
 
-def object_lp_factor(sqm: float, object_type: Optional[str]) -> float:
+def object_lp_factor(sqm: float, object_type: str | None) -> float:
     """
     Effective light-pollution factor for a specific object type.
 

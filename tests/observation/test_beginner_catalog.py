@@ -10,8 +10,8 @@ if 'psutil' not in sys.modules:
     sys.modules['psutil'] = types.ModuleType('psutil')
 
 import app as app_module  # type: ignore[import-not-found]  # noqa: E402
-from observation import beginner_catalog  # type: ignore[import-not-found]  # noqa: E402
 from blueprints import astrodex as astrodex_bp_module  # type: ignore[import-not-found]  # noqa: E402
+from observation import beginner_catalog  # type: ignore[import-not-found]  # noqa: E402
 from utils.auth import user_manager  # type: ignore[import-not-found]  # noqa: E402
 
 app = app_module.app

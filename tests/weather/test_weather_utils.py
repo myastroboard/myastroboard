@@ -4,7 +4,7 @@ Unit tests for weather utilities (weather_utils.py)
 
 from unittest.mock import Mock, patch
 
-from weather.weather_utils import create_weather_client, create_fresh_weather_client
+from weather.weather_utils import create_fresh_weather_client, create_weather_client
 
 RETRY_COUNT = 2
 BACKOFF_FACTOR = 0.5

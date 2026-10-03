@@ -23,9 +23,10 @@ import json
 import os
 import shutil
 import zipfile
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Callable, Dict, List, Optional, Union
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.dialects.sqlite import insert
@@ -61,7 +62,7 @@ class UnreadableDocument(Exception):
 class UserRecord:
     """One account, as ``User.to_dict()`` stores it."""
 
-    user: Dict[str, Any]
+    user: dict[str, Any]
 
 
 @dataclass
@@ -70,7 +71,7 @@ class DocumentRecord:
 
     user_id: str
     kind: str
-    data: Dict[str, Any]
+    data: dict[str, Any]
     doc_key: str = ''
 
 
@@ -82,7 +83,7 @@ class SettingRecord:
     value: Any
 
 
-Record = Union[UserRecord, DocumentRecord, SettingRecord]
+Record = UserRecord | DocumentRecord | SettingRecord
 
 
 @dataclass
@@ -94,8 +95,8 @@ class LegacySource:
     """
 
     name: str
-    discover: Callable[[str], List[str]]
-    convert: Callable[[str], List[Record]]
+    discover: Callable[[str], list[str]]
+    convert: Callable[[str], list[Record]]
     critical: bool = False
 
 
@@ -104,16 +105,16 @@ class ImportReport:
     """Outcome of :func:`run_if_needed`."""
 
     succeeded: bool = True
-    failure: Optional[str] = None
-    archive_path: Optional[str] = None
-    imported: List[str] = field(default_factory=list)
-    orphaned: List[str] = field(default_factory=list)
-    unreadable: List[str] = field(default_factory=list)
-    deleted: List[str] = field(default_factory=list)
-    delete_errors: List[str] = field(default_factory=list)
+    failure: str | None = None
+    archive_path: str | None = None
+    imported: list[str] = field(default_factory=list)
+    orphaned: list[str] = field(default_factory=list)
+    unreadable: list[str] = field(default_factory=list)
+    deleted: list[str] = field(default_factory=list)
+    delete_errors: list[str] = field(default_factory=list)
 
 
-def _sources() -> List[LegacySource]:
+def _sources() -> list[LegacySource]:
     """Every registered legacy source (see db/legacy_sources.py)."""
     from db.legacy_sources import SOURCES
 
@@ -125,7 +126,7 @@ def _sources() -> List[LegacySource]:
 
 def read_json_file(path: str) -> Any:
     """Parse a legacy JSON file (UTF-8, tolerating a BOM)."""
-    with open(path, 'r', encoding='utf-8-sig') as handle:
+    with open(path, encoding='utf-8-sig') as handle:
         return json.load(handle)
 
 
@@ -142,14 +143,14 @@ def _canonical(value: Any) -> str:
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _relative(path: str, root: str) -> str:
     return os.path.relpath(path, root).replace(os.sep, '/')
 
 
-def _sidecars(path: str) -> List[str]:
+def _sidecars(path: str) -> list[str]:
     """``.backup``/``.tmp``/``.corrupted.*`` leftovers next to ``path``."""
     directory, name = os.path.split(path)
     found = [path + suffix for suffix in _SIDECAR_SUFFIXES if os.path.isfile(path + suffix)]
@@ -161,7 +162,7 @@ def _sidecars(path: str) -> List[str]:
     return found
 
 
-def resolve_legacy_file(path: str) -> Optional[str]:
+def resolve_legacy_file(path: str) -> str | None:
     """The file to read for ``path``: itself, or its ``.backup`` when a 1.6 save crashed mid-way."""
     if os.path.isfile(path):
         return path
@@ -170,7 +171,7 @@ def resolve_legacy_file(path: str) -> Optional[str]:
     return None
 
 
-def _known_user_ids(records: List[Record]) -> set:
+def _known_user_ids(records: list[Record]) -> set:
     ids = {record.user['user_id'] for record in records if isinstance(record, UserRecord)}
     with read() as conn:
         ids.update(conn.execute(select(schema.users.c.user_id)).scalars())
@@ -217,9 +218,9 @@ def _expected(record: Record) -> Any:
     return record.value
 
 
-def _record_status(conn, rel_path: str, sha: Optional[str], status: str, detail: Optional[str] = None) -> None:
+def _record_status(conn, rel_path: str, sha: str | None, status: str, detail: str | None = None) -> None:
     now = _now()
-    values: Dict[str, Any] = {'path': rel_path, 'sha256': sha, 'status': status, 'detail': detail}
+    values: dict[str, Any] = {'path': rel_path, 'sha256': sha, 'status': status, 'detail': detail}
     if status == 'deleted':
         values['deleted_at'] = now
     else:
@@ -229,7 +230,7 @@ def _record_status(conn, rel_path: str, sha: Optional[str], status: str, detail:
     conn.execute(stmt.on_conflict_do_update(index_elements=[schema.legacy_import.c.path], set_=update))
 
 
-def _previous_imports() -> Dict[str, Dict[str, Any]]:
+def _previous_imports() -> dict[str, dict[str, Any]]:
     table = schema.legacy_import
     with read() as conn:
         return {row.path: {'sha256': row.sha256, 'status': row.status} for row in conn.execute(select(table))}
@@ -238,10 +239,10 @@ def _previous_imports() -> Dict[str, Dict[str, Any]]:
 # --- Archive ---------------------------------------------------------------------------
 
 
-def _write_archive(root: str, files: List[str]) -> str:
+def _write_archive(root: str, files: list[str]) -> str:
     backups_dir = os.path.join(root, BACKUPS_DIRNAME)
     os.makedirs(backups_dir, exist_ok=True)
-    stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
+    stamp = datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')
     archive_path = os.path.join(backups_dir, f'{ARCHIVE_PREFIX}{stamp}.zip')
     expected = {_relative(path, root): _sha256(path) for path in files}
     with zipfile.ZipFile(archive_path, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
@@ -263,17 +264,17 @@ def _write_archive(root: str, files: List[str]) -> str:
 # --- Entry point -----------------------------------------------------------------------
 
 
-def discover_all(root: Optional[str] = None) -> Dict[str, LegacySource]:
+def discover_all(root: str | None = None) -> dict[str, LegacySource]:
     """Every legacy file still on disk, mapped to its source."""
     root = root or data_dir()
-    found: Dict[str, LegacySource] = {}
+    found: dict[str, LegacySource] = {}
     for source in _sources():
         for path in source.discover(root):
             found[os.path.abspath(path)] = source
     return found
 
 
-def run_if_needed(root: Optional[str] = None) -> Optional[ImportReport]:
+def run_if_needed(root: str | None = None) -> ImportReport | None:
     """Import the legacy files still on disk; ``None`` when there were none."""
     root = root or data_dir()
     found = discover_all(root)
@@ -290,11 +291,11 @@ def run_if_needed(root: Optional[str] = None) -> Optional[ImportReport]:
     return report
 
 
-def _run(root: str, found: Dict[str, LegacySource], report: ImportReport) -> None:
+def _run(root: str, found: dict[str, LegacySource], report: ImportReport) -> None:
     previous = _previous_imports()
     files = sorted(found)
     _refuse_files_already_migrated(root, files, previous)
-    to_archive: List[str] = []
+    to_archive: list[str] = []
     for path in files:
         source_file = resolve_legacy_file(path)
         if source_file:
@@ -303,9 +304,9 @@ def _run(root: str, found: Dict[str, LegacySource], report: ImportReport) -> Non
     report.archive_path = _write_archive(root, sorted(set(to_archive)))
     logger.info(f'Archived {len(to_archive)} legacy data file(s) to {report.archive_path}')
 
-    records_by_file: Dict[str, List[Record]] = {}
-    hashes: Dict[str, str] = {}
-    unreadable: List[str] = []
+    records_by_file: dict[str, list[Record]] = {}
+    hashes: dict[str, str] = {}
+    unreadable: list[str] = []
     # Imported by an earlier start that crashed before deleting them: verified again, not rewritten.
     already_imported: set = set()
     for path in files:
@@ -390,7 +391,7 @@ def _run(root: str, found: Dict[str, LegacySource], report: ImportReport) -> Non
             logger.warning(f'Could not delete imported legacy file {rel}: {error}')
 
 
-def _refuse_files_already_migrated(root: str, files: List[str], previous: Dict[str, Dict[str, Any]]) -> None:
+def _refuse_files_already_migrated(root: str, files: list[str], previous: dict[str, dict[str, Any]]) -> None:
     """Stop when legacy files reappear next to a database that already took over from them.
 
     That happens after going back to 1.6 (unzipping the pre-1.7 archive) and upgrading again:
@@ -419,7 +420,7 @@ def _write_report_file(root: str, report: ImportReport) -> None:
     try:
         backups_dir = os.path.join(root, BACKUPS_DIRNAME)
         os.makedirs(backups_dir, exist_ok=True)
-        stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
+        stamp = datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')
         lines = [
             'MyAstroBoard 1.7 - import of the legacy JSON data files',
             f'Date: {_now()}',
@@ -447,11 +448,11 @@ def _write_report_file(root: str, report: ImportReport) -> None:
 # --- What the import left in data/backups/ (shown and deletable from the admin page) ------
 
 
-def _backups_dir(root: Optional[str] = None) -> str:
+def _backups_dir(root: str | None = None) -> str:
     return os.path.realpath(os.path.join(root or data_dir(), BACKUPS_DIRNAME))
 
 
-def _managed_entries(backups_dir: str) -> List[str]:
+def _managed_entries(backups_dir: str) -> list[str]:
     """The entries of ``backups_dir`` the import wrote: archives, reports, quarantine folders."""
     if not os.path.isdir(backups_dir):
         return []
@@ -468,13 +469,13 @@ def _managed_entries(backups_dir: str) -> List[str]:
     return entries
 
 
-def _files_under(path: str) -> List[str]:
+def _files_under(path: str) -> list[str]:
     if os.path.isfile(path):
         return [path]
     return [os.path.join(folder, name) for folder, _dirs, names in os.walk(path) for name in names]
 
 
-def migration_backups_summary(root: Optional[str] = None) -> Dict[str, Any]:
+def migration_backups_summary(root: str | None = None) -> dict[str, Any]:
     """What the 1.7 upgrade left in ``data/backups/``: archives, reports, files set aside, total size."""
     backups_dir = _backups_dir(root)
     entries = _managed_entries(backups_dir)
@@ -486,7 +487,7 @@ def migration_backups_summary(root: Optional[str] = None) -> Dict[str, Any]:
         size = sum(os.path.getsize(file) for file in files)
         total_size += size
         if name.startswith(ARCHIVE_PREFIX):
-            modified = datetime.fromtimestamp(os.path.getmtime(path), timezone.utc).isoformat()
+            modified = datetime.fromtimestamp(os.path.getmtime(path), UTC).isoformat()
             archives.append({'name': name, 'size': size, 'created_at': modified})
         elif name.startswith(REPORT_PREFIX):
             reports.append(name)
@@ -502,7 +503,7 @@ def migration_backups_summary(root: Optional[str] = None) -> Dict[str, Any]:
     }
 
 
-def latest_report_path(root: Optional[str] = None) -> Optional[str]:
+def latest_report_path(root: str | None = None) -> str | None:
     """The newest import report, or None."""
     reports = [
         path for path in _managed_entries(_backups_dir(root)) if os.path.basename(path).startswith(REPORT_PREFIX)
@@ -510,7 +511,7 @@ def latest_report_path(root: Optional[str] = None) -> Optional[str]:
     return reports[-1] if reports else None
 
 
-def delete_migration_backups(root: Optional[str] = None) -> int:
+def delete_migration_backups(root: str | None = None) -> int:
     """Delete what the import left in ``data/backups/`` (and the folder once empty); return files removed.
 
     Only the import's own entries are touched: anything else an operator put there stays.

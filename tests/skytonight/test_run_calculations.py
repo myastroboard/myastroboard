@@ -1,7 +1,7 @@
 """Tests for skytonight_calculator.run_calculations() and load_calculation_results()."""
 
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import patch
 
 from skytonight import skytonight_calculator as calc
@@ -17,8 +17,8 @@ run_calculations = calc.run_calculations
 
 def _fake_night():
     """Return a (start, end) pair one hour long, anchored in the past."""
-    start = datetime(2026, 5, 28, 21, 0, 0, tzinfo=timezone.utc)
-    end = datetime(2026, 5, 28, 22, 0, 0, tzinfo=timezone.utc)
+    start = datetime(2026, 5, 28, 21, 0, 0, tzinfo=UTC)
+    end = datetime(2026, 5, 28, 22, 0, 0, tzinfo=UTC)
     return start, end
 
 
@@ -133,8 +133,8 @@ class _FakeTimes:
 
     def __init__(self):
         self._data = [
-            datetime(2026, 5, 28, 21, 0, tzinfo=timezone.utc),
-            datetime(2026, 5, 28, 22, 0, tzinfo=timezone.utc),
+            datetime(2026, 5, 28, 21, 0, tzinfo=UTC),
+            datetime(2026, 5, 28, 22, 0, tzinfo=UTC),
         ]
 
     def __len__(self):

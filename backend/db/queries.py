@@ -4,7 +4,7 @@ These used to load every user's JSON file and walk it in Python (delete guards, 
 "is this picture visible" check, shared equipment...). Each function is one indexed query.
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from sqlalchemy import and_, distinct, func, or_, select
 
@@ -28,7 +28,7 @@ def _count(query) -> int:
 # --- Astrodex ----------------------------------------------------------------------------
 
 
-def count_astrodex_pictures(location_id: Optional[str] = None, combination_id: Optional[str] = None) -> int:
+def count_astrodex_pictures(location_id: str | None = None, combination_id: str | None = None) -> int:
     """Pictures (all users) taken at a location preset and/or with a combination."""
     query = select(func.count()).select_from(_pictures)
     if location_id is not None:
@@ -38,7 +38,7 @@ def count_astrodex_pictures(location_id: Optional[str] = None, combination_id: O
     return _count(query)
 
 
-def astrodex_picture_exists(filename: str, user_id: Optional[str] = None) -> bool:
+def astrodex_picture_exists(filename: str, user_id: str | None = None) -> bool:
     """Whether an Astrodex picture has this file name (of one user, or of anybody)."""
     query = select(func.count()).select_from(_pictures).where(_pictures.c.filename == filename)
     if user_id is not None:
@@ -66,7 +66,7 @@ def count_sessions_for_combination(combination_id: str) -> int:
 # --- Plans -------------------------------------------------------------------------------
 
 
-def count_plans(location_id: Optional[str] = None, combination_id: Optional[str] = None) -> int:
+def count_plans(location_id: str | None = None, combination_id: str | None = None) -> int:
     """Plans (all users) pinned to a location preset and/or a combination."""
     query = select(func.count()).select_from(_plans)
     if location_id is not None:
@@ -76,7 +76,7 @@ def count_plans(location_id: Optional[str] = None, combination_id: Optional[str]
     return _count(query)
 
 
-def plans_for_location(location_id: str) -> List[Tuple[str, str]]:
+def plans_for_location(location_id: str) -> list[tuple[str, str]]:
     """``(user_id, doc_key)`` of every plan pinned to a location preset."""
     with read() as conn:
         rows = conn.execute(select(_plans.c.user_id, _plans.c.doc_key).where(_plans.c.location_id == location_id))
@@ -86,16 +86,16 @@ def plans_for_location(location_id: str) -> List[Tuple[str, str]]:
 # --- Equipment ---------------------------------------------------------------------------
 
 # Combination columns referencing one equipment id, by equipment type
-COMBINATION_SCALAR_FIELDS: Dict[str, Tuple[str, ...]] = {
+COMBINATION_SCALAR_FIELDS: dict[str, tuple[str, ...]] = {
     'telescopes': ('telescope_id',),
     'cameras': ('camera_id', 'guide_camera_id'),
     'mounts': ('mount_id',),
 }
 # combination_equipment role referencing a list of equipment ids, by equipment type
-COMBINATION_LIST_ROLES: Dict[str, str] = {'filters': 'filter', 'accessories': 'accessory'}
+COMBINATION_LIST_ROLES: dict[str, str] = {'filters': 'filter', 'accessories': 'accessory'}
 
 
-def combinations_referencing(equipment_type: str, equipment_id: str) -> List[Dict[str, Any]]:
+def combinations_referencing(equipment_type: str, equipment_id: str) -> list[dict[str, Any]]:
     """``{name, owner_id}`` of every combination (any user) referencing this equipment id."""
     conditions = [_combinations.c[field] == equipment_id for field in COMBINATION_SCALAR_FIELDS.get(equipment_type, ())]
     role = COMBINATION_LIST_ROLES.get(equipment_type)
@@ -115,7 +115,7 @@ def combinations_referencing(equipment_type: str, equipment_id: str) -> List[Dic
         return [{'name': row.name or '', 'owner_id': row.user_id} for row in conn.execute(query)]
 
 
-def shared_equipment(equipment_type: str, exclude_user_id: str) -> List[Tuple[str, Any]]:
+def shared_equipment(equipment_type: str, exclude_user_id: str) -> list[tuple[str, Any]]:
     """``(owner_id, item)`` for every item of ``equipment_type`` shared by another user."""
     query = (
         select(_equipment.c.user_id, _equipment.c.data)

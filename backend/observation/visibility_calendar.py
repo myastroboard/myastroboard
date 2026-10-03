@@ -30,12 +30,13 @@ import contextlib
 import json
 import math
 from collections import OrderedDict
-from datetime import date, timezone
-from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
+from collections.abc import Iterator, Sequence
+from datetime import UTC, date
+from typing import Any
 from zoneinfo import ZoneInfo
 
-import numpy as np
 import astropy.units as u
+import numpy as np
 
 from astroweather.moon_planner import night_body_altitude_grid
 from observation import object_info
@@ -49,8 +50,8 @@ from utils.repo_config import load_config
 logger = get_logger(__name__)
 
 _ASTRO_NIGHT_SUN_ALT = -18.0
-_SAMPLE_DAYS: Tuple[int, ...] = (1, 15)
-_MONTHS: Tuple[int, ...] = tuple(range(1, 13))
+_SAMPLE_DAYS: tuple[int, ...] = (1, 15)
+_MONTHS: tuple[int, ...] = tuple(range(1, 13))
 _STEP_MINUTES = 10
 _MAX_CACHE_ENTRIES = 256
 # How far the year selector may reach (matches docs/API_ENDPOINTS.md and SKYTONIGHT.md).
@@ -64,7 +65,7 @@ YEAR_OFFSET_MAX = 5
 _UNSUPPORTED_CATEGORIES = {'bodies', 'comets'}
 _UNSUPPORTED_OTYPE_TOKENS = ('planet', 'comet', 'asteroid', 'moon', 'minor')
 
-_calendar_cache: "OrderedDict[Tuple[Any, ...], Dict[str, Any]]" = OrderedDict()
+_calendar_cache: OrderedDict[tuple[Any, ...], dict[str, Any]] = OrderedDict()
 
 
 def clear_cache() -> None:
@@ -72,7 +73,7 @@ def clear_cache() -> None:
     _calendar_cache.clear()
 
 
-def _resolve_target(identifier: str) -> Dict[str, Any]:
+def _resolve_target(identifier: str) -> dict[str, Any]:
     """Resolve *identifier* to equatorial coordinates (degrees) plus display metadata.
 
     The result always carries ``supported`` (bool). When supported it also has
@@ -140,7 +141,7 @@ def _target_altaz(
     dec_deg: float,
     lat_deg: float,
     lst_hours: np.ndarray,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """Analytic (alt, az) in degrees for a fixed target over a precomputed LST array.
 
     ``az`` is measured from north, increasing clockwise (0 = N, 90 = E), matching the
@@ -176,7 +177,7 @@ def build_night_context(
     lon_deg: float,
     timezone_name: str,
     night_date: date,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Everything about one night that does **not** depend on which target is observed.
 
     The Sun/Moon altitude grid is by far the expensive part of a visibility sample, and it
@@ -196,13 +197,13 @@ def build_night_context(
         'lst_hours': np.asarray(times.sidereal_time('apparent', longitude=lon_deg * u.deg).hour),
         'dark': sun_alt < _ASTRO_NIGHT_SUN_ALT,
         'moonless': moon_alt < 0.0,
-        'times_local': [dt.astimezone(tz) for dt in times.to_datetime(timezone=timezone.utc)],
+        'times_local': [dt.astimezone(tz) for dt in times.to_datetime(timezone=UTC)],
         'step_hours': _STEP_MINUTES / 60.0,
         'moon_illumination_pct': float(grid['moon_illumination_pct']),
     }
 
 
-def context_dark_hours(context: Dict[str, Any]) -> Tuple[float, float]:
+def context_dark_hours(context: dict[str, Any]) -> tuple[float, float]:
     """``(dark_hours, moonless_dark_hours)`` for a night, independent of any target.
 
     This is the location's own astronomical budget for that night - what the Session
@@ -217,13 +218,13 @@ def context_dark_hours(context: Dict[str, Any]) -> Tuple[float, float]:
 
 
 def sample_target_in_context(
-    context: Dict[str, Any],
+    context: dict[str, Any],
     ra_deg: float,
     dec_deg: float,
     alt_min: float,
     alt_max: float,
-    horizon_profile: List[Dict[str, Any]],
-) -> Dict[str, Any]:
+    horizon_profile: list[dict[str, Any]],
+) -> dict[str, Any]:
     """Fold one fixed target through an already-built night context.
 
     O(1) trig per time step - no ephemeris work - which is the whole point of splitting
@@ -248,7 +249,7 @@ def sample_target_in_context(
     max_altitude = float(np.max(target_alt)) if target_alt.size else None
 
     ha_hours = ((lst_hours - ra_deg / 15.0 + 12.0) % 24.0) - 12.0
-    transit_local_time: Optional[str] = None
+    transit_local_time: str | None = None
     crossings = np.where((ha_hours[:-1] < 0.0) & (ha_hours[1:] >= 0.0))[0]
     times_local = context['times_local']
     for index in crossings:
@@ -276,38 +277,40 @@ def _sample_night(
     night_date: date,
     alt_min: float,
     alt_max: float,
-    horizon_profile: List[Dict[str, Any]],
-) -> Dict[str, Any]:
+    horizon_profile: list[dict[str, Any]],
+) -> dict[str, Any]:
     """Compute one sample night's dark / observable / moonless hours for the target."""
     context = build_night_context(lat_deg, lon_deg, timezone_name, night_date)
     return sample_target_in_context(context, ra_deg, dec_deg, alt_min, alt_max, horizon_profile)
 
 
-def _aggregate_months(samples: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _mean(items: list[dict[str, Any]], key: str) -> float:
+    """Average of ``key`` over ``items``, rounded to 2 decimals (``items`` is never empty)."""
+    return round(sum(float(item[key]) for item in items) / len(items), 2)
+
+
+def _aggregate_months(samples: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Fold the 24 sample nights into 12 month aggregates with a normalized score."""
-    by_month: Dict[int, List[Dict[str, Any]]] = {}
+    by_month: dict[int, list[dict[str, Any]]] = {}
     for sample in samples:
         month = date.fromisoformat(sample['date']).month
         by_month.setdefault(month, []).append(sample)
 
-    months: List[Dict[str, Any]] = []
+    months: list[dict[str, Any]] = []
     for month in _MONTHS:
         month_samples = by_month.get(month, [])
         if not month_samples:
             continue
 
-        def _mean(key: str) -> float:
-            return round(sum(float(item[key]) for item in month_samples) / len(month_samples), 2)
-
         max_alts = [item['max_altitude'] for item in month_samples if item['max_altitude'] is not None]
         months.append(
             {
                 'month': month,
-                'dark_hours': _mean('dark_hours'),
-                'observable_hours': _mean('observable_hours'),
-                'moonless_observable_hours': _mean('moonless_observable_hours'),
+                'dark_hours': _mean(month_samples, 'dark_hours'),
+                'observable_hours': _mean(month_samples, 'observable_hours'),
+                'moonless_observable_hours': _mean(month_samples, 'moonless_observable_hours'),
                 'max_altitude': round(max(max_alts), 1) if max_alts else None,
-                'moon_illumination_pct': _mean('moon_illumination_pct'),
+                'moon_illumination_pct': _mean(month_samples, 'moon_illumination_pct'),
             }
         )
 
@@ -325,7 +328,7 @@ def _aggregate_months(samples: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return months
 
 
-def _resolve_constraints() -> Tuple[float, float]:
+def _resolve_constraints() -> tuple[float, float]:
     """(altitude_min, altitude_max) from the SkyTonight constraints, airmass included.
 
     Shared by the calendar and the v1.5 batch passes so none of them can drift from what
@@ -343,7 +346,7 @@ def _resolve_constraints() -> Tuple[float, float]:
     return alt_min, alt_max
 
 
-def _location_geometry(location: Dict[str, Any]) -> Tuple[float, float, str, List[Dict[str, Any]]]:
+def _location_geometry(location: dict[str, Any]) -> tuple[float, float, str, list[dict[str, Any]]]:
     """(latitude, longitude, timezone, horizon_profile) read defensively off a preset."""
     return (
         float(location.get('latitude') or 0.0),
@@ -353,7 +356,7 @@ def _location_geometry(location: Dict[str, Any]) -> Tuple[float, float, str, Lis
     )
 
 
-def _location_cache_signature(location: Dict[str, Any]) -> Tuple[Any, ...]:
+def _location_cache_signature(location: dict[str, Any]) -> tuple[Any, ...]:
     """Every preset field the cached results depend on, so editing a location misses the cache.
 
     Keying on the id alone kept serving results for the old coordinates after an
@@ -364,7 +367,7 @@ def _location_cache_signature(location: Dict[str, Any]) -> Tuple[Any, ...]:
     return (location.get('id'), lat_deg, lon_deg, timezone_name, json.dumps(horizon, sort_keys=True, default=str))
 
 
-def _compute_visibility_calendar(identifier: str, location: Dict[str, Any], year: int) -> Dict[str, Any]:
+def _compute_visibility_calendar(identifier: str, location: dict[str, Any], year: int) -> dict[str, Any]:
     target = _resolve_target(identifier)
     base = {
         'target': {
@@ -389,7 +392,7 @@ def _compute_visibility_calendar(identifier: str, location: Dict[str, Any], year
     alt_min, alt_max = _resolve_constraints()
     lat_deg, lon_deg, timezone_name, horizon_profile = _location_geometry(location)
 
-    samples: List[Dict[str, Any]] = []
+    samples: list[dict[str, Any]] = []
     # A year past the current one runs beyond the ~1-year horizon of the IERS
     # Earth-orientation table, so astropy warns it is assuming UT1-UTC = 0 and ERFA flags
     # the date as "dubious". For a monthly heatmap the extrapolation error is far below
@@ -437,7 +440,7 @@ def _compute_visibility_calendar(identifier: str, location: Dict[str, Any], year
     }
 
 
-def get_visibility_calendar(identifier: str, location: Dict[str, Any], year: int) -> Dict[str, Any]:
+def get_visibility_calendar(identifier: str, location: dict[str, Any], year: int) -> dict[str, Any]:
     """Return the 12-month visibility calendar for *identifier* at *location* for *year*.
 
     Cached in a bounded in-process LRU keyed on the identifier, the location's
@@ -466,13 +469,13 @@ def get_visibility_calendar(identifier: str, location: Dict[str, Any], year: int
 # which stays one click away behind the v1.4 modal.
 WISHLIST_MONTHS_AHEAD = 3
 
-_dark_hours_cache: "OrderedDict[Tuple[Any, ...], List[Dict[str, Any]]]" = OrderedDict()
+_dark_hours_cache: OrderedDict[tuple[Any, ...], list[dict[str, Any]]] = OrderedDict()
 
 # Night contexts depend only on (site, date) - never on which targets are folded through
 # them - so the same handful serves every wishlist load for that day. Bounded, like the
 # calendar's own LRU: the key space is (locations x dates) and only recent dates are ever
 # asked for.
-_context_cache: "OrderedDict[Tuple[Any, ...], Dict[str, Any]]" = OrderedDict()
+_context_cache: OrderedDict[tuple[Any, ...], dict[str, Any]] = OrderedDict()
 _MAX_CONTEXT_ENTRIES = 32
 
 
@@ -483,12 +486,12 @@ def clear_batch_caches() -> None:
 
 
 def _cached_night_context(
-    location_id: Optional[str],
+    location_id: str | None,
     lat_deg: float,
     lon_deg: float,
     timezone_name: str,
     night_date: date,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """A night context, reused across requests for the same site and date."""
     cache_key = (location_id, lat_deg, lon_deg, timezone_name, night_date.isoformat())
     cached = _context_cache.get(cache_key)
@@ -504,7 +507,7 @@ def _cached_night_context(
     return context
 
 
-def _remember(cache: "OrderedDict", key: Any, value: Any) -> Any:
+def _remember(cache: OrderedDict, key: Any, value: Any) -> Any:
     """Store *value* in a bounded LRU and return it."""
     cache[key] = value
     cache.move_to_end(key)
@@ -513,7 +516,7 @@ def _remember(cache: "OrderedDict", key: Any, value: Any) -> Any:
     return value
 
 
-def _iter_sample_nights(year: int, months: Tuple[int, ...] = _MONTHS) -> Iterator[date]:
+def _iter_sample_nights(year: int, months: tuple[int, ...] = _MONTHS) -> Iterator[date]:
     """The sample nights a monthly aggregate is built from."""
     for month in months:
         for day in _SAMPLE_DAYS:
@@ -533,7 +536,7 @@ def _epoch_guard(year: int):
     return distant_epoch_precision_warnings_muted() if int(year) > date.today().year else contextlib.nullcontext()
 
 
-def dark_hours_by_month(location: Dict[str, Any], year: int) -> List[Dict[str, Any]]:
+def dark_hours_by_month(location: dict[str, Any], year: int) -> list[dict[str, Any]]:
     """Mean dark and moonless-dark hours per calendar month at *location*.
 
     Target-independent: this is how much observable darkness the site itself offers, which
@@ -552,7 +555,7 @@ def dark_hours_by_month(location: Dict[str, Any], year: int) -> List[Dict[str, A
 
     lat_deg, lon_deg, timezone_name, _horizon = _location_geometry(location)
 
-    totals: Dict[int, List[Tuple[float, float, float]]] = {}
+    totals: dict[int, list[tuple[float, float, float]]] = {}
     with _epoch_guard(year):
         for night_date in _iter_sample_nights(year):
             try:
@@ -565,7 +568,7 @@ def dark_hours_by_month(location: Dict[str, Any], year: int) -> List[Dict[str, A
                 (dark_hours, moonless_dark_hours, context['moon_illumination_pct'])
             )
 
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     for month in _MONTHS:
         samples = totals.get(month, [])
         if not samples:
@@ -584,11 +587,11 @@ def dark_hours_by_month(location: Dict[str, Any], year: int) -> List[Dict[str, A
 
 
 def next_visibility_batch(
-    targets: Sequence[Dict[str, Any]],
-    location: Dict[str, Any],
-    reference_date: Optional[date] = None,
+    targets: Sequence[dict[str, Any]],
+    location: dict[str, Any],
+    reference_date: date | None = None,
     months_ahead: int = WISHLIST_MONTHS_AHEAD,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Upcoming observable hours for many fixed targets, one grid per sampled night.
 
     Each *target* is a dict carrying ``ra_deg`` and ``dec_deg`` (already resolved - the
@@ -603,7 +606,7 @@ def next_visibility_batch(
     today = reference_date or date.today()
     months = max(1, int(months_ahead))
 
-    sample_dates: List[date] = []
+    sample_dates: list[date] = []
     year, month = today.year, today.month
     for offset in range(months):
         current_year, current_month = year, month + offset
@@ -620,7 +623,7 @@ def next_visibility_batch(
         if isinstance(target, dict) and target.get('ra_deg') is not None and target.get('dec_deg') is not None
     ]
 
-    rows: List[Dict[str, Any]] = [
+    rows: list[dict[str, Any]] = [
         {
             'observable_hours_next': None,
             'moonless_observable_hours_next': None,

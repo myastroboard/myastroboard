@@ -2,11 +2,11 @@
 
 from dataclasses import asdict
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, jsonify, request
 
 from equipment import equipment_profiles
 from observation import astrodex
-from utils.auth import user_required, get_current_user, user_manager
+from utils.auth import get_current_user, user_manager, user_required
 from utils.logging_config import get_logger
 from utils.repo_config import load_config
 
@@ -48,7 +48,7 @@ def _validate_numeric_ranges(data, specs):
                 val = float(data[field])
                 if not (lo <= val <= hi):
                     return f'{field} must be between {lo} and {hi} {unit}'.strip()
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 return f'{field} must be a number'
     return None
 

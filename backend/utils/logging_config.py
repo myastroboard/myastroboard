@@ -8,20 +8,21 @@ import os
 import sys
 import time
 import weakref
-from datetime import datetime, timezone
+from collections.abc import Callable
+from datetime import UTC, datetime
 from logging.handlers import RotatingFileHandler
-from typing import Callable, Optional
-from utils.constants import LOG_FILE, LOG_MAX_BYTES, LOG_BACKUP_COUNT
+
+from utils.constants import LOG_BACKUP_COUNT, LOG_FILE, LOG_MAX_BYTES
 from utils.file_lock import interprocess_lock
 
 # Global logger registry to prevent duplicate handlers
 _loggers = {}
 
 # The single file handler shared by every logger of this process (created lazily)
-_file_handler: Optional[logging.Handler] = None
+_file_handler: logging.Handler | None = None
 
 # Console handlers following CONSOLE_LOG_LEVEL (those created without an explicit level)
-_console_handlers: "weakref.WeakSet[logging.Handler]" = weakref.WeakSet()
+_console_handlers: weakref.WeakSet[logging.Handler] = weakref.WeakSet()
 
 VALID_LOG_LEVELS = ('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL')
 
@@ -36,7 +37,7 @@ CONSOLE_LOG_LEVEL = os.environ.get('CONSOLE_LOG_LEVEL', 'WARNING').upper()
 # Each gunicorn worker is its own process: one that did not save the new levels picks
 # them up on its next refresh (at most this often, from request handling).
 LOG_LEVEL_REFRESH_INTERVAL_SECONDS = 5
-_level_provider: Optional[Callable[[], tuple]] = None
+_level_provider: Callable[[], tuple] | None = None
 _next_level_refresh = 0.0
 
 # Time-based retention on top of the size-based rotation: log lines contain usernames
@@ -45,7 +46,7 @@ _next_level_refresh = 0.0
 # startup - utils.app_settings imports this module, so it cannot be imported here.
 # Checked at most once a day per process, to keep log writes cheap.
 LOG_RETENTION_CHECK_INTERVAL_SECONDS = 24 * 3600
-_retention_days_provider: Optional[Callable[[], int]] = None
+_retention_days_provider: Callable[[], int] | None = None
 
 # Leading timestamp written by _ConfiguredTzFormatter: "2026-09-27 17:20:22,646 +0000"
 _TIMESTAMP_LENGTH = len('2026-09-27 17:20:22,646 +0000')
@@ -77,7 +78,7 @@ class _ConfiguredTzFormatter(logging.Formatter):
             tz_name = os.environ.get('TZ', 'UTC')
             cls._cached_tz = ZoneInfo(tz_name)
         except Exception:
-            cls._cached_tz = timezone.utc
+            cls._cached_tz = UTC
         return cls._cached_tz
 
     def formatTime(self, record, datefmt=None):
@@ -103,7 +104,7 @@ class MultiProcessRotatingFileHandler(RotatingFileHandler):
     cannot rename a file that is held open there.
     """
 
-    def __init__(self, filename: str, maxBytes: int = 0, backupCount: int = 0, encoding: Optional[str] = None):
+    def __init__(self, filename: str, maxBytes: int = 0, backupCount: int = 0, encoding: str | None = None):
         super().__init__(filename, maxBytes=maxBytes, backupCount=backupCount, encoding=encoding, delay=True)
         self.lock_path = self.baseFilename + ".lock"
         self.next_retention_check = 0.0
@@ -145,7 +146,7 @@ class MultiProcessRotatingFileHandler(RotatingFileHandler):
         size = os.fstat(self.stream.fileno()).st_size
         if size == 0:
             return False
-        msg = "%s\n" % self.format(record)
+        msg = f"{self.format(record)}\n"
         return size + len(msg.encode(self.encoding or "utf-8")) >= self.maxBytes
 
     def _due_retention_days(self) -> int:
@@ -177,16 +178,16 @@ class MultiProcessRotatingFileHandler(RotatingFileHandler):
             self.handleError(record)
 
 
-def _record_time(line: bytes) -> Optional[float]:
+def _record_time(line: bytes) -> float | None:
     """Epoch time of a log line that starts a record, None for continuation lines."""
     try:
         stamp = line[:_TIMESTAMP_LENGTH].decode('ascii')
         return datetime.strptime(stamp, _TIMESTAMP_FORMAT).timestamp()
-    except (UnicodeDecodeError, ValueError):
+    except UnicodeDecodeError, ValueError:
         return None
 
 
-def _oldest_record_time(path: str) -> Optional[float]:
+def _oldest_record_time(path: str) -> float | None:
     """Time of the first timestamped line in ``path``, None when absent or unreadable."""
     try:
         with open(path, 'rb') as handle:
@@ -271,7 +272,7 @@ def _current_retention_days() -> int:
         return 0  # a broken provider must never break logging
 
 
-def set_log_retention_provider(provider: Optional[Callable[[], int]]) -> None:
+def set_log_retention_provider(provider: Callable[[], int] | None) -> None:
     """Register the callable returning the retention in days (0 = size-based rotation only)."""
     global _retention_days_provider
     _retention_days_provider = provider
@@ -279,7 +280,7 @@ def set_log_retention_provider(provider: Optional[Callable[[], int]]) -> None:
         _file_handler.next_retention_check = 0.0  # type: ignore[attr-defined]
 
 
-def apply_log_retention(days: Optional[int] = None) -> int:
+def apply_log_retention(days: int | None = None) -> int:
     """Apply the retention now (e.g. right after the setting changed); return how many files changed."""
     days = _current_retention_days() if days is None else max(0, int(days))
     if days <= 0:
@@ -320,7 +321,7 @@ def _get_log_level():
     return _level_number(LOG_LEVEL, logging.INFO)
 
 
-def setup_logger(name: str, include_console: bool = True, console_level: Optional[str] = None) -> logging.Logger:
+def setup_logger(name: str, include_console: bool = True, console_level: str | None = None) -> logging.Logger:
     """
     Set up a logger with standard configuration for MyAstroBoard
 
@@ -379,7 +380,7 @@ def setup_logger(name: str, include_console: bool = True, console_level: Optiona
     return logger
 
 
-def get_logger(name: str, include_console: bool = True, console_level: Optional[str] = None) -> logging.Logger:
+def get_logger(name: str, include_console: bool = True, console_level: str | None = None) -> logging.Logger:
     """
     Get or create a logger with standard configuration
 
@@ -428,13 +429,13 @@ def get_current_console_log_level() -> str:
     return CONSOLE_LOG_LEVEL
 
 
-def env_log_level(variable: str) -> Optional[str]:
+def env_log_level(variable: str) -> str | None:
     """Level set by the ``LOG_LEVEL``/``CONSOLE_LOG_LEVEL`` environment variable, None when unset or invalid."""
     value = os.environ.get(variable, '').strip().upper()
     return value if value in VALID_LOG_LEVELS else None
 
 
-def set_log_level_provider(provider: Optional[Callable[[], tuple]]) -> None:
+def set_log_level_provider(provider: Callable[[], tuple] | None) -> None:
     """Register the callable returning the UI-chosen ``(file_level, console_level)``, and apply it."""
     global _level_provider, _next_level_refresh
     _level_provider = provider

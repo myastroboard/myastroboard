@@ -9,7 +9,7 @@ if 'psutil' not in sys.modules:
     sys.modules['psutil'] = types.ModuleType('psutil')
 
 from observation import visibility_calendar  # type: ignore[import-not-found]
-from skytonight.skytonight_models import SkyTonightTarget, SkyTonightCoordinates  # type: ignore[import-not-found]
+from skytonight.skytonight_models import SkyTonightCoordinates, SkyTonightTarget  # type: ignore[import-not-found]
 
 _YEAR = 2026
 _PARIS = {
@@ -150,6 +150,7 @@ def test_future_year_computes_all_months_despite_stale_iers(monkeypatch):
     """A year past the ~1-year IERS horizon must still return all 12 months - the
     calendar mutes the degraded-accuracy error the way the eclipse services do."""
     from datetime import date
+
     from astropy.utils import iers
 
     monkeypatch.setattr(iers.conf, 'iers_degraded_accuracy', 'error')
@@ -165,6 +166,7 @@ def test_current_year_does_not_mute_iers_process_wide(monkeypatch):
     """The IERS degraded-accuracy mute is process-wide, so it must not be entered for
     the common current/previous-year request - only for years past the IERS horizon."""
     from datetime import date
+
     from astropy.utils import iers
 
     entered = {'muted': False}
@@ -360,7 +362,6 @@ class TestNightContextSplit:
 
 
 class TestDarkHoursByMonth:
-
     def _location(self):
         return {'id': 'loc-dark', 'latitude': 48.0, 'longitude': 2.0, 'timezone': 'Europe/Paris'}
 
@@ -419,7 +420,6 @@ class TestDarkHoursByMonth:
 
 
 class TestNextVisibilityBatch:
-
     def _location(self):
         return {'id': 'loc-batch', 'latitude': 48.0, 'longitude': 2.0, 'timezone': 'Europe/Paris'}
 

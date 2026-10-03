@@ -14,8 +14,8 @@ from blueprints import skytonight_api as skytonight_api_module  # type: ignore[i
 from utils.auth import user_manager  # type: ignore[import-not-found]
 
 app = app_module.app
-from skytonight.skytonight_models import SkyTonightTarget  # type: ignore[import-not-found]
 from observation import visibility_calendar as visibility_calendar_module  # type: ignore[import-not-found]
+from skytonight.skytonight_models import SkyTonightTarget  # type: ignore[import-not-found]
 
 
 @pytest.fixture

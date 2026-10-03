@@ -29,8 +29,9 @@ import os
 import sys
 import threading
 import time
-from datetime import datetime, timezone
-from typing import Any, Callable, Dict, List, Optional
+from collections.abc import Callable
+from datetime import UTC, datetime
+from typing import Any
 
 from connectors.mqtt_connector import MqttConnector
 from utils.connector_secrets import load_secrets
@@ -61,14 +62,14 @@ _ACTIONS = ("publish", "remove")
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
-def _iso(dt: Optional[datetime]) -> Optional[str]:
+def _iso(dt: datetime | None) -> str | None:
     return dt.isoformat(timespec="seconds") if dt else None
 
 
-def _write_json(path: str, payload: Dict[str, Any]) -> bool:
+def _write_json(path: str, payload: dict[str, Any]) -> bool:
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         tmp = f"{path}.tmp"
@@ -81,12 +82,12 @@ def _write_json(path: str, payload: Dict[str, Any]) -> bool:
         return False
 
 
-def _read_json(path: str) -> Optional[Dict[str, Any]]:
+def _read_json(path: str) -> dict[str, Any] | None:
     try:
-        with open(path, "r", encoding="utf-8") as handle:
+        with open(path, encoding="utf-8") as handle:
             data = json.load(handle)
         return data if isinstance(data, dict) else None
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return None
 
 
@@ -102,7 +103,7 @@ def request_action(action: str) -> bool:
     return _write_json(TRIGGER_FILE, {"action": action, "requested_at": _iso(_now())})
 
 
-def _consume_trigger() -> Optional[str]:
+def _consume_trigger() -> str | None:
     data = _read_json(TRIGGER_FILE)
     if data is None and not os.path.exists(TRIGGER_FILE):
         return None
@@ -114,7 +115,7 @@ def _consume_trigger() -> Optional[str]:
     return action if action in _ACTIONS else None
 
 
-def default_status() -> Dict[str, Any]:
+def default_status() -> dict[str, Any]:
     return {
         "enabled": False,
         "configured": False,
@@ -132,7 +133,7 @@ def default_status() -> Dict[str, Any]:
     }
 
 
-def read_status() -> Dict[str, Any]:
+def read_status() -> dict[str, Any]:
     """The last status the publisher thread wrote, or an idle default."""
     status = default_status()
     stored = _read_json(STATUS_FILE)
@@ -151,9 +152,9 @@ class MqttPublisher:
 
     def __init__(
         self,
-        client_factory: Optional[Callable[[str], Any]] = None,
-        config_loader: Optional[Callable[[], Dict[str, Any]]] = None,
-        clock: Optional[Callable[[], datetime]] = None,
+        client_factory: Callable[[str], Any] | None = None,
+        config_loader: Callable[[], dict[str, Any]] | None = None,
+        clock: Callable[[], datetime] | None = None,
     ):
         self._client_factory = client_factory or self._default_client_factory
         self._config_loader = config_loader or self._default_config_loader
@@ -167,26 +168,26 @@ class MqttPublisher:
         self._client: Any = None
         self._connected = False
         self._force_full = False
-        self._connector: Optional[MqttConnector] = None
+        self._connector: MqttConnector | None = None
         # Kept off the connector object on purpose (see _refresh_connector): the connector's
         # own config is used for non-secret reads (host, client id, topics) throughout this
         # class, and mixing the password into that same dict makes every one of those reads
         # indistinguishable from a credential to a static data-flow analysis.
         self._password: str = ""
-        self._config: Dict[str, Any] = {}
+        self._config: dict[str, Any] = {}
         self._source_signature: Any = None
         self._next_due: float = 0.0
         self._last_full: float = 0.0
-        self._published: Dict[str, str] = {}
-        self._image_ids: Dict[str, str] = {}
-        self._manifest: Dict[str, List[str]] = {"discovery": [], "state": [], "image": []}
-        self._generated_client_id: Optional[str] = None
+        self._published: dict[str, str] = {}
+        self._image_ids: dict[str, str] = {}
+        self._manifest: dict[str, list[str]] = {"discovery": [], "state": [], "image": []}
+        self._generated_client_id: str | None = None
         self._messages_total = 0
-        self._last_publish: Optional[datetime] = None
-        self._last_error: Optional[str] = None
-        self._last_error_at: Optional[datetime] = None
-        self._devices_summary: List[Dict[str, Any]] = []
-        self._last_status_json: Optional[str] = None
+        self._last_publish: datetime | None = None
+        self._last_error: str | None = None
+        self._last_error_at: datetime | None = None
+        self._devices_summary: list[dict[str, Any]] = []
+        self._last_status_json: str | None = None
         self._load_manifest()
 
     # ------------------------------------------------------------------
@@ -201,7 +202,7 @@ class MqttPublisher:
         return mqtt.Client(CallbackAPIVersion.VERSION2, client_id=client_id, protocol=mqtt.MQTTv311)
 
     @staticmethod
-    def _default_config_loader() -> Dict[str, Any]:
+    def _default_config_loader() -> dict[str, Any]:
         from utils.repo_config import load_config
 
         return load_config()
@@ -273,7 +274,7 @@ class MqttPublisher:
             except Exception as exc:
                 try:
                     logger.error(f"Error releasing MQTT publisher lock: {exc}")
-                except (ValueError, OSError):
+                except ValueError, OSError:
                     pass  # log stream already closed during shutdown
             finally:
                 self._lock_file = None
@@ -496,9 +497,9 @@ class MqttPublisher:
         info = {"last_publish": now}
         devices = mqtt_payloads.collect(connector, self._config, info, now)
 
-        desired: Dict[str, set] = {"discovery": set(), "state": set(), "image": set()}
+        desired: dict[str, set] = {"discovery": set(), "state": set(), "image": set()}
         discovery_on = connector.discovery_enabled()
-        summary: List[Dict[str, Any]] = []
+        summary: list[dict[str, Any]] = []
         for device in devices:
             if discovery_on:
                 payload = json.dumps(device.discovery, sort_keys=True, separators=(",", ":"))
@@ -520,7 +521,7 @@ class MqttPublisher:
         self._last_publish = now
         logger.debug("MQTT publisher: cycle done, %d device(s), full=%s", len(devices), force_full)
 
-    def _publish_image(self, device, desired: Dict[str, set], force_full: bool) -> None:
+    def _publish_image(self, device, desired: dict[str, set], force_full: bool) -> None:
         topic = device.image_topic
         if not device.image_id or device.image_loader is None:
             return  # no picture: the topic is not desired, cleanup clears a previous one
@@ -536,7 +537,7 @@ class MqttPublisher:
         elif previously:
             desired["image"].add(topic)  # keep the last good picture rather than clearing it
 
-    def _cleanup(self, desired: Dict[str, set]) -> None:
+    def _cleanup(self, desired: dict[str, set]) -> None:
         for kind, topics in self._manifest.items():
             for topic in topics:
                 if topic in desired.get(kind, set()):
@@ -546,7 +547,7 @@ class MqttPublisher:
                 self._image_ids.pop(topic, None)
                 logger.info("MQTT publisher: cleared retained topic %s", topic)
 
-    def _remove_all(self, connector: Optional[MqttConnector]) -> None:
+    def _remove_all(self, connector: MqttConnector | None) -> None:
         """Purge every topic the manifest knows about, connecting first if needed."""
         if connector is None:
             return
@@ -586,7 +587,7 @@ class MqttPublisher:
         self._generated_client_id = str(cid) if isinstance(cid, str) and cid else None
 
     def _save_manifest(self) -> None:
-        payload: Dict[str, Any] = dict(self._manifest)
+        payload: dict[str, Any] = dict(self._manifest)
         payload["image_ids"] = dict(self._image_ids)
         payload["client_id"] = self._generated_client_id
         payload["updated_at"] = _iso(self._clock())
@@ -597,7 +598,7 @@ class MqttPublisher:
         self._last_error_at = self._clock()
         logger.warning("MQTT publisher: %s", message)
 
-    def status(self) -> Dict[str, Any]:
+    def status(self) -> dict[str, Any]:
         connector = self._connector
         status = default_status()
         if connector is not None:
@@ -663,7 +664,7 @@ def _relevant_config(connector: MqttConnector, password: str) -> str:
 # Module-level singleton, like push_scheduler
 # ---------------------------------------------------------------------------
 
-_publisher: Optional[MqttPublisher] = None
+_publisher: MqttPublisher | None = None
 _publisher_lock = threading.Lock()
 
 

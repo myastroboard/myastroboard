@@ -10,8 +10,9 @@ files.
 import json
 import os
 import threading
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Any, Iterator, Optional
+from typing import Any
 
 from sqlalchemy import event, select
 from sqlalchemy.engine import Connection, Engine, create_engine
@@ -25,8 +26,8 @@ DATABASE_FILENAME = 'myastroboard.db'
 # Writers wait this long for another worker's write transaction before failing.
 BUSY_TIMEOUT_MS = 10000
 
-_engine: Optional[Engine] = None
-_engine_url: Optional[str] = None
+_engine: Engine | None = None
+_engine_url: str | None = None
 _engine_mutex = threading.Lock()
 _local = threading.local()
 _wal_warning_logged = False
@@ -115,7 +116,7 @@ def get_engine() -> Engine:
         return _engine
 
 
-def configure_engine(url: Optional[str], enforce_foreign_keys: bool = True) -> Engine:
+def configure_engine(url: str | None, enforce_foreign_keys: bool = True) -> Engine:
     """Replace the engine (tests point it at a temporary database). ``None`` resets to the default.
 
     ``enforce_foreign_keys=False`` exists for the test suite only, where most tests store
@@ -136,7 +137,7 @@ def configure_engine(url: Optional[str], enforce_foreign_keys: bool = True) -> E
     return _engine
 
 
-def _current_connection() -> Optional[Connection]:
+def _current_connection() -> Connection | None:
     return getattr(_local, 'connection', None)
 
 

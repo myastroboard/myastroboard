@@ -21,7 +21,7 @@ import os
 import shutil
 import zipfile
 from dataclasses import dataclass, field
-from typing import IO, Any, Dict, List, Optional, Tuple
+from typing import IO, Any
 
 from sqlalchemy import select
 
@@ -44,7 +44,7 @@ _DOCUMENT_FOLDER_KINDS = {
 }
 
 
-def _binary_dirs() -> Dict[str, str]:
+def _binary_dirs() -> dict[str, str]:
     """Archive folder -> directory of the binary files shipped in the backup."""
     from observation import astrodex, observation_sessions
 
@@ -99,14 +99,14 @@ def write_backup(target: IO[bytes]) -> int:
 class RestorePlan:
     """What an archive contains, parsed and validated before anything is written."""
 
-    settings: Dict[str, Any] = field(default_factory=dict)
-    users: Optional[Dict[str, Dict[str, Any]]] = None
+    settings: dict[str, Any] = field(default_factory=dict)
+    users: dict[str, dict[str, Any]] | None = None
     # folder -> [(kind, user_id, doc_key, data)]
-    documents: Dict[str, List[Tuple[str, str, str, Dict[str, Any]]]] = field(default_factory=dict)
+    documents: dict[str, list[tuple[str, str, str, dict[str, Any]]]] = field(default_factory=dict)
     # archive folder -> [(zip member, sanitized relative parts)]
-    binaries: Dict[str, List[Tuple[zipfile.ZipInfo, List[str]]]] = field(default_factory=dict)
+    binaries: dict[str, list[tuple[zipfile.ZipInfo, list[str]]]] = field(default_factory=dict)
     # Why the archive cannot be restored (shown to the admin); nothing is written when set
-    error: Optional[str] = None
+    error: str | None = None
 
     @property
     def empty(self) -> bool:
@@ -116,7 +116,7 @@ class RestorePlan:
 @dataclass
 class RestoreReport:
     restored: int = 0
-    skipped: List[str] = field(default_factory=list)
+    skipped: list[str] = field(default_factory=list)
 
 
 # Returned by _load_json_member for a member that cannot be read or parsed
@@ -130,7 +130,7 @@ def _load_json_member(archive: zipfile.ZipFile, info: zipfile.ZipInfo) -> Any:
         return _UNREADABLE
 
 
-def _object_member_error(name: str, value: Any) -> Optional[str]:
+def _object_member_error(name: str, value: Any) -> str | None:
     if value is _UNREADABLE:
         return f'{name} is not valid JSON - archive may be corrupt'
     if not isinstance(value, dict):

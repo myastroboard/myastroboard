@@ -7,7 +7,7 @@ these tests never touch the shared temp DATA_DIR.
 
 import io
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
@@ -15,7 +15,7 @@ import pytest
 from connectors import mqtt_payloads as mp
 from connectors.mqtt_connector import MqttConnector
 
-NOW = datetime(2026, 9, 17, 20, 30, tzinfo=timezone.utc)
+NOW = datetime(2026, 9, 17, 20, 30, tzinfo=UTC)
 LOCATION = {"id": "loc-1", "name": "Backyard", "timezone": "Europe/Paris", "latitude": 48.8, "longitude": 2.3}
 
 
@@ -56,7 +56,6 @@ def no_skytonight(monkeypatch):
 
 
 class TestValueHelpers:
-
     def test_to_iso_localises_naive_report_strings(self):
         from zoneinfo import ZoneInfo
 
@@ -91,7 +90,7 @@ class TestDataAccessFallbacks:
     source (a corrupt cache, a missing package) must never take the whole publish down."""
 
     def test_tz_falls_back_to_utc_for_an_invalid_name(self):
-        assert mp._tz("Not/A/Real/Zone") == timezone.utc
+        assert mp._tz("Not/A/Real/Zone") == UTC
 
     def test_parse_dt_returns_none_when_the_iso_string_cannot_be_reparsed(self, monkeypatch):
         monkeypatch.setattr(mp, "to_iso", lambda value, tz=None: "not-actually-iso")
@@ -136,7 +135,6 @@ class TestDataAccessFallbacks:
 
 
 class TestAssembly:
-
     def test_sensor_and_binary_sensor_specs(self):
         key, spec = mp.sensor(
             "score",
@@ -229,7 +227,6 @@ class TestAssembly:
 
 
 class TestBoardDevice:
-
     def test_state_reflects_version_update_scheduler_and_publisher_info(self, caches, monkeypatch):
         from skytonight import skytonight_storage
 
@@ -382,7 +379,6 @@ def _plant_sky(caches, monkeypatch):
 
 
 class TestLocationDevice:
-
     def test_no_location_module_enabled_means_no_device(self, caches):
         assert mp.build_location_device(_connector(["board_diagnostics"]), {}, LOCATION, NOW) is None
 
@@ -782,7 +778,6 @@ def user_sources(monkeypatch):
 
 
 class TestUserDevice:
-
     def test_requires_opt_in_and_an_enabled_module(self, user_sources):
         assert mp.build_user_device(_connector(["user_activity"]), {}, _user(opted_in=False), NOW) is None
         assert mp.build_user_device(_connector(["sky_conditions"]), {}, _user(), NOW) is None
@@ -824,7 +819,7 @@ class TestUserDevice:
         assert s["integration_hours_total"] == 1.8  # 30 x 120 s = 60 min + 45 min
         assert s["last_session_date"] == "2026-09-10"
         assert device.image_topic is None
-        for key, comp in device.discovery["cmps"].items():
+        for key in device.discovery["cmps"]:
             assert key in s, key
         assert device.discovery["cmps"]["plan_state"]["ops"] == mp.PLAN_STATE_OPTIONS
 
@@ -1095,7 +1090,6 @@ class TestUserDevice:
 
 
 class TestEncodeThumbnail:
-
     @staticmethod
     def _png(tmp_path, size=(3000, 2000)):
         from PIL import Image
@@ -1150,7 +1144,6 @@ class TestEncodeThumbnail:
 
 
 class TestCollect:
-
     def test_collects_locations_users_and_board_in_order(self, caches, no_skytonight, user_sources, monkeypatch):
         from utils import auth, repo_config
 
@@ -1231,7 +1224,6 @@ class TestCollect:
 
 
 class TestLongTermStatistics:
-
     def test_only_the_users_cumulative_counters_record_statistics(self):
         """Home Assistant keeps long-term statistics for every sensor with a state_class, and keeps
         them after the entity is removed. Ephemeris and forecast values must not opt in."""

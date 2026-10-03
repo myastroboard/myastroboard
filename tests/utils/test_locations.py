@@ -18,6 +18,7 @@ import pytest
 
 from cache import cache_store
 from utils import repo_config
+from utils.config_defaults import DEFAULT_LOCATION
 from utils.repo_config import (
     _ensure_locations,
     get_active_location,
@@ -28,7 +29,6 @@ from utils.repo_config import (
     get_user_location_prefs,
     new_location_preset,
 )
-from utils.config_defaults import DEFAULT_LOCATION
 
 
 class _FakeUser:

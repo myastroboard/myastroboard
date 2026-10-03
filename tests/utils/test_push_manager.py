@@ -25,6 +25,7 @@ def reset_vapid_cache():
 def test_push_manager_handles_missing_psutil(monkeypatch):
     monkeypatch.delitem(sys.modules, 'psutil', raising=False)
     import importlib
+
     from utils import push_manager
 
     importlib.reload(push_manager)
@@ -87,8 +88,9 @@ def test_regenerates_when_value_missing_required_keys(monkeypatch):
 
 
 def test_returns_cached_keys_without_regenerating(monkeypatch):
-    from utils import push_manager
     from unittest.mock import MagicMock
+
+    from utils import push_manager
 
     push_manager._vapid_keys = {'private_key': 'CACHED', 'public_key': 'CACHED_PUB'}
 
@@ -198,8 +200,9 @@ def test_send_push_serializes_payload_as_json(monkeypatch):
 
 def test_pem_to_raw_b64_converts_key(monkeypatch):
     """convert PEM EC key to raw base64url scalar."""
-    from utils import push_manager
     from unittest.mock import MagicMock
+
+    from utils import push_manager
 
     fake_key = MagicMock()
     fake_key.private_numbers.return_value.private_value = 12345678901234567890123456789012
@@ -226,8 +229,9 @@ def test_pem_to_raw_b64_converts_key(monkeypatch):
 
 def test_generate_keys_returns_base64_key_pair(monkeypatch):
     """_generate_keys produces private_key and public_key."""
-    from utils import push_manager
     from unittest.mock import MagicMock
+
+    from utils import push_manager
 
     fake_vapid = MagicMock()
     fake_vapid.private_key.private_numbers.return_value.private_value = int.from_bytes(b'\x01' * 32, 'big')
@@ -262,8 +266,7 @@ def test_generate_keys_returns_base64_key_pair(monkeypatch):
 
 def test_load_warns_when_vapid_contact_email_empty(monkeypatch):
     """empty vapid_contact_email → warning emitted once."""
-    from utils import push_manager
-    from utils import app_settings
+    from utils import app_settings, push_manager
 
     push_manager._VAPID_CONTACT_WARNING_EMITTED = False
     monkeypatch.setattr(
@@ -357,8 +360,7 @@ def test_worker_adopts_keys_another_worker_already_generated(monkeypatch):
 
 def test_vapid_contact_email_configured_skips_warning(monkeypatch):
     """VAPID contact email IS set → skip the warning block."""
-    from utils import push_manager
-    from utils import app_settings
+    from utils import app_settings, push_manager
 
     push_manager._VAPID_CONTACT_WARNING_EMITTED = False
 
@@ -379,8 +381,7 @@ def test_vapid_contact_email_configured_skips_warning(monkeypatch):
 
 def test_get_vapid_claims_email_already_has_mailto_prefix(monkeypatch):
     """Email already prefixed with 'mailto:' is returned unchanged."""
-    from utils import push_manager
-    from utils import app_settings
+    from utils import app_settings, push_manager
 
     monkeypatch.setattr(app_settings, 'get_app_settings', lambda: {'vapid_contact_email': 'mailto:admin@example.com'})
     result = push_manager.get_vapid_claims_email()
@@ -389,8 +390,7 @@ def test_get_vapid_claims_email_already_has_mailto_prefix(monkeypatch):
 
 def test_get_vapid_claims_email_already_has_https_prefix(monkeypatch):
     """Email starting with 'https://' is returned unchanged (URL contact form)."""
-    from utils import push_manager
-    from utils import app_settings
+    from utils import app_settings, push_manager
 
     monkeypatch.setattr(
         app_settings, 'get_app_settings', lambda: {'vapid_contact_email': 'https://example.com/contact'}
@@ -401,8 +401,7 @@ def test_get_vapid_claims_email_already_has_https_prefix(monkeypatch):
 
 def test_get_vapid_claims_email_plain_address_gets_mailto_prefix(monkeypatch):
     """Plain email address is prefixed with 'mailto:'."""
-    from utils import push_manager
-    from utils import app_settings
+    from utils import app_settings, push_manager
 
     monkeypatch.setattr(app_settings, 'get_app_settings', lambda: {'vapid_contact_email': 'user@example.com'})
     result = push_manager.get_vapid_claims_email()
@@ -411,8 +410,7 @@ def test_get_vapid_claims_email_plain_address_gets_mailto_prefix(monkeypatch):
 
 def test_get_vapid_claims_email_empty_returns_default(monkeypatch):
     """Empty contact email falls back to the default mailto:admin@localhost."""
-    from utils import push_manager
-    from utils import app_settings
+    from utils import app_settings, push_manager
 
     monkeypatch.setattr(app_settings, 'get_app_settings', lambda: {'vapid_contact_email': ''})
     result = push_manager.get_vapid_claims_email()
@@ -426,8 +424,7 @@ def test_get_vapid_claims_email_empty_returns_default(monkeypatch):
 
 def test_get_vapid_contact_status_not_set(monkeypatch):
     """Empty contact email reports not_set."""
-    from utils import push_manager
-    from utils import app_settings
+    from utils import app_settings, push_manager
 
     monkeypatch.setattr(app_settings, 'get_app_settings', lambda: {'vapid_contact_email': ''})
     result = push_manager.get_vapid_contact_status()
@@ -436,8 +433,7 @@ def test_get_vapid_contact_status_not_set(monkeypatch):
 
 def test_get_vapid_contact_status_localhost_domain(monkeypatch):
     """localhost domain is rejected as invalid."""
-    from utils import push_manager
-    from utils import app_settings
+    from utils import app_settings, push_manager
 
     monkeypatch.setattr(app_settings, 'get_app_settings', lambda: {'vapid_contact_email': 'admin@localhost'})
     result = push_manager.get_vapid_contact_status()
@@ -447,8 +443,7 @@ def test_get_vapid_contact_status_localhost_domain(monkeypatch):
 
 def test_get_vapid_contact_status_example_domain(monkeypatch):
     """example.com domain is rejected as invalid."""
-    from utils import push_manager
-    from utils import app_settings
+    from utils import app_settings, push_manager
 
     monkeypatch.setattr(app_settings, 'get_app_settings', lambda: {'vapid_contact_email': 'admin@example.com'})
     result = push_manager.get_vapid_contact_status()
@@ -458,8 +453,7 @@ def test_get_vapid_contact_status_example_domain(monkeypatch):
 
 def test_get_vapid_contact_status_valid_email(monkeypatch):
     """Valid production email domain returns ok=True."""
-    from utils import push_manager
-    from utils import app_settings
+    from utils import app_settings, push_manager
 
     monkeypatch.setattr(app_settings, 'get_app_settings', lambda: {'vapid_contact_email': 'admin@mysite.com'})
     result = push_manager.get_vapid_contact_status()
@@ -468,8 +462,7 @@ def test_get_vapid_contact_status_valid_email(monkeypatch):
 
 def test_get_vapid_contact_status_mailto_prefixed_valid(monkeypatch):
     """get_vapid_contact_status strips 'mailto:' prefix before checking domain."""
-    from utils import push_manager
-    from utils import app_settings
+    from utils import app_settings, push_manager
 
     monkeypatch.setattr(app_settings, 'get_app_settings', lambda: {'vapid_contact_email': 'mailto:admin@mysite.com'})
     result = push_manager.get_vapid_contact_status()
@@ -478,8 +471,7 @@ def test_get_vapid_contact_status_mailto_prefixed_valid(monkeypatch):
 
 def test_get_vapid_contact_status_subdomain_of_bad(monkeypatch):
     """Domain ending with .local is treated as invalid."""
-    from utils import push_manager
-    from utils import app_settings
+    from utils import app_settings, push_manager
 
     monkeypatch.setattr(app_settings, 'get_app_settings', lambda: {'vapid_contact_email': 'admin@server.local'})
     result = push_manager.get_vapid_contact_status()

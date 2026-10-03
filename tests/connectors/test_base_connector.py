@@ -17,7 +17,6 @@ class _MinimalConnector(BaseConnector):
 
 
 class TestDefaultHooks:
-
     def test_get_module_urls_defaults_to_empty(self):
         connector = _MinimalConnector({'url': 'http://x'})
         assert connector.get_module_urls() == {}

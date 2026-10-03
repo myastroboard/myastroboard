@@ -91,7 +91,7 @@ class MyAstroShineConnector(BaseConnector):
             ip_obj = ipaddress.ip_address(resolved_ip)
             if ip_obj.is_loopback or ip_obj.is_link_local or ip_obj.is_unspecified or ip_obj.is_multicast:
                 return {"reachable": False, "modules": {}, "error": "url host is not allowed"}
-        except (socket.gaierror, ValueError):
+        except socket.gaierror, ValueError:
             return {"reachable": False, "modules": {}, "error": "unable to resolve host"}
 
         safe_scheme = "https" if parsed.scheme == "https" else "http"

@@ -1,14 +1,13 @@
 """Tests for object_info.py - pure functions and mocked-network paths."""
 
 import os
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 import requests as _req_module
 
-from skytonight import skytonight_targets as _st_module  # needed for patching the locally-imported get_lookup_entry
-
 from observation import object_info as oi
+from skytonight import skytonight_targets as _st_module  # needed for patching the locally-imported get_lookup_entry
 
 # Captured at import time, before the autouse fixture below mocks these out, so tests
 # that need the *real* disk-persistence behaviour can restore them explicitly.
@@ -953,7 +952,6 @@ class TestWikipediaWithFallbackNonCandidates:
 
 
 class TestSimbadBackoff:
-
     def test_failure_triggers_backoff_for_subsequent_calls(self):
         with patch("observation.object_info.requests.get", side_effect=_req_module.RequestException("down")):
             assert oi._simbad_query("SELECT * FROM basic") is None
@@ -980,7 +978,6 @@ class TestSimbadBackoff:
 
 
 class TestWikipediaBackoff:
-
     def test_failure_triggers_backoff_for_subsequent_calls(self):
         with patch("observation.object_info.requests.get", side_effect=_req_module.RequestException("down")):
             assert oi._get_wikipedia_summary("M 31") is None
@@ -1001,7 +998,6 @@ class TestWikipediaBackoff:
 
 
 class TestHips2fitsBackoff:
-
     def test_failure_triggers_backoff_for_subsequent_calls(self, tmp_path):
         with patch.object(oi, 'OBJECT_IMAGE_CACHE_DIR', str(tmp_path)):
             with patch("observation.object_info.requests.get", side_effect=_req_module.RequestException("down")):

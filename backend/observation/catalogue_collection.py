@@ -11,7 +11,8 @@ server-side because the largest catalogues (OpenNGC ~13k, OpenIC ~5.5k, Abell cl
 """
 
 import re
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from collections.abc import Sequence
+from typing import Any
 
 from observation import object_info
 from observation.astrodex import _extract_name_candidates
@@ -38,7 +39,7 @@ _INCLUDED_CATEGORIES = ('deep_sky',)
 
 # Display order of the catalogue picker: the small, completable sets first, the reference
 # mega-catalogues last. Anything not listed is appended alphabetically.
-_CATALOGUE_DISPLAY_ORDER: Tuple[str, ...] = (
+_CATALOGUE_DISPLAY_ORDER: tuple[str, ...] = (
     BODIES_CATALOGUE,
     'Messier',
     'Caldwell',
@@ -71,7 +72,7 @@ _NATURAL_CHUNKS = re.compile(r'(\d+)')
 # The Sun is not part of the built dataset (SkyTonight tracks it as the source of
 # twilight, never as a target), but it is very much something an astrophotographer
 # catches, so the Bodies collection carries it as a synthetic entry.
-_SUN_ENTRY: Dict[str, Any] = {
+_SUN_ENTRY: dict[str, Any] = {
     'target_id': 'body-sun',
     'catalogue_id': 'Sun',
     'preferred_name': 'Sun',
@@ -86,7 +87,7 @@ _SUN_ENTRY: Dict[str, Any] = {
 }
 
 
-def _natural_sort_key(value: str) -> Tuple:
+def _natural_sort_key(value: str) -> tuple:
     """Return a tuple that orders identifiers the way a human reads them ("M 9" < "M 10")."""
     parts = _NATURAL_CHUNKS.split(str(value or '').strip().casefold())
     # Digit runs become ints; the (0, int) / (1, str) prefix keeps the tuple comparable.
@@ -99,13 +100,13 @@ def _body_slug(target_id: str) -> str:
     return slug[len('body-') :] if slug.startswith('body-') else slug
 
 
-def _body_image_url(target_id: str) -> Optional[str]:
+def _body_image_url(target_id: str) -> str | None:
     """Return the bundled illustration for a solar-system body, or None if there is none."""
     slug = _body_slug(target_id)
     return f'/static/img/bodies/{slug}.svg' if re.fullmatch(r'[a-z]+', slug) else None
 
 
-def _target_key_candidates(entry: Dict[str, Any]) -> set:
+def _target_key_candidates(entry: dict[str, Any]) -> set:
     """Return the normalized names an Astrodex item may have been saved under for this object."""
     candidates = {entry.get('catalogue_id'), entry.get('preferred_name')}
     candidates.update(entry.get('aliases') or [])
@@ -131,13 +132,13 @@ def _target_all_keys(target: Any) -> set:
     return {key for key in (_normalize_key(value) for value in candidates) if key}
 
 
-def build_astrodex_index(items: Sequence[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+def build_astrodex_index(items: Sequence[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     """Map every normalized name an Astrodex item is known by to that item.
 
     Built once per request so annotating a 13k-object catalogue stays a set lookup per
     object rather than a repeated scan of the user's collection.
     """
-    index: Dict[str, Dict[str, Any]] = {}
+    index: dict[str, dict[str, Any]] = {}
     for item in items:
         if not isinstance(item, dict):
             continue
@@ -154,7 +155,7 @@ def build_astrodex_index(items: Sequence[Dict[str, Any]]) -> Dict[str, Dict[str,
     return index
 
 
-def _main_picture_filename(item: Dict[str, Any]) -> Optional[str]:
+def _main_picture_filename(item: dict[str, Any]) -> str | None:
     """Return the cover picture filename of an Astrodex item, or None when it has no picture."""
     pictures = item.get('pictures') if isinstance(item, dict) else None
     if not isinstance(pictures, list) or not pictures:
@@ -166,7 +167,7 @@ def _main_picture_filename(item: Dict[str, Any]) -> Optional[str]:
     return filename or None
 
 
-def _difficulty_for(magnitude: Optional[float], size_arcmin: Optional[float]) -> Optional[str]:
+def _difficulty_for(magnitude: float | None, size_arcmin: float | None) -> str | None:
     """Return the beginner/intermediate/advanced label for an object, or None if not rateable.
 
     Reuses SkyTonight's own scorer, which derives the label from magnitude and apparent size
@@ -188,7 +189,7 @@ def _difficulty_for(magnitude: Optional[float], size_arcmin: Optional[float]) ->
     return compute_difficulty_score(probe)[1]
 
 
-def _normalize_target(target: Any, catalogue: str) -> Optional[Dict[str, Any]]:
+def _normalize_target(target: Any, catalogue: str) -> dict[str, Any] | None:
     """Flatten a SkyTonightTarget (or its dict form) into the fields a collection card needs."""
     is_dict = isinstance(target, dict)
 
@@ -230,12 +231,12 @@ def _normalize_target(target: Any, catalogue: str) -> Optional[Dict[str, Any]]:
     }
 
 
-def _catalogue_entries(catalogue: str) -> List[Dict[str, Any]]:
+def _catalogue_entries(catalogue: str) -> list[dict[str, Any]]:
     """Return every dataset object carrying an identifier in ``catalogue``."""
     dataset = skytonight_targets.load_targets_dataset()
     targets = dataset.get('targets', []) if isinstance(dataset, dict) else []
 
-    entries: List[Dict[str, Any]] = []
+    entries: list[dict[str, Any]] = []
     for target in targets:
         category = target.get('category') if isinstance(target, dict) else getattr(target, 'category', '')
         if catalogue == BODIES_CATALOGUE:
@@ -253,13 +254,13 @@ def _catalogue_entries(catalogue: str) -> List[Dict[str, Any]]:
 
 
 def _annotate(
-    entry: Dict[str, Any],
-    astrodex_index: Dict[str, Dict[str, Any]],
-    wishlist_index: Optional[set] = None,
-) -> Dict[str, Any]:
+    entry: dict[str, Any],
+    astrodex_index: dict[str, dict[str, Any]],
+    wishlist_index: set | None = None,
+) -> dict[str, Any]:
     """Attach caught state, wishlist state and the card image to a normalized entry."""
     candidates = _target_key_candidates(entry)
-    matched: Optional[Dict[str, Any]] = None
+    matched: dict[str, Any] | None = None
     for key in candidates:
         matched = astrodex_index.get(key)
         if matched is not None:
@@ -267,8 +268,8 @@ def _annotate(
 
     caught = matched is not None
     picture_count = 0
-    image_url: Optional[str] = None
-    image_source: Optional[str] = None
+    image_url: str | None = None
+    image_source: str | None = None
 
     if matched is not None:
         pictures = matched.get('pictures')
@@ -303,7 +304,7 @@ def _annotate(
     }
 
 
-def list_catalogues(astrodex_items: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def list_catalogues(astrodex_items: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
     """Return every selectable catalogue with its object count and how many are caught.
 
     Counted in a single pass over the dataset: an object belongs to as many catalogues as
@@ -314,8 +315,8 @@ def list_catalogues(astrodex_items: Sequence[Dict[str, Any]]) -> List[Dict[str, 
     dataset = skytonight_targets.load_targets_dataset()
     targets = dataset.get('targets', []) if isinstance(dataset, dict) else []
 
-    totals: Dict[str, int] = {}
-    caught_counts: Dict[str, int] = {}
+    totals: dict[str, int] = {}
+    caught_counts: dict[str, int] = {}
 
     for target in targets:
         is_dict = isinstance(target, dict)
@@ -346,7 +347,7 @@ def list_catalogues(astrodex_items: Sequence[Dict[str, Any]]) -> List[Dict[str, 
 
 
 def _matches_filters(
-    card: Dict[str, Any],
+    card: dict[str, Any],
     search: str,
     object_type: str,
     constellation: str,
@@ -371,10 +372,10 @@ def _matches_filters(
     return True
 
 
-def _sort_cards(cards: List[Dict[str, Any]], sort: str, descending: bool) -> List[Dict[str, Any]]:
+def _sort_cards(cards: list[dict[str, Any]], sort: str, descending: bool) -> list[dict[str, Any]]:
     """Order cards by the requested field, always tie-breaking on the catalogue identifier."""
 
-    def tiebreak(card: Dict[str, Any]) -> Tuple:
+    def tiebreak(card: dict[str, Any]) -> tuple:
         return _natural_sort_key(card['catalogue_id'])
 
     # Objects carrying no value for the sorted field have no rank, so they stay grouped at
@@ -404,7 +405,7 @@ def _sort_cards(cards: List[Dict[str, Any]], sort: str, descending: bool) -> Lis
 
 def get_collection_page(
     catalogue: str,
-    astrodex_items: Sequence[Dict[str, Any]],
+    astrodex_items: Sequence[dict[str, Any]],
     page: int = 0,
     page_size: int = DEFAULT_PAGE_SIZE,
     sort: str = 'catalogue_id',
@@ -414,8 +415,8 @@ def get_collection_page(
     constellation: str = '',
     caught: str = 'all',
     difficulty: str = '',
-    wishlist_index: Optional[set] = None,
-) -> Dict[str, Any]:
+    wishlist_index: set | None = None,
+) -> dict[str, Any]:
     """Return one page of a catalogue's cards plus the counters and filter options around it.
 
     ``types`` and ``constellations`` are computed over the whole catalogue, not the current

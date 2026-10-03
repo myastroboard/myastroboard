@@ -1,7 +1,8 @@
 """Tests for _determine_sky_period and get_sky_widget_api."""
 
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
+
 import pytest
 
 # ---------------------------------------------------------------------------
@@ -69,7 +70,7 @@ class TestDetermineSkySeriod:
     # ── Invalid timezone falls back to UTC ───────────────────────────────
 
     def test_invalid_timezone_falls_back_to_utc(self):
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         # Astronomical night: dusk 2h ago, dawn 2h from now
         sd = _make_sun_data(
             astronomical_dusk=_fmt(now - timedelta(hours=2)),
@@ -96,7 +97,7 @@ class TestDetermineSkySeriod:
     # ── Astronomical night ───────────────────────────────────────────────
 
     def test_astronomical_night(self):
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sd = _make_sun_data(
             astronomical_dusk=_fmt(now - timedelta(hours=2)),
             astronomical_dawn=_fmt(now + timedelta(hours=2)),
@@ -108,7 +109,7 @@ class TestDetermineSkySeriod:
 
     def test_astronomical_night_boundary_exact_dusk(self):
         """now == astro_dusk (==) still is astronomical_night."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sd = _make_sun_data(
             astronomical_dusk=_fmt(now),
             astronomical_dawn=_fmt(now + timedelta(hours=4)),
@@ -119,7 +120,7 @@ class TestDetermineSkySeriod:
     # ── Astronomical twilight (dusk side) ───────────────────────────────
 
     def test_astronomical_twilight_dusk(self):
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sd = _make_sun_data(
             nautical_dusk=_fmt(now - timedelta(hours=1)),
             astronomical_dusk=_fmt(now + timedelta(hours=1)),
@@ -132,7 +133,7 @@ class TestDetermineSkySeriod:
     # ── Astronomical twilight (dawn side) ───────────────────────────────
 
     def test_astronomical_twilight_dawn(self):
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sd = _make_sun_data(
             astronomical_dawn=_fmt(now - timedelta(hours=1)),
             nautical_dawn=_fmt(now + timedelta(hours=1)),
@@ -145,7 +146,7 @@ class TestDetermineSkySeriod:
     # ── Nautical twilight (dusk side) ───────────────────────────────────
 
     def test_nautical_twilight_dusk(self):
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sd = _make_sun_data(
             civil_dusk=_fmt(now - timedelta(hours=1)),
             nautical_dusk=_fmt(now + timedelta(hours=1)),
@@ -158,7 +159,7 @@ class TestDetermineSkySeriod:
     # ── Nautical twilight (dawn side) ───────────────────────────────────
 
     def test_nautical_twilight_dawn(self):
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sd = _make_sun_data(
             nautical_dawn=_fmt(now - timedelta(hours=1)),
             civil_dawn=_fmt(now + timedelta(hours=1)),
@@ -171,7 +172,7 @@ class TestDetermineSkySeriod:
     # ── Civil twilight (dusk side) ──────────────────────────────────────
 
     def test_civil_twilight_dusk(self):
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sd = _make_sun_data(
             sunset=_fmt(now - timedelta(minutes=30)),
             civil_dusk=_fmt(now + timedelta(minutes=30)),
@@ -184,7 +185,7 @@ class TestDetermineSkySeriod:
     # ── Civil twilight (dawn side) ──────────────────────────────────────
 
     def test_civil_twilight_dawn(self):
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sd = _make_sun_data(
             civil_dawn=_fmt(now - timedelta(minutes=30)),
             sunrise=_fmt(now + timedelta(minutes=30)),
@@ -197,7 +198,7 @@ class TestDetermineSkySeriod:
     # ── Day ─────────────────────────────────────────────────────────────
 
     def test_day_sunset_in_future(self):
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sd = _make_sun_data(
             sunset=_fmt(now + timedelta(hours=3)),
         )
@@ -208,7 +209,7 @@ class TestDetermineSkySeriod:
 
     def test_day_no_sunset_civil_dusk_in_future(self):
         """sunset absent but civil_dusk is upcoming → still day."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sd = _make_sun_data(
             civil_dusk=_fmt(now + timedelta(hours=2)),
         )
@@ -219,7 +220,7 @@ class TestDetermineSkySeriod:
 
     def test_day_fallback_all_times_past(self):
         """All times in the past → day fallback, secs is None."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sd = _make_sun_data(
             sunset=_fmt(now - timedelta(hours=6)),
             civil_dusk=_fmt(now - timedelta(hours=5)),
@@ -238,7 +239,7 @@ class TestDetermineSkySeriod:
 
     def test_secs_clamps_to_zero_when_past(self):
         """secs() uses max(0, ...) — test with a dawn that just passed."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         # astro night ended 5 minutes ago (astro_dawn in past), nautical_dawn future
         sd = _make_sun_data(
             astronomical_dawn=_fmt(now - timedelta(minutes=5)),
@@ -285,8 +286,9 @@ class TestSkyWidgetApi:
     }
 
     def _setup_sun_cache(self, monkeypatch, sun_data):
-        from cache import cache_store as cs
         import time as _time
+
+        from cache import cache_store as cs
 
         entry = cs.get_location_cache_entry("sun_report", self._LOC_ID)
         entry["data"] = sun_data
@@ -295,8 +297,9 @@ class TestSkyWidgetApi:
         entry["timestamp"] = _time.time() + 60
 
     def _setup_astro_cache(self, current_conditions):
-        from cache import cache_store as cs
         import time as _time
+
+        from cache import cache_store as cs
 
         entry = cs.get_location_cache_entry("astro_weather", self._LOC_ID)
         entry["data"] = {"current_conditions": current_conditions} if current_conditions is not None else None
@@ -304,7 +307,7 @@ class TestSkyWidgetApi:
 
     def test_happy_path_returns_json(self, client_admin, monkeypatch):
         """Valid cache + valid conditions → 200 with all expected keys."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sd = _make_sun_data(
             astronomical_dusk=_fmt(now - timedelta(hours=2)),
             astronomical_dawn=_fmt(now + timedelta(hours=2)),
@@ -341,8 +344,9 @@ class TestSkyWidgetApi:
     def test_sun_cache_empty_consults_shared_file(self, client_admin, monkeypatch):
         """v1.2: an empty in-memory slot falls back to the shared cache file
         (load_location_cache → load_shared_cache_entry with the keyed name)."""
-        from cache import cache_store as cs
         import time as _time
+
+        from cache import cache_store as cs
 
         # Empty in-memory slot for this location
         entry = cs.get_location_cache_entry("sun_report", self._LOC_ID)
@@ -384,8 +388,9 @@ class TestSkyWidgetApi:
 
     def test_score_is_none_when_astro_cache_malformed(self, client_admin, monkeypatch):
         """A malformed astro_weather payload is swallowed, score is None."""
-        from cache import cache_store as cs
         import time as _time
+
+        from cache import cache_store as cs
 
         self._setup_sun_cache(monkeypatch, _make_sun_data())
         entry = cs.get_location_cache_entry("astro_weather", self._LOC_ID)

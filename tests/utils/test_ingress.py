@@ -12,8 +12,7 @@ import pytest
 if 'psutil' not in sys.modules:
     sys.modules['psutil'] = types.ModuleType('psutil')
 
-from utils import app_settings
-from utils import ingress
+from utils import app_settings, ingress
 
 PREFIX = '/api/hassio_ingress/tok3n-XyZ'
 SUPERVISOR = {'REMOTE_ADDR': ingress.SUPERVISOR_IP}
@@ -58,7 +57,6 @@ def _supervisor_environ(**extra):
 
 
 class TestMiddleware:
-
     def test_request_without_ingress_header_is_untouched(self):
         seen = _run({'HTTP_X_FORWARDED_FOR': '198.51.100.1'})
         assert seen['SCRIPT_NAME'] == ''
@@ -148,7 +146,6 @@ class TestMiddleware:
 
 
 class TestClientIp:
-
     @pytest.mark.parametrize(
         'forwarded, expected',
         [
@@ -168,7 +165,6 @@ class TestClientIp:
 
 
 class TestEnabledFlag:
-
     @pytest.mark.parametrize('value, expected', [('1', True), ('true', True), ('ON', True), ('0', False), ('', False)])
     def test_flag_values(self, monkeypatch, value, expected):
         monkeypatch.setenv(ingress.INGRESS_ENV_FLAG, value)
@@ -200,7 +196,6 @@ def ingress_client(flask_app):
 
 
 class TestPagesUnderIngress:
-
     def test_login_page_prefixes_assets_and_skips_the_pwa_manifest(self, ingress_client):
         resp = ingress_client.get('/login', headers=INGRESS_HEADERS, environ_base=SUPERVISOR)
         html = resp.get_data(as_text=True)
@@ -243,7 +238,6 @@ class TestPagesUnderIngress:
 
 
 class TestSessionCookie:
-
     def test_ingress_cookie_has_its_own_name_and_the_prefix_as_path(self, flask_app):
         with flask_app.test_request_context(environ_overrides={'myastroboard.ingress': True, 'SCRIPT_NAME': PREFIX}):
             assert flask_app.session_interface.get_cookie_name(flask_app) == ingress.INGRESS_SESSION_COOKIE_NAME
@@ -273,7 +267,6 @@ class TestSessionCookie:
 
 
 class TestClientIpReachesTheApp:
-
     def test_failed_login_is_counted_against_the_real_client(self, ingress_client):
         """One ingress user's failed logins must not lock out every other ingress user."""
         from blueprints import auth as auth_bp_module
@@ -295,7 +288,6 @@ class TestClientIpReachesTheApp:
 
 
 class TestExternalBaseUrl:
-
     @pytest.fixture(autouse=True)
     def _settings(self, monkeypatch):
         self.saved = {}
@@ -334,7 +326,6 @@ class TestExternalBaseUrl:
 
 
 class TestAdminSetting:
-
     @pytest.fixture(autouse=True)
     def _store(self, monkeypatch):
         self.saved = {}

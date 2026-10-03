@@ -13,15 +13,15 @@ import uuid
 
 import pytest
 
-from observation import astrodex
-from observation import observation_sessions
+from observation import astrodex, observation_sessions, wishlist
 from observation import session_analytics as session_analytics_module
-from observation import wishlist
 from utils.auth import user_manager
 from utils.constants import MAX_WISHLIST_ITEMS
 
 if 'psutil' not in sys.modules:
     sys.modules['psutil'] = types.ModuleType('psutil')
+
+from datetime import UTC
 
 from app import app
 from blueprints import session_analytics as session_analytics_bp_module
@@ -120,7 +120,6 @@ class TestAuth:
 
 
 class TestSummary:
-
     def test_empty_account_returns_zeros_not_an_error(self, client):
         """A fresh install has nothing logged; the dashboard still has to render."""
         payload = client.get('/api/session-analytics/summary').get_json()
@@ -189,16 +188,15 @@ class TestObserverToday:
         assert session_analytics_bp_module._observer_today({'timezone': 'Pacific/Kiritimati'}) is not None
 
     def test_falls_back_to_utc_for_an_unusable_timezone(self):
-        from datetime import datetime, timezone as dt_timezone
+        from datetime import datetime
 
-        utc_today = datetime.now(dt_timezone.utc).date()
+        utc_today = datetime.now(UTC).date()
         assert session_analytics_bp_module._observer_today({'timezone': 'Not/AZone'}) == utc_today
         assert session_analytics_bp_module._observer_today({}) == utc_today
         assert session_analytics_bp_module._observer_today({'timezone': '  '}) == utc_today
 
 
 class TestSkyCoverage:
-
     def test_empty_account(self, client):
         payload = client.get('/api/session-analytics/sky-coverage').get_json()
         assert payload['points'] == []
@@ -240,7 +238,6 @@ class TestSkyCoverage:
 
 
 class TestConditions:
-
     def test_empty_account(self, client):
         payload = client.get('/api/session-analytics/conditions').get_json()
         assert payload['samples'] == []
@@ -332,7 +329,6 @@ def _post_target(test_client, **overrides):
 
 
 class TestWishlistAuth:
-
     def test_every_route_requires_login(self, isolated_wishlist):
         app.config['TESTING'] = True
         with app.test_client() as anonymous:
@@ -358,7 +354,6 @@ class TestWishlistAuth:
 
 
 class TestWishlistList:
-
     def test_empty_wishlist(self, wishlist_client):
         payload = wishlist_client.get('/api/wishlist').get_json()
         assert payload['items'] == []
@@ -459,7 +454,6 @@ class TestWishlistCapturedState:
 
 
 class TestWishlistAdd:
-
     def test_missing_targets_list_is_rejected(self, wishlist_client):
         assert wishlist_client.post('/api/wishlist', json={}).status_code == 400
         assert wishlist_client.post('/api/wishlist', json={'targets': []}).status_code == 400
@@ -507,7 +501,6 @@ class TestWishlistAdd:
 
 
 class TestWishlistUpdateDelete:
-
     def test_update_priority(self, wishlist_client):
         item_id = _post_target(wishlist_client).get_json()['data']['added'][0]['id']
         response = wishlist_client.patch(f'/api/wishlist/{item_id}', json={'priority': 'high'})
@@ -553,7 +546,6 @@ class TestWishlistUpdateDelete:
 
 
 class TestWishlistArchiveCaptured:
-
     def test_removes_only_captured_items(self, wishlist_client, admin_user_id):
         _post_target(wishlist_client, name='M 31')
         _post_target(wishlist_client, name='M 42')
@@ -636,7 +628,6 @@ class TestBestMonths:
 
 
 class TestWishlistVisibility:
-
     def test_visibility_is_attached_by_default(self, wishlist_client):
         _post_target(wishlist_client)
         payload = wishlist_client.get('/api/wishlist').get_json()

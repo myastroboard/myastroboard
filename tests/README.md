@@ -174,19 +174,20 @@ Tests can be integrated into CI/CD pipelines:
 import pytest
 from module_name import function_to_test
 
+
 class TestFunctionality:
     """Test specific functionality"""
-    
+
     def test_basic_case(self):
         """Test basic usage"""
         result = function_to_test(input_data)
         assert result == expected_output
-    
+
     def test_edge_case(self):
         """Test edge case"""
         result = function_to_test(edge_input)
         assert result is not None
-    
+
     def test_error_handling(self):
         """Test error handling"""
         with pytest.raises(ValueError):

@@ -4,16 +4,15 @@ Replaces the singleton JSON files (config.json, app_settings.json, ...). Every w
 bumps the ``setting:<key>`` store revision in the same transaction.
 """
 
-from datetime import datetime, timezone
-from typing import Any, Callable, Optional, Tuple, TypeVar
+from collections.abc import Callable
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.dialects.sqlite import insert
 
 from db import schema
 from db.engine import bump_revision, get_revision, read, transaction
-
-T = TypeVar('T')
 
 _table = schema.settings
 
@@ -22,7 +21,7 @@ def _store(key: str) -> str:
     return f'setting:{key}'
 
 
-def get_setting(key: str) -> Optional[Any]:
+def get_setting(key: str) -> Any | None:
     """The stored value, or ``None`` when the key was never written."""
     with read() as conn:
         return conn.execute(select(_table.c.data).where(_table.c.key == key)).scalar()
@@ -30,7 +29,7 @@ def get_setting(key: str) -> Optional[Any]:
 
 def put_setting(key: str, value: Any) -> None:
     """Insert or replace the value of ``key``."""
-    stmt = insert(_table).values(key=key, data=value, updated_at=datetime.now(timezone.utc).isoformat())
+    stmt = insert(_table).values(key=key, data=value, updated_at=datetime.now(UTC).isoformat())
     stmt = stmt.on_conflict_do_update(
         index_elements=[_table.c.key], set_={'data': stmt.excluded.data, 'updated_at': stmt.excluded.updated_at}
     )
@@ -39,7 +38,7 @@ def put_setting(key: str, value: Any) -> None:
         bump_revision(conn, _store(key))
 
 
-def modify_setting(key: str, mutate: Callable[[Optional[Any]], Tuple[Optional[Any], T]]) -> T:
+def modify_setting[T](key: str, mutate: Callable[[Any | None], tuple[Any | None, T]]) -> T:
     """Atomic read-modify-write; ``mutate(current) -> (new_value or None to keep, result)``."""
     with transaction():
         new_value, result = mutate(get_setting(key))

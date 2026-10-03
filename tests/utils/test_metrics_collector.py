@@ -5,8 +5,10 @@ Covers pure-logic functions and mocked file/system calls.
 
 import os
 import time
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 import pytest
+
 from utils import metrics_collector as mc
 
 is_running_in_container = mc.is_running_in_container
@@ -530,8 +532,9 @@ class TestGetDiskSpaceDetailsFolderNone:
         mock_disk.free = 50 * 1024**3
         mock_disk.percent = 50.0
 
-        with patch.object(mc.psutil, 'disk_usage', create=True, return_value=mock_disk), patch(
-            'utils.metrics_collector.get_folder_disk_usage', return_value=None
+        with (
+            patch.object(mc.psutil, 'disk_usage', create=True, return_value=mock_disk),
+            patch('utils.metrics_collector.get_folder_disk_usage', return_value=None),
         ):
             result = mc.get_disk_space_details()
 
@@ -572,8 +575,9 @@ class TestGetDiskSpaceDetailsCache:
             def start(self):
                 self._target()
 
-        with patch('utils.metrics_collector._compute_disk_space_details', return_value=fresh_value), patch(
-            'utils.metrics_collector.threading.Thread', _ImmediateThread
+        with (
+            patch('utils.metrics_collector._compute_disk_space_details', return_value=fresh_value),
+            patch('utils.metrics_collector.threading.Thread', _ImmediateThread),
         ):
             result = mc.get_disk_space_details()
 
@@ -608,9 +612,10 @@ class TestGetDiskSpaceDetailsCache:
                 started.append(True)
                 self._target()
 
-        with patch(
-            'utils.metrics_collector._compute_disk_space_details', return_value=fresh_value
-        ) as mock_compute, patch('utils.metrics_collector.threading.Thread', _RecordingThread):
+        with (
+            patch('utils.metrics_collector._compute_disk_space_details', return_value=fresh_value) as mock_compute,
+            patch('utils.metrics_collector.threading.Thread', _RecordingThread),
+        ):
             result = mc.get_disk_space_details(block_if_cold=False)
 
         assert result['pending'] is True
@@ -624,9 +629,10 @@ class TestGetDiskSpaceDetailsCache:
         first-scan behavior."""
         fresh_value = {'root': {}, 'folders': {'sync': True}, 'total_tracked': 2}
 
-        with patch(
-            'utils.metrics_collector._compute_disk_space_details', return_value=fresh_value
-        ) as mock_compute, patch('utils.metrics_collector.threading.Thread') as mock_thread:
+        with (
+            patch('utils.metrics_collector._compute_disk_space_details', return_value=fresh_value) as mock_compute,
+            patch('utils.metrics_collector.threading.Thread') as mock_thread,
+        ):
             result = mc.get_disk_space_details()
 
         assert result == fresh_value
@@ -643,8 +649,9 @@ class TestGetDiskSpaceDetailsCache:
             def start(self):
                 self._target()
 
-        with patch('utils.metrics_collector._compute_disk_space_details', return_value=fresh_value), patch(
-            'utils.metrics_collector.threading.Thread', _ImmediateThread
+        with (
+            patch('utils.metrics_collector._compute_disk_space_details', return_value=fresh_value),
+            patch('utils.metrics_collector.threading.Thread', _ImmediateThread),
         ):
             mc.prime_disk_space_details_cache()
 
@@ -727,8 +734,9 @@ class TestGetEnvironmentProcessesBranchCoverage:
             'cpu_times': None,
             'cmdline': [],
         }
-        with patch.object(mc.psutil, 'process_iter', create=True, return_value=[mock_proc]), patch.object(
-            mc.psutil, 'cpu_count', create=True, return_value=4
+        with (
+            patch.object(mc.psutil, 'process_iter', create=True, return_value=[mock_proc]),
+            patch.object(mc.psutil, 'cpu_count', create=True, return_value=4),
         ):
             result = mc.get_environment_processes()
 
@@ -748,8 +756,9 @@ class TestGetEnvironmentProcessesBranchCoverage:
             'cpu_times': MagicMock(user=1.0, system=0.5),
             'cmdline': [],
         }
-        with patch.object(mc.psutil, 'process_iter', create=True, return_value=[mock_proc]), patch.object(
-            mc.psutil, 'cpu_count', create=True, return_value=4
+        with (
+            patch.object(mc.psutil, 'process_iter', create=True, return_value=[mock_proc]),
+            patch.object(mc.psutil, 'cpu_count', create=True, return_value=4),
         ):
             result = mc.get_environment_processes()
 
@@ -778,9 +787,10 @@ class TestGetEnvironmentProcessesBranchCoverage:
             'cmdline': [],
         }
 
-        with patch.object(
-            mc.psutil, 'process_iter', create=True, return_value=[mock_bad_proc, mock_good_proc]
-        ), patch.object(mc.psutil, 'cpu_count', create=True, return_value=4):
+        with (
+            patch.object(mc.psutil, 'process_iter', create=True, return_value=[mock_bad_proc, mock_good_proc]),
+            patch.object(mc.psutil, 'cpu_count', create=True, return_value=4),
+        ):
             result = mc.get_environment_processes()
 
         assert len(result) == 1
@@ -795,8 +805,9 @@ class TestGetEnvironmentProcessesBranchCoverage:
         mock_bad_proc = MagicMock()
         type(mock_bad_proc).info = PropertyMock(side_effect=RuntimeError("unexpected error"))
 
-        with patch.object(mc.psutil, 'process_iter', create=True, return_value=[mock_bad_proc]), patch.object(
-            mc.psutil, 'cpu_count', create=True, return_value=4
+        with (
+            patch.object(mc.psutil, 'process_iter', create=True, return_value=[mock_bad_proc]),
+            patch.object(mc.psutil, 'cpu_count', create=True, return_value=4),
         ):
             result = mc.get_environment_processes()
 

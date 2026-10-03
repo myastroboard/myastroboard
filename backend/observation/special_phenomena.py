@@ -10,25 +10,27 @@ Uses Astropy for accurate astronomical calculations.
 All calculations account for observer location and timezone.
 """
 
-from datetime import datetime, timedelta, date as date_type
-from typing import List, Dict, Any
+from datetime import date as date_type
+from datetime import datetime, timedelta
+from typing import Any
 from zoneinfo import ZoneInfo
-from utils import parse_iso_to_utc
-from utils.logging_config import get_logger
-from utils.i18n_utils import I18nManager
 
+import numpy as np
+from astropy import units as u
 from astropy.coordinates import (
-    EarthLocation,
+    ICRS,
     AltAz,
+    EarthLocation,
+    GeocentricTrueEcliptic,
+    SkyCoord,
     get_body,
     get_sun,
-    SkyCoord,
-    ICRS,
-    GeocentricTrueEcliptic,
 )
 from astropy.time import Time
-from astropy import units as u
-import numpy as np
+
+from utils import parse_iso_to_utc
+from utils.i18n_utils import I18nManager
+from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
@@ -74,7 +76,7 @@ class SpecialPhenomenaService:
 
         return fallback
 
-    def get_special_phenomena(self, days_ahead: int = 365) -> List[Dict[str, Any]]:
+    def get_special_phenomena(self, days_ahead: int = 365) -> list[dict[str, Any]]:
         """
         Get all special phenomena for the next N days.
 
@@ -112,7 +114,7 @@ class SpecialPhenomenaService:
 
         return events
 
-    def _find_seasonal_events(self, start_date: Time, end_date: Time) -> List[Dict[str, Any]]:
+    def _find_seasonal_events(self, start_date: Time, end_date: Time) -> list[dict[str, Any]]:
         """
         Find equinoxes and solstices.
         These are the four points of the Earth's orbit where declination of the Sun is extremal.
@@ -313,7 +315,7 @@ class SpecialPhenomenaService:
         # Summer solstice sits at solar longitude 90 deg, winter at 270 deg.
         return self._refine_to_solar_longitude(approx_time, 90.0 if season == 'summer' else 270.0)
 
-    def _find_zodiacal_light_windows(self, start_date: Time, end_date: Time) -> List[Dict[str, Any]]:
+    def _find_zodiacal_light_windows(self, start_date: Time, end_date: Time) -> list[dict[str, Any]]:
         """
         Find zodiacal light visibility windows.
         Zodiacal light is visible when:
@@ -432,7 +434,7 @@ class SpecialPhenomenaService:
 
         return events
 
-    def _find_milky_way_core_visibility(self, start_date: Time, end_date: Time) -> List[Dict[str, Any]]:
+    def _find_milky_way_core_visibility(self, start_date: Time, end_date: Time) -> list[dict[str, Any]]:
         """
         Find Milky Way core visibility windows.
         Core is visible when:

@@ -5,13 +5,13 @@ Routes: /api/auth/*, /api/users/*
 
 import time
 from collections import deque
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from threading import Lock
 
-from flask import Blueprint, request, jsonify, send_file, session
+from flask import Blueprint, jsonify, request, send_file, session
 
 from utils import security_settings as _security_settings
-from utils.auth import ALLOWED_ACCOUNT_SCOPES, user_manager, login_required, admin_required, get_current_user
+from utils.auth import ALLOWED_ACCOUNT_SCOPES, admin_required, get_current_user, login_required, user_manager
 from utils.logging_config import get_logger
 from utils.rate_limit import SlidingWindowCounter
 from utils.user_data import build_user_export
@@ -244,7 +244,7 @@ def login():
             session['pending_2fa_user_id'] = user.user_id
             session['pending_2fa_remember_me'] = bool(remember_me)
             session['pending_2fa_expires_at'] = (
-                datetime.now(timezone.utc) + timedelta(seconds=PENDING_2FA_TTL_SECONDS)
+                datetime.now(UTC) + timedelta(seconds=PENDING_2FA_TTL_SECONDS)
             ).isoformat()
             logger.info(f"Password accepted for user {username!r} from {client_ip!r}, awaiting 2FA code")
             return jsonify({'status': '2fa_required'})
@@ -268,7 +268,7 @@ def verify_login_2fa():
             return jsonify({'error': 'No pending verification', 'error_key': 'auth.otp_session_expired'}), 400
 
         try:
-            expired = datetime.now(timezone.utc) >= datetime.fromisoformat(expires_at)
+            expired = datetime.now(UTC) >= datetime.fromisoformat(expires_at)
         except ValueError:
             expired = True
         if expired:

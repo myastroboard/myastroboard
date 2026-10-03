@@ -9,54 +9,54 @@ resets only that preset's caches. Location-independent jobs (spaceflight,
 IERS, AllSky) keep running exactly once per cycle.
 """
 
-from datetime import datetime, timezone
 import time
-from typing import Callable, List, Optional, Tuple
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from utils.logging_config import get_logger
+from datetime import UTC, datetime
 
-from utils.repo_config import load_config, get_all_locations, get_install_default_location, get_scheduler_locations
+from astroweather.aurora_predictions import get_aurora_report
+from astroweather.horizon_graph import HorizonGraphService
 from astroweather.moon_astrotonight import AstroTonightService
+from astroweather.moon_eclipse import LunarEclipseService
 from astroweather.moon_phases import MoonService
 from astroweather.moon_planner import MoonPlanner
-from astroweather.sun_phases import SunService
 from astroweather.sun_eclipse import SolarEclipseService
-from astroweather.moon_eclipse import LunarEclipseService
-from astroweather.horizon_graph import HorizonGraphService
-from astroweather.aurora_predictions import get_aurora_report
-from space.iss_passes import get_iss_passes_report
-from space.css_passes import get_css_passes_report
-from weather.weather_openmeteo import get_hourly_forecast
-from weather.weather_astro import get_astro_weather_analysis
-from utils import slugify_location_name, _sanitize_for_json
+from astroweather.sun_phases import SunService
 from cache import cache_store
 
 # The two AllSky cache TTLs are the connector's own, declared on its class.
 # connectors/ imports nothing from cache/, so this edge closes no cycle.
 from connectors.allsky_connector import AllSkyConnector
+from space.css_passes import get_css_passes_report
+from space.iss_passes import get_iss_passes_report
+from utils import _sanitize_for_json, slugify_location_name
 from utils.constants import (
-    WEATHER_CACHE_TTL,
-    CACHE_TTL_MOON_REPORT,
-    CACHE_TTL_MOON_PLANNER,
-    CACHE_TTL_SUN_REPORT,
-    CACHE_TTL_BEST_WINDOW,
-    CACHE_TTL_SOLAR_ECLIPSE,
-    CACHE_TTL_LUNAR_ECLIPSE,
-    CACHE_TTL_HORIZON_GRAPH,
-    CACHE_TTL_AURORA,
-    CACHE_TTL_ISS_PASSES,
-    CACHE_TTL_CSS_PASSES,
-    CACHE_TTL_PLANETARY_EVENTS,
-    CACHE_TTL_SPECIAL_PHENOMENA,
-    CACHE_TTL_SOLAR_SYSTEM_EVENTS,
-    CACHE_TTL_SIDEREAL_TIME,
-    CACHE_TTL_SEEING_FORECAST,
     CACHE_TTL_ASTRO_WEATHER,
-    CACHE_TTL_SPACEFLIGHT_LAUNCHES,
+    CACHE_TTL_AURORA,
+    CACHE_TTL_BEST_WINDOW,
+    CACHE_TTL_CSS_PASSES,
+    CACHE_TTL_HORIZON_GRAPH,
+    CACHE_TTL_IERS,
+    CACHE_TTL_ISS_PASSES,
+    CACHE_TTL_LUNAR_ECLIPSE,
+    CACHE_TTL_MOON_PLANNER,
+    CACHE_TTL_MOON_REPORT,
+    CACHE_TTL_PLANETARY_EVENTS,
+    CACHE_TTL_SEEING_FORECAST,
+    CACHE_TTL_SIDEREAL_TIME,
+    CACHE_TTL_SOLAR_ECLIPSE,
+    CACHE_TTL_SOLAR_SYSTEM_EVENTS,
     CACHE_TTL_SPACEFLIGHT_ASTRONAUTS,
     CACHE_TTL_SPACEFLIGHT_EVENTS,
-    CACHE_TTL_IERS,
+    CACHE_TTL_SPACEFLIGHT_LAUNCHES,
+    CACHE_TTL_SPECIAL_PHENOMENA,
+    CACHE_TTL_SUN_REPORT,
+    WEATHER_CACHE_TTL,
 )
+from utils.logging_config import get_logger
+from utils.repo_config import get_all_locations, get_install_default_location, get_scheduler_locations, load_config
+from weather.weather_astro import get_astro_weather_analysis
+from weather.weather_openmeteo import get_hourly_forecast
 
 # Initialize logger for this module
 logger = get_logger(__name__)
@@ -87,7 +87,7 @@ def _masked_location_log(location):
     def _safe_coord(value):
         try:
             return int(float(value))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return "?"
 
     return (
@@ -246,11 +246,11 @@ def _next_astronomical_dusk_utc(sun_service, tz_name: str) -> str | None:
     Looks at today's and tomorrow's reports so the value stays valid even
     when the cache refreshes after midnight UTC (before local dusk has passed).
     """
+    from datetime import datetime as _dt
     from zoneinfo import ZoneInfo
-    from datetime import datetime as _dt, timezone as _tz
 
     tz = ZoneInfo(tz_name)
-    now_utc = _dt.now(_tz.utc)
+    now_utc = _dt.now(UTC)
 
     for report in (sun_service.get_today_report(), sun_service.get_tomorrow_report()):
         dusk_str = report.astronomical_dusk
@@ -258,7 +258,7 @@ def _next_astronomical_dusk_utc(sun_service, tz_name: str) -> str | None:
             continue
         try:
             dusk_local = _dt.fromisoformat(dusk_str).replace(tzinfo=tz)
-            dusk_utc = dusk_local.astimezone(_tz.utc)
+            dusk_utc = dusk_local.astimezone(UTC)
             if dusk_utc > now_utc:
                 return dusk_utc.isoformat()
         except Exception:
@@ -888,7 +888,7 @@ def update_spaceflight_launches_cache():
     """Fetch upcoming and recent launches from Launch Library 2 and cache results."""
     try:
         logger.debug("Updating Spaceflight launches cache...")
-        from space.spaceflight_tracker import get_upcoming_launches, get_past_launches
+        from space.spaceflight_tracker import get_past_launches, get_upcoming_launches
 
         upcoming = get_upcoming_launches(limit=12)
         past = get_past_launches(limit=10)
@@ -918,7 +918,7 @@ def update_spaceflight_astronauts_cache():
     """Fetch current ISS crew and all astronauts in space from Launch Library 2."""
     try:
         logger.debug("Updating Spaceflight astronauts cache...")
-        from space.spaceflight_tracker import get_iss_crew, get_astronauts_in_space
+        from space.spaceflight_tracker import get_astronauts_in_space, get_iss_crew
 
         iss_crew = get_iss_crew()
         astronauts = get_astronauts_in_space()
@@ -984,8 +984,9 @@ def update_spaceflight_events_cache():
 
         # Prune stale images from the three spaceflight caches
         try:
-            from space.spaceflight_tracker import prune_image_cache
             import itertools
+
+            from space.spaceflight_tracker import prune_image_cache
 
             def _collect_images(obj):
                 """Recursively yield all string values that look like cached image paths."""
@@ -1024,10 +1025,12 @@ def update_iers_cache():
     Called by the scheduler every CACHE_TTL_IERS seconds (21 days).
     """
     import os
+
     import requests
+    from astropy.time import Time
     from astropy.utils import iers as _iers
     from astropy.utils.iers import IERS_Auto
-    from astropy.time import Time
+
     from utils.constants import IERS_CACHE_FILE
 
     try:
@@ -1146,7 +1149,7 @@ def _cached_event_has_ended(job_name, entry):
     if end_time.tzinfo is None:
         return False
 
-    return end_time < datetime.now(timezone.utc)
+    return end_time < datetime.now(UTC)
 
 
 # (job_name, shared_cache_name, update_fn_name, ttl_seconds, day_sensitive)
@@ -1277,7 +1280,7 @@ def fully_initialize_caches():
                     )
 
         # --- Global jobs (spaceflight, IERS, AllSky) ---
-        global_jobs: List[Tuple[str, Optional[str], Callable[..., None], int, dict]] = [
+        global_jobs: list[tuple[str, str | None, Callable[..., None], int, dict]] = [
             (
                 "spaceflight_launches",
                 "spaceflight_launches",
@@ -1462,7 +1465,7 @@ def fully_initialize_caches():
                         )
 
         # --- Sequential compute jobs (Astropy - kept single-threaded for safety) ---
-        for index, (job_label, base_name, update_fn, ttl, location_id) in enumerate(
+        for index, (job_label, base_name, update_fn, _ttl, location_id) in enumerate(
             sequential, start=len(parallel) + 1
         ):
             cache_store.set_cache_initialization_in_progress(

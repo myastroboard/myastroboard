@@ -13,8 +13,8 @@ logging setup can use it without an import cycle.
 import os
 import sys
 import time
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Iterator
 
 if sys.platform == "win32":
     import msvcrt

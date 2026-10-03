@@ -5,22 +5,24 @@ Handles user authentication, authorization, and session management
 
 import json
 import os
-import uuid
 import re
 import threading
+import uuid
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from functools import wraps
+
 import pyotp
-from flask import session, jsonify, request
-from werkzeug.security import generate_password_hash, check_password_hash
+from flask import jsonify, request, session
+from werkzeug.security import check_password_hash, generate_password_hash
+
 from db import bootstrap as db_bootstrap
 from db import users_store
 from db.engine import data_dir as db_data_dir
 from db.engine import transaction as db_transaction
 from db.legacy_sources import legacy_users_file_pending
-from utils.logging_config import get_logger
 from utils.i18n_utils import SUPPORTED_LANGUAGES
+from utils.logging_config import get_logger
 from utils.user_data import purge_user_files
 
 logger = get_logger(__name__)
@@ -182,7 +184,7 @@ class User:
         self.username = username
         self.password_hash = password_hash
         self.role = role
-        self.created_at = created_at or datetime.now(timezone.utc).isoformat()
+        self.created_at = created_at or datetime.now(UTC).isoformat()
         self.last_login = last_login
         self.preferences = preferences.copy() if isinstance(preferences, dict) else DEFAULT_USER_PREFERENCES.copy()
         self.push_subscriptions = push_subscriptions if isinstance(push_subscriptions, list) else []
@@ -597,7 +599,7 @@ class UserManager:
         module-load-time cycle with repo_config.py, which itself lazily
         imports auth.user_manager in get_scheduler_locations et al)."""
         try:
-            from utils.repo_config import load_config, get_all_locations
+            from utils.repo_config import get_all_locations, load_config
 
             return [loc["id"] for loc in get_all_locations(load_config()) if loc.get("id")]
         except Exception:
@@ -746,7 +748,7 @@ class UserManager:
             raise ValueError("Invalid two-factor code")
 
         user.totp_enabled = True
-        user.totp_confirmed_at = datetime.now(timezone.utc).isoformat()
+        user.totp_confirmed_at = datetime.now(UTC).isoformat()
         self.save_users()
         logger.info(f"2FA confirmed and enabled for user {user.username} (ID: {user_id})")
         return user
@@ -1030,7 +1032,7 @@ class UserManager:
 
     @staticmethod
     def _stamp_last_login(user):
-        user.last_login = datetime.now(timezone.utc).isoformat()
+        user.last_login = datetime.now(UTC).isoformat()
         return user
 
     def authenticate(self, username, password):

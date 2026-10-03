@@ -10,8 +10,9 @@ from __future__ import annotations
 
 import os
 import shutil
-from typing import Any, Dict, Optional
+from typing import Any
 
+from utils import ensure_directory_exists, load_json_file, save_json_file, slugify_location_name
 from utils.constants import (
     SKYTONIGHT_CALCULATIONS_DIR,
     SKYTONIGHT_CATALOGUES_DIR,
@@ -24,10 +25,9 @@ from utils.constants import (
     SKYTONIGHT_SCHEDULER_STATUS_FILE,
     SKYTONIGHT_SCHEDULER_TRIGGER_FILE,
 )
-from utils import ensure_directory_exists, load_json_file, save_json_file, slugify_location_name
 
 
-def ensure_skytonight_directories(location_name: Optional[str] = None) -> Dict[str, str]:
+def ensure_skytonight_directories(location_name: str | None = None) -> dict[str, str]:
     """Ensure the SkyTonight shared directory layout exists."""
     directories = {
         'root': SKYTONIGHT_DIR,
@@ -78,11 +78,11 @@ def get_scheduler_lock_file() -> str:
     return SKYTONIGHT_SCHEDULER_LOCK_FILE
 
 
-def load_scheduler_status(default: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def load_scheduler_status(default: dict[str, Any] | None = None) -> dict[str, Any]:
     return load_json_file(get_scheduler_status_file(), default=default or {})
 
 
-def save_scheduler_status(payload: Dict[str, Any]) -> bool:
+def save_scheduler_status(payload: dict[str, Any]) -> bool:
     return save_json_file(get_scheduler_status_file(), payload)
 
 
@@ -100,7 +100,7 @@ def append_scheduler_log(message: str, file_name: str = 'scheduler.log', max_ent
 def _trim_log_file(log_path: str, max_lines: int) -> None:
     """Keep only the last *max_lines* non-empty lines in *log_path*."""
     try:
-        with open(log_path, 'r', encoding='utf-8') as f:
+        with open(log_path, encoding='utf-8') as f:
             lines = [line for line in f.readlines() if line.strip()]
         if len(lines) > max_lines:
             with open(log_path, 'w', encoding='utf-8') as f:
@@ -121,21 +121,21 @@ _COMETS_BASENAME = 'comets_results.json'
 _SKYMAP_BASENAME = 'skymap_data.json'
 
 
-def _default_location_id() -> Optional[str]:
+def _default_location_id() -> str | None:
     """Resolve the install default preset id (lazy import - avoids a cycle)."""
     try:
-        from utils.repo_config import load_config, get_install_default_location
+        from utils.repo_config import get_install_default_location, load_config
 
         return get_install_default_location(load_config()).get('id')
     except Exception:
         return None
 
 
-def _resolve_location_id(location_id: Optional[str]) -> Optional[str]:
+def _resolve_location_id(location_id: str | None) -> str | None:
     return location_id or _default_location_id()
 
 
-def get_location_results_dir(location_id: Optional[str] = None) -> str:
+def get_location_results_dir(location_id: str | None = None) -> str:
     """Return (and create) the calculations directory for a location preset."""
     resolved = _resolve_location_id(location_id)
     path = os.path.join(SKYTONIGHT_CALCULATIONS_DIR, resolved) if resolved else SKYTONIGHT_CALCULATIONS_DIR
@@ -143,28 +143,28 @@ def get_location_results_dir(location_id: Optional[str] = None) -> str:
     return path
 
 
-def get_results_file(location_id: Optional[str] = None) -> str:
+def get_results_file(location_id: str | None = None) -> str:
     """Return the path to the SkyTonight calculation results summary for a location."""
     return os.path.join(get_location_results_dir(location_id), _RESULTS_BASENAME)
 
 
-def get_dso_results_file(location_id: Optional[str] = None) -> str:
+def get_dso_results_file(location_id: str | None = None) -> str:
     return os.path.join(get_location_results_dir(location_id), _DSO_BASENAME)
 
 
-def get_bodies_results_file(location_id: Optional[str] = None) -> str:
+def get_bodies_results_file(location_id: str | None = None) -> str:
     return os.path.join(get_location_results_dir(location_id), _BODIES_BASENAME)
 
 
-def get_comets_results_file(location_id: Optional[str] = None) -> str:
+def get_comets_results_file(location_id: str | None = None) -> str:
     return os.path.join(get_location_results_dir(location_id), _COMETS_BASENAME)
 
 
-def get_skymap_file(location_id: Optional[str] = None) -> str:
+def get_skymap_file(location_id: str | None = None) -> str:
     return os.path.join(get_location_results_dir(location_id), _SKYMAP_BASENAME)
 
 
-def get_alttime_dir(location_id: Optional[str] = None) -> str:
+def get_alttime_dir(location_id: str | None = None) -> str:
     """Return (and create) the per-location directory for *_alttime.json files."""
     resolved = _resolve_location_id(location_id)
     path = os.path.join(SKYTONIGHT_OUTPUT_DIR, resolved) if resolved else SKYTONIGHT_OUTPUT_DIR
@@ -214,7 +214,7 @@ def drop_location_results(location_id: str) -> bool:
     return dropped
 
 
-def has_calculation_results(location_id: Optional[str] = None) -> bool:
+def has_calculation_results(location_id: str | None = None) -> bool:
     """Return True if all calculations are complete (summary exists and not in-progress)."""
     results_file = get_results_file(location_id)
     if not (os.path.isfile(results_file) and os.path.getsize(results_file) > 0):
@@ -223,19 +223,19 @@ def has_calculation_results(location_id: Optional[str] = None) -> bool:
     return not bool(data.get('metadata', {}).get('in_progress', False))
 
 
-def has_bodies_results(location_id: Optional[str] = None) -> bool:
+def has_bodies_results(location_id: str | None = None) -> bool:
     """Return True if solar body calculation results are available."""
     path = get_bodies_results_file(location_id)
     return os.path.isfile(path) and os.path.getsize(path) > 0
 
 
-def has_comets_results(location_id: Optional[str] = None) -> bool:
+def has_comets_results(location_id: str | None = None) -> bool:
     """Return True if comet calculation results are available."""
     path = get_comets_results_file(location_id)
     return os.path.isfile(path) and os.path.getsize(path) > 0
 
 
-def has_dso_results(location_id: Optional[str] = None) -> bool:
+def has_dso_results(location_id: str | None = None) -> bool:
     """Return True if deep-sky object calculation results are available."""
     path = get_dso_results_file(location_id)
     return os.path.isfile(path) and os.path.getsize(path) > 0

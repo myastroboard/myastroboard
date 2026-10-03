@@ -76,9 +76,9 @@ def test_best_month_reading_matches_the_real_sun(logged_in_page):
         (12.0, 3),
     ):
         reading = page.evaluate("hours => _saBestMonth(hours)", right_ascension_hours)
-        assert (
-            reading == expected_month
-        ), f"RA {right_ascension_hours}h should read as month {expected_month}, got {reading}"
+        assert reading == expected_month, (
+            f"RA {right_ascension_hours}h should read as month {expected_month}, got {reading}"
+        )
 
 
 def test_best_month_reading_survives_a_missing_right_ascension(logged_in_page):
@@ -151,7 +151,7 @@ def test_the_backdrop_takes_its_colours_from_the_stylesheet(logged_in_page, live
 
     def backdrop():
         return page.evaluate(
-            "() => sessionAnalyticsCharts.sessionAnalyticsCoverageChart" ".options.plugins.sessionAnalyticsSkyBackdrop"
+            "() => sessionAnalyticsCharts.sessionAnalyticsCoverageChart.options.plugins.sessionAnalyticsSkyBackdrop"
         )
 
     default_theme = backdrop()
@@ -161,6 +161,6 @@ def test_the_backdrop_takes_its_colours_from_the_stylesheet(logged_in_page, live
     page.evaluate("_saRenderCoverage(sessionAnalyticsData.coverage)")
     red_theme = backdrop()
 
-    assert (
-        red_theme['backgroundTop'] != default_theme['backgroundTop']
-    ), "the red night-vision theme reuses the default sky colour"
+    assert red_theme['backgroundTop'] != default_theme['backgroundTop'], (
+        "the red night-vision theme reuses the default sky colour"
+    )

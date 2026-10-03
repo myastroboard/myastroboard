@@ -19,8 +19,6 @@ Anything after the end-of-image marker is dropped (phones append secondary image
 maps, depth maps - each with its own EXIF). GIF has no EXIF/GPS in practice and is returned as is.
 """
 
-from typing import List, Optional
-
 from PIL import Image
 
 _EXIF_ORIENTATION_TAG = 0x0112
@@ -38,7 +36,7 @@ _WEBP_VP8X_EXIF_FLAG = 0x08
 _WEBP_VP8X_XMP_FLAG = 0x04
 
 
-def _read_orientation(exif_payload: bytes) -> Optional[int]:
+def _read_orientation(exif_payload: bytes) -> int | None:
     """Return the EXIF orientation (2-8) found in ``exif_payload``, or None when absent/normal/unreadable."""
     try:
         exif = Image.Exif()
@@ -87,9 +85,9 @@ def _skip_entropy_data(data: bytes, pos: int) -> int:
 
 
 def _strip_jpeg(data: bytes) -> bytes:
-    chunks: List[bytes] = []
+    chunks: list[bytes] = []
     insert_at = 0  # index in ``chunks`` right after the leading APP0 segments
-    orientation: Optional[int] = None
+    orientation: int | None = None
     pos = len(_JPEG_SOI)
     while True:
         if pos >= len(data) or data[pos] != 0xFF:
@@ -136,7 +134,7 @@ def _strip_jpeg(data: bytes) -> bytes:
 
 
 def _strip_png(data: bytes) -> bytes:
-    chunks: List[bytes] = [_PNG_SIGNATURE]
+    chunks: list[bytes] = [_PNG_SIGNATURE]
     pos = len(_PNG_SIGNATURE)
     while pos + 12 <= len(data):
         length = int.from_bytes(data[pos : pos + 4], 'big')
@@ -159,9 +157,9 @@ def _webp_chunk(fourcc: bytes, payload: bytes) -> bytes:
 
 
 def _strip_webp(data: bytes) -> bytes:
-    chunks: List[bytearray] = []
-    vp8x_index: Optional[int] = None
-    orientation: Optional[int] = None
+    chunks: list[bytearray] = []
+    vp8x_index: int | None = None
+    orientation: int | None = None
     pos = 12
     while pos + 8 <= len(data):
         fourcc = data[pos : pos + 4]

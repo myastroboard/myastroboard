@@ -5,7 +5,8 @@ columns for lookups and the uniqueness constraint. Every write bumps the ``users
 store revision in the same transaction.
 """
 
-from typing import Any, Dict, Iterable, Optional
+from collections.abc import Iterable
+from typing import Any
 
 from sqlalchemy import delete, select
 from sqlalchemy.dialects.sqlite import insert
@@ -18,7 +19,7 @@ STORE = 'users'
 _table = schema.users
 
 
-def _row(user: Dict[str, Any]) -> Dict[str, Any]:
+def _row(user: dict[str, Any]) -> dict[str, Any]:
     return {
         'user_id': user['user_id'],
         'username': user['username'],
@@ -29,19 +30,19 @@ def _row(user: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def get_all_users() -> Dict[str, Dict[str, Any]]:
+def get_all_users() -> dict[str, dict[str, Any]]:
     """Every account, keyed by user id."""
     with read() as conn:
         return {row.user_id: row.data for row in conn.execute(select(_table.c.user_id, _table.c.data))}
 
 
-def get_user(user_id: str) -> Optional[Dict[str, Any]]:
+def get_user(user_id: str) -> dict[str, Any] | None:
     """One account, or None."""
     with read() as conn:
         return conn.execute(select(_table.c.data).where(_table.c.user_id == user_id)).scalar()
 
 
-def upsert_users(users: Iterable[Dict[str, Any]]) -> None:
+def upsert_users(users: Iterable[dict[str, Any]]) -> None:
     """Insert or update accounts. Never deletes: removing an account cascades to all of
     its documents, so that only happens through :func:`delete_user`."""
     rows = [_row(user) for user in users]
@@ -59,7 +60,7 @@ def upsert_users(users: Iterable[Dict[str, Any]]) -> None:
         bump_revision(conn, STORE)
 
 
-def insert_imported_user(user: Dict[str, Any]) -> None:
+def insert_imported_user(user: dict[str, Any]) -> None:
     """Insert one account from the legacy import; the id must not exist yet."""
     with transaction() as conn:
         conn.execute(insert(_table).values(**_row(user)))

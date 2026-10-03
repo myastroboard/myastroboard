@@ -4,17 +4,18 @@ Tests core calculation functions including AstroScore, altitude calculations,
 and time conversions.
 """
 
-import pytest
-import numpy as np
-from datetime import datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
-from unittest.mock import MagicMock, patch
-import tempfile
 import os
+import tempfile
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
+from zoneinfo import ZoneInfo
+
+import numpy as np
+import pytest
 
 from skytonight import skytonight_calculator as calc
-from skytonight.skytonight_models import SkyTonightTarget, SkyTonightCoordinates
+from skytonight.skytonight_models import SkyTonightCoordinates, SkyTonightTarget
 from skytonight.skytonight_targets import normalize_object_name
 
 _normalise = calc._normalise
@@ -215,8 +216,8 @@ class TestSampleTimes:
 
     def test_sample_times_returns_astropy_time(self):
         """Test that sample_times returns an Astropy Time object."""
-        night_start = datetime(2026, 4, 17, 21, 0, 0, tzinfo=timezone.utc)
-        night_end = datetime(2026, 4, 18, 5, 0, 0, tzinfo=timezone.utc)
+        night_start = datetime(2026, 4, 17, 21, 0, 0, tzinfo=UTC)
+        night_end = datetime(2026, 4, 18, 5, 0, 0, tzinfo=UTC)
 
         result = _sample_times(night_start, night_end)
 
@@ -226,8 +227,8 @@ class TestSampleTimes:
 
     def test_sample_times_minimum_steps(self):
         """Test that at least minimum steps are created."""
-        night_start = datetime(2026, 4, 17, 21, 0, 0, tzinfo=timezone.utc)
-        night_end = datetime(2026, 4, 17, 21, 30, 0, tzinfo=timezone.utc)  # 30 minutes
+        night_start = datetime(2026, 4, 17, 21, 0, 0, tzinfo=UTC)
+        night_end = datetime(2026, 4, 17, 21, 30, 0, tzinfo=UTC)  # 30 minutes
 
         result = _sample_times(night_start, night_end)
 
@@ -235,8 +236,8 @@ class TestSampleTimes:
 
     def test_sample_times_reasonable_number_for_full_night(self):
         """Test that a full night gets reasonable number of samples."""
-        night_start = datetime(2026, 4, 17, 21, 0, 0, tzinfo=timezone.utc)
-        night_end = datetime(2026, 4, 18, 5, 0, 0, tzinfo=timezone.utc)  # 8 hours
+        night_start = datetime(2026, 4, 17, 21, 0, 0, tzinfo=UTC)
+        night_end = datetime(2026, 4, 18, 5, 0, 0, tzinfo=UTC)  # 8 hours
 
         result = _sample_times(night_start, night_end)
 
@@ -570,13 +571,13 @@ class TestTransitHelpers:
         mock_time.side_effect = lambda *args, **kwargs: _FakeTime()
         mock_location.return_value = SimpleNamespace(lon=0)
 
-        start = datetime(2026, 4, 17, 0, 0, tzinfo=timezone.utc)
+        start = datetime(2026, 4, 17, 0, 0, tzinfo=UTC)
         end = start + timedelta(minutes=15)
         out = _meridian_transit_time(5.0, start, end, 45.0, -75.0)
         assert out == "00:15"
 
     def test_meridian_transit_from_lst_projects_first_future_crossing(self):
-        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
+        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=UTC)
         night_end = night_start + timedelta(hours=10)
         # LST at night_start = 3.0 h, target RA = 5.0 h -> HA = -2.0 h -> transit in ~2 h
         # of sidereal time (a touch under 2 h of solar time).
@@ -587,13 +588,13 @@ class TestTransitHelpers:
         assert 113 <= minutes_after_start <= 120
 
     def test_meridian_transit_from_lst_none_when_outside_window(self):
-        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
+        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=UTC)
         night_end = night_start + timedelta(hours=4)
         # Target already 1 h past the meridian at night_start -> next transit ~23 h away.
         assert _meridian_transit_from_lst(5.0, night_start, night_end, 6.0) is None
 
     def test_meridian_transit_from_lst_matches_minute_scan(self):
-        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
+        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=UTC)
         night_end = night_start + timedelta(hours=11)
         lst0 = _local_sidereal_time_hours(night_start, -75.0)
         assert lst0 is not None
@@ -632,7 +633,7 @@ class TestTransitHelpers:
         mock_time.side_effect = lambda *args, **kwargs: _FakeTime()
         mock_location.return_value = SimpleNamespace(lon=0)
 
-        start = datetime(2026, 4, 17, 0, 0, tzinfo=timezone.utc)
+        start = datetime(2026, 4, 17, 0, 0, tzinfo=UTC)
         end = start + timedelta(minutes=15)
         out = _antimeridian_transit_time(5.0, start, end, 45.0, -75.0)
         assert out == "00:15"
@@ -652,7 +653,7 @@ class TestAlttimeAndMoonInfo:
     def test_save_and_clear_alttime_files(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             with patch.object(calc, 'get_alttime_dir', lambda *_a, **_k: tmp):
-                times = [datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)]
+                times = [datetime(2026, 4, 17, 21, 0, tzinfo=UTC)]
                 ok = _save_alttime_json(
                     target_id="m31",
                     name="M31",
@@ -1032,8 +1033,8 @@ class TestTargetAndBodyResultBuilders:
 # Helpers shared by TestComputeTargetDebug
 # ---------------------------------------------------------------------------
 
-_DEBUG_NIGHT_START = datetime(2026, 5, 28, 21, 0, 0, tzinfo=timezone.utc)
-_DEBUG_NIGHT_END = datetime(2026, 5, 29, 5, 0, 0, tzinfo=timezone.utc)  # 8-hour night
+_DEBUG_NIGHT_START = datetime(2026, 5, 28, 21, 0, 0, tzinfo=UTC)
+_DEBUG_NIGHT_END = datetime(2026, 5, 29, 5, 0, 0, tzinfo=UTC)  # 8-hour night
 
 
 def _debug_config(**constraint_overrides):
@@ -1157,8 +1158,9 @@ class TestComputeTargetDebug:
         target = _debug_dso()
         config = _debug_config()
         dataset = _debug_dataset(target)
-        with patch('skytonight.skytonight_calculator.load_targets_dataset', return_value=dataset), patch(
-            'skytonight.skytonight_calculator._get_night_window', return_value=None
+        with (
+            patch('skytonight.skytonight_calculator.load_targets_dataset', return_value=dataset),
+            patch('skytonight.skytonight_calculator._get_night_window', return_value=None),
         ):
             result = compute_target_debug(target.preferred_name, config=config)
         assert result['overall'] == 'no_night'
@@ -1177,8 +1179,12 @@ class TestComputeTargetDebug:
         )
         config = _debug_config()
         dataset = _debug_dataset(target)
-        with patch('skytonight.skytonight_calculator.load_targets_dataset', return_value=dataset), patch(
-            'skytonight.skytonight_calculator._get_night_window', return_value=(_DEBUG_NIGHT_START, _DEBUG_NIGHT_END)
+        with (
+            patch('skytonight.skytonight_calculator.load_targets_dataset', return_value=dataset),
+            patch(
+                'skytonight.skytonight_calculator._get_night_window',
+                return_value=(_DEBUG_NIGHT_START, _DEBUG_NIGHT_END),
+            ),
         ):
             result = compute_target_debug('NoCoords', config=config)
         assert result['overall'] == 'no_coordinates'
@@ -1367,7 +1373,7 @@ class TestSaveAlttimeJsonBranches:
 
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             with patch.object(calc, 'get_alttime_dir', lambda *_a, **_k: tmp):
-                night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
+                night_start = datetime(2026, 4, 17, 21, 0, tzinfo=UTC)
                 night_end = night_start + timedelta(hours=8)
                 ok = _save_alttime_json(
                     target_id='ngc-test',
@@ -1390,7 +1396,7 @@ class TestSaveAlttimeJsonBranches:
 
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             with patch.object(calc, 'get_alttime_dir', lambda *_a, **_k: tmp):
-                night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
+                night_start = datetime(2026, 4, 17, 21, 0, tzinfo=UTC)
                 ok = _save_alttime_json(
                     target_id='ngc-horizon',
                     name='NGC Horizon',
@@ -1415,8 +1421,8 @@ class TestSaveAlttimeJsonBranches:
                 name='Fail',
                 times=None,
                 altitudes=np.array([30.0]),
-                night_start=datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc),
-                night_end=datetime(2026, 4, 18, 5, 0, tzinfo=timezone.utc),
+                night_start=datetime(2026, 4, 17, 21, 0, tzinfo=UTC),
+                night_end=datetime(2026, 4, 18, 5, 0, tzinfo=UTC),
                 constraints={},
                 precomputed_times_iso=['2026-04-17T21:00:00'],
             )
@@ -1428,12 +1434,12 @@ class TestSaveAlttimeJsonBranches:
 
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             with patch.object(calc, 'get_alttime_dir', lambda *_a, **_k: tmp):
-                night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
+                night_start = datetime(2026, 4, 17, 21, 0, tzinfo=UTC)
                 # Create a fake times object whose to_datetime() returns list of datetimes
                 fake_times = MagicMock()
                 fake_dt_list = [
-                    datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc),
-                    datetime(2026, 4, 17, 21, 15, tzinfo=timezone.utc),
+                    datetime(2026, 4, 17, 21, 0, tzinfo=UTC),
+                    datetime(2026, 4, 17, 21, 15, tzinfo=UTC),
                 ]
                 # to_datetime should return objects with strftime
                 fake_times.to_datetime.return_value = fake_dt_list
@@ -1730,7 +1736,7 @@ class TestMeridianTransitExceptionPaths:
     def test_meridian_transit_time_exception(self, mock_time, mock_location):
         """Covers exception handler in _meridian_transit_time."""
         mock_time.side_effect = Exception('time broken')
-        start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
+        start = datetime(2026, 4, 17, 21, 0, tzinfo=UTC)
         end = start + timedelta(hours=1)
         result = _meridian_transit_time(5.0, start, end, 45.0, -75.0)
         assert result is None
@@ -1740,7 +1746,7 @@ class TestMeridianTransitExceptionPaths:
     def test_antimeridian_transit_time_exception(self, mock_time, mock_location):
         """Covers exception handler in _antimeridian_transit_time."""
         mock_time.side_effect = Exception('time broken')
-        start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
+        start = datetime(2026, 4, 17, 21, 0, tzinfo=UTC)
         end = start + timedelta(hours=1)
         result = _antimeridian_transit_time(5.0, start, end, 45.0, -75.0)
         assert result is None
@@ -1875,9 +1881,10 @@ class TestComputeTargetResultEdgeCases:
         mock_slice = MagicMock()
         mock_times.__getitem__ = MagicMock(return_value=mock_slice)
 
-        with patch('skytonight.skytonight_calculator.SkyCoord') as mock_skycoord, patch(
-            'skytonight.skytonight_calculator.AltAz'
-        ) as _:
+        with (
+            patch('skytonight.skytonight_calculator.SkyCoord') as mock_skycoord,
+            patch('skytonight.skytonight_calculator.AltAz') as _,
+        ):
             mock_altaz_inst = MagicMock()
             mock_altaz_inst.az.deg = [120.0]
             mock_coord_inst = MagicMock()
@@ -1970,8 +1977,8 @@ class TestComputeTargetResultEdgeCases:
             location=object(),
             moon=moon,
             constraints=self._base_constraints(),
-            night_start=datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc),
-            night_end=datetime(2026, 4, 18, 5, 0, tzinfo=timezone.utc),
+            night_start=datetime(2026, 4, 17, 21, 0, tzinfo=UTC),
+            night_end=datetime(2026, 4, 18, 5, 0, tzinfo=UTC),
             lat=45.0,
             lon=-75.0,
             az_values=np.array([90.0, 120.0, 150.0, 180.0]),
@@ -1996,8 +2003,8 @@ class TestComputeTargetResultEdgeCases:
             location=object(),
             moon=moon,
             constraints=self._base_constraints(),
-            night_start=datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc),
-            night_end=datetime(2026, 4, 18, 5, 0, tzinfo=timezone.utc),
+            night_start=datetime(2026, 4, 17, 21, 0, tzinfo=UTC),
+            night_end=datetime(2026, 4, 18, 5, 0, tzinfo=UTC),
             lat=45.0,
             lon=-75.0,
             az_values=np.array([90.0, 120.0, 150.0, 180.0]),
@@ -2218,7 +2225,7 @@ class TestCleanupCalculationMemory:
         e = [7]
         f = [8]
         ti = ['2026-01-01']
-        tl = [datetime(2026, 1, 1, tzinfo=timezone.utc)]
+        tl = [datetime(2026, 1, 1, tzinfo=UTC)]
         _cleanup_calculation_memory(
             deep_sky_results=a,
             bodies_results=b,
@@ -2297,7 +2304,7 @@ class TestRunCalculationsWithData:
     """Cover run_calculations with a minimal dataset."""
 
     def _make_dso_target(self):
-        from skytonight.skytonight_models import SkyTonightTarget, SkyTonightCoordinates
+        from skytonight.skytonight_models import SkyTonightCoordinates, SkyTonightTarget
 
         return SkyTonightTarget(
             target_id='dso-1',
@@ -2338,8 +2345,8 @@ class TestRunCalculationsWithData:
         """Cover run_calculations through the no-targets path."""
         from types import SimpleNamespace
 
-        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
-        night_end = datetime(2026, 4, 18, 5, 0, tzinfo=timezone.utc)
+        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=UTC)
+        night_end = datetime(2026, 4, 18, 5, 0, tzinfo=UTC)
 
         mock_config.return_value = {
             'location': {'latitude': 45.0, 'longitude': -75.0, 'timezone': 'UTC'},
@@ -2387,8 +2394,8 @@ class TestRunCalculationsWithData:
         """Cover the sqm/bortle derivation path."""
         from types import SimpleNamespace
 
-        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
-        night_end = datetime(2026, 4, 18, 5, 0, tzinfo=timezone.utc)
+        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=UTC)
+        night_end = datetime(2026, 4, 18, 5, 0, tzinfo=UTC)
 
         mock_config.return_value = {
             'location': {
@@ -2442,8 +2449,8 @@ class TestRunCalculationsWithData:
         """Cover the bodies loop in run_calculations."""
         from types import SimpleNamespace
 
-        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
-        night_end = datetime(2026, 4, 18, 5, 0, tzinfo=timezone.utc)
+        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=UTC)
+        night_end = datetime(2026, 4, 18, 5, 0, tzinfo=UTC)
 
         mock_config.return_value = {
             'location': {'latitude': 45.0, 'longitude': -75.0, 'timezone': 'UTC'},
@@ -2592,8 +2599,8 @@ class TestComputeTargetResultWindowStartHourFallback:
         }
         altaz_values = np.array([65.0, 70.0, 68.0, 66.0, 65.0])
         moon = SimpleNamespace(phase=0.1, ra_deg=None, dec_deg=None)
-        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
-        night_end = datetime(2026, 4, 18, 5, 0, tzinfo=timezone.utc)
+        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=UTC)
+        night_end = datetime(2026, 4, 18, 5, 0, tzinfo=UTC)
         result = _compute_target_result(
             target=target,
             times=None,
@@ -2677,8 +2684,8 @@ class TestRunCalculationsDictTargetFromDictException:
         mock_dirs,
     ):
         """Dataset contains a malformed dict target → from_dict raises, target is skipped."""
-        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
-        night_end = datetime(2026, 4, 18, 5, 0, tzinfo=timezone.utc)
+        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=UTC)
+        night_end = datetime(2026, 4, 18, 5, 0, tzinfo=UTC)
         mock_config.return_value = {
             'location': {'latitude': 45.0, 'longitude': -75.0, 'timezone': 'UTC'},
             'skytonight': {},
@@ -2724,10 +2731,10 @@ class TestRunCalculationsCometAltazException:
         mock_dirs,
     ):
         """Comet with bad coords: _compute_altaz_series raises, target is skipped."""
-        from skytonight.skytonight_models import SkyTonightTarget, SkyTonightCoordinates
+        from skytonight.skytonight_models import SkyTonightCoordinates, SkyTonightTarget
 
-        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
-        night_end = datetime(2026, 4, 18, 5, 0, tzinfo=timezone.utc)
+        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=UTC)
+        night_end = datetime(2026, 4, 18, 5, 0, tzinfo=UTC)
         comet = SkyTonightTarget(
             target_id='comet-1',
             category='comets',
@@ -2821,23 +2828,25 @@ class TestComputeTargetDebugExtraBranches:
                 f'custom::{norm}': {'target_id': target.target_id},  # matches → break
             },
         }
-        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
-        night_end = datetime(2026, 4, 18, 5, 0, tzinfo=timezone.utc)
+        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=UTC)
+        night_end = datetime(2026, 4, 18, 5, 0, tzinfo=UTC)
         alt_arr = np.array([35.0, 45.0, 60.0, 55.0, 40.0])
-        with patch('skytonight.skytonight_calculator.load_targets_dataset', return_value=dataset), patch(
-            'skytonight.skytonight_calculator._get_night_window', return_value=(night_start, night_end)
-        ), patch('skytonight.skytonight_calculator._get_astro_night_window', return_value=None), patch(
-            'skytonight.skytonight_calculator.EarthLocation'
-        ), patch(
-            'skytonight.skytonight_calculator._MoonInfo',
-            return_value=SimpleNamespace(phase=0.2, ra_deg=100.0, dec_deg=-10.0),
-        ), patch(
-            'skytonight.skytonight_calculator._sample_times',
-            return_value=MagicMock(
-                to_datetime=lambda **kw: [night_start + timedelta(minutes=i * 15) for i in range(5)]
+        with (
+            patch('skytonight.skytonight_calculator.load_targets_dataset', return_value=dataset),
+            patch('skytonight.skytonight_calculator._get_night_window', return_value=(night_start, night_end)),
+            patch('skytonight.skytonight_calculator._get_astro_night_window', return_value=None),
+            patch('skytonight.skytonight_calculator.EarthLocation'),
+            patch(
+                'skytonight.skytonight_calculator._MoonInfo',
+                return_value=SimpleNamespace(phase=0.2, ra_deg=100.0, dec_deg=-10.0),
             ),
-        ), patch(
-            'skytonight.skytonight_calculator._compute_altaz_series', return_value=(alt_arr, alt_arr)
+            patch(
+                'skytonight.skytonight_calculator._sample_times',
+                return_value=MagicMock(
+                    to_datetime=lambda **kw: [night_start + timedelta(minutes=i * 15) for i in range(5)]
+                ),
+            ),
+            patch('skytonight.skytonight_calculator._compute_altaz_series', return_value=(alt_arr, alt_arr)),
         ):
             result = self._run_with_dataset(dataset, target.preferred_name)
         assert result['found'] is True
@@ -2848,11 +2857,14 @@ class TestComputeTargetDebugExtraBranches:
             'targets': [],  # empty — no target with target_id 'missing-target'
             'lookup': {'preferred::ngc224': {'target_id': 'missing-target'}},
         }
-        with patch('skytonight.skytonight_calculator.load_targets_dataset', return_value=dataset), patch(
-            'skytonight.skytonight_calculator._get_night_window',
-            return_value=(
-                datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc),
-                datetime(2026, 4, 18, 5, 0, tzinfo=timezone.utc),
+        with (
+            patch('skytonight.skytonight_calculator.load_targets_dataset', return_value=dataset),
+            patch(
+                'skytonight.skytonight_calculator._get_night_window',
+                return_value=(
+                    datetime(2026, 4, 17, 21, 0, tzinfo=UTC),
+                    datetime(2026, 4, 18, 5, 0, tzinfo=UTC),
+                ),
             ),
         ):
             result = self._run_with_dataset(dataset, 'NGC 224')
@@ -2862,19 +2874,19 @@ class TestComputeTargetDebugExtraBranches:
         """altaz computation exception returns found=True with overall='error'."""
         target = _debug_dso()
         dataset = _debug_dataset(target)
-        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
-        night_end = datetime(2026, 4, 18, 5, 0, tzinfo=timezone.utc)
-        with patch('skytonight.skytonight_calculator.load_targets_dataset', return_value=dataset), patch(
-            'skytonight.skytonight_calculator._get_night_window', return_value=(night_start, night_end)
-        ), patch('skytonight.skytonight_calculator._get_astro_night_window', return_value=None), patch(
-            'skytonight.skytonight_calculator.EarthLocation'
-        ), patch(
-            'skytonight.skytonight_calculator._MoonInfo',
-            return_value=SimpleNamespace(phase=0.2, ra_deg=None, dec_deg=None),
-        ), patch(
-            'skytonight.skytonight_calculator._sample_times', return_value=MagicMock()
-        ), patch(
-            'skytonight.skytonight_calculator._compute_altaz_series', side_effect=RuntimeError('altaz boom')
+        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=UTC)
+        night_end = datetime(2026, 4, 18, 5, 0, tzinfo=UTC)
+        with (
+            patch('skytonight.skytonight_calculator.load_targets_dataset', return_value=dataset),
+            patch('skytonight.skytonight_calculator._get_night_window', return_value=(night_start, night_end)),
+            patch('skytonight.skytonight_calculator._get_astro_night_window', return_value=None),
+            patch('skytonight.skytonight_calculator.EarthLocation'),
+            patch(
+                'skytonight.skytonight_calculator._MoonInfo',
+                return_value=SimpleNamespace(phase=0.2, ra_deg=None, dec_deg=None),
+            ),
+            patch('skytonight.skytonight_calculator._sample_times', return_value=MagicMock()),
+            patch('skytonight.skytonight_calculator._compute_altaz_series', side_effect=RuntimeError('altaz boom')),
         ):
             result = self._run_with_dataset(dataset, target.preferred_name)
         assert result['found'] is True
@@ -2884,23 +2896,25 @@ class TestComputeTargetDebugExtraBranches:
         """DSO with size_arcmin=None gets 'No size data, filter skipped' check."""
         target = _debug_dso(size_arcmin=None)
         dataset = _debug_dataset(target)
-        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
-        night_end = datetime(2026, 4, 18, 5, 0, tzinfo=timezone.utc)
+        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=UTC)
+        night_end = datetime(2026, 4, 18, 5, 0, tzinfo=UTC)
         alt_arr = np.array([35.0, 45.0, 60.0, 55.0, 40.0])
-        with patch('skytonight.skytonight_calculator.load_targets_dataset', return_value=dataset), patch(
-            'skytonight.skytonight_calculator._get_night_window', return_value=(night_start, night_end)
-        ), patch('skytonight.skytonight_calculator._get_astro_night_window', return_value=None), patch(
-            'skytonight.skytonight_calculator.EarthLocation'
-        ), patch(
-            'skytonight.skytonight_calculator._MoonInfo',
-            return_value=SimpleNamespace(phase=0.2, ra_deg=100.0, dec_deg=-10.0),
-        ), patch(
-            'skytonight.skytonight_calculator._sample_times',
-            return_value=MagicMock(
-                to_datetime=lambda **kw: [night_start + timedelta(minutes=i * 15) for i in range(5)]
+        with (
+            patch('skytonight.skytonight_calculator.load_targets_dataset', return_value=dataset),
+            patch('skytonight.skytonight_calculator._get_night_window', return_value=(night_start, night_end)),
+            patch('skytonight.skytonight_calculator._get_astro_night_window', return_value=None),
+            patch('skytonight.skytonight_calculator.EarthLocation'),
+            patch(
+                'skytonight.skytonight_calculator._MoonInfo',
+                return_value=SimpleNamespace(phase=0.2, ra_deg=100.0, dec_deg=-10.0),
             ),
-        ), patch(
-            'skytonight.skytonight_calculator._compute_altaz_series', return_value=(alt_arr, alt_arr)
+            patch(
+                'skytonight.skytonight_calculator._sample_times',
+                return_value=MagicMock(
+                    to_datetime=lambda **kw: [night_start + timedelta(minutes=i * 15) for i in range(5)]
+                ),
+            ),
+            patch('skytonight.skytonight_calculator._compute_altaz_series', return_value=(alt_arr, alt_arr)),
         ):
             result = self._run_with_dataset(dataset, target.preferred_name)
         assert result['found'] is True
@@ -2913,23 +2927,25 @@ class TestComputeTargetDebugExtraBranches:
         """moon_use_illum=True sets effective_min_sep to moon.phase * 100."""
         target = _debug_dso()
         dataset = _debug_dataset(target)
-        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=timezone.utc)
-        night_end = datetime(2026, 4, 18, 5, 0, tzinfo=timezone.utc)
+        night_start = datetime(2026, 4, 17, 21, 0, tzinfo=UTC)
+        night_end = datetime(2026, 4, 18, 5, 0, tzinfo=UTC)
         alt_arr = np.array([35.0, 45.0, 60.0, 55.0, 40.0])
-        with patch('skytonight.skytonight_calculator.load_targets_dataset', return_value=dataset), patch(
-            'skytonight.skytonight_calculator._get_night_window', return_value=(night_start, night_end)
-        ), patch('skytonight.skytonight_calculator._get_astro_night_window', return_value=None), patch(
-            'skytonight.skytonight_calculator.EarthLocation'
-        ), patch(
-            'skytonight.skytonight_calculator._MoonInfo',
-            return_value=SimpleNamespace(phase=0.8, ra_deg=100.0, dec_deg=-10.0),
-        ), patch(
-            'skytonight.skytonight_calculator._sample_times',
-            return_value=MagicMock(
-                to_datetime=lambda **kw: [night_start + timedelta(minutes=i * 15) for i in range(5)]
+        with (
+            patch('skytonight.skytonight_calculator.load_targets_dataset', return_value=dataset),
+            patch('skytonight.skytonight_calculator._get_night_window', return_value=(night_start, night_end)),
+            patch('skytonight.skytonight_calculator._get_astro_night_window', return_value=None),
+            patch('skytonight.skytonight_calculator.EarthLocation'),
+            patch(
+                'skytonight.skytonight_calculator._MoonInfo',
+                return_value=SimpleNamespace(phase=0.8, ra_deg=100.0, dec_deg=-10.0),
             ),
-        ), patch(
-            'skytonight.skytonight_calculator._compute_altaz_series', return_value=(alt_arr, alt_arr)
+            patch(
+                'skytonight.skytonight_calculator._sample_times',
+                return_value=MagicMock(
+                    to_datetime=lambda **kw: [night_start + timedelta(minutes=i * 15) for i in range(5)]
+                ),
+            ),
+            patch('skytonight.skytonight_calculator._compute_altaz_series', return_value=(alt_arr, alt_arr)),
         ):
             result = self._run_with_dataset(
                 dataset, target.preferred_name, config_overrides={'moon_separation_use_illumination': True}
@@ -3095,8 +3111,8 @@ class TestRunCalculationsMiscBranches:
     """Cover non-dict/non-target skip and body with None altitudes."""
 
     def _setup(self, monkeypatch):
-        night_start = datetime(2026, 5, 28, 21, 0, 0, tzinfo=timezone.utc)
-        night_end = datetime(2026, 5, 28, 22, 0, 0, tzinfo=timezone.utc)
+        night_start = datetime(2026, 5, 28, 21, 0, 0, tzinfo=UTC)
+        night_end = datetime(2026, 5, 28, 22, 0, 0, tzinfo=UTC)
         monkeypatch.setattr(calc, 'ensure_skytonight_directories', lambda: None)
         monkeypatch.setattr(calc, '_get_night_window', lambda *a: (night_start, night_end))
         monkeypatch.setattr(calc, '_get_astro_night_window', lambda *a: None)
@@ -3179,8 +3195,9 @@ class TestBuildBodyAliasMapNormFalsy:
         orig_cache = calc._body_alias_map_cache
         try:
             calc._body_alias_map_cache = None
-            with patch.object(i18n_utils, 'I18nManager', _FakeI18n), patch.object(
-                i18n_utils, 'SUPPORTED_LANGUAGES', ['en']
+            with (
+                patch.object(i18n_utils, 'I18nManager', _FakeI18n),
+                patch.object(i18n_utils, 'SUPPORTED_LANGUAGES', ['en']),
             ):
                 result = _build_body_alias_map()
         finally:
@@ -3222,17 +3239,20 @@ class TestComputeTargetDebugExtraCoverage:
         az_arr = np.array([100.0, 120.0, 150.0, 180.0, 200.0])
         mock_times = MagicMock()
         mock_times.to_datetime.return_value = [_DEBUG_NIGHT_START + timedelta(minutes=i * 15) for i in range(5)]
-        with patch('skytonight.skytonight_calculator.load_targets_dataset', return_value=dataset), patch(
-            'skytonight.skytonight_calculator._get_night_window', return_value=(_DEBUG_NIGHT_START, _DEBUG_NIGHT_END)
-        ), patch('skytonight.skytonight_calculator._get_astro_night_window', return_value=None), patch(
-            'skytonight.skytonight_calculator.EarthLocation'
-        ), patch(
-            'skytonight.skytonight_calculator._MoonInfo',
-            return_value=SimpleNamespace(phase=0.2, ra_deg=100.0, dec_deg=-10.0),
-        ), patch(
-            'skytonight.skytonight_calculator._sample_times', return_value=mock_times
-        ), patch(
-            'skytonight.skytonight_calculator._compute_altaz_series', return_value=(alt_arr, az_arr)
+        with (
+            patch('skytonight.skytonight_calculator.load_targets_dataset', return_value=dataset),
+            patch(
+                'skytonight.skytonight_calculator._get_night_window',
+                return_value=(_DEBUG_NIGHT_START, _DEBUG_NIGHT_END),
+            ),
+            patch('skytonight.skytonight_calculator._get_astro_night_window', return_value=None),
+            patch('skytonight.skytonight_calculator.EarthLocation'),
+            patch(
+                'skytonight.skytonight_calculator._MoonInfo',
+                return_value=SimpleNamespace(phase=0.2, ra_deg=100.0, dec_deg=-10.0),
+            ),
+            patch('skytonight.skytonight_calculator._sample_times', return_value=mock_times),
+            patch('skytonight.skytonight_calculator._compute_altaz_series', return_value=(alt_arr, az_arr)),
         ):
             result = compute_target_debug(target.preferred_name, config=config)
         assert result['found'] is True
@@ -3252,19 +3272,17 @@ class TestComputeTargetDebugExtraCoverage:
         az_arr = np.array([100.0, 120.0, 150.0, 180.0, 200.0])
         mock_times = MagicMock()
         mock_times.to_datetime.return_value = [night_start + timedelta(minutes=i * 15) for i in range(5)]
-        with patch('skytonight.skytonight_calculator.load_targets_dataset', return_value=dataset), patch(
-            'skytonight.skytonight_calculator._get_night_window', return_value=(night_start, night_end)
-        ), patch(
-            'skytonight.skytonight_calculator._get_astro_night_window', return_value=(astro_start, astro_end)
-        ), patch(
-            'skytonight.skytonight_calculator.EarthLocation'
-        ), patch(
-            'skytonight.skytonight_calculator._MoonInfo',
-            return_value=SimpleNamespace(phase=0.2, ra_deg=100.0, dec_deg=-10.0),
-        ), patch(
-            'skytonight.skytonight_calculator._sample_times', return_value=mock_times
-        ), patch(
-            'skytonight.skytonight_calculator._compute_altaz_series', return_value=(alt_arr, az_arr)
+        with (
+            patch('skytonight.skytonight_calculator.load_targets_dataset', return_value=dataset),
+            patch('skytonight.skytonight_calculator._get_night_window', return_value=(night_start, night_end)),
+            patch('skytonight.skytonight_calculator._get_astro_night_window', return_value=(astro_start, astro_end)),
+            patch('skytonight.skytonight_calculator.EarthLocation'),
+            patch(
+                'skytonight.skytonight_calculator._MoonInfo',
+                return_value=SimpleNamespace(phase=0.2, ra_deg=100.0, dec_deg=-10.0),
+            ),
+            patch('skytonight.skytonight_calculator._sample_times', return_value=mock_times),
+            patch('skytonight.skytonight_calculator._compute_altaz_series', return_value=(alt_arr, az_arr)),
         ):
             result = compute_target_debug(target.preferred_name, config=config)
         assert result['found'] is True
@@ -3289,8 +3307,9 @@ class TestAltazSeriesFunctions:
         mock_coord = MagicMock()
         mock_coord.transform_to.return_value = mock_altaz
 
-        with patch.object(calc, 'SkyCoord', return_value=mock_coord), patch.object(
-            calc, 'AltAz', return_value=MagicMock()
+        with (
+            patch.object(calc, 'SkyCoord', return_value=mock_coord),
+            patch.object(calc, 'AltAz', return_value=MagicMock()),
         ):
             alt, az = calc._compute_altaz_series(5.0, 30.0, MagicMock(), MagicMock())
 
@@ -3313,8 +3332,11 @@ class TestAltazSeriesFunctions:
         mock_body_coord = MagicMock()
         mock_body_coord.transform_to.return_value = mock_altaz
 
-        with patch.object(calc, 'AltAz', return_value=MagicMock()), patch.object(
-            calc, 'get_body', side_effect=lambda n, t, loc: mock_body_coord if t is times else mock_mid_coord
+        with (
+            patch.object(calc, 'AltAz', return_value=MagicMock()),
+            patch.object(
+                calc, 'get_body', side_effect=lambda n, t, loc: mock_body_coord if t is times else mock_mid_coord
+            ),
         ):
             # Patch times indexing for mid_coord lookup
             times.__getitem__ = MagicMock(return_value=MagicMock())
@@ -3451,8 +3473,8 @@ class TestRunCalcMissingBranches:
     """Cover missing branches in run_calculations: body None, comet result, DSO batch."""
 
     def _setup(self, monkeypatch):
-        night_start = datetime(2026, 5, 28, 21, 0, 0, tzinfo=timezone.utc)
-        night_end = datetime(2026, 5, 28, 22, 0, 0, tzinfo=timezone.utc)
+        night_start = datetime(2026, 5, 28, 21, 0, 0, tzinfo=UTC)
+        night_end = datetime(2026, 5, 28, 22, 0, 0, tzinfo=UTC)
         monkeypatch.setattr(calc, 'ensure_skytonight_directories', lambda: None)
         monkeypatch.setattr(calc, '_get_night_window', lambda *a: (night_start, night_end))
         monkeypatch.setattr(calc, '_get_astro_night_window', lambda *a: None)
