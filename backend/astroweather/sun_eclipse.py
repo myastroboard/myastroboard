@@ -44,13 +44,14 @@ Example output:
 
 import datetime
 from dataclasses import dataclass
+from typing import Any
 from zoneinfo import ZoneInfo
-from typing import Any, Optional, List
 
-from astronomy import SearchLocalSolarEclipse, Time as AstronTime, Observer
-from astropy.time import Time as AstroTime
-from astropy.coordinates import EarthLocation, AltAz, get_sun
 import astropy.units as u
+from astronomy import Observer, SearchLocalSolarEclipse
+from astronomy import Time as AstronTime
+from astropy.coordinates import AltAz, EarthLocation, get_sun
+from astropy.time import Time as AstroTime
 
 from utils import distant_epoch_precision_warnings_muted
 
@@ -89,7 +90,7 @@ class SolarEclipseInfo:
     duration_minutes: int
     astrophotography_score: float
     score_classification: str
-    altitude_vs_time: List[EclipsePoint]
+    altitude_vs_time: list[EclipsePoint]
 
 
 # =============================
@@ -112,7 +113,7 @@ class SolarEclipseService:
     # Public API
     # =============================
 
-    def get_next_eclipse(self) -> Optional[SolarEclipseInfo]:
+    def get_next_eclipse(self) -> SolarEclipseInfo | None:
         """Get the solar eclipse in progress right now, or the next one.
 
         The next eclipse *visible from this location* can be many years out (for
@@ -124,10 +125,10 @@ class SolarEclipseService:
         with distant_epoch_precision_warnings_muted():
             return self._compute_next_eclipse()
 
-    def _compute_next_eclipse(self) -> Optional[SolarEclipseInfo]:
+    def _compute_next_eclipse(self) -> SolarEclipseInfo | None:
         """Find the current or next locally visible solar eclipse and describe it."""
 
-        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        now_utc = datetime.datetime.now(datetime.UTC)
 
         # Start the search in the past (see IN_PROGRESS_LOOKBACK) so an eclipse whose
         # peak has passed but whose partial phases are still running stays reported.
@@ -145,10 +146,10 @@ class SolarEclipseService:
 
         # Convert eclipse times to local.
         # Time.Utc() returns a NAIVE datetime — attach UTC tzinfo before converting.
-        peak_utc = eclipse.peak.time.Utc().replace(tzinfo=datetime.timezone.utc)
+        peak_utc = eclipse.peak.time.Utc().replace(tzinfo=datetime.UTC)
         peak_local = peak_utc.astimezone(self.timezone)
 
-        partial_begin_utc = eclipse.partial_begin.time.Utc().replace(tzinfo=datetime.timezone.utc)
+        partial_begin_utc = eclipse.partial_begin.time.Utc().replace(tzinfo=datetime.UTC)
         partial_begin_local = partial_begin_utc.astimezone(self.timezone)
 
         partial_end_local = partial_end_utc.astimezone(self.timezone)
@@ -211,7 +212,7 @@ class SolarEclipseService:
 
     def _eclipse_end_utc(self, eclipse: Any) -> datetime.datetime:
         """End of the partial phases, as an aware UTC datetime."""
-        return eclipse.partial_end.time.Utc().replace(tzinfo=datetime.timezone.utc)
+        return eclipse.partial_end.time.Utc().replace(tzinfo=datetime.UTC)
 
     def _get_eclipse_type(self, eclipse: Any) -> str:
         """Determine eclipse type from eclipse object"""
@@ -236,7 +237,7 @@ class SolarEclipseService:
         az = self._coord_attribute(sun_transformed, "az")
         return az if az is not None else 0.0
 
-    def _coord_attribute(self, coord: Any, attr_name: str) -> Optional[float]:
+    def _coord_attribute(self, coord: Any, attr_name: str) -> float | None:
         """Safely extract altitude or azimuth from transformed coordinate"""
         attr = getattr(coord, attr_name, None)
         if attr is None:
@@ -244,12 +245,12 @@ class SolarEclipseService:
         try:
             value = attr.to_value(u.deg) if hasattr(attr, "to_value") else float(attr)
             return float(value)
-        except (AttributeError, TypeError):
+        except AttributeError, TypeError:
             return None
 
     def _generate_altitude_vs_time(
         self, start_local: datetime.datetime, end_local: datetime.datetime
-    ) -> List[EclipsePoint]:
+    ) -> list[EclipsePoint]:
         """Generate altitude vs time points for the eclipse"""
 
         points = []
@@ -259,7 +260,7 @@ class SolarEclipseService:
         step = datetime.timedelta(minutes=5)
 
         while current <= end_local:
-            current_utc = current.astimezone(datetime.timezone.utc)
+            current_utc = current.astimezone(datetime.UTC)
             t_astropy = AstroTime(current_utc)
             frame = AltAz(obstime=t_astropy, location=self.location)
 

@@ -3,7 +3,8 @@ Tests for on_demand_translate.py
 Covers pure-logic branches and mocked HTTP calls.
 """
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 from utils import on_demand_translate as odt
 
 translate_text_on_demand = odt.translate_text_on_demand

@@ -1,8 +1,8 @@
 """Web Push notifications Blueprint. Routes: /api/push/*"""
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, jsonify, request
 
-from utils.auth import user_manager, login_required, get_current_user
+from utils.auth import get_current_user, login_required, user_manager
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -210,8 +210,8 @@ def push_test_trigger(trigger_id):
         if not current_user.push_subscriptions:
             return jsonify({'error': 'No push subscriptions for this user'}), 400
 
-        from utils.push_manager import send_push
         from utils.i18n_utils import get_translated_message
+        from utils.push_manager import send_push
 
         lang = current_user.preferences.get('language', 'en')
 

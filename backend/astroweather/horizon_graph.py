@@ -24,11 +24,10 @@ Example output:
 import datetime
 from dataclasses import dataclass
 from zoneinfo import ZoneInfo
-from typing import List, Optional
 
-from astropy.time import Time as AstroTime
-from astropy.coordinates import EarthLocation, AltAz, get_sun, get_body
 import astropy.units as u
+from astropy.coordinates import AltAz, EarthLocation, get_body, get_sun
+from astropy.time import Time as AstroTime
 
 # =============================
 # Data structures
@@ -48,8 +47,8 @@ class HorizonPoint:
 @dataclass
 class HorizonGraphInfo:
     date: str  # "YYYY-MM-DD"
-    sun_data: List[HorizonPoint]
-    moon_data: List[HorizonPoint]
+    sun_data: list[HorizonPoint]
+    moon_data: list[HorizonPoint]
 
 
 # =============================
@@ -71,7 +70,7 @@ class HorizonGraphService:
     # Public API
     # =============================
 
-    def get_horizon_data(self) -> Optional[HorizonGraphInfo]:
+    def get_horizon_data(self) -> HorizonGraphInfo | None:
         """Get sun and moon altitude/azimuth for current day (00:00 to 24:00)"""
 
         # Get current date in local timezone
@@ -88,7 +87,7 @@ class HorizonGraphService:
     # Core calculations
     # =============================
 
-    def _generate_body_positions(self, date: datetime.date, body: str) -> List[HorizonPoint]:
+    def _generate_body_positions(self, date: datetime.date, body: str) -> list[HorizonPoint]:
         """Generate altitude/azimuth positions for sun or moon for each hour of the day"""
 
         points = []
@@ -105,7 +104,7 @@ class HorizonGraphService:
             dt_local = dt_local.replace(tzinfo=self.timezone)
 
             # Convert to UTC
-            dt_utc = dt_local.astimezone(datetime.timezone.utc)
+            dt_utc = dt_local.astimezone(datetime.UTC)
 
             # Create astropy Time object
             t_astropy = AstroTime(dt_utc)
@@ -139,7 +138,7 @@ class HorizonGraphService:
 
         return points
 
-    def _coord_attribute(self, coord, attr_name: str) -> Optional[float]:
+    def _coord_attribute(self, coord, attr_name: str) -> float | None:
         """Safely extract altitude or azimuth from transformed coordinate"""
         attr = getattr(coord, attr_name, None)
         if attr is None:
@@ -147,5 +146,5 @@ class HorizonGraphService:
         try:
             value = attr.to_value(u.deg) if hasattr(attr, "to_value") else float(attr)
             return float(value)
-        except (AttributeError, TypeError):
+        except AttributeError, TypeError:
             return None

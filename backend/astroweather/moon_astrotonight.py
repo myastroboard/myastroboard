@@ -26,15 +26,14 @@ Example output (on API call):
 """
 
 import datetime
-from zoneinfo import ZoneInfo
 from dataclasses import dataclass
 from typing import Any, cast
+from zoneinfo import ZoneInfo
 
 import astropy.units as u
-from astropy.time import Time
-from astropy.coordinates import EarthLocation, AltAz, get_sun, get_body
-
 from astroplan.moon import moon_illumination
+from astropy.coordinates import AltAz, EarthLocation, get_body, get_sun
+from astropy.time import Time
 
 # ============================================================
 # Data structure
@@ -56,7 +55,6 @@ class BestWindow:
 
 
 class AstroTonightService:
-
     def __init__(self, latitude: float, longitude: float, timezone: str):
 
         self.latitude = latitude
@@ -110,7 +108,7 @@ class AstroTonightService:
             dt += step
 
         # Single vectorized Astropy pass: one AltAz frame for all N time steps
-        times_utc = [t.astimezone(datetime.timezone.utc) for t in times_local]
+        times_utc = [t.astimezone(datetime.UTC) for t in times_local]
         t_array = Time(times_utc)
         frame = AltAz(obstime=t_array, location=self.location)
         sun_alts = cast(Any, get_sun(t_array).transform_to(frame).alt).to_value(u.deg)
@@ -191,7 +189,7 @@ class AstroTonightService:
 
     def _moon_illumination(self, dt_local):
 
-        utc_dt = dt_local.astimezone(datetime.timezone.utc)
+        utc_dt = dt_local.astimezone(datetime.UTC)
         t = Time(utc_dt)
 
         illum = moon_illumination(t) * 100

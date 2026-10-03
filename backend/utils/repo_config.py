@@ -16,12 +16,12 @@ This module owns:
 import sys
 import uuid
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from db import settings_store
 from db.engine import transaction
-from utils.config_defaults import DEFAULT_CONFIG, DEFAULT_LOCATION, LOCATION_PRESET_EXTRA_FIELDS
 from utils import _sanitize_for_json
+from utils.config_defaults import DEFAULT_CONFIG, DEFAULT_LOCATION, LOCATION_PRESET_EXTRA_FIELDS
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -49,7 +49,7 @@ def _merge_defaults(config, defaults):
 
 
 def _utcnow_iso():
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def new_location_preset(base=None, is_install_default=False):

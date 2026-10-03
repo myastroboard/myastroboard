@@ -10,10 +10,10 @@ Covers every branch of all four routes:
 import sys
 import time
 import types
+from unittest.mock import MagicMock, patch
 
 import pytest
 import requests as _requests
-from unittest.mock import MagicMock, patch
 
 if 'psutil' not in sys.modules:
     sys.modules['psutil'] = types.ModuleType('psutil')
@@ -73,7 +73,6 @@ def _clear_allsky_caches():
 
 
 class TestAllSkyStatus:
-
     def test_requires_login(self, client):
         resp = client.get('/api/connectors/allsky/status')
         assert resp.status_code == 401
@@ -153,7 +152,6 @@ class TestAllSkyStatus:
 
 
 class TestAllSkyHealth:
-
     def test_requires_login(self, client):
         resp = client.get('/api/connectors/allsky/health')
         assert resp.status_code == 401
@@ -271,7 +269,6 @@ class TestAllSkyHealth:
 
 
 class TestAllSkyUrls:
-
     def test_requires_login(self, client):
         resp = client.get('/api/connectors/allsky/urls')
         assert resp.status_code == 401
@@ -333,7 +330,6 @@ class TestAllSkyUrls:
 
 
 class TestAllSkyProxy:
-
     def test_requires_login(self, client):
         resp = client.get('/api/connectors/allsky/proxy?module=live_image')
         assert resp.status_code == 401

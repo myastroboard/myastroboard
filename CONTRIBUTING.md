@@ -199,6 +199,8 @@ This includes:
 We follow [PEP 8](https://pep8.org/) with these specifics:
 
 #### Code Formatting
+- **ruff** formats and lints (`pyproject.toml`, which extends the organization baseline
+  `.github/org/ruff.base.toml`); quote style is left as written
 - Maximum line length: **120 characters**
 - Use **4 spaces** for indentation (no tabs)
 - Use **f-strings** for string formatting
@@ -211,11 +213,9 @@ from logging_config import get_logger
 
 logger = get_logger(__name__)
 
+
 def calculate_observation_score(
-    altitude: float,
-    magnitude: float,
-    moon_separation: float,
-    weather_quality: Optional[float] = None
+    altitude: float, magnitude: float, moon_separation: float, weather_quality: Optional[float] = None
 ) -> Dict[str, float]:
     """
     Calculate observation quality score for a celestial object.
@@ -235,7 +235,7 @@ def calculate_observation_score(
     score = {
         'altitude_score': altitude / 90.0,
         'magnitude_score': max(0, 1 - magnitude / 10),
-        'moon_score': moon_separation / 180.0
+        'moon_score': moon_separation / 180.0,
     }
 
     return score
@@ -446,11 +446,13 @@ docker-compose -f docker-compose-dev.yml run myastroboard pytest
 import pytest
 from backend.utils import parse_coordinates
 
+
 def test_parse_coordinates_valid_input():
     """Test coordinate parsing with valid decimal degrees."""
     lat, lon = parse_coordinates("48.8566", "2.3522")
     assert lat == pytest.approx(48.8566)
     assert lon == pytest.approx(2.3522)
+
 
 def test_parse_coordinates_invalid_format():
     """Test coordinate parsing handles invalid format gracefully."""
@@ -513,12 +515,12 @@ The failure output lists exactly which routes are unexpected or missing, so you 
 2. **Run tests and linting**
    ```bash
    pytest
-   black backend/ tests/
-   flake8 backend/ tests/
+   ruff format .
+   ruff check .
    pyright backend/
    djlint templates/ static/offline.html --profile jinja --lint --ignore H021,H023,H030,H031,J004,J018
    ```
-   `black` and `flake8` cover `tests/` too, not just `backend/`. `pyright` stays scoped to
+   `ruff` covers the whole repository (`backend/`, `tests/`, `scripts/`). `pyright` stays scoped to
    `backend/` - test code leans heavily on `monkeypatch`, `MagicMock` and other dynamic
    attributes that would drown real findings in false positives.
    `pyright` is the CLI equivalent of the Pylance errors VSCode shows inline — both come from

@@ -4,23 +4,24 @@ Provides astronomy planning and configuration management
 """
 
 import atexit
+import os
+import sys
+from datetime import timedelta
+
 from flask import (
     Flask,
-    request,
+    Response,
+    g,
+    redirect,
     render_template,
+    request,
     send_from_directory,
     session,
-    redirect,
     url_for,
-    g,
-    Response,
 )
 from flask_compress import Compress
 from flask_cors import CORS
 from werkzeug.middleware.proxy_fix import ProxyFix
-import os
-import sys
-from datetime import timedelta
 
 # Add backend to path for imports
 sys.path.insert(0, os.path.dirname(__file__))
@@ -41,8 +42,11 @@ _iers.conf.auto_max_age = None
 # If IERS-A was previously downloaded, load it into this worker's memory from the
 # known path so all Gunicorn workers benefit without any network call at startup.
 try:
+    from astropy.utils.iers import IERS_A as _IERS_A
+    from astropy.utils.iers import IERS_Auto as _IERS_Auto
+    from astropy.utils.iers import earth_orientation_table as _eot
+
     from utils.constants import IERS_CACHE_FILE as _IERS_CACHE_FILE
-    from astropy.utils.iers import IERS_Auto as _IERS_Auto, IERS_A as _IERS_A, earth_orientation_table as _eot
 
     if os.path.exists(_IERS_CACHE_FILE):  # pragma: no branch
         _table = _IERS_A.open(_IERS_CACHE_FILE)
@@ -54,26 +58,30 @@ try:
 except Exception:  # pragma: no cover
     pass  # No file yet; scheduler will download it on first cycle
 
-from utils.txtconf_loader import get_repo_version
-from utils.constants import DATA_DIR_CACHE
-from utils.logging_config import get_logger
+from astroweather import moon_planner  # noqa: F401
+from cache import cache_store  # noqa: F401
+from equipment import equipment_profiles  # noqa: F401
+
+# Domain modules re-exported here (not used directly by this module) because the test
+# suite patches them via monkeypatch.setattr(app.<module>, ...) - a stable seam even
+# though the actual route logic that calls them now lives in backend/blueprints/*.py.
+from observation import (
+    astrodex,  # noqa: F401
+    plan_my_night,
+)
 from skytonight.skytonight_storage import get_scheduler_lock_file as get_skytonight_scheduler_lock_file
+from space import (
+    css_passes,  # noqa: F401
+    iss_passes,  # noqa: F401
+)
 
 # Authentication
 # user_manager is unused directly by this module but kept as a test-patching seam,
 # same reason as the re-exports below (monkeypatch.setattr(app.user_manager, ...)).
 from utils.auth import get_current_user, user_manager  # noqa: F401
-
-# Domain modules re-exported here (not used directly by this module) because the test
-# suite patches them via monkeypatch.setattr(app.<module>, ...) - a stable seam even
-# though the actual route logic that calls them now lives in backend/blueprints/*.py.
-from observation import astrodex  # noqa: F401
-from cache import cache_store  # noqa: F401
-from space import css_passes  # noqa: F401
-from equipment import equipment_profiles  # noqa: F401
-from space import iss_passes  # noqa: F401
-from astroweather import moon_planner  # noqa: F401
-from observation import plan_my_night
+from utils.constants import DATA_DIR_CACHE
+from utils.logging_config import get_logger
+from utils.txtconf_loader import get_repo_version
 
 # Declares the re-exports above as intentional (not dead code) for static analysis -
 # their only consumers are tests doing monkeypatch.setattr(app.<name>, ...).
@@ -144,28 +152,28 @@ CORS(app, supports_credentials=True)
 Compress(app)
 
 # SkyTonight scheduler management (routes now live in blueprints.skytonight_api)
-from skytonight.skytonight_scheduler_manager import get_or_create_skytonight_scheduler
+from blueprints.admin import admin_bp
+from blueprints.astrodex import astrodex_bp
+from blueprints.astrodex_stream import astrodex_stream_bp
+from blueprints.astronomy import astronomy_bp
+from blueprints.auth import auth_bp
+from blueprints.connectors import connectors_bp
+from blueprints.connectors_allsky import connectors_allsky_bp
+from blueprints.connectors_mqtt import connectors_mqtt_bp
+from blueprints.connectors_myastroshine import connectors_myastroshine_bp
+from blueprints.equipment import equipment_bp
+from blueprints.locations import locations_bp
+from blueprints.misc import misc_bp
+from blueprints.observation_sessions import observation_sessions_bp
+from blueprints.plan_my_night import plan_my_night_bp
+from blueprints.push import push_bp
+from blueprints.session_analytics import session_analytics_bp
 
 # Domain Blueprints (see backend/blueprints/)
 from blueprints.skytonight_api import skytonight_bp
-from blueprints.auth import auth_bp
-from blueprints.push import push_bp
-from blueprints.locations import locations_bp
-from blueprints.connectors import connectors_bp
-from blueprints.connectors_allsky import connectors_allsky_bp
-from blueprints.connectors_myastroshine import connectors_myastroshine_bp
-from blueprints.connectors_mqtt import connectors_mqtt_bp
-from blueprints.astrodex_stream import astrodex_stream_bp
-from blueprints.admin import admin_bp
-from blueprints.misc import misc_bp
-from blueprints.weather import weather_bp
 from blueprints.tracking import tracking_bp
-from blueprints.astronomy import astronomy_bp
-from blueprints.plan_my_night import plan_my_night_bp
-from blueprints.astrodex import astrodex_bp
-from blueprints.equipment import equipment_bp
-from blueprints.observation_sessions import observation_sessions_bp
-from blueprints.session_analytics import session_analytics_bp
+from blueprints.weather import weather_bp
+from skytonight.skytonight_scheduler_manager import get_or_create_skytonight_scheduler
 
 app.register_blueprint(skytonight_bp)
 app.register_blueprint(auth_bp)
@@ -438,7 +446,8 @@ if _AUTOSTART_SCHEDULERS:  # pragma: no cover - never true while imported under 
     # config file is never rewritten at import time.
     try:
         from utils.connector_secrets import migrate_all_legacy_secrets as _migrate_secrets
-        from utils.repo_config import load_config as _load_config_for_secrets, save_config as _save_config_for_secrets
+        from utils.repo_config import load_config as _load_config_for_secrets
+        from utils.repo_config import save_config as _save_config_for_secrets
 
         _startup_config = _load_config_for_secrets()
         if _migrate_secrets(_startup_config):

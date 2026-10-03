@@ -5,11 +5,13 @@ v1.2 per-location cache slots (update functions write through
 cache_store.update_location_cache keyed by the preset id).
 """
 
-import pytest
-from unittest.mock import Mock, MagicMock, patch
 import sys
 import types
+from datetime import UTC
+from unittest.mock import MagicMock, Mock, patch
+
 import pandas as pd
+import pytest
 
 from cache.cache_updater import check_and_handle_config_changes
 
@@ -267,6 +269,7 @@ class TestCacheUpdateFunctionsBasic:
     def test_update_astro_weather_cache_success(self, mock_get_analysis, mock_cache_store, mock_config):
         """The astro_weather cache stores the analysis, JSON-sanitised, under the preset id."""
         import numpy as np
+
         from cache.cache_updater import update_astro_weather_cache
 
         mock_get_analysis.return_value = {
@@ -835,10 +838,12 @@ class TestNextAstronomicalDuskUtc:
 
     def test_returns_dusk_when_valid_and_future(self):
         """Returns ISO string when dusk is in the future."""
-        from cache.cache_updater import _next_astronomical_dusk_utc
-        from datetime import datetime as _dt, timezone, timedelta
+        from datetime import datetime as _dt
+        from datetime import timedelta
 
-        future_dusk = (_dt.now(timezone.utc) + timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%S")
+        from cache.cache_updater import _next_astronomical_dusk_utc
+
+        future_dusk = (_dt.now(UTC) + timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%S")
         report = types.SimpleNamespace(astronomical_dusk=future_dusk)
         sun_service = MagicMock()
         sun_service.get_today_report.return_value = report
@@ -874,10 +879,12 @@ class TestNextAstronomicalDuskUtc:
 
     def test_returns_none_when_dusk_in_past(self):
         """Returns None when dusk is already in the past."""
-        from cache.cache_updater import _next_astronomical_dusk_utc
-        from datetime import datetime as _dt, timezone, timedelta
+        from datetime import datetime as _dt
+        from datetime import timedelta
 
-        past_dusk = (_dt.now(timezone.utc) - timedelta(hours=3)).strftime("%Y-%m-%dT%H:%M:%S")
+        from cache.cache_updater import _next_astronomical_dusk_utc
+
+        past_dusk = (_dt.now(UTC) - timedelta(hours=3)).strftime("%Y-%m-%dT%H:%M:%S")
         report = types.SimpleNamespace(astronomical_dusk=past_dusk)
         sun_service = MagicMock()
         sun_service.get_today_report.return_value = report
@@ -888,11 +895,13 @@ class TestNextAstronomicalDuskUtc:
 
     def test_skips_bad_dusk_string_and_continues(self):
         """Bad dusk string is skipped and the loop continues to the next report."""
+        from datetime import datetime as _dt
+        from datetime import timedelta
+
         from cache.cache_updater import _next_astronomical_dusk_utc
-        from datetime import datetime as _dt, timezone, timedelta
 
         bad_report = types.SimpleNamespace(astronomical_dusk="not-a-valid-datetime")
-        future_dusk = (_dt.now(timezone.utc) + timedelta(hours=4)).strftime("%Y-%m-%dT%H:%M:%S")
+        future_dusk = (_dt.now(UTC) + timedelta(hours=4)).strftime("%Y-%m-%dT%H:%M:%S")
         good_report = types.SimpleNamespace(astronomical_dusk=future_dusk)
         sun_service = MagicMock()
         sun_service.get_today_report.return_value = bad_report
@@ -1955,8 +1964,9 @@ class TestCacheUpdaterIersBranches:
 
     def test_update_iers_no_mirror_url(self):
         """mirror_url is None → single URL list."""
-        from cache.cache_updater import update_iers_cache
         import astropy.utils.iers as _iers_mod
+
+        from cache.cache_updater import update_iers_cache
 
         mock_conf = MagicMock()
         mock_conf.iers_auto_url = "https://example.com/iers.ecsv"
@@ -2105,8 +2115,7 @@ def test_cache_updater_masked_location_log_safe_coord_exceptions():
 
 
 def test_update_allsky_sensor_cache_paths(monkeypatch):
-    from cache import cache_updater
-    from cache import cache_store
+    from cache import cache_store, cache_updater
 
     monkeypatch.setattr(
         cache_updater,
@@ -2138,8 +2147,7 @@ def test_update_allsky_sensor_cache_none_config_and_early_returns(monkeypatch):
 
 
 def test_update_allsky_health_cache_paths(monkeypatch):
-    from cache import cache_updater
-    from cache import cache_store
+    from cache import cache_store, cache_updater
 
     monkeypatch.setattr(
         cache_updater,
@@ -2376,9 +2384,10 @@ class TestCachedEventHasEnded:
 
     @staticmethod
     def _entry(payload_key, field, offset_hours):
-        from datetime import datetime as _dt, timezone, timedelta
+        from datetime import datetime as _dt
+        from datetime import timedelta
 
-        when = _dt.now(timezone.utc) + timedelta(hours=offset_hours)
+        when = _dt.now(UTC) + timedelta(hours=offset_hours)
         return {"timestamp": 1, "data": {payload_key: {field: when.isoformat(timespec="seconds")}}}
 
     def test_finished_solar_eclipse_is_reported_as_ended(self):
@@ -2423,7 +2432,9 @@ class TestCachedEventHasEnded:
 
 def _run_eclipse_job_cycle(monkeypatch, end_offset_hours):
     """Run one refresh cycle where the eclipse cache is TTL-valid; return the jobs that ran."""
-    from datetime import datetime as _dt, timezone, timedelta
+    from datetime import datetime as _dt
+    from datetime import timedelta
+
     from cache import cache_updater
 
     ran = []
@@ -2431,7 +2442,7 @@ def _run_eclipse_job_cycle(monkeypatch, end_offset_hours):
     def _eclipse_job(config=None, location=None):
         ran.append(location.get("id"))
 
-    end_time = _dt.now(timezone.utc) + timedelta(hours=end_offset_hours)
+    end_time = _dt.now(UTC) + timedelta(hours=end_offset_hours)
     mock_cs = MagicMock()
     mock_cs.load_location_cache.return_value = {
         "timestamp": 1,

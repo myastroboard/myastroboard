@@ -9,7 +9,6 @@ existing OTP and connector rate limiters accept.
 import time
 from collections import deque
 from threading import Lock
-from typing import Dict, Optional
 
 
 class SlidingWindowCounter:
@@ -22,13 +21,13 @@ class SlidingWindowCounter:
         self.max_events = max_events
         self.window_seconds = window_seconds
         self._lock = Lock()
-        self._events: Dict[str, deque] = {}
+        self._events: dict[str, deque] = {}
 
     def _expire(self, hits: deque, now: float) -> None:
         while hits and hits[0] <= now - self.window_seconds:
             hits.popleft()
 
-    def exceeded(self, key: str, now: Optional[float] = None) -> bool:
+    def exceeded(self, key: str, now: float | None = None) -> bool:
         """True when ``key`` already has ``max_events`` events inside the window."""
         now = time.time() if now is None else now
         with self._lock:
@@ -38,7 +37,7 @@ class SlidingWindowCounter:
             self._expire(hits, now)
             return len(hits) >= self.max_events
 
-    def retry_after(self, key: str, now: Optional[float] = None) -> int:
+    def retry_after(self, key: str, now: float | None = None) -> int:
         """Seconds until ``key`` drops back under the limit (0 when it is not limited)."""
         now = time.time() if now is None else now
         with self._lock:
@@ -51,7 +50,7 @@ class SlidingWindowCounter:
             oldest_blocking = hits[len(hits) - self.max_events]
             return max(1, int(oldest_blocking + self.window_seconds - now + 0.999))
 
-    def record(self, key: str, now: Optional[float] = None) -> None:
+    def record(self, key: str, now: float | None = None) -> None:
         now = time.time() if now is None else now
         with self._lock:
             hits = self._events.setdefault(key, deque())
@@ -64,7 +63,7 @@ class SlidingWindowCounter:
                     if not other_hits:
                         del self._events[other]
 
-    def clear(self, key: Optional[str] = None) -> None:
+    def clear(self, key: str | None = None) -> None:
         """Forget ``key``, or every key when called without one."""
         with self._lock:
             if key is None:

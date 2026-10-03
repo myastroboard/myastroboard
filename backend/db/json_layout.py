@@ -11,7 +11,6 @@ Paths are relative, ``/``-separated, under the data directory (or the archive ro
 """
 
 import re
-from typing import Dict, List, Optional, Tuple
 
 EQUIPMENT_TYPES = ('telescopes', 'cameras', 'mounts', 'filters', 'accessories', 'combinations')
 # The no-combination plan's document key and its historical file name
@@ -19,7 +18,7 @@ DEFAULT_PLAN_KEY = 'default'
 _DEFAULT_PLAN_FILE_SUFFIX = 'my_night'
 
 # kind -> (folder, file name suffix after "<user_id>_")
-_SIMPLE_KINDS: Dict[str, Tuple[str, str]] = {
+_SIMPLE_KINDS: dict[str, tuple[str, str]] = {
     'astrodex': ('astrodex', 'astrodex.json'),
     'observation_sessions': ('observation_sessions', 'sessions.json'),
     'wishlist': ('wishlist', 'wishlist.json'),
@@ -28,7 +27,7 @@ _EQUIPMENT_FOLDER = 'equipments'
 _PLAN_FOLDER = 'projects'
 
 # Every folder holding per-user documents
-DOCUMENT_FOLDERS: Tuple[str, ...] = tuple(folder for folder, _suffix in _SIMPLE_KINDS.values()) + (
+DOCUMENT_FOLDERS: tuple[str, ...] = tuple(folder for folder, _suffix in _SIMPLE_KINDS.values()) + (
     _EQUIPMENT_FOLDER,
     _PLAN_FOLDER,
 )
@@ -44,14 +43,14 @@ def document_path(kind: str, user_id: str, doc_key: str = '') -> str:
         folder, suffix = _SIMPLE_KINDS[kind]
         return f'{folder}/{user_id}_{suffix}'
     if kind.startswith('equipment.') and kind[len('equipment.') :] in EQUIPMENT_TYPES:
-        return f'{_EQUIPMENT_FOLDER}/{user_id}_{kind[len("equipment."):]}.json'
+        return f'{_EQUIPMENT_FOLDER}/{user_id}_{kind[len("equipment.") :]}.json'
     if kind == 'plan':
         name = _DEFAULT_PLAN_FILE_SUFFIX if doc_key in ('', DEFAULT_PLAN_KEY) else doc_key
         return f'{_PLAN_FOLDER}/{user_id}_plan_{name}.json'
     raise ValueError(f'Unknown document kind: {kind!r}')
 
 
-_PATTERNS: List[Tuple['re.Pattern[str]', str]] = [
+_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(rf'^{folder}/(?P<user>{_USER_ID})_{re.escape(suffix)}$'), kind)
     for kind, (folder, suffix) in _SIMPLE_KINDS.items()
 ] + [
@@ -63,7 +62,7 @@ _PATTERNS: List[Tuple['re.Pattern[str]', str]] = [
 ]
 
 
-def parse_document_path(relative_path: str) -> Optional[Tuple[str, str, str]]:
+def parse_document_path(relative_path: str) -> tuple[str, str, str] | None:
     """``(kind, user_id, doc_key)`` for a document's JSON path, or None when it is not one."""
     path = relative_path.replace('\\', '/')
     for pattern, kind in _PATTERNS:

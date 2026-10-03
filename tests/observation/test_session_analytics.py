@@ -211,7 +211,6 @@ class TestBuildSummaryEmpty:
 
 
 class TestBuildSummaryTotals:
-
     def test_lifetime_year_and_month_buckets(self, one_session):
         summary = build_summary(one_session, TODAY)
         totals = summary['totals']
@@ -311,7 +310,6 @@ class TestBuildSummaryTotals:
 
 
 class TestBuildSummaryMonthlySeries:
-
     def test_months_without_activity_are_filled_in(self):
         """A gap must render as a zero bar, not close up the axis."""
         sessions = [
@@ -349,7 +347,6 @@ class TestBuildSummaryMonthlySeries:
 
 
 class TestBuildSummaryBreakdowns:
-
     def test_object_types_are_ranked_by_integration(self):
         sessions = [
             make_session(
@@ -555,7 +552,6 @@ class TestBuildSummaryRobustness:
 
 
 class TestBuildConditions:
-
     def _rated(self, **night_fields):
         night = make_night('n1', '2026-09-10', **night_fields)
         return [make_session('s1', [night], [make_entry('M 31', integration_minutes=60.0, rating=4.0)])]
@@ -681,7 +677,6 @@ class TestBuildConditions:
 
 
 class TestBuildLoggedMonths:
-
     def test_always_returns_all_twelve_months(self):
         rows = build_logged_months([])
         assert [row['month'] for row in rows] == list(range(1, 13))
@@ -817,7 +812,6 @@ def stub_resolver(monkeypatch):
 
 
 class TestBuildSkyCoverage:
-
     def test_empty_inputs(self, stub_resolver):
         coverage = session_analytics.build_sky_coverage([], [])
         assert coverage['points'] == []

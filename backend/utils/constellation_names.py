@@ -12,8 +12,8 @@ exactly why the table used to exist as separate copies in ``observation/beginner
 and ``blueprints/skytonight_api.py``, each with a comment about dodging a circular import.
 """
 
-from typing import Any, Dict
 import re
+from typing import Any
 
 from constellation import Constellation as _Constellation
 
@@ -25,7 +25,7 @@ def _humanize(name: str) -> str:
     return _CAMEL_BOUNDARY.sub(' ', name)
 
 
-def _build_abbreviation_map() -> Dict[str, str]:
+def _build_abbreviation_map() -> dict[str, str]:
     mapping = {str(item.abbr): _humanize(item.name) for item in _Constellation if item.abbr is not None}
     # Serpens is the one constellation split into two disjoint areas; the dataset
     # distinguishes them, the enum does not.
@@ -34,11 +34,11 @@ def _build_abbreviation_map() -> Dict[str, str]:
     return mapping
 
 
-ABBREVIATION_TO_NAME: Dict[str, str] = _build_abbreviation_map()
+ABBREVIATION_TO_NAME: dict[str, str] = _build_abbreviation_map()
 
 # Lowercased full name -> canonical full name, so an already-expanded value in any casing
 # ("cygnus", "CYGNUS") normalizes to the exact spelling the i18n keys use.
-_NAME_BY_LOWERCASE: Dict[str, str] = {value.lower(): value for value in ABBREVIATION_TO_NAME.values()}
+_NAME_BY_LOWERCASE: dict[str, str] = {value.lower(): value for value in ABBREVIATION_TO_NAME.values()}
 
 
 def full_constellation_name(value: Any) -> str:

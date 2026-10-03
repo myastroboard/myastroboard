@@ -14,20 +14,19 @@ import math
 import os
 import re
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Dict, List, Optional, Tuple, cast
+from datetime import UTC, datetime, timedelta
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
-import numpy as np
 import astropy.units as u
+import numpy as np
+from astroplan.moon import moon_illumination
 from astropy.coordinates import AltAz, EarthLocation, SkyCoord, get_body
 from astropy.time import Time
 
-from astroplan.moon import moon_illumination
-
-from utils.logging_config import get_logger
-from utils.repo_config import load_config
+from astroweather.sun_phases import SunService
 from skytonight.skytonight_models import SkyTonightTarget
 from skytonight.skytonight_storage import (
     ensure_skytonight_directories,
@@ -39,8 +38,9 @@ from skytonight.skytonight_storage import (
     get_skymap_file,
 )
 from skytonight.skytonight_targets import choose_preferred_catalogue_name, load_targets_dataset, normalize_object_name
-from astroweather.sun_phases import SunService
 from utils import load_json_file, save_json_file
+from utils.logging_config import get_logger
+from utils.repo_config import load_config
 
 logger = get_logger(__name__)
 
@@ -80,7 +80,7 @@ def _comet_id_without_ref(target_id: str) -> str:
     return target_id[:token_index]
 
 
-def _alttime_json_path(target_id: str, location_id: Optional[str] = None) -> str:
+def _alttime_json_path(target_id: str, location_id: str | None = None) -> str:
     """Return the full path for a target's altitude-time JSON file (per location)."""
     safe_id = _ALTTIME_ID_SAFE.sub('_', target_id.lower())
     return os.path.join(get_alttime_dir(location_id), f'{safe_id}_alttime.json')
@@ -93,13 +93,13 @@ def _save_alttime_json(
     altitudes: np.ndarray,
     night_start: datetime,
     night_end: datetime,
-    constraints: Dict[str, Any],
+    constraints: dict[str, Any],
     timezone_name: str = 'UTC',
-    precomputed_times_iso: Optional[List[str]] = None,
-    az_degrees: Optional[np.ndarray] = None,
-    astro_night_start: Optional[datetime] = None,
-    astro_night_end: Optional[datetime] = None,
-    location_id: Optional[str] = None,
+    precomputed_times_iso: list[str] | None = None,
+    az_degrees: np.ndarray | None = None,
+    astro_night_start: datetime | None = None,
+    astro_night_end: datetime | None = None,
+    location_id: str | None = None,
 ) -> bool:
     """Persist altitude-time series for one target to the location's outputs directory.
 
@@ -114,9 +114,9 @@ def _save_alttime_json(
         else:
             times_iso = [
                 t.strftime('%Y-%m-%dT%H:%M:%S')  # type: ignore[attr-defined]
-                for t in times.to_datetime(timezone=timezone.utc)
+                for t in times.to_datetime(timezone=UTC)
             ]
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             'target_id': target_id,
             'name': name,
             'timezone': timezone_name,
@@ -143,7 +143,7 @@ def _save_alttime_json(
         return False
 
 
-def _clear_alttime_files(location_id: Optional[str] = None) -> None:
+def _clear_alttime_files(location_id: str | None = None) -> None:
     """Remove one location's altitude-time JSON files from the previous run."""
     try:
         alttime_dir = get_alttime_dir(location_id)
@@ -157,7 +157,7 @@ def _clear_alttime_files(location_id: Optional[str] = None) -> None:
         logger.debug(f'Failed to clear alttime files: {exc}')
 
 
-def compute_comet_alttime_on_demand(target_id: str, location: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def compute_comet_alttime_on_demand(target_id: str, location: dict[str, Any]) -> dict[str, Any] | None:
     """Compute tonight's altitude-time series for a comet with no saved file.
 
     Comets that never clear the site's altitude/airmass floor are excluded
@@ -204,13 +204,13 @@ def compute_comet_alttime_on_demand(target_id: str, location: Dict[str, Any]) ->
     skytonight_cfg = config.get('skytonight', {}) if isinstance(config, dict) else {}
     constraints = skytonight_cfg.get('constraints', {})
 
-    payload: Dict[str, Any] = {
+    payload: dict[str, Any] = {
         'target_id': target_id,
         'name': target.preferred_name or target_id,
         'timezone': timezone_name,
         'night_start': night_start.isoformat(),
         'night_end': night_end.isoformat(),
-        'times_utc': [t.strftime('%Y-%m-%dT%H:%M:%S') for t in times.to_datetime(timezone=timezone.utc)],
+        'times_utc': [t.strftime('%Y-%m-%dT%H:%M:%S') for t in times.to_datetime(timezone=UTC)],
         'altitudes': [round(float(a), 2) for a in alt_deg],
         'azimuths': [round(float(a), 1) for a in az_deg],
         'altitude_constraint_min': float(constraints.get('altitude_constraint_min', 30)),
@@ -230,22 +230,22 @@ def compute_comet_alttime_on_demand(target_id: str, location: Dict[str, Any]) ->
 # Module-level calculation progress - updated in-place during run_calculations
 # so the scheduler can surface live phase info while calculation runs.
 # ---------------------------------------------------------------------------
-_calculation_progress: Dict[str, Any] = {}
+_calculation_progress: dict[str, Any] = {}
 
 # Called (throttled) on progress updates so the scheduler can persist them to the
 # shared status file: the dict above only lives in the worker running the
 # calculation, while status requests are served by any gunicorn worker.
-_progress_listener: Optional[Callable[[], None]] = None
+_progress_listener: Callable[[], None] | None = None
 _PROGRESS_PUBLISH_INTERVAL_SECONDS = 2.0
 _last_progress_publish = 0.0
 
 
-def get_calculation_progress() -> Dict[str, Any]:
+def get_calculation_progress() -> dict[str, Any]:
     """Return a snapshot of the current calculation phase information."""
     return dict(_calculation_progress)
 
 
-def set_progress_listener(listener: Optional[Callable[[], None]]) -> None:
+def set_progress_listener(listener: Callable[[], None] | None) -> None:
     """Register (or clear, with None) the callback that publishes progress to other workers."""
     global _progress_listener, _last_progress_publish
     _progress_listener = listener
@@ -278,7 +278,7 @@ def _publish_progress() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _parse_localtime(text: str, tz: ZoneInfo) -> Optional[datetime]:
+def _parse_localtime(text: str, tz: ZoneInfo) -> datetime | None:
     text = str(text or '').strip()
     if not text or text == 'Not found':
         return None
@@ -309,7 +309,7 @@ def _angular_separation_deg(ra1: float, dec1: float, ra2: float, dec2: float) ->
     return math.degrees(math.acos(cos_val))
 
 
-def _horizon_floor_array(az_deg: np.ndarray, profile: List[Dict[str, Any]]) -> np.ndarray:
+def _horizon_floor_array(az_deg: np.ndarray, profile: list[dict[str, Any]]) -> np.ndarray:
     """Return the custom horizon minimum altitude at each azimuth sample.
 
     Linearly interpolates between profile points on the circular azimuth scale.
@@ -331,7 +331,7 @@ def _horizon_floor_array(az_deg: np.ndarray, profile: List[Dict[str, Any]]) -> n
         return np.zeros(len(az_deg), dtype=np.float32)
 
 
-def _surface_brightness(magnitude: Optional[float], size_arcmin: Optional[float]) -> Optional[float]:
+def _surface_brightness(magnitude: float | None, size_arcmin: float | None) -> float | None:
     """Approximate surface brightness from integrated magnitude and angular size."""
     if magnitude is None or size_arcmin is None or size_arcmin <= 0:
         return None
@@ -348,7 +348,7 @@ def _get_night_window(
     lat: float,
     lon: float,
     timezone_name: str,
-) -> Optional[Tuple[datetime, datetime]]:
+) -> tuple[datetime, datetime] | None:
     """Return (dusk, dawn) for tonight's nautical night; None if no night."""
     tz = ZoneInfo(timezone_name)
     sun_service = SunService(latitude=lat, longitude=lon, timezone=timezone_name)
@@ -375,7 +375,7 @@ def _get_astro_night_window(
     lat: float,
     lon: float,
     timezone_name: str,
-) -> Optional[Tuple[datetime, datetime]]:
+) -> tuple[datetime, datetime] | None:
     """Return (astro_dusk, astro_dawn) for tonight's astronomical night (-18° sun); None if unavailable."""
     tz = ZoneInfo(timezone_name)
     sun_service = SunService(latitude=lat, longitude=lon, timezone=timezone_name)
@@ -409,7 +409,7 @@ def _sample_times(night_start: datetime, night_end: datetime) -> Time:
     times_utc = [night_start + timedelta(minutes=i * step_minutes) for i in range(n_steps)]
     # Astropy isot format requires bare UTC strings without timezone offset (e.g.
     # "2026-04-01T20:00:00.000"), so strip the "+00:00" suffix produced by isoformat().
-    iso_strings = [t.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.000') for t in times_utc]
+    iso_strings = [t.astimezone(UTC).strftime('%Y-%m-%dT%H:%M:%S.000') for t in times_utc]
     return Time(iso_strings, format='isot', scale='utc')  # type: ignore[call-overload]
 
 
@@ -418,7 +418,7 @@ def _compute_altaz_series(
     dec_degrees: float,
     times: Any,
     location: EarthLocation,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """Return (alt_deg, az_deg) arrays for the target over 'times'."""
     coord = SkyCoord(ra=ra_hours * u.hourangle, dec=dec_degrees * u.deg, frame='icrs')
     frame = AltAz(obstime=times, location=location)
@@ -430,7 +430,7 @@ def _compute_body_altaz_series(
     body_name: str,
     times: Any,
     location: EarthLocation,
-) -> Tuple[np.ndarray, np.ndarray, float, float]:
+) -> tuple[np.ndarray, np.ndarray, float, float]:
     """Return (alt_deg, az_deg, ra_hours_mid, dec_degrees_mid) for a solar system body.
 
     Uses astropy's built-in ephemeris so positions are accurate for the current date.
@@ -457,7 +457,7 @@ def _meridian_transit_time(
     night_end: datetime,
     lat: float,
     lon: float,
-) -> Optional[str]:
+) -> str | None:
     """
     Approximate meridian transit time (local sidereal time equals target RA).
 
@@ -469,10 +469,10 @@ def _meridian_transit_time(
         step = timedelta(minutes=_TIME_RESOLUTION_MINUTES)
         current = night_start
 
-        prev_hour_angle: Optional[float] = None
+        prev_hour_angle: float | None = None
 
         while current <= night_end:
-            utc_moment = current.astimezone(timezone.utc)
+            utc_moment = current.astimezone(UTC)
             t = Time(utc_moment.strftime('%Y-%m-%dT%H:%M:%S.000'), format='isot', scale='utc')
             lst_hours = float(t.sidereal_time('apparent', longitude=location.lon).hour)  # type: ignore[attr-defined]
             ha = ((lst_hours - ra_hours + 12.0) % 24.0) - 12.0  # [-12, +12]
@@ -495,17 +495,17 @@ def _antimeridian_transit_time(
     night_end: datetime,
     lat: float,
     lon: float,
-) -> Optional[str]:
+) -> str | None:
     """Approximate antimeridian transit (HA = ±12 h)."""
     try:
         location = EarthLocation(lat=lat * u.deg, lon=lon * u.deg)
         anti_ra = (ra_hours + 12.0) % 24.0
         step = timedelta(minutes=_TIME_RESOLUTION_MINUTES)
         current = night_start
-        prev_hour_angle: Optional[float] = None
+        prev_hour_angle: float | None = None
 
         while current <= night_end:
-            utc_moment = current.astimezone(timezone.utc)
+            utc_moment = current.astimezone(UTC)
             t = Time(utc_moment.strftime('%Y-%m-%dT%H:%M:%S.000'), format='isot', scale='utc')
             lst_hours = float(t.sidereal_time('apparent', longitude=location.lon).hour)  # type: ignore[attr-defined]
             ha = ((lst_hours - anti_ra + 12.0) % 24.0) - 12.0
@@ -525,8 +525,8 @@ def _antimeridian_transit_time(
 def _meridian_transit_fast(
     ra_hours: float,
     lst_hours: np.ndarray,
-    times_local: List[datetime],
-) -> Optional[str]:
+    times_local: list[datetime],
+) -> str | None:
     """Fast meridian transit using a precomputed LST array (avoids per-step sidereal_time calls)."""
     try:
         ha = ((lst_hours - ra_hours + 12.0) % 24.0) - 12.0
@@ -542,8 +542,8 @@ def _meridian_transit_fast(
 def _antimeridian_transit_fast(
     ra_hours: float,
     lst_hours: np.ndarray,
-    times_local: List[datetime],
-) -> Optional[str]:
+    times_local: list[datetime],
+) -> str | None:
     """Fast antimeridian transit using a precomputed LST array."""
     try:
         anti_ra = (ra_hours + 12.0) % 24.0
@@ -563,7 +563,7 @@ def _antimeridian_transit_fast(
 _SIDEREAL_HOURS_PER_SOLAR_HOUR = 1.0027379093
 
 
-def _local_sidereal_time_hours(moment: datetime, lon_deg: float) -> Optional[float]:
+def _local_sidereal_time_hours(moment: datetime, lon_deg: float) -> float | None:
     """Apparent local sidereal time (hours in [0, 24)) at *moment* for *lon_deg*.
 
     One Astropy ``sidereal_time`` call. A caller that needs the meridian transit of
@@ -572,7 +572,7 @@ def _local_sidereal_time_hours(moment: datetime, lon_deg: float) -> Optional[flo
     """
     try:
         location = EarthLocation(lat=0.0 * u.deg, lon=lon_deg * u.deg)
-        utc_moment = moment.astimezone(timezone.utc)
+        utc_moment = moment.astimezone(UTC)
         t = Time(utc_moment.strftime('%Y-%m-%dT%H:%M:%S.000'), format='isot', scale='utc')
         return float(t.sidereal_time('apparent', longitude=location.lon).hour) % 24.0  # type: ignore[attr-defined]
     except Exception as exc:
@@ -585,7 +585,7 @@ def _meridian_transit_from_lst(
     night_start: datetime,
     night_end: datetime,
     lst_start_hours: float,
-) -> Optional[str]:
+) -> str | None:
     """Upper-meridian transit (local ``HH:MM``) from a precomputed LST at *night_start*.
 
     Same minute-level contract as :func:`_meridian_transit_time`, but O(1): the first
@@ -611,8 +611,8 @@ class _MoonInfo:
 
     def __init__(self, times: Any, location: EarthLocation) -> None:
         self.phase: float = 0.0  # 0 = new, 1 = full
-        self.ra_deg: Optional[float] = None
-        self.dec_deg: Optional[float] = None
+        self.ra_deg: float | None = None
+        self.dec_deg: float | None = None
         self._compute(times, location)
 
     def _compute(self, times: Any, location: EarthLocation) -> None:
@@ -639,16 +639,16 @@ def compute_astro_score(
     observable_hours: float,
     meridian_altitude: float,
     moon_phase: float,
-    angular_distance_moon: Optional[float],
-    magnitude: Optional[float],
-    size_arcmin: Optional[float],
+    angular_distance_moon: float | None,
+    magnitude: float | None,
+    size_arcmin: float | None,
     observable_hours_in_window: float,
     window_start_hour: int,
     is_messier: bool = False,
     is_planet: bool = False,
     is_opposition: bool = False,
-    sqm: Optional[float] = None,
-    object_type: Optional[str] = None,
+    sqm: float | None = None,
+    object_type: str | None = None,
 ) -> float:
     """
     Compute AstroScore on [0, 1] for astrophotography suitability.
@@ -737,7 +737,7 @@ _DIFFICULTY_WEIGHT_MAGNITUDE = 0.20
 # Minimum-integration-hours weight (0.10) is not applied - see docstring below.
 
 
-def compute_difficulty_score(target: SkyTonightTarget) -> Tuple[int, str]:
+def compute_difficulty_score(target: SkyTonightTarget) -> tuple[int, str]:
     """
     Compute a static astrophotography difficulty score and label for a target.
 
@@ -837,18 +837,18 @@ def _compute_target_result(
     altaz_values: np.ndarray,
     location: EarthLocation,
     moon: _MoonInfo,
-    constraints: Dict[str, Any],
+    constraints: dict[str, Any],
     night_start: datetime,
     night_end: datetime,
     lat: float,
     lon: float,
     *,
-    az_values: Optional[np.ndarray] = None,
-    lst_hours: Optional[np.ndarray] = None,
-    times_local: Optional[List[datetime]] = None,
-    preferred_name_order: Optional[List[str]] = None,
-    sqm: Optional[float] = None,
-) -> Optional[Dict[str, Any]]:
+    az_values: np.ndarray | None = None,
+    lst_hours: np.ndarray | None = None,
+    times_local: list[datetime] | None = None,
+    preferred_name_order: list[str] | None = None,
+    sqm: float | None = None,
+) -> dict[str, Any] | None:
     """Return a computed result dict for one target, or None if not visible."""
     if target.coordinates is None:
         return None
@@ -896,7 +896,7 @@ def _compute_target_result(
             effective_min_sep = moon.phase * 100.0
         if ang_sep < effective_min_sep:
             return None
-        angular_distance_moon: Optional[float] = ang_sep
+        angular_distance_moon: float | None = ang_sep
     else:
         angular_distance_moon = None
 
@@ -906,7 +906,7 @@ def _compute_target_result(
         return None
 
     # Steps where target is within [alt_min, alt_max], respecting custom horizon profile
-    horizon_profile: List[Dict[str, Any]] = constraints.get('horizon_profile', [])
+    horizon_profile: list[dict[str, Any]] = constraints.get('horizon_profile', [])
     if horizon_profile and az_values is not None:
         horizon_floors = np.maximum(alt_min, _horizon_floor_array(az_values, horizon_profile))
         in_window_mask = (altaz_values >= horizon_floors) & (altaz_values <= alt_max)
@@ -934,7 +934,7 @@ def _compute_target_result(
     meridian_altitude = float(altaz_values[peak_idx])
 
     # At the peak time, also record AZ
-    peak_az_deg: Optional[float] = None
+    peak_az_deg: float | None = None
     try:
         if az_values is not None:
             az_cw = float(az_values[peak_idx])
@@ -950,13 +950,13 @@ def _compute_target_result(
 
     # Find first/last observable indices using NumPy (avoids O(n) Python generator loops)
     obs_indices = np.nonzero(in_window_mask)[0]
-    first_obs_idx: Optional[int] = int(obs_indices[0]) if len(obs_indices) > 0 else None
-    last_obs_idx: Optional[int] = int(obs_indices[-1]) if len(obs_indices) > 0 else None
+    first_obs_idx: int | None = int(obs_indices[0]) if len(obs_indices) > 0 else None
+    last_obs_idx: int | None = int(obs_indices[-1]) if len(obs_indices) > 0 else None
 
     if times_local is not None:
         window_start_hour = times_local[first_obs_idx].hour if first_obs_idx is not None else night_start.hour
-        rise_time: Optional[str] = times_local[first_obs_idx].strftime('%H:%M') if first_obs_idx is not None else None
-        set_time: Optional[str] = times_local[last_obs_idx].strftime('%H:%M') if last_obs_idx is not None else None
+        rise_time: str | None = times_local[first_obs_idx].strftime('%H:%M') if first_obs_idx is not None else None
+        set_time: str | None = times_local[last_obs_idx].strftime('%H:%M') if last_obs_idx is not None else None
     else:
         if first_obs_idx is not None:
             _fot = night_start + timedelta(minutes=first_obs_idx * _TIME_RESOLUTION_MINUTES)
@@ -1018,9 +1018,9 @@ def _compute_target_result(
     # path. The night grid steps are irregular (~17 min) and rarely land on :00, so each
     # whole-hour mark inside the sampled span is linearly interpolated between its two
     # bracketing samples rather than snapped to the nearest sample.
-    hourly_altitude: List[Dict[str, Any]] = []
+    hourly_altitude: list[dict[str, Any]] = []
     if times_local is not None and len(times_local) == len(altaz_values) and len(times_local) >= 2:
-        by_hour: Dict[int, float] = {}
+        by_hour: dict[int, float] = {}
         for sample_idx in range(len(times_local) - 1):
             t0 = times_local[sample_idx]
             t1 = times_local[sample_idx + 1]
@@ -1086,12 +1086,12 @@ def _compute_body_result(
     times: Any,
     location: EarthLocation,
     moon: _MoonInfo,
-    constraints: Dict[str, Any],
+    constraints: dict[str, Any],
     night_start: datetime,
     night_end: datetime,
     lat: float,
     lon: float,
-) -> Tuple[Optional[Dict[str, Any]], Optional[np.ndarray], Optional[np.ndarray]]:
+) -> tuple[dict[str, Any] | None, np.ndarray | None, np.ndarray | None]:
     """Compute visibility for a solar system body using live ephemeris positions.
 
     Returns a tuple of (result_dict, alt_deg_array, az_deg_array).  All elements are None
@@ -1139,7 +1139,7 @@ def _compute_body_result(
     if total_steps < _MIN_STEPS:
         return None, None, None
 
-    horizon_profile_b: List[Dict[str, Any]] = constraints.get('horizon_profile', [])
+    horizon_profile_b: list[dict[str, Any]] = constraints.get('horizon_profile', [])
     if horizon_profile_b:
         horizon_floors_b = np.maximum(alt_min, _horizon_floor_array(az_deg, horizon_profile_b))
         in_window_mask = alt_deg >= horizon_floors_b
@@ -1186,14 +1186,14 @@ def _compute_body_result(
     )
 
     # Moon angular separation (informational only for bodies, not a filter)
-    angular_distance_moon: Optional[float] = None
+    angular_distance_moon: float | None = None
     if moon.ra_deg is not None and moon.dec_deg is not None:
         ang_sep = _angular_separation_deg(ra_hours * 15.0, dec_degrees, moon.ra_deg, moon.dec_deg)
         angular_distance_moon = ang_sep
 
     # Solar elongation - angular separation between this body and the Sun at night midpoint.
     # Used to detect opposition (+0.20 AstroScore bonus) and to flag inner planets in solar glare.
-    solar_elongation_deg: Optional[float] = None
+    solar_elongation_deg: float | None = None
     is_opposition = False
     try:
         mid_idx_b = len(times) // 2
@@ -1288,14 +1288,14 @@ def _degrees_to_dms(degrees: float) -> str:
 
 def _cleanup_calculation_memory(
     *,
-    deep_sky_results: List[Dict[str, Any]],
-    bodies_results: List[Dict[str, Any]],
-    comets_results: List[Dict[str, Any]],
-    skymap_entries: List[Dict[str, Any]],
-    all_targets: List[SkyTonightTarget],
-    dso_targets_with_coords: List[SkyTonightTarget],
-    times_iso_list: Optional[List[str]],
-    times_local: Optional[List[datetime]],
+    deep_sky_results: list[dict[str, Any]],
+    bodies_results: list[dict[str, Any]],
+    comets_results: list[dict[str, Any]],
+    skymap_entries: list[dict[str, Any]],
+    all_targets: list[SkyTonightTarget],
+    dso_targets_with_coords: list[SkyTonightTarget],
+    times_iso_list: list[str] | None,
+    times_local: list[datetime] | None,
 ) -> None:
     """Release large per-run containers before returning from the calculation cycle."""
     deep_sky_results.clear()
@@ -1317,9 +1317,9 @@ def _cleanup_calculation_memory(
 
 
 def run_calculations(
-    config: Optional[Dict[str, Any]] = None,
-    location: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    config: dict[str, Any] | None = None,
+    location: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """
     Compute observability and AstroScore for all visible targets.
 
@@ -1365,24 +1365,24 @@ def run_calculations(
     # Derive effective SQM for light-pollution weighting.
     # User-measured SQM takes priority; otherwise derive from Bortle midpoint.
     # If neither is configured, sqm stays None and LP weighting is disabled.
-    _sqm_for_run: Optional[float] = None
+    _sqm_for_run: float | None = None
     _raw_sqm = location.get('sqm')
     _raw_bortle = location.get('bortle')
     if _raw_sqm is not None:
         try:
             _sqm_for_run = float(_raw_sqm)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             pass  # malformed config value — _sqm_for_run stays None
     elif _raw_bortle is not None:
         try:
             from weather.sky_quality import bortle_to_sqm as _bortle_to_sqm
 
             _sqm_for_run = _bortle_to_sqm(int(_raw_bortle))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             pass  # malformed config value — _sqm_for_run stays None
 
     skytonight_cfg = config.get('skytonight', {}) if isinstance(config, dict) else {}
-    constraints: Dict[str, Any] = dict(skytonight_cfg.get('constraints', {}))
+    constraints: dict[str, Any] = dict(skytonight_cfg.get('constraints', {}))
     # horizon_profile lives on the location preset since v1.2 - inject it into
     # the constraints dict so the internal observability helpers stay unchanged.
     constraints['horizon_profile'] = location.get('horizon_profile') or []
@@ -1390,7 +1390,7 @@ def run_calculations(
     # User-configured catalogue name order: applied at result time to override the
     # dataset's build-time preferred_name so the display matches user preference.
     _raw_name_order = skytonight_cfg.get('preferred_name_order')
-    preferred_name_order: Optional[List[str]] = (
+    preferred_name_order: list[str] | None = (
         [str(x) for x in _raw_name_order if x] if isinstance(_raw_name_order, list) and _raw_name_order else None
     )
 
@@ -1407,7 +1407,7 @@ def run_calculations(
         results_file,
         {
             'metadata': {
-                'calculated_at': datetime.now(timezone.utc).isoformat(),
+                'calculated_at': datetime.now(UTC).isoformat(),
                 'location_id': location_id,
                 'location_name': location_name,
                 'in_progress': True,
@@ -1420,7 +1420,7 @@ def run_calculations(
     if night_window is None:
         logger.warning('No nautical night found for tonight; SkyTonight calculations skipped.')
         _empty_meta = {
-            'calculated_at': datetime.now(timezone.utc).isoformat(),
+            'calculated_at': datetime.now(UTC).isoformat(),
             'location_id': location_id,
             'location_name': location_name,
             'latitude': lat,
@@ -1455,7 +1455,7 @@ def run_calculations(
     _set_progress('loading_dataset')
     # --- Load targets dataset ---
     dataset = load_targets_dataset()
-    all_targets: List[SkyTonightTarget] = []
+    all_targets: list[SkyTonightTarget] = []
     for raw in dataset.get('targets', []):
         if isinstance(raw, SkyTonightTarget):
             all_targets.append(raw)
@@ -1483,20 +1483,20 @@ def run_calculations(
     moon = _MoonInfo(times, location_obj)
 
     logger.info(
-        f'Moon phase: {moon.phase:.2f} ' f'(RA={moon.ra_deg:.1f}°, Dec={moon.dec_deg:.1f}°)'
+        f'Moon phase: {moon.phase:.2f} (RA={moon.ra_deg:.1f}°, Dec={moon.dec_deg:.1f}°)'
         if moon.ra_deg is not None
         else f'Moon phase: {moon.phase:.2f}'
     )
 
     # --- Compute per-target results ---
-    deep_sky_results: List[Dict[str, Any]] = []
-    bodies_results: List[Dict[str, Any]] = []
-    comets_results: List[Dict[str, Any]] = []
+    deep_sky_results: list[dict[str, Any]] = []
+    bodies_results: list[dict[str, Any]] = []
+    comets_results: list[dict[str, Any]] = []
 
     processed_deep_sky = 0
     processed_bodies = 0
     processed_comets = 0
-    skymap_entries: List[Dict[str, Any]] = []  # accumulates trajectory data for sky map
+    skymap_entries: list[dict[str, Any]] = []  # accumulates trajectory data for sky map
     # Clear altitude-time JSON files from the previous calculation run so stale
     # files are never served after a recalculation for a different night.
     _clear_alttime_files(location_id)
@@ -1558,7 +1558,7 @@ def run_calculations(
         bodies_results_file,
         {
             'metadata': {
-                'calculated_at': datetime.now(timezone.utc).isoformat(),
+                'calculated_at': datetime.now(UTC).isoformat(),
                 'location_id': location_id,
                 'location_name': location_name,
                 'latitude': lat,
@@ -1646,7 +1646,7 @@ def run_calculations(
         comets_results_file,
         {
             'metadata': {
-                'calculated_at': datetime.now(timezone.utc).isoformat(),
+                'calculated_at': datetime.now(UTC).isoformat(),
                 'location_id': location_id,
                 'location_name': location_name,
                 'latitude': lat,
@@ -1670,12 +1670,12 @@ def run_calculations(
     n_dso_batch = len(dso_targets_with_coords)
     _set_progress('deep_sky', 0, n_dso_batch)
 
-    alt_matrix: Optional[np.ndarray] = None
-    az_matrix: Optional[np.ndarray] = None
-    all_dso_coords: Optional[SkyCoord] = None
-    lst_hours_arr: Optional[np.ndarray] = None
-    times_iso_list: Optional[List[str]] = None
-    times_local: Optional[List[datetime]] = None
+    alt_matrix: np.ndarray | None = None
+    az_matrix: np.ndarray | None = None
+    all_dso_coords: SkyCoord | None = None
+    lst_hours_arr: np.ndarray | None = None
+    times_iso_list: list[str] | None = None
+    times_local: list[datetime] | None = None
 
     if n_dso_batch > 0:
         n_steps = len(times)
@@ -1689,7 +1689,7 @@ def run_calculations(
         lst_hours_arr = np.array(times.sidereal_time('apparent', longitude=location_obj.lon).hour)
 
         # ISO strings computed once - reused for every alttime JSON write
-        times_iso_list = [t.strftime('%Y-%m-%dT%H:%M:%S') for t in times.to_datetime(timezone=timezone.utc)]
+        times_iso_list = [t.strftime('%Y-%m-%dT%H:%M:%S') for t in times.to_datetime(timezone=UTC)]
 
         # Build a single SkyCoord array for all DSO targets
         # coordinates is guaranteed non-None by the dso_targets_with_coords filter above
@@ -1702,7 +1702,7 @@ def run_calculations(
         alt_matrix = np.empty((n_dso_batch, n_steps), dtype=np.float32)
         az_matrix = np.empty((n_dso_batch, n_steps), dtype=np.float32)
 
-        logger.info(f'Computing batch AltAz for {n_dso_batch} DSO targets ' f'over {n_steps} time steps...')
+        logger.info(f'Computing batch AltAz for {n_dso_batch} DSO targets over {n_steps} time steps...')
         _set_progress('deep_sky_altaz', 0, n_steps)
         for step_i in range(n_steps):
             frame = AltAz(obstime=times[step_i], location=location_obj)
@@ -1782,7 +1782,7 @@ def run_calculations(
     }
 
     _final_meta = {
-        'calculated_at': datetime.now(timezone.utc).isoformat(),
+        'calculated_at': datetime.now(UTC).isoformat(),
         'location_id': location_id,
         'location_name': location_name,
         'latitude': lat,
@@ -1839,7 +1839,7 @@ def run_calculations(
     }
 
 
-def load_calculation_results(location_id: Optional[str] = None) -> Dict[str, Any]:
+def load_calculation_results(location_id: str | None = None) -> dict[str, Any]:
     """Load and combine a location's latest SkyTonight calculation results.
 
     *location_id* of None resolves to the install default preset.
@@ -1869,19 +1869,19 @@ def load_calculation_results(location_id: Optional[str] = None) -> Dict[str, Any
 # Per-target debug diagnostics
 # ---------------------------------------------------------------------------
 
-_body_alias_map_cache: Optional[Dict[str, str]] = None
+_body_alias_map_cache: dict[str, str] | None = None
 
 
-def _build_body_alias_map() -> Dict[str, str]:
+def _build_body_alias_map() -> dict[str, str]:
     """Build a reverse map: normalized localized body name → canonical English body name.
 
     Reads the 'planets' i18n namespace from every supported language so that
     any translated name (e.g. 'Lune', 'Saturne') resolves to the English name
     used in the dataset (e.g. 'Moon', 'Saturn').
     """
-    from utils.i18n_utils import I18nManager, SUPPORTED_LANGUAGES
+    from utils.i18n_utils import SUPPORTED_LANGUAGES, I18nManager
 
-    result: Dict[str, str] = {}
+    result: dict[str, str] = {}
     for lang in SUPPORTED_LANGUAGES:
         try:
             ns = I18nManager(lang).get_namespace('planets')
@@ -1900,8 +1900,8 @@ def _build_body_alias_map() -> Dict[str, str]:
 
 def _find_body_entry_by_localized_name(
     name_norm: str,
-    lookup: Dict[str, Any],
-) -> Optional[Dict[str, Any]]:
+    lookup: dict[str, Any],
+) -> dict[str, Any] | None:
     """Return a lookup entry by matching a localized body name via the i18n map."""
     global _body_alias_map_cache
     if _body_alias_map_cache is None:
@@ -1915,9 +1915,9 @@ def _find_body_entry_by_localized_name(
 
 def compute_target_debug(
     name: str,
-    config: Optional[Dict[str, Any]] = None,
-    location: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    config: dict[str, Any] | None = None,
+    location: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Compute detailed constraint diagnostics for a single target by name.
 
     Returns a structured dict describing which SkyTonight constraints the target
@@ -1942,20 +1942,20 @@ def compute_target_debug(
     timezone_name = str(location_cfg.get('timezone') or 'UTC')
 
     skytonight_cfg = config.get('skytonight', {}) if isinstance(config, dict) else {}
-    constraints: Dict[str, Any] = dict(skytonight_cfg.get('constraints', {}))
+    constraints: dict[str, Any] = dict(skytonight_cfg.get('constraints', {}))
     constraints['horizon_profile'] = location_cfg.get('horizon_profile') or []
     _raw_name_order = skytonight_cfg.get('preferred_name_order')
-    preferred_name_order: Optional[List[str]] = (
+    preferred_name_order: list[str] | None = (
         [str(x) for x in _raw_name_order if x] if isinstance(_raw_name_order, list) and _raw_name_order else None
     )
 
     # --- Look up target by name ---
     dataset = load_targets_dataset()
-    lookup: Dict[str, Any] = dataset.get('lookup', {})
-    all_targets: List[SkyTonightTarget] = dataset.get('targets', [])
+    lookup: dict[str, Any] = dataset.get('lookup', {})
+    all_targets: list[SkyTonightTarget] = dataset.get('targets', [])
 
     name_norm = normalize_object_name(name)
-    entry: Optional[Dict[str, Any]] = lookup.get(f'alias::{name_norm}') or lookup.get(f'preferred::{name_norm}')
+    entry: dict[str, Any] | None = lookup.get(f'alias::{name_norm}') or lookup.get(f'preferred::{name_norm}')
     if not entry:
         for key, val in lookup.items():
             if '::' in key and key.split('::', 1)[1] == name_norm:
@@ -1973,7 +1973,7 @@ def compute_target_debug(
         return {'found': False}
 
     target_id = str(entry.get('target_id') or entry.get('group_id') or '')
-    target: Optional[SkyTonightTarget] = next((t for t in all_targets if t.target_id == target_id), None)
+    target: SkyTonightTarget | None = next((t for t in all_targets if t.target_id == target_id), None)
     if target is None:
         return {'found': False}
 
@@ -1986,7 +1986,7 @@ def compute_target_debug(
     moon_sep_min = float(constraints.get('moon_separation_min', 45))
     frac_threshold = float(constraints.get('fraction_of_time_observable_threshold', 0.5))
     moon_use_illum = bool(constraints.get('moon_separation_use_illumination', True))
-    horizon_profile: List[Dict[str, Any]] = constraints.get('horizon_profile', [])
+    horizon_profile: list[dict[str, Any]] = constraints.get('horizon_profile', [])
 
     # Effective altitude floor: stricter of alt_min vs airmass-derived
     effective_alt_min = alt_min
@@ -2101,10 +2101,10 @@ def compute_target_debug(
             'overall': 'error',
         }
 
-    times_iso = [t.strftime('%Y-%m-%dT%H:%M:%S') for t in times.to_datetime(timezone=timezone.utc)]
+    times_iso = [t.strftime('%Y-%m-%dT%H:%M:%S') for t in times.to_datetime(timezone=UTC)]
 
     # --- Run constraint checks ---
-    checks: List[Dict[str, Any]] = []
+    checks: list[dict[str, Any]] = []
     overall = 'visible'
 
     # Size filter (DSOs and comets only, skip bodies)
@@ -2207,7 +2207,7 @@ def compute_target_debug(
         overall = 'filtered'
 
     # --- Alt-time series for chart ---
-    alttime: Dict[str, Any] = {
+    alttime: dict[str, Any] = {
         'times_utc': times_iso,
         'altitudes': [round(float(a), 2) for a in alt_deg],
         'azimuths': [round(float(a), 1) for a in az_deg],

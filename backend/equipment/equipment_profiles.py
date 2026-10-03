@@ -4,10 +4,10 @@ Manages user equipment profiles: telescopes, cameras, mounts, filters, and combi
 """
 
 import uuid
-from datetime import datetime, timezone
-from typing import Dict, List, Optional, Tuple
-from dataclasses import dataclass, asdict, fields
+from dataclasses import asdict, dataclass, fields
+from datetime import UTC, datetime
 from enum import Enum
+
 from db import documents, queries
 from utils.logging_config import get_logger
 
@@ -34,7 +34,7 @@ def _parse_optional_bool(value):
     return str(value).strip().lower() in ('true', '1', 'yes', 'on')
 
 
-class TelescopeType(str, Enum):
+class TelescopeType(str, Enum):  # noqa: UP042 - StrEnum changes str()/format() of members
     """Telescope types"""
 
     REFRACTOR = "Refractor"
@@ -50,7 +50,7 @@ class TelescopeType(str, Enum):
     DOBSONIAN = "Dobsonian"
 
 
-class SamplingClassification(str, Enum):
+class SamplingClassification(str, Enum):  # noqa: UP042 - StrEnum changes str()/format() of members
     """Image sampling classification"""
 
     UNDERSAMPLED = "Undersampled"
@@ -108,9 +108,9 @@ class Camera:
     weight_kg: float = 0.0  # Weight in kg (for payload calculation)
     sensor_diagonal_mm: float = 0.0  # Auto-calculated
     cooling_supported: bool = False
-    min_temperature_c: Optional[float] = None
-    read_noise_e: Optional[float] = None  # Read noise in electrons
-    quantum_efficiency: Optional[float] = None  # QE percentage
+    min_temperature_c: float | None = None
+    read_noise_e: float | None = None  # Read noise in electrons
+    quantum_efficiency: float | None = None  # QE percentage
     notes: str = ""
     created_at: str = ""
     updated_at: str = ""
@@ -140,11 +140,11 @@ class Mount:
     mount_type: str = ""  # Equatorial / Alt-Az
     payload_capacity_kg: float = 0.0  # Maximum payload capacity in kg
     recommended_payload_kg: float = 0.0  # Auto-calculated: 50-70% of max
-    tracking_accuracy_arcsec: Optional[float] = None  # Periodic error in arcsec
+    tracking_accuracy_arcsec: float | None = None  # Periodic error in arcsec
     guiding_supported: bool = False
     # v1.4 meridian-flip estimator fields. Absent keys on older data fall back to these
     # defaults on load, exactly like the other optional fields - no migration needed.
-    meridian_flip_required: Optional[bool] = None  # None -> derived from mount_type
+    meridian_flip_required: bool | None = None  # None -> derived from mount_type
     meridian_flip_delay_min: float = 0.0  # minutes tracked past the meridian before a flip is needed
     meridian_flip_duration_min: float = 5.0  # dead time for the flip + re-centre + re-guide
     notes: str = ""
@@ -170,7 +170,7 @@ class Mount:
 _MOUNT_FLIP_FIELDS = ('meridian_flip_required', 'meridian_flip_delay_min', 'meridian_flip_duration_min')
 
 
-def normalize_mount_flip_fields(mount: Optional[Dict]) -> Optional[Dict]:
+def normalize_mount_flip_fields(mount: dict | None) -> dict | None:
     """Backfill the v1.4 meridian-flip fields on a raw mount dict read from disk.
 
     Mount profiles written before v1.4 have no ``meridian_flip_required`` /
@@ -190,7 +190,7 @@ def normalize_mount_flip_fields(mount: Optional[Dict]) -> Optional[Dict]:
     known = {f.name for f in fields(Mount)}
     try:
         rebuilt = asdict(Mount(**{k: v for k, v in mount.items() if k in known}))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return mount
     return {**mount, **{key: rebuilt[key] for key in _MOUNT_FLIP_FIELDS}}
 
@@ -203,9 +203,9 @@ class Filter:
     name: str
     manufacturer: str = ""
     filter_type: str = ""  # LRGB / narrowband / broadband
-    central_wavelength_nm: Optional[float] = None  # Central wavelength in nm
-    bandwidth_nm: Optional[float] = None  # Bandwidth in nm
-    transmission_curve: Optional[str] = None  # JSON/CSV transmission data
+    central_wavelength_nm: float | None = None  # Central wavelength in nm
+    bandwidth_nm: float | None = None  # Bandwidth in nm
+    transmission_curve: str | None = None  # JSON/CSV transmission data
     intended_use: str = ""  # e.g., "emission nebulae", "broadband imaging"
     notes: str = ""
     created_at: str = ""
@@ -236,18 +236,18 @@ class EquipmentCombination:
 
     id: str
     name: str
-    telescope_id: Optional[str] = None
-    camera_id: Optional[str] = None
-    mount_id: Optional[str] = None
-    filter_ids: Optional[List[str]] = None  # List of filter IDs
-    accessory_ids: Optional[List[str]] = None  # List of accessory IDs
+    telescope_id: str | None = None
+    camera_id: str | None = None
+    mount_id: str | None = None
+    filter_ids: list[str] | None = None  # List of filter IDs
+    accessory_ids: list[str] | None = None  # List of accessory IDs
     notes: str = ""
     created_at: str = ""
     updated_at: str = ""
     is_disabled: bool = False
-    guide_camera_id: Optional[str] = None  # Separate guide camera, purely informational
-    lens_focal_length_mm: Optional[float] = None  # Camera-only combos (no telescope): lens on the camera
-    lens_focal_ratio: Optional[float] = None  # Camera-only combos: lens f-ratio
+    guide_camera_id: str | None = None  # Separate guide camera, purely informational
+    lens_focal_length_mm: float | None = None  # Camera-only combos (no telescope): lens on the camera
+    lens_focal_ratio: float | None = None  # Camera-only combos: lens f-ratio
 
     def __post_init__(self):
         if self.filter_ids is None:
@@ -274,14 +274,14 @@ class CombinationAnalysis:
     """Equipment combination analysis results"""
 
     combination_id: str
-    telescope: Optional[Dict] = None
-    camera: Optional[Dict] = None
-    mount: Optional[Dict] = None
-    filters: Optional[List[Dict]] = None
-    accessories: Optional[List[Dict]] = None
-    fov_calculation: Optional[FOVCalculation] = None
-    suitability: Optional[List[str]] = None
-    recommendations: Optional[List[str]] = None
+    telescope: dict | None = None
+    camera: dict | None = None
+    mount: dict | None = None
+    filters: list[dict] | None = None
+    accessories: list[dict] | None = None
+    fov_calculation: FOVCalculation | None = None
+    suitability: list[str] | None = None
+    recommendations: list[str] | None = None
 
     def __post_init__(self):
         if self.filters is None:
@@ -304,7 +304,7 @@ def equipment_kind(equipment_type: str) -> str:
     return f'equipment.{equipment_type}'
 
 
-def validate_equipment_data(data) -> Tuple[bool, str]:
+def validate_equipment_data(data) -> tuple[bool, str]:
     """
     Validate an equipment document before it is stored
 
@@ -320,7 +320,7 @@ def validate_equipment_data(data) -> Tuple[bool, str]:
     return True, ""
 
 
-def _load_equipment_document(user_id: str, equipment_type: str) -> Optional[Dict]:
+def _load_equipment_document(user_id: str, equipment_type: str) -> dict | None:
     """The stored document, or None when there is none (or it cannot be used)."""
     try:
         data = documents.get_document(user_id, equipment_kind(equipment_type))
@@ -333,7 +333,7 @@ def _load_equipment_document(user_id: str, equipment_type: str) -> Optional[Dict
     return data
 
 
-def safe_save_equipment(user_id: str, equipment_type: str, data: Dict) -> bool:
+def safe_save_equipment(user_id: str, equipment_type: str, data: dict) -> bool:
     """
     Validate and store a user's equipment of one type (one transaction, nothing half-written)
 
@@ -364,7 +364,7 @@ def _iter_equipment_documents(equipment_type: str):
 # ============================================================
 
 
-def load_all_shared_equipment(equipment_type: str, exclude_user_id: str) -> List[Dict]:
+def load_all_shared_equipment(equipment_type: str, exclude_user_id: str) -> list[dict]:
     """Return items marked is_shared=True from all users except exclude_user_id.
 
     Each returned item is annotated with owner_id and owner_username.
@@ -373,7 +373,7 @@ def load_all_shared_equipment(equipment_type: str, exclude_user_id: str) -> List
 
     user_map = {u['user_id']: u['username'] for u in user_manager.list_users()}
 
-    shared_items: List[Dict] = []
+    shared_items: list[dict] = []
     try:
         # Only object rows carry is_shared, so every item here is a dict
         for owner_id, item in queries.shared_equipment(equipment_type, exclude_user_id):
@@ -390,7 +390,7 @@ def load_all_shared_equipment(equipment_type: str, exclude_user_id: str) -> List
 _BASIC_EQUIPMENT_TYPES = ('telescopes', 'cameras', 'mounts', 'filters', 'accessories')
 
 
-def index_owned_and_shared_equipment(user_id: str) -> Tuple[Dict[str, Dict], Dict[str, Dict]]:
+def index_owned_and_shared_equipment(user_id: str) -> tuple[dict[str, dict], dict[str, dict]]:
     """Build (own_by_id, shared_by_id) indexes across all 5 basic equipment types.
 
     Exposed (not module-private) so a caller that needs the same index for several combinations
@@ -405,8 +405,8 @@ def index_owned_and_shared_equipment(user_id: str) -> Tuple[Dict[str, Dict], Dic
         'filters': load_user_filters,
         'accessories': load_user_accessories,
     }
-    own_by_id: Dict[str, Dict] = {}
-    shared_by_id: Dict[str, Dict] = {}
+    own_by_id: dict[str, dict] = {}
+    shared_by_id: dict[str, dict] = {}
     for eq_type in _BASIC_EQUIPMENT_TYPES:
         for item in loaders[eq_type](user_id).get('items', []):
             own_by_id[item['id']] = item
@@ -415,20 +415,20 @@ def index_owned_and_shared_equipment(user_id: str) -> Tuple[Dict[str, Dict], Dic
     return own_by_id, shared_by_id
 
 
-def index_telescopes_and_cameras(user_id: str) -> Tuple[Dict[str, Dict], Dict[str, Dict]]:
+def index_telescopes_and_cameras(user_id: str) -> tuple[dict[str, dict], dict[str, dict]]:
     """Return (telescopes_by_id, cameras_by_id) merging this user's own + all shared items.
 
     Used by SkyTonight's combination-aware scoring to resolve a combination's
     telescope_id/camera_id into full equipment dicts without re-reading every equipment document
     per combination.
     """
-    telescopes_by_id: Dict[str, Dict] = {}
+    telescopes_by_id: dict[str, dict] = {}
     for item in load_user_telescopes(user_id).get('items', []):
         telescopes_by_id[item['id']] = item
     for item in load_all_shared_equipment('telescopes', user_id):
         telescopes_by_id[item['id']] = item
 
-    cameras_by_id: Dict[str, Dict] = {}
+    cameras_by_id: dict[str, dict] = {}
     for item in load_user_cameras(user_id).get('items', []):
         cameras_by_id[item['id']] = item
     for item in load_all_shared_equipment('cameras', user_id):
@@ -437,9 +437,9 @@ def index_telescopes_and_cameras(user_id: str) -> Tuple[Dict[str, Dict], Dict[st
     return telescopes_by_id, cameras_by_id
 
 
-def _combination_reference_ids(combination: Dict) -> List[str]:
+def _combination_reference_ids(combination: dict) -> list[str]:
     """Flatten every equipment id a combination references into one list."""
-    ref_ids: List[str] = []
+    ref_ids: list[str] = []
     for field in ('telescope_id', 'camera_id', 'guide_camera_id', 'mount_id'):
         val = combination.get(field)
         if val:
@@ -449,7 +449,7 @@ def _combination_reference_ids(combination: Dict) -> List[str]:
     return ref_ids
 
 
-def _find_combinations_referencing(equipment_type: str, equipment_id: str) -> List[Dict]:
+def _find_combinations_referencing(equipment_type: str, equipment_id: str) -> list[dict]:
     """Return {name, owner_id} for every combination (any user) referencing this equipment id.
 
     Used as a delete-guard: equipment referenced by a combination cannot be removed while the
@@ -464,8 +464,8 @@ def _find_combinations_referencing(equipment_type: str, equipment_id: str) -> Li
 
 
 def compute_combination_validity_status(
-    combination: Dict, user_id: str, equipment_index: Optional[Tuple[Dict[str, Dict], Dict[str, Dict]]] = None
-) -> Dict:
+    combination: dict, user_id: str, equipment_index: tuple[dict[str, dict], dict[str, dict]] | None = None
+) -> dict:
     """Compute is_valid/invalid_reasons for a combination (feature.md's 'autocheck' requirement).
 
     Distinct from is_disabled (the combination's own explicit toggle): is_valid is computed
@@ -479,8 +479,8 @@ def compute_combination_validity_status(
     """
     own_by_id, shared_by_id = equipment_index or index_owned_and_shared_equipment(user_id)
 
-    invalid_reasons: List[str] = []
-    disabled_component_ids: List[str] = []
+    invalid_reasons: list[str] = []
+    disabled_component_ids: list[str] = []
 
     for eq_id in _combination_reference_ids(combination):
         item = own_by_id.get(eq_id) or shared_by_id.get(eq_id)
@@ -499,8 +499,8 @@ def compute_combination_validity_status(
 
 
 def compute_combination_share_status(
-    combination: Dict, user_id: str, equipment_index: Optional[Tuple[Dict[str, Dict], Dict[str, Dict]]] = None
-) -> Dict:
+    combination: dict, user_id: str, equipment_index: tuple[dict[str, dict], dict[str, dict]] | None = None
+) -> dict:
     """Compute is_shared, has_broken_share, and broken_items for a combination.
 
     A combination is 'shared' iff ALL constituent equipment items are accessible
@@ -515,7 +515,7 @@ def compute_combination_share_status(
 
     is_shared = True
     has_broken_share = False
-    broken_items: List[str] = []
+    broken_items: list[str] = []
 
     for eq_id in ref_ids:
         if eq_id in own_by_id:
@@ -530,7 +530,7 @@ def compute_combination_share_status(
             broken_items.append(eq_id)
 
     # Build per-equipment-id metadata for the UI (shared status of each item)
-    items_share_info: Dict[str, Dict] = {}
+    items_share_info: dict[str, dict] = {}
     for eq_id in ref_ids:
         if eq_id in own_by_id:
             item = own_by_id[eq_id]
@@ -557,7 +557,7 @@ def compute_combination_share_status(
     }
 
 
-def load_all_shared_combinations(exclude_user_id: str) -> List[Dict]:
+def load_all_shared_combinations(exclude_user_id: str) -> list[dict]:
     """Return combinations from other users whose constituent equipment is all shared.
 
     Computes share status from the owner's perspective for each combination.
@@ -566,7 +566,7 @@ def load_all_shared_combinations(exclude_user_id: str) -> List[Dict]:
 
     user_map = {u['user_id']: u['username'] for u in user_manager.list_users()}
 
-    result: List[Dict] = []
+    result: list[dict] = []
     try:
         for owner_id, data in _iter_equipment_documents('combinations'):
             if owner_id == exclude_user_id:
@@ -591,21 +591,21 @@ def load_all_shared_combinations(exclude_user_id: str) -> List[Dict]:
 # ============================================================
 
 
-def load_user_telescopes(user_id: str) -> Dict:
+def load_user_telescopes(user_id: str) -> dict:
     """Load user's telescope profiles"""
     data = _load_equipment_document(user_id, 'telescopes')
     if data is None:
-        return {'user_id': user_id, 'created_at': datetime.now(timezone.utc).isoformat(), 'items': []}
+        return {'user_id': user_id, 'created_at': datetime.now(UTC).isoformat(), 'items': []}
     return data
 
 
-def save_user_telescopes(user_id: str, data: Dict) -> bool:
+def save_user_telescopes(user_id: str, data: dict) -> bool:
     """Save user's telescope profiles with safety checks"""
-    data['updated_at'] = datetime.now(timezone.utc).isoformat()
+    data['updated_at'] = datetime.now(UTC).isoformat()
     return safe_save_equipment(user_id, 'telescopes', data)
 
 
-def create_telescope(user_id: str, telescope_data: Dict) -> Optional[Dict]:
+def create_telescope(user_id: str, telescope_data: dict) -> dict | None:
     """Create a new telescope profile"""
     try:
         # Create telescope object with auto-calculated fields
@@ -622,8 +622,8 @@ def create_telescope(user_id: str, telescope_data: Dict) -> Optional[Dict]:
             effective_focal_length=0.0,  # Will be calculated
             effective_focal_ratio=0.0,  # Will be calculated
             notes=telescope_data.get('notes', ''),
-            created_at=datetime.now(timezone.utc).isoformat(),
-            updated_at=datetime.now(timezone.utc).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
+            updated_at=datetime.now(UTC).isoformat(),
             is_shared=bool(telescope_data.get('is_shared', False)),
             is_disabled=bool(telescope_data.get('is_disabled', False)),
         )
@@ -644,7 +644,7 @@ def create_telescope(user_id: str, telescope_data: Dict) -> Optional[Dict]:
         return None
 
 
-def get_telescope(user_id: str, telescope_id: str) -> Optional[Dict]:
+def get_telescope(user_id: str, telescope_id: str) -> dict | None:
     """Get a specific telescope profile"""
     data = load_user_telescopes(user_id)
     for item in data['items']:
@@ -653,7 +653,7 @@ def get_telescope(user_id: str, telescope_id: str) -> Optional[Dict]:
     return None
 
 
-def update_telescope(user_id: str, telescope_id: str, telescope_data: Dict) -> Optional[Dict]:
+def update_telescope(user_id: str, telescope_id: str, telescope_data: dict) -> dict | None:
     """Update a telescope profile"""
     try:
         data = load_user_telescopes(user_id)
@@ -674,8 +674,8 @@ def update_telescope(user_id: str, telescope_id: str, telescope_data: Dict) -> O
                     effective_focal_length=0.0,
                     effective_focal_ratio=0.0,
                     notes=telescope_data.get('notes', ''),
-                    created_at=item.get('created_at', datetime.now(timezone.utc).isoformat()),
-                    updated_at=datetime.now(timezone.utc).isoformat(),
+                    created_at=item.get('created_at', datetime.now(UTC).isoformat()),
+                    updated_at=datetime.now(UTC).isoformat(),
                     is_shared=bool(telescope_data.get('is_shared', item.get('is_shared', False))),
                     is_disabled=bool(telescope_data.get('is_disabled', item.get('is_disabled', False))),
                 )
@@ -693,7 +693,7 @@ def update_telescope(user_id: str, telescope_id: str, telescope_data: Dict) -> O
         return None
 
 
-def delete_telescope(user_id: str, telescope_id: str) -> Tuple[bool, Optional[List[str]]]:
+def delete_telescope(user_id: str, telescope_id: str) -> tuple[bool, list[str] | None]:
     """Delete a telescope profile.
 
     Refuses deletion when any combination (owned by this user or another, since a shared
@@ -718,21 +718,21 @@ def delete_telescope(user_id: str, telescope_id: str) -> Tuple[bool, Optional[Li
 # ============================================================
 
 
-def load_user_cameras(user_id: str) -> Dict:
+def load_user_cameras(user_id: str) -> dict:
     """Load user's camera profiles"""
     data = _load_equipment_document(user_id, 'cameras')
     if data is None:
-        return {'user_id': user_id, 'created_at': datetime.now(timezone.utc).isoformat(), 'items': []}
+        return {'user_id': user_id, 'created_at': datetime.now(UTC).isoformat(), 'items': []}
     return data
 
 
-def save_user_cameras(user_id: str, data: Dict) -> bool:
+def save_user_cameras(user_id: str, data: dict) -> bool:
     """Save user's camera profiles with safety checks"""
-    data['updated_at'] = datetime.now(timezone.utc).isoformat()
+    data['updated_at'] = datetime.now(UTC).isoformat()
     return safe_save_equipment(user_id, 'cameras', data)
 
 
-def create_camera(user_id: str, camera_data: Dict) -> Optional[Dict]:
+def create_camera(user_id: str, camera_data: dict) -> dict | None:
     """Create a new camera profile"""
     try:
         camera = Camera(
@@ -752,8 +752,8 @@ def create_camera(user_id: str, camera_data: Dict) -> Optional[Dict]:
             read_noise_e=_get_float_or_none(camera_data.get('read_noise_e')),
             quantum_efficiency=_get_float_or_none(camera_data.get('quantum_efficiency')),
             notes=camera_data.get('notes', ''),
-            created_at=datetime.now(timezone.utc).isoformat(),
-            updated_at=datetime.now(timezone.utc).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
+            updated_at=datetime.now(UTC).isoformat(),
             is_shared=bool(camera_data.get('is_shared', False)),
             is_disabled=bool(camera_data.get('is_disabled', False)),
         )
@@ -770,7 +770,7 @@ def create_camera(user_id: str, camera_data: Dict) -> Optional[Dict]:
         return None
 
 
-def get_camera(user_id: str, camera_id: str) -> Optional[Dict]:
+def get_camera(user_id: str, camera_id: str) -> dict | None:
     """Get a specific camera profile"""
     data = load_user_cameras(user_id)
     for item in data['items']:
@@ -779,7 +779,7 @@ def get_camera(user_id: str, camera_id: str) -> Optional[Dict]:
     return None
 
 
-def update_camera(user_id: str, camera_id: str, camera_data: Dict) -> Optional[Dict]:
+def update_camera(user_id: str, camera_id: str, camera_data: dict) -> dict | None:
     """Update a camera profile"""
     try:
         data = load_user_cameras(user_id)
@@ -803,8 +803,8 @@ def update_camera(user_id: str, camera_id: str, camera_data: Dict) -> Optional[D
                     read_noise_e=_get_float_or_none(camera_data.get('read_noise_e')),
                     quantum_efficiency=_get_float_or_none(camera_data.get('quantum_efficiency')),
                     notes=camera_data.get('notes', ''),
-                    created_at=item.get('created_at', datetime.now(timezone.utc).isoformat()),
-                    updated_at=datetime.now(timezone.utc).isoformat(),
+                    created_at=item.get('created_at', datetime.now(UTC).isoformat()),
+                    updated_at=datetime.now(UTC).isoformat(),
                     is_shared=bool(camera_data.get('is_shared', item.get('is_shared', False))),
                     is_disabled=bool(camera_data.get('is_disabled', item.get('is_disabled', False))),
                 )
@@ -822,7 +822,7 @@ def update_camera(user_id: str, camera_id: str, camera_data: Dict) -> Optional[D
         return None
 
 
-def delete_camera(user_id: str, camera_id: str) -> Tuple[bool, Optional[List[str]]]:
+def delete_camera(user_id: str, camera_id: str) -> tuple[bool, list[str] | None]:
     """Delete a camera profile.
 
     Refuses deletion when any combination references this camera, either as its imaging
@@ -845,21 +845,21 @@ def delete_camera(user_id: str, camera_id: str) -> Tuple[bool, Optional[List[str
 # ============================================================
 
 
-def load_user_mounts(user_id: str) -> Dict:
+def load_user_mounts(user_id: str) -> dict:
     """Load user's mount profiles"""
     data = _load_equipment_document(user_id, 'mounts')
     if data is None:
-        return {'user_id': user_id, 'created_at': datetime.now(timezone.utc).isoformat(), 'items': []}
+        return {'user_id': user_id, 'created_at': datetime.now(UTC).isoformat(), 'items': []}
     return data
 
 
-def save_user_mounts(user_id: str, data: Dict) -> bool:
+def save_user_mounts(user_id: str, data: dict) -> bool:
     """Save user's mount profiles with safety checks"""
-    data['updated_at'] = datetime.now(timezone.utc).isoformat()
+    data['updated_at'] = datetime.now(UTC).isoformat()
     return safe_save_equipment(user_id, 'mounts', data)
 
 
-def create_mount(user_id: str, mount_data: Dict) -> Optional[Dict]:
+def create_mount(user_id: str, mount_data: dict) -> dict | None:
     """Create a new mount profile"""
     try:
         mount = Mount(
@@ -877,8 +877,8 @@ def create_mount(user_id: str, mount_data: Dict) -> Optional[Dict]:
             meridian_flip_delay_min=_get_float_or_none(mount_data.get('meridian_flip_delay_min'), 0.0),
             meridian_flip_duration_min=_get_float_or_none(mount_data.get('meridian_flip_duration_min'), 5.0),
             notes=mount_data.get('notes', ''),
-            created_at=datetime.now(timezone.utc).isoformat(),
-            updated_at=datetime.now(timezone.utc).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
+            updated_at=datetime.now(UTC).isoformat(),
             is_shared=bool(mount_data.get('is_shared', False)),
             is_disabled=bool(mount_data.get('is_disabled', False)),
         )
@@ -895,7 +895,7 @@ def create_mount(user_id: str, mount_data: Dict) -> Optional[Dict]:
         return None
 
 
-def get_mount(user_id: str, mount_id: str) -> Optional[Dict]:
+def get_mount(user_id: str, mount_id: str) -> dict | None:
     """Get a specific mount profile.
 
     The v1.4 meridian-flip fields are backfilled for pre-v1.4 mount files so every
@@ -908,7 +908,7 @@ def get_mount(user_id: str, mount_id: str) -> Optional[Dict]:
     return None
 
 
-def update_mount(user_id: str, mount_id: str, mount_data: Dict) -> Optional[Dict]:
+def update_mount(user_id: str, mount_id: str, mount_data: dict) -> dict | None:
     """Update a mount profile"""
     try:
         data = load_user_mounts(user_id)
@@ -942,8 +942,8 @@ def update_mount(user_id: str, mount_id: str, mount_data: Dict) -> Optional[Dict
                     is_shared=bool(mount_data.get('is_shared', item.get('is_shared', False))),
                     is_disabled=bool(mount_data.get('is_disabled', item.get('is_disabled', False))),
                     notes=mount_data.get('notes', ''),
-                    created_at=item.get('created_at', datetime.now(timezone.utc).isoformat()),
-                    updated_at=datetime.now(timezone.utc).isoformat(),
+                    created_at=item.get('created_at', datetime.now(UTC).isoformat()),
+                    updated_at=datetime.now(UTC).isoformat(),
                 )
 
                 data['items'][i] = asdict(mount)
@@ -959,7 +959,7 @@ def update_mount(user_id: str, mount_id: str, mount_data: Dict) -> Optional[Dict
         return None
 
 
-def delete_mount(user_id: str, mount_id: str) -> Tuple[bool, Optional[List[str]]]:
+def delete_mount(user_id: str, mount_id: str) -> tuple[bool, list[str] | None]:
     """Delete a mount profile. Refuses deletion when a combination still references it."""
     blocking = _find_combinations_referencing('mounts', mount_id)
     if blocking:
@@ -978,21 +978,21 @@ def delete_mount(user_id: str, mount_id: str) -> Tuple[bool, Optional[List[str]]
 # ============================================================
 
 
-def load_user_filters(user_id: str) -> Dict:
+def load_user_filters(user_id: str) -> dict:
     """Load user's filter profiles"""
     data = _load_equipment_document(user_id, 'filters')
     if data is None:
-        return {'user_id': user_id, 'created_at': datetime.now(timezone.utc).isoformat(), 'items': []}
+        return {'user_id': user_id, 'created_at': datetime.now(UTC).isoformat(), 'items': []}
     return data
 
 
-def save_user_filters(user_id: str, data: Dict) -> bool:
+def save_user_filters(user_id: str, data: dict) -> bool:
     """Save user's filter profiles with safety checks"""
-    data['updated_at'] = datetime.now(timezone.utc).isoformat()
+    data['updated_at'] = datetime.now(UTC).isoformat()
     return safe_save_equipment(user_id, 'filters', data)
 
 
-def create_filter(user_id: str, filter_data: Dict) -> Optional[Dict]:
+def create_filter(user_id: str, filter_data: dict) -> dict | None:
     """Create a new filter profile"""
     try:
         filter_obj = Filter(
@@ -1007,8 +1007,8 @@ def create_filter(user_id: str, filter_data: Dict) -> Optional[Dict]:
             transmission_curve=filter_data.get('transmission_curve'),
             intended_use=filter_data.get('intended_use', ''),
             notes=filter_data.get('notes', ''),
-            created_at=datetime.now(timezone.utc).isoformat(),
-            updated_at=datetime.now(timezone.utc).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
+            updated_at=datetime.now(UTC).isoformat(),
             is_shared=bool(filter_data.get('is_shared', False)),
             is_disabled=bool(filter_data.get('is_disabled', False)),
         )
@@ -1025,7 +1025,7 @@ def create_filter(user_id: str, filter_data: Dict) -> Optional[Dict]:
         return None
 
 
-def get_filter(user_id: str, filter_id: str) -> Optional[Dict]:
+def get_filter(user_id: str, filter_id: str) -> dict | None:
     """Get a specific filter profile"""
     data = load_user_filters(user_id)
     for item in data['items']:
@@ -1034,7 +1034,7 @@ def get_filter(user_id: str, filter_id: str) -> Optional[Dict]:
     return None
 
 
-def update_filter(user_id: str, filter_id: str, filter_data: Dict) -> Optional[Dict]:
+def update_filter(user_id: str, filter_id: str, filter_data: dict) -> dict | None:
     """Update a filter profile"""
     try:
         data = load_user_filters(user_id)
@@ -1055,8 +1055,8 @@ def update_filter(user_id: str, filter_id: str, filter_data: Dict) -> Optional[D
                     transmission_curve=filter_data.get('transmission_curve'),
                     intended_use=filter_data.get('intended_use', ''),
                     notes=filter_data.get('notes', ''),
-                    created_at=item.get('created_at', datetime.now(timezone.utc).isoformat()),
-                    updated_at=datetime.now(timezone.utc).isoformat(),
+                    created_at=item.get('created_at', datetime.now(UTC).isoformat()),
+                    updated_at=datetime.now(UTC).isoformat(),
                     is_shared=bool(filter_data.get('is_shared', item.get('is_shared', False))),
                     is_disabled=bool(filter_data.get('is_disabled', item.get('is_disabled', False))),
                 )
@@ -1074,7 +1074,7 @@ def update_filter(user_id: str, filter_id: str, filter_data: Dict) -> Optional[D
         return None
 
 
-def delete_filter(user_id: str, filter_id: str) -> Tuple[bool, Optional[List[str]]]:
+def delete_filter(user_id: str, filter_id: str) -> tuple[bool, list[str] | None]:
     """Delete a filter profile. Refuses deletion when a combination still references it."""
     blocking = _find_combinations_referencing('filters', filter_id)
     if blocking:
@@ -1093,24 +1093,24 @@ def delete_filter(user_id: str, filter_id: str) -> Tuple[bool, Optional[List[str
 # ============================================================
 
 
-def load_user_accessories(user_id: str) -> Dict:
+def load_user_accessories(user_id: str) -> dict:
     """Load user's accessory profiles"""
     data = _load_equipment_document(user_id, 'accessories')
     if data is None:
         return {
             'items': [],
-            'created_at': datetime.now(timezone.utc).isoformat(),
-            'updated_at': datetime.now(timezone.utc).isoformat(),
+            'created_at': datetime.now(UTC).isoformat(),
+            'updated_at': datetime.now(UTC).isoformat(),
         }
     return data
 
 
-def save_user_accessories(user_id: str, data: Dict) -> bool:
+def save_user_accessories(user_id: str, data: dict) -> bool:
     """Save user's accessory profiles"""
     return safe_save_equipment(user_id, 'accessories', data)
 
 
-def create_accessory(user_id: str, accessory_data: Dict) -> Optional[Dict]:
+def create_accessory(user_id: str, accessory_data: dict) -> dict | None:
     """Create a new accessory profile"""
     try:
         accessory = Accessory(
@@ -1120,8 +1120,8 @@ def create_accessory(user_id: str, accessory_data: Dict) -> Optional[Dict]:
             accessory_type=accessory_data.get('accessory_type', ''),
             weight_kg=_get_float_or_none(accessory_data.get('weight_kg'), 0.0),
             notes=accessory_data.get('notes', ''),
-            created_at=datetime.now(timezone.utc).isoformat(),
-            updated_at=datetime.now(timezone.utc).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
+            updated_at=datetime.now(UTC).isoformat(),
             is_shared=bool(accessory_data.get('is_shared', False)),
             is_disabled=bool(accessory_data.get('is_disabled', False)),
         )
@@ -1137,7 +1137,7 @@ def create_accessory(user_id: str, accessory_data: Dict) -> Optional[Dict]:
         return None
 
 
-def get_accessory(user_id: str, accessory_id: str) -> Optional[Dict]:
+def get_accessory(user_id: str, accessory_id: str) -> dict | None:
     """Get a specific accessory profile"""
     data = load_user_accessories(user_id)
     for item in data['items']:
@@ -1146,7 +1146,7 @@ def get_accessory(user_id: str, accessory_id: str) -> Optional[Dict]:
     return None
 
 
-def update_accessory(user_id: str, accessory_id: str, accessory_data: Dict) -> Optional[Dict]:
+def update_accessory(user_id: str, accessory_id: str, accessory_data: dict) -> dict | None:
     """Update an accessory profile"""
     try:
         data = load_user_accessories(user_id)
@@ -1160,8 +1160,8 @@ def update_accessory(user_id: str, accessory_id: str, accessory_data: Dict) -> O
                     accessory_type=accessory_data.get('accessory_type', item.get('accessory_type', '')),
                     weight_kg=_get_float_or_none(accessory_data.get('weight_kg'), item.get('weight_kg', 0.0)),
                     notes=accessory_data.get('notes', ''),
-                    created_at=item.get('created_at', datetime.now(timezone.utc).isoformat()),
-                    updated_at=datetime.now(timezone.utc).isoformat(),
+                    created_at=item.get('created_at', datetime.now(UTC).isoformat()),
+                    updated_at=datetime.now(UTC).isoformat(),
                     is_shared=bool(accessory_data.get('is_shared', item.get('is_shared', False))),
                     is_disabled=bool(accessory_data.get('is_disabled', item.get('is_disabled', False))),
                 )
@@ -1178,7 +1178,7 @@ def update_accessory(user_id: str, accessory_id: str, accessory_data: Dict) -> O
         return None
 
 
-def delete_accessory(user_id: str, accessory_id: str) -> Tuple[bool, Optional[List[str]]]:
+def delete_accessory(user_id: str, accessory_id: str) -> tuple[bool, list[str] | None]:
     """Delete an accessory profile. Refuses deletion when a combination still references it."""
     blocking = _find_combinations_referencing('accessories', accessory_id)
     if blocking:
@@ -1258,21 +1258,21 @@ def calculate_fov(
 # ============================================================
 
 
-def load_user_combinations(user_id: str) -> Dict:
+def load_user_combinations(user_id: str) -> dict:
     """Load user's equipment combinations"""
     data = _load_equipment_document(user_id, 'combinations')
     if data is None:
-        return {'user_id': user_id, 'created_at': datetime.now(timezone.utc).isoformat(), 'items': []}
+        return {'user_id': user_id, 'created_at': datetime.now(UTC).isoformat(), 'items': []}
     return data
 
 
-def save_user_combinations(user_id: str, data: Dict) -> bool:
+def save_user_combinations(user_id: str, data: dict) -> bool:
     """Save user's equipment combinations with safety checks"""
-    data['updated_at'] = datetime.now(timezone.utc).isoformat()
+    data['updated_at'] = datetime.now(UTC).isoformat()
     return safe_save_equipment(user_id, 'combinations', data)
 
 
-def create_combination(user_id: str, combination_data: Dict) -> Optional[Dict]:
+def create_combination(user_id: str, combination_data: dict) -> dict | None:
     """Create a new equipment combination"""
     try:
         # Validate: at minimum telescope or camera must be selected
@@ -1293,8 +1293,8 @@ def create_combination(user_id: str, combination_data: Dict) -> Optional[Dict]:
             filter_ids=combination_data.get('filter_ids', []),
             accessory_ids=combination_data.get('accessory_ids', []),
             notes=combination_data.get('notes', ''),
-            created_at=datetime.now(timezone.utc).isoformat(),
-            updated_at=datetime.now(timezone.utc).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
+            updated_at=datetime.now(UTC).isoformat(),
             is_disabled=bool(combination_data.get('is_disabled', False)),
             guide_camera_id=combination_data.get('guide_camera_id') or None,
             lens_focal_length_mm=(
@@ -1315,7 +1315,7 @@ def create_combination(user_id: str, combination_data: Dict) -> Optional[Dict]:
         return None
 
 
-def get_combination(user_id: str, combination_id: str) -> Optional[Dict]:
+def get_combination(user_id: str, combination_id: str) -> dict | None:
     """Get a specific equipment combination"""
     data = load_user_combinations(user_id)
     for item in data['items']:
@@ -1324,7 +1324,7 @@ def get_combination(user_id: str, combination_id: str) -> Optional[Dict]:
     return None
 
 
-def update_combination(user_id: str, combination_id: str, combination_data: Dict) -> Optional[Dict]:
+def update_combination(user_id: str, combination_id: str, combination_data: dict) -> dict | None:
     """Update an equipment combination"""
     try:
         data = load_user_combinations(user_id)
@@ -1349,8 +1349,8 @@ def update_combination(user_id: str, combination_id: str, combination_data: Dict
                     filter_ids=combination_data.get('filter_ids', []),
                     accessory_ids=combination_data.get('accessory_ids', []),
                     notes=combination_data.get('notes', ''),
-                    created_at=item.get('created_at', datetime.now(timezone.utc).isoformat()),
-                    updated_at=datetime.now(timezone.utc).isoformat(),
+                    created_at=item.get('created_at', datetime.now(UTC).isoformat()),
+                    updated_at=datetime.now(UTC).isoformat(),
                     is_disabled=bool(combination_data.get('is_disabled', item.get('is_disabled', False))),
                     guide_camera_id=combination_data.get('guide_camera_id') or None,
                     lens_focal_length_mm=(
@@ -1374,7 +1374,7 @@ def update_combination(user_id: str, combination_id: str, combination_data: Dict
         return None
 
 
-def delete_combination(user_id: str, combination_id: str) -> Tuple[bool, Optional[str]]:
+def delete_combination(user_id: str, combination_id: str) -> tuple[bool, str | None]:
     """Delete an equipment combination.
 
     Refuses deletion while any Astrodex picture (any user) still references this combination
@@ -1383,8 +1383,8 @@ def delete_combination(user_id: str, combination_id: str) -> Tuple[bool, Optiona
     ('in_use_by_session').
     """
     from observation.astrodex import count_pictures_for_combination
-    from observation.plan_my_night import count_plans_for_combination
     from observation.observation_sessions import count_sessions_for_combination
+    from observation.plan_my_night import count_plans_for_combination
 
     if count_pictures_for_combination(combination_id) > 0:
         return False, 'in_use_by_picture'
@@ -1406,7 +1406,7 @@ def delete_combination(user_id: str, combination_id: str) -> Tuple[bool, Optiona
 # ============================================================
 
 
-def analyze_combination(user_id: str, combination_id: str) -> Optional[CombinationAnalysis]:
+def analyze_combination(user_id: str, combination_id: str) -> CombinationAnalysis | None:
     """Analyze an equipment combination for imaging suitability"""
     try:
         combination = get_combination(user_id, combination_id)
@@ -1417,29 +1417,29 @@ def analyze_combination(user_id: str, combination_id: str) -> Optional[Combinati
         camera_id_value = combination.get('camera_id')
         mount_id_value = combination.get('mount_id')
 
-        telescope_id: Optional[str] = telescope_id_value if isinstance(telescope_id_value, str) else None
-        camera_id: Optional[str] = camera_id_value if isinstance(camera_id_value, str) else None
-        mount_id: Optional[str] = mount_id_value if isinstance(mount_id_value, str) else None
+        telescope_id: str | None = telescope_id_value if isinstance(telescope_id_value, str) else None
+        camera_id: str | None = camera_id_value if isinstance(camera_id_value, str) else None
+        mount_id: str | None = mount_id_value if isinstance(mount_id_value, str) else None
 
         telescope = get_telescope(user_id, telescope_id) if telescope_id else None
         camera = get_camera(user_id, camera_id) if camera_id else None
         mount = get_mount(user_id, mount_id) if mount_id else None
 
-        filter_items: List[Dict] = []
+        filter_items: list[dict] = []
         for filter_id in combination.get('filter_ids', []) or []:
             filter_obj = get_filter(user_id, filter_id)
             if filter_obj:
                 filter_items.append(filter_obj)
 
-        accessory_items: List[Dict] = []
+        accessory_items: list[dict] = []
         for accessory_id in combination.get('accessory_ids', []) or []:
             accessory_obj = get_accessory(user_id, accessory_id)
             if accessory_obj:
                 accessory_items.append(accessory_obj)
 
         fov_result = None
-        suitability: List[str] = []
-        recommendations: List[str] = []
+        suitability: list[str] = []
+        recommendations: list[str] = []
 
         if telescope and camera:
             focal_length = telescope.get('effective_focal_length') or telescope.get('focal_length_mm')
@@ -1512,7 +1512,7 @@ def analyze_combination(user_id: str, combination_id: str) -> Optional[Combinati
 # ============================================================
 
 
-def get_all_equipment_summary(user_id: str) -> Dict:
+def get_all_equipment_summary(user_id: str) -> dict:
     """Get a summary of all user equipment"""
     return {
         'telescopes_count': len(load_user_telescopes(user_id).get('items', [])),

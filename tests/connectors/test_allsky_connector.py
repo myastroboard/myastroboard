@@ -1,9 +1,9 @@
 """Unit tests for AllSkyConnector and BaseConnector."""
 
-import requests as _requests
 from unittest.mock import MagicMock, patch
 
 import pytest
+import requests as _requests
 
 from connectors import allsky_connector
 from connectors.allsky_connector import AllSkyConnector, _normalize_sensor_data
@@ -63,7 +63,6 @@ def _make_all_modules(enabled=True):
 
 
 class TestBaseConnector:
-
     def test_init_stores_config(self):
         cfg = {"url": "http://allsky.local", "enabled": True, "modules": {}}
         c = AllSkyConnector(cfg)
@@ -108,7 +107,6 @@ class TestBaseConnector:
 
 
 class TestUrlBuilders:
-
     def test_image_url_defaults(self):
         c = _make()
         assert c._image_url() == "http://allsky.local/current/image.jpg"
@@ -160,7 +158,6 @@ class TestUrlBuilders:
 
 
 class TestForceIpv4:
-
     def test_replaces_hostname_with_ipv4(self):
         with patch("socket.getaddrinfo", return_value=[(None, None, None, None, ("1.2.3.4", 80))]):
             result = AllSkyConnector._force_ipv4("http://allsky.local/image.jpg")
@@ -183,7 +180,6 @@ class TestForceIpv4:
 
 
 class TestHead:
-
     def _head(self, cfg=None):
         return _make(cfg)._head
 
@@ -235,7 +231,6 @@ class TestHead:
 
 
 class TestHealthCheck:
-
     def test_no_base_url_returns_unreachable(self):
         c = AllSkyConnector({})
         result = c.health_check()
@@ -311,7 +306,6 @@ class TestHealthCheck:
 
 
 class TestGetModuleUrls:
-
     @pytest.fixture(autouse=True)
     def _layout_probe_ok(self):
         """Every layout probe answers 200, so the configured image_path is kept."""
@@ -367,7 +361,6 @@ class TestGetModuleUrls:
 
 
 class TestFetchSensorData:
-
     @pytest.fixture(autouse=True)
     def _layout_probe_ok(self):
         """Every layout probe answers 200, so the configured image_path is kept."""
@@ -432,7 +425,6 @@ class TestFetchSensorData:
 
 
 class TestNormalizeSensorData:
-
     def test_legacy_payload_unchanged(self):
         data = {"AS_TEMPERATURE_C": "12.5", "AS_GAIN": "100", "DAY_OR_NIGHT": "NIGHT", "ALLSKY_VERSION": "v2024.12"}
         result = _normalize_sensor_data(data)
@@ -472,7 +464,6 @@ class TestNormalizeSensorData:
 
 
 class TestLayoutDetection:
-
     def _live(self, image_path=None):
         cfg = {"url": "http://allsky.local", "enabled": True, "modules": {"live_image": {"enabled": True}}}
         if image_path is not None:

@@ -5,15 +5,17 @@ https://open-meteo.com/en/docs
 
 import threading
 import time
-from typing import cast, Optional
-import requests
+from typing import cast
+
 import numpy as np
 import pandas as pd
+import requests
+
 from utils import save_json_file
-from utils.repo_config import load_config, get_install_default_location
-from utils.constants import URL_OPENMETEO, CONDITIONS_FILE, SKYTONIGHT_LIVE_CONDITIONS_DEBOUNCE_SECONDS
+from utils.constants import CONDITIONS_FILE, SKYTONIGHT_LIVE_CONDITIONS_DEBOUNCE_SECONDS, URL_OPENMETEO
 from utils.logging_config import get_logger
-from weather.weather_utils import create_weather_client, create_fresh_weather_client
+from utils.repo_config import get_install_default_location, load_config
+from weather.weather_utils import create_fresh_weather_client, create_weather_client
 
 # Create logger with centralized configuration
 logger = get_logger(__name__)
@@ -107,7 +109,7 @@ def fetch_weather(latitude, longitude, timezone, hourly_vars, forecast_hours=12,
     return response
 
 
-def parse_hourly(response, hourly_vars, timezone_str: Optional[str] = "UTC"):
+def parse_hourly(response, hourly_vars, timezone_str: str | None = "UTC"):
     """Transform raw response into pandas DataFrame, apply timezone"""
 
     hourly = response.Hourly()
@@ -178,7 +180,7 @@ def _normalize_hourly_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def _enrich_hourly_dataframe(df: pd.DataFrame, timezone_str: Optional[str] = "UTC") -> pd.DataFrame:
+def _enrich_hourly_dataframe(df: pd.DataFrame, timezone_str: str | None = "UTC") -> pd.DataFrame:
     """Apply timezone conversion and derive astronomy-focused weather metrics."""
     # Convert to requested timezone
     try:
@@ -274,7 +276,7 @@ def fetch_weather_json(latitude, longitude, timezone, hourly_vars, forecast_hour
     return payload
 
 
-def parse_hourly_json(payload, hourly_vars, timezone_str: Optional[str] = "UTC"):
+def parse_hourly_json(payload, hourly_vars, timezone_str: str | None = "UTC"):
     """Transform raw JSON fallback response into pandas DataFrame and derived metrics."""
     hourly = payload.get("hourly") or {}
     time_values = hourly.get("time")

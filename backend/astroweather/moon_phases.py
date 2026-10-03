@@ -37,27 +37,26 @@ Example output for current Moon status (on API call):
 """
 
 import datetime
-from dataclasses import dataclass
-from zoneinfo import ZoneInfo
 import math
-from typing import Any, Optional, cast
+from dataclasses import dataclass
+from typing import Any, cast
+from zoneinfo import ZoneInfo
 
+import astropy.units as u
 from astronomy import (
-    Time,
-    MoonPhase,
-    SearchMoonPhase,
-    SearchRiseSet,
     Body,
-    Observer,
+    Direction,
     Equator,
     Horizon,
+    MoonPhase,
+    Observer,
     Refraction,
-    Direction,
+    SearchMoonPhase,
+    SearchRiseSet,
+    Time,
 )
-
+from astropy.coordinates import AltAz, EarthLocation, get_body, get_sun
 from astropy.time import Time as AstroTime
-from astropy.coordinates import EarthLocation, AltAz, get_sun, get_body
-import astropy.units as u
 
 
 @dataclass
@@ -80,7 +79,6 @@ class MoonAstroPhotoInfo:
 
 
 class MoonService:
-
     def __init__(self, latitude: float, longitude: float, timezone: str):
         self.latitude = latitude
         self.longitude = longitude
@@ -93,7 +91,7 @@ class MoonService:
     def get_report(self) -> MoonAstroPhotoInfo:
         # --- Now UTC & local ---
         now_local = datetime.datetime.now(self.timezone)
-        now_utc = now_local.astimezone(datetime.timezone.utc)
+        now_utc = now_local.astimezone(datetime.UTC)
 
         # astronomy.Time expects ISO8601 with 'T' and 'Z'
         time_str = now_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -174,7 +172,7 @@ class MoonService:
 
         # Time.Utc() returns a NAIVE datetime — attach UTC tzinfo before converting,
         # otherwise Python interprets it as the system timezone on .astimezone().
-        dt_utc = astro_time_obj.Utc().replace(tzinfo=datetime.timezone.utc)
+        dt_utc = astro_time_obj.Utc().replace(tzinfo=datetime.UTC)
         dt_local = dt_utc.astimezone(self.timezone)
         return dt_local.isoformat(timespec='minutes')  # ex: "2026-02-03T20:28:00+01:00"
 
@@ -189,8 +187,8 @@ class MoonService:
         coarse_step_minutes = 15
         fine_step_minutes = 1
 
-        def _is_dark_moonless(dt_local: datetime.datetime) -> Optional[bool]:
-            utc = dt_local.astimezone(datetime.timezone.utc)
+        def _is_dark_moonless(dt_local: datetime.datetime) -> bool | None:
+            utc = dt_local.astimezone(datetime.UTC)
             t_astropy = AstroTime(utc)
             frame = AltAz(obstime=t_astropy, location=self.location)
             sun_alt = self._coord_altitude_deg(get_sun(t_astropy), frame)
@@ -218,14 +216,14 @@ class MoonService:
         # Build full coarse grid and compute all altitudes in one vectorized batch
         n_coarse = int((max_days * 24 * 60) / coarse_step_minutes)
         coarse_times = [start_local + datetime.timedelta(minutes=i * coarse_step_minutes) for i in range(n_coarse)]
-        times_utc = [dt.astimezone(datetime.timezone.utc) for dt in coarse_times]
+        times_utc = [dt.astimezone(datetime.UTC) for dt in coarse_times]
         t_array = AstroTime(times_utc)
         frame = AltAz(obstime=t_array, location=self.location)
         sun_alts = cast(Any, get_sun(t_array).transform_to(frame).alt).to_value(u.deg)
         moon_alts = cast(Any, get_body("moon", t_array).transform_to(frame).alt).to_value(u.deg)
         coarse_dark = (sun_alts < -18) & (moon_alts < 0)
 
-        found_start: Optional[datetime.datetime] = None
+        found_start: datetime.datetime | None = None
 
         for i, dt in enumerate(coarse_times):
             is_dark = bool(coarse_dark[i])
@@ -242,7 +240,7 @@ class MoonService:
 
         return ("Not found", "Not found")
 
-    def _coord_altitude_deg(self, coord: Any, frame: AltAz) -> Optional[float]:
+    def _coord_altitude_deg(self, coord: Any, frame: AltAz) -> float | None:
         if coord is None:
             return None
 

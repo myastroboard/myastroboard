@@ -16,7 +16,8 @@ request from any other address gets the ingress headers stripped and nothing els
 import ipaddress
 import os
 import re
-from typing import Any, Callable, Iterable, Optional
+from collections.abc import Callable, Iterable
+from typing import Any
 
 from flask import request
 from flask.sessions import SecureCookieSessionInterface
@@ -60,13 +61,13 @@ def trusted_proxy_ip() -> str:
     return os.environ.get(INGRESS_PROXY_ENV, '').strip() or SUPERVISOR_IP
 
 
-def _clean_prefix(raw: str) -> Optional[str]:
+def _clean_prefix(raw: str) -> str | None:
     """Validated ingress prefix without trailing slash, or None when unusable."""
     prefix = raw.strip().rstrip('/')
     return prefix if _PREFIX_RE.match(prefix) else None
 
 
-def _parse_ip(value: Optional[str]) -> Optional[ipaddress.IPv4Address | ipaddress.IPv6Address]:
+def _parse_ip(value: str | None) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
     """Parsed address, with IPv4-mapped IPv6 unwrapped, or None when not an address.
 
     gunicorn listens on [::]:5000 (dual stack), so an IPv4 peer such as the Supervisor shows
@@ -81,7 +82,7 @@ def _parse_ip(value: Optional[str]) -> Optional[ipaddress.IPv4Address | ipaddres
     return address
 
 
-def _client_ip(forwarded_for: str) -> Optional[str]:
+def _client_ip(forwarded_for: str) -> str | None:
     """Rightmost X-Forwarded-For hop outside the hassio network.
 
     Rightmost, not leftmost: everything left of the hop HA core appended itself comes
@@ -97,7 +98,7 @@ def _client_ip(forwarded_for: str) -> Optional[str]:
 class IngressMiddleware:
     """WSGI middleware applying the HA ingress prefix and client address (see module docstring)."""
 
-    def __init__(self, wsgi_app: Callable[..., Iterable[bytes]], proxy_ip: Optional[str] = None):
+    def __init__(self, wsgi_app: Callable[..., Iterable[bytes]], proxy_ip: str | None = None):
         self.wsgi_app = wsgi_app
         self.proxy_ip = _parse_ip(proxy_ip or trusted_proxy_ip())
 
@@ -163,7 +164,7 @@ class IngressAwareSessionInterface(SecureCookieSessionInterface):
         return super().get_cookie_path(app)
 
 
-def external_base_url() -> Optional[str]:
+def external_base_url() -> str | None:
     """Base URL other software (HA camera, MyAstroShine) can reach this instance at, no trailing slash.
 
     The admin setting wins. Otherwise the address of the current request, prefix included -

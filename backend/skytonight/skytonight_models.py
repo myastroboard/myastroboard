@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -13,7 +13,7 @@ class SkyTonightCoordinates:
     ra_hours: float
     dec_degrees: float
 
-    def to_dict(self) -> Dict[str, float]:
+    def to_dict(self) -> dict[str, float]:
         return asdict(self)
 
 
@@ -25,26 +25,26 @@ class SkyTonightTarget:
     category: str
     object_type: str
     preferred_name: str
-    catalogue_names: Dict[str, str] = field(default_factory=dict)
-    aliases: List[str] = field(default_factory=list)
+    catalogue_names: dict[str, str] = field(default_factory=dict)
+    aliases: list[str] = field(default_factory=list)
     constellation: str = ''
-    magnitude: Optional[float] = None
-    size_arcmin: Optional[float] = None
-    coordinates: Optional[SkyTonightCoordinates] = None
-    source_catalogues: List[str] = field(default_factory=list)
+    magnitude: float | None = None
+    size_arcmin: float | None = None
+    coordinates: SkyTonightCoordinates | None = None
+    source_catalogues: list[str] = field(default_factory=list)
     translation_key: str = ''
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     difficulty_score: int = 0
     difficulty: str = 'intermediate'
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
         if self.coordinates is None:
             payload['coordinates'] = None
         return payload
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'SkyTonightTarget':
+    def from_dict(cls, data: dict[str, Any]) -> SkyTonightTarget:
         coordinates_data = data.get('coordinates')
         coordinates = None
         if isinstance(coordinates_data, dict):

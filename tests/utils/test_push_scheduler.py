@@ -4,7 +4,7 @@ import builtins
 import sys
 import time
 import types
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -41,7 +41,7 @@ def _make_user(user_id='u1', username='alice', subscriptions=None, triggers=None
 
 
 def _now_iso(**delta):
-    return (datetime.now(timezone.utc) + timedelta(**delta)).isoformat()
+    return (datetime.now(UTC) + timedelta(**delta)).isoformat()
 
 
 # ---------------------------------------------------------------------------
@@ -544,8 +544,9 @@ def test_n5_reads_the_payload_the_cache_job_actually_writes(monkeypatch):
     rename on either side breaks this test instead of silently muting the notification.
     """
     from unittest.mock import patch
-    from utils import push_scheduler
+
     from cache import cache_updater
+    from utils import push_scheduler
 
     class _Eclipse:
         """Stands in for SolarEclipseInfo: the job serialises it through __dict__."""
@@ -557,9 +558,11 @@ def test_n5_reads_the_payload_the_cache_job_actually_writes(monkeypatch):
     eclipse = _Eclipse(_now_iso(minutes=20))
 
     stored = {}
-    with patch.object(cache_updater, 'SolarEclipseService') as mock_service, patch.object(
-        cache_updater, 'cache_store'
-    ) as mock_store, patch.object(cache_updater, 'load_config', return_value={'locations': []}):
+    with (
+        patch.object(cache_updater, 'SolarEclipseService') as mock_service,
+        patch.object(cache_updater, 'cache_store') as mock_store,
+        patch.object(cache_updater, 'load_config', return_value={'locations': []}),
+    ):
         mock_service.return_value.get_next_eclipse.return_value = eclipse
         mock_store.update_location_cache.side_effect = lambda name, loc_id, data: stored.update(data)
         cache_updater.update_solar_eclipse_cache(
@@ -764,7 +767,7 @@ def test_n9_naive_timestamps_are_treated_as_utc(monkeypatch):
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
 
-    naive_now = datetime.now(timezone.utc).replace(tzinfo=None)
+    naive_now = datetime.now(UTC).replace(tzinfo=None)
     cache = {
         'events': [
             {
@@ -784,7 +787,7 @@ def test_n9_days_until_counts_calendar_days_not_rounded_duration():
     """A peak 6h out lands after local midnight - 1 day away, where rounding the duration gives 0."""
     from utils import push_scheduler
 
-    now = datetime(2026, 8, 12, 21, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 8, 12, 21, 0, tzinfo=UTC)
     assert push_scheduler._n9_days_until(now + timedelta(hours=2), now, 'UTC') == 0
     assert push_scheduler._n9_days_until(now + timedelta(hours=6), now, 'UTC') == 1
     assert push_scheduler._n9_days_until(now + timedelta(days=3), now, 'UTC') == 3
@@ -794,7 +797,7 @@ def test_n9_days_until_uses_the_observing_site_timezone():
     """Same instant, two sites: the peak is tomorrow for a Paris observer but today for a Tokyo one."""
     from utils import push_scheduler
 
-    now = datetime(2026, 8, 12, 20, 0, tzinfo=timezone.utc)  # 22:00 in Paris, 05:00 the 13th in Tokyo
+    now = datetime(2026, 8, 12, 20, 0, tzinfo=UTC)  # 22:00 in Paris, 05:00 the 13th in Tokyo
     peak = now + timedelta(hours=3)  # 01:00 the 13th in Paris, 08:00 the 13th in Tokyo
     assert push_scheduler._n9_days_until(peak, now, 'Europe/Paris') == 1
     assert push_scheduler._n9_days_until(peak, now, 'Asia/Tokyo') == 0
@@ -803,7 +806,7 @@ def test_n9_days_until_uses_the_observing_site_timezone():
 def test_n9_days_until_falls_back_to_utc_on_unknown_timezone():
     from utils import push_scheduler
 
-    now = datetime(2026, 8, 12, 12, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 8, 12, 12, 0, tzinfo=UTC)
     assert push_scheduler._n9_days_until(now + timedelta(days=2), now, 'Not/AZone') == 2
     assert push_scheduler._n9_days_until(now + timedelta(days=2), now, None) == 2
 
@@ -896,8 +899,7 @@ def test_n9_body_counts_days_beyond_tomorrow(monkeypatch):
 
 
 def test_send_delivers_to_all_subscriptions_and_marks_notified(monkeypatch):
-    from utils import push_manager
-    from utils import push_scheduler
+    from utils import push_manager, push_scheduler
 
     delivered = []
     monkeypatch.setattr(
@@ -917,8 +919,7 @@ def test_send_delivers_to_all_subscriptions_and_marks_notified(monkeypatch):
 
 
 def test_send_skips_user_with_no_subscriptions(monkeypatch):
-    from utils import push_manager
-    from utils import push_scheduler
+    from utils import push_manager, push_scheduler
 
     delivered = []
     monkeypatch.setattr(push_manager, 'send_push', lambda *a: delivered.append(1) or True)
@@ -929,8 +930,7 @@ def test_send_skips_user_with_no_subscriptions(monkeypatch):
 
 
 def test_send_removes_dead_subscriptions(monkeypatch):
-    from utils import push_manager
-    from utils import push_scheduler
+    from utils import push_manager, push_scheduler
 
     monkeypatch.setattr(
         push_manager,
@@ -953,8 +953,7 @@ def test_send_removes_dead_subscriptions(monkeypatch):
 
 
 def test_send_does_not_call_cleanup_when_all_succeed(monkeypatch):
-    from utils import push_manager
-    from utils import push_scheduler
+    from utils import push_manager, push_scheduler
 
     monkeypatch.setattr(push_manager, 'send_push', lambda *a, **kw: True)
 
@@ -972,8 +971,7 @@ def test_send_does_not_call_cleanup_when_all_succeed(monkeypatch):
 
 
 def test_cleanup_removes_dead_endpoints_and_saves(monkeypatch):
-    from utils import auth
-    from utils import push_scheduler
+    from utils import auth, push_scheduler
 
     saved = []
     monkeypatch.setattr(auth.user_manager, 'save_users', lambda: saved.append(1))
@@ -995,8 +993,7 @@ def test_cleanup_removes_dead_endpoints_and_saves(monkeypatch):
 
 
 def test_cleanup_handles_all_dead(monkeypatch):
-    from utils import auth
-    from utils import push_scheduler
+    from utils import auth, push_scheduler
 
     monkeypatch.setattr(auth.user_manager, 'save_users', lambda: None)
 
@@ -1019,8 +1016,7 @@ def test_cleanup_handles_all_dead(monkeypatch):
 
 
 def test_send_does_not_mark_notified_when_all_deliveries_fail(monkeypatch):
-    from utils import push_manager
-    from utils import push_scheduler
+    from utils import push_manager, push_scheduler
 
     monkeypatch.setattr(push_manager, 'send_push', lambda *a, **kw: False)
     push_scheduler._send(_make_user(), 'N7', 'Title', 'Body', '/url')
@@ -1076,6 +1072,7 @@ def test_push_scheduler_pick_active_plan_delegates_to_plan_my_night(monkeypatch)
 
 def test_pick_active_plan_returns_none_when_import_fails(monkeypatch):
     import builtins
+
     from utils import push_scheduler
 
     real_import = builtins.__import__
@@ -1288,7 +1285,7 @@ def test_n1_naive_datetime_handled(monkeypatch):
     from datetime import datetime, timedelta
 
     # Naive ISO string (no +00:00)
-    naive_start = (datetime.now(timezone.utc) + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S')
+    naive_start = (datetime.now(UTC) + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S')
     payload = {'state': 'pending', 'timeline': {'is_inside_night': False}, 'plan': {'night_start': naive_start}}
     push_scheduler._check_n1_plan_start(_make_user(), payload)
     assert len(send_calls) == 1
@@ -1399,12 +1396,13 @@ def test_n6_exception_in_parsing_swallowed(monkeypatch):
 
 
 def test_n6_naive_dusk_handled(monkeypatch):
-    from utils import push_scheduler
     from datetime import datetime, timedelta
+
+    from utils import push_scheduler
 
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
-    naive = (datetime.now(timezone.utc) + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S')
+    naive = (datetime.now(UTC) + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S')
     push_scheduler._check_n6_darkness(_make_user(), {'next_astronomical_dusk_utc': naive})
     assert len(send_calls) == 1
 
@@ -1508,8 +1506,7 @@ def test_cleanup_exception_handler(monkeypatch):
     modify_user() would normally just find no matching id and return None without
     raising - patching modify_user directly is what actually exercises the except path.
     """
-    from utils import push_scheduler
-    from utils import auth
+    from utils import auth, push_scheduler
 
     monkeypatch.setattr(
         auth.user_manager, 'modify_user', lambda user_id, fn: (_ for _ in ()).throw(Exception('db fail'))
@@ -1630,8 +1627,9 @@ def test_run_calls_poll_once_then_exits(monkeypatch):
 
 def test_acquire_lock_open_fails_returns_false(monkeypatch, tmp_path):
     """open() raises → _lock_file stays None → if block skipped → return False."""
-    from utils import push_scheduler
     import builtins
+
+    from utils import push_scheduler
 
     push_scheduler._lock_file = None
 
@@ -1654,10 +1652,11 @@ def test_acquire_lock_open_fails_returns_false(monkeypatch, tmp_path):
 
 def test_poll_fast_mode_via_pending_night(monkeypatch):
     """Poll detects a plan with night starting within 30 min and sets any_active."""
-    from utils import push_scheduler
-    from datetime import datetime, timedelta, timezone as tz
+    from datetime import datetime, timedelta
 
-    soon_start = (datetime.now(tz.utc) + timedelta(minutes=10)).isoformat()
+    from utils import push_scheduler
+
+    soon_start = (datetime.now(UTC) + timedelta(minutes=10)).isoformat()
 
     for fn in (
         '_check_n7_aurora',
@@ -1714,12 +1713,13 @@ def test_n2_skips_when_state_none(monkeypatch):
 
 def test_n2_naive_datetime_in_entry_gets_utc(monkeypatch):
     """naive timeline_start is treated as UTC (tzinfo=None branch)."""
-    from utils import push_scheduler
     from datetime import datetime, timedelta
+
+    from utils import push_scheduler
 
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
-    soon = (datetime.now(timezone.utc) + timedelta(minutes=3)).strftime('%Y-%m-%dT%H:%M:%S')  # naive
+    soon = (datetime.now(UTC) + timedelta(minutes=3)).strftime('%Y-%m-%dT%H:%M:%S')  # naive
     plan_payload = {
         'state': 'current',
         'timeline': {'is_inside_night': True},
@@ -1733,14 +1733,15 @@ def test_n2_naive_datetime_in_entry_gets_utc(monkeypatch):
 
 def test_n6_bad_timezone_name_falls_back_to_empty(monkeypatch):
     """ZoneInfo(bad_tz_name) raises, dusk_local_time falls back to ''."""
+    from datetime import datetime, timedelta
+
     from utils import push_scheduler
-    from datetime import datetime, timedelta, timezone as tz
 
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     # Clear cooldown
     push_scheduler._last_sent.pop(_make_user().user_id, None)
-    soon = (datetime.now(tz.utc) + timedelta(minutes=5)).isoformat()
+    soon = (datetime.now(UTC) + timedelta(minutes=5)).isoformat()
     cache = {
         'next_astronomical_dusk_utc': soon,
         'location': {'timezone': 'NOT/A_REAL_TIMEZONE'},
@@ -1751,13 +1752,14 @@ def test_n6_bad_timezone_name_falls_back_to_empty(monkeypatch):
 
 def test_n3_solar_naive_datetime_gets_utc(monkeypatch):
     """naive solar transit start_time is replaced with UTC."""
-    from utils import push_scheduler
     from datetime import datetime, timedelta
+
+    from utils import push_scheduler
 
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     push_scheduler._last_sent.clear()
-    soon = (datetime.now(timezone.utc) + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S')  # naive
+    soon = (datetime.now(UTC) + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S')  # naive
     cache = {'solar_transits': [{'start_time': soon}], 'lunar_transits': []}
     push_scheduler._check_n3_iss(_make_user(), cache)
     assert len(send_calls) == 1
@@ -1765,13 +1767,14 @@ def test_n3_solar_naive_datetime_gets_utc(monkeypatch):
 
 def test_n3_lunar_naive_datetime_gets_utc(monkeypatch):
     """naive lunar transit start_time is replaced with UTC."""
-    from utils import push_scheduler
     from datetime import datetime, timedelta
+
+    from utils import push_scheduler
 
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     push_scheduler._last_sent.clear()
-    soon = (datetime.now(timezone.utc) + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S')  # naive
+    soon = (datetime.now(UTC) + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S')  # naive
     cache = {'solar_transits': [], 'lunar_transits': [{'start_time': soon}]}
     push_scheduler._check_n3_iss(_make_user(), cache)
     assert len(send_calls) == 1
@@ -1790,13 +1793,14 @@ def test_n3_bad_lunar_timestamp_exception_swallowed(monkeypatch):
 
 def test_n4_naive_peak_datetime_gets_utc(monkeypatch):
     """naive peak_time in lunar eclipse data is replaced with UTC."""
-    from utils import push_scheduler
     from datetime import datetime, timedelta
+
+    from utils import push_scheduler
 
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     push_scheduler._last_sent.clear()
-    soon = (datetime.now(timezone.utc) + timedelta(minutes=20)).strftime('%Y-%m-%dT%H:%M:%S')  # naive
+    soon = (datetime.now(UTC) + timedelta(minutes=20)).strftime('%Y-%m-%dT%H:%M:%S')  # naive
     lunar_data = {'lunar_eclipse': {'peak_time': soon}}
     push_scheduler._check_n4_n5_eclipse(_make_user(), None, lunar_data)
     assert len(send_calls) == 1
@@ -1899,14 +1903,15 @@ def test_release_lock_when_no_lock_file(monkeypatch):
 
 def test_n3_past_lunar_transit_not_added_to_candidates(monkeypatch):
     """→363: lunar transit in the PAST is not added to candidates (dt <= now)."""
-    from utils import push_scheduler
     from datetime import datetime, timedelta
+
+    from utils import push_scheduler
 
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     push_scheduler._last_sent.clear()
     # Past transit → dt < now → loop continues without appending
-    past = (datetime.now(timezone.utc) - timedelta(hours=1)).strftime('%Y-%m-%dT%H:%M:%SZ')
+    past = (datetime.now(UTC) - timedelta(hours=1)).strftime('%Y-%m-%dT%H:%M:%SZ')
     cache = {'solar_transits': [], 'lunar_transits': [{'start_time': past}]}
     push_scheduler._check_n3_iss(_make_user(), cache)
     assert not send_calls  # No candidate → no notification
@@ -1936,8 +1941,9 @@ def test_poll_no_plan_skips_fast_mode_detection(monkeypatch):
 
 def test_poll_night_start_naive_gets_utc(monkeypatch):
     """naive night_start string is given UTC tz (tzinfo=None branch)."""
-    from utils import push_scheduler
     from datetime import datetime, timedelta
+
+    from utils import push_scheduler
 
     for fn in (
         '_check_n7_aurora',
@@ -1950,7 +1956,7 @@ def test_poll_night_start_naive_gets_utc(monkeypatch):
         monkeypatch.setattr(push_scheduler, fn, lambda *a, **k: None)
     monkeypatch.setattr(push_scheduler, '_load_cache', lambda _k: {})
     # Naive datetime string for night_start, 10 min from now → active
-    soon_naive = (datetime.now(timezone.utc) + timedelta(minutes=10)).strftime('%Y-%m-%dT%H:%M:%S')
+    soon_naive = (datetime.now(UTC) + timedelta(minutes=10)).strftime('%Y-%m-%dT%H:%M:%S')
     monkeypatch.setattr(
         push_scheduler,
         '_pick_active_plan',
@@ -1968,8 +1974,9 @@ def test_poll_night_start_naive_gets_utc(monkeypatch):
 
 def test_poll_night_start_far_future_not_fast_mode(monkeypatch):
     """→562: secs_until > 30*60 → any_active stays False."""
+    from datetime import datetime, timedelta
+
     from utils import push_scheduler
-    from datetime import datetime, timedelta, timezone as tz
 
     for fn in (
         '_check_n7_aurora',
@@ -1981,7 +1988,7 @@ def test_poll_night_start_far_future_not_fast_mode(monkeypatch):
     ):
         monkeypatch.setattr(push_scheduler, fn, lambda *a, **k: None)
     monkeypatch.setattr(push_scheduler, '_load_cache', lambda _k: {})
-    far_future = (datetime.now(tz.utc) + timedelta(hours=2)).isoformat()
+    far_future = (datetime.now(UTC) + timedelta(hours=2)).isoformat()
     monkeypatch.setattr(
         push_scheduler,
         '_pick_active_plan',
@@ -2000,8 +2007,9 @@ def test_poll_night_start_far_future_not_fast_mode(monkeypatch):
 
 def test_release_lock_logger_failure_swallowed(monkeypatch):
     """nested logger error in _release_lock is silently swallowed."""
-    from utils import push_scheduler
     from unittest.mock import MagicMock
+
+    from utils import push_scheduler
 
     mock_file = MagicMock()
     mock_file.fileno.side_effect = OSError('fd closed')
@@ -2114,13 +2122,14 @@ def test_n8_bad_lunar_timestamp_exception_swallowed(monkeypatch):
 
 
 def test_n8_naive_solar_datetime_gets_utc(monkeypatch):
-    from utils import push_scheduler
     from datetime import datetime, timedelta
+
+    from utils import push_scheduler
 
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
     push_scheduler._last_sent.clear()
-    soon = (datetime.now(timezone.utc) + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S')  # naive
+    soon = (datetime.now(UTC) + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S')  # naive
     cache = {'solar_transits': [{'start_time': soon}], 'lunar_transits': []}
     push_scheduler._check_n8_css(_make_user(), cache)
     assert len(send_calls) == 1
@@ -2155,7 +2164,7 @@ def test_n8_naive_lunar_datetime_gets_utc(monkeypatch):
     push_scheduler._last_sent.clear()
     send_calls = []
     monkeypatch.setattr(push_scheduler, '_send', lambda *a, **kw: send_calls.append(a))
-    soon_naive = (datetime.now(timezone.utc) + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S')
+    soon_naive = (datetime.now(UTC) + timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S')
     cache = {'solar_transits': [], 'lunar_transits': [{'start_time': soon_naive}]}
     push_scheduler._check_n8_css(_make_user(), cache)
     assert len(send_calls) == 1

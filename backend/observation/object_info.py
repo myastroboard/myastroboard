@@ -14,13 +14,13 @@ import sys
 import time
 import urllib.parse
 from contextlib import contextmanager
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import requests
 
+from utils import fix_astropy_constellation_name
 from utils.constants import DATA_DIR_CACHE
 from utils.logging_config import get_logger
-from utils import fix_astropy_constellation_name
 
 # Windows-compatible file locking (mirrors cache_store.py's cross-platform pattern).
 if sys.platform == 'win32':
@@ -68,7 +68,7 @@ _IDENT_RE = re.compile(r"^[A-Za-z0-9 +\-_.*/']+$")
 
 # Pre-built Wikipedia base URLs keyed by lang code - the hostname is never
 # constructed from user input, which prevents SSRF (CodeQL CWE-918).
-_WIKIPEDIA_BASES: Dict[str, str] = {
+_WIKIPEDIA_BASES: dict[str, str] = {
     lang: f'https://{lang}.wikipedia.org/api/rest_v1/page/summary/'
     for lang in [
         'en',
@@ -117,8 +117,8 @@ OBJECT_IMAGE_CACHE_DIR = os.path.join(DATA_DIR_CACHE, 'object_images')
 _BACKOFF_FILE = os.path.join(DATA_DIR_CACHE, 'object_info_backoff.json')
 _BACKOFF_LOCK_FILE = os.path.join(DATA_DIR_CACHE, 'object_info_backoff.lock')
 _BACKOFF_TTL = 300  # seconds
-_backoff_until: Dict[str, float] = {}
-_backoff_state: Dict[str, Optional[float]] = {'mtime_seen': None}
+_backoff_until: dict[str, float] = {}
+_backoff_state: dict[str, float | None] = {'mtime_seen': None}
 
 
 @contextmanager
@@ -142,12 +142,12 @@ def _backoff_file_lock():
             lock_file.close()
 
 
-def _load_backoff_state() -> Dict[str, float]:
+def _load_backoff_state() -> dict[str, float]:
     """Load persisted per-service backoff expirations from disk."""
     try:
         if not os.path.exists(_BACKOFF_FILE):
             return {}
-        with open(_BACKOFF_FILE, 'r', encoding='utf-8') as fh:
+        with open(_BACKOFF_FILE, encoding='utf-8') as fh:
             raw = json.load(fh)
         now_ts = time.time()
         return {str(k): float(v) for k, v in (raw or {}).items() if float(v) > now_ts}
@@ -236,7 +236,7 @@ def _sanitize_lang(lang: str) -> str:
 # ──────────────────────────────────────────────
 
 
-def _simbad_query(adql: str) -> Optional[Dict]:
+def _simbad_query(adql: str) -> dict | None:
     """Execute an ADQL query against the SIMBAD TAP endpoint and return the JSON payload."""
     if _is_backed_off('simbad'):
         return None
@@ -261,7 +261,7 @@ def _simbad_query(adql: str) -> Optional[Dict]:
         return None
 
 
-def _sort_aliases(aliases: List[str]) -> List[str]:
+def _sort_aliases(aliases: list[str]) -> list[str]:
     """
     Return *aliases* sorted so that well-known catalogue names come first
     and noisy survey identifiers (NVSS, TGSS, Gaia, 2MASS, SDSS, …) come last.
@@ -332,7 +332,7 @@ def _sort_aliases(aliases: List[str]) -> List[str]:
     return sorted(aliases, key=_priority)
 
 
-def _resolve_via_simbad(identifier: str) -> Optional[Dict[str, Any]]:
+def _resolve_via_simbad(identifier: str) -> dict[str, Any] | None:
     """
     Resolve *identifier* through SIMBAD TAP.
 
@@ -362,7 +362,7 @@ def _resolve_via_simbad(identifier: str) -> Optional[Dict[str, Any]]:
 
     row = result['data'][0]
     cols = [c['name'] for c in result.get('metadata', [])]
-    row_dict = dict(zip(cols, row))
+    row_dict = dict(zip(cols, row, strict=False))
 
     main_id = str(row_dict.get('main_id') or '').strip()
     obj_type = str(row_dict.get('otype_txt') or '').strip()
@@ -371,11 +371,9 @@ def _resolve_via_simbad(identifier: str) -> Optional[Dict[str, Any]]:
 
     # Fetch all alternative identifiers
     safe_main = main_id.replace("'", "''")
-    alias_query = (
-        "SELECT i.id " "FROM ident AS i " "JOIN ident AS ref ON i.oidref = ref.oidref " f"WHERE ref.id = '{safe_main}'"
-    )
+    alias_query = f"SELECT i.id FROM ident AS i JOIN ident AS ref ON i.oidref = ref.oidref WHERE ref.id = '{safe_main}'"
     alias_result = _simbad_query(alias_query)
-    raw_aliases: List[str] = []
+    raw_aliases: list[str] = []
     if alias_result and alias_result.get('data'):
         for alias_row in alias_result['data']:
             alias_val = str(alias_row[0]).strip()
@@ -398,7 +396,7 @@ def _resolve_via_simbad(identifier: str) -> Optional[Dict[str, Any]]:
 
 # Recognized catalog patterns for building catalogue_names dicts from SIMBAD aliases.
 # Order matters: higher-priority catalogs are matched first.
-_CATALOGUE_ALIAS_PATTERNS: List[tuple] = [
+_CATALOGUE_ALIAS_PATTERNS: list[tuple] = [
     (re.compile(r'^M\s+\d+$', re.I), 'Messier'),
     (re.compile(r'^NGC\s+\w+$', re.I), 'OpenNGC'),
     (re.compile(r'^IC\s+\w+$', re.I), 'OpenIC'),
@@ -413,7 +411,7 @@ _CATALOGUE_ALIAS_PATTERNS: List[tuple] = [
 ]
 
 
-def build_catalogue_names_from_aliases(identifier: str, aliases: List[str]) -> Dict[str, str]:
+def build_catalogue_names_from_aliases(identifier: str, aliases: list[str]) -> dict[str, str]:
     """Build a {catalogue_key: identifier} dict from a SIMBAD alias list.
 
     The input identifier is always included under its detected catalog key (or 'Simbad').
@@ -421,7 +419,7 @@ def build_catalogue_names_from_aliases(identifier: str, aliases: List[str]) -> D
     object's CommonName, stripped of the "NAME " prefix - mirroring the CommonName key
     already used throughout the SkyTonight catalogue system for the same purpose.
     """
-    result: Dict[str, str] = {}
+    result: dict[str, str] = {}
     for name in [identifier] + aliases:
         stripped = name.strip()
         if 'CommonName' not in result and stripped.upper().startswith('NAME '):
@@ -438,7 +436,7 @@ def build_catalogue_names_from_aliases(identifier: str, aliases: List[str]) -> D
     return result
 
 
-def resolve_identifier_for_catalogue_lookup(identifier: str) -> Optional[Dict[str, Any]]:
+def resolve_identifier_for_catalogue_lookup(identifier: str) -> dict[str, Any] | None:
     """Resolve *identifier* via SIMBAD TAP for the Astrodex catalogue-lookup fallback.
 
     Returns {'object_type', 'constellation', 'aliases'} or None.
@@ -459,7 +457,7 @@ def resolve_identifier_for_catalogue_lookup(identifier: str) -> Optional[Dict[st
 
     row = result['data'][0]
     cols = [c['name'] for c in result.get('metadata', [])]
-    row_dict = dict(zip(cols, row))
+    row_dict = dict(zip(cols, row, strict=False))
 
     main_id = str(row_dict.get('main_id') or '').strip()
     obj_type = str(row_dict.get('otype_txt') or '').strip()
@@ -478,11 +476,9 @@ def resolve_identifier_for_catalogue_lookup(identifier: str) -> Optional[Dict[st
             pass  # astropy unavailable or coordinates out of range — constellation stays None
 
     safe_main = main_id.replace("'", "''")
-    alias_query = (
-        "SELECT i.id FROM ident AS i " "JOIN ident AS ref ON i.oidref = ref.oidref " f"WHERE ref.id = '{safe_main}'"
-    )
+    alias_query = f"SELECT i.id FROM ident AS i JOIN ident AS ref ON i.oidref = ref.oidref WHERE ref.id = '{safe_main}'"
     alias_result = _simbad_query(alias_query)
-    raw_aliases: List[str] = []
+    raw_aliases: list[str] = []
     if alias_result and alias_result.get('data'):
         for alias_row in alias_result['data']:
             alias_val = str(alias_row[0]).strip()
@@ -541,7 +537,7 @@ def get_object_image_proxy_url(ra: float, dec: float) -> str:
     return f'/api/object-image/{_object_image_filename(ra, dec)}'
 
 
-def parse_object_image_filename(filename: str) -> Optional[tuple]:
+def parse_object_image_filename(filename: str) -> tuple | None:
     """Validate an /api/object-image/<filename> path segment and recover (ra, dec).
 
     Returns None if the filename doesn't match the expected pattern or the
@@ -561,7 +557,7 @@ def parse_object_image_filename(filename: str) -> Optional[tuple]:
     return ra, dec
 
 
-def ensure_cached_object_image(ra: float, dec: float) -> Optional[str]:
+def ensure_cached_object_image(ra: float, dec: float) -> str | None:
     """Make sure the DSS2 image for (ra, dec) exists in the on-disk cache.
 
     Returns the absolute local file path (downloading from hips2fits first if
@@ -610,7 +606,7 @@ def _normalize_wikipedia_term(term: str) -> str:
     return ' '.join(term.split())
 
 
-def _get_wikipedia_summary(search_term: str, lang: str = 'en') -> Optional[Dict[str, str]]:
+def _get_wikipedia_summary(search_term: str, lang: str = 'en') -> dict[str, str] | None:
     """
     Fetch a Wikipedia page summary for *search_term* in the given *lang*.
 
@@ -663,7 +659,7 @@ def _get_wikipedia_summary(search_term: str, lang: str = 'en') -> Optional[Dict[
         return None
 
 
-def _wikipedia_with_fallback(aliases: List[str], lang: str) -> Optional[Dict[str, str]]:
+def _wikipedia_with_fallback(aliases: list[str], lang: str) -> dict[str, str] | None:
     """
     Try each term in *aliases* for the requested *lang*, then fall back to
     English if nothing is found.
@@ -696,7 +692,7 @@ _BARNARD_RE = re.compile(r'^Barnard\s+(\d+)$', re.I)
 _ABELL_RE = re.compile(r'^Abell\s+(\d+)$', re.I)
 
 
-def _simbad_identifier_variants(identifier: str) -> List[str]:
+def _simbad_identifier_variants(identifier: str) -> list[str]:
     """Return alternative SIMBAD-compatible identifiers to try when the primary lookup fails.
 
     SIMBAD uses different capitalization and spacing than our preferred names:
@@ -748,7 +744,7 @@ def _translate_object_type(object_type: str, lang: str) -> str:
     return object_type if translated == i18n_key else translated
 
 
-def get_object_info(identifier: str, lang: str = 'en') -> Dict[str, Any]:
+def get_object_info(identifier: str, lang: str = 'en') -> dict[str, Any]:
     """
     Return full metadata for an astronomical object.
 
@@ -812,7 +808,7 @@ def get_object_info(identifier: str, lang: str = 'en') -> Dict[str, Any]:
             _preferred = str(_local_entry.get('preferred_name') or identifier).strip()
             _image = {'url': get_object_image_proxy_url(_ra, _dec), 'credit': 'DSS2 Color / CDS HiPS'}
             _seen: set = set()
-            _search_terms: List[str] = []
+            _search_terms: list[str] = []
             for _t in [identifier, _preferred]:
                 _norm = _normalize_wikipedia_term(_t)
                 if _norm not in _seen:
@@ -870,7 +866,7 @@ def get_object_info(identifier: str, lang: str = 'en') -> Dict[str, Any]:
     # then SIMBAD main name, then recognisable aliases.
     # Also add compact (no-space) variant for Messier-style names like 'M 82' → 'M82'.
     _seen: set = set()
-    search_terms: List[str] = []
+    search_terms: list[str] = []
     for _t in [identifier, resolved['name']] + resolved.get('aliases', [])[:8]:
         _norm = _normalize_wikipedia_term(_t)
         if _norm not in _seen:

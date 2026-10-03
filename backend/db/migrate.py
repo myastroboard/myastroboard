@@ -6,7 +6,6 @@ the working directory.
 
 import os
 from functools import lru_cache
-from typing import Optional
 
 from alembic import command
 from alembic.config import Config
@@ -30,19 +29,19 @@ def alembic_config() -> Config:
 
 
 @lru_cache(maxsize=1)
-def head_revision() -> Optional[str]:
+def head_revision() -> str | None:
     """The newest revision shipped with this version of the application (fixed for the process)."""
     return ScriptDirectory.from_config(alembic_config()).get_current_head()
 
 
-def current_revision(engine: Optional[Engine] = None) -> Optional[str]:
+def current_revision(engine: Engine | None = None) -> str | None:
     """The revision the database is at (``None`` for an empty database)."""
     engine = engine or get_engine()
     with engine.connect() as conn:
         return MigrationContext.configure(conn).get_current_revision()
 
 
-def upgrade_to_head(engine: Optional[Engine] = None) -> None:
+def upgrade_to_head(engine: Engine | None = None) -> None:
     """Upgrade the database schema to the newest revision (no-op when already there)."""
     engine = engine or get_engine()
     before = current_revision(engine)
@@ -56,7 +55,7 @@ def upgrade_to_head(engine: Optional[Engine] = None) -> None:
     logger.info(f"Database schema upgraded from {before or 'empty'} to {target}")
 
 
-def downgrade_to(revision: str, engine: Optional[Engine] = None) -> None:
+def downgrade_to(revision: str, engine: Engine | None = None) -> None:
     """Downgrade the schema to ``revision`` ("base" removes every table). Used by tests and by hand."""
     config = alembic_config()
     with (engine or get_engine()).connect() as conn:

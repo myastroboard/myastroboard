@@ -1,7 +1,8 @@
 """Unit tests for backend i18n utilities (i18n_utils.py)."""
 
-import pytest
 from unittest.mock import mock_open, patch
+
+import pytest
 
 from utils import i18n_utils as module
 
@@ -30,8 +31,9 @@ def test_is_safe_path_true_for_nested_path(tmp_path):
 
 def test_load_translation_file_unsupported_language_falls_back_to_default():
     payload = '{"common": {"hello": "Hello"}}'
-    with patch("utils.i18n_utils.os.path.exists", return_value=True), patch(
-        "builtins.open", mock_open(read_data=payload)
+    with (
+        patch("utils.i18n_utils.os.path.exists", return_value=True),
+        patch("builtins.open", mock_open(read_data=payload)),
     ):
         data = module._load_translation_file("xx")
 
@@ -132,8 +134,9 @@ def test_load_translation_file_cache_hit(tmp_path):
     """second call for same language uses cached result."""
     module._translation_cache.clear()
     payload = '{"x": "y"}'
-    with patch("utils.i18n_utils.os.path.exists", return_value=True), patch(
-        "builtins.open", mock_open(read_data=payload)
+    with (
+        patch("utils.i18n_utils.os.path.exists", return_value=True),
+        patch("builtins.open", mock_open(read_data=payload)),
     ):
         module._load_translation_file("en")
         # Inject a sentinel to prove the cache is used on the second call
@@ -146,8 +149,9 @@ def test_load_translation_file_cache_hit(tmp_path):
 def test_load_translation_file_json_decode_error_returns_empty(tmp_path):
     """JSONDecodeError → empty dict returned."""
     module._translation_cache.clear()
-    with patch("utils.i18n_utils.os.path.exists", return_value=True), patch(
-        "builtins.open", mock_open(read_data="INVALID JSON {{{")
+    with (
+        patch("utils.i18n_utils.os.path.exists", return_value=True),
+        patch("builtins.open", mock_open(read_data="INVALID JSON {{{")),
     ):
         result = module._load_translation_file("en")
 

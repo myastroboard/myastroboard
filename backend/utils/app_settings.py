@@ -112,7 +112,7 @@ def normalize_log_retention_days(value, fallback: int = _DEFAULTS["log_retention
         return fallback
     try:
         days = int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return fallback
     return min(max(days, 0), LOG_RETENTION_MAX_DAYS)
 

@@ -17,9 +17,8 @@ sys.path.insert(0, "/app")
 # minutes under emulation. The libraries they use are exercised directly below.
 sys.modules.setdefault("pytest", types.ModuleType("pytest"))
 
-import backend.app  # noqa: E402,F401  - the import chain gunicorn workers run
-
 import astropy.units as u  # noqa: E402
+import backend.app  # noqa: E402,F401  - the import chain gunicorn workers run
 import matplotlib  # noqa: E402
 
 matplotlib.use("Agg")

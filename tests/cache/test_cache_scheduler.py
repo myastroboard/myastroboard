@@ -207,7 +207,7 @@ def test_acquire_lock_ioerror_from_open(monkeypatch, tmp_path):
     """IOError from open() should cause _acquire_lock to return False."""
     scheduler = module.CacheScheduler(interval_seconds=1)
     monkeypatch.setattr(module, "DATA_DIR_CACHE", str(tmp_path))
-    monkeypatch.setattr("builtins.open", lambda *_a, **_k: (_ for _ in ()).throw(IOError("permission denied")))
+    monkeypatch.setattr("builtins.open", lambda *_a, **_k: (_ for _ in ()).throw(OSError("permission denied")))
 
     assert scheduler._acquire_lock() is False
     assert scheduler._lock_file is None
@@ -370,7 +370,7 @@ def test_acquire_lock_fcntl_ioerror_closes_file_and_returns_false(monkeypatch, t
     mock_fcntl = types.SimpleNamespace(
         LOCK_EX=2,
         LOCK_NB=4,
-        flock=lambda fd, op: (_ for _ in ()).throw(IOError("device busy")),
+        flock=lambda fd, op: (_ for _ in ()).throw(OSError("device busy")),
     )
     monkeypatch.setattr(module, "fcntl", mock_fcntl)
 
@@ -425,7 +425,7 @@ def test_acquire_lock_write_ioerror_closes_file_and_returns_false(monkeypatch, t
 
     class WriteFailFile(DummyFile):
         def write(self, _value):
-            raise IOError("disk full")
+            raise OSError("disk full")
 
     monkeypatch.setattr(module, "DATA_DIR_CACHE", str(tmp_path))
     monkeypatch.setattr(module.sys, "platform", "win32")

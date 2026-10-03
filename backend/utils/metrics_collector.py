@@ -4,22 +4,24 @@ Provides container/VM-aware metrics with detailed disk space tracking and proces
 """
 
 import os
+import platform
 import threading
 import time
-from typing import TypedDict
-import psutil
-import platform
 from datetime import datetime
-from utils.logging_config import get_logger
+from typing import TypedDict
+
+import psutil
+
 from utils.constants import (
     DATA_DIR,
-    SKYTONIGHT_DIR,
-    SKYTONIGHT_CATALOGUES_DIR,
     SKYTONIGHT_CALCULATIONS_DIR,
+    SKYTONIGHT_CATALOGUES_DIR,
+    SKYTONIGHT_DIR,
     SKYTONIGHT_LOGS_DIR,
-    SKYTONIGHT_RUNTIME_DIR,
     SKYTONIGHT_OUTPUT_DIR,
+    SKYTONIGHT_RUNTIME_DIR,
 )
+from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
@@ -59,7 +61,7 @@ def is_running_in_container():
 
     # Check cgroup for container detection
     try:
-        with open('/proc/1/cgroup', 'r') as f:
+        with open('/proc/1/cgroup') as f:
             cgroup = f.read()
             if 'docker' in cgroup:
                 return True, 'Docker'
@@ -69,16 +71,16 @@ def is_running_in_container():
                 return True, 'Kubernetes'
             if 'systemd-nspawn' in cgroup:
                 return True, 'systemd-nspawn'
-    except (FileNotFoundError, IOError):
+    except OSError, FileNotFoundError:
         pass  # /proc/1/cgroup not present (non-Linux or restricted environment)
 
     # Check for hypervisor (VM detection)
     try:
-        with open('/proc/cpuinfo', 'r') as f:
+        with open('/proc/cpuinfo') as f:
             cpuinfo = f.read()
             if 'hypervisor' in cpuinfo:
                 return True, 'Virtual Machine'
-    except (FileNotFoundError, IOError):
+    except OSError, FileNotFoundError:
         pass  # /proc/cpuinfo not present (non-Linux or restricted environment)
 
     return False, None
@@ -104,9 +106,9 @@ def get_folder_disk_usage(folder_path):
                             total_size += entry.stat(follow_symlinks=False).st_size
                         elif entry.is_dir(follow_symlinks=False):
                             stack.append(entry.path)
-                    except (OSError, IOError):
+                    except OSError:
                         pass  # skip inaccessible files (permissions, broken symlinks)
-        except (OSError, IOError):
+        except OSError:
             pass  # skip inaccessible directories (permissions, deleted mid-scan)
     return total_size
 
@@ -297,7 +299,7 @@ def get_environment_processes():
                     'is_container_related': is_container_related,
                 }
             )
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+        except psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess:
             continue
         except Exception as e:
             logger.debug(f"Unable to read process info for PID {getattr(proc, 'pid', 'unknown')}: {e}")

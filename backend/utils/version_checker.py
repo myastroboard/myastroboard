@@ -10,13 +10,14 @@ remote fetch.
 
 import re
 import time
-from typing import Optional
 
 import requests
-from packaging.version import parse as parse_version, InvalidVersion
-from utils.logging_config import get_logger
+from packaging.version import InvalidVersion
+from packaging.version import parse as parse_version
+
 from cache import cache_store
 from utils.constants import VERSION_UPDATE_CACHE_TTL
+from utils.logging_config import get_logger
 from utils.txtconf_loader import get_repo_version
 
 logger = get_logger(__name__)
@@ -69,9 +70,9 @@ def parse_changelog(markdown: str, current_version: str, latest_version: str, ta
     [Unreleased] section and any non-semver heading are ignored.
     """
     releases = []
-    release: Optional[dict] = None
-    group: Optional[str] = None
-    bullet: Optional[list] = None
+    release: dict | None = None
+    group: str | None = None
+    bullet: list | None = None
 
     def _flush_bullet():
         nonlocal bullet
@@ -113,7 +114,7 @@ def parse_changelog(markdown: str, current_version: str, latest_version: str, ta
     return releases[:CHANGELOG_MAX_RELEASES]
 
 
-def fetch_release_changes(current_version: str, latest_version: str, tag: str) -> Optional[list]:
+def fetch_release_changes(current_version: str, latest_version: str, tag: str) -> list | None:
     """
     Fetch CHANGELOG.md at the latest release tag and return the parsed changes since current_version.
     Returns None when the file cannot be fetched or parsed, so the UI falls back to the release link.

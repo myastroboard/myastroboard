@@ -9,26 +9,26 @@ Architecture mirrors iss_passes.py exactly — all state is separate so both sta
 run as independent parallel cache jobs without any shared mutable data.
 """
 
-from datetime import datetime, timedelta, timezone
-from math import acos, asin, cos, degrees, radians, sin
-from typing import Optional, Dict, Any, List, Tuple, cast
-from urllib.parse import urlparse
-from zoneinfo import ZoneInfo
+import json
 import os
 import threading
 import time
+from datetime import UTC, datetime, timedelta
+from math import acos, asin, cos, degrees, radians, sin
+from typing import Any, cast
+from urllib.parse import urlparse
+from zoneinfo import ZoneInfo
 
-import json
+import astropy.units as u
 import numpy as np
 import requests
-import astropy.units as u
+from astropy.coordinates import AltAz, Angle, EarthLocation, get_sun
 from astropy.time import Time as AstroTime
-from astropy.coordinates import Angle, EarthLocation, AltAz, get_sun
-from skyfield.api import Loader, EarthSatellite, wgs84
+from skyfield.api import EarthSatellite, Loader, wgs84
 
+from utils import load_json_file, save_json_file
 from utils.constants import CACHE_TTL, DATA_DIR_CACHE
 from utils.logging_config import get_logger
-from utils import load_json_file, save_json_file
 
 logger = get_logger(__name__)
 
@@ -98,7 +98,7 @@ CELESTRAK_ADDENDUM_URL = "https://celestrak.org/NORAD/documentation/gp-data-form
 CELESTRAK_CSS_QUERY_URL = "https://celestrak.org/NORAD/elements/gp.php?CATNR=48274&FORMAT=TLE"
 
 # Server-side ground-track cache for CSS: recompute the ±50-min orbit path at most once per 5 min.
-_CSS_TRACK_CACHE: Dict[str, Any] = {}
+_CSS_TRACK_CACHE: dict[str, Any] = {}
 _CSS_TRACK_CACHE_LOCK = threading.Lock()
 _CSS_TRACK_CACHE_TTL_SECONDS = 300  # 5 minutes
 
@@ -107,12 +107,12 @@ def _utc_timestamp() -> int:
     return int(time.time())
 
 
-def _read_css_tle_cache() -> Dict[str, Any]:
+def _read_css_tle_cache() -> dict[str, Any]:
     payload = load_json_file(CSS_TLE_CACHE_FILE, default={})
     return payload if isinstance(payload, dict) else {}
 
 
-def _write_css_tle_cache(payload: Dict[str, Any]) -> None:
+def _write_css_tle_cache(payload: dict[str, Any]) -> None:
     save_json_file(CSS_TLE_CACHE_FILE, payload)
 
 
@@ -136,7 +136,7 @@ def _update_css_tle_cache(mutator) -> None:
         _write_css_tle_cache(payload)
 
 
-def _get_cached_css_tle(max_age_seconds: Optional[int] = None) -> Optional[Tuple[str, str, int]]:
+def _get_cached_css_tle(max_age_seconds: int | None = None) -> tuple[str, str, int] | None:
     cache = _read_css_tle_cache()
     line1 = str(cache.get('line1') or '').strip()
     line2 = str(cache.get('line2') or '').strip()
@@ -152,7 +152,7 @@ def _get_cached_css_tle(max_age_seconds: Optional[int] = None) -> Optional[Tuple
 
 
 def _set_cached_css_tle(line1: str, line2: str) -> None:
-    def _mutate(payload: Dict[str, Any]) -> None:
+    def _mutate(payload: dict[str, Any]) -> None:
         payload['line1'] = line1
         payload['line2'] = line2
         payload['fetched_at'] = _utc_timestamp()
@@ -176,7 +176,7 @@ def _is_celestrak_url(candidate_url: str) -> bool:
 
 
 def _set_cached_css_tle_with_source(line1: str, line2: str, source_url: str) -> None:
-    def _mutate(payload: Dict[str, Any]) -> None:
+    def _mutate(payload: dict[str, Any]) -> None:
         payload['line1'] = line1
         payload['line2'] = line2
         payload['fetched_at'] = _utc_timestamp()
@@ -187,7 +187,7 @@ def _set_cached_css_tle_with_source(line1: str, line2: str, source_url: str) -> 
     _update_css_tle_cache(_mutate)
 
 
-def get_css_tle_source_info() -> Dict[str, Any]:
+def get_css_tle_source_info() -> dict[str, Any]:
     payload = _read_css_tle_cache()
     return {
         "name": str(payload.get("last_source_name") or "").strip(),
@@ -209,7 +209,7 @@ def _in_css_tle_failure_cooldown() -> bool:
 
 
 def _set_css_celestrak_block(status_code: int, reason: str, source_url: str) -> None:
-    def _mutate(payload: Dict[str, Any]) -> None:
+    def _mutate(payload: dict[str, Any]) -> None:
         payload['celestrak_blocked'] = True
         payload['celestrak_blocked_at'] = _utc_timestamp()
         payload['celestrak_blocked_status_code'] = int(status_code)
@@ -220,7 +220,7 @@ def _set_css_celestrak_block(status_code: int, reason: str, source_url: str) -> 
 
 
 def _reset_css_celestrak_timeout_streak() -> None:
-    def _mutate(payload: Dict[str, Any]) -> None:
+    def _mutate(payload: dict[str, Any]) -> None:
         payload['celestrak_timeout_streak'] = 0
         payload['celestrak_last_timeout_at'] = None
         payload['celestrak_last_timeout_reason'] = None
@@ -230,9 +230,9 @@ def _reset_css_celestrak_timeout_streak() -> None:
 
 
 def _increment_css_celestrak_timeout_streak(reason: str, source_url: str) -> int:
-    captured: Dict[str, int] = {}
+    captured: dict[str, int] = {}
 
-    def _mutate(payload: Dict[str, Any]) -> None:
+    def _mutate(payload: dict[str, Any]) -> None:
         streak = int(payload.get('celestrak_timeout_streak') or 0) + 1
         payload['celestrak_timeout_streak'] = streak
         payload['celestrak_last_timeout_at'] = _utc_timestamp()
@@ -264,7 +264,7 @@ class _CelestrakHTTPError(RuntimeError):
 
 
 def _clear_css_celestrak_block(reset_failure_cooldown: bool = True) -> None:
-    def _mutate(payload: Dict[str, Any]) -> None:
+    def _mutate(payload: dict[str, Any]) -> None:
         payload['celestrak_blocked'] = False
         payload['celestrak_blocked_at'] = None
         payload['celestrak_blocked_status_code'] = None
@@ -280,7 +280,7 @@ def _clear_css_celestrak_block(reset_failure_cooldown: bool = True) -> None:
     _update_css_tle_cache(_mutate)
 
 
-def get_css_celestrak_status() -> Dict[str, Any]:
+def get_css_celestrak_status() -> dict[str, Any]:
     payload = _read_css_tle_cache()
     return {
         "blocked": bool(payload.get("celestrak_blocked") is True),
@@ -299,7 +299,7 @@ def get_css_celestrak_status() -> Dict[str, Any]:
     }
 
 
-def clear_css_celestrak_block_flag() -> Dict[str, Any]:
+def clear_css_celestrak_block_flag() -> dict[str, Any]:
     """Clear persisted Celestrak block flag after manual operator confirmation."""
     previous_status = get_css_celestrak_status()
     _clear_css_celestrak_block(reset_failure_cooldown=True)
@@ -322,7 +322,7 @@ class CSSPassService:
         self.timezone = ZoneInfo(timezone_str)
         self.location = EarthLocation(lat=latitude * u.deg, lon=longitude * u.deg, height=elevation_m * u.m)
 
-    def get_report(self, days: int = DEFAULT_FORECAST_DAYS) -> Dict[str, Any]:
+    def get_report(self, days: int = DEFAULT_FORECAST_DAYS) -> dict[str, Any]:
         """Generate CSS pass report for the requested window."""
         forecast_days = max(1, min(int(days), MAX_FORECAST_DAYS))
 
@@ -333,7 +333,7 @@ class CSSPassService:
         observer = wgs84.latlon(self.latitude, self.longitude, elevation_m=self.elevation_m)
         eph = self._load_ephemeris()
 
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
         end_utc = now_utc + timedelta(days=forecast_days)
 
         event_times, event_types = satellite.find_events(
@@ -400,7 +400,7 @@ class CSSPassService:
             logger.warning(f"Could not load ephemeris file de421.bsp: {exc}")
             return None
 
-    def _fetch_css_tle(self) -> Tuple[str, str]:
+    def _fetch_css_tle(self) -> tuple[str, str]:
         """Fetch latest CSS TLE with strict handling for Celestrak policy errors."""
         cached_recent = _get_cached_css_tle(max_age_seconds=CSS_TLE_MAX_AGE_SECONDS)
         if cached_recent is not None:
@@ -425,7 +425,7 @@ class CSSPassService:
                     return line1, line2
                 raise RuntimeError('CSS TLE fetch is in cooldown and no cached TLE is available')
 
-            last_error: Optional[Exception] = None
+            last_error: Exception | None = None
             celestrak_status = get_css_celestrak_status()
 
             for tle_url in CSS_TLE_URLS:
@@ -514,7 +514,7 @@ class CSSPassService:
             logger.warning("All CSS TLE sources failed and no cached TLE is available")
             raise RuntimeError(f"Failed to fetch CSS TLE from all sources: {last_error}")
 
-    def _parse_css_tle_from_response(self, response_text: str) -> Tuple[str, str]:
+    def _parse_css_tle_from_response(self, response_text: str) -> tuple[str, str]:
         """Extract CSS TLE pair from a response payload (JSON or plain-text)."""
         try:
             data = json.loads(response_text)
@@ -522,12 +522,12 @@ class CSSPassService:
             line2 = str(data.get("line2") or "").strip()
             if line1.startswith("1 ") and line2.startswith("2 "):
                 return line1, line2
-        except (json.JSONDecodeError, AttributeError, TypeError):
+        except json.JSONDecodeError, AttributeError, TypeError:
             # Response is not JSON — expected for plain-text TLE sources; fall through to line-based parsing
             pass
 
         lines = [line.strip() for line in response_text.splitlines() if line.strip()]
-        first_tle_pair: Optional[Tuple[str, str]] = None
+        first_tle_pair: tuple[str, str] | None = None
 
         for index in range(len(lines) - 1):
             line = lines[index]
@@ -548,12 +548,12 @@ class CSSPassService:
 
     def _build_passes(
         self, event_times, event_types, satellite: EarthSatellite, observer, ts, eph
-    ) -> List[Dict[str, Any]]:
-        passes: List[Dict[str, Any]] = []
-        current: Dict[str, Any] = {}
+    ) -> list[dict[str, Any]]:
+        passes: list[dict[str, Any]] = []
+        current: dict[str, Any] = {}
 
-        for event_time, event_type in zip(event_times, event_types):
-            dt_utc = event_time.utc_datetime().replace(tzinfo=timezone.utc)
+        for event_time, event_type in zip(event_times, event_types, strict=False):
+            dt_utc = event_time.utc_datetime().replace(tzinfo=UTC)
 
             if event_type == 0:
                 current = {"start": dt_utc}
@@ -596,7 +596,7 @@ class CSSPassService:
         observer,
         ts,
         eph,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         if end_utc <= start_utc:
             return None
 
@@ -667,9 +667,9 @@ class CSSPassService:
     @staticmethod
     def _iter_geometric_passes(event_times, event_types):
         """Yield (start_utc, end_utc) for each rise->set geometric pass from Skyfield events."""
-        current_start: Optional[datetime] = None
-        for event_time, event_type in zip(event_times, event_types):
-            dt_utc = event_time.utc_datetime().replace(tzinfo=timezone.utc)
+        current_start: datetime | None = None
+        for event_time, event_type in zip(event_times, event_types, strict=False):
+            dt_utc = event_time.utc_datetime().replace(tzinfo=UTC)
             if event_type == 0:
                 current_start = dt_utc
             elif event_type == 2 and current_start is not None:
@@ -677,7 +677,7 @@ class CSSPassService:
                 current_start = None
 
     @staticmethod
-    def _time_grid(start_utc: datetime, end_utc: datetime, step_seconds: float) -> List[datetime]:
+    def _time_grid(start_utc: datetime, end_utc: datetime, step_seconds: float) -> list[datetime]:
         """Inclusive list of UTC datetimes spanning [start, end] at a fixed step.
 
         Steps never overshoot ``end_utc`` (windows shorter than one step collapse to
@@ -728,7 +728,7 @@ class CSSPassService:
 
     def _sun_altaz_arrays_astropy(self, times_utc):
         """Vectorised Sun alt/az (deg) via Astropy - fallback when the ephemeris is unavailable."""
-        astro_time = AstroTime([when.astimezone(timezone.utc) for when in times_utc])
+        astro_time = AstroTime([when.astimezone(UTC) for when in times_utc])
         frame = AltAz(obstime=astro_time, location=self.location)
         altaz = get_sun(astro_time).transform_to(frame)
         return (
@@ -773,7 +773,7 @@ class CSSPassService:
         eph,
         event_times=None,
         event_types=None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Find CSS solar transits for the observer, sharing the geometric pass events."""
         if event_times is None or event_types is None:
             event_times, event_types = satellite.find_events(
@@ -783,7 +783,7 @@ class CSSPassService:
                 altitude_degrees=GEOMETRIC_PASS_MIN_ALTITUDE_DEG,
             )
 
-        transits: List[Dict[str, Any]] = []
+        transits: list[dict[str, Any]] = []
         for pass_start, pass_end in self._iter_geometric_passes(event_times, event_types):
             transit = self._extract_solar_transit_segment(
                 start_utc=pass_start,
@@ -807,7 +807,7 @@ class CSSPassService:
         observer,
         ts,
         eph,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Find a refined CSS solar transit within a daylight geometric pass (vectorised)."""
         if end_utc <= start_utc:
             return None
@@ -865,7 +865,7 @@ class CSSPassService:
 
     def _sample_time_range(
         self, start_utc: datetime, end_utc: datetime, step_seconds: float, sampler
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         if end_utc <= start_utc:
             return [sampler(start_utc)]
 
@@ -895,7 +895,7 @@ class CSSPassService:
         eph,
         event_times=None,
         event_types=None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Find CSS lunar transits for the observer, sharing the geometric pass events."""
         if eph is None:
             logger.warning("Ephemeris not loaded; CSS lunar transit detection skipped")
@@ -909,7 +909,7 @@ class CSSPassService:
                 altitude_degrees=GEOMETRIC_PASS_MIN_ALTITUDE_DEG,
             )
 
-        transits: List[Dict[str, Any]] = []
+        transits: list[dict[str, Any]] = []
         for pass_start, pass_end in self._iter_geometric_passes(event_times, event_types):
             transit = self._extract_lunar_transit_segment(
                 start_utc=pass_start,
@@ -933,7 +933,7 @@ class CSSPassService:
         observer,
         ts,
         eph,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Find a refined CSS lunar transit within a geometric pass where the Moon is up (vectorised)."""
         if end_utc <= start_utc:
             return None
@@ -1009,7 +1009,7 @@ class CSSPassService:
         cos_sep = max(-1.0, min(1.0, cos_sep))
         return degrees(acos(cos_sep))
 
-    def _sample_observation(self, when_utc: datetime, satellite: EarthSatellite, observer, ts, eph) -> Dict[str, Any]:
+    def _sample_observation(self, when_utc: datetime, satellite: EarthSatellite, observer, ts, eph) -> dict[str, Any]:
         event_time = ts.from_datetime(when_utc)
         topocentric = (satellite - observer).at(event_time)
         altitude, azimuth, _ = topocentric.altaz()
@@ -1044,12 +1044,12 @@ class CSSPassService:
         altitude, _, _ = astrometric.apparent().altaz()
         return float(altitude.degrees)
 
-    def _group_consecutive_indices(self, indices: List[int]) -> List[List[int]]:
+    def _group_consecutive_indices(self, indices: list[int]) -> list[list[int]]:
         if not indices:
             return []
 
-        groups: List[List[int]] = []
-        current_group: List[int] = [indices[0]]
+        groups: list[list[int]] = []
+        current_group: list[int] = [indices[0]]
 
         for index in indices[1:]:
             if index == current_group[-1] + 1:
@@ -1098,7 +1098,7 @@ class CSSPassService:
             raise ValueError("Could not determine Sun altitude")
         return float(cast(Any, sun_alt.to_value(u.deg)))
 
-    def _sun_alt_az_deg(self, when_utc: datetime) -> Tuple[float, float]:
+    def _sun_alt_az_deg(self, when_utc: datetime) -> tuple[float, float]:
         astro_time = AstroTime(when_utc)
         frame = AltAz(obstime=astro_time, location=self.location)
         sun_altaz = get_sun(astro_time).transform_to(frame)
@@ -1149,7 +1149,7 @@ def get_css_passes_report(
     elevation_m: float,
     timezone_str: str,
     days: int = DEFAULT_FORECAST_DAYS,
-) -> Optional[Dict[str, Any]]:
+) -> dict[str, Any] | None:
     """Convenience wrapper to generate CSS pass report."""
     try:
         service = CSSPassService(
@@ -1165,10 +1165,10 @@ def get_css_passes_report(
 
 
 def get_css_current_position(
-    latitude: Optional[float] = None,
-    longitude: Optional[float] = None,
+    latitude: float | None = None,
+    longitude: float | None = None,
     elevation_m: float = 0.0,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Compute current CSS ground position and ±50-minute ground track from cached TLE."""
     cached = _get_cached_css_tle(max_age_seconds=None)
     if cached is None:
@@ -1178,7 +1178,7 @@ def get_css_current_position(
     ts = SKYFIELD_LOADER.timescale()
     satellite = EarthSatellite(line1, line2, "CSS (TIANHE)", ts)
 
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
     now_t = ts.from_datetime(now_utc)
     subpoint = wgs84.subpoint(satellite.at(now_t))
     lat = float(subpoint.latitude.degrees)  # type: ignore[arg-type]
@@ -1208,7 +1208,7 @@ def get_css_current_position(
             _CSS_TRACK_CACHE["future_track"] = future_track
             _CSS_TRACK_CACHE["computed_at"] = now_ts
 
-    result: Dict[str, Any] = {
+    result: dict[str, Any] = {
         "latitude": lat,
         "longitude": lon,
         "altitude_km": round(alt_km, 1),

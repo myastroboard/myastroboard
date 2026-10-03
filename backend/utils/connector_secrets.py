@@ -18,7 +18,8 @@ keeps working through that fallback; ``migrate_legacy_secrets`` moves it over an
 from the config, once, at startup and on every save.
 """
 
-from typing import Any, Dict, Iterable, Optional
+from collections.abc import Iterable
+from typing import Any
 
 from db import settings_store
 from utils.logging_config import get_logger
@@ -28,17 +29,17 @@ logger = get_logger(__name__)
 SECRETS_KEY = 'connectors_secrets'
 
 
-def _clean(data: Any) -> Dict[str, Dict[str, str]]:
+def _clean(data: Any) -> dict[str, dict[str, str]]:
     if not isinstance(data, dict):
         return {}
-    cleaned: Dict[str, Dict[str, str]] = {}
+    cleaned: dict[str, dict[str, str]] = {}
     for name, values in data.items():
         if isinstance(values, dict):
             cleaned[str(name)] = {str(k): str(v) for k, v in values.items() if isinstance(v, str) and v}
     return cleaned
 
 
-def _read_all() -> Dict[str, Dict[str, str]]:
+def _read_all() -> dict[str, dict[str, str]]:
     try:
         return _clean(settings_store.get_setting(SECRETS_KEY))
     except Exception as exc:
@@ -51,12 +52,12 @@ def secrets_revision() -> int:
     return settings_store.setting_revision(SECRETS_KEY)
 
 
-def load_secrets(name: str) -> Dict[str, str]:
+def load_secrets(name: str) -> dict[str, str]:
     """The stored credentials of one connector (``{}`` when none)."""
     return dict(_read_all().get(name, {}))
 
 
-def save_secrets(name: str, values: Dict[str, Any]) -> bool:
+def save_secrets(name: str, values: dict[str, Any]) -> bool:
     """Merge *values* into the connector's stored credentials.
 
     A blank value removes the key; nothing else is touched. The read-merge-write is one
@@ -86,7 +87,7 @@ def save_secrets(name: str, values: Dict[str, Any]) -> bool:
         return False
 
 
-def merge_secrets(name: str, cfg: Optional[Dict[str, Any]], secret_fields: Iterable[str]) -> Dict[str, Any]:
+def merge_secrets(name: str, cfg: dict[str, Any] | None, secret_fields: Iterable[str]) -> dict[str, Any]:
     """The connector's config block with its credentials overlaid from the secrets store.
 
     The stored value wins whenever it holds a value; otherwise a legacy value still present in the
@@ -101,7 +102,7 @@ def merge_secrets(name: str, cfg: Optional[Dict[str, Any]], secret_fields: Itera
     return merged
 
 
-def migrate_legacy_secrets(name: str, secret_fields: Iterable[str], config: Dict[str, Any]) -> bool:
+def migrate_legacy_secrets(name: str, secret_fields: Iterable[str], config: dict[str, Any]) -> bool:
     """Move credentials still stored in ``config["connectors"][name]`` into the secrets store.
 
     Returns True when *config* was modified (the caller is then expected to persist it).
@@ -134,7 +135,7 @@ def migrate_legacy_secrets(name: str, secret_fields: Iterable[str], config: Dict
     return True
 
 
-def migrate_all_legacy_secrets(config: Dict[str, Any], registry: Optional[Dict[str, Any]] = None) -> bool:
+def migrate_all_legacy_secrets(config: dict[str, Any], registry: dict[str, Any] | None = None) -> bool:
     """Run ``migrate_legacy_secrets`` for every registered connector; True when *config* changed.
 
     Called once at application startup (``app.py``) so an upgraded install stops carrying

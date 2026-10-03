@@ -58,7 +58,7 @@ class FakeClient:
         if self.behaviour == 'refused':
             raise ConnectionRefusedError()
         if self.behaviour == 'socket-timeout':
-            raise socket.timeout()
+            raise TimeoutError()
         if self.behaviour == 'ssl':
             raise _SSLError('certificate verify failed')
         if self.behaviour == 'valueerror':
@@ -131,7 +131,6 @@ class TestParseBrokerUrl:
 
 
 class TestResolveBrokerHost:
-
     def test_refuses_dangerous_ranges_after_resolution(self, monkeypatch):
         monkeypatch.undo()
         for ip in ('127.0.0.1', '169.254.169.254', '0.0.0.0', '224.0.0.1', '::1'):
@@ -154,7 +153,6 @@ class TestResolveBrokerHost:
 
 
 class TestSanitizers:
-
     def test_object_id_keeps_only_ha_safe_characters(self):
         assert mc.sanitize_object_id('My Board/#1') == 'My_Board_1'
         assert mc.sanitize_object_id('') == 'myastroboard'
@@ -171,7 +169,6 @@ class TestSanitizers:
 
 
 class TestDeclaration:
-
     def test_registered_and_standalone(self):
         from connectors import REGISTRY
 
@@ -223,7 +220,6 @@ class TestDeclaration:
 
 
 class TestTopicLayout:
-
     def test_topics_follow_the_documented_layout(self):
         c = MqttConnector({'url': 'mqtt://b', 'base_topic': 'mab', 'discovery_prefix': 'ha'})
         assert c.availability_topic() == 'mab/status'
@@ -245,7 +241,6 @@ class TestTopicLayout:
 
 
 class TestProbe:
-
     def test_successful_connect_uses_credentials_and_the_vetted_ip(self):
         created = []
         c = MqttConnector({'url': 'mqtt://broker.lan:1884', 'username': 'u', 'password': 'p'})
@@ -343,7 +338,7 @@ class TestDescribeProbeError:
         'exc',
         [
             ConnectionRefusedError('some detail that must never surface'),
-            socket.timeout('some detail that must never surface'),
+            TimeoutError('some detail that must never surface'),
             ssl.SSLError('some detail that must never surface'),
             ValueError('some detail that must never surface'),
             RuntimeError('some detail that must never surface'),
@@ -356,7 +351,6 @@ class TestDescribeProbeError:
 
 
 class TestHealthCheck:
-
     def test_requires_a_url(self):
         assert MqttConnector({}).health_check() == {'reachable': False, 'modules': {}, 'error': 'url required'}
 
@@ -379,7 +373,6 @@ class TestHealthCheck:
 
 
 class TestImportBoundary:
-
     def test_connectors_package_imports_cleanly_after_cache_store(self):
         """cache/ and observation/ import connectors/ at module level; the MQTT modules must not
         import them back at module level, or a fresh interpreter hits a circular import."""

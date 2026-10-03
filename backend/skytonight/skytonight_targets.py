@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
-from utils.constants import SKYTONIGHT_DATASET_FILE, SKYTONIGHT_PREFERRED_NAME_ORDER
-from utils.logging_config import get_logger
 from skytonight.skytonight_models import SkyTonightTarget
 from utils import load_json_file, save_json_file
+from utils.constants import SKYTONIGHT_DATASET_FILE, SKYTONIGHT_PREFERRED_NAME_ORDER
+from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-_dataset_cache: Dict[str, Any] = {}
+_dataset_cache: dict[str, Any] = {}
 
 
 def invalidate_targets_dataset_cache() -> None:
@@ -36,7 +36,7 @@ def normalize_object_name(value: str) -> str:
     return filtered
 
 
-def _catalogue_priority(catalogue: str, order: Optional[List[str]] = None) -> Tuple[int, str]:
+def _catalogue_priority(catalogue: str, order: list[str] | None = None) -> tuple[int, str]:
     normalized = normalize_catalogue_name(catalogue)
     effective_order = order if order is not None else SKYTONIGHT_PREFERRED_NAME_ORDER
     try:
@@ -45,7 +45,7 @@ def _catalogue_priority(catalogue: str, order: Optional[List[str]] = None) -> Tu
         return (len(effective_order), normalized.lower())
 
 
-def choose_preferred_catalogue_name(catalogue_names: Dict[str, str], order: Optional[List[str]] = None) -> str:
+def choose_preferred_catalogue_name(catalogue_names: dict[str, str], order: list[str] | None = None) -> str:
     """Choose the display name using the SkyTonight catalogue priority.
 
     Parameters
@@ -63,7 +63,7 @@ def choose_preferred_catalogue_name(catalogue_names: Dict[str, str], order: Opti
     return str(catalogue_names.get(best_catalogue, '') or '').strip()
 
 
-def _build_lookup_entry(target: SkyTonightTarget) -> Dict[str, Any]:
+def _build_lookup_entry(target: SkyTonightTarget) -> dict[str, Any]:
     aliases = {
         normalize_catalogue_name(key): str(value) for key, value in target.catalogue_names.items() if str(value).strip()
     }
@@ -83,7 +83,7 @@ def _build_lookup_entry(target: SkyTonightTarget) -> Dict[str, Any]:
 
 
 def _append_lookup_name(
-    lookup: Dict[str, Dict[str, Any]], catalogue: str, object_name: str, entry: Dict[str, Any]
+    lookup: dict[str, dict[str, Any]], catalogue: str, object_name: str, entry: dict[str, Any]
 ) -> None:
     normalized_catalogue = normalize_catalogue_name(catalogue)
     normalized_name = normalize_object_name(object_name)
@@ -92,9 +92,9 @@ def _append_lookup_name(
     lookup[f'{normalized_catalogue.lower()}::{normalized_name}'] = entry
 
 
-def build_lookup_from_targets(targets: List[SkyTonightTarget]) -> Dict[str, Dict[str, Any]]:
+def build_lookup_from_targets(targets: list[SkyTonightTarget]) -> dict[str, dict[str, Any]]:
     """Build a lookup table compatible with legacy alias consumers."""
-    lookup: Dict[str, Dict[str, Any]] = {}
+    lookup: dict[str, dict[str, Any]] = {}
 
     for target in targets:
         entry = _build_lookup_entry(target)
@@ -112,10 +112,10 @@ def build_lookup_from_targets(targets: List[SkyTonightTarget]) -> Dict[str, Dict
     return lookup
 
 
-def _coerce_targets(raw_targets: Any) -> List[SkyTonightTarget]:
+def _coerce_targets(raw_targets: Any) -> list[SkyTonightTarget]:
     if not isinstance(raw_targets, list):
         return []
-    targets: List[SkyTonightTarget] = []
+    targets: list[SkyTonightTarget] = []
     for item in raw_targets:
         if not isinstance(item, dict):
             continue
@@ -129,7 +129,7 @@ def _coerce_targets(raw_targets: Any) -> List[SkyTonightTarget]:
     return targets
 
 
-def load_targets_dataset(force_reload: bool = False, dataset_file: Optional[str] = None) -> Dict[str, Any]:
+def load_targets_dataset(force_reload: bool = False, dataset_file: str | None = None) -> dict[str, Any]:
     """Load the persisted SkyTonight dataset and derive compatibility lookup tables."""
     global _dataset_cache
 
@@ -137,7 +137,7 @@ def load_targets_dataset(force_reload: bool = False, dataset_file: Optional[str]
     # The scheduler rebuilds the file in its own worker and only clears its own
     # cache, so every other gunicorn worker notices the rebuild by the file's mtime.
     try:
-        file_mtime_ns: Optional[int] = os.stat(target_dataset_file).st_mtime_ns
+        file_mtime_ns: int | None = os.stat(target_dataset_file).st_mtime_ns
     except OSError:
         file_mtime_ns = None
 
@@ -165,7 +165,7 @@ def load_targets_dataset(force_reload: bool = False, dataset_file: Optional[str]
 
 
 def save_targets_dataset(
-    targets: List[SkyTonightTarget], metadata: Optional[Dict[str, Any]] = None, dataset_file: Optional[str] = None
+    targets: list[SkyTonightTarget], metadata: dict[str, Any] | None = None, dataset_file: str | None = None
 ) -> bool:
     """Persist a normalized SkyTonight dataset to disk."""
     target_dataset_file = dataset_file or SKYTONIGHT_DATASET_FILE
@@ -183,8 +183,8 @@ def get_lookup_entry(
     catalogue: str,
     object_name: str,
     force_reload: bool = False,
-    dataset_file: Optional[str] = None,
-) -> Dict[str, Any]:
+    dataset_file: str | None = None,
+) -> dict[str, Any]:
     """Return a legacy-compatible lookup entry from the SkyTonight dataset."""
     if not catalogue or not object_name:
         return {}
@@ -202,18 +202,18 @@ def get_lookup_entry(
     return lookup.get(alias_key, {}) or lookup.get(preferred_key, {}) or {}
 
 
-def get_aliases_map(catalogue: str, object_name: str, dataset_file: Optional[str] = None) -> Dict[str, str]:
+def get_aliases_map(catalogue: str, object_name: str, dataset_file: str | None = None) -> dict[str, str]:
     entry = get_lookup_entry(catalogue, object_name, dataset_file=dataset_file)
     aliases = entry.get('aliases', {}) if isinstance(entry, dict) else {}
     return aliases if isinstance(aliases, dict) else {}
 
 
-def get_group_id(catalogue: str, object_name: str, dataset_file: Optional[str] = None) -> str:
+def get_group_id(catalogue: str, object_name: str, dataset_file: str | None = None) -> str:
     entry = get_lookup_entry(catalogue, object_name, dataset_file=dataset_file)
     return str(entry.get('group_id', '') or '') if isinstance(entry, dict) else ''
 
 
-def merge_item_with_target_entry(item: Dict[str, Any]) -> Dict[str, Any]:
+def merge_item_with_target_entry(item: dict[str, Any]) -> dict[str, Any]:
     """Attach SkyTonight alias metadata to an item in-place for compatibility."""
     if not isinstance(item, dict):
         return item

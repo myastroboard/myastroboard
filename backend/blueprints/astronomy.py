@@ -4,9 +4,9 @@ Routes: /api/sky-widget, /api/sun/*, /api/moon/next-eclipse, /api/events/*,
 /api/astro/*, /api/tonight/best-window
 """
 
-from typing import Any, Dict
+from typing import Any
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, jsonify, request
 
 from astroweather.sun_phases import determine_sky_period
 from cache import cache_store
@@ -311,7 +311,7 @@ def get_solar_system_events_api():
         return jsonify({'error': 'Internal server error'}), 500
 
 
-def _translate_solar_system_events(data: Dict[str, Any], language: str) -> Dict[str, Any]:
+def _translate_solar_system_events(data: dict[str, Any], language: str) -> dict[str, Any]:
     """
     Translate solar system event descriptions based on language
 
@@ -394,7 +394,7 @@ def _translate_solar_system_events(data: Dict[str, Any], language: str) -> Dict[
     return translated_data
 
 
-def _translate_special_phenomena_events(data: Dict[str, Any], language: str) -> Dict[str, Any]:
+def _translate_special_phenomena_events(data: dict[str, Any], language: str) -> dict[str, Any]:
     """Translate special phenomena events that are cached with localized strings."""
     translated_data = data.copy() if isinstance(data, dict) else {"events": []}
     events = translated_data.get("events", [])
@@ -645,7 +645,7 @@ def best_window_api():
                 results[current_mode] = {
                     "status": "pending",
                     "message": (
-                        f"Best window cache for mode '{current_mode}' is not ready yet. " "Please try again shortly."
+                        f"Best window cache for mode '{current_mode}' is not ready yet. Please try again shortly."
                     ),
                 }
 

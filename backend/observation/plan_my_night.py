@@ -2,25 +2,25 @@
 
 import copy
 import csv
+import io
 import json
 import os
 import re
 import uuid
-import io
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import numpy as np
 
-from skytonight import skytonight_targets
 from db import documents, queries
-from utils.logging_config import get_logger
+from skytonight import skytonight_targets
 from skytonight.skytonight_calculator import (
     _horizon_floor_array,
     _local_sidereal_time_hours,
     _meridian_transit_from_lst,
     _meridian_transit_time,
 )
+from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
@@ -37,12 +37,12 @@ _UUID_RE = re.compile(
 )
 
 
-def _is_valid_user_id(user_id: Optional[str]) -> bool:
+def _is_valid_user_id(user_id: str | None) -> bool:
     """Return True only when user_id matches the UUID v4 format used by auth.py."""
     return bool(user_id) and bool(_UUID_RE.match(str(user_id)))
 
 
-def _is_valid_combination_id(combination_id: Optional[str]) -> bool:
+def _is_valid_combination_id(combination_id: str | None) -> bool:
     """Return True for 'default' or a UUID string used as an equipment combination identifier."""
     if not combination_id:
         return False
@@ -59,7 +59,7 @@ def _to_iso(value: datetime) -> str:
     return value.astimezone().isoformat()
 
 
-def _parse_datetime(value: Any) -> Optional[datetime]:
+def _parse_datetime(value: Any) -> datetime | None:
     if not value:
         return None
     if isinstance(value, datetime):
@@ -90,7 +90,7 @@ _ALTTIME_FILENAME_RE = re.compile(r'[^a-z0-9_-]')
 _VISIBILITY_OK_THRESHOLD = 0.95
 
 
-def _load_alttime(alttime_file: str, location_id: Optional[str]) -> Optional[Dict[str, Any]]:
+def _load_alttime(alttime_file: str, location_id: str | None) -> dict[str, Any] | None:
     """Load a target's cached altitude-time series JSON for the given location preset."""
     if not alttime_file:
         return None
@@ -101,13 +101,13 @@ def _load_alttime(alttime_file: str, location_id: Optional[str]) -> Optional[Dic
     if not os.path.isfile(path):
         return None
     try:
-        with open(path, 'r', encoding='utf-8') as fh:
+        with open(path, encoding='utf-8') as fh:
             return json.load(fh)
     except Exception:
         return None
 
 
-def _parse_utc(s: Any) -> Optional[datetime]:
+def _parse_utc(s: Any) -> datetime | None:
     """Parse an ISO timestamp to a UTC-aware datetime.
 
     Bare timestamps with no offset (as stored in alttime JSON, e.g.
@@ -118,13 +118,13 @@ def _parse_utc(s: Any) -> Optional[datetime]:
     try:
         text = str(s).strip()
         if text.endswith('Z'):
-            dt = datetime.fromisoformat(text[:-1]).replace(tzinfo=timezone.utc)
+            dt = datetime.fromisoformat(text[:-1]).replace(tzinfo=UTC)
         else:
             dt = datetime.fromisoformat(text)
             if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
+                dt = dt.replace(tzinfo=UTC)
             else:
-                dt = dt.astimezone(timezone.utc)
+                dt = dt.astimezone(UTC)
         return dt
     except Exception:
         return None
@@ -135,7 +135,7 @@ def _clip_alttime_series(times_utc, altitudes, start_dt, end_dt):
     if not times_utc or not altitudes or not start_dt or not end_dt or start_dt >= end_dt:
         return [], []
     pts = []
-    for raw_t, a in zip(times_utc, altitudes):
+    for raw_t, a in zip(times_utc, altitudes, strict=False):
         dt = _parse_utc(raw_t)
         if dt is not None and a is not None:
             pts.append((dt, float(a)))
@@ -163,20 +163,20 @@ def _clip_alttime_series(times_utc, altitudes, start_dt, end_dt):
             out.append(_lerp(p, nxt, end_dt))
     if not out:
         return [], []
-    xs, ys = zip(*out)
+    xs, ys = zip(*out, strict=False)
     return list(xs), list(ys)
 
 
 def _observable_runs(
-    times_utc: List[Any],
-    altitudes: List[Any],
-    azimuths: Optional[List[Any]],
+    times_utc: list[Any],
+    altitudes: list[Any],
+    azimuths: list[Any] | None,
     alt_min: float,
     alt_max: float,
-    horizon_profile: Optional[List[Dict[str, Any]]],
-    night_start: Optional[datetime],
-    night_end: Optional[datetime],
-) -> List[Tuple[datetime, datetime]]:
+    horizon_profile: list[dict[str, Any]] | None,
+    night_start: datetime | None,
+    night_end: datetime | None,
+) -> list[tuple[datetime, datetime]]:
     """Return contiguous (start, end) UTC windows where a target's altitude sits
     within [alt_min, alt_max] (raised by the custom horizon profile, if any),
     clipped to [night_start, night_end].
@@ -187,7 +187,7 @@ def _observable_runs(
     if not times_utc or not altitudes or not night_start or not night_end or night_end <= night_start:
         return []
 
-    times: List[datetime] = []
+    times: list[datetime] = []
     for raw_t in times_utc:
         parsed_t = _parse_utc(raw_t)
         if parsed_t is None:
@@ -203,8 +203,8 @@ def _observable_runs(
             floors = [alt_min] * len(altitudes)
 
     # margin >= 0 means observable at that sample (within both the floor and the ceiling)
-    margins: List[Optional[float]] = []
-    for t, a, floor in zip(times, altitudes, floors):
+    margins: list[float | None] = []
+    for t, a, floor in zip(times, altitudes, floors, strict=False):
         if t is None or a is None:
             margins.append(None)
             continue
@@ -218,8 +218,8 @@ def _observable_runs(
         frac = max(0.0, min(1.0, m0 / (m0 - m1)))
         return t0 + (t1 - t0) * frac
 
-    runs: List[Tuple[datetime, datetime]] = []
-    run_start: Optional[datetime] = None
+    runs: list[tuple[datetime, datetime]] = []
+    run_start: datetime | None = None
     for i, m in enumerate(margins):
         observable = m is not None and m >= 0
         prev_margin = margins[i - 1] if i > 0 else None
@@ -242,9 +242,9 @@ def _observable_runs(
 
 
 def _coverage_for_window(
-    runs: List[Tuple[datetime, datetime]],
-    window_start: Optional[datetime],
-    window_end: Optional[datetime],
+    runs: list[tuple[datetime, datetime]],
+    window_start: datetime | None,
+    window_end: datetime | None,
 ) -> float:
     """Fraction (0..1) of [window_start, window_end] covered by any of the given runs."""
     if not runs or not window_start or not window_end or window_end <= window_start:
@@ -262,10 +262,10 @@ def _coverage_for_window(
 
 
 def _visibility_summary(
-    runs: List[Tuple[datetime, datetime]],
-    window_start: Optional[datetime],
-    window_end: Optional[datetime],
-) -> Dict[str, Any]:
+    runs: list[tuple[datetime, datetime]],
+    window_start: datetime | None,
+    window_end: datetime | None,
+) -> dict[str, Any]:
     """Summarize how well a target's real visibility runs line up with a planned window."""
     coverage = _coverage_for_window(runs, window_start, window_end)
     if coverage >= _VISIBILITY_OK_THRESHOLD:
@@ -275,8 +275,8 @@ def _visibility_summary(
     else:
         status = 'none'
 
-    visible_from: Optional[datetime] = None
-    visible_until: Optional[datetime] = None
+    visible_from: datetime | None = None
+    visible_until: datetime | None = None
     if window_start and window_end:
         overlapping = [r for r in runs if r[1] > window_start and r[0] < window_end]
         if overlapping:
@@ -298,14 +298,14 @@ def _visibility_summary(
 
 
 def _compute_entry_visibility(
-    entry: Dict[str, Any],
-    location_id: Optional[str],
-    night_start: Optional[datetime],
-    night_end: Optional[datetime],
-    window_start: Optional[datetime],
-    window_end: Optional[datetime],
-    cache: Dict[str, Any],
-) -> Optional[Dict[str, Any]]:
+    entry: dict[str, Any],
+    location_id: str | None,
+    night_start: datetime | None,
+    night_end: datetime | None,
+    window_start: datetime | None,
+    window_end: datetime | None,
+    cache: dict[str, Any],
+) -> dict[str, Any] | None:
     """Compute a single entry's visibility summary for a given planned [window_start, window_end]."""
     alttime_file = entry.get('alttime_file')
     if not alttime_file or not window_start or not window_end or not night_start or not night_end:
@@ -345,7 +345,7 @@ _MERIDIAN_FLIP_EARLY_MINUTES = 10
 _FLIP_TIE_BREAK_WINDOW_MINUTES = 20
 
 
-def _ra_to_hours(value: Any) -> Optional[float]:
+def _ra_to_hours(value: Any) -> float | None:
     """Parse a stored RA (``HHh MMm SSs``, ``HH:MM:SS`` or a bare decimal) to hours [0, 24).
 
     A bare decimal is read as decimal hours when it is in ``[0, 24)`` (the form
@@ -364,16 +364,16 @@ def _ra_to_hours(value: Any) -> Optional[float]:
         return (int(match.group(1)) + int(match.group(2)) / 60.0 + float(match.group(3)) / 3600.0) % 24.0
     try:
         number = float(text)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     return (number if 0.0 <= number < 24.0 else number / 15.0) % 24.0
 
 
-def _transit_datetime_from_hhmm(hhmm: str, night_start: datetime, night_end: datetime) -> Optional[datetime]:
+def _transit_datetime_from_hhmm(hhmm: str, night_start: datetime, night_end: datetime) -> datetime | None:
     """Resolve an ``HH:MM`` local wall-clock transit time to a datetime inside the night window."""
     try:
         hour, minute = (int(part) for part in hhmm.split(':'))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     candidate = night_start.replace(hour=hour, minute=minute, second=0, microsecond=0)
     if candidate < night_start:
@@ -383,12 +383,12 @@ def _transit_datetime_from_hhmm(hhmm: str, night_start: datetime, night_end: dat
     return None
 
 
-def _plan_location_latlon(location_id: Optional[str]) -> Tuple[Optional[float], Optional[float]]:
+def _plan_location_latlon(location_id: str | None) -> tuple[float | None, float | None]:
     """Resolve a pinned plan location id to (latitude, longitude) in degrees."""
     if not location_id:
         return None, None
     try:
-        from utils.repo_config import load_config, get_location_by_id
+        from utils.repo_config import get_location_by_id, load_config
 
         preset = get_location_by_id(load_config(), location_id)
         if not preset:
@@ -398,15 +398,15 @@ def _plan_location_latlon(location_id: Optional[str]) -> Tuple[Optional[float], 
         if latitude is None or longitude is None:
             return None, None
         return float(latitude), float(longitude)
-    except (TypeError, ValueError, ImportError):
+    except TypeError, ValueError, ImportError:
         return None, None
 
 
 def _flip_lst_start_hours(
-    mount: Optional[Dict[str, Any]],
-    lon: Optional[float],
-    night_start: Optional[datetime],
-) -> Optional[float]:
+    mount: dict[str, Any] | None,
+    lon: float | None,
+    night_start: datetime | None,
+) -> float | None:
     """Local sidereal time at ``night_start`` for the meridian-flip estimator, or None.
 
     Resolved once per plan (one Astropy call) and threaded into ``_entry_transit_and_flip``
@@ -418,7 +418,7 @@ def _flip_lst_start_hours(
     return _local_sidereal_time_hours(night_start, lon)
 
 
-def _resolve_plan_mount(user_id: str, combination_id: Optional[str]) -> Optional[Dict[str, Any]]:
+def _resolve_plan_mount(user_id: str, combination_id: str | None) -> dict[str, Any] | None:
     """Resolve a plan's pinned combination (own or shared) to its mount dict, or None.
 
     Lazy import: equipment_profiles imports plan_my_night for its delete guards, so a
@@ -451,14 +451,14 @@ def _resolve_plan_mount(user_id: str, combination_id: Optional[str]) -> Optional
 
 
 def _entry_transit_and_flip(
-    entry: Dict[str, Any],
-    mount: Optional[Dict[str, Any]],
-    lat: Optional[float],
-    lon: Optional[float],
-    night_start: Optional[datetime],
-    night_end: Optional[datetime],
-    lst_start_hours: Optional[float] = None,
-) -> Tuple[Optional[datetime], Optional[datetime]]:
+    entry: dict[str, Any],
+    mount: dict[str, Any] | None,
+    lat: float | None,
+    lon: float | None,
+    night_start: datetime | None,
+    night_end: datetime | None,
+    lst_start_hours: float | None = None,
+) -> tuple[datetime | None, datetime | None]:
     """Return (meridian_transit, flip_time) datetimes for an entry, or (None, None).
 
     ``flip_time = transit + mount.meridian_flip_delay_min``. Both are None whenever the
@@ -497,9 +497,9 @@ def _entry_transit_and_flip(
 
 
 def _flip_state_for_slot(
-    flip_time: Optional[datetime],
-    slot_start: Optional[datetime],
-    slot_end: Optional[datetime],
+    flip_time: datetime | None,
+    slot_start: datetime | None,
+    slot_end: datetime | None,
 ) -> str:
     """Classify a flip time against a planned slot: none / after / mid / early."""
     if flip_time is None or slot_start is None or slot_end is None:
@@ -514,16 +514,16 @@ def _flip_state_for_slot(
 
 
 def _compute_entry_meridian_flip(
-    entry: Dict[str, Any],
-    slot_start: Optional[datetime],
-    slot_end: Optional[datetime],
-    mount: Optional[Dict[str, Any]],
-    lat: Optional[float],
-    lon: Optional[float],
-    night_start: Optional[datetime],
-    night_end: Optional[datetime],
-    lst_start_hours: Optional[float] = None,
-) -> Dict[str, Any]:
+    entry: dict[str, Any],
+    slot_start: datetime | None,
+    slot_end: datetime | None,
+    mount: dict[str, Any] | None,
+    lat: float | None,
+    lon: float | None,
+    night_start: datetime | None,
+    night_end: datetime | None,
+    lst_start_hours: float | None = None,
+) -> dict[str, Any]:
     """Estimate the meridian-flip state for one plan timeline entry.
 
     States:
@@ -552,14 +552,14 @@ def _compute_entry_meridian_flip(
     }
 
 
-def _plan_doc_key(combination_id: Optional[str]) -> str:
+def _plan_doc_key(combination_id: str | None) -> str:
     """Document key of a plan: the combination id, or the default key when there is none."""
     if combination_id and _is_valid_combination_id(combination_id):
         return combination_id
     return _COMBINATION_ID_DEFAULT
 
 
-def list_user_plan_combination_ids(user_id: str) -> List[Optional[str]]:
+def list_user_plan_combination_ids(user_id: str) -> list[str | None]:
     """Combination id of every stored plan of this user (None for the no-combination plan)."""
     if not _is_valid_user_id(user_id):
         return []
@@ -569,7 +569,7 @@ def list_user_plan_combination_ids(user_id: str) -> List[Optional[str]]:
     ]
 
 
-def _default_payload(user_id: str, username: Optional[str] = None) -> Dict:
+def _default_payload(user_id: str, username: str | None = None) -> dict:
     return {
         'user_id': user_id,
         'username': username or 'unknown',
@@ -579,7 +579,7 @@ def _default_payload(user_id: str, username: Optional[str] = None) -> Dict:
     }
 
 
-def load_user_plan(user_id: str, username: Optional[str] = None, combination_id: Optional[str] = None) -> Dict:
+def load_user_plan(user_id: str, username: str | None = None, combination_id: str | None = None) -> dict:
     if not _is_valid_user_id(user_id):
         raise ValueError(f'Invalid user_id format: {user_id!r}')
     try:
@@ -607,7 +607,7 @@ def load_user_plan(user_id: str, username: Optional[str] = None, combination_id:
     return payload
 
 
-def validate_plan_data(payload: Any) -> Tuple[bool, str]:
+def validate_plan_data(payload: Any) -> tuple[bool, str]:
     """Validate a plan payload before it is stored."""
     if not isinstance(payload, dict):
         return False, 'JSON root must be an object'
@@ -632,9 +632,7 @@ def validate_plan_data(payload: Any) -> Tuple[bool, str]:
     return True, ''
 
 
-def save_user_plan(
-    user_id: str, payload: Dict, username: Optional[str] = None, combination_id: Optional[str] = None
-) -> bool:
+def save_user_plan(user_id: str, payload: dict, username: str | None = None, combination_id: str | None = None) -> bool:
     """Validate and store one plan (one transaction, nothing half-written)."""
     if not _is_valid_user_id(user_id):
         raise ValueError(f'Invalid user_id format: {user_id!r}')
@@ -666,13 +664,13 @@ def _target_group_id(catalogue: str, name: str) -> str:
     return str(entry.get('group_id', '') or '')
 
 
-def _target_aliases(catalogue: str, name: str) -> Dict[str, str]:
+def _target_aliases(catalogue: str, name: str) -> dict[str, str]:
     entry = skytonight_targets.get_lookup_entry(catalogue, name)
     aliases = entry.get('aliases', {}) if isinstance(entry, dict) else {}
     return aliases if isinstance(aliases, dict) else {}
 
 
-def _entry_matches(entry: Dict, catalogue: str, name: str) -> bool:
+def _entry_matches(entry: dict, catalogue: str, name: str) -> bool:
     requested_group = _target_group_id(catalogue, name)
     if requested_group and entry.get('catalogue_group_id') == requested_group:
         return True
@@ -703,7 +701,7 @@ def is_target_in_entries(plan_entries: list, catalogue: str, name: str) -> bool:
 
 
 def is_target_in_current_plan(
-    user_id: str, username: str, catalogue: str, name: str, combination_id: Optional[str] = None
+    user_id: str, username: str, catalogue: str, name: str, combination_id: str | None = None
 ) -> bool:
     payload = load_user_plan(user_id, username, combination_id=combination_id)
     plan = payload.get('plan')
@@ -719,7 +717,7 @@ def is_target_in_current_plan(
     return False
 
 
-def _parse_hhmm_to_minutes(value: str) -> Optional[int]:
+def _parse_hhmm_to_minutes(value: str) -> int | None:
     text = str(value or '').strip()
     if not text:
         return None
@@ -744,7 +742,7 @@ def _minutes_to_hhmm(minutes: int) -> str:
     return f'{hours:02d}:{remainder:02d}'
 
 
-def get_plan_state(plan: Optional[Dict], now_dt: Optional[datetime] = None) -> str:
+def get_plan_state(plan: dict | None, now_dt: datetime | None = None) -> str:
     if not plan:
         return 'none'
 
@@ -756,7 +754,7 @@ def get_plan_state(plan: Optional[Dict], now_dt: Optional[datetime] = None) -> s
     return 'current'
 
 
-def _build_target_payload(item_data: Dict, catalogue: str) -> Dict:
+def _build_target_payload(item_data: dict, catalogue: str) -> dict:
     item_name = str(item_data.get('name') or item_data.get('id') or item_data.get('target name') or '').strip()
     group_id = _target_group_id(catalogue, item_name)
     aliases = _target_aliases(catalogue, item_name)
@@ -766,7 +764,7 @@ def _build_target_payload(item_data: Dict, catalogue: str) -> Dict:
     if planned_minutes_value is not None:
         try:
             planned_minutes = int(str(planned_minutes_value))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             planned_minutes = 60
 
     return {
@@ -797,16 +795,16 @@ def _build_target_payload(item_data: Dict, catalogue: str) -> Dict:
 def create_or_add_target(
     user_id: str,
     username: str,
-    item_data: Dict,
+    item_data: dict,
     catalogue: str,
     night_start: Any,
     night_end: Any,
     duration_hours: float = 0.0,
-    combination_id: Optional[str] = None,
-    combination_name: Optional[str] = None,
-    location_id: Optional[str] = None,
-    location_name: Optional[str] = None,
-) -> Tuple[bool, str, Optional[Dict], Optional[Dict]]:
+    combination_id: str | None = None,
+    combination_name: str | None = None,
+    location_id: str | None = None,
+    location_name: str | None = None,
+) -> tuple[bool, str, dict | None, dict | None]:
     payload = load_user_plan(user_id, username, combination_id=combination_id)
     plan = payload.get('plan')
     now_dt = _now()
@@ -857,7 +855,7 @@ def create_or_add_target(
     return True, 'added', payload, target
 
 
-def clear_plan(user_id: str, username: str, combination_id: Optional[str] = None) -> bool:
+def clear_plan(user_id: str, username: str, combination_id: str | None = None) -> bool:
     payload = load_user_plan(user_id, username, combination_id=combination_id)
     payload['plan'] = None
     return save_user_plan(user_id, payload, username=username, combination_id=combination_id)
@@ -942,7 +940,7 @@ def purge_legacy_telescope_plans() -> int:
     return deleted
 
 
-def remove_target(user_id: str, username: str, entry_id: str, combination_id: Optional[str] = None) -> bool:
+def remove_target(user_id: str, username: str, entry_id: str, combination_id: str | None = None) -> bool:
     payload = load_user_plan(user_id, username, combination_id=combination_id)
     plan = payload.get('plan')
     if not plan:
@@ -963,8 +961,8 @@ def remove_target(user_id: str, username: str, entry_id: str, combination_id: Op
 
 
 def update_target(
-    user_id: str, username: str, entry_id: str, updates: Dict, combination_id: Optional[str] = None
-) -> Optional[Dict]:
+    user_id: str, username: str, entry_id: str, updates: dict, combination_id: str | None = None
+) -> dict | None:
     payload = load_user_plan(user_id, username, combination_id=combination_id)
     plan = payload.get('plan')
     if not plan:
@@ -993,7 +991,7 @@ def update_target(
             parsed_minutes = int(str(planned_minutes_value))
             target_entry['planned_minutes'] = max(0, min(parsed_minutes, 24 * 60))
             target_entry['planned_duration'] = _minutes_to_hhmm(target_entry['planned_minutes'])
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             pass  # non-integer planned_minutes — leave field unchanged
 
     target_entry['updated_at'] = _to_iso(_now())
@@ -1005,9 +1003,7 @@ def update_target(
     return target_entry
 
 
-def update_plan_meta(
-    user_id: str, username: str, updates: Dict, combination_id: Optional[str] = None
-) -> Optional[Dict]:
+def update_plan_meta(user_id: str, username: str, updates: dict, combination_id: str | None = None) -> dict | None:
     """Update plan-level metadata fields (e.g. start_delay_minutes)."""
     payload = load_user_plan(user_id, username, combination_id=combination_id)
     plan = payload.get('plan')
@@ -1020,7 +1016,7 @@ def update_plan_meta(
     if 'start_delay_minutes' in updates:
         try:
             delay = max(0, min(int(updates['start_delay_minutes']), 23 * 60 + 59))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             delay = 0
         plan['start_delay_minutes'] = delay
 
@@ -1031,7 +1027,7 @@ def update_plan_meta(
 
 
 def reorder_target(
-    user_id: str, username: str, entry_id: str, new_index: int, combination_id: Optional[str] = None
+    user_id: str, username: str, entry_id: str, new_index: int, combination_id: str | None = None
 ) -> bool:
     payload = load_user_plan(user_id, username, combination_id=combination_id)
     plan = payload.get('plan')
@@ -1057,7 +1053,7 @@ def reorder_target(
     return save_user_plan(user_id, payload, username=username, combination_id=combination_id)
 
 
-def pick_active_plan(user_id: str, username: str) -> Optional[Dict]:
+def pick_active_plan(user_id: str, username: str) -> dict | None:
     """Return the most relevant plan payload across all of the user's plan files.
 
     Plans are stored per combination, so every plan file (default and combination-specific)
@@ -1101,7 +1097,7 @@ def pick_active_plan(user_id: str, username: str) -> Optional[Dict]:
     return candidates[0]
 
 
-def get_plan_with_timeline(user_id: str, username: str, combination_id: Optional[str] = None) -> Dict:
+def get_plan_with_timeline(user_id: str, username: str, combination_id: str | None = None) -> dict:
     payload = load_user_plan(user_id, username, combination_id=combination_id)
     plan = payload.get('plan')
     if not plan:
@@ -1137,7 +1133,7 @@ def get_plan_with_timeline(user_id: str, username: str, combination_id: Optional
         start_delay_minutes = int(plan_copy.get('start_delay_minutes') or 0)
         cursor = night_start + timedelta(minutes=start_delay_minutes)
         location_id = plan_copy.get('location_id')
-        alttime_cache: Dict[str, Any] = {}
+        alttime_cache: dict[str, Any] = {}
         # Meridian-flip estimator inputs, resolved once for the whole plan (v1.4).
         flip_mount = _resolve_plan_mount(user_id, plan_copy.get('combination_id'))
         flip_lat, flip_lon = _plan_location_latlon(location_id)
@@ -1184,9 +1180,7 @@ def get_plan_with_timeline(user_id: str, username: str, combination_id: Optional
 # ---------------------------------------------------------------------------
 
 
-def compute_optimized_schedule(
-    user_id: str, username: str, combination_id: Optional[str] = None
-) -> Optional[Dict[str, Any]]:
+def compute_optimized_schedule(user_id: str, username: str, combination_id: str | None = None) -> dict[str, Any] | None:
     """Propose a target order + single initial delay that maximizes each target's
     overlap with its real (altitude-based) visibility window for the night.
 
@@ -1211,7 +1205,7 @@ def compute_optimized_schedule(
         return None
 
     location_id = plan.get('location_id')
-    alttime_cache: Dict[str, Any] = {}
+    alttime_cache: dict[str, Any] = {}
 
     # v1.4: flip-aware ordering inputs, resolved once for the whole plan.
     flip_mount = _resolve_plan_mount(user_id, plan.get('combination_id'))
@@ -1228,7 +1222,7 @@ def compute_optimized_schedule(
                 alttime_cache[alttime_file] = _load_alttime(alttime_file, location_id)
             data = alttime_cache[alttime_file]
 
-        runs: List[Tuple[datetime, datetime]] = []
+        runs: list[tuple[datetime, datetime]] = []
         if data and data.get('times_utc'):
             alt_min = float(data.get('altitude_constraint_min', 30))
             alt_max = float(data.get('altitude_constraint_max', 80))
@@ -1245,7 +1239,7 @@ def compute_optimized_schedule(
             )
 
         duration = timedelta(minutes=planned_minutes)
-        warnings: List[str] = []
+        warnings: list[str] = []
         fitting = [r for r in runs if (r[1] - r[0]) >= duration]
         if fitting:
             chosen_run = min(fitting, key=lambda r: r[0])
@@ -1352,8 +1346,8 @@ def compute_optimized_schedule(
 def apply_optimized_schedule(
     user_id: str,
     username: str,
-    combination_id: Optional[str],
-    order: List[str],
+    combination_id: str | None,
+    order: list[str],
     start_delay_minutes: int,
 ) -> bool:
     """Apply a previously-computed optimized order + initial delay to the plan.
@@ -1400,7 +1394,7 @@ def _csv_normalize_ra(val) -> str:
         if sec == 60:
             sec, mn = 0, mn + 1
         return f'{h:02d}:{mn:02d}:{sec:02d}'
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return s
 
 
@@ -1428,7 +1422,7 @@ def _csv_normalize_dec(val) -> str:
         if sec == 60:
             sec, mn = 0, mn + 1
         return f'{sign}{d:02d}:{mn:02d}:{sec:02d}'
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return s
 
 
@@ -1438,7 +1432,7 @@ def _csv_fmt_local_hm(iso_str) -> str:
         return ''
     try:
         return datetime.fromisoformat(iso_str).strftime('%H:%M')
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return str(iso_str)
 
 
@@ -1448,11 +1442,11 @@ def _csv_fmt_observable_pct(val) -> str:
         return ''
     try:
         return f'{float(val) * 100:.0f}%'
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return str(val)
 
 
-def serialize_plan_csv(plan_payload: Dict, labels: Optional[Dict[str, str]] = None) -> str:
+def serialize_plan_csv(plan_payload: dict, labels: dict[str, str] | None = None) -> str:
     labels = labels or {}
 
     def _label(key: str, fallback: str) -> str:
@@ -1600,7 +1594,7 @@ def get_all_plan_states(user_id: str, username: str, combinations: list) -> list
 # ---------------------------------------------------------------------------
 
 
-def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
+def generate_plan_pdf(payload: dict, metrics: dict, i18n_manager) -> io.BytesIO:
     """Render the observation plan as a print-friendly A4 PDF.
 
     Parameters
@@ -1609,10 +1603,10 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
     metrics:      output of ``_compute_plan_fill_metrics`` from app.py
     i18n_manager: :class:`i18n_utils.I18nManager` instance for the request language
     """
-    from matplotlib.backends.backend_pdf import PdfPages
-    import matplotlib.pyplot as plt
-    import matplotlib.gridspec as gridspec
     import matplotlib.dates as mdates
+    import matplotlib.gridspec as gridspec
+    import matplotlib.pyplot as plt
+    from matplotlib.backends.backend_pdf import PdfPages
     from matplotlib.patches import Rectangle
 
     plan = payload.get('plan')
@@ -1657,7 +1651,7 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
     # _load_alttime / _parse_utc / _clip_alttime_series are module-level (shared
     # with the visibility warnings + schedule optimizer above).
 
-    _local_tz: Any = timezone.utc  # updated after alttime_map is loaded
+    _local_tz: Any = UTC  # updated after alttime_map is loaded
 
     def _fmt_hm(iso_str: str | None) -> str:
         dt = _parse_utc(iso_str)
@@ -1672,7 +1666,7 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
         return f"{m // 60}h{m % 60:02d}"
 
     # ── load altitude-time JSON files ────────────────────────────────────────
-    alttime_map: Dict[str, Any] = {}
+    alttime_map: dict[str, Any] = {}
     for entry in entries:
         af = entry.get('alttime_file')
         if af:
@@ -1687,7 +1681,7 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
     try:
         _local_tz = _ZoneInfo(_tz_name)
     except Exception:
-        _local_tz = timezone.utc
+        _local_tz = UTC
         _tz_name = 'UTC'
 
     # ── shared header / footer ───────────────────────────────────────────────
@@ -1748,7 +1742,7 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
     ]
 
     def _render_col_headers(ax, y: float) -> float:
-        for cx, cl in zip(COL_X, COL_H):
+        for cx, cl in zip(COL_X, COL_H, strict=False):
             ax.text(
                 cx, y, cl, va='top', ha='left', fontsize=7, color=C_TXT_MID, fontweight='bold', transform=ax.transAxes
             )
@@ -1758,7 +1752,7 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
 
     ROW_H = 0.030  # compact fixed row height
 
-    def _render_entry_row(ax, abs_idx: int, entry: Dict, y: float) -> None:
+    def _render_entry_row(ax, abs_idx: int, entry: dict, y: float) -> None:
         color = PALETTE[abs_idx % len(PALETTE)]
         done = bool(entry.get('done'))
         name = (entry.get('name') or entry.get('target_name') or '?')[:26]
@@ -1827,7 +1821,6 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
     PER_PAGE = 28
 
     with PdfPages(buffer) as pdf:
-
         # ─── PAGE 1 ─────────────────────────────────────────────────────────
         fig = plt.figure(figsize=(8.27, 11.69))
         fig.patch.set_facecolor(C_WHITE)
@@ -1891,7 +1884,7 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
                 ax_info.text(
                     0.50,
                     0.88,
-                    f"{t('plan_my_night.export_pdf_combination') or 'Equipment'}:" f"  {combo_label}",
+                    f"{t('plan_my_night.export_pdf_combination') or 'Equipment'}:  {combo_label}",
                     va='top',
                     ha='left',
                     fontsize=9.5,
@@ -1901,7 +1894,7 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
             ax_info.text(
                 0.01,
                 0.58,
-                f"{t('plan_my_night.export_pdf_night_window') or 'Night window'}:" f"  {ns_str} → {ne_str}{delay_s}",
+                f"{t('plan_my_night.export_pdf_night_window') or 'Night window'}:  {ns_str} → {ne_str}{delay_s}",
                 va='top',
                 ha='left',
                 fontsize=9.5,
@@ -1935,7 +1928,7 @@ def generate_plan_pdf(payload: Dict, metrics: Dict, i18n_manager) -> io.BytesIO:
                 f"  {fill_pct:.0f}%   ({planned} / {night_d})"
             )
             if overflow > 0:
-                cov_lbl += f"   {t('plan_my_night.export_pdf_overflow') or 'Overflow'}:" f" +{_fmt_min(overflow)}"
+                cov_lbl += f"   {t('plan_my_night.export_pdf_overflow') or 'Overflow'}: +{_fmt_min(overflow)}"
             ax_info.text(
                 bx + bw / 2,
                 by + bh / 2,

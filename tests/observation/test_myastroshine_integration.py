@@ -17,7 +17,6 @@ import uuid
 import pytest
 
 from db import settings_store
-
 from observation import astrodex
 from observation import myastroshine_integration as integration
 

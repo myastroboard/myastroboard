@@ -9,12 +9,12 @@ import math
 import time as _time
 from zoneinfo import ZoneInfo
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, jsonify, request
 
-from cache import cache_store
 from astroweather import moon_calendar
+from cache import cache_store
 from utils.auth import login_required
-from utils.constants import CACHE_TTL, WEATHER_CACHE_TTL, CACHE_TTL_ASTRO_WEATHER
+from utils.constants import CACHE_TTL, CACHE_TTL_ASTRO_WEATHER, WEATHER_CACHE_TTL
 from utils.i18n_utils import I18nManager
 from utils.logging_config import get_logger
 from utils.repo_config import load_config
@@ -40,7 +40,7 @@ def _local_condition_score(record):
         cloudless = float(record["cloudless"])
         seeing = float(record["seeing"])
         transparency = float(record["transparency"])
-    except (KeyError, TypeError, ValueError):
+    except KeyError, TypeError, ValueError:
         return None
     if not all(math.isfinite(v) for v in (cloudless, seeing, transparency)):
         return None
@@ -79,7 +79,7 @@ def _forecast_with_observation_score(payload, location_id):
         if raw is not None:
             try:
                 merged = round(float(raw) * 10, 1)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 merged = None
         if merged is None:
             merged = _local_condition_score(record)
@@ -343,7 +343,7 @@ def _clamp_calendar_month(req_year, req_month, cur_year: int, cur_month: int) ->
     cur_index = cur_year * 12 + (cur_month - 1)
     try:
         req_index = int(req_year) * 12 + (int(req_month) - 1)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         req_index = cur_index
     req_index = max(cur_index, min(req_index, cur_index + 1))
     clamped_year, month_zero_based = divmod(req_index, 12)

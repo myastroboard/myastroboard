@@ -32,12 +32,11 @@ Example output for a night (on API call):
 import datetime
 from zoneinfo import ZoneInfo
 
-import numpy as np
 import astropy.units as u
-from astropy.time import Time
-from astropy.coordinates import EarthLocation, AltAz, get_sun, get_body
-
+import numpy as np
 from astroplan.moon import moon_illumination
+from astropy.coordinates import AltAz, EarthLocation, get_body, get_sun
+from astropy.time import Time
 
 # Local hour at which a night's Moon illumination is reported. Solidly night-time
 # and deliberately identical to the monthly phase calendar's sample hour
@@ -55,7 +54,7 @@ def moon_illumination_percent(dt_local: datetime.datetime) -> float:
     observation/observation_sessions.py) - the same engine already powering this
     module's own 7-night dark-time forecast, so numbers stay consistent app-wide.
     """
-    utc_dt = dt_local.astimezone(datetime.timezone.utc)
+    utc_dt = dt_local.astimezone(datetime.UTC)
     return float(moon_illumination(Time(utc_dt)) * 100)
 
 
@@ -99,7 +98,7 @@ def night_body_altitude_grid(
     utc_times = []
     dt = start
     while dt <= end:
-        utc_times.append(dt.astimezone(datetime.timezone.utc))
+        utc_times.append(dt.astimezone(datetime.UTC))
         dt += step
 
     t_arr = Time(utc_times)
@@ -116,7 +115,6 @@ def night_body_altitude_grid(
 
 
 class MoonPlanner:
-
     def __init__(self, latitude: float, longitude: float, timezone: str):
 
         self.latitude = latitude

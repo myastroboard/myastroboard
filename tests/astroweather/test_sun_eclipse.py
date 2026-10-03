@@ -3,14 +3,16 @@ Tests for sun_eclipse.py (SolarEclipseService).
 Covers pure-logic scoring and helper methods.
 """
 
-import pytest
 import datetime
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
+import pytest
+
 from astroweather.sun_eclipse import (
     IN_PROGRESS_LOOKBACK,
-    SolarEclipseService,
-    SolarEclipseInfo,
     EclipsePoint,
+    SolarEclipseInfo,
+    SolarEclipseService,
 )
 
 
@@ -122,7 +124,7 @@ class TestFmt:
 
     def test_formats_datetime_as_iso(self):
         svc = SolarEclipseService(45.0, -73.5, "UTC")
-        dt = datetime.datetime(2026, 8, 12, 14, 32, 15, tzinfo=datetime.timezone.utc)
+        dt = datetime.datetime(2026, 8, 12, 14, 32, 15, tzinfo=datetime.UTC)
         result = svc._fmt(dt)
         assert "2026-08-12" in result
         assert "14:32:15" in result
@@ -178,7 +180,7 @@ class TestSunGeometry:
         sun.transform_to.return_value = transformed
         mock_get_sun.return_value = sun
 
-        az = self.svc._get_sun_azimuth(datetime.datetime(2026, 8, 12, 14, 32, tzinfo=datetime.timezone.utc))
+        az = self.svc._get_sun_azimuth(datetime.datetime(2026, 8, 12, 14, 32, tzinfo=datetime.UTC))
         assert az == pytest.approx(210.2)
 
     @patch("astroweather.sun_eclipse.get_sun")
@@ -188,7 +190,7 @@ class TestSunGeometry:
         sun.transform_to.return_value = transformed
         mock_get_sun.return_value = sun
 
-        az = self.svc._get_sun_azimuth(datetime.datetime(2026, 8, 12, 14, 32, tzinfo=datetime.timezone.utc))
+        az = self.svc._get_sun_azimuth(datetime.datetime(2026, 8, 12, 14, 32, tzinfo=datetime.UTC))
         assert az == 0.0
 
     @patch("astroweather.sun_eclipse.get_sun")
@@ -203,8 +205,8 @@ class TestSunGeometry:
         sun.transform_to.return_value = transformed
         mock_get_sun.return_value = sun
 
-        start = datetime.datetime(2026, 8, 12, 13, 0, tzinfo=datetime.timezone.utc)
-        end = datetime.datetime(2026, 8, 12, 13, 10, tzinfo=datetime.timezone.utc)
+        start = datetime.datetime(2026, 8, 12, 13, 0, tzinfo=datetime.UTC)
+        end = datetime.datetime(2026, 8, 12, 13, 10, tzinfo=datetime.UTC)
         points = self.svc._generate_altitude_vs_time(start, end)
 
         assert len(points) == 3
@@ -219,8 +221,8 @@ class TestSunGeometry:
         sun.transform_to.return_value = transformed
         mock_get_sun.return_value = sun
 
-        start = datetime.datetime(2026, 8, 12, 13, 0, tzinfo=datetime.timezone.utc)
-        end = datetime.datetime(2026, 8, 12, 13, 0, tzinfo=datetime.timezone.utc)
+        start = datetime.datetime(2026, 8, 12, 13, 0, tzinfo=datetime.UTC)
+        end = datetime.datetime(2026, 8, 12, 13, 0, tzinfo=datetime.UTC)
         points = self.svc._generate_altitude_vs_time(start, end)
 
         assert len(points) == 1
@@ -358,14 +360,14 @@ class TestEclipseInProgress:
     @patch("astroweather.sun_eclipse.SearchLocalSolarEclipse")
     def test_search_starts_before_now(self, mock_search):
         """The search window opens in the past, otherwise a running eclipse is skipped."""
-        now = datetime.datetime.now(datetime.timezone.utc)
+        now = datetime.datetime.now(datetime.UTC)
         mock_search.return_value = self._eclipse(
             now + datetime.timedelta(days=30), now + datetime.timedelta(days=30, hours=1)
         )
 
         self.svc.get_next_eclipse()
 
-        searched_from = mock_search.call_args[0][0].Utc().replace(tzinfo=datetime.timezone.utc)
+        searched_from = mock_search.call_args[0][0].Utc().replace(tzinfo=datetime.UTC)
         assert searched_from < now
         assert now - searched_from <= IN_PROGRESS_LOOKBACK + datetime.timedelta(minutes=1)
 
@@ -374,7 +376,7 @@ class TestEclipseInProgress:
     @patch("astroweather.sun_eclipse.SearchLocalSolarEclipse")
     def test_running_eclipse_is_kept(self, mock_search, _mock_az, _mock_alttime):
         """Peak already passed but end still ahead: keep reporting that eclipse."""
-        now = datetime.datetime.now(datetime.timezone.utc)
+        now = datetime.datetime.now(datetime.UTC)
         running = self._eclipse(
             now - datetime.timedelta(minutes=40),
             now + datetime.timedelta(minutes=30),
@@ -385,16 +387,14 @@ class TestEclipseInProgress:
 
         assert mock_search.call_count == 1  # no second search: nothing to skip past
         assert info is not None
-        assert info.peak_time == running.peak.time.Utc().replace(tzinfo=datetime.timezone.utc).isoformat(
-            timespec="seconds"
-        )
+        assert info.peak_time == running.peak.time.Utc().replace(tzinfo=datetime.UTC).isoformat(timespec="seconds")
 
     @patch.object(SolarEclipseService, "_generate_altitude_vs_time", return_value=[])
     @patch.object(SolarEclipseService, "_get_sun_azimuth", return_value=180.0)
     @patch("astroweather.sun_eclipse.SearchLocalSolarEclipse")
     def test_finished_eclipse_is_replaced_by_the_next_one(self, mock_search, _mock_az, _mock_alttime):
         """An eclipse caught by the lookback but already over must not be reported."""
-        now = datetime.datetime.now(datetime.timezone.utc)
+        now = datetime.datetime.now(datetime.UTC)
         finished = self._eclipse(
             now - datetime.timedelta(hours=3),
             now - datetime.timedelta(hours=2),
@@ -413,7 +413,7 @@ class TestEclipseInProgress:
 
     @patch("astroweather.sun_eclipse.SearchLocalSolarEclipse")
     def test_returns_none_when_the_second_search_finds_nothing(self, mock_search):
-        now = datetime.datetime.now(datetime.timezone.utc)
+        now = datetime.datetime.now(datetime.UTC)
         finished = self._eclipse(
             now - datetime.timedelta(hours=3),
             now - datetime.timedelta(hours=2),
@@ -460,6 +460,7 @@ class TestSolarEclipseDistantEpochMuting:
         so the mute belongs at the entry point rather than at a single helper.
         """
         from unittest.mock import patch
+
         from astroweather.sun_eclipse import SolarEclipseService
 
         svc = SolarEclipseService(19.82, -155.47, "Pacific/Honolulu")

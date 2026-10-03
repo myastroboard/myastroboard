@@ -24,8 +24,8 @@ import io
 import os
 import textwrap
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import UTC, datetime
+from typing import Any
 
 from db import documents, queries
 from utils.constants import DATA_DIR
@@ -99,10 +99,10 @@ SKY_SCALE_MAX = 8
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
-def _coerce_optional_float(value: Any, minimum: Optional[float] = None, maximum: Optional[float] = None):
+def _coerce_optional_float(value: Any, minimum: float | None = None, maximum: float | None = None):
     """Best-effort float parse for a loosely-typed numeric field.
 
     Anything empty, unparseable or out of range becomes None rather than an error -
@@ -112,7 +112,7 @@ def _coerce_optional_float(value: Any, minimum: Optional[float] = None, maximum:
         return None
     try:
         parsed = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     if minimum is not None and parsed < minimum:
         return None
@@ -121,13 +121,13 @@ def _coerce_optional_float(value: Any, minimum: Optional[float] = None, maximum:
     return parsed
 
 
-def _coerce_optional_int(value: Any, minimum: Optional[int] = None, maximum: Optional[int] = None):
+def _coerce_optional_int(value: Any, minimum: int | None = None, maximum: int | None = None):
     """Best-effort int parse for a loosely-typed numeric field (see _coerce_optional_float)."""
     if value is None or value == '':
         return None
     try:
         parsed = int(float(value))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     if minimum is not None and parsed < minimum:
         return None
@@ -169,7 +169,7 @@ def ensure_observation_sessions_directories() -> None:
     os.makedirs(attachments_dir(), exist_ok=True)
 
 
-def _default_payload(user_id: str, username: Optional[str] = None) -> Dict:
+def _default_payload(user_id: str, username: str | None = None) -> dict:
     return {
         'user_id': user_id,
         'username': username or 'unknown',
@@ -179,7 +179,7 @@ def _default_payload(user_id: str, username: Optional[str] = None) -> Dict:
     }
 
 
-def _migrate_session_to_nights(session: Dict) -> bool:
+def _migrate_session_to_nights(session: dict) -> bool:
     """Transparent read-time upgrade for a pre-v1.3.1 session.
 
     Folds the old scalar date/start_time/end_time/sqm/seeing/transparency into a
@@ -219,7 +219,7 @@ def _migrate_session_to_nights(session: Dict) -> bool:
     return True
 
 
-def load_user_sessions(user_id: str, username: Optional[str] = None) -> Dict:
+def load_user_sessions(user_id: str, username: str | None = None) -> dict:
     """Load a user's observation sessions.
 
     Never raises to the caller: an unreadable or malformed stored value yields an empty
@@ -254,7 +254,7 @@ def load_user_sessions(user_id: str, username: Optional[str] = None) -> Dict:
     return data
 
 
-def validate_sessions_data(data: Any) -> Tuple[bool, str]:
+def validate_sessions_data(data: Any) -> tuple[bool, str]:
     """Validate a well-formed observation sessions payload before it is stored.
 
     Returns:
@@ -293,7 +293,7 @@ def validate_sessions_data(data: Any) -> Tuple[bool, str]:
     return True, ''
 
 
-def save_user_sessions(user_id: str, sessions_data: Dict, username: Optional[str] = None) -> bool:
+def save_user_sessions(user_id: str, sessions_data: dict, username: str | None = None) -> bool:
     """Validate and store a user's observation sessions (one transaction, nothing half-written)."""
     try:
         sessions_data['updated_at'] = _now_iso()
@@ -316,7 +316,7 @@ def save_user_sessions(user_id: str, sessions_data: Dict, username: Optional[str
         return False
 
 
-def load_all_users_sessions(usernames_by_id: Optional[Dict[str, str]] = None) -> List[Dict]:
+def load_all_users_sessions(usernames_by_id: dict[str, str] | None = None) -> list[dict]:
     """Load every user's sessions.
 
     Used by the delete-guard scans below, not by any UI route - sessions are private and
@@ -324,7 +324,7 @@ def load_all_users_sessions(usernames_by_id: Optional[Dict[str, str]] = None) ->
     """
     usernames_by_id = usernames_by_id or {}
 
-    collections: List[Dict] = []
+    collections: list[dict] = []
     for user_id, _doc_key, _data in documents.list_documents(SESSIONS_KIND):
         data = load_user_sessions(user_id, usernames_by_id.get(user_id))
         collections.append(
@@ -339,7 +339,7 @@ def load_all_users_sessions(usernames_by_id: Optional[Dict[str, str]] = None) ->
     return collections
 
 
-def _session_sort_key(session: Dict) -> Tuple[str, str]:
+def _session_sort_key(session: dict) -> tuple[str, str]:
     """Sort key placing the most recent observation date (then creation) first.
 
     A session's "date" for sorting purposes is the earliest of its nights - a
@@ -351,14 +351,14 @@ def _session_sort_key(session: Dict) -> Tuple[str, str]:
     return (primary_date, str(session.get('created_at') or ''))
 
 
-def get_user_sessions(user_id: str) -> List[Dict]:
+def get_user_sessions(user_id: str) -> list[dict]:
     """Return the user's own sessions, newest observation date first."""
     data = load_user_sessions(user_id)
     sessions = [session for session in data.get('sessions', []) if isinstance(session, dict)]
     return sorted(sessions, key=_session_sort_key, reverse=True)
 
 
-def get_session(user_id: str, session_id: str) -> Optional[Dict]:
+def get_session(user_id: str, session_id: str) -> dict | None:
     """Return one of the user's own sessions, or None when it doesn't exist."""
     for session in load_user_sessions(user_id).get('sessions', []):
         if isinstance(session, dict) and session.get('id') == session_id:
@@ -366,7 +366,7 @@ def get_session(user_id: str, session_id: str) -> Optional[Dict]:
     return None
 
 
-def build_astrodex_session_backlink_index(user_id: str) -> Tuple[Dict[str, List[Dict]], Dict[str, Dict]]:
+def build_astrodex_session_backlink_index(user_id: str) -> tuple[dict[str, list[dict]], dict[str, dict]]:
     """One-pass reverse index: Astrodex item/picture id -> the session entries pointing at it.
 
     Sessions are private, so this only ever scans the caller's own file (unlike the
@@ -379,8 +379,8 @@ def build_astrodex_session_backlink_index(user_id: str) -> Tuple[Dict[str, List[
     entries over multiple nights, so it gets a list; a picture is one specific photo, so
     it only ever needs its single (first-found) match.
     """
-    matches_by_item: Dict[str, List[Dict]] = {}
-    first_match_by_picture: Dict[str, Dict] = {}
+    matches_by_item: dict[str, list[dict]] = {}
+    first_match_by_picture: dict[str, dict] = {}
 
     for session in get_user_sessions(user_id):
         nights_by_id = {night['id']: night for night in session.get('nights', []) or [] if isinstance(night, dict)}
@@ -409,7 +409,7 @@ def build_astrodex_session_backlink_index(user_id: str) -> Tuple[Dict[str, List[
     return matches_by_item, first_match_by_picture
 
 
-def _apply_session_fields(session: Dict, source: Dict, fields=SESSION_UPDATABLE_FIELDS) -> None:
+def _apply_session_fields(session: dict, source: dict, fields=SESSION_UPDATABLE_FIELDS) -> None:
     """Copy/normalize the session ("trip") level fields present in *source* onto *session*."""
     for field in fields:
         if field not in source:
@@ -427,7 +427,7 @@ def _apply_session_fields(session: Dict, source: Dict, fields=SESSION_UPDATABLE_
             session[field] = _clean_text(value)
 
 
-def _build_night_payload(night_data: Dict) -> Dict:
+def _build_night_payload(night_data: dict) -> dict:
     """Build one night sub-object of a session (mirrors the scalar fields a session
     used to carry directly, pre-v1.3.1 - see NIGHT_UPDATABLE_FIELDS)."""
     now = _now_iso()
@@ -446,7 +446,7 @@ def _build_night_payload(night_data: Dict) -> Dict:
     }
 
 
-def _apply_night_fields(night: Dict, source: Dict) -> None:
+def _apply_night_fields(night: dict, source: dict) -> None:
     """Copy/normalize the night-level fields present in *source* onto *night*."""
     for field in NIGHT_UPDATABLE_FIELDS:
         if field not in source:
@@ -466,7 +466,7 @@ def _apply_night_fields(night: Dict, source: Dict) -> None:
             night[field] = _clean_text(value)
 
 
-def get_night(session: Dict, night_id: Optional[str]) -> Optional[Dict]:
+def get_night(session: dict, night_id: str | None) -> dict | None:
     """Look up one of *session*'s nights by id, or None if it doesn't resolve.
 
     Public (unlike _sorted_nights()/_primary_night()) because the blueprint layer needs
@@ -480,7 +480,7 @@ def get_night(session: Dict, night_id: Optional[str]) -> Optional[Dict]:
     return None
 
 
-def _sorted_nights(session: Dict) -> List[Dict]:
+def _sorted_nights(session: dict) -> list[dict]:
     """A session's nights, chronologically - the storage order isn't guaranteed to be
     (add_night() always appends, and import-from-plan can insert an earlier date after
     a later one already exists)."""
@@ -488,7 +488,7 @@ def _sorted_nights(session: Dict) -> List[Dict]:
     return sorted(nights, key=lambda night: str(night.get('date') or ''))
 
 
-def _primary_night(session: Dict) -> Dict:
+def _primary_night(session: dict) -> dict:
     """The session's earliest night. Used wherever code still needs exactly one night's
     conditions (the PDF info panel pending its dedicated per-night breakdown - see
     docs/OBSERVATION_LOG.md). Always non-empty for a session that went through
@@ -497,7 +497,7 @@ def _primary_night(session: Dict) -> Dict:
     return nights[0] if nights else {}
 
 
-def session_date_range(session: Dict) -> Tuple[str, str]:
+def session_date_range(session: dict) -> tuple[str, str]:
     """(earliest, latest) night date, for display - identical values for a single-night
     session, which is still the overwhelmingly common case."""
     nights = _sorted_nights(session)
@@ -507,7 +507,7 @@ def session_date_range(session: Dict) -> Tuple[str, str]:
     return dates[0], dates[-1]
 
 
-def create_session(user_id: str, username: str, session_data: Dict) -> Optional[Dict]:
+def create_session(user_id: str, username: str, session_data: dict) -> dict | None:
     """Create a new observation session, seeded with one night.
 
     ``date`` is required (an undated night is not a log entry) and seeds that first
@@ -535,7 +535,7 @@ def create_session(user_id: str, username: str, session_data: Dict) -> Optional[
             'moon_illumination_percent': session_data.get('moon_illumination_percent'),
         }
     )
-    session: Dict[str, Any] = {
+    session: dict[str, Any] = {
         'id': str(uuid.uuid4()),
         'location_id': None,
         'location_name': None,
@@ -561,7 +561,7 @@ def create_session(user_id: str, username: str, session_data: Dict) -> Optional[
     return None
 
 
-def update_session(user_id: str, session_id: str, updates: Dict) -> Optional[Dict]:
+def update_session(user_id: str, session_id: str, updates: dict) -> dict | None:
     """Update session ("trip") level fields - location, equipment, notes. Nights and
     entries are edited through their own dedicated functions (add_night()/
     update_night()/delete_night(), add_entry()/update_entry()/delete_entry())."""
@@ -581,7 +581,7 @@ def update_session(user_id: str, session_id: str, updates: Dict) -> Optional[Dic
     return None
 
 
-def add_night(user_id: str, session_id: str, night_data: Dict) -> Optional[Dict]:
+def add_night(user_id: str, session_id: str, night_data: dict) -> dict | None:
     """Add one more night to a multi-night session. ``date`` is required."""
     data = load_user_sessions(user_id)
 
@@ -605,7 +605,7 @@ def add_night(user_id: str, session_id: str, night_data: Dict) -> Optional[Dict]
     return None
 
 
-def update_night(user_id: str, session_id: str, night_id: str, updates: Dict) -> Optional[Dict]:
+def update_night(user_id: str, session_id: str, night_id: str, updates: dict) -> dict | None:
     """Update one night's conditions/notes. A blank date keeps the previous value - a
     night, like a session before it, can never become undated."""
     data = load_user_sessions(user_id)
@@ -685,14 +685,14 @@ def delete_session(user_id: str, session_id: str) -> bool:
         if file_path and os.path.exists(file_path):
             try:
                 os.remove(file_path)
-            except (OSError, IOError) as error:
+            except OSError as error:
                 logger.error(f"Error deleting attachment file {attachment.get('filename')}: {error}")
 
     data['sessions'] = [session for session in sessions if session is not target]
     return save_user_sessions(user_id, data)
 
 
-def _resolve_attachment_file_path(filename: Optional[str]) -> Optional[str]:
+def _resolve_attachment_file_path(filename: str | None) -> str | None:
     """Resolve a stored attachment filename to an absolute path inside the attachments
     directory, or None if it escapes that directory (same containment check as
     astrodex.py's own _resolve_image_file_path)."""
@@ -705,7 +705,7 @@ def _resolve_attachment_file_path(filename: Optional[str]) -> Optional[str]:
     return file_path
 
 
-def _build_attachment_payload(filename: str, original_name: str, content_type: str) -> Dict:
+def _build_attachment_payload(filename: str, original_name: str, content_type: str) -> dict:
     now = _now_iso()
     return {
         'id': str(uuid.uuid4()),
@@ -717,9 +717,7 @@ def _build_attachment_payload(filename: str, original_name: str, content_type: s
     }
 
 
-def add_attachment(
-    user_id: str, session_id: str, filename: str, original_name: str, content_type: str
-) -> Optional[Dict]:
+def add_attachment(user_id: str, session_id: str, filename: str, original_name: str, content_type: str) -> dict | None:
     """Record one already-uploaded attachment against a session. The file itself is
     saved to disk by the blueprint layer first, mirroring how astrodex.py's own image
     upload is split from the record that references it."""
@@ -759,7 +757,7 @@ def delete_attachment(user_id: str, session_id: str, attachment_id: str) -> bool
         if file_path and os.path.exists(file_path):
             try:
                 os.remove(file_path)
-            except (OSError, IOError) as error:
+            except OSError as error:
                 logger.error(f"Error deleting attachment file {target.get('filename')}: {error}")
 
         session['attachments'] = [
@@ -771,7 +769,7 @@ def delete_attachment(user_id: str, session_id: str, attachment_id: str) -> bool
     return False
 
 
-def rename_attachment(user_id: str, session_id: str, attachment_id: str, display_name: Optional[str]) -> Optional[Dict]:
+def rename_attachment(user_id: str, session_id: str, attachment_id: str, display_name: str | None) -> dict | None:
     """Set (or, given a blank/None name, clear) an attachment's custom display name.
 
     ``filename``/``original_name`` are left untouched - this only changes what the UI
@@ -800,7 +798,7 @@ def rename_attachment(user_id: str, session_id: str, attachment_id: str, display
     return None
 
 
-def _build_entry_payload(entry_data: Dict) -> Dict:
+def _build_entry_payload(entry_data: dict) -> dict:
     """Build a new session entry from a client payload.
 
     The target identity fields mirror plan_my_night._build_target_payload() and are a
@@ -841,7 +839,7 @@ def _build_entry_payload(entry_data: Dict) -> Dict:
     }
 
 
-def add_entry(user_id: str, session_id: str, entry_data: Dict) -> Optional[Dict]:
+def add_entry(user_id: str, session_id: str, entry_data: dict) -> dict | None:
     """Add one target entry to a session.
 
     Does **not** resolve Astrodex itself - the blueprint layer calls
@@ -870,7 +868,7 @@ def add_entry(user_id: str, session_id: str, entry_data: Dict) -> Optional[Dict]
     return None
 
 
-def update_entry(user_id: str, session_id: str, entry_id: str, updates: Dict) -> Optional[Dict]:
+def update_entry(user_id: str, session_id: str, entry_id: str, updates: dict) -> dict | None:
     """Update the "what actually happened" fields of one entry.
 
     Like add_entry(), this never resolves Astrodex - see that function's docstring.
@@ -938,7 +936,7 @@ def delete_entry(user_id: str, session_id: str, entry_id: str) -> bool:
     return False
 
 
-def _entry_from_plan_entry(plan_entry: Dict, night_id: str) -> Dict:
+def _entry_from_plan_entry(plan_entry: dict, night_id: str) -> dict:
     """Map one Plan My Night entry onto a fresh session entry payload for *night_id*."""
     entry = _build_entry_payload(
         {
@@ -961,9 +959,7 @@ def _entry_from_plan_entry(plan_entry: Dict, night_id: str) -> Dict:
     return entry
 
 
-def _find_or_create_night_for_date(
-    session: Dict, date: str, start_time: Optional[str], end_time: Optional[str]
-) -> Dict:
+def _find_or_create_night_for_date(session: dict, date: str, start_time: str | None, end_time: str | None) -> dict:
     """Find-or-create the night matching *date* within *session*.
 
     The storage-layer half of "day 2, import the new plan": re-importing the same
@@ -987,9 +983,9 @@ def _find_or_create_night_for_date(
 def create_session_from_plan(
     user_id: str,
     username: str,
-    plan_payload: Dict,
-    existing_session_id: Optional[str] = None,
-) -> Optional[Dict]:
+    plan_payload: dict,
+    existing_session_id: str | None = None,
+) -> dict | None:
     """Seed a new session from a Plan My Night plan, or merge into an existing one.
 
     ``plan_payload`` is the ``plan`` dict from ``plan_my_night.get_plan_with_timeline()``
@@ -1081,8 +1077,8 @@ def link_entry_to_astrodex(
     session_id: str,
     entry_id: str,
     astrodex_item_id: str,
-    astrodex_picture_id: Optional[str] = None,
-) -> Optional[Dict]:
+    astrodex_picture_id: str | None = None,
+) -> dict | None:
     """Store the Astrodex item (and optionally picture) an entry resolved to.
 
     Pure storage-layer setter with no cross-module import: the blueprint calls it for
@@ -1119,7 +1115,7 @@ def link_entry_to_astrodex(
     return None
 
 
-def get_session_stats(user_id: str) -> Dict:
+def get_session_stats(user_id: str) -> dict:
     """Aggregate the user's own sessions into the Observation Log's header counters.
 
     Deliberately minimal - full analytics (per month, per equipment, sky coverage) is
@@ -1256,7 +1252,7 @@ def _pdf_fmt_integration(minutes: Any) -> str:
     return f'{hours}h{rest:02d}' if hours else f'{rest} min'
 
 
-def _pdf_session_totals(entries: List[Dict]) -> Tuple[float, Optional[float]]:
+def _pdf_session_totals(entries: list[dict]) -> tuple[float, float | None]:
     """(total integration minutes, average rating or None) across one session's entries."""
     total_integration = 0.0
     rating_sum = 0.0
@@ -1357,7 +1353,7 @@ def _pdf_new_page(title: str, subtitle: str = ''):
     return fig
 
 
-def _pdf_draw_thumbnail(ax_img, image_path: Optional[str], t) -> None:
+def _pdf_draw_thumbnail(ax_img, image_path: str | None, t) -> None:
     """Draw an entry's attached photo, or a neutral placeholder box when there is none."""
     ax_img.axis('off')
     if image_path:
@@ -1400,7 +1396,7 @@ def _pdf_draw_thumbnail(ax_img, image_path: Optional[str], t) -> None:
     )
 
 
-def _pdf_render_entry_row(fig, entry: Dict, image_path: Optional[str], row_top: float, row_h: float, t) -> None:
+def _pdf_render_entry_row(fig, entry: dict, image_path: str | None, row_top: float, row_h: float, t) -> None:
     """One target: photo (or placeholder) on the left, identity/capture/notes text on the right."""
     from matplotlib.lines import Line2D
 
@@ -1505,7 +1501,7 @@ def _pdf_render_entry_row(fig, entry: Dict, image_path: Optional[str], row_top: 
     )
 
 
-def _pdf_render_info_panel(fig, session: Dict, entries: List[Dict], t) -> float:
+def _pdf_render_info_panel(fig, session: dict, entries: list[dict], t) -> float:
     """Session ('trip') level 'common information' card. Returns the y (figure-fraction)
     below which the night/target breakdown should start.
 
@@ -1652,7 +1648,7 @@ def _pdf_render_info_panel(fig, session: Dict, entries: List[Dict], t) -> float:
     return panel_bottom - 0.02
 
 
-def _pdf_render_night_header(fig, night: Dict, y_cursor: float, t) -> float:
+def _pdf_render_night_header(fig, night: dict, y_cursor: float, t) -> float:
     """One compact block introducing a night's own date/conditions/notes, drawn ahead of
     that night's own entries in a multi-night session's PDF. Returns the y
     (figure-fraction) below which content continues."""
@@ -1737,7 +1733,7 @@ def _pdf_render_night_header(fig, night: Dict, y_cursor: float, t) -> float:
     return y_cursor - 0.016
 
 
-def _render_session_section(pdf, session: Dict, image_paths: Dict[str, str], t) -> None:
+def _render_session_section(pdf, session: dict, image_paths: dict[str, str], t) -> None:
     """Append one session's pages (info panel, then every entry with its photo) to an
     already-open PdfPages. Shared by generate_session_pdf() and generate_sessions_pdf().
 
@@ -1807,8 +1803,8 @@ def _render_session_section(pdf, session: Dict, image_paths: Dict[str, str], t) 
         plt.close(fig)
         return
 
-    entries_by_night: Dict[str, List[Dict]] = {night['id']: [] for night in nights}
-    unassigned: List[Dict] = []
+    entries_by_night: dict[str, list[dict]] = {night['id']: [] for night in nights}
+    unassigned: list[dict] = []
     for entry in entries:
         bucket = entries_by_night.get(entry.get('night_id') or '')
         (bucket if bucket is not None else unassigned).append(entry)
@@ -1847,7 +1843,7 @@ def _render_session_section(pdf, session: Dict, image_paths: Dict[str, str], t) 
     plt.close(fig)
 
 
-def _pdf_render_cover_page(pdf, sessions: List[Dict], from_date: Optional[str], to_date: Optional[str], t) -> None:
+def _pdf_render_cover_page(pdf, sessions: list[dict], from_date: str | None, to_date: str | None, t) -> None:
     import matplotlib.pyplot as plt
 
     title = t('observation_log.export_pdf_title') or 'Observation Log'
@@ -1882,7 +1878,7 @@ def _pdf_render_cover_page(pdf, sessions: List[Dict], from_date: Optional[str], 
         ax, 0.5, 0.62, subtitle, ha='center', va='center', fontsize=13, color=_PDF_C_TXT_MID, transform=ax.transAxes
     )
 
-    generated_at = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
+    generated_at = datetime.now(UTC).strftime('%Y-%m-%d %H:%M UTC')
     _pdf_text(
         ax,
         0.5,
@@ -1929,7 +1925,7 @@ def _pdf_render_cover_page(pdf, sessions: List[Dict], from_date: Optional[str], 
     plt.close(fig)
 
 
-def _pdf_render_summary_pages(pdf, sessions: List[Dict], t) -> None:
+def _pdf_render_summary_pages(pdf, sessions: list[dict], t) -> None:
     import matplotlib.pyplot as plt
     from matplotlib.patches import Rectangle
 
@@ -1960,7 +1956,7 @@ def _pdf_render_summary_pages(pdf, sessions: List[Dict], t) -> None:
         ax.set_ylim(0, 1)
 
         y = 0.99
-        for cx, header in zip(col_x, col_headers):
+        for cx, header in zip(col_x, col_headers, strict=False):
             _pdf_text(
                 ax,
                 cx,
@@ -2015,7 +2011,7 @@ def _pdf_render_summary_pages(pdf, sessions: List[Dict], t) -> None:
                 _pdf_fmt_integration(total_integration),
                 f'{average_rating:.1f}' if average_rating is not None else '-',
             ]
-            for cx, value in zip(col_x, cells):
+            for cx, value in zip(col_x, cells, strict=False):
                 _pdf_text(
                     ax,
                     cx,
@@ -2033,7 +2029,7 @@ def _pdf_render_summary_pages(pdf, sessions: List[Dict], t) -> None:
         plt.close(fig)
 
 
-def generate_session_pdf(session: Dict, image_paths: Dict[str, str], i18n_manager) -> io.BytesIO:
+def generate_session_pdf(session: dict, image_paths: dict[str, str], i18n_manager) -> io.BytesIO:
     """Render one observation session as a print-friendly A4 PDF: common session info,
     then each logged target with its attached photo (if any).
 
@@ -2050,11 +2046,11 @@ def generate_session_pdf(session: Dict, image_paths: Dict[str, str], i18n_manage
 
 
 def generate_sessions_pdf(
-    sessions: List[Dict],
-    image_paths: Dict[str, str],
+    sessions: list[dict],
+    image_paths: dict[str, str],
     i18n_manager,
-    from_date: Optional[str] = None,
-    to_date: Optional[str] = None,
+    from_date: str | None = None,
+    to_date: str | None = None,
     order: str = 'asc',
 ) -> io.BytesIO:
     """Render every session in *sessions* (already date-filtered by the caller) as one

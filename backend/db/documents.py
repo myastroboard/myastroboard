@@ -7,8 +7,8 @@ document goes in and comes back whole. Every write bumps the ``doc:<kind>`` stor
 revision in the same transaction.
 """
 
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import delete, select
 from sqlalchemy.dialects.sqlite import insert
@@ -25,7 +25,7 @@ def _store(kind: str) -> str:
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _assemble(conn: Connection, user_id: str, kind: str, doc_key: str, header: Any) -> Any:
@@ -34,7 +34,7 @@ def _assemble(conn: Connection, user_id: str, kind: str, doc_key: str, header: A
     return header
 
 
-def get_document(user_id: str, kind: str, doc_key: str = '') -> Optional[Dict[str, Any]]:
+def get_document(user_id: str, kind: str, doc_key: str = '') -> dict[str, Any] | None:
     """The stored document, or ``None`` when the user has none of this kind/key."""
     with read() as conn:
         header = conn.execute(
@@ -45,7 +45,7 @@ def get_document(user_id: str, kind: str, doc_key: str = '') -> Optional[Dict[st
         return _assemble(conn, user_id, kind, doc_key, header)
 
 
-def put_document(user_id: str, kind: str, data: Dict[str, Any], doc_key: str = '') -> None:
+def put_document(user_id: str, kind: str, data: dict[str, Any], doc_key: str = '') -> None:
     """Insert or replace a document. The user must exist (foreign key)."""
     now = _now()
     fields = data if isinstance(data, dict) else {}
@@ -86,7 +86,7 @@ def delete_kind(kind: str) -> None:
         bump_revision(conn, _store(kind))
 
 
-def delete_user_documents(conn: Connection, user_id: str) -> List[str]:
+def delete_user_documents(conn: Connection, user_id: str) -> list[str]:
     """Delete every document of a user inside the caller's transaction; return the kinds touched."""
     kinds = sorted(set(conn.execute(select(_table.c.kind).where(_table.c.user_id == user_id)).scalars()))
     collections.delete_user_rows(conn, user_id)
@@ -96,7 +96,7 @@ def delete_user_documents(conn: Connection, user_id: str) -> List[str]:
     return kinds
 
 
-def list_documents(kind: str, doc_key: Optional[str] = None) -> List[Tuple[str, str, Dict[str, Any]]]:
+def list_documents(kind: str, doc_key: str | None = None) -> list[tuple[str, str, dict[str, Any]]]:
     """``(user_id, doc_key, data)`` for every document of ``kind`` (optionally one ``doc_key``)."""
     query = select(_table.c.user_id, _table.c.doc_key, _table.c.data).where(_table.c.kind == kind)
     if doc_key is not None:
@@ -106,7 +106,7 @@ def list_documents(kind: str, doc_key: Optional[str] = None) -> List[Tuple[str, 
         return [(row.user_id, row.doc_key, _assemble(conn, row.user_id, kind, row.doc_key, row.data)) for row in rows]
 
 
-def list_user_documents(user_id: str, kind: str) -> List[Tuple[str, Dict[str, Any]]]:
+def list_user_documents(user_id: str, kind: str) -> list[tuple[str, dict[str, Any]]]:
     """``(doc_key, data)`` for every document of ``kind`` owned by ``user_id``."""
     query = (
         select(_table.c.doc_key, _table.c.data)
@@ -118,7 +118,7 @@ def list_user_documents(user_id: str, kind: str) -> List[Tuple[str, Dict[str, An
         return [(row.doc_key, _assemble(conn, user_id, kind, row.doc_key, row.data)) for row in rows]
 
 
-def list_all_user_documents(user_id: str) -> List[Tuple[str, str, Dict[str, Any]]]:
+def list_all_user_documents(user_id: str) -> list[tuple[str, str, dict[str, Any]]]:
     """``(kind, doc_key, data)`` for every document of ``user_id`` (personal data export)."""
     query = (
         select(_table.c.kind, _table.c.doc_key, _table.c.data)

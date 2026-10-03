@@ -13,23 +13,21 @@ mirroring where ``blueprints/astrodex.py`` keeps its own equivalents.
 import os
 import re
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
-from flask import Blueprint, request, jsonify, send_file, send_from_directory
+from flask import Blueprint, jsonify, request, send_file, send_from_directory
 from werkzeug.utils import secure_filename
 
 from astroweather.moon_planner import moon_illumination_percent
+from blueprints.plan_my_night import _resolve_requested_language
 from equipment import equipment_profiles
-from observation import astrodex
-from observation import observation_sessions
-from observation import plan_my_night
-from utils.auth import login_required, user_required, get_current_user
+from observation import astrodex, observation_sessions, plan_my_night
+from utils.auth import get_current_user, login_required, user_required
 from utils.i18n_utils import I18nManager
 from utils.image_privacy import strip_image_metadata
 from utils.logging_config import get_logger
-from utils.repo_config import load_config, get_locations_for_user, get_location_by_id
-from blueprints.plan_my_night import _resolve_requested_language
+from utils.repo_config import get_location_by_id, get_locations_for_user, load_config
 
 logger = get_logger(__name__)
 
@@ -52,14 +50,14 @@ def _safe_session_coordinate(value, min_value, max_value):
         return None
     try:
         parsed = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     if not (min_value <= parsed <= max_value):
         return None
     return parsed
 
 
-def _validate_and_coerce_rating(entry_data: Dict) -> Any:
+def _validate_and_coerce_rating(entry_data: dict) -> Any:
     """Validate entry_data['rating'] in place (0.0-5.0 in 0.5 steps) and coerce it to a
     clean float, or None if left blank. Returns an error message string on failure, else
     None.
@@ -74,7 +72,7 @@ def _validate_and_coerce_rating(entry_data: Dict) -> Any:
         return None
     try:
         rating = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return 'rating must be a number between 0 and 5'
     if not (0 <= rating <= 5) or (rating * 2) != int(round(rating * 2)):
         return 'rating must be between 0 and 5 in 0.5 steps'
@@ -82,7 +80,7 @@ def _validate_and_coerce_rating(entry_data: Dict) -> Any:
     return None
 
 
-def _validate_and_coerce_picture_capture(picture_data: Dict) -> Any:
+def _validate_and_coerce_picture_capture(picture_data: dict) -> Any:
     """Validate/coerce picture_data['exposition_time'], ['frames'] and
     ['integration_minutes'] in place, mirroring Astrodex's own picture capture validator
     (``blueprints/astrodex.py``'s ``_validate_and_coerce_picture_capture``, duplicated
@@ -100,7 +98,7 @@ def _validate_and_coerce_picture_capture(picture_data: Dict) -> Any:
         else:
             try:
                 seconds = int(value)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 return 'exposition_time must be a whole number of seconds'
             if seconds < 0:
                 return 'exposition_time must be a whole number of seconds'
@@ -113,7 +111,7 @@ def _validate_and_coerce_picture_capture(picture_data: Dict) -> Any:
         else:
             try:
                 frames = int(value)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 return 'frames must be a whole number'
             if frames < 0:
                 return 'frames must be a whole number'
@@ -126,7 +124,7 @@ def _validate_and_coerce_picture_capture(picture_data: Dict) -> Any:
         else:
             try:
                 integration = float(value)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 return 'integration_minutes must be a number'
             if integration < 0:
                 return 'integration_minutes must be a number'
@@ -135,7 +133,7 @@ def _validate_and_coerce_picture_capture(picture_data: Dict) -> Any:
     return None
 
 
-def _resolve_session_combination_reference(combination_id, user_id) -> Optional[str]:
+def _resolve_session_combination_reference(combination_id, user_id) -> str | None:
     """Return combination_id if it resolves to an accessible (own or shared) combination
     for this user, else None - so a session (or, via the same check, one of its entries -
     see _apply_resolved_entry_combination below) can never be tagged with a combination
@@ -150,7 +148,7 @@ def _resolve_session_combination_reference(combination_id, user_id) -> Optional[
     return None
 
 
-def _apply_resolved_entry_combination(payload: Dict, user) -> None:
+def _apply_resolved_entry_combination(payload: dict, user) -> None:
     """Resolve an entry's optional per-target equipment override server-side, in place.
 
     Same contract as the combination half of _apply_resolved_session_fields (only
@@ -220,7 +218,7 @@ def _resolve_session_location_snapshot(
     return dict(_EMPTY_SESSION_LOCATION)
 
 
-def _location_preset_sqm(location_id) -> Optional[float]:
+def _location_preset_sqm(location_id) -> float | None:
     """Return a location preset's own configured SQM, used to pre-fill a new session."""
     if not location_id:
         return None
@@ -234,7 +232,7 @@ def _location_preset_sqm(location_id) -> Optional[float]:
     return _safe_session_coordinate(location.get('sqm'), 0, 30)
 
 
-def _compute_moon_illumination_for_date(date_str: Optional[str]) -> Optional[float]:
+def _compute_moon_illumination_for_date(date_str: str | None) -> float | None:
     """Moon illumination (%) for a given calendar date.
 
     Unlike seeing/transparency (a 7Timer *forecast*, only available for today), this is
@@ -249,16 +247,16 @@ def _compute_moon_illumination_for_date(date_str: Optional[str]) -> Optional[flo
         return None
     try:
         parsed_date = datetime.strptime(str(date_str), '%Y-%m-%d')
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     try:
-        return round(moon_illumination_percent(parsed_date.replace(hour=12, tzinfo=timezone.utc)), 1)
+        return round(moon_illumination_percent(parsed_date.replace(hour=12, tzinfo=UTC)), 1)
     except Exception as error:  # pragma: no cover - ephemeris library failure
         logger.error(f'Error computing moon illumination for {date_str}: {error}')
         return None
 
 
-def _apply_resolved_session_fields(payload: Dict, user) -> None:
+def _apply_resolved_session_fields(payload: dict, user) -> None:
     """Resolve the client-supplied combination/location of a create/update payload
     server-side, in place.
 
@@ -295,7 +293,7 @@ def _apply_resolved_session_fields(payload: Dict, user) -> None:
         )
 
 
-def _validate_night_id(session: Dict, night_id: Optional[str]) -> Any:
+def _validate_night_id(session: dict, night_id: str | None) -> Any:
     """Validate that *night_id* (if given) resolves to one of *session*'s nights.
     Returns an error message string on failure, else None (a blank night_id is valid -
     the caller defaults it, see _default_night_id())."""
@@ -306,7 +304,7 @@ def _validate_night_id(session: Dict, night_id: Optional[str]) -> Any:
     return 'night_id does not resolve to a night in this session'
 
 
-def _default_night_id(session: Dict) -> Optional[str]:
+def _default_night_id(session: dict) -> str | None:
     """Which night a new entry defaults to when the client doesn't specify one: the
     most recently added night, so adding a target right after "Add night" lands it on
     that new night rather than always the first one."""
@@ -314,7 +312,7 @@ def _default_night_id(session: Dict) -> Optional[str]:
     return nights[-1]['id'] if nights else None
 
 
-def _ensure_astrodex_item_for_entry(user, entry: Dict) -> Optional[str]:
+def _ensure_astrodex_item_for_entry(user, entry: dict) -> str | None:
     """Find-or-create the Astrodex item for this entry's target, idempotently.
 
     Returns the astrodex_item_id (existing or newly created), or None when the target
@@ -353,7 +351,7 @@ def _ensure_astrodex_item_for_entry(user, entry: Dict) -> Optional[str]:
     return fallback.get('id') if fallback else None
 
 
-def _auto_link_astrodex_item(user, session_id: str, entry: Dict) -> Dict:
+def _auto_link_astrodex_item(user, session_id: str, entry: dict) -> dict:
     """Register the entry's target in Astrodex as soon as it has real capture evidence.
 
     "Catch them all" is a keypoint of this app, so item-level catalogue membership is
@@ -855,7 +853,7 @@ def upload_observation_session_attachment(session_id):
             return jsonify({'error': 'Invalid file type'}), 400
 
         # Image attachments lose their EXIF/GPS metadata before being stored.
-        image_bytes: Optional[bytes] = None
+        image_bytes: bytes | None = None
         if file_ext in ATTACHMENT_IMAGE_EXTENSIONS:
             try:
                 image_bytes = strip_image_metadata(file.read())
@@ -897,7 +895,7 @@ def upload_observation_session_attachment(session_id):
         return jsonify({'error': 'Internal server error'}), 500
 
 
-def _attachment_download_name(attachment: Dict) -> str:
+def _attachment_download_name(attachment: dict) -> str:
     """The filename a browser should save this attachment as: the custom display name
     (if the user set one) with the real extension re-attached when missing, else the
     original upload filename - never the regenerated on-disk `{uuid}.{ext}` name."""
@@ -990,7 +988,7 @@ def delete_observation_session_attachment(session_id, attachment_id):
 # ---------------------------------------------------------------------------
 
 
-def _resolve_entry_image_path(user, entry: Dict) -> Optional[str]:
+def _resolve_entry_image_path(user, entry: dict) -> str | None:
     """Absolute path to an entry's attached Astrodex photo, or None when it has no photo,
     the linked item/picture no longer resolves, or the file is missing on disk.
 
@@ -1020,9 +1018,9 @@ def _resolve_entry_image_path(user, entry: Dict) -> Optional[str]:
     return file_path
 
 
-def _collect_image_paths(user, sessions: List[Dict]) -> Dict[str, str]:
+def _collect_image_paths(user, sessions: list[dict]) -> dict[str, str]:
     """entry id -> resolved image path, across every entry of every given session."""
-    image_paths: Dict[str, str] = {}
+    image_paths: dict[str, str] = {}
     for session in sessions:
         for entry in session.get('entries', []):
             if not isinstance(entry, dict):
@@ -1036,7 +1034,7 @@ def _collect_image_paths(user, sessions: List[Dict]) -> Dict[str, str]:
     return image_paths
 
 
-def _session_overlaps_date_range(session: Dict, from_date: Optional[str], to_date: Optional[str]) -> bool:
+def _session_overlaps_date_range(session: dict, from_date: str | None, to_date: str | None) -> bool:
     """True when *any* of the session's nights falls within [from_date, to_date]
     (either bound omitted = open-ended). A multi-night trip straddling a filter
     boundary still matches - the PDF renders every one of its nights regardless, this

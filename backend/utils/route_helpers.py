@@ -2,7 +2,7 @@
 
 from cache import cache_store
 from utils.auth import get_current_user
-from utils.repo_config import load_config, get_active_location
+from utils.repo_config import get_active_location, load_config
 
 
 def _resolve_active_location():

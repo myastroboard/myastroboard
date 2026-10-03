@@ -2,7 +2,7 @@
 Unit tests for txtconf_loader.py
 """
 
-from unittest.mock import patch, mock_open
+from unittest.mock import mock_open, patch
 
 from utils.txtconf_loader import get_repo_version
 

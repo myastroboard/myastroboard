@@ -3,9 +3,11 @@ Tests for sidereal_time.py
 Covers SiderealTimeService pure-logic and calculation methods.
 """
 
-import pytest
-from datetime import datetime, date
+from datetime import date, datetime
 from zoneinfo import ZoneInfo
+
+import pytest
+
 from observation.sidereal_time import SiderealTimeService
 
 
@@ -212,6 +214,7 @@ class TestGetBestObservationTimes:
     def test_altaz_none_path_is_handled(self):
         """altaz is None → continue (defensive guard in the hourly loop)."""
         from unittest.mock import patch
+
         from astropy.coordinates import SkyCoord
 
         svc = SiderealTimeService(45.0, -73.5, timezone="America/Montreal")
@@ -234,8 +237,9 @@ class TestGetBestObservationTimes:
 
     def test_ndarray_alt_val_branch(self):
         """alt_val is ndarray → float extraction via np.real/atleast_1d."""
-        import numpy as np
         from unittest.mock import MagicMock, patch
+
+        import numpy as np
         from astropy.coordinates import SkyCoord
 
         svc = SiderealTimeService(45.0, -73.5, timezone="America/Montreal")
@@ -258,9 +262,10 @@ class TestCalculateSiderealInfoNdarrayBranch:
     """gst.hour returns ndarray → float extraction via np.real/atleast_1d."""
 
     def test_ndarray_gst_hour_is_handled(self):
-        import numpy as np
         from unittest.mock import MagicMock
         from zoneinfo import ZoneInfo
+
+        import numpy as np
 
         svc = SiderealTimeService(48.85, 2.35, timezone="Europe/Paris")
 

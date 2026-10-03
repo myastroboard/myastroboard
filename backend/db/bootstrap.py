@@ -11,7 +11,6 @@ operator can go back to the previous release without losing anything.
 """
 
 import threading
-from typing import Optional
 
 from db.engine import database_path
 from utils.file_lock import interprocess_lock
@@ -21,7 +20,7 @@ logger = get_logger(__name__)
 
 _state_mutex = threading.Lock()
 _ready = False
-_maintenance_reason: Optional[str] = None
+_maintenance_reason: str | None = None
 
 
 def ensure_database_ready() -> bool:
@@ -42,7 +41,7 @@ def ensure_database_ready() -> bool:
         return _maintenance_reason is None
 
 
-def maintenance_reason() -> Optional[str]:
+def maintenance_reason() -> str | None:
     """Why the instance is in maintenance mode, or None when it is serving normally."""
     return _maintenance_reason
 

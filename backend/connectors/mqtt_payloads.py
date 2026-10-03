@@ -20,9 +20,10 @@ Wire conventions (see docs/HOME_ASSISTANT.md):
 - string states are capped below Home Assistant's 255-character limit.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from datetime import UTC, datetime, timedelta
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from connectors.mqtt_connector import MqttConnector
@@ -66,12 +67,12 @@ class Device:
     device_id: str
     discovery_topic: str
     state_topic: str
-    discovery: Dict[str, Any]
-    state: Dict[str, Any]
+    discovery: dict[str, Any]
+    state: dict[str, Any]
     entity_count: int = 0
-    image_topic: Optional[str] = None
-    image_id: Optional[str] = None  # the picture id behind image_topic, for change detection
-    image_loader: Optional[Callable[[], Optional[bytes]]] = field(default=None, repr=False)
+    image_topic: str | None = None
+    image_id: str | None = None  # the picture id behind image_topic, for change detection
+    image_loader: Callable[[], bytes | None] | None = field(default=None, repr=False)
 
 
 # ---------------------------------------------------------------------------
@@ -79,14 +80,14 @@ class Device:
 # ---------------------------------------------------------------------------
 
 
-def _tz(name: Optional[str]):
+def _tz(name: str | None):
     try:
         return ZoneInfo(str(name or "UTC"))
     except Exception:
-        return timezone.utc
+        return UTC
 
 
-def to_iso(value: Any, tz=None) -> Optional[str]:
+def to_iso(value: Any, tz=None) -> str | None:
     """Any of the timestamp shapes found in the caches -> ISO 8601 with offset, or None.
 
     Accepts datetimes, ``YYYY-MM-DD HH:MM[:SS]`` naive local strings (localised with *tz*),
@@ -113,30 +114,30 @@ def to_iso(value: Any, tz=None) -> Optional[str]:
             except ValueError:
                 return None
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=tz or timezone.utc)
+        dt = dt.replace(tzinfo=tz or UTC)
     return dt.isoformat(timespec="seconds")
 
 
-def to_date(value: Any) -> Optional[str]:
+def to_date(value: Any) -> str | None:
     """``YYYY-MM-DD`` or None."""
     text = str(value or "").strip()
     return text[:10] if len(text) >= 10 and text[4] == "-" and text[7] == "-" else None
 
 
-def num(value: Any, digits: Optional[int] = None) -> Optional[float]:
+def num(value: Any, digits: int | None = None) -> float | None:
     """A float (rounded when *digits* is given) or None for anything non-numeric."""
     if value is None or isinstance(value, bool):
         return None
     try:
         result = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     if result != result:  # NaN
         return None
     return round(result, digits) if digits is not None else result
 
 
-def text(value: Any) -> Optional[str]:
+def text(value: Any) -> str | None:
     """A non-empty string capped to the HA state length, or None."""
     if value is None:
         return None
@@ -146,7 +147,7 @@ def text(value: Any) -> Optional[str]:
     return cleaned[:MAX_STATE_LEN]
 
 
-def _parse_dt(value: Any, tz=None) -> Optional[datetime]:
+def _parse_dt(value: Any, tz=None) -> datetime | None:
     iso = to_iso(value, tz)
     if not iso:
         return None
@@ -171,16 +172,16 @@ def sensor(
     key: str,
     name: str,
     *,
-    device_class: Optional[str] = None,
-    unit: Optional[str] = None,
-    state_class: Optional[str] = None,
-    icon: Optional[str] = None,
-    options: Optional[List[str]] = None,
-    precision: Optional[int] = None,
+    device_class: str | None = None,
+    unit: str | None = None,
+    state_class: str | None = None,
+    icon: str | None = None,
+    options: list[str] | None = None,
+    precision: int | None = None,
     diagnostic: bool = False,
     attributes: bool = False,
-) -> Tuple[str, Dict[str, Any]]:
-    spec: Dict[str, Any] = {"p": "sensor", "name": name, "val_tpl": "{{ value_json.%s }}" % key}
+) -> tuple[str, dict[str, Any]]:
+    spec: dict[str, Any] = {"p": "sensor", "name": name, "val_tpl": "{{ value_json.%s }}" % key}  # noqa: UP031 - Jinja template: %-formatting avoids doubling every {{ }}
     if device_class:
         spec["dev_cla"] = device_class
     if unit:
@@ -196,17 +197,17 @@ def sensor(
     if diagnostic:
         spec["ent_cat"] = "diagnostic"
     if attributes:
-        spec["json_attr_tpl"] = "{{ value_json.%s_attributes | tojson }}" % key
+        spec["json_attr_tpl"] = "{{ value_json.%s_attributes | tojson }}" % key  # noqa: UP031 - Jinja template: %-formatting avoids doubling every {{ }}
     return key, spec
 
 
 def binary_sensor(
-    key: str, name: str, *, device_class: Optional[str] = None, icon: Optional[str] = None, diagnostic: bool = False
-) -> Tuple[str, Dict[str, Any]]:
-    spec: Dict[str, Any] = {
+    key: str, name: str, *, device_class: str | None = None, icon: str | None = None, diagnostic: bool = False
+) -> tuple[str, dict[str, Any]]:
+    spec: dict[str, Any] = {
         "p": "binary_sensor",
         "name": name,
-        "val_tpl": "{{ 'None' if value_json.%s is none else ('ON' if value_json.%s else 'OFF') }}" % (key, key),
+        "val_tpl": "{{ 'None' if value_json.%s is none else ('ON' if value_json.%s else 'OFF') }}" % (key, key),  # noqa: UP031 - Jinja template: %-formatting avoids doubling every {{ }}
     }
     if device_class:
         spec["dev_cla"] = device_class
@@ -229,15 +230,15 @@ def update(
     *,
     installed_version_key: str,
     latest_version_key: str,
-    release_url: Optional[str] = None,
-    icon: Optional[str] = None,
+    release_url: str | None = None,
+    icon: str | None = None,
     diagnostic: bool = False,
-) -> Tuple[str, Dict[str, Any]]:
-    tpl = "{{ {'installed_version': value_json.%s, 'latest_version': value_json.%s} | tojson }}" % (
+) -> tuple[str, dict[str, Any]]:
+    tpl = "{{ {'installed_version': value_json.%s, 'latest_version': value_json.%s} | tojson }}" % (  # noqa: UP031 - Jinja template: %-formatting avoids doubling every {{ }}
         installed_version_key,
         latest_version_key,
     )
-    spec: Dict[str, Any] = {"p": "update", "name": name, "val_tpl": tpl}
+    spec: dict[str, Any] = {"p": "update", "name": name, "val_tpl": tpl}
     if release_url:
         spec["rel_u"] = release_url
     if icon:
@@ -255,15 +256,15 @@ def _assemble(
     name: str,
     model: str,
     version: str,
-    components: List[Tuple[str, Dict[str, Any]]],
-    state: Dict[str, Any],
+    components: list[tuple[str, dict[str, Any]]],
+    state: dict[str, Any],
     via_board: bool = True,
-    image: Optional[Dict[str, Any]] = None,
+    image: dict[str, Any] | None = None,
 ) -> Device:
     """Fold component specs + state into a Device with a complete discovery payload."""
     device_id = connector.device_object_id(kind, object_id)
     state_topic = connector.state_topic(kind, object_id)
-    cmps: Dict[str, Any] = {}
+    cmps: dict[str, Any] = {}
     for key, spec in components:
         comp = dict(spec)
         comp["uniq_id"] = f"{device_id}_{key}"
@@ -276,7 +277,7 @@ def _assemble(
         comp["uniq_id"] = f"{device_id}_{comp.pop('key')}"
         cmps[comp.pop("cmp_key")] = comp
 
-    dev: Dict[str, Any] = {"ids": [device_id], "name": name, "mf": MANUFACTURER, "mdl": model, "sw": version}
+    dev: dict[str, Any] = {"ids": [device_id], "name": name, "mf": MANUFACTURER, "mdl": model, "sw": version}
     if via_board:
         dev["via_device"] = connector.device_object_id("board")
     discovery = {
@@ -304,7 +305,7 @@ def _assemble(
 # ---------------------------------------------------------------------------
 
 
-def _location_cache(name: str, location_id: str) -> Tuple[Optional[Dict[str, Any]], Optional[float]]:
+def _location_cache(name: str, location_id: str) -> tuple[dict[str, Any] | None, float | None]:
     """``(data, timestamp)`` of a per-location cache, ``(None, None)`` when absent or broken."""
     try:
         from cache import cache_store  # lazy: cache/ imports connectors/ at module level
@@ -317,7 +318,7 @@ def _location_cache(name: str, location_id: str) -> Tuple[Optional[Dict[str, Any
         return None, None
 
 
-def _shared_cache(name: str) -> Optional[Dict[str, Any]]:
+def _shared_cache(name: str) -> dict[str, Any] | None:
     try:
         from cache import cache_store  # lazy: cache/ imports connectors/ at module level
 
@@ -329,7 +330,7 @@ def _shared_cache(name: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def _skytonight_results(location_id: str) -> Dict[str, Any]:
+def _skytonight_results(location_id: str) -> dict[str, Any]:
     try:
         from skytonight.skytonight_calculator import load_calculation_results  # lazy: feature package
 
@@ -373,10 +374,10 @@ BOARD_COMPONENTS = [
 ]
 
 
-def build_board_device(connector: MqttConnector, publisher_info: Dict[str, Any]) -> Device:
+def build_board_device(connector: MqttConnector, publisher_info: dict[str, Any]) -> Device:
     """The install-level device. *publisher_info* carries what only the publisher knows."""
     version = _app_version()
-    state: Dict[str, Any] = {
+    state: dict[str, Any] = {
         "version": version,
         "latest_version": None,
         "caches_ready": None,
@@ -550,10 +551,10 @@ EVENTS_COMPONENTS = [
 ]
 
 
-def _sky_state(location: Dict[str, Any], now: datetime) -> Dict[str, Any]:
+def _sky_state(location: dict[str, Any], now: datetime) -> dict[str, Any]:
     lid = str(location.get("id") or "")
     tz = _tz(location.get("timezone"))
-    state: Dict[str, Any] = {key: None for key, _ in SKY_COMPONENTS}
+    state: dict[str, Any] = {key: None for key, _ in SKY_COMPONENTS}
     state["top_target_attributes"] = {}
 
     sun_data, _ = _location_cache("sun_report", lid)
@@ -648,7 +649,7 @@ def _sky_state(location: Dict[str, Any], now: datetime) -> Dict[str, Any]:
     return state
 
 
-def _nearest_hourly_row(rows: List[Dict[str, Any]], now: datetime) -> Optional[Dict[str, Any]]:
+def _nearest_hourly_row(rows: list[dict[str, Any]], now: datetime) -> dict[str, Any] | None:
     """The forecast row whose timestamp is closest to *now* (rows carry ISO strings)."""
     best_row, best_gap = None, None
     for row in rows:
@@ -663,9 +664,9 @@ def _nearest_hourly_row(rows: List[Dict[str, Any]], now: datetime) -> Optional[D
     return best_row
 
 
-def _weather_state(location: Dict[str, Any], now: datetime) -> Dict[str, Any]:
+def _weather_state(location: dict[str, Any], now: datetime) -> dict[str, Any]:
     lid = str(location.get("id") or "")
-    state: Dict[str, Any] = {key: None for key, _ in WEATHER_COMPONENTS}
+    state: dict[str, Any] = {key: None for key, _ in WEATHER_COMPONENTS}
     state["weather_alert_attributes"] = {}
 
     forecast, stamp = _location_cache("weather_forecast", lid)
@@ -684,7 +685,7 @@ def _weather_state(location: Dict[str, Any], now: datetime) -> Dict[str, Any]:
     state["pressure"] = num(row.get("surface_pressure"), 0)
     state["visibility"] = num(row.get("visibility"), 0)
     state["weather_code"] = num(row.get("weather_code"), 0)
-    state["forecast_updated_at"] = to_iso(datetime.fromtimestamp(stamp, tz=timezone.utc)) if stamp else None
+    state["forecast_updated_at"] = to_iso(datetime.fromtimestamp(stamp, tz=UTC)) if stamp else None
 
     astro, _ = _location_cache("astro_weather", lid)
     current = (astro or {}).get("current_conditions") or {}
@@ -705,7 +706,7 @@ def _weather_state(location: Dict[str, Any], now: datetime) -> Dict[str, Any]:
     return state
 
 
-def _next_pass(passes: Any, now: datetime) -> Optional[Dict[str, Any]]:
+def _next_pass(passes: Any, now: datetime) -> dict[str, Any] | None:
     upcoming = []
     for item in passes or []:
         if not isinstance(item, dict):
@@ -719,10 +720,10 @@ def _next_pass(passes: Any, now: datetime) -> Optional[Dict[str, Any]]:
     return upcoming[0][1] if upcoming else None
 
 
-def _events_state(location: Dict[str, Any], config: Dict[str, Any], now: datetime) -> Dict[str, Any]:
+def _events_state(location: dict[str, Any], config: dict[str, Any], now: datetime) -> dict[str, Any]:
     lid = str(location.get("id") or "")
     tz = _tz(location.get("timezone"))
-    state: Dict[str, Any] = {key: None for key, _ in EVENTS_COMPONENTS}
+    state: dict[str, Any] = {key: None for key, _ in EVENTS_COMPONENTS}
     state["next_event_attributes"] = {}
     state["next_solar_eclipse_at_attributes"] = {}
     state["next_lunar_eclipse_at_attributes"] = {}
@@ -829,12 +830,12 @@ def _events_state(location: Dict[str, Any], config: Dict[str, Any], now: datetim
 
 
 def build_location_device(
-    connector: MqttConnector, config: Dict[str, Any], location: Dict[str, Any], now: Optional[datetime] = None
-) -> Optional[Device]:
+    connector: MqttConnector, config: dict[str, Any], location: dict[str, Any], now: datetime | None = None
+) -> Device | None:
     """One device per location preset, holding whichever location modules are enabled."""
-    now = now or datetime.now(timezone.utc)
-    components: List[Tuple[str, Dict[str, Any]]] = []
-    state: Dict[str, Any] = {
+    now = now or datetime.now(UTC)
+    components: list[tuple[str, dict[str, Any]]] = []
+    state: dict[str, Any] = {
         "location_id": location.get("id"),
         "location_name": location.get("name"),
         "timezone": location.get("timezone"),
@@ -909,7 +910,7 @@ def user_opted_in(user: Any) -> bool:
     return bool(isinstance(prefs, dict) and prefs.get(USER_OPT_IN_PREFERENCE))
 
 
-def _astrodex_state(user_id: str, username: str, state: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def _astrodex_state(user_id: str, username: str, state: dict[str, Any]) -> dict[str, Any] | None:
     """Fill the astrodex_* keys; returns the newest picture record (with its item) or None."""
     try:
         from observation import astrodex  # lazy: observation/ imports connectors/ at module level
@@ -919,7 +920,7 @@ def _astrodex_state(user_id: str, username: str, state: Dict[str, Any]) -> Optio
         logger.debug("MQTT: astrodex for %s unavailable: %s", username, exc)
         return None
     items = [i for i in (data.get("items") or []) if isinstance(i, dict)]
-    pictures: List[Tuple[str, Dict[str, Any], Dict[str, Any]]] = []
+    pictures: list[tuple[str, dict[str, Any], dict[str, Any]]] = []
     constellations = set()
     for item in items:
         if text(item.get("constellation")):
@@ -949,7 +950,7 @@ def _astrodex_state(user_id: str, username: str, state: Dict[str, Any]) -> Optio
     return {"picture": pic, "item": item}
 
 
-def _plan_state(user_id: str, username: str, config: Dict[str, Any], state: Dict[str, Any]) -> Optional[str]:
+def _plan_state(user_id: str, username: str, config: dict[str, Any], state: dict[str, Any]) -> str | None:
     """Fill the plan_* keys; returns the active plan's combination id (for the equipment)."""
     try:
         from observation.plan_my_night import pick_active_plan  # lazy: observation/ imports connectors/
@@ -1015,7 +1016,7 @@ def _plan_state(user_id: str, username: str, config: Dict[str, Any], state: Dict
     return plan.get("combination_id") or None
 
 
-def _equipment_state(user_id: str, combination_id: Optional[str], state: Dict[str, Any]) -> None:
+def _equipment_state(user_id: str, combination_id: str | None, state: dict[str, Any]) -> None:
     if not combination_id:
         return
     try:
@@ -1054,7 +1055,7 @@ def _equipment_state(user_id: str, combination_id: Optional[str], state: Dict[st
         logger.debug("MQTT: equipment for %s unavailable: %s", user_id, exc)
 
 
-def _sessions_state(user_id: str, state: Dict[str, Any]) -> None:
+def _sessions_state(user_id: str, state: dict[str, Any]) -> None:
     try:
         from observation import observation_sessions, session_analytics  # lazy: feature package
 
@@ -1064,9 +1065,9 @@ def _sessions_state(user_id: str, state: Dict[str, Any]) -> None:
         return
     state["sessions_total"] = len(sessions)
     minutes = 0.0
-    last_date: Optional[str] = None
+    last_date: str | None = None
     try:
-        for session, night, entry in session_analytics.iter_entries(sessions):
+        for _session, night, entry in session_analytics.iter_entries(sessions):
             minutes += float(session_analytics.entry_integration_minutes(entry) or 0.0)
             day = session_analytics.entry_date(night)
             if day and (last_date is None or day > last_date):
@@ -1082,10 +1083,10 @@ def _sessions_state(user_id: str, state: Dict[str, Any]) -> None:
     state["last_session_date"] = to_date(last_date)
 
 
-def _image_loader(connector: MqttConnector, picture: Dict[str, Any]) -> Callable[[], Optional[bytes]]:
+def _image_loader(connector: MqttConnector, picture: dict[str, Any]) -> Callable[[], bytes | None]:
     """Encode the picture as a bounded JPEG when (and only when) the publisher asks for it."""
 
-    def _load() -> Optional[bytes]:
+    def _load() -> bytes | None:
         try:
             from observation import astrodex  # lazy: observation/ imports connectors/ at module level
 
@@ -1102,7 +1103,7 @@ def _image_loader(connector: MqttConnector, picture: Dict[str, Any]) -> Callable
     return _load
 
 
-def encode_thumbnail(path: str, max_edge: int, max_bytes: int, quality: int) -> Optional[bytes]:
+def encode_thumbnail(path: str, max_edge: int, max_bytes: int, quality: int) -> bytes | None:
     """A JPEG of *path* no larger than *max_edge* px and *max_bytes*, or None when impossible."""
     try:
         import io
@@ -1128,8 +1129,8 @@ def encode_thumbnail(path: str, max_edge: int, max_bytes: int, quality: int) -> 
 
 
 def build_user_device(
-    connector: MqttConnector, config: Dict[str, Any], user: Any, now: Optional[datetime] = None
-) -> Optional[Device]:
+    connector: MqttConnector, config: dict[str, Any], user: Any, now: datetime | None = None
+) -> Device | None:
     """One device per opted-in user. None when nothing is enabled for them."""
     user_id = str(getattr(user, "user_id", "") or "")
     username = str(getattr(user, "username", "") or "")
@@ -1140,12 +1141,12 @@ def build_user_device(
     if not activity and not image_wanted:
         return None
 
-    state: Dict[str, Any] = {"user_id": user_id, "username": username}
-    components: List[Tuple[str, Dict[str, Any]]] = []
-    image_spec: Optional[Dict[str, Any]] = None
-    image_topic: Optional[str] = None
-    image_id: Optional[str] = None
-    loader: Optional[Callable[[], Optional[bytes]]] = None
+    state: dict[str, Any] = {"user_id": user_id, "username": username}
+    components: list[tuple[str, dict[str, Any]]] = []
+    image_spec: dict[str, Any] | None = None
+    image_topic: str | None = None
+    image_id: str | None = None
+    loader: Callable[[], bytes | None] | None = None
 
     if activity:
         components.extend(USER_COMPONENTS)
@@ -1158,7 +1159,7 @@ def build_user_device(
         _equipment_state(user_id, combination_id, state)
         _sessions_state(user_id, state)
     else:
-        scratch: Dict[str, Any] = {}
+        scratch: dict[str, Any] = {}
         latest = _astrodex_state(user_id, username, scratch)
 
     if image_wanted:
@@ -1212,15 +1213,15 @@ def build_user_device(
 
 
 def collect(
-    connector: MqttConnector, config: Dict[str, Any], publisher_info: Dict[str, Any], now: Optional[datetime] = None
-) -> List[Device]:
+    connector: MqttConnector, config: dict[str, Any], publisher_info: dict[str, Any], now: datetime | None = None
+) -> list[Device]:
     """Every device to publish this cycle: locations, opted-in users, then the board.
 
     The board goes last so its counters reflect what this cycle produced. A builder that
     fails logs and is skipped - one broken cache never blocks the others.
     """
-    now = now or datetime.now(timezone.utc)
-    devices: List[Device] = []
+    now = now or datetime.now(UTC)
+    devices: list[Device] = []
 
     if any(connector.is_module_enabled(slug) for slug in ("sky_conditions", "weather_now", "upcoming_events")):
         try:

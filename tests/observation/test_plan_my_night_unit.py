@@ -3,15 +3,14 @@ Comprehensive unit tests for plan_my_night module.
 Tests date parsing, validation, matching logic, and file I/O.
 """
 
+import json
 import os
 import tempfile
-import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from threading import Thread
 from unittest.mock import patch
 
 import pytest
-
 
 from observation import plan_my_night
 
@@ -285,7 +284,7 @@ class TestGetPlanState:
 
     def test_state_with_custom_datetime(self):
         """Test state determination with custom datetime."""
-        custom_now = datetime(2026, 4, 17, 22, 0, 0, tzinfo=timezone.utc)
+        custom_now = datetime(2026, 4, 17, 22, 0, 0, tzinfo=UTC)
         plan = {"night_end": "2026-04-18T04:00:00"}
 
         state = get_plan_state(plan, now_dt=custom_now)
@@ -1329,7 +1328,7 @@ class TestEntryMatchesAlias:
 
     def test_is_target_in_current_plan_found(self, temp_plan_dir):
         user_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         payload = {
             'user_id': user_id,
             'username': 'testuser',
@@ -1354,7 +1353,7 @@ class TestEntryMatchesAlias:
 
     def test_create_or_add_target_already_in_plan(self, temp_plan_dir):
         user_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         night_start = (now - timedelta(hours=1)).isoformat()
         night_end = (now + timedelta(hours=5)).isoformat()
         with patch('observation.plan_my_night._target_group_id', return_value=''):
@@ -1596,7 +1595,7 @@ class TestGeneratePlanPdfBranchCoverage:
         monkeypatch.setattr(
             "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True
         )
-        now = datetime(2026, 8, 12, 21, 0, tzinfo=timezone.utc)
+        now = datetime(2026, 8, 12, 21, 0, tzinfo=UTC)
         payload = {
             "plan": {
                 "night_start": now.isoformat(),
@@ -1625,7 +1624,7 @@ class TestGeneratePlanPdfBranchCoverage:
         monkeypatch.setattr(
             "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True
         )
-        now = datetime(2026, 8, 12, 21, 0, tzinfo=timezone.utc)
+        now = datetime(2026, 8, 12, 21, 0, tzinfo=UTC)
         # Write an alttime file with a bad timezone
         alttime_data = {
             "timezone": "NOT/A_REAL_TIMEZONE",
@@ -1665,7 +1664,7 @@ class TestGeneratePlanPdfBranchCoverage:
         monkeypatch.setattr(
             "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True
         )
-        now = datetime(2026, 8, 12, 21, 0, tzinfo=timezone.utc)
+        now = datetime(2026, 8, 12, 21, 0, tzinfo=UTC)
         alttime_data = {
             "timezone": "UTC",
             "times_utc": [
@@ -1802,7 +1801,7 @@ class TestGeneratePlanPdfAdditionalBranches:
         )
         # Write invalid JSON
         (tmp_path / "m31_alttime.json").write_text("{invalid json", encoding="utf-8")
-        now = datetime.now(timezone.utc).replace(microsecond=0)
+        now = datetime.now(UTC).replace(microsecond=0)
         payload = {
             "plan": {
                 "night_start": now.isoformat(),
@@ -1831,7 +1830,7 @@ class TestGeneratePlanPdfAdditionalBranches:
         monkeypatch.setattr(
             "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True
         )
-        now = datetime.now(timezone.utc).replace(microsecond=0)
+        now = datetime.now(UTC).replace(microsecond=0)
         payload = {
             "plan": {
                 "night_start": now.isoformat(),
@@ -1855,7 +1854,7 @@ class TestGeneratePlanPdfAdditionalBranches:
         monkeypatch.setattr(
             "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True
         )
-        now = datetime.now(timezone.utc).replace(microsecond=0)
+        now = datetime.now(UTC).replace(microsecond=0)
         alttime_data = {
             "timezone": "UTC",
             "times_utc": [
@@ -1894,7 +1893,7 @@ class TestGeneratePlanPdfAdditionalBranches:
         monkeypatch.setattr(
             "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True
         )
-        now = datetime.now(timezone.utc).replace(microsecond=0)
+        now = datetime.now(UTC).replace(microsecond=0)
         alttime_data = {
             "timezone": "UTC",
             "times_utc": [
@@ -1953,7 +1952,7 @@ class TestGeneratePlanPdfAdditionalBranches:
         monkeypatch.setattr(
             "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True
         )
-        now = datetime.now(timezone.utc).replace(microsecond=0)
+        now = datetime.now(UTC).replace(microsecond=0)
         # Empty times_utc → _clip_alttime([], altitudes, ...) → return [], []
         alttime_empty = {
             "timezone": "UTC",
@@ -2009,8 +2008,8 @@ class TestGeneratePlanPdfAdditionalBranches:
         monkeypatch.setattr(
             "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: str(tmp_path), raising=True
         )
-        early = datetime(2026, 1, 1, 20, 0, 0, tzinfo=timezone.utc)
-        late = datetime(2026, 1, 1, 23, 0, 0, tzinfo=timezone.utc)
+        early = datetime(2026, 1, 1, 20, 0, 0, tzinfo=UTC)
+        late = datetime(2026, 1, 1, 23, 0, 0, tzinfo=UTC)
         # alttime data: two points at early hours (20:00 and 20:30)
         alttime_data = {
             "timezone": "UTC",
@@ -2069,8 +2068,8 @@ class TestVisibilityWarnings:
     the optimizer below."""
 
     def test_observable_runs_interpolates_crossing_and_clips_to_night(self):
-        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
-        night_end = datetime(2026, 7, 18, 8, 0, tzinfo=timezone.utc)
+        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=UTC)
+        night_end = datetime(2026, 7, 18, 8, 0, tzinfo=UTC)
         times = [(night_start + timedelta(minutes=30 * i)).strftime("%Y-%m-%dT%H:%M:%S") for i in range(5)]
         # Crosses the 25 deg floor between the 07:00 (20 deg) and 07:30 (30 deg) samples.
         altitudes = [-10.0, 0.0, 20.0, 30.0, 40.0]
@@ -2084,8 +2083,8 @@ class TestVisibilityWarnings:
         assert run_end == night_end  # altitude keeps rising through the end of the night
 
     def test_observable_runs_empty_when_never_in_range(self):
-        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
-        night_end = datetime(2026, 7, 18, 8, 0, tzinfo=timezone.utc)
+        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=UTC)
+        night_end = datetime(2026, 7, 18, 8, 0, tzinfo=UTC)
         times = [(night_start + timedelta(minutes=30 * i)).strftime("%Y-%m-%dT%H:%M:%S") for i in range(5)]
         altitudes = [-10.0, -5.0, -2.0, -1.0, -0.5]  # never reaches the 25 deg floor
 
@@ -2093,7 +2092,7 @@ class TestVisibilityWarnings:
         assert runs == []
 
     def test_visibility_summary_none_when_window_entirely_before_run(self):
-        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
+        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=UTC)
         run_start = night_start + timedelta(minutes=75)
         run_end = night_start + timedelta(hours=2)
         runs = [(run_start, run_end)]
@@ -2105,19 +2104,19 @@ class TestVisibilityWarnings:
         assert summary["visible_from"] is not None  # tells the user when it *does* become visible
 
     def test_visibility_summary_partial_when_window_overlaps_run(self):
-        run_start = datetime(2026, 7, 18, 7, 15, tzinfo=timezone.utc)
-        run_end = datetime(2026, 7, 18, 9, 0, tzinfo=timezone.utc)
+        run_start = datetime(2026, 7, 18, 7, 15, tzinfo=UTC)
+        run_end = datetime(2026, 7, 18, 9, 0, tzinfo=UTC)
         runs = [(run_start, run_end)]
-        window_start = datetime(2026, 7, 18, 6, 30, tzinfo=timezone.utc)
-        window_end = datetime(2026, 7, 18, 7, 30, tzinfo=timezone.utc)  # only the last 15 min overlap
+        window_start = datetime(2026, 7, 18, 6, 30, tzinfo=UTC)
+        window_end = datetime(2026, 7, 18, 7, 30, tzinfo=UTC)  # only the last 15 min overlap
 
         summary = _coverage_for_window(runs, window_start, window_end)
         assert 0.0 < summary < 1.0
         assert _visibility_summary(runs, window_start, window_end)["status"] == "partial"
 
     def test_visibility_summary_ok_when_window_inside_run(self):
-        run_start = datetime(2026, 7, 18, 7, 15, tzinfo=timezone.utc)
-        run_end = datetime(2026, 7, 18, 8, 0, tzinfo=timezone.utc)
+        run_start = datetime(2026, 7, 18, 7, 15, tzinfo=UTC)
+        run_end = datetime(2026, 7, 18, 8, 0, tzinfo=UTC)
         runs = [(run_start, run_end)]
 
         summary = _visibility_summary(runs, run_start, run_end)
@@ -2131,8 +2130,8 @@ class TestVisibilityWarnings:
         monkeypatch.setattr(
             "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: temp_plan_dir, raising=True
         )
-        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
-        night_end = datetime(2026, 7, 18, 8, 0, tzinfo=timezone.utc)
+        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=UTC)
+        night_end = datetime(2026, 7, 18, 8, 0, tzinfo=UTC)
         times = [(night_start + timedelta(minutes=30 * i)).strftime("%Y-%m-%dT%H:%M:%S") for i in range(5)]
         altitudes = [-10.0, 0.0, 20.0, 30.0, 40.0]
         _write_alttime(temp_plan_dir, "tri", times, altitudes)
@@ -2167,8 +2166,8 @@ class TestScheduleOptimizer:
         monkeypatch.setattr(
             "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: temp_plan_dir, raising=True
         )
-        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
-        night_end = datetime(2026, 7, 18, 10, 0, tzinfo=timezone.utc)
+        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=UTC)
+        night_end = datetime(2026, 7, 18, 10, 0, tzinfo=UTC)
         # Pin "now" inside the night window so the plan isn't seen as stale
         # once real wall-clock time passes this hardcoded night_end.
         monkeypatch.setattr(plan_my_night, "_now", lambda: night_start)
@@ -2220,8 +2219,8 @@ class TestScheduleOptimizer:
         monkeypatch.setattr(
             "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: temp_plan_dir, raising=True
         )
-        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
-        night_end = datetime(2026, 7, 18, 8, 0, tzinfo=timezone.utc)
+        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=UTC)
+        night_end = datetime(2026, 7, 18, 8, 0, tzinfo=UTC)
         monkeypatch.setattr(plan_my_night, "_now", lambda: night_start)
         times = [(night_start + timedelta(minutes=30 * i)).strftime("%Y-%m-%dT%H:%M:%S") for i in range(5)]
         always_low_alts = [-10.0, -8.0, -6.0, -4.0, -2.0]  # never reaches the 25 deg floor
@@ -2257,8 +2256,8 @@ class TestScheduleOptimizer:
         monkeypatch.setattr(
             "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: temp_plan_dir, raising=True
         )
-        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
-        night_end = datetime(2026, 7, 18, 8, 0, tzinfo=timezone.utc)  # 120-minute night
+        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=UTC)
+        night_end = datetime(2026, 7, 18, 8, 0, tzinfo=UTC)  # 120-minute night
         monkeypatch.setattr(plan_my_night, "_now", lambda: night_start)
         times = [(night_start + timedelta(minutes=30 * i)).strftime("%Y-%m-%dT%H:%M:%S") for i in range(5)]
         # Not observable until the very last sample (07:30) - forces a long mandatory delay.
@@ -2292,7 +2291,7 @@ class TestScheduleOptimizer:
         assert compute_optimized_schedule("eeee3004-0000-4000-8000-000000000000", "user") is None
 
     def test_apply_reorders_entries_and_sets_delay(self, temp_plan_dir, monkeypatch):
-        monkeypatch.setattr(plan_my_night, "_now", lambda: datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc))
+        monkeypatch.setattr(plan_my_night, "_now", lambda: datetime(2026, 7, 18, 6, 0, tzinfo=UTC))
         uid = "eeee3005-0000-4000-8000-000000000000"
         payload = {
             "user_id": uid,
@@ -2342,7 +2341,7 @@ class TestScheduleOptimizer:
         assert [e["id"] for e in unchanged["plan"]["entries"]] == ["a", "b"]
 
     def test_compute_returns_none_for_previous_plan_state(self, temp_plan_dir, monkeypatch):
-        monkeypatch.setattr(plan_my_night, "_now", lambda: datetime(2026, 7, 19, 6, 0, tzinfo=timezone.utc))
+        monkeypatch.setattr(plan_my_night, "_now", lambda: datetime(2026, 7, 19, 6, 0, tzinfo=UTC))
         uid = "eeee3011-0000-4000-8000-000000000000"
         payload = {
             "user_id": uid,
@@ -2358,7 +2357,7 @@ class TestScheduleOptimizer:
         assert compute_optimized_schedule(uid, "user") is None
 
     def test_compute_returns_none_for_empty_entries(self, temp_plan_dir, monkeypatch):
-        monkeypatch.setattr(plan_my_night, "_now", lambda: datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc))
+        monkeypatch.setattr(plan_my_night, "_now", lambda: datetime(2026, 7, 18, 6, 0, tzinfo=UTC))
         uid = "eeee3012-0000-4000-8000-000000000000"
         payload = {
             "user_id": uid,
@@ -2374,7 +2373,7 @@ class TestScheduleOptimizer:
         assert compute_optimized_schedule(uid, "user") is None
 
     def test_compute_returns_none_for_invalid_night_bounds(self, temp_plan_dir, monkeypatch):
-        monkeypatch.setattr(plan_my_night, "_now", lambda: datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc))
+        monkeypatch.setattr(plan_my_night, "_now", lambda: datetime(2026, 7, 18, 6, 0, tzinfo=UTC))
         uid = "eeee3013-0000-4000-8000-000000000000"
         payload = {
             "user_id": uid,
@@ -2391,7 +2390,7 @@ class TestScheduleOptimizer:
         assert compute_optimized_schedule(uid, "user") is None
 
     def test_compute_entry_without_alttime_file_is_never_observable(self, temp_plan_dir, monkeypatch):
-        monkeypatch.setattr(plan_my_night, "_now", lambda: datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc))
+        monkeypatch.setattr(plan_my_night, "_now", lambda: datetime(2026, 7, 18, 6, 0, tzinfo=UTC))
         uid = "eeee3014-0000-4000-8000-000000000000"
         payload = {
             "user_id": uid,
@@ -2414,8 +2413,8 @@ class TestScheduleOptimizer:
         monkeypatch.setattr(
             "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: temp_plan_dir, raising=True
         )
-        monkeypatch.setattr(plan_my_night, "_now", lambda: datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc))
-        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
+        monkeypatch.setattr(plan_my_night, "_now", lambda: datetime(2026, 7, 18, 6, 0, tzinfo=UTC))
+        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=UTC)
         times = [(night_start + timedelta(minutes=30 * i)).strftime("%Y-%m-%dT%H:%M:%S") for i in range(5)]
         always_visible = [40.0, 41.0, 42.0, 43.0, 44.0]
         _write_alttime(temp_plan_dir, "shared", times, always_visible)
@@ -2443,7 +2442,7 @@ class TestScheduleOptimizer:
         assert {p["id"] for p in result["preview"]} == {"e1", "e2"}
 
     def test_compute_flags_entries_pushed_past_night_end(self, temp_plan_dir, monkeypatch):
-        monkeypatch.setattr(plan_my_night, "_now", lambda: datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc))
+        monkeypatch.setattr(plan_my_night, "_now", lambda: datetime(2026, 7, 18, 6, 0, tzinfo=UTC))
         uid = "eeee3016-0000-4000-8000-000000000000"
         payload = {
             "user_id": uid,
@@ -2474,8 +2473,8 @@ class TestScheduleOptimizer:
 class TestMeridianFlip:
     """_compute_entry_meridian_flip: classifies a target's meridian flip against a planned slot."""
 
-    NIGHT_START = datetime(2026, 7, 18, 21, 0, tzinfo=timezone.utc)
-    NIGHT_END = datetime(2026, 7, 19, 5, 0, tzinfo=timezone.utc)
+    NIGHT_START = datetime(2026, 7, 18, 21, 0, tzinfo=UTC)
+    NIGHT_END = datetime(2026, 7, 19, 5, 0, tzinfo=UTC)
     EQ_MOUNT = {'meridian_flip_required': True, 'meridian_flip_delay_min': 15, 'meridian_flip_duration_min': 6}
 
     def _flip(self, monkeypatch, slot_start, slot_end, mount=None, transit='23:30'):
@@ -2506,33 +2505,33 @@ class TestMeridianFlip:
         assert result == {'state': 'none'}
 
     def test_flip_after_slot_end(self, monkeypatch):
-        slot_start = datetime(2026, 7, 18, 22, 0, tzinfo=timezone.utc)
-        slot_end = datetime(2026, 7, 18, 23, 0, tzinfo=timezone.utc)
+        slot_start = datetime(2026, 7, 18, 22, 0, tzinfo=UTC)
+        slot_end = datetime(2026, 7, 18, 23, 0, tzinfo=UTC)
         result = self._flip(monkeypatch, slot_start, slot_end)  # flip = 23:45
         assert result['state'] == 'after'
         assert result['lost_minutes'] == 6.0
 
     def test_flip_mid_session(self, monkeypatch):
-        slot_start = datetime(2026, 7, 18, 23, 0, tzinfo=timezone.utc)
-        slot_end = datetime(2026, 7, 19, 0, 30, tzinfo=timezone.utc)
+        slot_start = datetime(2026, 7, 18, 23, 0, tzinfo=UTC)
+        slot_end = datetime(2026, 7, 19, 0, 30, tzinfo=UTC)
         result = self._flip(monkeypatch, slot_start, slot_end)  # flip 23:45, > start+10
         assert result['state'] == 'mid'
 
     def test_flip_early_within_first_10_minutes(self, monkeypatch):
-        slot_start = datetime(2026, 7, 18, 23, 40, tzinfo=timezone.utc)
-        slot_end = datetime(2026, 7, 19, 0, 40, tzinfo=timezone.utc)
+        slot_start = datetime(2026, 7, 18, 23, 40, tzinfo=UTC)
+        slot_end = datetime(2026, 7, 19, 0, 40, tzinfo=UTC)
         result = self._flip(monkeypatch, slot_start, slot_end)  # flip 23:45 <= 23:50
         assert result['state'] == 'early'
 
     def test_flip_exactly_10_minutes_is_early(self, monkeypatch):
-        slot_start = datetime(2026, 7, 18, 23, 35, tzinfo=timezone.utc)
-        slot_end = datetime(2026, 7, 19, 0, 35, tzinfo=timezone.utc)
+        slot_start = datetime(2026, 7, 18, 23, 35, tzinfo=UTC)
+        slot_end = datetime(2026, 7, 19, 0, 35, tzinfo=UTC)
         result = self._flip(monkeypatch, slot_start, slot_end)  # flip 23:45 == 23:35 + 10
         assert result['state'] == 'early'
 
     def test_flip_before_slot_start_is_none(self, monkeypatch):
-        slot_start = datetime(2026, 7, 19, 0, 0, tzinfo=timezone.utc)
-        slot_end = datetime(2026, 7, 19, 1, 0, tzinfo=timezone.utc)
+        slot_start = datetime(2026, 7, 19, 0, 0, tzinfo=UTC)
+        slot_end = datetime(2026, 7, 19, 1, 0, tzinfo=UTC)
         result = self._flip(monkeypatch, slot_start, slot_end)  # flip 23:45 < 00:00
         assert result['state'] == 'none'
 
@@ -2547,8 +2546,8 @@ class TestMeridianFlip:
         monkeypatch.setattr(plan_my_night, '_meridian_transit_from_lst', lambda *_a, **_k: '23:30')
         result = plan_my_night._compute_entry_meridian_flip(
             {'ra': '00h 42m 44s'},
-            datetime(2026, 7, 18, 23, 0, tzinfo=timezone.utc),
-            datetime(2026, 7, 19, 0, 30, tzinfo=timezone.utc),
+            datetime(2026, 7, 18, 23, 0, tzinfo=UTC),
+            datetime(2026, 7, 19, 0, 30, tzinfo=UTC),
             self.EQ_MOUNT,
             48.0,
             2.0,
@@ -2586,15 +2585,15 @@ class TestRaToHours:
 class TestTransitDatetimeFromHhmm:
     """_transit_datetime_from_hhmm: resolve an HH:MM wall-clock time inside the night."""
 
-    NIGHT_START = datetime(2026, 7, 18, 21, 0, tzinfo=timezone.utc)
-    NIGHT_END = datetime(2026, 7, 19, 5, 0, tzinfo=timezone.utc)
+    NIGHT_START = datetime(2026, 7, 18, 21, 0, tzinfo=UTC)
+    NIGHT_END = datetime(2026, 7, 19, 5, 0, tzinfo=UTC)
 
     def test_malformed_string_returns_none(self):
         assert plan_my_night._transit_datetime_from_hhmm('aa:bb', self.NIGHT_START, self.NIGHT_END) is None
 
     def test_early_morning_time_rolls_to_next_day(self):
         out = plan_my_night._transit_datetime_from_hhmm('02:00', self.NIGHT_START, self.NIGHT_END)
-        assert out == datetime(2026, 7, 19, 2, 0, tzinfo=timezone.utc)
+        assert out == datetime(2026, 7, 19, 2, 0, tzinfo=UTC)
 
     def test_time_outside_window_returns_none(self):
         assert plan_my_night._transit_datetime_from_hhmm('12:00', self.NIGHT_START, self.NIGHT_END) is None
@@ -2655,8 +2654,8 @@ class TestEntryTransitAndFlipGuards:
     """_entry_transit_and_flip: the RA / transit-resolution guard clauses."""
 
     EQ_MOUNT = {'meridian_flip_required': True, 'meridian_flip_delay_min': 15.0}
-    NIGHT_START = datetime(2026, 7, 18, 21, 0, tzinfo=timezone.utc)
-    NIGHT_END = datetime(2026, 7, 19, 5, 0, tzinfo=timezone.utc)
+    NIGHT_START = datetime(2026, 7, 18, 21, 0, tzinfo=UTC)
+    NIGHT_END = datetime(2026, 7, 19, 5, 0, tzinfo=UTC)
 
     def test_unparseable_ra_returns_none_pair(self):
         out = plan_my_night._entry_transit_and_flip(
@@ -2701,8 +2700,8 @@ class TestOptimizerFlipAwareOrdering:
     """v1.4: among targets that would start at the same time, the earlier meridian flip goes first."""
 
     def _plan(self, temp_plan_dir, uid, monkeypatch):
-        night_start = datetime(2026, 7, 18, 21, 0, tzinfo=timezone.utc)
-        night_end = datetime(2026, 7, 19, 5, 0, tzinfo=timezone.utc)
+        night_start = datetime(2026, 7, 18, 21, 0, tzinfo=UTC)
+        night_end = datetime(2026, 7, 19, 5, 0, tzinfo=UTC)
         monkeypatch.setattr(plan_my_night, "_now", lambda: night_start)
         payload = {
             "user_id": uid,
@@ -2757,8 +2756,8 @@ class TestOptimizerFlipAwareOrdering:
         monkeypatch.setattr(
             "skytonight.skytonight_storage.get_alttime_dir", lambda *_a, **_k: temp_plan_dir, raising=True
         )
-        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
-        night_end = datetime(2026, 7, 18, 10, 0, tzinfo=timezone.utc)
+        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=UTC)
+        night_end = datetime(2026, 7, 18, 10, 0, tzinfo=UTC)
         monkeypatch.setattr(plan_my_night, "_now", lambda: night_start)
         times = [(night_start + timedelta(minutes=15 * i)).strftime("%Y-%m-%dT%H:%M:%S") for i in range(17)]
         # early_riser crosses the 25 deg floor ~06:07; late_riser ~06:17 - within one cluster.
@@ -2837,14 +2836,14 @@ class TestLoadAlttime:
 
 class TestObservableRunsEdgeCases:
     def test_returns_empty_for_invalid_night_window(self):
-        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
+        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=UTC)
         # night_end == night_start is invalid (not strictly after start).
         result = _observable_runs(['x'], [50.0], None, 30, 80, None, night_start, night_start)
         assert result == []
 
     def test_returns_empty_when_a_timestamp_is_unparseable(self):
-        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
-        night_end = datetime(2026, 7, 18, 8, 0, tzinfo=timezone.utc)
+        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=UTC)
+        night_end = datetime(2026, 7, 18, 8, 0, tzinfo=UTC)
         result = _observable_runs(
             [night_start.isoformat(), 'not-a-timestamp'], [50.0, 55.0], None, 30, 80, None, night_start, night_end
         )
@@ -2855,8 +2854,8 @@ class TestObservableRunsEdgeCases:
             raise RuntimeError('boom')
 
         monkeypatch.setattr(plan_my_night, '_horizon_floor_array', _boom)
-        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
-        night_end = datetime(2026, 7, 18, 8, 0, tzinfo=timezone.utc)
+        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=UTC)
+        night_end = datetime(2026, 7, 18, 8, 0, tzinfo=UTC)
         times = [night_start.isoformat(), (night_start + timedelta(hours=1)).isoformat()]
 
         result = _observable_runs(
@@ -2869,8 +2868,8 @@ class TestObservableRunsEdgeCases:
         assert result == [(night_start, night_start + timedelta(hours=1))]
 
     def test_horizon_profile_raises_floor_and_excludes_low_target(self):
-        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
-        night_end = datetime(2026, 7, 18, 8, 0, tzinfo=timezone.utc)
+        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=UTC)
+        night_end = datetime(2026, 7, 18, 8, 0, tzinfo=UTC)
         times = [night_start.isoformat(), (night_start + timedelta(hours=1)).isoformat()]
         # Horizon profile raises the floor to 20 deg at az=0/180 - well above alt_min.
         horizon_profile = [{'az': 0, 'alt': 20}, {'az': 180, 'alt': 20}]
@@ -2887,8 +2886,8 @@ class TestObservableRunsEdgeCases:
         side of the gap has no valid altitude to interpolate against, so it
         collapses to a zero-length run at the missing sample's neighbors -
         which then get clipped away entirely, rather than raising."""
-        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
-        night_end = datetime(2026, 7, 18, 8, 0, tzinfo=timezone.utc)
+        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=UTC)
+        night_end = datetime(2026, 7, 18, 8, 0, tzinfo=UTC)
         times = [
             night_start.isoformat(),
             (night_start + timedelta(minutes=30)).isoformat(),
@@ -2901,9 +2900,9 @@ class TestObservableRunsEdgeCases:
         assert result == []
 
     def test_clips_out_run_entirely_before_night_start(self):
-        before_start = datetime(2026, 7, 18, 2, 0, tzinfo=timezone.utc)
-        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
-        night_end = datetime(2026, 7, 18, 8, 0, tzinfo=timezone.utc)
+        before_start = datetime(2026, 7, 18, 2, 0, tzinfo=UTC)
+        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=UTC)
+        night_end = datetime(2026, 7, 18, 8, 0, tzinfo=UTC)
         times = [(before_start + timedelta(minutes=15 * i)).isoformat() for i in range(4)]
         altitudes = [50.0, 51.0, 52.0, 53.0]  # observable throughout, but entirely before night_start
 
@@ -2922,8 +2921,8 @@ class TestVisibilitySummaryEdgeCases:
 
 class TestComputeEntryVisibilityCache:
     def test_uses_cached_alttime_data_without_reloading(self):
-        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=timezone.utc)
-        night_end = datetime(2026, 7, 18, 8, 0, tzinfo=timezone.utc)
+        night_start = datetime(2026, 7, 18, 6, 0, tzinfo=UTC)
+        night_end = datetime(2026, 7, 18, 8, 0, tzinfo=UTC)
         cached_data = {
             'times_utc': [night_start.isoformat(), night_end.isoformat()],
             'altitudes': [50.0, 55.0],

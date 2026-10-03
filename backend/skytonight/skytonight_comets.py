@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import math
 import re
-from typing import Any, Dict, List, Optional, Tuple, cast
+from datetime import UTC, datetime
+from typing import Any, cast
 
 import requests
 
-from utils.logging_config import get_logger
+from observation.solar_system_events import SolarSystemEventsService
 from skytonight.skytonight_models import SkyTonightCoordinates, SkyTonightTarget
 from skytonight.skytonight_targets import normalize_object_name
-from observation.solar_system_events import SolarSystemEventsService
+from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
@@ -63,16 +63,16 @@ def _solve_kepler_hyperbolic(N: float, e: float) -> float:
     return F
 
 
-def _get_earth_heliocentric(obs_time: datetime) -> Tuple[float, float, float]:
+def _get_earth_heliocentric(obs_time: datetime) -> tuple[float, float, float]:
     """Return Earth's heliocentric position in equatorial J2000 (AU).
 
     Uses Astropy get_body_barycentric; falls back to a simple circular
     approximation when Astropy is unavailable.
     """
     try:
-        from astropy.time import Time
-        from astropy.coordinates import CartesianRepresentation, get_body_barycentric
         from astropy import units as u
+        from astropy.coordinates import CartesianRepresentation, get_body_barycentric
+        from astropy.time import Time
 
         t = Time(obs_time)
         e_bary = cast(CartesianRepresentation, get_body_barycentric('earth', t))
@@ -100,8 +100,8 @@ def _comet_ra_dec(
     peri_month: int,
     peri_day: float,
     obs_time: datetime,
-    earth_helio: Tuple[float, float, float],
-) -> Tuple[Optional[float], Optional[float], Optional[float], Optional[float]]:
+    earth_helio: tuple[float, float, float],
+) -> tuple[float | None, float | None, float | None, float | None]:
     """Compute geocentric RA (hours), Dec (degrees), heliocentric distance (AU),
     and geocentric distance (AU) for a comet.
 
@@ -117,7 +117,7 @@ def _comet_ra_dec(
         # Perihelion JD (days from J2000.0 = 2451545.0)
         day_int = int(peri_day)
         day_frac = peri_day - day_int
-        peri_dt = datetime(peri_year, peri_month, max(1, day_int), tzinfo=timezone.utc)
+        peri_dt = datetime(peri_year, peri_month, max(1, day_int), tzinfo=UTC)
         peri_jd = peri_dt.timestamp() / 86400.0 + 2440587.5 + day_frac
         obs_jd = obs_time.timestamp() / 86400.0 + 2440587.5
         dt = obs_jd - peri_jd  # days since perihelion
@@ -182,11 +182,11 @@ def _comet_ra_dec(
         dec_rad = math.asin(max(-1.0, min(1.0, gz / g_dist)))
 
         return math.degrees(ra_rad) / 15.0, math.degrees(dec_rad), round(r, 4), round(g_dist, 4)
-    except (ValueError, ZeroDivisionError, OverflowError):
+    except ValueError, ZeroDivisionError, OverflowError:
         return None, None, None, None
 
 
-def _parse_comets_txt_line(line: str) -> Optional[Dict[str, Any]]:
+def _parse_comets_txt_line(line: str) -> dict[str, Any] | None:
     """Parse one line of MPC CometEls.txt (fixed-width).  Returns None on failure."""
     if len(line) < 103:
         return None
@@ -231,16 +231,16 @@ def _parse_comets_txt_line(line: str) -> Optional[Dict[str, Any]]:
             'magnitude': abs_mag,
             'slope': slope,
         }
-    except (ValueError, IndexError):
+    except ValueError, IndexError:
         return None
 
 
-def _safe_float(value: Any) -> Optional[float]:
+def _safe_float(value: Any) -> float | None:
     if value is None:
         return None
     try:
         return float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 
@@ -248,7 +248,7 @@ def _target_id_from_name(name: str) -> str:
     return f"comet-{normalize_object_name(name)}"
 
 
-def _coerce_coordinates(row: Dict[str, Any]) -> Optional[SkyTonightCoordinates]:
+def _coerce_coordinates(row: dict[str, Any]) -> SkyTonightCoordinates | None:
     ra_hours = _safe_float(row.get('ra_hours'))
     dec_degrees = _safe_float(row.get('dec_degrees'))
     if ra_hours is None or dec_degrees is None:
@@ -256,7 +256,7 @@ def _coerce_coordinates(row: Dict[str, Any]) -> Optional[SkyTonightCoordinates]:
     return SkyTonightCoordinates(ra_hours=ra_hours, dec_degrees=dec_degrees)
 
 
-def _to_comet_target(row: Dict[str, Any], source: str) -> Optional[SkyTonightTarget]:
+def _to_comet_target(row: dict[str, Any], source: str) -> SkyTonightTarget | None:
     name = str(row.get('name') or row.get('designation') or '').strip()
     if not name:
         return None
@@ -266,9 +266,9 @@ def _to_comet_target(row: Dict[str, Any], source: str) -> Optional[SkyTonightTar
     if designation and designation != name:
         aliases.append(designation)
 
-    metadata: Dict[str, Any] = {
+    metadata: dict[str, Any] = {
         'source': source,
-        'updated_at': datetime.now(timezone.utc).isoformat(),
+        'updated_at': datetime.now(UTC).isoformat(),
     }
     for key in (
         'perihelion_date',
@@ -311,7 +311,7 @@ def _to_comet_target(row: Dict[str, Any], source: str) -> Optional[SkyTonightTar
     )
 
 
-def fetch_mpc_comets(timeout_seconds: int = 20) -> List[Dict[str, Any]]:
+def fetch_mpc_comets(timeout_seconds: int = 20) -> list[dict[str, Any]]:
     """Fetch comet orbital elements from MPC CometEls.txt and compute RA/Dec.
 
     Parses the fixed-width MPC CometEls.txt file, propagates each comet's
@@ -337,17 +337,15 @@ def fetch_mpc_comets(timeout_seconds: int = 20) -> List[Dict[str, Any]]:
             raw_rows.append(parsed)
 
     if not raw_rows:
-        logger.warning(
-            'MPC CometEls.txt returned no parseable comet data; ' f'body_preview=\'{_response_preview(text)}\''
-        )
+        logger.warning(f'MPC CometEls.txt returned no parseable comet data; body_preview=\'{_response_preview(text)}\'')
         return []
 
     logger.debug(f'Parsed {len(raw_rows)} comet orbital elements from MPC CometEls.txt')
 
-    obs_time = datetime.now(timezone.utc)
+    obs_time = datetime.now(UTC)
     earth_helio = _get_earth_heliocentric(obs_time)
 
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     computed = 0
     for raw in raw_rows:
         ra_h, dec_d, dist_sun, dist_earth = _comet_ra_dec(
@@ -368,7 +366,7 @@ def fetch_mpc_comets(timeout_seconds: int = 20) -> List[Dict[str, Any]]:
         row['distance_sun_au'] = dist_sun
         row['distance_earth_au'] = dist_earth
         row['perihelion_date'] = (
-            f"{raw['perihelion_year']:04d}-" f"{raw['perihelion_month']:02d}-" f"{int(raw['perihelion_day']):02d}"
+            f"{raw['perihelion_year']:04d}-{raw['perihelion_month']:02d}-{int(raw['perihelion_day']):02d}"
         )
         row['orbit_class'] = raw['orbit_type']
         row['uncertainty'] = None
@@ -380,7 +378,7 @@ def fetch_mpc_comets(timeout_seconds: int = 20) -> List[Dict[str, Any]]:
     return rows
 
 
-def _fetch_jpl_comet_snapshot(name: str, timeout_seconds: int = 8) -> Dict[str, Any]:
+def _fetch_jpl_comet_snapshot(name: str, timeout_seconds: int = 8) -> dict[str, Any]:
     if not name:
         return {}
     try:
@@ -405,7 +403,7 @@ def _fetch_jpl_comet_snapshot(name: str, timeout_seconds: int = 8) -> Dict[str, 
     }
 
 
-def enrich_with_jpl_fallback(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def enrich_with_jpl_fallback(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Fill missing fields from JPL when possible, preserving MPC rows as primary."""
     # Only these fields are worth fetching from JPL - and MPC already provides
     # them for virtually all comets.  Skip the HTTP call entirely when all of
@@ -415,7 +413,7 @@ def enrich_with_jpl_fallback(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]
     _MAX_JPL_REQUESTS = 50
 
     jpl_requests_made = 0
-    enriched: List[Dict[str, Any]] = []
+    enriched: list[dict[str, Any]] = []
     for row in rows:
         if not isinstance(row, dict):
             continue
@@ -445,8 +443,8 @@ def enrich_with_jpl_fallback(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]
     return enriched
 
 
-def _curated_fallback_rows() -> List[Dict[str, Any]]:
-    rows: List[Dict[str, Any]] = []
+def _curated_fallback_rows() -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
     for name, values in SolarSystemEventsService.NOTABLE_COMETS.items():
         rows.append(
             {
@@ -462,11 +460,11 @@ def _curated_fallback_rows() -> List[Dict[str, Any]]:
     return rows
 
 
-def build_comet_targets(source_mode: str = 'mpc+jpl') -> List[SkyTonightTarget]:
+def build_comet_targets(source_mode: str = 'mpc+jpl') -> list[SkyTonightTarget]:
     """Build normalized SkyTonight comet targets with MPC primary and JPL fallback/enrichment."""
     mode = str(source_mode or 'mpc+jpl').strip().lower()
 
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     if 'mpc' in mode:
         rows = fetch_mpc_comets()
 
@@ -479,14 +477,14 @@ def build_comet_targets(source_mode: str = 'mpc+jpl') -> List[SkyTonightTarget]:
     else:
         row_source = 'mpc+jpl' if 'jpl' in mode else 'mpc'
 
-    targets: List[SkyTonightTarget] = []
+    targets: list[SkyTonightTarget] = []
     for row in rows:
         target = _to_comet_target(row, source=row_source)
         if target is not None:
             targets.append(target)
 
     # Deduplicate by target_id while preserving first row priority.
-    deduplicated: Dict[str, SkyTonightTarget] = {}
+    deduplicated: dict[str, SkyTonightTarget] = {}
     for target in targets:
         deduplicated.setdefault(target.target_id, target)
 

@@ -39,7 +39,6 @@ Example output (Europe/Paris, September 2026):
 import calendar
 import datetime
 import math
-from typing import Optional
 from zoneinfo import ZoneInfo
 
 from astronomy import MoonPhase, NextMoonQuarter, SearchMoonQuarter, Time
@@ -88,7 +87,7 @@ def phase_at(instant: datetime.datetime) -> dict:
     Returns:
         ``{"illumination_percent": <float, 1 dp>, "waxing": <bool>, "moonless": <bool>}``.
     """
-    utc = instant.astimezone(datetime.timezone.utc)
+    utc = instant.astimezone(datetime.UTC)
     angle = float(MoonPhase(_astro_time(utc)))
     illumination = round(_illumination_percent(angle), 1)
     return {
@@ -116,13 +115,13 @@ def build_phase_calendar(year: int, month: int, timezone: str) -> dict:
 
     # --- principal phases whose local date falls within the target month ---
     month_start_local = datetime.datetime(year, month, 1, tzinfo=tz)
-    search_from_utc = (month_start_local - datetime.timedelta(days=2)).astimezone(datetime.timezone.utc)
+    search_from_utc = (month_start_local - datetime.timedelta(days=2)).astimezone(datetime.UTC)
 
     principal_phases: list[dict] = []
     events_by_day: dict[int, dict] = {}
     quarter = SearchMoonQuarter(_astro_time(search_from_utc))
     while True:
-        instant_local = quarter.time.Utc().replace(tzinfo=datetime.timezone.utc).astimezone(tz)
+        instant_local = quarter.time.Utc().replace(tzinfo=datetime.UTC).astimezone(tz)
         if (instant_local.year, instant_local.month) > (year, month):
             break
         if (instant_local.year, instant_local.month) == (year, month):
@@ -136,7 +135,7 @@ def build_phase_calendar(year: int, month: int, timezone: str) -> dict:
     days: list[dict] = []
     for day in range(1, days_in_month + 1):
         night_local = datetime.datetime(year, month, day, _SAMPLE_HOUR, tzinfo=tz)
-        event: Optional[dict] = events_by_day.get(day)
+        event: dict | None = events_by_day.get(day)
         days.append(
             {
                 "date": datetime.date(year, month, day).isoformat(),

@@ -32,10 +32,10 @@ import datetime
 from dataclasses import dataclass
 from zoneinfo import ZoneInfo
 
-import numpy as np
-from astropy.time import Time as AstroTime
-from astropy.coordinates import EarthLocation, AltAz, get_sun
 import astropy.units as u
+import numpy as np
+from astropy.coordinates import AltAz, EarthLocation, get_sun
+from astropy.time import Time as AstroTime
 
 # Standard sunrise/sunset altitude of the Sun's centre: the upper limb sits on the
 # horizon when the centre is 0.833° below it (34' mean refraction + 16' semidiameter).
@@ -71,7 +71,6 @@ class SunAstroInfo:
 
 
 class SunService:
-
     def __init__(self, latitude, longitude, timezone):
         self.latitude = latitude
         self.longitude = longitude
@@ -104,7 +103,7 @@ class SunService:
         start_local = datetime.datetime.combine(date, datetime.time(12, 0), self.timezone)
         # Anchor the sampling grid in UTC so a daylight-saving transition inside the
         # window cannot open a 1-hour gap in the wall-clock arithmetic.
-        start_utc = start_local.astimezone(datetime.timezone.utc)
+        start_utc = start_local.astimezone(datetime.UTC)
         n_steps = int(24 * 60 / step_minutes) + 1  # inclusive of both endpoints
 
         utc_times = [start_utc + datetime.timedelta(minutes=i * step_minutes) for i in range(n_steps)]
@@ -162,7 +161,7 @@ class SunService:
 
     def _sun_altitude(self, dt_local):
         """Return sun altitude in degrees at a single local datetime (used by tests)."""
-        utc = dt_local.astimezone(datetime.timezone.utc)
+        utc = dt_local.astimezone(datetime.UTC)
         t = AstroTime(utc)
         frame = AltAz(obstime=t, location=self.location)
         return float(get_sun(t).transform_to(frame).alt.deg)  # type: ignore[union-attr, arg-type]
@@ -208,7 +207,7 @@ def determine_sky_period(sun_data, timezone_str: str) -> tuple:
     try:
         tz = ZoneInfo(timezone_str)
     except Exception:
-        tz = datetime.timezone.utc
+        tz = datetime.UTC
     now = datetime.datetime.now(tz=tz)
 
     def parse_dt(s):

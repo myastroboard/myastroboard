@@ -10,7 +10,8 @@ on:
       - "tests/*.py"
       - "pyrightconfig.json"
       - "pyproject.toml"
-      - ".flake8"
+      - ".github/org/ruff.base.toml"
+      - ".github/workflows/lint-python.yml"
   pull_request:
     paths:
       - "backend/**/*.py"
@@ -20,11 +21,12 @@ on:
       - "tests/*.py"
       - "pyrightconfig.json"
       - "pyproject.toml"
-      - ".flake8"
+      - ".github/org/ruff.base.toml"
+      - ".github/workflows/lint-python.yml"
 
 jobs:
   lint-python:
-    name: black / flake8 (backend+tests) / pyright (backend, changed files)
+    name: ruff (whole repo) / pyright (backend, changed files)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -43,6 +45,14 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
 
+      # ruff takes about a second on the whole repository, so it checks everything: a
+      # configuration change (pyproject.toml, the synced organization baseline) is caught too.
+      - name: ruff format --check
+        run: ruff format --check .
+
+      - name: ruff check
+        run: ruff check .
+
       - name: Determine changed Python files
         id: changed
         run: |
@@ -57,23 +67,12 @@ jobs:
               BASE_SHA=$(git rev-parse HEAD^ 2>/dev/null || git rev-parse HEAD)
             fi
           fi
-          CHANGED=$(git diff --name-only --diff-filter=ACMR "$BASE_SHA" HEAD -- ':(glob)backend/**/*.py' ':(glob)scripts/**/*.py' ':(glob)tests/**/*.py')
+          CHANGED=$(git diff --name-only --diff-filter=ACMR "$BASE_SHA" HEAD -- ':(glob)backend/**/*.py' ':(glob)scripts/**/*.py')
           # pyright stays backend/scripts-only: test code's heavy use of monkeypatch/MagicMock
           # would drown real findings in false positives (see CONTRIBUTING.md).
-          BACKEND_FILES=$(printf '%s' "$CHANGED" | grep -E '^(backend|scripts)/' | tr '\n' ' ')
-          ALL_FILES=$(printf '%s' "$CHANGED" | tr '\n' ' ')
+          BACKEND_FILES=$(printf '%s' "$CHANGED" | tr '\n' ' ')
           echo "backend_files=$BACKEND_FILES" >> "$GITHUB_OUTPUT"
-          echo "all_files=$ALL_FILES" >> "$GITHUB_OUTPUT"
           echo "Changed backend/scripts files (pyright): $BACKEND_FILES"
-          echo "Changed backend/scripts/tests files (black/flake8): $ALL_FILES"
-
-      - name: black --check
-        if: steps.changed.outputs.all_files != ''
-        run: black --check --diff ${{ steps.changed.outputs.all_files }}
-
-      - name: flake8
-        if: steps.changed.outputs.all_files != ''
-        run: flake8 ${{ steps.changed.outputs.all_files }}
 
       - name: pyright
         if: steps.changed.outputs.backend_files != ''

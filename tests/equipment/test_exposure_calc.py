@@ -60,7 +60,6 @@ def compute_exposure(
 
 
 class TestComputeExposure:
-
     def test_plate_scale_formula(self):
         """206.265 × pixel / focal gives correct arcsec/px."""
         r = compute_exposure(

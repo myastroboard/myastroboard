@@ -1,10 +1,11 @@
-import threading
 import os
 import sys
+import threading
 from datetime import datetime
-from utils.logging_config import get_logger
+
 from cache.cache_updater import fully_initialize_caches
-from utils.constants import DATA_DIR_CACHE, CACHE_SCHEDULER_INTERVAL_SECONDS
+from utils.constants import CACHE_SCHEDULER_INTERVAL_SECONDS, DATA_DIR_CACHE
+from utils.logging_config import get_logger
 
 # Windows-compatible file locking
 if sys.platform == "win32":
@@ -70,7 +71,7 @@ class CacheScheduler:
             self._lock_file.flush()
             self._has_lock = True
             return True
-        except (IOError, OSError):
+        except OSError:
             if self._lock_file:
                 self._lock_file.close()
                 self._lock_file = None
@@ -95,7 +96,7 @@ class CacheScheduler:
             except Exception as e:
                 try:
                     logger.error(f"Error releasing cache scheduler lock: {e}")
-                except (ValueError, OSError):
+                except ValueError, OSError:
                     pass  # Log stream already closed during process shutdown
             finally:
                 self._lock_file = None

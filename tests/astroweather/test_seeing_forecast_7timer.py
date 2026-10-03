@@ -1,20 +1,21 @@
 """Unit tests for 7Timer atmospheric seeing forecast service."""
 
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import Mock, patch
+
 import pytest
 import requests
 
 from astroweather.seeing_forecast_7timer import (
-    SeeingForecastService,
-    get_seeing_forecast,
+    CLOUDCOVER_SCALE,
     SEEING_SCALE,
     TRANSPARENCY_SCALE,
-    CLOUDCOVER_SCALE,
     WIND_SPEED_SCALE,
+    SeeingForecastService,
     _decode_rh2m_percent,
-    _quality_label,
     _quality_component,
+    _quality_label,
+    get_seeing_forecast,
 )
 
 
@@ -156,7 +157,7 @@ class TestSeeingForecastService:
 
     def test_find_best_window_no_good_seeing(self, service):
         """Test _find_best_window returns None when no good seeing found."""
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
 
         forecast_list = [
             {"time": now_utc.isoformat(), "seeing": 4, "description": "Poor", "conditions": "Poor conditions"},
@@ -173,7 +174,7 @@ class TestSeeingForecastService:
 
     def test_find_best_window_with_good_seeing(self, service):
         """Test _find_best_window finds excellent/good seeing window."""
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
 
         forecast_list = [
             {"time": (now_utc).isoformat(), "seeing": 1, "description": "Excellent", "conditions": "Perfect"},
@@ -206,7 +207,7 @@ class TestSeeingForecastService:
 
     def test_find_best_window_multiple_windows(self, service):
         """Test _find_best_window selects longest window."""
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
 
         # Short good window (2 hours), then longer good window (6 hours)
         forecast_list = [
@@ -250,7 +251,7 @@ class TestSeeingForecastService:
 
     def test_find_best_window_composite_quality_score(self, service):
         """The composite window uses quality_score >= threshold (higher is better)."""
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
 
         forecast_list = [
             {"time": now_utc.isoformat(), "quality_score": 3.0},
@@ -271,7 +272,7 @@ class TestSeeingForecastService:
     @patch('astroweather.seeing_forecast_7timer.requests.get')
     def test_fetch_tonight_seeing_success(self, mock_get, service):
         """Test successful fetch from 7Timer API."""
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
         # Use an init time 1 hour in the future so all timepoints (3h, 6h, 9h from init) are ahead of now
         init_time = (now_utc + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
 
@@ -322,7 +323,7 @@ class TestSeeingForecastService:
     @patch('astroweather.seeing_forecast_7timer.requests.get')
     def test_fetch_tonight_seeing_empty_dataseries(self, mock_get, service):
         """Test fetch handles empty dataseries."""
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
         init_time = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
 
         mock_response = Mock()
@@ -356,7 +357,7 @@ class TestSeeingForecastService:
     @patch('astroweather.seeing_forecast_7timer.requests.get')
     def test_fetch_tonight_seeing_decodes_all_fields(self, mock_get, service):
         """Each forecast point exposes every decoded 7Timer field, not just seeing."""
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
         init_time = (now_utc + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
 
         mock_response = Mock()
@@ -425,7 +426,7 @@ class TestSeeingForecastBranchCoverage:
 
     def test_find_best_window_improves_within_window(self, service):
         """Second consecutive good point has lower seeing."""
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
         forecast_list = [
             {"time": now_utc.isoformat(), "seeing": 3, "description": "OK", "conditions": "OK"},
             {
@@ -461,7 +462,7 @@ class TestSeeingForecastBranchCoverage:
     @patch('astroweather.seeing_forecast_7timer.requests.get')
     def test_fetch_bad_timepoint_is_skipped(self, mock_get, service):
         """Bad timepoint/seeing values are skipped via continue."""
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
         init_time = now_utc.replace(minute=0, second=0, microsecond=0)
         mock_response = Mock()
         mock_response.json.return_value = {
@@ -481,7 +482,7 @@ class TestSeeingForecastBranchCoverage:
     @patch('astroweather.seeing_forecast_7timer.requests.get')
     def test_fetch_out_of_range_seeing_skipped(self, mock_get, service):
         """Seeing values outside 1-8 are skipped."""
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
         init_time = now_utc.replace(minute=0, second=0, microsecond=0)
         mock_response = Mock()
         mock_response.json.return_value = {
@@ -502,7 +503,7 @@ class TestSeeingForecastBranchCoverage:
     @patch('astroweather.seeing_forecast_7timer.requests.get')
     def test_fetch_all_seeing_out_of_range_returns_empty_struct(self, mock_get, service):
         """When all seeing values are out of range, returns empty forecast struct."""
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
         init_time = now_utc.replace(minute=0, second=0, microsecond=0)
         mock_response = Mock()
         mock_response.json.return_value = {
@@ -540,7 +541,7 @@ class TestSeeingForecastRemainingBranches:
     @patch('astroweather.seeing_forecast_7timer.requests.get')
     def test_none_timepoint_skipped(self, mock_get, service):
         """data point with None timepoint -> skip (if body not entered)."""
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
         init_time = (now_utc + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
         mock_response = Mock()
         mock_response.json.return_value = {
@@ -558,7 +559,7 @@ class TestSeeingForecastRemainingBranches:
     @patch('astroweather.seeing_forecast_7timer.requests.get')
     def test_missing_optional_fields_default_gracefully(self, mock_get, service):
         """A dataseries entry missing the new optional fields still parses (only seeing required)."""
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
         init_time = (now_utc + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
         mock_response = Mock()
         mock_response.json.return_value = {
@@ -577,7 +578,7 @@ class TestSeeingForecastRemainingBranches:
 
     def test_find_best_window_shorter_mid_window_does_not_replace(self, service):
         """mid-scan window shorter than best -> False branch."""
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
         # Window 1: 4 good points (12h) -> best_duration=12
         # Bad seeing (closes window 1)
         # Window 2: 1 good point (3h) -> 3 > 12 is False -> doesn't replace best
@@ -627,7 +628,7 @@ class TestSeeingForecastRemainingBranches:
 
     def test_find_best_window_shorter_end_window(self, service):
         """end-of-list window shorter than best -> False branch."""
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
         # Window 1: 4 good points (12h) -> best_duration=12 (closes via bad seeing)
         # Window 2: 1 good point (3h) at end -> 3 > 12 is False -> doesn't replace best
         forecast_list = [
@@ -674,7 +675,7 @@ class TestSeeingForecastIntegration:
     @patch('astroweather.seeing_forecast_7timer.requests.get')
     def test_forecast_response_structure(self, mock_get):
         """Test the complete response structure is correct."""
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
         init_time = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
 
         mock_response = Mock()

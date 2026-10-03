@@ -4,9 +4,11 @@ Provides seeing conditions for planetary imaging
 https://www.7timer.info/
 """
 
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
 import requests
-from datetime import datetime, timedelta, timezone
-from typing import Optional, Dict, Any, List
+
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -103,17 +105,17 @@ def _quality_label(score: float) -> str:
     return QUALITY_LABEL_DEFAULT
 
 
-def _decode_rh2m_percent(rh2m: int) -> Optional[float]:
+def _decode_rh2m_percent(rh2m: int) -> float | None:
     """Convert 7Timer's coded relative humidity value (-4..16) to a midpoint percentage."""
     try:
         code = int(rh2m)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     # Each code step is a 5-point-wide band starting at -4 => 0-5%, midpoint 2.5%
     return round(max(0.0, min(100.0, (code + 4) * 5 + 2.5)), 1)
 
 
-def _quality_component(value: Optional[int], scale_size: int, higher_raw_is_better: bool = False) -> float:
+def _quality_component(value: int | None, scale_size: int, higher_raw_is_better: bool = False) -> float:
     """Convert a 1..N 7Timer scale value to a 0-10 quality component (10=best).
 
     Most 7Timer scales are 1=best (seeing, cloudcover, wind speed class), but
@@ -145,7 +147,7 @@ class SeeingForecastService:
         self.longitude = longitude
         self.timezone_str = timezone_str
 
-    def fetch_tonight_seeing(self) -> Optional[Dict[str, Any]]:
+    def fetch_tonight_seeing(self) -> dict[str, Any] | None:
         """
         Fetch atmospheric forecast for tonight from 7Timer's ASTRO product.
 
@@ -188,7 +190,7 @@ class SeeingForecastService:
         """
         try:
             # Get current UTC time
-            now_utc = datetime.now(timezone.utc)
+            now_utc = datetime.now(UTC)
 
             # 7Timer API init timestamp format (YYYYMMDDHH)
             requested_init = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -218,8 +220,8 @@ class SeeingForecastService:
 
             # Use API init if present to compute timepoint offsets accurately
             try:
-                api_init = datetime.strptime(str(data.get("init", init_str)), "%Y%m%d%H").replace(tzinfo=timezone.utc)
-            except (TypeError, ValueError):
+                api_init = datetime.strptime(str(data.get("init", init_str)), "%Y%m%d%H").replace(tzinfo=UTC)
+            except TypeError, ValueError:
                 api_init = requested_init
 
             if not dataseries:
@@ -237,7 +239,7 @@ class SeeingForecastService:
                     try:
                         forecast_time = api_init + timedelta(hours=float(timepoint))
                         seeing_value = int(seeing)
-                    except (TypeError, ValueError):
+                    except TypeError, ValueError:
                         continue
 
                     # Skip undefined entries from 7Timer (-9999)
@@ -303,8 +305,8 @@ class SeeingForecastService:
             return None
 
     def _build_forecast_entry(
-        self, forecast_time: datetime, seeing_value: int, point: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, forecast_time: datetime, seeing_value: int, point: dict[str, Any]
+    ) -> dict[str, Any]:
         """Decode every ASTRO field for one timepoint and compute its composite quality_score."""
         seeing_info = SEEING_SCALE.get(seeing_value, {})
 
@@ -349,20 +351,20 @@ class SeeingForecastService:
         }
 
     @staticmethod
-    def _safe_int(value: Any) -> Optional[int]:
+    def _safe_int(value: Any) -> int | None:
         try:
             if value is None:
                 return None
             return int(value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
     @staticmethod
     def _compute_quality_score(
         seeing: int,
-        transparency: Optional[int],
-        cloudcover: Optional[int],
-        wind_speed_class: Optional[int],
+        transparency: int | None,
+        cloudcover: int | None,
+        wind_speed_class: int | None,
         prec_type: str,
     ) -> float:
         """0-10 composite quality score combining seeing, transparency, cloud cover and wind.
@@ -390,8 +392,8 @@ class SeeingForecastService:
         return round(max(0.0, min(10.0, score)), 1)
 
     def _find_best_window(
-        self, forecast_list: List[Dict], metric_key: str, threshold: float, higher_is_better: bool
-    ) -> Optional[Dict[str, Any]]:
+        self, forecast_list: list[dict], metric_key: str, threshold: float, higher_is_better: bool
+    ) -> dict[str, Any] | None:
         """
         Find the longest consecutive period where ``metric_key`` meets ``threshold``.
 
@@ -477,7 +479,7 @@ class SeeingForecastService:
         return None
 
 
-def get_seeing_forecast(latitude: float, longitude: float, timezone_str: str) -> Optional[Dict[str, Any]]:
+def get_seeing_forecast(latitude: float, longitude: float, timezone_str: str) -> dict[str, Any] | None:
     """
     Get seeing forecast for the specified location
 

@@ -2,13 +2,14 @@
 Unit tests for Moon and Sun phase calculations
 """
 
-import pytest
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+import pytest
+
 # Import services to test
-from astroweather.moon_phases import MoonService, MoonAstroPhotoInfo
-from astroweather.sun_phases import SunService, SunAstroInfo
+from astroweather.moon_phases import MoonAstroPhotoInfo, MoonService
+from astroweather.sun_phases import SunAstroInfo, SunService
 
 
 class TestMoonService:

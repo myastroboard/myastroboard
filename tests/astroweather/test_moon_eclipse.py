@@ -54,7 +54,7 @@ class TestFormattingAndTypes:
         self.svc = LunarEclipseService(latitude=48.0, longitude=2.0, timezone="UTC")
 
     def test_fmt_uses_iso_seconds(self):
-        dt = datetime.datetime(2026, 9, 18, 22, 45, 30, tzinfo=datetime.timezone.utc)
+        dt = datetime.datetime(2026, 9, 18, 22, 45, 30, tzinfo=datetime.UTC)
         assert self.svc._fmt(dt) == "2026-09-18T22:45:30+00:00"
 
     def test_get_eclipse_type_covers_all_paths(self):
@@ -111,9 +111,7 @@ class TestCoordinateHelpers:
         body.transform_to.return_value = transformed
         mock_get_body.return_value = body
 
-        alt, az = self.svc._get_moon_altitude_azimuth(
-            datetime.datetime(2026, 9, 18, 22, 45, tzinfo=datetime.timezone.utc)
-        )
+        alt, az = self.svc._get_moon_altitude_azimuth(datetime.datetime(2026, 9, 18, 22, 45, tzinfo=datetime.UTC))
         assert alt == pytest.approx(20.2)
         assert az == pytest.approx(181.8)
 
@@ -124,9 +122,7 @@ class TestCoordinateHelpers:
         body.transform_to.return_value = transformed
         mock_get_body.return_value = body
 
-        alt, az = self.svc._get_moon_altitude_azimuth(
-            datetime.datetime(2026, 9, 18, 22, 45, tzinfo=datetime.timezone.utc)
-        )
+        alt, az = self.svc._get_moon_altitude_azimuth(datetime.datetime(2026, 9, 18, 22, 45, tzinfo=datetime.UTC))
         assert alt == 0.0
         assert az == 0.0
 
@@ -142,8 +138,8 @@ class TestCoordinateHelpers:
         body.transform_to.return_value = transformed
         mock_get_body.return_value = body
 
-        start = datetime.datetime(2026, 9, 18, 20, 0, tzinfo=datetime.timezone.utc)
-        end = datetime.datetime(2026, 9, 18, 20, 10, tzinfo=datetime.timezone.utc)
+        start = datetime.datetime(2026, 9, 18, 20, 0, tzinfo=datetime.UTC)
+        end = datetime.datetime(2026, 9, 18, 20, 10, tzinfo=datetime.UTC)
         points = self.svc._generate_altitude_vs_time(start, end)
 
         assert len(points) == 3
@@ -158,8 +154,8 @@ class TestCoordinateHelpers:
         body.transform_to.return_value = transformed
         mock_get_body.return_value = body
 
-        start = datetime.datetime(2026, 9, 18, 20, 0, tzinfo=datetime.timezone.utc)
-        end = datetime.datetime(2026, 9, 18, 20, 0, tzinfo=datetime.timezone.utc)
+        start = datetime.datetime(2026, 9, 18, 20, 0, tzinfo=datetime.UTC)
+        end = datetime.datetime(2026, 9, 18, 20, 0, tzinfo=datetime.UTC)
         points = self.svc._generate_altitude_vs_time(start, end)
 
         assert len(points) == 1
@@ -324,12 +320,12 @@ class TestLunarEclipseInProgress:
 
     @patch("astroweather.moon_eclipse.SearchLunarEclipse")
     def test_search_starts_before_now(self, mock_search):
-        now = datetime.datetime.now(datetime.timezone.utc)
+        now = datetime.datetime.now(datetime.UTC)
         mock_search.return_value = self._eclipse(now + datetime.timedelta(days=60))
 
         self.svc.get_next_eclipse()
 
-        searched_from = mock_search.call_args[0][0].Utc().replace(tzinfo=datetime.timezone.utc)
+        searched_from = mock_search.call_args[0][0].Utc().replace(tzinfo=datetime.UTC)
         assert searched_from < now
         assert now - searched_from <= IN_PROGRESS_LOOKBACK + datetime.timedelta(minutes=1)
 
@@ -338,7 +334,7 @@ class TestLunarEclipseInProgress:
     @patch("astroweather.moon_eclipse.SearchLunarEclipse")
     def test_running_eclipse_is_kept(self, mock_search, _mock_alt_az, _mock_generate):
         """Peak passed 30 min ago, partial phase runs for 60 min: still the current one."""
-        now = datetime.datetime.now(datetime.timezone.utc)
+        now = datetime.datetime.now(datetime.UTC)
         mock_search.return_value = self._eclipse(now - datetime.timedelta(minutes=30), sd_partial=60)
 
         info = self.svc.get_next_eclipse()
@@ -350,7 +346,7 @@ class TestLunarEclipseInProgress:
     @patch.object(LunarEclipseService, "_get_moon_altitude_azimuth", return_value=(40.0, 180.0))
     @patch("astroweather.moon_eclipse.SearchLunarEclipse")
     def test_finished_eclipse_is_replaced_by_the_next_one(self, mock_search, _mock_alt_az, _mock_generate):
-        now = datetime.datetime.now(datetime.timezone.utc)
+        now = datetime.datetime.now(datetime.UTC)
         finished = self._eclipse(now - datetime.timedelta(hours=4), sd_partial=60)
         upcoming = self._eclipse(now + datetime.timedelta(days=170), sd_partial=60)
         mock_search.side_effect = [finished, upcoming]
@@ -363,14 +359,14 @@ class TestLunarEclipseInProgress:
 
     @patch("astroweather.moon_eclipse.SearchLunarEclipse")
     def test_returns_none_when_the_second_search_finds_nothing(self, mock_search):
-        now = datetime.datetime.now(datetime.timezone.utc)
+        now = datetime.datetime.now(datetime.UTC)
         mock_search.side_effect = [self._eclipse(now - datetime.timedelta(hours=4)), None]
 
         assert self.svc.get_next_eclipse() is None
 
     def test_penumbral_only_eclipse_uses_the_penumbral_window(self):
         """Without a partial phase, the reported window (and this check) uses sd_penum."""
-        now = datetime.datetime.now(datetime.timezone.utc)
+        now = datetime.datetime.now(datetime.UTC)
         eclipse = _Eclipse(
             kind="EclipseKind.Penumbral",
             peak=(now - datetime.timedelta(minutes=30)).replace(tzinfo=None),
@@ -390,6 +386,7 @@ class TestLunarEclipseDistantEpochMuting:
     def test_get_next_eclipse_wraps_computation_in_mute(self):
         """The lunar search is unbounded too, so it gets the same treatment."""
         from unittest.mock import patch
+
         from astroweather.moon_eclipse import LunarEclipseService
 
         svc = LunarEclipseService(19.82, -155.47, "Pacific/Honolulu")

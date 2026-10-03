@@ -521,7 +521,7 @@ class TestGenerateWeatherAlerts:
         df = self._build_alert_df("CRITICAL", "GOOD", 7.0, 80.0)
         alerts = analyzer._generate_weather_alerts(df)
         types = [a.get("type") or a.get("alert_type") or str(a) for a in alerts]
-        assert any("DEW" in str(t).upper() or "dew" in str(a).lower() for t, a in zip(types, alerts))
+        assert any("DEW" in str(t).upper() or "dew" in str(a).lower() for t, a in zip(types, alerts, strict=False))
 
     def test_wind_warning_generated(self):
         """CRITICAL wind → WIND_WARNING alert."""
@@ -947,18 +947,15 @@ class TestGenerateComprehensiveAnalysisSuccess:
         mock_df = _build_sample_dataframe()
         mock_weather = {"data": mock_df, "location": {"name": "Test"}}
 
-        with patch.object(analyzer, "fetch_extended_weather_data", return_value=mock_weather), patch.object(
-            analyzer, "analyze_cloud_layers", return_value=mock_df
-        ), patch.object(analyzer, "calculate_seeing_forecast", return_value=mock_df), patch.object(
-            analyzer, "calculate_transparency_forecast", return_value=mock_df
-        ), patch.object(
-            analyzer, "analyze_dew_point_alerts", return_value=mock_df
-        ), patch.object(
-            analyzer, "analyze_wind_tracking_impact", return_value=mock_df
-        ), patch.object(
-            analyzer, "_find_best_observation_periods", return_value=[]
-        ), patch.object(
-            analyzer, "_generate_weather_alerts", return_value=[]
+        with (
+            patch.object(analyzer, "fetch_extended_weather_data", return_value=mock_weather),
+            patch.object(analyzer, "analyze_cloud_layers", return_value=mock_df),
+            patch.object(analyzer, "calculate_seeing_forecast", return_value=mock_df),
+            patch.object(analyzer, "calculate_transparency_forecast", return_value=mock_df),
+            patch.object(analyzer, "analyze_dew_point_alerts", return_value=mock_df),
+            patch.object(analyzer, "analyze_wind_tracking_impact", return_value=mock_df),
+            patch.object(analyzer, "_find_best_observation_periods", return_value=[]),
+            patch.object(analyzer, "_generate_weather_alerts", return_value=[]),
         ):
             result = analyzer.generate_comprehensive_analysis(24)
 
@@ -1075,10 +1072,11 @@ class TestWeatherAstroBranches:
         """TTL not expired but cached data is None → fall through."""
         key = self.weather_astro._analysis_cache_key(24, "nocache_lang")
         now = time.time()
-        with patch("weather.weather_astro.time.time", return_value=now), patch(
-            "weather.weather_astro.is_openmeteo_rate_limited", return_value=True
-        ), patch("weather.weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS_TS", {key: now}), patch(
-            "weather.weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS", {}
+        with (
+            patch("weather.weather_astro.time.time", return_value=now),
+            patch("weather.weather_astro.is_openmeteo_rate_limited", return_value=True),
+            patch("weather.weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS_TS", {key: now}),
+            patch("weather.weather_astro._ASTRO_ANALYSIS_LAST_SUCCESS", {}),
         ):
             result = self.weather_astro.get_astro_weather_analysis(24, "nocache_lang")
         # rate limited + no cache → None

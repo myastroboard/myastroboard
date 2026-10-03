@@ -21,43 +21,43 @@ Editing one preset's coordinates invalidates only that preset's caches
 (:func:`reset_caches_for_location`), not the whole install.
 """
 
-import time
 import json
 import os
 import sys
+import time
 import uuid
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 # The two AllSky cache TTLs are the connector's own, declared on its class.
 # connectors/ imports nothing from cache/, so this edge closes no cycle.
 from connectors.allsky_connector import AllSkyConnector
-from utils.file_lock import interprocess_lock
 from utils.constants import (
-    WEATHER_CACHE_TTL,
-    DATA_DIR_CACHE,
-    CACHE_TTL_MOON_REPORT,
-    CACHE_TTL_DARK_WINDOW,
-    CACHE_TTL_MOON_PLANNER,
-    CACHE_TTL_SUN_REPORT,
-    CACHE_TTL_BEST_WINDOW,
-    CACHE_TTL_SOLAR_ECLIPSE,
-    CACHE_TTL_LUNAR_ECLIPSE,
-    CACHE_TTL_HORIZON_GRAPH,
-    CACHE_TTL_AURORA,
-    CACHE_TTL_ISS_PASSES,
-    CACHE_TTL_CSS_PASSES,
-    CACHE_TTL_PLANETARY_EVENTS,
-    CACHE_TTL_SPECIAL_PHENOMENA,
-    CACHE_TTL_SOLAR_SYSTEM_EVENTS,
-    CACHE_TTL_SIDEREAL_TIME,
-    CACHE_TTL_SEEING_FORECAST,
     CACHE_TTL_ASTRO_WEATHER,
-    CACHE_TTL_SPACEFLIGHT_LAUNCHES,
+    CACHE_TTL_AURORA,
+    CACHE_TTL_BEST_WINDOW,
+    CACHE_TTL_CSS_PASSES,
+    CACHE_TTL_DARK_WINDOW,
+    CACHE_TTL_HORIZON_GRAPH,
+    CACHE_TTL_IERS,
+    CACHE_TTL_ISS_PASSES,
+    CACHE_TTL_LUNAR_ECLIPSE,
+    CACHE_TTL_MOON_PLANNER,
+    CACHE_TTL_MOON_REPORT,
+    CACHE_TTL_PLANETARY_EVENTS,
+    CACHE_TTL_SEEING_FORECAST,
+    CACHE_TTL_SIDEREAL_TIME,
+    CACHE_TTL_SOLAR_ECLIPSE,
+    CACHE_TTL_SOLAR_SYSTEM_EVENTS,
     CACHE_TTL_SPACEFLIGHT_ASTRONAUTS,
     CACHE_TTL_SPACEFLIGHT_EVENTS,
-    CACHE_TTL_IERS,
+    CACHE_TTL_SPACEFLIGHT_LAUNCHES,
+    CACHE_TTL_SPECIAL_PHENOMENA,
+    CACHE_TTL_SUN_REPORT,
+    DATA_DIR_CACHE,
+    WEATHER_CACHE_TTL,
 )
+from utils.file_lock import interprocess_lock
 
 # Windows-compatible file locking
 if sys.platform == "win32":
@@ -215,7 +215,7 @@ def _read_shared_cache():
     if not os.path.exists(_SHARED_CACHE_FILE):
         return {}
     try:
-        with open(_SHARED_CACHE_FILE, "r", encoding="utf-8") as f:
+        with open(_SHARED_CACHE_FILE, encoding="utf-8") as f:
             return json.load(f) or {}
     except Exception:
         # If file is corrupted, ignore and treat as empty
@@ -372,7 +372,7 @@ def _load_location_signatures():
         _ensure_data_dir()
         if os.path.exists(_LOCATION_CACHE_FILE):
             mtime_ns = os.stat(_LOCATION_CACHE_FILE).st_mtime_ns
-            with open(_LOCATION_CACHE_FILE, 'r') as f:
+            with open(_LOCATION_CACHE_FILE) as f:
                 loaded = json.load(f)
             _location_signatures_mtime_ns = mtime_ns
             if isinstance(loaded, dict) and "latitude" in loaded:
@@ -587,7 +587,7 @@ def is_cache_valid_for_today(cache_entry, ttl_seconds, tz_name=None):
 def _default_status_location_ids():
     """Location ids the readiness/status checks should cover (lazy config read)."""
     try:
-        from utils.repo_config import load_config, get_scheduler_locations
+        from utils.repo_config import get_scheduler_locations, load_config
 
         config = load_config()
         ids = [loc["id"] for loc in get_scheduler_locations(config) if loc.get("id")]
@@ -684,7 +684,7 @@ def _is_execution_metrics_valid(job_name, ttl):
         return False
     try:
         dt = datetime.fromisoformat(last_run_str)
-        age = (datetime.now(timezone.utc) - dt).total_seconds()
+        age = (datetime.now(UTC) - dt).total_seconds()
         return age < ttl
     except Exception:
         return False
@@ -802,7 +802,7 @@ def record_cache_execution(job_name, duration_seconds, success, location_id=None
         if "_cache_metrics" not in shared:
             shared["_cache_metrics"] = {}
         shared["_cache_metrics"][job_name] = {
-            "last_run_at": datetime.now(timezone.utc).isoformat(),
+            "last_run_at": datetime.now(UTC).isoformat(),
             "last_duration_s": round(duration_seconds, 3),
             "last_success": success,
             "location_id": location_id,

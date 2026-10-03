@@ -5,12 +5,14 @@ from __future__ import annotations
 import os
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, Callable, Dict, Optional
+from typing import Any
 from zoneinfo import ZoneInfo
 
-from utils.logging_config import get_logger
+from astroweather.sun_phases import SunService
+from skytonight.skytonight_calculator import load_calculation_results
 from skytonight.skytonight_storage import (
     append_scheduler_log,
     ensure_skytonight_directories,
@@ -19,8 +21,7 @@ from skytonight.skytonight_storage import (
     load_scheduler_status,
     save_scheduler_status,
 )
-from skytonight.skytonight_calculator import load_calculation_results
-from astroweather.sun_phases import SunService
+from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
@@ -35,14 +36,14 @@ SKYTONIGHT_POST_NIGHT_OFFSET = timedelta(hours=1)
 @dataclass(frozen=True)
 class SkyTonightSchedule:
     mode: str
-    next_run: Optional[datetime]
+    next_run: datetime | None
     server_time_valid: bool
     reason: str
     server_time: datetime
     timezone: str
 
 
-def _parse_local_datetime(value: str, timezone_name: str) -> Optional[datetime]:
+def _parse_local_datetime(value: str, timezone_name: str) -> datetime | None:
     text = str(value or '').strip()
     if not text or text == 'Not found':
         return None
@@ -63,7 +64,7 @@ def _is_server_time_valid(current_time: datetime, timezone_name: str) -> bool:
     return True
 
 
-def _any_location_missing_results(config: Dict[str, Any]) -> bool:
+def _any_location_missing_results(config: dict[str, Any]) -> bool:
     """True when any scheduler location has no completed calculation results.
 
     Covers newly created/attributed presets and presets whose results were
@@ -78,7 +79,7 @@ def _any_location_missing_results(config: Dict[str, Any]) -> bool:
     return any(not has_calculation_results(loc.get('id')) for loc in locations)
 
 
-def resolve_schedule(config: Dict[str, Any], now: Optional[datetime] = None) -> SkyTonightSchedule:
+def resolve_schedule(config: dict[str, Any], now: datetime | None = None) -> SkyTonightSchedule:
     """Resolve the next SkyTonight run according to scheduler requirements.
 
     Dawn/dusk anchors use the install default location preset - it is the
@@ -168,35 +169,35 @@ class SkyTonightScheduler:
 
     def __init__(
         self,
-        config_loader: Callable[[], Dict[str, Any]],
-        runner: Callable[[], Dict[str, Any]],
+        config_loader: Callable[[], dict[str, Any]],
+        runner: Callable[[], dict[str, Any]],
         app=None,
-        cache_ready_event: Optional[threading.Event] = None,
+        cache_ready_event: threading.Event | None = None,
     ):
         self.config_loader = config_loader
         self.runner = runner
         self.app = app
         self.running = False
         self.thread = None
-        self.last_run: Optional[datetime] = None
-        self.last_error: Optional[str] = None
-        self.last_result: Dict[str, Any] = {}
-        self.execution_start_time: Optional[datetime] = None
+        self.last_run: datetime | None = None
+        self.last_error: str | None = None
+        self.last_result: dict[str, Any] = {}
+        self.execution_start_time: datetime | None = None
         self.is_executing = False
         self.current_mode = 'idle'
         self.current_reason = ''
-        self._triggered_mode: Optional[str] = None
-        self._triggered_reason: Optional[str] = None
+        self._triggered_mode: str | None = None
+        self._triggered_reason: str | None = None
         self._execution_lock = threading.Lock()
         self._scheduler_started = False
-        self.last_execution_duration_seconds: Optional[int] = None
+        self.last_execution_duration_seconds: int | None = None
         # Optional event set by CacheScheduler after first successful update.
         # When present, the first automatic run is delayed until caches are warm.
-        self._cache_ready_event: Optional[threading.Event] = cache_ready_event
+        self._cache_ready_event: threading.Event | None = cache_ready_event
         self._cache_ready_waited = False
         # The next scheduled run time that the loop commits to.  Persisted to
         # the status file so it survives restarts and is shown in the UI.
-        self._committed_next_run: Optional[datetime] = None
+        self._committed_next_run: datetime | None = None
         ensure_skytonight_directories()
 
         stored_status = load_scheduler_status(default={})
@@ -224,7 +225,7 @@ class SkyTonightScheduler:
         try:
             if stored_last_duration is not None:
                 self.last_execution_duration_seconds = int(stored_last_duration)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             self.last_execution_duration_seconds = None
 
         if not self.last_result:
@@ -472,7 +473,7 @@ class SkyTonightScheduler:
                 self._triggered_reason = None
                 self._write_status()
 
-    def _write_status(self, schedule: Optional[SkyTonightSchedule] = None):
+    def _write_status(self, schedule: SkyTonightSchedule | None = None):
         config = self.config_loader()
         enabled = bool(config.get('skytonight', {}).get('enabled', False))
 
@@ -537,7 +538,7 @@ class SkyTonightScheduler:
         }
         save_scheduler_status(payload)
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         config = self.config_loader()
         schedule = resolve_schedule(config)
         self._write_status(schedule=schedule)
@@ -546,7 +547,7 @@ class SkyTonightScheduler:
         status.setdefault('enabled', bool(config.get('skytonight', {}).get('enabled', False)))
         return status
 
-    def trigger_now(self) -> Dict[str, Any]:
+    def trigger_now(self) -> dict[str, Any]:
         if self._execution_lock.locked():
             return {'status': 'skipped', 'reason': 'execution already in progress'}
         threading.Thread(target=self._execute_cycle, kwargs={'manual_trigger': True}, daemon=True).start()

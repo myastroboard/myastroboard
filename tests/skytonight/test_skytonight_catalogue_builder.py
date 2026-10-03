@@ -7,19 +7,19 @@ import pytest
 
 from skytonight.skytonight_catalogue_builder import (
     PyOngcRow,
-    build_targets_from_rows,
-    _safe_float,
-    _coerce_identifier_list,
-    _normalize_identifier,
-    _collect_catalogue_names,
-    _build_aliases,
-    _canonical_key,
-    _merge_target,
-    _load_json_catalogue,
-    _ngc_ic_match_key,
-    _build_cross_ref_map,
     _apply_cross_refs,
+    _build_aliases,
+    _build_cross_ref_map,
     _build_standalone_targets_from_json,
+    _canonical_key,
+    _coerce_identifier_list,
+    _collect_catalogue_names,
+    _load_json_catalogue,
+    _merge_target,
+    _ngc_ic_match_key,
+    _normalize_identifier,
+    _safe_float,
+    build_targets_from_rows,
 )
 from skytonight.skytonight_models import SkyTonightCoordinates, SkyTonightTarget
 

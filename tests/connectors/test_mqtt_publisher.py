@@ -10,14 +10,14 @@ round trip to prove the thread actually runs and joins cleanly.
 import json
 import os
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
 from connectors import mqtt_publisher as pub
 from connectors.mqtt_payloads import Device
 
-NOW = datetime(2026, 9, 17, 20, 30, tzinfo=timezone.utc)
+NOW = datetime(2026, 9, 17, 20, 30, tzinfo=UTC)
 
 
 class _Reason:
@@ -181,7 +181,6 @@ def _connect(env):
 
 
 class TestChannel:
-
     def test_request_action_writes_and_consume_reads_once(self, env):
         assert pub.request_action("publish") is True
         assert json.load(open(pub.TRIGGER_FILE))["action"] == "publish"
@@ -222,7 +221,6 @@ class TestChannel:
 
 
 class TestLifecycle:
-
     def test_disabled_connector_never_connects_but_writes_status(self, env):
         env["config"] = _config(enabled=False)
         env["publisher"]._tick()
@@ -600,7 +598,6 @@ class TestLifecycle:
 
 
 class TestPublishCycle:
-
     def test_publish_cycle_is_a_noop_without_a_connector_or_client(self, env):
         publisher = env["publisher"]
         publisher._connector = None
@@ -764,7 +761,6 @@ class TestPublishCycle:
 
 
 class TestImages:
-
     def test_image_published_once_per_picture_id(self, env):
         env["devices"] = [
             _device(
@@ -856,7 +852,6 @@ class TestImages:
 
 
 class TestRemove:
-
     def test_remove_trigger_purges_everything_and_republishes_if_still_enabled(self, env):
         env["devices"] = [_device("location", "loc-1", {"a": 1})]
         client = _connect(env)
@@ -921,7 +916,6 @@ class TestRemove:
 
 
 class TestDefaults:
-
     def test_default_client_factory_builds_a_real_paho_client(self):
         import paho.mqtt.client as mqtt
 

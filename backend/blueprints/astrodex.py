@@ -2,27 +2,25 @@
 
 import os
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from flask import Blueprint, request, jsonify, send_from_directory
+from flask import Blueprint, jsonify, request, send_from_directory
 from werkzeug.utils import secure_filename
 
-from equipment import equipment_profiles
-from observation import astrodex
-from observation import beginner_catalog
-from observation import catalogue_collection
-from observation import wishlist
-from utils.auth import login_required, user_required, get_current_user, user_manager
-from utils.constellation_names import full_constellation_name
-from utils.image_privacy import strip_image_metadata
 from blueprints.plan_my_night import _resolve_requested_language
-from utils.logging_config import get_logger
-from utils.repo_config import load_config, get_locations_for_user, get_location_by_id
-from utils.route_helpers import _resolve_active_location
 from blueprints.skytonight_api import _preload_all_current_plan_entries
+from equipment import equipment_profiles
+from observation import astrodex, beginner_catalog, catalogue_collection, wishlist
 from skytonight import skytonight_targets
 from skytonight.skytonight_storage import get_dso_results_file, has_dso_results
-from utils import load_json_file, normalize_catalogue_key as _normalize_catalogue_key_for_difficulty
+from utils import load_json_file
+from utils import normalize_catalogue_key as _normalize_catalogue_key_for_difficulty
+from utils.auth import get_current_user, login_required, user_manager, user_required
+from utils.constellation_names import full_constellation_name
+from utils.image_privacy import strip_image_metadata
+from utils.logging_config import get_logger
+from utils.repo_config import get_location_by_id, get_locations_for_user, load_config
+from utils.route_helpers import _resolve_active_location
 
 logger = get_logger(__name__)
 
@@ -45,14 +43,14 @@ def _safe_picture_coordinate(value, min_value, max_value):
         return None
     try:
         parsed = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     if not (min_value <= parsed <= max_value):
         return None
     return parsed
 
 
-def _validate_and_coerce_picture_rating(picture_data: Dict) -> Any:
+def _validate_and_coerce_picture_rating(picture_data: dict) -> Any:
     """Validate picture_data['rating'] in place (0.0-5.0 in 0.5 steps) and coerce it to a clean
     float, or None if left blank. Returns an error message string on failure, else None.
 
@@ -65,7 +63,7 @@ def _validate_and_coerce_picture_rating(picture_data: Dict) -> Any:
         return None
     try:
         rating = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return 'rating must be a number between 0 and 5'
     if not (0 <= rating <= 5) or (rating * 2) != int(round(rating * 2)):
         return 'rating must be between 0 and 5 in 0.5 steps'
@@ -73,7 +71,7 @@ def _validate_and_coerce_picture_rating(picture_data: Dict) -> Any:
     return None
 
 
-def _validate_and_coerce_picture_capture(picture_data: Dict) -> Any:
+def _validate_and_coerce_picture_capture(picture_data: dict) -> Any:
     """Validate/coerce picture_data['exposition_time'], ['frames'] and
     ['integration_minutes'] in place. Only touches keys actually present, so a PUT that
     edits unrelated fields (notes, iso, ...) never disturbs these.
@@ -91,7 +89,7 @@ def _validate_and_coerce_picture_capture(picture_data: Dict) -> Any:
         else:
             try:
                 seconds = int(value)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 return 'exposition_time must be a whole number of seconds'
             if seconds < 0:
                 return 'exposition_time must be a whole number of seconds'
@@ -104,7 +102,7 @@ def _validate_and_coerce_picture_capture(picture_data: Dict) -> Any:
         else:
             try:
                 frames = int(value)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 return 'frames must be a whole number'
             if frames < 0:
                 return 'frames must be a whole number'
@@ -117,7 +115,7 @@ def _validate_and_coerce_picture_capture(picture_data: Dict) -> Any:
         else:
             try:
                 integration = float(value)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 return 'integration_minutes must be a number'
             if integration < 0:
                 return 'integration_minutes must be a number'
@@ -126,7 +124,7 @@ def _validate_and_coerce_picture_capture(picture_data: Dict) -> Any:
     return None
 
 
-def _resolve_picture_combination_reference(combination_id, user_id) -> Optional[str]:
+def _resolve_picture_combination_reference(combination_id, user_id) -> str | None:
     """Return combination_id if it resolves to an accessible (own or shared) combination for this
     user, else None. Resolved server-side so a picture can never end up tagged with a combination
     id that doesn't actually exist or that the uploader has no access to."""
@@ -186,10 +184,10 @@ def _resolve_picture_location_snapshot(
     return dict(_EMPTY_PICTURE_LOCATION)
 
 
-_difficulty_lookup_cache: Dict[str, Dict[str, Any]] = {}
+_difficulty_lookup_cache: dict[str, dict[str, Any]] = {}
 
 
-def _build_difficulty_lookup(location_id=None) -> Dict[str, str]:
+def _build_difficulty_lookup(location_id=None) -> dict[str, str]:
     """Build a normalized-catalogue-name -> difficulty lookup from a location's dso_results.json.
 
     Cached in memory per location, keyed by the file's mtime - dso_results.json is only
@@ -207,7 +205,7 @@ def _build_difficulty_lookup(location_id=None) -> Dict[str, str]:
         return slot['data']
 
     dso_data = load_json_file(dso_results_file, default={})
-    lookup: Dict[str, str] = {}
+    lookup: dict[str, str] = {}
     for entry in dso_data.get('deep_sky', []) if isinstance(dso_data, dict) else []:
         difficulty = entry.get('difficulty')
         catalogue_names = entry.get('catalogue_names', {})
@@ -449,7 +447,7 @@ def switch_astrodex_item_catalogue_name(item_id):
 
 
 def _apply_observation_session_backlinks(
-    items: List[Dict], matches_by_item: Dict, first_match_by_picture: Dict
+    items: list[dict], matches_by_item: dict, first_match_by_picture: dict
 ) -> None:
     """Attach 'which Observation Log session produced this' to items/pictures in place.
 
@@ -471,7 +469,7 @@ def _apply_observation_session_backlinks(
                 picture['observation_session'] = first_match_by_picture.get(picture_id) if picture_id else None
 
 
-def _with_observation_session_backlinks(user_id: str, item: Dict) -> Dict:
+def _with_observation_session_backlinks(user_id: str, item: dict) -> dict:
     """Single-item variant of _apply_observation_session_backlinks(), for the one-item GET route."""
     from observation.observation_sessions import build_astrodex_session_backlink_index
 
@@ -734,7 +732,7 @@ def upload_astrodex_image():
                 logger.warning("User not authenticated for file upload")
                 return jsonify({'error': 'User not authenticated'}), 401
 
-        except (TypeError, ValueError):  # pragma: no cover
+        except TypeError, ValueError:  # pragma: no cover
             logger.warning("Invalid user ID")
             return jsonify({'error': 'Invalid user ID'}), 400
 
@@ -919,9 +917,9 @@ def astrodex_catalogue_lookup():
 
         # Fallback: query SIMBAD TAP to support extended catalogs (HIP, HD, SAO, TYC…)
         from observation.object_info import (
-            resolve_identifier_for_catalogue_lookup,
             build_catalogue_names_from_aliases,
             is_safe_identifier,
+            resolve_identifier_for_catalogue_lookup,
         )
 
         if is_safe_identifier(name):

@@ -31,8 +31,9 @@ so a consumer never has to re-derive which way a scale runs.
 
 import math
 from collections import OrderedDict
+from collections.abc import Iterable, Iterator, Sequence
 from datetime import date
-from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
+from typing import Any
 
 from observation import target_coordinates
 from utils import normalize_catalogue_key as _normalize_key
@@ -60,7 +61,7 @@ _TRANSPARENCY_BANDS = ((_QUALITY_BEST, 6.0, 8.0), (_QUALITY_MID, 4.0, 5.0), (_QU
 _SQM_BANDS = ((_QUALITY_BEST, 20.5, 30.0), (_QUALITY_MID, 19.0, 20.5), (_QUALITY_WORST, 0.0, 19.0))
 _MOON_BANDS = ((_QUALITY_BEST, 0.0, 33.0), (_QUALITY_MID, 33.0, 66.0), (_QUALITY_WORST, 66.0, 100.0))
 
-_CONDITION_METRICS: Tuple[Tuple[str, str, Tuple[Tuple[str, float, float], ...]], ...] = (
+_CONDITION_METRICS: tuple[tuple[str, str, tuple[tuple[str, float, float], ...]], ...] = (
     ('seeing', 'lower_is_better', _SEEING_BANDS),
     ('transparency', 'higher_is_better', _TRANSPARENCY_BANDS),
     ('sqm', 'higher_is_better', _SQM_BANDS),
@@ -77,13 +78,13 @@ NO_COMBINATION_KEY = ''
 # ---------------------------------------------------------------------------
 
 
-def _as_float(value: Any) -> Optional[float]:
+def _as_float(value: Any) -> float | None:
     """Coerce a stored numeric field, returning None for absent/unparseable values."""
     if value is None or isinstance(value, bool):
         return None
     try:
         number = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     return number if math.isfinite(number) else None
 
@@ -92,7 +93,7 @@ def _as_text(value: Any) -> str:
     return str(value or '').strip()
 
 
-def _dicts(values: Any) -> List[Dict[str, Any]]:
+def _dicts(values: Any) -> list[dict[str, Any]]:
     """Return only the dict members of a stored list field."""
     if not isinstance(values, list):
         return []
@@ -103,7 +104,7 @@ def _round(value: float, digits: int = 2) -> float:
     return round(value + 0.0, digits)
 
 
-def _mean(values: Sequence[float], digits: int = 2) -> Optional[float]:
+def _mean(values: Sequence[float], digits: int = 2) -> float | None:
     return _round(sum(values) / len(values), digits) if values else None
 
 
@@ -112,12 +113,12 @@ def _mean(values: Sequence[float], digits: int = 2) -> Optional[float]:
 # ---------------------------------------------------------------------------
 
 
-def _sorted_nights(session: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _sorted_nights(session: dict[str, Any]) -> list[dict[str, Any]]:
     """A session's nights in chronological order (storage order is not guaranteed)."""
     return sorted(_dicts(session.get('nights')), key=lambda night: _as_text(night.get('date')))
 
 
-def _entry_night(session: Dict[str, Any], entry: Dict[str, Any]) -> Dict[str, Any]:
+def _entry_night(session: dict[str, Any], entry: dict[str, Any]) -> dict[str, Any]:
     """Resolve the night an entry belongs to.
 
     Falls back to the session's earliest night when ``night_id`` is null or dangling -
@@ -133,7 +134,7 @@ def _entry_night(session: Dict[str, Any], entry: Dict[str, Any]) -> Dict[str, An
     return nights[0] if nights else {}
 
 
-def iter_entries(sessions: Iterable[Dict[str, Any]]) -> Iterator[Tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any]]]:
+def iter_entries(sessions: Iterable[dict[str, Any]]) -> Iterator[tuple[dict[str, Any], dict[str, Any], dict[str, Any]]]:
     """Yield ``(session, night, entry)`` for every entry of every session."""
     for session in sessions:
         if not isinstance(session, dict):
@@ -142,13 +143,13 @@ def iter_entries(sessions: Iterable[Dict[str, Any]]) -> Iterator[Tuple[Dict[str,
             yield session, _entry_night(session, entry), entry
 
 
-def entry_date(night: Dict[str, Any]) -> str:
+def entry_date(night: dict[str, Any]) -> str:
     """The ``YYYY-MM-DD`` an entry is attributed to - the night it happened, never
     ``created_at``: a session logged three weeks late must land in the month it happened."""
     return _as_text(night.get('date'))
 
 
-def entry_integration_minutes(entry: Dict[str, Any]) -> float:
+def entry_integration_minutes(entry: dict[str, Any]) -> float:
     """Integration time for one entry.
 
     ``integration_minutes`` is the one guaranteed-summable field (see
@@ -165,7 +166,7 @@ def entry_integration_minutes(entry: Dict[str, Any]) -> float:
     return 0.0
 
 
-def entry_is_captured(entry: Dict[str, Any]) -> bool:
+def entry_is_captured(entry: dict[str, Any]) -> bool:
     """Whether an entry records real capture evidence rather than an empty placeholder.
 
     Same threshold the Observation Log itself uses to auto-register a target in Astrodex:
@@ -175,7 +176,7 @@ def entry_is_captured(entry: Dict[str, Any]) -> bool:
     return frames > 0 or entry_integration_minutes(entry) > 0
 
 
-def entry_rating(entry: Dict[str, Any]) -> Optional[float]:
+def entry_rating(entry: dict[str, Any]) -> float | None:
     """The entry's 0-5 rating, or None when it was never rated."""
     rating = _as_float(entry.get('rating'))
     if rating is None or rating < 0 or rating > 5:
@@ -183,7 +184,7 @@ def entry_rating(entry: Dict[str, Any]) -> Optional[float]:
     return rating
 
 
-def object_key(entry: Dict[str, Any]) -> str:
+def object_key(entry: dict[str, Any]) -> str:
     """Stable cross-catalogue identity for an entry's target.
 
     ``catalogue_group_id`` is the dataset's own identity when the target came from
@@ -193,7 +194,7 @@ def object_key(entry: Dict[str, Any]) -> str:
     return _as_text(entry.get('catalogue_group_id')) or _normalize_key(entry.get('name'))
 
 
-def effective_combination(session: Dict[str, Any], entry: Dict[str, Any]) -> Tuple[str, str]:
+def effective_combination(session: dict[str, Any], entry: dict[str, Any]) -> tuple[str, str]:
     """``(combination_id, combination_name)`` actually used for one entry.
 
     An entry's own combination is an optional override of the session's (someone switched
@@ -216,7 +217,7 @@ def _month_key(day: str) -> str:
     return day[:7] if len(day) >= 7 else ''
 
 
-def _dense_month_range(first: str, last: str) -> List[str]:
+def _dense_month_range(first: str, last: str) -> list[str]:
     """Every ``YYYY-MM`` from *first* to *last* inclusive, so the chart has no holes."""
     if not first or not last:
         return []
@@ -225,7 +226,7 @@ def _dense_month_range(first: str, last: str) -> List[str]:
         end_year, end_month = int(last[:4]), int(last[5:7])
     except ValueError:
         return []
-    months: List[str] = []
+    months: list[str] = []
     # A wide log is still only a few hundred months; the guard is against a corrupt date
     # producing an unbounded loop, not against a legitimately long history.
     while (year, month) <= (end_year, end_month) and len(months) < 2400:
@@ -236,20 +237,20 @@ def _dense_month_range(first: str, last: str) -> List[str]:
     return months
 
 
-def _accumulate(bucket: Dict[str, Any], integration: float, rating: Optional[float]) -> None:
+def _accumulate(bucket: dict[str, Any], integration: float, rating: float | None) -> None:
     bucket['integration_minutes'] += integration
     bucket['entries'] += 1
     if rating is not None:
         bucket['_ratings'].append(rating)
 
 
-def _new_bucket(**fields: Any) -> Dict[str, Any]:
-    bucket: Dict[str, Any] = {'integration_minutes': 0.0, 'entries': 0, '_ratings': []}
+def _new_bucket(**fields: Any) -> dict[str, Any]:
+    bucket: dict[str, Any] = {'integration_minutes': 0.0, 'entries': 0, '_ratings': []}
     bucket.update(fields)
     return bucket
 
 
-def _finalize(bucket: Dict[str, Any]) -> Dict[str, Any]:
+def _finalize(bucket: dict[str, Any]) -> dict[str, Any]:
     ratings = bucket.pop('_ratings')
     bucket['integration_minutes'] = _round(bucket['integration_minutes'])
     bucket['average_rating'] = _mean(ratings, 1)
@@ -257,18 +258,18 @@ def _finalize(bucket: Dict[str, Any]) -> Dict[str, Any]:
     return bucket
 
 
-def _sorted_buckets(buckets: Dict[Any, Dict[str, Any]], limit: Optional[int] = None) -> List[Dict[str, Any]]:
+def _sorted_buckets(buckets: dict[Any, dict[str, Any]], limit: int | None = None) -> list[dict[str, Any]]:
     rows = [_finalize(bucket) for bucket in buckets.values()]
     rows.sort(key=lambda row: (-row['integration_minutes'], -row['entries']))
     return rows[:limit] if limit else rows
 
 
 def build_summary(
-    sessions: Sequence[Dict[str, Any]],
+    sessions: Sequence[dict[str, Any]],
     today: date,
     astrodex_item_count: int = 0,
-    year: Optional[int] = None,
-) -> Dict[str, Any]:
+    year: int | None = None,
+) -> dict[str, Any]:
     """Aggregate a user's whole Observation Log into the stats dashboard payload.
 
     Args:
@@ -288,19 +289,19 @@ def build_summary(
     month_minutes = 0.0
     total_entries = 0
     captured_entries = 0
-    ratings: List[float] = []
+    ratings: list[float] = []
     object_keys = set()
     constellation_keys = set()
     dated_nights = set()
     first_day = ''
     last_day = ''
 
-    monthly: Dict[str, Dict[str, Any]] = {}
-    types: Dict[str, Dict[str, Any]] = {}
-    constellations: Dict[str, Dict[str, Any]] = {}
-    equipment: Dict[str, Dict[str, Any]] = {}
-    equipment_sessions: Dict[str, set] = {}
-    targets: Dict[str, Dict[str, Any]] = {}
+    monthly: dict[str, dict[str, Any]] = {}
+    types: dict[str, dict[str, Any]] = {}
+    constellations: dict[str, dict[str, Any]] = {}
+    equipment: dict[str, dict[str, Any]] = {}
+    equipment_sessions: dict[str, set] = {}
+    targets: dict[str, dict[str, Any]] = {}
 
     for session, night, entry in iter_entries(sessions):
         total_entries += 1
@@ -439,7 +440,7 @@ SOURCE_LOG = 'log'
 SOURCE_BOTH = 'both'
 
 
-def never_visible_declination(latitude: Optional[float]) -> Optional[float]:
+def never_visible_declination(latitude: float | None) -> float | None:
     """The declination below/above which nothing ever rises at *latitude*.
 
     Returns a signed bound: from the northern hemisphere nothing below
@@ -455,7 +456,7 @@ def never_visible_declination(latitude: Optional[float]) -> Optional[float]:
     return 90.0 + value
 
 
-def _astrodex_dates(item: Dict[str, Any]) -> Tuple[str, str]:
+def _astrodex_dates(item: dict[str, Any]) -> tuple[str, str]:
     """(earliest, latest) capture date across an Astrodex item's pictures.
 
     Falls back to the item's own ``created_at`` day: an item with no dated picture is
@@ -471,10 +472,10 @@ def _astrodex_dates(item: Dict[str, Any]) -> Tuple[str, str]:
 
 
 def build_sky_coverage(
-    sessions: Sequence[Dict[str, Any]],
-    astrodex_items: Sequence[Dict[str, Any]] = (),
-    latitude: Optional[float] = None,
-) -> Dict[str, Any]:
+    sessions: Sequence[dict[str, Any]],
+    astrodex_items: Sequence[dict[str, Any]] = (),
+    latitude: float | None = None,
+) -> dict[str, Any]:
     """Place every object the user has captured on an RA/Dec grid.
 
     Folds two sources into one set of points: Observation Log entries with real capture
@@ -487,10 +488,10 @@ def build_sky_coverage(
     than silently dropped - the same honest accounting ``astrodex.get_astrodex_map_points``
     does with its ungeotagged pictures.
     """
-    points: "OrderedDict[str, Dict[str, Any]]" = OrderedDict()
-    unplaced: Dict[str, str] = {}
+    points: OrderedDict[str, dict[str, Any]] = OrderedDict()
+    unplaced: dict[str, str] = {}
 
-    def record(key: str, name: str, identity: Dict[str, Any], source: str) -> Optional[Dict[str, Any]]:
+    def record(key: str, name: str, identity: dict[str, Any], source: str) -> dict[str, Any] | None:
         """Get or create the point for *key*, or register it as unplaceable."""
         existing = points.get(key)
         if existing is not None:
@@ -520,7 +521,7 @@ def build_sky_coverage(
         points[key] = point
         return point
 
-    def stamp_dates(point: Dict[str, Any], first: str, last: str) -> None:
+    def stamp_dates(point: dict[str, Any], first: str, last: str) -> None:
         if first and (not point['first_date'] or first < point['first_date']):
             point['first_date'] = first
         if last and last > point['last_date']:
@@ -584,7 +585,7 @@ def build_sky_coverage(
 # ---------------------------------------------------------------------------
 
 
-def _band_for(value: float, bands: Tuple[Tuple[str, float, float], ...]) -> Optional[str]:
+def _band_for(value: float, bands: tuple[tuple[str, float, float], ...]) -> str | None:
     """The quality band *value* falls into, or None when it is outside every band."""
     for quality, minimum, maximum in bands:
         if minimum <= value <= maximum:
@@ -592,16 +593,16 @@ def _band_for(value: float, bands: Tuple[Tuple[str, float, float], ...]) -> Opti
     return None
 
 
-def build_conditions(sessions: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
+def build_conditions(sessions: Sequence[dict[str, Any]]) -> dict[str, Any]:
     """Join every rated entry to its night's conditions and bucket the results.
 
     Strictly descriptive: each bucket reports its own sample count alongside its average,
     and a bucket under :data:`MINIMUM_BUCKET_SAMPLES` is flagged rather than plotted. No
     trend line and no correlation coefficient - see feature.md decision D8.
     """
-    samples: List[Dict[str, Any]] = []
+    samples: list[dict[str, Any]] = []
 
-    for session, night, entry in iter_entries(sessions):
+    for _session, night, entry in iter_entries(sessions):
         rating = entry_rating(entry)
         if rating is None:
             continue
@@ -618,9 +619,9 @@ def build_conditions(sessions: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
         if any(sample[metric] is not None for metric, _, _ in _CONDITION_METRICS):
             samples.append(sample)
 
-    metrics: "OrderedDict[str, Dict[str, Any]]" = OrderedDict()
+    metrics: OrderedDict[str, dict[str, Any]] = OrderedDict()
     for metric, direction, bands in _CONDITION_METRICS:
-        grouped: Dict[str, List[float]] = {quality: [] for quality, _, _ in bands}
+        grouped: dict[str, list[float]] = {quality: [] for quality, _, _ in bands}
         measured = 0
         for sample in samples:
             value = sample[metric]
@@ -660,14 +661,14 @@ def build_conditions(sessions: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def build_logged_months(sessions: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def build_logged_months(sessions: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
     """Per calendar month (1-12), what the user actually logged across all years.
 
     Pairs with the location's astronomical dark-hours figures to answer "when is it worth
     planning to be out here, and when have I actually been out". Deliberately *not* a
     weather statistic - MyAstroBoard keeps no historical weather (see feature.md 2.6).
     """
-    buckets: Dict[int, Dict[str, Any]] = {
+    buckets: dict[int, dict[str, Any]] = {
         month: {'month': month, 'integration_minutes': 0.0, 'entries': 0, '_ratings': [], '_nights': set()}
         for month in range(1, 13)
     }
@@ -690,7 +691,7 @@ def build_logged_months(sessions: Sequence[Dict[str, Any]]) -> List[Dict[str, An
         if rating is not None:
             bucket['_ratings'].append(rating)
 
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     for month in range(1, 13):
         bucket = buckets[month]
         nights = bucket.pop('_nights')

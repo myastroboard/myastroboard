@@ -4,7 +4,8 @@ import json
 import os
 import time
 from contextlib import contextmanager
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 import requests
 
 from space import spaceflight_tracker
@@ -44,7 +45,6 @@ def _no_cache():
 
 
 class TestNormaliseLaunch:
-
     def _raw(self, **overrides):
         base = {
             "id": "abc-123",
@@ -132,7 +132,6 @@ class TestNormaliseLaunch:
 
 
 class TestNormaliseAstronaut:
-
     def _raw(self, **overrides):
         base = {
             "id": 7,
@@ -184,7 +183,6 @@ class TestNormaliseAstronaut:
 
 
 class TestNormaliseExpedition:
-
     def _raw(self, **overrides):
         base = {
             "id": 71,
@@ -250,7 +248,6 @@ class TestNormaliseExpedition:
 
 
 class TestNormaliseEvent:
-
     def _raw(self, **overrides):
         base = {
             "id": 555,
@@ -304,7 +301,6 @@ class TestNormaliseEvent:
 
 
 class TestPruneImageCache:
-
     def test_no_dir_does_nothing(self, tmp_path):
         with patch("space.spaceflight_tracker._SPACEFLIGHT_IMAGES_DIR", str(tmp_path / "nonexistent")):
             prune_image_cache([])
@@ -377,7 +373,6 @@ class TestPruneImageCache:
 
 
 class TestSpaceflightCacheImagesIntact:
-
     def test_none_cache_returns_true(self):
         assert spaceflight_cache_images_intact(None) is True
 
@@ -424,7 +419,6 @@ class TestSpaceflightCacheImagesIntact:
 
 
 class TestCacheImage:
-
     def test_none_url_returns_none(self):
         result = _cache_image(None)
         assert result is None
@@ -496,7 +490,6 @@ class TestCacheImage:
 
 
 class TestGet:
-
     def setup_method(self):
         """Clear backoff dict and isolate from disk state before each test."""
         spaceflight_tracker._backoff_until.clear()
@@ -595,7 +588,6 @@ class TestGet:
 
 
 class TestGetUpcomingLaunches:
-
     def setup_method(self):
         spaceflight_tracker._backoff_until.clear()
 
@@ -637,7 +629,6 @@ class TestGetUpcomingLaunches:
 
 
 class TestGetPastLaunches:
-
     def setup_method(self):
         spaceflight_tracker._backoff_until.clear()
 
@@ -679,7 +670,6 @@ class TestGetPastLaunches:
 
 
 class TestGetIssCrew:
-
     def setup_method(self):
         spaceflight_tracker._backoff_until.clear()
 
@@ -849,7 +839,6 @@ class TestGetIssCrew:
 
 
 class TestGetAstronautsInSpace:
-
     def setup_method(self):
         spaceflight_tracker._backoff_until.clear()
 
@@ -883,7 +872,6 @@ class TestGetAstronautsInSpace:
 
 
 class TestGetUpcomingSpaceEvents:
-
     def setup_method(self):
         spaceflight_tracker._backoff_until.clear()
 
@@ -923,7 +911,6 @@ class TestGetUpcomingSpaceEvents:
 
 
 class TestGetLaunchVidurls:
-
     def setup_method(self):
         spaceflight_tracker._backoff_until.clear()
         spaceflight_tracker._vidurls_cache.clear()
@@ -1052,7 +1039,6 @@ class TestGetLaunchVidurls:
 
 
 class TestPruneImageCacheOsError:
-
     def test_oserror_on_remove_logged_not_raised(self, tmp_path):
         img_dir = tmp_path / "images"
         img_dir.mkdir()
@@ -1089,7 +1075,6 @@ class TestPruneImageCacheOsError:
 
 
 class TestSpaceflightCacheImagesIntactNonContainerObj:
-
     def test_integer_value_returns_true(self):
         """obj that is not str/dict/list/tuple hits the implicit-else branch → True."""
         data = {"count": 42}
@@ -1110,7 +1095,6 @@ class TestSpaceflightCacheImagesIntactNonContainerObj:
 
 
 class TestLoadBackoffState:
-
     def test_returns_empty_when_file_missing(self, tmp_path):
         missing = str(tmp_path / "no_backoff.json")
         with patch("space.spaceflight_tracker._SPACEFLIGHT_BACKOFF_FILE", missing):
@@ -1155,7 +1139,6 @@ class TestLoadBackoffState:
 
 
 class TestSaveBackoffState:
-
     def test_writes_active_entries(self, tmp_path, monkeypatch):
         import time as _time
 
@@ -1191,7 +1174,6 @@ class TestSaveBackoffState:
 
 
 class TestSpaceflightCacheImagesIntactTuple:
-
     def test_tuple_values_checked(self, tmp_path):
         img_dir = tmp_path / "images"
         img_dir.mkdir()

@@ -10,8 +10,7 @@ import uuid
 import pytest
 
 from equipment import equipment_profiles
-from observation import astrodex
-from observation import observation_sessions
+from observation import astrodex, observation_sessions
 from utils.auth import user_manager
 
 if 'psutil' not in sys.modules:

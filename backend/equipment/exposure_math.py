@@ -14,7 +14,6 @@ and limitations.
 from __future__ import annotations
 
 import math
-from typing import Optional
 
 # Bortle class -> sky surface brightness (SQM, mag/arcsec^2, V-band). Matches the
 # table in docs/EXPOSURE_CALC.md and BORTLE_SQM in static/js/equipment.js.
@@ -47,24 +46,24 @@ DEFAULT_TARGET_SNR = 15.0
 _ARCMIN2_TO_ARCSEC2_MAG = 2.5 * math.log10(3600.0)
 
 
-def sqm_for_bortle(bortle: Optional[float]) -> float:
+def sqm_for_bortle(bortle: float | None) -> float:
     """Return the SQM (mag/arcsec^2) for a Bortle class, defaulting to Bortle 5."""
     if bortle is None:
         return _DEFAULT_SQM
     try:
         return BORTLE_SQM.get(int(round(float(bortle))), _DEFAULT_SQM)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return _DEFAULT_SQM
 
 
-def surface_brightness_per_arcsec2(sb_per_arcmin2: Optional[float]) -> Optional[float]:
+def surface_brightness_per_arcsec2(sb_per_arcmin2: float | None) -> float | None:
     """Convert a surface brightness in mag/arcmin^2 to mag/arcsec^2."""
     if sb_per_arcmin2 is None:
         return None
     return float(sb_per_arcmin2) + _ARCMIN2_TO_ARCSEC2_MAG
 
 
-def plate_scale_arcsec_per_px(pixel_size_um: float, focal_length_mm: float) -> Optional[float]:
+def plate_scale_arcsec_per_px(pixel_size_um: float, focal_length_mm: float) -> float | None:
     """Angular size of one pixel on the sky (arcsec/px)."""
     if not pixel_size_um or not focal_length_mm:
         return None
@@ -89,15 +88,15 @@ def photon_rate_e_per_px_s(
 
 
 def estimate_min_integration_hours(
-    surface_brightness_per_arcmin2: Optional[float],
-    focal_length_mm: Optional[float],
-    focal_ratio: Optional[float],
-    pixel_size_um: Optional[float],
-    bortle: Optional[float] = None,
-    quantum_efficiency: Optional[float] = None,
+    surface_brightness_per_arcmin2: float | None,
+    focal_length_mm: float | None,
+    focal_ratio: float | None,
+    pixel_size_um: float | None,
+    bortle: float | None = None,
+    quantum_efficiency: float | None = None,
     target_snr: float = DEFAULT_TARGET_SNR,
-    sqm: Optional[float] = None,
-) -> Optional[float]:
+    sqm: float | None = None,
+) -> float | None:
     """Rough total integration time (hours) to reach ``target_snr`` per pixel on the
     target's mean surface brightness, in the sky-limited regime.
 

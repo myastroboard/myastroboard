@@ -2,13 +2,13 @@
 Tests for Astrodex module
 """
 
-import pytest
 import os
 import tempfile
 
+import pytest
+
 from db import documents
-from observation import astrodex
-from observation import catalogue_aliases
+from observation import astrodex, catalogue_aliases
 from skytonight import skytonight_targets
 
 

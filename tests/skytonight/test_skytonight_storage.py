@@ -3,10 +3,12 @@ Tests for skytonight_storage.py
 Covers directory creation, file helpers, and trimming.
 """
 
-import os
 import json
-import pytest
+import os
 from unittest.mock import patch
+
+import pytest
+
 from skytonight import skytonight_storage
 
 ensure_skytonight_directories = skytonight_storage.ensure_skytonight_directories
@@ -109,7 +111,7 @@ class TestAppendSchedulerLog:
 
     def test_append_writes_content(self):
         log_path = append_scheduler_log("hello log", file_name="hello.log")
-        with open(log_path, "r", encoding="utf-8") as f:
+        with open(log_path, encoding="utf-8") as f:
             content = f.read()
         assert "hello log" in content
 
@@ -243,9 +245,11 @@ class TestRemainingStorageGapArcs:
         (calc_dir / "loc-locked").mkdir(parents=True)
         out_dir.mkdir()
 
-        with patch.object(skytonight_storage, "SKYTONIGHT_CALCULATIONS_DIR", str(calc_dir)), patch.object(
-            skytonight_storage, "SKYTONIGHT_OUTPUT_DIR", str(out_dir)
-        ), patch.object(skytonight_storage.shutil, "rmtree", side_effect=OSError("locked")):
+        with (
+            patch.object(skytonight_storage, "SKYTONIGHT_CALCULATIONS_DIR", str(calc_dir)),
+            patch.object(skytonight_storage, "SKYTONIGHT_OUTPUT_DIR", str(out_dir)),
+            patch.object(skytonight_storage.shutil, "rmtree", side_effect=OSError("locked")),
+        ):
             assert skytonight_storage.drop_location_results("loc-locked") is False
 
     def test_drop_location_results_path_traversal_id_is_swallowed(self, tmp_path):
@@ -260,8 +264,9 @@ class TestRemainingStorageGapArcs:
         calc_dir.mkdir()
         out_dir.mkdir()
 
-        with patch.object(skytonight_storage, "SKYTONIGHT_CALCULATIONS_DIR", str(calc_dir)), patch.object(
-            skytonight_storage, "SKYTONIGHT_OUTPUT_DIR", str(out_dir)
+        with (
+            patch.object(skytonight_storage, "SKYTONIGHT_CALCULATIONS_DIR", str(calc_dir)),
+            patch.object(skytonight_storage, "SKYTONIGHT_OUTPUT_DIR", str(out_dir)),
         ):
             assert skytonight_storage.drop_location_results("../escape") is False
 

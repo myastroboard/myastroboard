@@ -46,13 +46,14 @@ Example output:
 
 import datetime
 from dataclasses import dataclass
+from typing import Any
 from zoneinfo import ZoneInfo
-from typing import Any, Optional, List
 
-from astronomy import SearchLunarEclipse, Time as AstronTime, Observer
-from astropy.time import Time as AstroTime
-from astropy.coordinates import EarthLocation, AltAz, get_body
 import astropy.units as u
+from astronomy import Observer, SearchLunarEclipse
+from astronomy import Time as AstronTime
+from astropy.coordinates import AltAz, EarthLocation, get_body
+from astropy.time import Time as AstroTime
 
 from utils import distant_epoch_precision_warnings_muted
 
@@ -83,8 +84,8 @@ class LunarEclipseInfo:
     type: str
     peak_time: str
     partial_begin: str
-    total_begin: Optional[str]
-    total_end: Optional[str]
+    total_begin: str | None
+    total_end: str | None
     partial_end: str
     peak_altitude_deg: float
     peak_azimuth_deg: float
@@ -93,7 +94,7 @@ class LunarEclipseInfo:
     obscuration_percent: float
     astrophotography_score: float
     score_classification: str
-    altitude_vs_time: List[EclipsePoint]
+    altitude_vs_time: list[EclipsePoint]
 
 
 # =============================
@@ -116,7 +117,7 @@ class LunarEclipseService:
     # Public API
     # =============================
 
-    def get_next_eclipse(self) -> Optional[LunarEclipseInfo]:
+    def get_next_eclipse(self) -> LunarEclipseInfo | None:
         """Get the lunar eclipse in progress right now, or the next one.
 
         Lunar eclipses are visible from a whole hemisphere, so the next one is
@@ -128,10 +129,10 @@ class LunarEclipseService:
         with distant_epoch_precision_warnings_muted():
             return self._compute_next_eclipse()
 
-    def _compute_next_eclipse(self) -> Optional[LunarEclipseInfo]:
+    def _compute_next_eclipse(self) -> LunarEclipseInfo | None:
         """Find the current or next lunar eclipse and describe it."""
 
-        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        now_utc = datetime.datetime.now(datetime.UTC)
 
         # Start the search in the past (see IN_PROGRESS_LOOKBACK) so an eclipse whose
         # peak has passed but whose phases are still running stays reported.
@@ -147,12 +148,12 @@ class LunarEclipseService:
 
         # Convert peak time to local.
         # Time.Utc() returns a NAIVE datetime — attach UTC tzinfo before converting.
-        peak_utc = eclipse.peak.Utc().replace(tzinfo=datetime.timezone.utc)
+        peak_utc = eclipse.peak.Utc().replace(tzinfo=datetime.UTC)
         peak_local = peak_utc.astimezone(self.timezone)
 
         # Convert eclipse times to local using semi-duration to calculate begin/end times
         # sd_penum, sd_partial, sd_total are in minutes
-        peak_time_utc = eclipse.peak.Utc().replace(tzinfo=datetime.timezone.utc)
+        peak_time_utc = eclipse.peak.Utc().replace(tzinfo=datetime.UTC)
 
         # Calculate partial begin/end from sd_partial
         if eclipse.sd_partial > 0:
@@ -250,7 +251,7 @@ class LunarEclipseService:
         Mirrors the begin/end computation below: the partial semi-duration when there
         is a partial phase, the penumbral one otherwise.
         """
-        peak_utc = eclipse.peak.Utc().replace(tzinfo=datetime.timezone.utc)
+        peak_utc = eclipse.peak.Utc().replace(tzinfo=datetime.UTC)
         semi_duration = eclipse.sd_partial if eclipse.sd_partial > 0 else eclipse.sd_penum
         return peak_utc + datetime.timedelta(minutes=semi_duration)
 
@@ -281,7 +282,7 @@ class LunarEclipseService:
         az = az if az is not None else 0.0
         return alt, az
 
-    def _coord_attribute(self, coord: Any, attr_name: str) -> Optional[float]:
+    def _coord_attribute(self, coord: Any, attr_name: str) -> float | None:
         """Safely extract altitude or azimuth from transformed coordinate"""
         attr = getattr(coord, attr_name, None)
         if attr is None:
@@ -289,12 +290,12 @@ class LunarEclipseService:
         try:
             value = attr.to_value(u.deg) if hasattr(attr, "to_value") else float(attr)
             return float(value)
-        except (AttributeError, TypeError):
+        except AttributeError, TypeError:
             return None
 
     def _generate_altitude_vs_time(
         self, start_local: datetime.datetime, end_local: datetime.datetime
-    ) -> List[EclipsePoint]:
+    ) -> list[EclipsePoint]:
         """Generate altitude vs time points for the eclipse"""
 
         points = []
@@ -304,7 +305,7 @@ class LunarEclipseService:
         step = datetime.timedelta(minutes=5)
 
         while current <= end_local:
-            current_utc = current.astimezone(datetime.timezone.utc)
+            current_utc = current.astimezone(datetime.UTC)
             t_astropy = AstroTime(current_utc)
             frame = AltAz(obstime=t_astropy, location=self.location)
 

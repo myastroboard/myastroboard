@@ -1,8 +1,8 @@
 """Unit tests for moon_phases.py pure-logic methods."""
 
 import datetime
-from zoneinfo import ZoneInfo
 from unittest.mock import MagicMock
+from zoneinfo import ZoneInfo
 
 from astroweather.moon_phases import MoonService
 
@@ -167,8 +167,9 @@ class TestNextAstronomicalDarkWindow:
         The coarse grid is mocked so that the first 3 slots are 'dark' and the rest are not,
         forcing one call to _refine_first_true and one call to _refine_first_false.
         """
-        import numpy as np
         from unittest.mock import MagicMock, patch
+
+        import numpy as np
 
         n_coarse = int((10 * 24 * 60) / 15)  # 960 points (10 days × 15-min grid)
         sun_alts = np.full(n_coarse, 5.0)
@@ -187,12 +188,12 @@ class TestNextAstronomicalDarkWindow:
         svc = MoonService(48.85, 2.35, 'Europe/Paris')
         start = datetime.datetime(2026, 1, 1, 22, 0, 0, tzinfo=ZoneInfo('Europe/Paris'))
 
-        with patch('astroweather.moon_phases.AstroTime', return_value=MagicMock()), patch(
-            'astroweather.moon_phases.AltAz', return_value=MagicMock()
-        ), patch('astroweather.moon_phases.get_sun', return_value=_make_alt_mock(sun_alts)), patch(
-            'astroweather.moon_phases.get_body', return_value=_make_alt_mock(moon_alts)
-        ), patch.object(
-            MoonService, '_coord_altitude_deg', return_value=None
+        with (
+            patch('astroweather.moon_phases.AstroTime', return_value=MagicMock()),
+            patch('astroweather.moon_phases.AltAz', return_value=MagicMock()),
+            patch('astroweather.moon_phases.get_sun', return_value=_make_alt_mock(sun_alts)),
+            patch('astroweather.moon_phases.get_body', return_value=_make_alt_mock(moon_alts)),
+            patch.object(MoonService, '_coord_altitude_deg', return_value=None),
         ):
             result = svc._next_astronomical_dark_window(start)
 
@@ -203,8 +204,9 @@ class TestNextAstronomicalDarkWindow:
         """The coarse grid never reaches astronomical night, so the loop runs to
         completion without a start and the sentinel ('Not found', 'Not found')
         is returned."""
-        import numpy as np
         from unittest.mock import MagicMock, patch
+
+        import numpy as np
 
         n_coarse = int((10 * 24 * 60) / 15)
         sun_alts = np.full(n_coarse, 5.0)  # sun always up -> never dark
@@ -222,10 +224,11 @@ class TestNextAstronomicalDarkWindow:
         svc = MoonService(48.85, 2.35, 'Europe/Paris')
         start = datetime.datetime(2026, 6, 21, 22, 0, 0, tzinfo=ZoneInfo('Europe/Paris'))
 
-        with patch('astroweather.moon_phases.AstroTime', return_value=MagicMock()), patch(
-            'astroweather.moon_phases.AltAz', return_value=MagicMock()
-        ), patch('astroweather.moon_phases.get_sun', return_value=_make_alt_mock(sun_alts)), patch(
-            'astroweather.moon_phases.get_body', return_value=_make_alt_mock(moon_alts)
+        with (
+            patch('astroweather.moon_phases.AstroTime', return_value=MagicMock()),
+            patch('astroweather.moon_phases.AltAz', return_value=MagicMock()),
+            patch('astroweather.moon_phases.get_sun', return_value=_make_alt_mock(sun_alts)),
+            patch('astroweather.moon_phases.get_body', return_value=_make_alt_mock(moon_alts)),
         ):
             result = svc._next_astronomical_dark_window(start)
 

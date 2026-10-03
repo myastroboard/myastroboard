@@ -6,20 +6,24 @@ Handles the SkyTonight scheduler lifecycle, including creation, status, and refr
 import json
 import os
 import sys
-from datetime import datetime, timezone
-from typing import Any, Dict
+from datetime import UTC, datetime
+from typing import Any
 
+from skytonight.skytonight_calculator import load_calculation_results, run_calculations
+from skytonight.skytonight_catalogue_builder import build_and_save_default_dataset
+from skytonight.skytonight_storage import (
+    ensure_skytonight_directories,
+)
+from skytonight.skytonight_storage import (
+    get_scheduler_lock_file as get_skytonight_scheduler_lock_file,
+)
+from skytonight.skytonight_storage import (
+    get_scheduler_status_file as get_skytonight_scheduler_status_file,
+)
+from skytonight.skytonight_targets import invalidate_targets_dataset_cache
 from utils.constants import MAX_LOCATIONS, SKYTONIGHT_CALCULATION_LOG_FILE
 from utils.logging_config import get_logger
 from utils.repo_config import load_config
-from skytonight.skytonight_catalogue_builder import build_and_save_default_dataset
-from skytonight.skytonight_calculator import run_calculations, load_calculation_results
-from skytonight.skytonight_targets import invalidate_targets_dataset_cache
-from skytonight.skytonight_storage import (
-    ensure_skytonight_directories,
-    get_scheduler_lock_file as get_skytonight_scheduler_lock_file,
-    get_scheduler_status_file as get_skytonight_scheduler_status_file,
-)
 
 # Windows-compatible file locking
 if sys.platform == 'win32':
@@ -35,11 +39,11 @@ logger = get_logger(__name__)
 # ============================================================
 
 
-def _append_skytonight_calculation_log(status: str, payload: Dict[str, Any]) -> None:
+def _append_skytonight_calculation_log(status: str, payload: dict[str, Any]) -> None:
     """Append a single line to the SkyTonight calculation log."""
     ensure_skytonight_directories()
     log_entry = {
-        'timestamp': datetime.now(timezone.utc).isoformat(),
+        'timestamp': datetime.now(UTC).isoformat(),
         'status': status,
         'payload': payload,
     }
@@ -58,7 +62,7 @@ def _trim_calculation_log(log_path: str, max_runs: int = 5) -> None:
     location, so budget 1 + MAX_LOCATIONS lines per run.
     """
     try:
-        with open(log_path, 'r', encoding='utf-8') as f:
+        with open(log_path, encoding='utf-8') as f:
             lines = [line for line in f.readlines() if line.strip()]
         max_lines = max_runs * (1 + MAX_LOCATIONS)
         if len(lines) > max_lines:
@@ -73,7 +77,7 @@ def _trim_calculation_log(log_path: str, max_runs: int = 5) -> None:
 # ============================================================
 
 
-def _run_skytonight_refresh() -> Dict[str, Any]:
+def _run_skytonight_refresh() -> dict[str, Any]:
     """Run the current SkyTonight refresh pipeline.
 
     Two phases:
@@ -125,8 +129,8 @@ def _run_skytonight_refresh() -> Dict[str, Any]:
         locations = [get_install_default_location(config)]
     install_default_id = get_install_default_location(config).get('id')
 
-    primary_result: Dict[str, Any] = {}
-    per_location_results: Dict[str, Any] = {}
+    primary_result: dict[str, Any] = {}
+    per_location_results: dict[str, Any] = {}
     for preset in locations:
         loc_id = preset.get('id')
         loc_name = preset.get('name') or loc_id
@@ -202,7 +206,7 @@ def get_or_create_skytonight_scheduler(app, cache_ready_event=None):
             app.config['is_skytonight_scheduler_worker'] = True
             logger.debug('SkyTonight scheduler created and started successfully.')
 
-        except (IOError, OSError):
+        except OSError:
             if not app.config.get('skytonight_scheduler_lock_logged'):
                 logger.debug('SkyTonight scheduler already running in another worker process, skipping creation')
                 app.config['skytonight_scheduler_lock_logged'] = True
@@ -238,7 +242,7 @@ def get_skytonight_scheduler_for_api():
     if os.path.exists(lock_file_path):
         test_file = None
         try:
-            test_file = open(lock_file_path, 'r')
+            test_file = open(lock_file_path)
             if sys.platform == 'win32':
                 try:
                     msvcrt.locking(test_file.fileno(), msvcrt.LK_NBLCK, 1)
@@ -248,7 +252,7 @@ def get_skytonight_scheduler_for_api():
             else:  # pragma: no cover
                 fcntl.flock(test_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
                 return None
-        except (IOError, OSError):
+        except OSError:
             return 'remote_scheduler'
         finally:
             if test_file is not None:
@@ -257,12 +261,12 @@ def get_skytonight_scheduler_for_api():
     return None
 
 
-def get_remote_skytonight_scheduler_status() -> Dict[str, Any]:
+def get_remote_skytonight_scheduler_status() -> dict[str, Any]:
     """Get SkyTonight scheduler status from shared file (used by remote workers)."""
     status_file = get_skytonight_scheduler_status_file()
     try:
         if os.path.exists(status_file):
-            with open(status_file, 'r', encoding='utf-8') as file_obj:
+            with open(status_file, encoding='utf-8') as file_obj:
                 status = json.load(file_obj)
                 if not isinstance(status.get('last_result'), dict):
                     status['last_result'] = {}

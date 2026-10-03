@@ -1,29 +1,27 @@
 """Config + multi-location profiles Blueprint. Routes: /api/config, /api/locations/*"""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from zoneinfo import available_timezones
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, jsonify, request
 
-from observation import astrodex
 from cache import cache_store
-from observation import observation_sessions
-from observation import plan_my_night
-from utils.auth import user_manager, login_required, admin_required, get_current_user
+from observation import astrodex, observation_sessions, plan_my_night
+from skytonight.skytonight_storage import drop_location_results as drop_skytonight_location_results
+from utils.auth import admin_required, get_current_user, login_required, user_manager
 from utils.constants import MAX_LOCATIONS
 from utils.logging_config import get_logger
 from utils.repo_config import (
-    load_config,
-    save_config,
-    get_all_locations,
-    get_location_by_id,
-    get_install_default_location,
-    get_locations_for_user,
     get_active_location,
+    get_all_locations,
+    get_install_default_location,
+    get_location_by_id,
+    get_locations_for_user,
     get_user_location_prefs,
+    load_config,
     new_location_preset,
+    save_config,
 )
-from skytonight.skytonight_storage import drop_location_results as drop_skytonight_location_results
 
 logger = get_logger(__name__)
 
@@ -64,7 +62,7 @@ def _validate_location_payload(payload, partial=False):
                 if raw_value is None:
                     raise TypeError()
                 value = float(raw_value)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 return None, f"location.{key} must be a number"
             limit = 90 if key == 'latitude' else 180
             if not (-limit <= value <= limit):
@@ -77,7 +75,7 @@ def _validate_location_payload(payload, partial=False):
             if raw_elevation is None:
                 raise TypeError()
             cleaned['elevation'] = float(raw_elevation)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None, "location.elevation must be a number"
 
     if not partial or 'timezone' in payload:
@@ -96,7 +94,7 @@ def _validate_location_payload(payload, partial=False):
                 if not (1 <= _b <= 9):
                     raise ValueError()
                 cleaned['bortle'] = _b
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 return None, "location.bortle must be an integer between 1 and 9"
 
     if 'sqm' in payload:
@@ -109,7 +107,7 @@ def _validate_location_payload(payload, partial=False):
                 if _s <= 0:
                     raise ValueError()
                 cleaned['sqm'] = _s
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 return None, "location.sqm must be a positive float (mag/arcsec²)"
 
     if 'horizon_profile' in payload:
@@ -152,7 +150,7 @@ def _validate_constraints_payload(payload):
         if field in payload:
             try:
                 value = float(payload[field])
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 return None, f"constraints.{field} must be a number"
             if not (lo <= value <= hi):
                 return None, f"constraints.{field} must be between {lo} and {hi} {unit}".strip()
@@ -267,7 +265,7 @@ def update_config_api():
                 preset.update(cleaned)
                 if legacy_horizon_payload or legacy_horizon_cleared:
                     preset['horizon_profile'] = legacy_horizon_payload or []
-                preset['updated_at'] = datetime.now(timezone.utc).isoformat()
+                preset['updated_at'] = datetime.now(UTC).isoformat()
                 location_changed = before != cache_store.get_current_location_signature(preset)
                 if location_changed:
                     cache_store.reset_caches_for_location(preset['id'])
@@ -394,7 +392,7 @@ def update_location_api(location_id):
             for other in get_all_locations(config):
                 other['is_install_default'] = other.get('id') == location_id
 
-        preset['updated_at'] = datetime.now(timezone.utc).isoformat()
+        preset['updated_at'] = datetime.now(UTC).isoformat()
         save_config(config)
 
         cache_reset = before_signature != cache_store.get_current_location_signature(preset)

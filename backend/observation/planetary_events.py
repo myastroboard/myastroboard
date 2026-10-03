@@ -12,19 +12,20 @@ All calculations account for observer location and timezone.
 """
 
 from datetime import datetime, timedelta
-from typing import List, Dict, Any, Tuple
+from typing import Any
 from zoneinfo import ZoneInfo
-from utils import parse_iso_to_utc
-from utils.logging_config import get_logger
 
+import numpy as np
+from astropy import units as u
 from astropy.coordinates import (
-    EarthLocation,
     AltAz,
+    EarthLocation,
     get_body,
 )
 from astropy.time import Time
-from astropy import units as u
-import numpy as np
+
+from utils import parse_iso_to_utc
+from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
@@ -62,7 +63,7 @@ class PlanetaryEventsService:
         self.timezone = ZoneInfo(timezone)
         self.location = EarthLocation(lat=latitude * u.deg, lon=longitude * u.deg, height=elevation * u.m)
 
-    def get_planetary_events(self, days_ahead: int = 365) -> List[Dict[str, Any]]:
+    def get_planetary_events(self, days_ahead: int = 365) -> list[dict[str, Any]]:
         """
         Get all planetary events for the next N days.
 
@@ -104,12 +105,12 @@ class PlanetaryEventsService:
         t_arr = start_date + np.arange(n) * step_days * u.day
         self._t_arr = t_arr
         self._step_days = step_days
-        self._coords: Dict[str, Any] = {}
+        self._coords: dict[str, Any] = {}
         for body in list(PLANETS.keys()) + ['sun']:
             self._coords[body] = get_body(body, t_arr, self.location)
 
     @staticmethod
-    def _parabolic_min(values: np.ndarray, idx: int, t_arr: Any, step_days: float) -> Tuple[Any, float]:
+    def _parabolic_min(values: np.ndarray, idx: int, t_arr: Any, step_days: float) -> tuple[Any, float]:
         """Refine a sampled minimum with a parabolic fit on its two neighbours.
 
         Returns ``(refined_time, refined_value)``. Because the closest approach
@@ -140,9 +141,9 @@ class PlanetaryEventsService:
         transitions = np.diff(padded.astype(int))
         starts = np.where(transitions == 1)[0]
         ends = np.where(transitions == -1)[0]
-        return list(zip(starts, ends))
+        return list(zip(starts, ends, strict=False))
 
-    def _find_conjunctions(self, start_date: Time, end_date: Time) -> List[Dict[str, Any]]:
+    def _find_conjunctions(self, start_date: Time, end_date: Time) -> list[dict[str, Any]]:
         """Find conjunctions using pre-computed vectorized positions."""
         coords = getattr(self, '_coords', None)
         t_arr = getattr(self, '_t_arr', None)
@@ -184,7 +185,7 @@ class PlanetaryEventsService:
 
         return events
 
-    def _find_moon_conjunctions(self, start_date: Time, days_ahead: int) -> List[Dict[str, Any]]:
+    def _find_moon_conjunctions(self, start_date: Time, days_ahead: int) -> list[dict[str, Any]]:
         """Find Moon-planet conjunctions using 2-hour sampling (Moon moves ~13°/day).
 
         The Moon covers ~1.1° per 2-hour step, well under the 3° appulse threshold,
@@ -235,7 +236,7 @@ class PlanetaryEventsService:
 
         return events
 
-    def _find_oppositions(self, start_date: Time, end_date: Time) -> List[Dict[str, Any]]:
+    def _find_oppositions(self, start_date: Time, end_date: Time) -> list[dict[str, Any]]:
         """Find oppositions using pre-computed vectorized positions."""
         coords = getattr(self, '_coords', None)
         t_arr = getattr(self, '_t_arr', None)
@@ -277,7 +278,7 @@ class PlanetaryEventsService:
 
         return events
 
-    def _find_elongations(self, start_date: Time, end_date: Time) -> List[Dict[str, Any]]:
+    def _find_elongations(self, start_date: Time, end_date: Time) -> list[dict[str, Any]]:
         """Find maximum elongations using pre-computed vectorized positions."""
         coords = getattr(self, '_coords', None)
         t_arr = getattr(self, '_t_arr', None)
@@ -320,7 +321,7 @@ class PlanetaryEventsService:
 
         return events
 
-    def _find_retrograde_periods(self, start_date: Time, end_date: Time) -> List[Dict[str, Any]]:
+    def _find_retrograde_periods(self, start_date: Time, end_date: Time) -> list[dict[str, Any]]:
         """Find retrograde motion using pre-computed vectorized RA arrays."""
         coords = getattr(self, '_coords', None)
         t_arr = getattr(self, '_t_arr', None)

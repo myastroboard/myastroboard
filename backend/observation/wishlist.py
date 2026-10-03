@@ -20,8 +20,9 @@ permanently private, like the Observation Log - there is no shared or merged vie
 """
 
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from collections.abc import Iterable, Sequence
+from datetime import UTC, datetime
+from typing import Any
 
 from db import documents
 from observation import target_coordinates
@@ -65,19 +66,19 @@ def _is_moving_target(category: Any, object_type: Any) -> bool:
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _clean_text(value: Any, max_length: int = _MAX_NOTES_LENGTH) -> str:
     return str(value or '').strip()[:max_length]
 
 
-def _optional_text(value: Any, max_length: int = 200) -> Optional[str]:
+def _optional_text(value: Any, max_length: int = 200) -> str | None:
     cleaned = _clean_text(value, max_length)
     return cleaned or None
 
 
-def _default_payload(user_id: str, username: Optional[str] = None) -> Dict[str, Any]:
+def _default_payload(user_id: str, username: str | None = None) -> dict[str, Any]:
     now = _now_iso()
     return {
         'user_id': user_id,
@@ -88,7 +89,7 @@ def _default_payload(user_id: str, username: Optional[str] = None) -> Dict[str, 
     }
 
 
-def load_user_wishlist(user_id: str, username: Optional[str] = None) -> Dict[str, Any]:
+def load_user_wishlist(user_id: str, username: str | None = None) -> dict[str, Any]:
     """Load a user's wishlist.
 
     Never raises: an unreadable or malformed stored value yields an empty payload,
@@ -115,7 +116,7 @@ def load_user_wishlist(user_id: str, username: Optional[str] = None) -> Dict[str
     return data
 
 
-def validate_wishlist_data(data: Any) -> Tuple[bool, str]:
+def validate_wishlist_data(data: Any) -> tuple[bool, str]:
     """Validate a well-formed wishlist payload before it is stored."""
     if not isinstance(data, dict):
         return False, 'JSON root is not a dictionary'
@@ -137,7 +138,7 @@ def validate_wishlist_data(data: Any) -> Tuple[bool, str]:
     return True, ''
 
 
-def save_user_wishlist(user_id: str, wishlist_data: Dict[str, Any], username: Optional[str] = None) -> bool:
+def save_user_wishlist(user_id: str, wishlist_data: dict[str, Any], username: str | None = None) -> bool:
     """Validate and store a user's wishlist (one transaction, nothing half-written)."""
     try:
         wishlist_data['updated_at'] = _now_iso()
@@ -164,7 +165,7 @@ def save_user_wishlist(user_id: str, wishlist_data: Dict[str, Any], username: Op
 # ---------------------------------------------------------------------------
 
 
-def item_key(item: Dict[str, Any]) -> str:
+def item_key(item: dict[str, Any]) -> str:
     """Cross-catalogue identity of a wishlist item.
 
     The dataset's ``catalogue_group_id`` when the object resolved, so "M 31" and
@@ -184,14 +185,14 @@ def _target_keys(name: Any, group_id: Any, aliases: Any) -> set:
     return {key for key in keys if key}
 
 
-def _existing_keys(items: Sequence[Dict[str, Any]]) -> set:
+def _existing_keys(items: Sequence[dict[str, Any]]) -> set:
     keys = set()
     for item in items:
         keys.update(_target_keys(item.get('name'), item.get('catalogue_group_id'), item.get('catalogue_aliases')))
     return keys
 
 
-def build_wishlist_index(items: Sequence[Dict[str, Any]]) -> set:
+def build_wishlist_index(items: Sequence[dict[str, Any]]) -> set:
     """Every identifier the user's wishlist covers, as one flat set.
 
     Built once per request so annotating a large SkyTonight result set stays a set
@@ -218,7 +219,7 @@ def is_target_in_index(
 # ---------------------------------------------------------------------------
 
 
-def _build_item(target: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def _build_item(target: dict[str, Any]) -> dict[str, Any] | None:
     """Build one wishlist item from a client target payload, or None when unusable."""
     name = _clean_text(target.get('name'), 200)
     if not name:
@@ -269,8 +270,8 @@ def _build_item(target: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 def add_targets(
     user_id: str,
     username: str,
-    targets: Iterable[Dict[str, Any]],
-) -> Dict[str, Any]:
+    targets: Iterable[dict[str, Any]],
+) -> dict[str, Any]:
     """Add one or more targets, skipping duplicates and respecting the per-user cap.
 
     Always list-shaped, even for the single "add to wishlist" button, so there is one
@@ -280,10 +281,10 @@ def add_targets(
     and ``skipped_full`` counts so the UI can say precisely what happened.
     """
     data = load_user_wishlist(user_id, username)
-    items: List[Dict[str, Any]] = data['items']
+    items: list[dict[str, Any]] = data['items']
     keys = _existing_keys(items)
 
-    added: List[Dict[str, Any]] = []
+    added: list[dict[str, Any]] = []
     skipped_duplicates = 0
     skipped_invalid = 0
     skipped_full = 0
@@ -327,7 +328,7 @@ def add_targets(
     }
 
 
-def update_item(user_id: str, item_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def update_item(user_id: str, item_id: str, updates: dict[str, Any]) -> dict[str, Any] | None:
     """Update an item's priority and/or notes. Returns the updated item, or None."""
     data = load_user_wishlist(user_id)
 
@@ -398,13 +399,13 @@ def build_captured_index(
     return index
 
 
-def annotate_captured(items: Sequence[Dict[str, Any]], captured_index: set) -> List[Dict[str, Any]]:
+def annotate_captured(items: Sequence[dict[str, Any]], captured_index: set) -> list[dict[str, Any]]:
     """Return copies of *items* carrying a freshly-derived ``captured`` flag.
 
     Never persisted - recomputed on every read, so editing an entry or deleting a session
     is reflected immediately instead of leaving a stale boolean on disk.
     """
-    annotated: List[Dict[str, Any]] = []
+    annotated: list[dict[str, Any]] = []
     for item in items:
         keys = _target_keys(item.get('name'), item.get('catalogue_group_id'), item.get('catalogue_aliases'))
         copied = dict(item)
@@ -413,7 +414,7 @@ def annotate_captured(items: Sequence[Dict[str, Any]], captured_index: set) -> L
     return annotated
 
 
-def progress(annotated_items: Sequence[Dict[str, Any]]) -> Dict[str, int]:
+def progress(annotated_items: Sequence[dict[str, Any]]) -> dict[str, int]:
     """The "X of Y captured" counters for the progress bar."""
     captured = sum(1 for item in annotated_items if item.get('captured'))
     return {'captured': captured, 'total': len(annotated_items)}
@@ -422,7 +423,7 @@ def progress(annotated_items: Sequence[Dict[str, Any]]) -> Dict[str, int]:
 _PRIORITY_ORDER = {'high': 0, 'normal': 1, 'low': 2}
 
 
-def sort_items(annotated_items: List[Dict[str, Any]], sort: str = 'visibility') -> List[Dict[str, Any]]:
+def sort_items(annotated_items: list[dict[str, Any]], sort: str = 'visibility') -> list[dict[str, Any]]:
     """Order the list for display.
 
     ``visibility`` (the default) puts what is observable soonest first, still-wanted
@@ -431,19 +432,19 @@ def sort_items(annotated_items: List[Dict[str, Any]], sort: str = 'visibility') 
     since "unknown" is not "now".
     """
 
-    def visibility_key(item: Dict[str, Any]):
+    def visibility_key(item: dict[str, Any]):
         hours = item.get('observable_hours_next')
         rank = -float(hours) if isinstance(hours, (int, float)) else 1.0
         return (bool(item.get('captured')), rank, str(item.get('name') or '').lower())
 
-    def priority_key(item: Dict[str, Any]):
+    def priority_key(item: dict[str, Any]):
         return (
             bool(item.get('captured')),
             _PRIORITY_ORDER.get(str(item.get('priority') or ''), 1),
             str(item.get('name') or '').lower(),
         )
 
-    def name_key(item: Dict[str, Any]):
+    def name_key(item: dict[str, Any]):
         return (str(item.get('name') or '').lower(),)
 
     keys = {'visibility': visibility_key, 'priority': priority_key, 'name': name_key}

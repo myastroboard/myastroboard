@@ -1,9 +1,10 @@
 """Unit tests for CSS (China Space Station) pass service and CSS event aggregation."""
 
-from datetime import datetime, timedelta, timezone
-from requests import HTTPError
+from datetime import UTC, datetime, timedelta
+
 import numpy as np
 import pytest
+from requests import HTTPError
 
 from space import css_passes as css_module
 from utils.events_aggregator import EventsAggregator
@@ -99,7 +100,7 @@ class TestCSSPassServiceSolarTransit:
 
     def test_extract_solar_transit_segment_returns_refined_window(self, monkeypatch):
         service = CSSPassService(45.5, -73.5, 30, "America/Montreal")
-        start_utc = datetime(2026, 5, 8, 12, 0, 0, tzinfo=timezone.utc)
+        start_utc = datetime(2026, 5, 8, 12, 0, 0, tzinfo=UTC)
         end_utc = start_utc + timedelta(seconds=30)
         center = start_utc + timedelta(seconds=15)
         self._patch_solar(monkeypatch, service, center)
@@ -111,14 +112,14 @@ class TestCSSPassServiceSolarTransit:
         assert transit["pass_type"] == "solar_transit"
         assert transit["css_altitude_deg"] == 30.0
         assert transit["minimum_separation_arcmin"] < 1.0
-        peak = datetime.fromisoformat(transit["peak_time"]).astimezone(timezone.utc)
+        peak = datetime.fromisoformat(transit["peak_time"]).astimezone(UTC)
         assert abs((peak - center).total_seconds()) < 1.0
 
     def test_extract_solar_transit_segment_returns_none_when_no_transit(self, monkeypatch):
         import numpy as np
 
         service = CSSPassService(45.5, -73.5, 30, "America/Montreal")
-        start_utc = datetime(2026, 5, 8, 12, 0, 0, tzinfo=timezone.utc)
+        start_utc = datetime(2026, 5, 8, 12, 0, 0, tzinfo=UTC)
         end_utc = start_utc + timedelta(seconds=30)
 
         # CSS stays ~40° from the Sun for the whole pass -> rejected at the coarse stage.
@@ -205,7 +206,7 @@ class TestCSSPassServiceTleFallback:
 
         try:
             service._fetch_css_tle()
-            assert False, "Expected RuntimeError when all CSS TLE sources fail"
+            raise AssertionError("Expected RuntimeError when all CSS TLE sources fail")
         except RuntimeError as exc:
             assert "CSS TLE" in str(exc)
 
@@ -752,7 +753,7 @@ class TestCSSPassServiceLunarTransit:
 
     def test_extract_lunar_transit_segment_returns_refined_window(self, monkeypatch):
         service = CSSPassService(45.5, -73.5, 30, "America/Montreal")
-        start_utc = datetime(2026, 5, 8, 21, 0, 0, tzinfo=timezone.utc)
+        start_utc = datetime(2026, 5, 8, 21, 0, 0, tzinfo=UTC)
         end_utc = start_utc + timedelta(seconds=30)
         center = start_utc + timedelta(seconds=15)
         self._patch_moon(monkeypatch, service, center)
@@ -765,14 +766,14 @@ class TestCSSPassServiceLunarTransit:
         assert transit["moon_illumination_pct"] == 75.0
         assert transit["minimum_separation_arcmin"] < 1.0
         assert transit["is_visible"] is True
-        peak = datetime.fromisoformat(transit["peak_time"]).astimezone(timezone.utc)
+        peak = datetime.fromisoformat(transit["peak_time"]).astimezone(UTC)
         assert abs((peak - center).total_seconds()) < 1.0
 
     def test_extract_lunar_transit_segment_returns_none_when_no_candidates(self, monkeypatch):
         import numpy as np
 
         service = CSSPassService(45.5, -73.5, 30, "America/Montreal")
-        start_utc = datetime(2026, 5, 8, 21, 0, 0, tzinfo=timezone.utc)
+        start_utc = datetime(2026, 5, 8, 21, 0, 0, tzinfo=UTC)
         end_utc = start_utc + timedelta(seconds=30)
 
         monkeypatch.setattr(
@@ -795,7 +796,7 @@ class TestCSSPassServiceLunarTransit:
         import numpy as np
 
         service = CSSPassService(45.5, -73.5, 30, "America/Montreal")
-        start_utc = datetime(2026, 5, 8, 21, 0, 0, tzinfo=timezone.utc)
+        start_utc = datetime(2026, 5, 8, 21, 0, 0, tzinfo=UTC)
         end_utc = start_utc + timedelta(seconds=30)
 
         monkeypatch.setattr(
@@ -817,7 +818,7 @@ class TestCSSPassServiceLunarTransit:
     def test_find_lunar_transits_skipped_without_ephemeris(self):
         """_find_lunar_transits returns [] gracefully when eph is None."""
         service = CSSPassService(45.5, -73.5, 30, "America/Montreal")
-        start_utc = datetime(2026, 5, 8, 0, 0, 0, tzinfo=timezone.utc)
+        start_utc = datetime(2026, 5, 8, 0, 0, 0, tzinfo=UTC)
         end_utc = start_utc + timedelta(days=1)
 
         result = service._find_lunar_transits(
@@ -852,6 +853,7 @@ class TestCSSPassServiceLunarTransit:
         monkeypatch.setattr(service, "_find_lunar_transits", lambda *args, **kwargs: [])
 
         import os
+
         from utils.constants import DATA_DIR_CACHE
 
         SKYFIELD_CACHE_DIR = os.path.join(DATA_DIR_CACHE, "skyfield")
@@ -1270,7 +1272,7 @@ def test_fetch_css_tle_resets_timeout_streak_on_non_timeout_error(monkeypatch):
 
 def test_build_passes_and_extract_visible_segment_paths(monkeypatch):
     svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
-    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    start = datetime(2026, 1, 1, tzinfo=UTC)
 
     class _Evt:
         def __init__(self, dt):
@@ -1311,13 +1313,13 @@ def test_build_passes_and_extract_visible_segment_paths(monkeypatch):
 
 def test_extract_visible_segment_invalid_window_returns_none():
     svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
-    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    now = datetime(2026, 1, 1, tzinfo=UTC)
     assert svc._extract_visible_segment(now, now, None, None, None, None) is None
 
 
 def test_find_solar_transits_and_extract_segment(monkeypatch):
     svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
-    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    start = datetime(2026, 1, 1, tzinfo=UTC)
     end = start + timedelta(seconds=4)
 
     class _Evt:
@@ -1362,7 +1364,7 @@ def test_find_solar_transits_reuses_precomputed_events(monkeypatch):
     """get_report shares one find_events() call between the geometric pass scan and the
     solar transit search - a satellite whose find_events() would blow up proves it."""
     svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
-    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    start = datetime(2026, 1, 1, tzinfo=UTC)
     end = start + timedelta(seconds=4)
 
     class _Evt:
@@ -1386,7 +1388,7 @@ def test_find_solar_transits_reuses_precomputed_events(monkeypatch):
 
 def test_sample_time_range_and_angular_radius_helpers():
     svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
-    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    start = datetime(2026, 1, 1, tzinfo=UTC)
     end = start + timedelta(seconds=2)
 
     one = svc._sample_time_range(start, start, 1.0, lambda when: {"time_utc": when})
@@ -1419,7 +1421,7 @@ def test_sample_time_range_and_angular_radius_helpers():
 
 def test_vectorised_geometry_helpers():
     svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
-    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    start = datetime(2026, 1, 1, tzinfo=UTC)
 
     grid = svc._time_grid(start, start + timedelta(seconds=20), 5.0)
     assert grid[0] == start and grid[-1] == start + timedelta(seconds=20)
@@ -1458,7 +1460,7 @@ def test_vectorised_geometry_helpers():
 
 def test_find_lunar_transits_and_extract_segment(monkeypatch):
     svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
-    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    start = datetime(2026, 1, 1, tzinfo=UTC)
     end = start + timedelta(seconds=4)
 
     assert svc._find_lunar_transits(start, end, None, None, None, None) == []
@@ -1509,7 +1511,7 @@ def test_find_lunar_transits_and_extract_segment(monkeypatch):
 def test_find_lunar_transits_reuses_precomputed_events(monkeypatch):
     """Same shared-events optimisation as the solar transit search."""
     svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
-    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    start = datetime(2026, 1, 1, tzinfo=UTC)
     end = start + timedelta(seconds=4)
 
     class _Evt:
@@ -1533,7 +1535,7 @@ def test_find_lunar_transits_reuses_precomputed_events(monkeypatch):
 
 def test_extract_lunar_transit_segment_invalid_window_returns_none():
     svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
-    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    now = datetime(2026, 1, 1, tzinfo=UTC)
     assert svc._extract_lunar_transit_segment(now, now, None, None, None, object()) is None
 
 
@@ -1561,7 +1563,7 @@ def test_lunar_angular_radius_helper():
 
 def test_sample_observation_and_sun_alt_helpers(monkeypatch):
     svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
-    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    now = datetime(2026, 1, 1, tzinfo=UTC)
 
     class _Topo:
         def altaz(self):
@@ -1617,7 +1619,7 @@ def test_sample_observation_and_sun_alt_helpers(monkeypatch):
 
 def test_sun_altitude_functions_and_satellite_altitude(monkeypatch):
     svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
-    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    now = datetime(2026, 1, 1, tzinfo=UTC)
 
     class _SunAltAz:
         def __init__(self, alt, az):
@@ -1840,7 +1842,7 @@ def test_fetch_css_tle_cooldown_with_stale_cache(monkeypatch):
 
 def test_parse_css_tle_prefers_named_css_pair():
     svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
-    payload = "OTHER\n" "1 00000 X\n" "2 00000 Y\n" "CSS (TIANHE)\n" "1 48274 A\n" "2 48274 B\n"
+    payload = "OTHER\n1 00000 X\n2 00000 Y\nCSS (TIANHE)\n1 48274 A\n2 48274 B\n"
     line1, line2 = svc._parse_css_tle_from_response(payload)
     assert line1 == "1 48274 A"
     assert line2 == "2 48274 B"
@@ -1862,7 +1864,7 @@ def test_parse_css_tle_valid_json_without_tle_fields_raises():
 
 def test_build_passes_event_edge_branches(monkeypatch):
     svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
-    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    now = datetime(2026, 1, 1, tzinfo=UTC)
 
     class _Evt:
         def __init__(self, dt):
@@ -1898,7 +1900,7 @@ def test_build_passes_event_edge_branches(monkeypatch):
 
 def test_extract_visible_segment_positive_path(monkeypatch):
     svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
-    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    start = datetime(2026, 1, 1, tzinfo=UTC)
 
     samples = [
         {"time_utc": start, "altitude_deg": 5.0, "azimuth_deg": 90.0, "sun_altitude_deg": -2.0, "is_visible": False},
@@ -1933,7 +1935,7 @@ def test_extract_visible_segment_positive_path(monkeypatch):
 
 def test_find_solar_transits_event_edge_branches(monkeypatch):
     svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
-    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    start = datetime(2026, 1, 1, tzinfo=UTC)
     end = start + timedelta(seconds=6)
 
     class _Evt:
@@ -1969,7 +1971,7 @@ def test_find_solar_transits_event_edge_branches(monkeypatch):
 
 def test_extract_solar_invalid_window_and_no_fine_candidate(monkeypatch):
     svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
-    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    start = datetime(2026, 1, 1, tzinfo=UTC)
 
     # Zero-length window -> None.
     assert svc._extract_solar_transit_segment(start, start, None, None, None, None) is None
@@ -1989,7 +1991,7 @@ def test_extract_solar_invalid_window_and_no_fine_candidate(monkeypatch):
 
 def test_find_lunar_transits_event_edge_branches(monkeypatch):
     svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
-    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    start = datetime(2026, 1, 1, tzinfo=UTC)
     end = start + timedelta(seconds=6)
 
     class _Evt:
@@ -2025,7 +2027,7 @@ def test_find_lunar_transits_event_edge_branches(monkeypatch):
 
 def test_extract_lunar_invalid_window_and_no_fine_candidate(monkeypatch):
     svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
-    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    start = datetime(2026, 1, 1, tzinfo=UTC)
 
     # Zero-length window -> None.
     assert svc._extract_lunar_transit_segment(start, start, None, None, None, object()) is None
@@ -2284,8 +2286,8 @@ def test_sun_altaz_radius_arrays_falls_back_to_astropy_without_ephemeris():
     """eph=None → uses the Astropy fallback (no Skyfield ephemeris available)."""
     svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
     times_utc = [
-        datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
-        datetime(2026, 1, 1, 13, 0, 0, tzinfo=timezone.utc),
+        datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC),
+        datetime(2026, 1, 1, 13, 0, 0, tzinfo=UTC),
     ]
     alt, az, radius = svc._sun_altaz_radius_arrays(times_utc, observer=None, ts=None, eph=None)
     assert len(alt) == len(times_utc)
@@ -2295,7 +2297,7 @@ def test_sun_altaz_radius_arrays_falls_back_to_astropy_without_ephemeris():
 
 def test_sun_altaz_arrays_astropy_direct():
     svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
-    times_utc = [datetime(2026, 6, 21, 12, 0, 0, tzinfo=timezone.utc)]
+    times_utc = [datetime(2026, 6, 21, 12, 0, 0, tzinfo=UTC)]
     alt, az = svc._sun_altaz_arrays_astropy(times_utc)
     assert len(alt) == 1
     assert len(az) == 1
@@ -2328,7 +2330,7 @@ def real_skyfield_objects():
 def test_iss_altaz_arrays_real_skyfield_computation(real_skyfield_objects):
     satellite, observer, ts, _eph = real_skyfield_objects
     svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
-    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    now = datetime(2026, 1, 1, tzinfo=UTC)
     times = [now, now + timedelta(minutes=1)]
 
     altitude, azimuth = svc._iss_altaz_arrays(times, satellite, observer, ts)
@@ -2341,7 +2343,7 @@ def test_iss_altaz_arrays_real_skyfield_computation(real_skyfield_objects):
 def test_sun_altaz_radius_arrays_uses_the_real_ephemeris_when_available(real_skyfield_objects):
     _satellite, observer, ts, eph = real_skyfield_objects
     svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
-    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    now = datetime(2026, 1, 1, tzinfo=UTC)
     times = [now, now + timedelta(minutes=1)]
 
     altitude, azimuth, radius = svc._sun_altaz_radius_arrays(times, observer, ts, eph)
@@ -2354,7 +2356,7 @@ def test_sun_altaz_radius_arrays_uses_the_real_ephemeris_when_available(real_sky
 def test_moon_altaz_radius_illum_arrays_real_skyfield_computation(real_skyfield_objects):
     _satellite, observer, ts, eph = real_skyfield_objects
     svc = mod.CSSPassService(45.5, -73.5, 10, "UTC")
-    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    now = datetime(2026, 1, 1, tzinfo=UTC)
     times = [now, now + timedelta(minutes=1)]
 
     altitude, azimuth, radius, illumination = svc._moon_altaz_radius_illum_arrays(times, observer, ts, eph)

@@ -12,9 +12,11 @@ if 'psutil' not in sys.modules:
     sys.modules['psutil'] = types.ModuleType('psutil')
 
 import app as app_module  # type: ignore[import-not-found]
-from observation import astrodex  # type: ignore[import-not-found]
-from observation import plan_my_night  # type: ignore[import-not-found]
 from blueprints import plan_my_night as plan_my_night_bp_module  # type: ignore[import-not-found]
+from observation import (
+    astrodex,  # type: ignore[import-not-found]
+    plan_my_night,  # type: ignore[import-not-found]
+)
 from skytonight import skytonight_targets  # type: ignore[import-not-found]
 
 app = app_module.app

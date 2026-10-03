@@ -6,6 +6,7 @@ import re
 import subprocess
 import sys
 import textwrap
+from datetime import UTC
 from pathlib import Path
 
 import pytest
@@ -137,9 +138,8 @@ def test_configured_tz_formatter_falls_back_to_utc_on_invalid_tz(monkeypatch):
 
     tz = _ConfiguredTzFormatter._get_tz()
     assert tz is not None
-    from datetime import timezone
 
-    assert tz == timezone.utc
+    assert tz == UTC
 
     _ConfiguredTzFormatter._cached_tz = None
     _ConfiguredTzFormatter._tz_resolved = False
@@ -425,9 +425,9 @@ _DAY = 86400
 
 
 def _stamp(epoch):
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    return datetime.fromtimestamp(epoch, tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S,000 +0000')
+    return datetime.fromtimestamp(epoch, tz=UTC).strftime('%Y-%m-%d %H:%M:%S,000 +0000')
 
 
 def _line(epoch, message):

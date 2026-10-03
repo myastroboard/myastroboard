@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Dict, List
+from datetime import UTC, datetime
 
 from skytonight.skytonight_models import SkyTonightTarget
 from skytonight.skytonight_targets import normalize_object_name
@@ -24,10 +23,10 @@ def _target_id(name: str) -> str:
     return f"body-{normalize_object_name(name)}"
 
 
-def build_body_targets() -> List[SkyTonightTarget]:
+def build_body_targets() -> list[SkyTonightTarget]:
     """Build static target records for major solar system bodies."""
-    generated_at = datetime.now(timezone.utc).isoformat()
-    targets: List[SkyTonightTarget] = []
+    generated_at = datetime.now(UTC).isoformat()
+    targets: list[SkyTonightTarget] = []
 
     for body in BODY_DEFINITIONS:
         name = str(body.get('name') or '').strip()
@@ -36,7 +35,7 @@ def build_body_targets() -> List[SkyTonightTarget]:
         object_type = str(body.get('object_type') or 'Body').strip()
         aliases = [str(value).strip() for value in body.get('aliases', []) if str(value).strip()]
 
-        metadata: Dict[str, str] = {
+        metadata: dict[str, str] = {
             'source': 'builtin-solar-system',
             'updated_at': generated_at,
         }

@@ -18,11 +18,11 @@ Where the live image / Export JSON is served is probed once and remembered (see
 
 import socket
 import time
+from datetime import UTC, datetime, timedelta
+from typing import Any
 from urllib.parse import urlparse, urlunparse
 
 import requests
-from datetime import datetime, timezone, timedelta
-from typing import Any
 
 from connectors.base_connector import BaseConnector
 from utils.logging_config import get_logger
@@ -237,7 +237,7 @@ class AllSkyConnector(BaseConnector):
         base_ok, base_code = self._head(self.base_url)
 
         # End-of-night files are named after the date the night started (previous day).
-        last_night = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y%m%d")
+        last_night = (datetime.now(UTC) - timedelta(days=1)).strftime("%Y%m%d")
         module_results = {}
 
         url_map = {
@@ -274,7 +274,7 @@ class AllSkyConnector(BaseConnector):
 
     def get_module_urls(self, date_str: str | None = None) -> dict:
         # End-of-night files are named after the date the night started (previous day).
-        last_night = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y%m%d")
+        last_night = (datetime.now(UTC) - timedelta(days=1)).strftime("%Y%m%d")
         today = date_str or last_night
         urls = {}
 

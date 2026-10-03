@@ -3,17 +3,18 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Dict, Iterable, Set
+from typing import Any
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 I18N_DIR = ROOT_DIR / "static" / "i18n"
 REFERENCE_FILE = "en.json"
 
 
-def flatten_keys(data: Any, parent: str = "") -> Set[str]:
+def flatten_keys(data: Any, parent: str = "") -> set[str]:
     """Return flattened dot-notation keys from nested JSON-like data."""
-    keys: Set[str] = set()
+    keys: set[str] = set()
 
     if isinstance(data, dict):
         for key, value in data.items():
@@ -35,7 +36,7 @@ def flatten_keys(data: Any, parent: str = "") -> Set[str]:
     return keys
 
 
-def load_json(path: Path) -> Dict[str, Any]:
+def load_json(path: Path) -> dict[str, Any]:
     """Load a JSON file and ensure top-level object is a dictionary."""
     with path.open("r", encoding="utf-8") as handle:
         payload = json.load(handle)
@@ -72,8 +73,8 @@ def main() -> None:
         print(f"Error: reference file {REFERENCE_FILE} has no keys to compare.")
         return
 
-    missing_by_file: Dict[str, list[str]] = {}
-    completion_by_file: Dict[str, tuple[int, int, float]] = {}
+    missing_by_file: dict[str, list[str]] = {}
+    completion_by_file: dict[str, tuple[int, int, float]] = {}
 
     for lang_file in iter_language_files(I18N_DIR):
         try:

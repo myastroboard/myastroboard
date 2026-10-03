@@ -3,16 +3,17 @@ Tests for events_aggregator module.
 Tests event aggregation, filtering, sorting, and translation logic.
 """
 
-import pytest
 from datetime import timedelta
-from zoneinfo import ZoneInfo
 from unittest.mock import patch
+from zoneinfo import ZoneInfo
+
+import pytest
 
 from utils.events_aggregator import (
-    EventType,
-    EventImportance,
     AstronomicalEvent,
+    EventImportance,
     EventsAggregator,
+    EventType,
 )
 
 

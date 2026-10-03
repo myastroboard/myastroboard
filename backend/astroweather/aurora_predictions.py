@@ -6,9 +6,11 @@ Uses NOAA Space Weather Prediction Center data.
 
 import threading
 import time
+from datetime import UTC, datetime
+from typing import Any
+
 import requests
-from datetime import datetime, timezone
-from typing import Optional, Dict, Any, List
+
 from utils.constants import CACHE_TTL, CACHE_TTL_AURORA
 from utils.logging_config import get_logger
 
@@ -27,8 +29,8 @@ REQUEST_TIMEOUT = 10
 # AuroraService instance) so N locations share one NOAA fetch per TTL window
 # instead of each making their own live call - mirrors the shared-TLE /
 # per-location-math split already used for ISS/CSS passes.
-_kp_index_cache: Dict[str, Any] = {'value': None, 'timestamp': 0.0}
-_kp_forecast_cache: Dict[str, Any] = {'value': None, 'timestamp': 0.0}
+_kp_index_cache: dict[str, Any] = {'value': None, 'timestamp': 0.0}
+_kp_forecast_cache: dict[str, Any] = {'value': None, 'timestamp': 0.0}
 
 # Serialises the NOAA fetches so several locations refreshing in parallel share a
 # single upstream call per TTL window instead of each issuing its own.
@@ -55,7 +57,7 @@ class AuroraService:
         self.longitude = longitude
         self.timezone_str = timezone_str
 
-    def fetch_current_kp_index(self) -> Optional[float]:
+    def fetch_current_kp_index(self) -> float | None:
         """
         Fetch current Kp index from NOAA API (shared across locations - see
         _kp_index_cache above)
@@ -95,7 +97,7 @@ class AuroraService:
                             _kp_index_cache['value'] = kp_value
                             _kp_index_cache['timestamp'] = now
                             return kp_value
-                        except (ValueError, TypeError):
+                        except ValueError, TypeError:
                             logger.warning(f"Could not parse Kp value from {latest}")
                 return None
             except requests.RequestException as e:
@@ -105,7 +107,7 @@ class AuroraService:
                 logger.error(f"Error fetching Kp index: {e}")
                 return None
 
-    def fetch_kp_forecast(self) -> Optional[List[Dict[str, Any]]]:
+    def fetch_kp_forecast(self) -> list[dict[str, Any]] | None:
         """
         Fetch 3-day Kp index forecast from NOAA
 
@@ -136,7 +138,7 @@ class AuroraService:
                             continue
                         try:
                             forecast_data.append({'timestamp': row.get('time_tag', ''), 'kp': float(raw_kp)})
-                        except (TypeError, ValueError):
+                        except TypeError, ValueError:
                             continue
                 # Legacy format: list of lists with header row
                 elif isinstance(data, list) and len(data) > 1 and isinstance(data[0], list):
@@ -150,7 +152,7 @@ class AuroraService:
                                 continue
                             try:
                                 kp_value = float(row[kp_idx])
-                            except (TypeError, ValueError):
+                            except TypeError, ValueError:
                                 continue
                             timestamp = ''
                             if time_idx is not None and len(row) > time_idx:
@@ -221,7 +223,7 @@ class AuroraService:
             return "High"
         return "Very High"
 
-    def get_aurora_score(self, kp_index: float, forecast_timestamp: Optional[str] = None) -> Dict[str, Any]:
+    def get_aurora_score(self, kp_index: float, forecast_timestamp: str | None = None) -> dict[str, Any]:
         """
         Calculate comprehensive aurora visibility score
 
@@ -264,18 +266,18 @@ class AuroraService:
 
             tzinfo = ZoneInfo(self.timezone_str)
         except Exception:
-            tzinfo = timezone.utc
+            tzinfo = UTC
         if forecast_timestamp:
             try:
                 # NOAA timestamp is usually in ISO format and UTC
                 dt_utc = datetime.fromisoformat(forecast_timestamp)
                 if dt_utc.tzinfo is None:
-                    dt_utc = dt_utc.replace(tzinfo=timezone.utc)
+                    dt_utc = dt_utc.replace(tzinfo=UTC)
                 local_timestamp = dt_utc.astimezone(tzinfo).isoformat()
             except Exception:
                 local_timestamp = datetime.now(tzinfo).isoformat()
         else:
-            now_utc = datetime.now(timezone.utc)
+            now_utc = datetime.now(UTC)
             now_local = now_utc.astimezone(tzinfo)
             local_timestamp = now_local.isoformat()
         return {
@@ -298,7 +300,7 @@ class AuroraService:
             "color_description": self._get_aurora_color_description(kp_index),
         }
 
-    def _get_aurora_color_description(self, kp_index: float) -> Dict[str, str]:
+    def _get_aurora_color_description(self, kp_index: float) -> dict[str, str]:
         """
         Describe expected aurora colors based on Kp index and altitude
 
@@ -327,7 +329,7 @@ class AuroraService:
 
         return colors
 
-    def get_detailed_report(self) -> Optional[Dict[str, Any]]:
+    def get_detailed_report(self) -> dict[str, Any] | None:
         """
         Generate comprehensive aurora report for observer location
 
@@ -350,7 +352,7 @@ class AuroraService:
                         try:
                             latest_kp = float(kp_value)
                             break
-                        except (TypeError, ValueError):
+                        except TypeError, ValueError:
                             continue
 
                     if latest_kp is not None:
@@ -371,8 +373,8 @@ class AuroraService:
 
                 tzinfo = ZoneInfo(self.timezone_str)
             except Exception:
-                tzinfo = timezone.utc
-            now_utc = datetime.now(timezone.utc)
+                tzinfo = UTC
+            now_utc = datetime.now(UTC)
             now_local = now_utc.astimezone(tzinfo)
             local_timestamp = now_local.isoformat()
 
@@ -398,7 +400,7 @@ class AuroraService:
 
                     tzinfo = ZoneInfo(self.timezone_str)
                 except Exception:
-                    tzinfo = timezone.utc
+                    tzinfo = UTC
                 now_local = datetime.now(tzinfo)
                 # Filter forecast entries to those after now
                 filtered = []
@@ -408,7 +410,7 @@ class AuroraService:
                         try:
                             dt_utc = datetime.fromisoformat(ts)
                             if dt_utc.tzinfo is None:
-                                dt_utc = dt_utc.replace(tzinfo=timezone.utc)
+                                dt_utc = dt_utc.replace(tzinfo=UTC)
                             dt_local = dt_utc.astimezone(tzinfo)
                             if dt_local > now_local:
                                 filtered.append((dt_local, entry))
@@ -416,7 +418,7 @@ class AuroraService:
                             continue
                 # Sort by local time and take next 8
                 filtered = sorted(filtered, key=lambda x: x[0])[:8]
-                for dt_local, entry in filtered:
+                for _dt_local, entry in filtered:
                     kp_val = entry.get('kp', 0)
                     report["forecast"].append(self.get_aurora_score(kp_val, entry.get('timestamp')))
 
@@ -428,7 +430,7 @@ class AuroraService:
             return None
 
 
-def get_aurora_report(latitude: float, longitude: float, timezone_str: str) -> Optional[Dict[str, Any]]:
+def get_aurora_report(latitude: float, longitude: float, timezone_str: str) -> dict[str, Any] | None:
     """
     Convenience function to get aurora report for a location
 

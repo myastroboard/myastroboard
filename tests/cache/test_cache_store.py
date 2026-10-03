@@ -5,11 +5,14 @@ and the per-location cache slots introduced by v1.2 multi-location profiles.
 """
 
 import json
-import pytest
+import os
 import sys
 import time
-import os
 import uuid
+from datetime import UTC
+
+import pytest
+
 from cache import cache_store
 from cache import cache_store as cs
 from utils.constants import CACHE_TTL, DATA_DIR_CACHE
@@ -636,7 +639,7 @@ class TestIsExecutionMetricsValid:
         assert cache_store._is_execution_metrics_valid("allsky_sensor", 300) is True
 
     def test_returns_false_when_success_but_expired(self, tmp_path, monkeypatch):
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta
 
         monkeypatch.setattr(cs, '_SHARED_CACHE_FILE', str(tmp_path / "ev4.json"))
         monkeypatch.setattr(cs, '_SHARED_CACHE_LOCK', str(tmp_path / "ev4.lock"))
@@ -645,7 +648,7 @@ class TestIsExecutionMetricsValid:
 
         with open(str(tmp_path / "ev4.json")) as f:
             data = json.load(f)
-        old_ts = (datetime.now(timezone.utc) - timedelta(seconds=400)).isoformat()
+        old_ts = (datetime.now(UTC) - timedelta(seconds=400)).isoformat()
         data["_cache_metrics"]["allsky_sensor"]["last_run_at"] = old_ts
         with open(str(tmp_path / "ev4.json"), "w") as f:
             json.dump(data, f)

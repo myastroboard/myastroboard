@@ -247,7 +247,7 @@ the same card. What is specific to it is declared, not special-cased:
 class MyAstroShineConnector(BaseConnector):
     min_version = "v0.4.0"
     target_modules = ["astrodex"]
-    MODULES = []                                     # the round-trip is the whole connector
+    MODULES = []  # the round-trip is the whole connector
     SECRET_FIELDS = ("token", "signing_secret")
     URL_FIELDS = ("callback_url_override",)
     CONFIG_FIELDS = {"token": "", "signing_secret": "", "callback_url_override": "", "copy_rating": False}
@@ -280,9 +280,16 @@ totals, latest picture). Publish-only. Full documentation, entity tables and top
 class MqttConnector(BaseConnector):
     target_modules = []
     SECRET_FIELDS = ("password",)
-    CONFIG_FIELDS = {"username": "", "password": "", "base_topic": "myastroboard", "discovery_enabled": True,
-                     "discovery_prefix": "homeassistant", "publish_interval_seconds": 60, "client_id": "",
-                     "tls_insecure": False}
+    CONFIG_FIELDS = {
+        "username": "",
+        "password": "",
+        "base_topic": "myastroboard",
+        "discovery_enabled": True,
+        "discovery_prefix": "homeassistant",
+        "publish_interval_seconds": 60,
+        "client_id": "",
+        "tls_insecure": False,
+    }
 ```
 
 The shared `url` field carries the broker as `mqtt://host:1883` or `mqtts://host:8883`;
@@ -349,8 +356,8 @@ never repeats the same photo twice in a row.
 ```python
 class AstrodexStreamConnector(BaseConnector):
     target_modules = ["astrodex"]
-    MODULES = []                                      # the slideshow is the whole connector
-    SECRET_FIELDS = ()                                 # nothing admin-entered - see below
+    MODULES = []  # the slideshow is the whole connector
+    SECRET_FIELDS = ()  # nothing admin-entered - see below
     CONFIG_FIELDS = {"display_seconds": 20, "aspect_ratio": "16:9"}
     ENUM_FIELDS = {"aspect_ratio": ("16:9", "9:16", "4:3", "3:4", "1:1")}
 ```

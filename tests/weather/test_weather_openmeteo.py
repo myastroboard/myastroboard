@@ -9,7 +9,6 @@ from weather import weather_openmeteo as wom
 
 
 class TestRateLimitHelpers:
-
     def test_is_rate_limited_false_by_default(self):
         wom._GLOBAL_CONCURRENCY_TS = 0.0
         assert wom.is_openmeteo_rate_limited() is False
@@ -40,7 +39,6 @@ class TestRateLimitHelpers:
 
 
 class TestGetHourlyForecastCooldowns:
-
     def test_returns_none_during_failure_cooldown(self):
         wom._FORECAST_LAST_FAILURE_TS = time.time()  # just failed
         result = wom.get_hourly_forecast()

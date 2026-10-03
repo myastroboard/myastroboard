@@ -3,8 +3,8 @@ Shared pytest fixtures and configuration for all tests
 """
 
 import os
-import sys
 import signal
+import sys
 import tempfile
 
 
@@ -18,7 +18,7 @@ def pytest_sessionfinish(session, exitstatus):
     """
     try:
         signal.signal(signal.SIGTERM, lambda s, f: sys.exit(0))
-    except (OSError, ValueError):
+    except OSError, ValueError:
         pass  # signal registration unsupported in this environment (e.g. non-main thread)
 
 
@@ -79,9 +79,10 @@ def _clean_stale_test_state():
 
 _clean_stale_test_state()
 
-import pytest
-import shutil
 import json
+import shutil
+
+import pytest
 
 # Add backend to Python path
 backend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'backend')
@@ -322,9 +323,9 @@ def sample_coordinates():
 # importing from each other).
 # ---------------------------------------------------------------------------
 
+import tempfile as _tmpfile
 import types as _types
 import uuid as _uuid
-import tempfile as _tmpfile
 
 if 'psutil' not in sys.modules:
     sys.modules['psutil'] = _types.ModuleType('psutil')

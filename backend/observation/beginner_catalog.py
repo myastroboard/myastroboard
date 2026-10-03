@@ -8,14 +8,14 @@ with the current user's SkyTonight/Astrodex/Plan My Night state.
 import json
 import os
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from observation import object_info
+from skytonight.skytonight_storage import get_alttime_dir
+from utils import normalize_catalogue_key as _normalize_key
 from utils.constellation_names import full_constellation_name
 from utils.i18n_utils import I18nManager
 from utils.logging_config import get_logger
-from skytonight.skytonight_storage import get_alttime_dir
-from utils import normalize_catalogue_key as _normalize_key
 
 logger = get_logger(__name__)
 
@@ -38,10 +38,10 @@ def _alttime_file_for_target(target_id: str, location_id: Any) -> str:
     return target_id if os.path.isfile(path) else ''
 
 
-_catalog_cache: Dict[str, Any] = {'data': None, 'key': None}
+_catalog_cache: dict[str, Any] = {'data': None, 'key': None}
 
 
-def load_beginner_catalog() -> List[Dict[str, Any]]:
+def load_beginner_catalog() -> list[dict[str, Any]]:
     """Load and return the static beginner catalog dataset.
 
     Returns an empty list (and logs a warning) if the bundled file is missing
@@ -75,7 +75,7 @@ def load_beginner_catalog() -> List[Dict[str, Any]]:
     return data
 
 
-def translate_catalog_entries(catalog: List[Dict[str, Any]], lang: str) -> List[Dict[str, Any]]:
+def translate_catalog_entries(catalog: list[dict[str, Any]], lang: str) -> list[dict[str, Any]]:
     """Return a new list of catalog entries with ``why_beginner``/``suggested_framing`` resolved via i18n.
 
     Args:
@@ -95,9 +95,9 @@ def translate_catalog_entries(catalog: List[Dict[str, Any]], lang: str) -> List[
     return translated
 
 
-def _build_dso_lookup(dso_results: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+def _build_dso_lookup(dso_results: dict[str, Any]) -> dict[str, dict[str, Any]]:
     """Build a normalized-name -> DSO result entry lookup from ``dso_results.json`` content."""
-    lookup: Dict[str, Dict[str, Any]] = {}
+    lookup: dict[str, dict[str, Any]] = {}
     for item in dso_results.get('deep_sky', []) if isinstance(dso_results, dict) else []:
         catalogue_names = item.get('catalogue_names', {})
         if not isinstance(catalogue_names, dict):
@@ -109,7 +109,7 @@ def _build_dso_lookup(dso_results: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
     return lookup
 
 
-def _build_name_key_set(items: List[Dict[str, Any]], name_fields: List[str]) -> set:
+def _build_name_key_set(items: list[dict[str, Any]], name_fields: list[str]) -> set:
     """Build a set of normalized keys from a list of item dicts, over multiple possible field names."""
     keys = set()
     for item in items:
@@ -123,13 +123,13 @@ def _build_name_key_set(items: List[Dict[str, Any]], name_fields: List[str]) -> 
 
 
 def enrich_with_skytonight(
-    catalog: List[Dict[str, Any]],
-    dso_results: Dict[str, Any],
-    user_astrodex_items: List[Dict[str, Any]],
-    user_plan_entries: List[Dict[str, Any]],
+    catalog: list[dict[str, Any]],
+    dso_results: dict[str, Any],
+    user_astrodex_items: list[dict[str, Any]],
+    user_plan_entries: list[dict[str, Any]],
     location_id: Any = None,
-    wishlist_index: Optional[set] = None,
-) -> List[Dict[str, Any]]:
+    wishlist_index: set | None = None,
+) -> list[dict[str, Any]]:
     """Add ``visible_tonight``, ``astro_score``, ``in_astrodex``, ``in_plan`` and
     ``in_wishlist`` to each catalog entry.
 

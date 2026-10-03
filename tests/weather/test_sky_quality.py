@@ -11,9 +11,9 @@ import pytest
 from weather.sky_quality import (
     BORTLE_SQM_MIDPOINTS,
     bortle_to_sqm,
-    sqm_to_bortle,
     light_pollution_factor,
     object_lp_factor,
+    sqm_to_bortle,
 )
 
 
@@ -94,7 +94,7 @@ class TestLightPollutionFactor:
         factors = [light_pollution_factor(s) for s in sqm_values]
         for i in range(len(factors) - 1):
             assert factors[i] <= factors[i + 1], (
-                f"Factor not increasing: SQM {sqm_values[i]} → {factors[i]}, " f"SQM {sqm_values[i+1]} → {factors[i+1]}"
+                f"Factor not increasing: SQM {sqm_values[i]} → {factors[i]}, SQM {sqm_values[i + 1]} → {factors[i + 1]}"
             )
 
     def test_output_in_range(self):

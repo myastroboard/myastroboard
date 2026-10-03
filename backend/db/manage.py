@@ -14,7 +14,6 @@ import argparse
 import os
 import secrets
 import sys
-from typing import List, Optional
 
 _BACKEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if _BACKEND_DIR not in sys.path:  # pragma: no cover - only when started as a script
@@ -107,7 +106,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     _ready()
     return args.func(args)

@@ -305,7 +305,7 @@ def main() -> int:
                 for key in sorted(set(ref_types) & set(lang_types)):
                     if ref_types[key] != lang_types[key]:
                         errors.append(
-                            f"[{lang}] Type mismatch at '{key}':" f" expected {ref_types[key]}, got {lang_types[key]}"
+                            f"[{lang}] Type mismatch at '{key}': expected {ref_types[key]}, got {lang_types[key]}"
                         )
 
     # --- Report ---
@@ -316,7 +316,7 @@ def main() -> int:
         print()
         return 1
 
-    print(f"i18n validation OK - {len(json_languages)} language(s): " f"{sorted(json_languages)}")
+    print(f"i18n validation OK - {len(json_languages)} language(s): {sorted(json_languages)}")
     return 0
 
 

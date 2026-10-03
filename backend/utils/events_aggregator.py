@@ -36,12 +36,13 @@ Example output:
 """
 
 import datetime
-from dataclasses import dataclass, asdict
-from typing import Optional, List, Dict, Any
-from zoneinfo import ZoneInfo
+from dataclasses import asdict, dataclass
 from enum import Enum
-from utils.logging_config import get_logger
+from typing import Any
+from zoneinfo import ZoneInfo
+
 from utils.i18n_utils import I18nManager
+from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
@@ -93,14 +94,14 @@ class AstronomicalEvent:
     icon_color_class: str  # Optional color class (e.g. "text-warning")
     title: str  # Short title
     description: str  # Description
-    start_time: Optional[str]  # Start time (ISO format)
-    peak_time: Optional[str]  # Peak/best time (ISO format)
-    end_time: Optional[str]  # End time (ISO format)
+    start_time: str | None  # Start time (ISO format)
+    peak_time: str | None  # Peak/best time (ISO format)
+    end_time: str | None  # End time (ISO format)
     days_until_event: int  # Days until event happens
     visibility: bool  # Is event visible from location?
     importance: str  # Importance level
-    score: Optional[float]  # Importance score (0-10)
-    raw_data: Dict[str, Any]  # Original data for detailed view
+    score: float | None  # Importance score (0-10)
+    raw_data: dict[str, Any]  # Original data for detailed view
     structure_key: str  # Stable frontend section key (moon, sun, ...)
     # Comet-specific: target never clears the configured site's altitude/airmass
     # floor during its visibility window (see solar_system_events._build_comet_event).
@@ -108,15 +109,15 @@ class AstronomicalEvent:
     altitude_limited: bool = False
     # Comet-specific: SkyTonight target_id, used by the frontend to open the
     # altitude-vs-time popup for this event. None for every other event type.
-    target_id: Optional[str] = None
+    target_id: str | None = None
     # Raw (untranslated) variable piece behind a composed title/description, exposed so
     # MQTT/API consumers can translate client-side instead of parsing the English sentence.
     # None where the event kind has no such variable, or doesn't set it below.
-    eclipse_type: Optional[str] = None
-    planet: Optional[str] = None
-    planet2: Optional[str] = None
-    shower_name: Optional[str] = None
-    comet_name: Optional[str] = None
+    eclipse_type: str | None = None
+    planet: str | None = None
+    planet2: str | None = None
+    shower_name: str | None = None
+    comet_name: str | None = None
 
 
 class EventsAggregator:
@@ -249,7 +250,7 @@ class EventsAggregator:
         }
         return mapping.get(event_type, fallback)
 
-    def _localize_planetary_text(self, event_data: Dict[str, Any]) -> tuple[str, str]:
+    def _localize_planetary_text(self, event_data: dict[str, Any]) -> tuple[str, str]:
         """Localize planetary event title and description using raw_data."""
         event_type = event_data.get("event_type", "")
         raw = event_data.get("raw_data", {}) or {}
@@ -320,7 +321,7 @@ class EventsAggregator:
 
         return fallback_title, fallback_description
 
-    def _raw_planet_fields(self, event_data: Dict[str, Any]) -> tuple[Optional[str], Optional[str]]:
+    def _raw_planet_fields(self, event_data: dict[str, Any]) -> tuple[str | None, str | None]:
         """Raw (untranslated) planet name(s) behind a planetary event's composed title."""
         event_type = event_data.get("event_type", "")
         raw = event_data.get("raw_data", {}) or {}
@@ -337,7 +338,7 @@ class EventsAggregator:
             return (raw.get("planet") or None, None)
         return (None, None)
 
-    def _localize_special_phenomena_text(self, event_data: Dict[str, Any]) -> tuple[str, str]:
+    def _localize_special_phenomena_text(self, event_data: dict[str, Any]) -> tuple[str, str]:
         """Localize special phenomena title/description using raw event identifiers."""
         raw = event_data.get("raw_data", {}) or {}
         fallback_title = event_data.get("title", "Special Phenomenon")
@@ -390,17 +391,17 @@ class EventsAggregator:
 
     def aggregate_all_events(
         self,
-        solar_eclipse_data: Optional[Dict[str, Any]] = None,
-        lunar_eclipse_data: Optional[Dict[str, Any]] = None,
-        aurora_data: Optional[Dict[str, Any]] = None,
-        iss_passes_data: Optional[Dict[str, Any]] = None,
-        css_passes_data: Optional[Dict[str, Any]] = None,
-        moon_phases_data: Optional[Dict[str, Any]] = None,
-        planetary_events_data: Optional[Dict[str, Any]] = None,
-        special_phenomena_data: Optional[Dict[str, Any]] = None,
-        solar_system_events_data: Optional[Dict[str, Any]] = None,
-        sidereal_time_data: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        solar_eclipse_data: dict[str, Any] | None = None,
+        lunar_eclipse_data: dict[str, Any] | None = None,
+        aurora_data: dict[str, Any] | None = None,
+        iss_passes_data: dict[str, Any] | None = None,
+        css_passes_data: dict[str, Any] | None = None,
+        moon_phases_data: dict[str, Any] | None = None,
+        planetary_events_data: dict[str, Any] | None = None,
+        special_phenomena_data: dict[str, Any] | None = None,
+        solar_system_events_data: dict[str, Any] | None = None,
+        sidereal_time_data: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Aggregate all available events into a unified format.
 
@@ -509,7 +510,7 @@ class EventsAggregator:
 
         return result
 
-    def _extract_solar_eclipse_events(self, eclipse_data: Dict[str, Any]) -> List[AstronomicalEvent]:
+    def _extract_solar_eclipse_events(self, eclipse_data: dict[str, Any]) -> list[AstronomicalEvent]:
         """Extract solar eclipse event(s) from raw eclipse data"""
         events = []
 
@@ -579,7 +580,7 @@ class EventsAggregator:
         events.append(event)
         return events
 
-    def _extract_lunar_eclipse_events(self, eclipse_data: Dict[str, Any]) -> List[AstronomicalEvent]:
+    def _extract_lunar_eclipse_events(self, eclipse_data: dict[str, Any]) -> list[AstronomicalEvent]:
         """Extract lunar eclipse event(s) from raw eclipse data"""
         events = []
 
@@ -652,7 +653,7 @@ class EventsAggregator:
         events.append(event)
         return events
 
-    def _extract_aurora_events(self, aurora_data: Dict[str, Any]) -> List[AstronomicalEvent]:
+    def _extract_aurora_events(self, aurora_data: dict[str, Any]) -> list[AstronomicalEvent]:
         """Return only the first strong aurora visibility event.
         The aurora event is different because it is a forecast with multiple time slots (8 x 3h),
         so we will extract the most relevant one based on visibility likelihood and timing.
@@ -717,7 +718,7 @@ class EventsAggregator:
 
         return []  # No strong events found
 
-    def _extract_moon_phase_events(self, moon_data: Dict[str, Any]) -> List[AstronomicalEvent]:
+    def _extract_moon_phase_events(self, moon_data: dict[str, Any]) -> list[AstronomicalEvent]:
         """Extract moon phase events from 'phases' or 'next_7_nights' format"""
         events = []
 
@@ -808,7 +809,7 @@ class EventsAggregator:
             events.append(event)
         return events
 
-    def _extract_iss_pass_events(self, iss_data: Dict[str, Any]) -> List[AstronomicalEvent]:
+    def _extract_iss_pass_events(self, iss_data: dict[str, Any]) -> list[AstronomicalEvent]:
         """Extract ISS visible pass, solar transit, and lunar transit events occurring in the next 7 days."""
         raw_passes = iss_data.get("passes")
         if not isinstance(raw_passes, list):
@@ -825,7 +826,7 @@ class EventsAggregator:
             next_lunar_transit = iss_data.get("next_lunar_transit")
             raw_lunar_transits = [next_lunar_transit] if next_lunar_transit else []
 
-        events: List[AstronomicalEvent] = []
+        events: list[AstronomicalEvent] = []
 
         for iss_pass in raw_passes:
             if not isinstance(iss_pass, dict):
@@ -998,7 +999,7 @@ class EventsAggregator:
         events.sort(key=lambda event: self._parse_iso_time(event.peak_time) if event.peak_time else self.local_now)
         return events
 
-    def _extract_css_pass_events(self, css_data: Dict[str, Any]) -> List[AstronomicalEvent]:
+    def _extract_css_pass_events(self, css_data: dict[str, Any]) -> list[AstronomicalEvent]:
         """Extract CSS visible pass, solar transit, and lunar transit events occurring in the next 7 days."""
         raw_passes = css_data.get("passes")
         if not isinstance(raw_passes, list):
@@ -1015,7 +1016,7 @@ class EventsAggregator:
             next_lunar_transit = css_data.get("next_lunar_transit")
             raw_lunar_transits = [next_lunar_transit] if next_lunar_transit else []
 
-        events: List[AstronomicalEvent] = []
+        events: list[AstronomicalEvent] = []
 
         for css_pass in raw_passes:
             if not isinstance(css_pass, dict):
@@ -1198,7 +1199,7 @@ class EventsAggregator:
         }
         return self._t(f"events_api.activities.{activity_key}", fallback_map.get(activity_key, "observing"))
 
-    def _event_window_has_ended(self, event_data: Dict[str, Any]) -> bool:
+    def _event_window_has_ended(self, event_data: dict[str, Any]) -> bool:
         """True if a timed event's visibility window (end_time, if any) is already in the past.
 
         Short nightly windows (Milky Way core, zodiacal light) carry a real end_time a few
@@ -1209,7 +1210,7 @@ class EventsAggregator:
         """
         return self._window_end_is_past(event_data.get("end_time"))
 
-    def _window_end_is_past(self, end_time_str: Optional[str]) -> bool:
+    def _window_end_is_past(self, end_time_str: str | None) -> bool:
         """True if ``end_time_str`` is a timestamp already behind us (None/empty = False)."""
         if not end_time_str:
             return False
@@ -1230,7 +1231,7 @@ class EventsAggregator:
         """Get current time in configured timezone"""
         return datetime.datetime.now(self.timezone)
 
-    def _extract_planetary_events(self, planetary_data: Dict[str, Any]) -> List[AstronomicalEvent]:
+    def _extract_planetary_events(self, planetary_data: dict[str, Any]) -> list[AstronomicalEvent]:
         """Extract planetary events from raw data"""
         events = []
 
@@ -1284,7 +1285,7 @@ class EventsAggregator:
 
         return events
 
-    def _extract_special_phenomena_events(self, phenomena_data: Dict[str, Any]) -> List[AstronomicalEvent]:
+    def _extract_special_phenomena_events(self, phenomena_data: dict[str, Any]) -> list[AstronomicalEvent]:
         """Extract special phenomena events from raw data"""
         events = []
 
@@ -1338,7 +1339,7 @@ class EventsAggregator:
 
         return events
 
-    def _extract_solar_system_events(self, solsys_data: Dict[str, Any]) -> List[AstronomicalEvent]:
+    def _extract_solar_system_events(self, solsys_data: dict[str, Any]) -> list[AstronomicalEvent]:
         """Extract solar system events (meteor showers, comets, occultations) from raw data"""
         events = []
 

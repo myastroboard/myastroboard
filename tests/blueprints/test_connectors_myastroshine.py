@@ -27,8 +27,8 @@ import pytest
 if "psutil" not in sys.modules:
     sys.modules["psutil"] = types.ModuleType("psutil")
 
-from observation import astrodex
 from connectors.myastroshine_connector import MyAstroShineConnector
+from observation import astrodex
 from observation import myastroshine_integration as integration
 from utils.auth import user_manager
 
