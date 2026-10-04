@@ -12,7 +12,7 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixes
 
-- None.
+- Observatory: AllSky sensor card shows a dome temperature (Dew Heater ambient, else the fan's control temperature) with the fan threshold on the fan row; the camera sensor `TEMPERATURE_C` `0` placeholder is hidden - see [docs/CONNECTORS.md](docs/CONNECTORS.md).
 
 ### Breaking changes
 

@@ -70,7 +70,7 @@ const _CONNECTOR_UI = {
                             { textKey: 'allsky_sensor_setup_extra_data',
                               value: 'DAY_OR_NIGHT,ALLSKY_VERSION,AS_TEMPERATURE_C,AS_GAIN,AS_EXPOSURE_US,AS_MEAN' },
                             { textKey: 'allsky_sensor_setup_dew_heater',
-                              value: 'AS_DEWCONTROLHUMIDITY,AS_DEWCONTROLDEW,AS_DEWCONTROLHEATER' },
+                              value: 'AS_DEWCONTROLAMBIENT,AS_DEWCONTROLHUMIDITY,AS_DEWCONTROLDEW,AS_DEWCONTROLHEATER' },
                             { textKey: 'allsky_sensor_setup_fans',
                               value: 'AS_FANS_FAN_STATE1,AS_FANS_TEMPERATURE1,AS_FANS_TEMP_LIMIT1,AS_FANS_PWM_DUTY_PERCENT1' },
                         ],

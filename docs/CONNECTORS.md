@@ -181,7 +181,7 @@ The connector card shows these steps under the *Sensor data* module (*How to set
 - **File Location**: `${ALLSKY_TMP}/current_images/allskydata.json`. The default `${ALLSKY_TMP}/allskydata.json` is no longer reachable over HTTP.
 - **Extra data to export**: the variables to show. Only listed variables are exported now, for example:
   `DAY_OR_NIGHT,ALLSKY_VERSION,AS_TEMPERATURE_C,AS_GAIN,AS_EXPOSURE_US,AS_MEAN`. Add
-  `AS_DEWCONTROLHUMIDITY,AS_DEWCONTROLDEW,AS_DEWCONTROLHEATER` when the Dew Heater module is installed, and
+  `AS_DEWCONTROLAMBIENT,AS_DEWCONTROLHUMIDITY,AS_DEWCONTROLDEW,AS_DEWCONTROLHEATER` when the Dew Heater module is installed, and
   `AS_FANS_FAN_STATE1,AS_FANS_TEMPERATURE1,AS_FANS_TEMP_LIMIT1,AS_FANS_PWM_DUTY_PERCENT1` when the Fans module is
   (same names ending in `2` for a second fan).
 
@@ -189,15 +189,16 @@ When sensor data is available the Observatory tab shows:
 
 | Field | AllSky variable |
 |-------|-----------------|
-| Temperature | `AS_TEMPERATURE_C` |
+| Dome temperature | `AS_DEWCONTROLAMBIENT` (Dew Heater module, optional), else the first fan's `AS_FANS_TEMPERATURE1` (v2024: `OTH_TEMPERATURE`) |
+| Camera sensor temperature (hidden when AllSky exports its `0` placeholder) | `AS_TEMPERATURE_C` |
 | Humidity | `AS_DEWCONTROLHUMIDITY` or `AS_HUMIDITY` |
 | Dew point | `AS_DEWCONTROLDEW` |
 | Dew heater | `AS_DEWCONTROLHEATER` |
 | Gain | `AS_GAIN` |
 | Exposure | `AS_sEXPOSURE`, or `AS_EXPOSURE_US` formatted as µs / ms / s (AllSky v2026 leaves `sEXPOSURE` empty) |
 | Brightness | `AS_MEAN` |
-| Fan (state, PWM duty %) | `AS_FANS_FAN_STATE1` / `2`, `AS_FANS_PWM_DUTY_PERCENT1` / `2` (v2024: `OTH_FANS`) |
-| Fan sensor temperature (threshold) | `AS_FANS_TEMPERATURE1` / `2`, `AS_FANS_TEMP_LIMIT1` / `2` (v2024: `OTH_TEMPERATURE`, `OTH_FANT`) |
+| Fan (state, PWM duty %, threshold) | `AS_FANS_FAN_STATE1` / `2`, `AS_FANS_PWM_DUTY_PERCENT1` / `2`, `AS_FANS_TEMP_LIMIT1` / `2` (v2024: `OTH_FANS`, `OTH_FANT`) |
+| Fan control temperature (Pi CPU by default, or the sensor chosen in the Fans module), only when not already the dome temperature | `AS_FANS_TEMPERATURE1` / `2` |
 | AllSky version | `ALLSKY_VERSION` |
 
 The **Day / Night badge** on the live image card is populated from the `DAY_OR_NIGHT` field in the same JSON. It is hidden when sensor data is disabled or when the field is absent from the exported data.

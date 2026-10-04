@@ -28,7 +28,8 @@ Displayed fields (when available in the JSON):
 
 | Label | AllSky key |
 |-------|-----------|
-| Temperature | `AS_TEMPERATURE_C` |
+| Dome temperature | `AS_DEWCONTROLAMBIENT` (Dew Heater module, optional), else the first fan's `AS_FANS_TEMPERATURE1` (v2024: `OTH_TEMPERATURE`) |
+| Camera sensor temperature (hidden when AllSky exports its `0` placeholder) | `AS_TEMPERATURE_C` |
 | Humidity | `AS_DEWCONTROLHUMIDITY` or `AS_HUMIDITY` |
 | Dew point | `AS_DEWCONTROLDEW` |
 | Dew heater | `AS_DEWCONTROLHEATER` |

@@ -386,11 +386,10 @@ const _roundTo2 = n => Math.round(n * 100) / 100;
 const _num = value => (Number.isFinite(Number(value)) ? _roundTo2(Number(value)) : value);
 
 /**
- * Rows for the AllSky Fans module (allsky_fans): a state row (+ PWM duty %) and a
- * temperature row (+ activation threshold) per fan found in the export. v2026 publishes
- * AS_FANS_*1 / AS_FANS_*2; v2024 published a single fan as OTH_FANS / OTH_TEMPERATURE / OTH_FANT.
+ * Fans published by the AllSky Fans module (allsky_fans). v2026 publishes AS_FANS_*1 /
+ * AS_FANS_*2; v2024 published a single fan as OTH_FANS / OTH_TEMPERATURE / OTH_FANT.
  */
-function _allSkyFanRows(data, hasValue) {
+function _allSkyFans(hasValue) {
     const fans = [1, 2]
         .filter(n => hasValue(`AS_FANS_FAN_STATE${n}`) || hasValue(`AS_FANS_TEMPERATURE${n}`))
         .map(n => ({
@@ -400,10 +399,20 @@ function _allSkyFanRows(data, hasValue) {
     if (!fans.length && (hasValue('OTH_FANS') || hasValue('OTH_TEMPERATURE'))) {
         fans.push({ n: 1, state: 'OTH_FANS', temperature: 'OTH_TEMPERATURE', limit: 'OTH_FANT', duty: null });
     }
+    return fans;
+}
 
+/**
+ * Rows for the fans: a state row (+ PWM duty %, + activation threshold) per fan, and a
+ * temperature row for a fan whose control temperature is not already shown as the dome one.
+ */
+function _allSkyFanRows(data, hasValue, fans, domeTempKey) {
     const rows = [];
     fans.forEach(fan => {
         const suffix = fans.length > 1 ? ` ${fan.n}` : '';
+        const limit = hasValue(fan.limit)
+            ? ` (${i18n.t('observatory.fan_threshold')} ${_num(data[fan.limit])} °C)`
+            : '';
         rows.push({
             key: fan.state, label: `${i18n.t('observatory.fan')}${suffix}`, unit: '', icon: 'bi-fan',
             format: value => {
@@ -413,18 +422,15 @@ function _allSkyFanRows(data, hasValue) {
                 const state = on || off ? i18n.t(on ? 'observatory.fan_on' : 'observatory.fan_off') : value;
                 // Duty % only means something while the fan runs on PWM
                 const duty = fan.duty && on && hasValue(fan.duty) ? ` (${_num(data[fan.duty])} %)` : '';
-                return `${state}${duty}`;
+                return `${state}${duty}${limit}`;
             },
         });
-        rows.push({
-            key: fan.temperature, label: `${i18n.t('observatory.fan_temperature')}${suffix}`, unit: '', icon: 'bi-thermometer',
-            format: value => {
-                const limit = hasValue(fan.limit)
-                    ? ` (${i18n.t('observatory.fan_threshold')} ${_num(data[fan.limit])} °C)`
-                    : '';
-                return `${_num(value)} °C${limit}`;
-            },
-        });
+        if (fan.temperature !== domeTempKey) {
+            rows.push({
+                key: fan.temperature, label: `${i18n.t('observatory.fan_temperature')}${suffix}`, unit: '', icon: 'bi-thermometer',
+                format: value => `${_num(value)} °C`,
+            });
+        }
     });
     return rows;
 }
@@ -470,12 +476,23 @@ async function _pollAllSkySensor() {
     // AllSky v2026 leaves sEXPOSURE empty (no module publishes it): format EXPOSURE_US instead
     const exposureKey  = hasValue('AS_sEXPOSURE') ? 'AS_sEXPOSURE' : 'AS_EXPOSURE_US';
 
+    // TEMPERATURE_C is the camera sensor, not the air: AllSky v2026 exports 0 when the camera
+    // reports none (most RPi cameras), so an exact 0 is its placeholder rather than a reading
+    const sensorTempKnown = hasValue('AS_TEMPERATURE_C') && Number(data.AS_TEMPERATURE_C) !== 0;
+
+    // Dome temperature: the Dew Heater's ambient sensor, else the temperature the first fan is
+    // driven by (Pi CPU or the sensor chosen in the Fans module), both inside the housing
+    const fans = _allSkyFans(hasValue);
+    const domeTempKey = ['AS_DEWCONTROLAMBIENT', fans[0]?.temperature].find(key => key && hasValue(key)) || null;
+
     const rows = [
-        { key: 'AS_TEMPERATURE_C',    label: i18n.t('observatory.temperature'),     unit: '°C', icon: 'bi-thermometer-half' },
+        { key: domeTempKey,           label: i18n.t('observatory.dome_temperature'), unit: '°C', icon: 'bi-thermometer-half',
+          format: value => _num(value) },
+        { key: sensorTempKnown ? 'AS_TEMPERATURE_C' : null, label: i18n.t('observatory.sensor_temperature'), unit: '°C', icon: 'bi-cpu' },
         { key: humidityKey,           label: i18n.t('observatory.humidity'),         unit: '%',  icon: 'bi-droplet-half' },
         { key: 'AS_DEWCONTROLDEW',    label: i18n.t('observatory.dew_point'),        unit: '°C', icon: 'bi-water' },
         { key: 'AS_DEWCONTROLHEATER', label: i18n.t('observatory.dew_heater'),       unit: '',   icon: 'bi-lightning-charge' },
-        ..._allSkyFanRows(data, hasValue),
+        ..._allSkyFanRows(data, hasValue, fans, domeTempKey),
         { key: 'AS_GAIN',             label: i18n.t('observatory.gain'),             unit: '',   icon: 'bi-sliders' },
         { key: exposureKey,           label: i18n.t('observatory.exposure'),         unit: '',   icon: 'bi-clock',
           format: exposureKey === 'AS_EXPOSURE_US' ? _formatExposureUs : null },
