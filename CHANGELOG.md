@@ -8,6 +8,20 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Features
 
+- None.
+
+### Fixes
+
+- None.
+
+### Breaking changes
+
+- None.
+
+## 1.7.1 (2026-10-04)
+
+### Features
+
 - Observatory: AllSky sensor card shows the Fans module (state, PWM duty %, temperature and threshold, up to two fans).
 
 ### Fixes
