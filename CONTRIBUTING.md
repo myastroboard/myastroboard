@@ -564,19 +564,10 @@ The failure output lists exactly which routes are unexpected or missing, so you 
 
 ### PR Checklist
 
-- [ ] Code follows project style guidelines
-- [ ] All text is in English
-- [ ] Self-review completed
-- [ ] Comments added for complex code
-- [ ] Documentation updated
-- [ ] CHANGELOG.md entry added under `## [Unreleased]` (required for `feature/`/`fix/` branches)
-- [ ] Tests added/updated
-- [ ] All tests passing
-- [ ] No merge conflicts
-- [ ] Logging uses centralized system (no `print()`)
-- [ ] Personal data handled per the GDPR rules in `.github/instructions/copilot.instructions.md`, and `docs/PRIVACY.md` updated if the change stores, shares or sends user data
-- [ ] A change to `backend/db/schema.py` comes with an Alembic revision (see [docs/DATABASE.md](docs/DATABASE.md#changing-the-schema))
-- [ ] Commit messages follow conventions
+The checklist lives in the [pull request template](.github/pull_request_template.md). It only lists
+what CI cannot check for you: self-review, tests, a Docker run, docs, dependencies,
+`docs/PRIVACY.md`, an Alembic revision for a change to `backend/db/schema.py` (see
+[docs/DATABASE.md](docs/DATABASE.md#changing-the-schema)), and breaking changes.
 
 ### Review Process
 
