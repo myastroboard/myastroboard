@@ -12,7 +12,8 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixes
 
-- None.
+- *What's new* window: the release just published is listed again instead of "could not be loaded" (its changelog
+  entries are read from the release tag's Unreleased section, archived only after tagging).
 
 ### Breaking changes
 
