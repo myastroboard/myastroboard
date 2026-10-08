@@ -8,6 +8,20 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Features
 
+- None.
+
+### Fixes
+
+- None.
+
+### Breaking changes
+
+- None.
+
+## 1.7.2 (2026-10-08)
+
+### Features
+
 - Parameters: MQTT brokers are now shared connections, managed in Configuration and picked by the MQTT / Home Assistant
   connector; an existing broker setup is migrated automatically - see [docs/HOME_ASSISTANT.md](docs/HOME_ASSISTANT.md#mqtt-connections).
 - Parameters: sub-tabs reordered (Locations, Configuration, Connectors, Logs, Users, Metrics, Backup / Restore); Log export
