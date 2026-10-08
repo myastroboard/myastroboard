@@ -250,7 +250,7 @@ EXPECTED_ROUTES = {
     ('/api/connectors/allsky/urls', ('GET',)),
     ('/api/connectors/astrodex_stream/rotate', ('POST',)),
     ('/api/connectors/myastroshine/health', ('GET', 'POST')),
-    ('/api/connectors/mqtt/health', ('GET', 'POST')),
+    ('/api/connectors/mqtt/health', ('GET',)),
     ('/api/connectors/mqtt/publish', ('POST',)),
     ('/api/connectors/mqtt/remove', ('POST',)),
     ('/api/connectors/mqtt/status', ('GET',)),

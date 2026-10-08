@@ -215,6 +215,21 @@ class TestConfigLoading:
         _set_config_file(monkeypatch, path)
         assert load_config()["astrodex"]["map_private"] is True
 
+    def test_obsolete_allsky_export_json_path_is_dropped(self, temp_dir, monkeypatch):
+        """The AllSky Export file is no longer read (sensor data arrives over MQTT): a stored
+        export_json_path disappears from the loaded config, the rest of the block stays."""
+        path = os.path.join(temp_dir, "allsky.json")
+        raw = {
+            "locations": [dict(DEFAULT_LOCATION, id="loc-1", is_install_default=True)],
+            "connectors": {"allsky": {"url": "http://allsky.lan", "export_json_path": "allskydata.json"}},
+        }
+        with open(path, "w", encoding="utf-8") as fp:
+            json.dump(raw, fp)
+        _set_config_file(monkeypatch, path)
+        allsky = load_config()["connectors"]["allsky"]
+        assert "export_json_path" not in allsky
+        assert allsky["url"] == "http://allsky.lan"
+
     def test_load_config_has_required_fields(self, temp_dir, monkeypatch):
         _set_config_file(monkeypatch, os.path.join(temp_dir, "required.json"))
         config = load_config()

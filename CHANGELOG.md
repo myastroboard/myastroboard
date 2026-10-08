@@ -14,6 +14,8 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   now sits under Logs.
 - Connectors: the "Display name" field only shows on connectors with an Observatory panel (AllSky), the only place it
   is used.
+- Observatory: AllSky sensor data now arrives over MQTT from AllSky's Publish Data module (v2024.12 and v2026), on a shared
+  MQTT connection; v2026's shared environment sensor is shown first - see [docs/CONNECTORS.md](docs/CONNECTORS.md#sensor-data-module).
 
 ### Fixes
 
@@ -22,7 +24,8 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Breaking changes
 
-- None.
+- AllSky connector: sensor data no longer reads the Export module file (`export_json_path` is gone). Pick an MQTT
+  connection in the *Sensor data* module and set up AllSky's Publish Data module as the card shows.
 
 ## 1.7.1 (2026-10-04)
 

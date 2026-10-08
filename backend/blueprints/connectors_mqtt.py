@@ -8,12 +8,12 @@ Every route here is admin-only, unlike the AllSky / MyAstroShine probes: a broke
 carries credentials, and only an admin can save the connector anyway.
 """
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify
 
 from connectors.mqtt_connector import MqttConnector
 from utils.auth import admin_required, login_required
 from utils.logging_config import get_logger
-from utils.mqtt_connections import connection_password, get_connection, overlay_connection
+from utils.mqtt_connections import connection_for, connection_password
 from utils.repo_config import load_config, save_config
 
 logger = get_logger(__name__)
@@ -32,7 +32,7 @@ def _saved_connector() -> MqttConnector:
     """
     config = load_config()
     block = config.get('connectors', {}).get('mqtt', {}) or {}
-    return MqttConnector(overlay_connection(block, config, MqttConnector.CONNECTION_FIELD))
+    return MqttConnector(block, connection=connection_for(MqttConnector, block, config))
 
 
 def _saved_password() -> str:
@@ -41,39 +41,17 @@ def _saved_password() -> str:
     return connection_password(block.get(MqttConnector.CONNECTION_FIELD))
 
 
-@connectors_mqtt_bp.route('/api/connectors/mqtt/health', methods=['GET', 'POST'])
+@connectors_mqtt_bp.route('/api/connectors/mqtt/health', methods=['GET'])
 @admin_required
 def mqtt_health_api():
-    """Connect to the broker once and report the outcome.
+    """Connect to the saved connector's broker once and report the outcome and module toggles.
 
-    GET - probe the saved configuration (its connection, with that connection's stored
-    credentials); also reports each module's toggle.
-
-    POST ``{"mqtt_connection_id"}`` - probe the connection picked in the card, before saving.
-    Testing a broker as typed is the connections' own route (/api/mqtt-connections/health).
-
-    A failed probe is a 200 with ``reachable: false`` and an ``error`` string the card can show;
-    400 is reserved for a missing or unknown connection.
+    Probes its connection with that connection's stored credentials. Testing a connection picked
+    on the card before saving goes through /api/mqtt-connections/health. A failed probe is a
+    200 with ``reachable: false`` and an ``error`` string the card can show.
     """
     try:
-        if request.method == 'GET':
-            return jsonify(_saved_connector().health_check(password=_saved_password()))
-
-        data = request.get_json(silent=True) or {}
-        connection_id = str(data.get(MqttConnector.CONNECTION_FIELD) or '').strip()
-        if not connection_id:
-            return jsonify({'reachable': False, 'modules': {}, 'error': 'connection required'}), 400
-        config = load_config()
-        if get_connection(config, connection_id) is None:
-            return jsonify({'reachable': False, 'modules': {}, 'error': 'unknown connection'}), 400
-
-        block = {MqttConnector.CONNECTION_FIELD: connection_id}
-        connector = MqttConnector(overlay_connection(block, config, MqttConnector.CONNECTION_FIELD))
-        result = connector.probe(password=connection_password(connection_id))
-        payload = {'reachable': bool(result['reachable']), 'modules': {}}
-        if result.get('error'):
-            payload['error'] = result['error']
-        return jsonify(payload)
+        return jsonify(_saved_connector().health_check(password=_saved_password()))
     except Exception as exc:
         logger.error(f"Error probing MQTT broker: {exc}")
         return jsonify({'error': 'Internal server error'}), 500

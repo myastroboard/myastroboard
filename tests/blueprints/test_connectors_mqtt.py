@@ -1,6 +1,6 @@
 """Tests for the MQTT connector routes (blueprints/connectors_mqtt.py).
 
-  GET|POST /api/connectors/mqtt/health
+  GET      /api/connectors/mqtt/health
   GET      /api/connectors/mqtt/status
   POST     /api/connectors/mqtt/publish
   POST     /api/connectors/mqtt/remove
@@ -68,7 +68,6 @@ class TestAccess:
         'method, path',
         [
             ('GET', '/api/connectors/mqtt/health'),
-            ('POST', '/api/connectors/mqtt/health'),
             ('POST', '/api/connectors/mqtt/publish'),
             ('POST', '/api/connectors/mqtt/remove'),
         ],
@@ -107,31 +106,10 @@ class TestHealth:
         assert body == {'reachable': False, 'modules': {}, 'error': 'url required'}
         assert probe['calls'] == []
 
-    def test_post_requires_a_connection(self, client_admin, saved, probe):
-        """POST without a connection id is a 400."""
-        resp = client_admin.post('/api/connectors/mqtt/health', json={})
-        assert resp.status_code == 400
-        assert resp.get_json()['error'] == 'connection required'
-
-    def test_post_rejects_an_unknown_connection(self, client_admin, saved, probe):
-        """POST naming a connection that does not exist is a 400, without probing."""
-        resp = client_admin.post('/api/connectors/mqtt/health', json={'mqtt_connection_id': 'nope'})
-        assert resp.status_code == 400
-        assert resp.get_json()['error'] == 'unknown connection'
+    def test_post_is_not_allowed(self, client_admin, saved, probe):
+        """Testing a picked connection before saving is /api/mqtt-connections/health's job."""
+        assert client_admin.post('/api/connectors/mqtt/health', json={}).status_code == 405
         assert probe['calls'] == []
-
-    def test_post_probes_the_picked_connection_before_saving(self, client_admin, saved, probe):
-        """POST probes the connection picked in the card (not the saved one), with its own settings."""
-        resp = client_admin.post('/api/connectors/mqtt/health', json={'mqtt_connection_id': 'conn2'})
-        assert resp.status_code == 200 and resp.get_json() == {'reachable': True, 'modules': {}}
-        assert probe['calls'] == [{'url': None, 'username': None, 'password': '', 'tls_insecure': None}]
-
-    def test_post_unreachable_is_a_200_with_the_error(self, client_admin, saved, probe):
-        """A failed probe is reported in the body, not as an HTTP error."""
-        probe['result'].update(reachable=False, error='connection refused')
-        resp = client_admin.post('/api/connectors/mqtt/health', json={'mqtt_connection_id': 'conn1'})
-        assert resp.status_code == 200
-        assert resp.get_json() == {'reachable': False, 'modules': {}, 'error': 'connection refused'}
 
     def test_saved_connector_reads_the_broker_from_the_connection(self, saved):
         """The routing connector gets url / username / TLS from its connection, never the password.
@@ -143,8 +121,8 @@ class TestHealth:
 
         connector = _saved_connector()
         assert connector.base_url == 'mqtt://broker.lan:1883'
-        assert connector.config['username'] == 'saved-user'
-        assert 'password' not in connector.config
+        assert connector.username() == 'saved-user'
+        assert 'password' not in connector.config and 'password' not in (connector.connection or {})
         assert _saved_password() == 'saved-pw'
 
     def test_unexpected_failure_is_a_500(self, client_admin, saved, monkeypatch):
@@ -153,7 +131,6 @@ class TestHealth:
 
         monkeypatch.setattr(MqttConnector, 'probe', boom)
         assert client_admin.get('/api/connectors/mqtt/health').status_code == 500
-        assert client_admin.post('/api/connectors/mqtt/health', json={'mqtt_connection_id': 'conn1'}).status_code == 500
 
 
 # ---------------------------------------------------------------------------

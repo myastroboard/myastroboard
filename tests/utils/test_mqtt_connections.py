@@ -78,26 +78,31 @@ class TestReading:
         assert public['used_by'] == ['mqtt']
         assert 'hunter22' not in str(public)
 
-    def test_overlay_connection_lays_the_broker_over_the_block(self):
-        """url / username / tls_insecure come from the connection; the password never does."""
+    def test_connection_for_returns_the_picked_connection_without_its_password(self):
+        """The connector gets its connection apart from its block; the password never comes with it."""
+
+        class _Picks:
+            CONNECTION_FIELD = 'mqtt_connection_id'
+
         save_secrets('mqtt_connection:c1', {'password': 'pw'})
         config = _config([_conn('c1', url='mqtts://b', username='u', tls_insecure=True)])
-        block = {'mqtt_connection_id': 'c1', 'base_topic': 'x', 'url': 'mqtt://stale'}
-        merged = mc.overlay_connection(block, config, 'mqtt_connection_id')
-        assert merged == {
-            'mqtt_connection_id': 'c1',
-            'base_topic': 'x',
-            'url': 'mqtts://b',
-            'username': 'u',
-            'tls_insecure': True,
-        }
-        assert block['url'] == 'mqtt://stale'  # the caller's block is left alone
+        block = {'mqtt_connection_id': 'c1', 'url': 'http://allsky.lan'}
+        assert mc.connection_for(_Picks, block, config) == _conn('c1', url='mqtts://b', username='u', tls_insecure=True)
+        assert block == {'mqtt_connection_id': 'c1', 'url': 'http://allsky.lan'}  # the block is left alone
 
-    def test_overlay_without_a_known_connection_is_not_configured(self):
-        """A missing or unknown connection leaves the URL blank."""
+    def test_connection_for_without_a_usable_connection(self):
+        """No connection field, no pick, or an unknown id all give None."""
+
+        class _Picks:
+            CONNECTION_FIELD = 'mqtt_connection_id'
+
+        class _NoConnection:
+            CONNECTION_FIELD = ''
+
         config = _config([_conn('c1')])
-        assert mc.overlay_connection({'mqtt_connection_id': 'gone'}, config, 'mqtt_connection_id')['url'] == ''
-        assert mc.overlay_connection(None, config, 'mqtt_connection_id')['url'] == ''
+        assert mc.connection_for(_Picks, {'mqtt_connection_id': 'gone'}, config) is None
+        assert mc.connection_for(_Picks, None, config) is None
+        assert mc.connection_for(_NoConnection, {'mqtt_connection_id': 'c1'}, config) is None
 
 
 class TestClientIdConflict:

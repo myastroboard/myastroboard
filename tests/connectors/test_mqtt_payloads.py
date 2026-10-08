@@ -20,10 +20,10 @@ LOCATION = {"id": "loc-1", "name": "Backyard", "timezone": "Europe/Paris", "lati
 
 
 def _connector(modules=None, **cfg):
-    config = {"url": "mqtt://broker", "enabled": True, "base_topic": "mab", "discovery_prefix": "ha"}
+    config = {"enabled": True, "base_topic": "mab", "discovery_prefix": "ha"}
     config.update(cfg)
     config["modules"] = {slug: {"enabled": True} for slug in (modules or [])}
-    return MqttConnector(config)
+    return MqttConnector(config, connection={"url": "mqtt://broker"})
 
 
 @pytest.fixture

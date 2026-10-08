@@ -13,6 +13,7 @@ from cache import cache_store
 from connectors.allsky_connector import AllSkyConnector
 from utils.auth import login_required
 from utils.logging_config import get_logger
+from utils.mqtt_connections import connection_for
 from utils.repo_config import load_config
 
 logger = get_logger(__name__)
@@ -22,8 +23,6 @@ connectors_allsky_bp = Blueprint('connectors_allsky', __name__)
 # Bound once, so the route's caching does not depend on the AllSkyConnector object itself
 # (which tests replace to stub out the network). The value's home stays the connector class.
 _HEALTH_CACHE_TTL = AllSkyConnector.HEALTH_CACHE_TTL
-_SENSOR_CACHE_TTL = AllSkyConnector.SENSOR_CACHE_TTL
-_SENSOR_EMPTY_RETRY = AllSkyConnector.SENSOR_EMPTY_RETRY
 
 # AllSky image/video files are named after the session date (YYYYMMDD). date_str is
 # interpolated directly into the upstream URL path (see AllSkyConnector._keogram_url and
@@ -35,7 +34,12 @@ _ALLSKY_DATE_PATTERN = re.compile(r'^\d{8}$')
 @connectors_allsky_bp.route('/api/connectors/allsky/status', methods=['GET'])
 @login_required
 def allsky_status_api():
-    """Return cached AllSky sensor data (allskydata.json)."""
+    """Return the AllSky sensor data of the last MQTT message (Publish Data module).
+
+    Read straight from the file the MQTT subscriber writes (connectors/mqtt_subscriber.py), so
+    any worker answers with the latest message; ``{}`` while none arrived yet or the last one is
+    too old. ``_received_at`` is when the board received it.
+    """
     config = load_config()
     allsky_cfg = config.get("connectors", {}).get("allsky", {})
     if not allsky_cfg.get("enabled") or not allsky_cfg.get("url"):
@@ -43,18 +47,8 @@ def allsky_status_api():
     if not allsky_cfg.get("modules", {}).get("sensor_data", {}).get("enabled"):
         return jsonify({"error": "sensor_data module not enabled"}), 404
 
-    # The age is checked here, not left to the cache updater: that job runs in the scheduler's
-    # process, and this in-memory entry is per process. An empty result (Export file not
-    # written yet, AllSky offline) is retried sooner, so it does not stick for the full TTL.
-    cached = cache_store._allsky_sensor_cache
-    data = cached.get("data")
-    age = time.time() - cached.get("timestamp", 0)
-    max_age = _SENSOR_CACHE_TTL if data else _SENSOR_EMPTY_RETRY
-    if data is None or age >= max_age:
-        data = AllSkyConnector(allsky_cfg).fetch_sensor_data()
-        cache_store._allsky_sensor_cache["data"] = data
-        cache_store._allsky_sensor_cache["timestamp"] = time.time()
-    return jsonify(data)
+    connector = AllSkyConnector(allsky_cfg, connection=connection_for(AllSkyConnector, allsky_cfg, config))
+    return jsonify(connector.fetch_sensor_data())
 
 
 @connectors_allsky_bp.route('/api/connectors/allsky/health', methods=['GET', 'POST'])
@@ -117,7 +111,8 @@ def allsky_health_api():
     if not fresh and cached.get("data") and age < _HEALTH_CACHE_TTL:
         return jsonify(cached["data"])
 
-    result = AllSkyConnector(allsky_cfg).health_check()
+    connection = connection_for(AllSkyConnector, allsky_cfg, config)
+    result = AllSkyConnector(allsky_cfg, connection=connection).health_check()
     cache_store._allsky_health_cache["data"] = result
     cache_store._allsky_health_cache["timestamp"] = time.time()
     return jsonify(result)

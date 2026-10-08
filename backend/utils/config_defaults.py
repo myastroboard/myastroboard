@@ -88,7 +88,11 @@ DEFAULT_ALLSKY_CONNECTOR = {
     "label": "My AllSky Camera",
     "image_path": "current",
     "image_filename": "image.jpg",
-    "export_json_path": "allskydata.json",
+    # Sensor data arrives over MQTT (AllSky's Publish Data module): the shared connection to
+    # listen on, the topic, and an optional client id - see connectors/allsky_connector.py.
+    "mqtt_connection_id": "",
+    "mqtt_topic": "allsky",
+    "client_id": "",
     "modules": {
         "live_image": {"enabled": True},
         "sensor_data": {"enabled": False},

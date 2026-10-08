@@ -500,6 +500,16 @@ if _AUTOSTART_SCHEDULERS:  # pragma: no cover - never true while imported under 
     except Exception as e:  # pragma: no cover
         logger.error(f'Failed to initialize MQTT publisher on startup: {e}', exc_info=True)
 
+    try:
+        # Idle until a connector asks for MQTT topics (AllSky sensor data); then it keeps one
+        # client per connector and stores their last message (see connectors/mqtt_subscriber.py).
+        logger.info('Initializing MQTT subscriber on application startup...')
+        from connectors import mqtt_subscriber as _mqtt_subscriber
+
+        _mqtt_subscriber.start()
+    except Exception as e:  # pragma: no cover
+        logger.error(f'Failed to initialize MQTT subscriber on startup: {e}', exc_info=True)
+
 try:
     # Generate VAPID keys early so the first /api/push/vapid-public-key request is instant.
     # A one-shot file write, not a recurring thread, so this stays unconditional.
@@ -531,6 +541,12 @@ def _stop_schedulers_on_exit():  # pragma: no cover
         _mp.stop()
     except Exception as e:
         logger.warning(f"Error stopping MQTT publisher on exit: {e}")
+    try:
+        from connectors import mqtt_subscriber as _ms
+
+        _ms.stop()
+    except Exception as e:
+        logger.warning(f"Error stopping MQTT subscriber on exit: {e}")
     skytonight_scheduler = app.config.get('skytonight_scheduler')
     if skytonight_scheduler:
         try:

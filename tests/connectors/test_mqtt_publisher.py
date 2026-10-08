@@ -359,7 +359,8 @@ class TestLifecycle:
         from connectors.mqtt_connector import MqttConnector
 
         publisher = env["publisher"]
-        connector = MqttConnector(_config()["connectors"]["mqtt"])
+        config = _config()
+        connector = MqttConnector(config["connectors"]["mqtt"], connection=config["mqtt_connections"][0])
         connector.broker = lambda: (_ for _ in ()).throw(ValueError("bad url"))
 
         publisher._connect(connector)

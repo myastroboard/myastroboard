@@ -11,7 +11,7 @@ from utils.auth import admin_required, login_required
 from utils.connector_secrets import mask_secret as _mask_secret
 from utils.connector_secrets import merge_secrets, migrate_legacy_secrets, save_secrets
 from utils.logging_config import get_logger
-from utils.mqtt_connections import client_id_conflict, get_connection, list_connections, overlay_connection
+from utils.mqtt_connections import client_id_conflict, connection_for, get_connection, list_connections
 from utils.repo_config import load_config, save_config
 
 logger = get_logger(__name__)
@@ -47,9 +47,7 @@ def list_connectors_api():
     connection_options = [{"id": c["id"], "name": c["name"]} for c in list_connections(config)]
     for name, cls in REGISTRY.items():
         cfg = merge_secrets(name, connectors_cfg.get(name, {}), cls.SECRET_FIELDS)
-        if cls.CONNECTION_FIELD:
-            cfg = overlay_connection(cfg, config, cls.CONNECTION_FIELD)
-        connector = cls(cfg)
+        connector = cls(cfg, connection=connection_for(cls, cfg, config))
         result.append(
             {
                 "name": name,
@@ -137,6 +135,10 @@ def save_connector_config_api(name):
         else:
             current[field] = str(raw or "").strip() or default
 
+    invalid = cls.validate_config(current)
+    if invalid:
+        return jsonify({"error": invalid}), 400
+
     if cls.CONNECTION_FIELD:
         connection_id = str(current.get(cls.CONNECTION_FIELD) or "")
         if connection_id and get_connection(config, connection_id) is None:
@@ -159,9 +161,7 @@ def save_connector_config_api(name):
     effective = dict(current)
     effective.update({k: v for k, v in stored_secrets.items() if k in cls.SECRET_FIELDS})
     effective.update(new_secrets)
-    if cls.CONNECTION_FIELD:
-        effective = overlay_connection(effective, config, cls.CONNECTION_FIELD)
-    connector = cls(effective)
+    connector = cls(effective, connection=connection_for(cls, effective, config))
     return jsonify({"status": "success", "enabled": connector.is_enabled(), "installed": connector.is_configured()})
 
 

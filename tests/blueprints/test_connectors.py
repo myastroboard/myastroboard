@@ -308,6 +308,9 @@ def _connection_registry():
         CONNECTION_FIELD = 'mqtt_connection_id'
         CONFIG_FIELDS = {'mqtt_connection_id': '', 'client_id': ''}
 
+        def is_configured(self):
+            return bool(self.connection)
+
         def health_check(self):
             return {'reachable': False, 'modules': {}}
 
@@ -345,7 +348,6 @@ class TestSharedConnection:
         assert data['first']['connection_field'] == 'mqtt_connection_id'
         assert data['first']['connection_options'] == [{'id': 'c1', 'name': 'Home'}, {'id': 'c2', 'name': 'Spare'}]
         assert data['first']['installed'] is True
-        assert data['first']['config']['url'] == 'mqtt://broker.lan'
         assert data['second']['installed'] is False
 
     def test_save_keeps_the_connection_id_and_never_a_url(self, client_admin, monkeypatch):

@@ -202,7 +202,6 @@ const CACHE_JOB_LABELS = {
     seeing_forecast:      'Seeing Forecast',
     weather_forecast:     'Weather Forecast',
     astro_weather:        'Astro Weather Analysis',
-    allsky_sensor:        'AllSky Sensor Data',
     allsky_health:        'AllSky Health Check',
 };
 

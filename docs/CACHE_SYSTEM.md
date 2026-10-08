@@ -22,7 +22,8 @@ Caches are split into two buckets (full details: [docs/LOCATIONS.md](LOCATIONS.m
   `weather_forecast`, `astro_weather` (single source of truth:
   `cache_store.LOCATION_SCOPED_CACHE_TTLS`).
 - **Global caches** keep the single-slot module-level shape: `spaceflight_launches`,
-  `spaceflight_astronauts`, `spaceflight_events`, `iers`, AllSky connector caches, and
+  `spaceflight_astronauts`, `spaceflight_events`, `iers`, the AllSky health cache (its sensor data
+  arrives over MQTT, not through a cache job), and
   the version-check cache. The ISS/CSS **TLE fetch** is also global (its own on-disk
   cache inside `space/iss_passes.py`/`space/css_passes.py`); only pass-visibility math is per
   location.
