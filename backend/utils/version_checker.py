@@ -30,6 +30,7 @@ CHANGELOG_MAX_BYTES = 1_000_000  # the whole file is ~60 KB; refuse anything abs
 CHANGELOG_MAX_RELEASES = 30  # an instance that far behind still gets a bounded payload
 
 # "## 1.6.8 (2026-09-30)" - the release workflow writes released sections in this exact shape
+_UNRELEASED_HEADING_RE = re.compile(r"^##\s+\[unreleased\]\s*$", re.IGNORECASE)
 _RELEASE_HEADING_RE = re.compile(r"^##\s+v?(\d+\.\d+\.\d+)\s*(?:\((\d{4}-\d{2}-\d{2})\))?\s*$")
 _GROUP_HEADINGS = {
     "features": "features",
@@ -60,16 +61,26 @@ def _absolutize_links(text: str, tag: str) -> str:
     return _RELATIVE_LINK_RE.sub(lambda m: f"]({GITHUB_REPO_URL}/blob/{tag}/{m.group(1)})", text)
 
 
-def parse_changelog(markdown: str, current_version: str, latest_version: str, tag: str) -> list:
+def _new_release(version: str, date: str) -> dict:
+    return {"version": version, "date": date, "features": [], "fixes": [], "breaking": []}
+
+
+def parse_changelog(markdown: str, current_version: str, latest_version: str, tag: str, release_date: str = "") -> list:
     """
     Extract the released sections strictly newer than current_version and up to latest_version.
 
     Returns a list (newest first, as in the file) of
     {"version", "date", "features": [...], "fixes": [...], "breaking": [...]} where every entry is
-    the bullet's markdown text on one line. "None." placeholder bullets are dropped, the
-    [Unreleased] section and any non-semver heading are ignored.
+    the bullet's markdown text on one line. "None." placeholder bullets are dropped and any
+    non-semver heading is ignored.
+
+    The release tag is cut before the post-release workflow archives [Unreleased] into a dated
+    section, so the file at the tag usually has no "## <latest_version>" heading: its
+    [Unreleased] section is then exactly the latest release, and is returned as such (dated
+    release_date). When the dated section does exist, [Unreleased] is ignored.
     """
     releases = []
+    unreleased = _new_release(latest_version, release_date)
     release: dict | None = None
     group: str | None = None
     bullet: list | None = None
@@ -88,11 +99,14 @@ def parse_changelog(markdown: str, current_version: str, latest_version: str, ta
             _flush_bullet()
             group = None
             release = None
+            if _UNRELEASED_HEADING_RE.match(line):
+                release = unreleased
+                continue
             match = _RELEASE_HEADING_RE.match(line)
             if match:
                 version, date = match.group(1), match.group(2) or ""
                 if is_newer_version(current_version, version) and not is_newer_version(latest_version, version):
-                    release = {"version": version, "date": date, "features": [], "fixes": [], "breaking": []}
+                    release = _new_release(version, date)
                     releases.append(release)
             continue
         if release is None:
@@ -111,10 +125,15 @@ def parse_changelog(markdown: str, current_version: str, latest_version: str, ta
             _flush_bullet()
     _flush_bullet()
 
+    has_latest_section = any(not is_newer_version(r["version"], latest_version) for r in releases)
+    has_unreleased_entries = any(unreleased[key] for key in ("features", "fixes", "breaking"))
+    if not has_latest_section and has_unreleased_entries and is_newer_version(current_version, latest_version):
+        releases.insert(0, unreleased)
+
     return releases[:CHANGELOG_MAX_RELEASES]
 
 
-def fetch_release_changes(current_version: str, latest_version: str, tag: str) -> list | None:
+def fetch_release_changes(current_version: str, latest_version: str, tag: str, release_date: str = "") -> list | None:
     """
     Fetch CHANGELOG.md at the latest release tag and return the parsed changes since current_version.
     Returns None when the file cannot be fetched or parsed, so the UI falls back to the release link.
@@ -131,7 +150,7 @@ def fetch_release_changes(current_version: str, latest_version: str, tag: str) -
         if len(text) > CHANGELOG_MAX_BYTES:
             logger.warning(f"CHANGELOG.md for {tag} is unexpectedly large ({len(text)} chars), ignoring it")
             return None
-        return parse_changelog(text, current_version, latest_version, tag)
+        return parse_changelog(text, current_version, latest_version, tag, release_date)
     except Exception as e:
         logger.warning(f"Could not load release changes for {tag}: {e}")
         return None
@@ -202,6 +221,7 @@ def check_for_updates():
 
         tag_name = str(release_data.get('tag_name', '')).strip()
         latest_version = tag_name.replace('v', '').strip()
+        published_at = str(release_data.get('published_at') or '')
         update_available = is_newer_version(current_version, latest_version)
 
         result = {
@@ -210,9 +230,13 @@ def check_for_updates():
             "update_available": update_available,
             "release_url": release_data.get('html_url', ''),
             "release_name": release_data.get('name', ''),
-            "published_at": release_data.get('published_at', ''),
+            "published_at": published_at,
             # None = changelog unavailable (UI shows only the release link)
-            "changes": fetch_release_changes(current_version, latest_version, tag_name) if update_available else None,
+            "changes": (
+                fetch_release_changes(current_version, latest_version, tag_name, published_at[:10])
+                if update_available
+                else None
+            ),
         }
         _save_version_result(result)
 
