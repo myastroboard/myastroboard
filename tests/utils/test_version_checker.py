@@ -316,6 +316,65 @@ def test_parse_changelog_never_returns_unreleased_or_newer_than_latest():
     assert all("Unreleased" not in entry for r in releases for entry in r["features"])
 
 
+# CHANGELOG.md as it is at a release tag: the post-release workflow archives [Unreleased] into a
+# dated section only after the tag is cut, so the release being published is still [Unreleased].
+_TAGGED_CHANGELOG = """# Changelog
+
+## [Unreleased]
+
+### Features
+
+- Shared MQTT connections, see
+  [docs/MQTT.md](docs/MQTT.md).
+
+### Fixes
+
+- None.
+
+### Breaking changes
+
+- Export file no longer read.
+
+## 1.3.0 (2026-03-10)
+
+### Fixes
+
+- Fixed a crash.
+"""
+
+
+def test_parse_changelog_reads_unreleased_as_latest_when_tag_has_no_dated_section():
+    """At a release tag, [Unreleased] holds the release being published and is returned under its version."""
+    releases = module.parse_changelog(_TAGGED_CHANGELOG, "1.2.0", "1.4.0", "v1.4.0", "2026-04-02")
+
+    assert [r["version"] for r in releases] == ["1.4.0", "1.3.0"]
+    latest = releases[0]
+    assert latest["date"] == "2026-04-02"
+    assert latest["features"] == [
+        "Shared MQTT connections, see [docs/MQTT.md](https://github.com/myastroboard/myastroboard/blob/v1.4.0/docs/MQTT.md)."
+    ]
+    assert latest["fixes"] == []
+    assert latest["breaking"] == ["Export file no longer read."]
+
+
+def test_parse_changelog_ignores_placeholder_only_unreleased_without_dated_section():
+    """An [Unreleased] section holding only "None." placeholders never becomes an empty latest release."""
+    markdown = (
+        _TAGGED_CHANGELOG.replace("- Shared MQTT connections, see", "- None.")
+        .replace("  [docs/MQTT.md](docs/MQTT.md).", "")
+        .replace("- Export file no longer read.", "- None.")
+    )
+
+    releases = module.parse_changelog(markdown, "1.2.0", "1.4.0", "v1.4.0", "2026-04-02")
+
+    assert [r["version"] for r in releases] == ["1.3.0"]
+
+
+def test_parse_changelog_ignores_unreleased_when_already_up_to_date():
+    """No release is made up from [Unreleased] when the latest version is not newer than the installed one."""
+    assert module.parse_changelog(_TAGGED_CHANGELOG, "1.4.0", "1.4.0", "v1.4.0") == []
+
+
 def test_parse_changelog_caps_the_number_of_releases(monkeypatch):
     monkeypatch.setattr(module, "CHANGELOG_MAX_RELEASES", 1)
 
@@ -396,6 +455,35 @@ def test_check_for_updates_includes_changes_when_update_available(monkeypatch):
 
     assert result["update_available"] is True
     assert [r["version"] for r in result["changes"]] == ["1.3.0", "1.2.0"]
+
+
+def test_check_for_updates_dates_the_unreleased_section_with_the_release_publication(monkeypatch):
+    """The latest release read from [Unreleased] at the tag carries the GitHub release publication date."""
+
+    class ReleaseResponse:
+        status_code = 200
+
+        @staticmethod
+        def raise_for_status():
+            return None
+
+        @staticmethod
+        def json():
+            return {"tag_name": "v1.4.0", "html_url": "", "name": "", "published_at": "2026-04-02T18:30:00Z"}
+
+    def _get(url, **_kwargs):
+        if url.endswith("CHANGELOG.md"):
+            return SimpleNamespace(status_code=200, text=_TAGGED_CHANGELOG)
+        return ReleaseResponse()
+
+    monkeypatch.setattr(module.cache_store, "is_cache_valid", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(module, "get_repo_version", lambda: "1.3.0")
+    monkeypatch.setattr(module.cache_store, "update_shared_cache_entry", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(module.requests, "get", _get)
+
+    result = module.check_for_updates()
+
+    assert [(r["version"], r["date"]) for r in result["changes"]] == [("1.4.0", "2026-04-02")]
 
 
 def test_check_for_updates_skips_changelog_when_up_to_date(monkeypatch):

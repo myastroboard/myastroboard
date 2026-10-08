@@ -12,6 +12,8 @@ adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixes
 
+- *What's new* window: the release just published is listed again instead of "could not be loaded" (its changelog
+  entries are read from the release tag's Unreleased section, archived only after tagging).
 - Screen-reader labels (close buttons, menu toggle, language and theme pickers, sky widget, photo slideshow arrows,
   location order buttons) are now translated instead of always English.
 
