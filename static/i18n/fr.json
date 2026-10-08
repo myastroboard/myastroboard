@@ -43,7 +43,10 @@
     "day": "Jour",
     "night": "Nuit",
     "modal_not_initialized": "La configuration de la modal n'a pas été correctement initialisée",
-    "comming_soon": "Cette fonctionnalité est en cours de développement et sera bientôt disponible !"
+    "comming_soon": "Cette fonctionnalité est en cours de développement et sera bientôt disponible !",
+    "toggle_navigation": "Afficher/masquer la navigation",
+    "move_up": "Monter",
+    "move_down": "Descendre"
   },
   "whats_new": {
     "footer_available": "v{version} est disponible",
@@ -1192,7 +1195,10 @@
     "stream_copy_url": "Copier l'URL",
     "stream_ha_setup_hint": "Dans Home Assistant : Paramètres -> Appareils et services -> Ajouter une intégration -> Caméra générique, puis collez l'URL ci-dessus dans « URL de l'image fixe ». Aucun identifiant ni mot de passe requis.",
     "stream_url_copied": "URL copiée dans le presse-papiers",
-    "stream_copy_failed": "Impossible de copier l'URL - sélectionnez-la et copiez-la manuellement"
+    "stream_copy_failed": "Impossible de copier l'URL - sélectionnez-la et copiez-la manuellement",
+    "previous_photo": "Photo précédente",
+    "next_photo": "Photo suivante",
+    "photo_alt": "Photo {number}"
   },
   "skytonight": {
     "info_1": "SkyTonight calcule les meilleures cibles d'observation de la nuit en fonction de votre emplacement, de la météo et des jeux de données internes.",
@@ -2914,7 +2920,8 @@
     "score_title": "Score qualité du ciel actuel (0-10) : seeing, transparence, couverture nuageuse, stabilité de suivi",
     "other_locations": "Lieux",
     "tz_badge_title": "Le fuseau horaire de ce lieu est {offset} - différent du vôtre",
-    "tz_notice": "Les horaires affichés pour ce lieu sont en {tz} ({offset}). Votre fuseau horaire est {your_tz} ({your_offset})."
+    "tz_notice": "Les horaires affichés pour ce lieu sont en {tz} ({offset}). Votre fuseau horaire est {your_tz} ({your_offset}).",
+    "score_label": "Score d'observation"
   },
   "wizard": {
     "title": "Premiers pas",

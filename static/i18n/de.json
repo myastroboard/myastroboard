@@ -43,7 +43,10 @@
     "day": "Tag",
     "night": "Nacht",
     "modal_not_initialized": "Konfigurationsmodalität nicht ordnungsgemäß initialisiert",
-    "comming_soon": "Diese Funktion befindet sich in Entwicklung und wird bald verfügbar sein."
+    "comming_soon": "Diese Funktion befindet sich in Entwicklung und wird bald verfügbar sein.",
+    "toggle_navigation": "Navigation ein-/ausblenden",
+    "move_up": "Nach oben",
+    "move_down": "Nach unten"
   },
   "whats_new": {
     "footer_available": "v{version} ist verfügbar",
@@ -1192,7 +1195,10 @@
     "stream_copy_url": "URL kopieren",
     "stream_ha_setup_hint": "In Home Assistant: Einstellungen -> Geräte & Dienste -> Integration hinzufügen -> Generic Camera, dann die obige URL in \"Still Image URL\" einfügen. Kein Benutzername oder Passwort erforderlich.",
     "stream_url_copied": "URL in die Zwischenablage kopiert",
-    "stream_copy_failed": "URL konnte nicht kopiert werden - bitte manuell markieren und kopieren"
+    "stream_copy_failed": "URL konnte nicht kopiert werden - bitte manuell markieren und kopieren",
+    "previous_photo": "Vorheriges Foto",
+    "next_photo": "Nächstes Foto",
+    "photo_alt": "Foto {number}"
   },
   "skytonight": {
     "info_1": "SkyTonight berechnet die besten Beobachtungsziele der Nacht basierend auf Standort, Wetter und internen Datensatzen.",
@@ -2914,7 +2920,8 @@
     "score_title": "Aktueller Himmelsqualitätswert (0-10): Seeing, Transparenz, Wolkenbedeckung, Nachführungsstabilität",
     "other_locations": "Standorte",
     "tz_badge_title": "Die Zeitzone dieses Standorts ist {offset} - abweichend von Ihrer eigenen",
-    "tz_notice": "Die für diesen Standort angezeigten Zeiten sind in {tz} ({offset}). Ihre Zeitzone ist {your_tz} ({your_offset})."
+    "tz_notice": "Die für diesen Standort angezeigten Zeiten sind in {tz} ({offset}). Ihre Zeitzone ist {your_tz} ({your_offset}).",
+    "score_label": "Beobachtungswert"
   },
   "wizard": {
     "title": "Erste Schritte",

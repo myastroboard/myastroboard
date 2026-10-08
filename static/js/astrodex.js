@@ -2587,7 +2587,7 @@ function _mountPictureSlideshow(slideshowPictures, opts) {
             <button type="button"
                 class="btn btn-lg slideshow-arrow astrodex-slideshow-arrow slideshow-prev position-absolute top-50 start-0 translate-middle-y ms-3
                     d-flex align-items-center justify-content-center"
-                aria-label="Previous photo"
+                aria-label="${escapeHtml(i18n.t('astrodex.previous_photo'))}"
                 style="z-index: 10; opacity: 0.7; border-radius: 50%; width: 50px; height: 50px;">
                 <i class="bi bi-chevron-double-left" aria-hidden="true"></i>
             </button>
@@ -2597,7 +2597,7 @@ function _mountPictureSlideshow(slideshowPictures, opts) {
             <button type="button"
                 class="btn btn-lg slideshow-arrow astrodex-slideshow-arrow slideshow-next position-absolute top-50 end-0 translate-middle-y me-3
                     d-flex align-items-center justify-content-center"
-                aria-label="Next photo"
+                aria-label="${escapeHtml(i18n.t('astrodex.next_photo'))}"
                 style="z-index: 10; opacity: 0.7; border-radius: 50%; width: 50px; height: 50px;">
                 <i class="bi bi-chevron-double-right" aria-hidden="true"></i>
             </button>
@@ -2606,7 +2606,7 @@ function _mountPictureSlideshow(slideshowPictures, opts) {
         const modalContent = `
             <div class="slideshow-body">
                 <div class="slideshow-container position-relative text-center mb-4">
-                    <img src="${escapeHtml(imageUrl)}" alt="Photo ${escapeHtml((currentIndex + 1).toString())}" class="slideshow-image img-fluid" style="max-height: 70vh; border-radius: 8px;">
+                    <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(i18n.t('astrodex.photo_alt', { number: currentIndex + 1 }))}" class="slideshow-image img-fluid" style="max-height: 70vh; border-radius: 8px;">
                     ${leftArrow}
                     ${rightArrow}
                 </div>

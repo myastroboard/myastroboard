@@ -541,7 +541,7 @@ function _renderMyLocationOrderList(locations) {
         upBtn.type = 'button';
         upBtn.className = 'btn btn-sm btn-outline-secondary';
         upBtn.disabled = index === 0;
-        upBtn.setAttribute('aria-label', 'Move up');
+        upBtn.setAttribute('aria-label', i18n.t('common.move_up'));
         upBtn.appendChild(DOMUtils.createIcon('bi bi-arrow-up'));
         upBtn.addEventListener('click', () => {
             [_myLocationOrder[index - 1], _myLocationOrder[index]] = [_myLocationOrder[index], _myLocationOrder[index - 1]];
@@ -553,7 +553,7 @@ function _renderMyLocationOrderList(locations) {
         downBtn.type = 'button';
         downBtn.className = 'btn btn-sm btn-outline-secondary';
         downBtn.disabled = index === _myLocationOrder.length - 1;
-        downBtn.setAttribute('aria-label', 'Move down');
+        downBtn.setAttribute('aria-label', i18n.t('common.move_down'));
         downBtn.appendChild(DOMUtils.createIcon('bi bi-arrow-down'));
         downBtn.addEventListener('click', () => {
             [_myLocationOrder[index], _myLocationOrder[index + 1]] = [_myLocationOrder[index + 1], _myLocationOrder[index]];

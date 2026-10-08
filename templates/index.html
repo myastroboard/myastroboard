@@ -106,7 +106,7 @@
                 <i id="sky-widget-icon" class="bi bi-circle sky-widget-period-icon" aria-hidden="true"></i>
                 <span id="sky-widget-location" class="sky-widget-location"></span>
                 <span id="sky-widget-tz-badge" class="sky-widget-tz-badge" style="display:none;"></span>
-                <span id="sky-widget-score" class="sky-widget-score" style="display:none;" aria-label="Observation score"></span>
+                <span id="sky-widget-score" class="sky-widget-score" style="display:none;" data-i18n-aria-label="sky_widget.score_label" aria-label="Observation score"></span>
             </div>
             <div class="sky-widget-panel">
                 <div class="sky-widget-panel-period">
@@ -126,7 +126,7 @@
                 <!-- Location switcher (only rendered when the user has >1 attributed location) -->
                 <div id="sky-widget-locations" class="sky-widget-locations" style="display:none;">
                     <div class="sky-widget-locations-header" data-i18n="sky_widget.other_locations">Locations</div>
-                    <ul id="sky-widget-locations-list" class="sky-widget-locations-list" role="listbox" aria-label="Observing locations"></ul>
+                    <ul id="sky-widget-locations-list" class="sky-widget-locations-list" role="listbox" data-i18n-aria-label="sky_widget.other_locations" aria-label="Locations"></ul>
                 </div>
             </div>
         </div>
@@ -143,7 +143,7 @@
             </b> <span data-i18n="auth.default_password_warning_request">
                 Please change it in the Users section for security.
             </span>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" data-i18n-aria-label="common.close" aria-label="Close"></button>
         </div>
 
         <!-- Global cache Status Banner -->
@@ -172,7 +172,7 @@
         <!-- Navbar -->
         <nav class="navbar navbar-expand-lg rounded mb-3">
             <div class="container-fluid">
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navBarMyAstroBoard" aria-controls="navBarMyAstroBoard" aria-expanded="false" aria-label="Toggle navigation">
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navBarMyAstroBoard" aria-controls="navBarMyAstroBoard" aria-expanded="false" data-i18n-aria-label="common.toggle_navigation" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
                 <div class="collapse navbar-collapse" id="navBarMyAstroBoard">
@@ -3346,7 +3346,7 @@
                 <div class="footer-controls">
                     <div class="footer-language">
                         <label class="language-label" for="language-select-footer" data-i18n="common.language">Language</label>
-                        <select id="language-select-footer" class="form-select form-select-sm language-select" aria-label="Language">
+                        <select id="language-select-footer" class="form-select form-select-sm language-select" data-i18n-aria-label="common.language" aria-label="Language">
                             <option value="de">Deutsch</option>
                             <option value="en">English</option>
                             <option value="es">Espanol</option>
@@ -3357,7 +3357,7 @@
                     </div>
                     <div class="footer-theme">
                         <label class="theme-label" for="theme-select-footer" data-i18n="common.theme">Theme</label>
-                        <select id="theme-select-footer" class="form-select form-select-sm theme-select theme-select-footer" data-theme-picker aria-label="Theme">
+                        <select id="theme-select-footer" class="form-select form-select-sm theme-select theme-select-footer" data-theme-picker data-i18n-aria-label="common.theme" aria-label="Theme">
                             <option value="auto">Auto</option>
                             <option value="light">Light</option>
                             <option value="dark">Dark</option>
@@ -3388,7 +3388,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="location-edit-modal-title" data-i18n="settings.location_edit_title">Location</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" data-i18n-aria-label="common.close" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <!-- Solid background wrapper (fixes gradient-on-text readability), same treatment as the setup wizard -->
@@ -3542,7 +3542,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="location-delete-modal-title" data-i18n="settings.location_delete_modal_title">Delete Location</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" data-i18n-aria-label="common.close" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <p id="location-delete-confirm-text" class="mb-2"></p>
@@ -3567,7 +3567,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="sf-launch-modal-title"></h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" data-i18n-aria-label="common.close" aria-label="Close"></button>
                 </div>
                 <div class="modal-body p-0" id="sf-launch-modal-body"></div>
                 <div class="modal-footer">
@@ -3590,7 +3590,7 @@
                     </h5>
                     <!-- The footer language selector sits behind this modal's static backdrop and is
                          unreachable while the wizard is open, so the wizard needs its own. -->
-                    <select id="wizard-language-select" class="form-select form-select-sm w-auto" aria-label="Language">
+                    <select id="wizard-language-select" class="form-select form-select-sm w-auto" data-i18n-aria-label="common.language" aria-label="Language">
                         <option value="de">Deutsch</option>
                         <option value="en">English</option>
                         <option value="es">Espanol</option>
@@ -3637,7 +3637,7 @@
                         <i class="bi bi-exclamation-triangle-fill icon-inline" aria-hidden="true"></i>
                         <span data-i18n="weather_alerts.section_title">Weather Alerts</span>
                     </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" data-i18n-aria-label="common.close" aria-label="Close"></button>
                 </div>
                 <div class="modal-body weather-alerts-modal-body" id="weather-alerts-modal-body"></div>
             </div>
@@ -3656,7 +3656,7 @@
                             <div class="whats-new-range" id="whats-new-range"></div>
                         </div>
                     </div>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" data-i18n-aria-label="common.close" aria-label="Close"></button>
                 </div>
                 <div class="modal-body" id="whats-new-modal-body"></div>
                 <div class="modal-footer">
@@ -3679,7 +3679,7 @@
                 <div class="modal-header">
                     <h5 class="modal-title" id="plan-combination-picker-modal-title"
                         data-i18n="plan_my_night.select_combination_for_plan">Select equipment for plan</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" data-i18n-aria-label="common.close" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <div class="bg-sub-container rounded p-3" id="plan-combination-picker-list"></div>
@@ -3697,7 +3697,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="modal_lg_close_title">Modal title</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" data-i18n-aria-label="common.close" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <!-- Solid background wrapper (fixes gradient-on-text readability), same treatment as the setup wizard -->
@@ -3716,7 +3716,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="modal_xl_close_title">Modal title</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" data-i18n-aria-label="common.close" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <!-- Solid background wrapper (fixes gradient-on-text readability), same treatment as the setup wizard -->
@@ -3735,7 +3735,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="modal_full_close_title">Modal title</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" data-i18n-aria-label="common.close" aria-label="Close"></button>
                 </div>
                 <div class="modal-body" id="modal_full_close_body">...</div>
                 <div class="modal-footer">
